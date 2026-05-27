@@ -45,6 +45,59 @@ for loca in proj.locas:
 ags4-check delivery.ags --json
 ```
 
+## Performance
+
+Validation throughput vs `python-ags4` 1.2.0, on synthetic AGS4 files
+of increasing size. Wall-clock after warmup, macOS arm64. All four
+laterite paths return **byte-identical findings** to python-ags4 —
+the speed gain is not at the cost of diagnostic coverage.
+
+The files are LOCA-heavy (40-column real-schema LOCA group, with
+`ID`/`PA`/`2DP`/`DT` TYPE columns) generated in two profiles:
+
+**Clean** — values pre-formatted to match their declared TYPE
+exactly (2DP rounded to 2 decimals, valid `yyyy-mm-dd` dates).
+Real-world files look closer to this. ~15 baseline findings from
+fixed-cost rules:
+
+| Size | python-ags4 | `laterite.validate` | `ags4-check` (CLI) | speedup |
+|---:|---:|---:|---:|---:|
+|   512 KB |    84 ms |   **5 ms** |   10 ms | **17×** |
+|     5 MB |   489 ms |  **57 ms** |   61 ms |  **9×** |
+|    50 MB |   5.27 s |  **0.62 s** | 0.64 s |  **8×** |
+|   500 MB |  53.43 s |  **6.5 s** |  6.6 s |  **8×** |
+|     1 GB | 117.27 s | **15.1 s** |  16.5 s |  **8×** |
+
+**Worst case** — same files but with floating-point noise in
+numeric cells that fails AGS4 Rule 8 (TYPE precision). Every cell
+triggers a finding; exercises the validator's per-finding
+accumulation + output-rendering paths fully:
+
+| Size | python-ags4 | `laterite.validate` | `ags4-check` (CLI) | Findings | speedup |
+|---:|---:|---:|---:|---:|---:|
+|   512 KB |    90 ms |   **7 ms** |   13 ms |     1 129 | **13×** |
+|     5 MB |   547 ms |  **67 ms** |   92 ms |    11 485 |  **8×** |
+|    50 MB |   6.09 s |  **0.79 s** | 0.96 s |   116 415 |  **8×** |
+|   500 MB |  62.45 s |   **8.1 s** | 10.1 s | 1 170 223 |  **8×** |
+|     1 GB | 132.67 s |  **18.3 s** | 22.9 s | 2 396 471 |  **7×** |
+
+Notes on the CLI:
+
+- `ags4-check --json` writes findings to stdout as JSON
+  (~80 bytes/finding). On the worst-case 1 GB file (2.4 M findings)
+  that's ~190 MB of JSON. The native PyO3 path skips this
+  serialisation step — for "validate then process findings in
+  Python", use `laterite.validate`; for "validate then pipe to
+  downstream tools", use `ags4-check`. On clean files the gap is
+  single-digit %.
+- Native PyO3 returns findings as a narwhals frame
+  (`rep.findings`) or as a Python dict (`rep.by_rule()`); both pay
+  ~0% extra over the bare validation pass — PyO3's `IntoPyObject`
+  is well-tuned for our `Finding` struct.
+
+Both validators scale linearly: ~17 ns/byte for laterite, ~110
+ns/byte for python-ags4.
+
 ## Parity with python-ags4
 
 122 / 131 of python-ags4 1.2.0's own test suite passes through
