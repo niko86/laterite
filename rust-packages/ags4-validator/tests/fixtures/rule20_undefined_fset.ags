@@ -1,0 +1,11 @@
+"GROUP","LOCA"
+"HEADING","LOCA_ID","FILE_FSET"
+"UNIT","",""
+"TYPE","ID","X"
+"DATA","BH1","FS9"
+
+"GROUP","FILE"
+"HEADING","FILE_FSET","FILE_NAME"
+"UNIT","",""
+"TYPE","X","X"
+"DATA","FS1","photo.jpg"

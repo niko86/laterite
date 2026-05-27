@@ -1,0 +1,5 @@
+# Compiled PyO3 extension (built from ../../rust-packages/laterite-py by
+# maturin) — a build artifact, never tracked. Rebuilt by `uv sync`.
+*.so
+*.pyd
+*.dll

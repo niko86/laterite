@@ -1,0 +1,80 @@
+# Parity oracle: runs python-ags4 1.2.0's own test suite shimmed
+# against laterite.compat. The pass count is the parity contract.
+#
+# Manual `workflow_dispatch` + scheduled monthly so an upstream
+# silent behavioural drift surfaces before it bites a user.
+#
+# Fails if the pass count drops below 122 — that's the line we hold
+# (see docs/parity-coverage-map.md for the 9 deliberate non-closures).
+
+name: parity
+
+on:
+  workflow_dispatch:
+  schedule:
+    # First of every month, 03:00 UTC.
+    - cron: "0 3 1 * *"
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHON_AGS4_VERSION: "1.2.0"
+  PARITY_MIN_PASSING: "122"
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install uv
+        # Pin to a specific v8 patch — astral-sh/setup-uv hasn't
+        # published a floating `v8` major tag yet (only `v7`).
+        # Revisit once `v8` floating exists.
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install Python 3.14
+        run: uv python install 3.14
+
+      - name: Clone python-ags4 sibling repo
+        run: |
+          git clone https://gitlab.com/ags-data-format-wg/ags-python-library \
+              ../ags-python-library
+          ( cd ../ags-python-library && git checkout "v${PYTHON_AGS4_VERSION}" )
+
+      - name: uv sync
+        run: uv sync --all-extras
+
+      - name: Run python-ags4 parity oracle
+        id: parity
+        run: |
+          set +e
+          ./tools/run_python_ags4_tests.sh 2>&1 | tee parity.log
+          set -e
+          passed=$(grep -Eo '[0-9]+ passed' parity.log | tail -n1 | awk '{print $1}')
+          failed=$(grep -Eo '[0-9]+ failed' parity.log | tail -n1 | awk '{print $1}')
+          echo "passed=${passed:-0}" >> "$GITHUB_OUTPUT"
+          echo "failed=${failed:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Summarise
+        run: |
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          ## parity vs python-ags4 ${PYTHON_AGS4_VERSION}
+
+          - Passed: **${{ steps.parity.outputs.passed }}**
+          - Failed: **${{ steps.parity.outputs.failed }}**
+          - Contract: \`PARITY_MIN_PASSING=${PARITY_MIN_PASSING}\`
+          EOF
+
+      - name: Enforce parity contract
+        run: |
+          passed="${{ steps.parity.outputs.passed }}"
+          if [ "${passed:-0}" -lt "${PARITY_MIN_PASSING}" ]; then
+            echo "::error::Parity regression: ${passed} passed, expected >= ${PARITY_MIN_PASSING}"
+            exit 1
+          fi
+          echo "Parity contract met (${passed} >= ${PARITY_MIN_PASSING})."

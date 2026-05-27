@@ -1,0 +1,83 @@
+[project]
+name = "laterite"
+version = "0.1.0"
+description = "Rust-backed AGS4 reader/writer/validator — a fast, drop-in replacement for python-ags4 with a narwhals-native API"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "niko86", email = "me@niko86.com" }]
+keywords = [
+    "ags",
+    "ags4",
+    "geotechnical",
+    "ground-investigation",
+    "validator",
+    "parser",
+    "rust",
+    "polars",
+    "narwhals",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering",
+    "Typing :: Typed",
+]
+requires-python = ">=3.14"
+# Mandatory runtime deps are intentionally just two:
+#   polars   — the Rust↔Python frame boundary (pyo3-polars hands back a
+#              polars DataFrame) and the narwhals native backing.
+#   narwhals — the public tabular return type, so callers can target
+#              polars / pandas / pyarrow without us picking for them.
+# pandas is NOT here on purpose — it is an *optional* extra (see below).
+# A python-ags4 install pulls pandas in unconditionally; laterite does not.
+dependencies = [
+    "polars>=1.40.1",
+    "narwhals>=1.40",
+]
+
+[project.urls]
+Homepage = "https://github.com/niko86/laterite"
+Repository = "https://github.com/niko86/laterite"
+Issues = "https://github.com/niko86/laterite/issues"
+Changelog = "https://github.com/niko86/laterite/blob/main/CHANGELOG.md"
+
+# `compat` is the python-ags4 drop-in surface — it defaults to returning
+# pandas frames, so `pip install laterite[compat]` is what most callers
+# want when porting from python_ags4. `pandas` is retained as a
+# back-compat alias (same set). `set_backend("polars")` (or
+# LATERITE_COMPAT_BACKEND=polars) removes the pandas requirement entirely.
+[project.optional-dependencies]
+# polars.to_pandas() needs pyarrow as a runtime helper, so the compat
+# extra pulls it in alongside pandas — otherwise the default materialise
+# path raises ModuleNotFoundError on pyarrow instead of working.
+compat = ["pandas<3", "pyarrow>=24.0.0"]
+pandas = ["pandas<3"]
+pyarrow = ["pyarrow>=24.0.0"]
+# Experimental DuckDB-backed .ags5db surface. Pulls in the laterite-ags5
+# companion wheel (~50 MB; bundles DuckDB). The base laterite wheel stays
+# light (~10 MB). Import via `from laterite.ags5db import …`.
+ags5 = ["laterite-ags5>=0.1.0"]
+all = ["pandas<3", "pyarrow>=24.0.0", "laterite-ags5>=0.1.0"]
+
+[project.scripts]
+# Deliberately named `ags4-check` (not `laterite`/`ags4`) so the command,
+# its flags, JSON/NDJSON shape and exit codes are byte-faithful to the
+# Rust `ags4-check` binary. This is the Python face of the same CLI.
+ags4-check = "laterite._cli:main"
+
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[tool.maturin]
+# The compiled extension is built from the sibling Rust crate; the pure
+# Python package lives under python/ (src-layout, maturin "mixed" mode).
+manifest-path = "../../rust-packages/laterite-py/Cargo.toml"
+python-source = "python"
+module-name = "laterite._laterite_native"
+# Not abi3: this is pinned to the workspace's CPython 3.14 (pyo3-polars
+# couples the wheel to the Rust/Python polars build, so a version-
+# specific wheel is correct here — see the package README).

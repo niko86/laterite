@@ -1,0 +1,17 @@
+"GROUP","TRAN"
+"HEADING","TRAN_AGS","TRAN_RCON"
+"UNIT","",""
+"TYPE","X","X"
+"DATA","4.2","+"
+
+"GROUP","UNIT"
+"HEADING","UNIT_UNIT","UNIT_DESC"
+"UNIT","",""
+"TYPE","X","X"
+"DATA","m","metres"
+
+"GROUP","TYPE"
+"HEADING","TYPE_TYPE","TYPE_DESC"
+"UNIT","",""
+"TYPE","X","X"
+"DATA","X","Text"

@@ -1,0 +1,17 @@
+"GROUP","PROJ"
+"HEADING","PROJ_ID","PROJ_NAME"
+"UNIT","",""
+"TYPE","ID","X"
+"DATA","P1","x"
+
+"GROUP","TRAN"
+"HEADING","TRAN_AGS","TRAN_RCON"
+"UNIT","",""
+"TYPE","X","X"
+"DATA","4.2","+"
+
+"GROUP","UNIT"
+"HEADING","UNIT_UNIT","UNIT_DESC"
+"UNIT","",""
+"TYPE","X","X"
+"DATA","m","metres"

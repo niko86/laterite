@@ -1,0 +1,236 @@
+# Release workflow: fires on a `v*` tag.
+#
+# Three jobs:
+#   build-wheels   — matrix over (linux x64, linux aarch64, macos
+#                    arm64, macos x64, windows x64). Builds both
+#                    laterite + laterite-ags5 wheels via maturin.
+#   build-binaries — same matrix; builds the ags4-check + ags5db
+#                    Rust CLI binaries.
+#   github-release — collects every artefact + cuts a GitHub release.
+#   pypi-publish   — only the laterite wheel for now (ags5 is
+#                    experimental; ships in a follow-up).
+#
+# Free-tier note: matrix parallel keeps wall-clock under ~25 min.
+# `fail-fast: false` so one OS failing doesn't block the others —
+# we'd rather ship 4/5 wheels than 0/5 on a stragger.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  # Manual trigger for workflow-debug runs — no tag history pollution.
+  # `dry_run: true` (default) builds wheels + binaries but skips the
+  # github-release + pypi-publish jobs so we don't create draft
+  # releases on every shakedown attempt. Real releases still tag.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build artefacts only; skip github-release + pypi-publish"
+        type: boolean
+        default: true
+
+# Cancel a queued/in-flight workflow_dispatch run if a new one starts
+# on the same ref. Tag-triggered runs use distinct refs (each tag is
+# a different ref), so they never cancel each other — only the manual
+# dispatch path benefits.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-wheels:
+    name: wheels (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Only `x86_64-apple-darwin` (Intel Mac, macos-13 runner)
+        # excluded for the rc cycle — those runners stall queued for
+        # an hour+ on the free tier, blocking github-release.
+        # `aarch64-apple-darwin` (Apple Silicon, macos-latest) is the
+        # realistic mac target and allocates fine. Intel mac restored
+        # for v0.1.0 GA.
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          # Native ARM Linux runner (GA late-2024) — avoids cross-
+          # compile from x86_64 entirely. rc2 proved that
+          # `manylinux: off` works for native Linux but maturin
+          # can't cross-compile from x86_64 ubuntu-latest to
+          # aarch64 without a cross-linker.
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v6
+
+      # Both wheels pin `requires-python = ">=3.14"` and are NOT abi3
+      # (pyo3-polars couples the wheel to a specific cpython build).
+      # Default runner Pythons are 3.11/3.12 — maturin would refuse to
+      # build without a matching interpreter. setup-python installs the
+      # 3.14 the wheels need on the native runners; for the docker
+      # (aarch64-linux) manylinux container the `-i python3.14` arg
+      # tells maturin which interpreter to bind to inside the image.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      # maturin needs both the Cargo.toml (for the Rust crate it
+      # links) and the pyproject.toml (for `[tool.maturin]` +
+      # `[build-system]`). When invoked from the repo root it picks
+      # up the workspace umbrella pyproject.toml, which has no
+      # build-system block. Setting `working-directory` to each
+      # package dir means maturin reads that package's pyproject.toml
+      # (which carries the manifest-path back to the Rust crate).
+      #
+      # `manylinux: off` for the Linux targets is intentional — the
+      # action's manylinux docker container doesn't propagate the
+      # `working-directory` input into the container, so maturin
+      # ends up at the repo root and trips on the umbrella
+      # pyproject.toml's missing `[build-system]`. Native runners
+      # (macOS, Windows) honour `working-directory` correctly and
+      # don't need this workaround. Loss: wheels are tagged
+      # `linux_x86_64` instead of `manylinux_2_*_x86_64`; acceptable
+      # for the Alpha cycle. Revisit for v0.1.0 GA once we have a
+      # cleaner docker-cwd story.
+      - name: Build laterite wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          working-directory: packages/laterite
+          args: --release -i python3.14 --out ../../dist
+          sccache: "true"
+          manylinux: ${{ contains(matrix.target, 'unknown-linux') && 'off' || 'auto' }}
+
+      - name: Build laterite-ags5 wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          working-directory: packages/laterite-ags5
+          args: --release -i python3.14 --out ../../dist
+          sccache: "true"
+          manylinux: ${{ contains(matrix.target, 'unknown-linux') && 'off' || 'auto' }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels-${{ matrix.target }}
+          path: dist/
+
+  build-binaries:
+    name: binaries (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Only Intel mac (macos-13) excluded — see build-wheels.
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: ""
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ext: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: .exe
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build CLI binaries
+        working-directory: rust-packages
+        run: |
+          cargo build --release --target ${{ matrix.target }} --bin ags4-check
+          cargo build --release --target ${{ matrix.target }} --bin ags5db
+
+      - name: Bundle binaries
+        shell: bash
+        run: |
+          mkdir -p out
+          cp rust-packages/target/${{ matrix.target }}/release/ags4-check${{ matrix.ext }} out/
+          cp rust-packages/target/${{ matrix.target }}/release/ags5db${{ matrix.ext }} out/
+          cd out
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            7z a ../laterite-binaries-${{ matrix.target }}.zip *
+          else
+            tar -czf ../laterite-binaries-${{ matrix.target }}.tar.gz *
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: binaries-${{ matrix.target }}
+          path: |
+            laterite-binaries-*.tar.gz
+            laterite-binaries-*.zip
+
+  github-release:
+    name: github release
+    runs-on: ubuntu-latest
+    needs: [build-wheels, build-binaries]
+    # Skip on workflow_dispatch dry_run; always run on tag push.
+    if: github.event_name == 'push' || inputs.dry_run != true
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: artefacts/
+          merge-multiple: true
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          generate_release_notes: true
+          files: |
+            artefacts/*.whl
+            artefacts/*.tar.gz
+            artefacts/*.zip
+
+  pypi-publish:
+    # Trusted-publishing flow (no API token). The PyPI trusted publisher
+    # is configured against this repo + this workflow + the `pypi`
+    # environment; first release on a tag uploads under the pending
+    # publisher, subsequent releases reuse it.
+    #
+    # Only the base `laterite` wheel publishes for now. The
+    # `laterite-ags5` companion ships via the GitHub release until the
+    # AGS5 surface stabilises.
+    #
+    # GATED OFF — `v0.1.0-rc*` tags shake out the wheel + binary +
+    # github-release jobs without touching PyPI. Re-enable (remove
+    # `if: false`) once the PyPI trusted-publisher + the `pypi` GitHub
+    # environment are both configured, just before the real v0.1.0 tag.
+    if: false
+    name: pypi (laterite only)
+    runs-on: ubuntu-latest
+    needs: build-wheels
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: Filter to laterite wheels only
+        run: |
+          mkdir -p pypi/
+          mv dist/laterite-*.whl pypi/ || true
+          ls -la pypi/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: pypi/

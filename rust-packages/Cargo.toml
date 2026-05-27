@@ -1,0 +1,40 @@
+# Cargo workspace for the Rust side of laterite.
+#
+# Members:
+#   ags4-validator    Clean-room Rust AGS4 validator (lib + the
+#                     `ags4-check` binary).
+#   ags5-core         AGS5 dictionary, codecs, registry, and shared
+#                     types. No DuckDB dep — kept light so the
+#                     base validator wheel doesn't pay for the
+#                     AGS5 surface.
+#   ags5db            DuckDB-backed `.ags5db` engine (read + write
+#                     + the `ags5db` binary).
+#   ags-cliutil       Shared CLI presentation primitives (spinner,
+#                     table, colour gate, JSON helpers).
+#   laterite-py       PyO3 cdylib exposing the validator engine to
+#                     Python (the `laterite` package).
+#   laterite-py-ags5  PyO3 cdylib exposing the AGS5 surface
+#                     (the `laterite-ags5` companion wheel).
+#
+# Build everything:  cargo build --workspace --release
+# Build just the binary:  cargo build --release --bin ags5db
+# Run all tests:  cargo test --workspace --release
+[workspace]
+resolver = "2"
+members = [
+    "ags5-core",
+    "ags5db",
+    "ags4-validator",
+    "ags-cliutil",
+    "laterite-py",
+    "laterite-py-ags5",
+]
+
+# Release profile lives at the workspace root — cargo only honours
+# profile settings declared here and silently ignores them on member
+# crates (which is what was emitting a build-time warning).
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
