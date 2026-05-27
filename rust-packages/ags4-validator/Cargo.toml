@@ -1,0 +1,100 @@
+# Clean-room AGS4 transfer-format validator.
+#
+# Implements the AGS4 numbered rules from the published spec
+# (reports/AGS 4_1.pdf). NOT derived from python-ags4's LGPL source —
+# see ../README.md and each src/rules/*.rs header. Bundled standard
+# dictionaries are ©AGS reference data; see data/PROVENANCE.md.
+
+[package]
+name = "ags4-validator"
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.85"
+description = "Clean-room Rust validator for the AGS4 geotechnical transfer format"
+license = "MIT"
+publish = false
+# `src/bin/ags4_check_tui.rs` is a `#[path]` submodule of the
+# ags4-check binary, NOT its own target. Disable bin auto-discovery so
+# cargo doesn't try to compile it standalone; the one real binary is
+# declared explicitly below.
+autobins = false
+
+[lib]
+name = "ags4_validator"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ags4-check"
+path = "src/bin/ags4_check.rs"
+
+[features]
+# Default build links NO TUI code or deps — the LLM/automation-facing
+# binary is provably unaffected (the `--tui` flag isn't even compiled
+# in; it falls into "unknown option → exit 5"). Build the experiment
+# with `cargo build --release --features tui`.
+default = []
+tui = ["dep:ratatui", "dep:crossterm"]
+
+[dependencies]
+# Compile-time perfect-hash maps for the bundled standard dictionaries —
+# zero startup cost, no runtime parse. phf does NOT implement PhfHash for
+# tuples, so dict keys are composite "GROUP\u{1f}HEADING" strings.
+phf = "0.13"
+thiserror = "1"
+# Rule 8 DT/T validity: pandas-equivalent calendar/clock checking
+# (python-ags4 uses pandas.to_datetime). default-features off keeps it
+# lean — no clock, no serde; just the Naive parsers. Already in the
+# workspace lockfile via ags5db, so no new external surface.
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+# Stage 7b: non-UTF-8 file encodings (cp1252 / latin1 / iso-8859-x) —
+# Mozilla's encoding_rs is the standard way to do this in Rust. The
+# library handles all WHATWG encodings; we only expose UTF-8 / CP1252 /
+# ISO-8859-1 (with the canonical "latin1" alias). default-features
+# leaves things minimal; not on the lean-dep guarded list
+# (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee
+# is unchanged.
+encoding_rs = "0.8"
+# CLI presentation parity with `ags5db` (ags5db/src/output.rs): the
+# animated spinner, the aligned UTF8 finding table, and rich-style
+# coloured JSON — now via the shared `ags-cliutil` crate (single
+# source of truth; was copied verbatim before). `ags-cliutil` pulls
+# only comfy-table/indicatif/serde_json (already in the workspace
+# lockfile via this bin) and NONE of walkdir/rayon/ratatui, so the
+# library's lean dep-graph guarantee is unaffected. Only the
+# `ags4-check` binary links it — the library stays phf + thiserror +
+# chrono. comfy-table/serde_json remain direct deps for the
+# findings-specific table/JSON shaping ags4-check still owns.
+ags-cliutil = { path = "../ags-cliutil" }
+comfy-table = "7"
+indicatif = "0.17"
+serde_json = { version = "1", features = ["preserve_order"] }
+# Optional, bin-only, behind the `tui` feature — the interactive
+# findings browser (`ags4-check --tui`). crossterm 0.28 is already in
+# the workspace lockfile transitively (indicatif/comfy-table), so it
+# adds zero new external surface; ratatui pulls a small pure-Rust tree.
+# The library (`ags4_validator`) links neither.
+ratatui = { version = "0.29", optional = true }
+crossterm = { version = "0.28", optional = true }
+
+[build-dependencies]
+# build.rs reads the vendored .ags dictionaries and emits phf static
+# tables into OUT_DIR/dict_data.rs.
+phf_codegen = "0.13"
+csv = "1.3"
+
+[dev-dependencies]
+# Perf guard: bench check_file on the 23 MB workspace fixture. The
+# bench skips cleanly when the fixture is absent (it is gitignored
+# working space), so CI without it still passes.
+criterion = "0.5"
+# The cp1252/lossy-decode tests need a real on-disk path (parse_file
+# takes &Path) but MUST NOT live in tests/fixtures/ — corpus-qa's
+# e2e.rs crawls that dir and asserts hard_error==0, and a non-UTF-8
+# fixture would also defeat the whole point of the lossy decode. So
+# those tests write a temp file instead. Dev-dep only + already in the
+# guarantee (no walkdir/rayon/ratatui) is untouched.
+tempfile = "3"
+
+[[bench]]
+name = "validate_large_fixture"
+harness = false

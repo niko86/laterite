@@ -1,0 +1,74 @@
+[package]
+name = "ags5db"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Read-side CLI for AGS5 .ags5db files (Rust port of ags5db-py)"
+license = "MIT"
+
+[dependencies]
+# S3a (release/v0.1.0-prep): pure-string AGS modules moved to ags5-core.
+# Re-exported via `pub use ags5_core::…;` in lib.rs for source compat.
+# Carries the deps that moved with them: zstd, age, rpassword, secrecy,
+# rust_xlsxwriter, calamine — now transitive via this dep.
+ags5-core = { path = "../ags5-core" }
+# Rust-native AGS4 validator (this workspace). Powers
+# `db-to-ags4 --validate` — emit + verify in one pass, no Python.
+ags4-validator = { path = "../ags4-validator" }
+duckdb = { version = "1.4", features = ["bundled"] }
+clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
+serde = { version = "1", features = ["derive"] }
+# preserve_order keeps JSON output keys in insertion order, matching Python's
+# dict-preserving json.dumps. The parity tests in tests/e2e_parity.rs compare
+# Python NDJSON byte-for-byte against the Rust output; without this feature
+# serde_json sorts keys alphabetically and parity breaks.
+serde_json = { version = "1", features = ["preserve_order"] }
+csv = "1.3"
+comfy-table = "7"
+strsim = "0.11"
+anyhow = "1"
+thiserror = "1"
+chrono = { version = "0.4", features = ["serde"] }
+nu-ansi-term = "0.50"
+# UUID7 for surrogate primary keys on writer rows. The `v7` feature
+# pulls in monotonic time-ordered UUIDs — same algorithm Python uses
+# via `uuid-utils`. `fast-rng` swaps the default OsRng for a thread-
+# local PRNG (the time prefix already gives us uniqueness; we only need
+# random bits for collision resistance within the millisecond).
+uuid = { version = "1", features = ["v7", "fast-rng"] }
+# sha2/hex remain direct in ags5db — the DuckDB-bound modules
+# (attachments.rs blob hashing, convert.rs row-hash dedup) use them.
+# The pure-string side that also uses them (ags4_writer) moved to
+# ags5-core which has its own direct dep.
+sha2 = "0.10"
+hex = "0.4"
+# Live progress indicator for the long-running write commands. The
+# default spinner animates a left-to-right glyph; we drive it with
+# `set_message(...)` updates per stage.
+indicatif = "0.17"
+# `commands/lock.rs` prompts for a passphrase via TTY. Direct dep
+# because the binary owns the prompt; the encryption itself lives
+# in ags5-core::transport via the `age` crate (transitive there).
+rpassword = "7"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+tempfile = "3"
+
+# [profile.release] moved to rust-packages/Cargo.toml — cargo only honours
+# profile settings declared at the workspace root and silently ignores
+# them on member crates.
+
+# Library target: the CLI-dep-free logic (conversion/query/codecs/DDL).
+# The `ags5db` binary is a thin CLI shim over this lib; `laterite-py`
+# depends on it to expose AGS4↔.ags5db conversion to Python (Stage B of
+# comfy-table / indicatif live only in the bin (main.rs + commands/ +
+# output.rs), never the lib.
+[lib]
+name = "ags5db"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ags5db"
+path = "src/main.rs"

@@ -1,0 +1,64 @@
+# PyO3 binding crate: the Python face of the clean-room AGS4 engine.
+#
+# This is the ONLY crate in the workspace that links pyo3. It depends
+# on `ags4-validator` (never the reverse) — exactly the wrapper
+# phf+thiserror+chrono dep-graph guarantee is untouched. The compiled
+# cdylib is loaded by Python as `laterite._laterite_native` (see
+# packages/laterite/pyproject.toml [tool.maturin]).
+#
+# Deliberate engineering choice: the Rust↔Python boundary carries
+# plain Python primitives (lists/dicts/str/int), NOT pyo3-polars
+# Arrow-FFI handles. Polars/narwhals frames are assembled on the
+# Python side. This removes the Rust↔Python polars ABI version
+# coupling the design doc flagged as a risk, keeps deps to
+# pyo3 + serde_json, and is the design doc's documented fallback
+
+[package]
+name = "laterite-py"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "PyO3 bindings exposing the clean-room ags4-validator engine to Python (laterite)"
+license = "MIT"
+publish = false
+build = "build.rs"
+
+[lib]
+name = "_laterite_native"
+# cdylib only: this crate is loaded by CPython, never linked by other
+# Rust crates, and has no Rust unit tests (its behaviour is covered by
+# packages/laterite/tests against the built extension). cdylib-only
+# keeps `cargo test --workspace` from trying to link a test harness
+# against an `extension-module` (no-libpython) build.
+crate-type = ["cdylib"]
+
+[dependencies]
+ags4-validator = { path = "../ags4-validator" }
+# S3b (release/v0.1.0-prep): pure-string AGS modules from ags5-core —
+# registry, ags_types, transport, excel, ddl, ags4_codec, ags4_writer,
+# error. No DuckDB. The DuckDB-bound ags5db_fns + typed_graph read/write
+# moved to the separate `laterite-py-ags5` cdylib that ships in the
+# `laterite[ags5]` extra wheel.
+ags5-core = { path = "../ags5-core" }
+pyo3 = { version = "0.28", features = ["extension-module", "chrono"] }
+# MUST mirror ags4-validator's serde_json feature set: the CLI's
+# `--json` output is built with `preserve_order` (insertion-ordered
+# Map). Byte-faithful CLI JSON parity depends on this matching.
+serde_json = { version = "1", features = ["preserve_order"] }
+# `chrono` is already transitive via ags5-core (used by ags_types.rs).
+# Naming it explicitly so the `chrono` feature on pyo3 has a matched
+# direct dep — that feature gives us IntoPyObject for NaiveDateTime /
+# NaiveDate / NaiveTime so `parse_value` returns native Python
+# datetime/date/time objects.
+chrono = "0.4"
+# Stage 7b: encoding name → `&'static encoding_rs::Encoding` lookup
+# for the `encoding=` kwarg on `run_check` / `parse_primitives`. The
+# crate is already a direct dep of `ags4-validator`, so no new
+# transitive surface — declaring it here lets `lib.rs` call
+# `encoding_rs::Encoding::for_label` directly without re-exports.
+encoding_rs = "0.8"
+
+# Used only by build.rs (Stage F2b-1 typed-graph codegen — reads
+# ../ags5-core/data/ags5_dictionary.json and emits OUT_DIR/typed_groups.rs).
+[build-dependencies]
+serde_json = "1"

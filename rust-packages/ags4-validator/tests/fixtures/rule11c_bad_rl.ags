@@ -1,0 +1,17 @@
+"GROUP","TRAN"
+"HEADING","TRAN_DLIM","TRAN_RCON"
+"UNIT","",""
+"TYPE","X","X"
+"DATA","|","+"
+
+"GROUP","LOCA"
+"HEADING","LOCA_ID"
+"UNIT",""
+"TYPE","ID"
+"DATA","BH1"
+
+"GROUP","SAMP"
+"HEADING","LOCA_ID","SAMP_LINK"
+"UNIT","",""
+"TYPE","ID","RL"
+"DATA","BH1","LOCA|BH404"

@@ -1,0 +1,72 @@
+[project]
+name = "laterite-workspace"
+version = "0.1.0"
+description = "uv workspace root for laterite + laterite-ags5"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "laterite",
+    "laterite-ags5",
+    "duckdb>=1.5.2",
+    "polars>=1.40.1",
+    "pyarrow>=24.0.0",
+    "lxml>=6.1.0",
+]
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+laterite = { workspace = true }
+laterite-ags5 = { workspace = true }
+
+[dependency-groups]
+# marimo / altair / vegafusion / vl-convert-python (the retired
+# format-comparison dashboards) and pyinstaller / nuitka (the dropped
+# Python-binary packaging) were removed here: the format question is
+# settled (.ags5db) and Rust `ags5db` is the sole shipped binary.
+# pandas<3 stays — python-ags4 needs it and ags5_ags4/codec.py imports
+# it directly.
+dev = [
+    "pandas<3",
+    "pytest>=9.0.3",
+    "pytest-benchmark>=5.2.3",
+    "ruff>=0.7",
+    # Build backend for the `laterite` package (PyO3 extension compiled
+    # from rust-packages/laterite-py). In the dev group so a workspace
+    # `uv sync` builds the native module; not a runtime dep of any
+    # ags5-* package.
+    "maturin>=1.7,<2",
+    # Oracle PIN, not a floor: the Rust↔python parity catalogue
+    # O-2/O-3/O-26/O-27/O-30/O-34) is encoded against python-ags4 1.2.0
+    # *source behaviour* (e.g. rule_6 no-op, rule_20 on-disk, default
+    # rename_duplicate_headers shielding O-8). A silent minor bump would
+    # invalidate those arms with no test failure — so pin exactly and
+    "python-ags4==1.2.0",
+    # python-ags4's own test_ags4.py imports `toml` (undeclared in its
+    # pyproject) to read a check-results fixture. Needed only for the
+    # parity runner (tools/run_python_ags4_tests.sh).
+    "toml>=0.10",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+extend-exclude = [
+    "examples/output",
+    "output",
+    "rust-packages",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "PIE"]
+ignore = [
+    "E501",  # line length — let the formatter handle it
+    "B008",  # function call in argument defaults (FastAPI/pytest idiom)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]
+"**/tests/**" = ["B011"]
+# Example scripts intentionally mutate sys.path/env before imports.
+"examples/**" = ["E402"]

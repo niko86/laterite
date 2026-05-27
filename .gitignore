@@ -1,0 +1,33 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Generated example output
+output/
+
+# AGS4 corpus-QA harness working dir (harvested share files + reports).
+# Real-world deliveries may be confidential; never tracked.
+corpus/
+
+# its cross-run confidence ledger. Regenerated; never tracked.
+forge-runs/
+
+# Rust build artifacts. `tools/build-rust.ps1` copies the final
+# `ags5db` binary to `dist/` (which is already gitignored higher up).
+# Cargo.lock IS tracked at rust-packages/ — the workspace pins
+# transitive deps once for the whole tree. The broad `**/target/`
+# also catches per-crate target dirs that linger from pre-workspace
+# builds (e.g. `rust-packages/ags5db/target/` left by a previous
+# `cargo build --manifest-path ags5db/Cargo.toml`).
+rust-packages/target/
+rust-packages/**/target/
+
+# Claude Code local settings
+.claude/
