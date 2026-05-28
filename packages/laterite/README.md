@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/niko86/laterite/main/assets/laterite-icon-256.png" alt="laterite" width="200" />
+</p>
+
 # laterite
 
 A Rust-backed AGS4 reader, writer and validator for Python.
