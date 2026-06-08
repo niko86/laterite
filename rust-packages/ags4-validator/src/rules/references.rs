@@ -44,7 +44,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use crate::dict::Dictionary;
-use crate::findings::{Findings, add};
+use crate::findings::{Findings, Location, Severity, Target, add, add_at};
 use crate::parse::ParsedFile;
 use crate::rules::dictionary::collect_file_dict;
 
@@ -90,7 +90,7 @@ pub fn check(
         let g = &parsed.groups[code];
         let Some(hl) = g.heading_line else { continue };
 
-        for h in &g.headings {
+        for (ci, h) in g.headings.iter().enumerate() {
             // The borrowed-heading rule only has something to say when
             // the prefix names a *different* group. No underscore / bad
             // shape is V3 Rule 19b + V4 Rule 9 — not re-reported here.
@@ -100,13 +100,19 @@ pub fn check(
             if prefix == code || PREFIX_EXCEPTIONS.contains(&prefix) {
                 continue;
             }
+            let loc = || Location {
+                target: Target::Heading,
+                field_index: Some(ci as u32),
+                heading: Some(h.clone()),
+                ..Default::default()
+            };
 
             let ref1 = merged(prefix);
             if ref1.is_empty() {
                 // python-ags4's rule_19b_2: the prefix names a group
                 // that's not defined anywhere. Wording byte-faithful
                 // so compat doesn't need a translator entry.
-                add(
+                add_at(
                     found,
                     RULE_19B,
                     Some(hl),
@@ -116,6 +122,8 @@ pub fn check(
                          found in either the standard dictionary or the \
                          DICT group."
                     ),
+                    loc(),
+                    Severity::Error,
                 );
                 // Stage 9c: half-revert O-26's consolidation. python-ags4's
                 // rule_19b_3 ALSO fires here when the heading itself
@@ -128,7 +136,7 @@ pub fn check(
                 // diagnostic report; O-26's consolidation lost the
                 // second angle.
                 if !defined_anywhere.contains(h.as_str()) {
-                    add(
+                    add_at(
                         found,
                         RULE_19B,
                         Some(hl),
@@ -137,11 +145,13 @@ pub fn check(
                             "{h} does not start with the name of this \
                              group, nor is it defined in another group."
                         ),
+                        loc(),
+                        Severity::Error,
                     );
                 }
             } else if !ref1.contains(h) {
                 if merged(code).contains(h) {
-                    add(
+                    add_at(
                         found,
                         RULE_19B,
                         Some(hl),
@@ -150,9 +160,11 @@ pub fn check(
                             "Heading {h:?} is defined under group {code} but its prefix \
                              names group {prefix}; rename it or define it under {prefix}."
                         ),
+                        loc(),
+                        Severity::Error,
                     );
                 } else if !defined_anywhere.contains(h.as_str()) {
-                    add(
+                    add_at(
                         found,
                         RULE_19B,
                         Some(hl),
@@ -161,6 +173,8 @@ pub fn check(
                             "Heading {h:?} neither starts with group {code} nor is \
                              defined in another group."
                         ),
+                        loc(),
+                        Severity::Error,
                     );
                 }
                 // else: defined under some third group → Rule 9's call.
@@ -253,17 +267,20 @@ fn rule_20_on_disk(parsed: &ParsedFile, source: &Path, found: &mut Findings) {
 /// Rule 20 (data level) — every FILE_FSET used must be defined in the
 /// FILE group; the FILE group must exist when FILE_FSET is used.
 fn rule_20(parsed: &ParsedFile, found: &mut Findings) {
-    // (group, fset value, line) for every alphanumeric FILE_FSET used.
-    let mut used: Vec<(&str, &str, u32)> = Vec::new();
+    // (group, fset value, line, field_index, data_row) for every
+    // alphanumeric FILE_FSET used. `ci` is the tag-stripped column index
+    // of FILE_FSET; the data row's 1-based ordinal lets the UI tint the
+    // exact cell.
+    let mut used: Vec<(&str, &str, u32, u32, u32)> = Vec::new();
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
         let Some(ci) = g.headings.iter().position(|h| h == "FILE_FSET") else {
             continue;
         };
-        for row in &g.rows {
+        for (ri, row) in g.rows.iter().enumerate() {
             if let Some(v) = row.values.get(ci) {
                 if v.chars().any(|c| c.is_ascii_alphanumeric()) {
-                    used.push((code, v, row.line));
+                    used.push((code, v, row.line, ci as u32, ri as u32 + 1));
                 }
             }
         }
@@ -296,14 +313,22 @@ fn rule_20(parsed: &ParsedFile, found: &mut Findings) {
         })
         .unwrap_or_default();
 
-    for (group, fset, line) in used {
+    for (group, fset, line, field_index, data_row) in used {
         if !defined.contains(fset) {
-            add(
+            add_at(
                 found,
                 RULE_20,
                 Some(line),
                 group,
                 format!("FILE_FSET {fset:?} is not defined in the FILE group."),
+                Location {
+                    target: Target::Cell,
+                    field_index: Some(field_index),
+                    heading: Some("FILE_FSET".to_string()),
+                    data_row: Some(data_row),
+                    ..Default::default()
+                },
+                Severity::Error,
             );
         }
     }
@@ -397,6 +422,149 @@ mod tests {
                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\
                   \"DATA\",\"FS1\",\"photo.jpg\"\r\n";
         assert!(!run(ok).contains_key(RULE_20), "{:?}", run(ok));
+    }
+
+    #[test]
+    fn unknown_prefix_also_emits_19b_3_when_heading_orphaned() {
+        // ZZZZ_FOO: prefix ZZZZ names no group (19b_2) AND ZZZZ_FOO is
+        // not defined anywhere (19b_3) → BOTH messages fire (the Stage-9c
+        // half-revert of O-26). Distinct fix hints: prefix-typo vs
+        // placement-mistake.
+        let src = "\"GROUP\",\"SAMP\"\r\n\
+                   \"HEADING\",\"SAMP_ID\",\"ZZZZ_FOO\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   \"DATA\",\"S1\",\"x\"\r\n";
+        let r = run(src);
+        let v = r.get(RULE_19B).expect("Rule 19b");
+        assert!(
+            v.iter().any(|x| x.desc.contains("could not be")),
+            "19b_2 (group-not-found) message: {v:?}"
+        );
+        assert!(
+            v.iter().any(|x| x
+                .desc
+                .contains("does not start with the name of this group")),
+            "19b_3 (orphaned-heading) message: {v:?}"
+        );
+    }
+
+    #[test]
+    fn heading_defined_under_own_group_but_prefixed_with_another() {
+        // SAMP declares (via its own DICT) a heading "LOCA_FOO" whose
+        // prefix LOCA names another group. LOCA exists (so ref1 is
+        // non-empty) but doesn't contain LOCA_FOO; LOCA_FOO IS defined
+        // under SAMP via the file DICT → the "defined under group SAMP
+        // but its prefix names group LOCA" arm (lines 152-165).
+        let src = "\"GROUP\",\"DICT\"\r\n\
+                   \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"X\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"HEADING\",\"SAMP\",\"LOCA_FOO\",\"OTHER\"\r\n\r\n\
+                   \"GROUP\",\"SAMP\"\r\n\
+                   \"HEADING\",\"SAMP_ID\",\"LOCA_FOO\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   \"DATA\",\"S1\",\"x\"\r\n";
+        let r = run(src);
+        let v = r.get(RULE_19B).expect("Rule 19b");
+        assert!(
+            v.iter()
+                .any(|x| x.desc.contains("LOCA_FOO") && x.desc.contains("rename it")),
+            "expected the defined-here-wrong-prefix message: {v:?}"
+        );
+    }
+
+    #[test]
+    fn heading_with_known_prefix_group_but_undefined_everywhere() {
+        // SAMP has heading "LOCA_NOPENOPE": LOCA exists (ref1 non-empty)
+        // but doesn't contain it, it's NOT defined under SAMP, and it's
+        // defined nowhere → the "neither starts with group SAMP nor
+        // defined in another group" arm (lines 166-178).
+        let src = "\"GROUP\",\"SAMP\"\r\n\
+                   \"HEADING\",\"SAMP_ID\",\"LOCA_NOPENOPE\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   \"DATA\",\"S1\",\"x\"\r\n";
+        let r = run(src);
+        let v = r.get(RULE_19B).expect("Rule 19b");
+        assert!(
+            v.iter()
+                .any(|x| x.desc.contains("LOCA_NOPENOPE") && x.desc.contains("neither starts")),
+            "expected the neither-starts-nor-defined message: {v:?}"
+        );
+    }
+
+    #[test]
+    fn heading_with_no_underscore_is_not_a_19b_borrow_finding() {
+        // A heading lacking an underscore ("BADHDNG") has no prefix to
+        // borrow from → the `split_once('_')` None continue (line 97-98).
+        // V3 Rule 19b / V4 Rule 9 own that defect, not this module.
+        let src = "\"GROUP\",\"SAMP\"\r\n\
+                   \"HEADING\",\"SAMP_ID\",\"BADHDNG\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   \"DATA\",\"S1\",\"x\"\r\n";
+        // No 19b borrow finding mentioning BADHDNG.
+        let r = run(src);
+        assert!(
+            r.get(RULE_19B)
+                .is_none_or(|v| !v.iter().any(|x| x.desc.contains("BADHDNG"))),
+            "underscore-less heading must not be a 19b borrow finding: {:?}",
+            r.get(RULE_19B)
+        );
+    }
+
+    #[test]
+    fn rule_20_on_disk_flags_missing_fset_subfolder_and_file() {
+        // check_files ON, FILE/ root exists but the declared FS1 sub-
+        // folder is absent → the "sub-folder … is missing on disk" arm.
+        // A second FILE row (FS2) has the sub-folder but not the named
+        // file → the "Declared file … is missing on disk" arm.
+        let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"FILE_FSET\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   \"DATA\",\"BH1\",\"FS1\"\r\n\"DATA\",\"BH2\",\"FS2\"\r\n\r\n\
+                   \"GROUP\",\"FILE\"\r\n\
+                   \"HEADING\",\"FILE_FSET\",\"FILE_NAME\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"FS1\",\"a.jpg\"\r\n\"DATA\",\"FS2\",\"b.jpg\"\r\n";
+        let pf = parse_str(src).expect("parses");
+        let d = Dictionary::bundled(DictVersion::V4_2);
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let ags = tmp.path().join("site.ags");
+
+        // Create FILE/ root and FILE/FS2 (but no file inside it). FS1
+        // sub-folder is deliberately absent.
+        std::fs::create_dir_all(tmp.path().join("FILE").join("FS2")).unwrap();
+
+        let mut f = Findings::new();
+        check(&pf, &d, Some(ags.as_path()), true, &mut f);
+        let r20 = f.get(RULE_20).expect("Rule 20 on-disk");
+        assert!(
+            r20.iter()
+                .any(|x| x.desc.contains("FILE/FS1") && x.desc.contains("missing on disk")),
+            "missing FS1 sub-folder must flag: {r20:?}"
+        );
+        assert!(
+            r20.iter()
+                .any(|x| x.desc.contains("FILE/FS2/b.jpg") && x.desc.contains("missing on disk")),
+            "missing file under present FS2 sub-folder must flag: {r20:?}"
+        );
+    }
+
+    #[test]
+    fn rule_20_on_disk_silent_without_file_group() {
+        // check_files ON, no FILE group at all → rule_20_on_disk early
+        // return (nothing on-disk to assert). The data-level pass is also
+        // silent (no FILE_FSET used).
+        let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH1\"\r\n";
+        let pf = parse_str(src).expect("parses");
+        let d = Dictionary::bundled(DictVersion::V4_2);
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let ags = tmp.path().join("site.ags");
+        let mut f = Findings::new();
+        check(&pf, &d, Some(ags.as_path()), true, &mut f);
+        assert!(
+            !f.contains_key(RULE_20),
+            "no FILE group → no Rule 20: {f:?}"
+        );
     }
 
     #[test]

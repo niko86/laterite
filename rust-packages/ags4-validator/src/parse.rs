@@ -113,6 +113,20 @@ pub fn parse_file_with_encoding(
         path: path.to_path_buf(),
         source: e,
     })?;
+    parse_bytes(&bytes, encoding)
+}
+
+/// Parse AGS4 from in-memory bytes with the given encoding — the
+/// filesystem-free core of [`parse_file_with_encoding`]. Used by
+/// callers that already hold the bytes and have no path: the browser
+/// **wasm** wrapper (no filesystem at all) reads the user's file into
+/// memory and hands it straight here. BOM sniff + lossy decode are
+/// identical to the on-disk path, so Rule 1 (and every later rule)
+/// behaves the same whether the bytes came from disk or a `FileReader`.
+pub fn parse_bytes(
+    bytes: &[u8],
+    encoding: &'static encoding_rs::Encoding,
+) -> Result<ParsedFile, ValidatorError> {
     // BOM sniff before decode: encoding_rs::decode strips the BOM
     // transparently (correct UTF-16/UTF-8 behaviour), so we have to
     // notice it here if Rule 1 is to emit a BOM-specific finding.
@@ -120,7 +134,7 @@ pub fn parse_file_with_encoding(
     // is out of spec; encoding_rs would still strip the BOM in those
     // cases, but the file would also fail other rules first).
     let has_bom = bytes.starts_with(&[0xEF, 0xBB, 0xBF]);
-    let (text, _enc, _had_replacements) = encoding.decode(&bytes);
+    let (text, _enc, _had_replacements) = encoding.decode(bytes);
     let mut parsed = parse_str(&text)?;
     parsed.has_bom = has_bom;
     Ok(parsed)
@@ -335,9 +349,134 @@ pub fn split_ags_line(line: &str) -> Vec<String> {
     out
 }
 
+/// Char-offset span of the **content inside the quotes** of the raw-line
+/// field at position `field_index + 1` — the `+1` skips the leading
+/// `DATA`/`HEADING` tag, so `field_index` is the *tag-stripped* index the
+/// rules carry. Returns a half-open `(start, end)` pair counted in
+/// `char`s (Unicode scalars), **not** bytes, so a multibyte line lights
+/// the right columns in a JS `Array.from`/spread slice.
+///
+/// **Span convention: the value BETWEEN the surrounding quotes** —
+/// the quotes themselves and the comma delimiter are excluded. For an
+/// unquoted field the span is the raw field content (commas excluded).
+/// `None` if the line has fewer fields than requested.
+///
+/// Mirrors [`split_ags_line`]'s quote / escaped-`""` state machine, but
+/// tracks the running `char` position and records the inner-content span
+/// of the target field rather than materialising every field's value.
+pub fn field_span(line: &str, field_index: u32) -> Option<(u32, u32)> {
+    let target = field_index as usize + 1; // +1 skips the leading tag.
+    let mut pos: u32 = 0; // running char offset into `line`.
+    let mut field = 0usize; // which field we're about to read.
+    let mut chars = line.chars().peekable();
+
+    loop {
+        match chars.peek().copied() {
+            None => return None, // ran out of fields before reaching target
+            Some('"') => {
+                chars.next();
+                pos += 1;
+                let start = pos; // first char inside the quotes
+                let mut end = pos;
+                loop {
+                    match chars.next() {
+                        None => break, // unterminated — span to EOL content
+                        Some('"') => {
+                            if chars.peek() == Some(&'"') {
+                                chars.next();
+                                pos += 2;
+                                end = pos; // escaped quote stays inside
+                            } else {
+                                pos += 1; // closing quote
+                                break;
+                            }
+                        }
+                        Some(_) => {
+                            pos += 1;
+                            end = pos;
+                        }
+                    }
+                }
+                if field == target {
+                    return Some((start, end));
+                }
+                // Skip stray chars up to and including the next comma.
+                while let Some(&c) = chars.peek() {
+                    chars.next();
+                    pos += 1;
+                    if c == ',' {
+                        break;
+                    }
+                }
+                field += 1;
+            }
+            Some(_) => {
+                // Unquoted field — content is everything up to the comma.
+                let start = pos;
+                let mut end = pos;
+                while let Some(&c) = chars.peek() {
+                    if c == ',' {
+                        break;
+                    }
+                    chars.next();
+                    pos += 1;
+                    end = pos;
+                }
+                if field == target {
+                    return Some((start, end));
+                }
+                if chars.peek() == Some(&',') {
+                    chars.next();
+                    pos += 1;
+                }
+                field += 1;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `field_span` must point at the inner value of the field at
+    /// `field_index + 1`, in CHAR offsets, matching `split_ags_line`'s
+    /// notion of each field's content. The cases mirror
+    /// `splits_quoted_fields_and_unescapes` plus an empty field and a
+    /// multibyte (`°`) line proving char-not-byte counting.
+    #[test]
+    fn field_span_points_at_inner_value_char_offsets() {
+        // `"DATA","BH01","100.50"` — field_index 0 is BH01, 1 is 100.50.
+        let line = r#""DATA","BH01","100.50""#;
+        let chars: Vec<char> = line.chars().collect();
+        let slice = |(s, e): (u32, u32)| chars[s as usize..e as usize].iter().collect::<String>();
+        assert_eq!(slice(field_span(line, 0).unwrap()), "BH01");
+        assert_eq!(slice(field_span(line, 1).unwrap()), "100.50");
+        assert_eq!(field_span(line, 2), None); // only 3 fields incl tag
+
+        // Escaped `""` stays inside the inner span. The span is over the
+        // RAW line, so the doubled quotes are part of the lit region
+        // (highlighting paints what's physically on the line, not the
+        // unescaped value).
+        let esc = r#""DATA","he said ""hi""","x""#;
+        let echars: Vec<char> = esc.chars().collect();
+        let span = field_span(esc, 0).unwrap();
+        let got: String = echars[span.0 as usize..span.1 as usize].iter().collect();
+        assert_eq!(got, r#"he said ""hi"""#);
+
+        // Empty field — zero-width span just inside the quotes.
+        let empty = r#""HEADING","",""#;
+        let (s, e) = field_span(empty, 0).unwrap();
+        assert_eq!(s, e, "empty field is a zero-width span");
+
+        // Multibyte: a `°` (2 UTF-8 bytes, 1 char) ahead of the target
+        // field must shift the span by ONE char, not two bytes.
+        let mb = r#""DATA","°C","42""#;
+        let mchars: Vec<char> = mb.chars().collect();
+        let mslice = |(s, e): (u32, u32)| mchars[s as usize..e as usize].iter().collect::<String>();
+        assert_eq!(mslice(field_span(mb, 0).unwrap()), "°C");
+        assert_eq!(mslice(field_span(mb, 1).unwrap()), "42");
+    }
 
     #[test]
     fn splits_quoted_fields_and_unescapes() {
@@ -483,5 +622,135 @@ mod tests {
         let v = &pf.groups["PROJ"].rows[0].values[0];
         assert_eq!(v, "P1\u{00B0}");
         assert!(!v.contains('\u{FFFD}'), "valid UTF-8 must not be mangled");
+    }
+}
+
+/// Property-based tests for the AGS4 field splitter + span tracker.
+///
+/// `split_ags_line` is the lenient field parser every rule reads through;
+/// `field_span` mirrors its state machine to light up editor columns. The
+/// properties pin the two contracts the examples only sample: the
+/// quote/escape splitter is the exact inverse of a well-formed encoder
+/// (round-trip identity), `field_span` counts in stable Unicode CHARS
+/// regardless of line terminator, and neither panics on arbitrary text.
+#[cfg(test)]
+mod proptest_suite {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Encode one field the way a *well-formed* AGS4 writer does: wrap in
+    /// double quotes, double every embedded quote. Inverse of the quoted
+    /// branch of `split_ags_line`.
+    fn encode_field(field: &str) -> String {
+        format!("\"{}\"", field.replace('"', "\"\""))
+    }
+
+    /// Join fields into a well-formed AGS4 line (no trailing comma, every
+    /// field quoted). The empty-vec case yields the empty string, which
+    /// `split_ags_line` reads back as `[]`.
+    fn encode_line(fields: &[String]) -> String {
+        fields
+            .iter()
+            .map(|f| encode_field(f))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+
+    /// Field values for the round-trip generator. Excludes the line
+    /// terminators `\r` / `\n` (a real AGS line carries none — they ARE
+    /// the line break), but deliberately includes quotes, commas, empty
+    /// strings, ASCII control-ish chars, and multibyte UTF-8 so the
+    /// quote/escape and comma-delimiting paths are all exercised.
+    fn field_value() -> impl Strategy<Value = String> {
+        prop::collection::vec(
+            prop_oneof![
+                // common AGS payload chars + the two delimiters
+                prop::char::range(' ', '~'),
+                Just('"'),
+                Just(','),
+                // multibyte coverage (Latin-1 supplement, CJK, emoji)
+                prop::char::range('\u{00a1}', '\u{017f}'),
+                prop::char::range('\u{4e00}', '\u{4e80}'),
+                Just('°'),
+                Just('🦀'),
+            ]
+            // No CR/LF — those terminate a line, not live inside a field.
+            .prop_filter("no line terminators", |c| *c != '\r' && *c != '\n'),
+            0..12,
+        )
+        .prop_map(|cs| cs.into_iter().collect())
+    }
+
+    proptest! {
+        /// Round-trip identity: encoding an arbitrary `Vec<String>` of
+        /// field values into a well-formed AGS4 line and splitting it back
+        /// recovers the EXACT originals — the splitter is the precise
+        /// inverse of the quote+escape encoder. Covers empty fields,
+        /// embedded quotes/commas, and multibyte UTF-8.
+        #[test]
+        fn split_ags_line_round_trips_well_formed(fields in prop::collection::vec(field_value(), 0..8)) {
+            let line = encode_line(&fields);
+            let got = split_ags_line(&line);
+            prop_assert_eq!(got, fields, "line={:?}", line);
+        }
+
+        /// `split_ags_line` never panics on arbitrary `&str` — including
+        /// unterminated quotes, stray bytes after a closing quote, and
+        /// adversarial multibyte. (The lenient parser tolerates malformed
+        /// input by design; this guards that tolerance can't crash.)
+        #[test]
+        fn split_ags_line_never_panics(line in ".*") {
+            let _ = split_ags_line(&line);
+            prop_assert!(true);
+        }
+
+        /// `field_span` never panics on arbitrary `(line, index)`.
+        #[test]
+        fn field_span_never_panics(line in ".*", idx in 0u32..32) {
+            let _ = field_span(&line, idx);
+            prop_assert!(true);
+        }
+
+        /// Char-offset stability across line terminators: the span for a
+        /// given field is IDENTICAL whether the encoded line ends in CRLF,
+        /// LF, or has no terminator. The trailing terminator is past every
+        /// field, so it must never shift an inner-content span. (Indices
+        /// are tag-stripped: `field_index` 0 is the SECOND encoded field.)
+        #[test]
+        fn field_span_stable_across_line_terminator(
+            fields in prop::collection::vec(field_value(), 2..6),
+            idx in 0u32..4,
+        ) {
+            let base = encode_line(&fields);
+            prop_assume!((idx as usize + 1) < fields.len());
+
+            let bare = field_span(&base, idx);
+            let with_lf = field_span(&format!("{base}\n"), idx);
+            let with_crlf = field_span(&format!("{base}\r\n"), idx);
+
+            prop_assert_eq!(bare, with_lf, "LF shifted the span");
+            prop_assert_eq!(bare, with_crlf, "CRLF shifted the span");
+        }
+
+        /// `field_span` agrees with `split_ags_line`: for a well-formed
+        /// line, slicing the RAW line by the returned char span yields the
+        /// field's content with embedded quotes RE-DOUBLED (the span is
+        /// over the physical line, so an escaped `""` shows as two chars).
+        /// Re-splitting that one-field reconstruction recovers the value.
+        #[test]
+        fn field_span_inner_slice_matches_field(
+            fields in prop::collection::vec(field_value(), 2..6),
+            idx in 0u32..4,
+        ) {
+            prop_assume!((idx as usize + 1) < fields.len());
+            let line = encode_line(&fields);
+            let chars: Vec<char> = line.chars().collect();
+            let (s, e) = field_span(&line, idx).expect("field exists");
+            let raw: String = chars[s as usize..e as usize].iter().collect();
+            // `raw` is the physical inner content (quotes doubled). Wrap it
+            // back in quotes and split → the un-escaped original value.
+            let reparsed = split_ags_line(&format!("\"{raw}\""));
+            prop_assert_eq!(&reparsed, &vec![fields[idx as usize + 1].clone()]);
+        }
     }
 }

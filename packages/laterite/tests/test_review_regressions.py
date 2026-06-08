@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import datetime as _dt
 
+import laterite
 import pytest
 from laterite.ags_types import parse_value
 
@@ -103,3 +104,87 @@ def test_parse_value_unknown_ags_type_passes_string_through():
 # laterite Python wrapper exposes, and the F2b-6a `.pyi` drift test
 # (`tests/test_pyi_stubs_match_generator.py`) catches the equivalent
 # drift one layer up.
+
+
+# ---------------------------------------------------------------------------
+# 4. AGS3 input is refused through the real engine (O-30)
+#
+# python-ags4 silently falls an AGS3 file back to AGS4.1.1 and validates it
+# against an AGS4 schema; the clean-room engine deliberately refuses
+# (UnsupportedEdition, exit code 4) once it sees the unambiguous AGS3
+# markers (`**GROUP` / `<UNITS>` / `<CONT>`). The previous coverage only
+# hit the hardcoded compat stub, not the engine's parse-level detection.
+# ---------------------------------------------------------------------------
+
+# Minimal AGS3-shaped text: `**PROJ` group + `<UNITS>` marker (mirrors the
+# Rust `parse::tests::ags3_is_unsupported_edition*` fixture).
+_AGS3_TEXT = (
+    '"**PROJ"\r\n'
+    '"*PROJ_ID","*PROJ_NAME","*PROJ_AGS"\r\n'
+    '"<UNITS>","",""\r\n'
+    '"P001","Demo","3.1"\r\n'
+)
+
+
+@pytest.mark.parametrize("entry", ["read", "validate"])
+def test_ags3_input_is_refused_with_exit_code_4(entry):
+    """AGS3 markers trigger UnsupportedEditionError (exit 4), not a silent
+    AGS4 validation — through both the read and validate entry points."""
+    fn = getattr(laterite, entry)
+    with pytest.raises(laterite.UnsupportedEditionError) as exc:
+        fn(text=_AGS3_TEXT)
+    assert exc.value.exit_code == 4
+    # Names the refused edition (clean-room "3.x", not the vague NotAgs4).
+    assert "3" in str(exc.value)
+
+
+def test_ags3_is_not_the_generic_notags4_error():
+    """AGS3 must surface as the specific UnsupportedEditionError, not the
+    generic NotAgs4Error a structureless file gets — they share exit code
+    4 but the distinction is the O-30 point."""
+    with pytest.raises(laterite.UnsupportedEditionError):
+        laterite.validate(text=_AGS3_TEXT)
+    # A genuinely structureless file is still the generic NotAgs4.
+    with pytest.raises(laterite.NotAgs4Error):
+        laterite.read(text="nope\nstill nope\n")
+
+
+# ---------------------------------------------------------------------------
+# 5. Non-UTF-8 bytes decode lossily, not refused (O-32)
+#
+# The Rust validator used to hard-fail non-UTF-8 input as `NotUtf8` (zero
+# rules evaluated — a black hole). O-32 reconciled this with python-ags4's
+# `errors="replace"`: an undecodable byte becomes U+FFFD and the file still
+# validates, surfacing a Rule 1 finding (U+FFFD > 255 → not AGS ASCII). A
+# future revert to hard-refuse would pass CI without this guard. Bytes can
+# only enter through a file path (the text= route is already a Python str).
+# ---------------------------------------------------------------------------
+
+# AGS4 with a lone cp1252 byte (0xB0, the degree sign) in a DATA value —
+# invalid as UTF-8, the exact shape O-32 documents from the real corpus.
+_NON_UTF8_BYTES = (
+    b'"GROUP","PROJ"\r\n'
+    b'"HEADING","PROJ_ID","PROJ_NAME"\r\n'
+    b'"UNIT","",""\r\n'
+    b'"TYPE","ID","X"\r\n'
+    b'"DATA","P1","temp 20\xb0C site"\r\n'
+)
+
+
+def test_non_utf8_validate_reports_rule_1_without_raising(tmp_path):
+    """Invalid UTF-8 input is decoded lossily and reported under Rule 1,
+    not refused with a raise (O-32)."""
+    bad = tmp_path / "cp1252.ags"
+    bad.write_bytes(_NON_UTF8_BYTES)
+    rep = laterite.validate(str(bad))  # must not raise
+    assert "AGS Format Rule 1" in rep.by_rule()
+
+
+def test_non_utf8_read_substitutes_u_fffd(tmp_path):
+    """read() decodes the bad byte to U+FFFD rather than raising — the
+    replacement char lands in the parsed value."""
+    bad = tmp_path / "cp1252.ags"
+    bad.write_bytes(_NON_UTF8_BYTES)
+    f = laterite.read(str(bad))  # must not raise
+    proj_name = f["PROJ"].to_native()["PROJ_NAME"].to_list()
+    assert proj_name == ["temp 20�C site"]

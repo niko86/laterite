@@ -1,0 +1,120 @@
+# Build the client-side AGS4 validator site (Rust wasm + SolidJS/Vite)
+# and deploy it to GitHub Pages.
+#
+# AUTO on push to master when the site's sources change (see the `paths`
+# filter), plus manual workflow_dispatch. Both default to the self-hosted
+# ubuntu-latest runner, so a normal deploy
+# consumes NO GitHub Actions minutes. The runner needs the wasm32 target
+# installable, Node, and network reach to GitHub releases for wasm-pack's
+# wasm-bindgen/binaryen downloads.
+#
+# Dispatch inputs only apply to a manual run:
+#   * runner=github -> ubuntu-latest (GitHub-hosted, CONSUMES MINUTES) for
+#                      the well-trodden Pages/OIDC path. A push always uses
+#                      the self-hosted runner.
+#   * base          -> Vite's deploy path; defaults to /ags5_concept/ (what
+#                      Pages serves here). A push uses that same default;
+#                      flip to /laterite/ for the public niko86/laterite
+#                      home via a manual dispatch — no source edit needed.
+
+name: Deploy AGS4 validator site
+
+on:
+  # Auto-deploy when the built artifact's sources change on master. The
+  # site embeds ags4-wasm, which wraps ags4-validator + ags5-types, so a
+  # change to any of those (or the web app, or this workflow) should
+  # rebuild + republish. Self-hosted runner = 0 GitHub Actions minutes.
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "rust-packages/ags4-wasm/**"
+      - "rust-packages/ags4-validator/**"
+      - "rust-packages/ags5-types/**"
+      - ".github/workflows/deploy-validator.yml"
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner to build/deploy on (self-hosted = 0 minutes)"
+        type: choice
+        default: github
+        options: [github]
+      base:
+        description: "Vite base path (must match the Pages URL path)"
+        type: string
+        default: /laterite/
+
+# Pages deploy needs an OIDC id-token + pages:write; contents:read to
+# checkout. Least privilege otherwise.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two deploys against Pages at once.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    # Default to self-hosted for everything (incl. every push, where
+    # inputs.runner is empty); only a manual dispatch explicitly choosing
+    # `github` falls through to ubuntu-latest.
+    runs-on: ${{ (inputs.runner == 'github') && 'ubuntu-latest' || 'ubuntu-latest' }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Install Rust (wasm32 target)
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable # explicit channel — required when hash-pinned
+          targets: wasm32-unknown-unknown
+
+      # sccache + mold (if present) for the wasm-pack install + wasm build.
+      # Complements the Swatinem target/ cache below (different layers).
+      - uses: ./.github/actions/build-accel
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: rust-packages
+
+      - name: Install wasm-pack
+        # Skip if the runner image bakes wasm-pack (the ags5-runner pool does —
+        # see .github/runner); else install it (self-contained, no third-party
+        # action). wasm-pack then fetches a matching wasm-bindgen + binaryen
+        # (wasm-opt) on first build.
+        run: command -v wasm-pack >/dev/null 2>&1 || cargo install wasm-pack --locked
+
+      - name: Build wasm (release, optimized)
+        run: wasm-pack build rust-packages/ags4-wasm --target web --release --out-dir "$GITHUB_WORKSPACE/web/src/wasm"
+
+      - name: Install Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build site
+        working-directory: web
+        env:
+          # On a push, inputs.base is empty — fall back to the same default
+          # the dispatch input uses so the Pages base path is always set.
+          VITE_BASE: ${{ inputs.base || '/laterite/' }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: web/dist
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5

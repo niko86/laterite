@@ -1,8 +1,18 @@
 # Cargo workspace for the Rust side of laterite.
 #
 # Members:
-#   ags4-validator    Clean-room Rust AGS4 validator (lib + the
-#                     `ags4-check` binary).
+#   ags4-validator    Clean-room Rust AGS4 validator — library only
+#                     (lean, wasm-safe leaf). The CLI is `ags4-check`.
+#   ags4-check        The `ags4-check` CLI front-end for the validator
+#                     (owns the comfy-table/indicatif + optional TUI
+#                     deps). Depends on the validator library API only.
+#   ags4-wasm         Browser wasm (cdylib) wrapper around the validator
+#                     — the engine behind the client-side web app in
+#                     web/. Built for wasm32 via wasm-pack, excluded
+#                     from the host workspace clippy/test.
+#   ags5-types        The AGS type system (canonical types + value
+#                     casting) as a wasm-safe leaf — shared by ags5-core
+#                     and ags4-wasm.
 #   ags5-core         AGS5 dictionary, codecs, registry, and shared
 #                     types. No DuckDB dep — kept light so the
 #                     base validator wheel doesn't pay for the
@@ -22,9 +32,12 @@
 [workspace]
 resolver = "2"
 members = [
+    "ags5-types",
     "ags5-core",
     "ags5db",
     "ags4-validator",
+    "ags4-check",
+    "ags4-wasm",
     "ags-cliutil",
     "laterite-py",
     "laterite-py-ags5",
@@ -38,3 +51,10 @@ opt-level = 3
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+# Dev/test profile (CI builds debug — see ci.yml). Default full debug-info on the
+# bundled-DuckDB C++ is enormous: it bloats `target/` (the disk pressure that
+# evicts the self-hosted runner's cache) and slows linking. `line-tables-only`
+# keeps backtraces useful while shedding the bulk — net faster CI + smaller cache.
+[profile.dev]
+debug = "line-tables-only"

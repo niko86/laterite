@@ -13,27 +13,10 @@ rust-version = "1.85"
 description = "Clean-room Rust validator for the AGS4 geotechnical transfer format"
 license = "MIT"
 publish = false
-# `src/bin/ags4_check_tui.rs` is a `#[path]` submodule of the
-# ags4-check binary, NOT its own target. Disable bin auto-discovery so
-# cargo doesn't try to compile it standalone; the one real binary is
-# declared explicitly below.
-autobins = false
 
 [lib]
 name = "ags4_validator"
 path = "src/lib.rs"
-
-[[bin]]
-name = "ags4-check"
-path = "src/bin/ags4_check.rs"
-
-[features]
-# Default build links NO TUI code or deps — the LLM/automation-facing
-# binary is provably unaffected (the `--tui` flag isn't even compiled
-# in; it falls into "unknown option → exit 5"). Build the experiment
-# with `cargo build --release --features tui`.
-default = []
-tui = ["dep:ratatui", "dep:crossterm"]
 
 [dependencies]
 # Compile-time perfect-hash maps for the bundled standard dictionaries —
@@ -54,27 +37,11 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 # (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee
 # is unchanged.
 encoding_rs = "0.8"
-# CLI presentation parity with `ags5db` (ags5db/src/output.rs): the
-# animated spinner, the aligned UTF8 finding table, and rich-style
-# coloured JSON — now via the shared `ags-cliutil` crate (single
-# source of truth; was copied verbatim before). `ags-cliutil` pulls
-# only comfy-table/indicatif/serde_json (already in the workspace
-# lockfile via this bin) and NONE of walkdir/rayon/ratatui, so the
-# library's lean dep-graph guarantee is unaffected. Only the
-# `ags4-check` binary links it — the library stays phf + thiserror +
-# chrono. comfy-table/serde_json remain direct deps for the
-# findings-specific table/JSON shaping ags4-check still owns.
-ags-cliutil = { path = "../ags-cliutil" }
-comfy-table = "7"
-indicatif = "0.17"
-serde_json = { version = "1", features = ["preserve_order"] }
-# Optional, bin-only, behind the `tui` feature — the interactive
-# findings browser (`ags4-check --tui`). crossterm 0.28 is already in
-# the workspace lockfile transitively (indicatif/comfy-table), so it
-# adds zero new external surface; ratatui pulls a small pure-Rust tree.
-# The library (`ags4_validator`) links neither.
-ratatui = { version = "0.29", optional = true }
-crossterm = { version = "0.28", optional = true }
+# serde: deliberate lean/wasm-safe inclusion — derive only, NO serde_json
+# (bindings own serialization). derive-only is zero runtime cost and
+# compiles clean on wasm32 (the wasm crate already links it). Not on the
+# lean-dep guard list (pyo3|polars|walkdir|rayon|ratatui).
+serde = { version = "1", features = ["derive"] }
 
 [build-dependencies]
 # build.rs reads the vendored .ags dictionaries and emits phf static
@@ -94,6 +61,17 @@ criterion = "0.5"
 # those tests write a temp file instead. Dev-dep only + already in the
 # guarantee (no walkdir/rayon/ratatui) is untouched.
 tempfile = "3"
+# serde_json: DEV-ONLY — the findings.rs byte-identity test serializes a
+# Finding and asserts the exact JSON string. The engine itself owns no
+# serde_json (bindings/CLIs do their own serialization), so the runtime
+# lean-dep contract is untouched.
+serde_json = "1"
+# Property-based tests: the AGS4 field splitter round-trip + field_span
+# char-offset stability + the Rule 8 format↔validate inverses. DEV-ONLY;
+# proptest's rand pull never reaches the lean runtime dep-graph
+# (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee is
+# untouched.
+proptest = "1"
 
 [[bench]]
 name = "validate_large_fixture"

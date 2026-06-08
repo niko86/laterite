@@ -15,7 +15,7 @@
 
 use std::path::PathBuf;
 
-use ags4_validator::{CheckOptions, ValidatorError, check_file, findings, parse};
+use ags4_validator::{CheckOptions, ValidatorError, check_file, findings, is_valid, parse};
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -64,6 +64,16 @@ fn clean_minimal_fixture_structure() {
 fn missing_file_is_a_hard_error_not_a_finding() {
     let err = check_file(&fixture("does_not_exist.ags"), &CheckOptions::default()).unwrap_err();
     assert!(matches!(err, ValidatorError::NotFound(_)));
+}
+
+#[test]
+fn is_valid_mirrors_zero_findings() {
+    // The CLI exit code + `db-to-ags4 --validate` key off `is_valid`.
+    // The conformant fixture is valid; a defect-bearing one is not, and
+    // a missing file is still a hard error (not `false`).
+    assert!(is_valid(&fixture("clean_minimal.ags"), &CheckOptions::default()).unwrap());
+    assert!(!is_valid(&fixture("rule13_no_proj.ags"), &CheckOptions::default()).unwrap());
+    assert!(is_valid(&fixture("does_not_exist.ags"), &CheckOptions::default()).is_err());
 }
 
 // ---- V1: line-level rules (1, 3, 5, 6) -----------------------------
@@ -397,7 +407,7 @@ fn invalid_utf8_input_flags_rule1_not_hard_error() {
     let f = check_file(tf.path(), &CheckOptions::default())
         .expect("invalid encoding must NOT be a hard error any more");
     assert!(
-        f.get("AGS Format Rule 1").is_some(),
+        f.contains_key("AGS Format Rule 1"),
         "lossy U+FFFD must surface as a Rule 1 finding, got {f:?}"
     );
 }
@@ -413,7 +423,7 @@ fn valid_utf8_extended_char_is_fyi_only_not_rule1() {
 
     let default = check_file(tf.path(), &CheckOptions::default()).unwrap();
     assert!(
-        default.get("AGS Format Rule 1").is_none(),
+        !default.contains_key("AGS Format Rule 1"),
         "valid extended-ASCII must not be a Rule 1 error, got {default:?}"
     );
 
@@ -426,7 +436,7 @@ fn valid_utf8_extended_char_is_fyi_only_not_rule1() {
     )
     .unwrap();
     assert!(
-        with_fyi.get("FYI (Related to Rule 1)").is_some(),
+        with_fyi.contains_key("FYI (Related to Rule 1)"),
         "valid extended-ASCII must surface as the Rule 1 FYI, got {with_fyi:?}"
     );
 }

@@ -1,0 +1,5 @@
+"GROUP","DICT"
+"HEADING","DICT_TYPE","DICT_GRP","DICT_HDNG","DICT_STAT","DICT_DTYP","DICT_DESC","DICT_UNIT","DICT_EXMP","DICT_PGRP","DICT_REM","FILE_FSET"
+"UNIT","","","","","","","","","","",""
+"TYPE","PA","X","X","PA","PT","X","PU","X","X","X","X"
+"DATA","HEADING","LLPL","LLPL_LL","REQUIRED","2DP","Liquid Limit","%","55.10","SAMP","",""

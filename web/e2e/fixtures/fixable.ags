@@ -1,0 +1,11 @@
+"GROUP","PROJ"
+"HEADING","PROJ_ID"
+"UNIT",""
+"TYPE","ID"
+"DATA","P1"
+
+"GROUP","LOCA"
+"HEADING","LOCA_ID","LOCA_NATE"
+"UNIT","","m"
+"TYPE","ID","2DP"
+"DATA","BH01","123.4"

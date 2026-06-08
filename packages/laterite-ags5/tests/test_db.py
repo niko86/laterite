@@ -76,44 +76,12 @@ def _make_project(n_readings: int = 20) -> PROJ:
     return PROJ(proj_id="TEST001", proj_name="DB round-trip test", locas=[loca])
 
 
+# NB: the deep write->read round-trip (proj/loca/core/geol/samp/llpl/treg/
+# tret/trel structure + scalar fidelity) is the canonical
+# test_typed_graph.py::test_read_db_round_trip_tree_structure (with the
+# scalar asserts folded in). The former TestDbRoundTrip::test_write_read_
+# roundtrip duplicated it and was cut (WS4 prune).
 class TestDbRoundTrip:
-    def test_write_read_roundtrip(self, tmp_path: Path):
-        proj = _make_project(20)
-        db_path = tmp_path / "test.ags5db"
-
-        write_ags5db(proj, db_path)
-        assert db_path.exists()
-        assert db_path.stat().st_size > 0
-
-        restored = read_ags5db(db_path)
-        assert restored.proj_id == "TEST001"
-        assert len(restored.locas) == 1
-
-        loca = restored.locas[0]
-        assert loca.loca_id == "BH01"
-        assert loca.loca_gl == 45.0
-
-        assert len(loca.cores) == 1
-        assert loca.cores[0].core_rqd == 85
-
-        assert len(loca.geols) == 1
-        assert loca.geols[0].geol_geol == "CLAY"
-
-        assert len(loca.samps) == 1
-        samp = loca.samps[0]
-        assert samp.samp_id == "SAMP001"
-
-        assert len(samp.llpls) == 1
-        assert samp.llpls[0].llpl_ll == 45
-
-        assert len(samp.tregs) == 1
-        treg = samp.tregs[0]
-        assert treg.treg_type == "CU"
-        assert len(treg.trets) == 1
-        assert len(treg.trets[0].trels) == 20
-        assert treg.trets[0].trels[0].trel_cell == 350.0
-        assert treg.trets[0].trels[19].trel_cell == 369.0
-
     def test_empty_project(self, tmp_path: Path):
         proj = PROJ(proj_id="EMPTY", proj_name="Empty project")
         db_path = tmp_path / "empty.ags5db"
@@ -124,10 +92,14 @@ class TestDbRoundTrip:
 
 
 class TestDbQueries:
-    @pytest.fixture()
-    def db_path(self, tmp_path: Path) -> Path:
+    # Class-scoped: the query tests below only read (sum/query), so they
+    # share ONE write instead of rebuilding the 20-LOCA DB per test. Unique
+    # value vs the canonical test_ags5db.py suite: the write_db (typed-graph)
+    # ingest path (test_ags5db.py ingests via AGS4 convert).
+    @pytest.fixture(scope="class")
+    def db_path(self, tmp_path_factory: pytest.TempPathFactory) -> Path:
         proj = _make_project(20)
-        p = tmp_path / "query_test.ags5db"
+        p = tmp_path_factory.mktemp("query_test") / "query_test.ags5db"
         write_ags5db(proj, p)
         return p
 
@@ -137,29 +109,12 @@ class TestDbQueries:
         result = _laterite_db.sum(db_path, "TREL", "trel_cell")
         assert abs(result - expected) < 0.01
 
-    def test_sum_field_with_where(self, db_path: Path):
-        # Only readings where trel_mnum <= 5 (mnum 1..5, values 350..354)
-        expected = sum(350.0 + i for i in range(5))
-        result = _laterite_db.sum(
-            db_path, "TREL", "trel_cell",
-            where=Predicate("trel_mnum", "<=", 5),
-        )
-        assert abs(result - expected) < 0.01
-
     def test_query_readings_all(self, db_path: Path):
         df = _laterite_db.query(db_path, "TREL", fields=["trel_cell", "trel_pwp"])
         assert isinstance(df, pl.DataFrame)
         assert len(df) == 20
         assert "trel_cell" in df.columns
         assert "trel_pwp" in df.columns
-
-    def test_query_readings_with_limit(self, db_path: Path):
-        df = _laterite_db.query(db_path, "TREL", fields=["trel_cell"], limit=5)
-        assert len(df) == 5
-
-    def test_predicate_rejects_bad_op(self):
-        with pytest.raises(ValueError, match="disallowed predicate op"):
-            Predicate("trel_mnum", "DROP TABLE", 1)  # type: ignore[arg-type]
 
 
 class TestSampUuidInvariants:
@@ -216,7 +171,7 @@ class TestSampUuidInvariants:
         finally:
             conn.close()
 
-    def test_in_process_dedup(self, tmp_path: Path):
+    def test_samp_pseudo_key_dedup(self, tmp_path: Path):
         """Two SAMP instances with identical pseudo-keys but different children
         collapse to ONE g_samp row with both children attached via the same UUID."""
         import duckdb
@@ -248,19 +203,6 @@ class TestSampUuidInvariants:
         finally:
             conn.close()
 
-    def test_uuid_is_internal_not_in_model(self, tmp_path: Path):
-        """The SAMP UUID is an internal DB optimisation; it must never
-        appear on the model class. F2a retired the .agsx round-trip
-        check; the property holds at the class level."""
-        proj = _make_project(2)
-        db_path = tmp_path / "rt.ags5db"
-        write_ags5db(proj, db_path)
-        restored = read_ags5db(db_path)
-        samp = restored.locas[0].samps[0]
-        assert samp.samp_id == "SAMP001"
-        # Model classes don't carry an id field; only the DB schema does.
-        assert not hasattr(samp, "id")
-
 
 class TestUuid7Schema:
     """Every group's PK is UUID7; every child's parent_id is UUID."""
@@ -283,7 +225,7 @@ class TestUuid7Schema:
         finally:
             conn.close()
 
-    def test_in_process_dedup(self, tmp_path: Path):
+    def test_tret_content_dedup(self, tmp_path: Path):
         """Two TRET instances with identical (parent_id, TRET_TESN) collapse
         to one g_tret row, both children attach via the same UUID."""
         import duckdb
@@ -330,15 +272,19 @@ class TestUuid7Schema:
         finally:
             conn.close()
 
-    def test_tret_uuid_not_on_model(self, tmp_path: Path):
-        """TRET UUID is internal DB-only; never appears on the model class."""
-        proj = _make_project(2)
-        db_path = tmp_path / "rt.ags5db"
-        write_ags5db(proj, db_path)
-        restored = read_ags5db(db_path)
-        tret = restored.locas[0].samps[0].tregs[0].trets[0]
-        assert tret.tret_tesn == "1"
-        assert not hasattr(tret, "id")
+    def test_model_classes_carry_no_internal_id(self):
+        """The UUID7 PK is a DB-only optimisation; it must never leak onto the
+        model classes. Pure-memory — replaces two former write+read tests that
+        asserted this `not hasattr(x, 'id')` property via full DuckDB writes
+        (WS4 prune)."""
+        assert not hasattr(PROJ(proj_id="P", proj_name="x"), "id")
+        assert not hasattr(
+            SAMP(loca_id="BH01", samp_top=5.0, samp_ref="S1",
+                 samp_type="U", samp_id="S001"), "id")
+        assert not hasattr(
+            TRET(loca_id="BH01", samp_top=5.0, samp_ref="S1", samp_type="U",
+                 samp_id="S001", spec_ref="S1", spec_dpth=5.0, tret_tesn="1"),
+            "id")
 
     # `test_treg_in_process_dedup` retired with F2c-3.
     #

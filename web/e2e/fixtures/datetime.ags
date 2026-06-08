@@ -1,0 +1,11 @@
+"GROUP","PROJ"
+"HEADING","PROJ_ID"
+"UNIT",""
+"TYPE","ID"
+"DATA","P1"
+
+"GROUP","TRAN"
+"HEADING","TRAN_DATE"
+"UNIT","yyyy-mm-dd"
+"TYPE","DT"
+"DATA","18/08/2020"

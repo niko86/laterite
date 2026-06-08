@@ -25,6 +25,10 @@ license = "MIT"
 publish = false
 
 [dependencies]
+# The AGS type system (canonical types + value casting), extracted to a
+# wasm-safe leaf so the browser explorer (`ags4-wasm`) shares the exact
+# casting logic. Re-exported as `ags5_core::ags_types` (see lib.rs).
+ags5-types = { path = "../ags5-types" }
 # Calendar/clock checking for canonical-type validation (mirrors the
 # `chrono` use in ags4-validator). `serde` feature so DateTime types
 # round-trip through serde_json without an extra map.

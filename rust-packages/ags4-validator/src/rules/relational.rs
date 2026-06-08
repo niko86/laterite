@@ -48,7 +48,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::dict::Dictionary;
-use crate::findings::{Findings, add};
+use crate::findings::{Findings, Location, Severity, Target, add, add_at};
 use crate::parse::{ParsedFile, ParsedGroup};
 
 const RULE_10A: &str = "AGS Format Rule 10a";
@@ -213,12 +213,18 @@ fn rule_10a(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findin
         if !g.headings.iter().any(|h| h == k) {
             all_present = false;
             if let Some(hl) = g.heading_line {
-                add(
+                add_at(
                     found,
                     RULE_10A,
                     Some(hl),
                     code,
                     format!("KEY field {k} is not present."),
+                    Location {
+                        target: Target::Heading,
+                        heading: Some(k.clone()),
+                        ..Default::default()
+                    },
+                    Severity::Error,
                 );
             }
         }
@@ -231,15 +237,21 @@ fn rule_10a(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findin
     for row in &g.rows {
         *counts.entry(tuple(g, &keys, row)).or_default() += 1;
     }
-    for row in &g.rows {
+    for (ri, row) in g.rows.iter().enumerate() {
         let t = tuple(g, &keys, row);
         if counts.get(&t).copied().unwrap_or(0) > 1 {
-            add(
+            add_at(
                 found,
                 RULE_10A,
                 Some(row.line),
                 code,
                 format!("Duplicate KEY field combination: {}", t.join("|")),
+                Location {
+                    target: Target::Cell,
+                    data_row: Some(ri as u32 + 1),
+                    ..Default::default()
+                },
+                Severity::Error,
             );
         }
     }
@@ -258,12 +270,18 @@ fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findin
             true => present.push(r),
             false => {
                 if let Some(hl) = g.heading_line {
-                    add(
+                    add_at(
                         found,
                         RULE_10B,
                         Some(hl),
                         code,
                         format!("REQUIRED field {r} is not present."),
+                        Location {
+                            target: Target::Heading,
+                            heading: Some(r.clone()),
+                            ..Default::default()
+                        },
+                        Severity::Error,
                     );
                 }
             }
@@ -277,7 +295,7 @@ fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findin
         .filter_map(|r| col(g, r).map(|i| (i, r.as_str())))
         .collect();
 
-    for row in &g.rows {
+    for (ri, row) in g.rows.iter().enumerate() {
         let any_empty = req_cols.iter().any(|(i, _)| {
             row.values
                 .get(*i)
@@ -311,12 +329,18 @@ fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findin
                 parts.push(v.to_string());
             }
         }
-        add(
+        add_at(
             found,
             RULE_10B,
             Some(row.line),
             code,
             format!("Empty REQUIRED fields: {}", parts.join("|")),
+            Location {
+                target: Target::Cell,
+                data_row: Some(ri as u32 + 1),
+                ..Default::default()
+            },
+            Severity::Error,
         );
     }
 }
@@ -413,7 +437,7 @@ fn rule_10c(
 
     let parent_tuples: HashSet<Vec<String>> =
         pg.rows.iter().map(|r| tuple(pg, &pkeys, r)).collect();
-    for row in &g.rows {
+    for (ri, row) in g.rows.iter().enumerate() {
         let t = tuple(g, &pkeys, row);
         // O-39: skip child rows whose parent KEY cells are ALL empty
         // — those are "standalone" rows by the file's own design
@@ -427,7 +451,7 @@ fn rule_10c(
             continue;
         }
         if !parent_tuples.contains(&t) {
-            add(
+            add_at(
                 found,
                 RULE_10C,
                 Some(row.line),
@@ -436,6 +460,12 @@ fn rule_10c(
                     "No parent entry in {parent} for KEY combination: {}",
                     t.join("|")
                 ),
+                Location {
+                    target: Target::Cell,
+                    data_row: Some(ri as u32 + 1),
+                    ..Default::default()
+                },
+                Severity::Error,
             );
         }
     }
@@ -494,15 +524,21 @@ fn rule_11c(parsed: &ParsedFile, delim: &str, concat: &str, found: &mut Findings
             if ty.trim() != "RL" {
                 continue;
             }
-            for row in &g.rows {
+            for (ri, row) in g.rows.iter().enumerate() {
                 let Some(rl) = row.values.get(ci) else {
                     continue;
                 };
                 if rl.is_empty() {
                     continue;
                 }
+                let loc = || Location {
+                    target: Target::Cell,
+                    field_index: Some(ci as u32),
+                    data_row: Some(ri as u32 + 1),
+                    ..Default::default()
+                };
                 if !rl.contains(delim) {
-                    add(
+                    add_at(
                         found,
                         RULE_11C,
                         Some(row.line),
@@ -511,26 +547,32 @@ fn rule_11c(parsed: &ParsedFile, delim: &str, concat: &str, found: &mut Findings
                             "Invalid Record Link {rl:?}: {delim:?} must separate the GROUP \
                              and KEY fields."
                         ),
+                        loc(),
+                        Severity::Error,
                     );
                     continue;
                 }
                 for link in rl.split(concat) {
                     let parts: Vec<&str> = link.split(delim).collect();
                     match fetch_count(parsed, &parts) {
-                        0 => add(
+                        0 => add_at(
                             found,
                             RULE_11C,
                             Some(row.line),
                             code,
                             format!("Invalid Record Link {link:?}: no such record."),
+                            loc(),
+                            Severity::Error,
                         ),
                         1 => {}
-                        _ => add(
+                        _ => add_at(
                             found,
                             RULE_11C,
                             Some(row.line),
                             code,
                             format!("Invalid Record Link {link:?}: matches more than one record."),
+                            loc(),
+                            Severity::Error,
                         ),
                     }
                 }
@@ -656,7 +698,7 @@ mod tests {
         let r = run(src);
         // Standalone row (LOCA_ID="") → no Rule 10c.
         assert!(
-            r.get(RULE_10C).map_or(true, |v| v.is_empty()),
+            r.get(RULE_10C).is_none_or(|v| v.is_empty()),
             "standalone row must not flag: {:?}",
             r.get(RULE_10C)
         );
@@ -701,6 +743,295 @@ mod tests {
             run(nodelim)
                 .get(RULE_11C)
                 .is_some_and(|v| v.iter().any(|x| x.desc.contains("must separate")))
+        );
+    }
+
+    #[test]
+    fn rule_11c_flags_link_matching_more_than_one_record() {
+        // Two LOCA rows share leading column "BH1" (LOCA's ID column
+        // isn't KEY-deduped here — fetch_record is positional, O-24), so
+        // a link "LOCA|BH1" resolves to 2 rows → the `_ => matches more
+        // than one` arm of rule_11c.
+        let src = "\"GROUP\",\"TRAN\"\r\n\
+                   \"HEADING\",\"TRAN_DLIM\",\"TRAN_RCON\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\"DATA\",\"|\",\"+\"\r\n\r\n\
+                   \"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\
+                   \"DATA\",\"BH1\"\r\n\"DATA\",\"BH1\"\r\n\r\n\
+                   \"GROUP\",\"SAMP\"\r\n\"HEADING\",\"LOCA_ID\",\"SAMP_LINK\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"RL\"\r\n\
+                   \"DATA\",\"BH1\",\"LOCA|BH1\"\r\n";
+        let r = run(src);
+        let r11c = r.get(RULE_11C).expect("Rule 11c");
+        assert!(
+            r11c.iter()
+                .any(|x| x.desc.contains("matches more than one record")),
+            "{r11c:?}"
+        );
+    }
+
+    #[test]
+    fn rule_11_silent_when_tran_has_no_data_row() {
+        // TRAN group with the delimiter headings but zero DATA rows →
+        // rule_11's `tran.rows.first()` None early return (no 11a/11b/c).
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\
+                   \"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_DLIM\",\"TRAN_RCON\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n";
+        let r = run(src);
+        assert!(!r.contains_key(RULE_11A), "{r:?}");
+        assert!(!r.contains_key(RULE_11B), "{r:?}");
+        assert!(!r.contains_key(RULE_11C), "{r:?}");
+    }
+
+    #[test]
+    fn rule_11_silent_when_tran_lacks_delim_columns() {
+        // TRAN present, has a DATA row, but no TRAN_DLIM/TRAN_RCON
+        // columns → the `(Some, Some)` column-resolve None arm.
+        let src = "\"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_AGS\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"4.2\"\r\n";
+        let r = run(src);
+        assert!(!r.contains_key(RULE_11A), "{r:?}");
+        assert!(!r.contains_key(RULE_11B), "{r:?}");
+    }
+
+    // ---- Rule 10c error branches (no/blank/absent parent, key mismatch) ----
+
+    #[test]
+    fn rule_10c_flags_parent_group_absent_from_file() {
+        // SAMP's parent LOCA is in the standard dictionary but not in the
+        // file → the "Parent group … is not in the file" arm.
+        let src = "\"GROUP\",\"SAMP\"\r\n\
+                   \"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\r\n\
+                   \"UNIT\",\"\",\"m\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\r\n\
+                   \"DATA\",\"BH1\",\"1.00\",\"S1\",\"B\",\"BH1S1\"\r\n";
+        let r = run(src);
+        let r10c = r.get(RULE_10C).expect("Rule 10c");
+        assert!(
+            r10c.iter()
+                .any(|x| x.group == "SAMP" && x.desc.contains("is not in the file")),
+            "{r10c:?}"
+        );
+    }
+
+    #[test]
+    fn rule_10c_flags_group_undefined_anywhere() {
+        // A custom group "QZZZ" with no standard- or DICT-defined parent
+        // → the `eff.parent(code) = None` "group not defined" arm. It's
+        // not in PARENTLESS, so 10c runs and can't find a parent at all.
+        let src = "\"GROUP\",\"QZZZ\"\r\n\"HEADING\",\"QZZZ_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"X1\"\r\n";
+        let r = run(src);
+        let r10c = r.get(RULE_10C).expect("Rule 10c");
+        assert!(
+            r10c.iter()
+                .any(|x| x.group == "QZZZ" && x.desc.contains("not defined")),
+            "{r10c:?}"
+        );
+    }
+
+    #[test]
+    fn rule_10c_uses_file_dict_to_define_a_custom_parent_chain() {
+        // A file DICT defines QZZZ (parent PROJ, KEY=QZZZ_ID) and child
+        // QCHD (parent QZZZ, KEY borrowing QZZZ_ID). QCHD's data row
+        // references a QZZZ_ID that doesn't exist → orphan flagged via
+        // the file-DICT overlay path (EffectiveDict::build with a DICT
+        // group, exercising file_parent + file_hdng + fields_with_status
+        // extras). PROJ is the QZZZ parent (PARENTLESS-exempt LOCA-style
+        // not used).
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\
+                   \"GROUP\",\"DICT\"\r\n\
+                   \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_PGRP\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"GROUP\",\"QZZZ\",\"\",\"\",\"PROJ\"\r\n\
+                   \"DATA\",\"HEADING\",\"QZZZ\",\"QZZZ_ID\",\"KEY\",\"\"\r\n\
+                   \"DATA\",\"GROUP\",\"QCHD\",\"\",\"\",\"QZZZ\"\r\n\
+                   \"DATA\",\"HEADING\",\"QCHD\",\"QZZZ_ID\",\"KEY\",\"\"\r\n\
+                   \"DATA\",\"HEADING\",\"QCHD\",\"QCHD_ID\",\"KEY\",\"\"\r\n\r\n\
+                   \"GROUP\",\"QZZZ\"\r\n\"HEADING\",\"QZZZ_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"Z1\"\r\n\r\n\
+                   \"GROUP\",\"QCHD\"\r\n\"HEADING\",\"QZZZ_ID\",\"QCHD_ID\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"ID\"\r\n\
+                   \"DATA\",\"Z9\",\"C1\"\r\n";
+        let r = run(src);
+        let r10c = r.get(RULE_10C).expect("Rule 10c");
+        // QCHD row references QZZZ_ID "Z9" which has no QZZZ parent (Z1).
+        assert!(
+            r10c.iter()
+                .any(|x| x.group == "QCHD" && x.desc.contains("Z9")),
+            "file-DICT-defined parent chain must drive the orphan check: {r10c:?}"
+        );
+    }
+
+    #[test]
+    fn rule_10b_uses_file_dict_required_status() {
+        // A file DICT marks QZZZ_REF as REQUIRED for a custom group;
+        // an empty cell there → Rule 10b fires via the file_hdng overlay
+        // (fields_with_status extras branch).
+        let src = "\"GROUP\",\"DICT\"\r\n\
+                   \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_PGRP\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"GROUP\",\"QZZZ\",\"\",\"\",\"-\"\r\n\
+                   \"DATA\",\"HEADING\",\"QZZZ\",\"QZZZ_ID\",\"KEY\",\"\"\r\n\
+                   \"DATA\",\"HEADING\",\"QZZZ\",\"QZZZ_REF\",\"REQUIRED\",\"\"\r\n\r\n\
+                   \"GROUP\",\"QZZZ\"\r\n\"HEADING\",\"QZZZ_ID\",\"QZZZ_REF\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   \"DATA\",\"Z1\",\"\"\r\n";
+        let r = run(src);
+        let r10b = r.get(RULE_10B).expect("Rule 10b");
+        assert!(
+            r10b.iter()
+                .any(|x| x.group == "QZZZ" && x.desc.contains("QZZZ_REF")),
+            "file-DICT REQUIRED status must drive Rule 10b: {r10b:?}"
+        );
+    }
+
+    #[test]
+    fn rule_10c_flags_parent_with_no_key_fields() {
+        // File-DICT: parent QPAR has NO KEY heading; child QCHD names
+        // QPAR as parent. pkeys is empty → the "No KEY fields are defined
+        // in the parent group" arm (lines 393-401).
+        let src = "\"GROUP\",\"DICT\"\r\n\
+                   \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_PGRP\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"GROUP\",\"QPAR\",\"\",\"\",\"-\"\r\n\
+                   \"DATA\",\"HEADING\",\"QPAR\",\"QPAR_VAL\",\"OTHER\",\"\"\r\n\
+                   \"DATA\",\"GROUP\",\"QCHD\",\"\",\"\",\"QPAR\"\r\n\
+                   \"DATA\",\"HEADING\",\"QCHD\",\"QCHD_ID\",\"KEY\",\"\"\r\n\r\n\
+                   \"GROUP\",\"QPAR\"\r\n\"HEADING\",\"QPAR_VAL\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"v\"\r\n\r\n\
+                   \"GROUP\",\"QCHD\"\r\n\"HEADING\",\"QCHD_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"C1\"\r\n";
+        let r = run(src);
+        let r10c = r.get(RULE_10C).expect("Rule 10c");
+        assert!(
+            r10c.iter()
+                .any(|x| x.group == "QCHD" && x.desc.contains("No KEY fields")),
+            "{r10c:?}"
+        );
+    }
+
+    #[test]
+    fn rule_10c_flags_parent_key_not_declared_in_child() {
+        // File-DICT: parent QPAR has KEY=QPAR_ID; child QCHD names QPAR
+        // as parent but does NOT declare QPAR_ID as one of its KEYs. So
+        // a parent KEY is "missing from the child" → lines 404-417.
+        let src = "\"GROUP\",\"DICT\"\r\n\
+                   \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_PGRP\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"GROUP\",\"QPAR\",\"\",\"\",\"-\"\r\n\
+                   \"DATA\",\"HEADING\",\"QPAR\",\"QPAR_ID\",\"KEY\",\"\"\r\n\
+                   \"DATA\",\"GROUP\",\"QCHD\",\"\",\"\",\"QPAR\"\r\n\
+                   \"DATA\",\"HEADING\",\"QCHD\",\"QCHD_ID\",\"KEY\",\"\"\r\n\r\n\
+                   \"GROUP\",\"QPAR\"\r\n\"HEADING\",\"QPAR_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\
+                   \"GROUP\",\"QCHD\"\r\n\"HEADING\",\"QCHD_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"C1\"\r\n";
+        let r = run(src);
+        let r10c = r.get(RULE_10C).expect("Rule 10c");
+        assert!(
+            r10c.iter().any(|x| x.group == "QCHD"
+                && x.desc.contains("QPAR_ID")
+                && x.desc.contains("not in the child group")),
+            "{r10c:?}"
+        );
+    }
+
+    #[test]
+    fn rule_10c_flags_key_column_absent_from_heading_row() {
+        // File-DICT: both QPAR and QCHD declare QPAR_ID as KEY (so the
+        // effective-dict KEY sets line up and `missing` is empty), but
+        // the child's actual HEADING row OMITS the QPAR_ID column → the
+        // `!(in_child && in_parent)` arm (lines 420-435), reported at the
+        // child's HEADING line.
+        let src = "\"GROUP\",\"DICT\"\r\n\
+                   \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_PGRP\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"GROUP\",\"QPAR\",\"\",\"\",\"-\"\r\n\
+                   \"DATA\",\"HEADING\",\"QPAR\",\"QPAR_ID\",\"KEY\",\"\"\r\n\
+                   \"DATA\",\"GROUP\",\"QCHD\",\"\",\"\",\"QPAR\"\r\n\
+                   \"DATA\",\"HEADING\",\"QCHD\",\"QPAR_ID\",\"KEY\",\"\"\r\n\
+                   \"DATA\",\"HEADING\",\"QCHD\",\"QCHD_ID\",\"KEY\",\"\"\r\n\r\n\
+                   \"GROUP\",\"QPAR\"\r\n\"HEADING\",\"QPAR_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\
+                   \"GROUP\",\"QCHD\"\r\n\"HEADING\",\"QCHD_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"C1\"\r\n";
+        let r = run(src);
+        let r10c = r.get(RULE_10C).expect("Rule 10c");
+        assert!(
+            r10c.iter()
+                .any(|x| x.group == "QCHD" && x.desc.contains("KEY fields missing")),
+            "{r10c:?}"
+        );
+    }
+
+    #[test]
+    fn rule_11c_ignores_empty_record_link_cell() {
+        // An RL-typed column whose value is empty must be skipped (the
+        // `rl.is_empty()` continue in rule_11c) — no Rule 11c finding.
+        let src = "\"GROUP\",\"TRAN\"\r\n\
+                   \"HEADING\",\"TRAN_DLIM\",\"TRAN_RCON\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\"DATA\",\"|\",\"+\"\r\n\r\n\
+                   \"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH1\"\r\n\r\n\
+                   \"GROUP\",\"SAMP\"\r\n\"HEADING\",\"LOCA_ID\",\"SAMP_LINK\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"RL\"\r\n\
+                   \"DATA\",\"BH1\",\"\"\r\n";
+        assert!(!run(src).contains_key(RULE_11C), "{:?}", run(src));
+    }
+
+    #[test]
+    fn rule_11c_unknown_group_in_link_is_no_such_record() {
+        // Link references group "NOPE" that isn't in the file →
+        // fetch_count's `parsed.groups.get == None` returns 0 → "no such
+        // record". Also covers a link whose key count exceeds the target
+        // group's heading count (fetch_count's `keys.len() > headings`).
+        let src = "\"GROUP\",\"TRAN\"\r\n\
+                   \"HEADING\",\"TRAN_DLIM\",\"TRAN_RCON\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\"DATA\",\"|\",\"+\"\r\n\r\n\
+                   \"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH1\"\r\n\r\n\
+                   \"GROUP\",\"SAMP\"\r\n\"HEADING\",\"LOCA_ID\",\"SAMP_LINK\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"RL\"\r\n\
+                   \"DATA\",\"BH1\",\"NOPE|x\"\r\n\"DATA\",\"BH1\",\"LOCA|a|b|c\"\r\n";
+        let r = run(src);
+        let r11c = r.get(RULE_11C).expect("Rule 11c");
+        // Both bad links resolve to 0 records → "no such record".
+        assert!(
+            r11c.iter()
+                .filter(|x| x.desc.contains("no such record"))
+                .count()
+                >= 2,
+            "{r11c:?}"
+        );
+    }
+
+    #[test]
+    fn rule_10c_flags_blank_parent_in_file_dict() {
+        // A file-DICT GROUP row whose DICT_PGRP is blank ("") for a
+        // non-PARENTLESS custom group → eff.parent returns Some("") →
+        // the "Parent group is left blank" arm.
+        let src = "\"GROUP\",\"DICT\"\r\n\
+                   \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_PGRP\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"GROUP\",\"QZZZ\",\"\",\"\",\"\"\r\n\
+                   \"DATA\",\"HEADING\",\"QZZZ\",\"QZZZ_ID\",\"KEY\",\"\"\r\n\r\n\
+                   \"GROUP\",\"QZZZ\"\r\n\"HEADING\",\"QZZZ_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"Z1\"\r\n";
+        let r = run(src);
+        let r10c = r.get(RULE_10C).expect("Rule 10c");
+        assert!(
+            r10c.iter()
+                .any(|x| x.group == "QZZZ" && x.desc.contains("left blank")),
+            "{r10c:?}"
         );
     }
 }

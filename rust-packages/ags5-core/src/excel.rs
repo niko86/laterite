@@ -485,3 +485,292 @@ fn matches_rule_19_heading(name: &str) -> bool {
     }
     suffix_len >= 1
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    // --- Rule 19 heading guard ------------------------------------
+
+    #[test]
+    fn rule_19_accepts_canonical_headings() {
+        assert!(matches_rule_19_heading("LOCA_ID"));
+        assert!(matches_rule_19_heading("PROJ_ID"));
+        assert!(matches_rule_19_heading("ABCD_E")); // 1-char suffix
+        assert!(matches_rule_19_heading("ABCD_WXYZ")); // 4-char suffix
+        assert!(matches_rule_19_heading("AB12_3D")); // digits allowed
+    }
+
+    #[test]
+    fn rule_19_rejects_malformed_headings() {
+        assert!(!matches_rule_19_heading("HEADING")); // no underscore
+        assert!(!matches_rule_19_heading("ABC_ID")); // 3-char group
+        assert!(!matches_rule_19_heading("ABCDE_ID")); // 5-char group, 'E' breaks
+        assert!(!matches_rule_19_heading("ABCD_")); // empty suffix
+        assert!(!matches_rule_19_heading("ABCD_ABCDE")); // 5-char suffix
+        assert!(!matches_rule_19_heading("abcd_id")); // lowercase
+        assert!(!matches_rule_19_heading("AB-D_ID")); // bad char in group
+        assert!(!matches_rule_19_heading("ABCD-ID")); // wrong separator
+        assert!(!matches_rule_19_heading("ABC")); // too short overall
+    }
+
+    // --- NumericFormat / SF formatter ------------------------------
+
+    #[test]
+    fn numeric_format_from_spec_resolves_each_family() {
+        assert!(matches!(
+            NumericFormat::from_spec("2DP"),
+            Some(NumericFormat::Dp(2))
+        ));
+        assert!(matches!(
+            NumericFormat::from_spec("3SF"),
+            Some(NumericFormat::Sf(3))
+        ));
+        assert!(matches!(
+            NumericFormat::from_spec("1SCI"),
+            Some(NumericFormat::Sci(1))
+        ));
+        // case-insensitive
+        assert!(matches!(
+            NumericFormat::from_spec("2dp"),
+            Some(NumericFormat::Dp(2))
+        ));
+        // non-numeric specs / bare suffixes are not numeric formats
+        assert!(NumericFormat::from_spec("X").is_none());
+        assert!(NumericFormat::from_spec("DP").is_none());
+        assert!(NumericFormat::from_spec("XDP").is_none());
+    }
+
+    #[test]
+    fn numeric_format_format_dp_sci() {
+        assert_eq!(NumericFormat::Dp(2).format(100.5), "100.50");
+        assert_eq!(NumericFormat::Dp(0).format(7.9), "8");
+        assert_eq!(NumericFormat::Sci(2).format(12345.0), "1.23E4");
+    }
+
+    #[test]
+    fn format_sf_small_and_large_and_zero() {
+        // small magnitudes keep precision via fractional digits
+        assert_eq!(format_sf(0.002, 3), "0.00200");
+        // large magnitudes round to nearest 10^k (i < 0 branch)
+        assert_eq!(format_sf(1234.0, 3), "1230");
+        // zero short-circuits
+        assert_eq!(format_sf(0.0, 3), "0");
+        // value with magnitude needing exactly the i==0 path
+        assert_eq!(format_sf(5.0, 1), "5");
+    }
+
+    // --- cell_str over every calamine Data variant -----------------
+
+    #[test]
+    fn cell_str_handles_all_data_variants() {
+        assert_eq!(cell_str(&Data::Empty), "");
+        assert_eq!(cell_str(&Data::String("hi".into())), "hi");
+        // integer-valued float strips the trailing .0
+        assert_eq!(cell_str(&Data::Float(5.0)), "5");
+        // fractional float keeps decimals
+        assert_eq!(cell_str(&Data::Float(5.5)), "5.5");
+        assert_eq!(cell_str(&Data::Int(42)), "42");
+        assert_eq!(cell_str(&Data::Bool(true)), "true");
+        assert_eq!(
+            cell_str(&Data::DateTimeIso("2020-01-01".into())),
+            "2020-01-01"
+        );
+        assert_eq!(cell_str(&Data::DurationIso("PT1H".into())), "PT1H");
+    }
+
+    // --- apply_type_formatting (the numeric re-format pass) --------
+
+    #[test]
+    fn apply_type_formatting_pads_and_skips() {
+        let headings = vec!["TEST_VAL".to_string(), "TEST_TXT".to_string()];
+        let types = vec!["3DP".to_string(), "X".to_string()];
+        let mut rows = vec![
+            HashMap::from([
+                ("TEST_VAL".to_string(), "5.1".to_string()),
+                ("TEST_TXT".to_string(), "keep".to_string()),
+            ]),
+            HashMap::from([
+                ("TEST_VAL".to_string(), "".to_string()), // empty -> skipped
+            ]),
+            HashMap::from([
+                ("TEST_VAL".to_string(), "notnum".to_string()), // unparseable -> untouched
+            ]),
+        ];
+        apply_type_formatting(&headings, &types, &mut rows);
+        assert_eq!(rows[0]["TEST_VAL"], "5.100"); // padded to 3DP
+        assert_eq!(rows[0]["TEST_TXT"], "keep"); // non-numeric type untouched
+        assert_eq!(rows[1]["TEST_VAL"], ""); // empty stays empty
+        assert_eq!(rows[2]["TEST_VAL"], "notnum"); // parse failure -> verbatim
+    }
+
+    #[test]
+    fn apply_type_formatting_skips_blank_and_missing_specs() {
+        let headings = vec!["TEST_A".to_string(), "TEST_B".to_string()];
+        // TEST_A has a blank type; TEST_B has no type entry at all.
+        let types = vec!["".to_string()];
+        let mut rows = vec![HashMap::from([
+            ("TEST_A".to_string(), "1.5".to_string()),
+            ("TEST_B".to_string(), "2.5".to_string()),
+        ])];
+        apply_type_formatting(&headings, &types, &mut rows);
+        assert_eq!(rows[0]["TEST_A"], "1.5"); // blank spec -> untouched
+        assert_eq!(rows[0]["TEST_B"], "2.5"); // missing spec -> untouched
+    }
+
+    // --- round trip: AGS4 -> XLSX -> AGS4 --------------------------
+
+    const SAMPLE_AGS4: &str = concat!(
+        "\"GROUP\",\"PROJ\"\r\n",
+        "\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n",
+        "\"UNIT\",\"\",\"\"\r\n",
+        "\"TYPE\",\"ID\",\"X\"\r\n",
+        "\"DATA\",\"P1\",\"Demo Project\"\r\n",
+        "\r\n",
+        "\"GROUP\",\"LOCA\"\r\n",
+        "\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n",
+        "\"UNIT\",\"\",\"m\"\r\n",
+        "\"TYPE\",\"ID\",\"2DP\"\r\n",
+        "\"DATA\",\"BH01\",\"523145.10\"\r\n",
+        "\"DATA\",\"BH02\",\"523200.00\"\r\n",
+    );
+
+    #[test]
+    fn ags4_to_excel_then_back_round_trips() {
+        let dir = tempdir().unwrap();
+        let ags_in = dir.path().join("in.ags");
+        let xlsx = dir.path().join("mid.xlsx");
+        let ags_out = dir.path().join("out.ags");
+        std::fs::write(&ags_in, SAMPLE_AGS4).unwrap();
+
+        let w = ags4_to_excel(&ags_in, &xlsx, None).unwrap();
+        assert_eq!(w.sheets_written, 2);
+        assert_eq!(w.rows_written, 3); // 1 PROJ + 2 LOCA
+        assert!(xlsx.exists());
+
+        let r = excel_to_ags4(&xlsx, &ags_out, true).unwrap();
+        assert_eq!(r.sheets_written, 2);
+        assert_eq!(r.rows_written, 3);
+
+        // The re-emitted AGS4 carries both groups and the data values.
+        let reparsed = read_ags4(&ags_out).unwrap();
+        assert!(reparsed.groups.contains_key("PROJ"));
+        let loca = &reparsed.groups["LOCA"];
+        assert_eq!(loca.rows.len(), 2);
+        assert_eq!(loca.rows[0]["LOCA_ID"], "BH01");
+        // 2DP numeric formatting preserved through the round trip.
+        assert_eq!(loca.rows[0]["LOCA_NATE"], "523145.10");
+    }
+
+    #[test]
+    fn ags4_to_excel_honours_ordered_keys_and_warns_on_missing() {
+        let dir = tempdir().unwrap();
+        let ags_in = dir.path().join("in.ags");
+        let xlsx = dir.path().join("mid.xlsx");
+        std::fs::write(&ags_in, SAMPLE_AGS4).unwrap();
+
+        // Request LOCA first, then a non-existent group.
+        let order = vec!["LOCA".to_string(), "NOPE".to_string()];
+        let stats = ags4_to_excel(&ags_in, &xlsx, Some(order)).unwrap();
+        assert_eq!(stats.sheets_written, 1); // only LOCA written
+        assert!(stats.warnings.iter().any(|w| w.contains("NOPE")));
+    }
+
+    #[test]
+    fn ags4_to_excel_empty_order_errors() {
+        let dir = tempdir().unwrap();
+        let ags_in = dir.path().join("in.ags");
+        let xlsx = dir.path().join("mid.xlsx");
+        std::fs::write(&ags_in, SAMPLE_AGS4).unwrap();
+        // An explicit empty order produces no groups -> Schema error.
+        let err = ags4_to_excel(&ags_in, &xlsx, Some(vec![])).unwrap_err();
+        assert!(matches!(err, CliError::Schema(_)));
+    }
+
+    #[test]
+    fn excel_to_ags4_drops_bad_columns_and_rows() {
+        // Build an XLSX by hand with a HEADING column, one Rule-19-valid
+        // heading, one invalid heading, and a stray non-UNIT/TYPE/DATA row.
+        let dir = tempdir().unwrap();
+        let xlsx = dir.path().join("hand.xlsx");
+        {
+            let mut wb = Workbook::new();
+            let sheet = wb.add_worksheet().set_name("TEST").unwrap();
+            sheet.write_string(0, 0, "HEADING").unwrap();
+            sheet.write_string(0, 1, "TEST_ID").unwrap();
+            sheet.write_string(0, 2, "badcol").unwrap(); // dropped by Rule 19
+            sheet.write_string(1, 0, "UNIT").unwrap();
+            sheet.write_string(2, 0, "TYPE").unwrap();
+            sheet.write_string(2, 1, "ID").unwrap();
+            sheet.write_string(3, 0, "DATA").unwrap();
+            sheet.write_string(3, 1, "A1").unwrap();
+            sheet.write_string(4, 0, "NOTE").unwrap(); // dropped (not UNIT/TYPE/DATA)
+            wb.save(&xlsx).unwrap();
+        }
+        let ags_out = dir.path().join("out.ags");
+        let stats = excel_to_ags4(&xlsx, &ags_out, false).unwrap();
+        assert_eq!(stats.sheets_written, 1);
+        assert_eq!(stats.rows_written, 1);
+        assert!(stats.warnings.iter().any(|w| w.contains("badcol")));
+        assert!(stats.warnings.iter().any(|w| w.contains("NOTE")));
+
+        let parsed = read_ags4(&ags_out).unwrap();
+        let g = &parsed.groups["TEST"];
+        assert_eq!(g.headings, vec!["TEST_ID".to_string()]);
+        assert_eq!(g.rows[0]["TEST_ID"], "A1");
+    }
+
+    #[test]
+    fn excel_to_ags4_skips_sheet_without_heading_column() {
+        let dir = tempdir().unwrap();
+        let xlsx = dir.path().join("noheading.xlsx");
+        {
+            let mut wb = Workbook::new();
+            // Sheet without a HEADING column -> dropped with warning.
+            let bad = wb.add_worksheet().set_name("BAD").unwrap();
+            bad.write_string(0, 0, "FOO").unwrap();
+            bad.write_string(0, 1, "BAR").unwrap();
+            // A valid sheet so the whole call still succeeds.
+            let good = wb.add_worksheet().set_name("TEST").unwrap();
+            good.write_string(0, 0, "HEADING").unwrap();
+            good.write_string(0, 1, "TEST_ID").unwrap();
+            good.write_string(1, 0, "DATA").unwrap();
+            good.write_string(1, 1, "X1").unwrap();
+            wb.save(&xlsx).unwrap();
+        }
+        let ags_out = dir.path().join("out.ags");
+        let stats = excel_to_ags4(&xlsx, &ags_out, false).unwrap();
+        assert_eq!(stats.sheets_written, 1);
+        assert!(
+            stats
+                .warnings
+                .iter()
+                .any(|w| w.contains("BAD") && w.contains("HEADING column"))
+        );
+    }
+
+    #[test]
+    fn excel_to_ags4_all_sheets_invalid_errors() {
+        let dir = tempdir().unwrap();
+        let xlsx = dir.path().join("allbad.xlsx");
+        {
+            let mut wb = Workbook::new();
+            let bad = wb.add_worksheet().set_name("BAD").unwrap();
+            bad.write_string(0, 0, "FOO").unwrap();
+            wb.save(&xlsx).unwrap();
+        }
+        let ags_out = dir.path().join("out.ags");
+        let err = excel_to_ags4(&xlsx, &ags_out, false).unwrap_err();
+        assert!(matches!(err, CliError::Schema(_)));
+    }
+
+    #[test]
+    fn excel_to_ags4_missing_input_errors() {
+        let dir = tempdir().unwrap();
+        let missing = dir.path().join("nope.xlsx");
+        let ags_out = dir.path().join("out.ags");
+        let err = excel_to_ags4(&missing, &ags_out, false).unwrap_err();
+        assert!(matches!(err, CliError::Schema(_)));
+    }
+}

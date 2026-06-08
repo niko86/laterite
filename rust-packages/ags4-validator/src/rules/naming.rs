@@ -39,7 +39,7 @@
 //! the dictionary agree. The prefix==GROUP / valid cross-group borrow
 //! check is dictionary-dependent → deferred to V8 (python's 19b_2/3).
 
-use crate::findings::{Findings, add};
+use crate::findings::{Findings, Location, Severity, Target, add, add_at};
 use crate::parse::ParsedFile;
 
 const RULE_19: &str = "AGS Format Rule 19";
@@ -64,9 +64,9 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
                     "HEADING row has no field names.",
                 );
             }
-            for h in &g.headings {
-                rule_19a(h, hl, code, found);
-                rule_19b(h, hl, code, found);
+            for (ci, h) in g.headings.iter().enumerate() {
+                rule_19a(h, ci, hl, code, found);
+                rule_19b(h, ci, hl, code, found);
             }
         }
     }
@@ -78,12 +78,17 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
 fn rule_19(code: &str, line: u32, found: &mut Findings) {
     let ok = code.chars().count() == 4 && code.chars().all(|c| c.is_ascii_uppercase());
     if !ok {
-        add(
+        add_at(
             found,
             RULE_19,
             Some(line),
             code,
             "GROUP name must be exactly 4 uppercase letters (A–Z).",
+            Location {
+                target: Target::Group,
+                ..Default::default()
+            },
+            Severity::Error,
         );
     }
 }
@@ -91,26 +96,36 @@ fn rule_19(code: &str, line: u32, found: &mut Findings) {
 /// Rule 19a — HEADING name: ≤9 chars, `[A-Z0-9_]` only. Length and
 /// charset are reported as separate findings (a heading can fail both),
 /// matching python-ags4's granularity for count parity.
-fn rule_19a(h: &str, line: u32, group: &str, found: &mut Findings) {
+fn rule_19a(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {
+    let loc = || Location {
+        target: Target::Heading,
+        field_index: Some(ci as u32),
+        heading: Some(h.to_string()),
+        ..Default::default()
+    };
     if h.chars().count() > 9 {
-        add(
+        add_at(
             found,
             RULE_19A,
             Some(line),
             group,
             format!("Heading {h:?} is more than 9 characters long."),
+            loc(),
+            Severity::Error,
         );
     }
     if !h
         .chars()
         .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
     {
-        add(
+        add_at(
             found,
             RULE_19A,
             Some(line),
             group,
             format!("Heading {h:?} must contain only uppercase letters, digits, and underscore."),
+            loc(),
+            Severity::Error,
         );
     }
 }
@@ -125,14 +140,22 @@ fn rule_19a(h: &str, line: u32, group: &str, found: &mut Findings) {
 /// stricter than the spec prose. The prefix-equals-GROUP (or valid
 /// cross-group borrow, e.g. `FILE_FSET` inside LOCA) check needs the
 /// dictionary and is deferred to V8 (python's 19b_2/3).
-fn rule_19b(h: &str, line: u32, group: &str, found: &mut Findings) {
+fn rule_19b(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {
+    let loc = || Location {
+        target: Target::Heading,
+        field_index: Some(ci as u32),
+        heading: Some(h.to_string()),
+        ..Default::default()
+    };
     let Some((prefix, field)) = h.split_once('_') else {
-        add(
+        add_at(
             found,
             RULE_19B,
             Some(line),
             group,
             format!("Heading {h:?} must be GROUP_FIELD (4-letter group + underscore + field)."),
+            loc(),
+            Severity::Error,
         );
         return;
     };
@@ -145,7 +168,7 @@ fn rule_19b(h: &str, line: u32, group: &str, found: &mut Findings) {
             .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit());
 
     if !prefix_ok || !field_ok {
-        add(
+        add_at(
             found,
             RULE_19B,
             Some(line),
@@ -154,6 +177,8 @@ fn rule_19b(h: &str, line: u32, group: &str, found: &mut Findings) {
                 "Heading {h:?} must be a 4-letter group-name prefix + underscore + a \
                  1–4 character field (uppercase letters/digits)."
             ),
+            loc(),
+            Severity::Error,
         );
     }
 }

@@ -18,6 +18,10 @@
 //!   4 not UTF-8 / not an AGS4 file · 5 bad arguments / bad dictionary
 
 use std::io;
+// Only the `--tui` interactivity gate needs the `IsTerminal` trait;
+// gated so the default build doesn't carry an unused import (-D warnings).
+#[cfg(feature = "tui")]
+use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
@@ -93,7 +97,7 @@ exit: 0 clean · 1 findings · 3 unreadable · 4 not AGS4 · 5 bad args";
 fn main() {
     // `--readme` → embedded CLI guide to stdout, exit 0 (before argv
     // parsing, like --help). Version-locked via include_str!.
-    ags_cliutil::print_readme_if_requested(include_str!("../../README-cli.md"));
+    ags_cliutil::print_readme_if_requested(include_str!("../README-cli.md"));
 
     let mut path: Option<PathBuf> = None;
     let mut opts = CheckOptions::default();
@@ -334,18 +338,13 @@ fn report_table(path: &Path, found: &Findings, n: usize) {
 fn json_value(path: &Path, found: &Findings) -> Value {
     let mut fmap = Map::new();
     for (rule, items) in found {
+        // Serialize the engine `Finding` directly — one model, surfaced
+        // everywhere. Line-only error findings still emit exactly
+        // `{line,group,desc}` (location/severity skip at default); migrated
+        // findings additively gain target/field_index/heading/char_span/severity.
         let arr: Vec<Value> = items
             .iter()
-            .map(|f| {
-                let mut o = Map::new();
-                o.insert(
-                    "line".into(),
-                    f.line.map(Value::from).unwrap_or(Value::Null),
-                );
-                o.insert("group".into(), Value::from(f.group.clone()));
-                o.insert("desc".into(), Value::from(f.desc.clone()));
-                Value::Object(o)
-            })
+            .map(|f| serde_json::to_value(f).unwrap_or(Value::Null))
             .collect();
         fmap.insert(rule.clone(), Value::Array(arr));
     }
@@ -367,14 +366,15 @@ fn ndjson_string(found: &Findings) -> String {
     let mut s = String::new();
     for (rule, items) in found {
         for f in items {
+            // Build `rule`-first (the historical NDJSON key position), then
+            // splice in the serialized `Finding` body so line-only findings
+            // stay `{rule,line,group,desc}` byte-for-byte and migrated ones
+            // additively gain the rich location/severity keys.
             let mut o = Map::new();
             o.insert("rule".into(), Value::from(rule.clone()));
-            o.insert(
-                "line".into(),
-                f.line.map(Value::from).unwrap_or(Value::Null),
-            );
-            o.insert("group".into(), Value::from(f.group.clone()));
-            o.insert("desc".into(), Value::from(f.desc.clone()));
+            if let Value::Object(body) = serde_json::to_value(f).unwrap_or(Value::Null) {
+                o.extend(body);
+            }
             s.push_str(&serde_json::to_string(&Value::Object(o)).unwrap_or_default());
             s.push('\n');
         }

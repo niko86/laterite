@@ -1,0 +1,33 @@
+# Codecov config — consumed only on the PUBLIC repo (niko86/laterite), where CI
+# uploads per-language coverage under the rust / python / web flags. The private
+# repo never uploads (the upload steps are guarded to `github.repository ==
+# 'niko86/laterite'`), so this file is inert there.
+#
+# Coverage here is REPORTED, not gated. The real floors are enforced in CI:
+#   * Rust   — cargo-llvm-cov --fail-under-lines 62   (.github/workflows/ci.yml)
+#   * Python — pytest --cov-fail-under=80             (.github/workflows/ci.yml)
+#   * Web    — vitest thresholds.lines 95             (web/vitest.config.ts)
+# So Codecov's own statuses are INFORMATIONAL — they annotate PRs, never block.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+# Per-language flags. Each CI job uploads under one flag, so the dashboard +
+# badges break down by language. carryforward keeps a flag's last value when a PR
+# didn't run that job (e.g. a web-only PR doesn't re-run rust/python coverage).
+flag_management:
+  default_rules:
+    carryforward: true
+  individual_flags:
+    - name: rust
+    - name: python
+    - name: web
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: false

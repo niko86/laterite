@@ -1,0 +1,44 @@
+{
+  "name": "ags4-validator-web",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Client-side AGS4 validator + data explorer (Rust wasm + SolidJS).",
+  "scripts": {
+    "sync-dict": "node scripts/sync-dict.mjs",
+    "predev": "node scripts/sync-dict.mjs",
+    "dev": "vite",
+    "prebuild": "node scripts/sync-dict.mjs",
+    "build": "vite build",
+    "build:wasm": "wasm-pack build ../rust-packages/ags4-wasm --target web --release --out-dir \"$PWD/src/wasm\"",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui"
+  },
+  "dependencies": {
+    "@duckdb/duckdb-wasm": "^1.33.1-dev45.0",
+    "@tanstack/solid-virtual": "^3.13.26",
+    "@types/leaflet": "^1.9.21",
+    "@types/proj4": "^2.5.6",
+    "apache-arrow": "^17.0.0",
+    "echarts": "^6.1.0",
+    "leaflet": "^1.9.4",
+    "proj4": "^2.20.8",
+    "solid-js": "^1.9.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "^4.1.8",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.2.0",
+    "vite-plugin-pwa": "^1.3.0",
+    "vite-plugin-solid": "^2.11.2",
+    "vitest": "^4.1.8"
+  }
+}

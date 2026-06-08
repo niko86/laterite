@@ -1,0 +1,5 @@
+# Playwright e2e artifacts (the browser binaries live in the OS cache, not here)
+test-results/
+playwright-report/
+playwright/.cache/
+blob-report/

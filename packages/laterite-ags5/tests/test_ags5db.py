@@ -95,11 +95,16 @@ _NUMERIC_LINES = [
 ]
 
 
-@pytest.fixture
-def numeric_db(tmp_path: Path) -> Path:
-    ags = tmp_path / "num.ags"
+@pytest.fixture(scope="module")
+def numeric_db(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    # Module-scoped: every consumer (count/sum/sql/peek/query/list_blobs/
+    # validate/info/groups) is read-only, so the ~15 of them share ONE
+    # convert instead of re-running it per test. Biggest single cut to the
+    # suite's convert count; build once into a shared temp dir.
+    d = tmp_path_factory.mktemp("numeric_db")
+    ags = d / "num.ags"
     ags.write_bytes(("\r\n".join(_NUMERIC_LINES)).encode("utf-8"))
-    db = tmp_path / "num.ags5db"
+    db = d / "num.ags5db"
     ags5db.convert(ags, db)
     return db
 
@@ -364,8 +369,25 @@ def _write_loca_ags(tmp_path: Path, name: str, locas: list[tuple[str, str]]) -> 
     return db
 
 
-def test_diff_identical_dbs_reports_no_changes(tmp_path: Path) -> None:
-    a = _write_loca_ags(tmp_path, "a", [("BH01", "CP"), ("BH02", "RC")])
+@pytest.fixture(scope="module")
+def diff_db_ab(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Shared read-only diff 'a'-side: LOCA [BH01 CP, BH02 RC], built once
+    per module. The identical + added/removed/modified diff tests both use
+    it (diff never mutates its inputs), so the convert runs once not twice."""
+    return _write_loca_ags(
+        tmp_path_factory.mktemp("diff_a_ab"), "a", [("BH01", "CP"), ("BH02", "RC")]
+    )
+
+
+@pytest.fixture(scope="module")
+def diff_db_a1(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Shared read-only diff 'a'-side: LOCA [BH01 CP]. Used by the
+    sample-cap + missing-file diff tests."""
+    return _write_loca_ags(tmp_path_factory.mktemp("diff_a_a1"), "a", [("BH01", "CP")])
+
+
+def test_diff_identical_dbs_reports_no_changes(diff_db_ab: Path, tmp_path: Path) -> None:
+    a = diff_db_ab
     b = _write_loca_ags(tmp_path, "b", [("BH01", "CP"), ("BH02", "RC")])
     rep = ags5db.diff(a, b)
     assert rep.has_changes is False
@@ -374,12 +396,12 @@ def test_diff_identical_dbs_reports_no_changes(tmp_path: Path) -> None:
     assert rep.groups_only_in_b == []
 
 
-def test_diff_detects_added_removed_modified(tmp_path: Path) -> None:
+def test_diff_detects_added_removed_modified(diff_db_ab: Path, tmp_path: Path) -> None:
     # A has BH01 (CP) + BH02 (RC); B has BH01 (CP) + BH03 (CP) + BH02 (CP).
     #   added in B  : BH03
     #   modified    : BH02 (RC -> CP)
     #   unchanged   : BH01
-    a = _write_loca_ags(tmp_path, "a", [("BH01", "CP"), ("BH02", "RC")])
+    a = diff_db_ab
     b = _write_loca_ags(tmp_path, "b", [("BH01", "CP"), ("BH02", "CP"), ("BH03", "CP")])
     rep = ags5db.diff(a, b)
     assert rep.has_changes is True
@@ -392,9 +414,9 @@ def test_diff_detects_added_removed_modified(tmp_path: Path) -> None:
     assert g.unchanged == 1
 
 
-def test_diff_sample_tuples_capped(tmp_path: Path) -> None:
+def test_diff_sample_tuples_capped(diff_db_a1: Path, tmp_path: Path) -> None:
     # 4 added rows; samples=2 should cap to 2.
-    a = _write_loca_ags(tmp_path, "a", [("BH01", "CP")])
+    a = diff_db_a1
     b = _write_loca_ags(
         tmp_path, "b",
         [("BH01", "CP"), ("BH02", "CP"), ("BH03", "CP"), ("BH04", "CP"), ("BH05", "CP")],
@@ -405,8 +427,8 @@ def test_diff_sample_tuples_capped(tmp_path: Path) -> None:
     assert len(g.sample_added) == 2
 
 
-def test_diff_missing_file_raises(tmp_path: Path) -> None:
-    a = _write_loca_ags(tmp_path, "a", [("BH01", "CP")])
+def test_diff_missing_file_raises(diff_db_a1: Path, tmp_path: Path) -> None:
+    a = diff_db_a1
     with pytest.raises(RuntimeError):
         ags5db.diff(a, tmp_path / "missing.ags5db")
 

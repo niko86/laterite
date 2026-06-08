@@ -23,7 +23,12 @@
 
 pub mod ags4_codec;
 pub mod ags4_writer;
-pub mod ags_types;
+// The AGS type system now lives in the wasm-safe leaf crate `ags5-types`
+// (so `ags4-wasm` can share the exact casting logic). Re-exported here
+// as `ags5_core::ags_types` so every existing consumer — ddl.rs,
+// ags5db's {convert,query,spec_tables}, the `ags5db::ags_types` 2nd-hop
+// re-export, laterite-py — keeps working unchanged.
+pub use ags5_types as ags_types;
 pub mod ddl;
 pub mod error;
 pub mod excel;

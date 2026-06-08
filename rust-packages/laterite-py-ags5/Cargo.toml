@@ -33,7 +33,9 @@ ags5db = { path = "../ags5db" }
 # Transitively via ags5db, but named explicitly here so the validator
 # crate doesn't need to be a separate dep further up the tree.
 ags4-validator = { path = "../ags4-validator" }
-pyo3 = { version = "0.28", features = ["extension-module", "chrono"] }
+# abi3-py312: must match the base wheel's pyo3 so both wheels are one
+# `cp312-abi3` per platform (3.12+). Rationale: see laterite-py/Cargo.toml.
+pyo3 = { version = "0.28", features = ["extension-module", "chrono", "abi3-py312"] }
 # preserve_order must match the base wheel's serde_json feature set
 # for any cross-wheel JSON to be byte-faithful.
 serde_json = { version = "1", features = ["preserve_order"] }

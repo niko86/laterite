@@ -238,7 +238,7 @@ mod tests {
     #[test]
     fn registry_loads() {
         let reg = registry();
-        assert!(reg.len() > 0, "registry is empty");
+        assert!(!reg.is_empty(), "registry is empty");
         let proj = reg.get("PROJ").expect("PROJ must exist");
         assert_eq!(proj.code, "PROJ");
         assert!(proj.parent.is_none(), "PROJ is the root");
@@ -271,5 +271,34 @@ mod tests {
             "SAMP should inherit LOCA_ID from LOCA, got {:?}",
             inherited,
         );
+    }
+
+    #[test]
+    fn no_group_contents_carries_a_bare_edition_tag() {
+        // TRIL once read "Triaxial Test Logged Data (AGS 4.2)" — a mislabel:
+        // it (with CONL/TREL) is an AGS-L draft group, NOT part of AGS4 4.2.
+        // Guard the whole table against re-introducing a bare "(AGS 4.x)" tag;
+        // provenance belongs in an explicit "AGS-L draft" marker instead.
+        for g in registry().iter() {
+            assert!(
+                !g.contents.contains("(AGS 4."),
+                "{} carries a bare edition tag in its contents: {:?}",
+                g.code,
+                g.contents,
+            );
+        }
+    }
+
+    #[test]
+    fn agsl_draft_groups_are_flagged_as_such() {
+        let reg = registry();
+        for code in ["CONL", "TREL", "TRIL"] {
+            let g = reg.get(code).unwrap_or_else(|| panic!("{code} must exist"));
+            assert!(
+                g.contents.contains("AGS-L"),
+                "{code} is an AGS-L draft group; its contents must say so, got {:?}",
+                g.contents,
+            );
+        }
     }
 }

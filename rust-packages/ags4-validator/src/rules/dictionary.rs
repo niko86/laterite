@@ -39,7 +39,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::dict::Dictionary;
-use crate::findings::{Findings, add};
+use crate::findings::{Findings, Location, Severity, Target, add, add_at};
 use crate::parse::ParsedFile;
 
 const RULE_7: &str = "AGS Format Rule 7";
@@ -71,10 +71,12 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
         }
         let known: BTreeSet<&str> = order.iter().copied().collect();
 
-        // Rule 9 — every heading must be defined somewhere.
-        for h in &g.headings {
+        // Rule 9 — every heading must be defined somewhere. `ci` is the
+        // tag-stripped heading index; the UI resolves the raw field as
+        // `field_index + 1` (field 0 is the HEADING tag).
+        for (ci, h) in g.headings.iter().enumerate() {
             if !known.contains(h.as_str()) {
-                add(
+                add_at(
                     found,
                     RULE_9,
                     Some(hl),
@@ -83,6 +85,13 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
                         "Heading {h:?} is not in the standard dictionary \
                          or the file's DICT group."
                     ),
+                    Location {
+                        target: Target::Heading,
+                        field_index: Some(ci as u32),
+                        heading: Some(h.clone()),
+                        ..Default::default()
+                    },
+                    Severity::Error,
                 );
             }
         }
@@ -96,14 +105,23 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
 /// with an empty group, matching python-ags4's per-line attribution.
 fn rule_7_1(headings: &[String], line: u32, found: &mut Findings) {
     let mut seen = BTreeSet::new();
-    let dup = headings.iter().any(|h| !seen.insert(h.as_str()));
-    if dup {
-        add(
+    // The first heading that repeats names the offending field for the
+    // UI; the set-level finding (`field_index: None`) still spans the
+    // whole HEADING row.
+    let dup = headings.iter().find(|h| !seen.insert(h.as_str()));
+    if let Some(dup) = dup {
+        add_at(
             found,
             RULE_7,
             Some(line),
             "",
             "HEADING row contains duplicate field names.",
+            Location {
+                target: Target::Heading,
+                heading: Some(dup.clone()),
+                ..Default::default()
+            },
+            Severity::Error,
         );
     }
 }

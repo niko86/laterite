@@ -20,15 +20,18 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Rust",
     "Topic :: Scientific/Engineering",
     "Typing :: Typed",
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 # Mandatory runtime deps are intentionally just two:
-#   polars   — the Rust↔Python frame boundary (pyo3-polars hands back a
-#              polars DataFrame) and the narwhals native backing.
+#   polars   — the Python-side frame backing: the Rust↔Python boundary
+#              carries plain primitives (NOT pyo3-polars), and _frames.py
+#              assembles polars/narwhals frames from them.
 #   narwhals — the public tabular return type, so callers can target
 #              polars / pandas / pyarrow without us picking for them.
 # pandas is NOT here on purpose — it is an *optional* extra (see below).
@@ -78,6 +81,6 @@ build-backend = "maturin"
 manifest-path = "../../rust-packages/laterite-py/Cargo.toml"
 python-source = "python"
 module-name = "laterite._laterite_native"
-# Not abi3: this is pinned to the workspace's CPython 3.14 (pyo3-polars
-# couples the wheel to the Rust/Python polars build, so a version-
-# specific wheel is correct here — see the package README).
+# abi3 (cp312-abi3): laterite-py/Cargo.toml sets `abi3-py312` on pyo3, so
+# maturin emits ONE `cp312-abi3` wheel per platform that runs on Python 3.12+.
+# (The old "pinned to 3.14 / pyo3-polars couples the wheel" note was wrong — the

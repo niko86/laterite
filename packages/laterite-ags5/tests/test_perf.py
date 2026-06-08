@@ -52,6 +52,7 @@ def project_1k() -> PROJ:
     return _build_project(1000)
 
 
+@pytest.mark.benchmark
 def test_write_1k_locations_baseline(benchmark, project_1k: PROJ, tmp_path: Path):
     """Pin the write throughput at 1000 LOCAs. A regression here means the
     per-group bulk insert path has been broken (e.g. someone reintroduced
