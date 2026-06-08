@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { enterExplore } from "./helpers";
 
-const APP = "/ags5_concept/";
+const APP = "/laterite/";
 const fixture = (name: string) =>
   path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", name);
 
@@ -270,10 +270,10 @@ test("PWA: installable — manifest, icons and theme-color are wired", async ({
 }) => {
   await ready(page);
   // The injected manifest link is base-prefixed so it resolves under the
-  // /ags5_concept/ deploy base (a bare href would 404 on Pages).
+  // /laterite/ deploy base (a bare href would 404 on Pages).
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
     "href",
-    "/ags5_concept/manifest.webmanifest",
+    "/laterite/manifest.webmanifest",
   );
   // The manifest parses and declares the installability essentials (a 512px
   // icon, standalone display, base-scoped start_url/scope).
@@ -283,8 +283,8 @@ test("PWA: installable — manifest, icons and theme-color are wired", async ({
       ?.getAttribute("href");
     return href ? await (await fetch(href)).json() : null;
   });
-  expect(manifest?.start_url).toBe("/ags5_concept/");
-  expect(manifest?.scope).toBe("/ags5_concept/");
+  expect(manifest?.start_url).toBe("/laterite/");
+  expect(manifest?.scope).toBe("/laterite/");
   expect(manifest?.display).toBe("standalone");
   expect(
     (manifest?.icons ?? []).some(

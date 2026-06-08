@@ -5,7 +5,7 @@ import path from "node:path";
 // Shared e2e helpers. Kept separate from app.spec.ts so multiple spec files
 // reuse them without duplicating the wasm-ready gate / fixture path logic.
 
-export const APP = "/ags5_concept/";
+export const APP = "/laterite/";
 
 export const fixture = (name: string) =>
   path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", name);

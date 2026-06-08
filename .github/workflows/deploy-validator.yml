@@ -12,7 +12,7 @@
 #   * runner=github -> ubuntu-latest (GitHub-hosted, CONSUMES MINUTES) for
 #                      the well-trodden Pages/OIDC path. A push always uses
 #                      the self-hosted runner.
-#   * base          -> Vite's deploy path; defaults to /ags5_concept/ (what
+#   * base          -> Vite's deploy path; defaults to /laterite/ (what
 #                      Pages serves here). A push uses that same default;
 #                      flip to /laterite/ for the public niko86/laterite
 #                      home via a manual dispatch — no source edit needed.

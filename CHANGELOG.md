@@ -7,7 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] — TBD
+## [0.2.0] — 2026-06-08
+
+### Changed
+
+- **Python support widened to ≥ 3.12** (previously ≥ 3.14). Both `laterite` and
+  `laterite-ags5` now build as a single `cp312-abi3` wheel per platform —
+  one artefact, installable on Python 3.12, 3.13, and 3.14.
+
+### Added
+
+- Validator findings now carry character-level spans and rule-aware severity,
+  enabling precise in-place error highlighting.
+- **AGS4 fix engine** — compute and apply mechanical corrections (pad short rows
+  to a group's field count, typographic→ASCII normalisation), with an opt-in
+  *risky* DATETIME-canonicalisation fixer kept separate from the safe set.
+- Edition-selectable dictionary / templates, sourced from the per-edition AGS
+  standard dictionary.
+
+### Fixed
+
+- Correct the TRIL group classification and flag CONL/TREL/TRIL as AGS-L.
+
+## [0.1.0] — 2026-05-27
 
 Initial public release.
 
@@ -37,5 +59,6 @@ Initial public release.
 - 9 python-ags4 parity tests fail by design; see
   [`docs/parity-coverage-map.md`](docs/parity-coverage-map.md).
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/niko86/laterite/releases/tag/v0.2.0
 [0.1.0]: https://github.com/niko86/laterite/releases/tag/v0.1.0
