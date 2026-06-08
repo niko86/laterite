@@ -1,6 +1,6 @@
 [project]
 name = "laterite-ags5"
-version = "0.1.0"
+version = "0.2.0"
 description = "Experimental AGS5 (.ags5db) surface for laterite — DuckDB-backed read/write/query"
 readme = "README.md"
 license = "MIT"
@@ -31,7 +31,7 @@ requires-python = ">=3.12"
 # `py.import("laterite._laterite_native")`, so we hard-require laterite
 # at the same major.
 dependencies = [
-    "laterite>=0.1.0",
+    "laterite>=0.2.0",
     "polars>=1.40.1",
 ]
 

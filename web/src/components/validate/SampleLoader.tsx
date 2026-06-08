@@ -14,7 +14,7 @@ export const SampleLoader: Component<{
     try {
       // Served from public/samples/ under the deploy base. BASE_URL
       // already ends in "/", so concatenation is correct under both
-      // "/" (dev) and "/ags5_concept/" (Pages).
+      // "/" (dev) and "/laterite/" (Pages).
       const res = await fetch(`${import.meta.env.BASE_URL}samples/${file}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buf = await res.arrayBuffer();

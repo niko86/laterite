@@ -7,7 +7,7 @@ import { defineConfig } from "@playwright/test";
 // exercises validate → fix → explore deterministically.
 //
 // Requires a prior `npm run build`: the webServer below runs `vite preview`,
-// which serves an existing `dist/` at the deploy base `/ags5_concept/` but
+// which serves an existing `dist/` at the deploy base `/laterite/` but
 // does NOT build it (CI's e2e workflow runs build:wasm + build first).
 export default defineConfig({
   testDir: "./e2e",
@@ -43,7 +43,7 @@ export default defineConfig({
   ],
   webServer: {
     command: "npm run preview -- --port 4173 --strictPort",
-    url: "http://localhost:4173/ags5_concept/",
+    url: "http://localhost:4173/laterite/",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

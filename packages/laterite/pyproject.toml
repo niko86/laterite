@@ -1,6 +1,6 @@
 [project]
 name = "laterite"
-version = "0.1.0"
+version = "0.2.0"
 description = "Rust-backed AGS4 reader/writer/validator — a fast, drop-in replacement for python-ags4 with a narwhals-native API"
 readme = "README.md"
 license = "MIT"
@@ -62,8 +62,8 @@ pyarrow = ["pyarrow>=24.0.0"]
 # Experimental DuckDB-backed .ags5db surface. Pulls in the laterite-ags5
 # companion wheel (~50 MB; bundles DuckDB). The base laterite wheel stays
 # light (~10 MB). Import via `from laterite.ags5db import …`.
-ags5 = ["laterite-ags5>=0.1.0"]
-all = ["pandas<3", "pyarrow>=24.0.0", "laterite-ags5>=0.1.0"]
+ags5 = ["laterite-ags5>=0.2.0"]
+all = ["pandas<3", "pyarrow>=24.0.0", "laterite-ags5>=0.2.0"]
 
 [project.scripts]
 # Deliberately named `ags4-check` (not `laterite`/`ags4`) so the command,

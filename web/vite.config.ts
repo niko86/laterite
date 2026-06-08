@@ -32,7 +32,7 @@ function stripDuckdbWorkerSourcemaps(): Plugin {
 // GitHub Pages serves 404.html for any path it doesn't recognise. Copy the
 // built index.html to 404.html so a COLD visit (no service worker yet) to a
 // mistyped or unknown in-scope URL still boots the app instead of a hard 404.
-// Routing is hash-only (every shared link is /ags5_concept/#…), so this only
+// Routing is hash-only (every shared link is /laterite/#…), so this only
 // matters for stray paths — but it's the conventional Pages SPA hardening and
 // costs one file. Runs in closeBundle, after index.html is finalised (manifest
 // link injected) and after the SW precache manifest is computed, so 404.html
@@ -53,11 +53,11 @@ function githubPagesSpaFallback(): Plugin {
 }
 
 // `base` is the single deploy-location knob. Private test repo now
-// (GitHub Pages serves it at /ags5_concept/); the future public home
+// (GitHub Pages serves it at /laterite/); the future public home
 // niko86/laterite is a one-line flip via VITE_BASE=/laterite/. A wrong
 // base 404s every asset, so it lives here and nowhere else.
 export default defineConfig({
-  base: process.env.VITE_BASE ?? "/ags5_concept/",
+  base: process.env.VITE_BASE ?? "/laterite/",
   plugins: [
     solid(),
     tailwindcss(),
@@ -102,7 +102,7 @@ export default defineConfig({
         orientation: "any",
         categories: ["productivity", "utilities"],
         // scope + start_url intentionally omitted → the plugin defaults them
-        // to Vite's `base` (/ags5_concept/), so they track the deploy knob.
+        // to Vite's `base` (/laterite/), so they track the deploy knob.
         icons: [
           { src: "icons/icon-128.png", sizes: "128x128", type: "image/png" },
           { src: "icons/icon-256.png", sizes: "256x256", type: "image/png" },
@@ -130,7 +130,7 @@ export default defineConfig({
         // right after the first visit is already served from cache.
         clientsClaim: true,
         // SPA offline reload → serve the app shell. The plugin base-prefixes
-        // this to /ags5_concept/index.html. Only fires for navigation requests
+        // this to /laterite/index.html. Only fires for navigation requests
         // (Workbox guards on request.mode === 'navigate'), so asset/JSON
         // fetches are untouched.
         navigateFallback: "index.html",

@@ -1,4 +1,4 @@
-# PR-tier CI: build + test on every push to a branch + every PR.
+# PR-tier CI: build + test on every PR (the single validation gate).
 #
 # Two jobs: `rust` then `python`. The Python job needs the compiled
 # PyO3 cdylibs, so it depends on `rust` to fail fast — if the Rust
@@ -10,31 +10,15 @@
 name: ci
 
 on:
-  # NB: deliberately NOT on push to main/master. PRs are validated by the
-  # `pull_request` trigger below (GitHub tests the merge result), so adding
-  # a push trigger for the default branch would just re-run the whole
-  # suite a second time on every merge — the slow maturin+DuckDB python
-  # job twice per change. The contract is therefore: all changes reach
-  # master via a PR (enforce with branch protection); a direct push to
-  # master is intentionally NOT CI-gated. `release/**` keeps push CI for
-  # release-prep branches.
-  push:
-    branches: ["release/**"]
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - "CHANGELOG.md"
-      - "LICENSE"
-      # web/** is built + tested by e2e.yml; a pure web PR doesn't touch the
-      # Rust/Python build, so don't run this heavy suite (and its bundled-DuckDB
-      # compile) for it. A mixed PR that also touches rust-packages/** still runs
-      # — paths-ignore only skips when EVERY changed file matches.
-      - "web/**"
-      # The runner image/stack (.github/runner/**) doesn't affect the
-      # Rust/Python build either — let a runner-image-only PR skip this suite.
-      - ".github/runner/**"
+  # Single validation gate: `pull_request`. Every change reaches master via a
+  # PR (owner-merged) and GitHub runs CI against the merge result, so a `push`
+  # trigger adds nothing but a duplicate run. Previously `push: release/**` also
+  # fired here, which DOUBLE-ran the heavy maturin+DuckDB suite on every
+  # release-prep branch — it matches `release/**` AND has a PR, and the two
+  # events carry different refs (`refs/heads/release/x` vs `refs/pull/N/merge`)
+  # so the `concurrency` group below can't collapse them. One run per PR now.
   pull_request:
-    branches: [main, master]
+    branches: [main]
     paths-ignore:
       - "**/*.md"
       - "docs/**"

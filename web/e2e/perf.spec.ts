@@ -22,7 +22,7 @@ import path from "node:path";
 //     should drop to ~instant once ingested).
 
 const RUN = !!process.env.PERF;
-const APP = "/ags5_concept/";
+const APP = "/laterite/";
 const RATES = (process.env.PERF_RATES ?? "1,4,6")
   .split(",")
   .map((n) => parseInt(n.trim(), 10))

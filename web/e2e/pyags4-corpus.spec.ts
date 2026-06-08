@@ -16,7 +16,7 @@ import path from "node:path";
 // This spec SKIPS cleanly unless you clone python-ags4 next to this repo:
 //
 //     git clone https://gitlab.com/ags-data-format-wg/ags-python-library \
-//         ../ags-python-library          # sibling of the ags5_concept repo
+//         ../ags-python-library          # sibling of the laterite repo
 //
 // Then build + run just this spec (it's skipped in the normal e2e run / CI):
 //
@@ -67,7 +67,7 @@ test("python-ags4 .ags corpus through the wasm validator (opt-in)", async ({
 
   const rows: Record<string, unknown>[] = [];
   for (const f of files) {
-    await page.goto("/ags5_concept/");
+    await page.goto("/laterite/");
     await expect(
       page.getByRole("button", { name: /Clean \(minimal\)/ }),
     ).toBeVisible();
