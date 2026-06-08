@@ -108,31 +108,54 @@ def test_compat_AGS4Error_aliases_native_Ags4Error():
 
 
 def test_compat_python_ags4_pin_stays_in_sync():
-    """The PEP-440 local-version segment of `__version__` and the
-    `PYTHON_AGS4_COMPAT` programmatic constant must agree — phase 1 of
-    the versioning migration documented in COMPAT.md. If you bump the
-    constant, the f-string auto-updates `__version__`; this test
-    guards against a future hand-edit accidentally desynchronising
-    them."""
-    pin = AGS4.PYTHON_AGS4_COMPAT
-    # PEP 440 local-version uses `+` separator; the parity-pin is the
-    # last `.`-separated segment of that local-version part.
-    assert "+" in AGS4.__version__, (
-        "phase-1 versioning expects a local-version pin; "
-        "update this test when phase 2 lands"
-    )
-    local = AGS4.__version__.split("+", 1)[1]
-    assert local.endswith(f".{pin}"), (
-        f"__version__ {AGS4.__version__!r} local-version segment "
-        f"{local!r} doesn't end with PYTHON_AGS4_COMPAT={pin!r}"
-    )
-    # And the dev-dep pin (pyproject.toml [dependency-groups] dev)
-    # MUST match the constant. The repo's tooling
-    # (`tools/run_python_ags4_tests.sh`) shells out to that pinned
-    # version; a desync would mean we're parity-testing against the
-    # wrong thing.
+    """The laterite.compat version-identity contract, kept bump-proof.
+
+    Phase-aware across the COMPAT.md phase 1 -> 2 migration, so the migration
+    itself doesn't require editing this test. Invariants:
+    - the SHIPPED distribution version is always clean PEP 440 (no `+local`) —
+      PyPI rejects local versions on upload, so this guards the release directly;
+    - compat.__version__'s release prefix tracks the shipped version (catches a
+      version bump that updated pyproject but left compat.py's prefix stale);
+    - phase 1: __version__ carries `+compat.python-ags4.<pin>` and the pin
+      matches PYTHON_AGS4_COMPAT; phase 2: the `+local` is gone (clean ==
+      shipped) but PYTHON_AGS4_COMPAT still exists. Either passes;
+    - PYTHON_AGS4_COMPAT matches the python-ags4==X dev pin (the parity oracle);
+    - the Checker banner identifies as laterite (+ the pin), never masquerades
+      as bare python-ags4 (COMPAT.md H-2 — a misidentified validator is worse
+      than a red parity test).
+    """
+    import importlib.metadata
     import pathlib
     import re
+
+    from laterite.compat import _CHECKER_STRING
+
+    pin = AGS4.PYTHON_AGS4_COMPAT
+    shipped = importlib.metadata.version("laterite")
+
+    # PyPI safety: the shipped distribution version must never carry a `+local`
+    # segment (PEP 440 local versions are rejected by PyPI on upload).
+    assert "+" not in shipped, (
+        f"shipped laterite version {shipped!r} carries a PEP 440 local segment "
+        "— PyPI would reject the upload"
+    )
+    # compat.__version__'s release prefix must equal the shipped version (so a
+    # bump that missed compat.py's hardcoded prefix turns red here).
+    assert AGS4.__version__.split("+", 1)[0] == shipped, (
+        f"compat.__version__ {AGS4.__version__!r} release prefix doesn't match "
+        f"the shipped laterite version {shipped!r} — did a version bump miss "
+        "compat.py?"
+    )
+    # Phase-aware pin coupling: phase 1 has the local segment ending in the pin.
+    if "+" in AGS4.__version__:
+        local = AGS4.__version__.split("+", 1)[1]
+        assert local.endswith(f".{pin}"), (
+            f"__version__ {AGS4.__version__!r} local segment {local!r} doesn't "
+            f"end with PYTHON_AGS4_COMPAT={pin!r}"
+        )
+    # The dev-dep pin (pyproject [dependency-groups] dev) MUST match the
+    # constant — tools/run_python_ags4_tests.sh shells out to that version, so a
+    # desync would parity-test against the wrong thing.
     root = pathlib.Path(__file__).resolve().parents[3]
     pyproject = (root / "pyproject.toml").read_text()
     m = re.search(r'"python-ags4==(?P<v>[0-9.]+)"', pyproject)
@@ -141,6 +164,9 @@ def test_compat_python_ags4_pin_stays_in_sync():
         f"PYTHON_AGS4_COMPAT={pin!r} but pyproject.toml dev pins "
         f"python-ags4=={m['v']!r}"
     )
+    # Identity honesty: the Checker banner says laterite (+ the pin), never
+    # claims to be bare python-ags4.
+    assert "laterite" in _CHECKER_STRING and pin in _CHECKER_STRING
 
 
 def test_compat_get_TRAN_AGS_returns_edition_string(tmp_path):
@@ -324,32 +350,94 @@ def test_compat_roundtrip_matches_python_ags4(tmp_path):
 
 # --- CLI byte-parity vs the Rust binary ----------------------------
 
+def _run_py_cli(args: list[str]) -> tuple[str, int]:
+    """Drive the Python `ags4-check` CLI *in-process* (covers
+    `laterite._cli`, the actual shipped entrypoint) instead of paying
+    for a cold interpreter start per fixture. Returns (stdout, exit).
+
+    `main()` writes findings to `sys.stdout`; capturing it here is the
+    byte-for-byte equivalent of reading the subprocess's stdout."""
+    from laterite import _cli
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+        code = _cli.main(args)
+    return buf.getvalue(), code
+
+
 @pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust ags4-check not built")
 @pytest.mark.parametrize("fx", _FIXTURES, ids=lambda p: p.name)
 def test_cli_json_ndjson_exit_byte_parity(fx):
-    def run(cmd):
+    def run_rust(cmd):
         p = subprocess.run(cmd, capture_output=True, text=True)
         return p.stdout, p.returncode
 
-    rj, rc_r = run([str(_RUST_BIN), str(fx), "--json"])
-    pj, rc_p = run([sys.executable, "-m", "laterite._cli", str(fx), "--json"])
-    rn, _ = run([str(_RUST_BIN), str(fx), "--ndjson"])
-    pn, _ = run([sys.executable, "-m", "laterite._cli", str(fx), "--ndjson"])
+    # Rust side stays a real subprocess (it is the reference binary);
+    # the Python side runs in-process so `_cli.main` is exercised under
+    # coverage and the contract (python output == rust output) holds.
+    rj, rc_r = run_rust([str(_RUST_BIN), str(fx), "--json"])
+    pj, rc_p = _run_py_cli([str(fx), "--json"])
+    rn, _ = run_rust([str(_RUST_BIN), str(fx), "--ndjson"])
+    pn, _ = _run_py_cli([str(fx), "--ndjson"])
     assert pj.rstrip("\n") == rj.rstrip("\n")
     assert pn == rn
     assert rc_p == rc_r
 
 
-@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust ags4-check not built")
 def test_cli_exit_codes():
-    def code(args):
-        return subprocess.run(
-            [sys.executable, "-m", "laterite._cli", *args], capture_output=True
-        ).returncode
+    # In-process: each branch exercises a distinct `_cli.main` exit path.
+    assert _run_py_cli([str(_CLEAN)])[1] == 0              # clean
+    assert _run_py_cli(["/no/such.ags", "--json"])[1] == 3  # not found
+    assert _run_py_cli(["--tui", str(_CLEAN)])[1] == 5     # unknown opt
+    assert _run_py_cli([])[1] == 5                         # no input file
+    # External --dict override is deliberately unimplemented (O-28).
+    assert _run_py_cli([str(_CLEAN), "--dict", "x.ags"])[1] == 5
 
-    assert code([str(_CLEAN)]) == 0                       # clean
-    assert code(["/no/such.ags", "--json"]) == 3          # not found
-    assert code(["--tui", str(_CLEAN)]) == 5              # unknown opt
+
+def test_cli_plain_report_and_out_file(tmp_path):
+    """The default (plain) report and the `--out`/`--json-out` tee
+    branches of `_cli.main` — the file-writing paths the byte-parity
+    test never touches."""
+    from laterite import _cli
+
+    # Plain report on a clean file → "clean (0 findings)".
+    out, code = _run_py_cli([str(_CLEAN)])
+    assert code == 0
+    assert "clean (0 findings)" in out
+
+    # A fixture with findings → tabular plain report with a Rule column.
+    findings_fx = _FIX / "rule19_bad_group_name.ags"
+    out, code = _run_py_cli([str(findings_fx)])
+    assert code == 1
+    assert "finding(s)" in out and "Rule" in out
+
+    # --out writes the active (plain) report to disk; stdout gets a
+    # one-line summary; exit code unchanged.
+    out_path = tmp_path / "report.txt"
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+        code = _cli.main([str(findings_fx), "--out", str(out_path)])
+    assert code == 1
+    assert out_path.read_text().rstrip("\n").endswith("CLAY") or "finding(s)" in out_path.read_text()
+    assert "finding(s)" in buf.getvalue()
+
+    # --json-out tees JSON to disk while stdout keeps the plain report.
+    json_path = tmp_path / "report.json"
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+        code = _cli.main([str(findings_fx), "--json-out", str(json_path)])
+    doc = json.loads(json_path.read_text())
+    assert set(doc) == {"file", "findings"}
+    assert "finding(s)" in buf.getvalue()  # plain report still on stdout
+
+
+def test_cli_readme_and_help_flags():
+    """`--readme` / `--help` / `-h` all print the bundled CLI README
+    and exit 0 (the help short-circuit before argparse)."""
+    for flag in ("--readme", "--help", "-h"):
+        out, code = _run_py_cli([flag])
+        assert code == 0
+        assert out.strip(), f"{flag} should print the README"
 
 
 # --- Stage 2a: python-ags4 surface completion ----------------------
@@ -412,15 +500,9 @@ def test_compat_format_numeric_column_DP_and_SF():
 
 def test_compat_sort_groups_dictionary_alphabetical_hierarchical(tmp_path):
     """`sort_groups` orders match python-ags4 on the three documented
-    strategies. The UnsortedGroups fixture lives in their repo;
-    skip cleanly if the sibling clone isn't there."""
-    py_ags4_repo = Path(__file__).resolve().parents[3].parent / "ags-python-library"
-    fixture = py_ags4_repo / "tests" / "test_files" / "UnsortedGroups.ags"
-    if not fixture.exists():
-        pytest.skip(
-            "needs ../ags-python-library cloned (run "
-            "./tools/run_python_ags4_tests.sh once to set up)"
-        )
+    strategies, on a committed clean-room unsorted-groups fixture."""
+    pytest.importorskip("python_ags4")
+    fixture = _COMPAT_FIX / "unsorted_groups.ags"
 
     from laterite.compat import sort_groups
     from python_ags4 import AGS4
@@ -473,17 +555,17 @@ def test_compat_write_error_report_handles_none_output():
 # --- Stage 2b: Rust-backed Excel I/O -------------------------------
 
 
-_PY_AGS4_REPO = Path(__file__).resolve().parents[3].parent / "ags-python-library"
-_PY_AGS4_TEST_DATA = _PY_AGS4_REPO / "python_ags4" / "data" / "test_data.ags"
-_PY_AGS4_TEST_XLSX = _PY_AGS4_REPO / "tests" / "test.xlsx"
+# Committed synthetic compat fixtures (clean-room — no python-ags4 data) so the
+# Excel/sort compat tests run in CI without the ../ags-python-library clone.
+_COMPAT_FIX = Path(__file__).resolve().parent / "fixtures"
+_PY_AGS4_TEST_DATA = _COMPAT_FIX / "excel_source.ags"
+_PY_AGS4_TEST_XLSX = _COMPAT_FIX / "excel_book.xlsx"
 
 
 def _need_py_ags4_repo():
-    if not _PY_AGS4_TEST_DATA.exists():
-        pytest.skip(
-            "needs ../ags-python-library cloned (run "
-            "./tools/run_python_ags4_tests.sh once to set up)"
-        )
+    # Fixtures are committed now — always present. Kept as a no-op so the six
+    # call sites read unchanged.
+    return
 
 
 def test_compat_AGS4_to_excel_round_trip(tmp_path):
@@ -559,7 +641,7 @@ def test_compat_excel_to_AGS4_applies_TYPE_precision(tmp_path):
     excel_to_AGS4(str(_PY_AGS4_TEST_XLSX), str(ags_out))
     tables, _ = AGS4_to_dataframe(str(ags_out))
     assert tables["LOCA"].loc[2, "LOCA_NATN"] == "5000000.001"
-    assert tables["LOCA"].loc[4, "LOCA_NATN"] == "5000000.100"
+    assert tables["LOCA"].loc[3, "LOCA_NATN"] == "5000000.100"
 
 
 def test_compat_excel_to_AGS4_dictionary_path_overrides_TYPE_precision(tmp_path):
@@ -573,7 +655,7 @@ def test_compat_excel_to_AGS4_dictionary_path_overrides_TYPE_precision(tmp_path)
     from laterite.compat import AGS4_to_dataframe, excel_to_AGS4
 
     out = tmp_path / "x.ags"
-    dict_path = _PY_AGS4_REPO / "tests" / "DICT.ags"
+    dict_path = _COMPAT_FIX / "dict_override.ags"
     excel_to_AGS4(str(_PY_AGS4_TEST_XLSX), str(out), dictionary=str(dict_path))
     # The dict reformats LLPL_LL to 2SF — the matching python-ags4 test
     # asserts the same expected text (e.g. 5000000.00 / 5000000.10).

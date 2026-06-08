@@ -1,0 +1,16 @@
+# Keep the GitHub Actions we depend on current. Once third-party actions are
+# SHA-pinned (a follow-up hardening PR), Dependabot bumps the pinned SHA and
+# puts the human-readable version in the PR; for tag-pinned actions it proposes
+# the next version. All action updates are grouped into one weekly PR to keep
+# churn low.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]

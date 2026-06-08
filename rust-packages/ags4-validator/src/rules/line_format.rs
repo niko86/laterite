@@ -33,7 +33,7 @@
 //!   illegal).
 
 use crate::CheckOptions;
-use crate::findings::{Findings, add};
+use crate::findings::{Findings, Location, Severity, add, add_at};
 use crate::parse::{ParsedFile, split_ags_line};
 
 const RULE_1: &str = "AGS Format Rule 1";
@@ -60,7 +60,7 @@ pub fn check(parsed: &ParsedFile, opts: &CheckOptions, found: &mut Findings) {
              is 'utf-8') and/or a byte-order-mark (BOM).",
         );
         if opts.include_fyi {
-            add(
+            add_at(
                 found,
                 RULE_1_FYI,
                 Some(1),
@@ -68,6 +68,8 @@ pub fn check(parsed: &ParsedFile, opts: &CheckOptions, found: &mut Findings) {
                 "If a BOM is present, then it is highly recommended \
                  that the file be saved without BOM encoding to avoid \
                  issues with other software.",
+                Location::default(),
+                Severity::Fyi,
             );
         }
     }
@@ -108,18 +110,48 @@ fn rule_1(line: &str, n: u32, opts: &CheckOptions, found: &mut Findings) {
         } else {
             "Line contains non-ASCII character(s) (code point > 255)."
         };
-        add(found, RULE_1, Some(n), "", desc);
+        // Span the first offending char (the half-open [i, i+1) range, in
+        // char offsets) so the UI lights exactly it, not the whole line.
+        let span = first_codepoint_over(line, 255).map(|i| (i, i + 1));
+        add_at(
+            found,
+            RULE_1,
+            Some(n),
+            "",
+            desc,
+            Location {
+                char_span: span,
+                ..Default::default()
+            },
+            Severity::Error,
+        );
     } else if opts.include_fyi {
         // 128..=255: extended/Latin-1. Tolerated; informational only.
-        add(
+        // Tint the first offending char so the UI can point at it.
+        let span = first_codepoint_over(line, 127).map(|i| (i, i + 1));
+        add_at(
             found,
             RULE_1_FYI,
             Some(n),
             "",
             "Line contains extended-ASCII character(s) (code point 128–255). \
              Permitted but plain ASCII is preferred.",
+            Location {
+                char_span: span,
+                ..Default::default()
+            },
+            Severity::Fyi,
         );
     }
+}
+
+/// Char offset (Unicode scalar count, not byte) of the first char whose
+/// code point exceeds `threshold`, or `None` if every char is at/below
+/// it. Used to point Rule 1's span at the exact offending character.
+fn first_codepoint_over(line: &str, threshold: u32) -> Option<u32> {
+    line.chars()
+        .position(|c| c as u32 > threshold)
+        .map(|i| i as u32)
 }
 
 /// Rule 3 — leading data descriptor.
@@ -175,14 +207,22 @@ enum QuotingDeviation {
 /// separation and inter-field newlines surface via Rule 5 / structural
 /// rules; this is the one independent Rule 6 check worth making.)
 fn rule_6(line: &str, n: u32, found: &mut Findings) {
-    if line.contains('\r') {
-        add(
+    // The first embedded CR is the anchor for the highlight; its char
+    // offset is its char position (CR is one scalar) so [i, i+1) spans it.
+    if let Some(i) = line.chars().position(|c| c == '\r') {
+        let i = i as u32;
+        add_at(
             found,
             RULE_6,
             Some(n),
             "",
             "Row contains an embedded carriage return (ASCII 13). \
              CR/LF are not allowed within or between data variables.",
+            Location {
+                char_span: Some((i, i + 1)),
+                ..Default::default()
+            },
+            Severity::Error,
         );
     }
 }
@@ -342,5 +382,85 @@ mod tests {
         let f = run(&src, false);
         assert!(f.contains_key(RULE_6), "embedded CR not caught: {f:?}");
         assert_eq!(f[RULE_6][0].line, Some(6));
+    }
+
+    #[test]
+    fn rule_1_flags_bom_error_and_fyi() {
+        // A UTF-8 BOM (EF BB BF) ahead of an otherwise-clean file. Only
+        // `parse_bytes`/`parse_file_with_encoding` set `has_bom`, so we
+        // go through the byte path. python-ags4 emits a Rule 1 error AND
+        // a FYI (Related to Rule 1); we mirror both.
+        let mut bytes = vec![0xEFu8, 0xBB, 0xBF];
+        bytes.extend_from_slice(HEAD.as_bytes());
+        let pf = crate::parse::parse_bytes(&bytes, encoding_rs::UTF_8).expect("parses");
+        assert!(pf.has_bom, "BOM must be sniffed");
+
+        // Errors-only: the Rule 1 error fires at line 1, FYI suppressed.
+        let mut f = Findings::new();
+        check(&pf, &CheckOptions::default(), &mut f);
+        let r1 = f.get(RULE_1).expect("Rule 1 BOM error");
+        assert!(r1.iter().any(|x| x.line == Some(1)), "{r1:?}");
+        assert!(!f.contains_key(RULE_1_FYI), "FYI suppressed by default");
+
+        // include_fyi: the BOM-recommendation FYI also surfaces at line 1.
+        let mut f2 = Findings::new();
+        check(
+            &pf,
+            &CheckOptions {
+                include_fyi: true,
+                ..Default::default()
+            },
+            &mut f2,
+        );
+        assert!(
+            f2.get(RULE_1_FYI)
+                .is_some_and(|v| v.iter().any(|x| x.line == Some(1))),
+            "{f2:?}"
+        );
+    }
+
+    #[test]
+    fn rule_1_over_255_on_line_1_uses_the_save_as_utf8_message() {
+        // A >255 code point ON LINE 1 selects the n==1 desc variant
+        // (lines 108-109) — distinct from the generic >255 message. The
+        // smart quote rides in the GROUP name on the very first line.
+        let src = "\"GROUP\",\"PROJ\u{2019}\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n";
+        let pf = parse_str(src).unwrap();
+        let mut f = Findings::new();
+        check(&pf, &CheckOptions::default(), &mut f);
+        let r1 = f.get(RULE_1).expect("Rule 1");
+        assert!(
+            r1.iter()
+                .any(|x| x.line == Some(1) && x.desc.contains("UTF-8")),
+            "line-1 >255 must use the save-as-UTF-8 wording: {r1:?}"
+        );
+    }
+
+    #[test]
+    fn rule_5_classifies_embedded_undoubled_quote_distinctly() {
+        // `"ACME "Gas""` — the inner `"Gas` opens after a closing quote
+        // with no comma, so check_quoting returns EmbeddedQuote (not the
+        // generic NotEnclosed). The two carry different descs.
+        let src = format!("{HEAD}\"DATA\",\"ACME \"Gas\"\"\r\n");
+        let f = run(&src, false);
+        let r5 = f.get(RULE_5).expect("Rule 5");
+        assert!(
+            r5.iter().any(|x| x.desc.contains("embedded double-quote")),
+            "expected the embedded-quote classification: {r5:?}"
+        );
+    }
+
+    #[test]
+    fn rule_5_flags_unterminated_open_field() {
+        // A field that opens with `"` but never closes → the `None`
+        // (unterminated) arm of check_quoting's inner loop (line 245).
+        let src = format!("{HEAD}\"DATA\",\"never closes\r\n");
+        let f = run(&src, false);
+        let r5 = f.get(RULE_5).expect("Rule 5");
+        assert!(
+            r5.iter().any(|x| x.desc.contains("not enclosed")),
+            "unterminated field must flag NotEnclosed: {r5:?}"
+        );
     }
 }

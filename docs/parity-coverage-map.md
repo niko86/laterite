@@ -13,6 +13,12 @@ and the parity-decisions catalogue in
 `laterite.compat` (93%).** The remaining 9 are deliberate
 non-closures, enumerated below.
 
+**Reproduce it yourself:** `./tools/parity-coverage.sh` clones python-ags4 1.2.0,
+runs its own test suite through `laterite.compat`, and reports the parity count
+**and** how much of `laterite.compat` that suite exercises (currently **76%** line
+coverage — the uncovered remainder is the Rust-backed Excel I/O). It exits
+non-zero if parity drops below 122.
+
 The 122/131 count is anchored against python-ags4 **1.2.0**
 specifically — the parity-pin (`PYTHON_AGS4_COMPAT`) is exact, not a
 floor. A silent upstream behavioural drift would otherwise invalidate
@@ -25,7 +31,7 @@ multiple reconcile arms in the O-N catalogue without a test failure
 # clone python-ags4 1.2.0 next to this repo
 git clone https://gitlab.com/ags-data-format-wg/ags-python-library \
     ../ags-python-library
-( cd ../ags-python-library && git checkout v1.2.0 )
+( cd ../ags-python-library && git checkout 1.2.0 )   # NB: the tag has no `v` prefix
 
 # run python-ags4's own test suite shimmed to laterite.compat
 ./tools/run_python_ags4_tests.sh

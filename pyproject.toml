@@ -31,12 +31,34 @@ dev = [
     "pandas<3",
     "pytest>=9.0.3",
     "pytest-benchmark>=5.2.3",
+    # Property-based testing. Drives `parse_value` totality + the
+    # Ags4File text round-trip with generated input the example-based
+    # tests don't reach (the laterite-base tests in
+    # packages/laterite/tests/test_ags_types.py + test_ags4file.py).
+    "hypothesis>=6.100",
+    # Parallel test execution. The laterite + ags5 suites are
+    # file/DuckDB-heavy (per-test tmp_path isolation), so they fan out
+    # cleanly across workers. CI runs `-n 4` to roughly halve the suite
+    # while leaving headroom on the shared self-hosted runner host.
+    "pytest-xdist>=3.6",
+    # Line-coverage gate for the laterite + laterite_ags5 Python surface.
+    # CI's pytest passes --cov + --cov-fail-under (see ci.yml); the
+    # [tool.coverage] config below scopes it to the two packages. Plays
+    # with xdist (combines per-worker data automatically).
+    "pytest-cov>=5",
     "ruff>=0.7",
     # Build backend for the `laterite` package (PyO3 extension compiled
     # from rust-packages/laterite-py). In the dev group so a workspace
     # `uv sync` builds the native module; not a runtime dep of any
     # ags5-* package.
     "maturin>=1.7,<2",
+    # Lets maturin set the cdylib rpath during `maturin develop` (the
+    # editable build) on Linux; without it maturin warns "Failed to set
+    # rpath … Failed to execute 'patchelf'". Installed into the workspace
+    # venv so `uv run maturin develop` finds it on PATH. Linux-only (the
+    # editable-.so rpath step is a Linux concern; macOS/Windows handle it
+    # differently) and marker-gated so cross-platform syncs skip it.
+    "patchelf; sys_platform == 'linux'",
     # Oracle PIN, not a floor: the Rust↔python parity catalogue
     # O-2/O-3/O-26/O-27/O-30/O-34) is encoded against python-ags4 1.2.0
     # *source behaviour* (e.g. rule_6 no-op, rule_20 on-disk, default
@@ -47,10 +69,41 @@ dev = [
     # pyproject) to read a check-results fixture. Needed only for the
     # parity runner (tools/run_python_ags4_tests.sh).
     "toml>=0.10",
+    # Declarative version bumping (the maintained bumpversion successor):
+    # stamps the release version across every site + rolls the CHANGELOG in
+    # one command. Config in [tool.bumpversion] below; policy in RELEASING.md.
+    "bump-my-version>=0.28",
 ]
+
+[tool.pytest.ini_options]
+# --benchmark-disable: run pytest-benchmark bodies ONCE as a functional
+# guard but skip the timing rounds (default is 5 rounds × every CI run,
+# pure wall-clock waste — test_perf only records, never gates). Devs pass
+# --benchmark-enable / --benchmark-only for an actual perf run.
+addopts = "--benchmark-disable"
+markers = [
+    "slow: heavy / CI-expensive tests; deselect on the fast path with -m 'not slow'",
+    "benchmark: pytest-benchmark perf guards (timings recorded, never gated)",
+]
+
+[tool.coverage.run]
+# Scope the coverage gate to the two Python packages CI exercises. Import
+# names (not paths) so the editable installs map to their src dirs; this also
+# keeps the test files out of the denominator without an explicit omit. The
+# --cov-fail-under floor lives in ci.yml's pytest step (visible alongside the
+# Rust/web gates), so a bare local `uv run pytest --cov` reports without
+# enforcing. pytest-cov combines the per-worker data under `-n` automatically.
+source = ["laterite", "laterite_ags5"]
+parallel = true
 
 [tool.ruff]
 line-length = 88
+# py314, NOT py312: ruff lints the WHOLE workspace, which includes the unshipped
+# ags5-xml — it uses `compression.zstd` (PEP 784), a 3.14-only stdlib module.
+# Lowering to py312 makes ruff reclassify `compression` as non-stdlib and flag
+# those files' import blocks as mis-sorted (I001). The shipped wheels DO target
+# 3.12 (abi3-py312 / requires-python >=3.12), but that floor is enforced by the
+# wheel metadata + the CI 3.12 wheel-test, not by this lint target.
 target-version = "py314"
 extend-exclude = [
     "examples/output",
@@ -70,3 +123,83 @@ ignore = [
 "**/tests/**" = ["B011"]
 # Example scripts intentionally mutate sys.path/env before imports.
 "examples/**" = ["E402"]
+
+# --- Release version management -------------------------------------------
+# `bump-my-version` stamps the release version across EVERY site in one command
+# and rolls the CHANGELOG. LOCKSTEP: both wheels + the umbrella always share one
+# version. Policy + workflow: RELEASING.md. Examples:
+#   uv run bump-my-version bump patch        # docs / small fixes
+#   uv run bump-my-version bump minor        # new feature OR (pre-1.0) a break
+#   uv run bump-my-version bump --new-version 0.2.0rc1   # explicit pre-release
+#   uv run bump-my-version bump minor --dry-run -v       # preview, no writes
+[tool.bumpversion]
+current_version = "0.1.0"
+# Parse accepts PEP 440 canonical pre-releases (0.2.0rc1 / 0.2.0dev1, no hyphen
+# — PyPI rejects hyphens) so an explicit `bump --new-version 0.2.0rc1` round-
+# trips. `bump major|minor|patch` produces a FINAL release (e.g. 0.2.0); cut a
+# pre-release explicitly with `--new-version`. (No auto-walking pre_l part — it
+# would make a plain `bump minor` reset to 0.2.0dev0.)
+parse = '(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:(?P<pre_l>rc|dev)(?P<pre_n>\d+))?'
+serialize = [
+    "{major}.{minor}.{patch}{pre_l}{pre_n}",
+    "{major}.{minor}.{patch}",
+]
+tag = true
+tag_name = "v{new_version}"          # matches release.yml `tags: ["v*"]`
+sign_tags = false
+commit = true
+message = "release: {new_version}"
+allow_dirty = false
+
+# wheel + umbrella [project] versions (lockstep)
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"                  # umbrella workspace (drives uv.lock; not a wheel)
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "packages/laterite/pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "packages/laterite-ags5/pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+# compat.py: bump ONLY the laterite release prefix. The +compat.python-ags4.<pin>
+# local segment + the banner's "python-ags4 1.2.0" are pinned independently
+# (PYTHON_AGS4_COMPAT) and must NOT move on a version bump.
+[[tool.bumpversion.files]]
+filename = "packages/laterite/python/laterite/compat.py"
+search = '__version__ = f"{current_version}+compat.python-ags4.'
+replace = '__version__ = f"{new_version}+compat.python-ags4.'
+
+[[tool.bumpversion.files]]
+filename = "packages/laterite/python/laterite/compat.py"
+search = "laterite {current_version} — compat:"
+replace = "laterite {new_version} — compat:"
+
+# cross-wheel lockstep floors: raise so an older base/companion can't satisfy a
+# newer one (both ship together at the same version).
+[[tool.bumpversion.files]]
+filename = "packages/laterite/pyproject.toml"
+search = "laterite-ags5>={current_version}"
+replace = "laterite-ags5>={new_version}"
+
+[[tool.bumpversion.files]]
+filename = "packages/laterite-ags5/pyproject.toml"
+search = "laterite>={current_version}"
+replace = "laterite>={new_version}"
+
+# CHANGELOG: roll [Unreleased] into the new version + date, and update the
+# compare/tag link refs (the old version's tag ref is left in place).
+[[tool.bumpversion.files]]
+filename = "CHANGELOG.md"
+search = "## [Unreleased]"
+replace = "## [Unreleased]\n\n## [{new_version}] — {now:%Y-%m-%d}"
+
+[[tool.bumpversion.files]]
+filename = "CHANGELOG.md"
+search = "compare/v{current_version}...HEAD"
+replace = "compare/v{new_version}...HEAD\n[{new_version}]: https://github.com/niko86/laterite/releases/tag/v{new_version}"

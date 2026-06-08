@@ -237,25 +237,20 @@ def _tiny_proj_and_write(tmp_path):
     return db_path
 
 
-def test_read_db_round_trip_scalar_values(tmp_path) -> None:
-    """Every scalar field round-trips through write_ags5db → read_db."""
+def test_read_db_round_trip_tree_structure(tmp_path) -> None:
+    """read_db produces the full PROJ → LOCA → SAMP → TREG → TRET → TREL
+    tree with each parent linked to its children via the typed list. Scalars
+    + walk() are folded in (WS4 prune merged the former scalar_values + walk
+    tests here — same fixture, one DuckDB round-trip)."""
     from laterite.ags5db import read_db
 
     db_path = _tiny_proj_and_write(tmp_path)
     proj = read_db(db_path)
 
+    # scalar round-trip (folded from test_read_db_round_trip_scalar_values)
     assert type(proj).__name__ == "PROJ"
     assert proj.proj_id == "P1"
     assert proj.proj_name == "test"
-
-
-def test_read_db_round_trip_tree_structure(tmp_path) -> None:
-    """read_db produces the full PROJ → LOCA → SAMP → TREG → TRET → TREL
-    tree with each parent linked to its children via the typed list."""
-    from laterite.ags5db import read_db
-
-    db_path = _tiny_proj_and_write(tmp_path)
-    proj = read_db(db_path)
 
     assert len(proj.locas) == 1
     loca = proj.locas[0]
@@ -273,13 +268,7 @@ def test_read_db_round_trip_tree_structure(tmp_path) -> None:
     assert [t.trel_mnum for t in trels] == [0, 1, 2]
     assert [t.trel_cell for t in trels] == [350.0, 351.0, 352.0]
 
-
-def test_read_db_walk_reaches_leaves(tmp_path) -> None:
-    """walk('TREL') from the PROJ root finds every TREL across the tree."""
-    from laterite.ags5db import read_db
-
-    db_path = _tiny_proj_and_write(tmp_path)
-    proj = read_db(db_path)
+    # walk reaches every leaf (folded from test_read_db_walk_reaches_leaves)
     assert len(proj.walk("TREL")) == 3
     assert len(proj.walk("LOCA")) == 1
 

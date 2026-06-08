@@ -10,13 +10,29 @@
 name: ci
 
 on:
+  # NB: deliberately NOT on push to main/master. PRs are validated by the
+  # `pull_request` trigger below (GitHub tests the merge result), so adding
+  # a push trigger for the default branch would just re-run the whole
+  # suite a second time on every merge — the slow maturin+DuckDB python
+  # job twice per change. The contract is therefore: all changes reach
+  # master via a PR (enforce with branch protection); a direct push to
+  # master is intentionally NOT CI-gated. `release/**` keeps push CI for
+  # release-prep branches.
   push:
-    branches: [main, master, "release/**"]
+    branches: ["release/**"]
     paths-ignore:
       - "**/*.md"
       - "docs/**"
       - "CHANGELOG.md"
       - "LICENSE"
+      # web/** is built + tested by e2e.yml; a pure web PR doesn't touch the
+      # Rust/Python build, so don't run this heavy suite (and its bundled-DuckDB
+      # compile) for it. A mixed PR that also touches rust-packages/** still runs
+      # — paths-ignore only skips when EVERY changed file matches.
+      - "web/**"
+      # The runner image/stack (.github/runner/**) doesn't affect the
+      # Rust/Python build either — let a runner-image-only PR skip this suite.
+      - ".github/runner/**"
   pull_request:
     branches: [main, master]
     paths-ignore:
@@ -24,6 +40,15 @@ on:
       - "docs/**"
       - "CHANGELOG.md"
       - "LICENSE"
+      # web/** is built + tested by e2e.yml; a pure web PR doesn't touch the
+      # Rust/Python build, so don't run this heavy suite (and its bundled-DuckDB
+      # compile) for it. A mixed PR that also touches rust-packages/** still runs
+      # — paths-ignore only skips when EVERY changed file matches.
+      - "web/**"
+      # The runner image/stack (.github/runner/**) doesn't affect the
+      # Rust/Python build either — let a runner-image-only PR skip this suite.
+      - ".github/runner/**"
+  workflow_dispatch:
 
 # Cancel previous runs on the same ref when a new commit lands —
 # keeps the free-tier minute budget under control.
@@ -35,86 +60,330 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
+# Least privilege: both jobs only check out + build + test — no writes to the repo,
+# releases, or deployments. Scope the token down from the repo default.
+permissions:
+  contents: read
+
 jobs:
-  rust:
+  # Gate the heavy jobs on actual CODE changes. A docs / tools / assets PR (no
+  # Rust or Python source change) skips rust/coverage/python — they'd only
+  # re-measure what master already passed, and the redundant bundled-DuckDB
+  # compiles pile up and starve the ephemeral pool under PR contention (the
+  # "empty step conclusion + missing log" runner deaths). Web tests have their
+  # own paths filter in e2e.yml. On NON-PR events (push to release/**, manual
+  # dispatch) the heavy jobs always run — the gate only filters pull_requests.
+  changes:
     runs-on: ubuntu-latest
-    # 35 min: bundled-DuckDB linkage in ags5db is the long pole on a
-    # cold cache; warmed runs typically finish in <8 min.
+    permissions:
+      contents: read
+      pull-requests: read   # dorny/paths-filter reads the PR's changed files
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        id: filter
+        with:
+          # `code` = anything that can change a Rust/Python test outcome: the
+          # crates, the wheels (source + tests), the deps, this workflow, the
+          # build-accel action, and the pyi generator (its drift test lives in
+          # the python job). tools/assets/docs/release-tooling deliberately don't.
+          filters: |
+            code:
+              - 'rust-packages/**'
+              - 'packages/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'tools/generate_pyi.py'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/build-accel/**'
+
+  rust:
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    # 35 min: bundled-DuckDB linkage in ags5db is the long pole on a cold
+    # sccache; warmed runs (cache hits) typically finish in <8 min.
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v6
+      # Ephemeral pool runners start each job with a fresh _work, so there's
+      # no persisted target/ to keep — the warm cache is sccache (content-
+      # addressed, on the shared NFS mount), turned on by build-accel below.
+      # See concepts/ci-and-runners.md for the sccache/ephemeral model.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
+          # Name the channel explicitly: pinned to a SHA there's no `@stable` ref
+          # for the action to infer the toolchain from (and Dependabot bumps the
+          # SHA over time, so don't rely on the action's default staying `stable`).
+          toolchain: stable
           components: rustfmt, clippy
 
-      # Swatinem/rust-cache understands cargo's directory layout
-      # (registry, git, target/{debug,release}) and only caches what
-      # actually changes — much better hit rate than a hand-rolled
-      # actions/cache key on Cargo.lock alone.
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust-packages
+      # Turn on sccache + mold IF the runner has them (the ags5-runner pool image
+      # does; a GitHub-hosted fallback doesn't → no-op). Must run before the
+      # build steps so the env it exports is in scope.
+      - uses: ./.github/actions/build-accel
+
+      # No Swatinem/rust-cache: sccache (shared, on NFS) is the build cache
+      # now, so a ~0.5 GB network target/-cache round-trip would be pure
+      # overhead — and it wouldn't cache the bundled-DuckDB C++ that sccache,
+      # wrapping CC/CXX, does.
 
       - name: cargo fmt --check
         working-directory: rust-packages
         run: cargo fmt --all -- --check
 
+      # ags4-wasm is a wasm32 cdylib (the browser validator); it is
+      # built + linted for its real target via wasm-pack in
+      # deploy-validator.yml. Exclude it from the host workspace
+      # clippy/test — compiling wasm-bindgen macro output on the host
+      # under -D warnings is toolchain-fragile and serves no purpose.
+      # Debug, not --release: nothing in CI asserts wall-clock (no perf gate), so
+      # the release profile's thin-LTO + codegen-units=1 just burned compile time
+      # — and debug shares `target/debug` with the python job's maturin build, so
+      # bundled DuckDB compiles ONCE per change instead of twice.
       - name: cargo clippy
         working-directory: rust-packages
-        run: cargo clippy --workspace --release -- -D warnings
+        run: cargo clippy --workspace --exclude ags4-wasm -- -D warnings
 
       - name: cargo test
         working-directory: rust-packages
-        run: cargo test --workspace --release
+        run: cargo test --workspace --exclude ags4-wasm
+
+      # ags4-wasm is excluded from the workspace clippy/test above only
+      # because compiling wasm-bindgen macro output under `-D warnings`
+      # is toolchain-fragile. Its host-compilable unit tests (the typed-
+      # Arrow parse() parity guard) run fine without that flag, so run
+      # them on their own — they don't need the wasm target.
+      - name: cargo test (ags4-wasm parity)
+        working-directory: rust-packages
+        run: cargo test -p ags4-wasm
+
+      # sccache hit/miss visibility (no-op if sccache isn't on this runner).
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
+  # Dedicated, PARALLEL coverage gate — no `needs`, so it never slows the
+  # fast `rust`/`python` feedback above. Separate because `-C instrument-
+  # coverage` changes RUSTFLAGS: sccache can't share its cache with the
+  # plain build (the bundled-DuckDB C++ still hits sccache via CC/CXX; only
+  # the instrumented Rust recompiles), so folding coverage into the `rust`
+  # job would just slow every run. This is a FLOOR, ratchet up over time.
+  #
+  # Scope: the workspace minus ags4-wasm (a wasm32 cdylib, built elsewhere)
+  # and the two PyO3 glue crates (laterite-py, laterite-py-ags5) — those are
+  # exercised by the Python suite in the `python` job, never by `cargo test`,
+  # so including them would measure ~0% binding glue and let unrelated PyO3
+  # growth trip the gate. Baseline at introduction 61.4%; RATCHETED to 62
+  # after the validator/types/core coverage push (those crates are now
+  # 95-97%; ags5db's CLI/query stays Python-tested, holding the workspace
+  # number at ~68% — hence the 62 floor with headroom for ags5db CLI growth).
+  coverage:
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Install Rust toolchain (+ llvm-tools)
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable # explicit channel — see the rust job's note above
+          # cargo-llvm-cov needs llvm-tools-preview (llvm-profdata/llvm-cov).
+          components: llvm-tools-preview
+
+      # sccache + mold: the bundled-DuckDB C++ compile (the long pole) is
+      # cached across this and the `rust` job; only the instrumented Rust
+      # crates recompile here.
+      - uses: ./.github/actions/build-accel
+
+      - name: Install cargo-llvm-cov
+        # Prebuilt binary (no compile, no runner-image rebuild). SHA-pinned
+        # per the supply-chain policy; Dependabot bumps it.
+        uses: taiki-e/install-action@56545b37b57562edd73171cb6c62cc509db4c34e # v2.81.7
+        with:
+          tool: cargo-llvm-cov
+
+      # Split into collect + report so the same profdata feeds BOTH the floor
+      # gate (always) and the lcov upload (public repo only). --no-report runs
+      # the instrumented tests; the two `report` calls reuse the merged profdata.
+      - name: cargo llvm-cov (collect)
+        working-directory: rust-packages
+        run: |
+          cargo llvm-cov --no-report --workspace \
+            --exclude ags4-wasm \
+            --exclude laterite-py \
+            --exclude laterite-py-ags5
+
+      - name: cargo llvm-cov (line-coverage floor)
+        working-directory: rust-packages
+        run: cargo llvm-cov report --summary-only --fail-under-lines 62
+
+      # Codecov `rust` flag — public repo only (niko86/laterite), where the badge
+      # lives + CODECOV_TOKEN is set. NB: this is the cargo-only number (the PyO3
+      # glue is Python-tested, excluded above), so the rust flag reads ~68%.
+      - name: lcov report for Codecov
+        if: github.repository == 'niko86/laterite'
+        working-directory: rust-packages
+        run: cargo llvm-cov report --lcov --output-path rust.lcov
+      - name: Upload Rust coverage to Codecov
+        if: github.repository == 'niko86/laterite'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: rust-packages/rust.lcov
+          flags: rust
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
   python:
+    needs: [changes, rust]
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
-    needs: rust
-    # 35 min: maturin develop on both wheels triggers full Rust rebuild
-    # for the PyO3 cdylibs (different feature set than the rust job's
-    # build, so cache hits are partial).
-    timeout-minutes: 35
+    env:
+      # uv's download cache (persistent runner home) and the workspace venv
+      # land on different filesystems on the Docker runner, so uv can't
+      # hardlink packages into the venv and warns on every sync/run. The
+      # copy fallback is what already happens (≈ms for our handful of
+      # packages); this just acknowledges it so the log isn't noisy. NOT a
+      # perf fix — that would need the cache to share the venv's filesystem.
+      UV_LINK_MODE: copy
+    # 50 min: the python job builds both PyO3 cdylibs fresh via maturin
+    # (the rust job excludes them), and laterite-py-ags5 links bundled
+    # DuckDB. On a cold sccache that first build is the long pole; the extra
+    # headroom over the rust job's 35 ensures the cold bootstrap run COMPLETES
+    # and populates the cache rather than timing out mid-compile (which would
+    # save nothing and loop). Warm runs finish in well under 10 min regardless.
+    timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v6
+      # needs: rust is fail-fast only — don't spend python minutes if the
+      # Rust build is red — NOT a way to share target/: on the ephemeral
+      # pool this job may land on a different runner with its own fresh
+      # _work. The cross-job warm cache is sccache, so maturin's PyO3 +
+      # bundled-DuckDB compile still hits the shared cache the rust job
+      # populated.
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable # explicit channel — see the rust job's note above
+
+      # sccache + mold for the maturin (PyO3 + bundled-DuckDB) build, if present.
+      - uses: ./.github/actions/build-accel
 
       - name: Install uv
         # Pin to a specific v8 patch — astral-sh/setup-uv hasn't
         # published a floating `v8` major tag yet (only `v7`).
         # Revisit once `v8` floating exists.
-        uses: astral-sh/setup-uv@v8.1.0
+        # enable-cache: false — uv keeps its own download cache under the
+        # persistent runner home, so resolution stays warm locally; the
+        # GitHub cache round-trip (+ the Windows tar/gzip save quirk) was
+        # avoidable overhead.
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          enable-cache: true
-          cache-dependency-glob: |
-            uv.lock
-            **/pyproject.toml
+          enable-cache: false
 
       - name: Install Python 3.14 via uv
         run: uv python install 3.14
 
-      - name: Cache cargo (python job)
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: rust-packages
-          # Separate cache key from the `rust` job — the cdylib build
-          # has a different feature/target set, so sharing a key
-          # produces near-misses that slow both jobs down.
-          key: python
+      # No Swatinem/rust-cache (python job): sccache is the shared build
+      # cache, so maturin's compile hits it directly — no separate network
+      # target/-cache key to download.
 
-      - name: uv sync (builds both wheels via maturin)
+      - name: uv sync (deps + maturin into the venv)
         run: uv sync --all-extras
+
+      - name: Build native extensions (maturin develop)
+        # uv sync installs the workspace packages *editable* but does NOT
+        # compile the PyO3 cdylibs — the _laterite_native and
+        # _laterite_ags5_native .so files only exist after maturin builds
+        # them into each package's python/ source tree, so without this
+        # step `import laterite` fails with a missing-_laterite_native
+        # ImportError. DEBUG build (no --release): nothing in the CI suite
+        # asserts wall-clock timing (test_perf only *records* via
+        # pytest-benchmark, never gates), so the heavy release profile
+        # (opt-level=3 + thin-LTO + codegen-units=1 × bundled DuckDB)
+        # would just risk the timeout for no test benefit.
+        #
+        # No `cargo clean -p` / `rm -rf target/maturin` guard: that worked
+        # around a truncated cdylib left in a *persisted* target/ by an
+        # interrupted build on the old single runner. Ephemeral runners start
+        # every job with a fresh _work (no persisted target/), so there's
+        # nothing stale to inherit — the guard would only force a needless
+        # relink of the two PyO3 cdylibs each run.
+        run: |
+          (cd packages/laterite      && uv run --no-sync maturin develop --uv)
+          (cd packages/laterite-ags5 && uv run --no-sync maturin develop --uv)
+
+      - name: Build ags4-check CLI (for the byte-parity tests)
+        # The byte-parity tests (test_cli_json_ndjson_exit_byte_parity et al.)
+        # compare the Python `laterite._cli` output against the Rust ags4-check
+        # binary at target/release/ags4-check, and @skipif when it's absent.
+        # The maturin step above builds only the PyO3 cdylibs, so without this
+        # the parity tests SILENTLY SKIP in CI — the Rust↔Python CLI contract
+        # goes unchecked on every PR. ags4-check is lean (no bundled DuckDB),
+        # so this release build is cheap and sccache-accelerated (build-accel
+        # above wraps CC/CXX/rustc). Release, not debug: the test hard-codes
+        # the target/release path (matching how the binary ships).
+        working-directory: rust-packages
+        run: cargo build --release -p ags4-check
 
       - name: ruff check
         run: uv run ruff check .
 
-      - name: pytest
+      - name: pytest (+ coverage floor)
+        # -n 4: parallel across 4 xdist workers (the host has 8 cores;
+        # 4 leaves headroom for the other services sharing it). The
+        # suites isolate via per-test tmp_path, so workers don't collide.
+        # --durations=20: surface the slowest tests so heavy fixtures can
+        # be targeted (session scope, parametrize) over time.
+        #
+        # --cov gates the laterite + laterite_ags5 Python surface (scope set
+        # in pyproject [tool.coverage.run]); pytest-cov combines the per-xdist-
+        # worker data automatically. --cov-fail-under is a FLOOR, ratcheted up.
+        #
+        # History: introduced at 68 (CI ~71%); RATCHETED to 80 after the
+        # laterite coverage push. #91 drove the CLI in-process (_cli.py 0% ->
+        # 99%) and replaced the python-ags4 sibling-clone compat fixtures with
+        # committed clean-room synthetic ones; #88 did the same for the
+        # round-trip/dedup fixture. So those tests now RUN in CI instead of
+        # silently skipping, and local + CI agree (~83%) — the old "local
+        # over-reports because the sibling clone is absent in CI" caveat is
+        # gone. (compat.py's remaining uncovered blocks are Rust-backed Excel
+        # I/O — covered in ags5-core/excel.rs, not via Python.)
         run: |
           uv run pytest \
             packages/laterite/tests \
             packages/laterite-ags5/tests \
-            -q --tb=short
+            -n 4 --durations=20 -q --tb=short \
+            --cov=laterite --cov=laterite_ags5 \
+            --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+
+      # Codecov `python` flag — public repo only (niko86/laterite), where the
+      # badge lives + CODECOV_TOKEN is set. coverage.xml is written by the
+      # --cov-report=xml above (repo root).
+      - name: Upload Python coverage to Codecov
+        if: github.repository == 'niko86/laterite'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: coverage.xml
+          flags: python
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      # sccache hit/miss visibility (no-op if sccache isn't on this runner).
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true

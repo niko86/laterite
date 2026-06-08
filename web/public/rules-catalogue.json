@@ -1,0 +1,409 @@
+{
+ "rules": [
+  {
+   "rule": "1",
+   "title": "Character Set",
+   "checks": "Checks that the file contains only plain ASCII characters (codes 0-127). Extended ASCII (128-255, e.g. the degree symbol) is tolerated but only flagged for information; characters above 255 (smart quotes, em-dashes) and a byte-order mark (BOM) are hard errors. A finding means a non-ASCII character or BOM was found at the reported position. To fix: replace smart quotes/dashes with plain ASCII equivalents, or let the validator strip a BOM automatically.",
+   "severity": "mixed",
+   "fixable": true,
+   "observations": [
+    {
+     "id": "O-1",
+     "note": "The validator deliberately tolerates extended ASCII (128-255) as info-only and only errors above 255, matching python-ags4's leniency rather than the strict spec which requires 0-127. So a degree symbol will not block your file."
+    },
+    {
+     "id": "O-32",
+     "note": "If the file is not valid UTF-8, bad bytes are replaced with the Unicode replacement character (U+FFFD) rather than rejecting the whole file outright; those replaced bytes then surface as Rule 1 errors."
+    }
+   ]
+  },
+  {
+   "rule": "2",
+   "title": "Data Groups and Data Rows",
+   "checks": "Checks that every GROUP in the file has at least one DATA row. A finding means a group has only header rows (HEADING/UNIT/TYPE) and no actual data. To fix: add the missing data rows, or remove the empty group if it is not needed.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-16",
+     "note": "A PROJ or TRAN group with zero data rows is reported twice: once here (general empty-group rule) and once by Rule 13/14 (specific cardinality). This double-report is expected; both validators behave this way."
+    }
+   ]
+  },
+  {
+   "rule": "2a",
+   "title": "Line Termination",
+   "checks": "Checks that every line ends with a carriage-return + line-feed pair (CRLF, \\r\\n). A finding means a line ended with a bare LF, or the final line had no terminator. To fix: this is corrected automatically by normalising all line endings to CRLF (common when a file was saved on macOS/Linux).",
+   "severity": "error",
+   "fixable": true
+  },
+  {
+   "rule": "2b",
+   "title": "Group Header Structure",
+   "checks": "Checks that every group has a complete, correctly ordered header: the UNIT row must immediately follow the HEADING row, and the TYPE row must immediately follow the UNIT row. A finding means a UNIT or TYPE row is missing or out of position. To fix: add the missing row or reorder so the sequence is HEADING, UNIT, TYPE.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-4",
+     "note": "A completely missing HEADING row is reported under Rule 4 (field count), not here, even though the spec prose hints it belongs to 2b. This is intentional to match python-ags4's attribution."
+    },
+    {
+     "id": "O-5",
+     "note": "Groups that lack a HEADING row are still fully validated by this validator; python-ags4 may under-report on such groups, so you may see findings here that the older tool would miss."
+    }
+   ]
+  },
+  {
+   "rule": "3",
+   "title": "Data Descriptors",
+   "checks": "Checks that every non-blank line starts with one of the five valid descriptors: GROUP, HEADING, UNIT, TYPE, or DATA. A finding means a line begins with something else (a stray value, a typo, or text that is not a proper AGS line). To fix: correct the first field to a valid descriptor or remove the stray line.",
+   "severity": "error",
+   "fixable": false
+  },
+  {
+   "rule": "4",
+   "title": "Field Count and GROUP Row Format",
+   "checks": "Checks field counts per row: a GROUP row must have exactly two fields (the descriptor plus the 4-letter group name), and every HEADING/UNIT/TYPE/DATA row must have the same number of fields as the HEADING row. A finding means a row has too few or too many fields (often a missing comma, an extra comma, or a ragged DATA row). To fix: align the offending row's field count to the HEADING row.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-3",
+     "note": "In python-ags4 an unquoted DATA field is reported as a Rule 4 field-count problem rather than a Rule 5 quoting problem; this validator may instead attribute it to Rule 5. The total set of findings matches, but the rule label on this specific defect can differ."
+    },
+    {
+     "id": "O-37",
+     "note": "The underlying native parser is lenient (it can merge duplicate GROUPs and pad ragged DATA rows), but a strict pre-check mimics python-ags4's hard-fail so behaviour matches the older tool."
+    }
+   ]
+  },
+  {
+   "rule": "5",
+   "title": "Quoted Fields",
+   "checks": "Checks that every field is wrapped in double quotes and that any literal double-quote inside a field is escaped by doubling it (\"\"). A finding means a field is unquoted or has an unescaped/unbalanced quote. To fix: wrap the field in quotes and double any embedded quote characters.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-3",
+     "note": "python-ags4 skips the enclosure check on DATA rows and reports unquoted DATA fields as Rule 4 instead. This validator may report them here under Rule 5; the same defect is caught either way."
+    }
+   ]
+  },
+  {
+   "rule": "6",
+   "title": "Embedded Carriage Returns",
+   "checks": "Checks that no carriage-return (CR) character appears inside a row's content; the only legitimate CR is part of the line terminator. A finding means a stray CR was found mid-row. To fix: the embedded CR is deleted automatically.",
+   "severity": "error",
+   "fixable": true,
+   "observations": [
+    {
+     "id": "O-2",
+     "note": "This check is effectively a no-op in python-ags4 (a known upstream bug), even though the spec forbids CR/LF inside quoted fields. This validator implements the real check, so it can catch embedded CRs the older tool silently passed."
+    }
+   ]
+  },
+  {
+   "rule": "7",
+   "title": "Heading Order and Duplicates",
+   "checks": "Checks that a HEADING row has no duplicate field names and that the headings appear in the same relative order as the AGS dictionary (or the file's own DICT group for user-defined headings). A finding means either a repeated heading or headings listed out of order. To fix: duplicates can be renamed automatically (to X_1, X_2, ...); ordering issues must be corrected by hand by reordering the columns.",
+   "severity": "error",
+   "fixable": true,
+   "observations": [
+    {
+     "id": "O-8",
+     "note": "python-ags4 can crash (IndexError) on duplicate headings when its rename option is turned off; this validator guards against that and reports cleanly instead of failing."
+    },
+    {
+     "id": "O-9",
+     "note": "The no-duplicate-headings requirement is inferred from the spec rather than stated explicitly. Both tools enforce it; this validator attributes it to Rule 7."
+    },
+    {
+     "id": "O-18",
+     "note": "There is no separate DICT-order check (Rule 18a). Dictionary ordering is enforced indirectly here (heading order against the merged dictionary) and by Rule 11 for record links."
+    }
+   ]
+  },
+  {
+   "rule": "8",
+   "title": "Typed Values",
+   "checks": "Checks that every data value matches the format declared in its TYPE row and is consistent with its UNIT. Covers decimal places (nDP), scientific notation (nSCI), significant figures (nSF), dates/times (DT), elapsed time (T), numeric (U), yes/no (YN), degrees-minutes-seconds (DMS), and ID uniqueness. A finding means a value is malformed or wrongly precise for its declared type. To fix: numeric cells (nDP/nSCI/nSF) are reformatted automatically to the declared precision when the cell is a valid number; other type errors (bad dates, non-numeric text, etc.) must be corrected by hand.",
+   "severity": "error",
+   "fixable": true,
+   "observations": [
+    {
+     "id": "O-11",
+     "note": "ID-uniqueness is reported under both Rule 8 (matching python-ags4's attribution) and Rule 10a (the correct relational home), so a non-unique ID may appear twice."
+    },
+    {
+     "id": "O-12",
+     "note": "Date/time and elapsed-time values are validated with a different engine (chrono) than python-ags4 (pandas), but behave the same for every UNIT shape in the AGS dictionary. For UNIT shapes the dictionary doesn't recognise, this validator only does a lenient structural check instead of attempting a full parse."
+    },
+    {
+     "id": "O-13",
+     "note": "TYPE classification uses exact matching rather than substring matching, which is more robust; conformant data sees no behavioural difference."
+    },
+    {
+     "id": "O-14",
+     "note": "Significant-figure (nSF) formatting was matched to python-ags4 by observed behaviour (clean-room), not by copying its source."
+    },
+    {
+     "id": "O-31",
+     "note": "An empty DT (date/time) UNIT is now flagged, matching python-ags4. A non-empty but unrecognised UNIT stays lenient (see O-12)."
+    },
+    {
+     "id": "O-33",
+     "note": "Date/time values are bounded to the pandas Timestamp range (1677-09-21 to 2262-04-11); values outside that window are flagged, closing a range gap that the date engine difference (O-12) otherwise missed."
+    },
+    {
+     "id": "O-38",
+     "note": "python-ags4 hard-codes ISO-8601 and rejects non-ISO date UNITs such as dd/mm/yyyy; the spec actually permits the format declared in the UNIT row, so this validator honours the declared format. A date that python-ags4 rejected may validate cleanly here."
+    }
+   ]
+  },
+  {
+   "rule": "9",
+   "title": "Dictionary Headings",
+   "checks": "Checks that every heading used in the file is defined either in the standard AGS dictionary or in the file's own DICT group. A finding means a heading is unknown (often a typo or an undeclared user-defined field). To fix: correct the spelling, or declare the user-defined heading in a DICT group.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-10",
+     "note": "The dictionary edition is chosen explicitly (default 4.2 historically) rather than purely from TRAN_AGS. This is now superseded by O-30."
+    },
+    {
+     "id": "O-30",
+     "note": "All five AGS4 editions are bundled and the edition is auto-selected from the file's TRAN_AGS value, with deliberate rules: bare '4.0' maps to the newest 4.0.x patch, bare '4' to the 4.0 line, and an AGS 3.x value is a hard error rather than silently falling back."
+    }
+   ]
+  },
+  {
+   "rule": "10a",
+   "title": "KEY Field Uniqueness",
+   "checks": "Checks that the dictionary-defined KEY fields are present in every group and that no two rows in a group share the same combination of KEY values. A finding means a required KEY column is missing or two rows have an identical KEY tuple (a duplicate record). To fix: supply the missing KEY column or make the duplicated rows unique.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-11",
+     "note": "ID/KEY uniqueness is also reported under Rule 8, so the same duplicate may show up under both rules."
+    },
+    {
+     "id": "O-22",
+     "note": "Rules 10a/10b/10c intentionally overlap with Rules 8/13/14; this is deliberate spec layering, not a defect, so some findings appear under more than one rule."
+    }
+   ]
+  },
+  {
+   "rule": "10b",
+   "title": "REQUIRED Field Non-Emptiness",
+   "checks": "Checks that every dictionary-defined REQUIRED field is present and non-empty in each DATA row. A finding means a mandatory field was left blank. To fix: fill in the missing value.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-15",
+     "note": "Rule 12 (null entries) is defined only as a pointer to this rule and emits nothing itself, so all empty-required-field findings land here under Rule 10b."
+    }
+   ]
+  },
+  {
+   "rule": "10c",
+   "title": "Parent-Child Linkage",
+   "checks": "Checks that each row in a child group has a matching parent row in its parent group (per the dictionary) by matching KEY fields. A finding means a child record references a parent that does not exist (an orphan). Top-level groups with no parent (PROJ, TRAN, LOCA, etc.) are exempt. To fix: add the missing parent row or correct the child's KEY values to match an existing parent.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-21",
+     "note": "The list of parentless groups is hardcoded (copied exactly from python-ags4) rather than derived from the dictionary, because DICT_PGRP does not fully encode checkable parent linkage."
+    },
+    {
+     "id": "O-24",
+     "note": "Parent-row resolution matches on the leading columns positionally rather than by the dictionary's named KEY fields. This works for conformant files where KEY fields lead by convention, and matches python-ags4."
+    },
+    {
+     "id": "O-39",
+     "note": "An empty KEY cell in a parent row is treated as 'no entry' (permissive) rather than a broken link, matching python-ags4, so blank-keyed parent rows do not trigger orphan errors."
+    }
+   ]
+  },
+  {
+   "rule": "11a",
+   "title": "Record-Link Delimiter",
+   "checks": "Checks that the record-link delimiter, declared in TRAN_DLIM (default |), is not empty. Record-Link (RL) fields use this delimiter to separate the target group name from its KEY fields. A finding means TRAN_DLIM was left blank. To fix: the default delimiter | is inserted automatically.",
+   "severity": "error",
+   "fixable": true,
+   "observations": [
+    {
+     "id": "O-23",
+     "note": "A completely absent TRAN_DLIM column is silently allowed (it is not a REQUIRED field); only an empty value triggers this rule. This matches python-ags4."
+    }
+   ]
+  },
+  {
+   "rule": "11b",
+   "title": "Record-Link Concatenator",
+   "checks": "Checks that the record-link concatenator, declared in TRAN_RCON (default +), is not empty. This character joins multiple cross-references within a single Record-Link field. A finding means TRAN_RCON was left blank. To fix: the default concatenator + is inserted automatically.",
+   "severity": "error",
+   "fixable": true,
+   "observations": [
+    {
+     "id": "O-23",
+     "note": "An absent TRAN_RCON column is silently allowed (not REQUIRED); only an empty value triggers this rule, matching python-ags4."
+    }
+   ]
+  },
+  {
+   "rule": "11c",
+   "title": "Record-Link Resolution",
+   "checks": "Checks that every Record-Link value resolves to exactly one DATA row in the referenced group, using the positional KEY fields. A finding means a link is malformed (wrong format or missing delimiter) or points to a row that does not exist or is ambiguous. To fix: correct the link's group name and KEY values so it resolves to a single target row.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-24",
+     "note": "Resolution is positional (leading columns) rather than KEY-aware per the dictionary; this works for conformant files and replicates python-ags4."
+    }
+   ]
+  },
+  {
+   "rule": "12",
+   "title": "Null Fields",
+   "checks": "No-op. This rule is fully subsumed by Rule 10b (REQUIRED field non-emptiness). It never produces findings on its own; any empty-mandatory-field issue is reported under Rule 10b instead.",
+   "severity": "fyi",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-15",
+     "note": "Rule 12 is defined only as a no-op pointer to Rule 10b; both this validator and python-ags4 emit nothing for it."
+    }
+   ]
+  },
+  {
+   "rule": "13",
+   "title": "PROJ Group Presence and Row Count",
+   "checks": "Checks that the file contains a PROJ (project) group with exactly one DATA row. A finding means PROJ is missing or has zero/multiple data rows. To fix: add a PROJ group with a single project record, or reduce it to one row.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-16",
+     "note": "A zero-row PROJ is reported both here and by Rule 2 (empty group); the spec structure permits this double-report."
+    }
+   ]
+  },
+  {
+   "rule": "14",
+   "title": "TRAN Group Presence and Row Count",
+   "checks": "Checks that the file contains a TRAN (transaction) group with exactly one DATA row. A finding means TRAN is missing or has zero/multiple data rows. To fix: add a TRAN group with a single transaction record, or reduce it to one row.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-16",
+     "note": "A zero-row TRAN is reported both here and by Rule 2 (empty group); the spec structure permits this double-report."
+    }
+   ]
+  },
+  {
+   "rule": "15",
+   "title": "Unit Definitions",
+   "checks": "Checks that the file has a UNIT group and that every unit appearing in a UNIT row or in a PU (physical-unit) field is listed in the UNIT group's UNIT_UNIT column. A finding means a unit is used but never defined. To fix: add the missing unit to the UNIT group.",
+   "severity": "error",
+   "fixable": false
+  },
+  {
+   "rule": "16",
+   "title": "Abbreviation Definitions",
+   "checks": "Checks that when PA (abbreviation) fields are used, every abbreviation is defined in the ABBR group (and a DICT group exists where needed). Fields holding multiple abbreviations are split on the TRAN_RCON concatenator (default +) and each part must be defined separately. A finding means an abbreviation is used but not defined in ABBR. To fix: add the missing abbreviation(s) to the ABBR group.",
+   "severity": "error",
+   "fixable": false
+  },
+  {
+   "rule": "16a",
+   "title": "Multi-Abbreviation Splitting",
+   "checks": "Part of Rule 16. Checks that when an abbreviation field holds several values joined by the record-link concatenator, each individual value is defined in the ABBR group. A finding means one of the concatenated abbreviations is undefined. To fix: define every part of the combined abbreviation value in ABBR.",
+   "severity": "error",
+   "fixable": false
+  },
+  {
+   "rule": "17",
+   "title": "Data Type Definitions",
+   "checks": "Checks that the file has a TYPE group and that every type code used in any TYPE row is listed in the TYPE group's TYPE_TYPE column. A finding means a type code is used but never defined. To fix: add the missing type code to the TYPE group.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-19",
+     "note": "An empty TYPE cell (\"\") is skipped here rather than flagged, to avoid noise; python-ags4 would flag it. (python-ags4 itself is inconsistent: its Rule 15 skips empty values but its Rule 17 does not.)"
+    }
+   ]
+  },
+  {
+   "rule": "18",
+   "title": "DICT Group for Non-Standard Names",
+   "checks": "Checks that if the file uses non-standard GROUP or HEADING names (those flagged by Rule 9), a DICT group is present to define them. A finding means user-defined names are used without a DICT group. To fix: add a DICT group declaring the non-standard groups/headings.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-17",
+     "note": "This rule fires off Rule 9 (heading) findings only. The spec also mentions non-standard GROUP names, but nothing actually keys off them; this narrow scope matches python-ags4."
+    }
+   ]
+  },
+  {
+   "rule": "19",
+   "title": "GROUP Name Format",
+   "checks": "Checks that every GROUP name is exactly four uppercase letters (A-Z). A finding means a group name is the wrong length or contains lowercase letters, digits, or symbols. To fix: rename the group to a valid 4-uppercase-letter code.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-6",
+     "note": "The spec prose loosely permits 'up to 4 characters, uppercase letters and numbers', but this validator enforces the stricter de-facto convention of exactly 4 uppercase letters (matching python-ags4 and the dictionary). All 319 real groups comply, so the stricter rule is safe."
+    }
+   ]
+  },
+  {
+   "rule": "19a",
+   "title": "HEADING Name Length and Character Set",
+   "checks": "Checks that every HEADING name is at most 9 characters and uses only uppercase letters, digits, and underscores. A finding means a heading is too long or contains illegal characters; a single bad heading can produce two findings (one for length, one for character set). To fix: shorten the heading and/or remove illegal characters.",
+   "severity": "error",
+   "fixable": false
+  },
+  {
+   "rule": "19b",
+   "title": "HEADING Name Structure and Cross-Group Borrowing",
+   "checks": "Checks that each HEADING follows the AAAA_BBBB pattern: a 4-letter group prefix, an underscore, then a 1-4 character field part (uppercase letters/digits, no further underscore). When a heading borrows another group's prefix (e.g. LOCA_ID used inside SAMP), that heading must actually be defined in the prefix group's dictionary entry. Sanctioned exceptions (SPEC_* and TEST_*) are exempt. A finding means a malformed heading name or an invalid cross-group borrow. To fix: correct the heading to the proper AAAA_BBBB form, or only borrow headings that the source group genuinely defines.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-7",
+     "note": "The 'field part is at most 4 characters' limit is enforced by python-ags4 but not stated in the spec prose. This validator enforces the same de-facto limit, and all 4,199 real headings obey it."
+    },
+    {
+     "id": "O-26",
+     "note": "A heading whose prefix is not a real group can be re-reported by the dictionary-aware sub-checks (19b_2/19b_3) on top of 19b_1/Rule 9. This validator emits two findings for that case (distinguishing 'typo' vs 'wrong placement' fixes) rather than python-ags4's three."
+    }
+   ]
+  },
+  {
+   "rule": "20",
+   "title": "File Attachments",
+   "checks": "Checks that every FILE_FSET value used in any group is defined as a row in the FILE group (and that a FILE group exists when any FILE_FSET is referenced). Optionally, when on-disk checking is enabled, also verifies the sidecar folder layout FILE/<FILE_FSET>/<FILE_NAME> exists next to the .ags file. A finding means a referenced file set is undefined, or (with disk checks on) a referenced attachment is missing on disk. To fix: define the file set in the FILE group, or provide the missing attachment files.",
+   "severity": "error",
+   "fixable": false,
+   "observations": [
+    {
+     "id": "O-27",
+     "note": "On-disk attachment checks are opt-in (off by default); the data-level FILE_FSET check always runs. The corpus QA tool enables disk checks by default, so results there may include missing-file findings you won't see in the default mode."
+    }
+   ]
+  }
+ ]
+}

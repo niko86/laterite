@@ -10,11 +10,13 @@
 //! this test enforces it. It matters most as `laterite-py`'s PyO3
 //! surface grows (Stage B of the staged-adoption roadmap).
 //!
-//! Mechanism: shell `cargo tree -p ags4-validator -e normal` (default
-//! features — `tui`/ratatui/crossterm stay opt-in) and assert none of
-//! the forbidden crates appear. `cargo tree` only resolves; it does
-//! not build, so there is no target-dir lock contention inside
-//! `cargo test`.
+//! Mechanism: shell `cargo tree -p ags4-validator -e normal` and assert
+//! none of the forbidden crates appear. Since the CLI split (the
+//! `ags4-check` crate now owns comfy-table/indicatif and the optional
+//! ratatui/crossterm TUI), the validator is a pure library leaf — its
+//! normal graph is just phf/thiserror/chrono/encoding_rs + their deps.
+//! `cargo tree` only resolves; it does not build, so there is no
+//! target-dir lock contention inside `cargo test`.
 
 use std::process::Command;
 
@@ -27,13 +29,16 @@ use std::process::Command;
 /// - `polars` — Rust↔Python ABI coupling the engine must stay free of.
 /// - `walkdir` / `rayon` — dev/QA-only crates (corpus-qa/forge) that
 ///   would bloat the engine if they leaked in.
-/// - `ratatui` — the TUI framework; must stay behind the opt-in `tui`
-///   feature, never in the default graph.
+/// - `ratatui` — the TUI framework; it lives in the `ags4-check` crate
+///   behind that crate's opt-in `tui` feature. Since the CLI split the
+///   validator has no dependency path to it at all; this entry stays as
+///   a guard against it ever creeping back into the engine.
 ///
-/// `crossterm` is deliberately NOT listed: it arrives transitively via
-/// `ags-cliutil → comfy-table → crossterm` (terminal capability
-/// detection for the findings table), a legitimate normal dep — not
-/// the `tui` path. The historical guarantee never excluded it.
+/// `crossterm` is deliberately NOT listed: historically it arrived
+/// transitively via `ags-cliutil → comfy-table` (terminal capability
+/// detection for the findings table). That whole chain moved to
+/// `ags4-check` in the CLI split, so it no longer appears in the
+/// validator's normal graph — but it was never a forbidden crate.
 const FORBIDDEN: &[&str] = &["pyo3", "polars", "walkdir", "rayon", "ratatui"];
 
 #[test]

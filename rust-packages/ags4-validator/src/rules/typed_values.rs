@@ -25,7 +25,7 @@
 //! its absence is a Rule 2b/4 finding from V2). See OBSERVATIONS
 //! O-11/O-12/O-13.
 
-use crate::findings::{Findings, add};
+use crate::findings::{Findings, Location, Severity, Target, add_at};
 use crate::parse::ParsedFile;
 
 const RULE_8: &str = "AGS Format Rule 8";
@@ -111,7 +111,7 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
                 continue;
             }
 
-            for row in &g.rows {
+            for (ri, row) in g.rows.iter().enumerate() {
                 let Some(v) = row.values.get(ci) else {
                     continue;
                 };
@@ -156,7 +156,7 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
                         .as_deref()
                         .map(|e| format!(" (Expected: {e})"))
                         .unwrap_or_default();
-                    add(
+                    add_at(
                         found,
                         RULE_8,
                         Some(row.line),
@@ -166,6 +166,14 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
                              declared TYPE {ty:?}{}.{suffix}",
                             unit_hint(&chk, unit)
                         ),
+                        Location {
+                            target: Target::Cell,
+                            field_index: Some(ci as u32),
+                            heading: Some(heading.to_string()),
+                            data_row: Some(ri as u32 + 1),
+                            ..Default::default()
+                        },
+                        Severity::Error,
                     );
                 }
             }
@@ -199,15 +207,22 @@ fn flag_duplicate_ids(
             }
         }
     }
-    for row in &g.rows {
+    for (ri, row) in g.rows.iter().enumerate() {
         if let Some(v) = row.values.get(ci) {
             if !v.is_empty() && counts.get(v.as_str()).copied().unwrap_or(0) > 1 {
-                add(
+                add_at(
                     found,
                     RULE_8,
                     Some(row.line),
                     code,
                     format!("ID value {v:?} in this {ty} column is not unique."),
+                    Location {
+                        target: Target::Cell,
+                        field_index: Some(ci as u32),
+                        data_row: Some(ri as u32 + 1),
+                        ..Default::default()
+                    },
+                    Severity::Error,
                 );
             }
         }
@@ -562,11 +577,30 @@ fn dt_semantic_ok(value: &str, unit: &str) -> bool {
         .is_some_and(in_pandas_range)
 }
 
+/// nDP expected form — fixed-point with exactly `n` fractional digits.
+/// The fixes engine (`fixes.rs`) reuses this to reformat an nDP cell to
+/// its declared precision; mirrors `is_ndp`'s grammar (`-?\d+\.\d{n}`,
+/// or a bare integer for 0DP). `pub(crate)` so only the engine sees it.
+pub(crate) fn format_ndp(f: f64, n: usize) -> String {
+    format!("{f:.n$}")
+}
+
+/// nSCI expected form — scientific notation with exactly one digit
+/// before the point and `n` after, matching `is_nsci`'s grammar
+/// (`-?\d\.\d{n}[eE][+-]?\d+`). Rust's `{:e}` already emits a single
+/// leading mantissa digit and a sign-less-or-minus exponent without a
+/// leading zero (`1.5e2`, `3.1e-5`) — exactly the AGS form — so `{:.n$e}`
+/// fixes the fraction width too. `pub(crate)` for the fixes engine.
+pub(crate) fn format_nsci(f: f64, n: usize) -> String {
+    format!("{f:.n$e}")
+}
+
 /// nSF expected form, ported from this workspace's MIT `ags5db`
 /// `ags_types::ags4_str` (already fitted to python-ags4's validator
 /// output: `0.002` @3SF → `"0.00200"`, `1234` @3SF → `"1230"`, never
-/// scientific). Zeros are handled by the caller (skipped).
-fn format_nsf(f: f64, n: usize) -> String {
+/// scientific). Zeros are handled by the caller (skipped). `pub(crate)`
+/// so the fixes engine can reuse the same rounding as the detector.
+pub(crate) fn format_nsf(f: f64, n: usize) -> String {
     if f == 0.0 {
         return format!("{:.*}", n.saturating_sub(1), 0.0);
     }
@@ -805,5 +839,139 @@ mod tests {
             \"DATA\",\"P1\",\"anything at all, 1e9, ??\"\r\n\
             \"DATA\",\"P2\",\"\"\r\n";
         assert!(run(src).is_empty());
+    }
+}
+
+/// Property-based tests for the Rule 8 typed-value helpers.
+///
+/// These pin the *format↔validate inverse* that Rule 8's fixes engine
+/// depends on: a `format_*` helper must always emit a string its matching
+/// `is_*` validator accepts — otherwise the engine would "fix" a cell into
+/// a still-invalid form. Also: the pattern validators never panic on
+/// arbitrary text, and the DT pandas-range gate is monotone at its bounds.
+#[cfg(test)]
+mod proptest_suite {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Format↔validate inverse for nDP: `format_ndp(x, n)` always
+        /// produces a string `is_ndp(_, n)` accepts, for any finite `f64`
+        /// and `n` in the realistic 0..=15 precision range. This is the
+        /// guarantee the nDP fixer relies on.
+        #[test]
+        fn format_ndp_is_accepted_by_is_ndp(
+            x in prop::num::f64::NORMAL | prop::num::f64::ZERO | prop::num::f64::SUBNORMAL,
+            n in 0usize..=15,
+        ) {
+            let formatted = format_ndp(x, n);
+            prop_assert!(
+                is_ndp(&formatted, n),
+                "format_ndp({x}, {n}) = {formatted:?} rejected by is_ndp",
+            );
+        }
+
+        /// Format↔validate inverse for nSCI: `format_nsci(x, n)` always
+        /// produces a string `is_nsci(_, n)` accepts (Rust's `{:e}` emits
+        /// exactly one mantissa digit + the AGS exponent shape).
+        #[test]
+        fn format_nsci_is_accepted_by_is_nsci(
+            x in prop::num::f64::NORMAL | prop::num::f64::ZERO | prop::num::f64::SUBNORMAL,
+            n in 1usize..=15,
+        ) {
+            let formatted = format_nsci(x, n);
+            prop_assert!(
+                is_nsci(&formatted, n),
+                "format_nsci({x}, {n}) = {formatted:?} rejected by is_nsci",
+            );
+        }
+
+        /// `format_nsf` is deterministic (pure fn — same f64 + n → same
+        /// string) and its output is always a parseable plain decimal
+        /// (never scientific — the validator rejects `1.0e2` under nSF), so
+        /// Rule 8's `format_nsf(cell, n) == cell` comparison is well-formed.
+        ///
+        /// NOTE: a reparse-idempotence property (`format_nsf(parse(s), n)
+        /// == s`) does NOT hold and is the WRONG shape for sig-fig
+        /// formatting — round-tripping through f64 is lossy, and worse,
+        /// rounding can cross a decade boundary (0.997 @1SF → "1.0", which
+        /// reparses to 1.0 → "1"). The fixer formats the original cell once
+        /// and never reparses, so this is a non-issue in production.
+        #[test]
+        fn format_nsf_is_deterministic_plain_decimal(
+            x in -1e9f64..1e9,
+            n in 1usize..=12,
+        ) {
+            let once = format_nsf(x, n);
+            prop_assert_eq!(format_nsf(x, n), once.clone(), "non-deterministic");
+            // Plain decimal: no scientific notation under nSF.
+            prop_assert!(
+                !once.contains('e') && !once.contains('E'),
+                "format_nsf emitted scientific: {once:?}",
+            );
+            // Parses back to a finite number (Rule 8 reads it as a cell).
+            let reparsed: f64 = once.parse().expect("plain decimal parses");
+            prop_assert!(reparsed.is_finite());
+        }
+
+        /// The pattern validators never panic on arbitrary input — they
+        /// read through hostile cell text on every file.
+        #[test]
+        fn pattern_validators_never_panic(s in ".*", n in 0usize..20) {
+            let _ = is_ndp(&s, n);
+            let _ = is_nsci(&s, n);
+            let _ = is_dms(&s);
+            let _ = is_elapsed_time(&s, "hh:mm:ss");
+            prop_assert!(true);
+        }
+
+        /// `dt_semantic_ok` never panics on arbitrary value/unit pairs
+        /// (it lexes the value against the unit token-by-token — a
+        /// malformed pair must fail closed, not crash).
+        #[test]
+        fn dt_semantic_ok_never_panics(value in ".*", unit in ".*") {
+            let _ = dt_semantic_ok(&value, &unit);
+            prop_assert!(true);
+        }
+
+        /// DT pandas-range gate: any in-range, real calendar date under a
+        /// `yyyy-mm-dd` UNIT is accepted; the same shape with a year far
+        /// outside the pandas Timestamp window (≤1677 or ≥2263) is
+        /// rejected. Mirrors O-33.
+        #[test]
+        fn dt_semantic_ok_bounds_to_pandas_range(
+            y in 1679i32..=2261,
+            mo in 1u32..=12,
+            d in 1u32..=28,
+        ) {
+            let in_range = format!("{y:04}-{mo:02}-{d:02}");
+            prop_assert!(
+                dt_semantic_ok(&in_range, "yyyy-mm-dd"),
+                "{in_range} should be in pandas range",
+            );
+
+            // Same calendar-valid date, year pushed below the window.
+            let below = format!("0{:03}-{mo:02}-{d:02}", y % 1000);
+            prop_assert!(
+                !dt_semantic_ok(&below, "yyyy-mm-dd"),
+                "{below} (year < 1677) should fail the pandas gate",
+            );
+        }
+
+        /// nDP idempotence at a fixed precision: formatting an
+        /// already-nDP-shaped value to the same `n` is a no-op. Unlike
+        /// nSF, `{:.n$}` re-rounds the reparsed value to the same `n`
+        /// fractional digits deterministically, so this holds across the
+        /// whole finite f64 range (including denormals/extreme magnitudes).
+        #[test]
+        fn format_ndp_idempotent(
+            x in prop::num::f64::NORMAL | prop::num::f64::ZERO | prop::num::f64::SUBNORMAL,
+            n in 0usize..=12,
+        ) {
+            let once = format_ndp(x, n);
+            let reparsed: f64 = once.parse().expect("format_ndp emits a parseable decimal");
+            let twice = format_ndp(reparsed, n);
+            prop_assert_eq!(&twice, &once, "x={} n={}", x, n);
+        }
     }
 }

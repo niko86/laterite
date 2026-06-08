@@ -206,6 +206,13 @@ impl Dictionary {
         self.groups.get(code)
     }
 
+    /// Every standard group code in this edition (unordered — the phf map
+    /// iteration order). Callers that need a stable order should sort. Used to
+    /// serialise the whole per-edition dictionary out to the web reference UI.
+    pub fn group_codes(&self) -> impl Iterator<Item = &'static str> + '_ {
+        self.groups.keys().copied()
+    }
+
     /// This group's standard headings, in the canonical dictionary
     /// order Rule 7 enforces. Empty slice for an unknown group (its
     /// headings then fall to Rule 9 / the file's own DICT group).
@@ -313,5 +320,49 @@ mod tests {
         }
         // Unknown group → empty slice, never a panic.
         assert!(d.group_headings("ZZZZ").is_empty());
+    }
+
+    #[test]
+    fn dict_resolution_as_str_round_trips() {
+        // The harness serialises the resolution kind; every variant must
+        // map to its stable token.
+        assert_eq!(DictResolution::Forced.as_str(), "forced");
+        assert_eq!(DictResolution::ExactTranAgs.as_str(), "exact");
+        assert_eq!(DictResolution::GuessedPatch.as_str(), "guessed");
+        assert_eq!(DictResolution::Fallback.as_str(), "fallback");
+    }
+
+    #[test]
+    fn version_and_group_codes_expose_the_edition() {
+        let d = Dictionary::bundled(DictVersion::V4_1);
+        assert_eq!(d.version(), DictVersion::V4_1);
+        // group_codes() is the unordered key view the web reference UI
+        // serialises; it must include the well-known groups and agree in
+        // length with group_count().
+        let codes: Vec<&str> = d.group_codes().collect();
+        assert_eq!(codes.len(), d.group_count());
+        assert!(codes.contains(&"PROJ"));
+        assert!(codes.contains(&"LOCA"));
+    }
+
+    #[test]
+    fn all_heading_names_includes_cross_group_borrows() {
+        // Rule 19b_3 keys off this: a borrowed heading (LOCA_ID under
+        // SAMP) must appear because it's "defined somewhere".
+        let d = Dictionary::bundled(DictVersion::V4_2);
+        let names: std::collections::HashSet<&str> = d.all_heading_names().collect();
+        assert!(names.contains("LOCA_ID"));
+        assert!(names.contains("PROJ_ID"));
+    }
+
+    #[test]
+    fn abbr_desc_resolves_a_standard_abbreviation() {
+        // The FYI-16 path looks up canonical ABBR descriptions keyed by
+        // (ABBR_HDNG, ABBR_CODE). `ARTW_TYPE/DRY → "Dry test"` is a
+        // verbatim row in the bundled 4.2 ABBR group (data/
+        // Standard_dictionary_v4_2.ags). An unknown pair → None.
+        let d = Dictionary::bundled(DictVersion::V4_2);
+        assert_eq!(d.abbr_desc("ARTW_TYPE", "DRY"), Some("Dry test"));
+        assert!(d.abbr_desc("NOPE_HDNG", "ZZ").is_none());
     }
 }

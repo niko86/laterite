@@ -1,0 +1,130 @@
+import {
+  createMemo,
+  createResource,
+  createSignal,
+  For,
+  Show,
+  type Component,
+} from "solid-js";
+
+// Plain-English reference for the AGS4 validation rules: what each rule
+// checks, its severity, whether the validator can auto-fix it, and any known
+// differences from the python-ags4 checker (the O-N divergences).
+// Curated into a static catalogue (web/public/rules-catalogue.json) — fully
+// client-side, useful with no file loaded.
+
+interface Obs {
+  id: string;
+  note: string;
+}
+interface Rule {
+  rule: string;
+  title: string;
+  checks: string;
+  severity: string;
+  fixable?: boolean;
+  observations?: Obs[];
+}
+interface Catalogue {
+  rules: Rule[];
+}
+
+function sevClass(sev: string): string {
+  switch (sev) {
+    case "error":
+      return "bg-rose-500/15 text-err";
+    case "warning":
+      return "bg-amber-500/15 text-warn";
+    case "fyi":
+      return "bg-accent/15 text-accent";
+    default:
+      return "bg-chip text-fg-soft";
+  }
+}
+
+export const RuleExplainer: Component = () => {
+  const [cat] = createResource(async () => {
+    const res = await fetch(`${import.meta.env.BASE_URL}rules-catalogue.json`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as Catalogue;
+  });
+  const [q, setQ] = createSignal("");
+
+  const rules = createMemo<Rule[]>(() => {
+    const c = cat();
+    if (!c) return [];
+    const term = q().trim().toLowerCase();
+    if (!term) return c.rules;
+    return c.rules.filter((r) =>
+      `${r.rule} ${r.title} ${r.checks}`.toLowerCase().includes(term),
+    );
+  });
+
+  return (
+    <div class="flex min-w-0 flex-col gap-3">
+      <input
+        class="w-full rounded-lg border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg outline-none placeholder:text-fg-dim"
+        placeholder="Search rules… (e.g. duplicate, datetime, heading)"
+        value={q()}
+        onInput={(e) => setQ(e.currentTarget.value)}
+      />
+      <p class="text-xs text-fg-dim">
+        The AGS Format Rules are stable across editions 4.0.3–4.2, so there's no
+        edition to pick here — only the group/heading/type definitions change.
+        For those, use the <span class="font-medium text-fg-soft">Dictionary</span>{" "}
+        tool's edition selector.
+      </p>
+      <Show
+        when={!cat.loading}
+        fallback={<p class="text-sm text-fg-muted">Loading rule catalogue…</p>}
+      >
+        <Show
+          when={!cat.error}
+          fallback={
+            <p class="text-sm text-err">
+              Could not load the rule catalogue: {String(cat.error)}
+            </p>
+          }
+        >
+          <For each={rules()}>
+            {(r) => (
+              <div class="rounded-lg border border-line bg-surface px-3 py-2">
+                <div class="flex flex-wrap items-baseline gap-2">
+                  <span class="mono font-medium text-fg">Rule {r.rule}</span>
+                  <span class="text-fg-soft">{r.title}</span>
+                  <span
+                    class={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${sevClass(r.severity)}`}
+                  >
+                    {r.severity}
+                  </span>
+                  <Show when={r.fixable}>
+                    <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ok">
+                      auto-fixable
+                    </span>
+                  </Show>
+                </div>
+                <p class="mt-1 text-sm text-fg-soft">{r.checks}</p>
+                <Show when={r.observations && r.observations.length > 0}>
+                  <div class="mt-2 border-t border-line-subtle pt-2">
+                    <p class="text-xs font-medium text-fg-muted">
+                      Differences from the python-ags4 checker:
+                    </p>
+                    <ul class="mt-1 space-y-0.5">
+                      <For each={r.observations}>
+                        {(o) => (
+                          <li class="text-xs text-fg-faint">
+                            <span class="mono text-fg-dim">{o.id}</span> {o.note}
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </div>
+                </Show>
+              </div>
+            )}
+          </For>
+        </Show>
+      </Show>
+    </div>
+  );
+};

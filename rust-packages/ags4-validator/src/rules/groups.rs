@@ -53,7 +53,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::CheckOptions;
 use crate::dict::Dictionary;
-use crate::findings::{Findings, add};
+use crate::findings::{Findings, Location, Severity, add, add_at};
 use crate::parse::{ParsedFile, ParsedGroup};
 
 const RULE_13: &str = "AGS Format Rule 13";
@@ -119,7 +119,7 @@ fn rule_16_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
         if std_desc.eq_ignore_ascii_case(file_desc) {
             continue;
         }
-        add(
+        add_at(
             found,
             RULE_16_FYI,
             Some(row.line),
@@ -129,6 +129,8 @@ fn rule_16_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
                  {file_desc:?} but it should be {std_desc:?} \
                  according to the standard abbreviations list."
             ),
+            Location::default(),
+            Severity::Fyi,
         );
     }
 }
@@ -151,7 +153,7 @@ fn tran_ags_fyi(parsed: &ParsedFile, found: &mut Findings) {
     if t.is_empty() || KNOWN_TRAN_AGS.contains(&t) {
         return;
     }
-    add(
+    add_at(
         found,
         FYI,
         None,
@@ -160,6 +162,8 @@ fn tran_ags_fyi(parsed: &ParsedFile, found: &mut Findings) {
             "TRAN_AGS is not a recognized AGS4 version: {t:?}. The \
              standard editions are 4.0.3 / 4.0.4 / 4.1 / 4.1.1 / 4.2."
         ),
+        Location::default(),
+        Severity::Fyi,
     );
 }
 
@@ -399,6 +403,23 @@ mod tests {
         f
     }
 
+    /// FYI-enabled runner — the FYI emitters (`tran_ags_fyi`,
+    /// `rule_16_fyi`) only run under `include_fyi`.
+    fn run_fyi(src: &str) -> Findings {
+        let pf = parse_str(src).expect("fixture parses");
+        let mut f = Findings::new();
+        check(
+            &pf,
+            &Dictionary::bundled(DictVersion::V4_2),
+            &CheckOptions {
+                include_fyi: true,
+                ..Default::default()
+            },
+            &mut f,
+        );
+        f
+    }
+
     #[test]
     fn rule_13_14_flag_missing_proj_and_tran() {
         // A lone LOCA group — no PROJ, no TRAN.
@@ -516,5 +537,137 @@ mod tests {
             &mut f,
         );
         assert!(!f.contains_key(RULE_18), "no Rule 9 → no Rule 18: {f:?}");
+    }
+
+    #[test]
+    fn rule_13_flags_zero_data_row_proj() {
+        // PROJ present with HEADING/UNIT/TYPE but no DATA row → the
+        // `0 => …"at least one DATA row"` arm of single_row_group.
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n";
+        let f = run(src);
+        let r13 = f.get(RULE_13).expect("Rule 13");
+        assert!(
+            r13.iter().any(|x| x.desc.contains("at least one DATA row")),
+            "{r13:?}"
+        );
+    }
+
+    #[test]
+    fn rule_15_flags_unit_used_in_pu_typed_column() {
+        // A `PU`-typed DATA cell carries a unit *value* ("kPa") that must
+        // be defined in UNIT — the PU branch of rule_15 (distinct from
+        // the UNIT-row source). UNIT defines only "mm".
+        let src = "\"GROUP\",\"LOCA\"\r\n\
+                   \"HEADING\",\"LOCA_ID\",\"LOCA_UNIT\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"PU\"\r\n\
+                   \"DATA\",\"BH1\",\"kPa\"\r\n\r\n\
+                   \"GROUP\",\"UNIT\"\r\n\"HEADING\",\"UNIT_UNIT\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"mm\"\r\n";
+        let f = run(src);
+        let r15 = f.get(RULE_15).expect("Rule 15");
+        assert!(
+            r15.iter()
+                .any(|x| x.desc.contains("\"kPa\"") && x.desc.contains("column LOCA_UNIT")),
+            "PU-typed unit value must be checked: {r15:?}"
+        );
+    }
+
+    #[test]
+    fn rule_16_splits_on_tran_rcon_concatenator() {
+        // A PA cell "TP+CP" with TRAN_RCON "+" splits into TP, CP; CP is
+        // undefined in ABBR → the concat-split branch (rule 16a).
+        let src = "\"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_RCON\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"+\"\r\n\r\n\
+                   \"GROUP\",\"SAMP\"\r\n\"HEADING\",\"SAMP_ID\",\"SAMP_TYPE\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"PA\"\r\n\
+                   \"DATA\",\"S1\",\"TP+CP\"\r\n\r\n\
+                   \"GROUP\",\"ABBR\"\r\n\
+                   \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"SAMP_TYPE\",\"TP\",\"Trial pit\"\r\n";
+        let f = run(src);
+        let r16 = f.get(RULE_16).expect("Rule 16");
+        // TP is defined, CP is not → only CP flagged (proves the split).
+        assert!(
+            r16.iter().any(|x| x.desc.contains("\"CP\"")),
+            "undefined split-part CP must flag: {r16:?}"
+        );
+        assert!(
+            !r16.iter().any(|x| x.desc.contains("\"TP\"")),
+            "defined split-part TP must not flag: {r16:?}"
+        );
+    }
+
+    #[test]
+    fn rule_16_silent_when_no_pa_column() {
+        // No PA-typed column anywhere → ABBR not required, rule_16 early
+        // return (the `!has_pa` guard).
+        let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH1\"\r\n";
+        assert!(!run(src).contains_key(RULE_16));
+    }
+
+    #[test]
+    fn tran_ags_fyi_flags_unrecognised_edition_string() {
+        // TRAN_AGS = "9.9" — present (so Rule 14 is satisfied) but not a
+        // known edition → the top-level FYI bucket (include_fyi only).
+        let src = "\"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_AGS\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"9.9\"\r\n";
+        let f = run_fyi(src);
+        let fyi = f.get(FYI).expect("top-level FYI");
+        assert!(
+            fyi.iter()
+                .any(|x| x.group == "TRAN" && x.desc.contains("9.9")),
+            "{fyi:?}"
+        );
+        // Default (no FYI) must stay silent.
+        assert!(!run(src).contains_key(FYI));
+    }
+
+    #[test]
+    fn tran_ags_fyi_silent_for_recognised_edition() {
+        // A recognised edition string ("4.2") is NOT flagged even with
+        // FYI on — the `KNOWN_TRAN_AGS.contains` early return.
+        let src = "\"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_AGS\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"4.2\"\r\n";
+        assert!(!run_fyi(src).contains_key(FYI));
+    }
+
+    #[test]
+    fn rule_16_fyi_flags_nonstandard_abbr_description() {
+        // ABBR defines ARTW_TYPE/DRY with a description that differs from
+        // the bundled-4.2 standard ("Dry test") → rule_16_fyi emits one
+        // mismatch finding. A PA column is present so the main Rule 16
+        // path also runs; ARTW_TYPE/DRY *is* defined so main Rule 16 is
+        // silent on it, leaving the FYI as the only signal.
+        let src = "\"GROUP\",\"FROM\"\r\n\"HEADING\",\"FROM_ID\",\"ARTW_TYPE\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"PA\"\r\n\
+                   \"DATA\",\"X1\",\"DRY\"\r\n\r\n\
+                   \"GROUP\",\"ABBR\"\r\n\
+                   \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"ARTW_TYPE\",\"DRY\",\"Totally wrong wording\"\r\n";
+        let f = run_fyi(src);
+        let fyi = f.get(RULE_16_FYI).expect("Rule 16 FYI");
+        assert!(
+            fyi.iter()
+                .any(|x| x.group == "ABBR" && x.desc.contains("DRY")),
+            "{fyi:?}"
+        );
+    }
+
+    #[test]
+    fn rule_16_fyi_silent_when_description_matches_case_insensitively() {
+        // Same (HDNG, CODE) but description equal to the standard up to
+        // case → the `eq_ignore_ascii_case` continue; no FYI.
+        let src = "\"GROUP\",\"FROM\"\r\n\"HEADING\",\"FROM_ID\",\"ARTW_TYPE\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"PA\"\r\n\
+                   \"DATA\",\"X1\",\"DRY\"\r\n\r\n\
+                   \"GROUP\",\"ABBR\"\r\n\
+                   \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"ARTW_TYPE\",\"DRY\",\"DRY TEST\"\r\n";
+        assert!(!run_fyi(src).contains_key(RULE_16_FYI));
     }
 }

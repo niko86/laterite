@@ -312,4 +312,72 @@ mod tests {
         assert_eq!(missing.len(), 1, "{r4:?}");
         assert_eq!(missing[0].line, None);
     }
+
+    #[test]
+    fn rule_2b_flags_missing_type_row() {
+        // HEADING/UNIT present, TYPE absent → the `None` arm of the TYPE
+        // match (distinct from the misplacement arm, exercised above).
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"DATA\",\"P1\"\r\n";
+        let f = run(src);
+        let r2b = f.get(RULE_2B).expect("Rule 2b");
+        assert!(
+            r2b.iter().any(|x| x.desc.contains("TYPE row missing")),
+            "{r2b:?}"
+        );
+    }
+
+    #[test]
+    fn rule_2b_flags_misplaced_unit_below_a_gap() {
+        // HEADING on line 2, but UNIT not immediately below it (a stray
+        // descriptor line between them) → UNIT-misplaced arm.
+        // GROUP(1) HEADING(2) TYPE(3) UNIT(4) DATA(5): UNIT at line 4 is
+        // not hl+1 (=3), so the placement check fires for UNIT too.
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\
+                   \"TYPE\",\"ID\"\r\n\"UNIT\",\"\"\r\n\"DATA\",\"P1\"\r\n";
+        let f = run(src);
+        let r2b = f.get(RULE_2B).expect("Rule 2b");
+        assert!(
+            r2b.iter().any(|x| x.desc.contains("UNIT row is misplaced")),
+            "expected a UNIT-misplacement finding: {r2b:?}"
+        );
+    }
+
+    #[test]
+    fn rule_4_flags_thin_group_row_missing_name() {
+        // A GROUP row carrying only the descriptor (no group name) →
+        // the `fields.len() < 2` malformed-GROUP arm. The bare "GROUP"
+        // line still parses (the parser tolerates it); structure flags it.
+        let src = "\"GROUP\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n";
+        let pf = parse_str(src).expect("parses");
+        let mut f = Findings::new();
+        // The parser may name the group ""; drive rule_4 over whatever
+        // group it produced.
+        check(&pf, &mut f);
+        let r4 = f.get(RULE_4).expect("Rule 4");
+        assert!(
+            r4.iter().any(|x| x.desc.contains("missing the group name")),
+            "{r4:?}"
+        );
+    }
+
+    #[test]
+    fn rule_4_flags_unit_and_type_field_count_mismatch() {
+        // HEADING has 2 fields; UNIT has 1 and TYPE has 3 — both the
+        // UNIT-count and TYPE-count arms fire (lines 182-197).
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"P1\",\"Site\"\r\n";
+        let f = run(src);
+        let r4 = f.get(RULE_4).expect("Rule 4");
+        assert!(
+            r4.iter().any(|x| x.desc.contains("UNIT row field count")),
+            "expected UNIT field-count mismatch: {r4:?}"
+        );
+        assert!(
+            r4.iter().any(|x| x.desc.contains("TYPE row field count")),
+            "expected TYPE field-count mismatch: {r4:?}"
+        );
+    }
 }

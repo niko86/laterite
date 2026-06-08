@@ -12,7 +12,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import duckdb
-import pytest
 from laterite import GEOL, LLPL, LOCA, PROJ, SAMP, TREG, TREL, TRET
 from laterite.ags5db import (
     read_db as read_ags5db,
@@ -137,30 +136,35 @@ def test_append_round_trips_via_read_ags5db(tmp_path: Path) -> None:
 
 # Test lives under packages/laterite-ags5/tests/ — repo root is three
 # parents up.
-_LARGE_AGS = (
-    Path(__file__).resolve().parents[3] / "examples" / "output" / "large.ags"
+# Committed synthetic multi-group fixture — always present, so this
+# real-file append-idempotence check runs in CI (the old git-ignored
+# large.ags made it silently skip).
+_FIXTURE = (
+    Path(__file__).resolve().parents[3]
+    / "rust-packages" / "ags4-validator" / "tests" / "fixtures"
+    / "synthetic_multigroup.ags"
 )
 
 
-@pytest.mark.skipif(not _LARGE_AGS.exists(), reason="large.ags fixture missing")
-def test_ags4_append_is_idempotent_on_real_file(tmp_path: Path) -> None:
+def test_ags4_append_is_idempotent_on_synthetic_file(tmp_path: Path) -> None:
     """Re-ingesting the same AGS4 file with append=True must not duplicate rows.
     Content-hash dedup is the only way to get this right for groups whose
-    auto-scaffolded KEYs aren't uniquely identifying."""
+    auto-scaffolded KEYs aren't uniquely identifying (e.g. the many TREL rows
+    sharing LOCA/SAMP keys)."""
     from laterite.ags5db import convert
 
     db = tmp_path / "merge.ags5db"
-    convert(_LARGE_AGS, db)
+    convert(_FIXTURE, db)
     before: dict[str, int] = {}
     conn = duckdb.connect(str(db), read_only=True)
     try:
-        for code in ("g_loca", "g_samp", "g_eres", "g_chis", "g_dcpt",
-                     "g_geol", "g_scpt"):
+        for code in ("g_loca", "g_samp", "g_geol", "g_core",
+                     "g_llpl", "g_treg", "g_tret", "g_trel"):
             before[code] = conn.execute(f"SELECT COUNT(*) FROM {code}").fetchone()[0]
     finally:
         conn.close()
 
-    convert(_LARGE_AGS, db, append=True)
+    convert(_FIXTURE, db, append=True)
     after: dict[str, int] = {}
     conn = duckdb.connect(str(db), read_only=True)
     try:

@@ -1,7 +1,10 @@
-"""Smoke tests for the AGS4 codec.
+"""Round-trip smoke tests for the AGS4 codec.
 
-Skips automatically if `examples/output/large.ags` isn't present so the
-test suite stays portable; for the demo we expect it to be there.
+Runs against a committed synthetic multi-group fixture
+(`tools/gen_synthetic_fixture.py` — deterministic, no real project data), so
+this exercises real-file round-trip fidelity everywhere including CI. (The old
+23 MB `examples/output/large.ags` was git-ignored and absent in CI, so this
+test silently skipped there.)
 """
 
 from __future__ import annotations
@@ -10,24 +13,25 @@ from pathlib import Path
 
 import pytest
 
-# Test lives under packages/laterite/tests/ — repo root is three
-# parents up.
-_LARGE_AGS_PATH = (
-    Path(__file__).resolve().parents[3] / "examples" / "output" / "large.ags"
+# Committed synthetic fixture: 9 groups across the
+# LOCA->SAMP->TREG->TRET->TREL chain plus GEOL/CORE/LLPL. Always present,
+# so the round-trip runs in CI.
+_FIXTURE = (
+    Path(__file__).resolve().parents[3]
+    / "rust-packages" / "ags4-validator" / "tests" / "fixtures"
+    / "synthetic_multigroup.ags"
 )
 
 
 @pytest.fixture(scope="module")
 def large_ags() -> Path:
-    if not _LARGE_AGS_PATH.exists():
-        pytest.skip(f"{_LARGE_AGS_PATH} not present (real AGS4 fixture)")
-    return _LARGE_AGS_PATH
+    return _FIXTURE
 
 
 def test_ags4_to_db_then_db_to_ags4_preserves_row_counts(
     large_ags: Path, tmp_path: Path,
 ) -> None:
-    """All 69 group row counts in large.ags survive the round-trip."""
+    """Every group's row count survives the AGS4 -> .ags5db -> AGS4 round-trip."""
     from laterite.ags5db import convert, export
     from python_ags4 import AGS4
 

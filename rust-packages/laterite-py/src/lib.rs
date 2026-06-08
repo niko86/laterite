@@ -15,6 +15,7 @@
 
 use std::path::Path;
 
+use ags4_validator::findings::{Severity, Target};
 use ags4_validator::{CheckOptions, DictVersion, Dictionary, Findings, ValidatorError};
 use ags5_core::error::CliError;
 use pyo3::exceptions::PyRuntimeError;
@@ -140,6 +141,26 @@ fn validate(
     }
 }
 
+/// Lowercase serde-name of a [`Target`] for the structured PyDict
+/// (matches the JSON `target` value).
+fn target_str(t: Target) -> &'static str {
+    match t {
+        Target::Line => "line",
+        Target::Heading => "heading",
+        Target::Cell => "cell",
+        Target::Group => "group",
+    }
+}
+
+/// Lowercase serde-name of a [`Severity`] for the structured PyDict.
+fn severity_str(s: Severity) -> &'static str {
+    match s {
+        Severity::Error => "error",
+        Severity::Warning => "warning",
+        Severity::Fyi => "fyi",
+    }
+}
+
 /// `{file, findings:{ "AGS Format Rule N":[{line,group,desc}] }}` —
 /// the exact `serde_json` value + insertion order the `ags4-check`
 /// binary's `json_value`/`json_string` produce. `preserve_order` (set
@@ -147,18 +168,13 @@ fn validate(
 fn findings_json(file: &str, found: &Findings) -> String {
     let mut fmap = Map::new();
     for (rule, items) in found {
+        // Serialize the engine `Finding` directly — byte-faithful to the
+        // CLI's `json_value`. Unset location/severity fields skip, so
+        // line-only findings stay `{line,group,desc}`; migrated findings
+        // additively gain the rich keys.
         let arr: Vec<Value> = items
             .iter()
-            .map(|f| {
-                let mut o = Map::new();
-                o.insert(
-                    "line".into(),
-                    f.line.map(Value::from).unwrap_or(Value::Null),
-                );
-                o.insert("group".into(), Value::from(f.group.clone()));
-                o.insert("desc".into(), Value::from(f.desc.clone()));
-                Value::Object(o)
-            })
+            .map(|f| serde_json::to_value(f).unwrap_or(Value::Null))
             .collect();
         fmap.insert(rule.clone(), Value::Array(arr));
     }
@@ -174,14 +190,13 @@ fn findings_ndjson(found: &Findings) -> String {
     let mut s = String::new();
     for (rule, items) in found {
         for f in items {
+            // `rule`-first then the serialized `Finding` body — byte-faithful
+            // to the CLI's `ndjson_string`.
             let mut o = Map::new();
             o.insert("rule".into(), Value::from(rule.clone()));
-            o.insert(
-                "line".into(),
-                f.line.map(Value::from).unwrap_or(Value::Null),
-            );
-            o.insert("group".into(), Value::from(f.group.clone()));
-            o.insert("desc".into(), Value::from(f.desc.clone()));
+            if let Value::Object(body) = serde_json::to_value(f).unwrap_or(Value::Null) {
+                o.extend(body);
+            }
             s.push_str(&serde_json::to_string(&Value::Object(o)).unwrap_or_default());
             s.push('\n');
         }
@@ -248,6 +263,29 @@ fn run_check<'py>(
                     o.set_item("line", f.line)?;
                     o.set_item("group", &f.group)?;
                     o.set_item("desc", &f.desc)?;
+                    // Additively surface the rich location/severity fields
+                    // when set away from default — existing readers keyed on
+                    // line/group/desc are unaffected. Target/Severity render
+                    // as their lowercase serde names; char_span as a 2-tuple.
+                    let loc = &f.location;
+                    if loc.target != Target::Line {
+                        o.set_item("target", target_str(loc.target))?;
+                    }
+                    if let Some(fi) = loc.field_index {
+                        o.set_item("field_index", fi)?;
+                    }
+                    if let Some(h) = &loc.heading {
+                        o.set_item("heading", h)?;
+                    }
+                    if let Some(dr) = loc.data_row {
+                        o.set_item("data_row", dr)?;
+                    }
+                    if let Some((a, b)) = loc.char_span {
+                        o.set_item("char_span", (a, b))?;
+                    }
+                    if f.severity != Severity::Error {
+                        o.set_item("severity", severity_str(f.severity))?;
+                    }
                     items.append(o)?;
                 }
             }

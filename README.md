@@ -1,16 +1,21 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/niko86/laterite/main/assets/laterite-icon-256.png" alt="laterite" width="200" />
+  <img src="https://raw.githubusercontent.com/niko86/laterite/main/assets/laterite-social-preview-white.png" alt="laterite — a Rust-backed AGS4 reader, writer and validator" width="600" />
 </p>
 
 # laterite
 
 A Rust-backed reader, writer and validator for the
 [AGS4](https://www.ags.org.uk/data-format/) geotechnical data format.
-Drop-in for [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library),
-faster, with a narwhals-native API.
+A faster drop-in for [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library)'s
+`AGS4` module — swap `from python_ags4 import AGS4` for
+`from laterite import compat as AGS4` — with a narwhals-native API.
 
 [![ci](https://github.com/niko86/laterite/actions/workflows/ci.yml/badge.svg)](https://github.com/niko86/laterite/actions/workflows/ci.yml)
+[![rust cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=rust&label=rust%20cov)](https://codecov.io/gh/niko86/laterite)
+[![python cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=python&label=python%20cov)](https://codecov.io/gh/niko86/laterite)
+[![web cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=web&label=web%20cov)](https://codecov.io/gh/niko86/laterite)
 [![PyPI](https://img.shields.io/pypi/v/laterite.svg)](https://pypi.org/project/laterite/)
+[![Python versions](https://img.shields.io/pypi/pyversions/laterite.svg)](https://pypi.org/project/laterite/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## Install
@@ -21,7 +26,7 @@ pip install "laterite[compat]"        # + pandas (python-ags4 drop-in)
 pip install "laterite[ags5]"          # + experimental .ags5db surface
 ```
 
-Requires Python ≥ 3.14.
+Requires Python ≥ 3.12.
 
 ## Use
 
@@ -30,13 +35,13 @@ import laterite
 
 # Validate a file
 result = laterite.validate("delivery.ags")
-for rule, findings in result.findings.items():
+for rule, findings in result.by_rule().items():
     print(rule, len(findings))
 
 # Or the python-ags4 drop-in
 from laterite import compat as AGS4
 tables, headings = AGS4.AGS4_to_dataframe("delivery.ags")
-AGS4.write_AGS4_file(tables, "round-trip.ags")
+AGS4.dataframe_to_AGS4(tables, headings, "round-trip.ags")
 
 # Typed view: PROJ → LOCA → SAMP → ...
 from laterite.ags4 import read_typed

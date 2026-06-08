@@ -376,6 +376,30 @@ where
     None
 }
 
+/// Parse an AGS4 DATETIME cell into a `NaiveDateTime`, trying the same
+/// `DATETIME_FORMATS` `parse_value` uses (a full datetime first, else a
+/// date-only value promoted to midnight — a `DT` cell legally carries
+/// just `2020-08-18` under a `yyyy-mm-dd` UNIT).
+///
+/// `parse_value` formats a DATETIME back to a `Value::String`, which is
+/// right for the JSON path but can't fill an Arrow `Timestamp` column.
+/// Callers that need the typed value — the browser explorer building
+/// typed Arrow (epoch-µs timestamps) — use this instead, so they cast
+/// *identically* to how `parse_value` decides what is a valid datetime.
+/// Returns `None` when no format matches (the caller appends a null).
+pub fn parse_datetime(s: &str) -> Option<NaiveDateTime> {
+    let s = s.trim();
+    for fmt in DATETIME_FORMATS {
+        if let Ok(dt) = NaiveDateTime::parse_from_str(s, fmt) {
+            return Some(dt);
+        }
+        if let Ok(d) = NaiveDate::parse_from_str(s, fmt) {
+            return d.and_hms_opt(0, 0, 0);
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526,5 +550,405 @@ mod tests {
         assert_eq!(truncate_dt_to_unit("100.50", "m"), "100.50");
         assert_eq!(truncate_dt_to_unit("anything", ""), "anything");
         assert_eq!(truncate_dt_to_unit("anything", "%"), "anything");
+    }
+
+    // --- CanonicalType label / SQL-type mapping ---------------------
+
+    #[test]
+    fn canonical_type_as_str_covers_every_variant() {
+        // The labels feed `_spec_headings`; they must match Python's
+        // StrEnum values exactly.
+        assert_eq!(CanonicalType::String.as_str(), "string");
+        assert_eq!(CanonicalType::Integer.as_str(), "integer");
+        assert_eq!(CanonicalType::Decimal.as_str(), "decimal");
+        assert_eq!(CanonicalType::Datetime.as_str(), "datetime");
+        assert_eq!(CanonicalType::Date.as_str(), "date");
+        assert_eq!(CanonicalType::Time.as_str(), "time");
+        assert_eq!(CanonicalType::Bool.as_str(), "bool");
+        assert_eq!(CanonicalType::Enum.as_str(), "enum");
+    }
+
+    #[test]
+    fn canonical_type_sql_type_covers_every_variant() {
+        assert_eq!(CanonicalType::String.sql_type(), "VARCHAR");
+        assert_eq!(CanonicalType::Enum.sql_type(), "VARCHAR");
+        assert_eq!(CanonicalType::Integer.sql_type(), "BIGINT");
+        assert_eq!(CanonicalType::Decimal.sql_type(), "DOUBLE");
+        assert_eq!(CanonicalType::Datetime.sql_type(), "TIMESTAMP");
+        assert_eq!(CanonicalType::Date.sql_type(), "DATE");
+        assert_eq!(CanonicalType::Time.sql_type(), "TIME");
+        assert_eq!(CanonicalType::Bool.sql_type(), "BOOLEAN");
+    }
+
+    #[test]
+    fn sql_type_fn_falls_back_to_varchar_on_unknown() {
+        assert_eq!(sql_type("ID"), "VARCHAR");
+        assert_eq!(sql_type("0DP"), "BIGINT");
+        assert_eq!(sql_type("2DP"), "DOUBLE");
+        assert_eq!(sql_type("DT"), "TIMESTAMP");
+        assert_eq!(sql_type("YN"), "BOOLEAN");
+        // RL maps to Decimal -> DOUBLE.
+        assert_eq!(sql_type("RL"), "DOUBLE");
+        // Unknown / passthrough code.
+        assert_eq!(sql_type("BANANA"), "VARCHAR");
+    }
+
+    #[test]
+    fn canonical_type_rl_is_decimal() {
+        assert_eq!(canonical_type("RL"), Some(CanonicalType::Decimal));
+        assert_eq!(canonical_type("DT"), Some(CanonicalType::Datetime));
+        assert_eq!(canonical_type("YN"), Some(CanonicalType::Bool));
+        assert_eq!(canonical_type("0DP"), Some(CanonicalType::Integer));
+    }
+
+    #[test]
+    fn canonical_type_rejects_malformed_numeric_prefix() {
+        // Trailing-letter forms with a non-digit / empty prefix are NOT
+        // numeric AGS codes — they fall through to None.
+        assert_eq!(canonical_type("DP"), None); // empty prefix
+        assert_eq!(canonical_type("XDP"), None); // non-digit prefix
+        assert_eq!(canonical_type("SF"), None);
+        assert_eq!(canonical_type("SCI"), None);
+    }
+
+    // --- ags4_str: the reverse formatter --------------------------
+
+    #[test]
+    fn ags4_str_null_is_empty() {
+        assert_eq!(ags4_str(&Value::Null, "2DP"), "");
+        assert_eq!(ags4_str(&Value::Null, "X"), "");
+        assert_eq!(ags4_str(&Value::Null, "DT"), "");
+    }
+
+    #[test]
+    fn ags4_str_yn_bool_renders_letters() {
+        assert_eq!(ags4_str(&Value::Bool(true), "YN"), "Y");
+        assert_eq!(ags4_str(&Value::Bool(false), "YN"), "N");
+        // A non-bool value under YN (shouldn't happen, but the branch
+        // falls through to the generic tail).
+        assert_eq!(ags4_str(&Value::String("Y".into()), "YN"), "Y");
+    }
+
+    #[test]
+    fn ags4_str_dt_strips_zero_time_to_date_only() {
+        // ISO form with a midnight time portion collapses to date-only.
+        assert_eq!(
+            ags4_str(&Value::String("2023-02-22T00:00:00".into()), "DT"),
+            "2023-02-22",
+        );
+        // Zero fractional seconds get trimmed first, then the zero-time
+        // collapse applies.
+        assert_eq!(
+            ags4_str(&Value::String("2023-02-22T00:00:00.000".into()), "DT"),
+            "2023-02-22",
+        );
+    }
+
+    #[test]
+    fn ags4_str_dt_keeps_iso_separator_for_real_times() {
+        // A non-midnight time keeps the full ISO form.
+        assert_eq!(
+            ags4_str(&Value::String("2023-02-22T10:24:37".into()), "DT"),
+            "2023-02-22T10:24:37",
+        );
+        // Non-zero fractional seconds are preserved verbatim (the all-zero
+        // strip guard does not fire).
+        assert_eq!(
+            ags4_str(&Value::String("2023-02-22T10:24:37.500".into()), "DT"),
+            "2023-02-22T10:24:37.500",
+        );
+    }
+
+    #[test]
+    fn ags4_str_dt_non_string_falls_through() {
+        // A DT-typed numeric value isn't a string, so the DT branch is
+        // skipped and the generic tail stringifies it.
+        assert_eq!(ags4_str(&Value::from(5_i64), "DT"), "5");
+    }
+
+    #[test]
+    fn ags4_str_0dp_handles_int_and_float() {
+        assert_eq!(ags4_str(&Value::from(5_i64), "0DP"), "5");
+        // A float-valued 0DP cell truncates toward zero.
+        assert_eq!(ags4_str(&Value::from(5.9_f64), "0DP"), "5");
+        // A non-numeric value under 0DP yields the empty default.
+        assert_eq!(ags4_str(&Value::String("x".into()), "0DP"), "");
+    }
+
+    #[test]
+    fn ags4_str_ndp_formats_to_precision() {
+        assert_eq!(ags4_str(&Value::from(100.5_f64), "2DP"), "100.50");
+        assert_eq!(ags4_str(&Value::from(3.14159_f64), "3DP"), "3.142");
+    }
+
+    #[test]
+    fn ags4_str_nsci_emits_scientific() {
+        // nSCI uses Rust's lowercase `e` scientific format with n
+        // fractional digits.
+        assert_eq!(ags4_str(&Value::from(12345.0_f64), "2SCI"), "1.23e4");
+        assert_eq!(ags4_str(&Value::from(0.0012_f64), "1SCI"), "1.2e-3");
+    }
+
+    #[test]
+    fn ags4_str_string_passthrough_for_text_types() {
+        assert_eq!(ags4_str(&Value::String("LOCA1".into()), "ID"), "LOCA1");
+        // A non-string, non-numeric-typed value stringifies via the
+        // generic arm.
+        assert_eq!(ags4_str(&Value::from(7_i64), "X"), "7");
+    }
+
+    #[test]
+    fn ags4_str_nsf_zero_renders_fixed_point() {
+        // Zero under nSF takes the dedicated `f == 0.0` branch:
+        // n-1 fractional digits.
+        assert_eq!(ags4_str(&Value::from(0.0_f64), "3SF"), "0.00");
+        assert_eq!(ags4_str(&Value::from(0.0_f64), "1SF"), "0");
+    }
+
+    // --- display_hint ---------------------------------------------
+
+    #[test]
+    fn display_hint_covers_all_numeric_families() {
+        assert_eq!(display_hint("1SCI"), Some("%.1e".to_string()));
+        assert_eq!(display_hint("12DP"), Some("%.12f".to_string()));
+        // Non-numeric / malformed prefixes return None.
+        assert_eq!(display_hint("DP"), None);
+        assert_eq!(display_hint("XSF"), None);
+        assert_eq!(display_hint("DT"), None);
+    }
+
+    // --- parse_value remaining branches ---------------------------
+
+    #[test]
+    fn parse_value_unknown_code_is_string() {
+        // An unrecognised AGS code stores the raw (trimmed) string.
+        assert_eq!(
+            parse_value(Some("  hello  "), "ZZZ"),
+            Value::String("hello".into()),
+        );
+    }
+
+    #[test]
+    fn parse_value_integer_rejects_non_numeric() {
+        assert_eq!(parse_value(Some("abc"), "0DP"), Value::Null);
+        // Infinity is not finite -> Null.
+        assert_eq!(parse_value(Some("inf"), "0DP"), Value::Null);
+    }
+
+    #[test]
+    fn parse_value_decimal_rejects_non_finite() {
+        assert_eq!(parse_value(Some("not-a-number"), "2DP"), Value::Null);
+        assert_eq!(parse_value(Some("NaN"), "2DP"), Value::Null);
+        assert_eq!(parse_value(Some("inf"), "2DP"), Value::Null);
+    }
+
+    #[test]
+    fn parse_value_datetime_unparseable_is_null() {
+        assert_eq!(parse_value(Some("garbage"), "DT"), Value::Null);
+    }
+
+    #[test]
+    fn parse_value_bool_full_token_set() {
+        for t in ["Y", "YES", "TRUE", "1", "yes", "true"] {
+            assert_eq!(parse_value(Some(t), "YN"), Value::Bool(true), "{t}");
+        }
+        for f in ["N", "NO", "FALSE", "0", "no", "false"] {
+            assert_eq!(parse_value(Some(f), "YN"), Value::Bool(false), "{f}");
+        }
+    }
+
+    #[test]
+    fn parse_value_datetime_alternate_formats() {
+        // dd/mm/yyyy and yyyy/mm/dd are in DATETIME_FORMATS and normalise
+        // to the canonical `yyyy-mm-dd HH:MM:SS`.
+        assert_eq!(
+            parse_value(Some("18/08/2020"), "DT"),
+            Value::String("2020-08-18 00:00:00".into()),
+        );
+        // datetime without seconds.
+        assert_eq!(
+            parse_value(Some("2020-08-18 13:05"), "DT"),
+            Value::String("2020-08-18 13:05:00".into()),
+        );
+    }
+
+    // --- parse_datetime (typed Arrow path) ------------------------
+
+    #[test]
+    fn parse_datetime_full_and_date_only() {
+        let dt = parse_datetime("2024-01-02T03:04:05").unwrap();
+        assert_eq!(
+            dt.format("%Y-%m-%d %H:%M:%S").to_string(),
+            "2024-01-02 03:04:05"
+        );
+        // Date-only promotes to midnight.
+        let midnight = parse_datetime("2020-08-18").unwrap();
+        assert_eq!(midnight.format("%H:%M:%S").to_string(), "00:00:00");
+        // Alternate date format.
+        assert!(parse_datetime("18/08/2020").is_some());
+    }
+
+    #[test]
+    fn parse_datetime_rejects_garbage() {
+        assert_eq!(parse_datetime("not a date"), None);
+        assert_eq!(parse_datetime(""), None);
+    }
+}
+
+/// Property-based tests for the permissive caster + type resolver.
+///
+/// Why properties here: `parse_value` / `canonical_type` are the *single*
+/// AGS-typing surface for both the DuckDB engine and the wasm explorer
+/// (crate header), so an arbitrary-input panic would crash either side on
+/// a hostile file. These check the universal contracts — totality
+/// (never-panic), determinism, normalisation, and the parse↔format
+/// inverse — across input domains the hand-written examples can't cover.
+#[cfg(test)]
+mod proptest_suite {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Every AGS spec TYPE code `canonical_type` recognises, plus the
+    /// nDP/nSF/nSCI numeric families. Drives the "valid-code" properties.
+    fn ags_type_code() -> impl Strategy<Value = String> {
+        let fixed = prop::sample::select(vec![
+            "ID", "X", "PA", "PT", "PU", "T", "U", "DMS", "MC", "XN", "0DP", "DT", "YN", "RL",
+        ])
+        .prop_map(String::from);
+        // nDP / nSF / nSCI with a small positive prefix.
+        let numeric = (1usize..=12, prop::sample::select(vec!["DP", "SF", "SCI"]))
+            .prop_map(|(n, suf)| format!("{n}{suf}"));
+        prop_oneof![fixed, numeric]
+    }
+
+    proptest! {
+        /// Totality: `parse_value` returns a `Value` for ANY
+        /// `(Option<&str>, &str)` — arbitrary raw text against arbitrary
+        /// type codes (recognised AGS codes *and* junk). The harness fails
+        /// the case if the call panics; reaching the assert means it didn't.
+        #[test]
+        fn parse_value_never_panics(
+            raw in prop::option::of(".*"),
+            ty in ".*",
+        ) {
+            let _ = parse_value(raw.as_deref(), &ty);
+            prop_assert!(true);
+        }
+
+        /// `parse_value` against the real AGS code set also never panics —
+        /// exercises every typed branch (datetime/date/time/bool/numeric)
+        /// with adversarial value strings.
+        #[test]
+        fn parse_value_typed_branches_never_panic(
+            raw in ".*",
+            ty in ags_type_code(),
+        ) {
+            let _ = parse_value(Some(&raw), &ty);
+            prop_assert!(true);
+        }
+
+        /// `canonical_type` is total (never panics) on arbitrary text.
+        #[test]
+        fn canonical_type_never_panics(ty in ".*") {
+            let _ = canonical_type(&ty);
+            prop_assert!(true);
+        }
+
+        /// `canonical_type` is deterministic — the same input always maps
+        /// to the same output (pure fn, no hidden state).
+        #[test]
+        fn canonical_type_deterministic(ty in ".*") {
+            prop_assert_eq!(canonical_type(&ty), canonical_type(&ty));
+        }
+
+        /// `canonical_type` normalises by trim + uppercase (per its body):
+        /// surrounding ASCII whitespace and letter-case are irrelevant.
+        #[test]
+        fn canonical_type_trims_and_uppercases(
+            ty in ags_type_code(),
+            lead in r"[ \t\r\n]{0,4}",
+            trail in r"[ \t\r\n]{0,4}",
+        ) {
+            let base = canonical_type(&ty);
+            // Whitespace padding doesn't change the verdict.
+            let padded = format!("{lead}{ty}{trail}");
+            prop_assert_eq!(canonical_type(&padded), base);
+            // Lower-casing the code doesn't either.
+            prop_assert_eq!(canonical_type(&ty.to_lowercase()), base);
+        }
+
+        /// nDP round-trip: a value parsed under an nDP type and formatted
+        /// back via `ags4_str` preserves the NUMERIC value (byte form may
+        /// re-canonicalise trailing zeros). Generate a value already at the
+        /// declared precision so no rounding loss is expected.
+        #[test]
+        fn ndp_parse_format_preserves_numeric_value(
+            n in 0usize..=6,
+            int_part in 0i64..1_000_000,
+            neg in any::<bool>(),
+        ) {
+            let ty = format!("{n}DP");
+            // Build a canonical nDP string: integer part + n fractional
+            // digits (here all zeros — exact, no rounding ambiguity).
+            let frac = "0".repeat(n);
+            let body = if n == 0 {
+                int_part.to_string()
+            } else {
+                format!("{int_part}.{frac}")
+            };
+            let s = if neg && int_part != 0 { format!("-{body}") } else { body };
+
+            let parsed = parse_value(Some(&s), &ty);
+            let formatted = ags4_str(&parsed, &ty);
+            // The formatted form re-parses to the SAME number.
+            let reparsed = parse_value(Some(&formatted), &ty);
+            prop_assert_eq!(&reparsed, &parsed, "s={:?} fmt={:?}", s, formatted);
+        }
+
+        /// DT idempotence proxy: `parse_value(Some(s), "DT")` is itself
+        /// idempotent on its own output string — parsing the normalised
+        /// `yyyy-mm-dd HH:MM:SS` form again yields the same Value (the
+        /// caster is a stable projection, not a one-shot transform).
+        #[test]
+        fn parse_dt_is_a_stable_projection(
+            y in 1900i32..2200,
+            mo in 1u32..=12,
+            d in 1u32..=28,
+            h in 0u32..=23,
+            mi in 0u32..=59,
+            se in 0u32..=59,
+        ) {
+            let s = format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{se:02}");
+            let first = parse_value(Some(&s), "DT");
+            // Re-feed the normalised string form.
+            if let Value::String(norm) = &first {
+                let second = parse_value(Some(norm), "DT");
+                prop_assert_eq!(&second, &first, "norm={:?}", norm);
+            } else {
+                prop_assert!(false, "DT of a valid datetime should be a String, got {first:?}");
+            }
+        }
+
+        /// `truncate_dt_to_unit` is idempotent: truncating an
+        /// already-truncated value to the same unit is a no-op.
+        #[test]
+        fn truncate_dt_to_unit_idempotent(
+            y in 1900i32..2200,
+            mo in 1u32..=12,
+            d in 1u32..=28,
+            h in 0u32..=23,
+            mi in 0u32..=59,
+            se in 0u32..=59,
+            unit in prop::sample::select(vec![
+                "yyyy-mm-dd",
+                "yyyy-mm-ddThh:mm",
+                "yyyy-mm-ddThh:mm:ss",
+            ]),
+        ) {
+            let value = format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{se:02}");
+            let once = truncate_dt_to_unit(&value, unit);
+            let twice = truncate_dt_to_unit(&once, unit);
+            prop_assert_eq!(twice, once);
+        }
     }
 }

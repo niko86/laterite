@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AGS4 Validator</title>
+    <meta
+      name="description"
+      content="Validate AGS4 geotechnical transfer files entirely in your browser — nothing is uploaded."
+    />
+    <!-- PWA icons (the manifest <link> is injected at build by vite-plugin-pwa).
+         %BASE_URL% resolves to the deploy base (/ags5_concept/). -->
+    <link rel="icon" type="image/png" href="%BASE_URL%icons/icon-128.png" />
+    <link rel="apple-touch-icon" href="%BASE_URL%icons/apple-touch-icon.png" />
+    <!-- Status-bar / address-bar tint. Tracks the SYSTEM scheme (theme-color
+         only supports prefers-color-scheme, not the app's class toggle), which
+         matches the no-flash script's default; values mirror --canvas. -->
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#f1f5f9"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#0d1117"
+    />
+    <!-- Apply the persisted/system theme before first paint so there's no
+         flash; theme.ts then reads this class as its initial state. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("theme");
+          if (
+            t === "dark" ||
+            (!t && matchMedia("(prefers-color-scheme: dark)").matches)
+          )
+            document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+</html>

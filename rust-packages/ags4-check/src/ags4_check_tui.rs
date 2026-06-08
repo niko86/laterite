@@ -95,7 +95,7 @@ struct App {
 }
 
 impl App {
-    fn new(found: &Findings, file: &str, dict: DictVersion) -> Self {
+    fn new(found: &Findings, file: &str, dict: Option<DictVersion>) -> Self {
         let mut rows = Vec::new();
         for (rule, items) in found {
             let short = rule
@@ -122,7 +122,10 @@ impl App {
             .collect();
         let mut app = App {
             file: file.to_string(),
-            dict: dict.as_str(),
+            // `None` ⇒ the CLI's auto-detect mode (no forced --dict-version);
+            // the resolved edition isn't surfaced through `check_file`, so
+            // show "auto" rather than a misleading specific version.
+            dict: dict.map(|d| d.as_str()).unwrap_or("auto"),
             visible: (0..rows.len()).collect(),
             rows,
             state: TableState::default(),
@@ -213,7 +216,7 @@ impl App {
 /// Entry point called from `ags4_check.rs` (only when `--tui` AND a
 /// real terminal). Always restores the terminal — even on panic or a
 /// loop error — so the user's shell is never left in raw mode.
-pub fn run(found: &Findings, file: &str, dict: DictVersion) -> io::Result<()> {
+pub fn run(found: &Findings, file: &str, dict: Option<DictVersion>) -> io::Result<()> {
     install_panic_hook();
     let mut terminal = setup()?;
     let res = event_loop(&mut terminal, App::new(found, file, dict));

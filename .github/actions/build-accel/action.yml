@@ -1,0 +1,80 @@
+name: build-accel
+description: >
+  Conditionally enable the Rust build accelerators (sccache + mold) for this job,
+  but ONLY when they're actually present on the runner. The pool's baked
+  `ags5-runner` image ships both; a GitHub-hosted fallback (or any other runner)
+  ships neither, where this step simply no-ops and the build runs unaccelerated.
+  That's the whole point: the workflows can carry these flags unconditionally
+  without breaking a runner that lacks the tools.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        # Fail fast on a disk-starved self-hosted host. A bundled-DuckDB debug
+        # build needs several GB of _work; when the VM is full the job otherwise
+        # dies ~14 min in with an opaque ENOSPC ("No space left on device") — or
+        # the runner agent itself core-dumps mid-job. Abort in ~2s with an
+        # actionable message instead. Only enforced on self-hosted; GitHub-hosted
+        # runners manage their own disk. Threshold via BUILD_ACCEL_MIN_FREE_GB.
+        if [ "${RUNNER_ENVIRONMENT:-}" = "self-hosted" ]; then
+          min_gb="${BUILD_ACCEL_MIN_FREE_GB:-12}"
+          avail_gb=$(($(df -Pk "${GITHUB_WORKSPACE:-$PWD}" | awk 'NR==2{print $4}') / 1024 / 1024))
+          if [ "$avail_gb" -lt "$min_gb" ]; then
+            echo "::error::build-accel: only ${avail_gb} GB free on the runner host (need >= ${min_gb} GB). Free disk or lower the pool's replicas — see .github/runner/README.md (replicas<->disk)."
+            exit 1
+          fi
+          echo "[build-accel] disk check: ${avail_gb} GB free (>= ${min_gb} GB)"
+        fi
+        # sccache: wrap rustc AND the C/C++ compiler (so DuckDB's bundled C++
+        # amalgamation is cached too, not just Rust). Incremental compilation is
+        # incompatible with sccache, so turn it off. SCCACHE_DIR/backend is
+        # provided by the runner's own env (the pool stack points it at the NFS
+        # mount); we only flip the wrappers on.
+        if command -v sccache >/dev/null 2>&1; then
+          # SCCACHE_BASEDIR rewrites absolute paths under the workspace to relative
+          # in the cache key — without it the EPHEMERAL runner's random name in the
+          # build path (/_work/ags5-pool-<rnd>/…) busts the C/C++ (bundled-DuckDB)
+          # cache every run (the long pole). BUT the sccache SERVER reads basedir
+          # only at STARTUP, and letting cargo spawn it implicitly left it unset
+          # ("Base directories (none)" → still cold). So start the server HERE with
+          # basedir in its own env. (SCCACHE_DIR comes from the runner-stack env.)
+          export SCCACHE_BASEDIR="$GITHUB_WORKSPACE"
+          sccache --stop-server >/dev/null 2>&1 || true
+          sccache --start-server || true
+          {
+            echo "RUSTC_WRAPPER=sccache"
+            echo "CC=sccache cc"
+            echo "CXX=sccache c++"
+            echo "CARGO_INCREMENTAL=0"
+            echo "SCCACHE_BASEDIR=$GITHUB_WORKSPACE"
+          } >> "$GITHUB_ENV"
+          echo "[build-accel] sccache server started (basedir=$GITHUB_WORKSPACE): $(sccache --version)"
+        else
+          echo "[build-accel] sccache not found — building unaccelerated"
+        fi
+        # mold: far faster at linking the bundled-DuckDB static lib. The runner
+        # base is Ubuntu 20.04, whose gcc 9 does NOT accept `-fuse-ld=mold` (that
+        # needs gcc 12+) — so point gcc at mold's `ld` shim via `-B`, which works
+        # on ANY gcc. Scoped to the x86_64 Linux target via the per-target
+        # rustflags env (wasm32 builds, which use lld, are untouched). Guarded: if
+        # the shim isn't where expected, skip rather than break the build.
+        if command -v mold >/dev/null 2>&1; then
+          mold_ld_dir="$(cd "$(dirname "$(command -v mold)")/../libexec/mold" 2>/dev/null && pwd || true)"
+          if [ -n "$mold_ld_dir" ] && [ -e "$mold_ld_dir/ld" ]; then
+            echo "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS=-Clink-arg=-B$mold_ld_dir" >> "$GITHUB_ENV"
+            echo "[build-accel] mold enabled via -B$mold_ld_dir ($(mold --version | head -1))"
+          else
+            echo "[build-accel] mold present but no libexec/mold/ld shim — default linker"
+          fi
+        else
+          echo "[build-accel] mold not found — default linker"
+        fi
+        # Cap parallel codegen so a single build can't spawn a rustc per host core
+        # and spike RAM — that starvation is what OOM-killed the runner agent
+        # ("lost communication"). Tracks nproc (so it follows a container CPU limit
+        # down on cgroup v2) but never exceeds 4.
+        jobs="$(nproc 2>/dev/null || echo 4)"; [ "$jobs" -gt 4 ] && jobs=4
+        echo "CARGO_BUILD_JOBS=$jobs" >> "$GITHUB_ENV"
+        echo "[build-accel] CARGO_BUILD_JOBS=$jobs"

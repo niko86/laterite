@@ -1,0 +1,141 @@
+@import "tailwindcss";
+
+/* Class-toggled dark mode: `dark:` keys off `.dark` on <html>, set by the
+   header toggle (theme.ts) — not prefers-color-scheme — with a no-flash
+   inline script in index.html applying the persisted/system choice before
+   first paint. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Semantic neutral tokens. The app was hardcoded to one slate scale; these
+   map it to roles that flip *once* here instead of at every call site.
+   `@theme inline` emits the value as `var(--token)`, so the utilities
+   (bg-surface, text-fg, border-line, …) resolve through the runtime vars
+   below and switch with the theme. Accent colours (emerald/amber/red/sky)
+   stay as palette classes — they read on both themes — with a light/dark
+   text shade applied inline only where contrast demands it. */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-code: var(--surface-code);
+  --color-chip: var(--chip);
+  --color-line: var(--line);
+  --color-line-subtle: var(--line-subtle);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-soft: var(--fg-soft);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-fg-dim: var(--fg-dim);
+  /* Accent *text* tokens (status + interactive). The matching tinted
+     backgrounds/borders stay as emerald/amber/red/sky palette classes —
+     a faint tint reads on both themes — but their text needs a darker
+     shade on light, a lighter one on dark, so it flips here. */
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-err: var(--err);
+  --color-accent: var(--accent);
+}
+
+/* Light + dark values were retuned off the #fff / #000 extremes (a UI-advisory
+   pass): the old light surface was pure-white (flat, glary) and the old dark
+   base was near-black with near-white text (~16:1 halation). New neutrals sit
+   on the Tailwind slate scale but pulled toward GitHub-Primer territory, with a
+   real canvas<surface<raised elevation ladder; dark status/accent shades dimmed
+   300→400 to cut glare. WCAG-checked: dark body text ~14:1, all body + status
+   accents pass AA in both modes. Token NAMES + the @theme inline wiring are
+   unchanged — this is a value-only swap. */
+:root {
+  color-scheme: light;
+  --canvas: #f1f5f9; /* page background — a step BELOW the surface so cards lift */
+  --surface: #fafbfc; /* panels / cards — off-white, not pure #fff (kills glare) */
+  --surface-raised: #eef2f6; /* inputs, sticky group headers */
+  --surface-code: #f1f5f9; /* source snippets */
+  --chip: #e2e8f0; /* small badges / tags */
+  --line: #e2e8f0; /* default border */
+  --line-subtle: #e9eef4; /* hairline row dividers */
+  --line-strong: #cbd5e1; /* input / control borders */
+  --fg: #0f172a; /* headings + strong body */
+  --fg-soft: #334155; /* labels */
+  --fg-muted: #475569; /* muted hints */
+  --fg-faint: #64748b; /* faint */
+  --fg-dim: #94a3b8; /* dimmest, e.g. line numbers */
+  --ok: #047857; /* emerald-700 */
+  --warn: #b45309; /* amber-700 */
+  --err: #b91c1c; /* red-700 */
+  --accent: #0369a1; /* sky-700 — bumped from sky-600 to clear AA on link text */
+}
+
+.dark {
+  color-scheme: dark;
+  --canvas: #0d1117; /* off near-black (GitHub Primer) — the big harshness fix */
+  --surface: #161b22; /* a real elevation step above canvas */
+  --surface-raised: #1c2230; /* clear third rung */
+  --surface-code: #0b0f17; /* lifted OFF slate-950 so code reads as an inset */
+  --chip: #222b3a;
+  --line: #262d3a; /* softer divider that whispers, not cuts */
+  --line-subtle: #1f2632;
+  --line-strong: #3a4252; /* control outlines still visible on lifted surfaces */
+  --fg: #e2e8f0; /* slate-200, not slate-100 — drops ~16:1→~14:1, no halation */
+  --fg-soft: #cbd5e1;
+  --fg-muted: #94a3b8;
+  --fg-faint: #7484a0; /* clears the now-lighter canvas */
+  --fg-dim: #566273; /* line numbers legible on the lifted code surface */
+  --ok: #34d399; /* emerald-400 (was 300) */
+  --warn: #fbbf24; /* amber-400 (was 300) — the brightest old offender */
+  --err: #f87171; /* red-400 (was 300) */
+  --accent: #38bdf8; /* sky-400 (was 300) */
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background-color: var(--canvas);
+  color: var(--fg);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+}
+
+/* Monospace for source snippets + the SQL console (Phase 2). */
+.mono {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+}
+
+/* Shared scroll container for the long data regions (findings list, result /
+   data / coverage tables). One home instead of four inline `max-height` styles,
+   so the cap is responsive: tighter on a phone (where a 70vh region buried under
+   other sections is unreachable), taller on a desktop. `dvh` tracks the *dynamic*
+   viewport (mobile URL-bar collapse) with a `vh` fallback for older engines. */
+.scroll-region {
+  max-height: 60vh;
+  max-height: 60dvh;
+  overflow: auto;
+}
+@media (min-width: 1024px) {
+  .scroll-region {
+    max-height: 70vh;
+    max-height: 70dvh;
+  }
+}
+
+/* Like .scroll-region, but the VERTICAL cap kicks in only from md up. On a
+   phone the region flows with the page (one scroll, not a scroll-within-scroll
+   buried under the editor), keeping just horizontal scroll for wide tables.
+   Used where a results grid STACKS under other content (the SQL console). */
+.scroll-region-soft {
+  overflow-x: auto;
+}
+@media (min-width: 768px) {
+  .scroll-region-soft {
+    max-height: 70vh;
+    max-height: 70dvh;
+    overflow: auto;
+  }
+}

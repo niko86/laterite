@@ -11,29 +11,32 @@ name: parity
 
 on:
   workflow_dispatch:
-  schedule:
-    # First of every month, 03:00 UTC.
-    - cron: "0 3 1 * *"
 
 env:
   CARGO_TERM_COLOR: always
   PYTHON_AGS4_VERSION: "1.2.0"
   PARITY_MIN_PASSING: "122"
 
+# Least privilege: the job only checks out, clones a public repo, and runs tests.
+permissions:
+  contents: read
+
 jobs:
   parity:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable # explicit channel — required when hash-pinned
 
       - name: Install uv
         # Pin to a specific v8 patch — astral-sh/setup-uv hasn't
         # published a floating `v8` major tag yet (only `v7`).
         # Revisit once `v8` floating exists.
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
           enable-cache: true
 
@@ -42,12 +45,30 @@ jobs:
 
       - name: Clone python-ags4 sibling repo
         run: |
+          # Idempotent: the self-hosted pool persists _work across jobs (the
+          # volume fix in PR #77), so a prior run's clone is still present and a
+          # bare `git clone` fails "destination already exists". Nuke + re-clone
+          # for a clean, correctly-pinned tree.
+          rm -rf ../ags-python-library
           git clone https://gitlab.com/ags-data-format-wg/ags-python-library \
               ../ags-python-library
-          ( cd ../ags-python-library && git checkout "v${PYTHON_AGS4_VERSION}" )
+          # python-ags4's tags have NO `v` prefix (the tag is `1.2.0`, not
+          # `v1.2.0`) — a `v${...}` checkout fails with "pathspec did not match".
+          ( cd ../ags-python-library && git checkout "${PYTHON_AGS4_VERSION}" )
 
       - name: uv sync
         run: uv sync --all-extras
+
+      # uv sync installs the workspace packages editable but does NOT compile the
+      # PyO3 cdylibs (_laterite_native / _laterite_ags5_native). Without this the
+      # oracle's `import laterite.compat` fails with a missing-_laterite_native
+      # ImportError and pytest collects 0 tests → "0 passed" → false regression.
+      # (Same step ci.yml's python job runs; parity was missing it — the broken
+      # `git checkout v1.2.0` clone masked it until that was fixed.)
+      - name: Build native extensions (maturin develop)
+        run: |
+          (cd packages/laterite      && uv run --no-sync maturin develop --uv)
+          (cd packages/laterite-ags5 && uv run --no-sync maturin develop --uv)
 
       - name: Run python-ags4 parity oracle
         id: parity

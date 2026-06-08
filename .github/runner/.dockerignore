@@ -1,0 +1,3 @@
+# The image fetches every artefact over the network and COPYs nothing from the
+# build context, so keep the context empty — Docker still reads the Dockerfile.
+*

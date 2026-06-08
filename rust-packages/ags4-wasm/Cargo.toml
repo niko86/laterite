@@ -1,0 +1,73 @@
+# `ags4-wasm` — the browser wasm front-end for the clean-room AGS4
+# validator (and, in Phase 2, the typed-Arrow parser for the data
+# explorer).
+#
+# A `cdylib` compiled to `wasm32-unknown-unknown` via wasm-pack. It
+# depends on `ags4-validator`'s pure, filesystem-free library API —
+# `parse_bytes` + `resolve_dict_version` + `Dictionary::bundled` +
+# `rules::run_all(source = None)` — so the entire validator runs
+# client-side with nothing uploaded.
+#
+# NB the workspace's `cargo build/clippy/test --workspace` runs on the
+# host; this cdylib compiles there too (wasm-bindgen's macros expand on
+# any target), but it is built *for wasm* only via wasm-pack in
+# deploy-validator.yml. CI excludes it from the host workspace lint/test
+# (see ci.yml `--exclude ags4-wasm`).
+
+[package]
+name = "ags4-wasm"
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.85"
+description = "Browser wasm wrapper around the clean-room AGS4 validator"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+# wasm-pack runs `wasm-opt` on the release build, but the binaryen it
+# downloads validates against MVP wasm — while modern Rust/LLVM enables
+# `bulk-memory` (memory.copy / memory.fill) and `nontrapping-fptoint`
+# (i32.trunc_sat_*) by default for wasm32-unknown-unknown. Without
+# telling wasm-opt to accept them the optimize pass aborts with
+# "Bulk memory operations require bulk memory [--enable-bulk-memory]"
+# (and the matching trunc_sat "all used features should be allowed").
+# `-all` enables every feature — all are universally browser-supported —
+# so `-O` optimization stays on. (Set this to `false` to skip wasm-opt
+# entirely if a future binaryen regresses.)
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-O', '-all']
+
+[dependencies]
+# The engine — pure-Rust, wasm-safe leaf after the Phase 0 CLI split.
+ags4-validator = { path = "../ags4-validator" }
+# The AGS type system — SAME canonical_type / parse_value / parse_datetime
+# the native .ags5db conversion uses, so the explorer casts identically
+# (parity by construction).
+ags5-types = { path = "../ags5-types" }
+# Typed Apache Arrow built in Rust, handed to DuckDB-wasm as one IPC
+# stream per group (no per-cell JS objects, no TRY_CAST). default-
+# features=false keeps the wasm lean — `ipc` (StreamWriter + the core
+# array/schema/record_batch deps it pulls) is all we need; the defaults
+# would drag in prettyprint->comfy-table and other host-only weight.
+arrow = { version = "55", default-features = false, features = ["ipc"] }
+wasm-bindgen = "0.2"
+serde = { version = "1", features = ["derive"] }
+# parse_value returns a serde_json::Value; parse() matches its variants
+# (Number/Bool/String/Null) to fill the typed Arrow column builders.
+serde_json = "1"
+# Structured report -> JS object (json_compatible: maps->objects,
+# None->null, matching the CLI's --json shape).
+serde-wasm-bindgen = "0.6"
+# Readable panics in the browser console (set once on first call).
+console_error_panic_hook = "0.1"
+# Same encoding_rs as the validator so `&'static Encoding` types match
+# across the parse_bytes boundary; resolves the UI's encoding select.
+encoding_rs = "0.8"
+
+[dev-dependencies]
+# Independent datetime oracle for the typed-Arrow parity test: the
+# production cast goes through ags5_types::parse_datetime, the test
+# computes the expected epoch-µs instant straight from chrono.
+chrono = { version = "0.4", default-features = false, features = ["std"] }

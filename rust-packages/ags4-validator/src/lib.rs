@@ -32,12 +32,14 @@ use std::path::{Path, PathBuf};
 pub mod dict;
 pub mod error;
 pub mod findings;
+pub mod fixes;
 pub mod parse;
 pub mod rules;
 
 pub use dict::{DictResolution, DictVersion, Dictionary};
 pub use error::ValidatorError;
 pub use findings::{Finding, Findings};
+pub use fixes::{Fix, FixKind, Fixes, SpanEdit, apply_fixes, compute_fixes};
 
 /// Validation options. `Default` = **auto-detect** the dictionary from
 /// the file's `TRAN_AGS`, errors only.
