@@ -45,6 +45,11 @@ jobs:
 
       - name: Clone python-ags4 sibling repo
         run: |
+          # Idempotent: the self-hosted pool persists _work across jobs (the
+          # volume fix in PR #77), so a prior run's clone is still present and a
+          # bare `git clone` fails "destination already exists". Nuke + re-clone
+          # for a clean, correctly-pinned tree.
+          rm -rf ../ags-python-library
           git clone https://gitlab.com/ags-data-format-wg/ags-python-library \
               ../ags-python-library
           # python-ags4's tags have NO `v` prefix (the tag is `1.2.0`, not
@@ -53,6 +58,17 @@ jobs:
 
       - name: uv sync
         run: uv sync --all-extras
+
+      # uv sync installs the workspace packages editable but does NOT compile the
+      # PyO3 cdylibs (_laterite_native / _laterite_ags5_native). Without this the
+      # oracle's `import laterite.compat` fails with a missing-_laterite_native
+      # ImportError and pytest collects 0 tests → "0 passed" → false regression.
+      # (Same step ci.yml's python job runs; parity was missing it — the broken
+      # `git checkout v1.2.0` clone masked it until that was fixed.)
+      - name: Build native extensions (maturin develop)
+        run: |
+          (cd packages/laterite      && uv run --no-sync maturin develop --uv)
+          (cd packages/laterite-ags5 && uv run --no-sync maturin develop --uv)
 
       - name: Run python-ags4 parity oracle
         id: parity
