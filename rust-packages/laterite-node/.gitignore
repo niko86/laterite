@@ -1,7 +1,9 @@
 node_modules/
 *.node
-index.js
-index.d.ts
+# index.js + index.d.ts (the napi-rs loader + type defs) ARE committed: they're
+# platform-independent, change only with the #[napi] surface, and the npm-publish
+# job needs them in the checkout (it never runs `napi build`). A drift guard in
+# the `node` CI job (`napi build` → `git diff --exit-code`) keeps them current.
 npm/
 dist/
 *.tgz
