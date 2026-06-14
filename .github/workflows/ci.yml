@@ -198,6 +198,13 @@ jobs:
       - name: Build (napi debug + tsup dist)
         run: npm run build:debug
 
+      # The napi loader (index.js) + types (index.d.ts) are committed (the
+      # npm-publish job needs them and never runs `napi build`). `napi build`
+      # above just regenerated them — assert they match the tracked copies so an
+      # edit to the #[napi] surface can't ship a stale loader/types.
+      - name: napi loader/types drift guard
+        run: git diff --exit-code -- index.js index.d.ts
+
       - name: typecheck (tsc --noEmit)
         run: npm run typecheck
 
@@ -206,6 +213,14 @@ jobs:
       # the { arrow: true } path fetches DuckDB's `arrow` community extension).
       - name: vitest
         run: npm test
+
+      # Packaging smoke: `npm pack` the package and run read/table/validate/emit
+      # against the PACKED dist + native binary — the thing `npm install laterite`
+      # ships. CI builds the addon itself, so a publish-only gap (the npm-publish
+      # job consumes prebuilt .nodes, never running `napi build`) is invisible to
+      # every build-first job; this exercises the consumer artifact instead.
+      - name: packaging smoke (pack + run the built library)
+        run: npm run smoke:pack
 
       - name: sccache stats
         if: always()
