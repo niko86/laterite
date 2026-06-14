@@ -8,6 +8,8 @@ import type {
   ValidationReport,
   DictVersionOpt,
   EncodingOpt,
+  EmitMode,
+  ExportResult,
   Fix,
   RevisionDelta,
   StandardDict,
@@ -23,7 +25,8 @@ type Pending =
   | { kind: "parsed"; resolve: (g: GroupMeta[]) => void; reject: (e: Error) => void }
   | { kind: "arrow"; resolve: (b: Uint8Array) => void; reject: (e: Error) => void }
   | { kind: "revisionDelta"; resolve: (d: RevisionDelta) => void; reject: (e: Error) => void }
-  | { kind: "dictionary"; resolve: (d: StandardDict) => void; reject: (e: Error) => void };
+  | { kind: "dictionary"; resolve: (d: StandardDict) => void; reject: (e: Error) => void }
+  | { kind: "toAgs4"; resolve: (r: ExportResult) => void; reject: (e: Error) => void };
 
 export interface GzipResult {
   bytes: ArrayBuffer;
@@ -79,6 +82,8 @@ worker.addEventListener("message", (e: MessageEvent<WorkerRes>) => {
     p.resolve(msg.delta);
   } else if (msg.kind === "dictionary" && p.kind === "dictionary") {
     p.resolve(msg.dict);
+  } else if (msg.kind === "toAgs4" && p.kind === "toAgs4") {
+    p.resolve(msg.result);
   } else {
     p.reject(new Error(`unexpected ${msg.kind} response for ${p.kind} request`));
   }
@@ -291,5 +296,24 @@ export function dictionary(
       edition: edition && edition !== "auto" ? edition : null,
     });
     pending.set(id, { kind: "dictionary", resolve, reject });
+  });
+}
+
+/** Build valid AGS4 from per-group data (Export tab). `groupsJson` is the
+ *  `[{code, headings, units?, types?, rows}, …]` shape; `mode` is autofix /
+ *  report / strict. Rejects on invalid JSON or a strict-mode rejection. */
+export function toAgs4(
+  groupsJson: string,
+  edition: DictVersionOpt | null,
+  mode: EmitMode,
+): Promise<ExportResult> {
+  return new Promise((resolve, reject) => {
+    const id = postBare({
+      kind: "toAgs4",
+      groupsJson,
+      edition: edition && edition !== "auto" ? edition : null,
+      mode,
+    });
+    pending.set(id, { kind: "toAgs4", resolve, reject });
   });
 }

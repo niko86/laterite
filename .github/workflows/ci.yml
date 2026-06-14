@@ -64,6 +64,7 @@ jobs:
       pull-requests: read   # dorny/paths-filter reads the PR's changed files
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      node: ${{ steps.filter.outputs.node }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
@@ -73,13 +74,19 @@ jobs:
           # crates, the wheels (source + tests), the deps, this workflow, the
           # build-accel action, and the pyi generator (its drift test lives in
           # the python job). tools/assets/docs/release-tooling deliberately don't.
+          # `node` = the laterite-node crate + TS package (drives the `node` job).
           filters: |
             code:
               - 'rust-packages/**'
               - 'packages/**'
+              - 'tests/**'              # the root suite = ags5-xml coverage (run below)
               - 'pyproject.toml'
               - 'uv.lock'
               - 'tools/generate_pyi.py'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/build-accel/**'
+            node:
+              - 'rust-packages/laterite-node/**'
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
 
@@ -152,6 +159,59 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
+  # laterite-node: the napi addon + TS package. The `rust` job above already
+  # compiles the crate (workspace clippy/test); this gate is the TS half —
+  # build the native addon, typecheck, and run the vitest suite (read/validate/
+  # emit, DuckDB sql/at + arrow output, typed-graph drift, transport). Same
+  # self-hosted Linux runner + sccache (the napi build reuses the warm cache).
+  node:
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.node == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: rust-packages/laterite-node
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+
+      # sccache + mold (no-op if the runner lacks them) — the napi build's Rust
+      # half shares the same content-addressed cache as the `rust` job.
+      - uses: ./.github/actions/build-accel
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+
+      # The platform `@laterite/native-*` packages are unpublished optional deps
+      # (the local napi build below provides the .node), so `npm ci` skips them.
+      - name: npm ci
+        run: npm ci
+
+      # Debug napi build (no --release: CI asserts no wall-clock) + the tsup dist
+      # — proves the native addon AND the shippable dual ESM/CJS bundle build.
+      - name: Build (napi debug + tsup dist)
+        run: npm run build:debug
+
+      - name: typecheck (tsc --noEmit)
+        run: npm run typecheck
+
+      # vitest: read/validate/emit, the typed-graph generator drift guard, and
+      # the DuckDB sql/at suite (the optional @duckdb/node-api peer is a devDep;
+      # the { arrow: true } path fetches DuckDB's `arrow` community extension).
+      - name: vitest
+        run: npm test
+
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
   # Dedicated, PARALLEL coverage gate — no `needs`, so it never slows the
   # fast `rust`/`python` feedback above. Separate because `-C instrument-
   # coverage` changes RUSTFLAGS: sccache can't share its cache with the
@@ -190,7 +250,7 @@ jobs:
       - name: Install cargo-llvm-cov
         # Prebuilt binary (no compile, no runner-image rebuild). SHA-pinned
         # per the supply-chain policy; Dependabot bumps it.
-        uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2.81.8
+        uses: taiki-e/install-action@7a79fe8c3a13344501c80d99cae481c1c9085912 # v2.81.10
         with:
           tool: cargo-llvm-cov
 
@@ -347,9 +407,16 @@ jobs:
         # gone. (compat.py's remaining uncovered blocks are Rust-backed Excel
         # I/O — covered in ags5-core/excel.rs, not via Python.)
         run: |
+          # The root `tests/` (the ags5-xml suite) is private-only — it's
+          # blocklisted from the public mirror (niko86/laterite) — so include it
+          # only when present. Handed a missing path, pytest aborts collection
+          # entirely (0 tests → coverage-floor fail), which broke the public
+          # repo's python job. The conditional is a no-op on the private repo
+          # (the dir exists, so behaviour + coverage are unchanged).
           uv run pytest \
             packages/laterite/tests \
             packages/laterite-ags5/tests \
+            $([ -d tests ] && echo tests) \
             -n 4 --durations=20 -q --tb=short \
             --cov=laterite --cov=laterite_ags5 \
             --cov-report=term-missing --cov-report=xml --cov-fail-under=80

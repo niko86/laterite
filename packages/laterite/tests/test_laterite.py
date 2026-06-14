@@ -19,12 +19,19 @@ import sys
 from pathlib import Path
 
 import laterite
-import narwhals.stable.v1 as nw
 import pytest
 from laterite import compat as AGS4
 
-_FIX = Path(__file__).parents[3] / "rust-packages" / "ags4-validator" / "tests" / "fixtures"
-_RUST_BIN = Path(__file__).parents[3] / "rust-packages" / "target" / "release" / "ags4-check"
+_FIX = (
+    Path(__file__).parents[3]
+    / "rust-packages"
+    / "ags4-validator"
+    / "tests"
+    / "fixtures"
+)
+_RUST_BIN = (
+    Path(__file__).parents[3] / "rust-packages" / "target" / "release" / "ags4-check"
+)
 _FIXTURES = sorted(_FIX.glob("*.ags"))
 _CLEAN = _FIX / "clean_minimal.ags"
 
@@ -32,11 +39,15 @@ logging.disable(logging.CRITICAL)
 
 
 def _quiet(fn, *a, **k):
-    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+    with (
+        contextlib.redirect_stdout(io.StringIO()),
+        contextlib.redirect_stderr(io.StringIO()),
+    ):
         return fn(*a, **k)
 
 
 # --- nice API -------------------------------------------------------
+
 
 def test_validate_clean_file_is_valid():
     rep = laterite.validate(str(_CLEAN))
@@ -62,7 +73,7 @@ def test_read_to_numeric_coerces_like_pandas():
         '"DATA","BH1","10.50"\r\n"DATA","BH2","oops"\r\n'
     )
     f = laterite.read(text=src)
-    col = f.to_numeric("LOCA").to_native()["LOCA_FDEP"].to_list()
+    col = f.to_numeric("LOCA")["LOCA_FDEP"].to_list()
     assert col == [10.5, None]
 
 
@@ -78,10 +89,12 @@ def test_missing_file_raises_filenotfound():
 
 # --- compat: python-ags4 drop-in -----------------------------------
 
+
 def test_compat_dataframe_shape_matches_python_ags4():
     pytest.importorskip("python_ags4")
     from python_ags4 import AGS4 as ref
-    t, h = AGS4.AGS4_to_dataframe(str(_CLEAN))            # default = pandas
+
+    t, h = AGS4.AGS4_to_dataframe(str(_CLEAN))  # default = pandas
     rt, rh = _quiet(ref.AGS4_to_dataframe, str(_CLEAN))
     assert set(t) == set(rt)
     for g in t:
@@ -104,6 +117,7 @@ def test_compat_AGS4Error_aliases_native_Ags4Error():
     """python-ags4 callers do `pytest.raises(AGS4Error, ...)`; native
     code raises `Ags4Error`. Same class so both catch each other."""
     from laterite._errors import Ags4Error
+
     assert AGS4.AGS4Error is Ags4Error
 
 
@@ -211,8 +225,9 @@ def test_compat_strict_pre_check_raises_on_ragged_data_row(tmp_path):
         '"TYPE","ID","X"\r\n'
         '"DATA","P1"\r\n'  # only 2 fields, HEADING has 3
     )
-    with pytest.raises(AGS4.AGS4Error,
-                       match=r"does not have the same number of entries"):
+    with pytest.raises(
+        AGS4.AGS4Error, match=r"does not have the same number of entries"
+    ):
         AGS4.AGS4_to_dict(str(bad))
 
 
@@ -223,38 +238,67 @@ def test_compat_desc_translator_unit():
     from laterite._compat_desc import translate
 
     # Rule 17 — "is not defined in" → "not found in"
-    assert (translate("AGS Format Rule 17", "TYPE",
-                      'Data type "ID" is not defined in the TYPE group.')
-            == 'Data type "ID" not found in TYPE group.')
+    assert (
+        translate(
+            "AGS Format Rule 17",
+            "TYPE",
+            'Data type "ID" is not defined in the TYPE group.',
+        )
+        == 'Data type "ID" not found in TYPE group.'
+    )
     # Rule 19 — wording change
-    assert (translate("AGS Format Rule 19", "test",
-                      "GROUP name must be exactly 4 uppercase letters (A–Z).")
-            == "GROUP name should consist of four uppercase letters.")
+    assert (
+        translate(
+            "AGS Format Rule 19",
+            "test",
+            "GROUP name must be exactly 4 uppercase letters (A–Z).",
+        )
+        == "GROUP name should consist of four uppercase letters."
+    )
     # Rule 19a — quotes stripped, wording change
-    assert (translate("AGS Format Rule 19a", "TEST",
-                      'Heading "test_DPTH" must contain only uppercase '
-                      'letters, digits, and underscore.')
-            == "Heading test_DPTH should consist of only uppercase letters, "
-               "numbers, and an underscore character.")
+    assert (
+        translate(
+            "AGS Format Rule 19a",
+            "TEST",
+            'Heading "test_DPTH" must contain only uppercase '
+            "letters, digits, and underscore.",
+        )
+        == "Heading test_DPTH should consist of only uppercase letters, "
+        "numbers, and an underscore character."
+    )
     # Rule 16 — uses finding group to stitch python-ags4's "in <group>" suffix
-    assert (translate("AGS Format Rule 16", "LOCA",
-                      'Abbreviation "RC" under LOCA_TYPE is not defined in '
-                      'the ABBR group.')
-            == '"RC" under LOCA_TYPE in LOCA not found in ABBR group.')
+    assert (
+        translate(
+            "AGS Format Rule 16",
+            "LOCA",
+            'Abbreviation "RC" under LOCA_TYPE is not defined in the ABBR group.',
+        )
+        == '"RC" under LOCA_TYPE in LOCA not found in ABBR group.'
+    )
     # Rule 8 — type-specific suffix (DMS)
-    assert (translate("AGS Format Rule 8", "LOCA",
-                      'Value "51:68:52.498" in LOCA_LAT does not match its '
-                      'declared TYPE "DMS".')
-            == "Value 51:68:52.498 in LOCA_LAT not of data type DMS or is "
-               "an invalid value.")
+    assert (
+        translate(
+            "AGS Format Rule 8",
+            "LOCA",
+            'Value "51:68:52.498" in LOCA_LAT does not match its declared TYPE "DMS".',
+        )
+        == "Value 51:68:52.498 in LOCA_LAT not of data type DMS or is "
+        "an invalid value."
+    )
     # Rule 8 — U type, non-numeric value → "Numeric value expected." suffix
-    assert (translate("AGS Format Rule 8", "SAMP",
-                      'Value "x" in SAMP_RECL does not match its declared '
-                      'TYPE "U".')
-            == "Value x in SAMP_RECL not of data type U. Numeric value expected.")
+    assert (
+        translate(
+            "AGS Format Rule 8",
+            "SAMP",
+            'Value "x" in SAMP_RECL does not match its declared TYPE "U".',
+        )
+        == "Value x in SAMP_RECL not of data type U. Numeric value expected."
+    )
     # Unmapped rule → desc returned untouched
-    assert (translate("AGS Format Rule 999", "X", "no entry for this")
-            == "no entry for this")
+    assert (
+        translate("AGS Format Rule 999", "X", "no entry for this")
+        == "no entry for this"
+    )
 
 
 def test_compat_check_file_opt_out_returns_laterite_wording():
@@ -278,7 +322,9 @@ def test_compat_check_file_matches_engine(fx):
     """compat.check_file rule-key set == the nice API == the engine.
     (This is the real contract; python-ags4 agreement is a separate,
     O-N-aware comparison.)"""
-    rule_keys = {k for k in AGS4.check_file(str(fx)) if k.startswith("AGS Format Rule ")}
+    rule_keys = {
+        k for k in AGS4.check_file(str(fx)) if k.startswith("AGS Format Rule ")
+    }
     rep_keys = set(laterite.validate(str(fx)).by_rule())
     assert rule_keys == rep_keys
 
@@ -326,19 +372,25 @@ def test_compat_convert_to_numeric_default_pandas_backend():
 
     import math
 
-    nf = nw.from_native(out, eager_only=True)
-    assert nf.shape[0] == 2  # UNIT/TYPE rows dropped, 2 DATA rows
-    vals = nf["LOCA_FDEP"].to_list()  # 2DP coerced; bad cell → missing
+    import polars as pl
+
+    # convert_to_numeric returns the process-wide default backend, which may be
+    # pandas OR polars — normalise to polars to assert backend-agnostically.
+    pf = out if isinstance(out, pl.DataFrame) else pl.from_pandas(out)
+    assert pf.shape[0] == 2  # UNIT/TYPE rows dropped, 2 DATA rows
+    vals = pf["LOCA_FDEP"].to_list()  # 2DP coerced; bad cell → missing
     assert vals[0] == 10.5
-    # pandas backend → NaN, polars/pyarrow → None: accept either
+    # pandas backend → NaN, polars → None: accept either
     assert vals[1] is None or (isinstance(vals[1], float) and math.isnan(vals[1]))
 
 
 # --- compat round-trip ---------------------------------------------
 
+
 def test_compat_roundtrip_matches_python_ags4(tmp_path):
     pytest.importorskip("python_ags4")
     from python_ags4 import AGS4 as ref
+
     t, h = AGS4.AGS4_to_dataframe(str(_CLEAN))
     rt, rh = _quiet(ref.AGS4_to_dataframe, str(_CLEAN))
     a = tmp_path / "lat.ags"
@@ -349,6 +401,7 @@ def test_compat_roundtrip_matches_python_ags4(tmp_path):
 
 
 # --- CLI byte-parity vs the Rust binary ----------------------------
+
 
 def _run_py_cli(args: list[str]) -> tuple[str, int]:
     """Drive the Python `ags4-check` CLI *in-process* (covers
@@ -386,10 +439,10 @@ def test_cli_json_ndjson_exit_byte_parity(fx):
 
 def test_cli_exit_codes():
     # In-process: each branch exercises a distinct `_cli.main` exit path.
-    assert _run_py_cli([str(_CLEAN)])[1] == 0              # clean
+    assert _run_py_cli([str(_CLEAN)])[1] == 0  # clean
     assert _run_py_cli(["/no/such.ags", "--json"])[1] == 3  # not found
-    assert _run_py_cli(["--tui", str(_CLEAN)])[1] == 5     # unknown opt
-    assert _run_py_cli([])[1] == 5                         # no input file
+    assert _run_py_cli(["--tui", str(_CLEAN)])[1] == 5  # unknown opt
+    assert _run_py_cli([])[1] == 5  # no input file
     # External --dict override is deliberately unimplemented (O-28).
     assert _run_py_cli([str(_CLEAN), "--dict", "x.ags"])[1] == 5
 
@@ -418,7 +471,10 @@ def test_cli_plain_report_and_out_file(tmp_path):
     with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
         code = _cli.main([str(findings_fx), "--out", str(out_path)])
     assert code == 1
-    assert out_path.read_text().rstrip("\n").endswith("CLAY") or "finding(s)" in out_path.read_text()
+    assert (
+        out_path.read_text().rstrip("\n").endswith("CLAY")
+        or "finding(s)" in out_path.read_text()
+    )
     assert "finding(s)" in buf.getvalue()
 
     # --json-out tees JSON to disk while stdout keeps the plain report.
@@ -482,17 +538,19 @@ def test_compat_format_numeric_column_DP_and_SF():
     from laterite.compat import format_numeric_column
     from python_ags4 import AGS4
 
-    df = pd.DataFrame({
-        "HEADING": ["UNIT", "TYPE", "DATA", "DATA", "DATA"],
-        "X": ["m", "2DP", 1.5, 2.0, 3.14159],
-    })
+    df = pd.DataFrame(
+        {
+            "HEADING": ["UNIT", "TYPE", "DATA", "DATA", "DATA"],
+            "X": ["m", "2DP", 1.5, 2.0, 3.14159],
+        }
+    )
 
     for spec in ("2DP", "1SCI", "3SF"):
         ours = format_numeric_column(df.copy(), "X", spec)
         theirs = AGS4.format_numeric_column(df.copy(), "X", spec)
         # DATA rows must match byte-for-byte; UNIT/TYPE pseudo-rows
         # remain object-typed strings on both sides.
-        assert (ours["X"].tolist() == theirs["X"].tolist()), (
+        assert ours["X"].tolist() == theirs["X"].tolist(), (
             f"divergence on TYPE={spec}: ours={ours['X'].tolist()} "
             f"theirs={theirs['X'].tolist()}"
         )
@@ -529,12 +587,8 @@ def test_compat_write_error_report_byte_exact(tmp_path):
         "AGS Format Rule 1": [
             {"line": 1, "group": '"LOCA"', "desc": "Non-ASCII char."}
         ],
-        "AGS Format Rule 7": [
-            {"line": 5, "group": '"PROJ"', "desc": "Field missing."}
-        ],
-        "Warning (foo)": [
-            {"line": 8, "group": '"SAMP"', "desc": "A warning."}
-        ],
+        "AGS Format Rule 7": [{"line": 5, "group": '"PROJ"', "desc": "Field missing."}],
+        "Warning (foo)": [{"line": 8, "group": '"SAMP"', "desc": "A warning."}],
     }
     ours_path = tmp_path / "ours.txt"
     theirs_path = tmp_path / "theirs.txt"
@@ -671,7 +725,6 @@ def test_compat_AGS4_to_excel_sorting_strategy(tmp_path):
     from laterite.compat import AGS4_to_excel
 
     xlsx = tmp_path / "sorted.xlsx"
-    AGS4_to_excel(str(_PY_AGS4_TEST_DATA), str(xlsx),
-                  sorting_strategy="alphabetical")
+    AGS4_to_excel(str(_PY_AGS4_TEST_DATA), str(xlsx), sorting_strategy="alphabetical")
     sheets = pd.read_excel(str(xlsx), sheet_name=None, engine="openpyxl")
     assert list(sheets.keys()) == sorted(sheets.keys())

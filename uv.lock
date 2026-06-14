@@ -299,10 +299,10 @@ wheels = [
 
 [[package]]
 name = "laterite"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "packages/laterite" }
 dependencies = [
-    { name = "narwhals" },
+    { name = "duckdb" },
     { name = "polars" },
 ]
 
@@ -317,7 +317,6 @@ all = [
 ]
 compat = [
     { name = "pandas" },
-    { name = "pyarrow" },
 ]
 pandas = [
     { name = "pandas" },
@@ -328,15 +327,14 @@ pyarrow = [
 
 [package.metadata]
 requires-dist = [
+    { name = "duckdb", specifier = ">=1.4.0" },
     { name = "laterite-ags5", marker = "extra == 'ags5'", editable = "packages/laterite-ags5" },
     { name = "laterite-ags5", marker = "extra == 'all'", editable = "packages/laterite-ags5" },
-    { name = "narwhals", specifier = ">=1.40" },
     { name = "pandas", marker = "extra == 'all'", specifier = "<3" },
     { name = "pandas", marker = "extra == 'compat'", specifier = "<3" },
     { name = "pandas", marker = "extra == 'pandas'", specifier = "<3" },
     { name = "polars", specifier = ">=1.40.1" },
     { name = "pyarrow", marker = "extra == 'all'", specifier = ">=24.0.0" },
-    { name = "pyarrow", marker = "extra == 'compat'", specifier = ">=24.0.0" },
     { name = "pyarrow", marker = "extra == 'pyarrow'", specifier = ">=24.0.0" },
 ]
 provides-extras = ["compat", "pandas", "pyarrow", "ags5", "all"]
@@ -531,15 +529,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
-]
-
-[[package]]
-name = "narwhals"
-version = "2.21.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/cf/a0/6198c56d42ef2f3c6ed0c42ba30dbcefdc86a91262d7d449010770ae085b/narwhals-2.21.2.tar.gz", hash = "sha256:5c5b2d0b47aef7c73ea412cfcbcd467f2f2d5be73e3c2ab19d78f4a97718790a", size = 632176, upload-time = "2026-05-16T08:49:08.314Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1d/77/928ea2e70641ca177a11140062cc5840d421795f2e82749d408d0cce900a/narwhals-2.21.2-py3-none-any.whl", hash = "sha256:7bb57c3700486039215455b9bf2d64261915cc0fd845cc30272d631df696b251", size = 451201, upload-time = "2026-05-16T08:49:05.536Z" },
 ]
 
 [[package]]

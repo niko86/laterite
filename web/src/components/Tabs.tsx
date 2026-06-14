@@ -1,12 +1,13 @@
 import { For, type Component } from "solid-js";
 
-export type TabId = "validate" | "fix" | "explore" | "tools";
+export type TabId = "validate" | "fix" | "explore" | "tools" | "export";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "validate", label: "Validate" },
   { id: "fix", label: "Fix" },
   { id: "explore", label: "Explore" },
   { id: "tools", label: "Tools" },
+  { id: "export", label: "Export" },
 ];
 
 export const Tabs: Component<{

@@ -29,6 +29,10 @@ publish = false
 # wasm-safe leaf so the browser explorer (`ags4-wasm`) shares the exact
 # casting logic. Re-exported as `ags5_core::ags_types` (see lib.rs).
 ags5-types = { path = "../ags5-types" }
+# The AGS4 writer/emitter, lifted into its own wasm-safe leaf. ags5-core's
+# excel.rs + ags5db's db-to-ags4 reach it via the `ags4_writer` re-export
+# shim; `From<EmitError> for CliError` (error.rs) keeps their `?` working.
+ags4-emit = { path = "../ags4-emit" }
 # Calendar/clock checking for canonical-type validation (mirrors the
 # `chrono` use in ags4-validator). `serde` feature so DateTime types
 # round-trip through serde_json without an extra map.

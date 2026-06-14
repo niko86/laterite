@@ -65,6 +65,27 @@ impl CliError {
     }
 }
 
+/// The AGS4 writer/emitter lives in the `ags4-emit` leaf now; map its
+/// error back onto `CliError` so `ags5-core`'s excel + `ags5db`'s
+/// db-to-ags4 callers keep using `?` over `write_ags4`. `write_ags4`
+/// only ever yields `Write`; the other variants come from `emit_ags4`'s
+/// validity modes (not used by these callers) but are mapped for totality.
+impl From<ags4_emit::EmitError> for CliError {
+    fn from(e: ags4_emit::EmitError) -> Self {
+        match e {
+            // Preserve the historical "ags4 write: …" Schema message.
+            ags4_emit::EmitError::Write(m) => CliError::Schema(format!("ags4 write: {m}")),
+            ags4_emit::EmitError::Reparse(m) => CliError::Schema(format!("ags4 emit: {m}")),
+            ags4_emit::EmitError::Invalid(found) => {
+                let n: usize = found.values().map(Vec::len).sum();
+                CliError::Schema(format!(
+                    "ags4 emit: strict mode rejected output ({n} finding(s))"
+                ))
+            }
+        }
+    }
+}
+
 fn suggest_hint(hints: &[String]) -> String {
     if hints.is_empty() {
         String::new()

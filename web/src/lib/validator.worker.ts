@@ -17,6 +17,7 @@ import init, {
   parse,
   diff,
   dictionary,
+  to_ags4,
 } from "../wasm/ags4_wasm.js";
 import type { ParsedDataset } from "../wasm/ags4_wasm.js";
 import wasmUrl from "../wasm/ags4_wasm_bg.wasm?url";
@@ -25,6 +26,7 @@ import type {
   Fix,
   RevisionDelta,
   StandardDict,
+  ExportResult,
 } from "./validator";
 import type { GroupMeta } from "./duckTypes";
 
@@ -94,6 +96,17 @@ export interface DictionaryReq {
   /** "auto"/null → the fallback edition; else 4.0.3|4.0.4|4.1|4.1.1|4.2. */
   edition: string | null;
 }
+/** Build valid AGS4 from per-group data (Export tab). Carries no file bytes
+ *  — `groupsJson` is the `[{code, headings, rows}, …]` shape `to_ags4` wants. */
+export interface ToAgs4Req {
+  id: number;
+  kind: "toAgs4";
+  groupsJson: string;
+  /** "auto"/null → 4.1.1; else 4.0.3|4.0.4|4.1|4.1.1|4.2. */
+  edition: string | null;
+  /** autofix | report | strict. */
+  mode: string;
+}
 export type WorkerReq =
   | ValidateReq
   | ComputeFixesReq
@@ -101,7 +114,8 @@ export type WorkerReq =
   | ParseReq
   | ArrowReq
   | RevisionDiffReq
-  | DictionaryReq;
+  | DictionaryReq
+  | ToAgs4Req;
 
 export type WorkerRes =
   | { type: "ready" }
@@ -114,6 +128,7 @@ export type WorkerRes =
   | { id: number; ok: true; kind: "arrow"; code: string; bytes: ArrayBuffer }
   | { id: number; ok: true; kind: "revisionDelta"; delta: RevisionDelta }
   | { id: number; ok: true; kind: "dictionary"; dict: StandardDict }
+  | { id: number; ok: true; kind: "toAgs4"; result: ExportResult }
   | { id: number; ok: false; error: string };
 
 /** The header counts of a report, sent alongside gzipped bytes so the UI
@@ -226,6 +241,17 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
     if (req.kind === "dictionary") {
       const dict = dictionary(req.edition ?? undefined) as StandardDict;
       reply({ id: req.id, ok: true, kind: "dictionary", dict });
+      return;
+    }
+
+    if (req.kind === "toAgs4") {
+      // Throws (→ caught below) on invalid JSON or a strict-mode rejection.
+      const result = to_ags4(
+        req.groupsJson,
+        req.edition ?? undefined,
+        req.mode,
+      ) as ExportResult;
+      reply({ id: req.id, ok: true, kind: "toAgs4", result });
       return;
     }
 

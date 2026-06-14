@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The **0.3.0** line — a DuckDB-engine redesign of the read / data-science surface. This is
+a **breaking** change (frame return types move from narwhals to polars / pandas); the 0.x
+version signals the surface is still settling.
+
+### Added
+
+- **In-memory DuckDB engine.** `laterite.read(path)` loads each AGS4 group into a
+  born-typed table in a Python-owned in-memory DuckDB (the pip `duckdb` package, *not*
+  bundled in the wheel), populated lazily per group on first touch:
+  - `ags["LOCA"]` → an eager **polars** `DataFrame` by default, born typed (a 2DP heading
+    is `Float64`, an ID `str`, a non-conforming numeric cell `null`).
+  - `read(path, backend="pandas")` → the same accessor returns **pandas**; both paths are
+    **pyarrow-free** (polars via the Arrow C-stream capsule, pandas via DuckDB's NumPy
+    `.df()`).
+  - `ags.sql("SELECT … WHERE …")` → a **DuckDB relation**: real cross-group joins and
+    **filter pushdown** (the `WHERE` runs in the engine, so a huge file materialises only
+    the rows you keep); finish with `.df()` / `pl.from_arrow(rel)` or chain more SQL.
+  - `ags.at("LOCA", ["BH01", "BH02"])` → a **filtered subset view**: pull a parent entity's
+    related records across groups (everything keyed by `LOCA_ID`), materialising only the
+    matching rows. `sub.groups` lists the related groups; chain `sub["SAMP"]`.
+  - `ags.register(name, frame)` joins your own frames against the groups; `ags.connection`
+    exposes the raw DuckDB connection (parquet export, Arrow via `.arrow()`, …). Read
+    handles are context managers — `with laterite.read(p) as ags: …` — with `close()`.
+- **Born-typed reads on a zero-copy Apache Arrow boundary.** The Rust parser builds typed
+  Arrow per group (`pyo3-arrow`, pyarrow-free) to seed the engine; `to_numeric` is now
+  redundant for typed columns (kept for the compat shape). Writes stay **byte-faithful** —
+  re-emitted from the retained Rust parse, independent of which groups were read.
+- `laterite.transport` (`pack` / `unpack` / `lock` / `unlock`) documented as
+  **content-agnostic** — any file, not only `.ags5db`; a non-path arg now raises an
+  actionable `TypeError`.
+
+### Changed
+
+- **BREAKING — frame return types are now polars / pandas, not narwhals.** The public
+  surface (`ags[code]`, `Report.findings`, `compat`) returns native polars (default) or
+  pandas frames directly; **narwhals is dropped**. A narwhals user wraps the result in one
+  line — `nw.from_native(ags["LOCA"])`. No deprecation shim (nothing depends on 0.2's
+  narwhals returns yet).
+- **Dependencies.** Base is now **`polars + duckdb`** (was `polars + narwhals`); **narwhals
+  and pyarrow are no longer base dependencies**. The `[compat]` extra is **`pandas +
+  pyarrow`** — compat's python-ags4 pandas output goes through `polars.to_pandas()`, which
+  needs pyarrow; compat-polars and the whole core are pyarrow-free. The single
+  `cp312-abi3` wheel is preserved.
+- `Ags4File(...)` given a bad argument (e.g. a file path) now raises a clear `TypeError`
+  pointing at `laterite.read()`, instead of failing several calls later with a cryptic
+  `'PosixPath' object is not subscriptable`.
+
+### Deprecated
+
+- The first parameter of `transport.pack` / `lock` (was `db=`), `unpack` (was `zst=`)
+  and `unlock` (was `file=`) is unified to `src=`. The old keyword names still work but
+  emit a `DeprecationWarning` and will be removed in a future release.
+
 ## [0.2.0] — 2026-06-08
 
 ### Changed

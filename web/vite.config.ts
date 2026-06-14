@@ -122,9 +122,11 @@ export default defineConfig({
         // Belt-and-braces with the runtimeCaching rules below: keep the heavy
         // assets out of the install precache no matter how the globs evolve.
         globIgnores: ["assets/duckdb-*.wasm", "grids/**", "**/*.map"],
-        // 3 MiB clears the 2.2 MB validator wasm but sits far below the 36 MB
-        // DuckDB wasm — so even if a glob slipped, the engine can't precache.
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // 4 MiB clears the ~3.3 MB validator wasm (the AGS4 *producer* —
+        // to_ags4 + the columnar to_ags4_ipc path — added ~1 MB over the
+        // prior 2.2 MB) but sits far below the 36 MB DuckDB wasm, so even if
+        // a glob slipped, the engine can't precache.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         // First-install SW controls the page immediately, so an offline reload
         // right after the first visit is already served from cache.

@@ -15,7 +15,11 @@ ags5-core = { path = "../ags5-core" }
 # Rust-native AGS4 validator (this workspace). Powers
 # `db-to-ags4 --validate` — emit + verify in one pass, no Python.
 ags4-validator = { path = "../ags4-validator" }
-duckdb = { version = "1.4", features = ["bundled"] }
+# `~1.4`, NOT a plain `1.4`: the duckdb crate's `1.MAJOR_MINOR_PATCH.x` scheme means a
+# caret `1.4` resolves up to `1.10503.x` (engine 1.5.3) — a `cargo update` would
+# silently leave the 1.4.x LTS line the bundled CLI engine must hold. Tilde pins 1.4.x.
+# Bump deliberately (dependabot/manual) when moving the LTS floor.
+duckdb = { version = "~1.4", features = ["bundled"] }
 clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
 serde = { version = "1", features = ["derive"] }
 # preserve_order keeps JSON output keys in insertion order, matching Python's

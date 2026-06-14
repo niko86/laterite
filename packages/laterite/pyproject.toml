@@ -1,6 +1,6 @@
 [project]
 name = "laterite"
-version = "0.2.0"
+version = "0.3.0"
 description = "Rust-backed AGS4 reader/writer/validator — a fast, drop-in replacement for python-ags4 with a narwhals-native API"
 readme = "README.md"
 license = "MIT"
@@ -28,17 +28,26 @@ classifiers = [
     "Typing :: Typed",
 ]
 requires-python = ">=3.12"
-# Mandatory runtime deps are intentionally just two:
-#   polars   — the Python-side frame backing: the Rust↔Python boundary
-#              carries plain primitives (NOT pyo3-polars), and _frames.py
-#              assembles polars/narwhals frames from them.
-#   narwhals — the public tabular return type, so callers can target
-#              polars / pandas / pyarrow without us picking for them.
-# pandas is NOT here on purpose — it is an *optional* extra (see below).
-# A python-ags4 install pulls pandas in unconditionally; laterite does not.
+# Mandatory runtime deps:
+#   polars   — the default frame backend; the read boundary hands Rust-built
+#              Arrow over zero-copy (a pyo3-arrow capsule), loaded into DuckDB,
+#              and materialised back pyarrow-free into born-typed polars frames.
+#   duckdb   — the Python-owned in-memory engine: read() loads each group into a
+#              born-typed DuckDB table, so ags[code] / ags.sql(...) run real
+#              cross-group joins + filter pushdown. NOT bundled in the wheel (the
+#              CLI keeps its own); needs no pinned storage version. Floor >=1.4.0
+#              (LTS line, in-memory COMPRESS).
+# narwhals is GONE — the core returns polars / pandas directly and `compat`
+# branches on the native frame; nothing imports narwhals at runtime.
+# pyarrow is NOT a laterite dependency anywhere — not base, not the [compat] extra.
+# The polars path uses the Arrow C-stream capsule; the pandas path (core AND compat)
+# uses DuckDB's NumPy `.df()`; both are pyarrow-free. An Arrow table is only reachable
+# via `ags.connection` (or the explicit `pyarrow` backend/extra) with the user's own
+# pyarrow. pandas is an optional extra; a python-ags4 install pulls pandas in
+# unconditionally, laterite does not.
 dependencies = [
     "polars>=1.40.1",
-    "narwhals>=1.40",
+    "duckdb>=1.4.0",
 ]
 
 [project.urls]
@@ -53,10 +62,12 @@ Changelog = "https://github.com/niko86/laterite/blob/main/CHANGELOG.md"
 # back-compat alias (same set). `set_backend("polars")` (or
 # LATERITE_COMPAT_BACKEND=polars) removes the pandas requirement entirely.
 [project.optional-dependencies]
-# polars.to_pandas() needs pyarrow as a runtime helper, so the compat
-# extra pulls it in alongside pandas — otherwise the default materialise
-# path raises ModuleNotFoundError on pyarrow instead of working.
-compat = ["pandas<3", "pyarrow>=24.0.0"]
+# compat (the python-ags4 drop-in, pandas by default) is now pyarrow-free: its pandas
+# output goes polars -> pandas via DuckDB's NumPy `.df()` (the same trick the core
+# uses), so the extra is just pandas. `pandas` is a back-compat alias of `compat`;
+# `pyarrow` stays for callers who explicitly want the Arrow backend (the only thing
+# that pulls pyarrow).
+compat = ["pandas<3"]
 pandas = ["pandas<3"]
 pyarrow = ["pyarrow>=24.0.0"]
 # Experimental DuckDB-backed .ags5db surface. Pulls in the laterite-ags5

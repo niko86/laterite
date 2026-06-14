@@ -18,6 +18,17 @@ A faster drop-in for [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-p
 [![Python versions](https://img.shields.io/pypi/pyversions/laterite.svg)](https://pypi.org/project/laterite/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+## Part of the laterite suite
+
+One clean-room Rust AGS4 engine, surfaced for every stack:
+
+| Surface | Package | Get it |
+|---|---|---|
+| **Python** | [`laterite`](https://pypi.org/project/laterite/) — PyPI | `pip install laterite` |
+| **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm | `npm install laterite` |
+| **Rust / CLI** | [`ags5db` + `ags4-check`](https://github.com/niko86/laterite/releases) | GitHub Releases |
+| **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser |
+
 ## Install
 
 ```bash

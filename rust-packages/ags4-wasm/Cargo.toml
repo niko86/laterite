@@ -42,17 +42,31 @@ wasm-opt = ['-O', '-all']
 [dependencies]
 # The engine — pure-Rust, wasm-safe leaf after the Phase 0 CLI split.
 ags4-validator = { path = "../ags4-validator" }
+# The shared AGS4 emit orchestrator (`to_ags4`): typed/string cells ->
+# valid AGS4 + AutoFix. Same core the native PyO3 binding uses; depends
+# only on ags5-types + ags4-validator, so it adds no wasm-hostile weight.
+# The `arrow` feature pulls the shared Arrow→Value transpose (group_from_arrow)
+# for the columnar `to_ags4_ipc` path — the same conversion the native host
+# uses, not a copy. arrow's display fallback stays comfy-table-free.
+ags4-emit = { path = "../ags4-emit", features = ["arrow"] }
 # The AGS type system — SAME canonical_type / parse_value / parse_datetime
 # the native .ags5db conversion uses, so the explorer casts identically
-# (parity by construction).
-ags5-types = { path = "../ags5-types" }
-# Typed Apache Arrow built in Rust, handed to DuckDB-wasm as one IPC
-# stream per group (no per-cell JS objects, no TRY_CAST). default-
-# features=false keeps the wasm lean — `ipc` (StreamWriter + the core
-# array/schema/record_batch deps it pulls) is all we need; the defaults
-# would drag in prettyprint->comfy-table and other host-only weight.
-arrow = { version = "55", default-features = false, features = ["ipc"] }
+# (parity by construction). The `arrow` feature pulls in arrow_cols, the
+# shared typed-Arrow column/record-batch builder both hosts emit through —
+# so the browser and the native PyCapsule path cast byte-identically.
+ags5-types = { path = "../ags5-types", features = ["arrow"] }
+# Arrow IPC framing only. The typed columns are built by the shared emitter
+# in ags5-types (arrow_cols); here we just StreamWriter that batch into an
+# IPC stream for duckdb-wasm (the native side hands the same batch to
+# pyo3-arrow as a zero-copy capsule instead). `ipc` pulls StreamWriter + the
+# core array/schema/record_batch crates; default-features=false drops
+# prettyprint->comfy-table and other host-only weight. v59 matches the
+# native pyo3-arrow 0.18 pin so one arrow version serves both hosts.
+arrow = { version = "59", default-features = false, features = ["ipc"] }
 wasm-bindgen = "0.2"
+# js_sys for the `to_ags4_ipc` input: walk the JS array of {code, ipc} and
+# pull each `ipc` Uint8Array's bytes (Reflect + Uint8Array::to_vec).
+js-sys = "0.3"
 serde = { version = "1", features = ["derive"] }
 # parse_value returns a serde_json::Value; parse() matches its variants
 # (Number/Bool/String/Null) to fill the typed Arrow column builders.

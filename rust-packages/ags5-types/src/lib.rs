@@ -15,6 +15,13 @@
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use serde_json::{Number, Value};
 
+// Typed Arrow column/record-batch building. Behind the `arrow` feature so
+// ags5-types stays a tiny wasm-safe leaf for consumers that only need the
+// type system (ags5-core → ags5db). Enabled by the two hosts that emit
+// Arrow: ags4-wasm (→ IPC stream) and laterite-py (→ zero-copy capsule).
+#[cfg(feature = "arrow")]
+pub mod arrow_cols;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CanonicalType {
     String,

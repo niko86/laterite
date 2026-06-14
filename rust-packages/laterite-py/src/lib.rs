@@ -2,9 +2,10 @@
 //!
 //! Thin boundary: every bit of AGS4 logic lives in `ags4-validator`
 //! (clean-room, parity-tested) or the local `emit` module. The Python
-//! side (`laterite/__init__.py`, `compat.py`, `_cli.py`) builds
-//! narwhals/polars frames and the python-ags4-shaped dict from the
-//! primitives returned here.
+//! side (`laterite/__init__.py`, `compat.py`, `_cli.py`) builds the
+//! python-ags4-shaped dict from the primitives `parse_primitives`
+//! returns; the read path's frames come born-typed from the Arrow
+//! tables `parse_arrow` hands over (pyo3-arrow capsule, zero-copy).
 //!
 //! Two error-JSON shapes are deliberately preserved (see the package
 //! README): the Rust-CLI shape `{file, findings:{rule:[...]}}` is
@@ -21,6 +22,7 @@ use ags5_core::error::CliError;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use pyo3_arrow::PyTable;
 use serde_json::{Map, Value};
 
 // S3b (release/v0.1.0-prep): `ags5db_fns` moved to the separate
@@ -28,6 +30,7 @@ use serde_json::{Map, Value};
 // AGS5 surface is gated behind the `laterite[ags5]` extra.
 mod ags_types_fns;
 mod emit;
+mod emit_typed;
 mod excel_fns;
 mod registry_fns;
 mod transport_fns;
@@ -368,6 +371,157 @@ fn parse_primitives<'py>(
     Ok(d)
 }
 
+/// A parsed AGS4 file held Rust-side. `parse_arrow` crosses only cheap
+/// per-group metadata; the raw `ParsedFile` stays HERE and serves two roles
+/// on demand: `table_for` builds a group's typed Arrow table on first touch
+/// (per-group lazy reads), and `emit` re-emits byte-faithful AGS4 for
+/// `write()`. No O(cells) PyObject dict crosses the boundary, and there is no
+/// second AGS formatter — emit reproduces the source DATA values exactly. The
+/// Python `Ags4File` holds one of these as its `_handle`.
+#[pyclass]
+struct Reading {
+    parsed: ags4_validator::parse::ParsedFile,
+}
+
+#[pymethods]
+impl Reading {
+    /// Reconstruct spec-correct AGS4 text from the retained parse (CRLF,
+    /// every field quoted, blank line between groups) — byte-faithful to
+    /// the source DATA values it re-emits.
+    fn emit(&self) -> String {
+        let blocks: Vec<emit::GroupBlock> = self
+            .parsed
+            .group_order
+            .iter()
+            .filter_map(|code| {
+                let g = self.parsed.groups.get(code)?;
+                let n = g.headings.len();
+                // tag + each of the n columns, padded/truncated like the old
+                // Python `_matrix` (a ragged DATA row fills its tail with "").
+                let pad = |tag: &str, src: &[String]| {
+                    let mut row = Vec::with_capacity(n + 1);
+                    row.push(tag.to_string());
+                    for i in 0..n {
+                        row.push(src.get(i).cloned().unwrap_or_default());
+                    }
+                    row
+                };
+                let mut matrix: Vec<Vec<String>> = Vec::with_capacity(3 + g.rows.len());
+                let mut heading = Vec::with_capacity(n + 1);
+                heading.push("HEADING".to_string());
+                heading.extend(g.headings.iter().cloned());
+                matrix.push(heading);
+                matrix.push(pad("UNIT", &g.units));
+                matrix.push(pad("TYPE", &g.types));
+                for r in &g.rows {
+                    matrix.push(pad("DATA", &r.values));
+                }
+                Some(emit::GroupBlock {
+                    code: code.clone(),
+                    matrix,
+                })
+            })
+            .collect();
+        emit::emit(&blocks)
+    }
+
+    /// Build ONE group's typed Arrow table on demand. The read path is
+    /// per-group lazy: `read()` / `scan()` only pay for the groups actually
+    /// touched, so a 69-group file you query two groups of builds two
+    /// RecordBatches, not 69. Returns `None` if `code` isn't in the file.
+    /// Same shared emitter (`ags5_types::arrow_cols`) as the old eager build —
+    /// byte-identical columns, and still the SAME cast the browser's IPC path
+    /// uses. The Python `Ags4File` memoises the result per code.
+    fn table_for(&self, code: &str) -> PyResult<Option<PyTable>> {
+        let Some(g) = self.parsed.groups.get(code) else {
+            return Ok(None);
+        };
+        let batch = ags5_types::arrow_cols::build_record_batch(
+            &g.headings,
+            &g.types,
+            g.rows.len(),
+            |col, row| {
+                g.rows
+                    .get(row)
+                    .and_then(|r| r.values.get(col))
+                    .map(String::as_str)
+            },
+        )
+        .map_err(|e| PyRuntimeError::new_err(format!("arrow batch for {code}: {e}")))?;
+        let schema = batch.schema();
+        Ok(Some(PyTable::try_new(vec![batch], schema)?))
+    }
+}
+
+/// Parse `path` or `text` for `read()` / `scan()`: per-group metadata only
+/// (headings/units/types/line_numbers). The typed Arrow table for a group is
+/// NOT built here — it is built lazily, per group, on first touch via the
+/// `_handle`'s `Reading::table_for` (cast by the one shared emitter
+/// `ags5_types::arrow_cols`, byte-identical to the browser's IPC path). The
+/// raw parse stays Rust-side in that `Reading` handle, also feeding
+/// byte-faithful `write()`; no per-cell PyObject rows cross the boundary.
+#[pyfunction]
+#[pyo3(signature = (path=None, text=None, encoding=None))]
+fn parse_arrow<'py>(
+    py: Python<'py>,
+    path: Option<String>,
+    text: Option<String>,
+    encoding: Option<String>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let enc = match encoding.as_deref() {
+        None | Some("") => encoding_rs::UTF_8,
+        Some(label) => match encoding_rs::Encoding::for_label(label.as_bytes()) {
+            Some(e) => e,
+            None => return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}")),
+        },
+    };
+    let parsed = match (path.as_deref(), text.as_deref()) {
+        (Some(p), _) => ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc),
+        (_, Some(t)) => ags4_validator::parse::parse_str(t),
+        _ => return err_dict(py, 5, "bad_args", "either path or text is required"),
+    };
+    let pf = match parsed {
+        Ok(pf) => pf,
+        Err(e) => {
+            let (c, k, m) = map_err(e);
+            return err_dict(py, c, &k, &m);
+        }
+    };
+
+    let d = PyDict::new(py);
+    d.set_item("ok", true)?;
+    d.set_item("group_order", pf.group_order.clone())?;
+    d.set_item("tran_ags", ags4_validator::tran_ags_of(&pf))?;
+
+    let groups = PyDict::new(py);
+    for code in &pf.group_order {
+        let Some(g) = pf.groups.get(code) else {
+            continue;
+        };
+        let gd = PyDict::new(py);
+        gd.set_item("group_line", g.group_line)?;
+        gd.set_item("heading_line", g.heading_line)?;
+        gd.set_item("unit_line", g.unit_line)?;
+        gd.set_item("type_line", g.type_line)?;
+        gd.set_item("headings", g.headings.clone())?;
+        gd.set_item("units", g.units.clone())?;
+        gd.set_item("types", g.types.clone())?;
+        gd.set_item(
+            "line_numbers",
+            g.rows.iter().map(|r| r.line).collect::<Vec<_>>(),
+        )?;
+        // No eager Arrow table here: the read path is per-group lazy — the
+        // typed table is built on first touch via `Reading::table_for` (the
+        // `_handle` below), so this loop only crosses cheap metadata.
+        groups.set_item(code, gd)?;
+    }
+    d.set_item("groups", groups)?;
+    // Keep the parse Rust-side for byte-faithful write (no per-cell PyObject
+    // rows cross; Reading::emit reproduces the source DATA values exactly).
+    d.set_item("_handle", Reading { parsed: pf })?;
+    Ok(d)
+}
+
 /// Resolve the bundled edition exactly as the engine does. Returns
 /// `(version, resolution)` e.g. `("4.1.1", "fallback")`. Raises
 /// `ValueError` on a bad override or an unsupported (AGS3) edition.
@@ -420,27 +574,15 @@ fn dict_group_unit_type<'py>(
     Ok(out)
 }
 
-/// Emit AGS4 text. `groups` is an ordered list of `(code, matrix)`
-/// where `matrix[0]` is the HEADING line (incl. the literal
-/// `"HEADING"` cell) and each later row begins with its
-/// `UNIT`/`TYPE`/`DATA` tag. CRLF, every field quoted, blank line
-/// between groups (Rule 5 / Rule 2a).
-#[pyfunction]
-fn emit_ags4(groups: Vec<(String, Vec<Vec<String>>)>) -> PyResult<String> {
-    let blocks: Vec<emit::GroupBlock> = groups
-        .into_iter()
-        .map(|(code, matrix)| emit::GroupBlock { code, matrix })
-        .collect();
-    Ok(emit::emit(&blocks))
-}
-
 #[pymodule]
 fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_check, m)?)?;
     m.add_function(wrap_pyfunction!(parse_primitives, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_arrow, m)?)?;
     m.add_function(wrap_pyfunction!(resolve_dict, m)?)?;
     m.add_function(wrap_pyfunction!(dict_group_unit_type, m)?)?;
-    m.add_function(wrap_pyfunction!(emit_ags4, m)?)?;
+    m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_from_arrow, m)?)?;
+    m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_compat, m)?)?;
     registry_fns::register(m)?;
     ags_types_fns::register(m)?;
     transport_fns::register(m)?;

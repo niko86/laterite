@@ -186,5 +186,5 @@ def test_non_utf8_read_substitutes_u_fffd(tmp_path):
     bad = tmp_path / "cp1252.ags"
     bad.write_bytes(_NON_UTF8_BYTES)
     f = laterite.read(str(bad))  # must not raise
-    proj_name = f["PROJ"].to_native()["PROJ_NAME"].to_list()
+    proj_name = f["PROJ"]["PROJ_NAME"].to_list()
     assert proj_name == ["temp 20�C site"]

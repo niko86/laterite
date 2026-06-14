@@ -1,0 +1,28 @@
+{
+  // P2 is typecheck-only (`tsc --noEmit`); vitest transpiles the tests and the
+  // shippable JS build (dual ESM+CJS via tsup) is a P4/distribution concern. So
+  // no rootDir/outDir/declaration here — just strict checking of ts/ + test/.
+  // `module: preserve` + `moduleResolution: bundler` keeps extensionless imports
+  // working and avoids the TS6 `node10` deprecation.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "esModuleInterop": true,
+    // tsup's dts builder injects a (now-deprecated) `baseUrl`; TS 6.0 errors on
+    // it without this escape hatch.
+    "ignoreDeprecations": "6.0",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    // The drift test imports the plain-JS generator (tools/*.mjs); allow it
+    // (types inferred from its JSDoc) without typechecking the JS itself.
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["ts/**/*.ts", "test/**/*.ts"]
+}

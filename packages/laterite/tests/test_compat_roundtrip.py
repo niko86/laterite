@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import math
 
-import narwhals.stable.v1 as nw
 import polars as pl
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -24,18 +23,11 @@ from laterite import compat as AGS4
 _DICT = "4.1.1"
 
 
-def _native(frame):
-    return nw.from_native(frame, eager_only=True).to_native()
-
-
 def _data_rows(frame, col):
-    """The DATA-row values of `col` as a plain list (drops UNIT/TYPE)."""
-    pf = _native(frame)
-    if not isinstance(pf, pl.DataFrame):
-        pf = pl.from_pandas(pf)
-    return (
-        pf.filter(pl.col("HEADING") == "DATA")[col].to_list()
-    )
+    """The DATA-row values of `col` as a plain list (drops UNIT/TYPE).
+    Accepts any compat backend (pandas / polars) by normalising to polars."""
+    pf = frame if isinstance(frame, pl.DataFrame) else pl.from_pandas(frame)
+    return pf.filter(pl.col("HEADING") == "DATA")[col].to_list()
 
 
 def _make_string_frame(fdep_cells):
@@ -43,11 +35,13 @@ def _make_string_frame(fdep_cells):
     LOCA_ID is an untyped string column that must pass through."""
     n = len(fdep_cells)
     ids = [f"BH{i}" for i in range(n)]
-    return pl.DataFrame({
-        "HEADING": ["UNIT", "TYPE"] + ["DATA"] * n,
-        "LOCA_ID": ["", "ID"] + ids,
-        "LOCA_FDEP": ["m", "2DP"] + list(fdep_cells),
-    })
+    return pl.DataFrame(
+        {
+            "HEADING": ["UNIT", "TYPE"] + ["DATA"] * n,
+            "LOCA_ID": ["", "ID"] + ids,
+            "LOCA_FDEP": ["m", "2DP"] + list(fdep_cells),
+        }
+    )
 
 
 def _round_trip(frame):
@@ -56,6 +50,7 @@ def _round_trip(frame):
 
 
 # --- example-based edge cases ---------------------------------------------
+
 
 def test_round_trip_preserves_numeric_values_and_string_column():
     frame = _make_string_frame(["10.50", "3.25", "0.00"])
@@ -87,11 +82,13 @@ def test_convert_to_numeric_no_type_row_is_noop():
     """With no TYPE row, no column is treated as numeric — values stay as
     strings and convert_to_text(dictionary=...) recovers the TYPE so the
     round-trip still closes."""
-    frame = pl.DataFrame({
-        "HEADING": ["DATA", "DATA"],
-        "LOCA_ID": ["BH1", "BH2"],
-        "LOCA_FDEP": ["10.50", "3.25"],
-    })
+    frame = pl.DataFrame(
+        {
+            "HEADING": ["DATA", "DATA"],
+            "LOCA_ID": ["BH1", "BH2"],
+            "LOCA_FDEP": ["10.50", "3.25"],
+        }
+    )
     numeric = AGS4.convert_to_numeric(frame)
     # Untouched (no UNIT/TYPE to drop, nothing flagged numeric).
     assert _data_rows(numeric, "LOCA_FDEP") == ["10.50", "3.25"]
@@ -110,14 +107,18 @@ def test_convert_to_text_without_dict_after_numeric_raises():
 
 # --- property: numeric values survive the round-trip to 2DP precision -----
 
+
 @settings(max_examples=80, suppress_health_check=[HealthCheck.too_slow])
 @given(
     values=st.lists(
         st.floats(
-            min_value=-1e6, max_value=1e6,
-            allow_nan=False, allow_infinity=False,
+            min_value=-1e6,
+            max_value=1e6,
+            allow_nan=False,
+            allow_infinity=False,
         ),
-        min_size=1, max_size=6,
+        min_size=1,
+        max_size=6,
     ),
 )
 def test_round_trip_numeric_values_equal_to_2dp_precision(values):
