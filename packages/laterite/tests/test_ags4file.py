@@ -11,14 +11,19 @@ from __future__ import annotations
 from pathlib import Path
 
 import laterite
+import polars as pl
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from laterite import _laterite_native as _native
 
 # Reuse the hand-authored clean fixture the rest of the suite uses.
 _FIX = (
     Path(__file__).resolve().parents[3]
-    / "rust-packages" / "ags4-validator" / "tests" / "fixtures"
+    / "rust-packages"
+    / "ags4-validator"
+    / "tests"
+    / "fixtures"
 )
 _CLEAN = _FIX / "clean_minimal.ags"
 
@@ -30,8 +35,35 @@ _NUMERIC_SRC = (
     '"UNIT","","m"\r\n'
     '"TYPE","ID","2DP"\r\n'
     '"DATA","BH1","10.50"\r\n'
-    '"DATA","BH2","oops"\r\n'   # non-numeric cell → null under coercion
+    '"DATA","BH2","oops"\r\n'  # non-numeric cell → null under coercion
     '"DATA","BH3","3.25"\r\n'
+)
+
+# LOCA + SAMP share LOCA_ID; PROJ has no LOCA_ID, so at() passes it through.
+_RELATED_SRC = "\r\n".join(
+    [
+        '"GROUP","PROJ"',
+        '"HEADING","PROJ_ID"',
+        '"UNIT",""',
+        '"TYPE","ID"',
+        '"DATA","P1"',
+        '"GROUP","LOCA"',
+        '"HEADING","LOCA_ID","LOCA_GL"',
+        '"UNIT","","m"',
+        '"TYPE","ID","2DP"',
+        '"DATA","BH01","12.30"',
+        '"DATA","BH02","13.40"',
+        '"DATA","BH03","9.10"',
+        '"GROUP","SAMP"',
+        '"HEADING","LOCA_ID","SAMP_REF"',
+        '"UNIT","",""',
+        '"TYPE","ID","ID"',
+        '"DATA","BH01","S1"',
+        '"DATA","BH01","S2"',
+        '"DATA","BH02","S3"',
+        '"DATA","BH03","S4"',
+        "",
+    ]
 )
 
 
@@ -40,7 +72,30 @@ def clean() -> laterite.Ags4File:
     return laterite.read(str(_CLEAN))
 
 
+# --- constructor guard (#112) ---------------------------------------------
+
+
+def test_ags4file_rejects_a_path_with_actionable_typeerror():
+    # The #112 footgun: `Ags4File(path)` used to construct silently and fail three
+    # calls later with a cryptic `'PosixPath' object is not subscriptable`. It must
+    # now fail early, naming `laterite.read()` as the fix.
+    with pytest.raises(TypeError, match=r"laterite\.read"):
+        laterite.Ags4File(_CLEAN)
+    with pytest.raises(TypeError, match=r"laterite\.read"):
+        laterite.Ags4File("site.ags")
+    # A mapping missing the load-bearing keys is also rejected (not silently stored).
+    with pytest.raises(TypeError, match=r"laterite\.read"):
+        laterite.Ags4File({"not": "parsed"})
+
+
+def test_ags4file_accepts_engine_parsed_mapping(clean):
+    # The legitimate construction path (via read()) still produces a usable handle.
+    assert isinstance(clean, laterite.Ags4File)
+    assert clean.groups  # the mapping passed the guard and is queryable
+
+
 # --- groups / membership --------------------------------------------------
+
 
 def test_groups_lists_file_order(clean):
     assert clean.groups == ["PROJ", "TRAN", "UNIT", "TYPE"]
@@ -71,6 +126,7 @@ def test_tran_ags_none_when_no_tran_group():
 
 # --- per-group metadata accessors -----------------------------------------
 
+
 def test_headings_units_types_lengths_and_content(clean):
     headings = clean.headings("PROJ")
     units = clean.units("PROJ")
@@ -93,22 +149,43 @@ def test_line_numbers_are_ints_and_match_row_count(clean):
 
 # --- table / __getitem__ / to_numeric -------------------------------------
 
+
 def test_getitem_and_table_are_equivalent(clean):
-    via_item = clean["PROJ"].to_native()
-    via_table = clean.table("PROJ").to_native()
+    via_item = clean["PROJ"]
+    via_table = clean.table("PROJ")
     assert via_item.equals(via_table)
     assert clean["PROJ"].columns == ["PROJ_ID", "PROJ_NAME"]
 
 
 def test_getitem_frame_holds_data_rows(clean):
-    df = clean["PROJ"].to_native()
+    df = clean["PROJ"]
     assert df["PROJ_ID"].to_list() == ["P1"]
+
+
+def test_getitem_is_born_typed():
+    """read()[group] is typed straight from the file's TYPE row (loaded into the
+    DuckDB engine) — a 2DP heading is Float64, 0DP Int64, ID String, and a
+    non-conforming numeric cell is null. No to_numeric needed."""
+    src = (
+        '"GROUP","LOCA"\r\n'
+        '"HEADING","LOCA_ID","LOCA_FDEP","LOCA_NUM"\r\n'
+        '"UNIT","","m",""\r\n'
+        '"TYPE","ID","2DP","0DP"\r\n'
+        '"DATA","BH1","10.50","7"\r\n'
+        '"DATA","BH2","bad","9"\r\n'
+    )
+    df = laterite.read(text=src)["LOCA"]
+    assert df.schema["LOCA_ID"] == pl.String
+    assert df.schema["LOCA_FDEP"] == pl.Float64
+    assert df.schema["LOCA_NUM"] == pl.Int64
+    assert df["LOCA_FDEP"].to_list() == [10.5, None]  # dirty cell -> null
+    assert df["LOCA_NUM"].to_list() == [7, 9]
 
 
 def test_to_numeric_coerces_numeric_columns_leaves_others():
     f = laterite.read(text=_NUMERIC_SRC)
-    df = f.to_numeric("LOCA").to_native()
-    # 2DP column cast to float; bad cell → null (errors='coerce' parity).
+    df = f.to_numeric("LOCA")
+    # 2DP column is born float; bad cell → null (errors='coerce' parity).
     assert df["LOCA_FDEP"].to_list() == [10.5, None, 3.25]
     # ID column untouched (still strings).
     assert df["LOCA_ID"].to_list() == ["BH1", "BH2", "BH3"]
@@ -116,11 +193,141 @@ def test_to_numeric_coerces_numeric_columns_leaves_others():
 
 def test_to_numeric_no_numeric_columns_returns_frame_unchanged(clean):
     """A group with no DP/SF/SCI/MC columns returns the same frame."""
-    out = clean.to_numeric("PROJ").to_native()
-    assert out.equals(clean["PROJ"].to_native())
+    out = clean.to_numeric("PROJ")
+    assert out.equals(clean["PROJ"])
+
+
+# --- backend selection + the in-memory DuckDB engine ----------------------
+#
+# read() -> Ags4File; ags[code] is a polars DataFrame by default (or pandas
+# with backend="pandas" — both pyarrow-free). Each group loads into the
+# in-memory DuckDB engine on first touch; ags.sql() returns a DuckDB relation
+# (the filter-pushdown path).
+
+
+def test_read_returns_polars_by_default():
+    df = laterite.read(text=_NUMERIC_SRC)["LOCA"]
+    assert isinstance(df, pl.DataFrame)
+
+
+def test_read_backend_pandas():
+    pd = pytest.importorskip("pandas")
+    f = laterite.read(text=_NUMERIC_SRC, backend="pandas")
+    assert f.backend == "pandas"
+    df = f["LOCA"]
+    assert isinstance(df, pd.DataFrame)
+    # Born-typed + pyarrow-free (DuckDB's NumPy .df()): bad cell -> NaN.
+    vals = df["LOCA_FDEP"].tolist()
+    assert vals[0] == 10.5
+    assert pd.isna(vals[1])
+
+
+def test_read_rejects_unknown_backend():
+    with pytest.raises(ValueError, match="backend must be"):
+        laterite.read(text=_NUMERIC_SRC, backend="arrow")
+
+
+def test_groups_load_into_engine_on_first_touch():
+    # The engine is lazy: read() alone spins up nothing; touching a group loads
+    # only that group as a native DuckDB table. A fresh handle (not the shared
+    # module-scoped `clean`, whose engine other tests populate).
+    f = laterite.read(str(_CLEAN))
+    assert f._con is None  # read() did not create the engine
+    _ = f["PROJ"]
+    assert f._con is not None and f._registered == {"PROJ"}
+    _ = f["PROJ"]  # second touch reuses the table, registers nothing new
+    assert f._registered == {"PROJ"}
+    _ = f["TRAN"]
+    assert f._registered == {"PROJ", "TRAN"}
+
+
+def test_sql_returns_a_duckdb_relation_with_pushdown():
+    f = laterite.read(text=_NUMERIC_SRC)
+    rel = f.sql("SELECT * FROM LOCA WHERE LOCA_FDEP > 5")
+    assert "duckdb" in type(rel).__module__.lower()
+    # The WHERE pushed into the engine — only the matching row materialises.
+    assert pl.from_arrow(rel)["LOCA_FDEP"].to_list() == [10.5]
+
+
+def test_sql_one_liner_survives_unbound_handle():
+    # No __del__ close: the relation keeps the connection alive, so a one-liner
+    # where the handle is never bound to a variable still materialises.
+    df = pl.from_arrow(laterite.read(text=_NUMERIC_SRC).sql("SELECT * FROM LOCA"))
+    assert len(df) == 3
+
+
+def test_connection_exposes_raw_duckdb_seeded_with_groups():
+    f = laterite.read(text=_NUMERIC_SRC)
+    con = f.connection
+    assert con.sql("SELECT COUNT(*) FROM LOCA").fetchone()[0] == 3
+
+
+def test_context_manager_closes_engine():
+    with laterite.read(text=_NUMERIC_SRC) as f:
+        _ = f["LOCA"]
+        assert f._con is not None
+    assert f._con is None  # __exit__ closed it
+
+
+# --- at(): location-subset view -------------------------------------------
+
+
+def test_at_filters_to_the_requested_subset():
+    sub = laterite.read(text=_RELATED_SRC).at("LOCA", ["BH01", "BH03"])
+    assert sub["LOCA"]["LOCA_ID"].to_list() == ["BH01", "BH03"]
+    # Related rows across groups: BH01 has S1+S2, BH03 has S4 (BH02's S3 excluded).
+    assert sub["SAMP"]["SAMP_REF"].to_list() == ["S1", "S2", "S4"]
+
+
+def test_at_groups_lists_related_groups_only():
+    sub = laterite.read(text=_RELATED_SRC).at("LOCA", ["BH01"])
+    # PROJ has no LOCA_ID, so it isn't "related".
+    assert sub.groups == ["LOCA", "SAMP"]
+
+
+def test_at_passes_through_groups_without_the_key():
+    sub = laterite.read(text=_RELATED_SRC).at("LOCA", ["BH01"])
+    assert sub["PROJ"]["PROJ_ID"].to_list() == ["P1"]  # unfiltered
+
+
+def test_at_empty_values_selects_nothing():
+    sub = laterite.read(text=_RELATED_SRC).at("LOCA", [])
+    assert sub["SAMP"].height == 0
+
+
+def test_at_honours_pandas_backend():
+    pd = pytest.importorskip("pandas")
+    sub = laterite.read(text=_RELATED_SRC, backend="pandas").at("LOCA", ["BH02"])
+    df = sub["SAMP"]
+    assert isinstance(df, pd.DataFrame)
+    assert df["SAMP_REF"].tolist() == ["S3"]
+
+
+def test_at_absent_group_raises_keyerror():
+    sub = laterite.read(text=_RELATED_SRC).at("LOCA", ["BH01"])
+    with pytest.raises(KeyError, match="not in file"):
+        _ = sub["NOPE"]
+
+
+def test_at_chaining_accumulates_filters():
+    # Chained .at() filters AND together: BH01,BH02 then BH01 -> only BH01.
+    sub = (
+        laterite.read(text=_RELATED_SRC)
+        .at("LOCA", ["BH01", "BH02"])
+        .at("LOCA", ["BH01"])
+    )
+    assert sub["SAMP"]["SAMP_REF"].to_list() == ["S1", "S2"]  # BH01's samples only
+
+
+def test_at_frames_pulls_all_related_groups():
+    frames = laterite.read(text=_RELATED_SRC).at("LOCA", ["BH01"]).frames()
+    assert set(frames) == {"LOCA", "SAMP"}  # related only (PROJ excluded)
+    assert frames["LOCA"]["LOCA_ID"].to_list() == ["BH01"]
+    assert frames["SAMP"]["SAMP_REF"].to_list() == ["S1", "S2"]
 
 
 # --- _g KeyError on absent group ------------------------------------------
+
 
 @pytest.mark.parametrize(
     "accessor",
@@ -137,6 +344,7 @@ def test_getitem_raises_keyerror_on_absent_group(clean):
 
 
 # --- write / to_ags4_text round-trip --------------------------------------
+
 
 def test_write_returns_path_and_reads_back(clean, tmp_path):
     out = tmp_path / "rt.ags"
@@ -166,6 +374,7 @@ def test_module_write_function_round_trips(clean, tmp_path):
 # heading lists survive a re-read. Byte-equality may NOT hold (every field
 # is re-quoted, CRLF is normalised), so we assert *structural* equality.
 
+
 def _ags_ident() -> st.SearchStrategy[str]:
     """A safe-ish AGS4 heading token: uppercase letter + alnum/underscore.
     Kept conservative so generated headings don't trip Rule-19a parse
@@ -189,14 +398,18 @@ def _ags_ident() -> st.SearchStrategy[str]:
         st.lists(
             st.text(
                 alphabet=st.characters(
-                    min_codepoint=32, max_codepoint=126,
+                    min_codepoint=32,
+                    max_codepoint=126,
                     blacklist_characters='"',
                 ),
-                min_size=0, max_size=8,
+                min_size=0,
+                max_size=8,
             ),
-            min_size=1, max_size=4,
+            min_size=1,
+            max_size=4,
         ),
-        min_size=1, max_size=3,
+        min_size=1,
+        max_size=3,
     ),
 )
 def test_to_ags4_text_round_trip_preserves_structure(group, headings, rows):
@@ -205,9 +418,15 @@ def test_to_ags4_text_round_trip_preserves_structure(group, headings, rows):
     n = len(headings)
     src = (
         f'"GROUP","{group}"\r\n'
-        + '"HEADING",' + ",".join(f'"{h}"' for h in headings) + "\r\n"
-        + '"UNIT",' + ",".join('""' for _ in headings) + "\r\n"
-        + '"TYPE",' + ",".join('"X"' for _ in headings) + "\r\n"
+        + '"HEADING",'
+        + ",".join(f'"{h}"' for h in headings)
+        + "\r\n"
+        + '"UNIT",'
+        + ",".join('""' for _ in headings)
+        + "\r\n"
+        + '"TYPE",'
+        + ",".join('"X"' for _ in headings)
+        + "\r\n"
         + "".join(
             '"DATA",' + ",".join(f'"{c}"' for c in (list(r) + [""] * n)[:n]) + "\r\n"
             for r in rows
@@ -227,3 +446,94 @@ def test_to_ags4_text_round_trip_preserves_structure(group, headings, rows):
     # Per-group headings are preserved.
     for g in f.groups:
         assert f.headings(g) == f2.headings(g)
+
+
+# --- flagship byte-fidelity round-trip (phase-1 Arrow engine) -------------
+#
+# read -> write -> read must preserve every DATA cell value, INCLUDING dirty
+# numerics the typed columns cannot hold: detection limits ("<0.01"),
+# non-canonical decimals ("1.1" in a 2DP column), junk ("n/a"). The typed
+# Arrow frame nulls those; fidelity rides on the raw-override path (#13). We
+# assert at the raw-string layer (parse_primitives keeps cells verbatim) so
+# the property is representation-independent — it passes on today's raw-rows
+# write AND guards the typed write-back (task 114) the same way.
+
+# Values where format(parse(v)) != v for a numeric column — the override path.
+_DIRTY_NUMERIC = (
+    "<0.01",
+    ">100",
+    "1.1",
+    "5",
+    "10.500",
+    "-0.00",
+    "1e3",
+    "n/a",
+    "",
+    "NaN",
+)
+_TYPE_CHOICES = ("ID", "X", "2DP", "3DP", "0DP")
+
+
+def _cell_for(ags_type: str) -> st.SearchStrategy[str]:
+    """A DATA cell for a column of this TYPE: numeric columns draw a mix of
+    conforming and dirty values (so the override path is exercised); text
+    columns draw printable tokens (no quote / whitespace-edge / CR-LF, which
+    re-quote differently and are a separate concern)."""
+    if ags_type in ("2DP", "3DP", "0DP"):
+        return st.one_of(
+            st.sampled_from(_DIRTY_NUMERIC),
+            st.integers(-9999, 9999).map(str),
+            st.floats(
+                allow_nan=False, allow_infinity=False, min_value=-1e6, max_value=1e6
+            ).map(lambda x: f"{x:.2f}"),
+        )
+    return st.text(
+        alphabet=st.characters(
+            min_codepoint=33, max_codepoint=126, blacklist_characters='"'
+        ),
+        min_size=0,
+        max_size=8,
+    )
+
+
+@settings(max_examples=80, suppress_health_check=[HealthCheck.too_slow])
+@given(
+    group=st.text(alphabet="ABCDEFGHIJKLMNOPQRSTUVWXYZ", min_size=4, max_size=4),
+    headings=st.lists(_ags_ident(), min_size=1, max_size=4, unique=True),
+    type_choices=st.lists(st.sampled_from(_TYPE_CHOICES), min_size=4, max_size=4),
+    data=st.data(),
+)
+def test_read_write_read_preserves_data_values(group, headings, type_choices, data):
+    n = len(headings)
+    types = type_choices[:n]
+    rows = data.draw(
+        st.lists(st.tuples(*[_cell_for(t) for t in types]), min_size=1, max_size=4)
+    )
+    src = (
+        f'"GROUP","{group}"\r\n'
+        + '"HEADING",'
+        + ",".join(f'"{h}"' for h in headings)
+        + "\r\n"
+        + '"UNIT",'
+        + ",".join('""' for _ in headings)
+        + "\r\n"
+        + '"TYPE",'
+        + ",".join(f'"{t}"' for t in types)
+        + "\r\n"
+        + "".join('"DATA",' + ",".join(f'"{c}"' for c in row) + "\r\n" for row in rows)
+    )
+    # Ground truth: the raw-string view of the source.
+    s1 = _native.parse_primitives(text=src)
+    if not s1.get("ok") or group not in s1.get("groups", {}):
+        return  # parser legitimately rejected the generated file — out of scope
+    # read -> write -> re-parse, then compare raw cell values + types.
+    f = laterite.read(text=src)
+    s2 = _native.parse_primitives(text=f.to_ags4_text())
+    assert s1["group_order"] == s2["group_order"]
+    for code in s1["group_order"]:
+        g1, g2 = s1["groups"][code], s2["groups"][code]
+        assert g1["headings"] == g2["headings"], code
+        assert g1["types"] == g2["types"], code
+        v1 = [r["values"] for r in g1["rows"]]
+        v2 = [r["values"] for r in g2["rows"]]
+        assert v1 == v2, (code, v1, v2)

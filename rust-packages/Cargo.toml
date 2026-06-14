@@ -35,12 +35,14 @@ members = [
     "ags5-types",
     "ags5-core",
     "ags5db",
+    "ags4-emit",
     "ags4-validator",
     "ags4-check",
     "ags4-wasm",
     "ags-cliutil",
     "laterite-py",
     "laterite-py-ags5",
+    "laterite-node",
 ]
 
 # Release profile lives at the workspace root — cargo only honours

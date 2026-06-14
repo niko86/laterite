@@ -18,9 +18,9 @@ async function ready(page: Page) {
 const tab = (page: Page, name: string) =>
   page.getByRole("tab", { name: new RegExp(`^${name}$`) });
 
-test("app loads with all four tabs", async ({ page }) => {
+test("app loads with all five tabs", async ({ page }) => {
   await ready(page);
-  for (const t of ["Validate", "Fix", "Explore", "Tools"]) {
+  for (const t of ["Validate", "Fix", "Explore", "Tools", "Export"]) {
     await expect(tab(page, t)).toBeVisible();
   }
 });

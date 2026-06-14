@@ -14,6 +14,7 @@ import { ValidatePane } from "./components/validate/ValidatePane";
 import { FixPane } from "./components/fix/FixPane";
 import { ExplorePane } from "./components/explore/ExplorePane";
 import { ToolsPane } from "./components/tools/ToolsPane";
+import { ExportPane } from "./components/export/ExportPane";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { PwaUpdater } from "./components/PwaUpdater";
 
@@ -95,6 +96,9 @@ const App: Component = () => {
           </Show>
           <Show when={tab() === "tools"}>
             <ToolsPane />
+          </Show>
+          <Show when={tab() === "export"}>
+            <ExportPane />
           </Show>
         </Show>
       </main>

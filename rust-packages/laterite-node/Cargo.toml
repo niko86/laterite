@@ -1,0 +1,54 @@
+# laterite-node — Node-API (napi-rs) bindings for the laterite AGS4 engine.
+#
+# The Node analog of `laterite-py` (PyO3): a cdylib `.node` addon that
+# re-expresses the engine surface — validate / parse → Arrow IPC / emit —
+# through `#[napi]` instead of `#[pyclass]`/`#[pyfunction]`. Returns Arrow
+# IPC bytes (Buffer) per group, exactly as `ags4-wasm` already does for the
+# browser; the TS `laterite` npm package (packages/laterite-node) layers the
+# high-level API on top. Engine crates are all DuckDB-free.
+#
+# NOT built by `cargo build --workspace` (the cdylib links against Node's
+# symbols, resolved at load time, like the PyO3 cdylibs) — built via
+# `@napi-rs/cli` (`napi build`), which sets the dynamic-lookup link args.
+
+[package]
+name = "laterite-node"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Node-API (napi-rs) bindings exposing the laterite AGS4 engine to Node.js"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# `serde-json` lets `parseValue` return a `serde_json::Value` straight across the
+# boundary as native JS (number/string/bool/null) — the AGS type system's own
+# output shape, no hand-rolled union.
+napi = { version = "2", default-features = false, features = ["napi8", "serde-json"] }
+napi-derive = "2"
+# The engine — all DuckDB-free, pure Rust (same crates laterite-py + ags4-wasm
+# wrap). ags5-types `arrow` feature pulls the shared typed-Arrow builder
+# (arrow_cols); `arrow` ipc frames each group's batch as an IPC stream Buffer.
+ags4-validator = { path = "../ags4-validator" }
+ags5-types = { path = "../ags5-types", features = ["arrow"] }
+# The shared producer (write_ags4 for byte-faithful emit; emit_ags4 +
+# group_from_arrow for the data→AGS4 path) — `arrow` feature for the IPC input.
+ags4-emit = { path = "../ags4-emit", features = ["arrow"] }
+arrow = { version = "59", default-features = false, features = ["ipc"] }
+encoding_rs = "0.8"
+# Transport (pack/unpack/lock/unlock) — zstd + age passphrase, reimplemented
+# directly (NOT via ags5-core, which would drag in Excel/csv/sha2 for a niche
+# feature). Same crates ags5-core links, so the age envelope stays
+# interoperable with the Python side (pyrage).
+zstd = "0.13"
+age = "0.10"
+# `preserve_order` MUST mirror ags4-validator / laterite-py: the validator's
+# `--json`/`--ndjson` insertion order is load-bearing (byte-faithful to the
+# `ags4-check` binary), and `Report.toJson()` re-exposes it verbatim.
+serde_json = { version = "1", features = ["preserve_order"] }
+
+[build-dependencies]
+napi-build = "2"

@@ -142,6 +142,29 @@ export type DictVersionOpt =
   | "4.2";
 export type EncodingOpt = "utf-8" | "windows-1252";
 
+// --- AGS4 producer (Export tab): the `ags4-wasm` to_ags4(groups, edition, mode)
+// result — build valid AGS4 from data. `mode`: autofix (default) | report |
+// strict. ---
+export type EmitMode = "autofix" | "report" | "strict";
+
+/** One finding on the *emitted* output (post-fix in AutoFix). `severity`
+ *  omitted ⇒ error, matching the engine. */
+export interface ExportFinding {
+  rule: string;
+  line?: number | null;
+  group: string;
+  desc: string;
+  severity?: string;
+}
+
+export interface ExportResult {
+  /** The AGS4 document text (UTF-8, CRLF) — wrap in a Blob to download. */
+  text: string;
+  findings: ExportFinding[];
+  /** Count of safe mechanical fixes AutoFix applied (0 for report/strict). */
+  fixes_applied: number;
+}
+
 // --- Standard dictionary (Tools reference): the `ags4-wasm` dictionary(edition)
 // result — the real per-edition AGS4 standard dictionary (canonical names,
 // descriptions, units, types, status), NOT the scaffolded ags5 merged JSON. ---

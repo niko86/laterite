@@ -10,23 +10,15 @@
 //! Phase 2 adds `parse()` → typed Arrow IPC for the DuckDB-wasm data
 //! explorer; this file is Phase 1 (validator) only.
 
-use std::sync::Arc;
-
 use ags4_validator::parse::{DataRow, ParsedFile, ParsedGroup, parse_bytes};
 use ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, dict::Dictionary, dict::FALLBACK, findings,
     resolve_dict_version, rules, tran_ags_of,
 };
-use ags5_types::{CanonicalType, canonical_type, parse_datetime, parse_value, sql_type};
-use arrow::array::{
-    ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder,
-    TimestampMicrosecondBuilder,
-};
-use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+use ags5_types::{parse_value, sql_type};
+// Arrow IPC framing only — the typed columns are built in ags5-types::arrow_cols.
 use arrow::ipc::writer::StreamWriter;
-use arrow::record_batch::RecordBatch;
-use serde::Serialize;
-use serde_json::Value;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 /// One rule violation — mirrors the CLI's `{line, group, desc}` JSON,
@@ -171,6 +163,309 @@ fn resolve_dict_override(s: Option<&str>) -> Result<Option<DictVersion>, String>
         Some(other) => Err(format!(
             "unknown dict_version {other:?}; expected auto|4.0.3|4.0.4|4.1|4.1.1|4.2"
         )),
+    }
+}
+
+// --- AGS4 production: `to_ags4` (the read path reversed) -----------------
+
+/// One group of input data, deserialised from the browser's JSON. The
+/// column `headings` are the AGS headings; `units`/`types` are optional
+/// per-heading overrides (the dictionary fills the rest); `rows` cells are
+/// JSON values (numbers/strings/bools/null).
+#[derive(Deserialize)]
+struct GroupInputJson {
+    code: String,
+    headings: Vec<String>,
+    #[serde(default)]
+    units: Option<Vec<String>>,
+    #[serde(default)]
+    types: Option<Vec<String>>,
+    rows: Vec<Vec<serde_json::Value>>,
+}
+
+/// One emit finding, flattened with its rule label for the JS side.
+#[derive(Serialize)]
+struct EmitFinding {
+    rule: String,
+    line: Option<u32>,
+    group: String,
+    desc: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    severity: Option<String>,
+}
+
+/// The `to_ags4` result. `text` is the AGS4 document (UTF-8, CRLF line
+/// endings) — the browser wraps it in a `Blob` to download.
+#[derive(Serialize)]
+struct ToAgs4Report {
+    text: String,
+    findings: Vec<EmitFinding>,
+    fixes_applied: usize,
+}
+
+fn emit_edition(s: Option<&str>) -> Result<DictVersion, String> {
+    match s.map(str::trim) {
+        None | Some("") | Some("auto") => Ok(DictVersion::V4_1_1),
+        Some("4.0.3") => Ok(DictVersion::V4_0_3),
+        Some("4.0.4") => Ok(DictVersion::V4_0_4),
+        Some("4.1") => Ok(DictVersion::V4_1),
+        Some("4.1.1") => Ok(DictVersion::V4_1_1),
+        Some("4.2") => Ok(DictVersion::V4_2),
+        Some(other) => Err(format!(
+            "unknown edition {other:?}; expected 4.0.3|4.0.4|4.1|4.1.1|4.2"
+        )),
+    }
+}
+
+fn emit_mode(s: Option<&str>) -> Result<ags4_emit::EmitMode, String> {
+    match s.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
+        None | Some("") | Some("autofix") => Ok(ags4_emit::EmitMode::AutoFix),
+        Some("report") => Ok(ags4_emit::EmitMode::Report),
+        Some("strict") => Ok(ags4_emit::EmitMode::Strict),
+        Some(other) => Err(format!(
+            "unknown mode {other:?}; expected autofix|report|strict"
+        )),
+    }
+}
+
+/// Core of [`to_ags4`], host-testable (no `JsValue`): parse the JSON, run
+/// the shared `ags4-emit` orchestrator, flatten the findings.
+fn build_ags4(
+    groups_json: &str,
+    edition: Option<&str>,
+    mode: Option<&str>,
+) -> Result<ToAgs4Report, String> {
+    let parsed: Vec<GroupInputJson> =
+        serde_json::from_str(groups_json).map_err(|e| format!("invalid groups JSON: {e}"))?;
+    let groups: Vec<ags4_emit::GroupInput> = parsed
+        .into_iter()
+        .map(|g| ags4_emit::GroupInput {
+            code: g.code,
+            headings: g.headings,
+            units: g.units,
+            types: g.types,
+            rows: g.rows,
+        })
+        .collect();
+    emit_report(groups, edition, mode)
+}
+
+/// Run the shared orchestrator over already-built `GroupInput`s and shape the
+/// JS report. The common tail of both input paths (JSON and Arrow IPC).
+fn emit_report(
+    groups: Vec<ags4_emit::GroupInput>,
+    edition: Option<&str>,
+    mode: Option<&str>,
+) -> Result<ToAgs4Report, String> {
+    let opts = ags4_emit::EmitOpts {
+        mode: emit_mode(mode)?,
+        edition: emit_edition(edition)?,
+    };
+    let res = ags4_emit::emit_ags4(&groups, &opts).map_err(|e| e.to_string())?;
+    let findings = res
+        .findings
+        .iter()
+        .flat_map(|(rule, items)| {
+            items.iter().map(move |f| EmitFinding {
+                rule: rule.clone(),
+                line: f.line,
+                group: f.group.clone(),
+                desc: f.desc.clone(),
+                severity: match f.severity {
+                    findings::Severity::Error => None,
+                    s => Some(format!("{s:?}").to_lowercase()),
+                },
+            })
+        })
+        .collect();
+    Ok(ToAgs4Report {
+        text: String::from_utf8_lossy(&res.bytes).into_owned(),
+        findings,
+        fixes_applied: res.fixes_applied,
+    })
+}
+
+/// Decode one group's Arrow IPC stream → a [`ags4_emit::GroupInput`] (the
+/// column names are the AGS headings). Uses the shared Arrow→Value transpose.
+fn group_from_ipc(code: String, bytes: &[u8]) -> Result<ags4_emit::GroupInput, String> {
+    let reader = arrow::ipc::reader::StreamReader::try_new(std::io::Cursor::new(bytes), None)
+        .map_err(|e| format!("arrow ipc: {e}"))?;
+    let schema = reader.schema();
+    let mut batches = Vec::new();
+    for b in reader {
+        batches.push(b.map_err(|e| format!("arrow ipc batch: {e}"))?);
+    }
+    Ok(ags4_emit::group_from_arrow(code, schema.as_ref(), &batches))
+}
+
+/// Build valid AGS4 from typed/string data in the browser — the data→AGS4
+/// producer (the read path reversed), with no server round-trip.
+///
+/// * `groups_json` — a JSON array of `{ code, headings, units?, types?, rows }`
+///   (each row an array of cell values). The headings are the AGS headings;
+///   UNIT/TYPE fill from the chosen edition's dictionary where omitted.
+/// * `edition` — `None`/`"auto"` → `4.1.1`, or `4.0.3|4.0.4|4.1|4.1.1|4.2`.
+/// * `mode` — `None`/`"autofix"` (default) | `"report"` | `"strict"`.
+///
+/// Returns `{ text, findings, fixes_applied }`; `text` is the AGS4 document
+/// (UTF-8, CRLF) for the browser to wrap in a `Blob`.
+#[wasm_bindgen]
+pub fn to_ags4(
+    groups_json: &str,
+    edition: Option<String>,
+    mode: Option<String>,
+) -> Result<JsValue, JsError> {
+    console_error_panic_hook::set_once();
+    let report = build_ags4(groups_json, edition.as_deref(), mode.as_deref())
+        .map_err(|e| JsError::new(&e))?;
+    serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// Build valid AGS4 from **columnar Arrow IPC** input — the same as
+/// [`to_ags4`] but for large, already-columnar browser data (e.g. a
+/// duckdb-wasm query result) without a per-cell JSON round-trip.
+///
+/// * `groups` — a JS array of `{ code: string, ipc: Uint8Array }`, each `ipc`
+///   an Arrow **IPC stream** for one group (its schema's field names are the
+///   AGS headings). Order is preserved (put `PROJ` first).
+/// * `edition` / `mode` — as [`to_ags4`].
+///
+/// Returns the same `{ text, findings, fixes_applied }`. The Arrow→AGS
+/// transpose is the read path's IPC reversed.
+#[wasm_bindgen]
+pub fn to_ags4_ipc(
+    groups: JsValue,
+    edition: Option<String>,
+    mode: Option<String>,
+) -> Result<JsValue, JsError> {
+    use wasm_bindgen::JsCast;
+    console_error_panic_hook::set_once();
+    let arr = js_sys::Array::from(&groups);
+    let mut inputs: Vec<ags4_emit::GroupInput> = Vec::with_capacity(arr.length() as usize);
+    for item in arr.iter() {
+        let code = js_sys::Reflect::get(&item, &JsValue::from_str("code"))
+            .ok()
+            .and_then(|v| v.as_string())
+            .ok_or_else(|| JsError::new("each group needs a string `code`"))?;
+        let ipc_val = js_sys::Reflect::get(&item, &JsValue::from_str("ipc"))
+            .map_err(|_| JsError::new("each group needs an `ipc` Uint8Array"))?;
+        let ipc = ipc_val
+            .dyn_into::<js_sys::Uint8Array>()
+            .map_err(|_| JsError::new("group `ipc` must be a Uint8Array"))?
+            .to_vec();
+        inputs.push(group_from_ipc(code, &ipc).map_err(|e| JsError::new(&e))?);
+    }
+    let report =
+        emit_report(inputs, edition.as_deref(), mode.as_deref()).map_err(|e| JsError::new(&e))?;
+    serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
+}
+
+#[cfg(test)]
+mod to_ags4_tests {
+    use super::*;
+
+    #[test]
+    fn emits_valid_and_canonicalises_typed() {
+        let json = r#"[
+          {"code":"PROJ","headings":["PROJ_ID","PROJ_NAME"],"rows":[["P1","Demo"]]},
+          {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01",12.3]]}
+        ]"#;
+        let r = build_ags4(json, Some("4.1.1"), Some("autofix")).unwrap();
+        assert!(
+            r.text.contains("\"12.30\""),
+            "expected canonical 2DP:\n{}",
+            r.text
+        );
+        assert!(
+            r.text.contains("\"UNIT\",\"\",\"m\""),
+            "dict UNIT fill:\n{}",
+            r.text
+        );
+        // The emitted text re-parses as well-formed AGS4.
+        let parsed = parse_bytes(r.text.as_bytes(), encoding_rs::UTF_8).unwrap();
+        assert!(parsed.groups.contains_key("LOCA"));
+    }
+
+    #[test]
+    fn autofix_pads_a_string_numeric() {
+        let json = r#"[
+          {"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]},
+          {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}
+        ]"#;
+        let r = build_ags4(json, None, Some("autofix")).unwrap();
+        assert!(r.fixes_applied >= 1, "AutoFix should apply a safe fix");
+        assert!(r.text.contains("\"12.30\""), "{}", r.text);
+    }
+
+    #[test]
+    fn report_keeps_strings_verbatim() {
+        let json = r#"[{"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}]"#;
+        let r = build_ags4(json, None, Some("report")).unwrap();
+        assert!(r.text.contains("\"12.3\""));
+        assert_eq!(r.fixes_applied, 0);
+    }
+
+    #[test]
+    fn rejects_unknown_mode_and_edition() {
+        let json = r#"[{"code":"LOCA","headings":["LOCA_ID"],"rows":[["BH01"]]}]"#;
+        assert!(build_ags4(json, None, Some("banana")).is_err());
+        assert!(build_ags4(json, Some("9.9"), None).is_err());
+    }
+
+    #[test]
+    fn ipc_columnar_input_emits_valid() {
+        use arrow::array::{Float64Array, StringArray};
+        use arrow::datatypes::{DataType, Field, Schema};
+        use arrow::record_batch::RecordBatch;
+        use std::sync::Arc;
+
+        // Serialize a batch to an Arrow IPC stream (the read path's writer).
+        fn ipc_bytes(schema: &Arc<Schema>, batch: &RecordBatch) -> Vec<u8> {
+            let mut buf = Vec::new();
+            let mut w = arrow::ipc::writer::StreamWriter::try_new(&mut buf, schema).unwrap();
+            w.write(batch).unwrap();
+            w.finish().unwrap();
+            drop(w);
+            buf
+        }
+
+        let proj_schema = Arc::new(Schema::new(vec![Field::new(
+            "PROJ_ID",
+            DataType::Utf8,
+            false,
+        )]));
+        let proj_batch = RecordBatch::try_new(
+            proj_schema.clone(),
+            vec![Arc::new(StringArray::from(vec!["P1"]))],
+        )
+        .unwrap();
+        let loca_schema = Arc::new(Schema::new(vec![
+            Field::new("LOCA_ID", DataType::Utf8, false),
+            Field::new("LOCA_GL", DataType::Float64, true), // a 2DP heading
+        ]));
+        let loca_batch = RecordBatch::try_new(
+            loca_schema.clone(),
+            vec![
+                Arc::new(StringArray::from(vec!["BH01", "BH02"])),
+                Arc::new(Float64Array::from(vec![12.3, 13.0])),
+            ],
+        )
+        .unwrap();
+
+        // Decode each IPC stream via the shared transpose, then emit.
+        let proj = group_from_ipc("PROJ".into(), &ipc_bytes(&proj_schema, &proj_batch)).unwrap();
+        let loca = group_from_ipc("LOCA".into(), &ipc_bytes(&loca_schema, &loca_batch)).unwrap();
+        let r = emit_report(vec![proj, loca], Some("4.1.1"), Some("autofix")).unwrap();
+
+        assert!(r.text.contains("\"12.30\""), "float64 → 2DP:\n{}", r.text);
+        assert!(r.text.contains("\"13.00\""), "{}", r.text);
+        assert!(
+            r.text.contains("\"UNIT\",\"\",\"m\""),
+            "dict fill:\n{}",
+            r.text
+        );
+        let parsed = parse_bytes(r.text.as_bytes(), encoding_rs::UTF_8).unwrap();
+        assert!(parsed.groups.contains_key("LOCA"));
     }
 }
 
@@ -518,22 +813,25 @@ impl ParsedDataset {
             .get(code)
             .ok_or_else(|| JsError::new(&format!("group {code:?} not in dataset")))?;
 
-        let ncols = group.headings.len();
-        let mut fields = Vec::with_capacity(ncols);
-        let mut columns: Vec<ArrayRef> = Vec::with_capacity(ncols);
-        for (i, heading) in group.headings.iter().enumerate() {
-            // AGS type from the file's TYPE row; unknown/missing -> "X"
-            // (text), matching the native passthrough fallback.
-            let ags_type = group.types.get(i).map(String::as_str).unwrap_or("X");
-            let (array, dt) = build_column(group, i, ags_type);
-            fields.push(Field::new(heading, dt, true));
-            columns.push(array);
-        }
+        // Typed columns come from the one shared emitter in ags5-types
+        // (arrow_cols) — the same casting the native PyCapsule path uses, so
+        // the browser and Python type a file byte-identically. We only frame
+        // the batch as an IPC stream here for duckdb-wasm.
+        let batch = ags5_types::arrow_cols::build_record_batch(
+            &group.headings,
+            &group.types,
+            group.rows.len(),
+            |col, row| {
+                group
+                    .rows
+                    .get(row)
+                    .and_then(|r| r.values.get(col))
+                    .map(String::as_str)
+            },
+        )
+        .map_err(|e| JsError::new(&format!("arrow batch for {code}: {e}")))?;
 
-        let schema = Arc::new(Schema::new(fields));
-        let batch = RecordBatch::try_new(schema.clone(), columns)
-            .map_err(|e| JsError::new(&format!("arrow batch for {code}: {e}")))?;
-
+        let schema = batch.schema();
         let mut buf = Vec::new();
         let mut writer = StreamWriter::try_new(&mut buf, &schema)
             .map_err(|e| JsError::new(&format!("arrow ipc for {code}: {e}")))?;
@@ -545,94 +843,6 @@ impl ParsedDataset {
             .map_err(|e| JsError::new(&format!("arrow ipc for {code}: {e}")))?;
         drop(writer);
         Ok(buf)
-    }
-}
-
-/// One data cell as `&str`, or `None` when the row is short (ragged-row
-/// safe). Free fn so the returned borrow can be tied to `row` — see the
-/// note in `build_column`.
-fn cell(row: &DataRow, col: usize) -> Option<&str> {
-    row.values.get(col).map(String::as_str)
-}
-
-/// Build one typed Arrow column for heading `col` of `group`, casting
-/// each cell through the shared `ags5_types` logic. Returns the array +
-/// its `DataType` (for the schema field). Ragged-row safe: a missing
-/// cell (`row.values.get(col)` is `None`) and any value `parse_value`
-/// rejects both append a null, so a short/long data row can't panic or
-/// misalign the builders.
-fn build_column(group: &ParsedGroup, col: usize, ags_type: &str) -> (ArrayRef, DataType) {
-    let n = group.rows.len();
-    // A closure can't name the lifetime tying its `&str` result to the
-    // `&DataRow` it borrows from (the `'1 must outlive '2` error); a free
-    // fn can, so `cell` lives at module scope.
-
-    match canonical_type(ags_type) {
-        Some(CanonicalType::Integer) => {
-            let mut b = Int64Builder::with_capacity(n);
-            for row in &group.rows {
-                match parse_value(cell(row, col), ags_type) {
-                    Value::Number(num) => b.append_option(num.as_i64()),
-                    _ => b.append_null(),
-                }
-            }
-            (Arc::new(b.finish()) as ArrayRef, DataType::Int64)
-        }
-        Some(CanonicalType::Decimal) => {
-            let mut b = Float64Builder::with_capacity(n);
-            for row in &group.rows {
-                match parse_value(cell(row, col), ags_type) {
-                    Value::Number(num) => b.append_option(num.as_f64()),
-                    _ => b.append_null(),
-                }
-            }
-            (Arc::new(b.finish()) as ArrayRef, DataType::Float64)
-        }
-        Some(CanonicalType::Bool) => {
-            let mut b = BooleanBuilder::with_capacity(n);
-            for row in &group.rows {
-                match parse_value(cell(row, col), ags_type) {
-                    Value::Bool(v) => b.append_value(v),
-                    _ => b.append_null(),
-                }
-            }
-            (Arc::new(b.finish()) as ArrayRef, DataType::Boolean)
-        }
-        Some(CanonicalType::Datetime) => {
-            // tz-naive microseconds — matches DuckDB TIMESTAMP and the
-            // native .ags5db. parse_datetime (not parse_value, which
-            // formats back to a string) gives the typed value; an
-            // unparseable / empty cell -> null, same null-ness as
-            // parse_value's Datetime arm.
-            let mut b = TimestampMicrosecondBuilder::with_capacity(n);
-            for row in &group.rows {
-                let micros = cell(row, col)
-                    .filter(|s| !s.trim().is_empty())
-                    .and_then(parse_datetime)
-                    .map(|dt| dt.and_utc().timestamp_micros());
-                b.append_option(micros);
-            }
-            (
-                Arc::new(b.finish()) as ArrayRef,
-                DataType::Timestamp(TimeUnit::Microsecond, None),
-            )
-        }
-        // String / Enum / unknown(None). Date / Time canonical types
-        // never arise from real AGS4 codes (only DT -> Datetime), so they
-        // also fall here -> Utf8, defensively.
-        _ => {
-            let mut b = StringBuilder::new();
-            for row in &group.rows {
-                match parse_value(cell(row, col), ags_type) {
-                    Value::String(s) => b.append_value(s),
-                    Value::Null => b.append_null(),
-                    // String/Enum/unknown always yield String|Null; other
-                    // variants can't occur, but keep the match total.
-                    other => b.append_value(other.to_string()),
-                }
-            }
-            (Arc::new(b.finish()) as ArrayRef, DataType::Utf8)
-        }
     }
 }
 
@@ -1107,10 +1317,13 @@ mod tests {
     //! file identically to a `.ags5db`, with no DuckDB/Node/wasm runtime.
     //! The datetime oracle is computed independently via `chrono`.
     use super::*;
-    // `Array` provides `is_null`/`len` on the concrete array types.
+    // `Array` provides `is_null`/`len`; ArrayRef/DataType/TimeUnit assert the
+    // shape of what the shared ags5-types builder hands back.
     use arrow::array::{
-        Array, BooleanArray, Float64Array, Int64Array, StringArray, TimestampMicrosecondArray,
+        Array, ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray,
+        TimestampMicrosecondArray,
     };
+    use arrow::datatypes::{DataType, TimeUnit};
     use chrono::NaiveDate;
 
     // Exercises every canonical category: ID/X -> Utf8, 2DP -> Float64,
@@ -1143,13 +1356,19 @@ mod tests {
         parse_bytes(FIXTURE, encoding_rs::UTF_8).expect("fixture parses")
     }
 
-    /// Build the column for `group.headings[name]` and hand it to `f`
-    /// along with its `DataType`.
+    /// Build the typed column for `group`'s heading `name`, returning the
+    /// array + its `DataType`. Routes through the shared ags5-types builder
+    /// (the production path), feeding it this column's cells.
     fn column(file: &ParsedFile, group: &str, name: &str) -> (ArrayRef, DataType) {
         let g = &file.groups[group];
         let col = g.headings.iter().position(|h| h == name).expect("heading");
         let ags_type = &g.types[col];
-        build_column(g, col, ags_type)
+        ags5_types::arrow_cols::build_column(g.rows.len(), ags_type, |row| {
+            g.rows
+                .get(row)
+                .and_then(|r| r.values.get(col))
+                .map(String::as_str)
+        })
     }
 
     fn micros(y: i32, m: u32, d: u32, hh: u32, mm: u32, ss: u32) -> i64 {

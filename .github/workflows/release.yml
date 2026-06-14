@@ -18,7 +18,20 @@ name: release
 
 on:
   push:
-    tags: ["v*"]
+    # `v*` drives the Python release (wheels + binaries + PyPI); `node-v*` drives
+    # the npm release (build-node + npm-publish) independently. Each job is gated
+    # to its own prefix below, so a `node-v0.1.0` tag never builds wheels and a
+    # `v0.3.0` tag never publishes to npm.
+    tags: ["v*", "node-v*"]
+  # A GitHub Release published from the web UI fires `release` (NOT `push`), and
+  # creating the tag from the Releases page is how the npm release is cut (there's
+  # no persistent local clone of the public repo). So the node jobs accept the
+  # `release` event too — `build-node` keys on the `node-v*` ref (event-agnostic)
+  # and `npm-publish` accepts push-or-release. The Python jobs stay push/dispatch-
+  # only (an explicit `github.event_name != 'release'` guard below), so a Python
+  # release published in the UI never re-builds wheels.
+  release:
+    types: [published]
   # Manual trigger for workflow-debug runs — no tag history pollution.
   # `dry_run: true` (default) builds wheels + binaries but skips the
   # github-release + pypi-publish jobs so we don't create draft
@@ -49,8 +62,10 @@ jobs:
   build-wheels:
     name: wheels (${{ matrix.target }})
     # Skip the build matrix on a workflow_dispatch republish run —
-    # republishing pulls existing wheels from a prior release.
-    if: inputs.republish_tag == ''
+    # republishing pulls existing wheels from a prior release. Also skip on a
+    # `node-v*` tag and on any `release` event (Python releases come via `v*`
+    # tag pushes / dispatch, never the Releases UI).
+    if: inputs.republish_tag == '' && !startsWith(github.ref, 'refs/tags/node-v') && github.event_name != 'release'
     runs-on: ${{ matrix.os }}
     env:
       # macOS Tart VM has CommandLineTools, not full Xcode. Set both:
@@ -256,7 +271,9 @@ jobs:
 
   build-binaries:
     name: binaries (${{ matrix.target }})
-    if: inputs.republish_tag == ''
+    # Python CLI binaries — skip on republish, on a `node-v*` (npm) tag, and on
+    # any `release` event.
+    if: inputs.republish_tag == '' && !startsWith(github.ref, 'refs/tags/node-v') && github.event_name != 'release'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -355,7 +372,10 @@ jobs:
     #   - workflow_dispatch dry_run (the default for shakedowns)
     #   - workflow_dispatch republish (the existing release already exists)
     # Always run on tag push.
-    if: github.event_name == 'push' || (inputs.dry_run != true && inputs.republish_tag == '')
+    # A GitHub release is the Python artefacts' home — skip on a `node-v*` tag
+    # (npm-publish ships to the registry with `--skip-gh-release`) and on any
+    # `release` event (a published release must not recurse into building one).
+    if: (github.event_name == 'push' || (inputs.dry_run != true && inputs.republish_tag == '')) && !startsWith(github.ref, 'refs/tags/node-v') && github.event_name != 'release'
     permissions:
       contents: write
     steps:
@@ -511,3 +531,150 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
         with:
           packages-dir: pypi/
+
+  # ── laterite-node (npm) ──────────────────────────────────────────────
+  #
+  # Per-platform `.node` build (same 3-runner matrix as the wheels/binaries),
+  # then a single publish job that assembles + publishes the `laterite` npm
+  # package + its `@laterite/native-*` platform packages. Dormant until a final
+  # `v*` tag — and gated additionally on owner-side npm setup (see
+  # RELEASING-node.md): the `@laterite` org + per-package trusted
+  # publishers. The job won't function until that's done; it harms nothing
+  # before (the tag gate keeps it from running on PRs/branches).
+  build-node:
+    name: node (${{ matrix.target }})
+    # The npm release rides its OWN tag namespace (`node-v*`), independent of the
+    # Python `v*` tags — so build-node + npm-publish only run for `node-v*`.
+    if: startsWith(github.ref, 'refs/tags/node-v')
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: rust-packages/laterite-node
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      # Same per-OS toolchain split as build-binaries: dtolnay's bash action on
+      # Linux/macOS; rustup directly on Windows (no Git Bash on PATH there).
+      - if: runner.os != 'Windows'
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - if: runner.os == 'Windows'
+        name: Setup Rust (Windows, pwsh-native)
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          rustup default stable-x86_64-pc-windows-msvc
+          rustup target add ${{ matrix.target }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+
+      # The platform `@laterite/native-*` deps are unpublished optionals (this
+      # job is what builds them) → `npm ci` skips them. Then a release napi build
+      # for the matrix target. Per-OS shell (Windows runner has no bash on PATH).
+      - if: runner.os != 'Windows'
+        name: npm ci + napi build (Linux / macOS)
+        shell: bash
+        run: |
+          npm ci
+          npx napi build --platform --release --target ${{ matrix.target }}
+      - if: runner.os == 'Windows'
+        name: npm ci + napi build (Windows)
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: |
+          npm ci
+          npx napi build --platform --release --target ${{ matrix.target }}
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: node-${{ matrix.target }}
+          path: rust-packages/laterite-node/*.node
+
+  npm-publish:
+    # Gated EXACTLY like `pypi-publish`:
+    #   1. Workflow-level (this `if:`): only FINAL `v*` tag pushes (no rc/dev).
+    #   2. Environment-level (`environment: npm`'s deployment_branch_policy):
+    #      the `npm` env only allows deployments from `v*` tag refs.
+    #   3. npm-side auth: the `NPM_TOKEN` secret for the FIRST release (npm can't
+    #      pre-configure a trusted publisher for a not-yet-existing package, so
+    #      OIDC alone can't bootstrap the four packages). After they exist + you
+    #      add the per-package trusted publishers (RELEASING-node.md), npm uses
+    #      OIDC automatically — `id-token` stays on below — and the token can go.
+    # Owner npm prerequisites are in RELEASING-node.md.
+    if: (github.event_name == 'push' || github.event_name == 'release') && startsWith(github.ref, 'refs/tags/node-v') && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'dev')
+    name: npm (laterite + @laterite/native-*)
+    runs-on: ubuntu-latest
+    needs: build-node
+    environment: npm
+    permissions:
+      id-token: write   # OIDC token exchange for npm trusted publishing
+      contents: read
+    defaults:
+      run:
+        working-directory: rust-packages/laterite-node
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # npm trusted publishing (OIDC) needs npm >= 11.5.1; node 22 ships npm 10.
+      - name: Upgrade npm (OIDC trusted-publishing support)
+        run: npm install -g npm@latest
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Verify tag matches package version
+        shell: bash
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME#node-v}"   # node-v0.1.0 → 0.1.0
+          test "$PKG" = "$TAG" || { echo "tag node-v$TAG != package $PKG"; exit 1; }
+
+      # Pull the three platform `.node`s built above, place them into the
+      # per-platform npm dirs, and build the shippable dual ESM/CJS dist.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: rust-packages/laterite-node/artifacts
+          pattern: node-*
+          merge-multiple: true
+      - name: Assemble platform packages + dist
+        run: |
+          npx napi create-npm-dir -t .
+          npx napi artifacts -d artifacts
+          npm run build:ts
+
+      # Publish the platform packages (napi prepublish: also syncs the main
+      # package's optionalDependencies to this version), then the main package.
+      # `--provenance` attaches the build provenance attestation.
+      #
+      # Auth: `NODE_AUTH_TOKEN` (the `NPM_TOKEN` secret) writes the `.npmrc` line.
+      # This is what the FIRST release uses, because npm — unlike PyPI — can't
+      # configure a trusted publisher for a package that doesn't exist yet. Once
+      # the four packages exist and you've added their trusted publishers (see
+      # RELEASING-node.md), npm uses OIDC automatically (it prefers the trusted
+      # publisher when `id-token` is available) — no workflow change, and you can
+      # then delete the token. `--provenance` works either way.
+      - name: Publish @laterite/native-* (platform packages)
+        run: npm run prepublish:napi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish laterite (main package)
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

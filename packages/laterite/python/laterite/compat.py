@@ -60,12 +60,11 @@ from ._frames import (
 # python-ags4. A misidentified validator is much harder to debug than
 # a parity test failing.
 PYTHON_AGS4_COMPAT = "1.2.0"
-__version__ = f"0.2.0+compat.python-ags4.{PYTHON_AGS4_COMPAT}"
+__version__ = f"0.3.0+compat.python-ags4.{PYTHON_AGS4_COMPAT}"
 
 # Human-readable Metadata.Checker — same intent, prose form.
 _CHECKER_STRING = (
-    "laterite 0.2.0 — compat: python-ags4 1.2.0 — "
-    "clean-room ags4_validator engine"
+    "laterite 0.3.0 — compat: python-ags4 1.2.0 — clean-room ags4_validator engine"
 )
 
 # python-ags4 maps these version strings → bundled standard dict files;
@@ -103,6 +102,7 @@ def get_backend() -> str:
 
 # --- readers --------------------------------------------------------
 
+
 def _primitives(filepath_or_buffer: Any, encoding: str) -> dict:
     if hasattr(filepath_or_buffer, "read"):
         text = filepath_or_buffer.read()
@@ -132,7 +132,7 @@ def _strict_pre_check(filepath_or_buffer: Any, encoding: str) -> None:
         if hasattr(filepath_or_buffer, "seek"):
             try:
                 filepath_or_buffer.seek(0)
-            except (OSError, ValueError):
+            except OSError, ValueError:
                 pass
     else:
         with open(filepath_or_buffer, encoding=encoding, errors="replace") as fh:
@@ -210,7 +210,10 @@ def AGS4_to_dict(
 
     for code in p["group_order"]:
         g = p["groups"][code]
-        cols = ["HEADING", *_rename_dups(list(g["headings"]), rename_duplicate_headers, code)]
+        cols = [
+            "HEADING",
+            *_rename_dups(list(g["headings"]), rename_duplicate_headers, code),
+        ]
         n = len(cols)
         unit = (["UNIT", *g["units"]] + [""] * n)[:n]
         typ = (["TYPE", *g["types"]] + [""] * n)[:n]
@@ -221,9 +224,7 @@ def AGS4_to_dict(
             hdr = [*cols, "line_number"]
             unit = [*unit, g["unit_line"]]
             typ = [*typ, g["type_line"]]
-            rows = [
-                [*row, r["line"]] for row, r in zip(rows, g["rows"], strict=False)
-            ]
+            rows = [[*row, r["line"]] for row, r in zip(rows, g["rows"], strict=False)]
 
         d: dict[str, list] = {c: [] for c in hdr}
         for rec in (unit, typ, *rows):
@@ -301,18 +302,16 @@ def AGS4_to_dataframe_AGS3(*_a, **_k):
 
 # --- writer ---------------------------------------------------------
 
-def _matrix_from_df(df: Any, columns: list[str]) -> list[list[str]]:
-    """Turn a python-ags4-shaped frame (any backend) into the cell
-    matrix the native emitter wants: row 0 = HEADING line, then the
-    UNIT/TYPE/DATA rows exactly as stored."""
-    import narwhals.stable.v1 as nw
 
-    nf = nw.from_native(df, eager_only=True)
-    cols = [c for c in columns if c in nf.columns] or list(nf.columns)
-    matrix = [list(cols)]
-    for row in nf.select(cols).iter_rows():
-        matrix.append(["" if v is None else str(v) for v in row])
-    return matrix
+def _to_polars(df: Any):
+    """Any python-ags4-shaped frame (pandas / polars) -> polars, without
+    narwhals — compat's cross-backend shim now branches on the native type.
+    A polars frame passes through; a pandas frame converts via from_pandas."""
+    import polars as pl
+
+    if isinstance(df, pl.DataFrame):
+        return df
+    return pl.from_pandas(df) if hasattr(df, "to_numpy") else pl.DataFrame(df)
 
 
 def dataframe_to_AGS4(
@@ -326,12 +325,20 @@ def dataframe_to_AGS4(
 ) -> None:
     """Write python-ags4-shaped frames back to a spec-correct AGS4
     file (CRLF, every field quoted, ``"``→``""``; blank line between
-    groups). Any backend in, via narwhals."""
-    blocks: list[tuple[str, list[list[str]]]] = []
+    groups). Any backend in (pandas / polars).
+
+    The per-cell stringify is **all-Rust**: each frame is normalised to
+    polars and column-selected to the ``headings`` order, then handed to
+    the native emitter as a pyarrow-free Arrow capsule — Rust reproduces
+    python-ags4's ``"" if v is None else str(v)`` and serialises (the
+    column names become the HEADING line; data rows carry their tag in
+    the ``"HEADING"`` column, exactly as stored)."""
+    blocks: list[tuple[str, Any]] = []
     for code, df in tables.items():
-        cols = headings.get(code) or []
-        blocks.append((code, _matrix_from_df(df, cols)))
-    text = _native.emit_ags4(blocks)
+        nf = _to_polars(df)
+        cols = [c for c in (headings.get(code) or []) if c in nf.columns] or list(nf.columns)
+        blocks.append((code, nf.select(cols)))
+    text = _native.emit_ags4_compat(blocks)
     m = "ab" if mode == "a" else "wb"
     with open(filepath, m) as f:
         f.write(text.encode(encoding))
@@ -339,11 +346,11 @@ def dataframe_to_AGS4(
 
 # --- numeric coercion ----------------------------------------------
 
+
 def convert_to_numeric(dataframe: Any) -> Any:
     """python-ags4 ``convert_to_numeric`` parity: coerce columns whose
     TYPE row contains ``DP|MC|SF|SCI`` to numeric (bad cells → null),
     drop the UNIT+TYPE rows, reset index. Pandas in / pandas out."""
-    import narwhals.stable.v1 as nw
     import polars as pl
 
     # Normalise to polars ONCE up front (same pattern as convert_to_text
@@ -351,9 +358,7 @@ def convert_to_numeric(dataframe: Any) -> Any:
     # frame directly was the bug: a filtered pandas frame keeps its
     # original index, so positional `tr[c][0]` raised KeyError on the
     # default pandas backend. Polars positional indexing is safe.
-    pf = nw.from_native(dataframe, eager_only=True).to_native()
-    if not isinstance(pf, pl.DataFrame):
-        pf = pl.from_pandas(pf) if hasattr(pf, "to_numpy") else pl.DataFrame(pf)
+    pf = _to_polars(dataframe)
 
     type_row = pf.filter(pl.col("HEADING") == "TYPE")
     numeric: list[str] = []
@@ -417,9 +422,7 @@ def _unit_type_from_external_dict_file(
     return out
 
 
-def _resolve_dict_unit_type(
-    dataframe: Any, edition: str
-) -> dict[str, tuple[str, str]]:
+def _resolve_dict_unit_type(dataframe: Any, edition: str) -> dict[str, tuple[str, str]]:
     """Look up UNIT/TYPE for the columns in ``dataframe`` from the
     bundled standard dictionary for ``edition``.
 
@@ -512,7 +515,6 @@ def convert_to_text(dataframe: Any, dictionary: str | None = None) -> Any:
     external dict files (not one of the bundled paths) still raise
     :class:`BadDictError` per O-28.
     """
-    import narwhals.stable.v1 as nw
     import polars as pl
 
     # Recover UNIT/TYPE rows from the dictionary when supplied.
@@ -537,10 +539,7 @@ def convert_to_text(dataframe: Any, dictionary: str | None = None) -> Any:
                 f"version string {sorted(_VERSION_STRINGS)} nor an "
                 "AGS4 dict file we can read."
             )
-    nf = nw.from_native(dataframe, eager_only=True)
-    pf = nf.to_native()
-    if not isinstance(pf, pl.DataFrame):
-        pf = pl.from_pandas(pf) if hasattr(pf, "to_numpy") else pl.DataFrame(pf)
+    pf = _to_polars(dataframe)
     # Capture which columns were numeric in the *input* — after the
     # UNIT/TYPE inject below, polars will unify dtypes to String (the
     # inject adds string rows). python-ags4 only reformats columns that
@@ -548,8 +547,16 @@ def convert_to_text(dataframe: Any, dictionary: str | None = None) -> Any:
     # outer except leaves the column alone). We get the same semantics
     # by gating on the pre-inject dtype.
     _NUMERIC_DTYPES = (
-        pl.Float32, pl.Float64, pl.Int8, pl.Int16, pl.Int32, pl.Int64,
-        pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64,
+        pl.Float32,
+        pl.Float64,
+        pl.Int8,
+        pl.Int16,
+        pl.Int32,
+        pl.Int64,
+        pl.UInt8,
+        pl.UInt16,
+        pl.UInt32,
+        pl.UInt64,
     )
     numeric_cols = {c for c in pf.columns if pf[c].dtype in _NUMERIC_DTYPES}
     if dict_unit_type is not None:
@@ -565,7 +572,7 @@ def convert_to_text(dataframe: Any, dictionary: str | None = None) -> Any:
             return ""
         try:
             x = float(v)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return str(v)
         if "DP" in t:
             return f"{x:.{int(t.strip('DP') or 0)}f}"
@@ -594,6 +601,7 @@ def convert_to_text(dataframe: Any, dictionary: str | None = None) -> Any:
 
 
 # --- validation -----------------------------------------------------
+
 
 def _dict_version_arg(standard_AGS4_dictionary: Any) -> str | None:
     if standard_AGS4_dictionary is None:
@@ -637,18 +645,22 @@ def check_file(
     # preserving the existing terse-by-default behaviour there.
     if is_path:
         r = raise_for(
-            _native.run_check(path=str(filepath_or_buffer), dict_version=dv,
-                              check_files=True, include_fyi=True,
-                              encoding=encoding)
+            _native.run_check(
+                path=str(filepath_or_buffer),
+                dict_version=dv,
+                check_files=True,
+                include_fyi=True,
+                encoding=encoding,
+            )
         )
-        p = raise_for(_native.parse_primitives(path=str(filepath_or_buffer),
-                                               encoding=encoding))
+        p = raise_for(
+            _native.parse_primitives(path=str(filepath_or_buffer), encoding=encoding)
+        )
     else:
         text = filepath_or_buffer.read()
         if isinstance(text, bytes):
             text = text.decode(encoding, errors="replace")
-        r = raise_for(_native.run_check(text=text, dict_version=dv,
-                                        include_fyi=True))
+        r = raise_for(_native.run_check(text=text, dict_version=dv, include_fyi=True))
         p = raise_for(_native.parse_primitives(text=text))
 
     ags_errors: dict[str, list[dict]] = {}
@@ -666,7 +678,9 @@ def check_file(
 
     if "AGS Format Rule 1" in ags_errors:
         add(
-            "General", "", "",
+            "General",
+            "",
+            "",
             "AGS4 Rule 1 is interpreted as allowing both standard ASCII "
             "characters (Unicode code points 0-127) and extended ASCII "
             "characters (Unicode code points 160-255).",
@@ -675,17 +689,33 @@ def check_file(
     # Summary of data (python-ags4 check.get_data_summary parity).
     groups = list(p["group_order"])
     tran = p.get("tran_ags")
-    add("Summary of data", "", "",
-        f'TRAN_AGS: "{tran}"' if tran else "TRAN_AGS: Not found")
-    add("Summary of data", "", "",
-        f"{len(groups)} groups identified in file: {' '.join(groups)}")
+    add(
+        "Summary of data",
+        "",
+        "",
+        f'TRAN_AGS: "{tran}"' if tran else "TRAN_AGS: Not found",
+    )
+    add(
+        "Summary of data",
+        "",
+        "",
+        f"{len(groups)} groups identified in file: {' '.join(groups)}",
+    )
     empty = [c for c in groups if not p["groups"][c]["rows"]]
     if empty:
-        add("Summary of data", "", "",
-            f"{len(empty)} group(s) do not have any data: {' '.join(empty)}")
+        add(
+            "Summary of data",
+            "",
+            "",
+            f"{len(empty)} group(s) do not have any data: {' '.join(empty)}",
+        )
     if "LOCA" in p["groups"]:
-        add("Summary of data", "", "",
-            f"{len(p['groups']['LOCA']['rows'])} data row(s) in LOCA group")
+        add(
+            "Summary of data",
+            "",
+            "",
+            f"{len(p['groups']['LOCA']['rows'])} data row(s) in LOCA group",
+        )
     add("Summary of data", "", "", f"Optional DICT group present? {'DICT' in groups}")
     add("Summary of data", "", "", f"Optional FILE group present? {'FILE' in groups}")
 
@@ -700,16 +730,25 @@ def check_file(
     # `test_sha256_hash` asserts SHA lands at `Metadata[6]`, which only
     # holds when Dictionary is present at [3].
     if r.get("dict_version"):
-        add("Metadata", "Dictionary", "",
-            f"Standard_dictionary_v{r['dict_version'].replace('.', '_')}.ags")
-    add("Metadata", "Time (UTC)", "",
-        datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S"))
+        add(
+            "Metadata",
+            "Dictionary",
+            "",
+            f"Standard_dictionary_v{r['dict_version'].replace('.', '_')}.ags",
+        )
+    add(
+        "Metadata",
+        "Time (UTC)",
+        "",
+        datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S"),
+    )
     add("Metadata", "File encoding", "", encoding)
 
     sha = hashlib.sha256()
     if is_path:
-        with open(filepath_or_buffer, newline="", encoding=encoding,
-                  errors="replace") as fh:
+        with open(
+            filepath_or_buffer, newline="", encoding=encoding, errors="replace"
+        ) as fh:
             for line in fh:
                 sha.update(line.encode(encoding))
     add("Metadata", "SHA256 hash", "", sha.hexdigest())
@@ -763,7 +802,9 @@ def AGS4_to_excel(
 
     try:
         _native.ags5db_ags4_to_excel(
-            str(input_file), str(output_file), ordered_keys,
+            str(input_file),
+            str(output_file),
+            ordered_keys,
         )
     except RuntimeError as exc:
         if "No valid AGS4 data" in str(exc):
@@ -808,7 +849,9 @@ def excel_to_AGS4(
     """
     try:
         _native.ags5db_excel_to_ags4(
-            str(input_file), str(output_file), bool(format_numeric_columns),
+            str(input_file),
+            str(output_file),
+            bool(format_numeric_columns),
         )
     except RuntimeError as exc:
         if "No valid AGS4 data" in str(exc):
@@ -881,9 +924,7 @@ def get_TRAN_AGS(tables: dict[str, Any]) -> str | None:
     # pyarrow / unknown: fall back to dict-of-lists conversion.
     try:
         d = tran.to_pydict()  # pyarrow Table
-        for h, v in zip(
-            d.get("HEADING", []), d.get("TRAN_AGS", []), strict=False
-        ):
+        for h, v in zip(d.get("HEADING", []), d.get("TRAN_AGS", []), strict=False):
             if h == "DATA":
                 return str(v)
     except AttributeError:
@@ -932,16 +973,15 @@ def get_DICT_table_from_json_file(filepath: Any) -> Any:
     """
     import pandas as pd
 
-    heading_rows = (
-        pd.read_json(filepath)
-        .rename(columns={
+    heading_rows = pd.read_json(filepath).rename(
+        columns={
             "group": "DICT_GRP",
             "heading": "DICT_HDNG",
             "suggested_type": "DICT_DTYP",
             "description": "DICT_DESC",
             "suggested_unit": "DICT_UNIT",
             "example": "DICT_EXMP",
-        })
+        }
     )
     heading_rows = heading_rows.assign(
         HEADING="DATA",
@@ -976,37 +1016,51 @@ def get_DICT_table_from_json_file(filepath: Any) -> Any:
         in_group_order=0,
     )
 
-    unit_and_type_rows = pd.DataFrame({
-        "HEADING": ["UNIT", "TYPE"],
-        "DICT_TYPE": ["", "PA"],
-        "DICT_GRP": ["", "X"],
-        "DICT_HDNG": ["", "X"],
-        "DICT_STAT": ["", "PA"],
-        "DICT_DTYP": ["", "PT"],
-        "DICT_DESC": ["", "X"],
-        "DICT_UNIT": ["", "PU"],
-        "DICT_EXMP": ["", "X"],
-        "DICT_PGRP": ["", "X"],
-        "DICT_REM": ["", "X"],
-        "FILE_FSET": ["", "X"],
-        "group_order": [-1, 0],
-    })
+    unit_and_type_rows = pd.DataFrame(
+        {
+            "HEADING": ["UNIT", "TYPE"],
+            "DICT_TYPE": ["", "PA"],
+            "DICT_GRP": ["", "X"],
+            "DICT_HDNG": ["", "X"],
+            "DICT_STAT": ["", "PA"],
+            "DICT_DTYP": ["", "PT"],
+            "DICT_DESC": ["", "X"],
+            "DICT_UNIT": ["", "PU"],
+            "DICT_EXMP": ["", "X"],
+            "DICT_PGRP": ["", "X"],
+            "DICT_REM": ["", "X"],
+            "FILE_FSET": ["", "X"],
+            "group_order": [-1, 0],
+        }
+    )
 
     DICT = pd.concat([unit_and_type_rows, heading_rows, group_rows])
 
     # Deprecated GROUPs carry the marker on the GROUP row only.
-    deprecated_mask = (
-        DICT["group_status"].eq("Deprecated") & DICT["DICT_TYPE"].eq("GROUP")
+    deprecated_mask = DICT["group_status"].eq("Deprecated") & DICT["DICT_TYPE"].eq(
+        "GROUP"
     )
     DICT.loc[deprecated_mask, "DICT_STAT"] = "DEPRECATED"
 
     DICT = (
         DICT.sort_values(by=["group_order", "in_group_order"])
-        .loc[:, [
-            "HEADING", "DICT_TYPE", "DICT_GRP", "DICT_HDNG", "DICT_STAT",
-            "DICT_DTYP", "DICT_DESC", "DICT_UNIT", "DICT_EXMP",
-            "DICT_PGRP", "DICT_REM", "FILE_FSET",
-        ]]
+        .loc[
+            :,
+            [
+                "HEADING",
+                "DICT_TYPE",
+                "DICT_GRP",
+                "DICT_HDNG",
+                "DICT_STAT",
+                "DICT_DTYP",
+                "DICT_DESC",
+                "DICT_UNIT",
+                "DICT_EXMP",
+                "DICT_PGRP",
+                "DICT_REM",
+                "FILE_FSET",
+            ],
+        ]
         .reset_index(drop=True)
     )
 
@@ -1041,34 +1095,42 @@ def get_ABBR_table_from_json_file(
 
     data_rows = (
         pd.read_json(filepath)
-        .rename(columns={
-            "Group": "ABBR_HDNG",
-            "Code": "ABBR_CODE",
-            "Description": "ABBR_DESC",
-        })
+        .rename(
+            columns={
+                "Group": "ABBR_HDNG",
+                "Code": "ABBR_CODE",
+                "Description": "ABBR_DESC",
+            }
+        )
         .assign(HEADING="DATA", ABBR_LIST=version, ABBR_REM="", FILE_FSET="")
-        .query("Version.str.contains(@version) & Status.str.contains('Approved', case=False)")
+        .query(
+            "Version.str.contains(@version) & Status.str.contains('Approved', case=False)"
+        )
         .sort_values(by=["ABBR_HDNG", "ABBR_CODE"])
     )
 
-    unit_and_type_rows = pd.DataFrame({
-        "HEADING": ["UNIT", "TYPE"],
-        "ABBR_HDNG": ["", "X"],
-        "ABBR_CODE": ["", "X"],
-        "ABBR_DESC": ["", "X"],
-        "ABBR_LIST": ["", "X"],
-        "ABBR_REM": ["", "X"],
-        "FILE_FSET": ["", "X"],
-    })
+    unit_and_type_rows = pd.DataFrame(
+        {
+            "HEADING": ["UNIT", "TYPE"],
+            "ABBR_HDNG": ["", "X"],
+            "ABBR_CODE": ["", "X"],
+            "ABBR_DESC": ["", "X"],
+            "ABBR_LIST": ["", "X"],
+            "ABBR_REM": ["", "X"],
+            "FILE_FSET": ["", "X"],
+        }
+    )
 
     if filepath_ELRG is not None:
         elrg_codes = (
             pd.read_json(filepath_ELRG)
-            .rename(columns={
-                "Code": "ABBR_CODE",
-                "code": "ABBR_CODE",
-                "description": "ABBR_DESC",
-            })
+            .rename(
+                columns={
+                    "Code": "ABBR_CODE",
+                    "code": "ABBR_CODE",
+                    "description": "ABBR_DESC",
+                }
+            )
             .assign(
                 HEADING="DATA",
                 ABBR_HDNG="ELRG_CODE",
@@ -1076,20 +1138,27 @@ def get_ABBR_table_from_json_file(
                 ABBR_REM="",
                 FILE_FSET="",
             )
-            .query("version.str.contains(@version) & status.str.contains('Approved', case=False)")
+            .query(
+                "version.str.contains(@version) & status.str.contains('Approved', case=False)"
+            )
             .sort_values(by=["ABBR_HDNG", "ABBR_CODE"])
         )
     else:
         elrg_codes = pd.DataFrame()
 
     ABBR = pd.concat([unit_and_type_rows, data_rows, elrg_codes])
-    return (
-        ABBR.loc[:, [
-            "HEADING", "ABBR_HDNG", "ABBR_CODE", "ABBR_DESC",
-            "ABBR_LIST", "ABBR_REM", "FILE_FSET",
-        ]]
-        .reset_index(drop=True)
-    )
+    return ABBR.loc[
+        :,
+        [
+            "HEADING",
+            "ABBR_HDNG",
+            "ABBR_CODE",
+            "ABBR_DESC",
+            "ABBR_LIST",
+            "ABBR_REM",
+            "FILE_FSET",
+        ],
+    ].reset_index(drop=True)
 
 
 def get_TYPE_table_from_json_file(filepath: Any, version: str = "4.1") -> Any:
@@ -1110,17 +1179,18 @@ def get_TYPE_table_from_json_file(filepath: Any, version: str = "4.1") -> Any:
         .sort_values(by=["TYPE_TYPE", "TYPE_DESC"])
     )
 
-    unit_and_type_rows = pd.DataFrame({
-        "HEADING": ["UNIT", "TYPE"],
-        "TYPE_TYPE": ["", "X"],
-        "TYPE_DESC": ["", "X"],
-        "FILE_FSET": ["", "X"],
-    })
+    unit_and_type_rows = pd.DataFrame(
+        {
+            "HEADING": ["UNIT", "TYPE"],
+            "TYPE_TYPE": ["", "X"],
+            "TYPE_DESC": ["", "X"],
+            "FILE_FSET": ["", "X"],
+        }
+    )
 
     TYPE = pd.concat([unit_and_type_rows, data_rows])
-    return (
-        TYPE.loc[:, ["HEADING", "TYPE_TYPE", "TYPE_DESC", "FILE_FSET"]]
-        .reset_index(drop=True)
+    return TYPE.loc[:, ["HEADING", "TYPE_TYPE", "TYPE_DESC", "FILE_FSET"]].reset_index(
+        drop=True
     )
 
 
@@ -1141,7 +1211,9 @@ def get_UNIT_table_from_json_file(filepath: Any, version: str = "4.1") -> Any:
         pd.read_json(filepath)
         .rename(columns={"Unit": "UNIT_UNIT", "Description": "UNIT_DESC"})
         .assign(HEADING="DATA", UNIT_REM="", FILE_FSET="")
-        .query("Version.str.contains(@version) & Status.str.contains('Approved', case=False)")
+        .query(
+            "Version.str.contains(@version) & Status.str.contains('Approved', case=False)"
+        )
         .drop_duplicates(subset="UNIT_UNIT", keep="first")
         # Case-insensitive sort — the in-file standard dict groups
         # `mm` and `MM` together, with uppercase reverse-precedence
@@ -1149,19 +1221,20 @@ def get_UNIT_table_from_json_file(filepath: Any, version: str = "4.1") -> Any:
         .sort_values(by=["UNIT_UNIT", "UNIT_DESC"], key=lambda x: x.str.lower())
     )
 
-    unit_and_type_rows = pd.DataFrame({
-        "HEADING": ["UNIT", "TYPE"],
-        "UNIT_UNIT": ["", "X"],
-        "UNIT_DESC": ["", "X"],
-        "UNIT_REM": ["", "X"],
-        "FILE_FSET": ["", "X"],
-    })
+    unit_and_type_rows = pd.DataFrame(
+        {
+            "HEADING": ["UNIT", "TYPE"],
+            "UNIT_UNIT": ["", "X"],
+            "UNIT_DESC": ["", "X"],
+            "UNIT_REM": ["", "X"],
+            "FILE_FSET": ["", "X"],
+        }
+    )
 
     UNIT = pd.concat([unit_and_type_rows, data_rows])
-    return (
-        UNIT.loc[:, ["HEADING", "UNIT_UNIT", "UNIT_DESC", "UNIT_REM", "FILE_FSET"]]
-        .reset_index(drop=True)
-    )
+    return UNIT.loc[
+        :, ["HEADING", "UNIT_UNIT", "UNIT_DESC", "UNIT_REM", "FILE_FSET"]
+    ].reset_index(drop=True)
 
 
 def format_numeric_column(dataframe: Any, column_name: str, TYPE: str) -> Any:
@@ -1200,10 +1273,8 @@ def format_numeric_column(dataframe: Any, column_name: str, TYPE: str) -> Any:
             df.loc[mask, col] = df.loc[mask, col].apply(lambda x: f"{x:.{i}E}")
         elif "SF" in TYPE:
             mask = (df.HEADING == "DATA") & df[col].notna()
-            df.loc[mask, [col]] = df.loc[mask, [col]].map(
-                lambda x: _format_sf(x, TYPE)
-            )
-    except (ValueError, TypeError):
+            df.loc[mask, [col]] = df.loc[mask, [col]].map(lambda x: _format_sf(x, TYPE))
+    except ValueError, TypeError:
         # python-ags4 silently logs and returns the unmodified frame
         # when a column has non-numeric entries. Match that behaviour
         # rather than letting the user see a traceback.
@@ -1284,7 +1355,7 @@ def write_error_report(
         with open(output_file, "w", newline="", encoding="utf-8") as f:
             if "Metadata" in ags_errors:
                 for entry in ags_errors["Metadata"]:
-                    f.write(f"""{entry['line']+':':<12} {entry['desc']}\r\n""")
+                    f.write(f"""{entry["line"] + ":":<12} {entry["desc"]}\r\n""")
                 f.write("\r\n")
 
             if error_count == 0:
@@ -1320,8 +1391,8 @@ def write_error_report(
                 f.write(f"{key}:\r\n")
                 for entry in ags_errors[key]:
                     f.write(
-                        f"""  Line {entry['line']:<8} {entry['group'].strip('"'):<7} """
-                        f"""{entry['desc']}\r\n"""
+                        f"""  Line {entry["line"]:<8} {entry["group"].strip('"'):<7} """
+                        f"""{entry["desc"]}\r\n"""
                     )
                 f.write("\r\n")
 
@@ -1329,8 +1400,8 @@ def write_error_report(
                 f.write(f"{key}:\r\n")
                 for entry in ags_errors[key]:
                     f.write(
-                        f"""  Line {entry['line']:<8} {entry['group'].strip('"'):<7} """
-                        f"""{entry['desc']}\r\n"""
+                        f"""  Line {entry["line"]:<8} {entry["group"].strip('"'):<7} """
+                        f"""{entry["desc"]}\r\n"""
                     )
                 f.write("\r\n")
 
@@ -1339,8 +1410,8 @@ def write_error_report(
                     f.write(f"{key}:\r\n")
                     for entry in ags_errors[key]:
                         f.write(
-                            f"""  Line {entry['line']:<8} {entry['group'].strip('"'):<7} """
-                            f"""{entry['desc']}\r\n"""
+                            f"""  Line {entry["line"]:<8} {entry["group"].strip('"'):<7} """
+                            f"""{entry["desc"]}\r\n"""
                         )
                     f.write("\r\n")
 
@@ -1349,8 +1420,8 @@ def write_error_report(
                     f.write(f"{key}:\r\n")
                     for entry in ags_errors[key]:
                         f.write(
-                            f"""  Line {entry['line']:<8} {entry['group'].strip('"'):<7} """
-                            f"""{entry['desc']}\r\n"""
+                            f"""  Line {entry["line"]:<8} {entry["group"].strip('"'):<7} """
+                            f"""{entry["desc"]}\r\n"""
                         )
                     f.write("\r\n")
 
@@ -1359,6 +1430,7 @@ def write_error_report(
         # warnings so the message is visible without configuring
         # logging.
         import warnings
+
         warnings.warn(
             f"write_error_report: could not write to {output_file!r} "
             "(parent directory missing). Report not saved.",
@@ -1399,7 +1471,13 @@ def sort_groups(tables: dict, sorting_strategy: str = "dictionary") -> dict:
         # other group alphabetically. Replicate that order so
         # callers porting from python-ags4 see the same output.
         _DICT_HEADER = (
-            "PROJ", "ABBR", "DICT", "FILE", "TRAN", "TYPE", "UNIT",
+            "PROJ",
+            "ABBR",
+            "DICT",
+            "FILE",
+            "TRAN",
+            "TYPE",
+            "UNIT",
         )
         header_set = set(_DICT_HEADER)
         alphabetical_rest = sorted(c for c in _LATERITE_GROUPS if c not in header_set)
@@ -1419,8 +1497,17 @@ def sort_groups(tables: dict, sorting_strategy: str = "dictionary") -> dict:
         # the alternative — auto-deriving from parent=None — gives a
         # different but valid order that breaks downstream tests.
         SEED_ROOTS = (
-            "PROJ", "TRAN", "ABBR", "DICT", "FILE", "TYPE", "UNIT",
-            "LBSG", "LBST", "PREM", "STND",
+            "PROJ",
+            "TRAN",
+            "ABBR",
+            "DICT",
+            "FILE",
+            "TYPE",
+            "UNIT",
+            "LBSG",
+            "LBST",
+            "PREM",
+            "STND",
         )
         group_list = list(SEED_ROOTS)
 
@@ -1458,6 +1545,7 @@ def sort_groups(tables: dict, sorting_strategy: str = "dictionary") -> dict:
     leftover = sorted(set(tables.keys()) - set(sorted_tables.keys()))
     if leftover:
         import warnings
+
         for code in leftover:
             warnings.warn(
                 f"sort_groups: appending {code!r} at the end — not found "

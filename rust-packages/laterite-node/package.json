@@ -1,0 +1,83 @@
+{
+  "name": "laterite",
+  "version": "0.1.0",
+  "description": "AGS4 geotechnical data for Node.js — read, validate, produce, and query (the Node port of the laterite Python toolkit, Rust-backed).",
+  "license": "MIT",
+  "author": "niko86",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/niko86/laterite.git",
+    "directory": "rust-packages/laterite-node"
+  },
+  "homepage": "https://github.com/niko86/laterite#readme",
+  "keywords": ["ags4", "ags", "geotechnical", "validator", "arrow", "napi", "rust"],
+  "type": "commonjs",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "imports": {
+    "#native": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": ["dist", "index.js", "index.d.ts", "README.md"],
+  "napi": {
+    "name": "laterite-node",
+    "package": {
+      "name": "@laterite/native"
+    },
+    "triples": {
+      "defaults": false,
+      "additional": [
+        "x86_64-unknown-linux-gnu",
+        "aarch64-apple-darwin",
+        "x86_64-pc-windows-msvc"
+      ]
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "napi build --platform --release && npm run build:ts",
+    "build:debug": "napi build --platform && npm run build:ts",
+    "build:ts": "tsup",
+    "artifacts": "napi artifacts",
+    "prepublish:napi": "napi prepublish -t npm --skip-gh-release",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "apache-arrow": "^21.1.0"
+  },
+  "optionalDependencies": {
+    "@laterite/native-darwin-arm64": "0.1.0",
+    "@laterite/native-linux-x64-gnu": "0.1.0",
+    "@laterite/native-win32-x64-msvc": "0.1.0"
+  },
+  "peerDependencies": {
+    "@duckdb/node-api": ">=1.5.0"
+  },
+  "peerDependenciesMeta": {
+    "@duckdb/node-api": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@duckdb/node-api": "^1.5.3-r.3",
+    "@napi-rs/cli": "^2.18.4",
+    "@types/node": "^25.9.3",
+    "tsup": "^8.5.0",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  }
+}

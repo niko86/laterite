@@ -1,0 +1,39 @@
+// laterite.agsTypes — the AGS4 type system, the Node port of laterite-py's
+// `ags_types`. The parsing LOGIC is native (one shared engine across hosts);
+// this is just the typed TS face over it.
+import { Ags4Error } from "./errors";
+import { canonicalType as nativeCanonicalType, displayHint, parseValue as nativeParseValue } from "./native";
+
+/** Cross-system target categories — the lowercase labels the engine returns. */
+export type CanonicalType =
+  | "string"
+  | "integer"
+  | "decimal"
+  | "datetime"
+  | "date"
+  | "time"
+  | "bool"
+  | "enum";
+
+/** A parsed AGS value: number (integer/decimal), boolean (YN), string
+ * (text/enum **and** the canonical datetime/date/time strings), or null. */
+export type AgsValue = string | number | boolean | null;
+
+/** AGS spec type code → canonical category. Throws for unknown codes (mirrors
+ * Python's `ValueError`). */
+export function canonicalType(agsType: string): CanonicalType {
+  const label = nativeCanonicalType(agsType);
+  if (label === null) throw new Ags4Error(`unknown AGS type code: ${JSON.stringify(agsType)}`);
+  return label as CanonicalType;
+}
+
+export { displayHint };
+
+/** Parse an AGS4-shaped raw value into its canonical JS value (empty /
+ * unparseable → null). datetime/date/time come back as the canonical **string**
+ * (engine shape; `new Date(s)` if you want a Date). Non-string input is
+ * stringified first (matches the Python wrapper). */
+export function parseValue(raw: unknown, agsType: string): AgsValue {
+  const s = raw === null || raw === undefined ? null : String(raw);
+  return nativeParseValue(s, agsType) as AgsValue;
+}

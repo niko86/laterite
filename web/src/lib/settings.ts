@@ -72,7 +72,7 @@ function persistedBool(key: string, def: boolean): [Accessor<boolean>, (v: boole
 
 const DICTS = ["auto", "4.0.3", "4.0.4", "4.1", "4.1.1", "4.2"];
 const ENCS = ["utf-8", "windows-1252"];
-const TABS = ["validate", "fix", "explore", "tools"];
+const TABS = ["validate", "fix", "explore", "tools", "export"];
 const EXPLORE_VIEWS = ["browse", "sql", "charts", "analyse"];
 const FIX_VIEWS = ["fixes", "diff"];
 const TOOLS_LIST = [

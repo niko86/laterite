@@ -41,7 +41,9 @@ pyo3 = { version = "0.28", features = ["extension-module", "chrono", "abi3-py312
 serde_json = { version = "1", features = ["preserve_order"] }
 chrono = "0.4"
 # Bundled libduckdb. Matches ags5db's pin so the linker sees one copy.
-duckdb = { version = "1.4", features = ["bundled"] }
+# `~1.4` not `1.4`: holds the 1.4.x LTS line — a plain caret would admit the crate's
+# `1.10503.x` / engine-1.5.3 scheme on a `cargo update`. See ags5db/Cargo.toml.
+duckdb = { version = "~1.4", features = ["bundled"] }
 # Blob hashing for `attach_blobs` (matches ags5db's direct deps).
 sha2 = "0.10"
 hex = "0.4"

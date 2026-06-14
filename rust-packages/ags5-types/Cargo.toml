@@ -28,6 +28,17 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 # parse_value returns serde_json::Value (scalar shapes only — no Maps,
 # so no preserve_order needed here; the native side unifies its own).
 serde_json = "1"
+# Typed Arrow column building (arrow_cols), behind the `arrow` feature.
+# Optional + default-features=false so non-Arrow consumers (ags5-core,
+# ags5db) don't pull it: only the core array/schema/record_batch crates,
+# no csv/json/ipc/prettyprint. The two emitters add what they need on top
+# (ags4-wasm enables `ipc` for the StreamWriter; laterite-py pairs it with
+# pyo3-arrow). v59 matches pyo3-arrow 0.18 so one build serves both hosts.
+arrow = { version = "59", default-features = false, optional = true }
+
+[features]
+# Typed Apache Arrow emission (the `arrow_cols` module).
+arrow = ["dep:arrow"]
 
 [dev-dependencies]
 # Property-based tests (round-trip / never-panic / idempotence) for the
