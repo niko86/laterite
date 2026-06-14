@@ -30,6 +30,9 @@
     }
   },
   "files": ["dist", "index.js", "index.d.ts", "README.md"],
+  "publishConfig": {
+    "access": "public"
+  },
   "napi": {
     "name": "laterite-node",
     "package": {
