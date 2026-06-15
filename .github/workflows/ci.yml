@@ -188,8 +188,13 @@ jobs:
         with:
           node-version: 22
 
-      # The platform `@laterite/native-*` packages are unpublished optional deps
-      # (the local napi build below provides the .node), so `npm ci` skips them.
+      # `npm ci` requires package-lock.json to stay in sync with the registry.
+      # The `@laterite/native-*` optional deps are pinned to the package version;
+      # once a version is published, the lockfile must record its resolved entry
+      # (an unresolved/empty entry → EUSAGE). So regenerate + commit the lockfile
+      # after each platform-package publish (see RELEASING-node.md). The matching
+      # platform `.node` gets installed here but the local napi build below
+      # overrides it (the loader prefers ./laterite-node.<triple>.node).
       - name: npm ci
         run: npm ci
 
