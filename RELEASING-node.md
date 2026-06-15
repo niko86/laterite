@@ -21,10 +21,15 @@ deleted. `--provenance` works under both.
 
 1. **Create the `@laterite` org** on npm (free, for public packages). Done — it
    owns the three scoped native packages.
-2. **Create a granular access token** (npm → *Access Tokens* → *Granular Access
-   Token*): read **and write**, scoped to the packages/scopes `laterite` and
-   `@laterite/*` (and the `@laterite` org). Add it as the **repo secret
+2. **Create a classic _Automation_ token** (npm → *Access Tokens* → *Generate New
+   Token* → **Classic Token** → **Automation**). Add it as the **repo secret
    `NPM_TOKEN`** (repo Settings → Secrets and variables → Actions).
+   - **Use Automation, not a granular/publish token, if your account has 2FA.**
+     Automation tokens are the documented exception that **bypass 2FA** in CI;
+     granular and classic-publish tokens respect the account's
+     "two-factor for writes" setting and the publish fails with **`EOTP` — "this
+     operation requires a one-time password"** (learned the hard way on the
+     0.1.0 release). Account-wide scope is fine; delete it once OIDC is wired.
 3. **Create the `npm` GitHub environment** (repo Settings → Environments → *New
    environment* `npm`) with a **deployment branch/tag policy** → *Selected* →
    add a tag rule **`node-v*`**. This is the environment-level half of the publish
@@ -76,6 +81,12 @@ node-v0.1.1`. Either way, the `node-v0.1.1` tag triggers `release.yml`:
   create-npm-dir` + `napi artifacts`), builds the dual ESM/CJS dist (`tsup`),
   publishes the platform packages (`napi prepublish`), then `npm publish
   --provenance` the main `laterite` package.
+  - **The scoped `@laterite/native-*` packages must publish _public_.** Scoped
+    packages default to **private** (a paid feature) → `npm publish` fails with
+    **`E402` — "you must sign up for private packages"**. `napi prepublish` has
+    no `--access` flag, so the root `package.json` carries
+    `"publishConfig": { "access": "public" }`, which `napi create-npm-dir`
+    **propagates** into every generated platform `package.json`. Don't remove it.
 
 ### Pre-releases
 
@@ -89,3 +100,20 @@ above, so treat the **first** `npm-publish` run as a shakedown: watch that `napi
 artifacts` places the three `.node`s correctly and that each `npm publish`
 authenticates. If OIDC + napi misbehave, use the token fallback. Subsequent
 releases are routine.
+
+**Done — `0.1.0` shipped 2026-06-15** (`laterite` + the three `@laterite/native-*`,
+provenance-signed; a real `npm install laterite` reads + validates against the
+published binary). The shakedown surfaced three gotchas, all now guarded against
+above: the committed napi loader (else the publish-only `build:ts` breaks — see
+the packaging smoke in the `node` CI job), the **Automation** token (2FA/`EOTP`),
+and `publishConfig.access=public` (scoped-private `E402`). Next: wire OIDC
+trusted publishers and delete `NPM_TOKEN`.
+
+> **After any publish — regenerate the lockfile.** The `@laterite/native-*`
+> optional deps are pinned to the package version. While a version is unpublished
+> the lockfile records them as *unresolved*; once published, `npm ci` resolves
+> them against the registry and the empty lockfile entry no longer matches →
+> **`EUSAGE` "lock file ... does not satisfy"**. So after a release: `cd
+> rust-packages/laterite-node && npm install`, then commit the updated
+> `package-lock.json`. (Don't use `npm ci --omit=optional` to dodge it — that
+> also drops rollup's own platform binary and breaks the `tsup` build.)
