@@ -1,7 +1,7 @@
 // Exception hierarchy + the two native-failure mappers — the Node port of
 // laterite-py's `_errors.py`. The engine never raises for un-validatable input;
 // it reports a `kind` + `exit_code` that these map to the right error class
-// (byte-faithful to the `ags4-check` exit codes), so callers can branch on the
+// (byte-faithful to the `lat-check` exit codes), so callers can branch on the
 // type, not a brittle message match.
 //
 // Two protocols feed `makeError` (see the error-protocol note in `lib.rs`):
@@ -12,7 +12,7 @@
 import type { ValidationReport } from "./native";
 
 export class Ags4Error extends Error {
-  /** The validator exit code this failure carries (mirrors `ags4-check`). */
+  /** The validator exit code this failure carries (mirrors `lat-check`). */
   readonly exitCode: number;
   constructor(message: string, exitCode = 1) {
     super(message);

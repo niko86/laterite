@@ -1,4 +1,4 @@
-# AUTO-GENERATED from rust-packages/ags5-core/data/ags5_dictionary.json
+# AUTO-GENERATED from rust-packages/laterite-core/data/ags5_dictionary.json
 # DO NOT EDIT BY HAND. Regenerate via:
 #   uv run python tools/generate_pyi.py
 #

@@ -21,7 +21,7 @@ import { controlClass } from "../../lib/controls";
 // `dictVersion` setting; "auto" resolves to the engine's fallback edition.
 
 // The edition the engine falls back to when none is forced (matches
-// ags4_validator::dict::FALLBACK); shown so "auto" isn't a mystery.
+// laterite_ags4_validator::dict::FALLBACK); shown so "auto" isn't a mystery.
 const AUTO_EDITION = "4.1.1";
 const EDITIONS: DictVersionOpt[] = [
   "auto",

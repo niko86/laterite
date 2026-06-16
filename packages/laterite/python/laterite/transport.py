@@ -4,8 +4,7 @@ The four operations are **content-agnostic**: they read a file's bytes,
 (de)compress and optionally (de)encrypt them, and write the result. They work on
 **any file** — an AGS4 ``.ags`` transfer file, an ``.ags5db``, anything — not only
 ``.ags5db`` (the historical framing; the Rust core just runs zstd/age over raw
-bytes). The native helpers keep their legacy ``ags5db_*`` names internally; that
-rename is deferred to the next PyO3 rebuild.
+bytes).
 
 Two pairs of operations:
 
@@ -13,7 +12,7 @@ Two pairs of operations:
   spot on AGS data (~10% ratio in a few seconds; higher levels buy minutes not
   bytes).
 * ``lock`` / ``unlock`` — zstd + age passphrase encryption. The age envelope is
-  interoperable with ``pyrage`` and the ``ags5db lock`` binary subcommand — both
+  interoperable with ``pyrage`` and the ``lat-db lock`` binary subcommand — both
   link the same Rust ``age`` crate.
 
     >>> from laterite import transport
@@ -111,7 +110,7 @@ def pack(
     """
     src_path = _src_path(src, fn="pack", legacy=("db", db))
     out = Path(dest) if dest is not None else _default_pack_out(src_path)
-    _native.ags5db_pack(str(src_path), str(out), level)
+    _native.transport_pack(str(src_path), str(out), level)
     return out
 
 
@@ -128,7 +127,7 @@ def unpack(
     """
     src_path = _src_path(src, fn="unpack", legacy=("zst", zst))
     out = Path(dest) if dest is not None else _default_unpack_out(src_path)
-    _native.ags5db_unpack(str(src_path), str(out))
+    _native.transport_unpack(str(src_path), str(out))
     return out
 
 
@@ -143,7 +142,7 @@ def lock(
     """Compress + age-passphrase-encrypt any file to ``<src>.zst.age``.
 
     Zstd first (low-entropy data compresses well), then age (scrypt +
-    ChaCha20-Poly1305). The envelope is interoperable with ``ags5db.exe lock`` and
+    ChaCha20-Poly1305). The envelope is interoperable with ``lat-db.exe lock`` and
     ``pyrage`` — both use the same Rust ``age`` crate. ``password`` is required (no
     agent-default path). ``level`` is the zstd level (default 9); ``dest`` overrides
     the default ``<src>.zst.age`` output path. (``db=`` is the deprecated former
@@ -151,7 +150,7 @@ def lock(
     """
     src_path = _src_path(src, fn="lock", legacy=("db", db))
     out = Path(dest) if dest is not None else _default_lock_out(src_path)
-    _native.ags5db_lock(str(src_path), str(out), password, level)
+    _native.transport_lock(str(src_path), str(out), password, level)
     return out
 
 
@@ -170,5 +169,5 @@ def unlock(
     """
     src_path = _src_path(src, fn="unlock", legacy=("file", file))
     out = Path(dest) if dest is not None else _default_unlock_out(src_path)
-    _native.ags5db_unlock(str(src_path), str(out), password)
+    _native.transport_unlock(str(src_path), str(out), password)
     return out

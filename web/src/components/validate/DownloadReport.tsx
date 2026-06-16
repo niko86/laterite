@@ -73,7 +73,7 @@ export const DownloadReport: Component<{
           This file has {props.report.finding_count.toLocaleString()} findings;
           an in-browser download may be slow or fail. For the complete report,
           prefer the native{" "}
-          <code class="mono">ags4-check delivery.ags --json</code> CLI (or
+          <code class="mono">lat-check delivery.ags --json</code> CLI (or
           laterite).
         </span>
       </Show>

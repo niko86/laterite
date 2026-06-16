@@ -11,7 +11,7 @@
 
 [package]
 name = "laterite-py-ags5"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 rust-version = "1.85"
 description = "Experimental AGS5 (.ags5db) PyO3 bindings for laterite"
@@ -26,13 +26,13 @@ crate-type = ["cdylib"]
 [dependencies]
 # Pure-string AGS modules (registry, ags_types, transport, excel, ddl,
 # ags4_codec, ags4_writer, error). Shared with laterite-py.
-ags5-core = { path = "../ags5-core" }
+laterite-core = { path = "../laterite-core" }
 # DuckDB-bound modules (convert, db, query, attachments, diff,
 # introspect, spec_tables, writer, …) — the conversion engine.
-ags5db = { path = "../ags5db" }
-# Transitively via ags5db, but named explicitly here so the validator
+laterite-ags5-db = { path = "../laterite-ags5-db" }
+# Transitively via laterite-ags5-db, but named explicitly here so the validator
 # crate doesn't need to be a separate dep further up the tree.
-ags4-validator = { path = "../ags4-validator" }
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 # abi3-py312: must match the base wheel's pyo3 so both wheels are one
 # `cp312-abi3` per platform (3.12+). Rationale: see laterite-py/Cargo.toml.
 pyo3 = { version = "0.28", features = ["extension-module", "chrono", "abi3-py312"] }
@@ -40,10 +40,10 @@ pyo3 = { version = "0.28", features = ["extension-module", "chrono", "abi3-py312
 # for any cross-wheel JSON to be byte-faithful.
 serde_json = { version = "1", features = ["preserve_order"] }
 chrono = "0.4"
-# Bundled libduckdb. Matches ags5db's pin so the linker sees one copy.
+# Bundled libduckdb. Matches laterite-ags5-db's pin so the linker sees one copy.
 # `~1.4` not `1.4`: holds the 1.4.x LTS line — a plain caret would admit the crate's
-# `1.10503.x` / engine-1.5.3 scheme on a `cargo update`. See ags5db/Cargo.toml.
+# `1.10503.x` / engine-1.5.3 scheme on a `cargo update`. See laterite-ags5-db/Cargo.toml.
 duckdb = { version = "~1.4", features = ["bundled"] }
-# Blob hashing for `attach_blobs` (matches ags5db's direct deps).
+# Blob hashing for `attach_blobs` (matches laterite-ags5-db's direct deps).
 sha2 = "0.10"
 hex = "0.4"

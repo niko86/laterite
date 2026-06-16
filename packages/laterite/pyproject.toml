@@ -1,6 +1,6 @@
 [project]
 name = "laterite"
-version = "0.3.0"
+version = "0.4.0"
 description = "Rust-backed AGS4 reader/writer/validator — a fast, drop-in replacement for python-ags4 with a narwhals-native API"
 readme = "README.md"
 license = "MIT"
@@ -73,14 +73,14 @@ pyarrow = ["pyarrow>=24.0.0"]
 # Experimental DuckDB-backed .ags5db surface. Pulls in the laterite-ags5
 # companion wheel (~50 MB; bundles DuckDB). The base laterite wheel stays
 # light (~10 MB). Import via `from laterite.ags5db import …`.
-ags5 = ["laterite-ags5>=0.2.0"]
-all = ["pandas<3", "pyarrow>=24.0.0", "laterite-ags5>=0.2.0"]
+ags5 = ["laterite-ags5>=0.4.0"]
+all = ["pandas<3", "pyarrow>=24.0.0", "laterite-ags5>=0.4.0"]
 
 [project.scripts]
-# Deliberately named `ags4-check` (not `laterite`/`ags4`) so the command,
+# Deliberately named `lat-check` (not `laterite`/`ags4`) so the command,
 # its flags, JSON/NDJSON shape and exit codes are byte-faithful to the
-# Rust `ags4-check` binary. This is the Python face of the same CLI.
-ags4-check = "laterite._cli:main"
+# Rust `lat-check` binary. This is the Python face of the same CLI.
+lat-check = "laterite._cli:main"
 
 [build-system]
 requires = ["maturin>=1.7,<2"]

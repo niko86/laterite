@@ -60,6 +60,29 @@ uv run bump-my-version bump --new-version 0.2.0         # promote to final
   pyproject version before building — so you can't tag `v0.2.0` against a stale
   `0.1.0` source.
 
+## PyPI projects + trusted publishers
+
+Two **separate** PyPI projects ship from this repo:
+
+| project | what | install |
+|---|---|---|
+| `laterite` | base AGS4 toolkit | `pip install laterite` |
+| `laterite-ags5` | the `.ags5db` companion (the `[ags5]` extra) | pulled by `pip install laterite[ags5]` |
+
+`release.yml`'s `pypi-publish` job uploads **both** wheels under PyPI trusted
+publishing (no API token). They do **not** share a publisher — each PyPI project
+needs its own, configured on PyPI → *Publishing* (or as a pending publisher)
+with: **owner/repo** `niko86/laterite` · **workflow** `release.yml` ·
+**environment** `pypi`.
+
+> **`laterite-ags5` first publish (one-time owner action):** it isn't on PyPI
+> yet, so add it as a **pending publisher** (PyPI → *Account settings* →
+> *Publishing* → *Add a pending publisher*) — project name `laterite-ags5`, the
+> values above — **before** the next `v*` release. On first publish PyPI creates
+> the project and binds the publisher. Without it, the `pypi-publish` job fails
+> on the `laterite-ags5` wheel and `pip install laterite[ags5]` stays
+> unresolvable from PyPI.
+
 ## The python-ags4 compat pin
 
 `compat.__version__` is `<version>+compat.python-ags4.<PYTHON_AGS4_COMPAT>` — a

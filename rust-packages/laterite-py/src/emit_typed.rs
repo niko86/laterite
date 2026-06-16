@@ -6,18 +6,18 @@
 //! — **pyarrow-free for both backends**, because DuckDB's own scanner +
 //! Arrow exporter do the work, not pyarrow. `pyo3_arrow::PyTable` imports
 //! that capsule zero-copy. Each batch is transposed to typed
-//! `serde_json::Value` rows by `ags4_emit::group_from_arrow` (the shared
+//! `serde_json::Value` rows by `laterite_ags4_emit::group_from_arrow` (the shared
 //! Arrow→Value conversion the wasm host uses too) and fed to the orchestrator,
 //! which formats (via `ags4_str` + dictionary UNIT/TYPE fill) and applies the
 //! chosen validity mode (AutoFix / Report / Strict).
 
-use ags4_emit::{DictVersion, EmitMode, EmitOpts, GroupInput, emit_ags4};
 use arrow::array::{
     Array, BooleanArray, Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array,
     LargeStringArray, StringArray, UInt8Array, UInt16Array, UInt32Array, UInt64Array,
 };
 use arrow::datatypes::DataType;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
+use laterite_ags4_emit::{DictVersion, EmitMode, EmitOpts, GroupInput, emit_ags4};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
@@ -73,8 +73,12 @@ pub fn emit_ags4_from_arrow(
     let mut groups: Vec<GroupInput> = Vec::with_capacity(tables.len());
     for (code, table) in tables {
         let (batches, schema) = table.into_inner();
-        // The Arrow→Value transpose is shared with the wasm host in ags4-emit.
-        groups.push(ags4_emit::group_from_arrow(code, schema.as_ref(), &batches));
+        // The Arrow→Value transpose is shared with the wasm host in laterite-ags4-emit.
+        groups.push(laterite_ags4_emit::group_from_arrow(
+            code,
+            schema.as_ref(),
+            &batches,
+        ));
     }
 
     let res = emit_ags4(&groups, &opts).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;

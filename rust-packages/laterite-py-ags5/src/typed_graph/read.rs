@@ -13,11 +13,11 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use ags5db::conn::open_readonly;
-use ags5db::db::{HeadingRow, headings_for};
 use chrono::{DateTime, NaiveDate, NaiveTime};
 use duckdb::Connection;
 use duckdb::types::{TimeUnit, Value as DuckValue};
+use laterite_ags5_db::conn::open_readonly;
+use laterite_ags5_db::db::{HeadingRow, headings_for};
 use pyo3::exceptions::{PyFileNotFoundError, PyRuntimeError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};

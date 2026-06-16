@@ -18,7 +18,7 @@ import pytest
 # so the round-trip runs in CI.
 _FIXTURE = (
     Path(__file__).resolve().parents[3]
-    / "rust-packages" / "ags4-validator" / "tests" / "fixtures"
+    / "rust-packages" / "laterite-ags4-validator" / "tests" / "fixtures"
     / "synthetic_multigroup.ags"
 )
 

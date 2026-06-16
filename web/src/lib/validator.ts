@@ -1,4 +1,4 @@
-// Shared types + data for the Rust `ags4-wasm` validator. This module is
+// Shared types + data for the Rust `laterite-ags4-wasm` validator. This module is
 // deliberately wasm-free so it's safe to import from the main thread: ALL
 // wasm calls (validate + the Apply-Fixes engine) live in
 // `validator.worker.ts`, driven through `validatorClient.ts`. The wasm
@@ -90,7 +90,7 @@ export function reportSeverity(report: ValidationReport): {
 }
 
 // ---- Apply-Fixes (a separate engine surface from validate) ----
-// Mirrors the Rust `ags4_validator::fixes` serde shape (snake_case).
+// Mirrors the Rust `laterite_ags4_validator::fixes` serde shape (snake_case).
 export type FixKind =
   | "normalize_crlf"
   | "strip_bom"
@@ -142,7 +142,7 @@ export type DictVersionOpt =
   | "4.2";
 export type EncodingOpt = "utf-8" | "windows-1252";
 
-// --- AGS4 producer (Export tab): the `ags4-wasm` to_ags4(groups, edition, mode)
+// --- AGS4 producer (Export tab): the `laterite-ags4-wasm` to_ags4(groups, edition, mode)
 // result — build valid AGS4 from data. `mode`: autofix (default) | report |
 // strict. ---
 export type EmitMode = "autofix" | "report" | "strict";
@@ -165,7 +165,7 @@ export interface ExportResult {
   fixes_applied: number;
 }
 
-// --- Standard dictionary (Tools reference): the `ags4-wasm` dictionary(edition)
+// --- Standard dictionary (Tools reference): the `laterite-ags4-wasm` dictionary(edition)
 // result — the real per-edition AGS4 standard dictionary (canonical names,
 // descriptions, units, types, status), NOT the scaffolded ags5 merged JSON. ---
 export interface DictHeading {
@@ -189,7 +189,7 @@ export interface StandardDict {
   groups: DictGroup[];
 }
 
-// --- Revision diff (Tools): the `ags4-wasm` diff(a, b) result. KEY-aware,
+// --- Revision diff (Tools): the `laterite-ags4-wasm` diff(a, b) result. KEY-aware,
 // type-aware comparison of two AGS4 files. Mirrors the Rust serde shapes.
 export interface CellDelta {
   heading: string;

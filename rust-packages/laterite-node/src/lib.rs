@@ -1,23 +1,23 @@
 //! Node-API (napi-rs) bindings for the laterite AGS4 engine — the Node
 //! analog of `laterite-py`. Re-expresses the engine surface through `#[napi]`:
 //! parse → typed **Arrow IPC `Buffer`** per group (the Node analog of
-//! laterite-py's pyo3-arrow capsule, exactly what `ags4-wasm` frames for the
+//! laterite-py's pyo3-arrow capsule, exactly what `laterite-ags4-wasm` frames for the
 //! browser), validate, emit. The TS `laterite` package layers the high-level
 //! API on top. napi auto-camelCases names (`table_ipc` → `tableIpc`).
 
 use std::io::Cursor;
 use std::path::Path;
 
-use ags4_validator::dict::Dictionary;
-use ags4_validator::findings::{Findings, Severity};
-use ags4_validator::parse::{ParsedFile, parse_file_with_encoding, parse_str};
-use ags4_validator::{
+use arrow::ipc::reader::StreamReader;
+use arrow::ipc::writer::StreamWriter;
+use laterite_ags4_validator::dict::Dictionary;
+use laterite_ags4_validator::findings::{Findings, Severity};
+use laterite_ags4_validator::parse::{ParsedFile, parse_file_with_encoding, parse_str};
+use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, check_file_with_dict, resolve_dict_version, rules,
     tran_ags_of,
 };
-use ags5_types::sql_type;
-use arrow::ipc::reader::StreamReader;
-use arrow::ipc::writer::StreamWriter;
+use laterite_types::sql_type;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde_json::{Map, Value};
@@ -31,7 +31,7 @@ mod transport_fns;
 // dict + `_errors.py::raise_for`. Hard failures (missing / not-AGS4 / bad
 // edition) carry a `kind` + `exit_code` so the TS layer maps them to the right
 // `Ags4Error` subclass WITHOUT brittle message-matching — byte-faithful to the
-// `ags4-check` exit codes (3 not-found/io, 4 not-utf8/not-ags4/unsupported-
+// `lat-check` exit codes (3 not-found/io, 4 not-utf8/not-ags4/unsupported-
 // edition, 5 bad-dict/bad-args). `runCheck` returns the failure as data (an
 // object, mirroring Python's dict); `parseArrow` returns a `Reading` *handle*,
 // so it can't carry an `{ok}` field and instead THROWS this — a `\u{1f}`
@@ -83,7 +83,7 @@ pub struct GroupMeta {
 }
 
 /// A parsed AGS4 file held native-side — the Node analog of laterite-py's
-/// `Reading` handle (and `ags4-wasm`'s `ParsedDataset`). Each group's typed
+/// `Reading` handle (and `laterite-ags4-wasm`'s `ParsedDataset`). Each group's typed
 /// `RecordBatch` is built lazily on `tableIpc(code)` and dropped after the
 /// bytes are returned, so peak residency is one batch.
 #[napi]
@@ -133,7 +133,7 @@ impl Reading {
 
     /// One group's rows as an Arrow **IPC stream** (`Buffer`), columns already
     /// correctly typed. The Node analog of the pyo3-arrow capsule: the typed
-    /// columns come from the one shared emitter (`ags5_types::arrow_cols`), the
+    /// columns come from the one shared emitter (`laterite_types::arrow_cols`), the
     /// SAME casting Python/wasm use — so a file types byte-identically across
     /// hosts. Returns `null` if the code isn't in the file.
     #[napi]
@@ -141,7 +141,7 @@ impl Reading {
         let Some(group) = self.parsed.groups.get(&code) else {
             return Ok(None);
         };
-        let batch = ags5_types::arrow_cols::build_record_batch(
+        let batch = laterite_types::arrow_cols::build_record_batch(
             &group.headings,
             &group.types,
             group.rows.len(),
@@ -203,9 +203,9 @@ impl Reading {
                 })
             })
             .collect();
-        let groups: Vec<ags4_emit::EmitGroup<'_>> = owned
+        let groups: Vec<laterite_ags4_emit::EmitGroup<'_>> = owned
             .iter()
-            .map(|o| ags4_emit::EmitGroup {
+            .map(|o| laterite_ags4_emit::EmitGroup {
                 code: &o.code,
                 headings: o.headings.iter().map(String::as_str).collect(),
                 units: o.units.iter().map(String::as_str).collect(),
@@ -214,7 +214,8 @@ impl Reading {
             })
             .collect();
         let mut buf = Vec::new();
-        ags4_emit::write_ags4(&mut buf, &groups).map_err(|e| Error::from_reason(e.to_string()))?;
+        laterite_ags4_emit::write_ags4(&mut buf, &groups)
+            .map_err(|e| Error::from_reason(e.to_string()))?;
         String::from_utf8(buf).map_err(|e| Error::from_reason(format!("emit utf8: {e}")))
     }
 }
@@ -260,7 +261,7 @@ pub struct Finding {
 /// `ok` is **false only for un-validatable input** (the TS `raiseFor` raises
 /// then); rule *violations* come back in `findings` with `ok:true`. `Report`'s
 /// `isValid` is the separate `count == 0`. `json`/`ndjson` are byte-identical
-/// to `ags4-check --json` / `--ndjson`.
+/// to `lat-check --json` / `--ndjson`.
 #[napi(object)]
 pub struct ValidationReport {
     pub ok: bool,
@@ -268,7 +269,7 @@ pub struct ValidationReport {
     /// `raiseFor` maps to an exception (`not_ags4`, `unsupported_edition`, …).
     pub error_kind: Option<String>,
     pub error: Option<String>,
-    /// Mirrors the `ags4-check` binary: 0 valid / 1 findings on success;
+    /// Mirrors the `lat-check` binary: 0 valid / 1 findings on success;
     /// 3 not-found/io, 4 not-utf8/not-ags4/bad-edition, 5 bad-dict on failure.
     pub exit_code: i32,
     pub file: String,
@@ -301,7 +302,7 @@ impl ValidationReport {
 }
 
 /// `{file, findings:{ "AGS Format Rule N":[{line,group,desc}] }}` pretty-JSON —
-/// byte-identical to `ags4-check --json` (ported verbatim from laterite-py's
+/// byte-identical to `lat-check --json` (ported verbatim from laterite-py's
 /// `findings_json`; `preserve_order` keeps the key order stable).
 fn findings_json(file: &str, found: &Findings) -> String {
     let mut fmap = Map::new();
@@ -319,7 +320,7 @@ fn findings_json(file: &str, found: &Findings) -> String {
 }
 
 /// One flat `{rule, …}` JSON object per finding per line — byte-identical to
-/// `ags4-check --ndjson` (ported verbatim from laterite-py's `findings_ndjson`).
+/// `lat-check --ndjson` (ported verbatim from laterite-py's `findings_ndjson`).
 fn findings_ndjson(found: &Findings) -> String {
     let mut s = String::new();
     for (rule, items) in found {
@@ -459,14 +460,14 @@ pub struct EmitResult {
 }
 
 /// Build valid AGS4 from per-group **Arrow IPC** streams (the columnar
-/// producer; the read boundary reversed). = `ags4-wasm`'s `to_ags4_ipc`.
+/// producer; the read boundary reversed). = `laterite-ags4-wasm`'s `to_ags4_ipc`.
 #[napi]
 pub fn emit_ags4_from_ipc(
     groups: Vec<GroupIpc>,
     edition: Option<String>,
     mode: Option<String>,
 ) -> Result<EmitResult> {
-    let opts = ags4_emit::EmitOpts {
+    let opts = laterite_ags4_emit::EmitOpts {
         mode: resolve_mode(mode.as_deref())?,
         edition: resolve_edition(edition.as_deref())
             .map_err(Error::from_reason)?
@@ -476,8 +477,8 @@ pub fn emit_ags4_from_ipc(
     for g in groups {
         inputs.push(group_from_ipc(g.code, &g.ipc)?);
     }
-    let res =
-        ags4_emit::emit_ags4(&inputs, &opts).map_err(|e| Error::from_reason(e.to_string()))?;
+    let res = laterite_ags4_emit::emit_ags4(&inputs, &opts)
+        .map_err(|e| Error::from_reason(e.to_string()))?;
     let findings_json = serde_json::to_string(&res.findings).unwrap_or_else(|_| "{}".into());
     Ok(EmitResult {
         bytes: res.bytes.into(),
@@ -486,7 +487,7 @@ pub fn emit_ags4_from_ipc(
     })
 }
 
-fn group_from_ipc(code: String, bytes: &[u8]) -> Result<ags4_emit::GroupInput> {
+fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::GroupInput> {
     let reader = StreamReader::try_new(Cursor::new(bytes), None)
         .map_err(|e| Error::from_reason(format!("arrow ipc: {e}")))?;
     let schema = reader.schema();
@@ -494,7 +495,11 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<ags4_emit::GroupInput> {
     for b in reader {
         batches.push(b.map_err(|e| Error::from_reason(format!("arrow ipc batch: {e}")))?);
     }
-    Ok(ags4_emit::group_from_arrow(code, schema.as_ref(), &batches))
+    Ok(laterite_ags4_emit::group_from_arrow(
+        code,
+        schema.as_ref(),
+        &batches,
+    ))
 }
 
 // --- helpers ------------------------------------------------------------
@@ -525,11 +530,11 @@ fn resolve_edition(s: Option<&str>) -> std::result::Result<Option<DictVersion>, 
     }
 }
 
-fn resolve_mode(s: Option<&str>) -> Result<ags4_emit::EmitMode> {
+fn resolve_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode> {
     match s.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
-        None | Some("") | Some("autofix") => Ok(ags4_emit::EmitMode::AutoFix),
-        Some("report") => Ok(ags4_emit::EmitMode::Report),
-        Some("strict") => Ok(ags4_emit::EmitMode::Strict),
+        None | Some("") | Some("autofix") => Ok(laterite_ags4_emit::EmitMode::AutoFix),
+        Some("report") => Ok(laterite_ags4_emit::EmitMode::Report),
+        Some("strict") => Ok(laterite_ags4_emit::EmitMode::Strict),
         Some(o) => Err(Error::from_reason(format!(
             "unknown mode {o:?}; expected autofix|report|strict"
         ))),

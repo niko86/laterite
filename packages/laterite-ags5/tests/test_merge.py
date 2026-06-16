@@ -141,7 +141,7 @@ def test_append_round_trips_via_read_ags5db(tmp_path: Path) -> None:
 # large.ags made it silently skip).
 _FIXTURE = (
     Path(__file__).resolve().parents[3]
-    / "rust-packages" / "ags4-validator" / "tests" / "fixtures"
+    / "rust-packages" / "laterite-ags4-validator" / "tests" / "fixtures"
     / "synthetic_multigroup.ags"
 )
 

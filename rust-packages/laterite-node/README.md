@@ -18,7 +18,7 @@ One clean-room Rust AGS4 engine, surfaced for every stack:
 |---|---|---|
 | **Python** | [`laterite`](https://pypi.org/project/laterite/) — PyPI | `pip install laterite` |
 | **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm | `npm install laterite` |
-| **Rust / CLI** | [`ags5db` + `ags4-check`](https://github.com/niko86/laterite/releases) | GitHub Releases |
+| **Rust / CLI** | [`lat-db` + `lat-check`](https://github.com/niko86/laterite/releases) | GitHub Releases |
 | **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser |
 
 ## Read & validate
@@ -34,7 +34,7 @@ loca.getChild("LOCA_GL")?.get(0);         // → 12.3 (a number)
 const report = validate("delivery.ags");
 report.isValid;                           // boolean
 report.findings;                          // [{ rule, line?, group, desc, severity? }]
-report.toJson();                          // byte-identical to `ags4-check --json`
+report.toJson();                          // byte-identical to `lat-check --json`
 ```
 
 ## Produce AGS4

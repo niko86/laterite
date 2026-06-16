@@ -1,0 +1,51 @@
+# laterite-ags4-emit — the wasm-safe AGS4 producer.
+#
+# Builds valid AGS4 plaintext from typed/string cell data, for BOTH the
+# native (PyO3) and browser (wasm) hosts over one shared orchestrator.
+# Extracted as a leaf so `laterite-ags4-wasm` can produce AGS4 without depending
+# on all of `laterite-core` (which drags age/zstd/calamine/rust_xlsxwriter —
+# wasm-hostile). It also lifts the AGS4 *writer* out of the "ags5"-named
+# core, the first concrete step toward relieving that naming/scope smell.
+#
+# Reuses the shipped, well-tested pieces so the only new code is the
+# orchestrator:
+#   - laterite-types::ags4_str — typed value -> AGS4 string per canonical type
+#                            (the inverse of parse_value); wasm-safe leaf.
+#   - laterite-ags4-validator       — the per-edition standard dictionary (UNIT/TYPE
+#                            fill) + parse + validate + the safe-fix
+#                            machinery (AutoFix). Already wasm-safe.
+# Both are already dependencies of `laterite-ags4-wasm`, so this leaf adds no new
+# wasm-hostile weight to the browser bundle.
+
+[package]
+name = "laterite-ags4-emit"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "AGS4 producer — typed data -> valid AGS4 plaintext, DuckDB-free + wasm-safe"
+license = "MIT"
+publish = false
+
+[dependencies]
+# ags4_str (typed -> AGS4 string) + parse_value (string -> typed), the
+# exact casting both hosts already share via laterite-ags4-wasm / the .ags5db path.
+laterite-types = { path = "../laterite-types" }
+# The per-edition standard Dictionary (UNIT/TYPE fill), parse_bytes,
+# rules::run_all (validate), and compute_fixes/apply_fixes (AutoFix).
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# Cells arrive as serde_json::Value (typed from Arrow/frames, or strings
+# from browser JSON); ags4_str/parse_value already speak this shape.
+serde_json = "1"
+# parse_bytes wants a &'static Encoding; we always emit/re-read UTF-8.
+encoding_rs = "0.8"
+# Optional: the Arrow→Value cell transpose (`arrow_in`), shared by BOTH
+# emit hosts — native (laterite-py, off the DuckDB capsule) and wasm
+# (laterite-ags4-wasm, off an Arrow IPC stream) — so the conversion lives in one
+# place, not copied per host. default-features=false keeps it lean (no
+# csv/json/ipc/prettyprint→comfy-table); v59 matches every other arrow pin.
+arrow = { version = "59", default-features = false, optional = true }
+
+[features]
+# Typed-Arrow input support (the `arrow_in` transpose). Off by default so
+# JSON-only consumers don't pull arrow.
+arrow = ["dep:arrow"]

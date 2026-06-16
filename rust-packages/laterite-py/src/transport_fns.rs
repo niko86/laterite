@@ -1,23 +1,29 @@
-//! PyO3 bindings for `ags5_core::transport` (zstd + age passphrase).
+//! PyO3 bindings for `laterite_core::transport` (zstd + age passphrase).
 //!
 //! Stage F2a-2c: exposes the lib API so `laterite.transport` can
 //! drive pack/unpack/lock/unlock from Python without subprocessing
 //! the binary.
+//!
+//! These operations are **content-agnostic** — zstd/age over raw bytes,
+//! so they work on any file (`.ags`, `.ags5db`, anything). The fns were
+//! renamed off the legacy `ags5db_*` prefix (#111 Facet B): the prefix
+//! wrongly implied `.ags5db`-only, the same misnomer W2 fixed for the
+//! Excel fns. Internal `_native.*` names (not public), so no alias —
+//! `laterite.transport` calls these directly.
 
 use std::path::Path;
 
-use ags5_core::transport;
+use laterite_core::transport;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
 use pyo3::wrap_pyfunction;
 
 use crate::map_cli_err;
 
-/// zstd-compress a `.ags5db` to `dest`. Returns `{bytes, ratio,
-/// elapsed_s}`.
+/// zstd-compress any file to `dest`. Returns `{bytes, ratio, elapsed_s}`.
 #[pyfunction]
 #[pyo3(signature = (src, dest, level = 9))]
-fn ags5db_pack<'py>(
+fn transport_pack<'py>(
     py: Python<'py>,
     src: String,
     dest: String,
@@ -31,11 +37,15 @@ fn ags5db_pack<'py>(
     Ok(d)
 }
 
-/// zstd-decompress a `.ags5db.zst` back to `dest`. Returns
-/// `{bytes, elapsed_s}`.
+/// zstd-decompress a `.zst` produced by `transport_pack` back to `dest`.
+/// Returns `{bytes, elapsed_s}`.
 #[pyfunction]
 #[pyo3(signature = (src, dest))]
-fn ags5db_unpack<'py>(py: Python<'py>, src: String, dest: String) -> PyResult<Bound<'py, PyDict>> {
+fn transport_unpack<'py>(
+    py: Python<'py>,
+    src: String,
+    dest: String,
+) -> PyResult<Bound<'py, PyDict>> {
     let stats = transport::unpack(Path::new(&src), Path::new(&dest)).map_err(map_cli_err)?;
     let d = PyDict::new(py);
     d.set_item("bytes", stats.bytes)?;
@@ -43,12 +53,12 @@ fn ags5db_unpack<'py>(py: Python<'py>, src: String, dest: String) -> PyResult<Bo
     Ok(d)
 }
 
-/// zstd-compress + age-passphrase-encrypt `src` to `dest`. Returns
+/// zstd-compress + age-passphrase-encrypt any file to `dest`. Returns
 /// `{bytes, ratio, elapsed_s}`. The age envelope is interoperable
 /// with `pyrage`.
 #[pyfunction]
 #[pyo3(signature = (src, dest, password, level = 9))]
-fn ags5db_lock<'py>(
+fn transport_lock<'py>(
     py: Python<'py>,
     src: String,
     dest: String,
@@ -69,7 +79,7 @@ fn ags5db_lock<'py>(
 /// surface as `RuntimeError`.
 #[pyfunction]
 #[pyo3(signature = (src, dest, password))]
-fn ags5db_unlock<'py>(
+fn transport_unlock<'py>(
     py: Python<'py>,
     src: String,
     dest: String,
@@ -84,9 +94,9 @@ fn ags5db_unlock<'py>(
 }
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(ags5db_pack, m)?)?;
-    m.add_function(wrap_pyfunction!(ags5db_unpack, m)?)?;
-    m.add_function(wrap_pyfunction!(ags5db_lock, m)?)?;
-    m.add_function(wrap_pyfunction!(ags5db_unlock, m)?)?;
+    m.add_function(wrap_pyfunction!(transport_pack, m)?)?;
+    m.add_function(wrap_pyfunction!(transport_unpack, m)?)?;
+    m.add_function(wrap_pyfunction!(transport_lock, m)?)?;
+    m.add_function(wrap_pyfunction!(transport_unlock, m)?)?;
     Ok(())
 }

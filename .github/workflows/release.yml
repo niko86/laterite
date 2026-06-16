@@ -4,11 +4,13 @@
 #   build-wheels   — matrix over (linux x64, linux aarch64, macos
 #                    arm64, macos x64, windows x64). Builds both
 #                    laterite + laterite-ags5 wheels via maturin.
-#   build-binaries — same matrix; builds the ags4-check + ags5db
+#   build-binaries — same matrix; builds the lat-check + lat-db
 #                    Rust CLI binaries.
 #   github-release — collects every artefact + cuts a GitHub release.
-#   pypi-publish   — only the laterite wheel for now (ags5 is
-#                    experimental; ships in a follow-up).
+#   pypi-publish   — the base `laterite` wheel + the `laterite-ags5`
+#                    companion (so `pip install laterite[ags5]` resolves
+#                    from PyPI). Separate PyPI projects, separate trusted
+#                    publishers.
 #
 # Free-tier note: matrix parallel keeps wall-clock under ~25 min.
 # `fail-fast: false` so one OS failing doesn't block the others —
@@ -320,8 +322,8 @@ jobs:
         working-directory: rust-packages
         shell: bash
         run: |
-          cargo build --release --target ${{ matrix.target }} -p ags4-check
-          cargo build --release --target ${{ matrix.target }} --bin ags5db
+          cargo build --release --target ${{ matrix.target }} -p laterite-ags4-check
+          cargo build --release --target ${{ matrix.target }} --bin lat-db
 
       - if: runner.os == 'Windows'
         name: Build CLI binaries (Windows)
@@ -330,8 +332,8 @@ jobs:
         # the default shell on Windows runners hits Restricted policy.
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
-          cargo build --release --target ${{ matrix.target }} -p ags4-check
-          cargo build --release --target ${{ matrix.target }} --bin ags5db
+          cargo build --release --target ${{ matrix.target }} -p laterite-ags4-check
+          cargo build --release --target ${{ matrix.target }} --bin lat-db
 
       # Bundle step: bash for Linux/macOS, pwsh for Windows. The
       # archive format differs (tar.gz vs zip) and we no longer want
@@ -341,8 +343,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p out
-          cp rust-packages/target/${{ matrix.target }}/release/ags4-check${{ matrix.ext }} out/
-          cp rust-packages/target/${{ matrix.target }}/release/ags5db${{ matrix.ext }} out/
+          cp rust-packages/target/${{ matrix.target }}/release/lat-check${{ matrix.ext }} out/
+          cp rust-packages/target/${{ matrix.target }}/release/lat-db${{ matrix.ext }} out/
           tar -czf laterite-binaries-${{ matrix.target }}.tar.gz -C out .
 
       - if: runner.os == 'Windows'
@@ -353,8 +355,8 @@ jobs:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           New-Item -ItemType Directory -Path out -Force | Out-Null
-          Copy-Item "rust-packages\target\${{ matrix.target }}\release\ags4-check${{ matrix.ext }}" out\
-          Copy-Item "rust-packages\target\${{ matrix.target }}\release\ags5db${{ matrix.ext }}" out\
+          Copy-Item "rust-packages\target\${{ matrix.target }}\release\lat-check${{ matrix.ext }}" out\
+          Copy-Item "rust-packages\target\${{ matrix.target }}\release\lat-db${{ matrix.ext }}" out\
           Compress-Archive -Path out\* -DestinationPath "laterite-binaries-${{ matrix.target }}.zip" -Force
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -404,9 +406,12 @@ jobs:
     # environment; first release on a tag uploads under the pending
     # publisher, subsequent releases reuse it.
     #
-    # Only the base `laterite` wheel publishes for now. The
-    # `laterite-ags5` companion ships via the GitHub release until the
-    # AGS5 surface stabilises.
+    # Publishes BOTH the base `laterite` wheel and the `laterite-ags5`
+    # companion (so `pip install laterite[ags5]` resolves from PyPI).
+    # They are SEPARATE PyPI projects: each needs its own trusted
+    # publisher (repo + this workflow + the `pypi` env). The same OIDC
+    # token from the `pypi` env uploads both; PyPI validates each wheel
+    # against its project's publisher. See RELEASING.md.
     #
     # Three-layer publish gate (Pro-tier private repo: env reviewers
     # aren't available, so guards are layered at the workflow + env
@@ -427,7 +432,7 @@ jobs:
     #    `pypi` env via OIDC. A misconfigured publisher or wrong
     #    repo is rejected upstream.
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'dev')
-    name: pypi (laterite only)
+    name: pypi (laterite + laterite-ags5)
     runs-on: ubuntu-latest
     needs: build-wheels
     environment: pypi
@@ -439,10 +444,11 @@ jobs:
           path: dist/
           merge-multiple: true
 
-      - name: Filter to laterite wheels only
+      - name: Filter to laterite + laterite-ags5 wheels
         run: |
           mkdir -p pypi/
-          mv dist/laterite-*.whl pypi/ || true
+          mv dist/laterite-*.whl pypi/ || true        # base AGS4 wheel
+          mv dist/laterite_ags5-*.whl pypi/ || true   # .ags5db companion (the [ags5] extra)
           ls -la pypi/
 
       # The Linux wheel jobs use `manylinux: off` to dodge the
@@ -452,11 +458,15 @@ jobs:
       # was on a glibc 2.39+ system but laterite only uses basic
       # glibc symbols, so manylinux2014 (glibc 2.17+) is a defensible
       # practical claim. Same retag also lives in pypi-republish.
+      # NB the laterite_ags5 wheel bundles DuckDB (a large C++ lib): the
+      # manylinux2014 claim is a bigger stretch there than for the pure
+      # base wheel — modern-glibc installs are fine, but the proper fix
+      # (a real manylinux Docker build) is the v0.x.y+ TODO below.
       - name: Re-tag Linux wheels as manylinux2014 (PyPI compatibility)
         run: |
           pip install --quiet wheel
           cd pypi/
-          for whl in laterite-*-linux_x86_64.whl; do
+          for whl in laterite-*-linux_x86_64.whl laterite_ags5-*-linux_x86_64.whl; do
             [ -e "$whl" ] || continue
             python -m wheel tags --platform-tag manylinux2014_x86_64 --remove "$whl"
           done
@@ -500,10 +510,10 @@ jobs:
           gh release download "${{ inputs.republish_tag }}" \
             -R "${{ github.repository }}" \
             -p 'laterite-*.whl' \
+            -p 'laterite_ags5-*.whl' \
             -D pypi/
-          # Don't include laterite_ags5 — that wheel ships via GitHub
-          # release only until the AGS5 surface stabilises (mirrors
-          # pypi-publish's "Filter to laterite wheels only" step).
+          # Both projects publish (mirrors pypi-publish's filter step):
+          # the base `laterite` wheel + the `laterite_ags5` companion.
           ls -la pypi/
 
       # Stop-gap re-tag: v0.1.0's release-workflow used `manylinux: off`
@@ -519,7 +529,7 @@ jobs:
         run: |
           pip install --quiet wheel
           cd pypi/
-          for whl in laterite-*-linux_x86_64.whl; do
+          for whl in laterite-*-linux_x86_64.whl laterite_ags5-*-linux_x86_64.whl; do
             [ -e "$whl" ] || continue
             python -m wheel tags --platform-tag manylinux2014_x86_64 --remove "$whl"
           done

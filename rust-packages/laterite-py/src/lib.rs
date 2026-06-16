@@ -1,6 +1,6 @@
 //! PyO3 module `laterite._laterite_native`.
 //!
-//! Thin boundary: every bit of AGS4 logic lives in `ags4-validator`
+//! Thin boundary: every bit of AGS4 logic lives in `laterite-ags4-validator`
 //! (clean-room, parity-tested) or the local `emit` module. The Python
 //! side (`laterite/__init__.py`, `compat.py`, `_cli.py`) builds the
 //! python-ags4-shaped dict from the primitives `parse_primitives`
@@ -10,15 +10,15 @@
 //! Two error-JSON shapes are deliberately preserved (see the package
 //! README): the Rust-CLI shape `{file, findings:{rule:[...]}}` is
 //! built *here* with the same `serde_json` (`preserve_order`) calls
-//! the `ags4-check` binary uses, so `--json`/`--ndjson` are
+//! the `lat-check` binary uses, so `--json`/`--ndjson` are
 //! byte-faithful; the python-ags4 `check_file` dict (with
 //! `Metadata`/`Summary`) is assembled in `laterite/compat.py`.
 
 use std::path::Path;
 
-use ags4_validator::findings::{Severity, Target};
-use ags4_validator::{CheckOptions, DictVersion, Dictionary, Findings, ValidatorError};
-use ags5_core::error::CliError;
+use laterite_ags4_validator::findings::{Severity, Target};
+use laterite_ags4_validator::{CheckOptions, DictVersion, Dictionary, Findings, ValidatorError};
+use laterite_core::error::CliError;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -36,7 +36,7 @@ mod registry_fns;
 mod transport_fns;
 mod typed_graph;
 
-/// Map an `ags5-core` `CliError` to a PyRuntimeError, preserving the
+/// Map an `laterite-core` `CliError` to a PyRuntimeError, preserving the
 /// exit-code label python callers may surface in error messages.
 /// Previously lived in `ags5db_fns.rs`; that module moved to the
 /// AGS5 cdylib in S3b, so the base-wheel transport + excel functions
@@ -63,7 +63,7 @@ fn parse_dv(s: Option<&str>) -> Result<Option<DictVersion>, String> {
 }
 
 /// (exit_code, error_kind, message) for a validator error — exit codes
-/// mirror the `ags4-check` binary exactly (3 not-found/io, 4
+/// mirror the `lat-check` binary exactly (3 not-found/io, 4
 /// not-utf8/not-ags4/unsupported-edition, 5 bad-dict).
 fn map_err(e: ValidatorError) -> (i32, String, String) {
     let msg = e.to_string();
@@ -112,7 +112,7 @@ fn validate(
     };
 
     if let Some(p) = path {
-        match ags4_validator::check_file_with_dict(Path::new(p), &opts) {
+        match laterite_ags4_validator::check_file_with_dict(Path::new(p), &opts) {
             Ok((found, dv, res)) => Ok((
                 p.to_string(),
                 dv.as_str().to_string(),
@@ -122,13 +122,13 @@ fn validate(
             Err(e) => Err(map_err(e)),
         }
     } else if let Some(t) = text {
-        let pf = ags4_validator::parse::parse_str(t).map_err(map_err)?;
-        let tran = ags4_validator::tran_ags_of(&pf);
-        let (dv, res) =
-            ags4_validator::resolve_dict_version(over, tran.as_deref()).map_err(map_err)?;
+        let pf = laterite_ags4_validator::parse::parse_str(t).map_err(map_err)?;
+        let tran = laterite_ags4_validator::tran_ags_of(&pf);
+        let (dv, res) = laterite_ags4_validator::resolve_dict_version(over, tran.as_deref())
+            .map_err(map_err)?;
         let dict = Dictionary::bundled(dv);
         let mut found = Findings::new();
-        ags4_validator::rules::run_all(&pf, &dict, &opts, None, &mut found);
+        laterite_ags4_validator::rules::run_all(&pf, &dict, &opts, None, &mut found);
         Ok((
             "<text>".to_string(),
             dv.as_str().to_string(),
@@ -165,7 +165,7 @@ fn severity_str(s: Severity) -> &'static str {
 }
 
 /// `{file, findings:{ "AGS Format Rule N":[{line,group,desc}] }}` —
-/// the exact `serde_json` value + insertion order the `ags4-check`
+/// the exact `serde_json` value + insertion order the `lat-check`
 /// binary's `json_value`/`json_string` produce. `preserve_order` (set
 /// in Cargo.toml, matching the validator) keeps the key order stable.
 fn findings_json(file: &str, found: &Findings) -> String {
@@ -325,8 +325,8 @@ fn parse_primitives<'py>(
         },
     };
     let parsed = match (path.as_deref(), text.as_deref()) {
-        (Some(p), _) => ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc),
-        (_, Some(t)) => ags4_validator::parse::parse_str(t),
+        (Some(p), _) => laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc),
+        (_, Some(t)) => laterite_ags4_validator::parse::parse_str(t),
         _ => {
             return err_dict(py, 5, "bad_args", "either path or text is required");
         }
@@ -342,7 +342,7 @@ fn parse_primitives<'py>(
     let d = PyDict::new(py);
     d.set_item("ok", true)?;
     d.set_item("group_order", pf.group_order.clone())?;
-    d.set_item("tran_ags", ags4_validator::tran_ags_of(&pf))?;
+    d.set_item("tran_ags", laterite_ags4_validator::tran_ags_of(&pf))?;
 
     let groups = PyDict::new(py);
     for code in &pf.group_order {
@@ -380,7 +380,7 @@ fn parse_primitives<'py>(
 /// Python `Ags4File` holds one of these as its `_handle`.
 #[pyclass]
 struct Reading {
-    parsed: ags4_validator::parse::ParsedFile,
+    parsed: laterite_ags4_validator::parse::ParsedFile,
 }
 
 #[pymethods]
@@ -429,14 +429,14 @@ impl Reading {
     /// per-group lazy: `read()` / `scan()` only pay for the groups actually
     /// touched, so a 69-group file you query two groups of builds two
     /// RecordBatches, not 69. Returns `None` if `code` isn't in the file.
-    /// Same shared emitter (`ags5_types::arrow_cols`) as the old eager build —
+    /// Same shared emitter (`laterite_types::arrow_cols`) as the old eager build —
     /// byte-identical columns, and still the SAME cast the browser's IPC path
     /// uses. The Python `Ags4File` memoises the result per code.
     fn table_for(&self, code: &str) -> PyResult<Option<PyTable>> {
         let Some(g) = self.parsed.groups.get(code) else {
             return Ok(None);
         };
-        let batch = ags5_types::arrow_cols::build_record_batch(
+        let batch = laterite_types::arrow_cols::build_record_batch(
             &g.headings,
             &g.types,
             g.rows.len(),
@@ -457,7 +457,7 @@ impl Reading {
 /// (headings/units/types/line_numbers). The typed Arrow table for a group is
 /// NOT built here — it is built lazily, per group, on first touch via the
 /// `_handle`'s `Reading::table_for` (cast by the one shared emitter
-/// `ags5_types::arrow_cols`, byte-identical to the browser's IPC path). The
+/// `laterite_types::arrow_cols`, byte-identical to the browser's IPC path). The
 /// raw parse stays Rust-side in that `Reading` handle, also feeding
 /// byte-faithful `write()`; no per-cell PyObject rows cross the boundary.
 #[pyfunction]
@@ -476,8 +476,8 @@ fn parse_arrow<'py>(
         },
     };
     let parsed = match (path.as_deref(), text.as_deref()) {
-        (Some(p), _) => ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc),
-        (_, Some(t)) => ags4_validator::parse::parse_str(t),
+        (Some(p), _) => laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc),
+        (_, Some(t)) => laterite_ags4_validator::parse::parse_str(t),
         _ => return err_dict(py, 5, "bad_args", "either path or text is required"),
     };
     let pf = match parsed {
@@ -491,7 +491,7 @@ fn parse_arrow<'py>(
     let d = PyDict::new(py);
     d.set_item("ok", true)?;
     d.set_item("group_order", pf.group_order.clone())?;
-    d.set_item("tran_ags", ags4_validator::tran_ags_of(&pf))?;
+    d.set_item("tran_ags", laterite_ags4_validator::tran_ags_of(&pf))?;
 
     let groups = PyDict::new(py);
     for code in &pf.group_order {
@@ -533,7 +533,7 @@ fn resolve_dict(
 ) -> PyResult<(String, String)> {
     let over =
         parse_dv(override_version.as_deref()).map_err(pyo3::exceptions::PyValueError::new_err)?;
-    match ags4_validator::resolve_dict_version(over, tran_ags.as_deref()) {
+    match laterite_ags4_validator::resolve_dict_version(over, tran_ags.as_deref()) {
         Ok((dv, res)) => Ok((dv.as_str().to_string(), res.as_str().to_string())),
         Err(e) => Err(pyo3::exceptions::PyValueError::new_err(e.to_string())),
     }
@@ -564,7 +564,7 @@ fn dict_group_unit_type<'py>(
                 "edition cannot be empty/auto; pass one of 4.0.3/4.0.4/4.1/4.1.1/4.2",
             )
         })?;
-    let dict = ags4_validator::dict::Dictionary::bundled(dv);
+    let dict = laterite_ags4_validator::dict::Dictionary::bundled(dv);
     let out = pyo3::types::PyDict::new(py);
     for h in dict.group_headings(group) {
         if let Some(entry) = dict.heading(group, h) {

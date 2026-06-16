@@ -25,7 +25,7 @@ SOFTWARE.
 Third-party data notice:
 
 The AGS4 standard data dictionaries bundled under
-`rust-packages/ags4-validator/data/` (`Standard_dictionary_v4_1.ags`,
+`rust-packages/laterite-ags4-validator/data/` (`Standard_dictionary_v4_1.ags`,
 `Standard_dictionary_v4_2.ags`) are © The Association of Geotechnical and
 Geoenvironmental Specialists (AGS), all rights reserved. They are reference
 data for the published AGS4 transfer-format standard, redistributed here as

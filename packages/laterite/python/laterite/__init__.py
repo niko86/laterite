@@ -1,13 +1,13 @@
 """laterite — a Rust-backed AGS4 reader / writer / validator.
 
-The engine is the clean-room ``ags4_validator`` Rust crate exposed via PyO3
+The engine is the clean-room ``laterite_ags4_validator`` Rust crate exposed via PyO3
 (``laterite._laterite_native``), with a Python-owned in-memory **DuckDB**
 engine on top: a parsed AGS4 file becomes born-typed DuckDB tables, and
 ``ags[code]`` / ``ags.sql(...)`` read them back as **polars** (default) or
 **pandas** frames — both pyarrow-free.
 
 For a literal ``python_ags4`` swap-in use ``from laterite import compat as
-AGS4``. For the CLI use ``ags4-check`` (byte-faithful to the Rust binary).
+AGS4``. For the CLI use ``lat-check`` (byte-faithful to the Rust binary).
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ def _split_source(source: Any, text: str | None) -> tuple[str | None, str | None
 
 class Report:
     """Outcome of :func:`validate`. ``findings`` is a polars frame; ``to_json``
-    / ``to_ndjson`` are byte-faithful to the Rust ``ags4-check`` binary."""
+    / ``to_ndjson`` are byte-faithful to the Rust ``lat-check`` binary."""
 
     __slots__ = ("_r",)
 
@@ -132,12 +132,12 @@ class Report:
 
     def to_json(self) -> str:
         """``{file, findings:{"AGS Format Rule N":[{line,group,desc}]}}`` —
-        byte-identical to ``ags4-check --json``."""
+        byte-identical to ``lat-check --json``."""
         return self._r["json"]
 
     def to_ndjson(self) -> str:
         """One flat ``{rule,line,group,desc}`` per line — byte-identical to
-        ``ags4-check --ndjson``."""
+        ``lat-check --ndjson``."""
         return self._r["ndjson"]
 
     def __repr__(self) -> str:
@@ -539,8 +539,10 @@ def emit_ags4(
     is preserved (pass an ordered mapping or a list of ``(code, frame)`` pairs;
     put ``PROJ`` first).
 
-    The frame crosses into Rust via the DuckDB engine as zero-copy Arrow —
-    **pyarrow-free for both backends** — where each cell is formatted to its
+    The frame crosses into Rust zero-copy via the Arrow C-stream — **pyarrow-free
+    for polars** (so this stays a base feature, no ``[compat]``) and for pandas
+    ≥ 2.2; an older pandas routes through DuckDB (pandas only ships via
+    ``[compat]``, which carries the deps). Each cell is formatted to its
     canonical AGS4 string. ``mode``:
 
     * ``"autofix"`` (default) — build, then apply the *safe* mechanical fixes
@@ -553,14 +555,25 @@ def emit_ags4(
     ``4.1.1``)."""
     import json
 
-    import duckdb
-
     items = list(groups.items()) if isinstance(groups, Mapping) else list(groups)
-    con = duckdb.connect()
-    # Register each frame under a unique name, then hand Rust the relation —
-    # which exposes the Arrow C-stream DuckDB produces itself (no pyarrow).
+    # Hand each frame straight to Rust via its Arrow C-stream PyCapsule
+    # (`__arrow_c_stream__`) — pyo3-arrow reads it with NO pyarrow, so the polars
+    # path stays a base feature. polars always exposes the capsule; pandas does
+    # from 2.2. Only an older pandas (no capsule) falls back through DuckDB — and
+    # pandas ships solely via [compat], which carries pyarrow + duckdb, so that
+    # branch never burdens a base polars user. (#111 base-surface audit: the old
+    # code registered EVERY frame into DuckDB, whose polars ingest goes via
+    # polars `.to_arrow()` → pyarrow, leaking [compat] into a base call.)
     tables = []
+    con = None
     for i, (code, frame) in enumerate(items):
+        if hasattr(frame, "__arrow_c_stream__"):
+            tables.append((code, frame))
+            continue
+        if con is None:
+            import duckdb
+
+            con = duckdb.connect()
         name = f"_emit_{i}"
         con.register(name, frame)
         tables.append((code, con.sql(f'SELECT * FROM "{name}"')))

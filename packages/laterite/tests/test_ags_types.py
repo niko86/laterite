@@ -1,7 +1,7 @@
 """Unit + property tests for `laterite.ags_types`.
 
 `canonical_type` / `display_hint` are thin Python wrappers over the Rust
-`ags5-core` type system; the value here is pinning the *contract* the
+`laterite-core` type system; the value here is pinning the *contract* the
 Python callers depend on (the `CanonicalType` identity, the `ValueError`
 on unknown codes, the printf-style display hints) plus a totality
 property over `parse_value` — the single ingest entry point that must
@@ -27,7 +27,7 @@ from laterite.ags_types import (
 #
 # NOTE on the "all 8 enum members" coverage goal: only FIVE of the eight
 # `CanonicalType` members are reachable through `canonical_type(ags_type)`.
-# The Rust mapping (`ags5-types::canonical_type`) routes AGS4 type codes to
+# The Rust mapping (`laterite-types::canonical_type`) routes AGS4 type codes to
 # STRING / INTEGER / DECIMAL / DATETIME / BOOL only — DATE / TIME / ENUM
 # exist in the enum for the type system's completeness (DuckDB `sql_type`
 # DATE/TIME/VARCHAR storage) but no AGS4 type code resolves to them. We

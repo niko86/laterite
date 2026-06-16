@@ -1,0 +1,78 @@
+# Clean-room AGS4 transfer-format validator.
+#
+# Implements the AGS4 numbered rules from the published spec
+# (reports/AGS 4_1.pdf). NOT derived from python-ags4's LGPL source —
+# see ../README.md and each src/rules/*.rs header. Bundled standard
+# dictionaries are ©AGS reference data; see data/PROVENANCE.md.
+
+[package]
+name = "laterite-ags4-validator"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "Clean-room Rust validator for the AGS4 geotechnical transfer format"
+license = "MIT"
+publish = false
+
+[lib]
+name = "laterite_ags4_validator"
+path = "src/lib.rs"
+
+[dependencies]
+# Compile-time perfect-hash maps for the bundled standard dictionaries —
+# zero startup cost, no runtime parse. phf does NOT implement PhfHash for
+# tuples, so dict keys are composite "GROUP\u{1f}HEADING" strings.
+phf = "0.13"
+thiserror = "1"
+# Rule 8 DT/T validity: pandas-equivalent calendar/clock checking
+# (python-ags4 uses pandas.to_datetime). default-features off keeps it
+# lean — no clock, no serde; just the Naive parsers. Already in the
+# workspace lockfile via ags5db, so no new external surface.
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+# Stage 7b: non-UTF-8 file encodings (cp1252 / latin1 / iso-8859-x) —
+# Mozilla's encoding_rs is the standard way to do this in Rust. The
+# library handles all WHATWG encodings; we only expose UTF-8 / CP1252 /
+# ISO-8859-1 (with the canonical "latin1" alias). default-features
+# leaves things minimal; not on the lean-dep guarded list
+# (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee
+# is unchanged.
+encoding_rs = "0.8"
+# serde: deliberate lean/wasm-safe inclusion — derive only, NO serde_json
+# (bindings own serialization). derive-only is zero runtime cost and
+# compiles clean on wasm32 (the wasm crate already links it). Not on the
+# lean-dep guard list (pyo3|polars|walkdir|rayon|ratatui).
+serde = { version = "1", features = ["derive"] }
+
+[build-dependencies]
+# build.rs reads the vendored .ags dictionaries and emits phf static
+# tables into OUT_DIR/dict_data.rs.
+phf_codegen = "0.13"
+csv = "1.3"
+
+[dev-dependencies]
+# Perf guard: bench check_file on the 23 MB workspace fixture. The
+# bench skips cleanly when the fixture is absent (it is gitignored
+# working space), so CI without it still passes.
+criterion = "0.5"
+# The cp1252/lossy-decode tests need a real on-disk path (parse_file
+# takes &Path) but MUST NOT live in tests/fixtures/ — corpus-qa's
+# e2e.rs crawls that dir and asserts hard_error==0, and a non-UTF-8
+# fixture would also defeat the whole point of the lossy decode. So
+# those tests write a temp file instead. Dev-dep only + already in the
+# guarantee (no walkdir/rayon/ratatui) is untouched.
+tempfile = "3"
+# serde_json: DEV-ONLY — the findings.rs byte-identity test serializes a
+# Finding and asserts the exact JSON string. The engine itself owns no
+# serde_json (bindings/CLIs do their own serialization), so the runtime
+# lean-dep contract is untouched.
+serde_json = "1"
+# Property-based tests: the AGS4 field splitter round-trip + field_span
+# char-offset stability + the Rule 8 format↔validate inverses. DEV-ONLY;
+# proptest's rand pull never reaches the lean runtime dep-graph
+# (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee is
+# untouched.
+proptest = "1"
+
+[[bench]]
+name = "validate_large_fixture"
+harness = false

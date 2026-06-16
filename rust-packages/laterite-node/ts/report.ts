@@ -1,5 +1,5 @@
 // The outcome of `validate()` — the Node port of laterite-py's `Report`.
-// `toJson` / `toNdjson` are byte-faithful to the `ags4-check` binary (produced
+// `toJson` / `toNdjson` are byte-faithful to the `lat-check` binary (produced
 // native-side; see `lib.rs::findings_json`). `findings` is a plain array (Node
 // has no polars analog; the data is small + structured, so an array is more
 // ergonomic than an arrow-js Table here).
@@ -34,7 +34,7 @@ export class Report {
   get exitCode(): number {
     return this.#r.exitCode;
   }
-  /** All findings, in `ags4-check` order: `{rule, line?, group, desc, severity?}`. */
+  /** All findings, in `lat-check` order: `{rule, line?, group, desc, severity?}`. */
   get findings(): Finding[] {
     return this.#r.findings;
   }
@@ -50,11 +50,11 @@ export class Report {
     return out;
   }
 
-  /** `{file, findings:{…}}` pretty-JSON — byte-identical to `ags4-check --json`. */
+  /** `{file, findings:{…}}` pretty-JSON — byte-identical to `lat-check --json`. */
   toJson(): string {
     return this.#r.json;
   }
-  /** One flat `{rule, …}` per line — byte-identical to `ags4-check --ndjson`. */
+  /** One flat `{rule, …}` per line — byte-identical to `lat-check --ndjson`. */
   toNdjson(): string {
     return this.#r.ndjson;
   }

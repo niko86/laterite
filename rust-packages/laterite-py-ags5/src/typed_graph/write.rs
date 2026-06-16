@@ -3,7 +3,7 @@
 //! Takes a Python typed-graph PROJ tree (built from compiled
 //! `#[pyclass]` types and/or `laterite.dynamic` factories) and writes
 //! a `.ags5db` file. Reuses the converter's bucket-writer path
-//! (`ags5db::convert::write_buckets`) so AGS4-ingest and typed-graph
+//! (`laterite_ags5_db::convert::write_buckets`) so AGS4-ingest and typed-graph
 //! writes share UUID7 minting, parent-id resolution, DDL, and the
 //! `_spec_*` self-describing tables.
 //!
@@ -19,8 +19,8 @@
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
-use ags5db::convert::{compact_db, write_buckets};
-use ags5db::registry::{GroupDescriptor, Heading, Registry, registry};
+use laterite_ags5_db::convert::{compact_db, write_buckets};
+use laterite_ags5_db::registry::{GroupDescriptor, Heading, Registry, registry};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::PyList;

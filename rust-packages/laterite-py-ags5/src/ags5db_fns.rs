@@ -3,10 +3,10 @@
 //! This is the fatter half of the laterite wheel: linking `ags5db`
 //! pulls in bundled libduckdb (gate B.2 of
 //! ~15-20 MB wheel accepted for v1). The validator half stays lean.
-//! `ags5db` depends on `ags4-validator` (for `db-to-ags4 --validate`),
+//! `ags5db` depends on `laterite-ags4-validator` (for `db-to-ags4 --validate`),
 //! never the reverse, so the engine's pyo3-free guarantee still holds.
 //!
-//! Each fn does the data work in `ags5db::convert` and returns a stats
+//! Each fn does the data work in `laterite_ags5_db::convert` and returns a stats
 //! dict; failures map to `RuntimeError` carrying the `CliError`'s exit
 //! code (the same code the binary would exit with). The nice Python
 //! wrappers live in `laterite/ags5db.py`.
@@ -18,10 +18,10 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 use serde_json::{Map, Value};
 
-use ags5db::convert;
-use ags5db::db::Rows;
-use ags5db::error::CliError;
-use ags5db::query;
+use laterite_ags5_db::convert;
+use laterite_ags5_db::db::Rows;
+use laterite_ags5_db::error::CliError;
+use laterite_ags5_db::query;
 
 /// A `CliError` → `RuntimeError` carrying the binary's exit code, so a
 /// Python caller can branch on it the way a shell would on `$?`.
@@ -84,10 +84,10 @@ fn ags5db_export<'py>(
 }
 
 // `.agsx` ↔ `.ags5db` conversion retired in Stage F2a (see
-// Python-only inspection helper via `ags5_xml.ags4_to_agsx`.
+// Python-only inspection helper via `laterite_ags5x.ags4_to_agsx`.
 
 // ---------------------------------------------------------------------
-// read-side query API (over ags5db::query)
+// read-side query API (over laterite_ags5_db::query)
 // ---------------------------------------------------------------------
 
 /// Serialise `Rows` to an order-preserving `{columns, records}` JSON
@@ -160,7 +160,7 @@ fn ags5db_peek(
 #[pyfunction]
 #[pyo3(signature = (db_path, group = None))]
 fn ags5db_inspect(db_path: String, group: Option<String>) -> PyResult<String> {
-    use ags5db::introspect;
+    use laterite_ags5_db::introspect;
     let report = introspect::inspect(Path::new(&db_path), group.as_deref()).map_err(map_cli_err)?;
 
     let mut root = Map::new();
@@ -222,7 +222,7 @@ fn ags5db_inspect(db_path: String, group: Option<String>) -> PyResult<String> {
 #[pyfunction]
 #[pyo3(signature = (db_path))]
 fn ags5db_info(db_path: String) -> PyResult<String> {
-    use ags5db::introspect;
+    use laterite_ags5_db::introspect;
     let summary = introspect::info(Path::new(&db_path)).map_err(map_cli_err)?;
     let n_groups = summary.n_groups();
     let n_nonempty = summary.n_nonempty();
@@ -269,7 +269,7 @@ fn ags5db_info(db_path: String) -> PyResult<String> {
 #[pyfunction]
 #[pyo3(signature = (db_path, nonempty = false))]
 fn ags5db_groups(db_path: String, nonempty: bool) -> PyResult<String> {
-    use ags5db::introspect;
+    use laterite_ags5_db::introspect;
     let groups = introspect::list_groups(Path::new(&db_path), nonempty).map_err(map_cli_err)?;
     let arr: Vec<Value> = groups
         .into_iter()
@@ -290,7 +290,7 @@ fn ags5db_groups(db_path: String, nonempty: bool) -> PyResult<String> {
 #[pyfunction]
 #[pyo3(signature = (db_path, group))]
 fn ags5db_headings(db_path: String, group: String) -> PyResult<String> {
-    use ags5db::introspect;
+    use laterite_ags5_db::introspect;
     let headings = introspect::headings(Path::new(&db_path), &group).map_err(map_cli_err)?;
     let arr: Vec<Value> = headings
         .into_iter()
@@ -315,7 +315,7 @@ fn ags5db_headings(db_path: String, group: String) -> PyResult<String> {
 #[pyfunction]
 #[pyo3(signature = (a_path, b_path, samples = 3))]
 fn ags5db_diff(a_path: String, b_path: String, samples: usize) -> PyResult<String> {
-    use ags5db::diff;
+    use laterite_ags5_db::diff;
     let result =
         diff::diff_dbs(Path::new(&a_path), Path::new(&b_path), samples).map_err(map_cli_err)?;
 

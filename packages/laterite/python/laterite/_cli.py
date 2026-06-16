@@ -1,7 +1,7 @@
-"""``ags4-check`` — the Python face of the Rust ``ags4-check`` binary.
+"""``lat-check`` — the Python face of the Rust ``lat-check`` binary.
 
 Flags, ``--json`` / ``--ndjson`` byte-shape and exit codes are
-faithful to ``rust-packages/ags4-validator/src/bin/ags4_check.rs``
+faithful to ``rust-packages/laterite-ags4-check/src/main.rs``
 (the JSON/NDJSON strings are built by the *same* serde_json calls in
 the native module). Exit codes: 0 clean · 1 findings · 3 not-found/io
 · 4 not-utf8/not-ags4/unsupported-edition · 5 bad-dict/bad-args.
@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     if "-h" in argv or "--help" in argv:
         return _print_readme()
 
-    p = argparse.ArgumentParser(prog="ags4-check", add_help=False)
+    p = argparse.ArgumentParser(prog="lat-check", add_help=False)
     p.add_argument("file", nargs="?")
     p.add_argument("--dict-version", choices=_DICT_CHOICES, default="auto")
     p.add_argument("--dict")

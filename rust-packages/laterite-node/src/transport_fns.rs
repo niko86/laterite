@@ -1,6 +1,6 @@
 //! Transport — zstd compression + age passphrase encryption, the Node port of
 //! laterite-py's `transport_fns`. Reimplemented directly on `zstd` + `age`
-//! (decoupled from `.ags5db` / ags5-core) as general file-envelope helpers:
+//! (decoupled from `.ags5db` / laterite-core) as general file-envelope helpers:
 //! compress/encrypt ANY file. The age envelope is interoperable with the Python
 //! side (`pyrage`) — same `age` crate, same on-disk format. napi camelCases:
 //! `transport_pack` → `transportPack`, `elapsed_s` → `elapsedS`.
@@ -149,4 +149,70 @@ fn decrypt_with_passphrase(ciphertext: &[u8], passphrase: &str) -> Result<Vec<u8
         .read_to_end(&mut out)
         .map_err(|e| Error::from_reason(format!("age read: {e}")))?;
     Ok(out)
+}
+
+// In a `cargo test` build the napi registration glue that references these
+// (private-module) `#[napi]` fns isn't emitted, so dead_code flags them + the
+// stats structs + the io/age helpers. A real round-trip exercises all of them
+// and pins the envelope behaviour (compress↔decompress, encrypt↔decrypt,
+// wrong-password rejection).
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env::temp_dir;
+    use std::fs;
+
+    fn tmp(tag: &str) -> String {
+        // Unique per process + tag so parallel tests / reruns don't collide.
+        temp_dir()
+            .join(format!("lat_node_transport_{}_{tag}", std::process::id()))
+            .to_string_lossy()
+            .into_owned()
+    }
+
+    #[test]
+    fn pack_then_unpack_round_trips() {
+        let (src, packed, out) = (tmp("p.src"), tmp("p.zst"), tmp("p.out"));
+        let payload = b"\"GROUP\",\"PROJ\"\r\nrepetitive AGS-ish content ".repeat(80);
+        fs::write(&src, &payload).unwrap();
+
+        let stats = transport_pack(src.clone(), packed.clone(), None).unwrap();
+        assert!(stats.ratio > 0.0 && stats.elapsed_s >= 0.0);
+        let _ = &stats.bytes; // touch the BigInt field
+
+        let u = transport_unpack(packed.clone(), out.clone()).unwrap();
+        assert!(u.elapsed_s >= 0.0);
+        let _ = &u.bytes;
+        assert_eq!(fs::read(&out).unwrap(), payload);
+
+        for p in [src, packed, out] {
+            let _ = fs::remove_file(p);
+        }
+    }
+
+    #[test]
+    fn lock_then_unlock_round_trips_and_rejects_wrong_password() {
+        let (src, locked, out) = (tmp("l.src"), tmp("l.age"), tmp("l.out"));
+        let payload = b"sensitive AGS payload ".repeat(60);
+        fs::write(&src, &payload).unwrap();
+
+        let stats =
+            transport_lock(src.clone(), locked.clone(), "hunter2".to_string(), None).unwrap();
+        let _ = (&stats.bytes, stats.ratio, stats.elapsed_s);
+
+        // wrong passphrase must fail
+        assert!(transport_unlock(locked.clone(), out.clone(), "wrong".to_string()).is_err());
+        // correct passphrase round-trips
+        transport_unlock(locked.clone(), out.clone(), "hunter2".to_string()).unwrap();
+        assert_eq!(fs::read(&out).unwrap(), payload);
+
+        for p in [src, locked, out] {
+            let _ = fs::remove_file(p);
+        }
+    }
+
+    #[test]
+    fn missing_source_errors() {
+        assert!(transport_pack(tmp("absent.src"), tmp("x.zst"), None).is_err());
+    }
 }

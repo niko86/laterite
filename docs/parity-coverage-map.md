@@ -75,7 +75,7 @@ every caller that benefits from the typed shape.
 | python-ags4 module | tests | laterite passes | covered by |
 |---|---|---|---|
 | `test_ags4.py` (parser, AGS4_to_dataframe, write_AGS4_file, …) | 30 | 30 | `packages/laterite/tests/test_laterite.py` (compat surface) |
-| `test_check.py::test_rule_*` (Rules 1–20) | ~85 | 82 | `packages/laterite/tests/test_laterite.py` + Rust crate tests under `rust-packages/ags4-validator/src/rules/` |
+| `test_check.py::test_rule_*` (Rules 1–20) | ~85 | 82 | `packages/laterite/tests/test_laterite.py` + Rust crate tests under `rust-packages/laterite-ags4-validator/src/rules/` |
 | `test_check.py::test_AGS4_check_file*` | 9 | 8 | `packages/laterite/tests/test_laterite.py` (end-to-end check) |
 | `test_main.py` (CLI shim) | 4 | 4 | `laterite._cli` + `packages/laterite/tests/test_laterite.py` |
 

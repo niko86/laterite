@@ -1,0 +1,73 @@
+# laterite-core — DuckDB-free pure-string AGS modules.
+#
+# Extracted from `ags5db` (S3a of release/v0.1.0-prep). Carries the
+# registry / canonical-types / DDL emitter / AGS4 codec / Excel I/O /
+# zstd+age transport / common error type — all the modules that don't
+# need DuckDB.
+#
+# Two consumers:
+# - `ags5db` (re-exports these modules for source compat; adds the
+#   DuckDB-bound surface on top: convert.rs, db.rs, query.rs, etc.)
+# - `laterite-py` (the base PyO3 cdylib for `laterite`, AGS4 surface —
+#   ships **without** DuckDB so the AGS4 wheel stays light).
+#
+# A separate `laterite-py-ags5` cdylib depends on BOTH `laterite-core` and
+# `ags5db` to expose the AGS5 surface to Python — that wheel bundles
+# DuckDB and ships as the optional `laterite[ags5]` extra.
+
+[package]
+name = "laterite-core"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "DuckDB-free pure-string core modules for AGS4/AGS5 toolchain"
+license = "MIT"
+publish = false
+
+[dependencies]
+# The AGS type system (canonical types + value casting), extracted to a
+# wasm-safe leaf so the browser explorer (`laterite-ags4-wasm`) shares the exact
+# casting logic. Re-exported as `laterite_core::ags_types` (see lib.rs).
+laterite-types = { path = "../laterite-types" }
+# The AGS4 writer/emitter, lifted into its own wasm-safe leaf. laterite-core's
+# excel.rs + ags5db's db-to-ags4 reach it via the `ags4_writer` re-export
+# shim; `From<EmitError> for CliError` (error.rs) keeps their `?` working.
+laterite-ags4-emit = { path = "../laterite-ags4-emit" }
+# Calendar/clock checking for canonical-type validation (mirrors the
+# `chrono` use in laterite-ags4-validator). `serde` feature so DateTime types
+# round-trip through serde_json without an extra map.
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+# preserve_order keeps JSON output keys in insertion order, matching
+# Python's dict-preserving json.dumps. Same rationale as ags5db's pin.
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "1"
+# csv crate is used by ags4_codec.rs for the CRLF/double-quoted CSV
+# parse. ags5db kept csv as a direct dep for some commands (csv emit
+# in `peek`), so it stays direct there too.
+csv = "1.3"
+# `zstd` for the `pack`/`unpack` transport. The crate wraps libzstd
+# via zstd-safe; bundling libzstd is automatic (no system dep).
+zstd = "0.13"
+# Encryption for `lock`/`unlock`. `age` is the audited X25519 +
+# ChaCha20-Poly1305 format; we use its scrypt passphrase mode.
+# `rpassword` for no-echo TTY passphrase prompts. `secrecy` is
+# transitively used by `age::scrypt::Identity::new(Secret<...>)`.
+age = "0.10"
+rpassword = "7"
+secrecy = "0.8"
+# Rust-backed Excel I/O for laterite.compat's AGS4 ↔ XLSX surface.
+# Both crates are pure-Rust (no Python deps).
+rust_xlsxwriter = "0.95"
+calamine = "0.32"
+# Content-hash dedup in the AGS4 ingest path uses sha256 over the raw
+# heading values; lives in laterite-core because excel.rs (which moves
+# here) touches it through ags4_writer.
+sha2 = "0.10"
+hex = "0.4"
+
+[dev-dependencies]
+# `ags4_codec.rs` test creates an on-disk fixture (temp dir) to exercise
+# the file path + parse cycle. The runtime modules don't take a Path
+# dependency; this is test-only.
+tempfile = "3"

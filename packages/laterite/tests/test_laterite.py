@@ -1,8 +1,8 @@
 """laterite contract tests.
 
 Engine parity is the load-bearing gate: `compat` / the nice API /
-the CLI all wrap the *same* clean-room `ags4_validator`, so they must
-agree with each other and with the Rust `ags4-check` binary
+the CLI all wrap the *same* clean-room `laterite_ags4_validator`, so they must
+agree with each other and with the Rust `lat-check` binary
 byte-for-byte. python-ags4 agreement is reported but the documented
 O-N clean-room divergences are expected (the engine, not laterite,
 owns them).
@@ -25,12 +25,12 @@ from laterite import compat as AGS4
 _FIX = (
     Path(__file__).parents[3]
     / "rust-packages"
-    / "ags4-validator"
+    / "laterite-ags4-validator"
     / "tests"
     / "fixtures"
 )
 _RUST_BIN = (
-    Path(__file__).parents[3] / "rust-packages" / "target" / "release" / "ags4-check"
+    Path(__file__).parents[3] / "rust-packages" / "target" / "release" / "lat-check"
 )
 _FIXTURES = sorted(_FIX.glob("*.ags"))
 _CLEAN = _FIX / "clean_minimal.ags"
@@ -304,7 +304,7 @@ def test_compat_desc_translator_unit():
 def test_compat_check_file_opt_out_returns_laterite_wording():
     """match_python_ags4_wording=False yields the engine's native
     (more precise) phrasings — the same strings laterite.Validator
-    and ags4-check CLI return."""
+    and lat-check CLI return."""
     # _CLEAN passes all rules so check on a fixture that fires Rule 19
     # in python-ags4's repo, if available; otherwise just confirm the
     # opt-out exists and changes behaviour on Rule-1 ASCII path.
@@ -404,7 +404,7 @@ def test_compat_roundtrip_matches_python_ags4(tmp_path):
 
 
 def _run_py_cli(args: list[str]) -> tuple[str, int]:
-    """Drive the Python `ags4-check` CLI *in-process* (covers
+    """Drive the Python `lat-check` CLI *in-process* (covers
     `laterite._cli`, the actual shipped entrypoint) instead of paying
     for a cold interpreter start per fixture. Returns (stdout, exit).
 
@@ -418,7 +418,7 @@ def _run_py_cli(args: list[str]) -> tuple[str, int]:
     return buf.getvalue(), code
 
 
-@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust ags4-check not built")
+@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat-check not built")
 @pytest.mark.parametrize("fx", _FIXTURES, ids=lambda p: p.name)
 def test_cli_json_ndjson_exit_byte_parity(fx):
     def run_rust(cmd):

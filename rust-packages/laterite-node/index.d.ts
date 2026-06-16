@@ -85,7 +85,7 @@ export interface Finding {
  * `ok` is **false only for un-validatable input** (the TS `raiseFor` raises
  * then); rule *violations* come back in `findings` with `ok:true`. `Report`'s
  * `isValid` is the separate `count == 0`. `json`/`ndjson` are byte-identical
- * to `ags4-check --json` / `--ndjson`.
+ * to `lat-check --json` / `--ndjson`.
  */
 export interface ValidationReport {
   ok: boolean
@@ -96,7 +96,7 @@ export interface ValidationReport {
   errorKind?: string
   error?: string
   /**
-   * Mirrors the `ags4-check` binary: 0 valid / 1 findings on success;
+   * Mirrors the `lat-check` binary: 0 valid / 1 findings on success;
    * 3 not-found/io, 4 not-utf8/not-ags4/bad-edition, 5 bad-dict on failure.
    */
   exitCode: number
@@ -133,12 +133,12 @@ export interface EmitResult {
 }
 /**
  * Build valid AGS4 from per-group **Arrow IPC** streams (the columnar
- * producer; the read boundary reversed). = `ags4-wasm`'s `to_ags4_ipc`.
+ * producer; the read boundary reversed). = `laterite-ags4-wasm`'s `to_ags4_ipc`.
  */
 export declare function emitAgs4FromIpc(groups: Array<GroupIpc>, edition?: string | undefined | null, mode?: string | undefined | null): EmitResult
 /**
  * A parsed AGS4 file held native-side — the Node analog of laterite-py's
- * `Reading` handle (and `ags4-wasm`'s `ParsedDataset`). Each group's typed
+ * `Reading` handle (and `laterite-ags4-wasm`'s `ParsedDataset`). Each group's typed
  * `RecordBatch` is built lazily on `tableIpc(code)` and dropped after the
  * bytes are returned, so peak residency is one batch.
  */
@@ -155,7 +155,7 @@ export declare class Reading {
   /**
    * One group's rows as an Arrow **IPC stream** (`Buffer`), columns already
    * correctly typed. The Node analog of the pyo3-arrow capsule: the typed
-   * columns come from the one shared emitter (`ags5_types::arrow_cols`), the
+   * columns come from the one shared emitter (`laterite_types::arrow_cols`), the
    * SAME casting Python/wasm use — so a file types byte-identically across
    * hosts. Returns `null` if the code isn't in the file.
    */

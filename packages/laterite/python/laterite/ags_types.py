@@ -1,7 +1,7 @@
 """laterite.ags_types — Rust-backed AGS4 type system.
 
 Exposes `parse_value` / `canonical_type` / `display_hint` semantics
-backed by the Rust engine in `rust-packages/ags5-core/src/ags_types.rs`.
+backed by the Rust engine in `rust-packages/laterite-core/src/ags_types.rs`.
 
 The `CanonicalType` StrEnum lives Python-side so existing
 `canonical_type(x) is CanonicalType.DECIMAL` checks keep their
@@ -64,7 +64,7 @@ def parse_value(raw: Any, ags_type: str) -> Any:
 
     Permissive: unparseable values return ``None``. The single source
     of truth for AGS4 + ``.agsx`` ingest (both Rust paths); the Python
-    ``ags5_xml._codec`` module is encode-only since Stage E3.
+    ``laterite_ags5x._codec`` module is encode-only since Stage E3.
     """
     # Accept any input PyO3 won't coerce directly (e.g. an int passed
     # by a careless caller) — match the Python implementation's

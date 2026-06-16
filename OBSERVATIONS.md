@@ -597,7 +597,7 @@ divergence (not a defect) · **[NOTE]** behavioural observation.
   `FILE/<fset>/` per defined FSET, and each `FILE_NAME` on disk.
 - **Us**: the **data-level** check always runs. The **on-disk** half
   is now implemented too, as `references::rule_20_on_disk`, gated by
-  `CheckOptions.check_files` (CLI `ags4-check --check-files`,
+  `CheckOptions.check_files` (CLI `lat-check --check-files`,
   `std::fs` only). **Default off**: a library validator must stay
   deterministic and path-independent and `db-to-ags4 --validate`
   validate` turns it **on** by default (`--no-check-files` to opt
@@ -617,12 +617,12 @@ divergence (not a defect) · **[NOTE]** behavioural observation.
   `blobs.py`) reconstructs the `FILE/<FILE_FSET>/<FILE_NAME>` sidecar
   tree from stored blobs (FSET recovered via `blob.parent_id =
   v_file.id`; orphan → flat + warn) so an exported delivery passes
-  `ags4-check --check-files`. Pinned by
+  `lat-check --check-files`. Pinned by
   `rule_20_on_disk_opt_in_and_default_off` + the attachment
   round-trip e2e / `test_cli` tests.
 
 ### O-28 [VARIANCE] External `--dict` override deliberately deferred beyond V8
-- **Plan**: listed an `ags4-check --dict <path>` runtime override.
+- **Plan**: listed an `lat-check --dict <path>` runtime override.
 - **Reality**: [`Dictionary`] is `'static` phf-backed (zero-startup,
   compiled-in). A runtime-parsed dictionary needs an owned variant and
   a non-`'static` lifetime threaded through `DictEntry`/`GroupMeta`
@@ -948,7 +948,7 @@ divergence (not a defect) · **[NOTE]** behavioural observation.
   a field count ≠ HEADING row, and (when `rename_duplicate_headers=
   False`) duplicate headings. Read fails; nothing downstream sees the
   bad row.
-- **Us** (`rust-packages/ags4-validator/src/parse.rs`): the native
+- **Us** (`rust-packages/laterite-ags4-validator/src/parse.rs`): the native
   parser is deliberately lenient — duplicate GROUP declarations are
   silently merged into one row bucket; ragged DATA rows pass through
   (extra fields dropped or short fields padded — finding-reportable
@@ -969,7 +969,7 @@ divergence (not a defect) · **[NOTE]** behavioural observation.
   for the three cases above, matching python-ags4's wording closely
   enough that `pytest.raises(AGS4Error, match=...)` against their
   test suite passes. Native callers (`laterite.Validator`,
-  `ags4-check`) never hit the pre-check.
+  `lat-check`) never hit the pre-check.
 
 ### O-38 [SPEC] Rule 8 DT validation: python-ags4 forbids non-ISO UNITs
 - **python-ags4** (`check.py::rule_8`, DT branch): builds two masks
@@ -1005,7 +1005,7 @@ divergence (not a defect) · **[NOTE]** behavioural observation.
   for an AGS-DFWG / python-ags4 issue (priority: high — affects
   real European/US delivery files).
 - **Our decision**: laterite implements the spec-correct path. New
-  `lex_unit_value` in `rust-packages/ags4-validator/src/rules/typed_values.rs`
+  `lex_unit_value` in `rust-packages/laterite-ags4-validator/src/rules/typed_values.rs`
   walks the UNIT pattern token-by-token (yyyy/yy/mm/dd/hh/ss with
   context-sensitive `mm` = month-or-minute), extracts calendar
   fields from the value, and validates ranges + pandas bound

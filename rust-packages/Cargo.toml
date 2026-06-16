@@ -1,25 +1,25 @@
 # Cargo workspace for the Rust side of laterite.
 #
 # Members:
-#   ags4-validator    Clean-room Rust AGS4 validator — library only
-#                     (lean, wasm-safe leaf). The CLI is `ags4-check`.
-#   ags4-check        The `ags4-check` CLI front-end for the validator
+#   laterite-ags4-validator    Clean-room Rust AGS4 validator — library only
+#                     (lean, wasm-safe leaf). The CLI is `lat-check`.
+#   laterite-ags4-check  The `lat-check` CLI front-end for the validator
 #                     (owns the comfy-table/indicatif + optional TUI
 #                     deps). Depends on the validator library API only.
-#   ags4-wasm         Browser wasm (cdylib) wrapper around the validator
+#   laterite-ags4-wasm         Browser wasm (cdylib) wrapper around the validator
 #                     — the engine behind the client-side web app in
 #                     web/. Built for wasm32 via wasm-pack, excluded
 #                     from the host workspace clippy/test.
-#   ags5-types        The AGS type system (canonical types + value
-#                     casting) as a wasm-safe leaf — shared by ags5-core
-#                     and ags4-wasm.
-#   ags5-core         AGS5 dictionary, codecs, registry, and shared
+#   laterite-types        The AGS type system (canonical types + value
+#                     casting) as a wasm-safe leaf — shared by laterite-core
+#                     and laterite-ags4-wasm.
+#   laterite-core         AGS5 dictionary, codecs, registry, and shared
 #                     types. No DuckDB dep — kept light so the
 #                     base validator wheel doesn't pay for the
 #                     AGS5 surface.
 #   ags5db            DuckDB-backed `.ags5db` engine (read + write
-#                     + the `ags5db` binary).
-#   ags-cliutil       Shared CLI presentation primitives (spinner,
+#                     + the `lat-db` binary).
+#   laterite-cliutil       Shared CLI presentation primitives (spinner,
 #                     table, colour gate, JSON helpers).
 #   laterite-py       PyO3 cdylib exposing the validator engine to
 #                     Python (the `laterite` package).
@@ -27,23 +27,32 @@
 #                     (the `laterite-ags5` companion wheel).
 #
 # Build everything:  cargo build --workspace --release
-# Build just the binary:  cargo build --release --bin ags5db
+# Build just the binary:  cargo build --release --bin lat-db
 # Run all tests:  cargo test --workspace --release
 [workspace]
 resolver = "2"
 members = [
-    "ags5-types",
-    "ags5-core",
-    "ags5db",
-    "ags4-emit",
-    "ags4-validator",
-    "ags4-check",
-    "ags4-wasm",
-    "ags-cliutil",
+    "laterite-types",
+    "laterite-core",
+    "laterite-ags5-db",
+    "laterite-ags4-emit",
+    "laterite-ags4-validator",
+    "laterite-ags4-check",
+    "laterite-ags4-wasm",
+    "laterite-cliutil",
     "laterite-py",
     "laterite-py-ags5",
     "laterite-node",
 ]
+
+# Single-sourced crate version: every member inherits this via
+# `version.workspace = true`, so the whole engine + both binaries
+# (lat-check, lat-db) move in one line. Two-tier scheme: this is the
+# internal/engine tier (also stamped by bump-my-version alongside the
+# Python wheels — see root pyproject [tool.bumpversion]); the published
+# npm `laterite` versions on its own `node-v*` track.
+[workspace.package]
+version = "0.4.0"
 
 # Release profile lives at the workspace root — cargo only honours
 # profile settings declared here and silently ignores them on member

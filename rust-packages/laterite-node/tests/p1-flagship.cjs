@@ -36,7 +36,7 @@ assert.strictEqual(typeof rep.dictVersion, "string");
 assert.ok(Array.isArray(rep.findings));
 assert.strictEqual(rep.count, rep.findings.length);
 assert.ok(rep.count > 0, "a LOCA-only file (no PROJ/TRAN) has findings");
-assert.match(rep.json, /"findings"/); // byte-faithful ags4-check --json
+assert.match(rep.json, /"findings"/); // byte-faithful lat-check --json
 
 // --- byte-faithful re-emit ---
 const reEmitted = reading.emit();

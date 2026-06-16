@@ -1,4 +1,4 @@
-//! PyO3 wrappers over the `ags5_core::registry` module.
+//! PyO3 wrappers over the `laterite_core::registry` module.
 //!
 //! Read-only at this stage (D2 of
 //! the static Rust registry to Python as JSON-shaped data so a thin
@@ -10,8 +10,7 @@
 //! Mutation (`register` / passthrough auto-registration) stays Python-
 //! side as an overlay merged with this base — see D4a in the plan.
 
-use ags5_core::ddl::build_ddl;
-use ags5_core::registry::{GroupDescriptor, ancestor_chain, inherited_key_names, registry};
+use laterite_core::registry::{ancestor_chain, inherited_key_names, registry};
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -72,37 +71,10 @@ fn registry_inherited_key_names(code: &str) -> PyResult<Vec<String>> {
     Ok(names)
 }
 
-/// Emit the full `.ags5db` DDL (tables + indexes + views + blob table)
-/// against the Rust singleton extended with `overlay_groups_json` — a
-/// JSON array of additional `GroupDescriptor`s contributed by Python-
-/// side `register()` calls (passthrough auto-registration; custom
-/// dictionaries registered in tests). Mirrors `Registry::extended_with
-/// (extra)` semantics: a code that already exists in the base registry
-/// gets replaced.
-///
-/// This is the seam that closes gate B.1 — `ags5_db._ddl.build_ddl()`
-/// delegates here (Stage D4b of `dec-rust-engine-staged-adoption.md`).
-/// Output is byte-identical to the pre-D4b Python implementation when
-/// the overlay is empty (which the previous parity test, now retired,
-/// validated for 4400 lines).
-#[pyfunction]
-fn registry_build_ddl_with_overlay(overlay_groups_json: &str) -> PyResult<String> {
-    let extra: Vec<GroupDescriptor> =
-        if overlay_groups_json.is_empty() || overlay_groups_json == "[]" {
-            Vec::new()
-        } else {
-            serde_json::from_str(overlay_groups_json)
-                .map_err(|e| PyValueError::new_err(format!("overlay decode: {}", e)))?
-        };
-    let reg = registry().extended_with(extra);
-    Ok(build_ddl(&reg))
-}
-
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_groups_json, m)?)?;
     m.add_function(wrap_pyfunction!(registry_get_group, m)?)?;
     m.add_function(wrap_pyfunction!(registry_ancestor_chain, m)?)?;
     m.add_function(wrap_pyfunction!(registry_inherited_key_names, m)?)?;
-    m.add_function(wrap_pyfunction!(registry_build_ddl_with_overlay, m)?)?;
     Ok(())
 }

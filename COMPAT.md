@@ -86,7 +86,7 @@ e.g. `0.2.0+compat.python-ags4.1.3.0`.
 `Metadata.Checker` in validation reports reads:
 
 ```
-laterite 0.1.0 — compat: python-ags4 1.2.0 — clean-room ags4_validator engine
+laterite 0.1.0 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine
 ```
 
 This is the source of 5 parity-test failures (which expect us to
@@ -198,7 +198,7 @@ The validator always runs with `include_fyi=True` when invoked
 through `compat.check_file` — python-ags4 emits FYI keys (`FYI`,
 `FYI (Related to Rule 1)`, `FYI (Related to Rule 16)`) which the
 parity tests assert on. The native `laterite.validate(...)` /
-`ags4-check` CLI default `include_fyi=False`.
+`lat-check` CLI default `include_fyi=False`.
 
 ---
 
@@ -369,7 +369,7 @@ Largest divergence area. Multiple sub-cases:
   `FILE_FSET` used must be defined in the FILE group) *and* the
   on-disk check (sidecar `FILE/<fset>/<name>` must exist).
 - **laterite**: data-level check is always on. On-disk check is
-  **opt-in** via `ags4-check --check-files` (or
+  **opt-in** via `lat-check --check-files` (or
   `CheckOptions::check_files=true`). Compat passes
   `check_files=True` to match python-ags4's always-on behaviour
   for parity.
@@ -480,7 +480,7 @@ exist verbatim:
 - `check_file(..., encoding="cp1252")` — non-UTF-8 file decoding.
 
 **Not mirrored**: python-ags4's CLI (`ags4_cli`). laterite ships
-`ags4-check` (Rust binary, byte-faithful JSON / NDJSON output) as
+`lat-check` (Rust binary, byte-faithful JSON / NDJSON output) as
 a different CLI surface. See the README for the two-error-JSON-shape
 table.
 
@@ -493,7 +493,7 @@ accordingly.
 
 laterite (Stage 7b) threads encoding through the **Rust shared lib**:
 
-- `ags4-check --encoding cp1252 file.ags` — CLI flag.
+- `lat-check --encoding cp1252 file.ags` — CLI flag.
 - `laterite.validate(path, opts=CheckOptions{encoding=...})` — native.
 - `laterite.compat.check_file(path, encoding="cp1252")` — compat.
 

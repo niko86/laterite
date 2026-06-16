@@ -1,0 +1,57 @@
+# `lat-check` — the CLI front-end for the clean-room AGS4 validator.
+#
+# Split out of `laterite-ags4-validator` so the engine library stays a lean,
+# wasm-safe leaf (phf + thiserror + chrono + encoding_rs). All the
+# CLI-only deps that can't cross-compile to wasm32 (comfy-table /
+# indicatif → console threads+TTY, the optional ratatui/crossterm TUI)
+# live here, behind the product binary, not on the library every
+# embedder (ags5db, laterite-py, laterite-ags4-wasm) inherits.
+
+[package]
+name = "laterite-ags4-check"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "CLI validator for the AGS4 geotechnical transfer format"
+license = "MIT"
+publish = false
+# `src/ags4_check_tui.rs` is a `#[path]` submodule of the binary, NOT
+# its own target. Disable bin auto-discovery so cargo doesn't try to
+# compile it standalone; the one real binary is declared explicitly.
+autobins = false
+
+[[bin]]
+name = "lat-check"
+path = "src/main.rs"
+
+[features]
+# Default build links NO TUI code or deps — the LLM/automation-facing
+# binary is provably unaffected (the `--tui` flag isn't even compiled
+# in; it falls into "unknown option → exit 5"). Build the experiment
+# with `cargo build --release --features tui`.
+default = []
+tui = ["dep:ratatui", "dep:crossterm"]
+
+[dependencies]
+# The engine. Depended on via its public library API only — the split
+# has zero code-consumer breakage (every call site uses the re-exported
+# surface: CheckOptions / DictVersion / Findings / ValidatorError /
+# check_file / findings).
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# Same encoding_rs as the validator so `&'static Encoding` types match
+# across the `CheckOptions::encoding` boundary.
+encoding_rs = "0.8"
+# CLI presentation parity with `ags5db` (laterite-ags5-db/src/output.rs): the
+# animated spinner, the aligned UTF8 finding table, rich-style coloured
+# JSON — via the shared `laterite-cliutil` crate (single source of truth,
+# serde_json + (transitively) crossterm for terminal capability
+# detection; none of that touches the validator library now.
+laterite-cliutil = { path = "../laterite-cliutil" }
+comfy-table = "7"
+indicatif = "0.17"
+serde_json = { version = "1", features = ["preserve_order"] }
+# Optional, behind the `tui` feature — the interactive findings browser
+# (`lat-check --tui`). crossterm arrives via ratatui::crossterm so the
+# backend/event types are version-matched to the linked ratatui.
+ratatui = { version = "0.29", optional = true }
+crossterm = { version = "0.28", optional = true }

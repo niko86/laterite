@@ -17,9 +17,9 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use ags5db::registry::registry;
 use duckdb::Connection;
 use duckdb::types::Value as DuckValue;
+use laterite_ags5_db::registry::registry;
 use pyo3::exceptions::{PyFileNotFoundError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;

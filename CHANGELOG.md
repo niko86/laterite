@@ -7,12 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The **0.3.0** line — a DuckDB-engine redesign of the read / data-science surface. This is
-a **breaking** change (frame return types move from narwhals to polars / pandas); the 0.x
-version signals the surface is still settling.
+## [0.4.0] — 2026-06-16
+
+The **0.4.0** line — the DuckDB-engine redesign of the read / data-science surface, the
+`laterite-*` crate rebrand, and version unification. This is a **breaking** change (frame
+return types move from narwhals to polars / pandas; the validator CLI is renamed to
+`lat-check`); the 0.x version signals the surface is still settling.
 
 ### Added
 
+- **`laterite-ags5` now publishes to PyPI.** `pip install laterite[ags5]` resolves the
+  `.ags5db` companion wheel from PyPI (previously the companion shipped via GitHub release
+  only). The base `laterite` and `laterite-ags5` are separate PyPI projects with separate
+  trusted publishers; the `[ags5]` extra pulls the companion.
 - **In-memory DuckDB engine.** `laterite.read(path)` loads each AGS4 group into a
   born-typed table in a Python-owned in-memory DuckDB (the pip `duckdb` package, *not*
   bundled in the wheel), populated lazily per group on first touch:
@@ -37,6 +44,12 @@ version signals the surface is still settling.
 - `laterite.transport` (`pack` / `unpack` / `lock` / `unlock`) documented as
   **content-agnostic** — any file, not only `.ags5db`; a non-path arg now raises an
   actionable `TypeError`.
+- **Data → valid AGS4.** `laterite.emit_ags4(groups, *, edition, mode)` builds a
+  spec-correct AGS4 document from your own per-group polars / pandas frames (columns =
+  AGS headings) — the inverse of `read`, with `autofix` / `report` / `strict` modes and
+  per-edition UNIT/TYPE fill. A **base** feature, pyarrow-free for polars. The browser
+  gets the same producer via the wasm `to_ags4` / `to_ags4_ipc` exports and a web Export
+  tab.
 
 ### Changed
 
@@ -53,6 +66,11 @@ version signals the surface is still settling.
 - `Ags4File(...)` given a bad argument (e.g. a file path) now raises a clear `TypeError`
   pointing at `laterite.read()`, instead of failing several calls later with a cryptic
   `'PosixPath' object is not subscriptable`.
+- **BREAKING — the validator CLI command is renamed `ags4-check` → `lat-check`.** The wheel
+  console-script and the standalone Rust binary attached to the GitHub release are now
+  `lat-check` (the flags, JSON/NDJSON shape, and exit codes are unchanged). Re-invoke as
+  `lat-check delivery.ags --json`. Part of the crate-suite rebrand (the Rust crate is now
+  `laterite-ags4-check`); there is no `ags4-check` alias.
 
 ### Deprecated
 
@@ -60,7 +78,17 @@ version signals the surface is still settling.
   and `unlock` (was `file=`) is unified to `src=`. The old keyword names still work but
   emit a `DeprecationWarning` and will be removed in a future release.
 
-## [0.2.0] — 2026-06-08
+### Fixed
+
+- **Base install no longer reaches into the optional extras** (#111). On a plain
+  `pip install laterite` (no `[ags5]` / `[compat]`):
+  - `laterite.ags4.read_typed(path)` builds the typed PROJ graph on the base path — it
+    no longer routes through a temporary `.ags5db`, so it no longer pulls the `[ags5]`
+    (DuckDB) companion.
+  - `laterite.emit_ags4(...)` with a polars frame is pyarrow-free — it no longer round-
+    trips through DuckDB (whose polars ingest called `.to_arrow()`, pulling `[compat]`'s
+    pyarrow).
+  A regression guard exercises the whole base surface under a simulated base-only install.
 
 ### Changed
 
@@ -101,7 +129,7 @@ Initial public release.
   diff / peek, plus binary blob attachments. Adds ~50 MB to the install
   footprint (bundles DuckDB), kept out of the base wheel so AGS4-only
   users stay light.
-- **`ags5db` CLI binary** *(experimental)* — attached to the GitHub release for users who want the `.ags5db` toolchain without installing the Python wheel.
+- **`lat-db` CLI binary** *(experimental)* — attached to the GitHub release for users who want the `.ags5db` toolchain without installing the Python wheel.
 
 ### Known limitations
 
@@ -112,6 +140,7 @@ Initial public release.
 - 9 python-ags4 parity tests fail by design; see
   [`docs/parity-coverage-map.md`](docs/parity-coverage-map.md).
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/niko86/laterite/releases/tag/v0.4.0
 [0.2.0]: https://github.com/niko86/laterite/releases/tag/v0.2.0
 [0.1.0]: https://github.com/niko86/laterite/releases/tag/v0.1.0

@@ -10,7 +10,7 @@
     "dev": "vite",
     "prebuild": "node scripts/sync-dict.mjs",
     "build": "vite build",
-    "build:wasm": "wasm-pack build ../rust-packages/ags4-wasm --target web --release --out-dir \"$PWD/src/wasm\"",
+    "build:wasm": "wasm-pack build ../rust-packages/laterite-ags4-wasm --target web --release --out-dir \"$PWD/src/wasm\"",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

@@ -26,7 +26,7 @@ One clean-room Rust AGS4 engine, surfaced for every stack:
 |---|---|---|
 | **Python** | [`laterite`](https://pypi.org/project/laterite/) — PyPI | `pip install laterite` |
 | **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm | `npm install laterite` |
-| **Rust / CLI** | [`ags5db` + `ags4-check`](https://github.com/niko86/laterite/releases) | GitHub Releases |
+| **Rust / CLI** | [`lat-db` + `lat-check`](https://github.com/niko86/laterite/releases) | GitHub Releases |
 | **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser |
 
 ## Install
@@ -62,7 +62,7 @@ for loca in proj.locas:
 ```
 
 ```bash
-ags4-check delivery.ags --json
+lat-check delivery.ags --json
 ```
 
 ## Performance
@@ -80,7 +80,7 @@ exactly (2DP rounded to 2 decimals, valid `yyyy-mm-dd` dates).
 Real-world files look closer to this. ~15 baseline findings from
 fixed-cost rules:
 
-| Size | python-ags4 | `laterite.validate` | `ags4-check` (CLI) | speedup |
+| Size | python-ags4 | `laterite.validate` | `lat-check` (CLI) | speedup |
 |---:|---:|---:|---:|---:|
 |   512 KB |    84 ms |   **5 ms** |   10 ms | **17×** |
 |     5 MB |   489 ms |  **57 ms** |   61 ms |  **9×** |
@@ -93,7 +93,7 @@ numeric cells that fails AGS4 Rule 8 (TYPE precision). Every cell
 triggers a finding; exercises the validator's per-finding
 accumulation + output-rendering paths fully:
 
-| Size | python-ags4 | `laterite.validate` | `ags4-check` (CLI) | Findings | speedup |
+| Size | python-ags4 | `laterite.validate` | `lat-check` (CLI) | Findings | speedup |
 |---:|---:|---:|---:|---:|---:|
 |   512 KB |    90 ms |   **7 ms** |   13 ms |     1 129 | **13×** |
 |     5 MB |   547 ms |  **67 ms** |   92 ms |    11 485 |  **8×** |
@@ -103,12 +103,12 @@ accumulation + output-rendering paths fully:
 
 Notes on the CLI:
 
-- `ags4-check --json` writes findings to stdout as JSON
+- `lat-check --json` writes findings to stdout as JSON
   (~80 bytes/finding). On the worst-case 1 GB file (2.4 M findings)
   that's ~190 MB of JSON. The native PyO3 path skips this
   serialisation step — for "validate then process findings in
   Python", use `laterite.validate`; for "validate then pipe to
-  downstream tools", use `ags4-check`. On clean files the gap is
+  downstream tools", use `lat-check`. On clean files the gap is
   single-digit %.
 - Native PyO3 returns findings as a narwhals frame
   (`rep.findings`) or as a Python dict (`rep.by_rule()`); both pay

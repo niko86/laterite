@@ -60,11 +60,11 @@ from ._frames import (
 # python-ags4. A misidentified validator is much harder to debug than
 # a parity test failing.
 PYTHON_AGS4_COMPAT = "1.2.0"
-__version__ = f"0.3.0+compat.python-ags4.{PYTHON_AGS4_COMPAT}"
+__version__ = f"0.4.0+compat.python-ags4.{PYTHON_AGS4_COMPAT}"
 
 # Human-readable Metadata.Checker — same intent, prose form.
 _CHECKER_STRING = (
-    "laterite 0.3.0 — compat: python-ags4 1.2.0 — clean-room ags4_validator engine"
+    "laterite 0.4.0 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine"
 )
 
 # python-ags4 maps these version strings → bundled standard dict files;
@@ -635,7 +635,7 @@ def check_file(
     strings are translated into python-ags4's phrasings — what callers
     porting from python-ags4 want. Pass ``False`` to see laterite's
     own (more precise) wording, which is what the native API
-    (``laterite.Validator``) and the Rust ``ags4-check`` CLI return."""
+    (``laterite.Validator``) and the Rust ``lat-check`` CLI return."""
     dv = _dict_version_arg(standard_AGS4_dictionary)
 
     is_path = not hasattr(filepath_or_buffer, "read")
@@ -768,7 +768,7 @@ def AGS4_to_excel(
 ) -> None:
     """Convert an AGS4 file to an XLSX spreadsheet, one sheet per group.
 
-    Rust-backed via `ags5db::excel::ags4_to_excel` (uses
+    Rust-backed via `laterite_core::excel::ags4_to_excel` (uses
     `rust_xlsxwriter`); openpyxl never enters the dep graph. Output
     matches python-ags4's column layout: HEADING column first, AGS
     heading names as headers, UNIT / TYPE / DATA pseudo-rows
@@ -801,7 +801,7 @@ def AGS4_to_excel(
         ordered_keys = list(sort_groups(tables, sorting_strategy).keys())
 
     try:
-        _native.ags5db_ags4_to_excel(
+        _native.ags4_to_excel(
             str(input_file),
             str(output_file),
             ordered_keys,
@@ -820,7 +820,7 @@ def excel_to_AGS4(
 ) -> None:
     """Convert an XLSX (AGS4-shaped) back to an AGS4 file.
 
-    Rust-backed via `ags5db::excel::excel_to_ags4` (uses `calamine`).
+    Rust-backed via `laterite_core::excel::excel_to_ags4` (uses `calamine`).
     Each worksheet with a ``HEADING`` column becomes one AGS4 group.
     Columns not matching Rule 19's ``[A-Z0-9]{4}_[A-Z0-9]{1,4}`` regex
     are dropped (with a warning); rows whose HEADING isn't UNIT /
@@ -833,7 +833,7 @@ def excel_to_AGS4(
             re-formatted to their column's TYPE precision (``<N>DP``,
             ``<N>SCI``, ``<N>SF``) so floats from XLSX don't lose
             trailing zeros. Done in Rust via
-            ``ags5db::excel::apply_type_formatting``.
+            ``laterite_core::excel::apply_type_formatting``.
         dictionary: Optional bundled-edition version string or AGS4
             dict-file path. When provided, the XLSX is first converted
             to AGS4 via Rust, then the dictionary's UNIT/TYPE rows
@@ -848,7 +848,7 @@ def excel_to_AGS4(
             bundled version string nor an AGS4 dict file we can read.
     """
     try:
-        _native.ags5db_excel_to_ags4(
+        _native.excel_to_ags4(
             str(input_file),
             str(output_file),
             bool(format_numeric_columns),

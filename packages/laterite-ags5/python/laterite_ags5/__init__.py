@@ -1,12 +1,12 @@
 """laterite.ags5db — convert AGS4 text ↔ ``.ags5db`` and query the DB.
 
 The Python face of the Rust ``ags5db`` conversion engine
-(``rust-packages/ags5db/src/convert.rs``), exposed in-process through
+(``rust-packages/laterite-ags5-db/src/convert.rs``), exposed in-process through
 ``laterite._laterite_native`` — no subprocess, no temp files. Linking
 the engine pulls bundled libduckdb into the wheel (the deliberate
 "fatter wheel" of the staged-adoption plan); the validator half stays
 lean. ``.agsx`` retired in Stage F2a — it is now a Python-only
-inspection format produced by ``ags5_xml.ags4_to_agsx``.
+inspection format produced by ``laterite_ags5x.ags4_to_agsx``.
 
 Each call does the data work in Rust and returns a small stats dict.
 Failures raise ``RuntimeError`` whose message carries the same exit
@@ -158,7 +158,7 @@ def export(
 
 
 # `.agsx` ↔ `.ags5db` conversion retired in Stage F2a; `.agsx` is now
-# a Python-only inspection helper via `ags5_xml.ags4_to_agsx`.
+# a Python-only inspection helper via `laterite_ags5x.ags4_to_agsx`.
 
 
 # --- read-side query API --------------------------------------------
@@ -597,7 +597,7 @@ def validate(
       disagrees with the ingest path.
 
     Stage F2a-2b: Rust-backed replacement for the retired
-    ``ags5_xml.validation.validate_ags5db``.
+    ``laterite_ags5x.validation.validate_ags5db``.
     """
     raw = _native.ags5db_validate(str(db), check_abbr, check_dt)
     findings_data = json.loads(raw)

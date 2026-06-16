@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the Rust read-side `ags5db` CLI in release mode.
+# Build the Rust read-side `lat-db` CLI in release mode.
 #
 # Mac/Linux sibling of build-rust.ps1. The Rust binary is the small-
 # and-fast counterpart to the Python CLI (`ags5db-py`, installed via
@@ -11,7 +11,7 @@
 #     tools/build-rust.sh
 #
 # Output:
-#     dist/ags5db                          the canonical read-side binary
+#     dist/lat-db                          the canonical read-side binary
 #     rust-packages/target/release/        cargo build cache (gitignored)
 #
 # Requires: cargo (Rust toolchain). Installed via `rustup`. The first
@@ -25,13 +25,13 @@ repo=$(cd "$script_dir/.." && pwd)
 
 (
   cd "$repo/rust-packages"
-  # `--bin ags5db` builds only the binary crate. The sibling crates
+  # `--bin lat-db` builds only the binary crate. The sibling crates
   # in the workspace aren't needed for shipping the read-side CLI.
-  cargo build --release --bin ags5db
+  cargo build --release --bin lat-db
 )
 
-src="$repo/rust-packages/target/release/ags5db"
-dst="$repo/dist/ags5db"
+src="$repo/rust-packages/target/release/lat-db"
+dst="$repo/dist/lat-db"
 if [[ ! -f $src ]]; then
   echo "Build reported success but $src is missing." >&2
   exit 1

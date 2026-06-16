@@ -4,7 +4,7 @@ Exercises the in-process Rust ags5db engine (convert / export / query)
 exposed through laterite._laterite_native: an AGS4 -> .ags5db -> AGS4
 round trip preserves the group set, query primitives return the right
 shapes, and a missing source raises carrying the binary's exit code.
-`.agsx` retired in Stage F2a — see ags5_xml.ags4_to_agsx for the
+`.agsx` retired in Stage F2a — see laterite_ags5x.ags4_to_agsx for the
 surviving Python-only `.agsx` writer.
 """
 
@@ -16,7 +16,7 @@ import laterite
 import pytest
 from laterite import ags5db
 
-_FIX = Path(__file__).parents[3] / "rust-packages" / "ags4-validator" / "tests" / "fixtures"
+_FIX = Path(__file__).parents[3] / "rust-packages" / "laterite-ags4-validator" / "tests" / "fixtures"
 _CLEAN = _FIX / "clean_minimal.ags"
 
 
@@ -47,7 +47,7 @@ def test_round_trip_preserves_group_set(tmp_path: Path) -> None:
 
 
 # `.agsx` ↔ `.ags5db` conversion tests retired in Stage F2a; `.agsx` is
-# now a Python-only inspection helper via `ags5_xml.ags4_to_agsx`
+# now a Python-only inspection helper via `laterite_ags5x.ags4_to_agsx`
 # (covered by tests/test_ags4_to_agsx.py).
 
 

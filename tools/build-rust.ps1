@@ -1,4 +1,4 @@
-# Build the Rust read-side `ags5db` CLI in release mode.
+# Build the Rust read-side `lat-db` CLI in release mode.
 #
 # Why this script exists: the Rust binary is the small-and-fast counterpart
 # to the Python CLI (`ags5db-py`, installed via `uv tool install ./packages/ags5-db`).
@@ -9,7 +9,7 @@
 #     .\tools\build-rust.ps1
 #
 # Output:
-#     dist\ags5db.exe                       the canonical read-side binary
+#     dist\lat-db.exe                       the canonical read-side binary
 #     rust-packages\target\release\         cargo build cache (gitignored)
 #
 # Requires: cargo (Rust toolchain). Installed via `rustup`. The first
@@ -24,12 +24,12 @@ try {
     # ErrorActionPreference + pipeline-redirect makes that fatal. See the
     # same workaround in build-exe-pyapp.ps1.
     #
-    # `--bin ags5db` builds only the binary crate. The sibling
-    # `ags4-validator` placeholder is part of the workspace but not
+    # `--bin lat-db` builds only the binary crate. The sibling
+    # `laterite-ags4-validator` placeholder is part of the workspace but not
     # needed for shipping the CLI.
     $prev_ea = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
-    cargo build --release --bin ags5db
+    cargo build --release --bin lat-db
     $cargo_exit = $LASTEXITCODE
     $ErrorActionPreference = $prev_ea
     if ($cargo_exit -ne 0) {
@@ -40,8 +40,8 @@ finally {
     Pop-Location
 }
 
-$src = "rust-packages\target\release\ags5db.exe"
-$dst = "dist\ags5db.exe"
+$src = "rust-packages\target\release\lat-db.exe"
+$dst = "dist\lat-db.exe"
 if (-not (Test-Path $src)) {
     Write-Error "Build reported success but $src is missing."
     exit 1

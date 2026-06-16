@@ -1,6 +1,6 @@
 """Generate `_laterite_native.pyi` from the AGS5 dictionary.
 
-Reads `rust-packages/ags5-core/data/ags5_dictionary.json` and emits the
+Reads `rust-packages/laterite-core/data/ags5_dictionary.json` and emits the
 type-stub file that sits next to the compiled `_laterite_native.so`,
 giving IDE autocomplete and mypy/pyright type-checking on the 92
 standard typed-graph classes.
@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DICT_JSON = REPO_ROOT / "rust-packages" / "ags5-core" / "data" / "ags5_dictionary.json"
+DICT_JSON = REPO_ROOT / "rust-packages" / "laterite-core" / "data" / "ags5_dictionary.json"
 OUT_PYI = (
     REPO_ROOT
     / "packages"
@@ -36,7 +36,7 @@ OUT_PYI = (
 
 
 # AGS type → Python type literal in the stub. Mirrors
-# `rust_type` in build.rs and `canonical_type` in ags5db::ags_types.
+# `rust_type` in build.rs and `canonical_type` in laterite_core::ags_types.
 _STRING_TYPES = {"ID", "X", "PA", "PT", "PU", "T", "U", "DMS", "MC", "XN"}
 
 
@@ -116,7 +116,7 @@ def generate() -> str:
     groups_sorted = sorted(groups, key=lambda g: g["code"])
 
     header = (
-        "# AUTO-GENERATED from rust-packages/ags5-core/data/ags5_dictionary.json\n"
+        "# AUTO-GENERATED from rust-packages/laterite-core/data/ags5_dictionary.json\n"
         "# DO NOT EDIT BY HAND. Regenerate via:\n"
         "#   uv run python tools/generate_pyi.py\n"
         "#\n"

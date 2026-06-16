@@ -1,13 +1,13 @@
 # PyO3 binding crate: the Python face of the clean-room AGS4 engine.
 #
 # This is the ONLY crate in the workspace that links pyo3. It depends
-# on `ags4-validator` (never the reverse) — exactly the wrapper
+# on `laterite-ags4-validator` (never the reverse) — exactly the wrapper
 # phf+thiserror+chrono dep-graph guarantee is untouched. The compiled
 # cdylib is loaded by Python as `laterite._laterite_native` (see
 # packages/laterite/pyproject.toml [tool.maturin]).
 #
 # Boundary shape (1.0 phase 1): the READ path emits typed Apache Arrow per
-# group — Rust builds the RecordBatch (ags5-types::arrow_cols) and hands it
+# group — Rust builds the RecordBatch (laterite-types::arrow_cols) and hands it
 # over zero-copy as an Arrow PyCapsule via pyo3-arrow, which polars ingests
 # pyarrow-free. This is abi3-safe (the Arrow C Data Interface + capsules,
 # NOT the pyo3-polars ABI coupling the design doc flagged) so the single
@@ -17,10 +17,10 @@
 
 [package]
 name = "laterite-py"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 rust-version = "1.85"
-description = "PyO3 bindings exposing the clean-room ags4-validator engine to Python (laterite)"
+description = "PyO3 bindings exposing the clean-room laterite-ags4-validator engine to Python (laterite)"
 license = "MIT"
 publish = false
 build = "build.rs"
@@ -35,23 +35,23 @@ name = "_laterite_native"
 crate-type = ["cdylib"]
 
 [dependencies]
-ags4-validator = { path = "../ags4-validator" }
-# S3b (release/v0.1.0-prep): pure-string AGS modules from ags5-core —
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# S3b (release/v0.1.0-prep): pure-string AGS modules from laterite-core —
 # registry, ags_types, transport, excel, ddl, ags4_codec, ags4_writer,
 # error. No DuckDB. The DuckDB-bound ags5db_fns + typed_graph read/write
 # moved to the separate `laterite-py-ags5` cdylib that ships in the
 # `laterite[ags5]` extra wheel.
-ags5-core = { path = "../ags5-core" }
+laterite-core = { path = "../laterite-core" }
 # The shared AGS4 emit orchestrator (typed cells -> valid AGS4 + AutoFix).
 # The emit_ags4_from_arrow binding (emit_typed.rs) feeds it Arrow tables
 # DuckDB hands over pyarrow-free — the read boundary reversed. The `arrow`
 # feature pulls the shared Arrow→Value transpose (group_from_arrow) so the
 # native + wasm hosts share one conversion.
-ags4-emit = { path = "../ags4-emit", features = ["arrow"] }
+laterite-ags4-emit = { path = "../laterite-ags4-emit", features = ["arrow"] }
 # Direct dep for the shared typed-Arrow column builder (`arrow_cols`, behind
 # the `arrow` feature). Phase 1 of the 1.0 redesign emits typed Arrow per
 # group on the read path — the SAME emitter the wasm explorer frames as IPC.
-ags5-types = { path = "../ags5-types", features = ["arrow"] }
+laterite-types = { path = "../laterite-types", features = ["arrow"] }
 # arrow 59 (matching pyo3-arrow 0.18) for the emit *consume* direction:
 # read each cell out of the RecordBatch DuckDB streams in. ArrayFormatter
 # (default features) is the robust fallback for temporal/decimal columns.
@@ -62,17 +62,17 @@ arrow = "59"
 # The floor is 3.12, not lower, because the generated #[pyclass(dict)] classes
 # need the 3.12 limited API (`dict` isn't exposed below it). Proven on
 pyo3 = { version = "0.28", features = ["extension-module", "chrono", "abi3-py312"] }
-# Zero-copy Arrow boundary for the read path: wraps the RecordBatch ags5-types
+# Zero-copy Arrow boundary for the read path: wraps the RecordBatch laterite-types
 # builds and hands it to Python as an Arrow PyCapsule (PyTable ->
 # __arrow_c_stream__), which polars ingests pyarrow-free. arrow 59 + pyo3 0.28
 # match our pins; the capsule protocol is the Arrow C Data Interface (NOT the
 # pyo3-polars ABI coupling), so the single cp312-abi3 wheel still holds.
 pyo3-arrow = "0.18"
-# MUST mirror ags4-validator's serde_json feature set: the CLI's
+# MUST mirror laterite-ags4-validator's serde_json feature set: the CLI's
 # `--json` output is built with `preserve_order` (insertion-ordered
 # Map). Byte-faithful CLI JSON parity depends on this matching.
 serde_json = { version = "1", features = ["preserve_order"] }
-# `chrono` is already transitive via ags5-core (used by ags_types.rs).
+# `chrono` is already transitive via laterite-core (used by ags_types.rs).
 # Naming it explicitly so the `chrono` feature on pyo3 has a matched
 # direct dep — that feature gives us IntoPyObject for NaiveDateTime /
 # NaiveDate / NaiveTime so `parse_value` returns native Python
@@ -80,12 +80,12 @@ serde_json = { version = "1", features = ["preserve_order"] }
 chrono = "0.4"
 # Stage 7b: encoding name → `&'static encoding_rs::Encoding` lookup
 # for the `encoding=` kwarg on `run_check` / `parse_primitives`. The
-# crate is already a direct dep of `ags4-validator`, so no new
+# crate is already a direct dep of `laterite-ags4-validator`, so no new
 # transitive surface — declaring it here lets `lib.rs` call
 # `encoding_rs::Encoding::for_label` directly without re-exports.
 encoding_rs = "0.8"
 
 # Used only by build.rs (Stage F2b-1 typed-graph codegen — reads
-# ../ags5-core/data/ags5_dictionary.json and emits OUT_DIR/typed_groups.rs).
+# ../laterite-core/data/ags5_dictionary.json and emits OUT_DIR/typed_groups.rs).
 [build-dependencies]
 serde_json = "1"

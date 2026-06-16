@@ -1,7 +1,7 @@
 [project]
 name = "laterite-workspace"
-version = "0.2.0"
-description = "uv workspace root for laterite + laterite-ags5"
+version = "0.4.0"
+description = "uv workspace root for the laterite AGS toolkit (dev monorepo aggregator; ships no wheel)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -24,7 +24,7 @@ laterite-ags5 = { workspace = true }
 # marimo / altair / vegafusion / vl-convert-python (the retired
 # format-comparison dashboards) and pyinstaller / nuitka (the dropped
 # Python-binary packaging) were removed here: the format question is
-# settled (.ags5db) and Rust `ags5db` is the sole shipped binary.
+# settled (.ags5db) and Rust `lat-db` is the sole shipped binary.
 # pandas<3 stays — python-ags4 needs it and ags5_ags4/codec.py imports
 # it directly.
 dev = [
@@ -99,7 +99,7 @@ parallel = true
 [tool.ruff]
 line-length = 88
 # py314, NOT py312: ruff lints the WHOLE workspace, which includes the unshipped
-# ags5-xml — it uses `compression.zstd` (PEP 784), a 3.14-only stdlib module.
+# laterite-ags5x — it uses `compression.zstd` (PEP 784), a 3.14-only stdlib module.
 # Lowering to py312 makes ruff reclassify `compression` as non-stdlib and flag
 # those files' import blocks as mis-sorted (I001). The shipped wheels DO target
 # 3.12 (abi3-py312 / requires-python >=3.12), but that floor is enforced by the
@@ -133,7 +133,7 @@ ignore = [
 #   uv run bump-my-version bump --new-version 0.2.0rc1   # explicit pre-release
 #   uv run bump-my-version bump minor --dry-run -v       # preview, no writes
 [tool.bumpversion]
-current_version = "0.2.0"
+current_version = "0.4.0"
 # Parse accepts PEP 440 canonical pre-releases (0.2.0rc1 / 0.2.0dev1, no hyphen
 # — PyPI rejects hyphens) so an explicit `bump --new-version 0.2.0rc1` round-
 # trips. `bump major|minor|patch` produces a FINAL release (e.g. 0.2.0); cut a
@@ -164,6 +164,14 @@ replace = 'version = "{new_version}"'
 
 [[tool.bumpversion.files]]
 filename = "packages/laterite-ags5/pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+# laterite-ags5x: UNSHIPPED dev-only package (the .agsx writer/validator; needs
+# py3.14, not in the public tree). Stamped here purely to keep its version
+# aligned with the suite — no scatter, no future drift — NOT because it ships.
+[[tool.bumpversion.files]]
+filename = "packages/laterite-ags5x/pyproject.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
@@ -203,3 +211,14 @@ replace = "## [Unreleased]\n\n## [{new_version}] — {now:%Y-%m-%d}"
 filename = "CHANGELOG.md"
 search = "compare/v{current_version}...HEAD"
 replace = "compare/v{new_version}...HEAD\n[{new_version}]: https://github.com/niko86/laterite/releases/tag/v{new_version}"
+
+# Rust crate suite: single-sourced via [workspace.package] version (every
+# member inherits it with version.workspace = true). Stamped here so a
+# `bump-my-version bump` moves the engine crates + both binaries (lat-check,
+# lat-db) in lockstep with the Python wheels — preventing the kind of
+# Python/Rust version drift this single-sourcing fixed. The only
+# `version = "X"` literal in that file is the [workspace.package] line.
+[[tool.bumpversion.files]]
+filename = "rust-packages/Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'

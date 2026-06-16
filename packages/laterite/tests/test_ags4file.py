@@ -21,7 +21,7 @@ from laterite import _laterite_native as _native
 _FIX = (
     Path(__file__).resolve().parents[3]
     / "rust-packages"
-    / "ags4-validator"
+    / "laterite-ags4-validator"
     / "tests"
     / "fixtures"
 )

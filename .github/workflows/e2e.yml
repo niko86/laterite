@@ -13,9 +13,9 @@ name: e2e (web)
 on:
   push:
     branches: [main]
-    paths: ["web/**", "rust-packages/ags4-wasm/**", ".github/workflows/e2e.yml"]
+    paths: ["web/**", "rust-packages/laterite-ags4-wasm/**", ".github/workflows/e2e.yml"]
   pull_request:
-    paths: ["web/**", "rust-packages/ags4-wasm/**", ".github/workflows/e2e.yml"]
+    paths: ["web/**", "rust-packages/laterite-ags4-wasm/**", ".github/workflows/e2e.yml"]
   workflow_dispatch:
     inputs:
       runner:
@@ -93,7 +93,7 @@ jobs:
         run: command -v wasm-pack >/dev/null 2>&1 || cargo install wasm-pack --locked
 
       - name: Build wasm (release)
-        run: wasm-pack build rust-packages/ags4-wasm --target web --release --out-dir "$GITHUB_WORKSPACE/web/src/wasm"
+        run: wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir "$GITHUB_WORKSPACE/web/src/wasm"
 
       - name: sccache stats
         if: always()

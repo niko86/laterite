@@ -86,7 +86,7 @@ describe("validate → Report", () => {
 
     const byRule = rep.byRule();
     expect(Object.keys(byRule).length).toBeGreaterThan(0);
-    // toJson is byte-faithful to `ags4-check --json` (produced native-side).
+    // toJson is byte-faithful to `lat-check --json` (produced native-side).
     const parsed = JSON.parse(rep.toJson());
     expect(parsed).toHaveProperty("findings");
     expect(rep.toNdjson().trimEnd().split("\n").length).toBe(rep.count);

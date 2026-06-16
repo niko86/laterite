@@ -1,0 +1,49 @@
+# laterite-types — the AGS type system as a wasm-safe leaf crate.
+#
+# Extracted from `laterite-core/src/ags_types.rs` (Phase 2 of the AGS4
+# validator wasm site) so it can be the SINGLE source of AGS typing for
+# both the native DuckDB engine (`laterite-core` → `ags5db`) and the browser
+# data explorer (`laterite-ags4-wasm`). The explorer casts a file *identically*
+# to a `.ags5db` because it calls the same `parse_value` / `parse_datetime`.
+#
+# Deliberately tiny + wasm-safe: only chrono (no clock, no wasmbind) +
+# serde_json. None of laterite-core's wasm-hostile deps (age/zstd/calamine/
+# rpassword/csv) — those live in other laterite-core modules, not here.
+
+[package]
+name = "laterite-types"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "AGS4 type system (canonical types + permissive value casting) — DuckDB-free, wasm-safe"
+license = "MIT"
+publish = false
+
+[dependencies]
+# Calendar/clock-free date parsing for canonical-type casting. `std`
+# (which implies `alloc`) is enough for parse_from_str + format!-to-
+# String; no `clock`/`wasmbind` so the crate is wasm-safe. Matches the
+# minimal chrono laterite-ags4-validator uses.
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+# parse_value returns serde_json::Value (scalar shapes only — no Maps,
+# so no preserve_order needed here; the native side unifies its own).
+serde_json = "1"
+# Typed Arrow column building (arrow_cols), behind the `arrow` feature.
+# Optional + default-features=false so non-Arrow consumers (laterite-core,
+# ags5db) don't pull it: only the core array/schema/record_batch crates,
+# no csv/json/ipc/prettyprint. The two emitters add what they need on top
+# (laterite-ags4-wasm enables `ipc` for the StreamWriter; laterite-py pairs it with
+# pyo3-arrow). v59 matches pyo3-arrow 0.18 so one build serves both hosts.
+arrow = { version = "59", default-features = false, optional = true }
+
+[features]
+# Typed Apache Arrow emission (the `arrow_cols` module).
+arrow = ["dep:arrow"]
+
+[dev-dependencies]
+# Property-based tests (round-trip / never-panic / idempotence) for the
+# permissive value caster + canonical-type resolver. dev-only: proptest
+# pulls rand + a few small crates, none of which touch the wasm-safe
+# runtime dep-graph. The moved unit tests still use only chrono +
+# serde_json + std.
+proptest = "1"

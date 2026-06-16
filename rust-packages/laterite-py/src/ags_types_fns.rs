@@ -1,4 +1,4 @@
-//! PyO3 wrappers over `ags5_core::ags_types`.
+//! PyO3 wrappers over `laterite_core::ags_types`.
 //!
 //! `parse_value` / `canonical_type` / `display_hint` route through Rust
 //! so the conversion engine and Python ingest paths share one
@@ -12,7 +12,7 @@
 //! gives us `IntoPyObject` for `NaiveDateTime` / `NaiveDate` /
 //! `NaiveTime` — no manual `PyDateTime` boilerplate needed.
 
-use ags5_core::ags_types::{
+use laterite_core::ags_types::{
     CanonicalType, canonical_type as rs_canonical_type, display_hint as rs_display_hint,
 };
 

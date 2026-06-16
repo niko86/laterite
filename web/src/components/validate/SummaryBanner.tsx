@@ -96,7 +96,7 @@ export const SummaryBanner: Component<{
                   of {props.report.finding_count.toLocaleString()} findings
                   (capped per rule to keep the page responsive). Download the
                   full report below, or for very large files use the{" "}
-                  <code class="mono">ags4-check</code> CLI.
+                  <code class="mono">lat-check</code> CLI.
                 </p>
               </Show>
             </div>
