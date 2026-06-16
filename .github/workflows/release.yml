@@ -105,7 +105,7 @@ jobs:
           # on the Mac (native ARM) is the cleanest provisioning path.
           - os: macos-latest
             target: aarch64-apple-darwin
-          - os: windows-latest
+          - os: windows-2022
             target: x86_64-pc-windows-msvc
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -288,7 +288,7 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
             ext: ""
-          - os: windows-latest
+          - os: windows-2022
             target: x86_64-pc-windows-msvc
             ext: .exe
     steps:
@@ -568,7 +568,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
           - os: macos-latest
             target: aarch64-apple-darwin
-          - os: windows-latest
+          - os: windows-2022
             target: x86_64-pc-windows-msvc
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
