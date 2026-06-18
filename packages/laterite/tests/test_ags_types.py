@@ -1,7 +1,7 @@
 """Unit + property tests for `laterite.ags_types`.
 
 `canonical_type` / `display_hint` are thin Python wrappers over the Rust
-`laterite-core` type system; the value here is pinning the *contract* the
+`laterite-ags4-core` type system; the value here is pinning the *contract* the
 Python callers depend on (the `CanonicalType` identity, the `ValueError`
 on unknown codes, the printf-style display hints) plus a totality
 property over `parse_value` — the single ingest entry point that must

@@ -136,13 +136,21 @@ jobs:
       # the release profile's thin-LTO + codegen-units=1 just burned compile time
       # — and debug shares `target/debug` with the python job's maturin build, so
       # bundled DuckDB compiles ONCE per change instead of twice.
+      # laterite-duckdb is ALSO excluded: it's a DuckDB *loadable* extension,
+      # so its libduckdb-sys is built with `loadable-extension` (host-resolved
+      # C API via a dispatch table) — mutually exclusive with the *bundled*
+      # DuckDB the rest of the workspace links (laterite-ags5-db /
+      # laterite-py-ags5). Co-building unifies the feature and routes bundled
+      # calls through an uninitialised dispatch table ("DuckDB API not
+      # initialized"). It's built + tested in isolation below, where `-p`
+      # resolves only its loadable subgraph.
       - name: cargo clippy
         working-directory: rust-packages
-        run: cargo clippy --workspace --exclude laterite-ags4-wasm -- -D warnings
+        run: cargo clippy --workspace --exclude laterite-ags4-wasm --exclude laterite-duckdb -- -D warnings
 
       - name: cargo test
         working-directory: rust-packages
-        run: cargo test --workspace --exclude laterite-ags4-wasm
+        run: cargo test --workspace --exclude laterite-ags4-wasm --exclude laterite-duckdb
 
       # laterite-ags4-wasm is excluded from the workspace clippy/test above only
       # because compiling wasm-bindgen macro output under `-D warnings`
@@ -152,6 +160,17 @@ jobs:
       - name: cargo test (laterite-ags4-wasm parity)
         working-directory: rust-packages
         run: cargo test -p laterite-ags4-wasm
+
+      # laterite-duckdb in isolation: clippy + the load/read_ags E2E. The
+      # script builds the loadable cdylib, then LOADs it into an in-process
+      # DuckDB (quack-rs `bundled-test` InMemoryDb) and exercises read_ags —
+      # so the table function's runtime behaviour is verified, not just its
+      # compile. `-p` here keeps libduckdb-sys on the loadable path.
+      - name: laterite-duckdb (clippy + load/read_ags E2E)
+        working-directory: rust-packages
+        run: |
+          cargo clippy -p laterite-duckdb -- -D warnings
+          ../tools/test-duckdb-ext.sh
 
       # sccache hit/miss visibility (no-op if sccache isn't on this runner).
       - name: sccache stats
@@ -283,7 +302,8 @@ jobs:
           cargo llvm-cov --no-report --workspace \
             --exclude laterite-ags4-wasm \
             --exclude laterite-py \
-            --exclude laterite-py-ags5
+            --exclude laterite-py-ags5 \
+            --exclude laterite-duckdb
 
       - name: cargo llvm-cov (line-coverage floor)
         working-directory: rust-packages
@@ -425,7 +445,7 @@ jobs:
         # silently skipping, and local + CI agree (~83%) — the old "local
         # over-reports because the sibling clone is absent in CI" caveat is
         # gone. (compat.py's remaining uncovered blocks are Rust-backed Excel
-        # I/O — covered in laterite-core/excel.rs, not via Python.)
+        # I/O — covered in laterite-ags4-core/excel.rs, not via Python.)
         run: |
           # The root `tests/` (the laterite-ags5x suite) is private-only — it's
           # blocklisted from the public mirror (niko86/laterite) — so include it

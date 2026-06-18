@@ -1,6 +1,6 @@
 //! AGS4 emitter — the byte-level writer (counterpart to the validator's
-//! reader). Moved here from `laterite-core::ags4_writer` so the browser host
-//! can reach it without pulling all of `laterite-core`.
+//! reader). Moved here from `laterite-ags4-core::ags4_writer` so the browser host
+//! can reach it without pulling all of `laterite-ags4-core`.
 //!
 //! Writes a sequence of group sections to AGS4 plaintext:
 //!

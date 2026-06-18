@@ -7,19 +7,26 @@ description = "Read-side CLI for AGS5 .ags5db files (Rust port of ags5db-py)"
 license = "MIT"
 
 [dependencies]
-# S3a (release/v0.1.0-prep): pure-string AGS modules moved to laterite-core.
-# Re-exported via `pub use laterite_core::…;` in lib.rs for source compat.
-# Carries the deps that moved with them: zstd, age, rpassword, secrecy,
-# rust_xlsxwriter, calamine — now transitive via this dep.
-laterite-core = { path = "../laterite-core" }
+# S3a (release/v0.1.0-prep): pure-string AGS modules moved to laterite-ags4-core.
+# Re-exported via `pub use laterite_ags4_core::…;` in lib.rs for source compat.
+# Carries the deps that moved with them: zstd, age, rpassword, secrecy —
+# now transitive via this dep. (Excel I/O + its calamine/rust_xlsxwriter
+# moved out to the laterite-excel crate, 2026-06-18; ags5-db never used it.)
+laterite-ags4-core = { path = "../laterite-ags4-core" }
 # Rust-native AGS4 validator (this workspace). Powers
 # `db-to-ags4 --validate` — emit + verify in one pass, no Python.
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
-# `~1.4`, NOT a plain `1.4`: the duckdb crate's `1.MAJOR_MINOR_PATCH.x` scheme means a
-# caret `1.4` resolves up to `1.10503.x` (engine 1.5.3) — a `cargo update` would
-# silently leave the 1.4.x LTS line the bundled CLI engine must hold. Tilde pins 1.4.x.
-# Bump deliberately (dependabot/manual) when moving the LTS floor.
-duckdb = { version = "~1.4", features = ["bundled"] }
+# The AGS4 emitter leaf — convert.rs's db-to-ags4 uses write_ags4 / EmitGroup
+# directly now that laterite-ags4-core's `ags4_writer` re-export shim is retired.
+laterite-ags4-emit = { path = "../laterite-ags4-emit" }
+# `~1.10503` (DuckDB engine 1.5.3), NOT a caret: the duckdb crate's
+# `1.MAJOR_MINOR_PATCH.x` scheme means a caret would let `cargo update` silently
+# jump engine minor/patch lines. The tilde pins the bundled engine to the 1.5.3
+# line (crate-patch updates only). Bump deliberately when moving the floor.
+# Moved 1.4.x → 1.5.3 on 2026-06-17 (owner decision) to unify the whole stack on
+# one DuckDB version with the laterite_ags4 loadable extension, whose remote/
+# httpfs reads require DuckDB 1.5's virtual filesystem (C Extension API ≥ 1.5).
+duckdb = { version = "~1.10503", features = ["bundled"] }
 clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
 serde = { version = "1", features = ["derive"] }
 # preserve_order keeps JSON output keys in insertion order, matching Python's
@@ -43,7 +50,7 @@ uuid = { version = "1", features = ["v7", "fast-rng"] }
 # sha2/hex remain direct in ags5db — the DuckDB-bound modules
 # (attachments.rs blob hashing, convert.rs row-hash dedup) use them.
 # The pure-string side that also uses them (ags4_writer) moved to
-# laterite-core which has its own direct dep.
+# laterite-ags4-core which has its own direct dep.
 sha2 = "0.10"
 hex = "0.4"
 # Live progress indicator for the long-running write commands. The
@@ -52,7 +59,7 @@ hex = "0.4"
 indicatif = "0.17"
 # `commands/lock.rs` prompts for a passphrase via TTY. Direct dep
 # because the binary owns the prompt; the encryption itself lives
-# in laterite-core::transport via the `age` crate (transitive there).
+# in laterite-ags4-core::transport via the `age` crate (transitive there).
 rpassword = "7"
 
 [dev-dependencies]

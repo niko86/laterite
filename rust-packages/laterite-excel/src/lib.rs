@@ -1,5 +1,13 @@
-//! AGS4 ↔ XLSX conversion — Rust-backed Excel I/O for
-//! `laterite.compat.AGS4_to_excel` and `laterite.compat.excel_to_AGS4`.
+//! `laterite-excel` — AGS4 ↔ XLSX conversion (Rust-backed Excel I/O for
+//! `laterite.compat.AGS4_to_excel` / `excel_to_AGS4`).
+//!
+//! ⚠️ ROUGH EXTRACTION (2026-06-18): lifted verbatim out of
+//! `laterite-ags4-core::excel` so `laterite-ags4-core` sheds `calamine` +
+//! `rust_xlsxwriter` — ~1.5 MB that every core consumer which never touches
+//! Excel was carrying (the DuckDB extension, `laterite-ags5-db`, `ags4-perf`).
+//! The logic is unchanged. **FLAGGED FOR REWRITE**: today this is
+//! AGS4-specific (one sheet per group, AGS4 UNIT/TYPE pseudo-rows); the
+//! intent is to rewrite it into a proper, general-purpose Excel library.
 //!
 //! Mirrors python-ags4's openpyxl-based implementation but uses two
 //! pure-Rust crates: `rust_xlsxwriter` for writing and `calamine` for
@@ -16,9 +24,9 @@ use std::path::Path;
 use calamine::{Data, Reader, open_workbook_auto};
 use rust_xlsxwriter::Workbook;
 
-use crate::ags4_codec::{AgsGroup, read_ags4};
-use crate::ags4_writer::{EmitGroup, write_ags4};
-use crate::error::CliError;
+use laterite_ags4_core::ags4_codec::{AgsGroup, read_ags4};
+use laterite_ags4_core::error::CliError;
+use laterite_ags4_emit::{EmitGroup, write_ags4};
 
 /// Stats returned by both conversion helpers. The PyO3 layer surfaces
 /// these as a dict on the Python side.

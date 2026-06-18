@@ -8,7 +8,7 @@
 
 use std::path::PathBuf;
 
-use laterite_core::excel::ExcelStats;
+use laterite_excel::ExcelStats;
 use pyo3::Bound;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
@@ -36,7 +36,7 @@ fn ags4_to_excel<'py>(
     output_file: &str,
     ordered_keys: Option<Vec<String>>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let stats = laterite_core::excel::ags4_to_excel(
+    let stats = laterite_excel::ags4_to_excel(
         &PathBuf::from(input_file),
         &PathBuf::from(output_file),
         ordered_keys,
@@ -53,7 +53,7 @@ fn excel_to_ags4<'py>(
     output_file: &str,
     format_numeric_columns: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let stats = laterite_core::excel::excel_to_ags4(
+    let stats = laterite_excel::excel_to_ags4(
         &PathBuf::from(input_file),
         &PathBuf::from(output_file),
         format_numeric_columns,

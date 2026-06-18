@@ -9,7 +9,6 @@ use std::io::Cursor;
 use std::path::Path;
 
 use arrow::ipc::reader::StreamReader;
-use arrow::ipc::writer::StreamWriter;
 use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};
 use laterite_ags4_validator::parse::{ParsedFile, parse_file_with_encoding, parse_str};
@@ -141,28 +140,13 @@ impl Reading {
         let Some(group) = self.parsed.groups.get(&code) else {
             return Ok(None);
         };
-        let batch = laterite_types::arrow_cols::build_record_batch(
+        let buf = laterite_types::ipc::build_group_ipc(
             &group.headings,
             &group.types,
             group.rows.len(),
-            |col, row| {
-                group
-                    .rows
-                    .get(row)
-                    .and_then(|r| r.values.get(col))
-                    .map(String::as_str)
-            },
+            |col, row| group.cell(col, row),
         )
-        .map_err(|e| Error::from_reason(format!("arrow batch for {code}: {e}")))?;
-        let schema = batch.schema();
-        let mut buf = Vec::new();
-        let mut w = StreamWriter::try_new(&mut buf, &schema)
-            .map_err(|e| Error::from_reason(format!("arrow ipc for {code}: {e}")))?;
-        w.write(&batch)
-            .map_err(|e| Error::from_reason(format!("arrow ipc for {code}: {e}")))?;
-        w.finish()
-            .map_err(|e| Error::from_reason(format!("arrow ipc for {code}: {e}")))?;
-        drop(w);
+        .map_err(|e| Error::from_reason(format!("arrow ipc for {code}: {e}")))?;
         Ok(Some(buf.into()))
     }
 

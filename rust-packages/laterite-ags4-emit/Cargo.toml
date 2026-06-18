@@ -3,7 +3,7 @@
 # Builds valid AGS4 plaintext from typed/string cell data, for BOTH the
 # native (PyO3) and browser (wasm) hosts over one shared orchestrator.
 # Extracted as a leaf so `laterite-ags4-wasm` can produce AGS4 without depending
-# on all of `laterite-core` (which drags age/zstd/calamine/rust_xlsxwriter —
+# on all of `laterite-ags4-core` (which drags age/zstd/calamine/rust_xlsxwriter —
 # wasm-hostile). It also lifts the AGS4 *writer* out of the "ags5"-named
 # core, the first concrete step toward relieving that naming/scope smell.
 #

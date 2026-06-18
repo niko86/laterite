@@ -1,4 +1,4 @@
-//! PyO3 wrappers over the `laterite_core::registry` module.
+//! PyO3 wrappers over the `laterite_ags4_core::registry` module.
 //!
 //! Read-only at this stage (D2 of
 //! the static Rust registry to Python as JSON-shaped data so a thin
@@ -10,7 +10,7 @@
 //! Mutation (`register` / passthrough auto-registration) stays Python-
 //! side as an overlay merged with this base — see D4a in the plan.
 
-use laterite_core::registry::{ancestor_chain, inherited_key_names, registry};
+use laterite_ags4_core::registry::{ancestor_chain, inherited_key_names, registry};
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;

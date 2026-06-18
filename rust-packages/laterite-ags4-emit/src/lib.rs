@@ -3,8 +3,8 @@
 //! One shared, host-agnostic orchestrator ([`emit_ags4`]) over two thin
 //! frontends (the native PyO3 binding and the browser wasm binding). The
 //! byte-level [`write_ags4`] writer lives here too (moved out of
-//! `laterite-core` so the wasm host can reach it without the wasm-hostile
-//! `laterite-core` deps).
+//! `laterite-ags4-core` so the wasm host can reach it without the wasm-hostile
+//! `laterite-ags4-core` deps).
 //!
 
 #[cfg(feature = "arrow")]

@@ -11,7 +11,7 @@
 
 use std::collections::HashSet;
 
-use laterite_core::registry::Registry;
+use laterite_ags4_core::registry::Registry;
 
 /// Parent-before-child group ordering. Mirrors Python's
 /// `_topological_order` — a depth-first walk from each group, visiting
@@ -41,7 +41,7 @@ pub fn topological_order(registry: &Registry) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use laterite_core::registry::registry;
+    use laterite_ags4_core::registry::registry;
 
     #[test]
     fn topological_order_proj_first() {

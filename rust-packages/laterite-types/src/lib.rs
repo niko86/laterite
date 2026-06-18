@@ -17,10 +17,16 @@ use serde_json::{Number, Value};
 
 // Typed Arrow column/record-batch building. Behind the `arrow` feature so
 // laterite-types stays a tiny wasm-safe leaf for consumers that only need the
-// type system (laterite-core → ags5db). Enabled by the two hosts that emit
+// type system (laterite-ags4-core → ags5db). Enabled by the two hosts that emit
 // Arrow: laterite-ags4-wasm (→ IPC stream) and laterite-py (→ zero-copy capsule).
 #[cfg(feature = "arrow")]
 pub mod arrow_cols;
+// Frame a typed group as a single-batch Arrow IPC stream — the shared
+// composition (build_record_batch + StreamWriter) laterite-node and
+// laterite-ags4-wasm both need. Parser-agnostic (closure-fed), so the leaf
+// gains no parser dependency.
+#[cfg(feature = "arrow")]
+pub mod ipc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CanonicalType {

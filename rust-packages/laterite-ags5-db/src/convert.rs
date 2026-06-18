@@ -21,13 +21,15 @@ use crate::ddl::build_ddl;
 use crate::spec_tables::write_spec;
 use crate::uuid7;
 use crate::writer::topological_order;
-use laterite_core::ags_types::{
+use laterite_ags4_core::ags_types::{
     CanonicalType, ags4_str, canonical_type, parse_value, truncate_dt_to_unit,
 };
-use laterite_core::ags4_codec::read_ags4;
-use laterite_core::ags4_writer::{EmitGroup, write_ags4};
-use laterite_core::error::CliError;
-use laterite_core::registry::{GroupDescriptor, Heading, Registry, inherited_key_names, registry};
+use laterite_ags4_core::ags4_codec::read_ags4;
+use laterite_ags4_core::error::CliError;
+use laterite_ags4_core::registry::{
+    GroupDescriptor, Heading, Registry, inherited_key_names, registry,
+};
+use laterite_ags4_emit::{EmitGroup, write_ags4};
 
 // ---------------------------------------------------------------------
 // ags4-to-db conversion (moved from commands/ags4_to_db.rs, PR-B0a)
@@ -257,7 +259,7 @@ impl CodecCtx {
 ///     the L-group CSV path.
 fn build_passthrough_descriptors(
     reg: &Registry,
-    parsed: &laterite_core::ags4_codec::ParsedAgs4,
+    parsed: &laterite_ags4_core::ags4_codec::ParsedAgs4,
 ) -> Vec<GroupDescriptor> {
     let mut out: Vec<GroupDescriptor> = Vec::new();
     for code in &parsed.order {
@@ -313,7 +315,7 @@ fn build_passthrough_descriptors(
 ///     via `ags4_str()` so on-disk values match new-row raw strings.
 fn preload_codec_state(conn: &Connection, reg: &Registry) -> Result<CodecCtx, CliError> {
     use crate::db::value_to_json;
-    use laterite_core::ags_types::ags4_str;
+    use laterite_ags4_core::ags_types::ags4_str;
 
     let mut ctx = CodecCtx::new();
 

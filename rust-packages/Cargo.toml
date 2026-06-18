@@ -11,9 +11,9 @@
 #                     web/. Built for wasm32 via wasm-pack, excluded
 #                     from the host workspace clippy/test.
 #   laterite-types        The AGS type system (canonical types + value
-#                     casting) as a wasm-safe leaf — shared by laterite-core
+#                     casting) as a wasm-safe leaf — shared by laterite-ags4-core
 #                     and laterite-ags4-wasm.
-#   laterite-core         AGS5 dictionary, codecs, registry, and shared
+#   laterite-ags4-core         AGS5 dictionary, codecs, registry, and shared
 #                     types. No DuckDB dep — kept light so the
 #                     base validator wheel doesn't pay for the
 #                     AGS5 surface.
@@ -33,7 +33,8 @@
 resolver = "2"
 members = [
     "laterite-types",
-    "laterite-core",
+    "laterite-ags4-core",
+    "laterite-excel",
     "laterite-ags5-db",
     "laterite-ags4-emit",
     "laterite-ags4-validator",

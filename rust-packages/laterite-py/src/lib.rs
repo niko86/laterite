@@ -16,9 +16,9 @@
 
 use std::path::Path;
 
+use laterite_ags4_core::error::CliError;
 use laterite_ags4_validator::findings::{Severity, Target};
 use laterite_ags4_validator::{CheckOptions, DictVersion, Dictionary, Findings, ValidatorError};
-use laterite_core::error::CliError;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -36,7 +36,7 @@ mod registry_fns;
 mod transport_fns;
 mod typed_graph;
 
-/// Map an `laterite-core` `CliError` to a PyRuntimeError, preserving the
+/// Map an `laterite-ags4-core` `CliError` to a PyRuntimeError, preserving the
 /// exit-code label python callers may surface in error messages.
 /// Previously lived in `ags5db_fns.rs`; that module moved to the
 /// AGS5 cdylib in S3b, so the base-wheel transport + excel functions
@@ -440,12 +440,7 @@ impl Reading {
             &g.headings,
             &g.types,
             g.rows.len(),
-            |col, row| {
-                g.rows
-                    .get(row)
-                    .and_then(|r| r.values.get(col))
-                    .map(String::as_str)
-            },
+            |col, row| g.cell(col, row),
         )
         .map_err(|e| PyRuntimeError::new_err(format!("arrow batch for {code}: {e}")))?;
         let schema = batch.schema();

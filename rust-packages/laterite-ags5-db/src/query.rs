@@ -20,7 +20,7 @@ use serde_json::{Map, Value};
 use crate::conn::open_readonly;
 use crate::db::{JsonParam, Rows, fetch_rows, headings_for, resolve_db_and_group};
 use crate::predicate::{Predicate, parse_many};
-use laterite_core::error::CliError;
+use laterite_ags4_core::error::CliError;
 
 // ---------------------------------------------------------------------
 // shared predicate → SQL helpers (moved from commands/count.rs so sum /
@@ -308,8 +308,8 @@ fn retain_keys(rec: &mut Map<String, Value>, drop: &HashSet<&str>) {
 //                  validator never disagrees with the ingest path.
 // ---------------------------------------------------------------------
 
-use laterite_core::ags_types::{CanonicalType, canonical_type, parse_value};
-use laterite_core::registry::registry;
+use laterite_ags4_core::ags_types::{CanonicalType, canonical_type, parse_value};
+use laterite_ags4_core::registry::registry;
 
 /// One validation finding: the layer surfaces the location, the
 /// code, and a human-readable message. Same shape Python's
@@ -358,12 +358,12 @@ pub fn validate_db(
 
     // Step 2: per registered group with PA/DT headings, sweep rows.
     for g in reg.iter() {
-        let pa_headings: Vec<&laterite_core::registry::Heading> = g
+        let pa_headings: Vec<&laterite_ags4_core::registry::Heading> = g
             .headings
             .iter()
             .filter(|h| h.ags_type.eq_ignore_ascii_case("PA"))
             .collect();
-        let dt_headings: Vec<&laterite_core::registry::Heading> = g
+        let dt_headings: Vec<&laterite_ags4_core::registry::Heading> = g
             .headings
             .iter()
             .filter(|h| {

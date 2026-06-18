@@ -1,7 +1,7 @@
 """F2b-6a: catch dictionary-edit drift in the committed `.pyi` stubs.
 
 The `_laterite_native.pyi` stub file is generated from
-`rust-packages/laterite-core/data/ags5_dictionary.json` by
+`rust-packages/laterite-ags4-core/data/ags5_dictionary.json` by
 `tools/generate_pyi.py`. If the dictionary is edited (a new heading,
 a renamed group, a precision change) the stub falls out of sync with
 the compiled Rust extension, which means IDE autocomplete starts

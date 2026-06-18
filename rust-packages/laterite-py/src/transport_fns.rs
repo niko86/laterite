@@ -1,4 +1,4 @@
-//! PyO3 bindings for `laterite_core::transport` (zstd + age passphrase).
+//! PyO3 bindings for `laterite_ags4_core::transport` (zstd + age passphrase).
 //!
 //! Stage F2a-2c: exposes the lib API so `laterite.transport` can
 //! drive pack/unpack/lock/unlock from Python without subprocessing
@@ -13,7 +13,7 @@
 
 use std::path::Path;
 
-use laterite_core::transport;
+use laterite_ags4_core::transport;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
 use pyo3::wrap_pyfunction;

@@ -1,14 +1,14 @@
 # laterite-types — the AGS type system as a wasm-safe leaf crate.
 #
-# Extracted from `laterite-core/src/ags_types.rs` (Phase 2 of the AGS4
+# Extracted from `laterite-ags4-core/src/ags_types.rs` (Phase 2 of the AGS4
 # validator wasm site) so it can be the SINGLE source of AGS typing for
-# both the native DuckDB engine (`laterite-core` → `ags5db`) and the browser
+# both the native DuckDB engine (`laterite-ags4-core` → `ags5db`) and the browser
 # data explorer (`laterite-ags4-wasm`). The explorer casts a file *identically*
 # to a `.ags5db` because it calls the same `parse_value` / `parse_datetime`.
 #
 # Deliberately tiny + wasm-safe: only chrono (no clock, no wasmbind) +
-# serde_json. None of laterite-core's wasm-hostile deps (age/zstd/calamine/
-# rpassword/csv) — those live in other laterite-core modules, not here.
+# serde_json. None of laterite-ags4-core's wasm-hostile deps (age/zstd/calamine/
+# rpassword/csv) — those live in other laterite-ags4-core modules, not here.
 
 [package]
 name = "laterite-types"
@@ -29,16 +29,18 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 # so no preserve_order needed here; the native side unifies its own).
 serde_json = "1"
 # Typed Arrow column building (arrow_cols), behind the `arrow` feature.
-# Optional + default-features=false so non-Arrow consumers (laterite-core,
+# Optional + default-features=false so non-Arrow consumers (laterite-ags4-core,
 # ags5db) don't pull it: only the core array/schema/record_batch crates,
-# no csv/json/ipc/prettyprint. The two emitters add what they need on top
-# (laterite-ags4-wasm enables `ipc` for the StreamWriter; laterite-py pairs it with
-# pyo3-arrow). v59 matches pyo3-arrow 0.18 so one build serves both hosts.
+# no csv/json/prettyprint. `ipc` IS pulled (feature below) for the shared
+# `ipc` module's StreamWriter framing — the framing laterite-node +
+# laterite-ags4-wasm used to each carry; laterite-py pairs the dep with
+# pyo3-arrow. v59 matches pyo3-arrow 0.18 so one build serves both hosts.
 arrow = { version = "59", default-features = false, optional = true }
 
 [features]
-# Typed Apache Arrow emission (the `arrow_cols` module).
-arrow = ["dep:arrow"]
+# Typed Apache Arrow emission: `arrow_cols` (typed columns) + `ipc` (frame a
+# group as an Arrow IPC stream — the shared composition for node + wasm).
+arrow = ["dep:arrow", "arrow/ipc"]
 
 [dev-dependencies]
 # Property-based tests (round-trip / never-panic / idempotence) for the

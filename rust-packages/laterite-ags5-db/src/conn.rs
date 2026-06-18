@@ -5,7 +5,7 @@
 //! Factored here so commands don't repeat the boilerplate.
 
 use duckdb::{AccessMode, Config, Connection};
-use laterite_core::error::CliError;
+use laterite_ags4_core::error::CliError;
 use std::path::Path;
 
 pub fn open_readonly(path: &Path) -> Result<Connection, CliError> {

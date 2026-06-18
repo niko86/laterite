@@ -10,12 +10,12 @@
 //! pipeline format.
 
 // S3a (release/v0.1.0-prep): the DuckDB-free modules moved out to
-// `laterite-core`. Re-exported here for source compat — external code
+// `laterite-ags4-core`. Re-exported here for source compat — external code
 // can still write `use laterite_ags5_db::registry::…` and resolve transparently.
-pub use laterite_core::{ags_types, ags4_codec, ags4_writer, error, excel, registry, transport};
+pub use laterite_ags4_core::{ags_types, ags4_codec, error, registry, transport};
 
 // `.ags5db` DDL emitter (DuckDB `g_<code>`/`v_<code>` tables + views). Moved
-// here from laterite-core (W2): it's a .ags5db concern, and this crate is its
+// here from laterite-ags4-core (W2): it's a .ags5db concern, and this crate is its
 // only consumer (convert.rs). Pure-string, so it adds no runtime weight, but
 // it no longer rides in the AGS4-base wheel.
 pub mod ddl;

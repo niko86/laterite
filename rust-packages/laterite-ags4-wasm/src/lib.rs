@@ -16,8 +16,6 @@ use laterite_ags4_validator::{
     resolve_dict_version, rules, tran_ags_of,
 };
 use laterite_types::{parse_value, sql_type};
-// Arrow IPC framing only — the typed columns are built in laterite-types::arrow_cols.
-use arrow::ipc::writer::StreamWriter;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -818,35 +816,18 @@ impl ParsedDataset {
             .get(code)
             .ok_or_else(|| JsError::new(&format!("group {code:?} not in dataset")))?;
 
-        // Typed columns come from the one shared emitter in laterite-types
-        // (arrow_cols) — the same casting the native PyCapsule path uses, so
-        // the browser and Python type a file byte-identically. We only frame
-        // the batch as an IPC stream here for duckdb-wasm.
-        let batch = laterite_types::arrow_cols::build_record_batch(
+        // Typed columns + IPC framing both come from laterite-types now
+        // (`ipc::build_group_ipc` = the shared `arrow_cols` cast + StreamWriter)
+        // — the SAME composition the napi host frames, so the browser, Node and
+        // Python type a file byte-identically by construction. Framed here only
+        // for duckdb-wasm.
+        let buf = laterite_types::ipc::build_group_ipc(
             &group.headings,
             &group.types,
             group.rows.len(),
-            |col, row| {
-                group
-                    .rows
-                    .get(row)
-                    .and_then(|r| r.values.get(col))
-                    .map(String::as_str)
-            },
+            |col, row| group.cell(col, row),
         )
-        .map_err(|e| JsError::new(&format!("arrow batch for {code}: {e}")))?;
-
-        let schema = batch.schema();
-        let mut buf = Vec::new();
-        let mut writer = StreamWriter::try_new(&mut buf, &schema)
-            .map_err(|e| JsError::new(&format!("arrow ipc for {code}: {e}")))?;
-        writer
-            .write(&batch)
-            .map_err(|e| JsError::new(&format!("arrow ipc for {code}: {e}")))?;
-        writer
-            .finish()
-            .map_err(|e| JsError::new(&format!("arrow ipc for {code}: {e}")))?;
-        drop(writer);
+        .map_err(|e| JsError::new(&format!("arrow ipc for {code}: {e}")))?;
         Ok(buf)
     }
 }

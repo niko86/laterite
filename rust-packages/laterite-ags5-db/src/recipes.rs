@@ -11,8 +11,8 @@
 
 use serde::Serialize;
 
-// S3a: data/ moved to ../laterite-core/data/.
-const RECIPES_MD: &str = include_str!("../../laterite-core/data/recipes.md");
+// S3a: data/ moved to ../laterite-ags4-core/data/.
+const RECIPES_MD: &str = include_str!("../../laterite-ags4-core/data/recipes.md");
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Recipe {

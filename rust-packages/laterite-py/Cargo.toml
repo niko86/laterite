@@ -36,12 +36,16 @@ crate-type = ["cdylib"]
 
 [dependencies]
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
-# S3b (release/v0.1.0-prep): pure-string AGS modules from laterite-core —
-# registry, ags_types, transport, excel, ddl, ags4_codec, ags4_writer,
-# error. No DuckDB. The DuckDB-bound ags5db_fns + typed_graph read/write
-# moved to the separate `laterite-py-ags5` cdylib that ships in the
-# `laterite[ags5]` extra wheel.
-laterite-core = { path = "../laterite-core" }
+# S3b (release/v0.1.0-prep): pure-string AGS modules from laterite-ags4-core —
+# registry, ags_types, transport, ddl, ags4_codec, ags4_writer, error.
+# No DuckDB. The DuckDB-bound ags5db_fns + typed_graph read/write moved to
+# the separate `laterite-py-ags5` cdylib that ships in the `laterite[ags5]`
+# extra wheel.
+laterite-ags4-core = { path = "../laterite-ags4-core" }
+# AGS4 ↔ XLSX conversion (excel_fns.rs → laterite.compat.AGS4_to_excel /
+# excel_to_AGS4). Extracted out of laterite-ags4-core (2026-06-18) so core stops
+# carrying calamine + rust_xlsxwriter; laterite-py is its sole consumer.
+laterite-excel = { path = "../laterite-excel" }
 # The shared AGS4 emit orchestrator (typed cells -> valid AGS4 + AutoFix).
 # The emit_ags4_from_arrow binding (emit_typed.rs) feeds it Arrow tables
 # DuckDB hands over pyarrow-free — the read boundary reversed. The `arrow`
@@ -72,7 +76,7 @@ pyo3-arrow = "0.18"
 # `--json` output is built with `preserve_order` (insertion-ordered
 # Map). Byte-faithful CLI JSON parity depends on this matching.
 serde_json = { version = "1", features = ["preserve_order"] }
-# `chrono` is already transitive via laterite-core (used by ags_types.rs).
+# `chrono` is already transitive via laterite-ags4-core (used by ags_types.rs).
 # Naming it explicitly so the `chrono` feature on pyo3 has a matched
 # direct dep — that feature gives us IntoPyObject for NaiveDateTime /
 # NaiveDate / NaiveTime so `parse_value` returns native Python
@@ -86,6 +90,6 @@ chrono = "0.4"
 encoding_rs = "0.8"
 
 # Used only by build.rs (Stage F2b-1 typed-graph codegen — reads
-# ../laterite-core/data/ags5_dictionary.json and emits OUT_DIR/typed_groups.rs).
+# ../laterite-ags4-core/data/ags5_dictionary.json and emits OUT_DIR/typed_groups.rs).
 [build-dependencies]
 serde_json = "1"

@@ -1,7 +1,7 @@
 """laterite.ags_types — Rust-backed AGS4 type system.
 
 Exposes `parse_value` / `canonical_type` / `display_hint` semantics
-backed by the Rust engine in `rust-packages/laterite-core/src/ags_types.rs`.
+backed by the Rust engine in `rust-packages/laterite-ags4-core/src/ags_types.rs`.
 
 The `CanonicalType` StrEnum lives Python-side so existing
 `canonical_type(x) is CanonicalType.DECIMAL` checks keep their

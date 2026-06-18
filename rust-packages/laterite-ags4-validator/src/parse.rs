@@ -57,6 +57,21 @@ pub struct ParsedGroup {
     pub rows: Vec<DataRow>,
 }
 
+impl ParsedGroup {
+    /// Raw string value at `(col, row)` by position, or `None` for a short/
+    /// ragged row. This is the positional accessor every typed-Arrow host
+    /// feeds to `laterite_types::arrow_cols` / `::ipc` — shared here so the
+    /// three bindings (py/node/wasm) stop each inlining the same
+    /// `rows.get(row).and_then(|r| r.values.get(col))` dance. Lean by design:
+    /// returns a borrow, pulls no Arrow/typing dep into the validator leaf.
+    pub fn cell(&self, col: usize, row: usize) -> Option<&str> {
+        self.rows
+            .get(row)
+            .and_then(|r| r.values.get(col))
+            .map(String::as_str)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ParsedFile {
     /// First-seen wins on duplicate GROUP codes (Rule 2 flags the dup

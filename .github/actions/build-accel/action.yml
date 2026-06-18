@@ -73,8 +73,16 @@ runs:
         fi
         # Cap parallel codegen so a single build can't spawn a rustc per host core
         # and spike RAM — that starvation is what OOM-killed the runner agent
-        # ("lost communication"). Tracks nproc (so it follows a container CPU limit
-        # down on cgroup v2) but never exceeds 4.
-        jobs="$(nproc 2>/dev/null || echo 4)"; [ "$jobs" -gt 4 ] && jobs=4
+        # ("lost communication"). An explicit CARGO_BUILD_JOBS in the runner's
+        # environment wins (a CPU-capped runner pins it to its core count, e.g. 2);
+        # otherwise default to min(nproc, 4). NOTE: nproc does NOT follow a `cpus:`
+        # quota down — that's a CFS bandwidth limit, not cpu affinity — so on a
+        # cgroup-limited container it still reports host cores. The explicit
+        # override is the only way a CPU-capped runner reins in its job count.
+        if [ -n "${CARGO_BUILD_JOBS:-}" ]; then
+          jobs="$CARGO_BUILD_JOBS"
+        else
+          jobs="$(nproc 2>/dev/null || echo 4)"; [ "$jobs" -gt 4 ] && jobs=4
+        fi
         echo "CARGO_BUILD_JOBS=$jobs" >> "$GITHUB_ENV"
         echo "[build-accel] CARGO_BUILD_JOBS=$jobs"

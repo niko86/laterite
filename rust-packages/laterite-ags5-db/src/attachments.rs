@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 use duckdb::{AccessMode, Config, Connection};
 use sha2::{Digest, Sha256};
 
-use laterite_core::error::CliError;
+use laterite_ags4_core::error::CliError;
 
 /// Outcome of a slurp / unspool pass — surfaced to the CLI so the
 /// command can report `files_attached: N` / `files_written: N`.

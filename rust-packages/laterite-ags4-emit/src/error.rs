@@ -1,6 +1,6 @@
 //! The emitter's error type — leaf-local so the crate stays free of
-//! `laterite-core` (which would be a dependency cycle, since `laterite-core`
-//! depends on *this*). `laterite-core` provides `From<EmitError> for
+//! `laterite-ags4-core` (which would be a dependency cycle, since `laterite-ags4-core`
+//! depends on *this*). `laterite-ags4-core` provides `From<EmitError> for
 //! CliError` so its `excel` / `db-to-ags4` callers keep using `?`.
 
 use std::fmt;

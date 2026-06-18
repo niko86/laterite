@@ -40,8 +40,8 @@ laterite-ags4-emit = { path = "../laterite-ags4-emit", features = ["arrow"] }
 arrow = { version = "59", default-features = false, features = ["ipc"] }
 encoding_rs = "0.8"
 # Transport (pack/unpack/lock/unlock) — zstd + age passphrase, reimplemented
-# directly (NOT via laterite-core, which would drag in Excel/csv/sha2 for a niche
-# feature). Same crates laterite-core links, so the age envelope stays
+# directly (NOT via laterite-ags4-core, which would drag in Excel/csv/sha2 for a niche
+# feature). Same crates laterite-ags4-core links, so the age envelope stays
 # interoperable with the Python side (pyrage).
 zstd = "0.13"
 age = "0.10"

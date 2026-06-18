@@ -66,7 +66,7 @@ impl CliError {
 }
 
 /// The AGS4 writer/emitter lives in the `laterite-ags4-emit` leaf now; map its
-/// error back onto `CliError` so `laterite-core`'s excel + `ags5db`'s
+/// error back onto `CliError` so `laterite-ags4-core`'s excel + `ags5db`'s
 /// db-to-ags4 callers keep using `?` over `write_ags4`. `write_ags4`
 /// only ever yields `Write`; the other variants come from `emit_ags4`'s
 /// validity modes (not used by these callers) but are mapped for totality.

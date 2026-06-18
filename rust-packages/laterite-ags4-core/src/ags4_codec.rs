@@ -50,17 +50,35 @@ impl ParsedAgs4 {
     }
 }
 
-/// Parse an AGS4 file. Uses the `csv` crate with flexible-record mode
-/// (rows vary in length: HEADING typically has N+1 fields, DATA has N+1
-/// fields but some emitters trim trailing empty fields).
+/// Parse an AGS4 file from a path. Thin wrapper over the shared
+/// [`parse_reader`]; the `csv` crate streams the file directly.
 pub fn read_ags4(path: &Path) -> Result<ParsedAgs4, CliError> {
-    let mut rdr = csv::ReaderBuilder::new()
+    let rdr = csv::ReaderBuilder::new()
         .has_headers(false)
         .flexible(true)
         .trim(csv::Trim::None)
         .from_path(path)
         .map_err(|e| CliError::Schema(format!("open AGS4 file: {}", e)))?;
+    parse_reader(rdr)
+}
 
+/// Parse AGS4 from an in-memory byte buffer — the read path used when the
+/// bytes already live in memory (e.g. a DuckDB table function that has
+/// slurped a local or remote file through DuckDB's virtual filesystem).
+/// Identical semantics to [`read_ags4`].
+pub fn read_ags4_bytes(bytes: &[u8]) -> Result<ParsedAgs4, CliError> {
+    let rdr = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .flexible(true)
+        .trim(csv::Trim::None)
+        .from_reader(bytes);
+    parse_reader(rdr)
+}
+
+/// Shared parse loop over any `csv::Reader`. Flexible-record mode (rows
+/// vary in length: HEADING typically has N+1 fields, DATA has N+1 fields
+/// but some emitters trim trailing empty fields).
+fn parse_reader<R: std::io::Read>(mut rdr: csv::Reader<R>) -> Result<ParsedAgs4, CliError> {
     let mut groups: HashMap<String, AgsGroup> = HashMap::new();
     let mut order: Vec<String> = Vec::new();
     let mut current_code: Option<String> = None;
@@ -200,5 +218,25 @@ mod tests {
         assert_eq!(loca.units, vec!["", "", "m"]);
         assert_eq!(loca.rows.len(), 2);
         assert_eq!(loca.rows[1]["LOCA_NATE"], "200.75");
+    }
+
+    #[test]
+    fn read_ags4_bytes_matches_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.ags");
+        write_fixture(&path, FIXTURE);
+
+        let from_path = read_ags4(&path).unwrap();
+        let from_bytes = read_ags4_bytes(FIXTURE.as_bytes()).unwrap();
+
+        assert_eq!(from_path.order, from_bytes.order);
+        for code in &from_path.order {
+            let a = from_path.get(code).unwrap();
+            let b = from_bytes.get(code).unwrap();
+            assert_eq!(a.headings, b.headings);
+            assert_eq!(a.types, b.types);
+            assert_eq!(a.units, b.units);
+            assert_eq!(a.rows, b.rows);
+        }
     }
 }

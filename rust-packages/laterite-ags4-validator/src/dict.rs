@@ -186,6 +186,21 @@ impl Dictionary {
         self.abbrs.get(k.as_str()).copied()
     }
 
+    /// Every `ABBR_CODE` the bundled standard ABBR table lists for
+    /// `heading` (the picklist), in the map's iteration order; empty if
+    /// the heading has no picklist. The keys are the `heading\u{1f}code`
+    /// composites [`abbr_desc`](Self::abbr_desc) looks up. Exposed so a
+    /// from the single-source dictionary rather than a hardcoded list.
+    pub fn abbr_codes(&self, heading: &str) -> Vec<&'static str> {
+        self.abbrs
+            .keys()
+            .filter_map(|k| {
+                let (h, code) = k.split_once('\u{1f}')?;
+                (h == heading).then_some(code)
+            })
+            .collect()
+    }
+
     pub fn version(&self) -> DictVersion {
         self.version
     }
@@ -364,5 +379,26 @@ mod tests {
         let d = Dictionary::bundled(DictVersion::V4_2);
         assert_eq!(d.abbr_desc("ARTW_TYPE", "DRY"), Some("Dry test"));
         assert!(d.abbr_desc("NOPE_HDNG", "ZZ").is_none());
+    }
+
+    #[test]
+    fn abbr_codes_enumerates_a_picklist() {
+        let d = Dictionary::bundled(DictVersion::V4_2);
+        // SAMP_TYPE is a substantial picklist; every enumerated code must
+        // round-trip through abbr_desc (same composite key), and "U"
+        // (Undisturbed) is a verbatim row.
+        let codes = d.abbr_codes("SAMP_TYPE");
+        assert!(codes.len() > 1, "SAMP_TYPE should have several codes");
+        assert!(
+            codes.contains(&"U"),
+            "SAMP_TYPE should include U, got {codes:?}"
+        );
+        for c in &codes {
+            assert!(
+                d.abbr_desc("SAMP_TYPE", c).is_some(),
+                "{c} must resolve a desc"
+            );
+        }
+        assert!(d.abbr_codes("NOPE_HDNG").is_empty());
     }
 }

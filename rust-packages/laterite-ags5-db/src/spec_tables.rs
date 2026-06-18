@@ -16,9 +16,9 @@
 use chrono::Utc;
 use duckdb::Connection;
 
-use laterite_core::ags_types::{canonical_type, display_hint};
-use laterite_core::error::CliError;
-use laterite_core::registry::Registry;
+use laterite_ags4_core::ags_types::{canonical_type, display_hint};
+use laterite_ags4_core::error::CliError;
+use laterite_ags4_core::registry::Registry;
 
 const FORMAT_VERSION: &str = "6.5.0";
 

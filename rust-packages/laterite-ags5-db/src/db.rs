@@ -59,7 +59,7 @@ impl<'a> ToSql for JsonParam<'a> {
 }
 
 use crate::suggest::suggest;
-use laterite_core::error::CliError;
+use laterite_ags4_core::error::CliError;
 
 /// Tabular query result: column order + one insertion-ordered JSON
 /// object per row. This is its canonical home (a lib-level data type);

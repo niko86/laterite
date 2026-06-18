@@ -28,7 +28,7 @@ use serde_json::Value;
 
 use crate::conn::open_readonly;
 use crate::db::{classify_catalog_error, value_to_json};
-use laterite_core::error::CliError;
+use laterite_ags4_core::error::CliError;
 
 /// Whole-file diff result.
 #[derive(Debug, Clone)]

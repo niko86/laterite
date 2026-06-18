@@ -7,7 +7,7 @@
 //! Values are coerced int -> float -> string so `loca_id=BH01` and
 //! `samp_top>=5.0` both work.
 
-use laterite_core::error::CliError;
+use laterite_ags4_core::error::CliError;
 use serde_json::Value;
 
 #[derive(Debug, Clone)]

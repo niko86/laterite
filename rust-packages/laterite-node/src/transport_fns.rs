@@ -1,6 +1,6 @@
 //! Transport — zstd compression + age passphrase encryption, the Node port of
 //! laterite-py's `transport_fns`. Reimplemented directly on `zstd` + `age`
-//! (decoupled from `.ags5db` / laterite-core) as general file-envelope helpers:
+//! (decoupled from `.ags5db` / laterite-ags4-core) as general file-envelope helpers:
 //! compress/encrypt ANY file. The age envelope is interoperable with the Python
 //! side (`pyrage`) — same `age` crate, same on-disk format. napi camelCases:
 //! `transport_pack` → `transportPack`, `elapsed_s` → `elapsedS`.

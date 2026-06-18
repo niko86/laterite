@@ -9,7 +9,7 @@ use std::path::Path;
 
 use crate::conn::open_readonly;
 use crate::db::{HeadingRow, classify_catalog_error, display_native, headings_for};
-use laterite_core::error::CliError;
+use laterite_ags4_core::error::CliError;
 
 /// One group's row count + parent + contents description.
 #[derive(Debug, Clone)]

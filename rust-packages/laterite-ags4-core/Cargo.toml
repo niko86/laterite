@@ -1,4 +1,4 @@
-# laterite-core — DuckDB-free pure-string AGS modules.
+# laterite-ags4-core — DuckDB-free pure-string AGS modules.
 #
 # Extracted from `ags5db` (S3a of release/v0.1.0-prep). Carries the
 # registry / canonical-types / DDL emitter / AGS4 codec / Excel I/O /
@@ -11,12 +11,12 @@
 # - `laterite-py` (the base PyO3 cdylib for `laterite`, AGS4 surface —
 #   ships **without** DuckDB so the AGS4 wheel stays light).
 #
-# A separate `laterite-py-ags5` cdylib depends on BOTH `laterite-core` and
+# A separate `laterite-py-ags5` cdylib depends on BOTH `laterite-ags4-core` and
 # `ags5db` to expose the AGS5 surface to Python — that wheel bundles
 # DuckDB and ships as the optional `laterite[ags5]` extra.
 
 [package]
-name = "laterite-core"
+name = "laterite-ags4-core"
 version.workspace = true
 edition = "2024"
 rust-version = "1.85"
@@ -27,9 +27,9 @@ publish = false
 [dependencies]
 # The AGS type system (canonical types + value casting), extracted to a
 # wasm-safe leaf so the browser explorer (`laterite-ags4-wasm`) shares the exact
-# casting logic. Re-exported as `laterite_core::ags_types` (see lib.rs).
+# casting logic. Re-exported as `laterite_ags4_core::ags_types` (see lib.rs).
 laterite-types = { path = "../laterite-types" }
-# The AGS4 writer/emitter, lifted into its own wasm-safe leaf. laterite-core's
+# The AGS4 writer/emitter, lifted into its own wasm-safe leaf. laterite-ags4-core's
 # excel.rs + ags5db's db-to-ags4 reach it via the `ags4_writer` re-export
 # shim; `From<EmitError> for CliError` (error.rs) keeps their `?` working.
 laterite-ags4-emit = { path = "../laterite-ags4-emit" }
@@ -56,15 +56,15 @@ zstd = "0.13"
 age = "0.10"
 rpassword = "7"
 secrecy = "0.8"
-# Rust-backed Excel I/O for laterite.compat's AGS4 ↔ XLSX surface.
-# Both crates are pure-Rust (no Python deps).
-rust_xlsxwriter = "0.95"
-calamine = "0.32"
-# Content-hash dedup in the AGS4 ingest path uses sha256 over the raw
-# heading values; lives in laterite-core because excel.rs (which moves
-# here) touches it through ags4_writer.
+# The deterministic keychain (keychain.rs) hashes the spec key-chain with
+# SHA-256 → UUIDv8. (calamine + rust_xlsxwriter + hex left with excel.rs when
+# the Excel I/O moved out to the laterite-excel crate, 2026-06-18.)
 sha2 = "0.10"
-hex = "0.4"
+# Deterministic content-addressed row keys (keychain.rs): SHA-256 over the
+# spec key-chain → UUIDv8. `v8` is RFC 9562's custom/application version —
+# the correct choice for app-defined deterministic UUIDs (contrast ags5-db's
+# random, clock-seeded `v7`, which cannot agree across calls).
+uuid = { version = "1", features = ["v8"] }
 
 [dev-dependencies]
 # `ags4_codec.rs` test creates an on-disk fixture (temp dir) to exercise
