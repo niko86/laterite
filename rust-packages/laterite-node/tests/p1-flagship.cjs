@@ -13,7 +13,7 @@ const ags =
   '"DATA","BH02","13.00","N","2023-03-01"\r\n';
 
 // --- parse → typed Arrow IPC (the boundary, typed like Python/wasm) ---
-const reading = native.parseArrow(null, ags, null);
+const reading = native.parseArrow(null, ags, null, null); // (path, text, data, encoding)
 assert.deepStrictEqual(reading.groupCodes(), ["LOCA"]);
 const meta = reading.meta("LOCA");
 assert.deepStrictEqual(meta.types, ["ID", "2DP", "YN", "DT"]);
@@ -28,8 +28,8 @@ assert.match(t("LOCA_STAR"), /Timestamp|Date/);
 assert.strictEqual(table.getChild("LOCA_GL").get(0), 12.3);
 assert.strictEqual(reading.tableIpc("NOPE"), null);
 
-// --- validate (runCheck: path, text, dictVersion, warnings, fyi, files, enc) ---
-const rep = native.runCheck(null, ags, null, false, false, false, null);
+// --- validate (runCheck: path, text, data, dictVersion, warnings, fyi, files, enc) ---
+const rep = native.runCheck(null, ags, null, null, false, false, false, null);
 console.log("runCheck:", { ok: rep.ok, dictVersion: rep.dictVersion, resolution: rep.resolution, count: rep.count });
 assert.strictEqual(rep.ok, true); // parsed fine — `ok` means validatable, not valid
 assert.strictEqual(typeof rep.dictVersion, "string");
@@ -43,7 +43,7 @@ const reEmitted = reading.emit();
 assert.match(reEmitted, /"GROUP","LOCA"/);
 assert.match(reEmitted, /"DATA","BH01","12\.30","Y"/);
 assert.match(reEmitted, /\r\n/);
-assert.deepStrictEqual(native.parseArrow(null, reEmitted, null).groupCodes(), ["LOCA"]);
+assert.deepStrictEqual(native.parseArrow(null, reEmitted, null, null).groupCodes(), ["LOCA"]);
 
 // --- data → AGS4 via Arrow IPC (build arrow-js tables → emit) ---
 const toIpc = (tbl) => Buffer.from(tableToIPC(tbl, "stream"));

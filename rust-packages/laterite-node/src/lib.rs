@@ -11,7 +11,9 @@ use std::path::Path;
 use arrow::ipc::reader::StreamReader;
 use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};
-use laterite_ags4_validator::parse::{ParsedFile, parse_file_with_encoding, parse_str};
+use laterite_ags4_validator::parse::{
+    ParsedFile, parse_bytes, parse_file_with_encoding, parse_str,
+};
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, check_file_with_dict, resolve_dict_version, rules,
     tran_ags_of,
@@ -204,26 +206,32 @@ impl Reading {
     }
 }
 
-/// Parse an AGS4 file (`path`) or in-memory `text` into a `Reading` handle.
-/// `encoding`: `"utf-8"` (default) / `"windows-1252"` / a label. Throws the
-/// classified `kind␟code␟message` (see the error-protocol note) on bad input.
+/// Parse an AGS4 file (`path`), in-memory `text`, or raw `data` bytes into a
+/// `Reading` handle. `encoding`: `"utf-8"` (default) / `"windows-1252"` / a label
+/// — applies to `path` / `data` (text is already decoded). Throws the classified
+/// `kind␟code␟message` (see the error-protocol note) on bad input.
 #[napi]
 pub fn parse_arrow(
     path: Option<String>,
     text: Option<String>,
+    data: Option<Uint8Array>,
     encoding: Option<String>,
 ) -> Result<Reading> {
-    // `text` wins when both are given (matches P1 / laterite-py's source split).
-    // Text is already a decoded UTF-8 `String`, so `parse_str`; a path reads
-    // with the requested encoding via the engine (which classifies IO errors).
+    // `text` wins, then `data` (raw bytes — V8's ~512 MB string cap doesn't apply,
+    // so a web backend can hand a large upload straight in without `.toString()`),
+    // then a `path` the engine reads itself. Text is already decoded UTF-8 →
+    // `parse_str`; bytes / path decode with the requested encoding.
     let parsed = if let Some(t) = text {
         parse_str(&t).map_err(thrown)?
+    } else if let Some(d) = data {
+        let enc = resolve_encoding(encoding.as_deref());
+        parse_bytes(d.as_ref(), enc).map_err(thrown)?
     } else if let Some(p) = path {
         let enc = resolve_encoding(encoding.as_deref());
         parse_file_with_encoding(Path::new(&p), enc).map_err(thrown)?
     } else {
         return Err(Error::from_reason(format!(
-            "bad_args{SEP}5{SEP}provide `path` or `text`"
+            "bad_args{SEP}5{SEP}provide `path`, `text`, or `data`"
         )));
     };
     Ok(Reading { parsed })
@@ -330,6 +338,7 @@ fn findings_ndjson(found: &Findings) -> String {
 fn validate_inner(
     path: Option<&str>,
     text: Option<&str>,
+    data: Option<&[u8]>,
     forced: Option<DictVersion>,
     opts: CheckOptions,
 ) -> std::result::Result<(String, String, String, Findings), (i32, &'static str, String)> {
@@ -346,6 +355,20 @@ fn validate_inner(
         rules::run_all(&parsed, &dict, &opts, None, &mut found);
         Ok((
             "<text>".to_string(),
+            dv.as_str().to_string(),
+            res.as_str().to_string(),
+            found,
+        ))
+    } else if let Some(d) = data {
+        // Raw bytes decode with the requested encoding, then the same rule run as text.
+        let parsed = parse_bytes(d, opts.encoding).map_err(map)?;
+        let (dv, res) =
+            resolve_dict_version(forced, tran_ags_of(&parsed).as_deref()).map_err(map)?;
+        let dict = Dictionary::bundled(dv);
+        let mut found = Findings::new();
+        rules::run_all(&parsed, &dict, &opts, None, &mut found);
+        Ok((
+            "<bytes>".to_string(),
             dv.as_str().to_string(),
             res.as_str().to_string(),
             found,
@@ -367,9 +390,11 @@ fn validate_inner(
 /// `None`/`"auto"` auto-detects from `TRAN_AGS`, else forces an edition. Returns
 /// the `{ok:false}` failure report (not a throw) for un-validatable input.
 #[napi]
+#[allow(clippy::too_many_arguments)] // the napi surface mirrors lat-check's flags
 pub fn run_check(
     path: Option<String>,
     text: Option<String>,
+    data: Option<Uint8Array>,
     dict_version: Option<String>,
     include_warnings: Option<bool>,
     include_fyi: Option<bool>,
@@ -388,11 +413,16 @@ pub fn run_check(
         encoding: resolve_encoding(encoding.as_deref()),
         ..CheckOptions::default()
     };
-    let (file, dv, res, found) =
-        match validate_inner(path.as_deref(), text.as_deref(), forced, opts) {
-            Ok(t) => t,
-            Err((code, kind, msg)) => return Ok(ValidationReport::failure(kind, code, msg)),
-        };
+    let (file, dv, res, found) = match validate_inner(
+        path.as_deref(),
+        text.as_deref(),
+        data.as_deref(),
+        forced,
+        opts,
+    ) {
+        Ok(t) => t,
+        Err((code, kind, msg)) => return Ok(ValidationReport::failure(kind, code, msg)),
+    };
     let findings: Vec<Finding> = found
         .iter()
         .flat_map(|(rule, items)| {

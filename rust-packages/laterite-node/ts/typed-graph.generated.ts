@@ -3,7 +3,7 @@
 
 /* eslint-disable */
 // A typed builder graph: `new PROJ({ PROJ_ID: 'P1', locas: [new LOCA({…})] })`,
-// then `emitAgs4(proj)` walks it into per-group rows. Each class carries a
+// then `buildAgs4(proj)` walks it into per-group rows. Each class carries a
 // static `code` and extends AgsGroup; child arrays are
 // `<childCode>`.toLowerCase() + 's'.
 import { AgsGroup } from "./ags-group";

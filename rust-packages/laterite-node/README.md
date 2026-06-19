@@ -26,7 +26,7 @@ One clean-room Rust AGS4 engine, surfaced for every stack:
 ```ts
 import { read, validate } from "laterite";
 
-const ags = read("delivery.ags");        // or read(undefined, { text })
+const ags = read("delivery.ags");        // path, or read(bytes) / read(undefined, { text })
 ags.groups;                               // ["PROJ", "LOCA", "SAMP", …]
 const loca = ags.table("LOCA");           // a born-typed apache-arrow Table
 loca.getChild("LOCA_GL")?.get(0);         // → 12.3 (a number)
@@ -42,28 +42,28 @@ report.toJson();                          // byte-identical to `lat-check --json
 From per-group data (arrow-js Tables or plain row objects):
 
 ```ts
-import { emitAgs4 } from "laterite";
+import { buildAgs4 } from "laterite";
 
-const res = emitAgs4(new Map([
+const res = buildAgs4(new Map([
   ["PROJ", [{ PROJ_ID: "P1", PROJ_NAME: "Demo" }]],
   ["LOCA", [{ LOCA_ID: "BH01", LOCA_GL: 12.3 }]],
 ]), { edition: "4.1.1", mode: "autofix" });
 
 res.text;          // the AGS4 document
-res.write("out.ags");
+res.save("out.ags");
 ```
 
 …or from a **typed builder graph** (`import { PROJ, LOCA } from "laterite"`):
 
 ```ts
-import { PROJ, LOCA, emitAgs4 } from "laterite";
+import { PROJ, LOCA, buildAgs4 } from "laterite";
 
 const proj = new PROJ({
   PROJ_ID: "P1",
   PROJ_NAME: "Demo",
   locas: [new LOCA({ LOCA_ID: "BH01", LOCA_GL: 12.3 })],
 });
-emitAgs4(proj);    // walks the tree → valid AGS4
+buildAgs4(proj);    // walks the tree → valid AGS4
 ```
 
 ## SQL across groups (optional)

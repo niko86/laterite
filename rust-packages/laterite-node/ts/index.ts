@@ -3,7 +3,7 @@
 // DuckDB `sql()`/`at()` layer + typed-graph + transport land in P3.
 import { type Table, tableFromArrays, tableToIPC } from "apache-arrow";
 import { Ags4File } from "./ags4-file";
-import { EmitResult } from "./emit-result";
+import { BuildResult } from "./build-result";
 import { Ags4Error, fromNativeError, raiseFor } from "./errors";
 import { type GroupIpc, emitAgs4FromIpc, parseArrow, runCheck } from "./native";
 import * as registry from "./registry";
@@ -17,12 +17,16 @@ export interface ReadOptions {
   encoding?: string;
 }
 
-/** Parse an AGS4 file (`source` path) or in-memory `text` into an `Ags4File`.
- * Throws `NotAgs4Error` / `FileNotFoundError` / `UnsupportedEditionError` for
- * un-parseable input. */
-export function read(source?: string, opts: ReadOptions = {}): Ags4File {
+/** Parse AGS4 — a file `source` path, raw `Uint8Array`/`Buffer` bytes, or
+ * in-memory `text` — into an `Ags4File`. Pass bytes (not a string) for large
+ * inputs: V8 caps strings at ~512 MB, but a `Uint8Array` does not, so a web
+ * backend can hand a multi-hundred-MB upload straight in. Throws `NotAgs4Error`
+ * / `FileNotFoundError` / `UnsupportedEditionError` for un-parseable input. */
+export function read(source?: string | Uint8Array, opts: ReadOptions = {}): Ags4File {
+  const path = typeof source === "string" ? source : undefined;
+  const data = typeof source === "string" || source == null ? undefined : source;
   try {
-    return new Ags4File(parseArrow(source, opts.text, opts.encoding));
+    return new Ags4File(parseArrow(path, opts.text, data, opts.encoding));
   } catch (e) {
     throw fromNativeError(e);
   }
@@ -39,13 +43,17 @@ export interface ValidateOptions extends ReadOptions {
   checkFiles?: boolean;
 }
 
-/** Validate an AGS4 file (`source` path) or in-memory `text` against the AGS4
- * rules. Throws for un-validatable input; rule *violations* come back in the
- * `Report`. */
-export function validate(source?: string, opts: ValidateOptions = {}): Report {
+/** Validate AGS4 — a file `source` path, raw `Uint8Array`/`Buffer` bytes, or
+ * in-memory `text` — against the AGS4 rules. Throws for un-validatable input;
+ * rule *violations* come back in the `Report`. (Bytes avoid V8's ~512 MB string
+ * cap, the same as `read`.) */
+export function validate(source?: string | Uint8Array, opts: ValidateOptions = {}): Report {
+  const path = typeof source === "string" ? source : undefined;
+  const data = typeof source === "string" || source == null ? undefined : source;
   const r = runCheck(
-    source,
+    path,
     opts.text,
+    data,
     opts.dictVersion,
     opts.warnings,
     opts.fyi,
@@ -55,15 +63,9 @@ export function validate(source?: string, opts: ValidateOptions = {}): Report {
   return new Report(raiseFor(r));
 }
 
-/** Write an `Ags4File` back to spec-correct AGS4 (byte-faithful to the source
- * DATA values). Returns `path`. */
-export function write(source: Ags4File, path: string): string {
-  return source.write(path);
-}
-
 /** Row-oriented group data: an array of `{HEADING: value}` objects. */
 export type GroupRows = Array<Record<string, unknown>>;
-/** One group's data for `emitAgs4` — an arrow-js `Table` or row objects. */
+/** One group's data for `buildAgs4` — an arrow-js `Table` or row objects. */
 export type GroupData = Table | GroupRows;
 
 export interface EmitOptions {
@@ -100,7 +102,7 @@ function walkTree(root: AgsGroup): Array<[string, GroupRows]> {
     const code = (node.constructor as { code?: string }).code;
     const desc = code !== undefined ? registry.get(code) : undefined;
     if (code === undefined || desc === undefined) {
-      throw new Ags4Error("emitAgs4: not a known typed AGS group instance");
+      throw new Ags4Error("buildAgs4: not a known typed AGS group instance");
     }
     const record = node as unknown as Record<string, unknown>;
     const row: Record<string, unknown> = {};
@@ -116,16 +118,17 @@ function walkTree(root: AgsGroup): Array<[string, GroupRows]> {
   return [...buckets];
 }
 
-/** Build valid AGS4 from your own data — the data→AGS4 door (the inverse of
- * `read`). `groups` is either a **typed-graph root** (`new PROJ({…})`, walked
- * depth-first) OR a Map/array mapping each AGS group code to an arrow-js `Table`
- * or row objects whose **keys are the AGS headings** (`LOCA_ID`, …). UNIT/TYPE
- * are filled from the chosen `edition`; order is preserved (put `PROJ` first).
- * Needs no DuckDB. */
-export function emitAgs4(
+/** Build valid AGS4 from your own data — the data→AGS4 door. Where `read` loads
+ * an *existing* file, `buildAgs4` *constructs* a new one (and autofixes +
+ * validates it). `groups` is either a **typed-graph root** (`new PROJ({…})`,
+ * walked depth-first) OR a Map/array mapping each AGS group code to an arrow-js
+ * `Table` or row objects whose **keys are the AGS headings** (`LOCA_ID`, …).
+ * UNIT/TYPE are filled from the chosen `edition`; order is preserved (put `PROJ`
+ * first). Needs no DuckDB. Persist the result with `BuildResult.save`. */
+export function buildAgs4(
   groups: AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>,
   opts: EmitOptions = {},
-): EmitResult {
+): BuildResult {
   const items: Array<[string, GroupData]> =
     groups instanceof AgsGroup
       ? walkTree(groups)
@@ -141,13 +144,13 @@ export function emitAgs4(
   const findings = Object.entries(byRule).flatMap(([rule, list]) =>
     list.map((f) => ({ rule, ...f })),
   );
-  return new EmitResult(res.bytes, findings, res.fixesApplied);
+  return new BuildResult(res.bytes, findings, res.fixesApplied);
 }
 
 export { Ags4File } from "./ags4-file";
 export { AgsSubset, type Filter } from "./subset";
 export type { QueryOptions, Row } from "./duckdb";
-export { EmitResult, type EmitFinding } from "./emit-result";
+export { BuildResult, type BuildFinding } from "./build-result";
 export {
   Ags4Error,
   BadDictError,

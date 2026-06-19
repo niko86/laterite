@@ -25,6 +25,7 @@ pub mod ags4_codec;
 // re-export, laterite-py — keeps working unchanged.
 pub use laterite_types as ags_types;
 pub mod error;
+pub mod index;
 pub mod keychain;
 pub mod registry;
 pub mod transport;

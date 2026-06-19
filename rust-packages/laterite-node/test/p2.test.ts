@@ -1,15 +1,15 @@
 // P2 — the high-level TS layer (Arrow-direct, no DuckDB): read → born-typed
-// arrow-js Table, validate → Report, emitAgs4 → EmitResult round-trip, and the
+// arrow-js Table, validate → Report, buildAgs4 → BuildResult round-trip, and the
 // native-failure → mapped-exception protocol.
 import { type Table, tableFromArrays } from "apache-arrow";
 import { describe, expect, it } from "vitest";
 import {
   Ags4File,
-  type EmitResult,
+  type BuildResult,
   FileNotFoundError,
   NotAgs4Error,
   type Report,
-  emitAgs4,
+  buildAgs4,
   read,
   validate,
 } from "../ts/index";
@@ -69,7 +69,7 @@ describe("read → Arrow-direct, born-typed", () => {
 
   it("re-emits byte-faithful AGS4 that re-parses", () => {
     const ags = read(undefined, { text: AGS });
-    const text = ags.toAgs4Text();
+    const text = ags.text;
     expect(text).toMatch(/"GROUP","PROJ"/);
     expect(text).toMatch(/\r\n/);
     expect(read(undefined, { text }).groups).toEqual(["PROJ", "LOCA"]);
@@ -102,6 +102,35 @@ describe("validate → Report", () => {
   });
 });
 
+describe("read/validate from raw bytes (the V8 string-cap door)", () => {
+  const bytes = new TextEncoder().encode(AGS); // a Uint8Array
+
+  it("read(Uint8Array) parses identically to read(text)", () => {
+    const fromBytes = read(bytes);
+    expect(fromBytes.groups).toEqual(read(undefined, { text: AGS }).groups);
+    // born-typed survives the bytes path (a 2DP cell is a real f64, not a string)
+    expect(fromBytes.table("LOCA").getChild("LOCA_GL")!.get(0)).toBe(12.3);
+  });
+
+  it("accepts a Node Buffer too (Buffer is a Uint8Array)", () => {
+    expect(read(Buffer.from(AGS, "utf8")).groups).toEqual(["PROJ", "LOCA"]);
+  });
+
+  it("validate(Uint8Array) matches validate(text), byte-faithfully", () => {
+    expect(validate(bytes).toNdjson()).toBe(validate(undefined, { text: AGS }).toNdjson());
+  });
+
+  it("encoding applies to the bytes path (windows-1252)", () => {
+    // 'é' is 0xE9 in windows-1252; latin1 round-trips each char to its byte.
+    const w1252 = Buffer.from(
+      '"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n"DATA","Pré"\r\n',
+      "latin1",
+    );
+    const proj = read(w1252, { encoding: "windows-1252" }).table("PROJ");
+    expect(proj.getChild("PROJ_ID")!.get(0)).toBe("Pré");
+  });
+});
+
 describe("native failure → mapped exception", () => {
   it("read() of a missing path throws FileNotFoundError (exit 3)", () => {
     try {
@@ -128,14 +157,14 @@ describe("native failure → mapped exception", () => {
   });
 });
 
-describe("emitAgs4 → data → AGS4", () => {
+describe("buildAgs4 → data → AGS4", () => {
   it("builds valid AGS4 from arrow-js Tables and round-trips", () => {
     const proj = tableFromArrays({ PROJ_ID: ["P1"], PROJ_NAME: ["Demo project"] });
     const loca = tableFromArrays({
       LOCA_ID: ["BH01", "BH02"],
       LOCA_GL: Float64Array.from([12.3, 13.0]),
     });
-    const res: EmitResult = emitAgs4(
+    const res: BuildResult = buildAgs4(
       new Map<string, Table>([
         ["PROJ", proj],
         ["LOCA", loca],
@@ -153,7 +182,7 @@ describe("emitAgs4 → data → AGS4", () => {
   });
 
   it("accepts row-objects (transposed to a typed Table)", () => {
-    const res = emitAgs4([
+    const res = buildAgs4([
       ["PROJ", [{ PROJ_ID: "P1", PROJ_NAME: "Demo" }]],
       [
         "LOCA",

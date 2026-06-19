@@ -41,6 +41,17 @@ class BadDictError(Ags4Error):
     exit_code = 5
 
 
+class StaleCertError(Ags4Error):
+    """A passed ``index=`` certificate (``.ags.idx``) does not match the file it
+    was read for — its size/SHA-256 differ, so its byte offsets and clean verdict
+    are now lies. Raised at :func:`read` time (fail-fast): an explicit ``index=``
+    asserts "this cert is for this file", so a mismatch is an error, never a silent
+    fall-back to re-validation. Rebuild it (``read(p).validate().certify()``).
+    """
+
+    exit_code = 4
+
+
 # error_kind (from the Rust layer) → exception. "not_found" maps to the
 # builtin FileNotFoundError so callers can `except FileNotFoundError`.
 _KIND_TO_EXC: dict[str, type[Ags4Error]] = {

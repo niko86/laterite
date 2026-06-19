@@ -1,5 +1,5 @@
 // Export tab — build a valid AGS4 file from your own per-group data, entirely
-// client-side (the `laterite-ags4-wasm` `to_ags4` producer). Each group's column
+// client-side (the `laterite-ags4-wasm` `build_ags4` producer). Each group's column
 // headings are the AGS headings; UNIT/TYPE fill from the chosen edition's
 // dictionary; the mode picks AutoFix / Report / Strict. Nothing is uploaded.
 

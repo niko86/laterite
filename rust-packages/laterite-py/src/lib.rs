@@ -17,6 +17,7 @@
 use std::path::Path;
 
 use laterite_ags4_core::error::CliError;
+use laterite_ags4_core::index::{Sidecar as CoreSidecar, ValidationStamp};
 use laterite_ags4_validator::findings::{Severity, Target};
 use laterite_ags4_validator::{CheckOptions, DictVersion, Dictionary, Findings, ValidatorError};
 use pyo3::exceptions::PyRuntimeError;
@@ -78,13 +79,14 @@ fn map_err(e: ValidatorError) -> (i32, String, String) {
     (code, kind.to_string(), msg)
 }
 
-/// Run the validator from either a path or in-memory text. Returns
+/// Run the validator from a path, in-memory text, or raw bytes. Returns
 /// `(file, dict_version, resolution, findings)` or
 /// `(exit_code, error_kind, message)`.
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn validate(
     path: Option<&str>,
     text: Option<&str>,
+    data: Option<&[u8]>,
     dvr: Option<&str>,
     warnings: bool,
     fyi: bool,
@@ -135,11 +137,28 @@ fn validate(
             res.as_str().to_string(),
             found,
         ))
+    } else if let Some(d) = data {
+        // bytes path: decode with `enc` (BOM-sniffed) then validate — the text
+        // branch's twin for callers that hold raw bytes (a web backend, an
+        // embedded host) with no file on disk. Same engine the wasm surface uses.
+        let pf = laterite_ags4_validator::parse::parse_bytes(d, enc).map_err(map_err)?;
+        let tran = laterite_ags4_validator::tran_ags_of(&pf);
+        let (dv, res) = laterite_ags4_validator::resolve_dict_version(over, tran.as_deref())
+            .map_err(map_err)?;
+        let dict = Dictionary::bundled(dv);
+        let mut found = Findings::new();
+        laterite_ags4_validator::rules::run_all(&pf, &dict, &opts, None, &mut found);
+        Ok((
+            "<bytes>".to_string(),
+            dv.as_str().to_string(),
+            res.as_str().to_string(),
+            found,
+        ))
     } else {
         Err((
             5,
             "bad_args".to_string(),
-            "either path or text is required".to_string(),
+            "one of path, text, or data is required".to_string(),
         ))
     }
 }
@@ -227,12 +246,13 @@ fn err_dict<'py>(
 /// error, exit_code}` (the Python layer raises the mapped exception;
 /// the CLI uses `exit_code` directly).
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, dict_version=None, include_warnings=false, include_fyi=false, check_files=false, encoding=None))]
+#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, check_files=false, encoding=None))]
 #[allow(clippy::too_many_arguments)]
 fn run_check<'py>(
     py: Python<'py>,
     path: Option<String>,
     text: Option<String>,
+    data: Option<Vec<u8>>,
     dict_version: Option<String>,
     include_warnings: bool,
     include_fyi: bool,
@@ -242,6 +262,7 @@ fn run_check<'py>(
     match validate(
         path.as_deref(),
         text.as_deref(),
+        data.as_deref(),
         dict_version.as_deref(),
         include_warnings,
         include_fyi,
@@ -308,11 +329,12 @@ fn run_check<'py>(
 /// side prepends the literal `HEADING`/`UNIT`/`TYPE`/`DATA` when it
 /// needs the python-ags4-shaped frame.
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, encoding=None))]
+#[pyo3(signature = (path=None, text=None, data=None, encoding=None))]
 fn parse_primitives<'py>(
     py: Python<'py>,
     path: Option<String>,
     text: Option<String>,
+    data: Option<Vec<u8>>,
     encoding: Option<String>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let enc = match encoding.as_deref() {
@@ -324,11 +346,14 @@ fn parse_primitives<'py>(
             }
         },
     };
-    let parsed = match (path.as_deref(), text.as_deref()) {
-        (Some(p), _) => laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc),
-        (_, Some(t)) => laterite_ags4_validator::parse::parse_str(t),
+    let parsed = match (path.as_deref(), text.as_deref(), data.as_deref()) {
+        (Some(p), _, _) => {
+            laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc)
+        }
+        (_, Some(t), _) => laterite_ags4_validator::parse::parse_str(t),
+        (_, _, Some(d)) => laterite_ags4_validator::parse::parse_bytes(d, enc),
         _ => {
-            return err_dict(py, 5, "bad_args", "either path or text is required");
+            return err_dict(py, 5, "bad_args", "one of path, text, or data is required");
         }
     };
     let pf = match parsed {
@@ -448,6 +473,141 @@ impl Reading {
     }
 }
 
+/// A read-only handle to an `.ags.idx` validity **certificate** + byte-offset
+/// index (the core `laterite_ags4_core::index::Sidecar`). `Ags4File.certify`
+/// mints one over an already-clean file; `read(index=…)` loads + freshness-checks
+/// one to skip re-validation. Core owns the format and can *read* a cert with no
+/// validator, but cannot *mint* (it doesn't depend on the validator); minting fills
+/// the validator identity here and trusts that the CALLER (the Python `certify`)
+/// confirmed a clean validation first.
+#[pyclass(name = "Sidecar")]
+struct PySidecar {
+    inner: CoreSidecar,
+}
+
+#[pymethods]
+impl PySidecar {
+    /// Assemble a certificate for an ALREADY-clean file: index `data`'s group
+    /// sections and stamp the validation. The caller MUST have validated `data`
+    /// clean (0 error findings) — core trusts that, it cannot re-check. `edition`
+    /// is the resolved AGS edition (e.g. "4.1.1"); `checked_at` an RFC-3339 UTC
+    /// timestamp; `warnings`/`fyi` the advisory counts present at validation
+    /// (errors are 0 by construction). The validator name + version are filled
+    /// here. Raises `ValueError` if `data` isn't indexable AGS4 (e.g. non-UTF-8,
+    /// which the byte index rejects).
+    #[staticmethod]
+    #[pyo3(signature = (data, edition, checked_at, warnings=0, fyi=0))]
+    fn assemble(
+        data: &[u8],
+        edition: String,
+        checked_at: String,
+        warnings: u32,
+        fyi: u32,
+    ) -> PyResult<Self> {
+        let stamp = ValidationStamp {
+            validator: "laterite_ags4".to_string(),
+            validator_version: env!("CARGO_PKG_VERSION").to_string(),
+            checked_at,
+            warnings,
+            fyi,
+        };
+        let inner = CoreSidecar::assemble(data, edition, stamp)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(Self { inner })
+    }
+
+    /// Parse a certificate from its on-disk JSON bytes, rejecting an unknown
+    /// format version. Raises `ValueError` on malformed / unsupported JSON.
+    #[staticmethod]
+    fn from_json(data: &[u8]) -> PyResult<Self> {
+        let inner = CoreSidecar::from_json(data)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(Self { inner })
+    }
+
+    /// Is this certificate still current for `data`? Strong check: format version
+    /// + byte length + SHA-256. A mismatch means the source changed under the cert
+    /// (its byte offsets and clean verdict are now lies), so it must be rebuilt.
+    fn is_fresh_for(&self, data: &[u8]) -> bool {
+        self.inner.is_fresh_for(data)
+    }
+
+    /// Serialise to the on-disk `.ags.idx` JSON (pretty). Raises on a serialize
+    /// failure (not expected for a well-formed cert).
+    fn to_json<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
+        let bytes = self
+            .inner
+            .to_json()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(pyo3::types::PyBytes::new(py, &bytes))
+    }
+
+    /// The byte-offset index — `{group_code: (start, end)}` in file order (an
+    /// insertion-ordered dict). Locates each group's bytes for a sliced read.
+    fn index<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let d = PyDict::new(py);
+        for code in &self.inner.order {
+            if let Some((s, e)) = self.inner.groups.get(code) {
+                d.set_item(code, (*s, *e))?;
+            }
+        }
+        Ok(d)
+    }
+
+    #[getter]
+    fn version(&self) -> u32 {
+        self.inner.version
+    }
+    #[getter]
+    fn size(&self) -> u64 {
+        self.inner.file.size
+    }
+    #[getter]
+    fn sha256(&self) -> &str {
+        &self.inner.file.sha256
+    }
+    #[getter]
+    fn edition(&self) -> &str {
+        &self.inner.file.edition
+    }
+    #[getter]
+    fn validator(&self) -> &str {
+        &self.inner.validation.validator
+    }
+    #[getter]
+    fn validator_version(&self) -> &str {
+        &self.inner.validation.validator_version
+    }
+    #[getter]
+    fn checked_at(&self) -> &str {
+        &self.inner.validation.checked_at
+    }
+    #[getter]
+    fn warnings(&self) -> u32 {
+        self.inner.validation.warnings
+    }
+    #[getter]
+    fn fyi(&self) -> u32 {
+        self.inner.validation.fyi
+    }
+    #[getter]
+    fn order(&self) -> Vec<String> {
+        self.inner.order.clone()
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "<Sidecar v{} {} groups {} bytes edition={:?} by {} {}>",
+            self.inner.version,
+            self.inner.order.len(),
+            self.inner.file.size,
+            self.inner.file.edition,
+            self.inner.validation.validator,
+            self.inner.validation.validator_version,
+        )
+    }
+}
+
 /// Parse `path` or `text` for `read()` / `scan()`: per-group metadata only
 /// (headings/units/types/line_numbers). The typed Arrow table for a group is
 /// NOT built here — it is built lazily, per group, on first touch via the
@@ -456,11 +616,12 @@ impl Reading {
 /// raw parse stays Rust-side in that `Reading` handle, also feeding
 /// byte-faithful `write()`; no per-cell PyObject rows cross the boundary.
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, encoding=None))]
+#[pyo3(signature = (path=None, text=None, data=None, encoding=None))]
 fn parse_arrow<'py>(
     py: Python<'py>,
     path: Option<String>,
     text: Option<String>,
+    data: Option<Vec<u8>>,
     encoding: Option<String>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let enc = match encoding.as_deref() {
@@ -470,10 +631,13 @@ fn parse_arrow<'py>(
             None => return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}")),
         },
     };
-    let parsed = match (path.as_deref(), text.as_deref()) {
-        (Some(p), _) => laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc),
-        (_, Some(t)) => laterite_ags4_validator::parse::parse_str(t),
-        _ => return err_dict(py, 5, "bad_args", "either path or text is required"),
+    let parsed = match (path.as_deref(), text.as_deref(), data.as_deref()) {
+        (Some(p), _, _) => {
+            laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc)
+        }
+        (_, Some(t), _) => laterite_ags4_validator::parse::parse_str(t),
+        (_, _, Some(d)) => laterite_ags4_validator::parse::parse_bytes(d, enc),
+        _ => return err_dict(py, 5, "bad_args", "one of path, text, or data is required"),
     };
     let pf = match parsed {
         Ok(pf) => pf,
@@ -578,6 +742,7 @@ fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(dict_group_unit_type, m)?)?;
     m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_from_arrow, m)?)?;
     m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_compat, m)?)?;
+    m.add_class::<PySidecar>()?;
     registry_fns::register(m)?;
     ags_types_fns::register(m)?;
     transport_fns::register(m)?;

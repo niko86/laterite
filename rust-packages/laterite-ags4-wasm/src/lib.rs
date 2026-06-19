@@ -7,7 +7,7 @@
 //! un-validatable inputs (not AGS4, unsupported edition, bad arguments)
 //! populate `report.error` — nothing throws across the wasm boundary.
 //!
-//! Phase 2 adds `parse()` → typed Arrow IPC for the DuckDB-wasm data
+//! Phase 2 adds `read()` → typed Arrow IPC for the DuckDB-wasm data
 //! explorer; this file is Phase 1 (validator) only.
 
 use laterite_ags4_validator::parse::{DataRow, ParsedFile, ParsedGroup, parse_bytes};
@@ -164,7 +164,7 @@ fn resolve_dict_override(s: Option<&str>) -> Result<Option<DictVersion>, String>
     }
 }
 
-// --- AGS4 production: `to_ags4` (the read path reversed) -----------------
+// --- AGS4 production: `build_ags4` (the read path reversed) -----------------
 
 /// One group of input data, deserialised from the browser's JSON. The
 /// column `headings` are the AGS headings; `units`/`types` are optional
@@ -192,10 +192,10 @@ struct EmitFinding {
     severity: Option<String>,
 }
 
-/// The `to_ags4` result. `text` is the AGS4 document (UTF-8, CRLF line
+/// The `build_ags4` result. `text` is the AGS4 document (UTF-8, CRLF line
 /// endings) — the browser wraps it in a `Blob` to download.
 #[derive(Serialize)]
-struct ToAgs4Report {
+struct BuildAgs4Report {
     text: String,
     findings: Vec<EmitFinding>,
     fixes_applied: usize,
@@ -226,13 +226,13 @@ fn emit_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode, String> {
     }
 }
 
-/// Core of [`to_ags4`], host-testable (no `JsValue`): parse the JSON, run
+/// Core of [`build_ags4`], host-testable (no `JsValue`): parse the JSON, run
 /// the shared `laterite-ags4-emit` orchestrator, flatten the findings.
-fn build_ags4(
+fn build_ags4_from_json(
     groups_json: &str,
     edition: Option<&str>,
     mode: Option<&str>,
-) -> Result<ToAgs4Report, String> {
+) -> Result<BuildAgs4Report, String> {
     let parsed: Vec<GroupInputJson> =
         serde_json::from_str(groups_json).map_err(|e| format!("invalid groups JSON: {e}"))?;
     let groups: Vec<laterite_ags4_emit::GroupInput> = parsed
@@ -254,7 +254,7 @@ fn emit_report(
     groups: Vec<laterite_ags4_emit::GroupInput>,
     edition: Option<&str>,
     mode: Option<&str>,
-) -> Result<ToAgs4Report, String> {
+) -> Result<BuildAgs4Report, String> {
     let opts = laterite_ags4_emit::EmitOpts {
         mode: emit_mode(mode)?,
         edition: emit_edition(edition)?,
@@ -276,7 +276,7 @@ fn emit_report(
             })
         })
         .collect();
-    Ok(ToAgs4Report {
+    Ok(BuildAgs4Report {
         text: String::from_utf8_lossy(&res.bytes).into_owned(),
         findings,
         fixes_applied: res.fixes_applied,
@@ -312,30 +312,30 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
 /// Returns `{ text, findings, fixes_applied }`; `text` is the AGS4 document
 /// (UTF-8, CRLF) for the browser to wrap in a `Blob`.
 #[wasm_bindgen]
-pub fn to_ags4(
+pub fn build_ags4(
     groups_json: &str,
     edition: Option<String>,
     mode: Option<String>,
 ) -> Result<JsValue, JsError> {
     console_error_panic_hook::set_once();
-    let report = build_ags4(groups_json, edition.as_deref(), mode.as_deref())
+    let report = build_ags4_from_json(groups_json, edition.as_deref(), mode.as_deref())
         .map_err(|e| JsError::new(&e))?;
     serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// Build valid AGS4 from **columnar Arrow IPC** input — the same as
-/// [`to_ags4`] but for large, already-columnar browser data (e.g. a
+/// [`build_ags4`] but for large, already-columnar browser data (e.g. a
 /// duckdb-wasm query result) without a per-cell JSON round-trip.
 ///
 /// * `groups` — a JS array of `{ code: string, ipc: Uint8Array }`, each `ipc`
 ///   an Arrow **IPC stream** for one group (its schema's field names are the
 ///   AGS headings). Order is preserved (put `PROJ` first).
-/// * `edition` / `mode` — as [`to_ags4`].
+/// * `edition` / `mode` — as [`build_ags4`].
 ///
 /// Returns the same `{ text, findings, fixes_applied }`. The Arrow→AGS
 /// transpose is the read path's IPC reversed.
 #[wasm_bindgen]
-pub fn to_ags4_ipc(
+pub fn build_ags4_ipc(
     groups: JsValue,
     edition: Option<String>,
     mode: Option<String>,
@@ -363,7 +363,7 @@ pub fn to_ags4_ipc(
 }
 
 #[cfg(test)]
-mod to_ags4_tests {
+mod build_ags4_tests {
     use super::*;
 
     #[test]
@@ -372,7 +372,7 @@ mod to_ags4_tests {
           {"code":"PROJ","headings":["PROJ_ID","PROJ_NAME"],"rows":[["P1","Demo"]]},
           {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01",12.3]]}
         ]"#;
-        let r = build_ags4(json, Some("4.1.1"), Some("autofix")).unwrap();
+        let r = build_ags4_from_json(json, Some("4.1.1"), Some("autofix")).unwrap();
         assert!(
             r.text.contains("\"12.30\""),
             "expected canonical 2DP:\n{}",
@@ -394,7 +394,7 @@ mod to_ags4_tests {
           {"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]},
           {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}
         ]"#;
-        let r = build_ags4(json, None, Some("autofix")).unwrap();
+        let r = build_ags4_from_json(json, None, Some("autofix")).unwrap();
         assert!(r.fixes_applied >= 1, "AutoFix should apply a safe fix");
         assert!(r.text.contains("\"12.30\""), "{}", r.text);
     }
@@ -402,7 +402,7 @@ mod to_ags4_tests {
     #[test]
     fn report_keeps_strings_verbatim() {
         let json = r#"[{"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}]"#;
-        let r = build_ags4(json, None, Some("report")).unwrap();
+        let r = build_ags4_from_json(json, None, Some("report")).unwrap();
         assert!(r.text.contains("\"12.3\""));
         assert_eq!(r.fixes_applied, 0);
     }
@@ -410,8 +410,8 @@ mod to_ags4_tests {
     #[test]
     fn rejects_unknown_mode_and_edition() {
         let json = r#"[{"code":"LOCA","headings":["LOCA_ID"],"rows":[["BH01"]]}]"#;
-        assert!(build_ags4(json, None, Some("banana")).is_err());
-        assert!(build_ags4(json, Some("9.9"), None).is_err());
+        assert!(build_ags4_from_json(json, None, Some("banana")).is_err());
+        assert!(build_ags4_from_json(json, Some("9.9"), None).is_err());
     }
 
     #[test]
@@ -738,7 +738,7 @@ pub fn apply_fixes(data: &[u8], encoding_label: Option<String>, fixes_json: JsVa
 }
 
 // ---------------------------------------------------------------------
-// Phase 2: parse() -> typed Arrow IPC for the DuckDB-wasm data explorer.
+// Phase 2: read() -> typed Arrow IPC for the DuckDB-wasm data explorer.
 //
 // AGS4 isn't a format DuckDB reads natively. We parse it in Rust, build
 // ONE correctly-typed Arrow RecordBatch per group, and hand JS the IPC
@@ -837,7 +837,7 @@ impl ParsedDataset {
 /// columns for whatever parsed, so the explorer works even on a file with
 /// findings. Only an unparseable-as-AGS4 input returns `Err`.
 #[wasm_bindgen]
-pub fn parse(data: &[u8], encoding_label: Option<String>) -> Result<ParsedDataset, JsError> {
+pub fn read(data: &[u8], encoding_label: Option<String>) -> Result<ParsedDataset, JsError> {
     console_error_panic_hook::set_once();
     let encoding = resolve_encoding(encoding_label.as_deref());
     let parsed = parse_bytes(data, encoding).map_err(|e| JsError::new(&e.to_string()))?;
@@ -1293,7 +1293,7 @@ pub fn dictionary(edition_label: Option<String>) -> Result<JsValue, JsError> {
 
 #[cfg(test)]
 mod tests {
-    //! Parity-by-construction guard for `parse()`'s typed-Arrow path.
+    //! Parity-by-construction guard for `read()`'s typed-Arrow path.
     //!
     //! `build_column` is the whole casting surface (the wasm-bindgen
     //! wrappers above only marshal it), and it casts through the SAME

@@ -72,6 +72,12 @@ serde_json = "1"
 # (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee is
 # untouched.
 proptest = "1"
+# Parser-parity gate (`tests/parse_parity.rs`): assert the validator's `parse`
+# agrees structurally with laterite-ags4-core's `ags4_codec` — the parser that
+# builds the `.ags.idx` sidecar's byte index. A cert is only coherent if the
+# index-builder and the parser `validate()` runs agree. DEV-ONLY: it never reaches
+# the validator's lean RUNTIME graph (lean_dep_graph checks `-e normal`).
+laterite-ags4-core = { path = "../laterite-ags4-core" }
 
 [[bench]]
 name = "validate_large_fixture"

@@ -1,6 +1,6 @@
 // Shared types + cell coercion for the typed-data (Explore / Tools) path.
 //
-// The Rust `parse()` (laterite-ags4-wasm) hands back one typed Arrow IPC stream per
+// The Rust `read()` (laterite-ags4-wasm) hands back one typed Arrow IPC stream per
 // group plus a per-group `meta`. DuckDB-wasm ingests the IPC and queries it;
 // the values it reads back need careful coercion before they touch the DOM
 // (see formatCell). This module holds the contract so the worker, the

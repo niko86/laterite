@@ -12,7 +12,7 @@
 //   3. extract it, drop in the locally-built platform `.node` (the bit a real
 //      install pulls from `@laterite/native-*`), and
 //   4. require the packed CJS *and* import the packed ESM, exercising
-//      read / table (born-typed) / validate / emitAgs4 end to end.
+//      read / table (born-typed) / validate / buildAgs4 end to end.
 //
 // apache-arrow (a real runtime dep) is resolved via NODE_PATH from the dev
 // node_modules — the stand-in for it being installed alongside the package.
@@ -90,7 +90,7 @@ try {
       assert.strictEqual(typeof rep.isValid, "boolean", "validate");
       assert.ok(rep.findings.length > 0, "findings");
 
-      const res = m.emitAgs4(
+      const res = m.buildAgs4(
         new Map([["LOCA", [{ LOCA_ID: "BH01", LOCA_GL: 12.3 }]]]),
         { edition: "4.1.1", mode: "autofix" },
       );

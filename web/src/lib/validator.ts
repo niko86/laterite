@@ -142,7 +142,7 @@ export type DictVersionOpt =
   | "4.2";
 export type EncodingOpt = "utf-8" | "windows-1252";
 
-// --- AGS4 producer (Export tab): the `laterite-ags4-wasm` to_ags4(groups, edition, mode)
+// --- AGS4 producer (Export tab): the `laterite-ags4-wasm` build_ags4(groups, edition, mode)
 // result — build valid AGS4 from data. `mode`: autofix (default) | report |
 // strict. ---
 export type EmitMode = "autofix" | "report" | "strict";

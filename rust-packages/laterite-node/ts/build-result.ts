@@ -1,10 +1,10 @@
-// The product of `emitAgs4()` — the Node port of laterite-py's `EmitResult`:
+// The product of `buildAgs4()` — the Node port of laterite-py's `BuildResult`:
 // the AGS4 `bytes`, the validator `findings` on those bytes (post-fix in AutoFix
 // mode), and the count of safe fixes applied.
 import { writeFileSync } from "node:fs";
 
-/** A flattened emit finding — `rule` plus whatever rich keys the validator set. */
-export interface EmitFinding {
+/** A flattened build finding — `rule` plus whatever rich keys the validator set. */
+export interface BuildFinding {
   rule: string;
   line?: number;
   group?: string;
@@ -12,10 +12,10 @@ export interface EmitFinding {
   [key: string]: unknown;
 }
 
-export class EmitResult {
+export class BuildResult {
   constructor(
     readonly bytes: Buffer,
-    readonly findings: EmitFinding[],
+    readonly findings: BuildFinding[],
     readonly fixesApplied: number,
   ) {}
 
@@ -25,12 +25,12 @@ export class EmitResult {
   }
 
   /** Save the bytes to `path`; returns `path`. */
-  write(path: string): string {
+  save(path: string): string {
     writeFileSync(path, this.bytes);
     return path;
   }
 
   toString(): string {
-    return `<EmitResult ${this.bytes.length} bytes, ${this.findings.length} finding(s), fixesApplied=${this.fixesApplied}>`;
+    return `<BuildResult ${this.bytes.length} bytes, ${this.findings.length} finding(s), fixesApplied=${this.fixesApplied}>`;
   }
 }

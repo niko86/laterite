@@ -14,10 +14,10 @@ import init, {
   validate,
   compute_fixes,
   apply_fixes,
-  parse,
+  read,
   diff,
   dictionary,
-  to_ags4,
+  build_ags4,
 } from "../wasm/ags4_wasm.js";
 import type { ParsedDataset } from "../wasm/ags4_wasm.js";
 import wasmUrl from "../wasm/ags4_wasm_bg.wasm?url";
@@ -97,7 +97,7 @@ export interface DictionaryReq {
   edition: string | null;
 }
 /** Build valid AGS4 from per-group data (Export tab). Carries no file bytes
- *  — `groupsJson` is the `[{code, headings, rows}, …]` shape `to_ags4` wants. */
+ *  — `groupsJson` is the `[{code, headings, rows}, …]` shape `build_ags4` wants. */
 export interface ToAgs4Req {
   id: number;
   kind: "toAgs4";
@@ -206,7 +206,7 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
 
     if (req.kind === "parse") {
       dataset?.free();
-      dataset = parse(new Uint8Array(req.bytes), req.encoding);
+      dataset = read(new Uint8Array(req.bytes), req.encoding);
       const groups: GroupMeta[] = dataset.group_codes().map((code) => {
         const m = dataset!.meta(code) as Omit<GroupMeta, "code"> | null;
         return m
@@ -246,7 +246,7 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
 
     if (req.kind === "toAgs4") {
       // Throws (→ caught below) on invalid JSON or a strict-mode rejection.
-      const result = to_ags4(
+      const result = build_ags4(
         req.groupsJson,
         req.edition ?? undefined,
         req.mode,

@@ -67,11 +67,12 @@ export interface GroupMeta {
   lineNumbers: Array<number>
 }
 /**
- * Parse an AGS4 file (`path`) or in-memory `text` into a `Reading` handle.
- * `encoding`: `"utf-8"` (default) / `"windows-1252"` / a label. Throws the
- * classified `kind␟code␟message` (see the error-protocol note) on bad input.
+ * Parse an AGS4 file (`path`), in-memory `text`, or raw `data` bytes into a
+ * `Reading` handle. `encoding`: `"utf-8"` (default) / `"windows-1252"` / a label
+ * — applies to `path` / `data` (text is already decoded). Throws the classified
+ * `kind␟code␟message` (see the error-protocol note) on bad input.
  */
-export declare function parseArrow(path?: string | undefined | null, text?: string | undefined | null, encoding?: string | undefined | null): Reading
+export declare function parseArrow(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, encoding?: string | undefined | null): Reading
 /** One rule violation (omitting `severity` ⇒ error, matching the engine). */
 export interface Finding {
   rule: string
@@ -113,7 +114,7 @@ export interface ValidationReport {
  * `None`/`"auto"` auto-detects from `TRAN_AGS`, else forces an edition. Returns
  * the `{ok:false}` failure report (not a throw) for un-validatable input.
  */
-export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null): ValidationReport
+export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null): ValidationReport
 /**
  * One group of columnar input — its code + an Arrow IPC stream (`Buffer`)
  * whose column names are the AGS headings.

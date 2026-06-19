@@ -27,8 +27,8 @@ _FIX = (
 )
 _CLEAN = _FIX / "clean_minimal.ags"
 
-# An inline AGS4 file carrying a numeric (2DP) column so to_numeric() has
-# something to coerce, plus a non-numeric (ID) column it must leave alone.
+# An inline AGS4 file with a born-typed numeric (2DP) column plus a non-numeric
+# (ID) column — exercises the born-typed / backend / engine tests below.
 _NUMERIC_SRC = (
     '"GROUP","LOCA"\r\n'
     '"HEADING","LOCA_ID","LOCA_FDEP"\r\n'
@@ -147,7 +147,7 @@ def test_line_numbers_are_ints_and_match_row_count(clean):
     assert lines == sorted(lines)
 
 
-# --- table / __getitem__ / to_numeric -------------------------------------
+# --- table / __getitem__ ---------------------------------------------------
 
 
 def test_getitem_and_table_are_equivalent(clean):
@@ -180,21 +180,6 @@ def test_getitem_is_born_typed():
     assert df.schema["LOCA_NUM"] == pl.Int64
     assert df["LOCA_FDEP"].to_list() == [10.5, None]  # dirty cell -> null
     assert df["LOCA_NUM"].to_list() == [7, 9]
-
-
-def test_to_numeric_coerces_numeric_columns_leaves_others():
-    f = laterite.read(text=_NUMERIC_SRC)
-    df = f.to_numeric("LOCA")
-    # 2DP column is born float; bad cell → null (errors='coerce' parity).
-    assert df["LOCA_FDEP"].to_list() == [10.5, None, 3.25]
-    # ID column untouched (still strings).
-    assert df["LOCA_ID"].to_list() == ["BH1", "BH2", "BH3"]
-
-
-def test_to_numeric_no_numeric_columns_returns_frame_unchanged(clean):
-    """A group with no DP/SF/SCI/MC columns returns the same frame."""
-    out = clean.to_numeric("PROJ")
-    assert out.equals(clean["PROJ"])
 
 
 # --- backend selection + the in-memory DuckDB engine ----------------------
@@ -331,7 +316,7 @@ def test_at_frames_pulls_all_related_groups():
 
 @pytest.mark.parametrize(
     "accessor",
-    ["headings", "units", "types", "line_numbers", "to_numeric"],
+    ["headings", "units", "types", "line_numbers"],
 )
 def test_accessors_raise_keyerror_on_absent_group(clean, accessor):
     with pytest.raises(KeyError, match="not in file"):
@@ -343,36 +328,23 @@ def test_getitem_raises_keyerror_on_absent_group(clean):
         _ = clean["NOPE"]
 
 
-# --- write / to_ags4_text round-trip --------------------------------------
+# --- save / text round-trip -----------------------------------------------
 
 
-def test_write_returns_path_and_reads_back(clean, tmp_path):
+def test_save_returns_path_and_reads_back(clean, tmp_path):
     out = tmp_path / "rt.ags"
-    returned = clean.write(out)
+    returned = clean.save(out)
     assert returned == out
     assert out.exists()
     f2 = laterite.read(str(out))
     assert set(f2.groups) == set(clean.groups)
 
 
-def test_module_write_function_rejects_non_ags4file(tmp_path):
-    """laterite.write() guards against non-Ags4File input (TypeError)."""
-    with pytest.raises(TypeError, match="Ags4File"):
-        laterite.write({"not": "an Ags4File"}, tmp_path / "x.ags")
-
-
-def test_module_write_function_round_trips(clean, tmp_path):
-    out = tmp_path / "via_module.ags"
-    laterite.write(clean, out)
-    f2 = laterite.read(str(out))
-    assert set(f2.groups) == set(clean.groups)
-
-
 # --- structure-preserving round-trip property -----------------------------
 #
-# to_ags4_text() must reconstruct a file whose group set and per-group
-# heading lists survive a re-read. Byte-equality may NOT hold (every field
-# is re-quoted, CRLF is normalised), so we assert *structural* equality.
+# .text must reconstruct a file whose group set and per-group heading lists
+# survive a re-read. Byte-equality may NOT hold (every field is re-quoted,
+# CRLF is normalised), so we assert *structural* equality.
 
 
 def _ags_ident() -> st.SearchStrategy[str]:
@@ -412,7 +384,7 @@ def _ags_ident() -> st.SearchStrategy[str]:
         max_size=3,
     ),
 )
-def test_to_ags4_text_round_trip_preserves_structure(group, headings, rows):
+def test_text_round_trip_preserves_structure(group, headings, rows):
     # Build a minimal valid-shaped AGS4 file: GROUP / HEADING / UNIT / TYPE
     # then DATA rows, every field padded/truncated to the heading width.
     n = len(headings)
@@ -438,7 +410,7 @@ def test_to_ags4_text_round_trip_preserves_structure(group, headings, rows):
     # files it accepts are in-scope for the round-trip invariant.
     if group not in f:
         return
-    text = f.to_ags4_text()
+    text = f.text
     f2 = laterite.read(text=text)
 
     # Group set is preserved.
@@ -528,7 +500,7 @@ def test_read_write_read_preserves_data_values(group, headings, type_choices, da
         return  # parser legitimately rejected the generated file — out of scope
     # read -> write -> re-parse, then compare raw cell values + types.
     f = laterite.read(text=src)
-    s2 = _native.parse_primitives(text=f.to_ags4_text())
+    s2 = _native.parse_primitives(text=f.text)
     assert s1["group_order"] == s2["group_order"]
     for code in s1["group_order"]:
         g1, g2 = s1["groups"][code], s2["groups"][code]

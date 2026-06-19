@@ -6,9 +6,9 @@ import {
   generateTypedGraph,
   loadDictionary,
 } from "../tools/generate-typed-graph.mjs";
-import { LOCA, PROJ, emitAgs4, read } from "../ts/index";
+import { LOCA, PROJ, buildAgs4, read } from "../ts/index";
 
-describe("typed-graph builder → emitAgs4", () => {
+describe("typed-graph builder → buildAgs4", () => {
   it("walks a typed tree into valid AGS4 that round-trips", () => {
     const proj = new PROJ({
       PROJ_ID: "P1",
@@ -18,7 +18,7 @@ describe("typed-graph builder → emitAgs4", () => {
         new LOCA({ LOCA_ID: "BH02", LOCA_GL: 13.0 }),
       ],
     });
-    const res = emitAgs4(proj);
+    const res = buildAgs4(proj);
     expect(res.text).toMatch(/"GROUP","PROJ"/);
     expect(res.text).toMatch(/"GROUP","LOCA"/);
     // Every declared heading is emitted (LOCA_GL is column 7, not adjacent to

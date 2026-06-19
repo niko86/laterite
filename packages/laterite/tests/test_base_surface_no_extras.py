@@ -71,12 +71,12 @@ _EXERCISE = textwrap.dedent(
         laterite.read(ags).sql("SELECT COUNT(*) AS n FROM LOCA").fetchall()
     def t_connection():
         assert laterite.read(ags).connection is not None
-    def t_write():
-        assert laterite.read(ags).write(d / "o.ags").exists()
+    def t_save():
+        assert laterite.read(ags).save(d / "o.ags").exists()
     def t_validate():
         laterite.validate(ags)
     def t_emit():
-        res = laterite.emit_ags4(
+        res = laterite.build_ags4(
             {"PROJ": pl.DataFrame({"PROJ_ID": ["P1"], "PROJ_NAME": ["demo"]})}
         )
         assert res.bytes
@@ -109,7 +109,7 @@ _EXERCISE = textwrap.dedent(
 
     CASES = [
         ("read", t_read), ("sql", t_sql), ("connection", t_connection),
-        ("write", t_write), ("validate", t_validate), ("emit_ags4", t_emit),
+        ("save", t_save), ("validate", t_validate), ("build_ags4", t_emit),
         ("ags4.read_typed", t_read_typed), ("transport", t_transport),
         ("registry", t_registry), ("ags_types", t_ags_types),
         ("typed_classes", t_typed_classes), ("dict_for", t_dict_for),

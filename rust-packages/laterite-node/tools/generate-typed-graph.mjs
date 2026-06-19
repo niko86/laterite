@@ -98,7 +98,7 @@ export function generateTypedGraph(groups) {
     HEADER +
     "/* eslint-disable */\n" +
     "// A typed builder graph: `new PROJ({ PROJ_ID: 'P1', locas: [new LOCA({…})] })`,\n" +
-    "// then `emitAgs4(proj)` walks it into per-group rows. Each class carries a\n" +
+    "// then `buildAgs4(proj)` walks it into per-group rows. Each class carries a\n" +
     "// static `code` and extends AgsGroup; child arrays are\n" +
     "// `<childCode>`.toLowerCase() + 's'.\n" +
     'import { AgsGroup } from "./ags-group";\n\n' +

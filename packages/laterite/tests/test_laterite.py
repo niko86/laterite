@@ -66,17 +66,6 @@ def test_validate_text_and_to_json_is_rust_shaped():
     assert all(k.startswith("AGS Format Rule ") for k in doc["findings"])
 
 
-def test_read_to_numeric_coerces_like_pandas():
-    src = (
-        '"GROUP","LOCA"\r\n"HEADING","LOCA_ID","LOCA_FDEP"\r\n'
-        '"UNIT","","m"\r\n"TYPE","ID","2DP"\r\n'
-        '"DATA","BH1","10.50"\r\n"DATA","BH2","oops"\r\n'
-    )
-    f = laterite.read(text=src)
-    col = f.to_numeric("LOCA")["LOCA_FDEP"].to_list()
-    assert col == [10.5, None]
-
-
 def test_not_ags4_raises_mapped_exception():
     with pytest.raises(laterite.NotAgs4Error):
         laterite.read(text="definitely not ags4")

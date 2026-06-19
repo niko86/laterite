@@ -10,7 +10,6 @@ as plain functional tests in CI.
 Phase-1 result (2000-row synthetic, release, median, vs the v0.2.0 primitives
 path) — the Arrow boundary + the Rust write-back handle:
     group-access   404us ->  26us   (~16x; zero-copy capsule, was per-cell)
-    to_numeric     489us ->  61us   (~8x; redundant on born-typed columns)
     read-cold      864us -> 660us   (~1.3x; parse+Arrow replaced the O(cells) dict)
     validate      1161us -> 1169us  (unchanged control)
 
@@ -81,13 +80,6 @@ def test_group_access_baseline(benchmark, parsed: laterite.Ags4File):
     """Building one group's frame — now a zero-copy ingest of the Rust-built
     Arrow table (replacing the per-cell string-frame path); born-typed."""
     benchmark(lambda: parsed["LOCA"])
-
-
-@pytest.mark.benchmark
-def test_to_numeric_baseline(benchmark, parsed: laterite.Ags4File):
-    """Numeric coercion — redundant at 1.0 (columns are born-typed); kept for
-    back-compat + the MC string-cast."""
-    benchmark(lambda: parsed.to_numeric("LOCA"))
 
 
 @pytest.mark.benchmark

@@ -92,7 +92,7 @@ def test_deprecated_db_keyword_still_works_with_warning(ags_file: Path) -> None:
 
 def test_non_path_arg_raises_actionable_typeerror() -> None:
     # Passing e.g. an Ags4File (or any non-path) fails early, naming the fix.
-    with pytest.raises(TypeError, match=r"\.write\(path\)"):
+    with pytest.raises(TypeError, match=r"\.save\(path\)"):
         transport.pack(object())
     with pytest.raises(TypeError, match=r"missing required argument: 'src'"):
         transport.pack()

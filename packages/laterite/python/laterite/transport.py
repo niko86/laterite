@@ -62,7 +62,7 @@ def _src_path(src, *, fn: str, legacy=None) -> Path:
         raise TypeError(
             f"{fn}() expects a file path (str or os.PathLike), not "
             f"{type(src).__name__!r}. transport works on any file by PATH — if you "
-            f"have an Ags4File, call .write(path) first, then {fn}(path)."
+            f"have an Ags4File, call .save(path) first, then {fn}(path)."
         )
     return Path(src)
 

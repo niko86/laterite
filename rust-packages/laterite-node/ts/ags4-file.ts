@@ -21,6 +21,9 @@ export class Ags4File {
   readonly #tables = new Map<string, Table>();
   // The DuckDB engine — created lazily on first sql()/at()/connection.
   #engine: DuckEngine | null = null;
+  // Memoised AGS4 re-emit (the `text`/`bytes` getters; the emit is O(size)).
+  #text?: string;
+  #bytes?: Buffer;
 
   constructor(reading: Reading) {
     this.#reading = reading;
@@ -82,17 +85,22 @@ export class Ags4File {
     return table;
   }
 
-  // --- emit / write --------------------------------------------------------
+  // --- emit / save ---------------------------------------------------------
 
-  /** Reconstruct spec-correct AGS4 text — byte-faithful to the source DATA
-   * values (re-emitted native-side from the retained parse). */
-  toAgs4Text(): string {
-    return this.#reading.emit();
+  /** Spec-correct AGS4 as text — byte-faithful to the source DATA values
+   * (re-emitted native-side from the retained parse). Memoised. */
+  get text(): string {
+    return (this.#text ??= this.#reading.emit());
   }
 
-  /** Write the AGS4 text to `path` (UTF-8); returns `path`. */
-  write(path: string): string {
-    writeFileSync(path, this.toAgs4Text(), "utf8");
+  /** `text` encoded UTF-8 — the bytes `save()` writes. Memoised. */
+  get bytes(): Buffer {
+    return (this.#bytes ??= Buffer.from(this.text, "utf8"));
+  }
+
+  /** Write the AGS4 to `path` (UTF-8); returns `path`. The inverse of `read`. */
+  save(path: string): string {
+    writeFileSync(path, this.bytes);
     return path;
   }
 
