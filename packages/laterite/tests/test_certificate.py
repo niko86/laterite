@@ -190,6 +190,8 @@ def test_sidecar_records_provenance_and_index(tmp_path):
     cert = lat.read(src).validate().certify()
     sc = lat._laterite_native.Sidecar.from_json(cert.read_bytes())
     assert sc.validator == "laterite_ags4" and sc.validator_version
+    assert sc.compat is None  # native validation, not the compat profile
+    assert sc.matches_native_validator() is True  # minted by this engine
     assert sc.edition == "4.2"
     assert sc.warnings == 0 and sc.fyi == 0  # errors-only validate
     # the byte index locates every group, in file order, tiling [0, size)
@@ -197,3 +199,85 @@ def test_sidecar_records_provenance_and_index(tmp_path):
     assert sc.order == ["PROJ", "TRAN", "UNIT", "TYPE"] == list(idx)
     assert idx["PROJ"][0] == 0
     assert idx["TYPE"][1] == sc.size
+
+
+def test_cert_from_a_different_engine_is_not_trusted(tmp_path):
+    # The skip must be checker-aware, not just byte-fresh: a cert minted by a
+    # different/older validator engine is re-validated, never trusted (its clean
+    # verdict may not reproduce under today's rules).
+    import json
+
+    src = _write(tmp_path)
+    cert = lat.read(src).validate().certify()
+    data = json.loads(cert.read_bytes())
+    data["validation"]["validator_version"] = "0.0.0-ancient"  # simulate an old engine
+    cert.write_bytes(json.dumps(data).encode())
+
+    # bytes still match (so read() does NOT raise StaleCertError) ...
+    h = lat.read(src, index=cert)
+    # ... but the checker differs, so validate() runs the engine, not the cert.
+    rep = h.validate().report
+    assert rep.resolution != "certified"  # engine actually ran
+    assert rep.is_valid  # and the file is genuinely clean
+
+
+def _cert(path):
+    return lat._laterite_native.Sidecar.from_json(path.read_bytes())
+
+
+def test_certify_stamps_the_check_profile(tmp_path):
+    src = _write(tmp_path)
+    # default validate → default (errors-only, auto-edition) profile, local mint
+    sc = _cert(lat.read(src).validate().certify())
+    assert sc.check_files is False and sc.edition_forced is False
+    assert sc.etag is None and sc.last_modified is None  # Python mints locally
+    # --check-files validate → stamped
+    cf = _cert(lat.read(src).validate(check_files=True).certify(path=tmp_path / "cf.idx"))
+    assert cf.check_files is True
+    # forced edition → stamped
+    fe = _cert(lat.read(src).validate(dict_version="4.2").certify(path=tmp_path / "fe.idx"))
+    assert fe.edition_forced is True
+
+
+def test_forced_edition_cert_does_not_satisfy_an_auto_request(tmp_path):
+    src = _write(tmp_path)
+    cert = lat.read(src).validate(dict_version="4.2").certify()
+    # an AUTO request must NOT skip on a forced cert (different dictionaries possible)
+    assert lat.read(src, index=cert).validate().report.resolution != "certified"
+    # ...but the SAME forced request does skip
+    assert (
+        lat.read(src, index=cert).validate(dict_version="4.2").report.resolution
+        == "certified"
+    )
+
+
+def test_check_files_request_needs_a_check_files_cert(tmp_path):
+    src = _write(tmp_path)
+    # a default cert can't satisfy a --check-files request → re-validate
+    default_cert = lat.read(src).validate().certify()
+    assert (
+        lat.read(src, index=default_cert).validate(check_files=True).report.resolution
+        != "certified"
+    )
+    # a --check-files cert covers BOTH a check_files request and a weaker default one
+    cf_cert = lat.read(src).validate(check_files=True).certify(path=tmp_path / "cf.idx")
+    assert (
+        lat.read(src, index=cf_cert).validate(check_files=True).report.resolution
+        == "certified"
+    )
+    assert lat.read(src, index=cf_cert).validate().report.resolution == "certified"
+
+
+def test_compat_provenance_field_round_trips(tmp_path):
+    # The cert can carry the python-ags4 compat version (for a laterite.compat-
+    # minted cert); a native cert leaves it None, and the two are distinct
+    # checker identities.
+    src = _write(tmp_path)
+    raw = src.read_bytes()
+    sc = lat._laterite_native.Sidecar.assemble(
+        raw, "4.2", "2026-06-20T00:00:00Z", 0, 0, "python-ags4-0.5.0"
+    )
+    back = lat._laterite_native.Sidecar.from_json(sc.to_json())
+    assert back.compat == "python-ags4-0.5.0"
+    # a compat-minted cert is NOT the native checker identity
+    assert back.matches_native_validator() is False

@@ -250,6 +250,8 @@ class Ags4File:
         "_bytes",
         "_cert",
         "_con",
+        "_last_check_files",
+        "_last_forced",
         "_p",
         "_registered",
         "_report",
@@ -296,6 +298,10 @@ class Ags4File:
         # A fresh `.ags.idx` certificate, set by `read(index=...)` only after it
         # matched this file's bytes — lets `.validate()` skip the rule engine.
         self._cert = None
+        # The check profile of the most recent `.validate()` engine run — what
+        # `.certify()` stamps into the cert so a later skip can match profiles.
+        self._last_check_files = False
+        self._last_forced = False
 
     # --- metadata (no engine spin-up) ----------------------------------------
 
@@ -490,20 +496,27 @@ class Ags4File:
         retained source validates its spec-correct re-emit instead.
 
         **Certificate short-circuit:** if this handle carries a fresh ``index=``
-        certificate (from :func:`read`) and you ask for the *default* check, the rule
-        engine is skipped — the cert already proves the file validated clean — and
-        :attr:`report` is the synthesised certified report (:meth:`Report.from_cert`).
-        Asking for more than the cert vouches for (an explicit ``dict_version`` /
-        ``warnings`` / ``fyi`` / ``check_files``) always runs the engine."""
+        certificate (from :func:`read`) **minted by the current validator engine**,
+        and you ask for the *default* check, the rule engine is skipped — the cert
+        already proves the file validated clean — and :attr:`report` is the
+        synthesised certified report (:meth:`Report.from_cert`). A cert from a
+        *different/older* engine is re-validated, not trusted (its clean verdict may
+        not reproduce under today's rules). Asking for more than the cert vouches for
+        (an explicit ``dict_version`` / ``warnings`` / ``fyi`` / ``check_files``)
+        always runs the engine."""
         if (
             self._cert is not None
-            and dict_version is None
+            and self._cert.matches_native_validator()
+            and self._cert.profile_covers(check_files, dict_version)
             and not warnings
             and not fyi
-            and not check_files
         ):
             self._report = Report.from_cert(self._cert, self._src)
             return self
+        # Engine run — remember the check profile so a following `.certify()`
+        # stamps it into the cert (errors-only default ⇒ both False).
+        self._last_check_files = check_files
+        self._last_forced = dict_version is not None
         if self._src is not None:
             path, txt, data = self._src
         else:
@@ -577,7 +590,11 @@ class Ags4File:
 
         checked_at = datetime.now(UTC).isoformat()
         cert = _native.Sidecar.assemble(
-            self._source_bytes(), self._report.dict_version, checked_at
+            self._source_bytes(),
+            self._report.dict_version,
+            checked_at,
+            check_files=self._last_check_files,
+            edition_forced=self._last_forced,
         )
         path.write_bytes(cert.to_json())
         return path

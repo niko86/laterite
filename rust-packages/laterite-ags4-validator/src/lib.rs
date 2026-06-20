@@ -29,6 +29,13 @@
 
 use std::path::{Path, PathBuf};
 
+/// The validation **engine** version — the identity a `.ags.idx` certificate
+/// stamps so a clean verdict is only trusted (validation skipped) when the same
+/// engine would produce it. Distinct from any binding's crate version (the Python
+/// wheel, the DuckDB extension) so a cert minted on one surface is comparable on
+/// another: all bindings record THIS, not their own version.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub mod dict;
 pub mod error;
 pub mod findings;

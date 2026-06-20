@@ -127,11 +127,30 @@ pub const SIDECAR_VERSION: u32 = 1;
 pub struct FileMeta {
     /// Source byte length.
     pub size: u64,
-    /// Hex-encoded SHA-256 of the source bytes — the strong staleness check.
+    /// Hex-encoded SHA-256 of the source bytes — the strong, portable,
+    /// origin-independent staleness fingerprint, and the ground truth any cheaper
+    /// check falls back to. Always present; never superseded by the optional
+    /// transport validators below (a local file has no ETag, and an ETag is only
+    /// meaningful relative to the endpoint that issued it).
     pub sha256: String,
     /// AGS edition resolved from the file's `TRAN_AGS` at validation time
     /// (e.g. "4.1"); empty if the minting layer didn't resolve one.
     pub edition: String,
+    /// The remote origin's HTTP `ETag` observed at mint time, verbatim (`W/`
+    /// weak prefix preserved), when minted from a remote (http/s3) source — else
+    /// `None`. A *cheap* freshness shortcut: a HEAD whose ETag matches proves the
+    /// object is byte-identical, so a remote reader can trust the SHA + byte
+    /// offsets WITHOUT re-downloading to re-hash. Only ever grants trust on a
+    /// match; absence/mismatch downgrades to the SHA path (see
+    /// [`Sidecar::is_fresh_for_remote`]).
+    #[serde(default)]
+    pub etag: Option<String>,
+    /// The remote origin's HTTP `Last-Modified` at mint time, when known — the
+    /// weak fallback (paired with `size`) for stores that return no usable ETag.
+    /// Weaker than the ETag (second granularity), so it gates the cheap ranged
+    /// read but never the strong verdict on its own.
+    #[serde(default)]
+    pub last_modified: Option<String>,
 }
 
 /// The validation a [`Sidecar`] registers. A sidecar is only minted for a file
@@ -143,8 +162,31 @@ pub struct FileMeta {
 pub struct ValidationStamp {
     /// What validated it (e.g. "lat-check", "laterite_ags4").
     pub validator: String,
-    /// The validator's version string.
+    /// The validation **engine** version (`laterite_ags4_validator::VERSION`),
+    /// NOT the minting binding's crate version — so a cert is comparable across
+    /// surfaces (the Python wheel and the independently-versioned DuckDB extension
+    /// both stamp the engine version). A consumer trusts the clean verdict (skips
+    /// re-validation) only when this still matches its own engine.
     pub validator_version: String,
+    /// The python-ags4 compatibility version when validated through the
+    /// `laterite.compat` drop-in (whose behaviour mimics that python-ags4
+    /// release), else `None` for the native validator. Part of the checker
+    /// identity: a compat-minted clean verdict isn't trusted by the native
+    /// validator (and vice versa), since the two can disagree on a file.
+    #[serde(default)]
+    pub compat: Option<String>,
+    /// Whether the validation ran Rule 20's **on-disk** half (the sibling `FILE/`
+    /// tree must exist) — `lat-check --check-files`. Part of the check PROFILE: a
+    /// missing on-disk file is an error, so a cert minted *without* this must not
+    /// be trusted to skip a request that *wants* it ([`Sidecar::profile_covers`]).
+    #[serde(default)]
+    pub check_files: bool,
+    /// Whether the edition was **forced** (`--dict-version X`) rather than
+    /// auto-resolved from `TRAN_AGS`. A forced cert and an auto cert can record the
+    /// same `edition` string yet have run different dictionaries when the file's
+    /// `TRAN_AGS` disagrees — so the skip only trusts a same-forcing request.
+    #[serde(default)]
+    pub edition_forced: bool,
     /// When, as an ISO-8601 / RFC-3339 UTC string, set by the minting layer.
     pub checked_at: String,
     /// Non-blocking advisory counts present at validation. Errors are 0 by
@@ -180,6 +222,20 @@ pub struct Sidecar {
     pub order: Vec<String>,
 }
 
+/// Verdict of a cheap, I/O-free remote freshness check ([`Sidecar::is_fresh_for_remote`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RemoteFreshness {
+    /// A strong validator (ETag) matched — the object is byte-identical; trust the
+    /// SHA + byte offsets without re-downloading.
+    Trusted,
+    /// Only weak signals (size + Last-Modified) matched — probably fresh; fine to
+    /// gate the cheap ranged read, but a verdict-strict caller may still re-hash.
+    ProbablyFresh,
+    /// No usable cheap match — download + re-hash ([`Sidecar::is_fresh_for`]) or
+    /// regenerate the cert.
+    MustRehash,
+}
+
 impl Sidecar {
     /// Assemble a sidecar for an already-validated file. The CALLER must have
     /// confirmed a clean validation (zero error findings) and supply the
@@ -198,11 +254,25 @@ impl Sidecar {
                 size: bytes.len() as u64,
                 sha256: sha256_hex(bytes),
                 edition,
+                // Local mint by default; a remote-aware minting layer records the
+                // origin's HTTP validators via `with_origin`.
+                etag: None,
+                last_modified: None,
             },
             validation,
             groups: index.groups,
             order: index.order,
         })
+    }
+
+    /// Record the remote origin's HTTP validators (`ETag` / `Last-Modified`)
+    /// observed at mint time, so a remote consumer can confirm freshness with a
+    /// HEAD instead of re-downloading to re-hash. Builder; a local mint leaves both
+    /// `None` (and the SHA stays the authoritative check regardless).
+    pub fn with_origin(mut self, etag: Option<String>, last_modified: Option<String>) -> Self {
+        self.file.etag = etag;
+        self.file.last_modified = last_modified;
+        self
     }
 
     /// Serialise to pretty JSON — the on-disk `.ags.idx` form.
@@ -239,6 +309,88 @@ impl Sidecar {
     /// ETag/Last-Modified check at the call site.
     pub fn size_matches(&self, size: u64) -> bool {
         self.file.size == size
+    }
+
+    /// Was this cert minted by the given checker identity? `is_fresh_for` proves
+    /// the *bytes* are unchanged; this proves the *checker* is the same — both
+    /// must hold before a consumer trusts the clean verdict and **skips**
+    /// re-validation. A cert from a different/older engine (or a different compat
+    /// profile) is byte-fresh but checker-stale: re-validate rather than trust a
+    /// verdict today's rules might not reproduce.
+    pub fn checker_matches(
+        &self,
+        validator: &str,
+        validator_version: &str,
+        compat: Option<&str>,
+    ) -> bool {
+        self.validation.validator == validator
+            && self.validation.validator_version == validator_version
+            && self.validation.compat.as_deref() == compat
+    }
+
+    /// Does this cert's check **profile** cover a request's? A clean verdict is
+    /// only trustworthy for a request the cert validated *at least as strictly*:
+    ///
+    /// - it ran the on-disk file check if the request wants it
+    ///   (`cert.check_files >= want_check_files` — a stronger cert covers a weaker
+    ///   request, never the reverse), and
+    /// - its edition forcing matches: a *forced* request (`want_forced_edition =
+    ///   Some(ed)`) is covered only by a cert forced to the same edition; an *auto*
+    ///   request (`None`) only by an auto cert — because a forced and an
+    ///   auto-resolved run can apply different dictionaries to the same bytes.
+    ///
+    /// Pair with [`Sidecar::checker_matches`] (engine identity) and freshness
+    /// before skipping re-validation.
+    pub fn profile_covers(
+        &self,
+        want_check_files: bool,
+        want_forced_edition: Option<&str>,
+    ) -> bool {
+        let check_ok = self.validation.check_files >= want_check_files;
+        let edition_ok = match want_forced_edition {
+            Some(ed) => self.validation.edition_forced && self.file.edition == ed,
+            None => !self.validation.edition_forced,
+        };
+        check_ok && edition_ok
+    }
+
+    /// Cheap, **I/O-free** remote freshness check against a live HEAD's observed
+    /// `(size, etag, last_modified)`. Core never does the network I/O — the caller
+    /// (the DuckDB VFS / httpfs / a remote reader) performs the HEAD and passes the
+    /// observed values in. The optional transport validators can only ever GRANT
+    /// trust on a match; absence or mismatch downgrades toward the strong SHA path
+    /// ([`Sidecar::is_fresh_for`]), never the reverse — so they can never make a
+    /// stale cert look fresh.
+    pub fn is_fresh_for_remote(
+        &self,
+        observed_size: u64,
+        observed_etag: Option<&str>,
+        observed_last_modified: Option<&str>,
+    ) -> RemoteFreshness {
+        // Wrong format version or a size change → the cheap path can't help.
+        if self.version != SIDECAR_VERSION || self.file.size != observed_size {
+            return RemoteFreshness::MustRehash;
+        }
+        // Strong: a stored ETag we can compare to the live one.
+        if let (Some(cert), Some(live)) = (self.file.etag.as_deref(), observed_etag) {
+            return if cert == live {
+                RemoteFreshness::Trusted
+            } else {
+                RemoteFreshness::MustRehash // ETag changed ⇒ object changed
+            };
+        }
+        // Weak: size already matched; require Last-Modified to agree too.
+        if let (Some(cert), Some(live)) =
+            (self.file.last_modified.as_deref(), observed_last_modified)
+        {
+            return if cert == live {
+                RemoteFreshness::ProbablyFresh
+            } else {
+                RemoteFreshness::MustRehash
+            };
+        }
+        // size matched but no usable transport validator → can't cheaply confirm.
+        RemoteFreshness::MustRehash
     }
 
     /// The byte-offset index view (for locating / slicing groups).
@@ -407,6 +559,9 @@ mod tests {
         ValidationStamp {
             validator: "test".into(),
             validator_version: "0.0.0".into(),
+            compat: None,
+            check_files: false,
+            edition_forced: false,
             checked_at: "2026-06-19T00:00:00Z".into(),
             warnings: 0,
             fyi: 1,
@@ -437,6 +592,143 @@ mod tests {
         let mut changed = bytes.to_vec();
         changed.push(b'\n');
         assert!(!sc.is_fresh_for(&changed), "a changed file is not fresh");
+    }
+
+    #[test]
+    fn checker_matches_is_exact_on_identity() {
+        let bytes = TWO.as_bytes();
+        let sc = Sidecar::assemble(bytes, "4.1".into(), stamp()).unwrap();
+        // stamp() is the native shape (validator "test", version "0.0.0", no compat)
+        assert!(
+            sc.checker_matches("test", "0.0.0", None),
+            "same checker trusted"
+        );
+        assert!(
+            !sc.checker_matches("test", "0.0.1", None),
+            "a newer engine version is NOT trusted (re-validate)"
+        );
+        assert!(
+            !sc.checker_matches("other", "0.0.0", None),
+            "a different validator is NOT trusted"
+        );
+        assert!(
+            !sc.checker_matches("test", "0.0.0", Some("python-ags4-0.5")),
+            "a compat consumer does NOT trust a native-minted cert"
+        );
+    }
+
+    #[test]
+    fn compat_provenance_round_trips_and_defaults() {
+        let bytes = TWO.as_bytes();
+        let mut st = stamp();
+        st.compat = Some("python-ags4-0.5.0".into());
+        let sc = Sidecar::assemble(bytes, "4.1".into(), st).unwrap();
+        let back = Sidecar::from_json(&sc.to_json().unwrap()).unwrap();
+        assert_eq!(back.validation.compat.as_deref(), Some("python-ags4-0.5.0"));
+        assert!(back.checker_matches("test", "0.0.0", Some("python-ags4-0.5.0")));
+        // a legacy cert JSON without the field deserialises with compat = None
+        let legacy = r#"{"version":1,"file":{"size":1,"sha256":"x","edition":"4.1"},
+            "validation":{"validator":"v","validator_version":"1","checked_at":"t","warnings":0,"fyi":0},
+            "groups":{},"order":[]}"#;
+        assert_eq!(
+            Sidecar::from_json(legacy.as_bytes())
+                .unwrap()
+                .validation
+                .compat,
+            None
+        );
+    }
+
+    #[test]
+    fn profile_covers_is_directional() {
+        let bytes = TWO.as_bytes();
+        // default cert: check_files=false, edition_forced=false, edition "4.1"
+        let def = Sidecar::assemble(bytes, "4.1".into(), stamp()).unwrap();
+        assert!(
+            def.profile_covers(false, None),
+            "default cert covers a default request"
+        );
+        assert!(
+            !def.profile_covers(true, None),
+            "a default cert does NOT cover a --check-files request"
+        );
+        assert!(
+            !def.profile_covers(false, Some("4.1")),
+            "an auto cert does NOT cover a forced-edition request (different dictionaries possible)"
+        );
+
+        // a stronger cert: ran the on-disk file check
+        let mut s = stamp();
+        s.check_files = true;
+        let strong = Sidecar::assemble(bytes, "4.1".into(), s).unwrap();
+        assert!(
+            strong.profile_covers(true, None),
+            "covers a --check-files request"
+        );
+        assert!(
+            strong.profile_covers(false, None),
+            "and still covers a weaker default request"
+        );
+
+        // a forced-edition cert covers only the SAME forced edition
+        let mut f = stamp();
+        f.edition_forced = true;
+        let forced = Sidecar::assemble(bytes, "4.0.4".into(), f).unwrap();
+        assert!(
+            forced.profile_covers(false, Some("4.0.4")),
+            "covers the same forced edition"
+        );
+        assert!(
+            !forced.profile_covers(false, Some("4.1")),
+            "not a different forced edition"
+        );
+        assert!(!forced.profile_covers(false, None), "not an auto request");
+    }
+
+    #[test]
+    fn remote_freshness_grants_only_on_a_validator_match() {
+        let bytes = TWO.as_bytes();
+        let size = bytes.len() as u64;
+        let sc = Sidecar::assemble(bytes, "4.1".into(), stamp())
+            .unwrap()
+            .with_origin(
+                Some("\"abc123\"".into()),
+                Some("Wed, 19 Jun 2026 00:00:00 GMT".into()),
+            );
+        // round-trips
+        let sc = Sidecar::from_json(&sc.to_json().unwrap()).unwrap();
+        assert_eq!(sc.file.etag.as_deref(), Some("\"abc123\""));
+
+        // strong: a matching ETag is trusted (no re-hash needed)
+        assert_eq!(
+            sc.is_fresh_for_remote(size, Some("\"abc123\""), None),
+            RemoteFreshness::Trusted
+        );
+        // a changed ETag means changed bytes — must re-hash, NOT fall to weak
+        assert_eq!(
+            sc.is_fresh_for_remote(
+                size,
+                Some("\"different\""),
+                Some("Wed, 19 Jun 2026 00:00:00 GMT")
+            ),
+            RemoteFreshness::MustRehash
+        );
+        // no live ETag → weak path: size + Last-Modified match ⇒ probably fresh
+        assert_eq!(
+            sc.is_fresh_for_remote(size, None, Some("Wed, 19 Jun 2026 00:00:00 GMT")),
+            RemoteFreshness::ProbablyFresh
+        );
+        // a size change is never cheaply fresh
+        assert_eq!(
+            sc.is_fresh_for_remote(size + 1, Some("\"abc123\""), None),
+            RemoteFreshness::MustRehash
+        );
+        // a purely-local cert (no transport validators) can't be cheaply confirmed
+        let local = Sidecar::assemble(bytes, "4.1".into(), stamp()).unwrap();
+        assert_eq!(
+            local.is_fresh_for_remote(size, None, None),
+            RemoteFreshness::MustRehash
+        );
     }
 
     #[test]

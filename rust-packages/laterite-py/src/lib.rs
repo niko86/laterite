@@ -496,17 +496,26 @@ impl PySidecar {
     /// here. Raises `ValueError` if `data` isn't indexable AGS4 (e.g. non-UTF-8,
     /// which the byte index rejects).
     #[staticmethod]
-    #[pyo3(signature = (data, edition, checked_at, warnings=0, fyi=0))]
+    #[pyo3(signature = (data, edition, checked_at, warnings=0, fyi=0, compat=None, check_files=false, edition_forced=false))]
+    #[allow(clippy::too_many_arguments)] // a builder-style mint API; all keyword-only from Python
     fn assemble(
         data: &[u8],
         edition: String,
         checked_at: String,
         warnings: u32,
         fyi: u32,
+        compat: Option<String>,
+        check_files: bool,
+        edition_forced: bool,
     ) -> PyResult<Self> {
         let stamp = ValidationStamp {
             validator: "laterite_ags4".to_string(),
-            validator_version: env!("CARGO_PKG_VERSION").to_string(),
+            // The ENGINE version (not this wheel's), so the cert is comparable
+            // across surfaces (e.g. a cert minted by the DuckDB extension).
+            validator_version: laterite_ags4_validator::VERSION.to_string(),
+            compat,
+            check_files,
+            edition_forced,
             checked_at,
             warnings,
             fyi,
@@ -579,8 +588,48 @@ impl PySidecar {
         &self.inner.validation.validator_version
     }
     #[getter]
+    fn compat(&self) -> Option<&str> {
+        self.inner.validation.compat.as_deref()
+    }
+    #[getter]
     fn checked_at(&self) -> &str {
         &self.inner.validation.checked_at
+    }
+
+    #[getter]
+    fn check_files(&self) -> bool {
+        self.inner.validation.check_files
+    }
+    #[getter]
+    fn edition_forced(&self) -> bool {
+        self.inner.validation.edition_forced
+    }
+    #[getter]
+    fn etag(&self) -> Option<&str> {
+        self.inner.file.etag.as_deref()
+    }
+    #[getter]
+    fn last_modified(&self) -> Option<&str> {
+        self.inner.file.last_modified.as_deref()
+    }
+
+    /// Was this cert minted by the CURRENT native validator engine (same engine
+    /// version, not the `laterite.compat` profile)? `.validate()` skips the rule
+    /// engine only when a carried cert is both fresh (bytes unchanged) AND this
+    /// holds — a cert from an older engine is re-validated, not trusted.
+    fn matches_native_validator(&self) -> bool {
+        self.inner
+            .checker_matches("laterite_ags4", laterite_ags4_validator::VERSION, None)
+    }
+
+    /// Does this cert's check profile cover a request's? (`check_files`: the cert
+    /// must have run at least what's asked; `forced_edition`: a forced request is
+    /// covered only by the same forced edition, an auto request only by an auto
+    /// cert.) The `.validate()` skip requires this alongside a fresh cert + engine
+    /// match.
+    #[pyo3(signature = (check_files, forced_edition=None))]
+    fn profile_covers(&self, check_files: bool, forced_edition: Option<&str>) -> bool {
+        self.inner.profile_covers(check_files, forced_edition)
     }
     #[getter]
     fn warnings(&self) -> u32 {
