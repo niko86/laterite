@@ -108,7 +108,7 @@ jobs:
           - os: windows-2022
             target: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       # Tag <-> version guard: the wheel version comes from the STATIC pyproject
       # [project] version, not from the tag — so a `vX` tag against a stale
@@ -292,7 +292,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             ext: .exe
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       # dtolnay/rust-toolchain is a bash-shell action; it works on
       # Linux (Docker container has bash) and macOS (Tart VM has bash)
@@ -381,7 +381,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -389,7 +389,7 @@ jobs:
           merge-multiple: true
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
         with:
           generate_release_notes: true
           # rc/dev tags (PEP 440 canonical, no hyphen) → flagged pre-release so
@@ -571,7 +571,7 @@ jobs:
           - os: windows-2022
             target: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       # Same per-OS toolchain split as build-binaries: dtolnay's bash action on
       # Linux/macOS; rustup directly on Windows (no Git Bash on PATH there).
@@ -635,7 +635,7 @@ jobs:
       run:
         working-directory: rust-packages/laterite-node
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
