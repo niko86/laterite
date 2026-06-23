@@ -1,8 +1,12 @@
 // "Why is this column typed as X?" — a plain-English description of an AGS4
-// TYPE code, mirroring the canonical categories `laterite-types::canonical_type`
-// uses to decide the in-browser DuckDB column type. Kept in sync with
-// rust-packages/laterite-types/src/lib.rs (the authority) by hand; it's a small,
-// stable mapping (the AGS type vocabulary rarely changes).
+// TYPE code for the Explore "Analyse" view. The human DESCRIPTIONS here are
+// web-authored display prose: this file is their home — they live nowhere else
+// (laterite-types holds the type *classification*, not these glosses). The
+// CATEGORY each code falls in (numeric / date / pick-list / text) tracks
+// `laterite-types::canonical_type`, the gated authority for the actual in-browser
+// DuckDB column type. A drift test (agsTypeInfo.test.ts) pins every AGS type code
+// in the dictionary to a real description, so a newly-added code can't silently
+// fall back to "text".
 
 /** Human description of an AGS4 TYPE code (e.g. "2DP" → "decimal, 2 places").
  *  Falls back to "text" for unknown / opaque codes (the engine treats those
@@ -37,6 +41,8 @@ export function typeDescription(agsType: string): string {
       return "degrees:minutes:seconds";
     case "MC":
       return "moisture-condition value";
+    case "RL":
+      return "record link";
     case "X":
       return "text";
     case "XN":

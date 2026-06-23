@@ -7,10 +7,29 @@ import {
   geologyTemplate,
   relExamples,
   asKeyMap,
+  dictMapFromJson,
   type DictMap,
 } from "./relationships";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import type { RawUnion } from "./dict";
 
 const H = (name: string, status: string, type: string) => ({ name, status, type });
+
+// The canonical single source of truth — read at runtime (not a static import,
+// which would make tsc infer the ~800 KB literal). This is the exact file every
+// other consumer reads via lib/dict.ts.
+const REAL_UNION = JSON.parse(
+  readFileSync(
+    fileURLToPath(
+      new URL(
+        "../../../rust-packages/laterite-ags4-core/data/ags_dictionary.json",
+        import.meta.url,
+      ),
+    ),
+    "utf8",
+  ),
+) as RawUnion;
 
 function dict(): DictMap {
   const m: DictMap = new Map();
@@ -241,6 +260,43 @@ describe("depthColumnFor — self fallback", () => {
   it("returns null when there is no usable depth column at all", () => {
     // LOCA carries no *_TOP of TYPE 2DP, and the live cols lack SPEC_DPTH/SAMP_TOP.
     expect(depthColumnFor("LOCA", cols(d, "LOCA"), d)).toBeNull();
+  });
+});
+
+describe("dictMapFromJson — built from the real ags_dictionary.json", () => {
+  const real = dictMapFromJson(REAL_UNION);
+
+  it("parses the union: real parent chains + populated contents", () => {
+    expect(real.get("SAMP")?.parent).toBe("LOCA");
+    expect(real.get("LOCA")?.parent).toBe("PROJ");
+    expect(real.get("PROJ")?.parent).toBeNull();
+    // descriptions are present in the faithful dictionary (the old scaffolded
+    // copy had ~91% empty), so the builder's `contents` is non-empty.
+    expect(real.get("LOCA")?.contents).toBeTruthy();
+  });
+
+  it("treats combined KEY+REQUIRED statuses as KEY (e.g. PROJ_ID)", () => {
+    // The official dictionary marks PROJ_ID 'KEY+REQUIRED'; a bare
+    // `status === "KEY"` would miss it. Guards the +-aware KEY detection.
+    expect(real.get("PROJ")?.keys).toContain("PROJ_ID");
+  });
+
+  it("derives GEOL's real TOP/BASE depth band from the union", () => {
+    expect(depthRangeOf("GEOL", real)).toEqual({
+      loca: "LOCA_ID",
+      top: "GEOL_TOP",
+      base: "GEOL_BASE",
+    });
+  });
+
+  it("offers real relationships: SAMP ⋈ LOCA appears for a loaded subset", () => {
+    const codes = ["PROJ", "LOCA", "SAMP", "GEOL"];
+    const metas = codes.map((code) => ({
+      code,
+      headings: (real.get(code)?.headings ?? []).map((h) => h.name),
+    }));
+    const names = relExamples(metas, real).map((e) => e.name);
+    expect(names).toContain("SAMP ⋈ LOCA");
   });
 });
 

@@ -13,10 +13,10 @@ from laterite import registry as latreg
 
 def test_groups_loaded() -> None:
     assert isinstance(latreg.GROUPS, dict)
-    assert len(latreg.GROUPS) == 92, f"expected 92 groups, got {len(latreg.GROUPS)}"
-    assert "PROJ" in latreg.GROUPS
-    assert "LOCA" in latreg.GROUPS
-    assert "SAMP" in latreg.GROUPS
+    # The consolidated UNION of the official 4.0.3-4.2 dictionary (~174 groups).
+    assert len(latreg.GROUPS) > 150, f"expected the full official union, got {len(latreg.GROUPS)}"
+    for code in ("PROJ", "LOCA", "SAMP", "CPTG"):  # CPTG was missing from the old curated subset
+        assert code in latreg.GROUPS
 
 
 def test_group_descriptor_shape() -> None:
@@ -24,14 +24,14 @@ def test_group_descriptor_shape() -> None:
     assert isinstance(proj, latreg.GroupDescriptor)
     assert proj.code == "PROJ"
     assert proj.parent is None  # root
-    assert proj.is_high_volume is False
     assert proj.table == "g_proj"
     assert proj.view == "v_proj"
     assert proj.headings, "PROJ must have headings"
     h0 = proj.headings[0]
     assert isinstance(h0, latreg.Heading)
     assert h0.name == "PROJ_ID"
-    assert h0.status == "KEY"
+    assert h0.status == "KEY+REQUIRED"  # official status; still a KEY (below)
+    assert h0.is_key
     assert h0.py_name == "proj_id"
 
 
@@ -48,12 +48,12 @@ def test_key_vs_non_key_partitioning() -> None:
 
 
 def test_ancestor_chain_root_down_order() -> None:
-    # TREL is a deep group; chain returned in [code, ..., root] order.
-    chain = latreg.ancestor_chain("TREL")
-    assert chain[0] == "TREL"
+    # LLPL is a deep group; chain returned in [code, ..., root] order.
+    chain = latreg.ancestor_chain("LLPL")
+    assert chain[0] == "LLPL"
     assert chain[-1] == "PROJ"
-    # PROJ → LOCA → SAMP → TREG → TRET → TREL (per the dictionary)
-    assert chain == ["TREL", "TRET", "TREG", "SAMP", "LOCA", "PROJ"]
+    # LLPL → SAMP → LOCA → PROJ (per the dictionary)
+    assert chain == ["LLPL", "SAMP", "LOCA", "PROJ"]
 
 
 def test_ancestor_chain_root_group() -> None:
@@ -79,6 +79,6 @@ def test_inherited_key_names_root_is_empty() -> None:
 
 # `test_matches_ags5_models` retired with F2c-4: ags5-models gone,
 # so there's no second registry to cross-check against. The single
-# source of truth is `rust-packages/laterite-ags4-core/data/ags5_dictionary.json`;
+# source of truth is `rust-packages/laterite-ags4-core/data/ags_dictionary.json`;
 # `tests/test_pyi_stubs_match_generator.py` catches drift between
 # that JSON and the typed-graph .pyi.

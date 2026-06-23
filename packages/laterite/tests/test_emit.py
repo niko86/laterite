@@ -70,16 +70,27 @@ def test_strict_mode_raises_on_invalid():
 def test_edition_is_selectable():
     loca = pd.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
     # A different edition still resolves + emits (smoke; dict differs internally).
-    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, edition="4.2")
+    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, dict_version="4.2")
     assert '"DATA","BH01","12.30"' in res.text
 
 
 def test_unknown_edition_and_mode_raise():
     loca = pd.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
     with pytest.raises(RuntimeError, match="unknown edition"):
-        laterite.build_ags4({"LOCA": loca}, edition="9.9")
+        laterite.build_ags4({"LOCA": loca}, dict_version="9.9")
     with pytest.raises(RuntimeError, match="unknown mode"):
         laterite.build_ags4({"LOCA": loca}, mode="banana")
+
+
+def test_edition_is_a_deprecated_alias_for_dict_version():
+    loca = pd.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
+    # `edition=` still works (BC) but warns; `dict_version=` is the name now.
+    with pytest.deprecated_call():
+        res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, edition="4.2")
+    assert '"DATA","BH01","12.30"' in res.text
+    # passing both names at once is a hard error.
+    with pytest.raises(TypeError, match="not both"):
+        laterite.build_ags4({"LOCA": loca}, dict_version="4.2", edition="4.2")
 
 
 def test_round_trips_through_read():

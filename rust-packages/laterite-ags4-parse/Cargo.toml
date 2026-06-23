@@ -1,0 +1,27 @@
+# The shared AGS4 parse leaf (#168). One tolerant tokenizer + one source-true
+# byte/line/char walk, below BOTH laterite-ags4-core and laterite-ags4-validator
+# — so the two historical parsers (core::ags4_codec, validator::parse) converge
+# here instead of drifting. FS-free + wasm-clean by construction: it returns raw
+# strings (no typing — that stays in laterite-types), and depends only on
+# encoding_rs (the decode front door, moved down from the validator) + memchr
+# (newline scan). Additive in Phase 1 — nothing consumes it yet.
+[package]
+name = "laterite-ags4-parse"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "Shared, source-true AGS4 line/field parser (the convergence leaf)"
+license = "MIT"
+publish = false
+
+[dependencies]
+encoding_rs = "0.8"
+memchr = "2"
+serde = { version = "1", features = ["derive"], optional = true }
+
+[dev-dependencies]
+proptest = "1"
+
+[features]
+default = []
+serde = ["dep:serde"]

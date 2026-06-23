@@ -22,6 +22,7 @@ from __future__ import annotations
 import datetime
 import hashlib
 import os
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -619,6 +620,29 @@ def _dict_version_arg(standard_AGS4_dictionary: Any) -> str | None:
     )
 
 
+# python-ags4 1.2.0's edition selection (check.py STANDARD_DICT_FILES + the
+# LATEST_DICT_VERSION fallback): an exact string in the table wins; anything
+# else — missing / bare "4" / unknown — falls back to 4.1.1. NB "4.0" maps to
+# 4.0.3 (the older patch); laterite picks 4.0.4 (O-30), which is what the O-42
+# divergence turns on. Mirrored here so compat can WARN (never silently diverge)
+# when its auto-resolved edition differs — without running python-ags4.
+_PYAGS4_STANDARD_DICT = {
+    "4.0": "4.0.3",
+    "4.0.3": "4.0.3",
+    "4.0.4": "4.0.4",
+    "4.1": "4.1",
+    "4.1.1": "4.1.1",
+    "4.2": "4.2",
+}
+
+
+def _python_ags4_edition(tran_ags: Any) -> str:
+    """The edition python-ags4 1.2.0 would validate `tran_ags` against."""
+    if tran_ags is None:
+        return "4.1.1"  # python: TRAN_AGS missing -> LATEST_DICT_VERSION
+    return _PYAGS4_STANDARD_DICT.get(str(tran_ags).strip(), "4.1.1")
+
+
 def check_file(
     filepath_or_buffer: Any,
     standard_AGS4_dictionary: Any = None,
@@ -662,6 +686,27 @@ def check_file(
             text = text.decode(encoding, errors="replace")
         r = raise_for(_native.run_check(text=text, dict_version=dv, include_fyi=True))
         p = raise_for(_native.parse_primitives(text=text))
+
+    # Transparency (#190 / O-30 / O-42): laterite resolves a few ambiguous
+    # TRAN_AGS strings to a DIFFERENT edition than python-ags4 would (e.g.
+    # "4.0" -> 4.0.4 here vs python's 4.0.3, "4" -> 4.0.4 vs 4.1.1). On an
+    # AUTO-resolved file (no explicit dict), WARN when the chosen edition
+    # differs so a drop-in caller isn't silently surprised by a divergent
+    # verdict. Deliberately NOT added to the returned dict — that preserves
+    # python-ags4 output-parity (the 122 oracle); a strict-fidelity mode that
+    # replicates python's choice is tracked as future work.
+    if standard_AGS4_dictionary is None:
+        _lat_ed = r.get("dict_version")
+        _py_ed = _python_ags4_edition(p.get("tran_ags"))
+        if _lat_ed and _lat_ed != _py_ed:
+            warnings.warn(
+                f"laterite resolved TRAN_AGS={p.get('tran_ags')!r} to edition "
+                f"{_lat_ed}; python-ags4 1.2.0 would use {_py_ed} (OBSERVATIONS "
+                f"O-30/O-42). Verdicts may differ on edition-specific rules "
+                f"(e.g. Rule 9 headings, Rule 10c parent links).",
+                UserWarning,
+                stacklevel=2,
+            )
 
     ags_errors: dict[str, list[dict]] = {}
 

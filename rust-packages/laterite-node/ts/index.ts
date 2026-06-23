@@ -4,8 +4,16 @@
 import { type Table, tableFromArrays, tableToIPC } from "apache-arrow";
 import { Ags4File } from "./ags4-file";
 import { BuildResult } from "./build-result";
-import { Ags4Error, fromNativeError, raiseFor } from "./errors";
-import { type GroupIpc, emitAgs4FromIpc, parseArrow, runCheck } from "./native";
+import { Ags4Error, fromNativeError, makeError, raiseFor } from "./errors";
+import { FixResult } from "./fix-result";
+import {
+  type GroupIpc,
+  emitAgs4FromIpc,
+  fixFile,
+  listRules as nativeListRules,
+  parseArrow,
+  runCheck,
+} from "./native";
 import * as registry from "./registry";
 import { Report } from "./report";
 import { AgsGroup } from "./typed-graph";
@@ -70,6 +78,8 @@ export type GroupData = Table | GroupRows;
 
 export interface EmitOptions {
   /** `"4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2"` (default `"4.1.1"`). */
+  dictVersion?: string;
+  /** @deprecated alias for `dictVersion`. */
   edition?: string;
   /** `"autofix"` (default) | `"report"` | `"strict"`. */
   mode?: "autofix" | "report" | "strict";
@@ -123,7 +133,7 @@ function walkTree(root: AgsGroup): Array<[string, GroupRows]> {
  * validates it). `groups` is either a **typed-graph root** (`new PROJ({…})`,
  * walked depth-first) OR a Map/array mapping each AGS group code to an arrow-js
  * `Table` or row objects whose **keys are the AGS headings** (`LOCA_ID`, …).
- * UNIT/TYPE are filled from the chosen `edition`; order is preserved (put `PROJ`
+ * UNIT/TYPE are filled from the chosen `dictVersion`; order is preserved (put `PROJ`
  * first). Needs no DuckDB. Persist the result with `BuildResult.save`. */
 export function buildAgs4(
   groups: AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>,
@@ -139,7 +149,7 @@ export function buildAgs4(
     const table = Array.isArray(data) ? rowsToTable(data) : data;
     return { code, ipc: Buffer.from(tableToIPC(table, "stream")) };
   });
-  const res = emitAgs4FromIpc(ipcGroups, opts.edition, opts.mode);
+  const res = emitAgs4FromIpc(ipcGroups, opts.dictVersion ?? opts.edition, opts.mode);
   const byRule = JSON.parse(res.findingsJson) as Record<string, Array<Record<string, unknown>>>;
   const findings = Object.entries(byRule).flatMap(([rule, list]) =>
     list.map((f) => ({ rule, ...f })),
@@ -147,10 +157,58 @@ export function buildAgs4(
   return new BuildResult(res.bytes, findings, res.fixesApplied);
 }
 
+/** One cited divergence observation on a rule (`{id, note}`). */
+export interface RuleObservation {
+  id: string;
+  note: string;
+}
+
+/** One rule's catalogue entry — the gated `rules_meta.json` shape. */
+export interface RuleMeta {
+  rule: string;
+  title: string;
+  checks: string;
+  severity: string;
+  fixable: boolean;
+  observations: RuleObservation[];
+}
+
+/** The AGS4 rule catalogue — one entry per rule (title, severity, whether `fix`
+ * can repair it, cited `O-N` notes). Mirrors `laterite.list_rules()` /
+ * `lat-check --list-rules`; backed by the gated `rules_meta.json`. No input. */
+export function listRules(): RuleMeta[] {
+  return (JSON.parse(nativeListRules()) as { rules: RuleMeta[] }).rules;
+}
+
+export interface FixOptions {
+  /** Repair in-memory `text` instead of a file path. */
+  text?: string;
+  /** Force an edition (`"4.0.3"`…`"4.2"`); default auto-detects from `TRAN_AGS`. */
+  dictVersion?: string;
+  /** Source encoding label (`"utf-8"` default, `"windows-1252"`, …). */
+  encoding?: string;
+  /** Also apply the intent-guessing (risky) fixes, not just the safe set. */
+  risky?: boolean;
+}
+
+/** Mechanically repair AGS4 — a file `source` path, raw `Uint8Array`/`Buffer`
+ * bytes, or in-memory `text`. Applies the safe fixes (plus the risky set when
+ * `risky`), re-validates, and returns a `FixResult` (`.bytes` / `.text` /
+ * `.save(path)`); `findings` are what could NOT be mechanically fixed. Mirrors
+ * `laterite.fix()` / `lat-check --fix`. Throws for un-fixable input. */
+export function fix(source?: string | Uint8Array, opts: FixOptions = {}): FixResult {
+  const path = typeof source === "string" ? source : undefined;
+  const data = typeof source === "string" || source == null ? undefined : source;
+  const r = fixFile(path, opts.text, data, opts.dictVersion, opts.encoding, opts.risky);
+  if (!r.ok) throw makeError(r.errorKind ?? "", r.exitCode, r.error ?? "unknown error");
+  return new FixResult(r.fixed, r.residual, r.applied, r.dictVersion);
+}
+
 export { Ags4File } from "./ags4-file";
 export { AgsSubset, type Filter } from "./subset";
 export type { QueryOptions, Row } from "./duckdb";
 export { BuildResult, type BuildFinding } from "./build-result";
+export { FixResult, type AppliedFix } from "./fix-result";
 export {
   Ags4Error,
   BadDictError,

@@ -1,8 +1,9 @@
 # Releasing laterite
 
-`laterite` and `laterite-ags5` are versioned **in lockstep** (always the same
-version — they ship together; the `[ags5]` extra pulls the companion) and follow
-**semantic versioning** with a pre-1.0 convention.
+`laterite` is the single shipped wheel and follows **semantic versioning** with a
+pre-1.0 convention. (The experimental `.ags5db` companion `laterite-ags5` was
+decoupled to the dormant `ags5/` holding folder in #177 — it is no longer built
+or published; a future AGS5 strand will publish it separately.)
 
 ## Version policy — the axis is *compatibility*, not change size
 
@@ -30,25 +31,46 @@ string** — the guard test + the release tag-check will catch drift.
 uv run bump-my-version bump minor --dry-run -v     # or: patch
 # 2. Apply it — stamps all sites, rolls CHANGELOG, commits "release: X", tags vX:
 uv run bump-my-version bump minor
-# 3. Push the branch + the tag (the tag triggers release.yml → wheels → PyPI):
+# 3. Push the branch + the tag (the tag triggers release.yml → wheels + sdist → PyPI):
 git push && git push --tags
 ```
 
-`bump-my-version` updates, atomically: both wheel `pyproject.toml`s + the root
-umbrella, `compat.py`'s `__version__` base + Checker banner (preserving the
-`+compat.python-ags4.<pin>` pin), the cross-wheel dependency floors, and rolls
+`bump-my-version` updates, atomically: the `laterite` wheel `pyproject.toml` + the
+root umbrella, `compat.py`'s `__version__` base + Checker banner (preserving the
+`+compat.python-ags4.<pin>` pin), the Rust workspace version, and rolls
 `CHANGELOG.md`'s `[Unreleased]` into the new dated section. Run `uv lock`
 afterwards if the lockfile needs refreshing.
 
 ### Pre-releases (RC / dev)
 
-The `.ags5db` format may still change pre-1.0, so cut a release candidate first
-when in doubt. Use the **explicit** form (PEP 440 canonical — no hyphen):
+The API may still change pre-1.0, so cut a release candidate first when in doubt.
+Use the **explicit** form (PEP 440 canonical — no hyphen):
 
 ```bash
 uv run bump-my-version bump --new-version 0.2.0rc1     # then rc2, rc3, ...
 uv run bump-my-version bump --new-version 0.2.0         # promote to final
 ```
+
+### The npm `laterite` (node) track — separate, manual
+
+The npm `laterite` package (+ the three `@laterite/native-*` platform packages) is
+versioned on its **own `node-v*` tag track**, *independent* of the Python wheel.
+`bump-my-version` does **not** touch `rust-packages/laterite-node/package.json` (the
+napi crate's *Cargo* version rides the workspace, but the published npm version does
+not), so a Python `v0.5.0` release leaves npm `laterite` at its current version until a
+node release is cut separately. To cut one:
+
+```bash
+# 1. Bump package.json "version" AND the three optionalDependencies pins
+#    (@laterite/native-*) to the new node version — they must match.
+# 2. Commit, then tag node-v<version> and push the tag (triggers release.yml's
+#    npm publish, which checks the tag == package.json version):
+git tag node-v0.5.0 && git push origin node-v0.5.0
+```
+
+Keep the npm version aligned with the wheels when practical (the last alignment was a
+deliberate manual commit), but a Python release does **not** require a simultaneous node
+release.
 
 ## What keeps it honest
 
@@ -60,28 +82,25 @@ uv run bump-my-version bump --new-version 0.2.0         # promote to final
   pyproject version before building — so you can't tag `v0.2.0` against a stale
   `0.1.0` source.
 
-## PyPI projects + trusted publishers
+## PyPI project + trusted publisher
 
-Two **separate** PyPI projects ship from this repo:
+One PyPI project ships from this repo:
 
 | project | what | install |
 |---|---|---|
 | `laterite` | base AGS4 toolkit | `pip install laterite` |
-| `laterite-ags5` | the `.ags5db` companion (the `[ags5]` extra) | pulled by `pip install laterite[ags5]` |
 
-`release.yml`'s `pypi-publish` job uploads **both** wheels under PyPI trusted
-publishing (no API token). They do **not** share a publisher — each PyPI project
-needs its own, configured on PyPI → *Publishing* (or as a pending publisher)
+`release.yml`'s `pypi-publish` job uploads the per-platform **wheels** plus a
+**source distribution** (built once on the Linux leg) under PyPI trusted
+publishing (no API token). The publisher is configured on PyPI → *Publishing*
 with: **owner/repo** `niko86/laterite` · **workflow** `release.yml` ·
 **environment** `pypi`.
 
-> **`laterite-ags5` first publish (one-time owner action):** it isn't on PyPI
-> yet, so add it as a **pending publisher** (PyPI → *Account settings* →
-> *Publishing* → *Add a pending publisher*) — project name `laterite-ags5`, the
-> values above — **before** the next `v*` release. On first publish PyPI creates
-> the project and binds the publisher. Without it, the `pypi-publish` job fails
-> on the `laterite-ags5` wheel and `pip install laterite[ags5]` stays
-> unresolvable from PyPI.
+The sdist is the install fallback for any platform without a published wheel
+(e.g. ARM Linux, dropped from the wheel matrix at the self-hosted cutover):
+`pip install laterite` builds from source. The sdist vendors all six path-dep
+Rust crates (validator/core/emit/excel/types/py) and is verified
+buildable + installable in isolation (#175).
 
 ## The python-ags4 compat pin
 

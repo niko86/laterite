@@ -58,3 +58,23 @@ pub enum ValidatorError {
     )]
     UnsupportedEdition { found: String },
 }
+
+/// Map the shared parse leaf's terminal into the validator's (#168 Phase 2).
+/// The validator's `parse` wrappers convert via this so every caller keeps
+/// handling `ValidatorError` unchanged. `NotUtf8` carries no path in the leaf
+/// (it's FS-free) and is unreachable on the validator's lossy path anyway
+/// (the validator never uses `Reject` mode), so an empty path is fine.
+impl From<laterite_ags4_parse::ParseError> for ValidatorError {
+    fn from(e: laterite_ags4_parse::ParseError) -> Self {
+        use laterite_ags4_parse::ParseError as P;
+        match e {
+            P::NotAgs4(msg) => ValidatorError::NotAgs4(msg),
+            P::UnsupportedEdition { found } => ValidatorError::UnsupportedEdition { found },
+            P::NotUtf8 => ValidatorError::NotUtf8(PathBuf::new()),
+            // Unreachable on the validator's lenient path (it never sets
+            // `strict_structure`), but the match must be total — a structural
+            // hard-fail is closest to "not a parseable AGS4 file".
+            P::Structure(msg) => ValidatorError::NotAgs4(msg),
+        }
+    }
+}

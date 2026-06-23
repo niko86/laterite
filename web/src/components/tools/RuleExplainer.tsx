@@ -10,8 +10,11 @@ import {
 // Plain-English reference for the AGS4 validation rules: what each rule
 // checks, its severity, whether the validator can auto-fix it, and any known
 // differences from the python-ags4 checker (the O-N divergences).
-// Curated into a static catalogue (web/public/rules-catalogue.json) — fully
-// client-side, useful with no file loaded.
+// Reads the static catalogue web/public/rules-catalogue.json — a verbatim copy
+// of the single source of truth, the validator's rules_meta.json (synced by
+// scripts/sync-rules.mjs, gated by src/lib/rulesCatalogue.test.ts) — so the
+// page can't drift from the rules the engine actually emits. Fully client-side,
+// useful with no file loaded.
 
 interface Obs {
   id: string;
@@ -34,6 +37,11 @@ function sevClass(sev: string): string {
     case "error":
       return "bg-rose-500/15 text-err";
     case "warning":
+      return "bg-amber-500/15 text-warn";
+    // A rule whose finding is always an error, but which can ALSO emit a
+    // related FYI/Warning bucket (e.g. Rule 1 extended-ASCII, Rule 16/18 DICT)
+    // — the catalogue marks these `mixed`. Amber, like a warning.
+    case "mixed":
       return "bg-amber-500/15 text-warn";
     case "fyi":
       return "bg-accent/15 text-accent";

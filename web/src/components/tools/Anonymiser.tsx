@@ -1,5 +1,6 @@
 import {
   createMemo,
+  createResource,
   createSignal,
   For,
   Show,
@@ -9,6 +10,7 @@ import { splitAgsFields, quoteAgsField } from "../../lib/agsline";
 import { fileStore } from "../../lib/fileStore";
 import { downloadBlob, baseName } from "../../lib/download";
 import { controlCompact } from "../../lib/controls";
+import { loadSensitive, prefillCodes, categoryOf } from "../../lib/sensitive";
 
 // Anonymiser / redactor: blank or replace identifying cell values (coords,
 // remarks, names) before sharing a file. Column-checklist driven, with
@@ -17,12 +19,13 @@ import { controlCompact } from "../../lib/controls";
 // the lossless splitAgsFields round-trip. Line endings are normalised to CRLF
 // with a single trailing newline (AGS4 Rule 2a), so the output is canonical
 // rather than byte-identical to a hand-edited LF source.
-
-// Headings that commonly carry location-revealing or free-text PII. Used to
-// pre-tick the defaults — the user can adjust. Deliberately avoids KEY-ish
-// "_ID" headings (redacting those would break cross-group references).
-const SENSITIVE =
-  /(_REM|_DESC|_MEMO|_NOTE|_LOC|_NAME|_CLNT|_CONT)$|(NATE|NATN|LON|LAT|LOCX|LOCY|GREF|ELAT|ELON)$|CLNT|CONT/i;
+//
+// The pre-tick defaults come from the sensitive-headings SSOT
+// (sensitive_headings.json) — the SAME list the corpus `censor` tool uses,
+// fetched at runtime (see lib/sensitive.ts). It deliberately skips the
+// identifier categories (location_id / project_id): this tool blanks values
+// and can't pseudonymise, so blanking a cross-referenced key would break the
+// file. The user can still tick any column by hand.
 
 interface FileGroup {
   code: string;
@@ -79,15 +82,28 @@ export const Anonymiser: Component = () => {
   });
   const groups = createMemo(() => (text() ? parseGroups(text()) : []));
 
+  // The sensitive-headings SSOT (fetched once). `prefill` = codes to pre-tick;
+  // `cats` = code → category for the per-column hint. Empty until it resolves,
+  // so the defaults recompute reactively when it arrives.
+  const [ssot] = createResource(loadSensitive);
+  const prefill = createMemo(() => {
+    const d = ssot();
+    return d ? prefillCodes(d) : new Set<string>();
+  });
+  const cats = createMemo(() => {
+    const d = ssot();
+    return d ? categoryOf(d) : new Map<string, string>();
+  });
+
   // Selected columns as "GROUP.HEADING" keys; default to the sensitive ones.
   const [selected, setSelected] = createSignal<Set<string>>(new Set());
   // Seed once when groups first arrive (createMemo recompute keeps it in sync
   // with a newly-loaded file via the effect-free derived default below).
   const defaults = createMemo(() => {
     const s = new Set<string>();
+    const pre = prefill();
     for (const g of groups())
-      for (const h of g.headings)
-        if (SENSITIVE.test(h)) s.add(colKey(g.code, h));
+      for (const h of g.headings) if (pre.has(h)) s.add(colKey(g.code, h));
     return s;
   });
   // The working set: user edits override, else the computed defaults.
@@ -238,6 +254,13 @@ export const Anonymiser: Component = () => {
                           >
                             {h}
                           </span>
+                          <Show when={cats().get(h)}>
+                            {(c) => (
+                              <span class="rounded bg-line/60 px-1 text-[10px] text-fg-faint">
+                                {c()}
+                              </span>
+                            )}
+                          </Show>
                         </label>
                       );
                     }}

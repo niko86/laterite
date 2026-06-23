@@ -63,8 +63,7 @@ def parse_value(raw: Any, ags_type: str) -> Any:
     """Parse an AGS4-shaped raw string into the canonical Python type.
 
     Permissive: unparseable values return ``None``. The single source
-    of truth for AGS4 + ``.agsx`` ingest (both Rust paths); the Python
-    ``laterite_ags5x._codec`` module is encode-only since Stage E3.
+    of truth for AGS4 ingest (the Rust base path).
     """
     # Accept any input PyO3 won't coerce directly (e.g. an int passed
     # by a careless caller) — match the Python implementation's

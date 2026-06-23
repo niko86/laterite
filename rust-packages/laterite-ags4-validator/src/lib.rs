@@ -36,6 +36,7 @@ use std::path::{Path, PathBuf};
 /// another: all bindings record THIS, not their own version.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+pub mod catalogue;
 pub mod dict;
 pub mod error;
 pub mod findings;
@@ -43,10 +44,13 @@ pub mod fixes;
 pub mod parse;
 pub mod rules;
 
+pub use catalogue::{RULE_LABELS, rule_metadata_json};
 pub use dict::{DictResolution, DictVersion, Dictionary};
 pub use error::ValidatorError;
 pub use findings::{Finding, Findings};
-pub use fixes::{Fix, FixKind, Fixes, SpanEdit, apply_fixes, compute_fixes};
+pub use fixes::{
+    Fix, FixKind, FixOutcome, Fixes, SpanEdit, apply_fixes, compute_fixes, fix_document,
+};
 
 /// Validation options. `Default` = **auto-detect** the dictionary from
 /// the file's `TRAN_AGS`, errors only.
@@ -187,6 +191,58 @@ pub fn check_file(path: &Path, opts: &CheckOptions) -> Result<Findings, Validato
     check_file_with_dict(path, opts).map(|(f, _, _)| f)
 }
 
+/// Headings introduced in AGS 4.0.4 that did **not** exist in 4.0.3. The two
+/// editions are otherwise identical — same 124 groups, no headings removed;
+/// the only other delta is PMTL's parent re-pointing PMTD→PMTG. So a file in
+/// the 4.0 line that carries any of these is the one *deterministic* signal
+/// that it is really ≥4.0.4. Sourced from the official
+/// `Standard_dictionary_v4_0_3`↔`v4_0_4` diff; both editions are frozen, so
+/// this list never drifts. (laterite#222 / OBSERVATIONS O-42.)
+const HEADINGS_NEW_IN_4_0_4: &[(&str, &str)] = &[
+    ("GCHM", "GCHM_DLM"),
+    ("GCHM", "GCHM_RTXT"),
+    ("LOCA", "LOCA_NATD"),
+    ("LOCA", "LOCA_ORCO"),
+    ("LOCA", "LOCA_ORID"),
+    ("LOCA", "LOCA_ORJO"),
+    ("RDEN", "RDEN_IDEN"),
+    ("SAMP", "SAMP_RECL"),
+];
+
+/// The first heading the file uses that exists only from 4.0.4, if any — the
+/// signal that a 4.0-line file should be judged against 4.0.4, not 4.0.3.
+fn first_post_4_0_3_heading(parsed: &parse::ParsedFile) -> Option<&'static str> {
+    HEADINGS_NEW_IN_4_0_4.iter().find_map(|(grp, hdng)| {
+        parsed
+            .groups
+            .get(*grp)
+            .filter(|g| g.headings.iter().any(|h| h == hdng))
+            .map(|_| *hdng)
+    })
+}
+
+/// Content-aware defence on the 4.0 ambiguity (#222 / O-42): if auto-resolution
+/// landed on **4.0.3** but the file uses a heading introduced in 4.0.4, judge it
+/// against **4.0.4** instead — its newer vocabulary is then not false-flagged as
+/// non-standard (Rule 9) and PMTL uses its 4.0.4 parent (PMTG, not PMTD). The
+/// ambiguous `"4.0"`/`"4"` already guess 4.0.4 (O-30); this additionally catches
+/// a file *mislabeled* `"4.0.3"`. An explicit `--dict-version` (`Forced`) is
+/// never overridden — that edition is the caller's deliberate choice. The third
+/// return value is the triggering heading (so the caller can emit a transparency
+/// FYI), `Some` iff an upgrade happened.
+fn guard_4_0_4(
+    dv: DictVersion,
+    kind: DictResolution,
+    parsed: &parse::ParsedFile,
+) -> (DictVersion, DictResolution, Option<&'static str>) {
+    if dv == DictVersion::V4_0_3 && kind != DictResolution::Forced {
+        if let Some(h) = first_post_4_0_3_heading(parsed) {
+            return (DictVersion::V4_0_4, DictResolution::GuessedPatch, Some(h));
+        }
+    }
+    (dv, kind, None)
+}
+
 /// Like [`check_file`] but also returns the bundled edition the file
 /// was judged against **and how it was resolved** (forced / exact
 /// `TRAN_AGS` / guessed-patch / fallback). Single parse — used by the
@@ -209,6 +265,7 @@ pub fn check_file_with_dict(
 
     let parsed = parse::parse_file_with_encoding(path, opts.encoding)?;
     let (dv, kind) = resolve_dict_version(opts.dict_version, tran_ags_of(&parsed).as_deref())?;
+    let (dv, kind, upgraded_from_4_0_3) = guard_4_0_4(dv, kind, &parsed);
     let dict = Dictionary::bundled(dv);
 
     let mut found: Findings = Findings::new();
@@ -216,6 +273,25 @@ pub fn check_file_with_dict(
     // on-disk half can locate the sibling `FILE/` tree (no lifetime
     // ripple: the borrow is strictly shorter than `path`).
     rules::run_all(&parsed, &dict, opts, Some(path), &mut found);
+    // Transparency FYI (#222 / O-42): if we resolved UP from the file's
+    // declared 4.0.3 to 4.0.4 because it uses 4.0.4-only vocabulary, say so —
+    // TRAN_AGS and the file's content disagree, and the user may want to bump
+    // TRAN_AGS (or drop the heading). Shown only with `--show-fyi`.
+    if let Some(h) = upgraded_from_4_0_3 {
+        findings::add_at(
+            &mut found,
+            "FYI",
+            None,
+            "TRAN",
+            format!(
+                "TRAN_AGS declares 4.0.3 but the file uses {h:?}, a heading \
+                 introduced in 4.0.4 — validated against 4.0.4. Set TRAN_AGS to \
+                 4.0.4 (or remove the heading) to make the file self-consistent."
+            ),
+            findings::Location::default(),
+            findings::Severity::Fyi,
+        );
+    }
     Ok((found, dv, kind))
 }
 
@@ -266,6 +342,44 @@ mod tests {
         assert_eq!(r("4"), V4_0_4);
         assert_eq!(r("4."), V4_0_4);
         assert_eq!(r("4.x"), V4_0_4);
+    }
+
+    #[test]
+    fn guard_upgrades_4_0_3_to_4_0_4_on_a_4_0_4_only_heading() {
+        // SAMP_RECL is new in 4.0.4 (absent from 4.0.3) — its presence means
+        // the file is really ≥4.0.4 (#222 / O-42).
+        let with = parse::parse_str(
+            "\"GROUP\",\"SAMP\"\r\n\"HEADING\",\"LOCA_ID\",\"SAMP_RECL\"\r\n\
+             \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\"DATA\",\"BH1\",\"0.50\"\r\n",
+        )
+        .unwrap();
+        assert_eq!(first_post_4_0_3_heading(&with), Some("SAMP_RECL"));
+        // an exact "4.0.3" auto-resolution is upgraded to 4.0.4, naming the heading
+        let (dv, _, trig) = guard_4_0_4(V4_0_3, DictResolution::ExactTranAgs, &with);
+        assert_eq!(dv, V4_0_4);
+        assert_eq!(trig, Some("SAMP_RECL"));
+        // but a *forced* 4.0.3 (--dict-version) is the caller's choice — kept
+        let (dvf, _, trigf) = guard_4_0_4(V4_0_3, DictResolution::Forced, &with);
+        assert_eq!(dvf, V4_0_3);
+        assert!(trigf.is_none());
+    }
+
+    #[test]
+    fn guard_leaves_editions_alone_without_a_4_0_4_heading() {
+        let plain = parse::parse_str(
+            "\"GROUP\",\"SAMP\"\r\n\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\"\r\n\
+             \"UNIT\",\"\",\"m\"\r\n\"TYPE\",\"ID\",\"2DP\"\r\n\"DATA\",\"BH1\",\"0.50\"\r\n",
+        )
+        .unwrap();
+        assert!(first_post_4_0_3_heading(&plain).is_none());
+        // 4.0.3 with no 4.0.4 vocabulary stays 4.0.3 (no upgrade, no FYI)
+        assert_eq!(
+            guard_4_0_4(V4_0_3, DictResolution::ExactTranAgs, &plain),
+            (V4_0_3, DictResolution::ExactTranAgs, None)
+        );
+        // a higher edition is never touched, heading or not
+        let (dv2, _, _) = guard_4_0_4(V4_2, DictResolution::ExactTranAgs, &plain);
+        assert_eq!(dv2, V4_2);
     }
 
     #[test]

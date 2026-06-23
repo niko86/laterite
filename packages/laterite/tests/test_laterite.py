@@ -476,6 +476,90 @@ def test_cli_plain_report_and_out_file(tmp_path):
     assert "finding(s)" in buf.getvalue()  # plain report still on stdout
 
 
+def test_cli_fix_writes_sibling_and_exit_codes(tmp_path):
+    """`lat-check --fix` (Python CLI): sibling output by default, in-place /
+    --fix-out variants, and exit 0 clean vs 1 residual."""
+    lf = tmp_path / "delivery.ags"
+    lf.write_bytes(_CLEAN.read_bytes().replace(b"\r\n", b"\n"))  # LF-only → fixable clean
+
+    # Default: writes delivery.fixed.ags, source untouched, exit 0 (clean).
+    out, code = _run_py_cli([str(lf)] + ["--fix"])
+    sibling = tmp_path / "delivery.fixed.ags"
+    assert code == 0
+    assert sibling.exists() and b"\r\n" in sibling.read_bytes()
+    assert b"\r\n" not in lf.read_bytes()  # source left alone
+    assert "applied 1 fix(es)" in out and "clean (0 findings)" in out
+
+    # --in-place overwrites the source.
+    _, code = _run_py_cli([str(lf), "--fix", "--in-place"])
+    assert code == 0 and b"\r\n" in lf.read_bytes()
+
+    # A file with non-fixable findings → exit 1, findings remain.
+    _, code = _run_py_cli([str(_RULE8_PRECISION), "--fix", "--fix-out", str(tmp_path / "r8.ags")])
+    assert code == 1
+    assert (tmp_path / "r8.ags").exists()
+
+
+def test_cli_fix_misuse_and_errors(tmp_path):
+    """--in-place/--fix-out without --fix, conflicting dest, and bad input."""
+    assert _run_py_cli([str(_CLEAN), "--in-place"])[1] == 5  # --in-place needs --fix
+    assert _run_py_cli([str(_CLEAN), "--fix", "--in-place", "--fix-out", "x"])[1] == 5
+    assert _run_py_cli(["/no/such.ags", "--fix"])[1] == 3  # not found
+
+
+@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat-check not built")
+def test_cli_fix_rust_binary_parity(tmp_path):
+    """The standalone Rust binary's --fix agrees with the Python CLI: same
+    sibling-write behaviour and exit code."""
+    lf = tmp_path / "d.ags"
+    lf.write_bytes(_CLEAN.read_bytes().replace(b"\r\n", b"\n"))
+    r = subprocess.run([str(_RUST_BIN), str(lf), "--fix"], capture_output=True, text=True)
+    assert r.returncode == 0
+    assert (tmp_path / "d.fixed.ags").read_bytes().count(b"\r\n") >= 1
+
+
+_FIXABLE_RULES = {"1", "2a", "4", "6", "7", "8", "11a", "11b"}  # fixes.rs FIXABLE_RULE_LABELS
+
+
+def test_list_rules_returns_the_27_with_fields():
+    """laterite.list_rules() → the engine's rule catalogue, one dict per rule."""
+    rules = laterite.list_rules()
+    assert len(rules) == 27
+    ids = {r["rule"] for r in rules}
+    assert "12" not in ids and "16a" not in ids  # no phantoms
+    for r in rules:
+        assert {"rule", "title", "severity", "fixable", "observations"} <= set(r)
+        assert r["severity"] in {"error", "fyi", "mixed"}
+
+
+def test_list_rules_fixable_matches_fix_engine():
+    """The catalogue's `fixable` flag matches the rules `laterite.fix` repairs."""
+    rules = laterite.list_rules()
+    assert {r["rule"] for r in rules if r["fixable"]} == _FIXABLE_RULES
+
+
+def test_cli_list_rules_table_and_json():
+    """`lat-check --list-rules` (Python CLI): table by default, JSON with --json,
+    no input file needed, exit 0."""
+    out, code = _run_py_cli(["--list-rules"])
+    assert code == 0 and "Rule" in out and "Character Set" in out
+
+    out, code = _run_py_cli(["--list-rules", "--json"])
+    assert code == 0
+    doc = json.loads(out)
+    assert len(doc["rules"]) == 27
+
+
+@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat-check not built")
+def test_cli_list_rules_rust_binary_json_matches_python():
+    """The standalone Rust binary's --list-rules --json is byte-identical to the
+    Python CLI's — both stream the same compile-time-embedded rules_meta.json."""
+    r = subprocess.run([str(_RUST_BIN), "--list-rules", "--json"], capture_output=True, text=True)
+    assert r.returncode == 0
+    py, _ = _run_py_cli(["--list-rules", "--json"])
+    assert r.stdout == py  # byte-identical, not merely structurally equal
+
+
 def test_cli_readme_and_help_flags():
     """`--readme` / `--help` / `-h` all print the bundled CLI README
     and exit 0 (the help short-circuit before argparse)."""
@@ -717,3 +801,286 @@ def test_compat_AGS4_to_excel_sorting_strategy(tmp_path):
     AGS4_to_excel(str(_PY_AGS4_TEST_DATA), str(xlsx), sorting_strategy="alphabetical")
     sheets = pd.read_excel(str(xlsx), sheet_name=None, engine="openpyxl")
     assert list(sheets.keys()) == sorted(sheets.keys())
+
+
+# --- Headless mechanical fix/repair: laterite.fix / Ags4File.fix (#198) -----
+
+_RULE8_PRECISION = _FIX / "rule8_dp_wrong_precision.ags"
+# A duplicate heading within one group → the RISKY RenameDuplicateHeading fix.
+_DUP_HEADING_SRC = (
+    '"GROUP","LOCA"\r\n'
+    '"HEADING","LOCA_ID","LOCA_ID"\r\n'
+    '"UNIT","",""\r\n'
+    '"TYPE","ID","ID"\r\n'
+    '"DATA","BH1","BH1"\r\n'
+)
+
+
+def test_fix_normalizes_crlf_to_clean():
+    """An LF-only clean file → normalize_crlf → CRLF output, no residual findings."""
+    lf = _CLEAN.read_bytes().replace(b"\r\n", b"\n")
+    r = laterite.fix(data=lf)
+    assert [a["kind"] for a in r.applied] == ["normalize_crlf"]
+    assert r.fixes_applied == 1
+    assert b"\r\n" in r.bytes and len(r.findings) == 0
+
+
+def test_fix_strips_bom():
+    """A BOM-prefixed file → strip_bom → BOM gone from the output."""
+    r = laterite.fix(data=b"\xef\xbb\xbf" + _CLEAN.read_bytes())
+    assert any(a["kind"] == "strip_bom" for a in r.applied)
+    assert not r.bytes.startswith(b"\xef\xbb\xbf")
+
+
+def test_fix_reformat_numeric_real_fixture():
+    """A wrong-precision DP cell is mechanically reformatted (real fixture)."""
+    before = laterite.validate(str(_RULE8_PRECISION)).count
+    r = laterite.fix(str(_RULE8_PRECISION))
+    assert any(a["kind"] == "reformat_numeric" for a in r.applied)
+    assert len(r.findings) < before  # at least one finding resolved
+
+
+def test_fix_clean_file_is_noop():
+    """A clean file gets no fixes and its bytes are returned unchanged."""
+    clean = _CLEAN.read_bytes()
+    r = laterite.fix(data=clean)
+    assert r.fixes_applied == 0
+    assert r.bytes == clean  # untouched, not silently re-encoded
+
+
+def test_fix_risky_excluded_by_default_included_on_request():
+    """Duplicate-heading rename is RISKY: excluded by default, applied with risky=True."""
+    safe = laterite.fix(text=_DUP_HEADING_SRC)
+    risky = laterite.fix(text=_DUP_HEADING_SRC, risky=True)
+    assert all(a["kind"] != "rename_duplicate_heading" for a in safe.applied)
+    assert any(a["kind"] == "rename_duplicate_heading" for a in risky.applied)
+    assert all(a["risk"] == "risky" for a in risky.applied if a["kind"] == "rename_duplicate_heading")
+
+
+def test_fix_result_save_and_text(tmp_path):
+    """FixResult.save writes the bytes; .text decodes them."""
+    r = laterite.fix(data=_CLEAN.read_bytes().replace(b"\r\n", b"\n"))
+    out = tmp_path / "fixed.ags"
+    assert r.save(out) == out
+    assert out.read_bytes() == r.bytes
+    assert r.text == r.bytes.decode("utf-8")
+
+
+def test_fix_in_place_overwrites_source(tmp_path):
+    """fix(path, in_place=True) overwrites the original file."""
+    p = tmp_path / "delivery.ags"
+    p.write_bytes(_CLEAN.read_bytes().replace(b"\r\n", b"\n"))  # LF-only
+    r = laterite.fix(str(p), in_place=True)
+    assert r.fixes_applied >= 1
+    assert b"\r\n" in p.read_bytes()  # the file on disk was repaired
+
+
+def test_fix_out_writes_elsewhere_source_untouched(tmp_path):
+    """fix(path, out=...) writes the fixed file there; the source is untouched."""
+    p = tmp_path / "delivery.ags"
+    original = _CLEAN.read_bytes().replace(b"\r\n", b"\n")
+    p.write_bytes(original)
+    out = tmp_path / "clean.ags"
+    laterite.fix(str(p), out=str(out))
+    assert out.exists() and b"\r\n" in out.read_bytes()
+    assert p.read_bytes() == original  # source unchanged
+
+
+def test_fix_in_place_requires_path():
+    """in_place=True with a non-path source is a clear error, not a silent no-write."""
+    with pytest.raises(laterite.Ags4Error):
+        laterite.fix(data=_CLEAN.read_bytes().replace(b"\r\n", b"\n"), in_place=True)
+
+
+def test_fix_in_place_and_out_conflict():
+    with pytest.raises(TypeError, match="only one"):
+        laterite.fix(text="x", in_place=True, out="y.ags")
+
+
+def test_fix_handle_method_returns_repaired_handle():
+    """Ags4File.fix() returns a repaired, chainable Ags4File; the FixResult rides
+    on .fix_report (a handle not produced by .fix() has none)."""
+    handle = laterite.read(data=_CLEAN.read_bytes().replace(b"\r\n", b"\n"))
+    repaired = handle.fix()
+    assert isinstance(repaired, laterite.Ags4File)
+    assert b"\r\n" in repaired.bytes
+    # the repaired handle is itself a clean, chainable file
+    assert repaired.validate().report.is_valid
+    # the fix report is carried for inspection; the source handle has none
+    assert isinstance(repaired.fix_report, laterite.FixResult)
+    assert repaired.fix_report.fixes_applied >= 1
+    assert handle.fix_report is None
+
+
+def test_fix_missing_file_raises_filenotfound():
+    with pytest.raises(FileNotFoundError):
+        laterite.fix("/no/such/file.ags")
+
+
+def test_fix_non_ags_raises():
+    with pytest.raises(laterite.NotAgs4Error):
+        laterite.fix(text="not an ags file at all")
+
+
+# --- Modern first-class Excel verbs: laterite.to_excel / from_excel (#195) ---
+
+
+def test_to_excel_path_round_trips(tmp_path):
+    """laterite.to_excel(path) → from_excel(xlsx) preserves every group."""
+    xlsx = tmp_path / "rt.xlsx"
+    stats = laterite.to_excel(str(_PY_AGS4_TEST_DATA), str(xlsx))
+    assert xlsx.stat().st_size > 0
+    assert set(stats) >= {"sheets_written", "rows_written", "warnings"}
+
+    back = laterite.from_excel(str(xlsx))
+    assert isinstance(back, laterite.Ags4File)
+    orig = laterite.read(str(_PY_AGS4_TEST_DATA))
+    assert sorted(back.groups) == sorted(orig.groups)
+
+
+def test_to_excel_from_handle_method(tmp_path):
+    """Ags4File.to_excel() writes a workbook from the parsed handle (no source path
+    needed — it stages the handle's spec-correct bytes)."""
+    handle = laterite.read(str(_PY_AGS4_TEST_DATA))
+    xlsx = tmp_path / "handle.xlsx"
+    stats = handle.to_excel(str(xlsx))
+    assert xlsx.stat().st_size > 0
+    assert stats["sheets_written"] == len(handle.groups)
+
+
+def test_to_excel_from_text_source(tmp_path):
+    """to_excel(text=...) routes the text/bytes branch through the re-emit."""
+    text = _PY_AGS4_TEST_DATA.read_text(encoding="utf-8")
+    xlsx = tmp_path / "fromtext.xlsx"
+    laterite.to_excel(text=text, output=str(xlsx))
+    assert xlsx.stat().st_size > 0
+
+
+def test_to_excel_groups_subset_orders_sheets(tmp_path):
+    """`groups=` fixes the sheet order / subset."""
+    import pandas as pd
+
+    xlsx = tmp_path / "subset.xlsx"
+    laterite.to_excel(str(_PY_AGS4_TEST_DATA), str(xlsx), groups=["LOCA", "PROJ"])
+    sheets = pd.read_excel(str(xlsx), sheet_name=None, engine="openpyxl")
+    assert list(sheets.keys()) == ["LOCA", "PROJ"]
+
+
+def test_to_excel_requires_output():
+    """Calling to_excel without an output path is a clear TypeError, not a cryptic
+    native error."""
+    with pytest.raises(TypeError, match="output path"):
+        laterite.to_excel(str(_PY_AGS4_TEST_DATA))
+
+
+def test_from_excel_to_file_returns_stats(tmp_path):
+    """from_excel(xlsx, out) writes AGS4 and returns the converter stats dict."""
+    xlsx = tmp_path / "src.xlsx"
+    laterite.to_excel(str(_PY_AGS4_TEST_DATA), str(xlsx))
+    out = tmp_path / "back.ags"
+    stats = laterite.from_excel(str(xlsx), str(out))
+    assert isinstance(stats, dict)
+    assert out.stat().st_size > 0
+
+
+def test_from_excel_handle_is_self_contained(tmp_path):
+    """from_excel(xlsx) returns a handle that validates without a backing file — its
+    source is the bytes, not the (deleted) temp path."""
+    xlsx = tmp_path / "selfc.xlsx"
+    laterite.to_excel(str(_PY_AGS4_TEST_DATA), str(xlsx))
+    back = laterite.from_excel(str(xlsx))
+    # .validate() re-reads the retained source; a dangling temp path would raise.
+    report = back.validate().report
+    assert report is not None
+
+
+def test_to_excel_rejects_non_ags_input(tmp_path):
+    """A non-AGS source surfaces NotAgs4Error, not a raw RuntimeError."""
+    from laterite import NotAgs4Error
+
+    junk = tmp_path / "junk.ags"
+    junk.write_text("not an ags file at all\n", encoding="utf-8")
+    with pytest.raises(NotAgs4Error):
+        laterite.to_excel(str(junk), str(tmp_path / "x.xlsx"))
+
+
+# --- Report.findings / by_rule carry severity + location (#196) -------------
+
+_RULE10A_DUP = _FIX / "rule10a_dup_key.ags"  # cell-target findings (field_index/data_row)
+_RULE11C_RL = _FIX / "rule11c_bad_rl.ags"  # a heading-target finding
+
+
+def test_findings_frame_has_severity_and_location_columns():
+    """The findings frame surfaces the severity + location columns the native layer
+    already carries — not just rule/line/group/desc."""
+    rep = laterite.validate(str(_RULE10A_DUP))
+    cols = set(rep.findings.columns)
+    assert {
+        "rule",
+        "line",
+        "group",
+        "desc",
+        "severity",
+        "target",
+        "heading",
+        "field_index",
+        "data_row",
+    } <= cols
+
+
+def test_findings_severity_defaults_error():
+    """Error findings (the default tier) report severity == 'error' even though the
+    boundary omits the field for them."""
+    rep = laterite.validate(str(_RULE10A_DUP))
+    sev = set(rep.findings["severity"].to_list())
+    assert sev == {"error"}
+
+
+def test_findings_fyi_severity(tmp_path):
+    """A BOM-prefixed file validated with fyi=True surfaces an FYI row whose
+    severity column reads 'fyi' — the non-error tier flows through to the frame."""
+    bom = tmp_path / "bom.ags"
+    bom.write_bytes(b"\xef\xbb\xbf" + _CLEAN.read_bytes())
+    rep = laterite.validate(str(bom), fyi=True)
+    df = rep.findings
+    fyi_rows = df.filter(df["severity"] == "fyi")
+    assert fyi_rows.height >= 1
+    assert all("FYI" in r for r in fyi_rows["rule"].to_list())
+
+
+def test_findings_heading_target_populated():
+    """A heading-targeted finding pins target='heading' and the offending heading."""
+    rep = laterite.validate(str(_RULE11C_RL))
+    df = rep.findings
+    heads = df.filter(df["target"] == "heading")
+    assert heads.height >= 1
+    assert heads["heading"].null_count() < heads.height  # at least one heading set
+
+
+def test_findings_cell_target_has_field_index_and_data_row():
+    """A cell-targeted finding pins target='cell' with a field_index + data_row."""
+    rep = laterite.validate(str(_RULE10A_DUP))
+    df = rep.findings
+    cells = df.filter(df["target"] == "cell")
+    assert cells.height >= 1
+    assert cells["field_index"].null_count() < cells.height
+    assert cells["data_row"].null_count() < cells.height
+
+
+def test_by_rule_carries_severity_and_location():
+    """by_rule items carry severity (always) plus whatever location fields the
+    finding pins."""
+    rep = laterite.validate(str(_RULE10A_DUP))
+    by = rep.by_rule()
+    # Every item has severity; at least one cell-target item carries field_index.
+    all_items = [f for items in by.values() for f in items]
+    assert all("severity" in f for f in all_items)
+    assert any(f.get("target") == "cell" and "field_index" in f for f in all_items)
+
+
+def test_by_rule_back_compat_keys_preserved():
+    """The original line/group/desc keys are still present — widening is additive."""
+    rep = laterite.validate(str(_RULE10A_DUP))
+    for items in rep.by_rule().values():
+        for f in items:
+            assert {"line", "group", "desc"} <= set(f)

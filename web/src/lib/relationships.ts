@@ -9,6 +9,7 @@
 
 import type { GroupKeyInfo, DictKeyMap } from "./analytics";
 import { selectSql, type JoinSpec, type QualifiedCol } from "./sqlgen";
+import { fetchUnion, isKeyStatus, type RawUnion } from "./dict";
 
 const DEPTH_TYPE = "2DP"; // the AGS TYPE that lands as a DOUBLE column
 
@@ -31,34 +32,33 @@ export interface DictGroupInfo extends GroupKeyInfo {
 }
 export type DictMap = Map<string, DictGroupInfo>;
 
-/** Fetch + parse ags5_dictionary.json into a DictMap once (replaces
- *  AnalyseView's KEY-only loadKeyMap; the parent+keys shape is unchanged). */
-export async function loadDict(): Promise<DictMap> {
-  const res = await fetch(`${import.meta.env.BASE_URL}ags5_dictionary.json`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const d = (await res.json()) as {
-    groups: {
-      code: string;
-      contents?: string;
-      parent: string | null;
-      headings: { name: string; status: string; type: string }[];
-    }[];
-  };
+/** Build a DictMap from the canonical union dictionary (the LATEST-edition
+ *  union of every group/heading — the right shape for Explore, which must
+ *  describe any file regardless of edition). Split out from `loadDict` so it's
+ *  unit-testable from the real `ags_dictionary.json` without a fetch. KEY
+ *  detection is `+`-aware (combined statuses like "KEY+REQUIRED"). */
+export function dictMapFromJson(raw: RawUnion): DictMap {
   const m: DictMap = new Map();
-  for (const g of d.groups) {
+  for (const [code, g] of Object.entries(raw.groups)) {
     const headings = g.headings.map((h) => ({
       name: h.name,
       status: h.status,
       type: h.type,
     }));
-    m.set(g.code, {
+    m.set(code, {
       parent: g.parent,
-      keys: headings.filter((h) => h.status === "KEY").map((h) => h.name),
+      keys: headings.filter((h) => isKeyStatus(h.status)).map((h) => h.name),
       headings,
-      contents: g.contents ?? "",
+      contents: g.description ?? "",
     });
   }
   return m;
+}
+
+/** Fetch + parse the union ags_dictionary.json into a DictMap once (the single
+ *  source the Explore builders share). */
+export async function loadDict(): Promise<DictMap> {
+  return dictMapFromJson(await fetchUnion());
 }
 
 /** A DictMap is structurally a DictKeyMap (parent+keys); this hands it to the
@@ -212,7 +212,7 @@ export function depthRangeOf(
   // an inherited parent `*_TOP` (e.g. TREG's SAMP_TOP) that must not pair with
   // an unrelated `*_BASE` (SPEC_BASE) into an incoherent [SAMP_TOP, SPEC_BASE).
   for (const h of info.headings) {
-    if (!/_TOP$/.test(h.name) || h.type !== DEPTH_TYPE || h.status !== "KEY")
+    if (!/_TOP$/.test(h.name) || h.type !== DEPTH_TYPE || !isKeyStatus(h.status))
       continue;
     const baseName = `${h.name.slice(0, -"_TOP".length)}_BASE`;
     const hasBase = info.headings.some(

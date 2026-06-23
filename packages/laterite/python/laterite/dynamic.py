@@ -1,8 +1,9 @@
 """Dynamic typed-graph classes for custom AGS groups.
 
-Stage F2b-4. Built on demand by ``laterite.ags5db.read_db`` (and
-``laterite.ags4.read_typed``) when a file's ``_spec_*`` tables list
-a group not in the compiled-in typed-graph registry.
+Stage F2b-4. Built on demand by ``laterite.ags4.read_typed`` when a file
+declares a group not in the compiled-in typed-graph registry. (The decoupled
+``.ags5db`` reader in ``ags5/`` uses the same factory from a file's
+``_spec_*`` tables.)
 
 The factory caches classes process-wide by
 ``(code, sorted-heading-tuple)`` so subsequent reads with the same

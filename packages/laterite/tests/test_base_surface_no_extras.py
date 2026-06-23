@@ -1,26 +1,32 @@
 """Regression guard: the **base** ``laterite`` surface works on a base-only
-install and never reaches *into* an optional extra (#111).
+install and never reaches *into* an optional extra or the now-decoupled
+experimental AGS5 package (#111, #177).
 
 The original report: a base ``pip install laterite`` user called
 ``from laterite.ags4 import read_typed`` and got
 ``ModuleNotFoundError: laterite.ags5db requires the 'ags5' extra`` — a base
-namespace silently depending on the heavy ``[ags5]`` (DuckDB) wheel. The
+namespace silently depending on the heavy AGS5 (DuckDB) wheel. The
 emit path had the same disease (it round-tripped frames through DuckDB,
 whose polars ingest pulls ``pyarrow`` — a ``[compat]`` dep).
 
+Since #177 the experimental ``.ags5db`` surface is fully decoupled — its code
+moved to the dormant ``ags5/`` holding folder, there is no ``[ags5]`` extra,
+and ``laterite.ags5db`` no longer ships. This test still guards that the base
+never re-acquires that dependency, alongside the live ``[compat]`` extras.
+
 We can't uninstall the extras in the dev workspace (everything's installed),
 so we run a **subprocess** with a ``sys.meta_path`` finder that makes the
-optional-extra top-levels (``laterite_ags5`` = ``[ags5]``; ``pandas`` /
-``pyarrow`` = ``[compat]``) un-importable — a faithful base-only simulation.
-Base ``duckdb`` / ``polars`` / ``narwhals`` stay (they ARE base deps). The
+decoupled/optional top-levels (``laterite_ags5`` = the AGS5 package;
+``pandas`` / ``pyarrow`` = ``[compat]``) un-importable — a faithful base-only
+simulation. Base ``duckdb`` / ``polars`` stay (they ARE base deps). The
 subprocess exercises the whole documented base surface and asserts:
 
 * every base call works,
-* no blocked extra is imported as a side effect, and
-* the extra-gated surface (``laterite.ags5db``) still fails with a *clear*
-  message, not a cryptic one.
+* no blocked package is imported as a side effect, and
+* the decoupled AGS5 surface (``laterite.ags5db``) is absent from the base.
 
-If this test fails, a base feature has started depending on an extra again.
+If this test fails, a base feature has started depending on an extra or the
+decoupled AGS5 package again.
 """
 
 from __future__ import annotations
@@ -35,7 +41,7 @@ _EXERCISE = textwrap.dedent(
     '''
     import sys
 
-    BLOCKED = {"laterite_ags5", "pandas", "pyarrow"}  # [ags5] + [compat]
+    BLOCKED = {"laterite_ags5", "pandas", "pyarrow"}  # decoupled AGS5 pkg + [compat]
 
     class _BlockExtras:
         def find_spec(self, name, path=None, target=None):
@@ -124,7 +130,8 @@ _EXERCISE = textwrap.dedent(
 
     leaked = sorted(m for m in sys.modules if m.split(".")[0] in BLOCKED)
 
-    # The extra-gated surface must still fail CLEANLY (clear message, not cryptic).
+    # The decoupled AGS5 surface must be ABSENT from the base (#177): no
+    # `laterite.ags5db` module ships, so importing it fails.
     gate_ok = False
     try:
         from laterite.ags5db import read_db  # noqa: F401
@@ -133,8 +140,8 @@ _EXERCISE = textwrap.dedent(
 
     if fails or leaked or not gate_ok:
         print("BASE-SURFACE FAILURES:", fails)
-        print("LEAKED EXTRAS:", leaked)
-        print("ags5 gate clear:", gate_ok)
+        print("LEAKED PACKAGES:", leaked)
+        print("ags5 absent from base:", gate_ok)
         sys.exit(1)
     sys.exit(0)
     '''

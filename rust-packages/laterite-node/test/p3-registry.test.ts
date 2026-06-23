@@ -4,8 +4,11 @@ import { describe, expect, it } from "vitest";
 import { Ags4Error, GroupDescriptor, registry } from "../ts/index";
 
 describe("registry.GROUPS", () => {
-  it("holds the 92 standard groups as descriptors", () => {
-    expect(Object.keys(registry.GROUPS)).toHaveLength(92);
+  it("holds every standard group as a descriptor", () => {
+    // The union dictionary spans editions 4.0.3–4.2 (174 groups at time of
+    // writing); assert a floor, not an exact count, so adding a group later
+    // doesn't break this test.
+    expect(Object.keys(registry.GROUPS).length).toBeGreaterThan(150);
     expect(registry.get("PROJ")).toBeInstanceOf(GroupDescriptor);
     expect(registry.get("NOPE")).toBeUndefined();
   });

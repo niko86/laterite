@@ -19,19 +19,13 @@ on:
   # so the `concurrency` group below can't collapse them. One run per PR now.
   pull_request:
     branches: [main]
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - "CHANGELOG.md"
-      - "LICENSE"
-      # web/** is built + tested by e2e.yml; a pure web PR doesn't touch the
-      # Rust/Python build, so don't run this heavy suite (and its bundled-DuckDB
-      # compile) for it. A mixed PR that also touches rust-packages/** still runs
-      # — paths-ignore only skips when EVERY changed file matches.
-      - "web/**"
-      # The runner image/stack (.github/runner/**) doesn't affect the
-      # Rust/Python build either — let a runner-image-only PR skip this suite.
-      - ".github/runner/**"
+    # NO trigger-level `paths-ignore`. Path-filtering lives ENTIRELY in the
+    # `changes` job below (the single source of truth) so the heavy jobs report a
+    # status on EVERY PR — they run, or skip-as-SUCCESS via their `if:` when the
+    # filter says no code changed. That's what lets rust/python/node be REQUIRED
+    # status checks WITHOUT a docs/web-only PR blocking forever on a check that a
+    # trigger-skip would leave eternally "pending". The only cost is a ~7s
+    # `changes` job on a docs PR; the bundled-DuckDB suite still skips.
   workflow_dispatch:
 
 # Cancel previous runs on the same ref when a new commit lands —
@@ -66,7 +60,7 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
       node: ${{ steps.filter.outputs.node }}
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         id: filter
         with:
@@ -79,14 +73,22 @@ jobs:
             code:
               - 'rust-packages/**'
               - 'packages/**'
-              - 'tests/**'              # the root suite = laterite-ags5x coverage (run below)
+              - 'tests/**'              # the root suite = AGS4 dictionary-faithfulness tests (run below)
               - 'pyproject.toml'
               - 'uv.lock'
               - 'tools/generate_pyi.py'
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
             node:
-              - 'rust-packages/laterite-node/**'
+              # The napi addon links sibling crates — laterite-ags4-validator,
+              # laterite-types, laterite-ags4-emit (see laterite-node/Cargo.toml) —
+              # so a change to ANY of them rebuilds + can break the node addon.
+              # Watching only laterite-node/** silently SKIPPED the node job on a
+              # dependency change (a validator/types/emit edit ran rust + python but
+              # not node). Watch all of rust-packages/** so node can never drift out
+              # of sync with its deps; the node job is ~40s, so the occasional run on
+              # an unrelated crate is cheap insurance against a silent skip.
+              - 'rust-packages/**'
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
 
@@ -94,15 +96,16 @@ jobs:
     needs: changes
     if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
-    # 35 min: bundled-DuckDB linkage in laterite-ags5-db is the long pole on a cold
-    # sccache; warmed runs (cache hits) typically finish in <8 min.
+    # 35 min ceiling (generous): the AGS5 crates (the bundled-DuckDB long pole)
+    # were decoupled to ags5/, so the kept workspace links no bundled DuckDB and
+    # a cold build is much faster; warmed runs (sccache hits) finish in minutes.
     timeout-minutes: 35
     steps:
       # Ephemeral pool runners start each job with a fresh _work, so there's
       # no persisted target/ to keep — the warm cache is sccache (content-
       # addressed, on the shared NFS mount), turned on by build-accel below.
       # See concepts/ci-and-runners.md for the sccache/ephemeral model.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -130,47 +133,47 @@ jobs:
       # laterite-ags4-wasm is a wasm32 cdylib (the browser validator); it is
       # built + linted for its real target via wasm-pack in
       # deploy-validator.yml. Exclude it from the host workspace
-      # clippy/test — compiling wasm-bindgen macro output on the host
+      # clippy — compiling wasm-bindgen macro output on the host
       # under -D warnings is toolchain-fragile and serves no purpose.
       # Debug, not --release: nothing in CI asserts wall-clock (no perf gate), so
-      # the release profile's thin-LTO + codegen-units=1 just burned compile time
-      # — and debug shares `target/debug` with the python job's maturin build, so
-      # bundled DuckDB compiles ONCE per change instead of twice.
-      # laterite-duckdb is ALSO excluded: it's a DuckDB *loadable* extension,
-      # so its libduckdb-sys is built with `loadable-extension` (host-resolved
-      # C API via a dispatch table) — mutually exclusive with the *bundled*
-      # DuckDB the rest of the workspace links (laterite-ags5-db /
-      # laterite-py-ags5). Co-building unifies the feature and routes bundled
-      # calls through an uninitialised dispatch table ("DuckDB API not
-      # initialized"). It's built + tested in isolation below, where `-p`
-      # resolves only its loadable subgraph.
+      # the release profile's thin-LTO + codegen-units=1 just burned compile time.
+      # The `laterite_ags4` DuckDB loadable extension is NOT built here — it lives
+      # in its own canonical repo `niko86/laterite-duckdb` with its own CI (it
+      # path-deps the library crates via a submodule of the public mirror). It
+      # couldn't co-build anyway: its `loadable-extension` libduckdb-sys is
+      # mutually exclusive with the *bundled* DuckDB the rest of the workspace
+      # links ("DuckDB API not initialized" at runtime).
       - name: cargo clippy
         working-directory: rust-packages
-        run: cargo clippy --workspace --exclude laterite-ags4-wasm --exclude laterite-duckdb -- -D warnings
+        run: cargo clippy --workspace --exclude laterite-ags4-wasm -- -D warnings
 
-      - name: cargo test
+      # The shared parse leaf (#168) becomes a wasm dependency of the browser
+      # validator from Phase 3 on. Build it for wasm32 NOW so a
+      # wasm-incompatible change (name-allowlist ≠ wasm-compilability — memchr's
+      # std::arch paths, encoding_rs) fails here, not at adoption.
+      - name: cargo build (parse leaf, wasm32)
         working-directory: rust-packages
-        run: cargo test --workspace --exclude laterite-ags4-wasm --exclude laterite-duckdb
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo build -p laterite-ags4-parse --target wasm32-unknown-unknown
 
-      # laterite-ags4-wasm is excluded from the workspace clippy/test above only
-      # because compiling wasm-bindgen macro output under `-D warnings`
-      # is toolchain-fragile. Its host-compilable unit tests (the typed-
-      # Arrow parse() parity guard) run fine without that flag, so run
-      # them on their own — they don't need the wasm target.
+      # No `cargo test --workspace` here: the dedicated `coverage` job below is
+      # the SOLE Rust test authority. It runs the same instrumented workspace
+      # tests (minus the two PyO3 glue crates, which the Python job exercises)
+      # AND gates a line-coverage floor — so a plain `cargo test` here would just
+      # re-run the identical suite, a duplicate full Rust test pass (incl. the
+      # long bundled-DuckDB compile) on every push for no extra signal. The one
+      # test the coverage job excludes is laterite-ags4-wasm's, run on its own
+      # below.
+
+      # laterite-ags4-wasm is excluded from the coverage workspace run too (a
+      # wasm32 cdylib, built elsewhere), so it's the single test the sole-
+      # authority coverage job doesn't cover. Its host-compilable unit tests
+      # (the typed-Arrow parse() parity guard) run fine on the host without the
+      # wasm target, so run them on their own here.
       - name: cargo test (laterite-ags4-wasm parity)
         working-directory: rust-packages
         run: cargo test -p laterite-ags4-wasm
-
-      # laterite-duckdb in isolation: clippy + the load/read_ags E2E. The
-      # script builds the loadable cdylib, then LOADs it into an in-process
-      # DuckDB (quack-rs `bundled-test` InMemoryDb) and exercises read_ags —
-      # so the table function's runtime behaviour is verified, not just its
-      # compile. `-p` here keeps libduckdb-sys on the loadable path.
-      - name: laterite-duckdb (clippy + load/read_ags E2E)
-        working-directory: rust-packages
-        run: |
-          cargo clippy -p laterite-duckdb -- -D warnings
-          ../tools/test-duckdb-ext.sh
 
       # sccache hit/miss visibility (no-op if sccache isn't on this runner).
       - name: sccache stats
@@ -192,7 +195,7 @@ jobs:
       run:
         working-directory: rust-packages/laterite-node
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -251,28 +254,31 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
-  # Dedicated, PARALLEL coverage gate — no `needs`, so it never slows the
-  # fast `rust`/`python` feedback above. Separate because `-C instrument-
-  # coverage` changes RUSTFLAGS: sccache can't share its cache with the
-  # plain build (the bundled-DuckDB C++ still hits sccache via CC/CXX; only
-  # the instrumented Rust recompiles), so folding coverage into the `rust`
-  # job would just slow every run. This is a FLOOR, ratchet up over time.
+  # The SOLE Rust test authority + the coverage floor gate, in one job. The
+  # `rust` job above runs fmt/clippy (+ the wasm-only parity test) but NO
+  # `cargo test --workspace` — this job's instrumented run IS that test pass,
+  # so there's exactly one full Rust test execution per push instead of two.
+  # PARALLEL — no `needs`, so it never slows the fast `rust`/`python` feedback
+  # above. Separate because `-C instrument-coverage` changes RUSTFLAGS: sccache
+  # can't share its cache with the plain build (the bundled-DuckDB C++ still
+  # hits sccache via CC/CXX; only the instrumented Rust recompiles), so folding
+  # coverage into the `rust` job would just slow every run. The floor is a
+  # FLOOR, ratchet up over time.
   #
   # Scope: the workspace minus laterite-ags4-wasm (a wasm32 cdylib, built elsewhere)
-  # and the two PyO3 glue crates (laterite-py, laterite-py-ags5) — those are
-  # exercised by the Python suite in the `python` job, never by `cargo test`,
-  # so including them would measure ~0% binding glue and let unrelated PyO3
-  # growth trip the gate. Baseline at introduction 61.4%; RATCHETED to 62
-  # after the validator/types/core coverage push (those crates are now
-  # 95-97%; laterite-ags5-db's CLI/query stays Python-tested, holding the workspace
-  # number at ~68% — hence the 62 floor with headroom for laterite-ags5-db CLI growth).
+  # and the PyO3 glue crate laterite-py — exercised by the Python suite in the
+  # `python` job, never by `cargo test`, so including it would measure ~0%
+  # binding glue and let unrelated PyO3 growth trip the gate. The 62 floor has
+  # ample headroom: since the AGS5 crates (laterite-ags5-db's Python-tested
+  # CLI/query, which held the number down to ~68%) were decoupled to ags5/, the
+  # kept crates (validator/types/core at 95-97%) lift the workspace number clear.
   coverage:
     needs: changes
     if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install Rust toolchain (+ llvm-tools)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -289,7 +295,7 @@ jobs:
       - name: Install cargo-llvm-cov
         # Prebuilt binary (no compile, no runner-image rebuild). SHA-pinned
         # per the supply-chain policy; Dependabot bumps it.
-        uses: taiki-e/install-action@7a79fe8c3a13344501c80d99cae481c1c9085912 # v2.81.10
+        uses: taiki-e/install-action@9e1e5806d4a4822de933115878265be9aaa786d9 # v2.82.2
         with:
           tool: cargo-llvm-cov
 
@@ -301,9 +307,7 @@ jobs:
         run: |
           cargo llvm-cov --no-report --workspace \
             --exclude laterite-ags4-wasm \
-            --exclude laterite-py \
-            --exclude laterite-py-ags5 \
-            --exclude laterite-duckdb
+            --exclude laterite-py
 
       - name: cargo llvm-cov (line-coverage floor)
         working-directory: rust-packages
@@ -342,12 +346,12 @@ jobs:
       # packages); this just acknowledges it so the log isn't noisy. NOT a
       # perf fix — that would need the cache to share the venv's filesystem.
       UV_LINK_MODE: copy
-    # 50 min: the python job builds both PyO3 cdylibs fresh via maturin
-    # (the rust job excludes them), and laterite-py-ags5 links bundled
-    # DuckDB. On a cold sccache that first build is the long pole; the extra
-    # headroom over the rust job's 35 ensures the cold bootstrap run COMPLETES
-    # and populates the cache rather than timing out mid-compile (which would
-    # save nothing and loop). Warm runs finish in well under 10 min regardless.
+    # 50 min ceiling: the python job builds the laterite-py PyO3 cdylib fresh
+    # via maturin (the rust job excludes it). Since the AGS5 crates (the
+    # bundled-DuckDB long pole) were decoupled to ags5/, this is now far
+    # lighter; the headroom over the rust job's 35 still covers a cold bootstrap
+    # run COMPLETING + populating the cache rather than timing out mid-compile
+    # (which would save nothing and loop). Warm runs finish well under 10 min.
     timeout-minutes: 50
     steps:
       # needs: rust is fail-fast only — don't spend python minutes if the
@@ -356,7 +360,7 @@ jobs:
       # _work. The cross-job warm cache is sccache, so maturin's PyO3 +
       # bundled-DuckDB compile still hits the shared cache the rust job
       # populated.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
@@ -390,11 +394,11 @@ jobs:
 
       - name: Build native extensions (maturin develop)
         # uv sync installs the workspace packages *editable* but does NOT
-        # compile the PyO3 cdylibs — the _laterite_native and
-        # _laterite_ags5_native .so files only exist after maturin builds
-        # them into each package's python/ source tree, so without this
-        # step `import laterite` fails with a missing-_laterite_native
-        # ImportError. DEBUG build (no --release): nothing in the CI suite
+        # compile the PyO3 cdylib — the _laterite_native .so only exists
+        # after maturin builds it into the package's python/ source tree,
+        # so without this step `import laterite` fails with a
+        # missing-_laterite_native ImportError. DEBUG build (no --release):
+        # nothing in the CI suite
         # asserts wall-clock timing (test_perf only *records* via
         # pytest-benchmark, never gates), so the heavy release profile
         # (opt-level=3 + thin-LTO + codegen-units=1 × bundled DuckDB)
@@ -405,10 +409,9 @@ jobs:
         # interrupted build on the old single runner. Ephemeral runners start
         # every job with a fresh _work (no persisted target/), so there's
         # nothing stale to inherit — the guard would only force a needless
-        # relink of the two PyO3 cdylibs each run.
+        # relink of the PyO3 cdylib each run.
         run: |
-          (cd packages/laterite      && uv run --no-sync maturin develop --uv)
-          (cd packages/laterite-ags5 && uv run --no-sync maturin develop --uv)
+          (cd packages/laterite && uv run --no-sync maturin develop --uv)
 
       - name: Build lat-check CLI (for the byte-parity tests)
         # The byte-parity tests (test_cli_json_ndjson_exit_byte_parity et al.)
@@ -433,9 +436,9 @@ jobs:
         # --durations=20: surface the slowest tests so heavy fixtures can
         # be targeted (session scope, parametrize) over time.
         #
-        # --cov gates the laterite + laterite_ags5 Python surface (scope set
-        # in pyproject [tool.coverage.run]); pytest-cov combines the per-xdist-
-        # worker data automatically. --cov-fail-under is a FLOOR, ratcheted up.
+        # --cov gates the laterite Python surface (scope set in pyproject
+        # [tool.coverage.run]); pytest-cov combines the per-xdist-worker data
+        # automatically. --cov-fail-under is a FLOOR, ratcheted up.
         #
         # History: introduced at 68 (CI ~71%); RATCHETED to 80 after the
         # laterite coverage push. #91 drove the CLI in-process (_cli.py 0% ->
@@ -447,39 +450,21 @@ jobs:
         # gone. (compat.py's remaining uncovered blocks are Rust-backed Excel
         # I/O — covered in laterite-ags4-core/excel.rs, not via Python.)
         run: |
-          # The root `tests/` (the laterite-ags5x suite) is private-only — it's
-          # blocklisted from the public mirror (niko86/laterite) — so include it
-          # only when present. Handed a missing path, pytest aborts collection
-          # entirely (0 tests → coverage-floor fail), which broke the public
-          # repo's python job. The conditional is a no-op on the private repo
-          # (the dir exists, so behaviour + coverage are unchanged).
+          # The root `tests/` (the AGS4 dictionary-faithfulness suite) is
+          # private-only — it's blocklisted from the public mirror
+          # (niko86/laterite) — so include it only when present. Handed a
+          # missing path, pytest aborts collection entirely (0 tests →
+          # coverage-floor fail), which broke the public repo's python job. The
+          # conditional is a no-op on the private repo (the dir exists, so
+          # behaviour + coverage are unchanged). A broken import in `tests/`
+          # surfaces as a collection error here (non-zero exit) — no separate
+          # sentinel step needed.
           uv run pytest \
             packages/laterite/tests \
-            packages/laterite-ags5/tests \
             $([ -d tests ] && echo tests) \
             -n 4 --durations=20 -q --tb=short \
-            --cov=laterite --cov=laterite_ags5 \
+            --cov=laterite \
             --cov-report=term-missing --cov-report=xml --cov-fail-under=80
-
-      # The root `tests/` suite IS the laterite-ags5x coverage, but it's
-      # EXCLUDED from the --cov denominator above (--cov=laterite/laterite_ags5),
-      # so a silent collection break — e.g. a future laterite.registry /
-      # laterite.ags5db rename that ImportErrors laterite-ags5x out of
-      # collection — would NOT trip --cov-fail-under (the laterite suites alone
-      # clear the floor). Assert it explicitly: `pytest` exits 5 on "no tests
-      # collected", failing loud. Private-only — `tests/` is blocklisted from
-      # the public mirror, so guard on its presence (mirrors the `[ -d tests ]`
-      # above; on the public tree this step + the sentinel just skip).
-      - name: Assert laterite-ags5x suite (no silent collection break)
-        if: hashFiles('tests/**') != ''
-        run: uv run pytest tests/ -q --no-cov
-
-      # Cheapest drift catch: pins the laterite surfaces laterite-ags5x leans on
-      # (laterite.registry + laterite.ags5db) and that the package imports — a
-      # rename of those Python-facing names turns this red immediately.
-      - name: laterite-ags5x import sentinel
-        if: hashFiles('tests/**') != ''
-        run: uv run python -c "from laterite.registry import GROUPS, GroupDescriptor, child_groups; from laterite.ags5db import read_db, convert; import laterite_ags5x"
 
       # Codecov `python` flag — public repo only (niko86/laterite), where the
       # badge lives + CODECOV_TOKEN is set. coverage.xml is written by the

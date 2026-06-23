@@ -14,19 +14,24 @@ export type { HeadingStatus };
 /** One heading's descriptor: `{name, status, type, unit, description}`. */
 export type Heading = GeneratedHeading;
 
+/** A heading is a KEY if any `+`-separated status part is KEY — the union
+ * dictionary carries combined statuses like `KEY+REQUIRED`, so a bare
+ * `status === "KEY"` would wrongly miss them (matches the Rust/Python check). */
+export function isKeyStatus(status: string): boolean {
+  return status.split("+").some((p) => p.trim().toUpperCase() === "KEY");
+}
+
 export class GroupDescriptor {
   readonly code: string;
   readonly contents: string;
   readonly parent: string | null;
   readonly headings: readonly Heading[];
-  readonly isHighVolume: boolean;
 
   constructor(g: GeneratedGroup) {
     this.code = g.code;
     this.contents = g.contents;
     this.parent = g.parent;
     this.headings = g.headings;
-    this.isHighVolume = g.isHighVolume;
   }
 
   /** DuckDB table name (`g_<code>`) — for parity with the Python descriptor. */
@@ -38,10 +43,10 @@ export class GroupDescriptor {
     return `v_${this.code.toLowerCase()}`;
   }
   get keyHeadings(): readonly Heading[] {
-    return this.headings.filter((h) => h.status === "KEY");
+    return this.headings.filter((h) => isKeyStatus(h.status));
   }
   get nonKeyHeadings(): readonly Heading[] {
-    return this.headings.filter((h) => h.status !== "KEY");
+    return this.headings.filter((h) => !isKeyStatus(h.status));
   }
 }
 

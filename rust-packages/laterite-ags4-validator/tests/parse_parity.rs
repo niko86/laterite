@@ -84,6 +84,41 @@ fn inline_quoting_and_ragged_rows_agree() {
     );
 }
 
+// The `parity()` value check compares core's TRIMMED row values against the
+// validator's UNTRIMMED ones (see `crow.get(h)` vs `vrow.values.get(j)` above).
+// It only ever agrees because no corpus fixture has whitespace INSIDE a quoted
+// field — so the gate is structurally BLIND to core's trim. This case proves it:
+// the same input parses to "P1" in core and "  P1  " in the validator. The
+// asymmetry is DELIBERATE and PERSISTS post-convergence (#168 fork 1 — the shared
+// leaf is untrimmed; core's `from_shared` re-trims to stay byte-identical to
+// today), so `parity()` stays restricted to interior-whitespace-free inputs.
+const INTERIOR_WS: &str = concat!(
+    "\"GROUP\",\"PROJ\"\r\n",
+    "\"HEADING\",\"PROJ_ID\"\r\n",
+    "\"UNIT\",\"\"\r\n",
+    "\"TYPE\",\"ID\"\r\n",
+    "\"DATA\",\"  P1  \"\r\n",
+);
+
+#[test]
+fn trim_asymmetry_core_trims_validator_does_not() {
+    let core = read_ags4_bytes(INTERIOR_WS.as_bytes()).unwrap();
+    let val = parse_str(INTERIOR_WS).unwrap();
+    let cv = core.get("PROJ").unwrap().rows[0]
+        .get("PROJ_ID")
+        .map(String::as_str);
+    let vv = val.groups.get("PROJ").unwrap().rows[0]
+        .values
+        .first()
+        .map(String::as_str);
+    assert_eq!(cv, Some("P1"), "core trims interior-quoted whitespace");
+    assert_eq!(vv, Some("  P1  "), "the validator preserves it verbatim");
+    assert_ne!(
+        cv, vv,
+        "the trim asymmetry parity() is blind to (#168 fork 1)"
+    );
+}
+
 #[test]
 fn fixtures_corpus_agrees() {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");

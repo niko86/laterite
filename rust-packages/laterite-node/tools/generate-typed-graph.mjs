@@ -1,6 +1,6 @@
-// Generate the registry data + the 92 typed-graph classes from the AGS5
+// Generate the registry data + the typed-graph classes from the AGS4 union
 // dictionary — the TS analog of `tools/generate_pyi.py`. Single source of truth:
-// `rust-packages/laterite-ags4-core/data/ags5_dictionary.json`. Run after a dictionary
+// `rust-packages/laterite-ags4-core/data/ags_dictionary.json`. Run after a dictionary
 // edit; `test/p3-typed-graph.test.ts` is the CI drift guard (byte-equality).
 //
 //   node tools/generate-typed-graph.mjs        # rewrite the generated files
@@ -12,12 +12,12 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const DICT_PATH = join(HERE, "..", "..", "laterite-ags4-core", "data", "ags5_dictionary.json");
+const DICT_PATH = join(HERE, "..", "..", "laterite-ags4-core", "data", "ags_dictionary.json");
 const REGISTRY_OUT = join(HERE, "..", "ts", "registry.generated.ts");
 const TYPED_OUT = join(HERE, "..", "ts", "typed-graph.generated.ts");
 
 const HEADER =
-  "// AUTO-GENERATED from ags5_dictionary.json by tools/generate-typed-graph.mjs.\n" +
+  "// AUTO-GENERATED from ags_dictionary.json by tools/generate-typed-graph.mjs.\n" +
   "// DO NOT EDIT — re-run the generator after a dictionary change.\n\n";
 
 // Port of `generate_pyi.py::_STRING_TYPES` / `_py_type`, to TS.
@@ -57,9 +57,8 @@ function childrenOf(groups) {
 export function generateRegistry(groups) {
   const data = groups.map((g) => ({
     code: g.code,
-    contents: g.contents,
+    contents: g.description ?? "",
     parent: g.parent ?? null,
-    isHighVolume: Boolean(g.is_high_volume),
     headings: g.headings.map((h) => ({
       name: h.name,
       status: h.status,
@@ -70,7 +69,7 @@ export function generateRegistry(groups) {
   }));
   return (
     HEADER +
-    'export type HeadingStatus = "KEY" | "REQUIRED" | "OTHER";\n\n' +
+    'export type HeadingStatus = "KEY" | "REQUIRED" | "OTHER" | "KEY+REQUIRED" | "DEPRECATED";\n\n' +
     "export interface GeneratedHeading {\n" +
     "  readonly name: string;\n" +
     "  readonly status: HeadingStatus;\n" +
@@ -82,14 +81,13 @@ export function generateRegistry(groups) {
     "  readonly code: string;\n" +
     "  readonly contents: string;\n" +
     "  readonly parent: string | null;\n" +
-    "  readonly isHighVolume: boolean;\n" +
     "  readonly headings: readonly GeneratedHeading[];\n" +
     "}\n\n" +
     `export const GROUPS_DATA: readonly GeneratedGroup[] = ${JSON.stringify(data, null, 2)};\n`
   );
 }
 
-/** The 92 typed-graph classes — scalar heading fields + child arrays. */
+/** The typed-graph classes — scalar heading fields + child arrays. */
 export function generateTypedGraph(groups) {
   const children = childrenOf(groups);
   const ordered = [...groups].sort((a, b) => a.code.localeCompare(b.code));
@@ -122,10 +120,13 @@ function emitClass(g, childCodes) {
   return lines.join("\n");
 }
 
-/** The 92 group descriptors (the dictionary JSON is `{format_version,
- * ags_edition, groups}`). */
+/** The group descriptors. The union dict is heading-local — `groups` is an
+ * object map keyed by code, and each heading's flat fields ARE the latest-
+ * edition (union) definition — so flatten to the array shape the generators
+ * expect, injecting `code`. */
 export function loadDictionary() {
-  return JSON.parse(readFileSync(DICT_PATH, "utf8")).groups;
+  const groups = JSON.parse(readFileSync(DICT_PATH, "utf8")).groups;
+  return Object.entries(groups).map(([code, g]) => ({ code, ...g }));
 }
 
 // CLI: rewrite the generated files.

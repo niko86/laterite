@@ -24,6 +24,11 @@ path = "src/lib.rs"
 # tuples, so dict keys are composite "GROUP\u{1f}HEADING" strings.
 phf = "0.13"
 thiserror = "1"
+# The shared parse leaf (#168 Phase 2): the validator's `parse` module
+# re-exports its types/tokenizer (`pub use`) + wraps parse_bytes/parse_str/
+# parse_file* to keep returning ValidatorError (so every consumer is
+# unchanged). Pure leaf (encoding_rs + memchr) → engine-purity guard intact.
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # Rule 8 DT/T validity: pandas-equivalent calendar/clock checking
 # (python-ags4 uses pandas.to_datetime). default-features off keeps it
 # lean — no clock, no serde; just the Naive parsers. Already in the
@@ -44,10 +49,11 @@ encoding_rs = "0.8"
 serde = { version = "1", features = ["derive"] }
 
 [build-dependencies]
-# build.rs reads the vendored .ags dictionaries and emits phf static
-# tables into OUT_DIR/dict_data.rs.
+# build.rs projects each edition out of the consolidated union dictionary
+# (laterite-ags4-core/data/ags_dictionary.json) into phf static tables in
+# OUT_DIR/dict_data.rs.
 phf_codegen = "0.13"
-csv = "1.3"
+serde_json = "1"
 
 [dev-dependencies]
 # Perf guard: bench check_file on the 23 MB workspace fixture. The

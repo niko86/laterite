@@ -36,11 +36,17 @@ crate-type = ["cdylib"]
 
 [dependencies]
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# The shared parse leaf (#168 Phase 3): the binding parses text/bytes through
+# the leaf directly (the validator is no longer on the parse hot-path); its
+# `ParseError` is converted to ValidatorError via the Phase-2 `From` bridge so
+# the exit-code/message map stays byte-identical. The validator dep stays for
+# the FS entry (`parse_file_with_encoding`), the rule engine, and ValidatorError.
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # S3b (release/v0.1.0-prep): pure-string AGS modules from laterite-ags4-core —
 # registry, ags_types, transport, ddl, ags4_codec, ags4_writer, error.
-# No DuckDB. The DuckDB-bound ags5db_fns + typed_graph read/write moved to
-# the separate `laterite-py-ags5` cdylib that ships in the `laterite[ags5]`
-# extra wheel.
+# No DuckDB. The DuckDB-bound ags5db_fns + typed_graph read/write live in the
+# separate `laterite-py-ags5` cdylib, which was decoupled to the dormant
+# `ags5/` holding folder (#177) — the base wheel ships AGS4-only.
 laterite-ags4-core = { path = "../laterite-ags4-core" }
 # AGS4 ↔ XLSX conversion (excel_fns.rs → laterite.compat.AGS4_to_excel /
 # excel_to_AGS4). Extracted out of laterite-ags4-core (2026-06-18) so core stops
@@ -52,6 +58,9 @@ laterite-excel = { path = "../laterite-excel" }
 # feature pulls the shared Arrow→Value transpose (group_from_arrow) so the
 # native + wasm hosts share one conversion.
 laterite-ags4-emit = { path = "../laterite-ags4-emit", features = ["arrow"] }
+# The KEY-aware/type-aware revision-diff leaf (#204): `diff_parsed` over two
+# parsed files + a Dictionary — the same diff wasm + the CLI use.
+laterite-ags4-diff = { path = "../laterite-ags4-diff" }
 # Direct dep for the shared typed-Arrow column builder (`arrow_cols`, behind
 # the `arrow` feature). Phase 1 of the 1.0 redesign emits typed Arrow per
 # group on the read path — the SAME emitter the wasm explorer frames as IPC.

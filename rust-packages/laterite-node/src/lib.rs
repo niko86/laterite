@@ -11,12 +11,13 @@ use std::path::Path;
 use arrow::ipc::reader::StreamReader;
 use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};
-use laterite_ags4_validator::parse::{
-    ParsedFile, parse_bytes, parse_file_with_encoding, parse_str,
-};
+// #168 Phase 3: text/bytes parse through the leaf directly; the FS entry
+// (`parse_file_with_encoding`) stays in the validator (it owns NotFound/Io).
+use laterite_ags4_parse::{ParsedFile, parse_bytes, parse_str};
+use laterite_ags4_validator::parse::parse_file_with_encoding;
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, ValidatorError, check_file_with_dict, resolve_dict_version, rules,
-    tran_ags_of,
+    CheckOptions, DictVersion, ValidatorError, check_file_with_dict, fix_document,
+    resolve_dict_version, rule_metadata_json, rules, tran_ags_of,
 };
 use laterite_types::sql_type;
 use napi::bindgen_prelude::*;
@@ -222,10 +223,14 @@ pub fn parse_arrow(
     // then a `path` the engine reads itself. Text is already decoded UTF-8 →
     // `parse_str`; bytes / path decode with the requested encoding.
     let parsed = if let Some(t) = text {
-        parse_str(&t).map_err(thrown)?
+        parse_str(&t)
+            .map_err(ValidatorError::from)
+            .map_err(thrown)?
     } else if let Some(d) = data {
         let enc = resolve_encoding(encoding.as_deref());
-        parse_bytes(d.as_ref(), enc).map_err(thrown)?
+        parse_bytes(d.as_ref(), enc)
+            .map_err(ValidatorError::from)
+            .map_err(thrown)?
     } else if let Some(p) = path {
         let enc = resolve_encoding(encoding.as_deref());
         parse_file_with_encoding(Path::new(&p), enc).map_err(thrown)?
@@ -347,7 +352,7 @@ fn validate_inner(
         (code, kind, e.to_string())
     };
     if let Some(t) = text {
-        let parsed = parse_str(t).map_err(map)?;
+        let parsed = parse_str(t).map_err(ValidatorError::from).map_err(map)?;
         let (dv, res) =
             resolve_dict_version(forced, tran_ags_of(&parsed).as_deref()).map_err(map)?;
         let dict = Dictionary::bundled(dv);
@@ -361,7 +366,9 @@ fn validate_inner(
         ))
     } else if let Some(d) = data {
         // Raw bytes decode with the requested encoding, then the same rule run as text.
-        let parsed = parse_bytes(d, opts.encoding).map_err(map)?;
+        let parsed = parse_bytes(d, opts.encoding)
+            .map_err(ValidatorError::from)
+            .map_err(map)?;
         let (dv, res) =
             resolve_dict_version(forced, tran_ags_of(&parsed).as_deref()).map_err(map)?;
         let dict = Dictionary::bundled(dv);
@@ -451,6 +458,159 @@ pub fn run_check(
         resolution: res,
         count,
         findings,
+    })
+}
+
+// --- fix (mechanical repair) + rule catalogue ---------------------------
+
+/// The AGS4 rule catalogue as the gated `rules_meta.json` — byte-identical to
+/// laterite-py's `list_rules()` and `lat-check --list-rules --json`. The TS
+/// layer parses it into typed `RuleMeta[]`. No input file.
+#[napi]
+pub fn list_rules() -> String {
+    rule_metadata_json().to_string()
+}
+
+/// One applied fix — the Node mirror of laterite-py's `applied[]` entries.
+/// `kind`/`risk` are the serde snake_case strings (`strip_bom`, `safe`, …) so
+/// the shape is identical across Python / CLI / Node.
+#[napi(object)]
+pub struct AppliedFix {
+    pub kind: String,
+    pub label: String,
+    pub rule: String,
+    pub line: Option<u32>,
+    pub risk: String,
+}
+
+/// The repair report — the Node mirror of laterite-py's `fix_file` dict. `ok` is
+/// false only for un-fixable input (the TS layer raises then). `fixed` is the
+/// repaired bytes (the original verbatim when nothing applied); `residual` is
+/// what could *not* be mechanically fixed.
+#[napi(object)]
+pub struct FixReport {
+    pub ok: bool,
+    pub error_kind: Option<String>,
+    pub error: Option<String>,
+    pub exit_code: i32,
+    pub fixed: Buffer,
+    pub dict_version: String,
+    pub resolution: String,
+    pub fixes_applied: u32,
+    pub applied: Vec<AppliedFix>,
+    pub residual: Vec<Finding>,
+}
+
+impl FixReport {
+    fn failure(kind: &str, exit_code: i32, message: String) -> Self {
+        FixReport {
+            ok: false,
+            error_kind: Some(kind.to_string()),
+            error: Some(message),
+            exit_code,
+            fixed: Buffer::from(Vec::<u8>::new()),
+            dict_version: String::new(),
+            resolution: String::new(),
+            fixes_applied: 0,
+            applied: Vec::new(),
+            residual: Vec::new(),
+        }
+    }
+}
+
+/// Mechanically repair an AGS4 file (`path`) / `text` / `data`: apply the SAFE
+/// fixes (plus the risky set when `includeRisky`), re-validate, and return the
+/// fixed bytes + residual findings. Mirrors laterite-py's `fix()` /
+/// `lat-check --fix`; the single `fix_document` orchestration is shared. The TS
+/// layer wraps this into a `FixResult` (`.bytes` / `.text` / `.save(path)`).
+#[napi]
+#[allow(clippy::too_many_arguments)]
+pub fn fix_file(
+    path: Option<String>,
+    text: Option<String>,
+    data: Option<Uint8Array>,
+    dict_version: Option<String>,
+    encoding: Option<String>,
+    include_risky: Option<bool>,
+) -> Result<FixReport> {
+    let raw: Vec<u8> = if let Some(t) = text {
+        t.into_bytes()
+    } else if let Some(d) = data {
+        d.to_vec()
+    } else if let Some(p) = path {
+        match std::fs::read(&p) {
+            Ok(b) => b,
+            Err(e) => return Ok(FixReport::failure("io", 3, format!("{p}: {e}"))),
+        }
+    } else {
+        return Ok(FixReport::failure(
+            "bad_args",
+            5,
+            "provide `path`, `text`, or `data`".to_string(),
+        ));
+    };
+    let forced = match resolve_edition(dict_version.as_deref()) {
+        Ok(v) => v,
+        Err(msg) => return Ok(FixReport::failure("bad_dict", 5, msg)),
+    };
+    let opts = CheckOptions {
+        dict_version: forced,
+        encoding: resolve_encoding(encoding.as_deref()),
+        ..CheckOptions::default()
+    };
+    let outcome = match fix_document(&raw, &opts, include_risky.unwrap_or(false)) {
+        Ok(o) => o,
+        Err(e) => {
+            let (code, kind) = classify(&e);
+            return Ok(FixReport::failure(kind, code, e.to_string()));
+        }
+    };
+    let applied: Vec<AppliedFix> = outcome
+        .applied
+        .iter()
+        .map(|f| AppliedFix {
+            // serde-serialize the enums so kind/risk match Python/CLI byte-for-byte.
+            kind: serde_json::to_value(f.kind)
+                .ok()
+                .and_then(|x| x.as_str().map(String::from))
+                .unwrap_or_default(),
+            label: f.label.clone(),
+            rule: f.rule.clone(),
+            line: f.line,
+            risk: serde_json::to_value(f.risk)
+                .ok()
+                .and_then(|x| x.as_str().map(String::from))
+                .unwrap_or_default(),
+        })
+        .collect();
+    let residual: Vec<Finding> = outcome
+        .residual
+        .iter()
+        .flat_map(|(rule, items)| {
+            items.iter().map(move |f| Finding {
+                rule: rule.clone(),
+                line: f.line,
+                group: f.group.clone(),
+                desc: f.desc.clone(),
+                severity: match f.severity {
+                    Severity::Error => None,
+                    s => Some(format!("{s:?}").to_lowercase()),
+                },
+            })
+        })
+        .collect();
+    let fixes_applied = applied.len() as u32;
+    Ok(FixReport {
+        ok: true,
+        error_kind: None,
+        error: None,
+        exit_code: if residual.is_empty() { 0 } else { 1 },
+        fixed: Buffer::from(outcome.fixed),
+        dict_version: outcome.dict_version.as_str().to_string(),
+        resolution: outcome.resolution.as_str().to_string(),
+        fixes_applied,
+        applied,
+        residual,
     })
 }
 

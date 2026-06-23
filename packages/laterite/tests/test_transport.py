@@ -73,7 +73,7 @@ def test_unlock_wrong_password_raises(ags_file: Path, tmp_path: Path) -> None:
     locked = transport.lock(ags_file, password="correct")
     with pytest.raises(RuntimeError) as exc:
         transport.unlock(locked, password="wrong", dest=tmp_path / "x.ags")
-    assert "ags5db error" in str(exc.value)
+    assert "laterite error" in str(exc.value)
 
 
 def test_lock_both_levels_work(ags_file: Path, tmp_path: Path) -> None:

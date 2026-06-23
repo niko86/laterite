@@ -1,9 +1,9 @@
 """Generate `_laterite_native.pyi` from the AGS5 dictionary.
 
-Reads `rust-packages/laterite-ags4-core/data/ags5_dictionary.json` and emits the
+Reads `rust-packages/laterite-ags4-core/data/ags_dictionary.json` and emits the
 type-stub file that sits next to the compiled `_laterite_native.so`,
-giving IDE autocomplete and mypy/pyright type-checking on the 92
-standard typed-graph classes.
+giving IDE autocomplete and mypy/pyright type-checking on the standard
+AGS4 typed-graph classes (the union of the official 4.0.3-4.2 dictionary).
 
 Run after every dictionary edit::
 
@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DICT_JSON = REPO_ROOT / "rust-packages" / "laterite-ags4-core" / "data" / "ags5_dictionary.json"
+DICT_JSON = REPO_ROOT / "rust-packages" / "laterite-ags4-core" / "data" / "ags_dictionary.json"
 OUT_PYI = (
     REPO_ROOT
     / "packages"
@@ -108,7 +108,10 @@ def _emit_class(g: dict, children: list[str]) -> str:
 def generate() -> str:
     """Build the full `.pyi` content from the dictionary."""
     data = json.loads(DICT_JSON.read_text(encoding="utf-8"))
-    groups: list[dict] = data["groups"]
+    # Heading-local schema: `groups` is a {CODE: group} map. Inject the code and
+    # take the flat headings (the UNION at each heading's latest-edition def;
+    # the `by_ed`/`eds` per-edition variation is ignored). Mirrors build.rs.
+    groups: list[dict] = [{"code": code, **g} for code, g in data["groups"].items()]
     children = _children_of(groups)
     # Sort groups alphabetically for stable, easy-to-diff output;
     # `from __future__ import annotations` makes forward refs work
@@ -116,14 +119,18 @@ def generate() -> str:
     groups_sorted = sorted(groups, key=lambda g: g["code"])
 
     header = (
-        "# AUTO-GENERATED from rust-packages/laterite-ags4-core/data/ags5_dictionary.json\n"
+        "# AUTO-GENERATED from rust-packages/laterite-ags4-core/data/ags_dictionary.json\n"
         "# DO NOT EDIT BY HAND. Regenerate via:\n"
         "#   uv run python tools/generate_pyi.py\n"
         "#\n"
         "# Type-stub file for the compiled `laterite._laterite_native`\n"
         "# extension. IDEs and type-checkers consult this to type-check\n"
-        "# code that imports the 92 standard AGS5 typed-graph classes\n"
-        "# plus the `read_db` / `write_db` functions.\n"
+        "# code that imports the standard AGS4 typed-graph classes\n"
+        "# (`from laterite import PROJ, LOCA, ...`). The module's internal\n"
+        "# functions (run_check / fix_file / list_rules / parse_* / the\n"
+        "# excel + transport helpers / Sidecar) are reached through the\n"
+        "# typed Python wrappers in `laterite/__init__.py`, which carry the\n"
+        "# annotations, so they are not stubbed here.\n"
         "#\n"
         "# Custom / passthrough groups built at runtime via\n"
         "# `laterite.dynamic.get_or_register` are NOT typed in this stub —\n"
@@ -133,32 +140,20 @@ def generate() -> str:
         "from __future__ import annotations\n"
         "\n"
         "import datetime as _dt\n"
-        "from os import PathLike\n"
         "from typing import Any\n"
         "\n"
     )
 
     body_blocks = [_emit_class(g, children.get(g["code"], [])) for g in groups_sorted]
 
-    # The top-level functions exposed from the native module that
-    # callers reach via `laterite._laterite_native.{read_db,write_db}`
-    # (the public face goes through `laterite.ags5db`; the lib
-    # functions just delegate to these).
-    fn_block = (
-        "def ags5db_read_db(path: str | PathLike[str]) -> PROJ: ...\n"
-        "\n\n"
-        "def ags5db_write_db(\n"
-        "    proj: Any,\n"
-        "    path: str | PathLike[str],\n"
-        ") -> None: ...\n"
-        "\n\n"
-        "def ags5db_attach_blobs(\n"
-        "    path: str | PathLike[str],\n"
-        "    blobs: list[dict[str, Any]],\n"
-        ") -> int: ...\n"
-    )
-
-    return header + "\n".join(body_blocks) + "\n" + fn_block
+    # Only the typed-graph classes are stubbed. The native module's internal
+    # functions (run_check / fix_file / list_rules / parse_* / excel /
+    # transport / Sidecar) are reached through the typed Python wrappers in
+    # `laterite/__init__.py`, which carry the annotations — so they are
+    # deliberately not stubbed here. (The old `ags5db_*` stubs were removed:
+    # the AGS5 surface was decoupled in #177, so they typed symbols the
+    # module no longer registers.)
+    return header + "\n".join(body_blocks) + "\n"
 
 
 def main() -> int:

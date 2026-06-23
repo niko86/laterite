@@ -165,9 +165,11 @@ export interface ExportResult {
   fixes_applied: number;
 }
 
-// --- Standard dictionary (Tools reference): the `laterite-ags4-wasm` dictionary(edition)
-// result — the real per-edition AGS4 standard dictionary (canonical names,
-// descriptions, units, types, status), NOT the scaffolded ags5 merged JSON. ---
+// --- Standard dictionary (Tools reference): one edition of the AGS4 standard
+// dictionary (canonical names, descriptions, units, types, status). Now produced
+// by `lib/dict.ts::projectEdition` from the canonical union `ags_dictionary.json`
+// (the single web dict source); shape kept identical to the prior wasm
+// `dictionary(edition)` result so the Tools UIs render unchanged. ---
 export interface DictHeading {
   name: string;
   status: string;

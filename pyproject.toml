@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "laterite",
-    "laterite-ags5",
     "duckdb>=1.5.2",
     "polars>=1.40.1",
     "pyarrow>=24.0.0",
@@ -14,11 +13,13 @@ dependencies = [
 ]
 
 [tool.uv.workspace]
+# Only `packages/laterite` remains here; the experimental AGS5 packages
+# (laterite-ags5 / laterite-ags5x) were moved to the dormant `ags5/` holding
+# folder (#177 decouple) and are no longer workspace members.
 members = ["packages/*"]
 
 [tool.uv.sources]
 laterite = { workspace = true }
-laterite-ags5 = { workspace = true }
 
 [dependency-groups]
 # marimo / altair / vegafusion / vl-convert-python (the retired
@@ -93,7 +94,7 @@ markers = [
 # --cov-fail-under floor lives in ci.yml's pytest step (visible alongside the
 # Rust/web gates), so a bare local `uv run pytest --cov` reports without
 # enforcing. pytest-cov combines the per-worker data under `-n` automatically.
-source = ["laterite", "laterite_ags5"]
+source = ["laterite"]
 parallel = true
 
 [tool.ruff]
@@ -106,6 +107,9 @@ line-length = 88
 # wheel metadata + the CI 3.12 wheel-test, not by this lint target.
 target-version = "py314"
 extend-exclude = [
+    # The dormant experimental-AGS5 holding folder (#177): preserved as-is for
+    # a future AGS5 strand to re-link, not active code — excluded from lint.
+    "ags5",
     "examples/output",
     "output",
     "rust-packages",
@@ -162,19 +166,6 @@ filename = "packages/laterite/pyproject.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
-[[tool.bumpversion.files]]
-filename = "packages/laterite-ags5/pyproject.toml"
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
-
-# laterite-ags5x: UNSHIPPED dev-only package (the .agsx writer/validator; needs
-# py3.14, not in the public tree). Stamped here purely to keep its version
-# aligned with the suite — no scatter, no future drift — NOT because it ships.
-[[tool.bumpversion.files]]
-filename = "packages/laterite-ags5x/pyproject.toml"
-search = 'version = "{current_version}"'
-replace = 'version = "{new_version}"'
-
 # compat.py: bump ONLY the laterite release prefix. The +compat.python-ags4.<pin>
 # local segment + the banner's "python-ags4 1.2.0" are pinned independently
 # (PYTHON_AGS4_COMPAT) and must NOT move on a version bump.
@@ -187,18 +178,6 @@ replace = '__version__ = f"{new_version}+compat.python-ags4.'
 filename = "packages/laterite/python/laterite/compat.py"
 search = "laterite {current_version} — compat:"
 replace = "laterite {new_version} — compat:"
-
-# cross-wheel lockstep floors: raise so an older base/companion can't satisfy a
-# newer one (both ship together at the same version).
-[[tool.bumpversion.files]]
-filename = "packages/laterite/pyproject.toml"
-search = "laterite-ags5>={current_version}"
-replace = "laterite-ags5>={new_version}"
-
-[[tool.bumpversion.files]]
-filename = "packages/laterite-ags5/pyproject.toml"
-search = "laterite>={current_version}"
-replace = "laterite>={new_version}"
 
 # CHANGELOG: roll [Unreleased] into the new version + date, and update the
 # compare/tag link refs (the old version's tag ref is left in place).

@@ -3,8 +3,8 @@
 //! Extracted from `ags5db` in S3a of `release/v0.1.0-prep`. This crate
 //! holds the modules that don't need DuckDB:
 //!
-//! - [`registry`] — the 92-group AGS5 dictionary (loaded at build time
-//!   from `data/ags5_dictionary.json`) + group-tree descriptors.
+//! - [`registry`] — the AGS4 multi-edition dictionary union (loaded at
+//!   build time from `data/ags_dictionary.json`) + group-tree descriptors.
 //! - [`ags_types`] — canonical type system (ID, X, 1DP, 2DP, PA, …)
 //!   + value parsing/formatting.
 //! - [`ags4_codec`] — AGS4 reader (CRLF lines, double-quoted CSV).

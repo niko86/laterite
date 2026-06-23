@@ -45,12 +45,42 @@ const RULE_2B: &str = "AGS Format Rule 2b";
 const RULE_4: &str = "AGS Format Rule 4";
 
 pub fn check(parsed: &ParsedFile, found: &mut Findings) {
+    rule_2_orphan_rows(parsed, found);
     rule_2a(parsed, found);
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
         rule_2(g, found);
         rule_2b(g, found);
         rule_4(parsed, g, found);
+    }
+}
+
+/// Rule 2 — a HEADING/UNIT/TYPE/DATA row before the first GROUP is *orphaned*:
+/// it belongs to no group, so the (deliberately lenient) parse drops it and no
+/// group-scoped rule ever sees it. python-ags4's PARSER hard-fails here ("… is
+/// not associated with a GROUP"), which means it can report nothing else about
+/// the file; we REPORT each orphan as a finding instead, so the validation
+/// report stays complete (see O-41). Walks `raw_lines` only up to the first
+/// GROUP, so a well-formed file (GROUP on line 1) pays one comparison.
+fn rule_2_orphan_rows(parsed: &ParsedFile, found: &mut Findings) {
+    for rl in &parsed.raw_lines {
+        if rl.text.trim().is_empty() {
+            continue; // blank separators are not rows (the parse walk skips them)
+        }
+        let fields = split_ags_line(&rl.text);
+        match fields.first().map(String::as_str).unwrap_or("") {
+            "GROUP" => break, // first GROUP reached — every later row is in-group
+            tag @ ("HEADING" | "UNIT" | "TYPE" | "DATA") => add(
+                found,
+                RULE_2,
+                Some(rl.number),
+                "",
+                format!(
+                    "{tag} row before any GROUP — every header and data row must belong to a GROUP."
+                ),
+            ),
+            _ => {} // unknown / non-descriptor tag — the parse ignores it too
+        }
     }
 }
 
@@ -242,6 +272,48 @@ mod tests {
         let r2 = f.get(RULE_2).expect("Rule 2");
         assert_eq!(r2.len(), 1);
         assert_eq!(r2[0].group, "LOCA");
+    }
+
+    #[test]
+    fn rule_2_flags_orphan_rows_before_first_group() {
+        // HEADING + DATA before any GROUP — python-ags4's parser crashes here;
+        // we REPORT each as a Rule 2 finding (O-41) and still validate the real
+        // group that follows.
+        let src = format!("\"HEADING\",\"STRAY\"\r\n\"DATA\",\"oops\"\r\n{CLEAN}");
+        let f = run(&src);
+        let orphans: Vec<_> = f
+            .get(RULE_2)
+            .expect("Rule 2")
+            .iter()
+            .filter(|x| x.desc.contains("before any GROUP"))
+            .collect();
+        assert_eq!(orphans.len(), 2, "{f:?}");
+        assert!(
+            orphans
+                .iter()
+                .any(|x| x.line == Some(1) && x.desc.starts_with("HEADING"))
+        );
+        assert!(
+            orphans
+                .iter()
+                .any(|x| x.line == Some(2) && x.desc.starts_with("DATA"))
+        );
+    }
+
+    #[test]
+    fn rule_4_flags_group_without_a_code() {
+        // A bare "GROUP" row (no code) — the lenient parse yields a code-"" group;
+        // Rule 4 already flags it malformed (this #189 relies on that).
+        let src = "\"GROUP\"\r\n\"HEADING\",\"X\"\r\n\"UNIT\",\"\"\r\n\
+                   \"TYPE\",\"ID\"\r\n\"DATA\",\"v\"\r\n";
+        let f = run(src);
+        assert!(
+            f.get(RULE_4)
+                .expect("Rule 4")
+                .iter()
+                .any(|x| x.desc.contains("missing the group name")),
+            "{f:?}"
+        );
     }
 
     #[test]

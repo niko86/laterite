@@ -33,22 +33,22 @@
 resolver = "2"
 members = [
     "laterite-types",
+    "laterite-ags4-parse",
     "laterite-ags4-core",
     "laterite-excel",
-    "laterite-ags5-db",
     "laterite-ags4-emit",
+    "laterite-ags4-diff",
     "laterite-ags4-validator",
     "laterite-ags4-check",
     "laterite-ags4-wasm",
     "laterite-cliutil",
     "laterite-py",
-    "laterite-py-ags5",
     "laterite-node",
 ]
 
 # Single-sourced crate version: every member inherits this via
-# `version.workspace = true`, so the whole engine + both binaries
-# (lat-check, lat-db) move in one line. Two-tier scheme: this is the
+# `version.workspace = true`, so the whole engine + the `lat-check` binary
+# move in one line. Two-tier scheme: this is the
 # internal/engine tier (also stamped by bump-my-version alongside the
 # Python wheels — see root pyproject [tool.bumpversion]); the published
 # npm `laterite` versions on its own `node-v*` track.

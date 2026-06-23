@@ -8,32 +8,29 @@ import {
 } from "solid-js";
 import { agsLine } from "../../lib/agsline";
 import { downloadBlob } from "../../lib/download";
-import { dictionary } from "../../lib/validatorClient";
+import {
+  loadStandardDict,
+  loadEditionMeta,
+  isKeyStatus,
+  isRequiredStatus,
+} from "../../lib/dict";
 import type { DictGroup, DictHeading, DictVersionOpt } from "../../lib/validator";
 import { dictVersion, setDictVersion } from "../../lib/settings";
 import { controlClass } from "../../lib/controls";
 
 // Template generator: pick AGS groups for the SELECTED edition and emit a blank
 // GROUP/HEADING/UNIT/TYPE skeleton (no DATA rows) ready to fill in — with the
-// canonical UNIT + TYPE rows from the engine's per-edition standard dictionary
-// (via wasm `dictionary(edition)`), not a scaffolded merged JSON. Fully
-// client-side. Edition = the shared, shareable `dictVersion` setting.
-
-const AUTO_EDITION = "4.1.1";
-const EDITIONS: DictVersionOpt[] = [
-  "auto",
-  "4.0.3",
-  "4.0.4",
-  "4.1",
-  "4.1.1",
-  "4.2",
-];
+// canonical UNIT + TYPE rows projected from the union `ags_dictionary.json` (the
+// single web dict source — see lib/dict.ts) down to the chosen edition. Fully
+// client-side. Edition = the shared, shareable `dictVersion` setting; the edition
+// list + "auto" fallback come from the union too (loadEditionMeta).
 
 export const TemplateGenerator: Component = () => {
   const [dict] = createResource(
     () => dictVersion(),
-    (ed) => dictionary(ed),
+    (ed) => loadStandardDict(ed),
   );
+  const [editionMeta] = createResource(loadEditionMeta);
 
   const [q, setQ] = createSignal("");
   const [picked, setPicked] = createSignal<Set<string>>(new Set());
@@ -62,7 +59,7 @@ export const TemplateGenerator: Component = () => {
     });
 
   const keep = (h: DictHeading) =>
-    !requiredOnly() || h.status === "KEY" || h.status === "REQUIRED";
+    !requiredOnly() || isKeyStatus(h.status) || isRequiredStatus(h.status);
 
   // Build the skeleton in dictionary order for the picked groups.
   const template = createMemo<string>(() => {
@@ -122,10 +119,12 @@ export const TemplateGenerator: Component = () => {
             value={dictVersion()}
             onChange={(e) => setDictVersion(e.currentTarget.value as DictVersionOpt)}
           >
-            <For each={EDITIONS}>
+            <For each={["auto", ...(editionMeta()?.editions ?? [])]}>
               {(ed) => (
                 <option value={ed}>
-                  {ed === "auto" ? `auto (→ ${AUTO_EDITION})` : ed}
+                  {ed === "auto"
+                    ? `auto (→ ${editionMeta()?.fallback ?? ""})`
+                    : ed}
                 </option>
               )}
             </For>

@@ -611,11 +611,68 @@ mod tests {
     use crate::parse::parse_str;
 
     fn run(src: &str) -> Findings {
+        run_v(src, DictVersion::V4_2)
+    }
+
+    fn run_v(src: &str, v: DictVersion) -> Findings {
         let pf = parse_str(src).expect("fixture parses");
-        let d = Dictionary::bundled(DictVersion::V4_2);
+        let d = Dictionary::bundled(v);
         let mut f = Findings::new();
         check(&pf, &d, &mut f);
         f
+    }
+
+    /// Synthetic repro of the #222 / O-42 corpus file (no real data): PMTL's
+    /// parent is **PMTD** in 4.0.3 (KEY includes `PMTD_SEQ`) but **PMTG** in
+    /// 4.0.4+. This PMTL row has a blank `PMTD_SEQ`, so under 4.0.3 it orphans
+    /// against PMTD (no PMTD row with that blank SEQ) while under 4.0.4 it
+    /// matches its PMTG parent on the shorter key. PMTL is the only group in
+    /// the dictionary with an edition-varying parent.
+    const PMTL_EDITION_FIXTURE: &str = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+        \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH1\"\r\n\r\n\
+        \"GROUP\",\"PMTG\"\r\n\"HEADING\",\"LOCA_ID\",\"PMTG_DPTH\",\"PMTG_TESN\"\r\n\
+        \"UNIT\",\"\",\"m\",\"\"\r\n\"TYPE\",\"ID\",\"2DP\",\"ID\"\r\n\
+        \"DATA\",\"BH1\",\"10.00\",\"T1\"\r\n\r\n\
+        \"GROUP\",\"PMTD\"\r\n\
+        \"HEADING\",\"LOCA_ID\",\"PMTG_DPTH\",\"PMTG_TESN\",\"PMTD_SEQ\"\r\n\
+        \"UNIT\",\"\",\"m\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"2DP\",\"ID\",\"ID\"\r\n\
+        \"DATA\",\"BH1\",\"10.00\",\"T1\",\"1\"\r\n\r\n\
+        \"GROUP\",\"PMTL\"\r\n\
+        \"HEADING\",\"LOCA_ID\",\"PMTG_DPTH\",\"PMTG_TESN\",\"PMTL_LNO\",\"PMTD_SEQ\"\r\n\
+        \"UNIT\",\"\",\"m\",\"\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"2DP\",\"ID\",\"ID\",\"ID\"\r\n\
+        \"DATA\",\"BH1\",\"10.00\",\"T1\",\"1\",\"\"\r\n";
+
+    #[test]
+    fn rule_10c_pmtl_parent_is_edition_dependent() {
+        // #222 / O-42: the parent PMTL is checked against differs by edition.
+        let pmtl_orphans = |v| {
+            run_v(PMTL_EDITION_FIXTURE, v)
+                .get(RULE_10C)
+                .map(|f| {
+                    f.iter()
+                        .filter(|x| x.group == "PMTL" && x.desc.contains("No parent entry"))
+                        .count()
+                })
+                .unwrap_or(0)
+        };
+        // 4.0.3: PMTL→PMTD on a key incl. the (blank) PMTD_SEQ → orphan.
+        assert_eq!(
+            pmtl_orphans(DictVersion::V4_0_3),
+            1,
+            "4.0.3 should orphan PMTL→PMTD"
+        );
+        // 4.0.4+: PMTL→PMTG on the shorter key → matches, no orphan. python-ags4's
+        // stale "4.0"→4.0.3 alias is what makes it over-report these (false positives).
+        assert_eq!(
+            pmtl_orphans(DictVersion::V4_0_4),
+            0,
+            "4.0.4 should match PMTL→PMTG"
+        );
+        assert_eq!(
+            pmtl_orphans(DictVersion::V4_2),
+            0,
+            "4.2 keeps the 4.0.4 PMTL→PMTG parent"
+        );
     }
 
     #[test]

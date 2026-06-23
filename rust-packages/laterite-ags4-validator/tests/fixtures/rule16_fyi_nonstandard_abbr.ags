@@ -1,0 +1,23 @@
+"GROUP","PROJ"
+"HEADING","PROJ_ID"
+"UNIT",""
+"TYPE","ID"
+"DATA","P1"
+
+"GROUP","TRAN"
+"HEADING","TRAN_AGS"
+"UNIT",""
+"TYPE","X"
+"DATA","4.2"
+
+"GROUP","SAMP"
+"HEADING","LOCA_ID","SAMP_TOP","SAMP_REF","SAMP_TYPE","SAMP_ID"
+"UNIT","","m","","",""
+"TYPE","ID","2DP","X","PA","ID"
+"DATA","BH1","1.00","S1","ZZ","BH1_1.00"
+
+"GROUP","ABBR"
+"HEADING","ABBR_HDNG","ABBR_CODE","ABBR_DESC"
+"UNIT","","",""
+"TYPE","X","X","X"
+"DATA","SAMP_TYPE","ZZ","Special non-standard sample"

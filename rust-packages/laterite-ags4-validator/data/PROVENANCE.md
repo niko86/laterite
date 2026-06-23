@@ -7,12 +7,24 @@
 `Standard_dictionary_v4_2.ags` are the machine-readable AGS4 **Data
 Dictionary** for each published edition — the canonical list of group
 codes, heading names, AGS data types, units, status, and descriptions
-that the AGS4 transfer-format standard defines. They are the reference
-schema this validator checks files against (Rules 7, 9, 16, 17, 19).
+that the AGS4 transfer-format standard defines. They are the **origin**
+of the dictionary the validator checks files against (Rules 7, 9, 16,
+17, 19).
+
+These files are read by **one tool only** — `tools/gen_dictionary.py`,
+which projects all five editions into the single consolidated union
+`rust-packages/laterite-ags4-core/data/ags_dictionary.json`. The
+validator's `build.rs` then reads **that union** (not these `.ags`
+directly) and projects each edition back out into its compiled lookup
+tables; so does every other consumer (the typed-graph codegen, the web).
+One source, no second parser. (A CI gate, `tests/test_dictionary_faithful.py`,
+re-runs `gen_dictionary.py` and asserts the committed union still
+reconstructs each edition from these files exactly.)
+
 The validator auto-selects the matching edition from a file's
-`TRAN_AGS` (see `src/lib.rs::resolve_dict_version`); all five are
-bundled so real-world deliveries (overwhelmingly AGS 4.0/4.1, not 4.2)
-are validated against their own schema, not a newer one.
+`TRAN_AGS` (see `src/lib.rs::resolve_dict_version`); all five editions
+are carried so real-world deliveries (overwhelmingly AGS 4.0/4.1, not
+4.2) are validated against their own schema, not a newer one.
 
 ## Source
 

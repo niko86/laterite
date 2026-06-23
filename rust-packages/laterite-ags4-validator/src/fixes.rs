@@ -117,6 +117,13 @@ const RULE_8: &str = "AGS Format Rule 8";
 const RULE_11A: &str = "AGS Format Rule 11a";
 const RULE_11B: &str = "AGS Format Rule 11b";
 
+/// The rule suffixes the fix engine can repair (the `RULE_*` consts above, sans
+/// the `"AGS Format Rule "` prefix) — the single source for the catalogue's
+/// `fixable` flag (`crate::catalogue`). The `fixable_labels_match_rule_consts`
+/// test keeps it in lock-step with the consts, so a new fix can't leave the
+/// catalogue's `fixable` stale.
+pub const FIXABLE_RULE_LABELS: &[&str] = &["1", "2a", "4", "6", "7", "8", "11a", "11b"];
+
 /// Walk the findings + the parsed file and emit one [`Fix`] per fixable
 /// finding. Pure read — never mutates `parsed` or `found` (the oracle
 /// stays intact). Findings whose fix would be ambiguous/unsafe (Rule 1
@@ -797,6 +804,75 @@ pub fn apply_fixes(text: &str, has_bom: bool, selected: &[Fix]) -> String {
     result
 }
 
+/// The outcome of [`fix_document`]: the repaired `fixed` bytes (UTF-8; the
+/// original bytes verbatim when nothing was applicable), the `residual`
+/// findings that remain *after* the fixes, the `applied` fixes, and the edition
+/// the residual was validated against.
+pub struct FixOutcome {
+    pub fixed: Vec<u8>,
+    pub residual: Findings,
+    pub applied: Fixes,
+    pub dict_version: crate::DictVersion,
+    pub resolution: crate::DictResolution,
+}
+
+/// Headless one-shot repair of a delivered AGS4 document's bytes — the single
+/// orchestration shared by the PyO3 `fix()` verb and the `lat-check --fix` CLI
+/// (and the natural home for any future surface). Parses, runs the rules,
+/// [`compute_fixes`], applies the **safe** set (plus the intent-guessing
+/// **risky** set when `include_risky`), then re-validates the result so
+/// [`FixOutcome::residual`] is what could *not* be mechanically fixed.
+///
+/// The applier re-emits UTF-8 (BOM-sniffed via `opts.encoding`), so repairing a
+/// non-UTF-8 / BOM'd / CRLF-broken file also normalises those. When no fix is
+/// applicable the input bytes are returned verbatim (no silent re-encode).
+pub fn fix_document(
+    raw: &[u8],
+    opts: &crate::CheckOptions,
+    include_risky: bool,
+) -> Result<FixOutcome, crate::ValidatorError> {
+    let has_bom = raw.starts_with(&[0xEF, 0xBB, 0xBF]);
+    let pf = crate::parse::parse_bytes(raw, opts.encoding)?;
+    let tran = crate::tran_ags_of(&pf);
+    let (dv, res) = crate::resolve_dict_version(opts.dict_version, tran.as_deref())?;
+    let dict = crate::Dictionary::bundled(dv);
+    let mut found = Findings::new();
+    crate::rules::run_all(&pf, &dict, opts, None, &mut found);
+
+    let mut selected = compute_fixes(&pf, &found);
+    if !include_risky {
+        selected.retain(|f| f.risk == FixRisk::Safe);
+    }
+    if selected.is_empty() {
+        return Ok(FixOutcome {
+            fixed: raw.to_vec(),
+            residual: found,
+            applied: Vec::new(),
+            dict_version: dv,
+            resolution: res,
+        });
+    }
+
+    let (decoded, _, _) = opts.encoding.decode(raw);
+    let fixed = apply_fixes(&decoded, has_bom, &selected).into_bytes();
+
+    // Residual findings on the fixed (UTF-8, BOM-stripped) output.
+    let pf2 = crate::parse::parse_bytes(&fixed, encoding_rs::UTF_8)?;
+    let tran2 = crate::tran_ags_of(&pf2);
+    let (dv2, res2) = crate::resolve_dict_version(opts.dict_version, tran2.as_deref())?;
+    let dict2 = crate::Dictionary::bundled(dv2);
+    let mut residual = Findings::new();
+    crate::rules::run_all(&pf2, &dict2, opts, None, &mut residual);
+
+    Ok(FixOutcome {
+        fixed,
+        residual,
+        applied: selected,
+        dict_version: dv2,
+        resolution: res2,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1328,5 +1404,48 @@ mod tests {
         let out = apply_fixes(src, parsed.has_bom, std::slice::from_ref(dt));
         assert!(out.contains("\"2020-08-18\""), "applied ISO date: {out:?}");
         assert!(!out.contains("18/08/2020"));
+    }
+
+    #[test]
+    fn fix_document_noop_returns_original_bytes_verbatim() {
+        // Nothing fixable in HEAD → fix_document must return the input untouched
+        // (no silent decode/re-encode round-trip).
+        let raw = HEAD.as_bytes();
+        let out = fix_document(raw, &CheckOptions::default(), false).expect("fixes");
+        assert!(out.applied.is_empty());
+        assert_eq!(
+            out.fixed, raw,
+            "a no-op fix returns the source byte-for-byte"
+        );
+    }
+
+    #[test]
+    fn fix_document_repairs_lf_only_and_clears_rule_2a() {
+        // First line ends LF-only → Rule 2a → NormalizeCrlf; the residual must no
+        // longer carry Rule 2a once applied.
+        let raw = HEAD.replacen("\r\n", "\n", 1);
+        let out = fix_document(raw.as_bytes(), &CheckOptions::default(), false).expect("fixes");
+        assert_eq!(kinds(&out.applied), vec![FixKind::NormalizeCrlf]);
+        assert!(out.fixed.windows(2).any(|w| w == b"\r\n"), "output is CRLF");
+        assert!(
+            !out.residual.contains_key("AGS Format Rule 2a"),
+            "the CRLF finding is resolved in the residual"
+        );
+    }
+
+    #[test]
+    fn fixable_labels_match_rule_consts() {
+        // FIXABLE_RULE_LABELS (the catalogue's single source for `fixable`) must
+        // be exactly the rule labels the fix engine attaches — keep it in
+        // lock-step with the RULE_* consts compute_fixes uses.
+        let from_consts: std::collections::BTreeSet<String> = [
+            RULE_1, RULE_2A, RULE_4, RULE_6, RULE_7, RULE_8, RULE_11A, RULE_11B,
+        ]
+        .iter()
+        .map(|l| l.trim_start_matches("AGS Format Rule ").to_string())
+        .collect();
+        let exported: std::collections::BTreeSet<String> =
+            FIXABLE_RULE_LABELS.iter().map(|s| s.to_string()).collect();
+        assert_eq!(exported, from_consts);
     }
 }

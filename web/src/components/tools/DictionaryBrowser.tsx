@@ -6,49 +6,41 @@ import {
   Show,
   type Component,
 } from "solid-js";
-import { dictionary } from "../../lib/validatorClient";
+import {
+  loadStandardDict,
+  loadEditionMeta,
+  isKeyStatus,
+  isRequiredStatus,
+} from "../../lib/dict";
 import type { DictGroup, DictVersionOpt } from "../../lib/validator";
 import { dictVersion, setDictVersion } from "../../lib/settings";
 import { Chevron } from "../Chevron";
 import { controlClass } from "../../lib/controls";
 
 // Searchable reference for the AGS4 groups + their headings, for the SELECTED
-// edition. Served from the engine's own per-edition standard dictionary (via
-// the wasm `dictionary(edition)` export) — canonical names + descriptions +
-// units + types + status, the same data validation checks against. (It used to
-// fetch a static scaffolded merged JSON whose descriptions were ~91% empty, so
-// searching by description found nothing.) Edition is the shared, shareable
-// `dictVersion` setting; "auto" resolves to the engine's fallback edition.
+// edition. Projected from the canonical union `ags_dictionary.json` (the single
+// web dict source — see lib/dict.ts) down to the chosen edition — canonical
+// names + descriptions + units + types + status, the same data validation
+// checks against. Edition is the shared, shareable `dictVersion` setting;
+// "auto" resolves to the validator's fallback edition.
 
-// The edition the engine falls back to when none is forced (matches
-// laterite_ags4_validator::dict::FALLBACK); shown so "auto" isn't a mystery.
-const AUTO_EDITION = "4.1.1";
-const EDITIONS: DictVersionOpt[] = [
-  "auto",
-  "4.0.3",
-  "4.0.4",
-  "4.1",
-  "4.1.1",
-  "4.2",
-];
+// The edition list + the "auto" fallback come from the union (loadEditionMeta),
+// not a hand-copied array — see lib/dict.ts.
 
+// `+`-aware: the union preserves combined statuses (e.g. "KEY+REQUIRED").
 function statusClass(status: string): string {
-  switch (status.toUpperCase()) {
-    case "KEY":
-      return "text-accent";
-    case "REQUIRED":
-      return "text-warn";
-    default:
-      return "text-fg-faint";
-  }
+  if (isKeyStatus(status)) return "text-accent";
+  if (isRequiredStatus(status)) return "text-warn";
+  return "text-fg-faint";
 }
 
 export const DictionaryBrowser: Component = () => {
-  // Reload whenever the edition changes; the worker resolves "auto" itself.
+  // Reload whenever the edition changes; loadStandardDict resolves "auto".
   const [dict] = createResource(
     () => dictVersion(),
-    (ed) => dictionary(ed),
+    (ed) => loadStandardDict(ed),
   );
+  const [editionMeta] = createResource(loadEditionMeta);
   const [q, setQ] = createSignal("");
 
   const groups = createMemo<DictGroup[]>(() => {
@@ -85,10 +77,12 @@ export const DictionaryBrowser: Component = () => {
             value={dictVersion()}
             onChange={(e) => setDictVersion(e.currentTarget.value as DictVersionOpt)}
           >
-            <For each={EDITIONS}>
+            <For each={["auto", ...(editionMeta()?.editions ?? [])]}>
               {(ed) => (
                 <option value={ed}>
-                  {ed === "auto" ? `auto (→ ${AUTO_EDITION})` : ed}
+                  {ed === "auto"
+                    ? `auto (→ ${editionMeta()?.fallback ?? ""})`
+                    : ed}
                 </option>
               )}
             </For>

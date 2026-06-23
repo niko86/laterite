@@ -18,7 +18,9 @@ from typing import Literal
 
 from . import _laterite_native as _native
 
-HeadingStatus = Literal["KEY", "REQUIRED", "OTHER"]
+# The official AGS dictionary uses combined statuses (e.g. "KEY+REQUIRED")
+# and a "DEPRECATED" marker alongside the base KEY/REQUIRED/OTHER.
+HeadingStatus = Literal["KEY", "REQUIRED", "OTHER", "KEY+REQUIRED", "DEPRECATED"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +36,11 @@ class Heading:
     def py_name(self) -> str:
         return self.name.lower()
 
+    @property
+    def is_key(self) -> bool:
+        # KEY iff "KEY" is one of the `+`-separated status parts.
+        return any(p.strip().upper() == "KEY" for p in self.status.split("+"))
+
 
 @dataclass(frozen=True, slots=True)
 class GroupDescriptor:
@@ -41,7 +48,6 @@ class GroupDescriptor:
     contents: str
     parent: str | None
     headings: tuple[Heading, ...]
-    is_high_volume: bool = False
     index_parent: bool | None = None
 
     @property
@@ -54,11 +60,11 @@ class GroupDescriptor:
 
     @property
     def key_headings(self) -> tuple[Heading, ...]:
-        return tuple(h for h in self.headings if h.status == "KEY")
+        return tuple(h for h in self.headings if h.is_key)
 
     @property
     def non_key_headings(self) -> tuple[Heading, ...]:
-        return tuple(h for h in self.headings if h.status != "KEY")
+        return tuple(h for h in self.headings if not h.is_key)
 
 
 def _load() -> dict[str, GroupDescriptor]:
@@ -84,7 +90,6 @@ def _load() -> dict[str, GroupDescriptor]:
             contents=g["contents"],
             parent=g.get("parent"),
             headings=headings,
-            is_high_volume=g.get("is_high_volume", False),
             index_parent=g.get("index_parent"),
         )
         out[desc.code] = desc

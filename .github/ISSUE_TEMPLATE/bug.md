@@ -28,6 +28,6 @@ divergences. -->
 - laterite version: `python -c "import laterite; print(laterite.__version__)"`
 - Python version:
 - OS:
-- Installed extras (`[compat]`, `[ags5]`, `[all]`, none):
+- Installed extras (`[compat]`, `[all]`, none):
 
 ## Additional context

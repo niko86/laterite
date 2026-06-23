@@ -1,35 +1,33 @@
 """AGS4 → typed PROJ tree, in one call — on the DuckDB-free base path.
 
-Companion to ``laterite.ags5db.read_db`` for callers who have an AGS4
-transfer file (rather than a ``.ags5db``) and want the typed-graph form
-directly.
+The base AGS4 typed reader: hand it an AGS4 transfer file, get the
+typed-graph form directly.
 
 **Why this is hand-rolled here** (W2, 2026-06-16). ``read_typed`` is a
-*base* AGS4 API — it must work on a plain ``pip install laterite`` with no
-``[ags5]`` extra. It used to route ``convert(ags4 → temp .ags5db)`` then
-``read_db(tmp)``, dragging the whole DuckDB-bundled ``laterite-ags5``
-companion wheel into what is a pure-AGS4 read. This builds the same PROJ
-tree from the base parser (``parse_primitives``), the registry, and
-``parse_value`` — no DuckDB, nothing imported from ``laterite.ags5db``.
+*base* AGS4 API — it must work on a plain ``pip install laterite``. It used
+to route ``convert(ags4 → temp .ags5db)`` then ``read_db(tmp)``, dragging a
+DuckDB-bundled companion wheel into what is a pure-AGS4 read. This builds the
+PROJ tree from the base parser (``parse_primitives``), the registry, and
+``parse_value`` — no DuckDB. (Since #177 the experimental ``.ags5db`` engine
+is fully decoupled to the dormant ``ags5/`` holding folder, so the base
+genuinely cannot reach it.)
 
-**Parity is enforced, not assumed.** The tree returned here must be
-identical to the ``convert → read_db`` reference. The linkage below is a
-faithful port of the converter's parent resolution
-(``laterite-ags5-db/src/convert.rs`` — ``insert_group_rows`` /
-``resolve_parent_uuid``): topological group order, content-key row dedup,
-and the *shared-keys intersection* — for each child group, the parent's KEY
-headings whose names the child also KEYs on (in parent-KEY order), joined
-into a tuple and matched between parent and child rows. (Pseudo-key drift
-like MOND_REF↔PIPE_REF needs no special case: drifted names simply fall out
-of the name-intersection, so linkage rides the keys both layers share. The
-implicit PROJ↔LOCA edge works the same way — PROJ_ID isn't a LOCA heading,
-so the intersection is empty and every LOCA attaches to the one PROJ.) A
-parity test in the ``[ags5]`` suite asserts byte-equality against the DuckDB
-path on a real multi-group fixture, so drift in *either* implementation
-fails loud.
+**Parity with the converter.** The linkage below is a faithful port of the
+``.ags5db`` converter's parent resolution (``insert_group_rows`` /
+``resolve_parent_uuid`` in the decoupled ``ags5/`` ``convert.rs``):
+topological group order, content-key row dedup, and the *shared-keys
+intersection* — for each child group, the parent's KEY headings whose names
+the child also KEYs on (in parent-KEY order), joined into a tuple and matched
+between parent and child rows. (Pseudo-key drift like MOND_REF↔PIPE_REF needs
+no special case: drifted names simply fall out of the name-intersection, so
+linkage rides the keys both layers share. The implicit PROJ↔LOCA edge works
+the same way — PROJ_ID isn't a LOCA heading, so the intersection is empty and
+every LOCA attaches to the one PROJ.) The byte-equality parity test against
+the DuckDB path moved with the AGS5 engine to ``ags5/`` (dormant); the
+algorithm here remains the reference for the base typed read.
 
-Custom / passthrough groups (present in the file but not in the 92-entry
-dictionary) flow through the same ``laterite.dynamic`` factory ``read_db``
+Custom / passthrough groups (present in the file but not in the standard
+dictionary) flow through the same ``laterite.dynamic`` factory the converter
 uses: parent defaults to LOCA, every heading is OTHER-status with the file's
 declared AGS type — matching ``convert.rs::build_passthrough_descriptors``.
 """
@@ -73,8 +71,7 @@ def read_typed(
             in the returned tree), so this argument has no effect here.
 
     Returns:
-        A PROJ instance — the same shape ``laterite.ags5db.read_db``
-        returns. Standard groups are compiled ``#[pyclass]`` types; custom /
+        A PROJ instance. Standard groups are compiled ``#[pyclass]`` types; custom /
         passthrough groups are dynamic Python classes from
         ``laterite.dynamic``.
 

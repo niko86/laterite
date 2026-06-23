@@ -310,7 +310,7 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { canonicalType, displayHint, parseValue, transportPack, transportUnpack, transportLock, transportUnlock, version, Reading, parseArrow, runCheck, emitAgs4FromIpc } = nativeBinding
+const { canonicalType, displayHint, parseValue, transportPack, transportUnpack, transportLock, transportUnlock, version, Reading, parseArrow, runCheck, listRules, fixFile, emitAgs4FromIpc } = nativeBinding
 
 module.exports.canonicalType = canonicalType
 module.exports.displayHint = displayHint
@@ -323,4 +323,6 @@ module.exports.version = version
 module.exports.Reading = Reading
 module.exports.parseArrow = parseArrow
 module.exports.runCheck = runCheck
+module.exports.listRules = listRules
+module.exports.fixFile = fixFile
 module.exports.emitAgs4FromIpc = emitAgs4FromIpc

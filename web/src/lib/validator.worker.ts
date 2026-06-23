@@ -258,6 +258,9 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
     const report = validate(
       new Uint8Array(req.bytes),
       req.dict,
+      // include_warnings: warnings are produced always (Rule 18 etc.) — the
+      // severity FilterBar (error+warning on by default) controls display.
+      true,
       req.includeFyi,
       req.encoding,
       req.maxPerRule,

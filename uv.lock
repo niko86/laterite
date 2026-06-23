@@ -5,7 +5,6 @@ requires-python = ">=3.12"
 [manifest]
 members = [
     "laterite",
-    "laterite-ags5",
     "laterite-workspace",
 ]
 
@@ -307,11 +306,7 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-ags5 = [
-    { name = "laterite-ags5" },
-]
 all = [
-    { name = "laterite-ags5" },
     { name = "pandas" },
     { name = "pyarrow" },
 ]
@@ -328,8 +323,6 @@ pyarrow = [
 [package.metadata]
 requires-dist = [
     { name = "duckdb", specifier = ">=1.4.0" },
-    { name = "laterite-ags5", marker = "extra == 'ags5'", editable = "packages/laterite-ags5" },
-    { name = "laterite-ags5", marker = "extra == 'all'", editable = "packages/laterite-ags5" },
     { name = "pandas", marker = "extra == 'all'", specifier = "<3" },
     { name = "pandas", marker = "extra == 'compat'", specifier = "<3" },
     { name = "pandas", marker = "extra == 'pandas'", specifier = "<3" },
@@ -337,22 +330,7 @@ requires-dist = [
     { name = "pyarrow", marker = "extra == 'all'", specifier = ">=24.0.0" },
     { name = "pyarrow", marker = "extra == 'pyarrow'", specifier = ">=24.0.0" },
 ]
-provides-extras = ["compat", "pandas", "pyarrow", "ags5", "all"]
-
-[[package]]
-name = "laterite-ags5"
-version = "0.4.0"
-source = { editable = "packages/laterite-ags5" }
-dependencies = [
-    { name = "laterite" },
-    { name = "polars" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "laterite", editable = "packages/laterite" },
-    { name = "polars", specifier = ">=1.40.1" },
-]
+provides-extras = ["compat", "pandas", "pyarrow", "all"]
 
 [[package]]
 name = "laterite-workspace"
@@ -361,7 +339,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "duckdb" },
     { name = "laterite" },
-    { name = "laterite-ags5" },
     { name = "lxml" },
     { name = "polars" },
     { name = "pyarrow" },
@@ -387,7 +364,6 @@ dev = [
 requires-dist = [
     { name = "duckdb", specifier = ">=1.5.2" },
     { name = "laterite", editable = "packages/laterite" },
-    { name = "laterite-ags5", editable = "packages/laterite-ags5" },
     { name = "lxml", specifier = ">=6.1.0" },
     { name = "polars", specifier = ">=1.40.1" },
     { name = "pyarrow", specifier = ">=24.0.0" },

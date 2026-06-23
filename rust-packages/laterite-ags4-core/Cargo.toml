@@ -29,6 +29,12 @@ publish = false
 # wasm-safe leaf so the browser explorer (`laterite-ags4-wasm`) shares the exact
 # casting logic. Re-exported as `laterite_ags4_core::ags_types` (see lib.rs).
 laterite-types = { path = "../laterite-types" }
+# The shared parse leaf (#168 Phase 4): the `.ags.idx` byte-offset index
+# (index.rs) now sources GROUP record starts from the leaf's source-true byte
+# walk instead of the csv reader — the csv index was off-by-one for CRLF and
+# absorbed leading blanks (see O-40). Pure leaf (encoding_rs + memchr). Phase 5
+# extends this dep to core's read path.
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # The AGS4 writer/emitter, lifted into its own wasm-safe leaf. laterite-ags4-core's
 # excel.rs + ags5db's db-to-ags4 reach it via the `ags4_writer` re-export
 # shim; `From<EmitError> for CliError` (error.rs) keeps their `?` working.
@@ -42,10 +48,6 @@ serde = { version = "1", features = ["derive"] }
 # Python's dict-preserving json.dumps. Same rationale as ags5db's pin.
 serde_json = { version = "1", features = ["preserve_order"] }
 thiserror = "1"
-# csv crate is used by ags4_codec.rs for the CRLF/double-quoted CSV
-# parse. ags5db kept csv as a direct dep for some commands (csv emit
-# in `peek`), so it stays direct there too.
-csv = "1.3"
 # `zstd` for the `pack`/`unpack` transport. The crate wraps libzstd
 # via zstd-safe; bundling libzstd is automatic (no system dep).
 zstd = "0.13"

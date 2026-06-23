@@ -10,13 +10,14 @@
 //! bytes (O(size) total, not O(groups × size)). Persisted as a sidecar it also
 //! lets a remote reader range-GET one group's bytes.
 //!
-//! **Slice re-parse agrees with the whole-file parse by construction.** The scan
-//! drives the *same* `csv::Reader` configuration as
-//! [`crate::ags4_codec::parse_reader`] and reads each record's byte offset via
-//! `csv::StringRecord::position()`, so a section's start is exactly the byte
-//! offset of its `"GROUP",…` record and re-parsing the slice reproduces the
-//! whole-file group exactly — the `slice_parity` test guards the two CSV configs
-//! against drift.
+//! **Slice re-parse agrees with the whole-file parse by construction.** Section
+//! starts come from the shared parse leaf's source-true byte walk
+//! ([`laterite_ags4_parse`]): each section begins at the exact byte offset of its
+//! `"GROUP",…` record, so re-parsing the slice reproduces the whole-file group
+//! exactly. The in-module consistency tests guard that those offsets slice
+//! correctly for [`crate::ags4_codec`]'s reparse. (Before #168 Phase 4 the scan
+//! used the csv reader's record positions, which were off-by-one for CRLF and
+//! absorbed leading blank lines — see O-40.)
 //!
 //! This is a *locator*, not a validator: it inspects only `"GROUP"` records, so it
 //! does not reproduce the parser's structural checks (it won't reject, e.g., a
@@ -28,6 +29,7 @@
 
 use std::collections::HashMap;
 
+use laterite_ags4_parse::{ParseOptions, parse_bytes_opts};
 use serde::{Deserialize, Serialize};
 
 use crate::ags4_codec::{AgsGroup, read_ags4_bytes};
@@ -52,51 +54,48 @@ impl GroupIndex {
     }
 }
 
-/// Scan `bytes` for group-section boundaries. One pass with the parser's CSV
-/// config; each `"GROUP",…` record's byte offset starts a section, which runs to
-/// the next `"GROUP"` (or EOF).
+/// Build the group-section byte index from the shared parse leaf's source-true
+/// byte walk (#168 Phase 4). Each `"GROUP",…` record's `group_byte` starts a
+/// section, which runs to the next group's start (or EOF). The leaf's offsets are
+/// the real line-starts — the csv reader this replaced recorded the preceding
+/// `\n` for CRLF groups and absorbed leading blank lines (see O-40).
 pub fn index_ags4_bytes(bytes: &[u8]) -> Result<GroupIndex, CliError> {
-    // MUST match `ags4_codec::parse_reader`'s builder so record boundaries — and
-    // thus each GROUP record's byte offset — line up with the parser. The
-    // `slice_parity` test fails loudly if this drifts.
-    let mut rdr = csv::ReaderBuilder::new()
-        .has_headers(false)
-        .flexible(true)
-        .trim(csv::Trim::None)
-        .from_reader(bytes);
-
-    // (code, start byte) for each GROUP marker, in file order.
-    let mut starts: Vec<(String, u64)> = Vec::new();
-    for result in rdr.records() {
-        let record = result.map_err(|e| CliError::Schema(format!("AGS4 CSV: {e}")))?;
-        if record.get(0).unwrap_or("").trim() == "GROUP" {
-            let code = record
-                .get(1)
-                .ok_or_else(|| CliError::Schema("GROUP row missing group code".into()))?
-                .trim()
-                .to_string();
-            // `position()` is the byte offset of the record's start — populated by
-            // default; only `None` if position tracking were disabled.
-            let start = record
-                .position()
-                .map(|p| p.byte())
-                .ok_or_else(|| CliError::Schema("csv position unavailable for GROUP row".into()))?;
-            starts.push((code, start));
-        }
+    // Lean profile: no raw-line retention, and reject invalid UTF-8 loudly —
+    // mirroring the csv reader this replaced (which also failed on non-UTF-8).
+    // `lean()` never substitutes bytes, so the offsets index the original buffer.
+    let parsed =
+        parse_bytes_opts(bytes, ParseOptions::lean()).map_err(crate::ags4_codec::map_parse_err)?;
+    // Defence in depth: a cert whose offsets don't index the original bytes is a
+    // lie. `lean()` rejects rather than substitutes, so this never fires today —
+    // but it must stay true if the profile ever changes.
+    if !parsed.byte_offsets_source_true {
+        return Err(CliError::Schema(
+            "byte offsets are not source-true (encoding substitution shifted a record start)"
+                .into(),
+        ));
     }
 
-    let total = bytes.len() as u64;
-    let mut groups: HashMap<String, Range> = HashMap::with_capacity(starts.len());
-    let mut order: Vec<String> = Vec::with_capacity(starts.len());
-    for (i, (code, start)) in starts.iter().enumerate() {
-        // A section ends where the next one begins, or at EOF for the last.
-        let end = starts.get(i + 1).map(|(_, s)| *s).unwrap_or(total);
-        // First section wins for a (non-conforming) repeated group — see the
-        // module note.
-        if !groups.contains_key(code) {
-            order.push(code.clone());
-            groups.insert(code.clone(), (*start, end));
+    let total = parsed.total_bytes;
+    let mut groups: HashMap<String, Range> = HashMap::with_capacity(parsed.group_order.len());
+    let mut order: Vec<String> = Vec::with_capacity(parsed.group_order.len());
+    // `group_order` is already de-duplicated (the leaf keeps the first-seen GROUP
+    // for a repeated code), so each code resolves in `groups` exactly once.
+    for (i, code) in parsed.group_order.iter().enumerate() {
+        // A GROUP record with no code can't be located or sliced — reject it,
+        // matching the retired csv index (and `ags4_codec::parse_reader`, which
+        // still errors). The leaf yields an empty code for a bare `"GROUP"` row.
+        if code.is_empty() {
+            return Err(CliError::Schema("GROUP row missing group code".into()));
         }
+        let start = parsed.groups[code].group_byte;
+        // A section ends where the next one begins, or at EOF for the last.
+        let end = parsed
+            .group_order
+            .get(i + 1)
+            .map(|next| parsed.groups[next].group_byte)
+            .unwrap_or(total);
+        order.push(code.clone());
+        groups.insert(code.clone(), (start, end));
     }
     Ok(GroupIndex { groups, order })
 }
@@ -444,7 +443,10 @@ mod tests {
         // Order matches the parser.
         assert_eq!(idx.order, whole.order, "index order must match parse order");
 
-        // Ranges tile [0, len): start at byte 0, end at EOF, contiguous.
+        // For a file that BEGINS with a GROUP (no leading blanks/BOM), ranges tile
+        // [0, len): first at byte 0, last at EOF, contiguous. Files with leading
+        // content start the first section at the true offset instead (a gap before
+        // it) — see `leading_blank_lines_shift_the_first_offset` and O-40.
         let ranges: Vec<Range> = idx.order.iter().map(|c| idx.range(c).unwrap()).collect();
         assert_eq!(
             ranges.first().unwrap().0,
@@ -553,6 +555,46 @@ mod tests {
                 assert_consistent(&s);
             }
         }
+    }
+
+    /// #168 Phase 4 (O-40): a file with leading blank lines locates its first
+    /// section at the TRUE offset (after the blanks), NOT byte 0 — the ratified
+    /// tightening. The leading bytes belong to no section, yet every group still
+    /// slice-reparses identically. (The retired csv index absorbed the blanks,
+    /// recording the first GROUP at 0.)
+    #[test]
+    fn leading_blank_lines_shift_the_first_offset() {
+        let content = format!("\n\n{TWO}"); // two blank lines before the first GROUP
+        let bytes = content.as_bytes();
+        let whole = read_ags4_bytes(bytes).unwrap();
+        let idx = index_ags4_bytes(bytes).unwrap();
+
+        // The first section now starts at byte 2 (after the two `\n`), not 0 — so
+        // bytes [0, 2) deliberately belong to no section.
+        assert_eq!(
+            idx.range(&idx.order[0]).unwrap().0,
+            2,
+            "first GROUP is located after the leading blank lines"
+        );
+        // Slice parity still holds for every group despite the leading gap.
+        for code in &whole.order {
+            let g = whole.get(code).unwrap();
+            let s = parse_group_slice(bytes, idx.range(code).unwrap(), code).unwrap();
+            assert_eq!(s.headings, g.headings, "{code} headings");
+            assert_eq!(s.rows, g.rows, "{code} rows");
+        }
+    }
+
+    /// A bare `"GROUP"` row with no code can't be located or sliced. The
+    /// leaf yields an empty code for it; `index_ags4_bytes` rejects it, preserving
+    /// the retired csv index's behaviour (and matching `ags4_codec`).
+    #[test]
+    fn group_row_without_a_code_is_rejected() {
+        let err = index_ags4_bytes(b"\"GROUP\"\n\"HEADING\",\"X\"\n\"UNIT\",\"\"\n").unwrap_err();
+        assert!(
+            matches!(err, CliError::Schema(ref m) if m.contains("missing group code")),
+            "expected a 'missing group code' schema error, got {err:?}"
+        );
     }
 
     fn stamp() -> ValidationStamp {

@@ -21,6 +21,21 @@ Rule violations in a file.
     --out <path>         write the active format to <path> instead of
                          stdout (prints a one-line confirmation)
     --json-out <path>    also tee the JSON report to <path>
+    --fix                mechanically repair the file: apply the SAFE
+                         fixes (CRLF / BOM / embedded-CR / short-row pad /
+                         numeric reformat / TRAN delimiter+concatenator
+                         rows) and write the result. Non-destructive —
+                         writes a sibling <file>.fixed.ags by default.
+                         Exit 0 if the repaired file is clean, 1 if
+                         findings remain that can't be auto-fixed.
+    --fix-risky          like --fix but ALSO applies the intent-guessing
+                         fixes (duplicate-heading rename, dd/mm date
+                         canonicalisation, smart-quote→ASCII typography)
+    --in-place           with --fix: overwrite the source file in place
+    --fix-out <path>     with --fix: write the repaired file to <path>
+    --diff <other.ags>   compare the input file against <other> and print the
+                         KEY-aware/type-aware revision delta (per-group
+                         +added -removed ~changed; --json for the full delta)
     --show-warnings      include WARNING-severity findings
     --show-fyi           include FYI-severity findings (e.g. Rule 1)
     --check-files        also run Rule 20's on-disk check: the sidecar
@@ -28,6 +43,14 @@ Rule violations in a file.
                          .ags. Default OFF — data-level Rule 20 is
                          path-independent (the library default); enable
                          for a packaging/QA pass on a real delivery.
+    --encoding <name>    source text encoding for legacy extended-ASCII
+                         files: utf-8 (default) | cp1252 | latin1 |
+                         iso-8859-1 | iso-8859-15. latin1 / iso-8859-1
+                         map to Windows-1252 (the CP1252 superset
+                         python-ags4 uses by default).
+    --list-rules         print the AGS4 rule catalogue (title / severity /
+                         fixable / cited observations) and exit; add --json
+                         for the full machine-readable form. No input file.
     --quiet              suppress the progress spinner
     --tui                interactive findings browser (needs the
                          `tui` build feature + an interactive terminal)
@@ -64,6 +87,9 @@ nested `{file, findings:{rule:[{line,group,desc}]}}` document;
     lat-check delivery.ags --json | jq .   # machine-readable
     lat-check delivery.ags --dict-version 4.2   # force an edition
     lat-check delivery.ags --show-fyi --out report.txt
+    lat-check delivery.ags --fix                # → delivery.fixed.ags
+    lat-check delivery.ags --fix --in-place     # repair in place
+    lat-check delivery.ags --fix-risky --fix-out clean.ags
 
 > The clean-room boundary, licence, and bundled-dictionary provenance
 > are documented in the crate's `README.md` and `data/PROVENANCE.md`.

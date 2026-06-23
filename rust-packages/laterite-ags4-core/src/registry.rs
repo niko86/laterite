@@ -1,20 +1,25 @@
-//! AGS5 group registry — port of `ags5_models.registry`.
+//! AGS4 group registry.
 //!
-//! Loads the bundled `ags5_dictionary.json` (embedded via `include_str!`)
-//! into a singleton at first access. Provides `GroupDescriptor` + `Heading`
-//! structs and the parent-chain walks the DDL builder and migrate command
-//! need.
+//! Loads the bundled multi-edition `ags_dictionary.json` (embedded via
+//! `include_str!`), reconstructs the UNION of all editions (latest-edition
+//! heading definitions), and caches it in a singleton at first access.
+//! Provides `GroupDescriptor` + `Heading` structs and the parent-chain walks
+//! the DDL builder and migrate command need.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use serde::{Deserialize, Serialize};
 
-// Dictionary lives in the Rust crate's own data/ dir as of Stage D1; the
-// Python ags5-models wheel pulls the same bytes via hatchling force-include
-// (see packages/ags5-models/pyproject.toml). tests/test_dictionary_single_source.py
-// asserts byte-equality across the two distribution paths.
-const DICTIONARY_JSON: &str = include_str!("../data/ags5_dictionary.json");
+// The consolidated multi-edition dictionary (heading-local layout), generated
+// from the official AGS standard dictionaries by `tools/gen_dictionary.py`. The
+// registry / typed graph / DDL consume the UNION of every heading across
+// editions, each at its latest-edition definition — which is exactly the flat
+// heading fields of the heading-local schema (the `by_ed`/`eds` per-edition
+// variation is ignored here; edition-aware consumers reconstruct a specific
+// edition separately). A faithfulness gate (tests/test_dictionary_faithful.py)
+// keeps this file == the official-projection generator output.
+const DICTIONARY_JSON: &str = include_str!("../data/ags_dictionary.json");
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Heading {
@@ -39,7 +44,11 @@ impl Heading {
     }
 
     pub fn is_key(&self) -> bool {
-        self.status.eq_ignore_ascii_case("KEY")
+        // The official dict uses combined statuses (e.g. "KEY+REQUIRED"); a
+        // heading is a KEY iff "KEY" is one of the `+`-separated parts.
+        self.status
+            .split('+')
+            .any(|p| p.eq_ignore_ascii_case("KEY"))
     }
 }
 
@@ -48,8 +57,6 @@ pub struct GroupDescriptor {
     pub code: String,
     pub contents: String,
     pub parent: Option<String>,
-    #[serde(default)]
-    pub is_high_volume: bool,
     pub headings: Vec<Heading>,
     /// Phase 6.5.2 declarative index override. `None` = use built-in rule
     /// (auto-index parent_id iff parent is not None).
@@ -77,13 +84,97 @@ impl GroupDescriptor {
     }
 }
 
+/// The heading-local on-disk schema of `ags_dictionary.json`. The flat heading
+/// fields ARE each heading's latest-edition definition; the `by_ed`/`eds`
+/// per-edition variation is intentionally not captured (serde drops the unknown
+/// fields) — the registry consumes the UNION at the latest-edition definition.
+#[derive(Debug, Deserialize)]
+struct DictHeading {
+    name: String,
+    status: String,
+    #[serde(rename = "type")]
+    ags_type: String,
+    #[serde(default)]
+    unit: Option<String>,
+    #[serde(default)]
+    description: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DictGroup {
+    parent: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    headings: Vec<DictHeading>,
+}
+
 #[derive(Debug, Deserialize)]
 struct DictionaryFile {
     #[allow(dead_code)]
     format_version: String,
     #[allow(dead_code)]
-    ags_edition: String,
-    groups: Vec<GroupDescriptor>,
+    editions: Vec<String>,
+    groups: HashMap<String, DictGroup>,
+}
+
+/// Parent-depth of `code` (PROJ-rooted; root = 0). Orders groups
+/// parents-before-children — the invariant the DDL emission relies on.
+fn group_depth(groups: &HashMap<String, DictGroup>, code: &str) -> usize {
+    let (mut depth, mut cur, mut guard) = (0, code, 0);
+    while let Some(g) = groups.get(cur) {
+        match g.parent.as_deref() {
+            Some(p) if groups.contains_key(p) => {
+                depth += 1;
+                cur = p;
+                guard += 1;
+                if guard > 64 {
+                    break; // cycle guard — should never fire
+                }
+            }
+            _ => break,
+        }
+    }
+    depth
+}
+
+/// The UNION group set (every heading across editions, each at its
+/// latest-edition definition), ordered parents-before-children and
+/// deterministically by `(depth, code)`. Shared by `registry()` and the
+/// `build.rs` typed-class codegen so the typed graph, the DDL, and the registry
+/// single-source one reconstruction of the heading-local dictionary.
+pub fn union_groups() -> Vec<GroupDescriptor> {
+    let file: DictionaryFile =
+        serde_json::from_str(DICTIONARY_JSON).expect("bundled ags_dictionary.json must parse");
+    let mut codes: Vec<&String> = file.groups.keys().collect();
+    codes.sort_by(|a, b| {
+        group_depth(&file.groups, a)
+            .cmp(&group_depth(&file.groups, b))
+            .then_with(|| a.cmp(b))
+    });
+    codes
+        .into_iter()
+        .map(|code| {
+            let g = &file.groups[code];
+            GroupDescriptor {
+                code: code.clone(),
+                contents: g.description.clone().unwrap_or_default(),
+                parent: g.parent.clone(),
+                headings: g
+                    .headings
+                    .iter()
+                    .map(|h| Heading {
+                        name: h.name.clone(),
+                        status: h.status.clone(),
+                        ags_type: h.ags_type.clone(),
+                        unit: h.unit.clone(),
+                        description: h.description.clone(),
+                        indexed: None,
+                    })
+                    .collect(),
+                index_parent: None,
+            }
+        })
+        .collect()
 }
 
 /// Insertion-order-preserving map of group code → descriptor. Group
@@ -115,8 +206,8 @@ impl Registry {
 
     /// Serialise every group as a JSON array, in declaration order. The
     /// per-group field order matches the on-disk dictionary's
-    /// declaration order (`code, contents, parent, is_high_volume,
-    /// headings, index_parent?`) thanks to `serde_json`'s
+    /// declaration order (`code, contents, parent, headings,
+    /// index_parent?`) thanks to `serde_json`'s
     /// `preserve_order` feature + the struct field ordering. Used by
     /// `laterite.registry` to ferry the registry across the PyO3
     /// boundary without rebuilding a parallel schema (Stage D2 of
@@ -149,11 +240,10 @@ static REGISTRY: OnceLock<Registry> = OnceLock::new();
 
 pub fn registry() -> &'static Registry {
     REGISTRY.get_or_init(|| {
-        let file: DictionaryFile =
-            serde_json::from_str(DICTIONARY_JSON).expect("bundled ags5_dictionary.json must parse");
-        let mut entries: Vec<(String, GroupDescriptor)> = Vec::with_capacity(file.groups.len());
-        let mut by_code = HashMap::with_capacity(file.groups.len());
-        for g in file.groups {
+        let groups = union_groups();
+        let mut entries: Vec<(String, GroupDescriptor)> = Vec::with_capacity(groups.len());
+        let mut by_code = HashMap::with_capacity(groups.len());
+        for g in groups {
             by_code.insert(g.code.clone(), entries.len());
             entries.push((g.code.clone(), g));
         }
@@ -254,10 +344,10 @@ mod tests {
     #[test]
     fn ancestor_chain_includes_root() {
         let reg = registry();
-        let chain = ancestor_chain(reg, "TREL");
-        // TREL parent chain: TREL -> TREG -> SAMP -> LOCA -> PROJ
+        let chain = ancestor_chain(reg, "LLPL");
+        // LLPL parent chain: LLPL -> SAMP -> LOCA -> PROJ
         let codes: Vec<&str> = chain.iter().map(|g| g.code.as_str()).collect();
-        assert_eq!(codes.first(), Some(&"TREL"));
+        assert_eq!(codes.first(), Some(&"LLPL"));
         assert_eq!(codes.last(), Some(&"PROJ"));
     }
 
@@ -274,15 +364,19 @@ mod tests {
     }
 
     #[test]
-    fn no_group_contents_carries_a_bare_edition_tag() {
-        // TRIL once read "Triaxial Test Logged Data (AGS 4.2)" — a mislabel:
-        // it (with CONL/TREL) is an AGS-L draft group, NOT part of AGS4 4.2.
-        // Guard the whole table against re-introducing a bare "(AGS 4.x)" tag;
-        // provenance belongs in an explicit "AGS-L draft" marker instead.
-        for g in registry().iter() {
+    fn contents_come_from_the_official_description() {
+        // The consolidated dict uses the official AGS group description (no
+        // laterite edition tags / "(scaffolded)" placeholders). Spot-check a
+        // couple and guard against a bare "(AGS 4.x)" tag creeping back in.
+        let reg = registry();
+        assert_eq!(
+            reg.get("MOND").map(|g| g.contents.as_str()),
+            Some("Monitoring Readings")
+        );
+        for g in reg.iter() {
             assert!(
-                !g.contents.contains("(AGS 4."),
-                "{} carries a bare edition tag in its contents: {:?}",
+                !g.contents.contains("(AGS 4.") && !g.contents.contains("(scaffolded)"),
+                "{} carries a non-official contents string: {:?}",
                 g.code,
                 g.contents,
             );
@@ -290,14 +384,27 @@ mod tests {
     }
 
     #[test]
-    fn agsl_draft_groups_are_flagged_as_such() {
+    fn dropped_agsl_drafts_are_absent() {
+        // CONL/TREL/TRIL are AGS-L 2026 drafts, not in official 4.0.3-4.2;
+        // the faithful dict drops them.
         let reg = registry();
         for code in ["CONL", "TREL", "TRIL"] {
-            let g = reg.get(code).unwrap_or_else(|| panic!("{code} must exist"));
             assert!(
-                g.contents.contains("AGS-L"),
-                "{code} is an AGS-L draft group; its contents must say so, got {:?}",
-                g.contents,
+                reg.get(code).is_none(),
+                "{code} (AGS-L draft) must be absent"
+            );
+        }
+    }
+
+    #[test]
+    fn union_gained_official_groups() {
+        // The faithful union has the official groups the old curated subset
+        // lacked (~92 -> ~174). Spot-check a few that were missing before.
+        let reg = registry();
+        for code in ["CPTG", "CBRP", "CTRC"] {
+            assert!(
+                reg.get(code).is_some(),
+                "official group {code} must be present"
             );
         }
     }

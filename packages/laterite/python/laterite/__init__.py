@@ -43,9 +43,16 @@ del _code
 __all__ = [
     "validate",
     "read",
+    "source",
+    "to_excel",
+    "from_excel",
+    "fix",
+    "FixResult",
     "build_ags4",
     "BuildResult",
     "dict_for",
+    "list_rules",
+    "diff",
     "Report",
     "Ags4File",
     "AgsQuery",
@@ -62,6 +69,12 @@ __all__ = [
 # `.df()`. Arrow tables are deliberately NOT offered here; reach for
 # `ags.connection` (with your own pyarrow) if you want them.
 _BACKENDS = ("polars", "pandas")
+
+# XN read modes for `read(..., xn=)`. AGS XN ("numeric, may carry a non-numeric
+# qualifier like NP / <5 / >100") is parsed byte-faithfully as a string by
+# default; "numeric" gives a Float64 read-side view (qualifiers → null). A fuller
+# bidirectional/typed XN treatment is future work (see issue tracker).
+_XN_MODES = ("string", "numeric")
 
 
 def _looks_like_ags_text(s: str) -> bool:
@@ -122,6 +135,21 @@ def _resolve_source(
             return None, s, None
         return s, None, None  # treat as a (missing) path — the parser raises NotFound
     raise TypeError(f"unsupported source type {type(source).__name__}")
+
+
+def _source_bytes(source: Any) -> bytes:
+    """Resolve any diff input — a path, AGS4 text, raw bytes, file-like, or an
+    :class:`Ags4File` — to the raw bytes the native ``diff_files`` parses."""
+    if isinstance(source, Ags4File):
+        return source.bytes
+    p, txt, raw = _resolve_source(source)
+    if raw is not None:
+        return raw
+    if txt is not None:
+        return txt.encode("utf-8")
+    from pathlib import Path
+
+    return Path(p).read_bytes()
 
 
 class Report:
@@ -191,8 +219,22 @@ class Report:
 
     @property
     def findings(self) -> pl.DataFrame:
-        """Polars frame ``rule, line, group, desc`` (one row per finding;
-        ``line`` is a nullable Int64)."""
+        """Polars frame, one row per finding. Columns:
+
+        - ``rule`` — ``"AGS Format Rule N"`` (or an ``"FYI …"`` key for FYI findings).
+        - ``line`` — nullable ``Int64`` source line.
+        - ``group`` / ``desc`` — the AGS group code and the human-readable message.
+        - ``severity`` — ``"error"`` (default), ``"warning"`` or ``"fyi"``; lets a
+          ``validate(warnings=True, fyi=True)`` run separate the tiers straight from
+          the frame.
+        - ``target`` — what the finding points at: ``"line"`` (default), ``"heading"``,
+          ``"cell"`` or ``"group"``.
+        - ``heading`` / ``field_index`` / ``data_row`` — the offending heading name,
+          its 0-based column index, and the 0-based data-row index, when the finding
+          pins them (else null).
+
+        The within-line character span (``char_span``) is editor-oriented and lives on
+        :meth:`by_rule` / :meth:`to_json` / :meth:`to_ndjson`, not this flat frame."""
         items = self._r["findings"]
         return pl.DataFrame(
             {
@@ -200,17 +242,35 @@ class Report:
                 "line": pl.Series([f["line"] for f in items], dtype=pl.Int64),
                 "group": pl.Series([f["group"] for f in items], dtype=pl.String),
                 "desc": pl.Series([f["desc"] for f in items], dtype=pl.String),
+                # severity is omitted at the boundary when Error (the default), so
+                # absent → "error"; warning/fyi findings carry it explicitly.
+                "severity": pl.Series(
+                    [f.get("severity", "error") for f in items], dtype=pl.String
+                ),
+                "target": pl.Series(
+                    [f.get("target", "line") for f in items], dtype=pl.String
+                ),
+                "heading": pl.Series([f.get("heading") for f in items], dtype=pl.String),
+                "field_index": pl.Series(
+                    [f.get("field_index") for f in items], dtype=pl.Int64
+                ),
+                "data_row": pl.Series([f.get("data_row") for f in items], dtype=pl.Int64),
             }
         )
 
     def by_rule(self) -> dict[str, list[dict]]:
-        """``{"AGS Format Rule N": [{line, group, desc}, ...]}`` — the spec-rule
-        grouping (sorted, like the Rust BTreeMap)."""
+        """``{"AGS Format Rule N": [{line, group, desc, severity, ...}, ...]}`` — the
+        spec-rule grouping (sorted, like the Rust BTreeMap). Each finding carries
+        ``line`` / ``group`` / ``desc`` plus ``severity`` (always present — ``"error"``
+        by default) and whatever location fields the finding pins (``target``,
+        ``heading``, ``field_index``, ``data_row``, ``char_span``)."""
         out: dict[str, list[dict]] = {}
         for f in self._r["findings"]:
-            out.setdefault(f["rule"], []).append(
-                {"line": f["line"], "group": f["group"], "desc": f["desc"]}
-            )
+            # Pass every field through verbatim except `rule` (it's the dict key);
+            # normalise `severity` so callers can read it unconditionally.
+            item = {k: v for k, v in f.items() if k != "rule"}
+            item.setdefault("severity", "error")
+            out.setdefault(f["rule"], []).append(item)
         return out
 
     def to_json(self) -> str:
@@ -250,6 +310,7 @@ class Ags4File:
         "_bytes",
         "_cert",
         "_con",
+        "_fix_report",
         "_last_check_files",
         "_last_forced",
         "_p",
@@ -257,6 +318,7 @@ class Ags4File:
         "_report",
         "_src",
         "_text",
+        "_xn",
     )
 
     def __init__(
@@ -264,6 +326,7 @@ class Ags4File:
         parsed: dict,
         backend: str = "polars",
         *,
+        xn: str = "string",
         _src: tuple[str | None, str | None, bytes | None] | None = None,
     ) -> None:
         # Guard the common `read(path)` vs `Ags4File(path)` mix-up: the ctor takes
@@ -284,8 +347,14 @@ class Ags4File:
                 f"backend must be one of {_BACKENDS} (got {backend!r}); for Arrow "
                 "tables use ags.connection with your own pyarrow."
             )
+        if xn not in _XN_MODES:
+            raise ValueError(f"xn must be one of {_XN_MODES} (got {xn!r})")
         self._p = parsed
         self._backend = backend
+        # XN-column read mode: "string" (byte-faithful, default) or "numeric"
+        # (XN-typed columns cast to Float64 in the engine; non-numeric tokens →
+        # null). Read-side only — write-back stays byte-faithful from the parse.
+        self._xn = xn
         self._con = None  # lazy DuckDB engine (first group access / sql / connection)
         self._registered: set[str] = set()  # groups loaded into _con
         # The (path, text, data) this handle was read from — lets chainable
@@ -302,6 +371,9 @@ class Ags4File:
         # `.certify()` stamps into the cert so a later skip can match profiles.
         self._last_check_files = False
         self._last_forced = False
+        # The FixResult from the `.fix()` that produced this handle (what was
+        # applied + the residual findings); None unless this came from `.fix()`.
+        self._fix_report: FixResult | None = None
 
     # --- metadata (no engine spin-up) ----------------------------------------
 
@@ -364,10 +436,30 @@ class Ags4File:
         tmp = f"__arrow_{code}"
         con.register(tmp, table)  # the arro3 table's Arrow capsule (pyarrow-free)
         try:
-            con.execute(f'CREATE TABLE "{code}" AS SELECT * FROM "{tmp}"')
+            select = "*" if self._xn == "string" else self._xn_select(con, tmp, code)
+            con.execute(f'CREATE TABLE "{code}" AS SELECT {select} FROM "{tmp}"')
         finally:
             con.unregister(tmp)
         self._registered.add(code)
+
+    def _xn_select(self, con, tmp: str, code: str) -> str:
+        """The projection for ``xn="numeric"``: ``* REPLACE (...)`` casting this
+        group's XN-typed columns to DOUBLE — non-numeric AGS qualifiers (NP, <5,
+        >100, …) become null via ``TRY_CAST``. Registry-driven and intersected
+        with the columns actually present, so it's a no-op (``*``) for a group
+        with no XN headings or a passthrough group absent from the dictionary."""
+        g = _GROUPS.get(code)
+        if g is None:
+            return "*"  # dynamic / passthrough group — no dictionary XN info
+        xn_headings = {h.name for h in g.headings if h.type == "XN"}
+        if not xn_headings:
+            return "*"
+        present = {row[0] for row in con.execute(f'DESCRIBE SELECT * FROM "{tmp}"').fetchall()}
+        cols = [c for c in present if c in xn_headings]
+        if not cols:
+            return "*"
+        replace = ", ".join(f'TRY_CAST("{c}" AS DOUBLE) AS "{c}"' for c in cols)
+        return f"* REPLACE ({replace})"
 
     def _register_all(self) -> None:
         for code in self._p["group_order"]:
@@ -606,6 +698,63 @@ class Ags4File:
         path.write_bytes(self.bytes)
         return path
 
+    def to_excel(
+        self, path: str | os.PathLike[str], *, groups: list[str] | None = None
+    ) -> dict:
+        """Write this file to an XLSX workbook — one sheet per group — and return the
+        Rust writer's stats (``{"sheets_written", "rows_written", "warnings"}``).
+
+        Rust-backed via ``laterite_excel`` (``rust_xlsxwriter``); openpyxl and
+        pyarrow never enter the dep graph. Sheets carry the AGS HEADING / UNIT /
+        TYPE / DATA layout. ``groups`` optionally fixes the sheet order (a subset or
+        re-ordering of :attr:`groups`); default is source order. The workbook is
+        written from this handle's spec-correct :attr:`bytes`, so it round-trips
+        through :func:`from_excel` regardless of how the handle was read."""
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as d:
+            tmp = Path(d) / "_to_excel.ags"
+            tmp.write_bytes(self.bytes)
+            return _excel_convert(_native.ags4_to_excel, str(tmp), os.fspath(path), groups)
+
+    @property
+    def fix_report(self) -> FixResult | None:
+        """The :class:`FixResult` from the :meth:`fix` that produced this handle —
+        what was applied and the findings that could **not** be mechanically fixed —
+        or ``None`` for a handle not produced by :meth:`fix`."""
+        return self._fix_report
+
+    def fix(self, *, risky: bool = False) -> Ags4File:
+        """Repair this file and return a new, repaired :class:`Ags4File` — the fluent
+        transform, so ``read(path).fix().validate().save(out)`` reads as one chain.
+        The **safe** mechanical fixes (CRLF / BOM / embedded-CR / short-row pad /
+        numeric reformat / TRAN delimiter+concatenator rows) are applied; ``risky=True``
+        also applies the intent-guessing ones (duplicate-heading rename, datetime
+        canonicalisation, typography). The same engine the browser fix UI uses.
+
+        Non-destructive — the source on disk is untouched; persist the repaired handle
+        with :meth:`save`. The :class:`FixResult` — what was applied and the residual
+        findings — rides on the returned handle's :attr:`fix_report`. The new handle
+        inherits this one's ``backend`` / ``xn``. For the report itself (and the
+        ``in_place=`` / ``out=`` write options) instead of a handle, call the free
+        :func:`fix`."""
+        if self._src is not None:
+            p, t, d = self._src
+        else:
+            # A synthesised handle has no retained source — fix its re-emit.
+            p, t, d = None, None, self.bytes
+        report = fix(path=p, text=t, data=d, risky=risky)
+        repaired = read(data=report.bytes, backend=self._backend, xn=self._xn)
+        repaired._fix_report = report
+        return repaired
+
+    def diff(self, other: Any, *, dict_version: str | None = None) -> dict:
+        """Compare this file (the **baseline**) against ``other`` (the **revision** —
+        a path, AGS4 text, bytes, or another :class:`Ags4File`); returns the
+        :func:`diff` ``RevisionDelta`` dict. Rows are matched by the group's KEY
+        headings, cells compared through the typed value."""
+        return diff(self, other, dict_version=dict_version)
+
     def __repr__(self) -> str:
         return (
             f"<Ags4File groups={len(self.groups)} backend={self._backend!r} "
@@ -841,6 +990,7 @@ def read(
     index: str | os.PathLike[str] | None = None,
     encoding: str | None = None,
     backend: str = "polars",
+    xn: str = "string",
 ) -> Ags4File:
     """Read AGS4 — from a path, a file-like, raw bytes, or in-memory text — into
     an :class:`Ags4File` over an in-memory DuckDB engine. The inverse of
@@ -853,6 +1003,13 @@ def read(
     frame type for ``ags[code]`` — ``"polars"`` (default) or ``"pandas"`` (both
     pyarrow-free).
 
+    ``xn`` controls AGS ``XN``-typed columns (numeric values that may carry a
+    non-numeric qualifier — ``NP`` / ``<5`` / ``>100``): ``"string"`` (default)
+    keeps them byte-faithful as text; ``"numeric"`` casts them to ``Float64``
+    across the whole handle (``ags[code]`` / ``sql`` / ``at``), non-numeric tokens
+    becoming null. Read-side only — ``save`` / ``text`` / ``bytes`` stay
+    byte-faithful regardless. (A fuller bidirectional XN treatment is future work.)
+
     ``index`` is the explicit path to this file's ``.ags.idx`` certificate (from
     :meth:`Ags4File.certify`). It is opt-in — there is no autodiscovery. When given,
     the cert is loaded and freshness-checked against the source bytes (format version
@@ -861,7 +1018,7 @@ def read(
     is carried so a later default :meth:`Ags4File.validate` skips the rule engine."""
     p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
     res = _native.parse_arrow(path=p, text=txt, data=raw, encoding=encoding)
-    handle = Ags4File(raise_for(res), backend=backend, _src=(p, txt, raw))
+    handle = Ags4File(raise_for(res), backend=backend, xn=xn, _src=(p, txt, raw))
     if index is not None:
         cert = _native.Sidecar.from_json(Path(index).read_bytes())
         if not cert.is_fresh_for(handle._source_bytes()):
@@ -874,12 +1031,104 @@ def read(
     return handle
 
 
+# `source` is the fluent-chain entry name (`laterite.source(x).validate()…`);
+# `read` is the plain-verb name. Same callable — one surface, two vocabularies.
+source = read
+
+
+def _excel_convert(fn, *args) -> dict:
+    """Call a native AGS4↔XLSX conversion fn and normalise its outcome: the stats
+    PyDict becomes a plain ``dict``; the engine's "no valid AGS4 data" RuntimeError
+    is re-raised as :class:`NotAgs4Error` to match the rest of the read surface."""
+    try:
+        return dict(fn(*args))
+    except RuntimeError as exc:
+        if "No valid AGS4 data" in str(exc):
+            raise NotAgs4Error(str(exc)) from exc
+        raise
+
+
+def to_excel(
+    source: Any = None,
+    output: str | os.PathLike[str] | None = None,
+    *,
+    path: str | os.PathLike[str] | None = None,
+    text: str | None = None,
+    data: bytes | bytearray | memoryview | None = None,
+    groups: list[str] | None = None,
+) -> dict:
+    """Convert AGS4 to an XLSX workbook — one sheet per group — and return the Rust
+    writer's stats (``{"sheets_written", "rows_written", "warnings"}``).
+
+    Rust-backed via ``laterite_excel`` (``rust_xlsxwriter``); openpyxl and pyarrow
+    never enter the dep graph. ``source`` is anything :func:`read` accepts (a path /
+    file-like / bytes / AGS4 text) or an already-:func:`read` :class:`Ags4File`;
+    ``output`` is the ``.xlsx`` path to write. ``groups`` optionally fixes the sheet
+    order (a subset or re-ordering of the file's groups); default is source order."""
+    if output is None:
+        raise TypeError("to_excel() requires an output path (the .xlsx to write)")
+    if isinstance(source, Ags4File):
+        return source.to_excel(output, groups=groups)
+    p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
+    if p is not None:
+        # A real on-disk AGS4 file → one Rust pass straight to XLSX (no re-emit).
+        return _excel_convert(_native.ags4_to_excel, os.fspath(p), os.fspath(output), groups)
+    # text / bytes → parse then write from the spec-correct re-emit.
+    return read(text=txt, data=raw).to_excel(output, groups=groups)
+
+
+def from_excel(
+    source: str | os.PathLike[str],
+    output: str | os.PathLike[str] | None = None,
+    *,
+    format_numeric_columns: bool = True,
+    backend: str = "polars",
+    xn: str = "string",
+) -> dict | Ags4File:
+    """Convert an AGS4-shaped XLSX workbook to AGS4.
+
+    Rust-backed via ``laterite_excel`` (``calamine``). Each worksheet with a
+    ``HEADING`` column becomes one group; columns not matching Rule 19's heading
+    pattern are dropped. With ``output`` given, writes an AGS4 file and returns the
+    Rust converter's stats; with ``output=None`` (default), returns a parsed
+    :class:`Ags4File` read straight from the conversion. ``format_numeric_columns``
+    (default ``True``) re-formats DATA cells to their column's TYPE precision so
+    floats from XLSX keep trailing zeros; ``backend`` / ``xn`` apply only to the
+    returned-handle form."""
+    src = os.fspath(source)
+    if output is not None:
+        return _excel_convert(
+            _native.excel_to_ags4, src, os.fspath(output), bool(format_numeric_columns)
+        )
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as d:
+        tmp = Path(d) / "_from_excel.ags"
+        _excel_convert(_native.excel_to_ags4, src, str(tmp), bool(format_numeric_columns))
+        raw = tmp.read_bytes()
+    # Read from bytes (not the now-deleted temp path) so the handle is self-contained
+    # — its `.validate()` / `.certify()` don't depend on a vanished file.
+    return read(data=raw, backend=backend, xn=xn)
+
+
 def dict_for(source: Any = None, *, text: str | None = None) -> tuple[str, str]:
     """``(edition, resolution)`` the engine would validate this file against —
     e.g. ``("4.1.1", "fallback")`` — without running rules."""
     path, txt, data = _resolve_source(source, text=text)
     p = raise_for(_native.parse_primitives(path=path, text=txt, data=data))
     return _native.resolve_dict(p.get("tran_ags"), None)
+
+
+def list_rules() -> list[dict]:
+    """The rule catalogue the engine enforces — one dict per AGS4 rule with
+    ``rule`` (e.g. ``"10c"``), ``title``, ``checks`` (a plain-English summary),
+    ``severity`` (``"error"`` / ``"fyi"`` / ``"mixed"``), ``fixable`` (whether
+    :func:`fix` can repair it), and ``observations`` (the cited ``O-N`` divergence
+    notes). Read-only and file-independent — sourced from the engine's gated rule
+    metadata, so it always matches the rules ``validate`` actually runs."""
+    import json
+
+    return json.loads(_native.list_rules())["rules"]
 
 
 class BuildResult:
@@ -913,7 +1162,8 @@ class BuildResult:
 def build_ags4(
     groups: Mapping[str, Any] | list[tuple[str, Any]],
     *,
-    edition: str = "4.1.1",
+    dict_version: str | None = None,
+    edition: str | None = None,
     mode: str = "autofix",
 ) -> BuildResult:
     """Build valid AGS4 from your own per-group data — the data→AGS4 door.
@@ -922,7 +1172,7 @@ def build_ags4(
 
     ``groups`` maps each AGS group code to a frame (pandas **or** polars)
     whose **column names are the AGS headings** (e.g. ``LOCA_ID``, ``LOCA_GL``);
-    UNIT/TYPE are filled from the chosen edition's standard dictionary. Order
+    UNIT/TYPE are filled from the chosen dictionary edition. Order
     is preserved (pass an ordered mapping or a list of ``(code, frame)`` pairs;
     put ``PROJ`` first).
 
@@ -938,8 +1188,23 @@ def build_ags4(
     * ``"report"`` — build unchanged, return findings for you to act on.
     * ``"strict"`` — raise if the output violates any error-severity rule.
 
-    ``edition`` is one of ``4.0.3 | 4.0.4 | 4.1 | 4.1.1 | 4.2`` (default
-    ``4.1.1``)."""
+    ``dict_version`` is one of ``4.0.3 | 4.0.4 | 4.1 | 4.1.1 | 4.2`` (default
+    ``4.1.1``). ``edition`` is a deprecated alias for ``dict_version``."""
+    if edition is not None:
+        if dict_version is not None:
+            raise TypeError(
+                "build_ags4: pass dict_version, not both dict_version and edition"
+            )
+        import warnings as _warnings
+
+        _warnings.warn(
+            "build_ags4(edition=...) is the old name for dict_version=...",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        dict_version = edition
+    if dict_version is None:
+        dict_version = "4.1.1"
     import json
 
     items = list(groups.items()) if isinstance(groups, Mapping) else list(groups)
@@ -964,7 +1229,135 @@ def build_ags4(
         name = f"_emit_{i}"
         con.register(name, frame)
         tables.append((code, con.sql(f'SELECT * FROM "{name}"')))
-    data, findings_json, fixes = _native.emit_ags4_from_arrow(tables, edition, mode)
+    data, findings_json, fixes = _native.emit_ags4_from_arrow(tables, dict_version, mode)
     by_rule: dict[str, list[dict]] = json.loads(findings_json)
     findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
     return BuildResult(data, findings, fixes)
+
+
+class FixResult:
+    """The product of :func:`fix` (and carried on :attr:`Ags4File.fix_report`): the
+    repaired AGS4 ``bytes``, the ``findings`` that REMAIN after the fixes were
+    applied, and ``applied`` — the list of fixes that were made (each ``{kind, label,
+    rule, line, risk}``). ``fixes_applied`` is ``len(applied)``; ``.text`` decodes the
+    bytes; ``.save(path)`` writes them. The fixed output is always UTF-8 with no
+    BOM (so fixing a CRLF/encoding issue normalises both)."""
+
+    __slots__ = ("applied", "bytes", "dict_version", "findings")
+
+    def __init__(
+        self, data: bytes, findings: list[dict], applied: list[dict], dict_version: str
+    ) -> None:
+        self.bytes = data
+        self.findings = findings
+        self.applied = applied
+        self.dict_version = dict_version
+
+    @property
+    def fixes_applied(self) -> int:
+        return len(self.applied)
+
+    @property
+    def text(self) -> str:
+        return self.bytes.decode("utf-8")
+
+    def save(self, path: str | Path) -> Path:
+        path = Path(path)
+        path.write_bytes(self.bytes)
+        return path
+
+    def __repr__(self) -> str:
+        return (
+            f"<FixResult {len(self.bytes)} bytes, applied={self.fixes_applied}, "
+            f"{len(self.findings)} residual finding(s)>"
+        )
+
+
+def fix(
+    source: Any = None,
+    *,
+    path: str | os.PathLike[str] | None = None,
+    text: str | None = None,
+    data: bytes | bytearray | memoryview | None = None,
+    dict_version: str | None = None,
+    encoding: str | None = None,
+    risky: bool = False,
+    in_place: bool = False,
+    out: str | os.PathLike[str] | None = None,
+) -> FixResult:
+    """Mechanically repair an existing AGS4 file and return a :class:`FixResult`.
+
+    The same fix engine the browser uses, run headless: ``source`` is anything
+    :func:`read` accepts (path / file-like / bytes / AGS4 text). The **safe**
+    fixes (CRLF / BOM / embedded-CR / short-row pad / numeric reformat / the TRAN
+    delimiter+concatenator rows) are always applied; ``risky=True`` also applies
+    the intent-guessing ones (duplicate-heading rename, ``dd/mm`` datetime
+    canonicalisation, smart-quote→ASCII typography). The result is re-validated, so
+    ``FixResult.findings`` is what could **not** be mechanically fixed.
+
+    Non-destructive by default — the fixed bytes come back on the result and are
+    written only if you ask: ``in_place=True`` overwrites the source file (requires
+    a path source), or ``out=<path>`` writes there. Otherwise call
+    :meth:`FixResult.save`. The output is UTF-8 (fixing a non-UTF-8 file also
+    normalises its encoding)."""
+    import json
+
+    if in_place and out is not None:
+        raise TypeError("pass only one of in_place=True / out=<path>")
+    p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
+    res = raise_for(
+        _native.fix_file(
+            path=p,
+            text=txt,
+            data=raw,
+            dict_version=dict_version,
+            encoding=encoding,
+            include_risky=risky,
+        )
+    )
+    by_rule: dict[str, list[dict]] = json.loads(res["findings_json"])
+    findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
+    result = FixResult(res["fixed"], findings, list(res["applied"]), res["dict_version"])
+
+    if in_place:
+        if p is None:
+            raise Ags4Error(
+                "fix(in_place=True) needs a path source to overwrite; pass a file "
+                "path, or use out=<path> / FixResult.save(path)"
+            )
+        result.save(p)
+    elif out is not None:
+        result.save(out)
+    return result
+
+
+def diff(
+    a: Any,
+    b: Any,
+    *,
+    dict_version: str | None = None,
+    encoding: str | None = None,
+) -> dict:
+    """Compare two AGS4 documents and return their **revision diff**.
+
+    ``a`` (the baseline) and ``b`` (the revision) are each anything :func:`read`
+    accepts — a path, AGS4 text, raw bytes, a file-like, or an :class:`Ags4File`.
+    Returns a ``RevisionDelta`` dict — ``groups`` (a per-group list of row/heading
+    deltas) plus ``groups_added`` / ``groups_removed`` and the
+    ``total_added`` / ``total_removed`` / ``total_changed`` counts.
+
+    Rows are matched by the group's dictionary **KEY** headings (not line order, so
+    a re-sorted file still pairs the same boreholes), and cells are compared through
+    the **typed** value — a formatting-only change (``"1.0"`` → ``"1.00"``) is not a
+    diff. The dictionary edition is the revision's ``TRAN_AGS`` (force it with
+    ``dict_version``). The same engine the browser's revision-diff tool and
+    ``lat-check <a> --diff <b>`` use."""
+    import json
+
+    r = _native.diff_files(
+        _source_bytes(a),
+        _source_bytes(b),
+        dict_version=dict_version,
+        encoding=encoding,
+    )
+    return json.loads(raise_for(r)["delta_json"])

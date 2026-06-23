@@ -88,3 +88,13 @@ def test_str_sniff_prefers_existing_path(ags_path):
     # a str that is an existing path → path; an AGS-content str → text.
     assert sorted(lat.read(str(ags_path)).groups) == ["LOCA", "PROJ"]
     assert sorted(lat.read(AGS).groups) == ["LOCA", "PROJ"]
+
+
+def test_source_is_an_alias_of_read(ags_path):
+    # `source` is the fluent-chain entry name; `read` is the plain verb. Same
+    # callable — one surface, two vocabularies — and both are exported.
+    assert lat.source is lat.read
+    assert "source" in lat.__all__
+    # exercises the alias end-to-end across the input shapes read() accepts.
+    assert sorted(lat.source(ags_path).groups) == ["LOCA", "PROJ"]
+    assert _loca(lat.source(data=AGS.encode("utf-8"))).equals(_loca(lat.read(text=AGS)))

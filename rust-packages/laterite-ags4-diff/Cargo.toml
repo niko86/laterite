@@ -1,0 +1,39 @@
+# laterite-ags4-diff — the wasm-safe AGS4 revision-diff core.
+#
+# A KEY-aware, type-aware comparison of two AGS4 files: rows are matched by a
+# group's *dictionary* KEY headings (not line order), and matched cells are
+# compared through the canonical type system so formatting-only changes are
+# suppressed. Extracted as a leaf so the SAME engine-consistent diff is shared
+# by every host — wasm (browser Tools tab), PyO3 (the `laterite` wheel) and the
+# `lat-check` CLI — rather than living only inside `laterite-ags4-wasm`.
+#
+# Reuses the shipped, well-tested pieces; the only new code is the diff
+# orchestration:
+#   - laterite-ags4-parse      — the shared parse leaf (ParsedFile/ParsedGroup/
+#                                DataRow); rows arrive already tokenised.
+#   - laterite-ags4-validator  — the per-edition standard Dictionary (the KEY
+#                                headings that drive row matching + the
+#                                declared types). Already wasm-safe.
+#   - laterite-types           — parse_value, the canonical cast that makes the
+#                                cell comparison type-aware ("1.0" == "1.00").
+# All three are already dependencies of `laterite-ags4-wasm`, so repointing it
+# at this leaf adds no new wasm-hostile weight to the browser bundle.
+
+[package]
+name = "laterite-ags4-diff"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "AGS4 revision diff — KEY-aware/type-aware comparison of two files, DuckDB-free + wasm-safe"
+license = "MIT"
+publish = false
+
+[dependencies]
+# ParsedFile/ParsedGroup/DataRow — the tokenised rows the diff walks.
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+# The per-edition standard Dictionary: KEY headings (row matching) + types.
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# parse_value — the canonical cast that suppresses formatting-only changes.
+laterite-types = { path = "../laterite-types" }
+# RevisionDelta + nested structs serialise to JS/JSON unchanged across hosts.
+serde = { version = "1", features = ["derive"] }

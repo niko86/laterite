@@ -38,6 +38,10 @@ tui = ["dep:ratatui", "dep:crossterm"]
 # surface: CheckOptions / DictVersion / Findings / ValidatorError /
 # check_file / findings).
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# `--diff` (#204): parse both files via the shared parse leaf + the
+# KEY-aware/type-aware revision delta via the laterite-ags4-diff leaf.
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+laterite-ags4-diff = { path = "../laterite-ags4-diff" }
 # Same encoding_rs as the validator so `&'static Encoding` types match
 # across the `CheckOptions::encoding` boundary.
 encoding_rs = "0.8"

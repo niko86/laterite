@@ -67,6 +67,11 @@ const RULE_18: &str = "AGS Format Rule 18";
 // "FYI (Related to Rule 1)" / "FYI (Related to Rule 16)".
 const FYI: &str = "FYI";
 const RULE_16_FYI: &str = "FYI (Related to Rule 16)";
+// WARNING-tier label for Rule 18 structural defects (#200). A separate label
+// (NOT "AGS Format Rule 18") so the compat severity classifier — which keys off
+// the rule-label substring — never miscounts it as an error, and the error-tier
+// Rule 18 bucket stays byte-stable. Mirrors the "FYI (Related to Rule N)" scheme.
+const RULE_18_WARN: &str = "Warning (Related to Rule 18)";
 
 const KNOWN_TRAN_AGS: &[&str] = &["4.0", "4.0.3", "4.0.4", "4.1", "4.1.1", "4.2"];
 
@@ -80,6 +85,10 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, opts: &CheckOptions, found:
     if opts.include_fyi {
         tran_ags_fyi(parsed, found);
         rule_16_fyi(parsed, dict, found);
+        rule_16_fyi_nonstandard_abbr(parsed, dict, found);
+    }
+    if opts.include_warnings {
+        rule_18_structure(parsed, found);
     }
 }
 
@@ -128,6 +137,60 @@ fn rule_16_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
                 "{hdng}: Description of abbreviation {code:?} is \
                  {file_desc:?} but it should be {std_desc:?} \
                  according to the standard abbreviations list."
+            ),
+            Location::default(),
+            Severity::Fyi,
+        );
+    }
+}
+
+/// FYI emit: an abbreviation the file SELF-DECLARES in its ABBR group that is
+/// not a recognised standard abbreviation for its heading. The file is
+/// spec-legal — Rule 16 only requires a `PA` value be defined in ABBR, which it
+/// is — but a non-standard or mistyped code (e.g. `"Borng"` for `"Boring"`)
+/// doesn't interoperate with tooling that expects the standard picklist, so we
+/// surface it as an FYI (the owner's deliberate choice over a WARNING, since the
+/// file breaks no rule). Bounded to headings that HAVE a bundled standard
+/// picklist; a genuinely custom / DICT-defined `PA` heading has no standard set
+/// to judge against and is skipped, keeping the FYI quiet on bespoke schemas.
+///
+/// This is a laterite-originated check — python-ags4 has no equivalent (its
+/// `fyi_16_1` only flags description drift on an *otherwise-standard* code; its
+/// Warnings section is unimplemented). See OBSERVATIONS O-43. Complementary to
+/// [`rule_16_fyi`]: that fires when a standard code's description differs; this
+/// fires when the code itself isn't standard (the case `rule_16_fyi` skips).
+fn rule_16_fyi_nonstandard_abbr(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
+    let Some(abbr) = parsed.groups.get("ABBR") else {
+        return;
+    };
+    let (Some(hi), Some(ci)) = (col(abbr, "ABBR_HDNG"), col(abbr, "ABBR_CODE")) else {
+        return; // malformed ABBR — main Rule 16 / Rule 9 report it
+    };
+    for row in &abbr.rows {
+        let hdng = row.values.get(hi).map(String::as_str).unwrap_or("");
+        let code = row.values.get(ci).map(String::as_str).unwrap_or("");
+        if hdng.is_empty() || code.is_empty() {
+            continue;
+        }
+        // Only a heading with a bundled standard picklist can have a
+        // "non-standard" judgement; a custom / DICT-defined PA heading has no
+        // standard set to compare against, so skip it (bounds the FYI).
+        if dict.abbr_codes(hdng).is_empty() {
+            continue;
+        }
+        // `abbr_desc` resolves Some(desc) iff the code IS in the standard
+        // picklist; None means the file declared a non-standard code.
+        if dict.abbr_desc(hdng, code).is_some() {
+            continue;
+        }
+        add_at(
+            found,
+            RULE_16_FYI,
+            Some(row.line),
+            "ABBR",
+            format!(
+                "{hdng}: abbreviation {code:?} is declared in the ABBR group but is \
+                 not a recognised standard abbreviation for {hdng}."
             ),
             Location::default(),
             Severity::Fyi,
@@ -385,6 +448,93 @@ fn rule_18(parsed: &ParsedFile, found: &mut Findings) {
     }
 }
 
+/// WARNING emit (#200, O-44): structural defects in the file's OWN DICT group.
+/// The engine only *consumes* DICT to extend the effective dictionary (Rules
+/// 7/9) — a malformed DICT silently degrades every downstream check, so the
+/// clearest defects are surfaced as opt-in WARNINGs. Bounded first cut: a
+/// missing required DICT column (`DICT_TYPE` / `DICT_GRP` / `DICT_HDNG`), a row
+/// with a blank `DICT_GRP`, and a `HEADING`-type row with a blank `DICT_HDNG`.
+/// Softer "REQUIRED where HEADING/GROUP" cells (`DICT_STAT` / `DICT_UNIT` /
+/// `DICT_PGRP`) are deliberately deferred to avoid false positives.
+///
+/// WARNING, not Error: python-ags4 does NO DICT structural validation, so an
+/// error here would break the parity baseline; opt-in (`include_warnings`)
+/// leaves the default verdict and the compat path untouched. The label is
+/// [`RULE_18_WARN`] (not `"AGS Format Rule 18"`) so the compat severity
+/// classifier never miscounts it as an error. Clean-room — laterite-originated.
+fn rule_18_structure(parsed: &ParsedFile, found: &mut Findings) {
+    let Some(dictg) = parsed.groups.get("DICT") else {
+        return; // a missing DICT is the error-tier `rule_18`'s job, not this.
+    };
+    let idx = |n: &str| dictg.headings.iter().position(|h| h == n);
+    let (ti, gi, hi) = (idx("DICT_TYPE"), idx("DICT_GRP"), idx("DICT_HDNG"));
+
+    // (1) Missing required columns — without these the DICT can't be interpreted.
+    let head_line = dictg.heading_line.unwrap_or(dictg.group_line);
+    for (name, present) in [
+        ("DICT_TYPE", ti.is_some()),
+        ("DICT_GRP", gi.is_some()),
+        ("DICT_HDNG", hi.is_some()),
+    ] {
+        if !present {
+            add_at(
+                found,
+                RULE_18_WARN,
+                Some(head_line),
+                "DICT",
+                format!(
+                    "DICT group is missing the required {name} column; its \
+                     non-standard definitions can't be validated."
+                ),
+                Location::default(),
+                Severity::Warning,
+            );
+        }
+    }
+    // Need DICT_GRP to attribute rows; the missing-column warning already fired.
+    let Some(gi) = gi else { return };
+
+    // (2) Per-row defects.
+    for row in &dictg.rows {
+        let grp = row.values.get(gi).map(String::as_str).unwrap_or("");
+        if grp.is_empty() {
+            add_at(
+                found,
+                RULE_18_WARN,
+                Some(row.line),
+                "DICT",
+                "DICT row has a blank DICT_GRP — every DICT definition must name \
+                 the group it belongs to."
+                    .to_string(),
+                Location::default(),
+                Severity::Warning,
+            );
+            continue;
+        }
+        // A HEADING-type row must name the heading it defines (a GROUP-type row
+        // legitimately has a blank DICT_HDNG, so branch on DICT_TYPE first).
+        let dtype = ti
+            .and_then(|ti| row.values.get(ti))
+            .map(String::as_str)
+            .unwrap_or("");
+        let hdng = hi
+            .and_then(|hi| row.values.get(hi))
+            .map(String::as_str)
+            .unwrap_or("");
+        if dtype.eq_ignore_ascii_case("HEADING") && hdng.is_empty() {
+            add_at(
+                found,
+                RULE_18_WARN,
+                Some(row.line),
+                "DICT",
+                format!("DICT row defines a HEADING for group {grp:?} but DICT_HDNG is blank."),
+                Location::default(),
+                Severity::Warning,
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -418,6 +568,123 @@ mod tests {
             &mut f,
         );
         f
+    }
+
+    /// WARNING-enabled runner — `rule_18_structure` only runs under
+    /// `include_warnings`.
+    fn run_warn(src: &str) -> Findings {
+        let pf = parse_str(src).expect("fixture parses");
+        let mut f = Findings::new();
+        check(
+            &pf,
+            &Dictionary::bundled(DictVersion::V4_2),
+            &CheckOptions {
+                include_warnings: true,
+                ..Default::default()
+            },
+            &mut f,
+        );
+        f
+    }
+
+    // A PROJ + DICT scaffold; `dict_rows` is the DICT group's HEADING + DATA
+    // body (so each test supplies just the DICT shape under test).
+    fn dict_fixture(dict_block: &str) -> String {
+        format!(
+            "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\
+             \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\
+             \"GROUP\",\"DICT\"\r\n{dict_block}"
+        )
+    }
+
+    #[test]
+    fn rule_18_structure_flags_blank_dict_hdng_on_heading_row() {
+        // A HEADING-type row that names no heading.
+        let src = dict_fixture(
+            "\"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\"\r\n\
+             \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+             \"DATA\",\"HEADING\",\"LOCA\",\"\"\r\n",
+        );
+        let w = run_warn(&src)
+            .get(RULE_18_WARN)
+            .cloned()
+            .expect("a Rule 18 warning");
+        assert!(
+            w.iter().any(|x| x.desc.contains("DICT_HDNG is blank")),
+            "{w:?}"
+        );
+    }
+
+    #[test]
+    fn rule_18_structure_flags_blank_dict_grp() {
+        let src = dict_fixture(
+            "\"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\"\r\n\
+             \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+             \"DATA\",\"HEADING\",\"\",\"LOCA_XX\"\r\n",
+        );
+        let w = run_warn(&src)
+            .get(RULE_18_WARN)
+            .cloned()
+            .expect("a Rule 18 warning");
+        assert!(w.iter().any(|x| x.desc.contains("blank DICT_GRP")), "{w:?}");
+    }
+
+    #[test]
+    fn rule_18_structure_flags_missing_required_column() {
+        // No DICT_TYPE column at all.
+        let src = dict_fixture(
+            "\"HEADING\",\"DICT_GRP\",\"DICT_HDNG\"\r\n\
+             \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\
+             \"DATA\",\"LOCA\",\"LOCA_XX\"\r\n",
+        );
+        let w = run_warn(&src)
+            .get(RULE_18_WARN)
+            .cloned()
+            .expect("a Rule 18 warning");
+        assert!(
+            w.iter()
+                .any(|x| x.desc.contains("missing the required DICT_TYPE")),
+            "{w:?}"
+        );
+    }
+
+    #[test]
+    fn rule_18_structure_silent_for_group_row_blank_hdng() {
+        // A GROUP-type row legitimately carries a blank DICT_HDNG — must NOT warn.
+        let src = dict_fixture(
+            "\"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_PGRP\"\r\n\
+             \"UNIT\",\"\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\",\"X\"\r\n\
+             \"DATA\",\"GROUP\",\"LOCX\",\"\",\"PROJ\"\r\n",
+        );
+        let f = run_warn(&src);
+        assert!(
+            f.get(RULE_18_WARN)
+                .is_none_or(|w| !w.iter().any(|x| x.desc.contains("DICT_HDNG is blank"))),
+            "a GROUP row must not be flagged for a blank DICT_HDNG: {:?}",
+            f.get(RULE_18_WARN)
+        );
+    }
+
+    #[test]
+    fn rule_18_structure_off_by_default() {
+        let src = dict_fixture(
+            "\"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\"\r\n\
+             \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+             \"DATA\",\"HEADING\",\"LOCA\",\"\"\r\n",
+        );
+        assert!(run(&src).get(RULE_18_WARN).is_none());
+    }
+
+    #[test]
+    fn rule_18_structure_clean_dict_no_warning() {
+        // A well-formed DICT (one HEADING row, one GROUP row) → no warning.
+        let src = dict_fixture(
+            "\"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_PGRP\"\r\n\
+             \"UNIT\",\"\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\",\"X\"\r\n\
+             \"DATA\",\"GROUP\",\"LOCX\",\"\",\"PROJ\"\r\n\
+             \"DATA\",\"HEADING\",\"LOCX\",\"LOCX_ID\",\"\"\r\n",
+        );
+        assert!(run_warn(&src).get(RULE_18_WARN).is_none());
     }
 
     #[test]
@@ -479,6 +746,70 @@ mod tests {
         let f = run(bad);
         let r16 = f.get(RULE_16).expect("Rule 16");
         assert!(r16.iter().any(|x| x.desc.contains("\"XX\"")), "{r16:?}");
+    }
+
+    // A PROJ + ABBR scaffold; `{hdng}`/`{code}` is the one ABBR declaration
+    // under test. (Other rules fire too — the tests only inspect RULE_16_FYI.)
+    fn abbr_fixture(hdng: &str, code: &str) -> String {
+        format!(
+            "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\
+             \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\
+             \"GROUP\",\"ABBR\"\r\n\
+             \"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\",\"ABBR_DESC\"\r\n\
+             \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+             \"DATA\",{hdng:?},{code:?},\"Self-declared\"\r\n"
+        )
+    }
+
+    #[test]
+    fn rule_16_fyi_flags_declared_nonstandard_abbr() {
+        // SAMP_TYPE has a bundled standard picklist; "ZZ" is not in it but is
+        // self-declared in ABBR (so the error Rule 16 stays silent) → one FYI.
+        let f = run_fyi(&abbr_fixture("SAMP_TYPE", "ZZ"));
+        let fyi = f
+            .get(RULE_16_FYI)
+            .expect("an FYI (Related to Rule 16) bucket");
+        assert!(
+            fyi.iter().any(|x| {
+                x.desc.contains("\"ZZ\"") && x.desc.contains("not a recognised standard")
+            }),
+            "{fyi:?}"
+        );
+        // It is an FYI, never an error Rule 16 (the code IS in the file's ABBR).
+        assert!(
+            run_fyi(&abbr_fixture("SAMP_TYPE", "ZZ"))
+                .get(RULE_16)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn rule_16_fyi_silent_for_standard_abbr() {
+        // "U" IS a standard SAMP_TYPE code → no non-standard FYI fires.
+        let f = run_fyi(&abbr_fixture("SAMP_TYPE", "U"));
+        let no_nonstd = f.get(RULE_16_FYI).is_none_or(|v| {
+            !v.iter()
+                .any(|x| x.desc.contains("not a recognised standard"))
+        });
+        assert!(no_nonstd, "U is standard — must not be flagged");
+    }
+
+    #[test]
+    fn rule_16_fyi_nonstandard_off_without_include_fyi() {
+        // Default opts (include_fyi = false) → the FYI never fires.
+        let f = run(&abbr_fixture("SAMP_TYPE", "ZZ"));
+        assert!(f.get(RULE_16_FYI).is_none());
+    }
+
+    #[test]
+    fn rule_16_fyi_skips_heading_without_standard_picklist() {
+        // A heading with no bundled standard picklist can't be judged
+        // non-standard — bespoke / DICT-defined PA headings stay quiet.
+        let f = run_fyi(&abbr_fixture("XXXX_TYPE", "ZZ"));
+        let none = f
+            .get(RULE_16_FYI)
+            .is_none_or(|v| !v.iter().any(|x| x.desc.contains("XXXX_TYPE")));
+        assert!(none, "a picklist-less heading must not be flagged");
     }
 
     #[test]

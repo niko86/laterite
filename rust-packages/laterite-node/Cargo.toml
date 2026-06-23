@@ -33,6 +33,11 @@ napi-derive = "2"
 # wrap). laterite-types `arrow` feature pulls the shared typed-Arrow builder
 # (arrow_cols); `arrow` ipc frames each group's batch as an IPC stream Buffer.
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# The shared parse leaf (#168 Phase 3): text/bytes parse through the leaf
+# directly; its `ParseError` → ValidatorError via the Phase-2 `From` bridge so
+# the `thrown`/`classify` exit-code map is unchanged. Validator dep stays for
+# the FS entry (`parse_file_with_encoding`), rules, and ValidatorError.
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 laterite-types = { path = "../laterite-types", features = ["arrow"] }
 # The shared producer (write_ags4 for byte-faithful emit; emit_ags4 +
 # group_from_arrow for the data→AGS4 path) — `arrow` feature for the IPC input.

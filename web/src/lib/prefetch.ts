@@ -51,7 +51,7 @@ export function warmLazyAssets(): void {
   onIdle(() => void import("echarts/core").catch(() => {}));
   onIdle(() => {
     const base = import.meta.env.BASE_URL;
-    void fetch(`${base}ags5_dictionary.json`).catch(() => {});
+    void fetch(`${base}ags_dictionary.json`).catch(() => {});
     void fetch(`${base}rules-catalogue.json`).catch(() => {});
   });
 

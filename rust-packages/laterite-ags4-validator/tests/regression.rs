@@ -442,3 +442,138 @@ fn valid_utf8_extended_char_is_fyi_only_not_rule1() {
         "valid extended-ASCII must surface as the Rule 1 FYI, got {with_fyi:?}"
     );
 }
+
+#[test]
+fn rule_16_nonstandard_self_declared_abbr_is_fyi_only() {
+    // A file using SAMP_TYPE="ZZ", self-declared in ABBR. Rule 16 (error) is
+    // satisfied — ZZ IS in the file's ABBR — but ZZ is not a standard SAMP_TYPE
+    // code, which surfaces ONLY as the Rule 16 FYI under include_fyi (O-43).
+    let path = fixture("rule16_fyi_nonstandard_abbr.ags");
+    assert!(path.exists(), "missing fixture: {}", path.display());
+
+    let default = check_file(&path, &CheckOptions::default()).unwrap();
+    assert!(
+        !default.contains_key("AGS Format Rule 16"),
+        "ZZ is defined in ABBR, so Rule 16 (error) must stay silent: {default:?}"
+    );
+    assert!(
+        !default.contains_key("FYI (Related to Rule 16)"),
+        "the FYI must be suppressed by default (opt-in): {default:?}"
+    );
+
+    let with_fyi = check_file(
+        &path,
+        &CheckOptions {
+            include_fyi: true,
+            ..CheckOptions::default()
+        },
+    )
+    .unwrap();
+    let fyi = with_fyi
+        .get("FYI (Related to Rule 16)")
+        .expect("the non-standard-abbr FYI under include_fyi");
+    assert!(
+        fyi.iter()
+            .any(|f| f.desc.contains("\"ZZ\"") && f.desc.contains("not a recognised standard")),
+        "expected the non-standard SAMP_TYPE FYI, got {fyi:?}"
+    );
+}
+
+#[test]
+fn rule_18_malformed_dict_is_warning_only() {
+    // A DICT group with a HEADING-type row that names no heading (blank
+    // DICT_HDNG). It is a WARNING under include_warnings (O-44), suppressed by
+    // default, and never the error-tier "AGS Format Rule 18".
+    let path = fixture("rule18_malformed_dict.ags");
+    assert!(path.exists(), "missing fixture: {}", path.display());
+
+    let default = check_file(&path, &CheckOptions::default()).unwrap();
+    assert!(
+        !default.contains_key("Warning (Related to Rule 18)"),
+        "the DICT warning must be opt-in: {default:?}"
+    );
+
+    let with_warn = check_file(
+        &path,
+        &CheckOptions {
+            include_warnings: true,
+            ..CheckOptions::default()
+        },
+    )
+    .unwrap();
+    let w = with_warn
+        .get("Warning (Related to Rule 18)")
+        .expect("the malformed-DICT warning under include_warnings");
+    assert!(
+        w.iter().any(|f| f.desc.contains("DICT_HDNG is blank")),
+        "expected the blank-DICT_HDNG warning, got {w:?}"
+    );
+    assert_eq!(w[0].severity, findings::Severity::Warning);
+}
+
+#[test]
+fn rule_labels_inventory_is_grounded_against_real_emissions() {
+    // Grounds catalogue::RULE_LABELS against what the engine ACTUALLY emits:
+    // run every fixture (FYI on) and assert no numbered rule label escapes the
+    // inventory, and no unexpected top-level FYI bucket appears. Catches a new
+    // rule emitting a label the catalogue (and `--list-rules`) doesn't know —
+    // the drift direction the in-crate `metadata_covers_exactly_the_inventory`
+    // gate (meta == RULE_LABELS) can't see on its own.
+    use std::collections::BTreeSet;
+    let inventory: BTreeSet<&str> = laterite_ags4_validator::RULE_LABELS
+        .iter()
+        .copied()
+        .collect();
+    // The non-numbered FYI / WARNING buckets are a DELIBERATELY separate label
+    // space (see catalogue.rs) — enumerated here so a NEW one also trips this gate.
+    let known_non_numbered: BTreeSet<&str> = [
+        "FYI",
+        "FYI (Related to Rule 1)",
+        "FYI (Related to Rule 16)",
+        "Warning (Related to Rule 18)",
+    ]
+    .into_iter()
+    .collect();
+
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures");
+    let opts = CheckOptions {
+        include_fyi: true,
+        include_warnings: true,
+        ..CheckOptions::default()
+    };
+    let mut seen_numbered: BTreeSet<String> = BTreeSet::new();
+    for entry in std::fs::read_dir(&dir).expect("read fixtures dir") {
+        let path = entry.expect("dir entry").path();
+        if path.extension().and_then(|e| e.to_str()) != Some("ags") {
+            continue;
+        }
+        let Ok(found) = check_file(&path, &opts) else {
+            continue; // a hard-error fixture (not-utf8/not-ags4) emits no findings
+        };
+        for label in found.keys() {
+            if let Some(suffix) = label.strip_prefix("AGS Format Rule ") {
+                assert!(
+                    inventory.contains(suffix),
+                    "{}: emits {label:?} but {suffix:?} is not in RULE_LABELS",
+                    path.display()
+                );
+                seen_numbered.insert(suffix.to_string());
+            } else {
+                assert!(
+                    known_non_numbered.contains(label.as_str()),
+                    "{}: emits an unknown non-numbered label {label:?}",
+                    path.display()
+                );
+            }
+        }
+    }
+    // Sanity: the corpus exercises a meaningful slice of the inventory (so this
+    // test isn't silently a no-op if fixtures vanish).
+    assert!(
+        seen_numbered.len() >= 15,
+        "fixtures should exercise many rules, saw {}",
+        seen_numbered.len()
+    );
+}

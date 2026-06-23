@@ -44,7 +44,7 @@ export const ExplorePane: Component = () => {
   const [sqlText, setSqlText] = createSignal("");
   // The AGS dictionary (parent + KEY metadata) — shared with the SQL/chart
   // builders so they can offer relationship-aware joins without hand-written
-  // SQL. Cheap: a fetch of the (cached) ags5_dictionary.json.
+  // SQL. Cheap: a fetch of the (cached) union ags_dictionary.json.
   const [dict] = createResource(loadDict);
 
   // Overlapping-load guard: createResource does NOT cancel a superseded

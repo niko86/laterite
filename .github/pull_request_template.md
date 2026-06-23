@@ -7,7 +7,7 @@
 <!-- How you verified this. Tick all that apply. -->
 
 - [ ] `cargo test --workspace --release` passes
-- [ ] `uv run pytest tests/ packages/laterite/tests packages/laterite-ags5/tests -q` passes
+- [ ] `uv run pytest tests/ packages/laterite/tests -q` passes
 - [ ] `./tools/run_python_ags4_tests.sh` parity count unchanged (or improved)
 - [ ] New behaviour covered by a test
 - [ ] Validator behaviour change → `OBSERVATIONS.md` updated

@@ -19,10 +19,13 @@ use std::path::Path;
 use laterite_ags4_core::error::CliError;
 use laterite_ags4_core::index::{Sidecar as CoreSidecar, ValidationStamp};
 use laterite_ags4_validator::findings::{Severity, Target};
-use laterite_ags4_validator::{CheckOptions, DictVersion, Dictionary, Findings, ValidatorError};
+use laterite_ags4_validator::fixes::FixRisk;
+use laterite_ags4_validator::{
+    CheckOptions, DictVersion, Dictionary, Findings, Fix, ValidatorError, fix_document,
+};
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyBytes, PyDict, PyList};
 use pyo3_arrow::PyTable;
 use serde_json::{Map, Value};
 
@@ -44,7 +47,7 @@ mod typed_graph;
 /// share this local copy instead.
 pub(crate) fn map_cli_err(e: CliError) -> PyErr {
     let code = e.exit_code();
-    PyRuntimeError::new_err(format!("ags5db error (exit {code}): {e}"))
+    PyRuntimeError::new_err(format!("laterite error (exit {code}): {e}"))
 }
 
 /// Map a `--dict-version` string to the optional override. `None` /
@@ -124,7 +127,9 @@ fn validate(
             Err(e) => Err(map_err(e)),
         }
     } else if let Some(t) = text {
-        let pf = laterite_ags4_validator::parse::parse_str(t).map_err(map_err)?;
+        let pf = laterite_ags4_parse::parse_str(t)
+            .map_err(ValidatorError::from)
+            .map_err(map_err)?;
         let tran = laterite_ags4_validator::tran_ags_of(&pf);
         let (dv, res) = laterite_ags4_validator::resolve_dict_version(over, tran.as_deref())
             .map_err(map_err)?;
@@ -141,7 +146,9 @@ fn validate(
         // bytes path: decode with `enc` (BOM-sniffed) then validate — the text
         // branch's twin for callers that hold raw bytes (a web backend, an
         // embedded host) with no file on disk. Same engine the wasm surface uses.
-        let pf = laterite_ags4_validator::parse::parse_bytes(d, enc).map_err(map_err)?;
+        let pf = laterite_ags4_parse::parse_bytes(d, enc)
+            .map_err(ValidatorError::from)
+            .map_err(map_err)?;
         let tran = laterite_ags4_validator::tran_ags_of(&pf);
         let (dv, res) = laterite_ags4_validator::resolve_dict_version(over, tran.as_deref())
             .map_err(map_err)?;
@@ -323,6 +330,212 @@ fn run_check<'py>(
     }
 }
 
+/// Headless one-shot mechanical repair of a delivered AGS4 file (the same engine
+/// the browser fix UI uses, applied without a UI). Reads from path/text/data,
+/// computes fixes against the file's own findings, applies the *safe* set (plus
+/// the intent-guessing *risky* set when `include_risky`), and re-validates the
+/// result. Returns `(fixed_bytes, residual_findings, applied_fixes, dict_version,
+/// resolution)` or the `(exit_code, kind, msg)` error triple. Mirrors the
+/// AutoFix path in `laterite-ags4-emit::emit`, but on a file's own bytes rather
+/// than freshly-built data.
+#[allow(clippy::type_complexity)]
+fn fix_core(
+    path: Option<&str>,
+    text: Option<&str>,
+    data: Option<&[u8]>,
+    dvr: Option<&str>,
+    encoding: Option<&str>,
+    include_risky: bool,
+) -> Result<(Vec<u8>, Findings, Vec<Fix>, String, String), (i32, String, String)> {
+    let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
+    let enc = match encoding {
+        None | Some("") => encoding_rs::UTF_8,
+        Some(label) => encoding_rs::Encoding::for_label(label.as_bytes()).ok_or_else(|| {
+            (
+                5,
+                "bad_args".to_string(),
+                format!("unknown encoding {label:?}"),
+            )
+        })?,
+    };
+    // The source bytes — fix needs the raw document to apply byte/char edits to,
+    // so unlike `validate` we always materialise bytes (a path is read here).
+    let raw: Vec<u8> = if let Some(p) = path {
+        std::fs::read(p).map_err(|e| {
+            let kind = if e.kind() == std::io::ErrorKind::NotFound {
+                "not_found"
+            } else {
+                "io"
+            };
+            (3, kind.to_string(), format!("{p}: {e}"))
+        })?
+    } else if let Some(d) = data {
+        d.to_vec()
+    } else if let Some(t) = text {
+        t.as_bytes().to_vec()
+    } else {
+        return Err((
+            5,
+            "bad_args".to_string(),
+            "one of path, text, or data is required".to_string(),
+        ));
+    };
+
+    // The orchestration (parse → run → compute → apply → re-validate) lives once,
+    // in the validator's `fix_document`; the CLI shares it.
+    let opts = CheckOptions {
+        dict_version: over,
+        custom_dict: None,
+        include_warnings: false,
+        include_fyi: true,
+        check_files: false,
+        encoding: enc,
+    };
+    let out = fix_document(&raw, &opts, include_risky).map_err(map_err)?;
+    Ok((
+        out.fixed,
+        out.residual,
+        out.applied,
+        out.dict_version.as_str().to_string(),
+        out.resolution.as_str().to_string(),
+    ))
+}
+
+/// Headless mechanical fix of `path`/`text`/`data`. Returns a dict the Python
+/// `fix()` turns into a `FixResult` (`fixed` bytes, `findings_json` residual
+/// `{rule:[…]}`, the `applied` fix list, `fixes_applied` count). On
+/// un-fixable input returns the same `{ok:false, …}` shape as `run_check`, so
+/// the Python layer raises the mapped exception.
+#[pyfunction]
+#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, encoding=None, include_risky=false))]
+fn fix_file<'py>(
+    py: Python<'py>,
+    path: Option<String>,
+    text: Option<String>,
+    data: Option<Vec<u8>>,
+    dict_version: Option<String>,
+    encoding: Option<String>,
+    include_risky: bool,
+) -> PyResult<Bound<'py, PyDict>> {
+    match fix_core(
+        path.as_deref(),
+        text.as_deref(),
+        data.as_deref(),
+        dict_version.as_deref(),
+        encoding.as_deref(),
+        include_risky,
+    ) {
+        Err((code, kind, msg)) => err_dict(py, code, &kind, &msg),
+        Ok((bytes, residual, applied, dv, res)) => {
+            let d = PyDict::new(py);
+            d.set_item("ok", true)?;
+            d.set_item("fixed", PyBytes::new(py, &bytes))?;
+            d.set_item("dict_version", dv)?;
+            d.set_item("resolution", res)?;
+            d.set_item(
+                "findings_json",
+                serde_json::to_string(&residual).unwrap_or_else(|_| "{}".into()),
+            )?;
+            d.set_item("fixes_applied", applied.len())?;
+            let applist = PyList::empty(py);
+            for f in &applied {
+                let o = PyDict::new(py);
+                let kind = serde_json::to_value(f.kind)
+                    .ok()
+                    .and_then(|v| v.as_str().map(str::to_string))
+                    .unwrap_or_default();
+                o.set_item("kind", kind)?;
+                o.set_item("label", &f.label)?;
+                o.set_item("rule", &f.rule)?;
+                o.set_item("line", f.line)?;
+                o.set_item(
+                    "risk",
+                    match f.risk {
+                        FixRisk::Safe => "safe",
+                        FixRisk::Risky => "risky",
+                    },
+                )?;
+                applist.append(o)?;
+            }
+            d.set_item("applied", applist)?;
+            Ok(d)
+        }
+    }
+}
+
+/// The rule catalogue (title / severity / fixable / cited observations per rule)
+/// as the engine's gated `rules_meta.json` — the single source
+/// `laterite.list_rules()` parses. Read-only; no file argument; the JSON is
+/// compile-time-embedded so this never touches disk.
+#[pyfunction]
+fn list_rules() -> &'static str {
+    laterite_ags4_validator::rule_metadata_json()
+}
+
+/// The KEY-aware/type-aware revision diff of two AGS4 documents (`a` baseline,
+/// `b` revision), serialised as a `RevisionDelta` JSON string — the same diff
+/// the browser's Tools tab produces, via the shared `laterite-ags4-diff` leaf.
+/// Rows are matched by the group's dictionary KEY headings; cells are compared
+/// through the typed value, so a formatting-only change (`"1.0"` → `"1.00"`) is
+/// suppressed. The dictionary edition is the revision's `TRAN_AGS` (forced by
+/// `dict_version`), falling back to the bundled default — like the wasm `diff()`.
+fn diff_core(
+    a: &[u8],
+    b: &[u8],
+    dvr: Option<&str>,
+    encoding: Option<&str>,
+) -> Result<String, (i32, String, String)> {
+    let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
+    let enc = match encoding {
+        None | Some("") => encoding_rs::UTF_8,
+        Some(label) => encoding_rs::Encoding::for_label(label.as_bytes()).ok_or_else(|| {
+            (
+                5,
+                "bad_args".to_string(),
+                format!("unknown encoding {label:?}"),
+            )
+        })?,
+    };
+    let pa = laterite_ags4_parse::parse_bytes(a, enc)
+        .map_err(ValidatorError::from)
+        .map_err(map_err)?;
+    let pb = laterite_ags4_parse::parse_bytes(b, enc)
+        .map_err(ValidatorError::from)
+        .map_err(map_err)?;
+    // KEY headings come from the dictionary; pick the edition from the revision
+    // (b)'s TRAN_AGS (forced by dict_version), falling back to the standard.
+    let tran = laterite_ags4_validator::tran_ags_of(&pb);
+    let dv = laterite_ags4_validator::resolve_dict_version(over, tran.as_deref())
+        .map(|(dv, _)| dv)
+        .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
+    let dict = Dictionary::bundled(dv);
+    let delta = laterite_ags4_diff::diff_parsed(&pa, &pb, &dict, None);
+    Ok(serde_json::to_string(&delta).unwrap_or_else(|_| "{}".to_string()))
+}
+
+/// Compare two AGS4 documents (raw `a`/`b` bytes). Returns `{ok:true,
+/// delta_json}` (the serialised `RevisionDelta`, which the Python layer parses)
+/// or the `{ok:false, error_kind, exit_code, error}` failure dict.
+#[pyfunction]
+#[pyo3(signature = (a, b, dict_version=None, encoding=None))]
+fn diff_files<'py>(
+    py: Python<'py>,
+    a: Vec<u8>,
+    b: Vec<u8>,
+    dict_version: Option<String>,
+    encoding: Option<String>,
+) -> PyResult<Bound<'py, PyDict>> {
+    match diff_core(&a, &b, dict_version.as_deref(), encoding.as_deref()) {
+        Err((code, kind, msg)) => err_dict(py, code, &kind, &msg),
+        Ok(delta_json) => {
+            let d = PyDict::new(py);
+            d.set_item("ok", true)?;
+            d.set_item("delta_json", delta_json)?;
+            Ok(d)
+        }
+    }
+}
+
 /// Parse `path` or `text` into per-group primitives (string cells —
 /// AGS4 is a text format). `headings`/`units`/`types`/row `values`
 /// exclude the leading row tag (matching `ParsedGroup`); the Python
@@ -350,8 +563,8 @@ fn parse_primitives<'py>(
         (Some(p), _, _) => {
             laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc)
         }
-        (_, Some(t), _) => laterite_ags4_validator::parse::parse_str(t),
-        (_, _, Some(d)) => laterite_ags4_validator::parse::parse_bytes(d, enc),
+        (_, Some(t), _) => laterite_ags4_parse::parse_str(t).map_err(ValidatorError::from),
+        (_, _, Some(d)) => laterite_ags4_parse::parse_bytes(d, enc).map_err(ValidatorError::from),
         _ => {
             return err_dict(py, 5, "bad_args", "one of path, text, or data is required");
         }
@@ -405,7 +618,7 @@ fn parse_primitives<'py>(
 /// Python `Ags4File` holds one of these as its `_handle`.
 #[pyclass]
 struct Reading {
-    parsed: laterite_ags4_validator::parse::ParsedFile,
+    parsed: laterite_ags4_parse::ParsedFile,
 }
 
 #[pymethods]
@@ -684,8 +897,8 @@ fn parse_arrow<'py>(
         (Some(p), _, _) => {
             laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc)
         }
-        (_, Some(t), _) => laterite_ags4_validator::parse::parse_str(t),
-        (_, _, Some(d)) => laterite_ags4_validator::parse::parse_bytes(d, enc),
+        (_, Some(t), _) => laterite_ags4_parse::parse_str(t).map_err(ValidatorError::from),
+        (_, _, Some(d)) => laterite_ags4_parse::parse_bytes(d, enc).map_err(ValidatorError::from),
         _ => return err_dict(py, 5, "bad_args", "one of path, text, or data is required"),
     };
     let pf = match parsed {
@@ -785,6 +998,9 @@ fn dict_group_unit_type<'py>(
 #[pymodule]
 fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_check, m)?)?;
+    m.add_function(wrap_pyfunction!(fix_file, m)?)?;
+    m.add_function(wrap_pyfunction!(list_rules, m)?)?;
+    m.add_function(wrap_pyfunction!(diff_files, m)?)?;
     m.add_function(wrap_pyfunction!(parse_primitives, m)?)?;
     m.add_function(wrap_pyfunction!(parse_arrow, m)?)?;
     m.add_function(wrap_pyfunction!(resolve_dict, m)?)?;

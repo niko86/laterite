@@ -1,0 +1,12 @@
+"GROUP","PROJ"
+"HEADING","PROJ_ID"
+"UNIT",""
+"TYPE","ID"
+"DATA","P1"
+
+"GROUP","DICT"
+"HEADING","DICT_TYPE","DICT_GRP","DICT_HDNG","DICT_STAT","DICT_DTYP","DICT_DESC"
+"UNIT","","","","","",""
+"TYPE","X","X","X","X","X","X"
+"DATA","HEADING","LOCA","LOCA_CUST","OTHER","X","A valid custom heading"
+"DATA","HEADING","LOCA","","OTHER","X","A heading row with no name"

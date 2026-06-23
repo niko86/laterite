@@ -10,10 +10,9 @@ A faster drop-in for
 [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library)'s
 `AGS4` module (1.2.0 parity-pinned, 122/131 tests) — swap
 `from python_ags4 import AGS4` for `from laterite import compat as AGS4`.
-Native API returns
-[narwhals](https://narwhals-api.readthedocs.io/) frames over Polars,
-so you can target polars / pandas / pyarrow without laterite picking
-for you.
+The native API returns born-typed **polars** frames by default (or
+**pandas** with `read(..., backend="pandas")`) — both **pyarrow-free**,
+read back from a Python-owned in-memory DuckDB engine.
 
 [![ci](https://github.com/niko86/laterite/actions/workflows/ci.yml/badge.svg)](https://github.com/niko86/laterite/actions/workflows/ci.yml)
 [![rust cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=rust&label=rust%20cov)](https://codecov.io/gh/niko86/laterite)
@@ -24,9 +23,8 @@ for you.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ```bash
-pip install laterite                  # base AGS4 (polars + narwhals)
+pip install laterite                  # base AGS4 (polars + duckdb, pyarrow-free)
 pip install "laterite[compat]"        # + pandas (python-ags4 drop-in)
-pip install "laterite[ags5]"          # + experimental .ags5db surface
 ```
 
 ```python

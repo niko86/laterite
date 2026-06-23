@@ -1,0 +1,6 @@
+# Byte-exact parser-convergence fixtures (#168). These deliberately carry
+# EXACT bytes — LF-only, embedded quoted newlines, leading blank lines, a UTF-8
+# BOM — to pin the byte-offset oracle and line-contract snapshots. They must
+# NOT be EOL-converted, so this OVERRIDES the repo-root `*.ags text eol=crlf`
+# for this directory only (the closest .gitattributes wins).
+*.ags -text

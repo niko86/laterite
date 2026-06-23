@@ -11,6 +11,7 @@
 //! ```text
 //! lat-check <file.ags> [--dict-version 4.1|4.2] [--dict <path>]
 //!                       [--json] [--show-warnings] [--show-fyi] [--quiet]
+//!                       [--fix [--in-place | --fix-out <path>]]
 //! ```
 //!
 //! Exit codes (mirror ags5db's convention):
@@ -25,8 +26,11 @@ use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
+use laterite_ags4_parse::parse_bytes;
+use laterite_ags4_validator::dict::{Dictionary, FALLBACK};
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, Findings, ValidatorError, check_file, findings,
+    CheckOptions, DictVersion, Findings, ValidatorError, check_file, findings, fix_document,
+    resolve_dict_version, tran_ags_of,
 };
 use laterite_cliutil::{Spinner, colour_enabled, styled_table, write_atomic, write_json_pretty};
 use serde_json::{Map, Value};
@@ -76,6 +80,21 @@ usage: lat-check <file.ags> [options]
                             of stdout (prints a one-line confirmation)
   --json-out <path>         also write the JSON report to <path> while
                             the normal report still prints (tee)
+  --fix                     mechanically repair the file: apply the SAFE
+                            fixes (CRLF / BOM / embedded-CR / short-row
+                            pad / numeric reformat / TRAN rows) and write
+                            the result. Non-destructive — writes a sibling
+                            <file>.fixed.ags by default (see --in-place /
+                            --fix-out). Exit 0 if the result is clean, 1 if
+                            findings remain that can't be auto-fixed.
+  --fix-risky               like --fix but also apply the intent-guessing
+                            fixes (duplicate-heading rename, dd/mm date
+                            canonicalisation, smart-quote→ASCII)
+  --in-place                with --fix: overwrite the source file in place
+  --fix-out <path>          with --fix: write the repaired file to <path>
+  --diff <other.ags>        compare the input file against <other> and print the
+                            KEY-aware/type-aware revision delta (per-group
+                            +added -removed ~changed; --json for the full delta)
   --show-warnings           include WARNING-severity findings
   --show-fyi                include FYI-severity findings (e.g. Rule 1)
   --check-files             also run Rule 20's on-disk check: the
@@ -88,6 +107,10 @@ usage: lat-check <file.ags> [options]
                             Accepts utf-8 / cp1252 / latin1 /
                             iso-8859-1 / iso-8859-15. Use for legacy
                             files with extended-ASCII descriptions.
+  --list-rules              print the AGS4 rule catalogue (title /
+                            severity / fixable / cited observations) and
+                            exit; add --json for the full machine form.
+                            No input file needed.
   --quiet                   suppress the progress spinner
   --tui                     interactive findings browser (needs the
                             `tui` build feature + an interactive terminal)
@@ -108,6 +131,18 @@ fn main() {
     let mut out_path: Option<PathBuf> = None;
     let mut json_out_path: Option<PathBuf> = None;
     let mut quiet = false;
+    // Headless fix (#198): --fix applies safe fixes, --fix-risky also the
+    // intent-guessing ones; the result lands at a sibling / in place / --fix-out.
+    let mut fix = false;
+    let mut fix_risky = false;
+    let mut in_place = false;
+    let mut fix_out: Option<PathBuf> = None;
+    // `--diff <other.ags>` (#204): compare the input file against <other> and
+    // print the KEY-aware/type-aware revision delta (--json for the full delta).
+    let mut diff_path: Option<PathBuf> = None;
+    // `--list-rules` (#197): informational, no input file — print the rule
+    // catalogue and exit (the `--json` flag selects machine-readable output).
+    let mut list_rules = false;
     // Only declared/used with the `tui` feature; without it, `--tui`
     // is an unknown option (exit 5) — guardrail G6.
     #[cfg(feature = "tui")]
@@ -137,6 +172,27 @@ fn main() {
                 }
             },
             "--quiet" => quiet = true,
+            "--list-rules" => list_rules = true,
+            "--fix" => fix = true,
+            "--fix-risky" => {
+                fix = true;
+                fix_risky = true;
+            }
+            "--in-place" => in_place = true,
+            "--fix-out" => match argv.next() {
+                Some(p) => fix_out = Some(PathBuf::from(p)),
+                None => {
+                    eprintln!("error: --fix-out expects a path");
+                    exit(5);
+                }
+            },
+            "--diff" => match argv.next() {
+                Some(p) => diff_path = Some(PathBuf::from(p)),
+                None => {
+                    eprintln!("error: --diff expects a path to the other file");
+                    exit(5);
+                }
+            },
             #[cfg(feature = "tui")]
             "--tui" => tui_requested = true,
             "--show-warnings" => opts.include_warnings = true,
@@ -194,6 +250,12 @@ fn main() {
         }
     }
 
+    // `--list-rules`: informational, input-independent — print the catalogue
+    // and exit (before the required-input-file check), like `--readme`.
+    if list_rules {
+        run_list_rules(json);
+    }
+
     let Some(path) = path else {
         eprintln!("error: no input file\n\n{USAGE}");
         exit(5);
@@ -201,6 +263,21 @@ fn main() {
 
     if json && ndjson {
         eprintln!("error: --json and --ndjson are mutually exclusive");
+        exit(5);
+    }
+
+    // `--diff <b>`: compare the input file against another and exit (never falls
+    // through to the validate-report below).
+    if let Some(other) = diff_path.as_deref() {
+        run_diff(&path, other, &opts, json, quiet);
+    }
+
+    // `--fix`: repair-and-write path. Runs the shared `fix_document` and exits;
+    // it never falls through to the validate-report below.
+    if fix {
+        run_fix(&path, &opts, fix_risky, in_place, fix_out.as_deref(), quiet);
+    } else if in_place || fix_out.is_some() {
+        eprintln!("error: --in-place / --fix-out only apply with --fix");
         exit(5);
     }
 
@@ -298,6 +375,202 @@ fn main() {
             });
         }
     }
+}
+
+/// `--fix`: mechanically repair the file via the validator's shared
+/// `fix_document`, write the result, print a terse summary, and exit. Safe
+/// fixes always; `risky` also applies the intent-guessing ones. Destination:
+/// the source itself (`in_place`), an explicit `fix_out`, or a sibling
+/// `<file>.fixed.ags`. Exit 0 if the repaired file is clean, 1 if findings
+/// remain that aren't mechanically fixable (3/4/5 on read/parse/dict errors).
+/// `--diff <b>`: the KEY-aware/type-aware revision delta between the input file
+/// (`a`, baseline) and `b` (the revision), via the shared `laterite-ags4-diff`
+/// leaf. `--json` emits the full `RevisionDelta`; otherwise a per-group summary.
+fn run_diff(a: &Path, b: &Path, opts: &CheckOptions, json: bool, quiet: bool) -> ! {
+    let spinner = Spinner::start("diffing...", quiet);
+    let read = |p: &Path| match std::fs::read(p) {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            eprintln!("error: {}: {e}", p.display());
+            exit(3);
+        }
+    };
+    let raw_a = read(a);
+    let raw_b = read(b);
+    let parse = |raw: &[u8], p: &Path| match parse_bytes(raw, opts.encoding) {
+        Ok(pf) => pf,
+        Err(e) => {
+            eprintln!("error: {}: {}", p.display(), ValidatorError::from(e));
+            exit(4);
+        }
+    };
+    let pa = parse(&raw_a, a);
+    let pb = parse(&raw_b, b);
+    drop(spinner);
+
+    // KEY headings come from the dictionary; pick the edition from the revision
+    // (b)'s TRAN_AGS (forced by --dict-version), falling back to the standard.
+    let dv = resolve_dict_version(opts.dict_version, tran_ags_of(&pb).as_deref())
+        .map(|(dv, _)| dv)
+        .unwrap_or(FALLBACK);
+    let dict = Dictionary::bundled(dv);
+    let delta = laterite_ags4_diff::diff_parsed(&pa, &pb, &dict, None);
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&delta).unwrap_or_default()
+        );
+    } else {
+        println!("{} → {}", a.display(), b.display());
+        for g in &delta.groups {
+            println!("  {:<6} +{} -{} ~{}", g.code, g.added, g.removed, g.changed);
+        }
+        if !delta.groups_added.is_empty() {
+            println!("  groups added:   {}", delta.groups_added.join(", "));
+        }
+        if !delta.groups_removed.is_empty() {
+            println!("  groups removed: {}", delta.groups_removed.join(", "));
+        }
+        println!(
+            "  total: +{} added · −{} removed · ~{} changed",
+            delta.total_added, delta.total_removed, delta.total_changed
+        );
+    }
+    exit(0);
+}
+
+fn run_fix(
+    path: &Path,
+    opts: &CheckOptions,
+    risky: bool,
+    in_place: bool,
+    fix_out: Option<&Path>,
+    quiet: bool,
+) -> ! {
+    if in_place && fix_out.is_some() {
+        eprintln!("error: --in-place and --fix-out are mutually exclusive");
+        exit(5);
+    }
+    let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("file");
+    let spinner = Spinner::start(&format!("fixing {name}..."), quiet);
+
+    let raw = match std::fs::read(path) {
+        Ok(b) => b,
+        Err(e) => {
+            drop(spinner);
+            eprintln!("error: {}: {e}", path.display());
+            exit(3);
+        }
+    };
+    let outcome = match fix_document(&raw, opts, risky) {
+        Ok(o) => o,
+        Err(e) => {
+            drop(spinner);
+            eprintln!("error: {e}");
+            exit(match e {
+                ValidatorError::NotFound(_) | ValidatorError::Io { .. } => 3,
+                ValidatorError::NotUtf8(_)
+                | ValidatorError::NotAgs4(_)
+                | ValidatorError::UnsupportedEdition { .. } => 4,
+                ValidatorError::BadDict { .. } => 5,
+            });
+        }
+    };
+    drop(spinner);
+
+    let dest = if in_place {
+        path.to_path_buf()
+    } else if let Some(o) = fix_out {
+        o.to_path_buf()
+    } else {
+        sibling_fixed_path(path)
+    };
+    if let Err(e) = write_atomic(&dest, &outcome.fixed) {
+        eprintln!("error: writing {}: {e}", dest.display());
+        exit(3);
+    }
+
+    // Distinct fix kinds (serde snake_case names) for a one-line summary.
+    let mut kinds: Vec<String> = outcome
+        .applied
+        .iter()
+        .filter_map(|f| {
+            serde_json::to_value(f.kind)
+                .ok()
+                .and_then(|v| v.as_str().map(String::from))
+        })
+        .collect();
+    kinds.sort();
+    kinds.dedup();
+    let n_applied = outcome.applied.len();
+    if n_applied == 0 {
+        println!("no fixes applicable → {}", dest.display());
+    } else {
+        println!(
+            "applied {n_applied} fix(es) [{}] → {}",
+            kinds.join(", "),
+            dest.display()
+        );
+    }
+    let n_residual = findings::count(&outcome.residual);
+    if n_residual == 0 {
+        println!("{}: clean (0 findings)", dest.display());
+        exit(0);
+    }
+    println!(
+        "{}: {n_residual} finding(s) remain (not mechanically fixable)",
+        dest.display()
+    );
+    exit(1);
+}
+
+/// `--list-rules`: print the AGS4 rule catalogue and exit. `--json` emits the
+/// raw gated `rules_meta.json` (compile-time-embedded — no disk, no validation
+/// run); otherwise a compact table. Input-independent (exits 0).
+fn run_list_rules(json: bool) -> ! {
+    let raw = laterite_ags4_validator::rule_metadata_json();
+    if json {
+        println!("{raw}");
+        exit(0);
+    }
+    let doc: Value = serde_json::from_str(raw).expect("rules_meta.json is gated to parse");
+    let rows: Vec<Vec<String>> = doc["rules"]
+        .as_array()
+        .map(|rs| {
+            rs.iter()
+                .map(|r| {
+                    let fixable = r["fixable"].as_bool().unwrap_or(false);
+                    vec![
+                        r["rule"].as_str().unwrap_or("").to_string(),
+                        r["title"].as_str().unwrap_or("").to_string(),
+                        r["severity"].as_str().unwrap_or("").to_string(),
+                        if fixable { "yes" } else { "" }.to_string(),
+                    ]
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    println!(
+        "{}",
+        styled_table(
+            &["Rule", "Title", "Severity", "Fix?"],
+            rows,
+            colour_enabled(false)
+        )
+    );
+    exit(0);
+}
+
+/// `delivery.ags` → `delivery.fixed.ags` (insert `.fixed` before the
+/// extension); an extension-less `foo` → `foo.fixed`.
+fn sibling_fixed_path(path: &Path) -> PathBuf {
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("out");
+    let fname = match path.extension().and_then(|s| s.to_str()) {
+        Some(ext) => format!("{stem}.fixed.{ext}"),
+        None => format!("{stem}.fixed"),
+    };
+    path.with_file_name(fname)
 }
 
 /// Findings flattened to one row per finding, in spec-rule order (the

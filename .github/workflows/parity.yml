@@ -11,6 +11,17 @@ name: parity
 
 on:
   workflow_dispatch:
+  # Per-PR regression gate (#190): only when something that can move the
+  # compat verdict changes, so doc-only PRs don't pay the GitLab-clone cost.
+  pull_request:
+    paths:
+      - 'rust-packages/laterite-ags4-validator/**'
+      - 'rust-packages/laterite-ags4-parse/**'
+      - 'rust-packages/laterite-ags4-core/**'
+      - 'rust-packages/laterite-py/**'
+      - 'packages/laterite/python/laterite/**'
+      - 'tools/run_python_ags4_tests.sh'
+      - '.github/workflows/parity.yml'
 
 env:
   CARGO_TERM_COLOR: always
@@ -26,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
@@ -60,15 +71,14 @@ jobs:
         run: uv sync --all-extras
 
       # uv sync installs the workspace packages editable but does NOT compile the
-      # PyO3 cdylibs (_laterite_native / _laterite_ags5_native). Without this the
-      # oracle's `import laterite.compat` fails with a missing-_laterite_native
+      # PyO3 cdylib (_laterite_native). Without this the oracle's
+      # `import laterite.compat` fails with a missing-_laterite_native
       # ImportError and pytest collects 0 tests → "0 passed" → false regression.
       # (Same step ci.yml's python job runs; parity was missing it — the broken
       # `git checkout v1.2.0` clone masked it until that was fixed.)
       - name: Build native extensions (maturin develop)
         run: |
-          (cd packages/laterite      && uv run --no-sync maturin develop --uv)
-          (cd packages/laterite-ags5 && uv run --no-sync maturin develop --uv)
+          (cd packages/laterite && uv run --no-sync maturin develop --uv)
 
       - name: Run python-ags4 parity oracle
         id: parity

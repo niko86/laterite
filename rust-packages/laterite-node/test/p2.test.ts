@@ -169,7 +169,7 @@ describe("buildAgs4 → data → AGS4", () => {
         ["PROJ", proj],
         ["LOCA", loca],
       ]),
-      { edition: "4.1.1", mode: "autofix" },
+      { dictVersion: "4.1.1", mode: "autofix" },
     );
     expect(Buffer.isBuffer(res.bytes)).toBe(true);
     expect(res.text).toMatch(/"GROUP","PROJ"/);
@@ -179,6 +179,17 @@ describe("buildAgs4 → data → AGS4", () => {
 
     // The emitted bytes re-parse to the same groups.
     expect(read(undefined, { text: res.text }).groups).toEqual(["PROJ", "LOCA"]);
+  });
+
+  it("accepts `edition` as a deprecated alias for `dictVersion`", () => {
+    const loca = tableFromArrays({
+      LOCA_ID: ["BH01"],
+      LOCA_GL: Float64Array.from([12.3]),
+    });
+    const res = buildAgs4(new Map<string, Table>([["LOCA", loca]]), {
+      edition: "4.2",
+    });
+    expect(res.text).toMatch(/"DATA","BH01","12\.30"/);
   });
 
   it("accepts row-objects (transposed to a typed Table)", () => {

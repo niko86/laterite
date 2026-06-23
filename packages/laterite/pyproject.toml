@@ -1,7 +1,7 @@
 [project]
 name = "laterite"
 version = "0.4.0"
-description = "Rust-backed AGS4 reader/writer/validator — a fast, drop-in replacement for python-ags4 with a narwhals-native API"
+description = "Rust-backed AGS4 reader/writer/validator — a fast, drop-in replacement for python-ags4 with born-typed polars/pandas reads (pyarrow-free)"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -15,7 +15,8 @@ keywords = [
     "parser",
     "rust",
     "polars",
-    "narwhals",
+    "pandas",
+    "duckdb",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -70,11 +71,11 @@ Changelog = "https://github.com/niko86/laterite/blob/main/CHANGELOG.md"
 compat = ["pandas<3"]
 pandas = ["pandas<3"]
 pyarrow = ["pyarrow>=24.0.0"]
-# Experimental DuckDB-backed .ags5db surface. Pulls in the laterite-ags5
-# companion wheel (~50 MB; bundles DuckDB). The base laterite wheel stays
-# light (~10 MB). Import via `from laterite.ags5db import …`.
-ags5 = ["laterite-ags5>=0.4.0"]
-all = ["pandas<3", "pyarrow>=24.0.0", "laterite-ags5>=0.4.0"]
+# The experimental DuckDB-backed `.ags5db` surface was decoupled from the
+# shipped AGS4 product (#177) — it now lives in the dormant `ags5/` holding
+# folder and is no longer installable as an extra. The future AGS5 strand
+# will publish it as a separate library.
+all = ["pandas<3", "pyarrow>=24.0.0"]
 
 [project.scripts]
 # Deliberately named `lat-check` (not `laterite`/`ags4`) so the command,

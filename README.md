@@ -8,7 +8,7 @@ A Rust-backed reader, writer and validator for the
 [AGS4](https://www.ags.org.uk/data-format/) geotechnical data format.
 A faster drop-in for [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library)'s
 `AGS4` module — swap `from python_ags4 import AGS4` for
-`from laterite import compat as AGS4` — with a narwhals-native API.
+`from laterite import compat as AGS4` — with a modern, born-typed polars API.
 
 [![ci](https://github.com/niko86/laterite/actions/workflows/ci.yml/badge.svg)](https://github.com/niko86/laterite/actions/workflows/ci.yml)
 [![rust cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=rust&label=rust%20cov)](https://codecov.io/gh/niko86/laterite)
@@ -26,15 +26,14 @@ One clean-room Rust AGS4 engine, surfaced for every stack:
 |---|---|---|
 | **Python** | [`laterite`](https://pypi.org/project/laterite/) — PyPI | `pip install laterite` |
 | **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm | `npm install laterite` |
-| **Rust / CLI** | [`lat-db` + `lat-check`](https://github.com/niko86/laterite/releases) | GitHub Releases |
+| **Rust / CLI** | [`lat-check`](https://github.com/niko86/laterite/releases) | GitHub Releases |
 | **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser |
 
 ## Install
 
 ```bash
-pip install laterite                  # base AGS4 (polars + narwhals)
+pip install laterite                  # base AGS4 (polars + duckdb)
 pip install "laterite[compat]"        # + pandas (python-ags4 drop-in)
-pip install "laterite[ags5]"          # + experimental .ags5db surface
 ```
 
 Requires Python ≥ 3.12.
@@ -110,10 +109,12 @@ Notes on the CLI:
   Python", use `laterite.validate`; for "validate then pipe to
   downstream tools", use `lat-check`. On clean files the gap is
   single-digit %.
-- Native PyO3 returns findings as a narwhals frame
-  (`rep.findings`) or as a Python dict (`rep.by_rule()`); both pay
-  ~0% extra over the bare validation pass — PyO3's `IntoPyObject`
-  is well-tuned for our `Finding` struct.
+- Native PyO3 returns findings as native Python objects (no Arrow
+  boundary — findings are few); `rep.findings` assembles them into a
+  polars frame and `rep.by_rule()` into a dict, both ~0% over the bare
+  validation pass (PyO3's `IntoPyObject` is well-tuned for our `Finding`
+  struct). The zero-copy Arrow capsule is the separate *data* read path
+  (`read()` / `ags[code]`), not this validation path.
 
 Both validators scale linearly: ~17 ns/byte for laterite, ~110
 ns/byte for python-ags4.

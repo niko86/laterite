@@ -116,6 +116,50 @@ export interface ValidationReport {
  */
 export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null): ValidationReport
 /**
+ * The AGS4 rule catalogue as the gated `rules_meta.json` — byte-identical to
+ * laterite-py's `list_rules()` and `lat-check --list-rules --json`. The TS
+ * layer parses it into typed `RuleMeta[]`. No input file.
+ */
+export declare function listRules(): string
+/**
+ * One applied fix — the Node mirror of laterite-py's `applied[]` entries.
+ * `kind`/`risk` are the serde snake_case strings (`strip_bom`, `safe`, …) so
+ * the shape is identical across Python / CLI / Node.
+ */
+export interface AppliedFix {
+  kind: string
+  label: string
+  rule: string
+  line?: number
+  risk: string
+}
+/**
+ * The repair report — the Node mirror of laterite-py's `fix_file` dict. `ok` is
+ * false only for un-fixable input (the TS layer raises then). `fixed` is the
+ * repaired bytes (the original verbatim when nothing applied); `residual` is
+ * what could *not* be mechanically fixed.
+ */
+export interface FixReport {
+  ok: boolean
+  errorKind?: string
+  error?: string
+  exitCode: number
+  fixed: Buffer
+  dictVersion: string
+  resolution: string
+  fixesApplied: number
+  applied: Array<AppliedFix>
+  residual: Array<Finding>
+}
+/**
+ * Mechanically repair an AGS4 file (`path`) / `text` / `data`: apply the SAFE
+ * fixes (plus the risky set when `includeRisky`), re-validate, and return the
+ * fixed bytes + residual findings. Mirrors laterite-py's `fix()` /
+ * `lat-check --fix`; the single `fix_document` orchestration is shared. The TS
+ * layer wraps this into a `FixResult` (`.bytes` / `.text` / `.save(path)`).
+ */
+export declare function fixFile(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, includeRisky?: boolean | undefined | null): FixReport
+/**
  * One group of columnar input — its code + an Arrow IPC stream (`Buffer`)
  * whose column names are the AGS headings.
  */

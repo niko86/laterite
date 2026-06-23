@@ -1,0 +1,11 @@
+"GROUP","PROJ"
+"HEADING","X_ID"
+"UNIT",""
+"TYPE","ID"
+"DATA","a
+b"
+"GROUP","TRAN"
+"HEADING","TRAN_RCON"
+"UNIT",""
+"TYPE","X"
+"DATA","1"

@@ -10,12 +10,14 @@
 //! Phase 2 adds `read()` → typed Arrow IPC for the DuckDB-wasm data
 //! explorer; this file is Phase 1 (validator) only.
 
-use laterite_ags4_validator::parse::{DataRow, ParsedFile, ParsedGroup, parse_bytes};
+// #168 Phase 3: parse types + tokenizer come straight from the leaf
+// (encoding_rs + memchr only — wasm-safe); the validator dep stays for rules.
+use laterite_ags4_parse::{ParsedFile, parse_bytes};
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, dict::Dictionary, dict::FALLBACK, findings,
     resolve_dict_version, rules, tran_ags_of,
 };
-use laterite_types::{parse_value, sql_type};
+use laterite_types::sql_type;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -150,17 +152,24 @@ fn resolve_encoding(label: Option<&str>) -> &'static encoding_rs::Encoding {
 /// returns `Err(message)` (the caller turns it into a `bad_args`
 /// report); we return the short message rather than the whole report so
 /// the `Err` variant stays small (clippy `result_large_err`).
+/// `"4.0.3|4.0.4|4.1|4.1.1|4.2"` for error messages — from the generated set.
+fn editions_pipe() -> String {
+    DictVersion::ALL
+        .iter()
+        .map(|v| v.as_str())
+        .collect::<Vec<_>>()
+        .join("|")
+}
+
 fn resolve_dict_override(s: Option<&str>) -> Result<Option<DictVersion>, String> {
     match s.map(str::trim) {
         None | Some("") | Some("auto") => Ok(None),
-        Some("4.0.3") => Ok(Some(DictVersion::V4_0_3)),
-        Some("4.0.4") => Ok(Some(DictVersion::V4_0_4)),
-        Some("4.1") => Ok(Some(DictVersion::V4_1)),
-        Some("4.1.1") => Ok(Some(DictVersion::V4_1_1)),
-        Some("4.2") => Ok(Some(DictVersion::V4_2)),
-        Some(other) => Err(format!(
-            "unknown dict_version {other:?}; expected auto|4.0.3|4.0.4|4.1|4.1.1|4.2"
-        )),
+        Some(other) => DictVersion::from_edition(other).map(Some).ok_or_else(|| {
+            format!(
+                "unknown dict_version {other:?}; expected auto|{}",
+                editions_pipe()
+            )
+        }),
     }
 }
 
@@ -203,15 +212,9 @@ struct BuildAgs4Report {
 
 fn emit_edition(s: Option<&str>) -> Result<DictVersion, String> {
     match s.map(str::trim) {
-        None | Some("") | Some("auto") => Ok(DictVersion::V4_1_1),
-        Some("4.0.3") => Ok(DictVersion::V4_0_3),
-        Some("4.0.4") => Ok(DictVersion::V4_0_4),
-        Some("4.1") => Ok(DictVersion::V4_1),
-        Some("4.1.1") => Ok(DictVersion::V4_1_1),
-        Some("4.2") => Ok(DictVersion::V4_2),
-        Some(other) => Err(format!(
-            "unknown edition {other:?}; expected 4.0.3|4.0.4|4.1|4.1.1|4.2"
-        )),
+        None | Some("") | Some("auto") => Ok(FALLBACK),
+        Some(other) => DictVersion::from_edition(other)
+            .ok_or_else(|| format!("unknown edition {other:?}; expected {}", editions_pipe())),
     }
 }
 
@@ -306,7 +309,7 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
 /// * `groups_json` — a JSON array of `{ code, headings, units?, types?, rows }`
 ///   (each row an array of cell values). The headings are the AGS headings;
 ///   UNIT/TYPE fill from the chosen edition's dictionary where omitted.
-/// * `edition` — `None`/`"auto"` → `4.1.1`, or `4.0.3|4.0.4|4.1|4.1.1|4.2`.
+/// * `dict_version` — `None`/`"auto"` → `4.1.1`, or `4.0.3|4.0.4|4.1|4.1.1|4.2`.
 /// * `mode` — `None`/`"autofix"` (default) | `"report"` | `"strict"`.
 ///
 /// Returns `{ text, findings, fixes_applied }`; `text` is the AGS4 document
@@ -314,11 +317,11 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
 #[wasm_bindgen]
 pub fn build_ags4(
     groups_json: &str,
-    edition: Option<String>,
+    dict_version: Option<String>,
     mode: Option<String>,
 ) -> Result<JsValue, JsError> {
     console_error_panic_hook::set_once();
-    let report = build_ags4_from_json(groups_json, edition.as_deref(), mode.as_deref())
+    let report = build_ags4_from_json(groups_json, dict_version.as_deref(), mode.as_deref())
         .map_err(|e| JsError::new(&e))?;
     serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
 }
@@ -330,14 +333,14 @@ pub fn build_ags4(
 /// * `groups` — a JS array of `{ code: string, ipc: Uint8Array }`, each `ipc`
 ///   an Arrow **IPC stream** for one group (its schema's field names are the
 ///   AGS headings). Order is preserved (put `PROJ` first).
-/// * `edition` / `mode` — as [`build_ags4`].
+/// * `dict_version` / `mode` — as [`build_ags4`].
 ///
 /// Returns the same `{ text, findings, fixes_applied }`. The Arrow→AGS
 /// transpose is the read path's IPC reversed.
 #[wasm_bindgen]
 pub fn build_ags4_ipc(
     groups: JsValue,
-    edition: Option<String>,
+    dict_version: Option<String>,
     mode: Option<String>,
 ) -> Result<JsValue, JsError> {
     use wasm_bindgen::JsCast;
@@ -357,8 +360,8 @@ pub fn build_ags4_ipc(
             .to_vec();
         inputs.push(group_from_ipc(code, &ipc).map_err(|e| JsError::new(&e))?);
     }
-    let report =
-        emit_report(inputs, edition.as_deref(), mode.as_deref()).map_err(|e| JsError::new(&e))?;
+    let report = emit_report(inputs, dict_version.as_deref(), mode.as_deref())
+        .map_err(|e| JsError::new(&e))?;
     serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
 }
 
@@ -476,6 +479,7 @@ mod build_ags4_tests {
 /// * `data` — the file bytes (from a `FileReader`/textarea, never uploaded).
 /// * `dict_version` — `None`/`"auto"` to detect from `TRAN_AGS`, or a
 ///   forced edition string.
+/// * `include_warnings` — surface WARNING-severity findings (e.g. Rule 18).
 /// * `include_fyi` — surface FYI-severity findings (e.g. Rule 1 FYI).
 /// * `encoding_label` — `None`/`"utf-8"` or `"windows-1252"` for legacy files.
 /// * `max_per_rule` — cap on how many findings per rule are **serialized**
@@ -492,6 +496,7 @@ mod build_ags4_tests {
 pub fn validate(
     data: &[u8],
     dict_version: Option<String>,
+    include_warnings: bool,
     include_fyi: bool,
     encoding_label: Option<String>,
     max_per_rule: Option<u32>,
@@ -501,6 +506,7 @@ pub fn validate(
     let report = run(
         data,
         dict_version.as_deref(),
+        include_warnings,
         include_fyi,
         encoding_label.as_deref(),
         max_per_rule.map(|c| c as usize),
@@ -513,9 +519,18 @@ pub fn validate(
         .expect("ValidationReport is plain data and always serialises")
 }
 
+/// The AGS4 rule catalogue as the gated `rules_meta.json` JSON string — the
+/// browser parses it into typed rule entries. Mirrors `laterite.list_rules()` /
+/// `lat-check --list-rules`. No input.
+#[wasm_bindgen]
+pub fn list_rules() -> String {
+    laterite_ags4_validator::rule_metadata_json().to_string()
+}
+
 fn run(
     data: &[u8],
     dict_version: Option<&str>,
+    include_warnings: bool,
     include_fyi: bool,
     encoding_label: Option<&str>,
     max_per_rule: Option<usize>,
@@ -529,7 +544,9 @@ fn run(
     let parsed = match parse_bytes(data, encoding) {
         Ok(p) => p,
         Err(e) => {
-            let (kind, message) = classify(&e);
+            // #168 Phase 3: convert the leaf's ParseError via the validator's
+            // `From` bridge so `classify` (and the surfaced text) is unchanged.
+            let (kind, message) = classify(&ValidatorError::from(e));
             return ValidationReport::failure(kind, message);
         }
     };
@@ -545,6 +562,7 @@ fn run(
     let dict = Dictionary::bundled(dv);
     let opts = CheckOptions {
         dict_version: dict_over,
+        include_warnings,
         include_fyi,
         encoding,
         ..CheckOptions::default()
@@ -612,17 +630,14 @@ fn run(
                             findings::Target::Cell => Some("cell".to_string()),
                             findings::Target::Group => Some("group".to_string()),
                         };
-                        // severity always emitted as the lowercase token —
-                        // harmless (TS treats it optional) and lets the UI
-                        // pick the row-band colour without inferring a default.
-                        let severity = Some(
-                            match f.severity {
-                                findings::Severity::Error => "error",
-                                findings::Severity::Warning => "warning",
-                                findings::Severity::Fyi => "fyi",
-                            }
-                            .to_string(),
-                        );
+                        // severity emitted as the lowercase token — taken from
+                        // `Severity`'s own serde rename (the ONE source) rather
+                        // than re-spelling error/warning/fyi here. Harmless that
+                        // it's optional (TS treats it so) and lets the UI pick
+                        // the row-band colour without inferring a default.
+                        let severity = serde_json::to_value(f.severity)
+                            .ok()
+                            .and_then(|v| v.as_str().map(str::to_string));
                         // Span precedence: a finding-carried span (Rules 1/6)
                         // wins; otherwise, for a field-targeted finding,
                         // compute the inner-value span from the raw line so
@@ -630,8 +645,7 @@ fn run(
                         let char_span = f.location.char_span.map(|(s, e)| [s, e]).or_else(|| {
                             let fi = f.location.field_index?;
                             let line = raw_line(f.line)?;
-                            laterite_ags4_validator::parse::field_span(line, fi)
-                                .map(|(s, e)| [s, e])
+                            laterite_ags4_parse::field_span(line, fi).map(|(s, e)| [s, e])
                         });
                         FindingDto {
                             line: f.line,
@@ -840,292 +854,9 @@ impl ParsedDataset {
 pub fn read(data: &[u8], encoding_label: Option<String>) -> Result<ParsedDataset, JsError> {
     console_error_panic_hook::set_once();
     let encoding = resolve_encoding(encoding_label.as_deref());
-    let parsed = parse_bytes(data, encoding).map_err(|e| JsError::new(&e.to_string()))?;
+    let parsed = parse_bytes(data, encoding)
+        .map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
     Ok(ParsedDataset { parsed })
-}
-
-// --- Revision diff (Tools tab) ----------------------------------------------
-//
-// A KEY-aware, type-aware comparison of two AGS4 files (a baseline `a` and a
-// revision `b`). Rows within a group are matched by the group's *dictionary*
-// KEY headings, not by line order — so a re-sorted or re-numbered file still
-// pairs the same boreholes/samples. Matched cells are compared through
-// `laterite_types::parse_value`, so a formatting-only change ("1.0" → "1.00",
-// trailing whitespace, an equivalent datetime spelling) is NOT reported —
-// only a genuine typed change is. This is the engine-consistent diff the
-// JS-side line diff (PR-8) can't be: it understands the data model.
-//
-// Fallback: a group with no dictionary KEY headings present in both files
-// (a custom/passthrough group) is matched on its whole row tuple, so a
-// changed row there shows as a remove + add pair (and `keyed` is false).
-
-/// One changed cell of a matched row.
-#[derive(Serialize)]
-struct CellDelta {
-    heading: String,
-    #[serde(rename = "type")]
-    ags_type: String,
-    /// raw value in the baseline / revision (`null` if the row is shorter
-    /// than the heading list on that side).
-    a: Option<String>,
-    b: Option<String>,
-}
-
-/// One row's verdict: added (only in `b`), removed (only in `a`), or changed
-/// (matched by KEY, ≥1 cell differs).
-#[derive(Serialize)]
-struct RowDelta {
-    kind: &'static str,
-    /// the KEY values (or whole-row tuple, when unkeyed) identifying the row.
-    key: Vec<String>,
-    line_a: Option<u32>,
-    line_b: Option<u32>,
-    /// changed cells — populated only for `kind == "changed"`.
-    cells: Vec<CellDelta>,
-}
-
-#[derive(Serialize)]
-struct GroupDelta {
-    code: String,
-    /// true totals (independent of any `rows` cap).
-    added: usize,
-    removed: usize,
-    changed: usize,
-    /// headings present only in `b` / only in `a` (structural change).
-    headings_added: Vec<String>,
-    headings_removed: Vec<String>,
-    /// false ⇒ matched on whole-row tuple (no dictionary KEY headings).
-    keyed: bool,
-    /// the KEY heading names used to match rows + label them.
-    key_headings: Vec<String>,
-    /// the per-row deltas (capped by `max_rows_per_group`).
-    rows: Vec<RowDelta>,
-}
-
-#[derive(Serialize)]
-struct RevisionDelta {
-    /// groups with ≥1 row/heading change, in `b`'s file order then `a`-only.
-    groups: Vec<GroupDelta>,
-    groups_added: Vec<String>,
-    groups_removed: Vec<String>,
-    total_added: usize,
-    total_removed: usize,
-    total_changed: usize,
-}
-
-/// heading name → column index, for O(1) cell lookup by name on each side.
-fn heading_index(headings: &[String]) -> std::collections::HashMap<&str, usize> {
-    headings
-        .iter()
-        .enumerate()
-        .map(|(i, h)| (h.as_str(), i))
-        .collect()
-}
-
-/// Composite match-key for a row: the KEY-heading cell values (keyed), else
-/// the whole row tuple (unkeyed fallback).
-fn row_key(
-    row: &DataRow,
-    idx: &std::collections::HashMap<&str, usize>,
-    key_headings: &[String],
-    keyed: bool,
-) -> Vec<String> {
-    if keyed {
-        key_headings
-            .iter()
-            .map(|h| {
-                idx.get(h.as_str())
-                    .and_then(|&i| row.values.get(i))
-                    .cloned()
-                    .unwrap_or_default()
-            })
-            .collect()
-    } else {
-        row.values.clone()
-    }
-}
-
-/// Cells of a matched row that genuinely differ. A cell counts as changed
-/// only when its raw values differ AND they don't canonicalise to the same
-/// non-null typed value (so "1.0"/"1.00" is suppressed). Compared over the
-/// headings common to both files; structural heading adds/removes are
-/// reported at the group level instead.
-#[allow(clippy::too_many_arguments)]
-fn changed_cells(
-    code: &str,
-    common: &[String],
-    row_a: &DataRow,
-    idx_a: &std::collections::HashMap<&str, usize>,
-    types_a: &[String],
-    row_b: &DataRow,
-    idx_b: &std::collections::HashMap<&str, usize>,
-    types_b: &[String],
-    dict: &Dictionary,
-) -> Vec<CellDelta> {
-    let mut out = Vec::new();
-    for h in common {
-        let a = idx_a
-            .get(h.as_str())
-            .and_then(|&i| row_a.values.get(i))
-            .map(String::as_str);
-        let b = idx_b
-            .get(h.as_str())
-            .and_then(|&i| row_b.values.get(i))
-            .map(String::as_str);
-        // AGS type: the revision's file TYPE row first, then the baseline's,
-        // then the dictionary, then opaque string ("X") — so the typed
-        // comparison uses the most authoritative declared type.
-        let ty = idx_b
-            .get(h.as_str())
-            .and_then(|&i| types_b.get(i))
-            .map(String::as_str)
-            .or_else(|| {
-                idx_a
-                    .get(h.as_str())
-                    .and_then(|&i| types_a.get(i))
-                    .map(String::as_str)
-            })
-            .or_else(|| dict.heading(code, h).map(|e| e.ags_type))
-            .unwrap_or("X");
-        let va = parse_value(a, ty);
-        let vb = parse_value(b, ty);
-        let typed_equal = !va.is_null() && va == vb;
-        if a != b && !typed_equal {
-            out.push(CellDelta {
-                heading: h.clone(),
-                ags_type: ty.to_string(),
-                a: a.map(str::to_string),
-                b: b.map(str::to_string),
-            });
-        }
-    }
-    out
-}
-
-fn diff_group(
-    code: &str,
-    ga: &ParsedGroup,
-    gb: &ParsedGroup,
-    dict: &Dictionary,
-    cap: Option<usize>,
-) -> GroupDelta {
-    let set_a: std::collections::BTreeSet<&str> = ga.headings.iter().map(String::as_str).collect();
-    let set_b: std::collections::BTreeSet<&str> = gb.headings.iter().map(String::as_str).collect();
-    let headings_added: Vec<String> = gb
-        .headings
-        .iter()
-        .filter(|h| !set_a.contains(h.as_str()))
-        .cloned()
-        .collect();
-    let headings_removed: Vec<String> = ga
-        .headings
-        .iter()
-        .filter(|h| !set_b.contains(h.as_str()))
-        .cloned()
-        .collect();
-    let common: Vec<String> = gb
-        .headings
-        .iter()
-        .filter(|h| set_a.contains(h.as_str()))
-        .cloned()
-        .collect();
-
-    // KEY headings that exist on BOTH sides (so they can index either row).
-    let key_headings: Vec<String> = dict
-        .group_headings(code)
-        .iter()
-        .filter(|h| {
-            dict.heading(code, h)
-                .is_some_and(|e| e.status.contains("KEY"))
-        })
-        .filter(|h| set_a.contains(**h) && set_b.contains(**h))
-        .map(|h| h.to_string())
-        .collect();
-    let keyed = !key_headings.is_empty();
-
-    let idx_a = heading_index(&ga.headings);
-    let idx_b = heading_index(&gb.headings);
-
-    // Index B rows by key → queue of row indices (a queue pairs duplicate
-    // keys in file order rather than collapsing them).
-    let mut b_by_key: std::collections::HashMap<Vec<String>, std::collections::VecDeque<usize>> =
-        std::collections::HashMap::new();
-    for (i, row) in gb.rows.iter().enumerate() {
-        b_by_key
-            .entry(row_key(row, &idx_b, &key_headings, keyed))
-            .or_default()
-            .push_back(i);
-    }
-
-    let mut rows: Vec<RowDelta> = Vec::new();
-    let mut added = 0usize;
-    let mut removed = 0usize;
-    let mut changed = 0usize;
-    let mut matched_b = vec![false; gb.rows.len()];
-    let under_cap = |rows: &Vec<RowDelta>| cap.is_none_or(|c| rows.len() < c);
-
-    for row_a in &ga.rows {
-        let k = row_key(row_a, &idx_a, &key_headings, keyed);
-        match b_by_key.get_mut(&k).and_then(|q| q.pop_front()) {
-            Some(bi) => {
-                matched_b[bi] = true;
-                let row_b = &gb.rows[bi];
-                let cells = changed_cells(
-                    code, &common, row_a, &idx_a, &ga.types, row_b, &idx_b, &gb.types, dict,
-                );
-                if !cells.is_empty() {
-                    changed += 1;
-                    if under_cap(&rows) {
-                        rows.push(RowDelta {
-                            kind: "changed",
-                            key: k,
-                            line_a: Some(row_a.line),
-                            line_b: Some(row_b.line),
-                            cells,
-                        });
-                    }
-                }
-            }
-            None => {
-                removed += 1;
-                if under_cap(&rows) {
-                    rows.push(RowDelta {
-                        kind: "removed",
-                        key: k,
-                        line_a: Some(row_a.line),
-                        line_b: None,
-                        cells: Vec::new(),
-                    });
-                }
-            }
-        }
-    }
-    for (i, row_b) in gb.rows.iter().enumerate() {
-        if !matched_b[i] {
-            added += 1;
-            if under_cap(&rows) {
-                rows.push(RowDelta {
-                    kind: "added",
-                    key: row_key(row_b, &idx_b, &key_headings, keyed),
-                    line_a: None,
-                    line_b: Some(row_b.line),
-                    cells: Vec::new(),
-                });
-            }
-        }
-    }
-
-    GroupDelta {
-        code: code.to_string(),
-        added,
-        removed,
-        changed,
-        headings_added,
-        headings_removed,
-        keyed,
-        key_headings,
-        rows,
-    }
 }
 
 /// Compare two AGS4 files. `max_rows_per_group` caps how many per-row deltas
@@ -1140,8 +871,10 @@ pub fn diff(
 ) -> Result<JsValue, JsError> {
     console_error_panic_hook::set_once();
     let encoding = resolve_encoding(encoding_label.as_deref());
-    let pa = parse_bytes(a, encoding).map_err(|e| JsError::new(&e.to_string()))?;
-    let pb = parse_bytes(b, encoding).map_err(|e| JsError::new(&e.to_string()))?;
+    let pa =
+        parse_bytes(a, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
+    let pb =
+        parse_bytes(b, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
 
     // KEY headings come from the dictionary; pick the edition from the
     // revision's TRAN_AGS (the "new" file), falling back to the standard.
@@ -1151,47 +884,10 @@ pub fn diff(
     let dict = Dictionary::bundled(dv);
     let cap = max_rows_per_group.map(|c| c as usize);
 
-    // Union of group codes: B's file order, then groups only in A.
-    let mut codes: Vec<String> = pb.group_order.clone();
-    for c in &pa.group_order {
-        if !pb.groups.contains_key(c) {
-            codes.push(c.clone());
-        }
-    }
-
-    let mut groups: Vec<GroupDelta> = Vec::new();
-    let mut groups_added: Vec<String> = Vec::new();
-    let mut groups_removed: Vec<String> = Vec::new();
-    let (mut total_added, mut total_removed, mut total_changed) = (0usize, 0usize, 0usize);
-
-    for code in &codes {
-        match (pa.groups.get(code), pb.groups.get(code)) {
-            (None, Some(_)) => groups_added.push(code.clone()),
-            (Some(_), None) => groups_removed.push(code.clone()),
-            (Some(ga), Some(gb)) => {
-                let d = diff_group(code, ga, gb, &dict, cap);
-                total_added += d.added;
-                total_removed += d.removed;
-                total_changed += d.changed;
-                if d.added + d.removed + d.changed > 0
-                    || !d.headings_added.is_empty()
-                    || !d.headings_removed.is_empty()
-                {
-                    groups.push(d);
-                }
-            }
-            (None, None) => {}
-        }
-    }
-
-    let delta = RevisionDelta {
-        groups,
-        groups_added,
-        groups_removed,
-        total_added,
-        total_removed,
-        total_changed,
-    };
+    // The KEY-aware/type-aware comparison itself lives in the shared
+    // laterite-ags4-diff leaf (so PyO3 + the CLI reuse it); this wrapper only
+    // parses, resolves the dictionary, and serialises the result to JS.
+    let delta = laterite_ags4_diff::diff_parsed(&pa, &pb, &dict, cap);
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();
     delta
         .serialize(&serializer)
@@ -1236,15 +932,15 @@ struct DictDto {
     groups: Vec<DictGroupDto>,
 }
 
-/// Serialise the bundled standard dictionary for `edition_label`
+/// Serialise the bundled standard dictionary for `dict_version`
 /// (`None`/`"auto"` → the [`FALLBACK`] edition; else `4.0.3|4.0.4|4.1|4.1.1|
 /// 4.2`). Groups are sorted by code; each group's headings keep the canonical
 /// dictionary order. Returns the web reference UI's `{ags_edition, groups:[…]}`
 /// shape.
 #[wasm_bindgen]
-pub fn dictionary(edition_label: Option<String>) -> Result<JsValue, JsError> {
+pub fn dictionary(dict_version: Option<String>) -> Result<JsValue, JsError> {
     console_error_panic_hook::set_once();
-    let version = resolve_dict_override(edition_label.as_deref())
+    let version = resolve_dict_override(dict_version.as_deref())
         .map_err(|e| JsError::new(&e))?
         .unwrap_or(FALLBACK);
     let d = Dictionary::bundled(version);
@@ -1449,76 +1145,6 @@ mod tests {
         let a = arr.as_any().downcast_ref::<Float64Array>().unwrap();
         assert_eq!(a.len(), 1);
         assert!(a.is_null(0));
-    }
-
-    // --- revision diff -----------------------------------------------------
-
-    #[test]
-    fn diff_group_is_key_aware_and_type_aware() {
-        // Baseline: BH01..BH03. Revision: BH01 unchanged-but-reformatted
-        // (523145.67 -> 523145.670), BH02 a real value change, BH03 removed,
-        // BH04 added. Matched by the dictionary KEY heading LOCA_ID, NOT by
-        // row order.
-        let a = b"\"GROUP\",\"LOCA\"\r\n\
-\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
-\"UNIT\",\"\",\"m\"\r\n\
-\"TYPE\",\"ID\",\"2DP\"\r\n\
-\"DATA\",\"BH01\",\"523145.67\"\r\n\
-\"DATA\",\"BH02\",\"523200.00\"\r\n\
-\"DATA\",\"BH03\",\"523300.00\"\r\n";
-        let b = b"\"GROUP\",\"LOCA\"\r\n\
-\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
-\"UNIT\",\"\",\"m\"\r\n\
-\"TYPE\",\"ID\",\"2DP\"\r\n\
-\"DATA\",\"BH02\",\"523200.50\"\r\n\
-\"DATA\",\"BH01\",\"523145.670\"\r\n\
-\"DATA\",\"BH04\",\"523400.00\"\r\n";
-        let pa = parse_bytes(a, encoding_rs::UTF_8).unwrap();
-        let pb = parse_bytes(b, encoding_rs::UTF_8).unwrap();
-        let dict = Dictionary::bundled(DictVersion::V4_1_1);
-        let d = diff_group("LOCA", &pa.groups["LOCA"], &pb.groups["LOCA"], &dict, None);
-
-        assert!(d.keyed, "LOCA_ID is a dictionary KEY heading");
-        assert_eq!(d.key_headings, vec!["LOCA_ID".to_string()]);
-        assert_eq!(d.added, 1, "BH04 added");
-        assert_eq!(d.removed, 1, "BH03 removed");
-        assert_eq!(
-            d.changed, 1,
-            "only BH02 — BH01's 523145.67 -> 523145.670 is a 2DP no-op"
-        );
-
-        let changed: Vec<_> = d.rows.iter().filter(|r| r.kind == "changed").collect();
-        assert_eq!(changed.len(), 1);
-        assert_eq!(changed[0].key, vec!["BH02".to_string()]);
-        assert_eq!(changed[0].cells.len(), 1);
-        assert_eq!(changed[0].cells[0].heading, "LOCA_NATE");
-        assert_eq!(changed[0].cells[0].a.as_deref(), Some("523200.00"));
-        assert_eq!(changed[0].cells[0].b.as_deref(), Some("523200.50"));
-    }
-
-    #[test]
-    fn diff_group_unkeyed_falls_back_to_whole_row() {
-        // A custom group with no dictionary KEY headings: a changed row can't
-        // be paired, so it shows as a remove + add (keyed = false).
-        let a = b"\"GROUP\",\"ZZZZ\"\r\n\
-\"HEADING\",\"ZZZZ_A\",\"ZZZZ_B\"\r\n\
-\"UNIT\",\"\",\"\"\r\n\
-\"TYPE\",\"X\",\"X\"\r\n\
-\"DATA\",\"p\",\"q\"\r\n";
-        let b = b"\"GROUP\",\"ZZZZ\"\r\n\
-\"HEADING\",\"ZZZZ_A\",\"ZZZZ_B\"\r\n\
-\"UNIT\",\"\",\"\"\r\n\
-\"TYPE\",\"X\",\"X\"\r\n\
-\"DATA\",\"p\",\"r\"\r\n";
-        let pa = parse_bytes(a, encoding_rs::UTF_8).unwrap();
-        let pb = parse_bytes(b, encoding_rs::UTF_8).unwrap();
-        let dict = Dictionary::bundled(DictVersion::V4_1_1);
-        let d = diff_group("ZZZZ", &pa.groups["ZZZZ"], &pb.groups["ZZZZ"], &dict, None);
-
-        assert!(!d.keyed);
-        assert_eq!(d.changed, 0);
-        assert_eq!(d.added, 1);
-        assert_eq!(d.removed, 1);
     }
 
     // --- encoding resolution + transcode (the cp1252/UTF-8 path) ---

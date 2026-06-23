@@ -1048,6 +1048,199 @@ divergence (not a defect) · **[NOTE]** behavioural observation.
 
 ---
 
+### O-40 [NOTE] The `.ags.idx` byte index records true GROUP line-starts (the csv reader's record positions were off-by-one for CRLF, and absorbed leading blanks)
+- **Observed**: the byte-offset index in the `.ags.idx` certificate
+  recorded each `"GROUP",…` section's start from the `csv` crate's
+  `StringRecord::position().byte()`. That offset is the byte where the
+  reader *enters* a record, which for a CRLF-terminated previous line is
+  the preceding `\n` — one byte before the GROUP record's true
+  line-start. It also absorbs leading blank lines, reporting the first
+  GROUP at byte 0 instead of after the blanks. The independent,
+  hand-computed `byte_offset_ground_truth.rs` oracle pins both:
+  `two_group_crlf` TRAN true=70 / csv=69; `leading_blank` PROJ true=2 /
+  csv=0. LF / BOM / quoted-embedded-newline files already matched.
+- **Spec**: the `.ags.idx` sidecar is *our* format, not AGS-specced — but
+  Rule 2a mandates CRLF terminators, so the off-by-one was the **common
+  real-world case**, not an edge. The loose offsets were still *valid*
+  certs: a slice taken at the csv offset keeps a harmless leading
+  `\n`/blank that the reparse skips, which is exactly why the
+  `slice_parity` consistency tests never caught the looseness.
+- **Assessment**: a cert should record where a group's bytes *actually*
+  start, so a sliced read or a remote ranged-GET lands precisely on the
+  `"GROUP"` record. The shared parse leaf (`laterite_ags4_parse`, #168)
+  already emits a source-true `group_byte` from its one-pass byte walk;
+  sourcing the index from it removes the divergence by construction.
+- **Upstream-reportable**: none — this is `csv`-crate record-position
+  semantics plus our own cert format, not an AGS4-spec or python-ags4
+  matter.
+- **Our decision** (#168 Phase 4): `index_ags4_bytes` now sources GROUP
+  offsets from the parse leaf's source-true byte walk instead of the csv
+  reader. The `.ags.idx` format stays **locked at v1** — only the offset
+  *values* tighten; the structure is unchanged, so existing certs still
+  deserialize and reparse (their loose offsets remain usable via the
+  leading-byte tolerance; a re-mint produces tight offsets). The oracle
+  now asserts byte-identity to ground truth for **all** fixtures, and the
+  two `csv_index_is_loose_for_*` snapshots were retired with the
+  csv-based index they documented. First concrete csv-removal step in
+  core (Phase 5 retires `ags4_codec`'s read path; Phase 7 drops the dep).
+
+### O-41 [VARIANCE] Rows before the first GROUP are REPORTED as Rule 2 findings, not a hard parser crash
+- **Observed**: a HEADING / UNIT / TYPE / DATA row that appears
+  before any GROUP row is structurally invalid — it belongs to no
+  group. The question is what a validator should DO with it.
+- **python-ags4** (`AGS4.py`): its PARSER hard-fails. A pre-GROUP HEADING
+  raises `AGS4Error('HEADER row in Line N is not associated with a
+  GROUP …')`; a pre-GROUP DATA/UNIT/TYPE raises a `KeyError` on
+  `headings[group]` (group is `None`). Because the parser raises,
+  `check.py` never runs — the user gets a traceback and NO findings
+  report for the file at all.
+- **Us** (#189): the shared parse leaf is deliberately LENIENT — it
+  drops the orphan row (so the rule engine still runs over the rest of
+  the file). `rules/structure.rs::rule_2_orphan_rows` then REPORTS each
+  orphan as an `AGS Format Rule 2` error finding, line-located, and the
+  remaining groups validate normally. (The sibling case — a code-less
+  `"GROUP"` row — is already a Rule 4 finding.)
+- **Assessment**: reporting beats crashing. Laterite produces a COMPLETE
+  findings report that *includes* the structural defect, where
+  python-ags4 aborts on the first one and reports nothing. Same
+  philosophy as O-32 (invalid UTF-8 → lossy decode + a Rule 1 finding,
+  not a crash). Rule 2 is the attribution — the row belongs to no
+  GROUP, which is Rule 2's domain (data is organised into GROUPs).
+- **Upstream-reportable**: **[NOTE]** — python-ags4 could downgrade these parser
+  hard-fails to `check.py` findings for a more useful report, but it's
+  a design-philosophy difference, not a defect; not filing.
+- **Our decision** (#168 Phase-5 follow-up): added `rule_2_orphan_rows`
+  (walks `raw_lines` up to the first GROUP — one comparison for a
+  well-formed file). python-ags4 parity is UNCHANGED at 122/9 (no
+  parity-test file carries a pre-GROUP row). The core *reader* path
+  (`ags4_codec`, opt-in strict — Phase 5) hard-fails on the same case
+  instead, because a data reader is a different consumer than a
+  validator.
+
+### O-42 [VARIANCE] TRAN_AGS="4.0" resolves to 4.0.4 (superset-safe), with a content guard; python's static "4.0"→4.0.3 over-reports Rule 10c
+- **Observed**: `TRAN_AGS="4.0"` is ambiguous — there were two 4.0
+  dictionary releases. 4.0.4 is a STRICT SUPERSET of 4.0.3: identical 124
+  groups, ZERO headings removed, 8 headings added (`GCHM_DLM`, `GCHM_RTXT`,
+  `LOCA_NATD`, `LOCA_ORCO`, `LOCA_ORID`, `LOCA_ORJO`, `RDEN_IDEN`,
+  `SAMP_RECL`), and exactly ONE other delta — PMTL's parent is `PMTD` in
+  4.0.3, `PMTG` in 4.0.4+. PMTL's columns are byte-identical across both.
+- **python-ags4** (`check.py::pick_standard_dictionary`): a static table maps the
+  string `"4.0"` → the *4.0.3* dictionary (the older patch; anything not in
+  the table → 4.1.1). So a `"4.0"` file is judged against 4.0.3 — its PMTL is
+  checked against PMTD and its heading set is 4.0.3's.
+- **Us** (`resolve_dict_version` + `guard_4_0_4`): `"4.0"`/bare `"4"` →
+  4.0.4 (newest bundled 4.0 patch, O-30). Because 4.0.4 ⊇ 4.0.3 this never
+  false-flags the 8 newer headings. A content guard additionally upgrades an
+  exact `"4.0.3"` to 4.0.4 when the file uses any of the 8 4.0.4-only
+  headings — the one deterministic edition signal — and emits a transparency
+  FYI naming the heading. An explicit `--dict-version` (Forced) is never
+  overridden.
+- **Assessment**: 4.0.4 is the low-false-positive default and, for a real corpus
+  file, demonstrably correct: that file declares `"4.0"`, USES 4.0.4-only
+  headings (so it is ≥4.0.4) and its PMTL `PMTD_SEQ` (the 4.0.3 chain key) is
+  blank in all rows (not using the PMTD chain). python's 4.0.3 read forces
+  PMTL→PMTD and reports 150 Rule 10c orphans that are FALSE POSITIVES. Our
+  Rule 10c + dictionary are correct: forcing `--dict-version 4.0.3`
+  reproduces python's 150 exactly; 4.0.4/auto report 0. The editions are
+  content-indistinguishable EXCEPT those 8 headings, so no signal can prove a
+  no-heading file is 4.0.3 — the superset (4.0.4) is the only safe default.
+- **Upstream-reportable**: **[YES]** — python-ags4's static `"4.0"→4.0.3` alias is stale
+  (never bumped when 4.0.4 shipped): it over-reports Rule 10c via the
+  PMTL→PMTD hierarchy and would mis-flag the 8 4.0.4 headings as non-standard
+  on 4.0.4 files tagged `"4.0"`. Candidate upstream report.
+- **Our decision** (#191/#222): KEEP `"4.0"→4.0.4` (O-30) — confirmed correct, no
+  dictionary change. Added `guard_4_0_4` (`validator/src/lib.rs`): a 4.0-line
+  auto-resolution lands on 4.0.4 when the file uses a 4.0.4-only heading, with
+  an FYI when it overrides a declared `"4.0.3"`. PMTL is the ONLY group with
+  an edition-varying parent, so the residual blast radius is one group on a
+  `"4.0.3"`-exact file carrying no 4.0.4 heading — undetectable by design,
+  accepted. compat↔python parity on the real corpus is 800/801 (the lone
+  divergence is this file; laterite avoids the 150 phantom orphans).
+  - **Reported**: laterite#222 (2026-06-22).
+
+## Post-V8 — laterite-originated checks (no python-ags4 equivalent)
+
+### O-43 [VARIANCE] A self-declared but non-standard PA abbreviation is a laterite-originated FYI (Related to Rule 16); python-ags4 has no such check
+- **Observed**: AGS Rule 16 requires every value in a `PA`-typed field to be
+  defined in the file's ABBR group. A file can SATISFY that by self-declaring
+  a code in ABBR that is not in the standard abbreviation picklist for its
+  heading — a typo (`SAMP_TYPE="Borng"` for `"Boring"`) or an invented code
+  (`SAMP_TYPE="ZZ"`). The file is spec-legal, but the non-standard code does
+  not interoperate with tooling that keys off the standard picklist.
+- **python-ags4** (`check.py`): `rule_16` checks PA values only against the file's
+  OWN ABBR (matching our error-tier Rule 16). `fyi_16_1` flags only
+  DESCRIPTION drift on an *otherwise-standard* code (matching our
+  `rule_16_fyi`). The Warnings section is literally `# TO BE ADDED`. So
+  python-ags4 has NO check that a self-declared abbreviation is itself
+  non-standard — this is a laterite-originated signal, not a parity gap.
+- **Us** (`validator/src/rules/groups.rs::rule_16_fyi_nonstandard_abbr`,
+  gated under `include_fyi`): for each `(ABBR_HDNG, ABBR_CODE)` the file
+  declares where the heading HAS a bundled standard picklist
+  (`Dictionary::abbr_codes` non-empty) but the code is NOT in it
+  (`abbr_desc` is `None`), emit one `FYI (Related to Rule 16)`. Bounded to
+  standard-picklist headings — a genuinely custom / DICT-defined `PA` heading
+  has no standard set to judge against and is skipped, so the FYI stays quiet
+  on bespoke schemas. Complementary to `rule_16_fyi` (which fires on a
+  standard code's description drift — the case this one skips).
+- **Assessment**: a clean-room data-quality signal that catches typo'd / invented
+  abbreviations the error-tier rules cannot (the file IS Rule-16-valid). It is
+  informational (FYI) and opt-in (`include_fyi` / `--show-fyi`), and never
+  changes the error verdict, so python-ags4 parity is untouched
+  (`compat.check_file` does not set `include_fyi`). Deliberately an FYI, not a
+  WARNING: the file breaks no rule, so over-stating it as a warning would be
+  wrong (owner decision, #199). The WARNING tier therefore remains
+  unpopulated — kept empty until a genuinely spec-ambiguous-but-suspicious
+  condition warrants it.
+- **Upstream-reportable**: **[NO]** — this is an additive laterite feature, not a defect in
+  python-ags4. It could be suggested upstream as an enhancement (their
+  Warnings section is unimplemented), but there is no divergence to report.
+- **Our decision** (#199): SHIP as an FYI under the existing
+  `FYI (Related to Rule 16)` bucket — no new finding key, so the compat
+  severity classifier (which keys off the label substring) treats it as FYI
+  with no change. Reuses the already-bundled standard picklist
+  (`Dictionary::abbr_codes` / `abbr_desc`); no dictionary change. First member
+  of a new "laterite-originated checks" family that python-ags4 lacks.
+
+### O-44 [VARIANCE] Structural validation of a file-level DICT group is a laterite-originated WARNING (Related to Rule 18); python-ags4 only consumes DICT, never validates it
+- **Observed**: AGS Rule 18 requires a DICT group when non-standard GROUP /
+  HEADING names are used, but says nothing about the DICT's OWN
+  well-formedness. A file can declare custom groups/headings through a
+  MALFORMED DICT — a missing `DICT_TYPE` / `DICT_GRP` / `DICT_HDNG` column, a
+  row with a blank `DICT_GRP`, or a `HEADING`-type row with a blank
+  `DICT_HDNG`. The engine only *consumes* DICT (Rules 7/9 —
+  `collect_file_dict` / `EffectiveDict::build` both bail or skip such rows
+  silently), so a malformed DICT degrades every downstream check with ZERO
+  feedback.
+- **python-ags4** (`check.py`): `rule_18` does NO structural validation — like our
+  error-tier `rule_18` (O-17) it only flags non-standard headings that have no
+  DICT group at all. It never inspects the DICT group's own structure or
+  completeness.
+- **Us** (`validator/src/rules/groups.rs::rule_18_structure`, gated under
+  `include_warnings`): flags the clearest defects as opt-in WARNINGs under a
+  `Warning (Related to Rule 18)` label — a missing required column, a blank
+  `DICT_GRP`, and a `HEADING`-type row with a blank `DICT_HDNG`. Branches on
+  `DICT_TYPE` first so a GROUP-type row (legitimately blank `DICT_HDNG`) is not
+  flagged. Softer `DICT_STAT` / `DICT_UNIT` / `DICT_PGRP` cells are deliberately
+  deferred. The **first WARNING-tier producer** end-to-end (validator →
+  PyO3/CLI/wasm → the dataframe `severity` column).
+- **Assessment**: a clean-room structural check that catches a genuinely malformed
+  dictionary the spec is silent on and python-ags4 ignores. WARNING, not
+  Error: an error would break the 122/9 parity baseline (python-ags4 emits
+  none); opt-in (`include_warnings` / `--show-warnings`) leaves the default
+  verdict and the compat path untouched (`compat.check_file` does not set
+  `include_warnings`). The separate `Warning (Related to Rule 18)` label keeps
+  the compat severity classifier (label-substring keyed) from miscounting it as
+  an error, and the error-tier Rule 18 bucket byte-stable. WARNING over FYI
+  (cf. O-43): a malformed DICT is genuinely broken (it degrades downstream),
+  not merely spec-legal-but-unusual.
+- **Upstream-reportable**: **[NO]** — an additive laterite feature, not a python-ags4
+  defect. Could be suggested upstream as an enhancement (their Warnings section
+  is unimplemented), but there is no divergence to report.
+- **Our decision** (#200): SHIP as the FIRST WARNING-tier producer — the
+  shipped-but-inert `--show-warnings` / `warnings=True` flag now has a
+  defensible producer. The unrecognised-`TRAN_AGS` FYI is a candidate SECOND
+  warning (a laterite-stricter categorisation divergence; tracked, owner-gated).
+
 ## How to add an entry
 
 Append under the current phase heading. Use the next `O-N`. Keep the

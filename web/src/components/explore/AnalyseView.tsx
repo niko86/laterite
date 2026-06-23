@@ -18,6 +18,7 @@ import {
   type Coverage,
 } from "../../lib/analytics";
 import { typeDescription } from "../../lib/agsTypeInfo";
+import { fetchUnion, isKeyStatus } from "../../lib/dict";
 import { goTo } from "../../lib/nav";
 import { Chevron } from "../Chevron";
 
@@ -27,21 +28,24 @@ import { Chevron } from "../Chevron";
 // (orphan finder), completeness (+ why each column is typed as it is), and a
 // LOCA × group coverage matrix.
 
+// The per-group slice of the union dictionary the orphan-finder needs: a
+// parent + the headings (to derive KEY columns).
 interface DictGroup {
-  code: string;
   parent: string | null;
   headings: { name: string; status: string }[];
 }
 
+// Build the parent+KEY map from the canonical union ags_dictionary.json (the
+// single web dict source — see lib/dict.ts). KEY detection is `+`-aware so
+// combined statuses like "KEY+REQUIRED" still count.
 async function loadKeyMap(): Promise<DictKeyMap> {
-  const res = await fetch(`${import.meta.env.BASE_URL}ags5_dictionary.json`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const d = (await res.json()) as { groups: DictGroup[] };
+  const raw = await fetchUnion();
   const m: DictKeyMap = new Map();
-  for (const g of d.groups) {
-    m.set(g.code, {
-      parent: g.parent,
-      keys: g.headings.filter((h) => h.status === "KEY").map((h) => h.name),
+  for (const [code, g] of Object.entries(raw.groups)) {
+    const grp: DictGroup = g;
+    m.set(code, {
+      parent: grp.parent,
+      keys: grp.headings.filter((h) => isKeyStatus(h.status)).map((h) => h.name),
     });
   }
   return m;
