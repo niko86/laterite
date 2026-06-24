@@ -51,3 +51,6 @@ lcov.info
 web/coverage/
 rust-packages/**/*.profraw
 .DS_Store
+
+# marimo session/cache snapshots
+__marimo__/

@@ -40,36 +40,82 @@ Requires Python ≥ 3.12.
 
 ## Use
 
+The same clean-room engine drives every surface — pick your stack.
+
+### Python
+
 ```python
 import laterite
 
-# Validate a file
-result = laterite.validate("delivery.ags")
-for rule, findings in result.by_rule().items():
+# Validate — errors + warnings by default (FYI is opt-in)
+report = laterite.validate("delivery.ags")
+report.is_valid
+for rule, findings in report.by_rule().items():
     print(rule, len(findings))
 
-# Or the python-ags4 drop-in
-from laterite import compat as AGS4
-tables, headings = AGS4.AGS4_to_dataframe("delivery.ags")
-AGS4.dataframe_to_AGS4(tables, headings, "round-trip.ags")
+# Read born-typed columns: a 2DP heading is a float, a DT a datetime
+ags = laterite.read("delivery.ags")
+ags.groups                       # ['PROJ', 'LOCA', 'SAMP', …]
+ags["LOCA"]["LOCA_GL"][0]        # → 12.3  (a polars DataFrame per group)
 
-# Typed view: PROJ → LOCA → SAMP → ...
+# Typed graph: PROJ → LOCA → SAMP → …
 from laterite.ags4 import read_typed
 proj = read_typed("delivery.ags")
 for loca in proj.locas:
     print(loca.loca_id, loca.loca_gl)
+
+# python-ags4 drop-in — swap the import, keep your code
+from laterite import compat as AGS4
+tables, headings = AGS4.AGS4_to_dataframe("delivery.ags")
+AGS4.dataframe_to_AGS4(tables, headings, "round-trip.ags")
 ```
 
-```bash
-lat-check delivery.ags --json
+### Node.js
+
+```ts
+import { read, validate, buildAgs4 } from "laterite";
+
+const ags = read("delivery.ags");      // path, or read(bytes) / read(undefined, { text })
+ags.groups;                            // ["PROJ", "LOCA", "SAMP", …]
+ags.table("LOCA").getChild("LOCA_GL")?.get(0);   // → 12.3 (born-typed apache-arrow)
+
+const report = validate("delivery.ags");
+report.isValid;                        // boolean
+report.toJson();                       // byte-identical to `lat-check --json`
+
+// Produce valid AGS4 from plain rows (or a typed PROJ/LOCA graph)
+const res = buildAgs4(new Map([
+  ["PROJ", [{ PROJ_ID: "P1", PROJ_NAME: "Demo" }]],
+  ["LOCA", [{ LOCA_ID: "BH01", LOCA_GL: 12.3 }]],
+]), { mode: "autofix" });
+res.save("out.ags");
 ```
+
+Cross-group SQL (`ags.sql(...)` / `ags.at(...)`) needs the optional peer `@duckdb/node-api`.
+
+### CLI (`lat-check`)
+
+```bash
+lat-check delivery.ags                 # human report; exit 0 clean / 1 findings
+lat-check delivery.ags --json          # machine-readable findings (pretty JSON)
+lat-check delivery.ags --no-warnings   # errors only (warnings show by default)
+lat-check delivery.ags --fix           # repair → sibling .fixed.ags (safe fixes)
+lat-check old.ags --diff new.ags       # KEY-aware revision delta (+added -removed ~changed)
+lat-check --list-rules                 # the AGS4 rule catalogue (no input needed)
+```
+
+Exit codes: `0` clean · `1` findings · `3` unreadable · `4` not AGS4 · `5` bad args.
+Run `lat-check --readme` for the full guide.
 
 ## Performance
 
 Validation throughput vs `python-ags4` 1.2.0, on synthetic AGS4 files
 of increasing size. Wall-clock after warmup, macOS arm64. All four
-laterite paths return **byte-identical findings** to python-ags4 —
-the speed gain is not at the cost of diagnostic coverage.
+laterite paths agree on the **same findings** here, matching
+`python-ags4`'s on these files — speed not at the cost of diagnostic
+coverage. (The [Parity](#parity-with-python-ags4) section has the full
+comparison: 122 / 131 of python-ags4's own test suite, divergences
+documented.)
 
 The files are LOCA-heavy (40-column real-schema LOCA group, with
 `ID`/`PA`/`2DP`/`DT` TYPE columns) generated in two profiles:

@@ -22,13 +22,15 @@ members = ["packages/*"]
 laterite = { workspace = true }
 
 [dependency-groups]
-# marimo / altair / vegafusion / vl-convert-python (the retired
-# format-comparison dashboards) and pyinstaller / nuitka (the dropped
-# Python-binary packaging) were removed here: the format question is
-# settled (.ags5db) and Rust `lat-db` is the sole shipped binary.
-# pandas<3 stays — python-ags4 needs it and ags5_ags4/codec.py imports
-# it directly.
+# altair / vegafusion / vl-convert-python (the retired format-comparison
+# dashboards) and pyinstaller / nuitka (the dropped Python-binary packaging)
+# were removed here. `marimo` is back for the laterite tour notebook —
+# author it with `uv run --group dev marimo edit --sandbox examples/laterite_tour.py`
+# (the notebook's PEP 723 header brings polars/duckdb/altair/pyarrow/laterite,
+# so the shipped wheel never gains marimo). pandas<3 stays — python-ags4 needs
+# it and ags5_ags4/codec.py imports it directly.
 dev = [
+    "marimo>=0.10",
     "pandas<3",
     "pytest>=9.0.3",
     "pytest-benchmark>=5.2.3",
@@ -126,7 +128,9 @@ ignore = [
 "tests/**" = ["B011"]
 "**/tests/**" = ["B011"]
 # Example scripts intentionally mutate sys.path/env before imports.
-"examples/**" = ["E402"]
+# E402: marimo notebooks import inside @app.cell functions.
+# B018: a marimo cell's bare last expression IS its rendered output.
+"examples/**" = ["E402", "B018"]
 
 # --- Release version management -------------------------------------------
 # `bump-my-version` stamps the release version across EVERY site in one command
