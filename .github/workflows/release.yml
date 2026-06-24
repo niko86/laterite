@@ -439,8 +439,10 @@ jobs:
       - name: Filter to the laterite wheel + sdist
         run: |
           mkdir -p pypi/
-          mv dist/laterite-*.whl pypi/ || true        # base AGS4 wheels (per platform)
-          mv dist/laterite-*.tar.gz pypi/ || true     # the source dist (built once, Linux leg)
+          mv dist/laterite-*.whl pypi/ || true            # base AGS4 wheels (per platform)
+          mv dist/laterite-[0-9]*.tar.gz pypi/ || true    # the source dist (built once, Linux leg).
+          #   [0-9] anchors the version digit so this matches `laterite-<ver>.tar.gz`
+          #   but NOT the CLI bundle `laterite-binaries-*.tar.gz` (twine rejects it).
           ls -la pypi/
 
       # The Linux wheel jobs use `manylinux: off` to dodge the
@@ -499,8 +501,10 @@ jobs:
           gh release download "${{ inputs.republish_tag }}" \
             -R "${{ github.repository }}" \
             -p 'laterite-*.whl' \
-            -p 'laterite-*.tar.gz' \
+            -p 'laterite-[0-9]*.tar.gz' \
             -D pypi/
+          #   [0-9] anchors the version digit: the `laterite-<ver>.tar.gz` sdist,
+          #   not the CLI bundle `laterite-binaries-*.tar.gz` also on the release.
           # Mirrors pypi-publish's filter step: the base `laterite` wheels + sdist.
           ls -la pypi/
 
