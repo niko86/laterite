@@ -223,7 +223,7 @@ export type { AgsValue, CanonicalType } from "./ags-types";
 // The read-only group registry, as a namespace (mirrors `laterite.registry`).
 export * as registry from "./registry";
 export { GroupDescriptor, type Heading, type HeadingStatus } from "./registry";
-// The 92 typed-graph classes (`import { PROJ, LOCA } from "laterite"`) + base.
+// The 174 typed-graph classes (`import { PROJ, LOCA } from "laterite"`) + base.
 export * from "./typed-graph";
 // zstd + age file-envelope helpers, as a namespace (mirrors `laterite.transport`).
 export * as transport from "./transport";

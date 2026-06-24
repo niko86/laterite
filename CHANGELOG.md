@@ -43,6 +43,8 @@ npm package stays at 0.5.0; this is the `v*` Python track only.)
   - `lat-check --show-warnings` — warnings are shown by default since 0.5.0; use
     `--no-warnings` to opt out. (#258)
   - the `[pandas]` install extra — use `[compat]`, which includes pandas. (#258)
+  - **Node** (`laterite` npm 0.5.1, on its own `node-v*` track): `edition` removed
+    from `EmitOptions` — use `dictVersion`. (#258)
 
 ## [0.5.0] — 2026-06-23
 

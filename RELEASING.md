@@ -51,8 +51,17 @@ gh pr create -B master -t "release: X" -b "version bump"   # merge once CI is gr
 # 4. Sync the bumped tree to the mirror, then cut the release THERE:
 ./tools/release/push-public-tree.sh --push           # carries the bump → niko86/laterite
 #   then on niko86/laterite: Releases → Draft a new release → tag vX
+#   (or: gh release create vX --repo niko86/laterite --target main)
 #   → fires the MIRROR's release.yml → wheels + sdist → PyPI. (node: tag node-vX likewise.)
+# 5. Approve the `pypi` environment in the resulting Actions run (the OIDC publish gate).
 ```
+
+> Cutting a release on a **new** tag fires **two** workflow runs — a `push` (tag) run
+> and a `release` run — because GitHub raises both events. That's expected: the `push`
+> run builds + publishes; the `release` run no-ops (Python jobs skip on `release`). They
+> no longer cancel each other (the concurrency key includes `github.event_name`;
+> laterite#264). If you ever see the build run *cancelled* at ~3s, that regression is
+> back — re-run the `push` run.
 
 `bump-my-version` updates, atomically: the `laterite` wheel `pyproject.toml` + the
 root umbrella, `compat.py`'s `__version__` base + Checker banner (preserving the

@@ -49,12 +49,17 @@ on:
         type: string
         default: ""
 
-# Cancel a queued/in-flight workflow_dispatch run if a new one starts
-# on the same ref. Tag-triggered runs use distinct refs (each tag is
-# a different ref), so they never cancel each other — only the manual
-# dispatch path benefits.
+# Dedup concurrent runs of the SAME event on the SAME ref (the manual
+# workflow_dispatch path). `github.event_name` is part of the key ON PURPOSE:
+# publishing a release on a NEW tag fires BOTH a `push` (tag) event and a
+# `release` event with the SAME `github.ref`. Keying on ref alone put them in
+# one group, so `cancel-in-progress` killed the wheel-building `push` run the
+# instant the (no-op) `release` run started — and nothing reached PyPI (the
+# v0.5.1 cut hit exactly this; laterite#264). Including the event keeps the
+# two in separate groups so the build runs to completion. (Distinct tags
+# already have distinct refs, so they never shared a group anyway.)
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 env:
