@@ -48,7 +48,6 @@ fn classify(e: &ValidatorError) -> (i32, &'static str) {
     match e {
         ValidatorError::NotFound(_) => (3, "not_found"),
         ValidatorError::Io { .. } => (3, "io"),
-        ValidatorError::NotUtf8(_) => (4, "not_utf8"),
         ValidatorError::NotAgs4(_) => (4, "not_ags4"),
         ValidatorError::UnsupportedEdition { .. } => (4, "unsupported_edition"),
         ValidatorError::BadDict { .. } => (5, "bad_dict"),

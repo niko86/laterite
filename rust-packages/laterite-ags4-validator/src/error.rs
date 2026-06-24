@@ -23,21 +23,6 @@ pub enum ValidatorError {
         source: std::io::Error,
     },
 
-    /// Retained for public-API back-compat only — **`parse_file` no
-    /// longer raises this**. Invalid UTF-8 is now decoded lossily
-    /// (`String::from_utf8_lossy`, mirroring python-ags4's
-    /// `errors="replace"`) so cp1252/latin1 inputs validate and surface
-    /// non-ASCII as a Rule 1 finding instead of becoming a
-    /// zero-rules-evaluated black hole. Kept (not removed) so the
-    /// error/exit-code map, the parity string, and downstream `match`
-    /// arms stay compilable; it is now unreachable from the library.
-    /// See O-32.
-    #[error(
-        "{0} is not valid UTF-8. This validator is UTF-8 only; convert first, e.g. \
-         `iconv -f cp1252 -t utf-8 in.ags > out.ags`"
-    )]
-    NotUtf8(PathBuf),
-
     /// The file couldn't be parsed into AGS4 structure at all (e.g. no
     /// GROUP rows). We can't run rules against a non-AGS4 file.
     #[error("not a parseable AGS4 file: {0}")]
@@ -61,19 +46,17 @@ pub enum ValidatorError {
 
 /// Map the shared parse leaf's terminal into the validator's (#168 Phase 2).
 /// The validator's `parse` wrappers convert via this so every caller keeps
-/// handling `ValidatorError` unchanged. `NotUtf8` carries no path in the leaf
-/// (it's FS-free) and is unreachable on the validator's lossy path anyway
-/// (the validator never uses `Reject` mode), so an empty path is fine.
+/// handling `ValidatorError` unchanged. The leaf's `NotUtf8` / `Structure`
+/// only arise in `Reject` mode, which the validator never uses (it decodes
+/// lossily and surfaces non-UTF-8 as a Rule 1 finding — O-32), so they map to
+/// the closest validator error to keep the conversion total.
 impl From<laterite_ags4_parse::ParseError> for ValidatorError {
     fn from(e: laterite_ags4_parse::ParseError) -> Self {
         use laterite_ags4_parse::ParseError as P;
         match e {
             P::NotAgs4(msg) => ValidatorError::NotAgs4(msg),
             P::UnsupportedEdition { found } => ValidatorError::UnsupportedEdition { found },
-            P::NotUtf8 => ValidatorError::NotUtf8(PathBuf::new()),
-            // Unreachable on the validator's lenient path (it never sets
-            // `strict_structure`), but the match must be total — a structural
-            // hard-fail is closest to "not a parseable AGS4 file".
+            P::NotUtf8 => ValidatorError::NotAgs4("file is not valid UTF-8".to_string()),
             P::Structure(msg) => ValidatorError::NotAgs4(msg),
         }
     }

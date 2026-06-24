@@ -116,14 +116,13 @@ impl ValidationReport {
 
 /// Map a `ValidatorError` to a `(kind, message)`. In the wasm path only
 /// `NotAgs4` / `UnsupportedEdition` are actually reachable — there is no
-/// filesystem (so no `NotFound`/`Io`), decode is lossy (so no
-/// `NotUtf8`), and we never set `custom_dict` (so no `BadDict`) — but we
-/// map every arm so the `match` is total and future-proof.
+/// filesystem (so no `NotFound`/`Io`), decode is lossy (non-UTF-8 surfaces
+/// as a Rule 1 finding), and we never set `custom_dict` (so no `BadDict`) —
+/// but we map every arm so the `match` is total and future-proof.
 fn classify(e: &ValidatorError) -> (&'static str, String) {
     let kind = match e {
         ValidatorError::NotAgs4(_) => "not_ags4",
         ValidatorError::UnsupportedEdition { .. } => "unsupported_edition",
-        ValidatorError::NotUtf8(_) => "not_utf8",
         ValidatorError::BadDict { .. } => "bad_dict",
         ValidatorError::NotFound(_) | ValidatorError::Io { .. } => "io",
     };

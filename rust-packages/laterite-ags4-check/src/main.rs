@@ -377,9 +377,7 @@ fn main() {
             eprintln!("error: {e}");
             exit(match e {
                 ValidatorError::NotFound(_) | ValidatorError::Io { .. } => 3,
-                ValidatorError::NotUtf8(_)
-                | ValidatorError::NotAgs4(_)
-                | ValidatorError::UnsupportedEdition { .. } => 4,
+                ValidatorError::NotAgs4(_) | ValidatorError::UnsupportedEdition { .. } => 4,
                 ValidatorError::BadDict { .. } => 5,
             });
         }
@@ -479,9 +477,7 @@ fn run_fix(
             eprintln!("error: {e}");
             exit(match e {
                 ValidatorError::NotFound(_) | ValidatorError::Io { .. } => 3,
-                ValidatorError::NotUtf8(_)
-                | ValidatorError::NotAgs4(_)
-                | ValidatorError::UnsupportedEdition { .. } => 4,
+                ValidatorError::NotAgs4(_) | ValidatorError::UnsupportedEdition { .. } => 4,
                 ValidatorError::BadDict { .. } => 5,
             });
         }
