@@ -53,7 +53,7 @@ members = [
 # Python wheels — see root pyproject [tool.bumpversion]); the published
 # npm `laterite` versions on its own `node-v*` track.
 [workspace.package]
-version = "0.5.0"
+version = "0.5.1"
 
 # Release profile lives at the workspace root — cargo only honours
 # profile settings declared here and silently ignores them on member

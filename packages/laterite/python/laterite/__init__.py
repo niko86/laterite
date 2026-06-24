@@ -30,6 +30,7 @@ from ._errors import (
 )
 from ._frames import ArrowStream, frame_from_arrow
 from .registry import GROUPS as _GROUPS
+from .registry import child_groups as _child_groups
 
 # Re-export the typed-graph classes for ergonomic
 # `from laterite import PROJ, LOCA, SAMP, ...`. The class objects live in the
@@ -1178,8 +1179,93 @@ class BuildResult:
         )
 
 
+def _typed_group_code(obj: Any) -> str | None:
+    """The AGS group code if ``obj`` is a typed-graph node, else ``None``.
+
+    The Python twin of laterite-node's ``instanceof AgsGroup`` test. Node has a
+    shared ``AgsGroup`` base; the compiled ``#[pyclass]`` types here don't (their
+    MRO is just ``[PROJ, object]``), so we key off identity instead: a compiled
+    group is its class name being a known code in the native module; a
+    ``laterite.dynamic`` passthrough carries its code on ``_ags_code``."""
+    code = getattr(type(obj), "_ags_code", None)
+    if isinstance(code, str):
+        return code
+    cls = type(obj)
+    if cls.__module__ == "laterite._laterite_native" and cls.__name__ in _GROUPS:
+        return cls.__name__
+    return None
+
+
+def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
+    """Walk a typed PROJ tree depth-first into ``(code, polars frame)`` pairs —
+    the Python twin of laterite-node's ``walkTree``. Every *declared* heading
+    becomes a column (null if unset); the registry's parent→child links drive
+    recursion via the ``<child>s`` accessors, so only the PROJ-rooted subtree is
+    walked. Root-metadata groups (TRAN/UNIT/TYPE/ABBR/DICT, parent ``None``) and
+    orphaned subtrees (a child whose intermediate parent is absent) aren't part
+    of the tree — emit's autofix re-adds the mandatory TRAN rows. Coverage for
+    standard groups is identical to Node's walk by construction (same dictionary
+    parent→child map); additionally — a Python-only superset, since Node has no
+    passthrough surface — a custom group that ``read_typed`` hangs off a parent
+    (a dynamic ``laterite.dynamic`` node on an undeclared ``<code>s`` accessor)
+    is also carried, so a ``read_typed`` → ``build_ags4`` round trip is lossless."""
+    buckets: dict[str, list[dict[str, Any]]] = {}
+
+    def heading_names(code: str, node: Any) -> list[str]:
+        desc = _GROUPS.get(code)
+        if desc is not None:
+            return [h.name for h in desc.headings]
+        specs = getattr(type(node), "_ags_heading_specs", None)
+        if specs:
+            return [name for name, _type in specs]
+        raise TypeError(f"build_ags4: cannot determine headings for group {code!r}")
+
+    def visit(node: Any) -> None:
+        code = _typed_group_code(node)
+        if code is None:
+            raise TypeError(
+                "build_ags4: not a known typed AGS group instance "
+                f"(got {type(node).__name__!r})"
+            )
+        names = heading_names(code, node)
+        buckets.setdefault(code, []).append(
+            {n: getattr(node, n.lower(), None) for n in names}
+        )
+        # Registry-declared children (standard parent→child links).
+        declared = [f"{child.code.lower()}s" for child in _child_groups(code)]
+        for accessor in declared:
+            for kid in getattr(node, accessor, None) or []:
+                visit(kid)
+        # Passthrough children: read_typed hangs a *custom* group off its
+        # parent's `<code>s` accessor via setattr (the registry doesn't know
+        # that link), so it lives in the instance __dict__ rather than on a
+        # declared accessor. Pick up any extra list of typed nodes so a
+        # read_typed → build_ags4 round trip doesn't silently drop it.
+        declared_set = set(declared)
+        for attr, value in (getattr(node, "__dict__", None) or {}).items():
+            if attr in declared_set or not isinstance(value, list) or not value:
+                continue
+            if _typed_group_code(value[0]) is not None:
+                for kid in value:
+                    visit(kid)
+
+    visit(root)
+
+    items: list[tuple[str, pl.DataFrame]] = []
+    for code, rows in buckets.items():
+        names = list(rows[0])  # every row of a group shares its heading set
+        df = pl.DataFrame({n: [r[n] for r in rows] for n in names})
+        # An all-None column infers as polars Null; the Arrow canonicaliser
+        # wants a (possibly empty) string column, not a Null one — cast those.
+        null_cols = [c for c, dtype in df.schema.items() if dtype == pl.Null]
+        if null_cols:
+            df = df.with_columns([pl.col(c).cast(pl.Utf8) for c in null_cols])
+        items.append((code, df))
+    return items
+
+
 def build_ags4(
-    groups: Mapping[str, Any] | list[tuple[str, Any]],
+    groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
     *,
     dict_version: str | None = None,
     mode: str = "autofix",
@@ -1188,11 +1274,17 @@ def build_ags4(
     Where :func:`read` loads an *existing* file, ``build_ags4`` *constructs* a new
     one (and autofixes + validates it); persist the result with ``BuildResult.save``.
 
-    ``groups`` maps each AGS group code to a frame (pandas **or** polars)
-    whose **column names are the AGS headings** (e.g. ``LOCA_ID``, ``LOCA_GL``);
-    UNIT/TYPE are filled from the chosen dictionary edition. Order
-    is preserved (pass an ordered mapping or a list of ``(code, frame)`` pairs;
-    put ``PROJ`` first).
+    ``groups`` is either a **typed-graph root** — a ``PROJ`` instance with its
+    children attached (``PROJ(...)``; ``proj.locas.append(LOCA(...))``), walked
+    depth-first via the registry's parent→child links — OR a mapping / list of
+    ``(code, frame)`` pairs where each frame (pandas **or** polars) has **column
+    names that are the AGS headings** (e.g. ``LOCA_ID``, ``LOCA_GL``). This
+    mirrors laterite-node's ``buildAgs4``, which accepts the same two shapes.
+    UNIT/TYPE are filled from the chosen dictionary edition. Order is preserved
+    (pass an ordered mapping or a list of ``(code, frame)`` pairs; put ``PROJ``
+    first). A typed graph emits only its PROJ-rooted subtree — root-metadata
+    groups (TRAN/UNIT/TYPE/ABBR/DICT) aren't children of PROJ, so use the
+    ``(code, frame)`` form if you need to carry those.
 
     The frame crosses into Rust zero-copy via the Arrow C-stream — **pyarrow-free
     for polars** (so this stays a base feature, no ``[compat]``) and for pandas
@@ -1212,7 +1304,12 @@ def build_ags4(
         dict_version = "4.1.1"
     import json
 
-    items = list(groups.items()) if isinstance(groups, Mapping) else list(groups)
+    if _typed_group_code(groups) is not None:
+        items = _typed_graph_to_items(groups)
+    elif isinstance(groups, Mapping):
+        items = list(groups.items())
+    else:
+        items = list(groups)
     # Hand each frame straight to Rust via its Arrow C-stream PyCapsule
     # (`__arrow_c_stream__`) — pyo3-arrow reads it with NO pyarrow, so the polars
     # path stays a base feature. polars always exposes the capsule; pandas does

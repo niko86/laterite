@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-06-24
+
+A Python patch release: completes one cross-surface parity gap, fixes IDE/type-checker
+resolution of the typed-graph classes, and removes the deprecated back-compat shims that
+0.5.0 still carried. The removals are technically breaking, but the shimmed surface was
+already deprecated and the library is pre-1.0 with no external users — hence a patch. (The
+npm package stays at 0.5.0; this is the `v*` Python track only.)
+
+### Added
+
+- **`build_ags4` accepts a typed PROJ graph.** Previously it took only a `{code: frame}`
+  mapping or `(code, frame)` list; a typed `PROJ` root raised
+  `TypeError: 'PROJ' object is not iterable`. It now also walks a typed-graph root
+  depth-first — the same registry-driven traversal as Node's `buildAgs4`, closing a
+  cross-surface gap. A custom group attached by `read_typed` survives a
+  `read_typed` → `build_ags4` round trip. (#214)
+
+### Fixed
+
+- **`from laterite import PROJ, LOCA, …` resolves in IDEs / type-checkers.** The 174
+  typed-graph classes are bound to the package root at runtime by a dynamic loop, which
+  static analysers couldn't see — so Pylance/pyright flagged the imports as unknown symbols
+  (no autocomplete, spurious type errors) even though they work at runtime. The `.pyi` stub
+  now carries an `__all__` and the package re-exports it at type-check time. (#261)
+
+### Removed
+
+- **Deprecated back-compat shims** (all already deprecated in 0.5.0):
+  - `build_ags4(edition=)` — use `dict_version=`. (#258)
+  - the legacy `db=` / `zst=` / `file=` keyword arguments on
+    `transport.{pack,unpack,lock,unlock}` — pass the source positionally. (#258)
+  - `read_typed(attachments_dir=)` — was accepted and ignored (no binary side-channel in the
+    typed tree). (#260)
+  - `lat-check --show-warnings` — warnings are shown by default since 0.5.0; use
+    `--no-warnings` to opt out. (#258)
+  - the `[pandas]` install extra — use `[compat]`, which includes pandas. (#258)
+
 ## [0.5.0] — 2026-06-23
 
 The next line settles the AGS4 surface and decouples the experimental AGS5 strand. A
@@ -313,7 +350,8 @@ Initial public release.
 - 9 python-ags4 parity tests fail by design; see
   [`docs/parity-coverage-map.md`](docs/parity-coverage-map.md).
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/niko86/laterite/releases/tag/v0.5.1
 [0.5.0]: https://github.com/niko86/laterite/releases/tag/v0.5.0
 [0.4.0]: https://github.com/niko86/laterite/releases/tag/v0.4.0
 [0.2.0]: https://github.com/niko86/laterite/releases/tag/v0.2.0

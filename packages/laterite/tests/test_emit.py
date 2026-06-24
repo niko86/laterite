@@ -106,3 +106,136 @@ def test_accepts_ordered_pairs_too():
         [("PROJ", _proj()), ("LOCA", pd.DataFrame({"LOCA_ID": ["BH01"]}))]
     )
     assert res.text.index('"GROUP","PROJ"') < res.text.index('"GROUP","LOCA"')
+
+
+# --- typed-graph door (#214: parity with laterite-node's buildAgs4) --------
+#
+# build_ags4 also accepts a typed PROJ tree, walked depth-first the same way
+# laterite-node's `walkTree` does. Before #214 a typed graph raised
+# `TypeError: 'PROJ' object is not iterable` (it fell through to `list(groups)`);
+# Node already accepted one via `instanceof AgsGroup`.
+
+
+def test_typed_graph_root_builds():
+    # The #214 repro: a hand-built PROJ tree used to raise TypeError.
+    proj = laterite.PROJ(proj_id="P1", proj_name="Demo project")
+    proj.locas.append(laterite.LOCA(loca_id="BH01", loca_gl=12.34))
+    proj.locas.append(laterite.LOCA(loca_id="BH02", loca_gl=8.0))
+    res = laterite.build_ags4(proj)
+    assert res.text.startswith('"GROUP","PROJ"')
+    assert '"GROUP","LOCA"' in res.text
+
+
+def test_typed_graph_native_floats_canonicalise():
+    # Native floats carried on the typed node format to their 2DP heading with
+    # no fixing — the same born-typed guarantee the frames door gives.
+    proj = laterite.PROJ(proj_id="P1")
+    proj.locas.append(laterite.LOCA(loca_id="BH01", loca_gl=12.34))
+    proj.locas.append(laterite.LOCA(loca_id="BH02", loca_gl=8.0))
+    res = laterite.build_ags4(proj)
+    assert '"DATA","BH01"' in res.text
+    assert '"12.34"' in res.text
+    assert '"8.00"' in res.text  # 8.0 padded to 2DP
+
+
+def test_typed_graph_round_trips_through_read():
+    proj = laterite.PROJ(proj_id="P1", proj_name="Demo project")
+    proj.locas.append(laterite.LOCA(loca_id="BH01", loca_gl=12.34))
+    proj.locas.append(laterite.LOCA(loca_id="BH02", loca_gl=8.0))
+    back = laterite.read(data=laterite.build_ags4(proj).bytes)
+    assert back.groups == ["PROJ", "LOCA"]
+    loca = back["LOCA"]
+    assert loca["LOCA_ID"].to_list() == ["BH01", "BH02"]
+    assert loca["LOCA_GL"].to_list() == [12.34, 8.0]
+
+
+def test_typed_graph_recurses_deeply():
+    # The walk follows the registry's parent→child links to any depth:
+    # PROJ → LOCA → SAMP → LLPL (the four-level chain in the dictionary).
+    from laterite import LLPL, LOCA, PROJ, SAMP
+
+    proj = PROJ(proj_id="P1", proj_name="Deep tree")
+    loca = LOCA(loca_id="BH01")
+    samp = SAMP(loca_id="BH01", samp_id="S1", samp_top=1.5)
+    samp.llpls.append(LLPL(loca_id="BH01", samp_id="S1", spec_ref="BS1377"))
+    loca.samps.append(samp)
+    proj.locas.append(loca)
+
+    back = laterite.read(data=laterite.build_ags4(proj).bytes)
+    assert sorted(back.groups) == ["LLPL", "LOCA", "PROJ", "SAMP"]
+
+
+def test_typed_graph_round_trips_via_read_typed(tmp_path):
+    # read_typed builds a PROJ tree; build_ags4 walks it back out. The round
+    # trip recovers the PROJ-rooted subtree (parity-defining coverage — exactly
+    # Node's walk). TRAN is root-metadata (parent None), so it's not in the tree.
+    from laterite.ags4 import read_typed
+
+    src = tmp_path / "in.ags"
+    src.write_bytes(
+        laterite.build_ags4(
+            {
+                "PROJ": _proj(),
+                "LOCA": pl.DataFrame({"LOCA_ID": ["BH01", "BH02"]}),
+            }
+        ).bytes
+    )
+    proj = read_typed(src)
+    back = laterite.read(data=laterite.build_ags4(proj).bytes)
+    assert sorted(back.groups) == ["LOCA", "PROJ"]
+    assert back["LOCA"]["LOCA_ID"].to_list() == ["BH01", "BH02"]
+
+
+def test_typed_graph_childless_root_builds():
+    res = laterite.build_ags4(laterite.PROJ(proj_id="P1", proj_name="Solo"))
+    back = laterite.read(data=res.bytes)
+    assert back.groups == ["PROJ"]
+    assert back["PROJ"]["PROJ_ID"].to_list() == ["P1"]
+
+
+def test_typed_graph_non_group_child_raises():
+    # A foreign object hung off a child accessor is caught with a clear message,
+    # not a confusing downstream failure (mirrors Node's walkTree guard).
+    proj = laterite.PROJ(proj_id="P1")
+    proj.locas.append(object())  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="not a known typed AGS group instance"):
+        laterite.build_ags4(proj)
+
+
+def test_typed_graph_passthrough_root_builds():
+    # A laterite.dynamic passthrough class (a custom group) can be the root —
+    # a Python-only superset of Node's walk (Node has no passthrough surface).
+    from laterite import dynamic
+
+    dynamic.clear_cache()
+    cls = dynamic.get_or_register(
+        "XCUS", [{"name": "XCUS_ID", "type": "ID"}, {"name": "XCUS_VAL", "type": "X"}]
+    )
+    res = laterite.build_ags4(cls(xcus_id="A", xcus_val="hello"))
+    assert '"GROUP","XCUS"' in res.text
+    assert '"hello"' in res.text
+
+
+def test_typed_graph_custom_group_child_survives_round_trip(tmp_path):
+    # Regression: read_typed hangs a custom group off its parent via setattr
+    # (an undeclared `<code>s` accessor the registry doesn't know about). The
+    # walk must still carry it, or read_typed → build_ags4 silently loses the
+    # group and its data.
+    from laterite import dynamic
+    from laterite.ags4 import read_typed
+
+    dynamic.clear_cache()
+    src = (
+        '"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n'
+        '"DATA","P1"\r\n\r\n'
+        '"GROUP","LOCA"\r\n"HEADING","LOCA_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n'
+        '"DATA","BH01"\r\n\r\n'
+        '"GROUP","MYGP"\r\n"HEADING","LOCA_ID","MYGP_VAL"\r\n"UNIT","",""\r\n'
+        '"TYPE","ID","X"\r\n"DATA","BH01","custom-data-here"\r\n'
+    )
+    p = tmp_path / "custom.ags"
+    p.write_text(src)
+    proj = read_typed(p)
+    back = laterite.read(data=laterite.build_ags4(proj).bytes)
+    assert "MYGP" in back.groups
+    assert back["MYGP"]["MYGP_VAL"].to_list() == ["custom-data-here"]

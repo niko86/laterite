@@ -1,6 +1,6 @@
 [project]
 name = "laterite-workspace"
-version = "0.5.0"
+version = "0.5.1"
 description = "uv workspace root for the laterite AGS toolkit (dev monorepo aggregator; ships no wheel)"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -141,7 +141,7 @@ ignore = [
 #   uv run bump-my-version bump --new-version 0.2.0rc1   # explicit pre-release
 #   uv run bump-my-version bump minor --dry-run -v       # preview, no writes
 [tool.bumpversion]
-current_version = "0.5.0"
+current_version = "0.5.1"
 # Parse accepts PEP 440 canonical pre-releases (0.2.0rc1 / 0.2.0dev1, no hyphen
 # — PyPI rejects hyphens) so an explicit `bump --new-version 0.2.0rc1` round-
 # trips. `bump major|minor|patch` produces a FINAL release (e.g. 0.2.0); cut a
