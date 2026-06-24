@@ -25,13 +25,18 @@ on:
     # to its own prefix below, so a `node-v0.1.0` tag never builds wheels and a
     # `v0.3.0` tag never publishes to npm.
     tags: ["v*", "node-v*"]
-  # A GitHub Release published from the web UI fires `release` (NOT `push`), and
-  # creating the tag from the Releases page is how the npm release is cut (there's
-  # no persistent local clone of the public repo). So the node jobs accept the
-  # `release` event too — `build-node` keys on the `node-v*` ref (event-agnostic)
-  # and `npm-publish` accepts push-or-release. The Python jobs stay push/dispatch-
-  # only (an explicit `github.event_name != 'release'` guard below), so a Python
-  # release published in the UI never re-builds wheels.
+  # Publishing a GitHub Release on a NEW tag fires BOTH a `push` (tag) event AND
+  # a `release` event. Creating the release from the UI / `gh release create` is
+  # how a release is cut (no persistent local clone of the public mirror) — and
+  # that path DOES fire `push` (the new tag), so `push` alone covers every cut.
+  # ALL build/publish jobs are therefore push/dispatch-gated (an explicit
+  # `github.event_name != 'release'` guard, Python and node alike): the `push`
+  # run builds + publishes, the `release` run is a no-op. This avoids both the
+  # node double-publish (jobs used to run on either event) and the push↔release
+  # concurrency cancel that the event-aware concurrency key also guards against
+  # (laterite#264). The `release` trigger is kept only so a maintainer who
+  # publishes a release on an ALREADY-existing tag still gets a (no-op) run
+  # rather than silent nothing; dropping it entirely is a possible follow-up.
   release:
     types: [published]
   # Manual trigger for workflow-debug runs — no tag history pollution.
@@ -552,7 +557,13 @@ jobs:
     name: node (${{ matrix.target }})
     # The npm release rides its OWN tag namespace (`node-v*`), independent of the
     # Python `v*` tags — so build-node + npm-publish only run for `node-v*`.
-    if: startsWith(github.ref, 'refs/tags/node-v')
+    # Push-gated (like the Python jobs): a node release on a NEW tag fires BOTH a
+    # `push` and a `release` event, and node's jobs used to run on EITHER — so the
+    # tag built + published twice (the second npm publish failing on the duplicate
+    # version). A new tag always fires `push` (incl. via `gh release create` / the
+    # Releases UI), so `push` alone covers every cut; skipping `release` drops the
+    # redundant run (laterite#264).
+    if: startsWith(github.ref, 'refs/tags/node-v') && github.event_name != 'release'
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -620,7 +631,7 @@ jobs:
     #      add the per-package trusted publishers (RELEASING-node.md), npm uses
     #      OIDC automatically — `id-token` stays on below — and the token can go.
     # Owner npm prerequisites are in RELEASING-node.md.
-    if: (github.event_name == 'push' || github.event_name == 'release') && startsWith(github.ref, 'refs/tags/node-v') && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'dev')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/node-v') && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'dev')
     name: npm (laterite + @laterite/native-*)
     runs-on: ubuntu-latest
     needs: build-node
