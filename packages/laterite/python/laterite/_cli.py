@@ -183,6 +183,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--ndjson", action="store_true")
     p.add_argument("--out")
     p.add_argument("--json-out")
+    # WARNINGs show by default (#203); --no-warnings drops to errors-only.
+    # --show-warnings kept as an accepted no-op (redundant) for script back-compat.
+    p.add_argument("--no-warnings", action="store_true")
     p.add_argument("--show-warnings", action="store_true")
     p.add_argument("--show-fyi", action="store_true")
     p.add_argument("--check-files", action="store_true")
@@ -240,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
     r = _native.run_check(
         path=args.file,
         dict_version=args.dict_version,
-        include_warnings=args.show_warnings,
+        include_warnings=not args.no_warnings,
         include_fyi=args.show_fyi,
         check_files=args.check_files,
         encoding=args.encoding,

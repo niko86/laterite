@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-23
+
 The next line settles the AGS4 surface and decouples the experimental AGS5 strand. A
 **breaking** change (the `[ags5]` extra and the `.ags5db` companion are gone from the
 shipped package); the 0.x version signals the surface is still settling.
@@ -105,6 +107,22 @@ shipped package); the 0.x version signals the surface is still settling.
 
 ### Changed
 
+- **Validation reports show WARNINGs by default** — severity tiers now track importance
+  like a compiler: errors **and warnings** by default, FYI still opt-in. The default flips
+  to `warnings=True` across `laterite.validate()` / `Ags4File.validate()`, the Node
+  `runCheck`, and `lat-check` (opt out with the new `--no-warnings`; the old `--show-warnings`
+  is an accepted no-op). Pass `warnings=False` for errors-only. The **verdict is unchanged** —
+  warnings never gate `is_valid` / the error count — and the `compat` python-ags4 shim keeps
+  its own errors-only output, so the 122/9 parity is untouched. (The DuckDB `validate_ags` SQL
+  function stays opt-in by convention.) One consequence: a *default* `validate()` no longer
+  takes the `.ags.idx` certificate skip (a cert records the error verdict, not the warning
+  list) — pass `warnings=False` to engage it on a known-clean file. (#203)
+- **An unrecognised `TRAN_AGS` edition is now a WARNING (was an FYI).** A `TRAN_AGS` that
+  isn't a recognised AGS4 edition makes laterite fall back to a default dictionary and possibly
+  validate against the wrong schema; a default-visible `Warning (Related to Rule 14)` now flags
+  that risk rather than the buried FYI. `compat` keeps python-ags4's FYI for drop-in fidelity.
+  Combined with the WARNING-default above, the schema-fallback risk is now seen without a flag
+  (OBSERVATIONS O-45).
 - **`Ags4File.fix()` now returns a repaired `Ags4File`** (was a `FixResult`) — the fluent
   capstone, so `read(path).fix().validate().save(out)` reads as one chain. The repaired
   handle inherits the source's `backend` / `xn`; the `FixResult` (what was applied + the
@@ -295,7 +313,8 @@ Initial public release.
 - 9 python-ags4 parity tests fail by design; see
   [`docs/parity-coverage-map.md`](docs/parity-coverage-map.md).
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/niko86/laterite/releases/tag/v0.5.0
 [0.4.0]: https://github.com/niko86/laterite/releases/tag/v0.4.0
 [0.2.0]: https://github.com/niko86/laterite/releases/tag/v0.2.0
 [0.1.0]: https://github.com/niko86/laterite/releases/tag/v0.1.0

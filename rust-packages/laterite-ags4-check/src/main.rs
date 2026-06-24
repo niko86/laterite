@@ -95,7 +95,9 @@ usage: lat-check <file.ags> [options]
   --diff <other.ags>        compare the input file against <other> and print the
                             KEY-aware/type-aware revision delta (per-group
                             +added -removed ~changed; --json for the full delta)
-  --show-warnings           include WARNING-severity findings
+  --no-warnings             errors only — suppress the WARNING tier, which is
+                            shown by default (malformed DICT, nonstandard
+                            abbreviations, unrecognised TRAN_AGS edition)
   --show-fyi                include FYI-severity findings (e.g. Rule 1)
   --check-files             also run Rule 20's on-disk check: the
                             sidecar FILE/<fset>/<name> tree must exist
@@ -125,7 +127,13 @@ fn main() {
     laterite_cliutil::print_readme_if_requested(include_str!("../README-cli.md"));
 
     let mut path: Option<PathBuf> = None;
-    let mut opts = CheckOptions::default();
+    // Default report verbosity (#203): like a compiler, lat-check shows errors AND
+    // WARNINGs by default (the engine default is errors-only; this binding opts in).
+    // `--no-warnings` drops to errors-only; `--show-fyi` adds the low-signal tier.
+    let mut opts = CheckOptions {
+        include_warnings: true,
+        ..CheckOptions::default()
+    };
     let mut json = false;
     let mut ndjson = false;
     let mut out_path: Option<PathBuf> = None;
@@ -195,6 +203,10 @@ fn main() {
             },
             #[cfg(feature = "tui")]
             "--tui" => tui_requested = true,
+            // WARNINGs are on by default now; `--no-warnings` drops to errors-only.
+            // `--show-warnings` is kept as an accepted no-op so existing scripts
+            // don't break (it's redundant — warnings already show).
+            "--no-warnings" => opts.include_warnings = false,
             "--show-warnings" => opts.include_warnings = true,
             "--show-fyi" => opts.include_fyi = true,
             "--check-files" => opts.check_files = true,

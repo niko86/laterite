@@ -396,6 +396,10 @@ fn validate_inner(
 /// Validate an AGS4 file (`path`) or `text` against the AGS4 rules. `dict_version`
 /// `None`/`"auto"` auto-detects from `TRAN_AGS`, else forces an edition. Returns
 /// the `{ok:false}` failure report (not a throw) for un-validatable input.
+///
+/// Severity tiers track importance (like a compiler): errors **and WARNINGs** are
+/// returned by default (`includeWarnings` defaults to `true`); pass `false` for
+/// errors-only. `includeFyi` (default `false`) adds the low-signal FYI tier.
 #[napi]
 #[allow(clippy::too_many_arguments)] // the napi surface mirrors lat-check's flags
 pub fn run_check(
@@ -414,7 +418,7 @@ pub fn run_check(
     };
     let opts = CheckOptions {
         dict_version: forced,
-        include_warnings: include_warnings.unwrap_or(false),
+        include_warnings: include_warnings.unwrap_or(true),
         include_fyi: include_fyi.unwrap_or(false),
         check_files: check_files.unwrap_or(false),
         encoding: resolve_encoding(encoding.as_deref()),

@@ -61,11 +61,11 @@ from ._frames import (
 # python-ags4. A misidentified validator is much harder to debug than
 # a parity test failing.
 PYTHON_AGS4_COMPAT = "1.2.0"
-__version__ = f"0.4.0+compat.python-ags4.{PYTHON_AGS4_COMPAT}"
+__version__ = f"0.5.0+compat.python-ags4.{PYTHON_AGS4_COMPAT}"
 
 # Human-readable Metadata.Checker — same intent, prose form.
 _CHECKER_STRING = (
-    "laterite 0.4.0 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine"
+    "laterite 0.5.0 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine"
 )
 
 # python-ags4 maps these version strings → bundled standard dict files;

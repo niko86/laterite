@@ -314,7 +314,9 @@ def test_compat_check_file_matches_engine(fx):
     rule_keys = {
         k for k in AGS4.check_file(str(fx)) if k.startswith("AGS Format Rule ")
     }
-    rep_keys = set(laterite.validate(str(fx)).by_rule())
+    # `validate` now shows WARNINGs by default (#203); this contract is about the
+    # ERROR-tier rule keys, so compare errors-only (warnings=False).
+    rep_keys = set(laterite.validate(str(fx), warnings=False).by_rule())
     assert rule_keys == rep_keys
 
 

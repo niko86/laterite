@@ -26,20 +26,39 @@ The version lives in one logical place, stamped everywhere by
 in the root `pyproject.toml` `[tool.bumpversion]`). **Never hand-edit a version
 string** — the guard test + the release tag-check will catch drift.
 
+> [!IMPORTANT] **Releases PUBLISH FROM THE PUBLIC MIRROR `niko86/laterite`, NOT this
+> repo.** `laterite`'s `release.yml` builds + tests the matrix, but only the
+> *mirror's* `release.yml` publishes — the PyPI/npm trusted publishers are configured
+> for `niko86/laterite`. **Do NOT `git push --tags` to `laterite`**: it builds, then
+> the publish step fails with `invalid-publisher` (by design). The release tag goes on
+> the **mirror** (see step 4).
+
 ```bash
-# 1. Pick the bump per the policy above (preview first):
-uv run bump-my-version bump minor --dry-run -v     # or: patch
-# 2. Apply it — stamps all sites, rolls CHANGELOG, commits "release: X", tags vX:
+# 1. Preview the bump (per the policy above):
+uv run bump-my-version bump minor --dry-run -v       # or: patch
+
+# 2. Apply it — stamps every version site + rolls CHANGELOG + commits "release: X":
 uv run bump-my-version bump minor
-# 3. Push the branch + the tag (the tag triggers release.yml → wheels + sdist → PyPI):
-git push && git push --tags
+uv lock                                              # the version touches uv.lock + Cargo.lock —
+git commit --amend --no-edit -a                      #   fold them into the one "release: X" commit
+#   (node release only: ALSO regen rust-packages/laterite-node/package-lock.json — see
+#    RELEASING-node.md — or `npm ci` fails with EUSAGE at publish.)
+
+# 3. master is PROTECTED → land the bump via a release PR (merge-commit, NOT squash):
+git switch -c release/vX && git push -u origin release/vX
+gh pr create -B master -t "release: X" -b "version bump"   # merge once CI is green
+
+# 4. Sync the bumped tree to the mirror, then cut the release THERE:
+./tools/release/push-public-tree.sh --push           # carries the bump → niko86/laterite
+#   then on niko86/laterite: Releases → Draft a new release → tag vX
+#   → fires the MIRROR's release.yml → wheels + sdist → PyPI. (node: tag node-vX likewise.)
 ```
 
 `bump-my-version` updates, atomically: the `laterite` wheel `pyproject.toml` + the
 root umbrella, `compat.py`'s `__version__` base + Checker banner (preserving the
 `+compat.python-ags4.<pin>` pin), the Rust workspace version, and rolls
-`CHANGELOG.md`'s `[Unreleased]` into the new dated section. Run `uv lock`
-afterwards if the lockfile needs refreshing.
+`CHANGELOG.md`'s `[Unreleased]` into the new dated section. It does **not** touch
+the lockfiles or the npm `package-lock.json` — see steps 2.
 
 ### Pre-releases (RC / dev)
 

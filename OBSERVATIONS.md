@@ -1226,9 +1226,10 @@ divergence (not a defect) · **[NOTE]** behavioural observation.
 - **Assessment**: a clean-room structural check that catches a genuinely malformed
   dictionary the spec is silent on and python-ags4 ignores. WARNING, not
   Error: an error would break the 122/9 parity baseline (python-ags4 emits
-  none); opt-in (`include_warnings` / `--show-warnings`) leaves the default
-  verdict and the compat path untouched (`compat.check_file` does not set
-  `include_warnings`). The separate `Warning (Related to Rule 18)` label keeps
+  none); shown by DEFAULT (#203 flipped the WARNING tier on, opt out with
+  `--no-warnings` / `warnings=False`); it leaves the default *verdict* (the
+  error count / `is_valid`) and the compat path untouched (`compat.check_file`
+  does not set `include_warnings`). The separate `Warning (Related to Rule 18)` label keeps
   the compat severity classifier (label-substring keyed) from miscounting it as
   an error, and the error-tier Rule 18 bucket byte-stable. WARNING over FYI
   (cf. O-43): a malformed DICT is genuinely broken (it degrades downstream),
@@ -1240,6 +1241,40 @@ divergence (not a defect) · **[NOTE]** behavioural observation.
   shipped-but-inert `--show-warnings` / `warnings=True` flag now has a
   defensible producer. The unrecognised-`TRAN_AGS` FYI is a candidate SECOND
   warning (a laterite-stricter categorisation divergence; tracked, owner-gated).
+
+### O-45 [VARIANCE] An unrecognised TRAN_AGS edition is a laterite WARNING (Related to Rule 14), shown by default; python-ags4 emits it only as an opt-in FYI
+- **Observed**: a `TRAN_AGS` value that is PRESENT (so Rule 14 is satisfied) but is
+  not a recognised AGS4 edition string — a typo, an old `"4"`, or a bespoke
+  label. The edition can't be matched, so the validator falls back to a default
+  dictionary (4.1.1) and silently validates the file against a schema that may
+  not be the author's — a wrong-schema risk with, until now, no default-visible
+  signal.
+- **python-ags4** (`check.py`): emits a top-level `"FYI"` key (`"TRAN_AGS is not a
+  recognized AGS4 version: ..."`). It is opt-in there too and never an error.
+- **Us** (`validator/src/rules/groups.rs::tran_ags_unrecognised`): laterite
+  classifies the SAME condition as a WARNING under a `Warning (Related to Rule
+  14)` label, gated under `include_warnings`. Since #203 made the WARNING tier
+  shown by default, the schema-fallback risk is now visible by default rather
+  than buried behind a flag. In FYI-only mode — i.e. `compat`, which runs
+  `include_fyi` without `include_warnings` — the same function instead emits the
+  python-ags4-matching `"FYI"`, so drop-in fidelity is preserved.
+- **Assessment**: a deliberate laterite-STRICTER categorisation (cf. O-43/O-44). An
+  unrecognised edition is materially riskier than a cosmetic FYI — it can yield
+  a verdict against the wrong dictionary — so it belongs in the default-visible
+  WARNING tier, not a tier the user must opt into. WARNING, not Error: the file
+  breaks no rule (`TRAN_AGS` IS present), and an error would break the 122/9
+  parity baseline (python-ags4 emits none as error). Error-parity is untouched:
+  the parity gate compares only `AGS Format Rule N` keys (FYI/WARNING labels are
+  excluded), and `compat` still emits the matching `"FYI"`. The separate
+  `Warning (Related to Rule 14)` label keeps the compat severity classifier
+  (label-substring keyed) from miscounting it as an error.
+- **Upstream-reportable**: **[NO]** — a laterite categorisation choice, not a python-ags4
+  defect; python-ags4's FYI is a legitimate, if softer, call. There is no
+  divergence to report.
+- **Our decision** (#203): PROMOTE FYI → WARNING and ship the WARNING tier ON by
+  default (opt out with `--no-warnings` / `warnings=False`) so the wrong-schema
+  risk is seen without a flag. `compat` keeps python-ags4's FYI for drop-in
+  fidelity. The SECOND WARNING-tier producer after O-44 (Rule 18).
 
 ## How to add an entry
 

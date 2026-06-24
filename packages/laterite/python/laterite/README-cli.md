@@ -36,7 +36,9 @@ Rule violations in a file.
     --diff <other.ags>   compare the input file against <other> and print the
                          KEY-aware/type-aware revision delta (per-group
                          +added -removed ~changed; --json for the full delta)
-    --show-warnings      include WARNING-severity findings
+    --no-warnings        errors only — suppress the WARNING tier, which is
+                         shown by default (malformed DICT, nonstandard
+                         abbreviations, unrecognised TRAN_AGS edition)
     --show-fyi           include FYI-severity findings (e.g. Rule 1)
     --check-files        also run Rule 20's on-disk check: the sidecar
                          FILE/<fset>/<name> tree must exist next to the

@@ -113,6 +113,10 @@ export interface ValidationReport {
  * Validate an AGS4 file (`path`) or `text` against the AGS4 rules. `dict_version`
  * `None`/`"auto"` auto-detects from `TRAN_AGS`, else forces an edition. Returns
  * the `{ok:false}` failure report (not a throw) for un-validatable input.
+ *
+ * Severity tiers track importance (like a compiler): errors **and WARNINGs** are
+ * returned by default (`includeWarnings` defaults to `true`); pass `false` for
+ * errors-only. `includeFyi` (default `false`) adds the low-signal FYI tier.
  */
 export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null): ValidationReport
 /**

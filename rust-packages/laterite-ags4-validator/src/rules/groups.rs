@@ -72,6 +72,14 @@ const RULE_16_FYI: &str = "FYI (Related to Rule 16)";
 // the rule-label substring — never miscounts it as an error, and the error-tier
 // Rule 18 bucket stays byte-stable. Mirrors the "FYI (Related to Rule N)" scheme.
 const RULE_18_WARN: &str = "Warning (Related to Rule 18)";
+// WARNING-tier label for an unrecognised TRAN_AGS edition string (#203). laterite
+// is deliberately STRICTER than python-ags4 here: an unrecognised edition means we
+// fall back to a default dictionary (4.1.1) and may validate against the WRONG
+// schema, which warrants a WARNING the user sees by default — not a buried FYI
+// (OBSERVATIONS O-44). `compat` still mirrors python-ags4's FYI tier (see `check`).
+// Same "Warning (...)" scheme as RULE_18_WARN so the compat severity classifier
+// never miscounts it as an error.
+const RULE_14_WARN: &str = "Warning (Related to Rule 14)";
 
 const KNOWN_TRAN_AGS: &[&str] = &["4.0", "4.0.3", "4.0.4", "4.1", "4.1.1", "4.2"];
 
@@ -82,13 +90,22 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, opts: &CheckOptions, found:
     rule_16(parsed, found);
     rule_17(parsed, found);
     rule_18(parsed, found);
-    if opts.include_fyi {
-        tran_ags_fyi(parsed, found);
-        rule_16_fyi(parsed, dict, found);
-        rule_16_fyi_nonstandard_abbr(parsed, dict, found);
-    }
     if opts.include_warnings {
         rule_18_structure(parsed, found);
+        // Native (warnings-on) view: an unrecognised TRAN_AGS is a WARNING — the
+        // schema-fallback risk should be visible by default (O-44).
+        tran_ags_unrecognised(parsed, found, RULE_14_WARN, Severity::Warning);
+    }
+    if opts.include_fyi {
+        // FYI-only mode (i.e. `compat`, which runs include_fyi without
+        // include_warnings) mirrors python-ags4: it emits the same finding at the
+        // FYI tier. Guarded so a caller asking for BOTH tiers sees it once (as the
+        // stricter WARNING above), never duplicated.
+        if !opts.include_warnings {
+            tran_ags_unrecognised(parsed, found, FYI, Severity::Fyi);
+        }
+        rule_16_fyi(parsed, dict, found);
+        rule_16_fyi_nonstandard_abbr(parsed, dict, found);
     }
 }
 
@@ -198,11 +215,17 @@ fn rule_16_fyi_nonstandard_abbr(parsed: &ParsedFile, dict: &Dictionary, found: &
     }
 }
 
-/// FYI emit: TRAN_AGS value present but not a recognised AGS4 edition.
-/// python-ags4 emits the same FYI; useful to flag custom/typo'd
-/// edition strings without raising a Rule 14 error (TRAN_AGS being
-/// *present* is what Rule 14 requires; *recognised* isn't a rule).
-fn tran_ags_fyi(parsed: &ParsedFile, found: &mut Findings) {
+/// TRAN_AGS value present but not a recognised AGS4 edition — laterite then falls
+/// back to a default dictionary and may validate against the wrong schema. Not a
+/// Rule 14 error (TRAN_AGS being *present* is what Rule 14 requires; *recognised*
+/// isn't a rule). Emitted at the caller's chosen tier: a WARNING for the native
+/// (warnings-on) view, or python-ags4's FYI tier for `compat` — see `check`.
+fn tran_ags_unrecognised(
+    parsed: &ParsedFile,
+    found: &mut Findings,
+    label: &'static str,
+    severity: Severity,
+) {
     let Some(tran) = parsed.groups.get("TRAN") else {
         return;
     };
@@ -218,7 +241,7 @@ fn tran_ags_fyi(parsed: &ParsedFile, found: &mut Findings) {
     }
     add_at(
         found,
-        FYI,
+        label,
         None,
         "TRAN",
         format!(
@@ -226,7 +249,7 @@ fn tran_ags_fyi(parsed: &ParsedFile, found: &mut Findings) {
              standard editions are 4.0.3 / 4.0.4 / 4.1 / 4.1.1 / 4.2."
         ),
         Location::default(),
-        Severity::Fyi,
+        severity,
     );
 }
 
@@ -553,8 +576,9 @@ mod tests {
         f
     }
 
-    /// FYI-enabled runner — the FYI emitters (`tran_ags_fyi`,
-    /// `rule_16_fyi`) only run under `include_fyi`.
+    /// FYI-enabled runner — the FYI emitters (`rule_16_fyi`, and the
+    /// `tran_ags_unrecognised` FYI tier when warnings are off) only run under
+    /// `include_fyi`.
     fn run_fyi(src: &str) -> Findings {
         let pf = parse_str(src).expect("fixture parses");
         let mut f = Findings::new();
@@ -940,11 +964,23 @@ mod tests {
     }
 
     #[test]
-    fn tran_ags_fyi_flags_unrecognised_edition_string() {
-        // TRAN_AGS = "9.9" — present (so Rule 14 is satisfied) but not a
-        // known edition → the top-level FYI bucket (include_fyi only).
+    fn tran_ags_unrecognised_is_warning_natively_and_fyi_in_compat() {
+        // TRAN_AGS = "9.9" — present (so Rule 14 is satisfied) but not a known
+        // edition. Native (warnings-on) view → a WARNING (RULE_14_WARN, visible by
+        // default); FYI-only view (compat, mirroring python-ags4) → the top-level
+        // FYI; errors-only default → silent on both (#203 / O-44).
         let src = "\"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_AGS\"\r\n\
                    \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"9.9\"\r\n";
+        let w = run_warn(src);
+        let warn = w.get(RULE_14_WARN).expect("Rule 14 WARNING");
+        assert!(
+            warn.iter()
+                .any(|x| x.group == "TRAN" && x.desc.contains("9.9")),
+            "{warn:?}"
+        );
+        // The warnings view must NOT also emit the FYI (seen once, as the warning).
+        assert!(!w.contains_key(FYI), "{w:?}");
+        // FYI-only (compat) → python-ags4's FYI tier, NOT the warning.
         let f = run_fyi(src);
         let fyi = f.get(FYI).expect("top-level FYI");
         assert!(
@@ -952,17 +988,20 @@ mod tests {
                 .any(|x| x.group == "TRAN" && x.desc.contains("9.9")),
             "{fyi:?}"
         );
-        // Default (no FYI) must stay silent.
-        assert!(!run(src).contains_key(FYI));
+        assert!(!f.contains_key(RULE_14_WARN), "{f:?}");
+        // Errors-only default → silent on both tiers.
+        let d = run(src);
+        assert!(!d.contains_key(FYI) && !d.contains_key(RULE_14_WARN));
     }
 
     #[test]
-    fn tran_ags_fyi_silent_for_recognised_edition() {
-        // A recognised edition string ("4.2") is NOT flagged even with
-        // FYI on — the `KNOWN_TRAN_AGS.contains` early return.
+    fn tran_ags_recognised_edition_is_silent_on_every_tier() {
+        // A recognised edition string ("4.2") is NOT flagged on any tier — the
+        // `KNOWN_TRAN_AGS.contains` early return.
         let src = "\"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_AGS\"\r\n\
                    \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"4.2\"\r\n";
         assert!(!run_fyi(src).contains_key(FYI));
+        assert!(!run_warn(src).contains_key(RULE_14_WARN));
     }
 
     #[test]

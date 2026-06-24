@@ -117,7 +117,9 @@ def test_fresh_cert_makes_validate_skip_the_engine(tmp_path):
     src = _write(tmp_path)
     cert = lat.read(src).validate().certify()
 
-    rep = lat.read(src, index=cert).validate().report
+    # WARNINGs show by default now (#203), which bypasses the cert skip (a cert
+    # vouches only for the ERROR verdict); ask errors-only to exercise the skip.
+    rep = lat.read(src, index=cert).validate(warnings=False).report
     assert rep.resolution == "certified"  # the engine-skipped sentinel
     assert rep.count == 0 and rep.is_valid
     assert rep.dict_version == "4.2"  # carried from the cert (TRAN_AGS=4.2)
@@ -142,7 +144,7 @@ def test_asking_for_more_than_the_cert_vouches_runs_the_engine(tmp_path):
 
 def test_certified_read_round_trips_from_text(tmp_path):
     cert = lat.read(text=CLEAN).validate().certify(path=tmp_path / "t.idx")
-    rep = lat.read(text=CLEAN, index=cert).validate().report
+    rep = lat.read(text=CLEAN, index=cert).validate(warnings=False).report
     assert rep.resolution == "certified" and rep.count == 0
 
 
@@ -242,11 +244,18 @@ def test_certify_stamps_the_check_profile(tmp_path):
 def test_forced_edition_cert_does_not_satisfy_an_auto_request(tmp_path):
     src = _write(tmp_path)
     cert = lat.read(src).validate(dict_version="4.2").certify()
-    # an AUTO request must NOT skip on a forced cert (different dictionaries possible)
-    assert lat.read(src, index=cert).validate().report.resolution != "certified"
+    # an AUTO request must NOT skip on a forced cert (different dictionaries
+    # possible). errors-only (warnings=False) so the cert-profile mismatch is the
+    # ONLY reason it doesn't skip — warnings-on (the #203 default) bypasses it too.
+    assert (
+        lat.read(src, index=cert).validate(warnings=False).report.resolution
+        != "certified"
+    )
     # ...but the SAME forced request does skip
     assert (
-        lat.read(src, index=cert).validate(dict_version="4.2").report.resolution
+        lat.read(src, index=cert)
+        .validate(dict_version="4.2", warnings=False)
+        .report.resolution
         == "certified"
     )
 
@@ -254,18 +263,27 @@ def test_forced_edition_cert_does_not_satisfy_an_auto_request(tmp_path):
 def test_check_files_request_needs_a_check_files_cert(tmp_path):
     src = _write(tmp_path)
     # a default cert can't satisfy a --check-files request → re-validate
+    # errors-only (warnings=False) throughout, so the skip turns purely on the
+    # cert profile (check_files), not the #203 warnings-on default.
     default_cert = lat.read(src).validate().certify()
     assert (
-        lat.read(src, index=default_cert).validate(check_files=True).report.resolution
+        lat.read(src, index=default_cert)
+        .validate(check_files=True, warnings=False)
+        .report.resolution
         != "certified"
     )
     # a --check-files cert covers BOTH a check_files request and a weaker default one
     cf_cert = lat.read(src).validate(check_files=True).certify(path=tmp_path / "cf.idx")
     assert (
-        lat.read(src, index=cf_cert).validate(check_files=True).report.resolution
+        lat.read(src, index=cf_cert)
+        .validate(check_files=True, warnings=False)
+        .report.resolution
         == "certified"
     )
-    assert lat.read(src, index=cf_cert).validate().report.resolution == "certified"
+    assert (
+        lat.read(src, index=cf_cert).validate(warnings=False).report.resolution
+        == "certified"
+    )
 
 
 def test_compat_provenance_field_round_trips(tmp_path):

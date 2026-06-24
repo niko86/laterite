@@ -577,7 +577,7 @@ class Ags4File:
         self,
         *,
         dict_version: str | None = None,
-        warnings: bool = False,
+        warnings: bool = True,
         fyi: bool = False,
         check_files: bool = False,
     ) -> Self:
@@ -587,15 +587,21 @@ class Ags4File:
         read from (so line numbers match the original file). A handle built without a
         retained source validates its spec-correct re-emit instead.
 
+        Severity tiers track importance, like a compiler: **errors and WARNINGs show
+        by default** (``warnings=True``); pass ``warnings=False`` to drop to
+        errors-only, and ``fyi=True`` to add the low-signal FYI tier. (The ``compat``
+        shim keeps its own python-ags4-faithful defaults, unaffected by this.)
+
         **Certificate short-circuit:** if this handle carries a fresh ``index=``
         certificate (from :func:`read`) **minted by the current validator engine**,
-        and you ask for the *default* check, the rule engine is skipped — the cert
+        and you ask for an errors-only check, the rule engine is skipped — the cert
         already proves the file validated clean — and :attr:`report` is the
         synthesised certified report (:meth:`Report.from_cert`). A cert from a
         *different/older* engine is re-validated, not trusted (its clean verdict may
         not reproduce under today's rules). Asking for more than the cert vouches for
-        (an explicit ``dict_version`` / ``warnings`` / ``fyi`` / ``check_files``)
-        always runs the engine."""
+        runs the engine — which now includes the **default** check, since a cert
+        records only the error verdict, not the warning list; pass ``warnings=False``
+        to engage the skip on a known-clean file."""
         if (
             self._cert is not None
             and self._cert.matches_native_validator()
@@ -961,13 +967,18 @@ def validate(
     *,
     text: str | None = None,
     dict_version: str | None = None,
-    warnings: bool = False,
+    warnings: bool = True,
     fyi: bool = False,
     check_files: bool = False,
 ) -> Report:
     """Validate an AGS4 file (path) or in-memory ``text=`` against the AGS4.1
     rules. Raises for un-validatable input (missing / not AGS4 / unsupported
-    edition); rule *violations* come back in the :class:`Report`."""
+    edition); rule *violations* come back in the :class:`Report`.
+
+    Severity tiers track importance: **errors and WARNINGs show by default**
+    (``warnings=True``) — pass ``warnings=False`` for errors-only, ``fyi=True`` to
+    add the low-signal FYI tier. (The ``compat`` shim keeps its own
+    python-ags4-faithful defaults.)"""
     path, txt, data = _resolve_source(source, text=text)
     r = _native.run_check(
         path=path,
