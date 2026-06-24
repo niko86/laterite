@@ -146,6 +146,21 @@ def generate() -> str:
 
     body_blocks = [_emit_class(g, children.get(g["code"], [])) for g in groups_sorted]
 
+    # `__all__` lists every typed-graph class. `laterite/__init__.py` does
+    # `if TYPE_CHECKING: from ._laterite_native import *`, which re-exports
+    # exactly these names to the package root so `from laterite import PROJ,
+    # LOCA, ...` resolves + autocompletes (the runtime globals() alias loop is
+    # invisible to static analysers). Restricting the star to the classes keeps
+    # the module's internal functions out of the package namespace.
+    all_names = [g["code"] for g in groups_sorted]
+    all_block = (
+        "\n# Re-exported to the package root for `from laterite import PROJ, ...`\n"
+        "# (see laterite/__init__.py). DO NOT EDIT BY HAND.\n"
+        "__all__ = [\n"
+        + "".join(f"    {name!r},\n" for name in all_names)
+        + "]\n"
+    )
+
     # Only the typed-graph classes are stubbed. The native module's internal
     # functions (run_check / fix_file / list_rules / parse_* / excel /
     # transport / Sidecar) are reached through the typed Python wrappers in
@@ -153,7 +168,7 @@ def generate() -> str:
     # deliberately not stubbed here. (The old `ags5db_*` stubs were removed:
     # the AGS5 surface was decoupled in #177, so they typed symbols the
     # module no longer registers.)
-    return header + "\n".join(body_blocks) + "\n"
+    return header + "\n".join(body_blocks) + all_block
 
 
 def main() -> int:

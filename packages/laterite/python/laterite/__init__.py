@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import polars as pl
 
@@ -33,12 +33,20 @@ from .registry import GROUPS as _GROUPS
 
 # Re-export the typed-graph classes for ergonomic
 # `from laterite import PROJ, LOCA, SAMP, ...`. The class objects live in the
-# compiled Rust extension `_laterite_native`; this loop just aliases them at the
-# package root. Type checkers follow the `.pyi` next to the .so.
+# compiled Rust extension `_laterite_native`; this loop aliases them onto the
+# package root at runtime.
 _TYPED_CLASS_NAMES: tuple[str, ...] = tuple(sorted(_GROUPS))
 for _code in _TYPED_CLASS_NAMES:
     globals()[_code] = getattr(_native, _code)
 del _code
+
+# The runtime loop above is invisible to static analysers, so without this they
+# flag `from laterite import PROJ` as an unknown symbol — no IDE autocomplete and
+# spurious type errors. Re-importing the classes here (type-check time only,
+# never executed) makes them statically visible; the star is restricted to the
+# typed-graph classes by `_laterite_native.pyi`'s generated `__all__`.
+if TYPE_CHECKING:
+    from ._laterite_native import *  # noqa: F403
 
 __all__ = [
     "validate",
