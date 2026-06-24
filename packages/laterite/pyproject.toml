@@ -59,17 +59,14 @@ Changelog = "https://github.com/niko86/laterite/blob/main/CHANGELOG.md"
 
 # `compat` is the python-ags4 drop-in surface — it defaults to returning
 # pandas frames, so `pip install laterite[compat]` is what most callers
-# want when porting from python_ags4. `pandas` is retained as a
-# back-compat alias (same set). `set_backend("polars")` (or
+# want when porting from python_ags4. `set_backend("polars")` (or
 # LATERITE_COMPAT_BACKEND=polars) removes the pandas requirement entirely.
 [project.optional-dependencies]
 # compat (the python-ags4 drop-in, pandas by default) is now pyarrow-free: its pandas
 # output goes polars -> pandas via DuckDB's NumPy `.df()` (the same trick the core
-# uses), so the extra is just pandas. `pandas` is a back-compat alias of `compat`;
-# `pyarrow` stays for callers who explicitly want the Arrow backend (the only thing
-# that pulls pyarrow).
+# uses), so the extra is just pandas. `pyarrow` stays for callers who explicitly want
+# the Arrow backend (the only thing that pulls pyarrow).
 compat = ["pandas<3"]
-pandas = ["pandas<3"]
 pyarrow = ["pyarrow>=24.0.0"]
 # The experimental DuckDB-backed `.ags5db` surface was decoupled from the
 # shipped AGS4 product (#177) — it now lives in the dormant `ags5/` holding

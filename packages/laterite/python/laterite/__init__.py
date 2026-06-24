@@ -1174,7 +1174,6 @@ def build_ags4(
     groups: Mapping[str, Any] | list[tuple[str, Any]],
     *,
     dict_version: str | None = None,
-    edition: str | None = None,
     mode: str = "autofix",
 ) -> BuildResult:
     """Build valid AGS4 from your own per-group data — the data→AGS4 door.
@@ -1200,20 +1199,7 @@ def build_ags4(
     * ``"strict"`` — raise if the output violates any error-severity rule.
 
     ``dict_version`` is one of ``4.0.3 | 4.0.4 | 4.1 | 4.1.1 | 4.2`` (default
-    ``4.1.1``). ``edition`` is a deprecated alias for ``dict_version``."""
-    if edition is not None:
-        if dict_version is not None:
-            raise TypeError(
-                "build_ags4: pass dict_version, not both dict_version and edition"
-            )
-        import warnings as _warnings
-
-        _warnings.warn(
-            "build_ags4(edition=...) is the old name for dict_version=...",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        dict_version = edition
+    ``4.1.1``)."""
     if dict_version is None:
         dict_version = "4.1.1"
     import json

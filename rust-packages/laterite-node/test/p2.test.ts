@@ -181,17 +181,6 @@ describe("buildAgs4 → data → AGS4", () => {
     expect(read(undefined, { text: res.text }).groups).toEqual(["PROJ", "LOCA"]);
   });
 
-  it("accepts `edition` as a deprecated alias for `dictVersion`", () => {
-    const loca = tableFromArrays({
-      LOCA_ID: ["BH01"],
-      LOCA_GL: Float64Array.from([12.3]),
-    });
-    const res = buildAgs4(new Map<string, Table>([["LOCA", loca]]), {
-      edition: "4.2",
-    });
-    expect(res.text).toMatch(/"DATA","BH01","12\.30"/);
-  });
-
   it("accepts row-objects (transposed to a typed Table)", () => {
     const res = buildAgs4([
       ["PROJ", [{ PROJ_ID: "P1", PROJ_NAME: "Demo" }]],

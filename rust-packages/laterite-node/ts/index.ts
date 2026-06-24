@@ -79,8 +79,6 @@ export type GroupData = Table | GroupRows;
 export interface EmitOptions {
   /** `"4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2"` (default `"4.1.1"`). */
   dictVersion?: string;
-  /** @deprecated alias for `dictVersion`. */
-  edition?: string;
   /** `"autofix"` (default) | `"report"` | `"strict"`. */
   mode?: "autofix" | "report" | "strict";
 }
@@ -149,7 +147,7 @@ export function buildAgs4(
     const table = Array.isArray(data) ? rowsToTable(data) : data;
     return { code, ipc: Buffer.from(tableToIPC(table, "stream")) };
   });
-  const res = emitAgs4FromIpc(ipcGroups, opts.dictVersion ?? opts.edition, opts.mode);
+  const res = emitAgs4FromIpc(ipcGroups, opts.dictVersion, opts.mode);
   const byRule = JSON.parse(res.findingsJson) as Record<string, Array<Record<string, unknown>>>;
   const findings = Object.entries(byRule).flatMap(([rule, list]) =>
     list.map((f) => ({ rule, ...f })),

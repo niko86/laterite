@@ -400,9 +400,6 @@ all = [
 compat = [
     { name = "pandas" },
 ]
-pandas = [
-    { name = "pandas" },
-]
 pyarrow = [
     { name = "pyarrow" },
 ]
@@ -412,12 +409,11 @@ requires-dist = [
     { name = "duckdb", specifier = ">=1.4.0" },
     { name = "pandas", marker = "extra == 'all'", specifier = "<3" },
     { name = "pandas", marker = "extra == 'compat'", specifier = "<3" },
-    { name = "pandas", marker = "extra == 'pandas'", specifier = "<3" },
     { name = "polars", specifier = ">=1.40.1" },
     { name = "pyarrow", marker = "extra == 'all'", specifier = ">=24.0.0" },
     { name = "pyarrow", marker = "extra == 'pyarrow'", specifier = ">=24.0.0" },
 ]
-provides-extras = ["compat", "pandas", "pyarrow", "all"]
+provides-extras = ["compat", "pyarrow", "all"]
 
 [[package]]
 name = "laterite-workspace"

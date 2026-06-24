@@ -82,17 +82,6 @@ def test_unknown_edition_and_mode_raise():
         laterite.build_ags4({"LOCA": loca}, mode="banana")
 
 
-def test_edition_is_a_deprecated_alias_for_dict_version():
-    loca = pd.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
-    # `edition=` still works (BC) but warns; `dict_version=` is the name now.
-    with pytest.deprecated_call():
-        res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, edition="4.2")
-    assert '"DATA","BH01","12.30"' in res.text
-    # passing both names at once is a hard error.
-    with pytest.raises(TypeError, match="not both"):
-        laterite.build_ags4({"LOCA": loca}, dict_version="4.2", edition="4.2")
-
-
 def test_round_trips_through_read():
     loca = pl.DataFrame({"LOCA_ID": ["BH01", "BH02"], "LOCA_GL": [12.3, 13.0]})
     res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca})

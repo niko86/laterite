@@ -92,7 +92,7 @@ try {
 
       const res = m.buildAgs4(
         new Map([["LOCA", [{ LOCA_ID: "BH01", LOCA_GL: 12.3 }]]]),
-        { edition: "4.1.1", mode: "autofix" },
+        { dictVersion: "4.1.1", mode: "autofix" },
       );
       assert.ok(res.text.includes("LOCA"), "emit");
       console.log("  ${entry}: read+table+validate+emit OK ✓");

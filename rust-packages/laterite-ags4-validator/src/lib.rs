@@ -68,9 +68,9 @@ pub struct CheckOptions {
     /// returns [`ValidatorError::BadDict`] (a clear error, never
     /// silent).
     pub custom_dict: Option<PathBuf>,
-    /// Include WARNING-severity findings (parity with `ags4_cli
-    /// --show-warnings`). No rule emits a WARNING-tier finding yet, so
-    /// this is currently inert — kept for API/flag stability.
+    /// Include WARNING-severity findings (malformed DICT, nonstandard
+    /// abbreviations, unrecognised TRAN_AGS edition, …). On by default at
+    /// the binding layer; `--no-warnings` drops to errors-only.
     pub include_warnings: bool,
     /// Include FYI-severity findings.
     pub include_fyi: bool,

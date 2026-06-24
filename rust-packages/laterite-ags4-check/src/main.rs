@@ -10,7 +10,7 @@
 //!
 //! ```text
 //! lat-check <file.ags> [--dict-version 4.1|4.2] [--dict <path>]
-//!                       [--json] [--show-warnings] [--show-fyi] [--quiet]
+//!                       [--json] [--show-fyi] [--quiet]
 //!                       [--fix [--in-place | --fix-out <path>]]
 //! ```
 //!
@@ -204,10 +204,7 @@ fn main() {
             #[cfg(feature = "tui")]
             "--tui" => tui_requested = true,
             // WARNINGs are on by default now; `--no-warnings` drops to errors-only.
-            // `--show-warnings` is kept as an accepted no-op so existing scripts
-            // don't break (it's redundant — warnings already show).
             "--no-warnings" => opts.include_warnings = false,
-            "--show-warnings" => opts.include_warnings = true,
             "--show-fyi" => opts.include_fyi = true,
             "--check-files" => opts.check_files = true,
             "--encoding" => match argv.next().as_deref() {

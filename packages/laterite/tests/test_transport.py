@@ -82,17 +82,11 @@ def test_lock_both_levels_work(ags_file: Path, tmp_path: Path) -> None:
     assert out1.exists() and out9.exists()
 
 
-# --- #111-B: the src/db deprecation shim + non-path guard -------------------
-
-def test_deprecated_db_keyword_still_works_with_warning(ags_file: Path) -> None:
-    with pytest.warns(DeprecationWarning, match=r"'db=' keyword is renamed 'src='"):
-        out = transport.pack(db=ags_file)
-    assert out.exists()
-
+# --- non-path guard ---------------------------------------------------------
 
 def test_non_path_arg_raises_actionable_typeerror() -> None:
     # Passing e.g. an Ags4File (or any non-path) fails early, naming the fix.
     with pytest.raises(TypeError, match=r"\.save\(path\)"):
         transport.pack(object())
-    with pytest.raises(TypeError, match=r"missing required argument: 'src'"):
+    with pytest.raises(TypeError, match=r"required positional argument: 'src'"):
         transport.pack()

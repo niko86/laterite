@@ -184,9 +184,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out")
     p.add_argument("--json-out")
     # WARNINGs show by default (#203); --no-warnings drops to errors-only.
-    # --show-warnings kept as an accepted no-op (redundant) for script back-compat.
     p.add_argument("--no-warnings", action="store_true")
-    p.add_argument("--show-warnings", action="store_true")
     p.add_argument("--show-fyi", action="store_true")
     p.add_argument("--check-files", action="store_true")
     p.add_argument("--encoding")

@@ -6,6 +6,8 @@
 #     "pyarrow>=17",
 #     "duckdb>=1.4.0",
 #     "altair>=5.4",
+#     "folium>=0.17",
+#     "pyproj>=3.6",
 #     "laterite>=0.5.0",
 # ]
 # ///
@@ -33,11 +35,25 @@ def _():
 
     import altair as alt
     import duckdb
+    import folium
     import laterite
     import marimo as mo
     import polars as pl
+    from pyproj import Transformer
 
-    return alt, duckdb, hashlib, laterite, mo, pathlib, pl, tempfile, urllib
+    return (
+        Transformer,
+        alt,
+        duckdb,
+        folium,
+        hashlib,
+        laterite,
+        mo,
+        pathlib,
+        pl,
+        tempfile,
+        urllib,
+    )
 
 
 @app.cell
@@ -225,7 +241,8 @@ def _(ags_path, fyi_sw, laterite, mo, warnings_sw):
     _kpis = mo.hstack(
         [
             mo.stat(
-                "PASS" if report.is_valid else "FAIL",
+                # errors + warnings are the gate; FYI is advisory and never fails it
+                "PASS" if (_counts["error"] == 0 and _counts["warning"] == 0) else "FAIL",
                 label="Validity",
                 caption=f"dict {report.dict_version}",
                 bordered=True,
@@ -254,58 +271,56 @@ def _(ags_path, fyi_sw, laterite, mo, warnings_sw):
 
 
 @app.cell
-def _(alt, ags, mo):
-    mo.md("## 3 · Charts — real geotech, straight from born-typed columns")
+def _(mo):
+    mo.md(
+        "## 3 · Charts — real geotech, straight from born-typed columns\n\n"
+        "**Site plan** — boreholes on a Leaflet map. `LOCA_NATE` / `LOCA_NATN` "
+        "(British National Grid, OSGB36) are projected to WGS84 with the same "
+        "Helmert transform the browser app uses (~5 m, no grid download). "
+        "Pan / zoom and hover a pin."
+    )
+    return
+
+
+@app.cell
+def _(Transformer, ags, folium, mo):
     _have_site = "LOCA" in ags.groups and {"LOCA_NATE", "LOCA_NATN"} <= set(
         ags["LOCA"].columns
     )
     if _have_site:
         _loca = ags["LOCA"]
-        _enc = dict(
-            x=alt.X("LOCA_NATE:Q", scale=alt.Scale(zero=False), title="Easting (m)"),
-            y=alt.Y("LOCA_NATN:Q", scale=alt.Scale(zero=False), title="Northing (m)"),
-            tooltip=list(_loca.columns),
+        # OSGB36 British National Grid -> WGS84 (Helmert 7-param), matching
+        # web/src/lib/coords.ts: ~5 m, no OSTN15 grid download needed.
+        _osgb = (
+            "+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 "
+            "+y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.15,"
+            "0.247,0.842,-20.489 +units=m +no_defs"
         )
-        if "LOCA_FDEP" in _loca.columns:
-            _enc["color"] = alt.Color(
-                "LOCA_FDEP:Q",
-                title="Final depth (m)",
-                scale=alt.Scale(scheme="orangered"),
-            )
-        _chart = (
-            alt.Chart(_loca)
-            .mark_circle(size=160, opacity=0.85, stroke="#5a1a14", strokeWidth=1)
-            .encode(**_enc)
-            .properties(height=380, title="Site plan — borehole locations")
+        _to_wgs84 = Transformer.from_crs(_osgb, "EPSG:4326", always_xy=True)
+        _rows = []
+        for _r in _loca.iter_rows(named=True):
+            _lon, _lat = _to_wgs84.transform(_r["LOCA_NATE"], _r["LOCA_NATN"])
+            _rows.append((_r.get("LOCA_ID"), _lat, _lon, _r.get("LOCA_FDEP")))
+        _lat0 = sum(r[1] for r in _rows) / len(_rows)
+        _lon0 = sum(r[2] for r in _rows) / len(_rows)
+        _map = folium.Map(
+            location=[_lat0, _lon0], zoom_start=15, tiles="CartoDB positron"
         )
-        site = mo.ui.altair_chart(_chart)
-        _out = mo.vstack(
-            [
-                mo.md(
-                    "**Site plan** (`LOCA_NATE` × `LOCA_NATN`). Drag-select "
-                    "boreholes — the table below reacts."
-                ),
-                site,
-            ]
-        )
+        for _id, _lat, _lon, _fdep in _rows:
+            folium.CircleMarker(
+                [_lat, _lon],
+                radius=8,
+                color="#5a1a14",
+                weight=1,
+                fill=True,
+                fill_color="#b2342a",
+                fill_opacity=0.85,
+                tooltip=f"{_id} — {_fdep} m deep",
+            ).add_to(_map)
+        _out = _map  # marimo renders folium's _repr_html_
     else:
-        site = None
-        _out = mo.md("*(load a file with `LOCA` easting/northing for the site plan)*")
+        _out = mo.md("*(load a file with `LOCA` easting/northing for the site map)*")
     _out
-    return (site,)
-
-
-@app.cell
-def _(mo, site):
-    if site is not None and site.value is not None and len(site.value):
-        _sel = mo.vstack(
-            [mo.md(f"**{len(site.value)} borehole(s) selected:**"), mo.ui.table(site.value)]
-        )
-    elif site is not None:
-        _sel = mo.md("*Drag a box on the site plan to filter boreholes here.*")
-    else:
-        _sel = mo.md("")
-    _sel
     return
 
 
@@ -501,8 +516,12 @@ def _(ags, duckdb, mo, pathlib, tempfile):
         pathlib.Path(_store_path).unlink(missing_ok=True)
         _store = duckdb.connect(_store_path)
         for _g in ags.groups:
-            _df = ags.table(_g)  # born-typed polars; duckdb reads it by name
-            _store.execute(f'CREATE TABLE "{_g}" AS SELECT * FROM _df')
+            _df = ags.table(_g)  # born-typed polars
+            # register explicitly — duckdb's implicit local-scan doesn't reach
+            # the cell frame in every sandbox (e.g. molab)
+            _store.register("_src_df", _df)
+            _store.execute(f'CREATE TABLE "{_g}" AS SELECT * FROM _src_df')
+        _store.unregister("_src_df")
         _store.close()
         _chk = duckdb.connect(_store_path, read_only=True)
         _tables = [r[0] for r in _chk.execute("SHOW TABLES").fetchall()]
@@ -674,7 +693,7 @@ def _(mo):
             ),
             "⌨️ CLI — `lat-check` (the Rust binary)": mo.md(
                 "```bash\n"
-                "pip install laterite          # ships the lat-check binary\n\n"
+                "pip install laterite          # installs the lat-check command\n\n"
                 "lat-check site.ags            # human report; exit 0 clean / 1 findings\n"
                 "lat-check site.ags --json     # machine-readable findings\n"
                 "lat-check site.ags --fix      # repair → sibling .fixed.ags\n"
