@@ -56,19 +56,11 @@ _PASSTHROUGH_PARENT = "LOCA"
 _KEY_SEP = "\n\0"
 
 
-def read_typed(
-    ags4: str | PathLike[str],
-    *,
-    attachments_dir: str | PathLike[str] | None = None,
-) -> Any:
+def read_typed(ags4: str | PathLike[str]) -> Any:
     """Read an AGS4 transfer file and return its typed PROJ tree.
 
     Args:
         ags4: Path to the ``.ags`` source file.
-        attachments_dir: Accepted for signature stability. The typed tree
-            carries no binary side-channel (AGS4 Rule 20 FILE attachments
-            only ever materialised in the ``.ags5db`` ``blob`` table, never
-            in the returned tree), so this argument has no effect here.
 
     Returns:
         A PROJ instance. Standard groups are compiled ``#[pyclass]`` types; custom /
@@ -82,7 +74,6 @@ def read_typed(
     ags4 = Path(ags4)
     if not ags4.exists():
         raise FileNotFoundError(str(ags4))
-    _ = attachments_dir  # see docstring — retained, no-op for the tree
 
     parsed = _native.parse_primitives(path=str(ags4))
     if not parsed.get("ok"):
