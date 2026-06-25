@@ -86,7 +86,10 @@ def test_round_trips_through_read():
     loca = pl.DataFrame({"LOCA_ID": ["BH01", "BH02"], "LOCA_GL": [12.3, 13.0]})
     res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca})
     back = laterite.read(text=res.text)
-    assert back.groups == ["PROJ", "LOCA"]
+    # autofix synthesizes the mandatory metadata groups, so the round-tripped
+    # file is valid and carries TRAN/UNIT/TYPE alongside the data groups.
+    assert sorted(back.groups) == ["LOCA", "PROJ", "TRAN", "TYPE", "UNIT"]
+    assert not res.findings
     df = back["LOCA"]
     assert df["LOCA_ID"].to_list() == ["BH01", "BH02"]
     assert df["LOCA_GL"].to_list() == [12.3, 13.0]
@@ -143,7 +146,7 @@ def test_typed_graph_round_trips_through_read():
     proj.locas.append(laterite.LOCA(loca_id="BH01", loca_gl=12.34))
     proj.locas.append(laterite.LOCA(loca_id="BH02", loca_gl=8.0))
     back = laterite.read(data=laterite.build_ags4(proj).bytes)
-    assert back.groups == ["PROJ", "LOCA"]
+    assert sorted(back.groups) == ["LOCA", "PROJ", "TRAN", "TYPE", "UNIT"]
     loca = back["LOCA"]
     assert loca["LOCA_ID"].to_list() == ["BH01", "BH02"]
     assert loca["LOCA_GL"].to_list() == [12.34, 8.0]
@@ -162,13 +165,15 @@ def test_typed_graph_recurses_deeply():
     proj.locas.append(loca)
 
     back = laterite.read(data=laterite.build_ags4(proj).bytes)
-    assert sorted(back.groups) == ["LLPL", "LOCA", "PROJ", "SAMP"]
+    # the four walked groups + the autofix-synthesized metadata catalogs
+    assert sorted(back.groups) == ["LLPL", "LOCA", "PROJ", "SAMP", "TRAN", "TYPE", "UNIT"]
 
 
 def test_typed_graph_round_trips_via_read_typed(tmp_path):
-    # read_typed builds a PROJ tree; build_ags4 walks it back out. The round
-    # trip recovers the PROJ-rooted subtree (parity-defining coverage — exactly
-    # Node's walk). TRAN is root-metadata (parent None), so it's not in the tree.
+    # read_typed builds a PROJ tree; build_ags4 walks it back out. read_typed
+    # recovers only the PROJ-rooted subtree (parity-defining coverage — exactly
+    # Node's walk; the root-metadata groups have parent None, so aren't in the
+    # tree), and build_ags4's autofix then re-synthesizes TRAN/UNIT/TYPE.
     from laterite.ags4 import read_typed
 
     src = tmp_path / "in.ags"
@@ -182,15 +187,59 @@ def test_typed_graph_round_trips_via_read_typed(tmp_path):
     )
     proj = read_typed(src)
     back = laterite.read(data=laterite.build_ags4(proj).bytes)
-    assert sorted(back.groups) == ["LOCA", "PROJ"]
+    assert sorted(back.groups) == ["LOCA", "PROJ", "TRAN", "TYPE", "UNIT"]
     assert back["LOCA"]["LOCA_ID"].to_list() == ["BH01", "BH02"]
 
 
 def test_typed_graph_childless_root_builds():
     res = laterite.build_ags4(laterite.PROJ(proj_id="P1", proj_name="Solo"))
     back = laterite.read(data=res.bytes)
-    assert back.groups == ["PROJ"]
+    assert sorted(back.groups) == ["PROJ", "TRAN", "TYPE", "UNIT"]
     assert back["PROJ"]["PROJ_ID"].to_list() == ["P1"]
+
+
+def test_autofix_synthesizes_missing_metadata_groups():
+    # Under the default autofix mode, build_ags4 mints the mandatory UNIT/TYPE
+    # catalogs (from the data) and a placeholder TRAN, so a data-only build is
+    # valid out of the box; report mode leaves them absent.
+    loca = pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
+    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca})
+    assert {"TRAN", "UNIT", "TYPE"}.issubset(laterite.read(data=res.bytes).groups)
+    assert not res.findings  # fully valid, no Rule 14/15/17
+
+    rep = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, mode="report")
+    assert "TRAN" not in laterite.read(data=rep.bytes).groups
+    assert rep.findings  # report mode reports the missing metadata instead
+
+
+def test_autofix_synthesizes_abbr_for_pa_codes():
+    # When the data uses a PA picklist code (LOCA_TYPE is a PA heading), autofix
+    # also synthesizes ABBR (Rule 16) defining that code, so the build is valid.
+    loca = pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_TYPE": ["TP"]})
+    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca})
+    assert "ABBR" in laterite.read(data=res.bytes).groups
+    assert '"DATA","LOCA_TYPE","TP"' in res.text
+    assert not res.findings  # fully valid, incl. Rule 16
+
+
+def test_typed_graph_emits_only_set_columns():
+    # The typed-graph door emits only the headings you SET (like the frames
+    # door), not the full union schema — so a sparse node builds clean at the
+    # default edition instead of dragging in ~45 blank columns (whose unset
+    # edition-specific / PA headings would trip Rule 9 / 16).
+    proj = laterite.PROJ(proj_id="LAT-DEMO", proj_name="Demo")
+    proj.locas.append(laterite.LOCA(loca_id="BH01", loca_gl=12.50))
+    res = laterite.build_ags4(proj)
+    hdr = next(ln for ln in res.text.splitlines() if ln.startswith('"HEADING","LOCA_ID"'))
+    assert hdr == '"HEADING","LOCA_ID","LOCA_GL"'  # only the two set columns, in order
+    assert not res.findings  # valid at the default 4.1.1
+
+    # No data loss: a deliberately-set heading survives the prune (here a
+    # 4.2-only one — flagged at 4.1.1, clean at 4.2, value kept either way).
+    p2 = laterite.PROJ(proj_id="P", proj_name="x")
+    p2.locas.append(laterite.LOCA(loca_id="BH01", loca_gl=12.5, loca_vssl="MV Demo"))
+    assert "LOCA_VSSL" in laterite.build_ags4(p2).text
+    assert not laterite.build_ags4(p2, dict_version="4.2").findings
 
 
 def test_typed_graph_non_group_child_raises():

@@ -25,6 +25,7 @@ use laterite_ags4_validator::parse::parse_bytes;
 use laterite_ags4_validator::{CheckOptions, DictVersion, rules};
 use laterite_types::ags4_str;
 use serde_json::Value;
+use std::collections::BTreeSet;
 
 use crate::error::EmitError;
 use crate::writer::{EmitGroup, write_ags4};
@@ -90,7 +91,7 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
 
     // --- steps 1–2: resolve UNIT/TYPE (hybrid) + format cells ---------
     // `OwnedGroup` holds Strings; `EmitGroup` borrows them for the write.
-    let owned: Vec<OwnedGroup> = groups
+    let mut owned: Vec<OwnedGroup> = groups
         .iter()
         .map(|g| {
             let units: Vec<String> = (0..g.headings.len())
@@ -128,6 +129,17 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
             }
         })
         .collect();
+
+    // --- step 2.5: synthesize missing mandatory metadata groups -------
+    // AutoFix only: a data-only build (notably a typed PROJ graph, which
+    // can't reach the parentless root-metadata groups) still yields a valid
+    // file — mint UNIT/TYPE (derived from the data), a placeholder TRAN, and
+    // ABBR (when PA codes are used) for whichever are absent. PROJ is never
+    // synthesized (real project identity), so a missing PROJ stays a Rule 13 finding.
+    if opts.mode == EmitMode::AutoFix {
+        let synth = synthesize_metadata(&owned, &dict);
+        owned.extend(synth);
+    }
 
     // --- step 3: write the sections -----------------------------------
     let views: Vec<EmitGroup<'_>> = owned
@@ -257,6 +269,211 @@ fn validate(bytes: &[u8], edition: DictVersion) -> Result<Findings, EmitError> {
     let mut found = Findings::new();
     rules::run_all(&parsed, &dict, &opts, None, &mut found);
     Ok(found)
+}
+
+/// Under AutoFix, synthesize whichever mandatory metadata catalog group is
+/// absent so a data-only build still yields a valid file. UNIT and TYPE are
+/// pure derivations of the data; TRAN is a placeholder stub the caller
+/// overwrites; ABBR is minted when (and only when) the data uses PA picklist
+/// codes (Rule 16). PROJ is deliberately never synthesized — it carries real
+/// project identity, not derivable metadata, so a missing PROJ stays a Rule 13
+/// finding.
+fn synthesize_metadata(owned: &[OwnedGroup], dict: &Dictionary) -> Vec<OwnedGroup> {
+    let present: BTreeSet<&str> = owned.iter().map(|g| g.code.as_str()).collect();
+    let mut synth: Vec<OwnedGroup> = Vec::new();
+
+    // TRAN first: its DT `TRAN_DATE` introduces the `yyyy-mm-dd` unit and the
+    // `DT` type that the UNIT/TYPE catalogs below must then cover.
+    if !present.contains("TRAN") {
+        synth.push(synth_tran(dict));
+    }
+    // UNIT: one row per distinct unit used across all groups (Rule 15).
+    if !present.contains("UNIT") {
+        let units = collect_units(owned.iter().chain(synth.iter()));
+        synth.push(synth_catalog("UNIT", "UNIT_UNIT", "UNIT_DESC", &units));
+    }
+    // TYPE: one row per distinct type code used (Rule 17). Force `X` — every
+    // synthesized metadata group is all-`X`, so the catalog must self-cover.
+    if !present.contains("TYPE") {
+        let mut types = collect_types(owned.iter().chain(synth.iter()));
+        types.insert("X".to_string());
+        synth.push(synth_catalog("TYPE", "TYPE_TYPE", "TYPE_DESC", &types));
+    }
+    // ABBR: only when the data uses PA picklist codes (Rule 16) — one row per
+    // distinct (heading, code), description from the standard ABBR table
+    // (fallback: the code itself). PA values are split on the concatenator the
+    // same way Rule 16 reads it (the file's `TRAN_RCON`, else the AGS `+`).
+    if !present.contains("ABBR") {
+        let abbrs = collect_abbreviations(owned, dict, &concatenator(owned));
+        if !abbrs.is_empty() {
+            synth.push(synth_abbr(abbrs));
+        }
+    }
+    synth
+}
+
+/// Distinct non-empty units used (Rule 15): every group's UNIT-row value plus
+/// every distinct value in a `PU`-typed data column. Blanks and the literal
+/// `"UNIT"` are excluded.
+fn collect_units<'a>(groups: impl Iterator<Item = &'a OwnedGroup>) -> BTreeSet<String> {
+    let mut units = BTreeSet::new();
+    for g in groups {
+        for u in &g.units {
+            let u = u.trim();
+            if !u.is_empty() && u != "UNIT" {
+                units.insert(u.to_string());
+            }
+        }
+        for (ci, ty) in g.types.iter().enumerate() {
+            if ty.trim() == "PU" {
+                for row in &g.rows {
+                    if let Some(v) = row.get(ci).map(|s| s.trim()) {
+                        if !v.is_empty() {
+                            units.insert(v.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    units
+}
+
+/// Distinct non-empty type codes used (Rule 17): every group's TYPE-row value.
+/// Blanks and the literal `"TYPE"` are excluded.
+fn collect_types<'a>(groups: impl Iterator<Item = &'a OwnedGroup>) -> BTreeSet<String> {
+    let mut types = BTreeSet::new();
+    for g in groups {
+        for t in &g.types {
+            let t = t.trim();
+            if !t.is_empty() && t != "TYPE" {
+                types.insert(t.to_string());
+            }
+        }
+    }
+    types
+}
+
+/// A two-column catalog group (UNIT or TYPE): the KEY symbol + a DESC that
+/// falls back to the symbol itself (the validator only requires DESC be
+/// non-empty, and the dictionary carries no unit/type description catalog).
+fn synth_catalog(code: &str, key: &str, desc: &str, symbols: &BTreeSet<String>) -> OwnedGroup {
+    OwnedGroup {
+        code: code.to_string(),
+        headings: vec![key.to_string(), desc.to_string()],
+        units: vec![String::new(), String::new()],
+        types: vec!["X".to_string(), "X".to_string()],
+        rows: symbols.iter().map(|s| vec![s.clone(), s.clone()]).collect(),
+    }
+}
+
+/// A minimal valid TRAN stub. `TRAN_AGS` is the edition's expected value (no
+/// unrecognised-edition warning); `TRAN_DLIM`/`TRAN_RCON` are the AGS standard
+/// `"|"`/`"+"`. The REQUIRED transmission fields the build can't know
+/// (producer, recipient, status) are `"TBC"` placeholders and `TRAN_DATE` a
+/// fixed placeholder date — all meant to be overwritten by the caller.
+fn synth_tran(dict: &Dictionary) -> OwnedGroup {
+    OwnedGroup {
+        code: "TRAN".to_string(),
+        headings: [
+            "TRAN_ISNO",
+            "TRAN_DATE",
+            "TRAN_PROD",
+            "TRAN_STAT",
+            "TRAN_AGS",
+            "TRAN_RECV",
+            "TRAN_DLIM",
+            "TRAN_RCON",
+        ]
+        .map(String::from)
+        .to_vec(),
+        units: ["", "yyyy-mm-dd", "", "", "", "", "", ""]
+            .map(String::from)
+            .to_vec(),
+        types: ["X", "DT", "X", "X", "X", "X", "X", "X"]
+            .map(String::from)
+            .to_vec(),
+        rows: vec![vec![
+            "1".to_string(),
+            "1900-01-01".to_string(),
+            "TBC".to_string(),
+            "TBC".to_string(),
+            dict.tran_ags().to_string(),
+            "TBC".to_string(),
+            "|".to_string(),
+            "+".to_string(),
+        ]],
+    }
+}
+
+/// The PA concatenator (Rule 16a) — the file's `TRAN_RCON` if a TRAN group was
+/// supplied, else the AGS standard `+` (also what `synth_tran` writes).
+fn concatenator(owned: &[OwnedGroup]) -> String {
+    for g in owned {
+        if g.code == "TRAN" {
+            if let Some(ci) = g.headings.iter().position(|h| h == "TRAN_RCON") {
+                if let Some(v) = g.rows.first().and_then(|r| r.get(ci)) {
+                    let v = v.trim();
+                    if !v.is_empty() {
+                        return v.to_string();
+                    }
+                }
+            }
+        }
+    }
+    "+".to_string()
+}
+
+/// Distinct `(heading, code, desc)` triples for every abbreviation used in a
+/// `PA`-typed column (Rule 16). Each cell is split on `concat` (matching Rule
+/// 16a); the description is the standard ABBR table's, falling back to the code.
+fn collect_abbreviations(
+    groups: &[OwnedGroup],
+    dict: &Dictionary,
+    concat: &str,
+) -> Vec<[String; 3]> {
+    let mut seen: BTreeSet<(String, String)> = BTreeSet::new();
+    for g in groups {
+        for (ci, ty) in g.types.iter().enumerate() {
+            if ty.trim() == "PA" {
+                let heading = g.headings.get(ci).map(String::as_str).unwrap_or("");
+                for row in &g.rows {
+                    if let Some(cell) = row.get(ci) {
+                        for code in cell.split(concat) {
+                            let code = code.trim();
+                            if !code.is_empty() {
+                                seen.insert((heading.to_string(), code.to_string()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    seen.into_iter()
+        .map(|(h, c)| {
+            let desc = dict
+                .abbr_desc(&h, &c)
+                .map(str::to_string)
+                .unwrap_or_else(|| c.clone());
+            [h, c, desc]
+        })
+        .collect()
+}
+
+/// The ABBR group from collected `(heading, code, desc)` triples.
+fn synth_abbr(rows: Vec<[String; 3]>) -> OwnedGroup {
+    OwnedGroup {
+        code: "ABBR".to_string(),
+        headings: vec![
+            "ABBR_HDNG".to_string(),
+            "ABBR_CODE".to_string(),
+            "ABBR_DESC".to_string(),
+        ],
+        units: vec![String::new(), String::new(), String::new()],
+        types: vec!["X".to_string(), "X".to_string(), "X".to_string()],
+        rows: rows.into_iter().map(|r| r.to_vec()).collect(),
+    }
 }
 
 #[cfg(test)]
@@ -389,6 +606,93 @@ mod tests {
         assert!(
             parsed.groups.contains_key("PROJ"),
             "PROJ group should survive the round trip"
+        );
+    }
+
+    #[test]
+    fn autofix_synthesizes_missing_metadata_groups() {
+        // The flagship enhancement: a data-only build (PROJ + LOCA, no
+        // TRAN/UNIT/TYPE) under the default AutoFix mode synthesizes the
+        // missing root-metadata groups and comes back fully valid.
+        let loca = GroupInput {
+            code: "LOCA".into(),
+            headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
+            units: None,
+            types: None,
+            rows: vec![vec![json!("BH01"), json!(12.3)]],
+        };
+        let r = emit_ags4(&[proj(), loca], &EmitOpts::default()).unwrap();
+        let text = String::from_utf8(r.bytes.clone()).unwrap();
+        for g in ["TRAN", "UNIT", "TYPE"] {
+            assert!(
+                text.contains(&format!("\"GROUP\",\"{g}\"")),
+                "AutoFix should synthesize the {g} group, got:\n{text}"
+            );
+        }
+        // The synthesized file is valid — no error-severity findings.
+        let errors = r
+            .findings
+            .values()
+            .flatten()
+            .filter(|f| f.severity == Severity::Error)
+            .count();
+        assert_eq!(
+            errors, 0,
+            "synthesized build should be error-free, findings:\n{:?}",
+            r.findings
+        );
+    }
+
+    #[test]
+    fn autofix_synthesizes_abbr_for_pa_codes() {
+        // A PA-coded value (LOCA_TYPE is a PA heading) needs an ABBR definition
+        // (Rule 16); AutoFix mints ABBR covering exactly the codes used, and the
+        // file is valid.
+        let loca = GroupInput {
+            code: "LOCA".into(),
+            headings: vec!["LOCA_ID".into(), "LOCA_TYPE".into()],
+            units: None,
+            types: None,
+            rows: vec![vec![json!("BH01"), json!("TP")]],
+        };
+        let r = emit_ags4(&[proj(), loca], &EmitOpts::default()).unwrap();
+        let text = String::from_utf8(r.bytes.clone()).unwrap();
+        assert!(
+            text.contains("\"GROUP\",\"ABBR\""),
+            "AutoFix should synthesize ABBR, got:\n{text}"
+        );
+        assert!(
+            text.contains("\"DATA\",\"LOCA_TYPE\",\"TP\""),
+            "ABBR should define LOCA_TYPE/TP, got:\n{text}"
+        );
+        let errors = r
+            .findings
+            .values()
+            .flatten()
+            .filter(|f| f.severity == Severity::Error)
+            .count();
+        assert_eq!(
+            errors, 0,
+            "PA-coded build should be error-free, findings:\n{:?}",
+            r.findings
+        );
+    }
+
+    #[test]
+    fn report_mode_does_not_synthesize() {
+        // Report mode leaves the file as given — a missing TRAN is not minted.
+        let r = emit_ags4(
+            &[proj()],
+            &EmitOpts {
+                mode: EmitMode::Report,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let text = String::from_utf8(r.bytes).unwrap();
+        assert!(
+            !text.contains("\"GROUP\",\"TRAN\""),
+            "Report must not synthesize TRAN, got:\n{text}"
         );
     }
 }

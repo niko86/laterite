@@ -142,8 +142,11 @@ function rowsToTable(rows: GroupRows): Table {
 }
 
 /** Walk a typed-graph tree (`new PROJ({…, locas:[new LOCA({…})]})`) depth-first
- * into per-group row buckets — every declared heading becomes a column (null if
- * unset); child arrays are recursed via the registry's parent→child links. */
+ * into per-group row buckets, then emit only the headings you actually SET —
+ * columns entirely unset (null) across a group's rows are dropped (except KEY
+ * headings), so the typed-graph door matches the frames door (emit your data,
+ * not the full union schema). Child arrays are recursed via the registry's
+ * parent→child links. A heading set to `""` survives — that's a real value. */
 function walkTree(root: AgsGroup): Array<[string, GroupRows]> {
   const buckets = new Map<string, GroupRows>();
   const visit = (node: AgsGroup): void => {
@@ -163,6 +166,18 @@ function walkTree(root: AgsGroup): Array<[string, GroupRows]> {
     }
   };
   visit(root);
+  // Prune entirely-unset columns (keep KEY headings — a missing key must be
+  // flagged, not silently dropped). Otherwise a sparse node emits ~45 blank
+  // columns whose unset edition-specific / PA headings trip Rule 9 / 16.
+  for (const [code, rows] of buckets) {
+    const desc = registry.get(code)!;
+    for (const h of desc.headings) {
+      if (registry.isKeyStatus(h.status)) continue;
+      if (rows.every((r) => r[h.name] == null)) {
+        for (const r of rows) delete r[h.name];
+      }
+    }
+  }
   return [...buckets];
 }
 
@@ -171,16 +186,21 @@ function walkTree(root: AgsGroup): Array<[string, GroupRows]> {
  * an *existing* file, `buildAgs4` *constructs* a new one: it lays the groups out
  * in order, fills UNIT/TYPE from the chosen `dictVersion`, then runs the output
  * through the validator (the `mode` knob on `opts` decides what happens to the
- * findings — e.g. `"autofix"` applies the safe fixes, `"report"` merely records
- * them). The returned `BuildResult` carries the bytes, the residual `findings`,
+ * findings — `"autofix"` applies the safe fixes *and* synthesizes any missing
+ * UNIT/TYPE/TRAN/ABBR metadata group so a data-only build is valid; `"report"` merely
+ * records them). The returned `BuildResult` carries the bytes, the residual `findings`,
  * and a `fixesApplied` count; persist it with `BuildResult.save`. Needs no DuckDB.
  *
  * `groups` accepts two shapes. A **typed-graph root** (`new PROJ({…, locas:[new
  * LOCA({…})]})`) is walked depth-first via the registry's parent→child links,
- * every declared heading becoming a column (null if unset). Or pass a **Map /
- * array of `[code, data]`** entries where `data` is an arrow-js `Table` or row
- * objects whose **keys are the AGS headings** (`LOCA_ID`, …). Either way group
- * order is preserved, so put `PROJ` first.
+ * only the headings you set becoming columns (entirely-unset ones are dropped,
+ * except KEY). The walk covers only
+ * PROJ's subtree (the root-metadata groups have no parent), but under `"autofix"`
+ * the missing UNIT/TYPE/TRAN (and ABBR for PA codes) are synthesized, so a
+ * typed-graph build is valid out of the box. Or pass a **Map / array of `[code,
+ * data]`** entries where `data` is
+ * an arrow-js `Table` or row objects whose **keys are the AGS headings**
+ * (`LOCA_ID`, …). Either way group order is preserved, so put `PROJ` first.
  *
  * @param groups The data to emit — a typed-graph root (`new PROJ({…})`), or a
  *   `Map`/array of `[groupCode, Table | rowObjects]` entries (headings as keys).

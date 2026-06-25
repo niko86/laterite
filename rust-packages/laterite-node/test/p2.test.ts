@@ -177,8 +177,15 @@ describe("buildAgs4 → data → AGS4", () => {
     expect(res.text).toMatch(/"DATA","BH01","12\.30"/); // Float64 12.3 → canonical 2DP
     expect(Array.isArray(res.findings)).toBe(true);
 
-    // The emitted bytes re-parse to the same groups.
-    expect(read(undefined, { text: res.text }).groups).toEqual(["PROJ", "LOCA"]);
+    // The emitted bytes re-parse to the data groups + the autofix-synthesized
+    // metadata catalogs (UNIT/TYPE/TRAN).
+    expect(read(undefined, { text: res.text }).groups).toEqual([
+      "PROJ",
+      "LOCA",
+      "TRAN",
+      "UNIT",
+      "TYPE",
+    ]);
   });
 
   it("accepts row-objects (transposed to a typed Table)", () => {

@@ -98,16 +98,29 @@ export function ancestorChain(code: string): string[] {
   return chain;
 }
 
-/** KEY heading names a group inherits from its ancestors (its own KEYs are not
- * included — the chain is walked from the parent up).
+/** KEY heading names a group inherits from its **direct parent** — the
+ * intersection of this group's KEY headings with its immediate parent's. This
+ * matches the Rust/Python `inherited_key_names` (NOT the whole ancestor chain):
+ * because AGS re-declares inherited keys at every level, the direct-parent
+ * intersection already captures every key a group carries from above, so an
+ * ancestor-chain union would only add ancestor keys the group doesn't have
+ * (e.g. `PROJ_ID` on `SAMP`).
  *
  * @param code The group whose inherited KEY names to gather.
- * @returns The set of KEY heading names contributed by every ancestor.
- * @throws {Ags4Error} If `code` isn't in the registry (via {@link ancestorChain}). */
+ * @returns The set of KEY heading names shared with the direct parent (empty for a root).
+ * @throws {Ags4Error} If `code` isn't in the registry. */
 export function inheritedKeyNames(code: string): Set<string> {
+  const g = GROUPS[code];
+  if (g === undefined) {
+    throw new Ags4Error(`unknown group code: ${JSON.stringify(code)}`);
+  }
   const names = new Set<string>();
-  for (const ancestor of ancestorChain(code).slice(1)) {
-    for (const h of GROUPS[ancestor]!.keyHeadings) names.add(h.name);
+  if (g.parent === null) return names;
+  const parent = GROUPS[g.parent];
+  if (parent === undefined) return names;
+  const parentKeys = new Set(parent.keyHeadings.map((h) => h.name));
+  for (const h of g.keyHeadings) {
+    if (parentKeys.has(h.name)) names.add(h.name);
   }
   return names;
 }

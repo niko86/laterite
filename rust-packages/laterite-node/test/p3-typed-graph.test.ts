@@ -21,15 +21,17 @@ describe("typed-graph builder → buildAgs4", () => {
     const res = buildAgs4(proj);
     expect(res.text).toMatch(/"GROUP","PROJ"/);
     expect(res.text).toMatch(/"GROUP","LOCA"/);
-    // Every declared heading is emitted (LOCA_GL is column 7, not adjacent to
-    // LOCA_ID), so assert the row + the canonicalised 2DP value separately.
-    expect(res.text).toMatch(/"DATA","BH01",/);
-    expect(res.text).toMatch(/"12\.30"/); // 2DP canonicalised from 12.3
+    // Only the SET headings are emitted (LOCA_ID, LOCA_GL) — not the full union
+    // schema — so LOCA_GL is now adjacent to LOCA_ID and the build is clean.
+    expect(res.text).toMatch(/"HEADING","LOCA_ID","LOCA_GL"/);
+    expect(res.text).toMatch(/"DATA","BH01","12\.30"/); // 2DP canonicalised from 12.3
     expect(res.text).toMatch(/"DATA","P1","Demo project"/);
+    expect(res.findings).toHaveLength(0); // sparse graph builds valid (prune + synth)
 
-    // The emitted bytes re-parse to the built groups.
+    // The emitted bytes re-parse to the built groups + the autofix-synthesized
+    // metadata catalogs (UNIT/TYPE/TRAN).
     const back = read(undefined, { text: res.text });
-    expect(back.groups).toEqual(["PROJ", "LOCA"]);
+    expect(back.groups).toEqual(["PROJ", "LOCA", "TRAN", "UNIT", "TYPE"]);
     expect(back.table("LOCA").numRows).toBe(2);
     expect(back.table("LOCA").getChild("LOCA_GL")!.get(0)).toBe(12.3);
   });

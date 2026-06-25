@@ -37,9 +37,10 @@ describe("registry traversal", () => {
     expect(() => registry.ancestorChain("NOPE")).toThrow(Ags4Error);
   });
 
-  it("inheritedKeyNames gathers ancestors' KEY names", () => {
+  it("inheritedKeyNames is the direct-parent intersection (parity with Rust/Python)", () => {
     const inherited = registry.inheritedKeyNames("SAMP");
-    expect(inherited.has("LOCA_ID")).toBe(true); // from the LOCA ancestor
-    expect(inherited.has("PROJ_ID")).toBe(true); // from the PROJ ancestor
+    expect(inherited.has("LOCA_ID")).toBe(true); // shared with the direct parent LOCA
+    expect(inherited.has("PROJ_ID")).toBe(false); // NOT inherited — SAMP carries no PROJ_ID key
+    expect(() => registry.inheritedKeyNames("NOPE")).toThrow(Ags4Error);
   });
 });

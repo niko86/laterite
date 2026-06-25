@@ -110,6 +110,22 @@ jobs:
           npm ci
           npm run build
 
+      # The docs site publishes ONLY to the public mirror's Pages
+      # (https://niko86.github.io/laterite/docs/) — never the private laterite
+      # preview — so both steps are gated on the repo. mkdocs builds into
+      # web/dist/docs (its site_dir), riding the SAME Pages artifact as the app;
+      # run AFTER the Vite build so it doesn't clobber web/dist. uv (the ci.yml
+      # pin) runs an ephemeral mkdocs-material — no project sync, no extra deps.
+      # Non-strict on purpose: a docs link issue must never block the app deploy
+      # (the PR-time `mkdocs build --strict` gate is where that's enforced).
+      - name: Set up uv (docs build, public mirror only)
+        if: github.repository == 'niko86/laterite'
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - name: Build docs (public mirror only)
+        if: github.repository == 'niko86/laterite'
+        working-directory: web/docs-site
+        run: uv run --no-project --with mkdocs-material mkdocs build
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:

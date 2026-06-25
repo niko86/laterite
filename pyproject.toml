@@ -78,6 +78,16 @@ dev = [
     "bump-my-version>=0.28",
 ]
 
+# Docs site (#201, Phase 1): MkDocs + Material. A separate group so the core
+# dev sync isn't bloated — the docs CI job + the Pages deploy install
+# `--group docs`; the doctest gate also needs the dev wheel to run the
+# example library. Material bundles the `--8<--` snippet includes
+# (pymdownx.snippets) and the tags plugin the cookbook uses. mkdocstrings
+# (the Phase-2 API reference) is added when that phase lands.
+docs = [
+    "mkdocs-material>=9.5",
+]
+
 [tool.pytest.ini_options]
 # --benchmark-disable: run pytest-benchmark bodies ONCE as a functional
 # guard but skip the timing rounds (default is 5 rounds × every CI run,

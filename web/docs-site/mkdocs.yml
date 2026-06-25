@@ -1,0 +1,94 @@
+# laterite docs site (#201). Built with MkDocs + Material; published at
+# /laterite/docs/ on the same GitHub Pages artifact as the validator web app
+# (the deploy builds into ../dist/docs, which lives under web/dist that the
+# Pages workflow uploads). `strict: true` turns any broken internal link or
+# missing-nav page into a build failure — the docs can't silently rot.
+#
+# Example-first: every Python/CLI snippet is single-sourced from
+# examples/{python,cli}/ via pymdownx.snippets (`--8<--`), and those files are
+# executed by tests/test_docs_examples.py, so a page and its test are the same
+# bytes. Phase 1 is Python + CLI only (Node/DuckDB tabs land with their gates).
+
+site_name: laterite
+site_description: >-
+  Read, validate, query and produce AGS4 geotechnical data — born-typed, fluent,
+  one engine across Python, the CLI, Node and DuckDB.
+site_url: https://niko86.github.io/laterite/docs/
+repo_url: https://github.com/niko86/laterite
+repo_name: niko86/laterite
+copyright: laterite — MIT, clean-room AGS4
+
+docs_dir: docs
+site_dir: ../dist/docs
+strict: true
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: deep orange
+      toggle: { icon: material/weather-night, name: Switch to dark mode }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: deep orange
+      toggle: { icon: material/weather-sunny, name: Switch to light mode }
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.indexes
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - search.highlight
+    - search.suggest
+    - toc.follow
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - tags
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets:
+      # `--8<-- "python/ex01_read_typed.py"` resolves under examples/ — the same
+      # files tests/test_docs_examples.py executes, so page == test.
+      base_path: [examples]
+      check_paths: true
+
+nav:
+  - Home: index.md
+  - Learn:
+      - learn/index.md
+      - 1. Install & first validate: learn/install.md
+      - 2. Read & explore a file: learn/read.md
+      - 3. Validate in Python: learn/validate.md
+      - 4. Query across groups: learn/query.md
+      - 5. Produce AGS4: learn/produce.md
+  - Cookbook:
+      - cookbook/index.md
+  - Chaining: chaining/index.md
+  - Concepts:
+      - Born-typed reads: concepts/born-typed.md
+  - Reference:
+      - CLI (lat-check): reference/cli.md
+      - Python cheatsheet: reference/cheatsheet.md

@@ -1388,12 +1388,15 @@ def _typed_group_code(obj: Any) -> str | None:
 
 def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
     """Walk a typed PROJ tree depth-first into ``(code, polars frame)`` pairs —
-    the Python twin of laterite-node's ``walkTree``. Every *declared* heading
-    becomes a column (null if unset); the registry's parent→child links drive
+    the Python twin of laterite-node's ``walkTree``. Only the headings you *set*
+    become columns (entirely-unset ones are dropped, except KEY); the registry's parent→child links drive
     recursion via the ``<child>s`` accessors, so only the PROJ-rooted subtree is
     walked. Root-metadata groups (TRAN/UNIT/TYPE/ABBR/DICT, parent ``None``) and
     orphaned subtrees (a child whose intermediate parent is absent) aren't part
-    of the tree — emit's autofix re-adds the mandatory TRAN rows. Coverage for
+    of the tree, so the walk yields only PROJ's subtree; under the default
+    ``"autofix"`` mode the emitter then synthesizes the missing UNIT/TYPE/TRAN
+    metadata groups (and ABBR when the data uses PA codes; see
+    :func:`build_ags4`). Coverage for
     standard groups is identical to Node's walk by construction (same dictionary
     parent→child map); additionally — a Python-only superset, since Node has no
     passthrough surface — a custom group that ``read_typed`` hangs off a parent
@@ -1445,8 +1448,26 @@ def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
     for code, rows in buckets.items():
         names = list(rows[0])  # every row of a group shares its heading set
         df = pl.DataFrame({n: [r[n] for r in rows] for n in names})
-        # An all-None column infers as polars Null; the Arrow canonicaliser
-        # wants a (possibly empty) string column, not a Null one — cast those.
+        # Emit only the headings you actually set: drop columns that are entirely
+        # unset (None) so the typed-graph door matches the frames door — you emit
+        # your data, not the full union schema. (Otherwise a sparse node emits
+        # ~45 blank columns, and the unset edition-specific / PA ones trip
+        # Rule 9 / 16.) An entirely-None column infers as polars `Null`, so that
+        # dtype IS the "unset" signal. KEY headings are always kept — a missing
+        # key must be flagged, not silently dropped — as are custom passthrough
+        # groups (no descriptor), so a read_typed → build_ags4 round trip stays
+        # lossless. A heading set to "" (not None) survives: that's a real value.
+        desc = _GROUPS.get(code)
+        if desc is not None:
+            keys = {h.name for h in desc.headings if "KEY" in (h.status or "").upper()}
+            drop = [
+                c for c, dtype in df.schema.items() if dtype == pl.Null and c not in keys
+            ]
+            if drop:
+                df = df.drop(drop)
+        # A remaining all-None column (an unset KEY kept above, or a custom
+        # group's column) infers as polars Null; the Arrow canonicaliser wants a
+        # (possibly empty) string column, not a Null one — cast those.
         null_cols = [c for c, dtype in df.schema.items() if dtype == pl.Null]
         if null_cols:
             df = df.with_columns([pl.col(c).cast(pl.Utf8) for c in null_cols])
@@ -1474,7 +1495,11 @@ def build_ags4(
       registry's parent→child links. A typed graph emits only its PROJ-rooted
       subtree: the root-metadata groups (TRAN/UNIT/TYPE/ABBR/DICT) aren't children
       of ``PROJ``, so reach for the ``(code, frame)`` form if you need to carry
-      those (the emitter's autofix re-adds the mandatory TRAN rows regardless).
+      those. Under the default ``"autofix"`` mode the missing UNIT/TYPE catalogs
+      (derived from your data), a placeholder TRAN, and — when the data uses PA
+      picklist codes — ABBR are synthesized for you, so a typed-graph build is valid
+      out of the box; ``"report"``/``"strict"`` leave them absent (Rule 14/15/16/17
+      findings). PROJ (real project identity) is never synthesized.
     * a **mapping or list of ``(code, frame)`` pairs**, where each frame (pandas
       **or** polars) has **column names that are the AGS headings** (e.g.
       ``LOCA_ID``, ``LOCA_GL``).
@@ -1498,9 +1523,10 @@ def build_ags4(
         dict_version: The dictionary edition to fill UNIT/TYPE and validate against —
             one of ``"4.0.3"`` | ``"4.0.4"`` | ``"4.1"`` | ``"4.1.1"`` | ``"4.2"``.
             Defaults to ``"4.1.1"`` when ``None``.
-        mode: How findings are handled. ``"autofix"`` (default) builds, then applies
-            the *safe* mechanical fixes (pad decimals, normalise, …) — anything that
-            couldn't be safely fixed (e.g. a missing required heading) stays in
+        mode: How findings are handled. ``"autofix"`` (default) builds, then
+            synthesizes any missing UNIT/TYPE/TRAN/ABBR metadata group (so a data-only
+            build is valid) and applies the *safe* mechanical fixes (pad decimals,
+            normalise, …); anything left unfixable (e.g. a missing PROJ) stays in
             ``BuildResult.findings``. ``"report"`` builds unchanged and returns the
             findings for you to act on. ``"strict"`` raises if the output violates
             any error-severity rule.

@@ -309,7 +309,9 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
 ///   (each row an array of cell values). The headings are the AGS headings;
 ///   UNIT/TYPE fill from the chosen edition's dictionary where omitted.
 /// * `dict_version` — `None`/`"auto"` → `4.1.1`, or `4.0.3|4.0.4|4.1|4.1.1|4.2`.
-/// * `mode` — `None`/`"autofix"` (default) | `"report"` | `"strict"`.
+/// * `mode` — `None`/`"autofix"` (default) | `"report"` | `"strict"`. Under
+///   `"autofix"` the missing UNIT/TYPE/TRAN/ABBR metadata groups are synthesized
+///   (from the data) so a data-only build is valid; `"report"`/`"strict"` don't.
 ///
 /// Returns `{ text, findings, fixes_applied }`; `text` is the AGS4 document
 /// (UTF-8, CRLF) for the browser to wrap in a `Blob`.

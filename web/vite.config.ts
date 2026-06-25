@@ -136,13 +136,13 @@ export default defineConfig({
         // (Workbox guards on request.mode === 'navigate'), so asset/JSON
         // fetches are untouched.
         navigateFallback: "index.html",
-        // Never answer a top-level navigation to a file-like URL with the app
-        // shell — let real assets (and the runtime-cached .wasm/.gsb) resolve
-        // as themselves. The app is hash-only today so this can't fire, but it
-        // forecloses the classic "deep-link to /foo.json returns HTML" trap if
-        // a non-hash route is ever added. (Matches any final path segment that
-        // has a dot-extension.)
-        navigateFallbackDenylist: [/\/[^/?]+\.[^/?]+$/],
+        // Never answer a top-level navigation with the app shell when it should
+        // resolve elsewhere: (1) file-like URLs (a final path segment with a
+        // dot-extension) — let real assets / the runtime-cached .wasm/.gsb serve
+        // themselves; (2) `/docs/` — the MkDocs site (published alongside the app
+        // at /laterite/docs/) is its own static site, so the app's service worker
+        // must not intercept a navigation into it.
+        navigateFallbackDenylist: [/\/[^/?]+\.[^/?]+$/, /\/docs\//],
         runtimeCaching: [
           {
             // DuckDB engine wasm — 36 MB (EH) + 41 MB (MVP). Fingerprinted +
