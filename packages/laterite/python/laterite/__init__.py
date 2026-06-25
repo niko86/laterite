@@ -162,8 +162,42 @@ def _source_bytes(source: Any) -> bytes:
 
 
 class Report:
-    """Outcome of :func:`validate`. ``findings`` is a polars frame; ``to_json``
-    / ``to_ndjson`` are byte-faithful to the Rust ``lat-check`` binary."""
+    """The verdict the validate door hands back — *is this a conformant AGS4 file, and where does it break the rules?*
+
+    A ``Report`` is what :func:`validate` returns once the AGS4.1 numbered-rules
+    engine has run over a file; it is also minted by :meth:`from_cert` for the
+    engine-skipped path, where a fresh, byte-matching ``.ags.idx`` certificate
+    stands in for a fresh run (then :attr:`resolution` is the sentinel
+    ``"certified"`` and :attr:`count` is 0). Either way it is an immutable read-out,
+    not a live handle: it carries the answer, you don't act *through* it.
+
+    Read the headline off :attr:`is_valid` / :attr:`count` (conformant when the
+    finding count is 0), with :attr:`exit_code` mirroring what the ``lat-check``
+    binary would return. :attr:`file` and :attr:`dict_version` say *what* was
+    judged and *against which* AGS dictionary edition, and :attr:`resolution`
+    records *how* that edition was chosen — ``"exact"`` / ``"fallback"`` /
+    ``"forced"`` from the engine, or ``"certified"`` when the verdict came from a
+    certificate rather than a rules pass.
+
+    The detail comes three ways, all over the same findings, so you reach for the
+    shape that fits your tool. :attr:`findings` is a flat **polars** frame, one row
+    per finding (rule / line / group / desc / severity / target and the pinned
+    location columns) — ideal for filtering and slicing the warning/fyi tiers in a
+    dataframe. :meth:`by_rule` regroups those same findings under their spec rule
+    (``{"AGS Format Rule N": [...]}``, sorted like the Rust BTreeMap, carrying the
+    editor-oriented ``char_span``). :meth:`to_json` and :meth:`to_ndjson` are the
+    serialised forms, byte-identical to ``lat-check --json`` / ``--ndjson`` — for
+    handing the verdict to another process unchanged.
+
+    Attributes:
+        file: The file label that was validated (path, ``"<bytes>"``, or ``"<text>"``).
+        dict_version: The AGS dictionary edition the rules were resolved against.
+        resolution: How that edition was resolved — ``"exact"`` / ``"fallback"`` / ``"forced"``, or ``"certified"`` for a certificate-backed verdict.
+        count: Number of findings (0 ⇒ conformant).
+        is_valid: ``True`` when :attr:`count` is 0.
+        exit_code: Process exit code mirroring the ``lat-check`` binary.
+        findings: Flat polars frame, one row per finding (rule, line, group, desc, severity, target, heading, field_index, data_row).
+    """
 
     __slots__ = ("_r",)
 
@@ -388,14 +422,21 @@ class Ags4File:
 
     @property
     def groups(self) -> list[str]:
+        """The 4-letter group codes present, in source order — the read order of the
+        original file, which :attr:`text` / :meth:`save` preserve."""
         return list(self._p["group_order"])
 
     @property
     def backend(self) -> str:
+        """The frame type a materialising call (``ags["LOCA"]``, ``.frame()``) hands
+        back — ``"polars"`` (default) or ``"pandas"``, as fixed at :func:`read` time."""
         return self._backend
 
     @property
     def tran_ags(self) -> str | None:
+        """The file's declared AGS edition — its ``TRAN_AGS`` stamp (e.g. ``"4.1"``),
+        or ``None`` if the file declares no edition. This is what resolves the
+        dictionary a bare :meth:`validate` (no ``dict_version``) projects the rules from."""
         return self._p.get("tran_ags")
 
     def _g(self, code: str) -> dict:
@@ -405,15 +446,25 @@ class Ags4File:
             raise KeyError(f"group {code!r} not in file") from None
 
     def headings(self, code: str) -> list[str]:
+        """The ordered HEADING names of group ``code`` (raises ``KeyError`` if the group
+        is not in the file). Pure metadata — no engine spin-up."""
         return list(self._g(code)["headings"])
 
     def units(self, code: str) -> list[str]:
+        """The UNIT row of group ``code``, one entry per heading (raises ``KeyError``
+        if the group is not in the file). Pure metadata — no engine spin-up."""
         return list(self._g(code)["units"])
 
     def types(self, code: str) -> list[str]:
+        """The AGS data TYPE row of group ``code`` (ID, X, 2DP, PA, …), one entry per
+        heading (raises ``KeyError`` if the group is not in the file). Pure metadata —
+        no engine spin-up."""
         return list(self._g(code)["types"])
 
     def line_numbers(self, code: str) -> list[int]:
+        """The source line number of each DATA row of group ``code`` — what validator
+        findings point back at (raises ``KeyError`` if the group is not in the file).
+        Pure metadata — no engine spin-up."""
         return list(self._g(code)["line_numbers"])
 
     def __contains__(self, code: str) -> bool:
@@ -833,8 +884,22 @@ class AgsQuery:
         return AgsQuery(self._parent, **state)
 
     def at(self, group: str, values) -> AgsQuery:
-        """Add a parent-entity key filter (e.g. ``.at("LOCA", ["BH01"])``),
-        parameterised; accumulates with AND."""
+        """Add a parent-entity key filter — ``.at("LOCA", ["BH01", "BH02"])`` keeps only
+        rows whose ``{group}_ID`` (e.g. ``LOCA_ID``) is in ``values``. Filters accumulate
+        with AND, and a group that doesn't carry a given filter's key column passes
+        through unfiltered, so one ``.at()`` chain narrows a whole related record set at
+        once. The value list is bound as a parameterised ``IN`` (no SQL injection on the
+        values), unlike the SQL-fragment ``.filter()``.
+
+        Args:
+            group: The parent group code whose ``{group}_ID`` key column is filtered
+                (e.g. ``"LOCA"``).
+            values: The key values to keep — any iterable; an empty selection matches
+                no rows.
+
+        Returns:
+            AgsQuery: A new query with the added filter (the builder is immutable).
+        """
         return self._with(filters=[*self._filters, (f"{group}_ID", list(values))])
 
     def filter(self, predicate: str) -> AgsQuery:
@@ -854,7 +919,17 @@ class AgsQuery:
         return self._with(base=sql)
 
     def pipe(self, fn, /, *args, **kwargs):
-        """Apply ``fn(self, *args, **kwargs)`` and return its result."""
+        """Apply ``fn(self, *args, **kwargs)`` and return its result — a functional escape
+        hatch to slot a custom step into a query chain without leaving the fluent flow.
+
+        Args:
+            fn: A callable taking this :class:`AgsQuery` as its first argument.
+            *args: Extra positional arguments forwarded to ``fn``.
+            **kwargs: Extra keyword arguments forwarded to ``fn``.
+
+        Returns:
+            Whatever ``fn`` returns.
+        """
         return fn(self, *args, **kwargs)
 
     # --- multi-group fan-out (from .at) ---------------------------------------
@@ -980,14 +1055,63 @@ def validate(
     fyi: bool = False,
     check_files: bool = False,
 ) -> Report:
-    """Validate an AGS4 file (path) or in-memory ``text=`` against the AGS4.1
-    rules. Raises for un-validatable input (missing / not AGS4 / unsupported
-    edition); rule *violations* come back in the :class:`Report`.
+    """Run the AGS4.1 numbered-rules engine over a file and return its verdict as a
+    :class:`Report`. This is the validate door: it answers *is this a conformant
+    AGS4 file, and where does it break the rules?* — distinct from :func:`read`
+    (which loads the data into an :class:`Ags4File` over DuckDB) and
+    :func:`build_ags4` (which emits AGS4 from your own data).
 
-    Severity tiers track importance: **errors and WARNINGs show by default**
-    (``warnings=True``) — pass ``warnings=False`` for errors-only, ``fyi=True`` to
-    add the low-signal FYI tier. (The ``compat`` shim keeps its own
-    python-ags4-faithful defaults.)"""
+    The distinction the door draws is **un-validatable input vs rule violations**.
+    Input that can't even be assessed — a missing path, bytes that aren't AGS4 or
+    aren't UTF-8, a recognised-but-unsupported edition, an unknown
+    ``dict_version`` — *raises*, because there is no meaningful verdict to give.
+    Genuine *violations* of a parseable AGS4 file never raise: they come back as
+    findings in the :class:`Report` (a clean file is a :class:`Report` with
+    ``count == 0``).
+
+    ``source`` is auto-detected the same way :func:`read` does it: a single
+    positional argument is sniffed as a path (when it exists on disk — the
+    unambiguous case), a file-like (``.read()``), raw bytes, or in-memory AGS4
+    text. Pass ``text=`` to be explicit for an ambiguous string (e.g. AGS4 content
+    whose first line could be read as a filename).
+
+    Severity tiers track importance, and the defaults are tuned for a human
+    reading a delivery: **errors and WARNINGs surface by default**
+    (``warnings=True``). Pass ``warnings=False`` for an errors-only verdict, and
+    ``fyi=True`` to add the low-signal FYI tier on top. The tiers are also carried
+    on each row of :attr:`Report.findings` (``severity``), so a single
+    ``validate(warnings=True, fyi=True)`` run can be split back apart downstream.
+    (The :mod:`laterite.compat` python-ags4 shim keeps its own faithful
+    defaults — ``check_files`` and the FYI tier on — rather than these.)
+
+    Args:
+        source: The AGS4 to validate, auto-detected — a path, a file-like, raw
+            bytes, or in-memory AGS4 text. Mutually exclusive with ``text``.
+        text: In-memory AGS4 text, given explicitly to bypass the ``source``
+            sniff for an ambiguous string.
+        dict_version: The AGS edition whose dictionary the rules are projected
+            from (e.g. ``"4.1"``); ``None`` resolves the edition from the file
+            (see :attr:`Report.resolution`). An unknown value raises
+            :class:`BadDictError`.
+        warnings: Include WARNING-tier findings alongside errors (default
+            ``True``); ``False`` gives an errors-only :class:`Report`.
+        fyi: Also include the low-signal FYI tier (default ``False``).
+        check_files: Run Rule 20 FILE-attachment checks against files on disk
+            (default ``False``).
+
+    Returns:
+        A :class:`Report` — ``count`` / ``is_valid`` for the verdict at a glance,
+        and ``findings`` (a polars frame, one row per violation) for the detail.
+
+    Raises:
+        FileNotFoundError: ``source`` is a path that doesn't exist, or an IO
+            error occurred reading it.
+        NotAgs4Error: The input is not parseable AGS4 (no GROUP rows) or is not
+            valid UTF-8.
+        UnsupportedEditionError: The input is a recognised but unsupported
+            edition (e.g. AGS3).
+        BadDictError: ``dict_version`` is not a known edition.
+    """
     path, txt, data = _resolve_source(source, text=text)
     r = _native.run_check(
         path=path,
@@ -1013,29 +1137,64 @@ def read(
     xn: str = "string",
 ) -> Ags4File:
     """Read AGS4 — from a path, a file-like, raw bytes, or in-memory text — into
-    an :class:`Ags4File` over an in-memory DuckDB engine. The inverse of
-    :meth:`Ags4File.save`; to build AGS4 from your own data use :func:`build_ags4`.
+    an :class:`Ags4File` over an in-memory DuckDB engine. This is the front door
+    to the read surface: the inverse of :meth:`Ags4File.save`, and the source of
+    the handle every later verb (``ags[code]`` / :meth:`Ags4File.validate` /
+    :meth:`Ags4File.certify` / ``sql`` / ``at``) hangs off. To build AGS4 *from*
+    your own data rather than parse it, reach for :func:`build_ags4` instead.
 
-    A single positional argument is auto-detected (path / file-like / bytes /
-    AGS4 text); pass ``path=`` / ``text=`` / ``data=`` to be explicit for an
-    ambiguous input. ``encoding`` (a WHATWG label, default UTF-8) applies to
-    bytes / path input — text is already decoded. ``backend`` is the default
-    frame type for ``ags[code]`` — ``"polars"`` (default) or ``"pandas"`` (both
-    pyarrow-free).
+    One positional ``source`` is auto-detected (path / file-like / bytes / AGS4
+    text); when an input is ambiguous, name it with the keyword-only ``path=`` /
+    ``text=`` / ``data=`` doors to skip the sniff. ``encoding`` (a WHATWG label,
+    default UTF-8) governs how bytes / path input is decoded — ``text=`` is
+    already a string and is untouched. ``backend`` picks the default frame type
+    handed back by ``ags[code]`` — ``"polars"`` (default) or ``"pandas"`` — both
+    pyarrow-free bridges off the DuckDB engine.
 
     ``xn`` controls AGS ``XN``-typed columns (numeric values that may carry a
-    non-numeric qualifier — ``NP`` / ``<5`` / ``>100``): ``"string"`` (default)
+    non-numeric qualifier — ``NP`` / ``<5`` / ``>100``). ``"string"`` (default)
     keeps them byte-faithful as text; ``"numeric"`` casts them to ``Float64``
-    across the whole handle (``ags[code]`` / ``sql`` / ``at``), non-numeric tokens
-    becoming null. Read-side only — ``save`` / ``text`` / ``bytes`` stay
-    byte-faithful regardless. (A fuller bidirectional XN treatment is future work.)
+    across the whole handle (``ags[code]`` / ``sql`` / ``at``), with non-numeric
+    tokens becoming null. This is read-side only — :meth:`Ags4File.save` and the
+    ``.text`` / ``.bytes`` doors stay byte-faithful regardless of the setting.
+    (A fuller bidirectional XN treatment is future work.)
 
-    ``index`` is the explicit path to this file's ``.ags.idx`` certificate (from
-    :meth:`Ags4File.certify`). It is opt-in — there is no autodiscovery. When given,
-    the cert is loaded and freshness-checked against the source bytes (format version
-    + size + SHA-256); a **stale** cert raises :class:`StaleCertError` here (fail-fast
-    — an explicit ``index=`` asserts the cert is for this file), while a **fresh** one
-    is carried so a later default :meth:`Ags4File.validate` skips the rule engine."""
+    ``index`` is the explicit path to this file's ``.ags.idx`` certificate (minted
+    by :meth:`Ags4File.certify`). It is strictly opt-in — there is no
+    autodiscovery — because naming it asserts the cert belongs to *this* file.
+    When given, the cert is loaded and freshness-checked against the source bytes
+    (format version + size + SHA-256): a **fresh** cert is carried so a later
+    default :meth:`Ags4File.validate` can skip the rule engine, while a **stale**
+    one fails fast with :class:`StaleCertError`.
+
+    Args:
+        source: The AGS4 to read, auto-detected as a path, a file-like, raw
+            bytes, or in-memory AGS4 text. Leave as ``None`` and use one of the
+            keyword doors below to be explicit.
+        path: Explicit on-disk path to an AGS4 file (keyword-only).
+        text: Explicit already-decoded AGS4 text (keyword-only); not subject to
+            ``encoding``.
+        data: Explicit raw AGS4 bytes (keyword-only).
+        index: Path to this file's ``.ags.idx`` certificate (keyword-only).
+            Opt-in, no autodiscovery; a fresh cert is carried to let a later
+            :meth:`Ags4File.validate` skip the rule engine.
+        encoding: WHATWG encoding label for bytes / path input (keyword-only);
+            defaults to UTF-8. Ignored for ``text=``.
+        backend: Default frame type for ``ags[code]`` — ``"polars"`` (default)
+            or ``"pandas"`` (keyword-only); both pyarrow-free.
+        xn: Read-side handling of ``XN`` columns — ``"string"`` (default,
+            byte-faithful) or ``"numeric"`` (cast to ``Float64``, non-numeric
+            tokens to null) (keyword-only).
+
+    Returns:
+        Ags4File: A handle over an in-memory DuckDB engine, carrying a fresh
+        certificate when a matching ``index=`` was supplied.
+
+    Raises:
+        StaleCertError: If ``index=`` points at a certificate whose size /
+            SHA-256 do not match the bytes just read — the source changed under
+            the cert; rebuild it with ``read(...).validate().certify()``.
+    """
     p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
     res = _native.parse_arrow(path=p, text=txt, data=raw, encoding=encoding)
     handle = Ags4File(raise_for(res), backend=backend, xn=xn, _src=(p, txt, raw))
@@ -1152,9 +1311,40 @@ def list_rules() -> list[dict]:
 
 
 class BuildResult:
-    """The product of :func:`build_ags4`: the AGS4 ``bytes``, the validator
-    ``findings`` on those bytes (post-fix in AutoFix mode), and the count of
-    safe fixes applied. ``.text`` decodes the bytes; ``.save(path)`` writes them."""
+    """What :func:`build_ags4` hands back: a finished AGS4 file plus the verdict on it.
+
+    Where :func:`read` opens a file someone else wrote and :func:`validate` judges
+    one, ``build_ags4`` *constructs* a fresh AGS4 file from your own per-group data —
+    and this is what it returns. The whole point of a result object is that building
+    and judging happen together: the same call that emits the bytes also runs them
+    back through the validator, so you never hold output you haven't checked.
+
+    The file lives in :attr:`bytes` (the canonical form — UTF-8, byte-faithful AGS4).
+    Reach for :attr:`text` when you want it as a ``str`` for display or diffing, and
+    :meth:`save` when you want it on disk; ``save`` writes the bytes verbatim and
+    returns the :class:`~pathlib.Path` it wrote, so it composes in a pipeline.
+
+    :attr:`findings` and :attr:`fixes_applied` are the verdict, and what they hold
+    depends on the ``mode`` you built under. In the default ``"autofix"`` mode the
+    emitter applies the *safe* mechanical repairs first — padding decimals,
+    normalising — counts them in :attr:`fixes_applied`, and leaves only what it
+    couldn't safely fix (a missing required heading, say) in :attr:`findings`; so a
+    clean autofix build comes back with empty findings and a non-zero fix count. In
+    ``"report"`` mode nothing is touched, :attr:`fixes_applied` is ``0``, and every
+    finding the validator raised is yours to act on. (``"strict"`` mode never yields
+    a result with error-severity findings — it raises instead.) Each entry in
+    :attr:`findings` is a dict carrying its ``rule`` alongside the validator's
+    per-finding detail.
+
+    Attributes:
+        bytes: The emitted AGS4 file as canonical UTF-8 ``bytes`` (byte-faithful).
+        findings: The validator findings on those bytes — post-fix in ``"autofix"``
+            mode, the full set in ``"report"`` mode. Each is a dict with a ``rule``
+            key plus the validator's per-finding fields.
+        fixes_applied: Count of safe mechanical fixes applied during the build
+            (``0`` outside ``"autofix"`` mode).
+        text: The bytes decoded as a UTF-8 ``str`` (read-only property).
+    """
 
     __slots__ = ("bytes", "findings", "fixes_applied")
 
@@ -1271,35 +1461,63 @@ def build_ags4(
     mode: str = "autofix",
 ) -> BuildResult:
     """Build valid AGS4 from your own per-group data — the data→AGS4 door.
+
     Where :func:`read` loads an *existing* file, ``build_ags4`` *constructs* a new
-    one (and autofixes + validates it); persist the result with ``BuildResult.save``.
+    one (and autofixes + validates it); persist the result with
+    :meth:`BuildResult.save`.
 
-    ``groups`` is either a **typed-graph root** — a ``PROJ`` instance with its
-    children attached (``PROJ(...)``; ``proj.locas.append(LOCA(...))``), walked
-    depth-first via the registry's parent→child links — OR a mapping / list of
-    ``(code, frame)`` pairs where each frame (pandas **or** polars) has **column
-    names that are the AGS headings** (e.g. ``LOCA_ID``, ``LOCA_GL``). This
-    mirrors laterite-node's ``buildAgs4``, which accepts the same two shapes.
-    UNIT/TYPE are filled from the chosen dictionary edition. Order is preserved
-    (pass an ordered mapping or a list of ``(code, frame)`` pairs; put ``PROJ``
-    first). A typed graph emits only its PROJ-rooted subtree — root-metadata
-    groups (TRAN/UNIT/TYPE/ABBR/DICT) aren't children of PROJ, so use the
-    ``(code, frame)`` form if you need to carry those.
+    ``groups`` arrives in one of two shapes — the same two laterite-node's
+    ``buildAgs4`` accepts:
 
-    The frame crosses into Rust zero-copy via the Arrow C-stream — **pyarrow-free
-    for polars** (so this stays a base feature, no ``[compat]``) and for pandas
-    ≥ 2.2; an older pandas routes through DuckDB (pandas only ships via
-    ``[compat]``, which carries the deps). Each cell is formatted to its
-    canonical AGS4 string. ``mode``:
+    * a **typed-graph root** — a ``PROJ`` instance with its children attached
+      (``PROJ(...)``; ``proj.locas.append(LOCA(...))``), walked depth-first via the
+      registry's parent→child links. A typed graph emits only its PROJ-rooted
+      subtree: the root-metadata groups (TRAN/UNIT/TYPE/ABBR/DICT) aren't children
+      of ``PROJ``, so reach for the ``(code, frame)`` form if you need to carry
+      those (the emitter's autofix re-adds the mandatory TRAN rows regardless).
+    * a **mapping or list of ``(code, frame)`` pairs**, where each frame (pandas
+      **or** polars) has **column names that are the AGS headings** (e.g.
+      ``LOCA_ID``, ``LOCA_GL``).
 
-    * ``"autofix"`` (default) — build, then apply the *safe* mechanical fixes
-      (pad decimals, normalise, …); ``BuildResult.findings`` holds whatever
-      couldn't be safely fixed (e.g. a missing required heading).
-    * ``"report"`` — build unchanged, return findings for you to act on.
-    * ``"strict"`` — raise if the output violates any error-severity rule.
+    UNIT/TYPE are filled from the chosen dictionary edition and each cell is
+    formatted to its canonical AGS4 string. Order is preserved — pass an ordered
+    mapping or a list of ``(code, frame)`` pairs, and put ``PROJ`` first.
 
-    ``dict_version`` is one of ``4.0.3 | 4.0.4 | 4.1 | 4.1.1 | 4.2`` (default
-    ``4.1.1``)."""
+    Each frame crosses into Rust zero-copy via the Arrow C-stream — **pyarrow-free
+    for polars** (so this stays a base feature, no ``[compat]`` needed) and for
+    pandas ≥ 2.2; an older pandas with no capsule routes through DuckDB instead, but
+    pandas only ships via the ``[compat]`` extra, which carries those deps, so that
+    fallback never burdens a base polars user.
+
+    Args:
+        groups: The source data. Either a typed-graph ``PROJ`` root (any compiled
+            ``#[pyclass]`` group or a :mod:`laterite.dynamic` passthrough node with
+            its children attached), a mapping of ``{code: frame}``, or a list of
+            ``(code, frame)`` pairs. Each ``frame`` is a polars or pandas
+            ``DataFrame`` whose column names are the AGS headings.
+        dict_version: The dictionary edition to fill UNIT/TYPE and validate against —
+            one of ``"4.0.3"`` | ``"4.0.4"`` | ``"4.1"`` | ``"4.1.1"`` | ``"4.2"``.
+            Defaults to ``"4.1.1"`` when ``None``.
+        mode: How findings are handled. ``"autofix"`` (default) builds, then applies
+            the *safe* mechanical fixes (pad decimals, normalise, …) — anything that
+            couldn't be safely fixed (e.g. a missing required heading) stays in
+            ``BuildResult.findings``. ``"report"`` builds unchanged and returns the
+            findings for you to act on. ``"strict"`` raises if the output violates
+            any error-severity rule.
+
+    Returns:
+        A :class:`BuildResult` carrying the AGS4 ``bytes``, the validator
+        ``findings`` on those bytes (post-fix in ``"autofix"`` mode), and
+        ``fixes_applied`` — the count of safe fixes made. ``.text`` decodes the
+        bytes; ``.save(path)`` writes them.
+
+    Raises:
+        TypeError: If a typed-graph node isn't a known AGS group instance, or its
+            headings can't be determined.
+        RuntimeError: In ``mode="strict"``, if the emitted output violates an
+            error-severity rule ("strict mode rejected …"); also for an unknown
+            ``dict_version`` or ``mode``.
+    """
     if dict_version is None:
         dict_version = "4.1.1"
     import json
@@ -1338,12 +1556,43 @@ def build_ags4(
 
 
 class FixResult:
-    """The product of :func:`fix` (and carried on :attr:`Ags4File.fix_report`): the
-    repaired AGS4 ``bytes``, the ``findings`` that REMAIN after the fixes were
-    applied, and ``applied`` — the list of fixes that were made (each ``{kind, label,
-    rule, line, risk}``). ``fixes_applied`` is ``len(applied)``; ``.text`` decodes the
-    bytes; ``.save(path)`` writes them. The fixed output is always UTF-8 with no
-    BOM (so fixing a CRLF/encoding issue normalises both)."""
+    """The product of :func:`fix` — and the same object carried on
+    :attr:`Ags4File.fix_report` after a handle is repaired.
+
+    Where :class:`Report` tells you what is *wrong* with a file, ``FixResult`` is
+    the answer after the fixer has had its turn: the mechanically repaired AGS4
+    document plus an honest account of what it could and could not put right. The
+    headline payload is :attr:`bytes` — the rewritten file, always UTF-8 with no
+    BOM, so a single fix run that targets a CRLF or encoding fault also normalises
+    the file's line endings and encoding as a side effect. :attr:`text` decodes
+    those bytes for you, and :meth:`save` writes them to a path (returning the
+    :class:`~pathlib.Path` it wrote), for the common case where :func:`fix` was
+    called without ``in_place`` / ``out`` and you decide where the output lands.
+
+    The result is deliberately two-sided about success. :attr:`applied` is the
+    ledger of every repair that was made — each a ``{kind, label, rule, line,
+    risk}`` record, and :attr:`fixes_applied` is just its length — so you can show
+    or audit exactly what changed. :attr:`findings` is the complement: the
+    fixer re-validates its own output, so these are the issues that **survived**
+    the repair and still need a human (each finding carries its ``rule`` alongside
+    the usual per-rule fields). A run that leaves ``findings`` empty fixed
+    everything; a run with entries did what it mechanically could and is telling
+    you what it couldn't guess. :attr:`dict_version` records the AGS dictionary
+    edition the repaired bytes were validated against, whether you pinned it or it
+    was derived from the file's ``TRAN_AGS``.
+
+    Attributes:
+        bytes (bytes): The repaired AGS4 document, always UTF-8 with no BOM.
+        findings (list[dict]): The issues that remain after fixing — what could
+            not be mechanically resolved; each carries its ``rule`` plus the
+            per-rule fields.
+        applied (list[dict]): The fixes that were made, each a ``{kind, label,
+            rule, line, risk}`` record.
+        dict_version (str): The AGS dictionary edition the repaired bytes were
+            validated against.
+        fixes_applied (int): Count of applied fixes — ``len(applied)``.
+        text (str): The repaired bytes decoded as UTF-8.
+    """
 
     __slots__ = ("applied", "bytes", "dict_version", "findings")
 
@@ -1390,18 +1639,54 @@ def fix(
     """Mechanically repair an existing AGS4 file and return a :class:`FixResult`.
 
     The same fix engine the browser uses, run headless: ``source`` is anything
-    :func:`read` accepts (path / file-like / bytes / AGS4 text). The **safe**
+    :func:`read` accepts (path / file-like / bytes / AGS4 text), or name the input
+    explicitly with one of the ``path`` / ``text`` / ``data`` doors. The **safe**
     fixes (CRLF / BOM / embedded-CR / short-row pad / numeric reformat / the TRAN
-    delimiter+concatenator rows) are always applied; ``risky=True`` also applies
-    the intent-guessing ones (duplicate-heading rename, ``dd/mm`` datetime
-    canonicalisation, smart-quote→ASCII typography). The result is re-validated, so
-    ``FixResult.findings`` is what could **not** be mechanically fixed.
+    delimiter+concatenator rows) are always applied; ``risky=True`` also applies the
+    intent-guessing ones (duplicate-heading rename, ``dd/mm`` datetime
+    canonicalisation, smart-quote→ASCII typography). The repaired bytes are
+    re-validated, so :attr:`FixResult.findings` is what could **not** be
+    mechanically fixed.
 
     Non-destructive by default — the fixed bytes come back on the result and are
-    written only if you ask: ``in_place=True`` overwrites the source file (requires
-    a path source), or ``out=<path>`` writes there. Otherwise call
-    :meth:`FixResult.save`. The output is UTF-8 (fixing a non-UTF-8 file also
-    normalises its encoding)."""
+    written only if you ask: ``in_place=True`` overwrites the source file (which
+    requires a path source), or ``out=<path>`` writes there; the two are mutually
+    exclusive. Otherwise call :meth:`FixResult.save`. The output is always UTF-8
+    with no BOM, so fixing a non-UTF-8 file also normalises its encoding.
+
+    Args:
+        source: The AGS4 input, given positionally — a path, file-like, raw bytes,
+            or AGS4 text (anything :func:`read` accepts). Leave unset to name the
+            input via the ``path`` / ``text`` / ``data`` keywords instead.
+        path: Explicit filesystem path to the source file, as an alternative to
+            passing it positionally.
+        text: Explicit AGS4 source text, as an alternative to passing it
+            positionally.
+        data: Explicit raw source bytes, as an alternative to passing them
+            positionally.
+        dict_version: AGS dictionary version (edition) to validate the repaired
+            file against. ``None`` derives it from the file's ``TRAN_AGS``.
+        encoding: Override the source's text encoding. ``None`` auto-detects.
+        risky: When ``True``, also apply the intent-guessing fixes (duplicate-heading
+            rename, datetime canonicalisation, typography) on top of the always-on
+            safe set. Defaults to ``False``.
+        in_place: When ``True``, write the repaired bytes back over the source file.
+            Requires a path source and is mutually exclusive with ``out``. Defaults
+            to ``False``.
+        out: Destination path to write the repaired bytes to. Mutually exclusive
+            with ``in_place``. ``None`` leaves the result unwritten.
+
+    Returns:
+        FixResult: The repaired UTF-8 ``bytes``, the residual ``findings`` that the
+        fixer could not mechanically resolve, the ``applied`` list of fixes made,
+        and the resolved ``dict_version``.
+
+    Raises:
+        TypeError: If both ``in_place=True`` and ``out`` are given.
+        Ags4Error: If ``in_place=True`` but the source is not a path (so there is
+            nothing to overwrite) — use ``out=<path>`` or :meth:`FixResult.save`
+            instead.
+    """
     import json
 
     if in_place and out is not None:
@@ -1444,16 +1729,39 @@ def diff(
 
     ``a`` (the baseline) and ``b`` (the revision) are each anything :func:`read`
     accepts — a path, AGS4 text, raw bytes, a file-like, or an :class:`Ags4File`.
+    The door answers the question "what actually changed between this submission and
+    the last one" in *AGS terms*, not text terms.
+
+    Two design choices make the diff meaningful rather than noisy. Rows are matched
+    by the group's dictionary **KEY** headings, not by line order — so a file whose
+    boreholes have been re-sorted still pairs each ``LOCA`` against its prior self,
+    and the result reports genuine row churn (``groups_added`` / ``groups_removed``)
+    instead of a wholesale rewrite. Cells are compared through the **typed** value, so
+    a formatting-only edit (``"1.0"`` → ``"1.00"``, a re-padded coordinate) is *not* a
+    diff; only a change in the parsed quantity counts. The dictionary edition used to
+    locate the KEY headings is the revision's ``TRAN_AGS`` by default; pass
+    ``dict_version`` to pin it when the file's own stamp is wrong or absent.
+
     Returns a ``RevisionDelta`` dict — ``groups`` (a per-group list of row/heading
     deltas) plus ``groups_added`` / ``groups_removed`` and the
-    ``total_added`` / ``total_removed`` / ``total_changed`` counts.
+    ``total_added`` / ``total_removed`` / ``total_changed`` counts. This is the same
+    engine the browser's revision-diff tool and ``lat-check <a> --diff <b>`` use.
 
-    Rows are matched by the group's dictionary **KEY** headings (not line order, so
-    a re-sorted file still pairs the same boreholes), and cells are compared through
-    the **typed** value — a formatting-only change (``"1.0"`` → ``"1.00"``) is not a
-    diff. The dictionary edition is the revision's ``TRAN_AGS`` (force it with
-    ``dict_version``). The same engine the browser's revision-diff tool and
-    ``lat-check <a> --diff <b>`` use."""
+    Args:
+        a: The baseline document — a path, AGS4 text, raw bytes, a file-like, or an
+            :class:`Ags4File` (anything :func:`read` accepts).
+        b: The revision document, in any of the same forms as ``a``.
+        dict_version: Dictionary edition (e.g. ``"4.1"``) used to resolve each group's
+            KEY headings. Defaults to ``None``, which takes the edition from the
+            revision's ``TRAN_AGS`` stamp.
+        encoding: Source text encoding for both documents. Defaults to ``None`` (the
+            native parser sniffs it).
+
+    Returns:
+        A ``RevisionDelta`` dict: ``groups`` (per-group row/heading deltas),
+        ``groups_added`` / ``groups_removed``, and the ``total_added`` /
+        ``total_removed`` / ``total_changed`` counts.
+    """
     import json
 
     r = _native.diff_files(

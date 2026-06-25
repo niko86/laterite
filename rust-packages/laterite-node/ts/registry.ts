@@ -1,7 +1,11 @@
-// laterite.registry — the read-only AGS group registry, the Node port of
-// laterite-py's `registry`. Generated from the SAME dictionary JSON as Python's
-// (registry.generated.ts, drift-tested), so the metadata can't drift from the
-// authoritative source.
+/**
+ * laterite.registry — the read-only AGS group registry, the Node port of
+ * laterite-py's `registry`. Generated from the SAME dictionary JSON as Python's
+ * (see `registry.generated.ts`, drift-tested), so the metadata here can't drift
+ * from the authoritative source.
+ *
+ * @module
+ */
 import { Ags4Error } from "./errors";
 import {
   GROUPS_DATA,
@@ -10,6 +14,10 @@ import {
   type HeadingStatus,
 } from "./registry.generated";
 
+/** A heading's status as it appears in the union dictionary. Beyond the base
+ * `KEY`/`REQUIRED`/`OTHER` it carries the combined marker `KEY+REQUIRED` and a
+ * standalone `DEPRECATED` value, which is why key-ness is decided by
+ * {@link isKeyStatus} rather than a bare `=== "KEY"`. */
 export type { HeadingStatus };
 /** One heading's descriptor: `{name, status, type, unit, description}`. */
 export type Heading = GeneratedHeading;
@@ -21,6 +29,10 @@ export function isKeyStatus(status: string): boolean {
   return status.split("+").some((p) => p.trim().toUpperCase() === "KEY");
 }
 
+/** A typed, immutable view onto one standard AGS group: its 4-letter `code`,
+ * human `contents` description, `parent` code (or `null` for a root group), and
+ * its ordered `headings`. Wraps a single entry from the generated dictionary so
+ * the registry never hands out mutable raw rows. */
 export class GroupDescriptor {
   readonly code: string;
   readonly contents: string;
@@ -42,9 +54,13 @@ export class GroupDescriptor {
   get view(): string {
     return `v_${this.code.toLowerCase()}`;
   }
+  /** This group's KEY headings (status part-matched via {@link isKeyStatus}), in
+   * declaration order. */
   get keyHeadings(): readonly Heading[] {
     return this.headings.filter((h) => isKeyStatus(h.status));
   }
+  /** This group's non-KEY headings — the complement of {@link keyHeadings} — in
+   * declaration order. */
   get nonKeyHeadings(): readonly Heading[] {
     return this.headings.filter((h) => !isKeyStatus(h.status));
   }
@@ -82,7 +98,12 @@ export function ancestorChain(code: string): string[] {
   return chain;
 }
 
-/** KEY heading names a group inherits from its ancestors. */
+/** KEY heading names a group inherits from its ancestors (its own KEYs are not
+ * included — the chain is walked from the parent up).
+ *
+ * @param code The group whose inherited KEY names to gather.
+ * @returns The set of KEY heading names contributed by every ancestor.
+ * @throws {Ags4Error} If `code` isn't in the registry (via {@link ancestorChain}). */
 export function inheritedKeyNames(code: string): Set<string> {
   const names = new Set<string>();
   for (const ancestor of ancestorChain(code).slice(1)) {

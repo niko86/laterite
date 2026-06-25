@@ -19,8 +19,15 @@ export type CanonicalType =
  * (text/enum **and** the canonical datetime/date/time strings), or null. */
 export type AgsValue = string | number | boolean | null;
 
-/** AGS spec type code → canonical category. Throws for unknown codes (mirrors
- * Python's `ValueError`). */
+/**
+ * AGS spec type code → canonical category. Throws for unknown codes (mirrors
+ * Python's `ValueError`), so the engine's permissive `null` never leaks into
+ * caller code as a silent miss.
+ *
+ * @param agsType - An AGS4 spec type code (e.g. `"2DP"`, `"ID"`, `"YN"`, `"DT"`).
+ * @returns The lowercase canonical category the engine maps that code to.
+ * @throws {Ags4Error} If the code is not a recognised AGS type.
+ */
 export function canonicalType(agsType: string): CanonicalType {
   const label = nativeCanonicalType(agsType);
   if (label === null) throw new Ags4Error(`unknown AGS type code: ${JSON.stringify(agsType)}`);
@@ -29,10 +36,16 @@ export function canonicalType(agsType: string): CanonicalType {
 
 export { displayHint };
 
-/** Parse an AGS4-shaped raw value into its canonical JS value (empty /
+/**
+ * Parse an AGS4-shaped raw value into its canonical JS value (empty /
  * unparseable → null). datetime/date/time come back as the canonical **string**
  * (engine shape; `new Date(s)` if you want a Date). Non-string input is
- * stringified first (matches the Python wrapper). */
+ * stringified first (matches the Python wrapper).
+ *
+ * @param raw - The raw cell value; non-string input is coerced via `String(...)`, and `null`/`undefined` short-circuit to `null`.
+ * @param agsType - The AGS4 spec type code governing how `raw` is interpreted.
+ * @returns The canonical value: a number (integer/decimal), boolean (YN), string (text/enum and the datetime/date/time strings), or `null`.
+ */
 export function parseValue(raw: unknown, agsType: string): AgsValue {
   const s = raw === null || raw === undefined ? null : String(raw);
   return nativeParseValue(s, agsType) as AgsValue;

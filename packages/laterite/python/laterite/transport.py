@@ -83,6 +83,21 @@ def pack(
     Works on **any file** — ``.ags``, ``.ags5db``, anything. ``level`` is the zstd
     level (1=fastest, 22=highest ratio); default 9 is the sweet spot on AGS data.
     ``dest`` overrides the default ``<src>.zst`` output path.
+
+    Args:
+        src: Path to the file to compress (``str`` or ``os.PathLike``). An
+            ``Ags4File`` is rejected early — call ``.save(path)`` first.
+        level: zstd compression level, 1 (fastest) to 22 (highest ratio).
+            Defaults to 9.
+        dest: Output path. Defaults to ``<src>.zst`` (original suffix preserved,
+            ``.zst`` appended).
+
+    Returns:
+        The ``Path`` written.
+
+    Raises:
+        TypeError: If ``src`` is not a path-like (e.g. an ``Ags4File``).
+        RuntimeError: If the underlying zstd operation fails.
     """
     src_path = _src_path(src, fn="pack")
     out = Path(dest) if dest is not None else _default_pack_out(src_path)
@@ -98,6 +113,18 @@ def unpack(
     """Decompress a ``.zst`` produced by ``pack`` back to the original file.
 
     By default the output strips the ``.zst`` suffix; pass ``dest`` to override.
+
+    Args:
+        src: Path to the ``.zst`` file to decompress.
+        dest: Output path. Defaults to ``src`` with its ``.zst`` suffix stripped
+            (or ``<src>.unpacked`` if it has no ``.zst`` suffix).
+
+    Returns:
+        The ``Path`` written.
+
+    Raises:
+        TypeError: If ``src`` is not a path-like.
+        RuntimeError: If the input is not valid zstd or the operation fails.
     """
     src_path = _src_path(src, fn="unpack")
     out = Path(dest) if dest is not None else _default_unpack_out(src_path)
@@ -115,10 +142,25 @@ def lock(
     """Compress + age-passphrase-encrypt any file to ``<src>.zst.age``.
 
     Zstd first (low-entropy data compresses well), then age (scrypt +
-    ChaCha20-Poly1305). The envelope is interoperable with ``lat-db.exe lock`` and
+    ChaCha20-Poly1305). The envelope is interoperable with ``lat-db lock`` and
     ``pyrage`` — both use the same Rust ``age`` crate. ``password`` is required (no
     agent-default path). ``level`` is the zstd level (default 9); ``dest`` overrides
     the default ``<src>.zst.age`` output path.
+
+    Args:
+        src: Path to the file to compress and encrypt.
+        password: The age passphrase. Required — there is no agent-key path.
+        level: zstd compression level, 1 (fastest) to 22 (highest ratio).
+            Defaults to 9.
+        dest: Output path. Defaults to ``<src>.zst.age`` (flagging both the
+            compression and encryption layers).
+
+    Returns:
+        The ``Path`` written.
+
+    Raises:
+        TypeError: If ``src`` is not a path-like.
+        RuntimeError: If the underlying zstd or age operation fails.
     """
     src_path = _src_path(src, fn="lock")
     out = Path(dest) if dest is not None else _default_lock_out(src_path)
@@ -136,6 +178,20 @@ def unlock(
 
     Wrong passphrase or non-passphrase envelopes raise ``RuntimeError``. By default
     the output strips ``.age`` then ``.zst``.
+
+    Args:
+        src: Path to the ``.zst.age`` file to decrypt and decompress.
+        password: The age passphrase used by ``lock``.
+        dest: Output path. Defaults to ``src`` with ``.age`` then ``.zst``
+            stripped (or ``<src>.unlocked`` if neither suffix is present).
+
+    Returns:
+        The ``Path`` written.
+
+    Raises:
+        TypeError: If ``src`` is not a path-like.
+        RuntimeError: If the passphrase is wrong, the envelope is not a
+            passphrase envelope, or decompression fails.
     """
     src_path = _src_path(src, fn="unlock")
     out = Path(dest) if dest is not None else _default_unlock_out(src_path)

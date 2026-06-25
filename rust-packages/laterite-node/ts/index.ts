@@ -25,11 +25,31 @@ export interface ReadOptions {
   encoding?: string;
 }
 
-/** Parse AGS4 — a file `source` path, raw `Uint8Array`/`Buffer` bytes, or
- * in-memory `text` — into an `Ags4File`. Pass bytes (not a string) for large
- * inputs: V8 caps strings at ~512 MB, but a `Uint8Array` does not, so a web
- * backend can hand a multi-hundred-MB upload straight in. Throws `NotAgs4Error`
- * / `FileNotFoundError` / `UnsupportedEditionError` for un-parseable input. */
+/**
+ * Parse AGS4 into an `Ags4File`. Where the data→AGS4 door (`buildAgs4`)
+ * *constructs* a file, `read` *loads* one that already exists — from a file
+ * `source` path, raw `Uint8Array`/`Buffer` bytes, or in-memory `opts.text`.
+ *
+ * Prefer bytes over a string for large inputs: V8 caps a single string at
+ * ~512 MB, but a `Uint8Array` does not, so a web backend can hand a
+ * multi-hundred-MB upload straight in without first stringifying it. A string
+ * `source` is the file path; non-string bytes are the raw content; an absent
+ * `source` means the input came in as `opts.text`.
+ *
+ * The engine never returns a soft failure for un-parseable input — it throws a
+ * typed error (the same exit-code identity as `lat-check`) so callers branch on
+ * the class, not a brittle message match.
+ *
+ * @param source - File path (string), raw `Uint8Array`/`Buffer` bytes, or
+ *   omitted when the input is supplied via `opts.text`.
+ * @param opts - Read options ({@link ReadOptions}): in-memory `text` and the
+ *   source `encoding` label (default `"utf-8"`).
+ * @returns An {@link Ags4File} wrapping the parsed groups.
+ * @throws {FileNotFoundError} The path could not be opened.
+ * @throws {NotAgs4Error} The input has no GROUP rows / is not decodable as AGS4.
+ * @throws {UnsupportedEditionError} A recognised but unsupported edition (e.g. AGS3).
+ * @throws {Ags4Error} Any other native parse failure (the fallback mapping).
+ */
 export function read(source?: string | Uint8Array, opts: ReadOptions = {}): Ags4File {
   const path = typeof source === "string" ? source : undefined;
   const data = typeof source === "string" || source == null ? undefined : source;
@@ -52,9 +72,29 @@ export interface ValidateOptions extends ReadOptions {
 }
 
 /** Validate AGS4 — a file `source` path, raw `Uint8Array`/`Buffer` bytes, or
- * in-memory `text` — against the AGS4 rules. Throws for un-validatable input;
- * rule *violations* come back in the `Report`. (Bytes avoid V8's ~512 MB string
- * cap, the same as `read`.) */
+ * in-memory `text` (via `opts.text`) — against the numbered AGS4 rules, returning
+ * a `Report`. The crucial distinction: rule *violations* are data, not errors —
+ * they come back inside the `Report` (`.findings`, `.byRule()`, `.isValid`); only
+ * *un-validatable* input (missing file, not AGS4, AGS3, bad dictionary) throws.
+ * By default the report is the error-tier findings; opt warnings and FYIs in with
+ * `opts.warnings` / `opts.fyi`. The edition auto-detects from `TRAN_AGS` unless
+ * pinned with `opts.dictVersion`. Pass bytes (not a string) for large inputs:
+ * V8 caps strings at ~512 MB but a `Uint8Array` does not, so a web backend can
+ * hand a multi-hundred-MB upload straight in — the same byte door as `read`.
+ * Mirrors `laterite.validate()` / the `lat-check` binary.
+ *
+ * @param source File path (string), or raw bytes (`Uint8Array`/`Buffer`); omit to
+ *   validate `opts.text` instead.
+ * @param opts Validation knobs (`ValidateOptions`) — the dictionary-version pin
+ *   (`dictVersion`), severity gates, in-memory text/encoding, and the on-disk
+ *   Rule-20 toggle; see the interface for each field.
+ * @returns A `Report` carrying the findings, the resolved `dictVersion`, the
+ *   finding `count`, `isValid`, and `lat-check`-faithful `toJson()` / `toNdjson()`.
+ * @throws {FileNotFoundError} the path could not be opened.
+ * @throws {NotAgs4Error} the input has no GROUP rows / is not decodable AGS4.
+ * @throws {UnsupportedEditionError} a recognised-but-unsupported edition (AGS3).
+ * @throws {BadDictError} an invalid `opts.dictVersion` / unimplemented dictionary.
+ */
 export function validate(source?: string | Uint8Array, opts: ValidateOptions = {}): Report {
   const path = typeof source === "string" ? source : undefined;
   const data = typeof source === "string" || source == null ? undefined : source;
@@ -126,13 +166,30 @@ function walkTree(root: AgsGroup): Array<[string, GroupRows]> {
   return [...buckets];
 }
 
-/** Build valid AGS4 from your own data — the data→AGS4 door. Where `read` loads
- * an *existing* file, `buildAgs4` *constructs* a new one (and autofixes +
- * validates it). `groups` is either a **typed-graph root** (`new PROJ({…})`,
- * walked depth-first) OR a Map/array mapping each AGS group code to an arrow-js
- * `Table` or row objects whose **keys are the AGS headings** (`LOCA_ID`, …).
- * UNIT/TYPE are filled from the chosen `dictVersion`; order is preserved (put `PROJ`
- * first). Needs no DuckDB. Persist the result with `BuildResult.save`. */
+/**
+ * Build valid AGS4 from your own data — the data→AGS4 door. Where `read` loads
+ * an *existing* file, `buildAgs4` *constructs* a new one: it lays the groups out
+ * in order, fills UNIT/TYPE from the chosen `dictVersion`, then runs the output
+ * through the validator (the `mode` knob on `opts` decides what happens to the
+ * findings — e.g. `"autofix"` applies the safe fixes, `"report"` merely records
+ * them). The returned `BuildResult` carries the bytes, the residual `findings`,
+ * and a `fixesApplied` count; persist it with `BuildResult.save`. Needs no DuckDB.
+ *
+ * `groups` accepts two shapes. A **typed-graph root** (`new PROJ({…, locas:[new
+ * LOCA({…})]})`) is walked depth-first via the registry's parent→child links,
+ * every declared heading becoming a column (null if unset). Or pass a **Map /
+ * array of `[code, data]`** entries where `data` is an arrow-js `Table` or row
+ * objects whose **keys are the AGS headings** (`LOCA_ID`, …). Either way group
+ * order is preserved, so put `PROJ` first.
+ *
+ * @param groups The data to emit — a typed-graph root (`new PROJ({…})`), or a
+ *   `Map`/array of `[groupCode, Table | rowObjects]` entries (headings as keys).
+ * @param opts Emit options (`dictVersion`, `mode`); see {@link EmitOptions}.
+ * @returns A {@link BuildResult} — `.bytes`/`.text` of the AGS4 document, the
+ *   `findings` it could not fix, the `fixesApplied` count, and `.save(path)`.
+ * @throws {Ags4Error} If a typed-graph node is not a registered AGS group.
+ * @throws If the native emitter rejects the input (e.g. an unknown `dictVersion`).
+ */
 export function buildAgs4(
   groups: AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>,
   opts: EmitOptions = {},
@@ -171,9 +228,20 @@ export interface RuleMeta {
   observations: RuleObservation[];
 }
 
-/** The AGS4 rule catalogue — one entry per rule (title, severity, whether `fix`
- * can repair it, cited `O-N` notes). Mirrors `laterite.list_rules()` /
- * `lat-check --list-rules`; backed by the gated `rules_meta.json`. No input. */
+/**
+ * The AGS4 rule catalogue — one `RuleMeta` per numbered rule, surfaced so a
+ * caller can show *which* rules exist and how each behaves before (or instead
+ * of) running `validate`/`fix` over a file. Each entry carries the rule id and
+ * title, a one-line `checks` summary, its `severity`, whether `fix` can
+ * mechanically repair it (`fixable`), and any cited `O-N` divergence
+ * observations. Mirrors `laterite.list_rules()` / `lat-check --list-rules`;
+ * backed by the gated `rules_meta.json` (the catalogue is static, so this takes
+ * no input and reads no file).
+ *
+ * @returns The full rule catalogue as a `RuleMeta[]` — see `RuleMeta` for the
+ *   per-entry shape (`rule`, `title`, `checks`, `severity`, `fixable`,
+ *   `observations`).
+ */
 export function listRules(): RuleMeta[] {
   return (JSON.parse(nativeListRules()) as { rules: RuleMeta[] }).rules;
 }
@@ -189,11 +257,31 @@ export interface FixOptions {
   risky?: boolean;
 }
 
-/** Mechanically repair AGS4 — a file `source` path, raw `Uint8Array`/`Buffer`
- * bytes, or in-memory `text`. Applies the safe fixes (plus the risky set when
- * `risky`), re-validates, and returns a `FixResult` (`.bytes` / `.text` /
- * `.save(path)`); `findings` are what could NOT be mechanically fixed. Mirrors
- * `laterite.fix()` / `lat-check --fix`. Throws for un-fixable input. */
+/** Mechanically repair AGS4 — the headless twin of the browser's Fix engine.
+ * `source` is a file path, raw `Uint8Array`/`Buffer` bytes, or (via `opts.text`)
+ * in-memory text. The *safe* fixes — CRLF / BOM / embedded-CR normalisation,
+ * short-row padding, numeric reformatting, and the TRAN delimiter+concatenator
+ * rows — are always applied; pass `risky` to also run the intent-guessing set
+ * (duplicate-heading rename, `dd/mm` datetime canonicalisation, smart-quote→ASCII
+ * typography). The repaired bytes are re-validated, so `FixResult.findings` is
+ * what could NOT be mechanically fixed.
+ *
+ * Non-destructive: nothing is written here — the repaired bytes come back on the
+ * result (`.bytes` / `.text` / `.save(path)`), already UTF-8 with no BOM, so
+ * fixing a non-UTF-8 file also normalises its encoding. Mirrors `laterite.fix()`
+ * / `lat-check --fix`.
+ *
+ * @param source - The AGS4 input: a filesystem path (`string`) or raw bytes
+ *   (`Uint8Array`/`Buffer`). Omit to repair `opts.text` instead.
+ * @param opts - {@link FixOptions} — `text` source, `risky` fixes, `dictVersion`
+ *   override, and source `encoding`.
+ * @returns A {@link FixResult} carrying the repaired `bytes` (and `.text` /
+ *   `.save`), the `applied` fixes (with `fixesApplied` count), the residual
+ *   `findings` left after re-validation, and the resolved `dictVersion`.
+ * @throws {Ags4Error} (or a subclass — {@link FileNotFoundError},
+ *   {@link NotAgs4Error}, {@link UnsupportedEditionError}, {@link BadDictError})
+ *   for un-fixable input, carrying the matching `lat-check` exit code.
+ */
 export function fix(source?: string | Uint8Array, opts: FixOptions = {}): FixResult {
   const path = typeof source === "string" ? source : undefined;
   const data = typeof source === "string" || source == null ? undefined : source;

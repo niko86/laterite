@@ -59,17 +59,40 @@ _KEY_SEP = "\n\0"
 def read_typed(ags4: str | PathLike[str]) -> Any:
     """Read an AGS4 transfer file and return its typed PROJ tree.
 
+    The base AGS4 typed read: hand it a ``.ags`` file and get the whole transfer
+    back as a single live object graph, rooted at its PROJ row, with every group
+    already cast to its AGS data type. This is the *base* door — it stands the PROJ
+    tree up from the pure-string parser, the dictionary registry, and ``parse_value``
+    alone, so it works on a plain ``pip install laterite`` with no DuckDB on the path.
+
+    The shape it hands back mirrors the standard's parent/child model rather than the
+    file's flat ``GROUP`` / ``HEADING`` / ``DATA`` blocks: the one PROJ instance is the
+    root, and each group hangs off its parent under a ``<child code lower>s`` list
+    (``root.locas``, a LOCA's ``samps``, and so on). Edges are recovered from the
+    groups' shared KEY headings; identical raw rows collapse to one instance (first
+    occurrence wins), and a non-PROJ row whose parent can't be resolved is built but
+    left out of the tree as an orphan — the same way the converter drops a row whose
+    parent reference points at nothing.
+
+    Groups present in the file but absent from the standard dictionary flow through
+    the :mod:`laterite.dynamic` factory: they become runtime classes parented to
+    LOCA, every heading OTHER-status carrying the file's declared AGS type (an empty
+    type padded to ``X``).
+
     Args:
-        ags4: Path to the ``.ags`` source file.
+        ags4: Path to the ``.ags`` source file (a ``str`` or any
+            :class:`os.PathLike`).
 
     Returns:
-        A PROJ instance. Standard groups are compiled ``#[pyclass]`` types; custom /
-        passthrough groups are dynamic Python classes from
-        ``laterite.dynamic``.
+        The root PROJ instance, with descendant groups attached under their
+        ``<child code lower>s`` lists. Standard groups are the compiled
+        ``#[pyclass]`` types; custom / passthrough groups are dynamic classes minted
+        via :func:`laterite.dynamic.get_or_register`.
 
     Raises:
         FileNotFoundError: if ``ags4`` does not exist.
-        RuntimeError: if the file fails to parse, or has no PROJ row.
+        RuntimeError: if the file fails to parse, or contains no PROJ row
+            (every AGS4 transfer must have exactly one).
     """
     ags4 = Path(ags4)
     if not ags4.exists():

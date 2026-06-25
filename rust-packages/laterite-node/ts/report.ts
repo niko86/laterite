@@ -1,13 +1,35 @@
-// The outcome of `validate()` — the Node port of laterite-py's `Report`.
-// `toJson` / `toNdjson` are byte-faithful to the `lat-check` binary (produced
-// native-side; see `lib.rs::findings_json`). `findings` is a plain array (Node
-// has no polars analog; the data is small + structured, so an array is more
-// ergonomic than an arrow-js Table here).
 import type { Finding, ValidationReport } from "./native";
 
 /** One finding without its `rule` key — the value shape `byRule()` groups. */
 export type RuleFinding = Omit<Finding, "rule">;
 
+/**
+ * The verdict from {@link validate} — the Node port of laterite-py's `Report`.
+ *
+ * `validate()` runs the numbered-rule engine over an AGS4 source and hands back
+ * one of these: an immutable wrapper over the native `ValidationReport`. It is a
+ * pure *result* object (it does not carry the file's bytes — that is what the
+ * read/build outputs are for); what it carries is the answer to "is this file
+ * conformant, and if not, why".
+ *
+ * Start with the headline getters. `isValid` is the one most callers branch on —
+ * it is `true` iff there are zero findings, which is deliberately *distinct* from
+ * the native `ok` flag (`ok` only means the source was parseable enough to
+ * validate). `count` is the number of findings, and `exitCode` mirrors what the
+ * `lat-check` binary would return for the same file, so a CLI wrapper can pass it
+ * straight through. The provenance getters — `file`, `dictVersion` (the AGS
+ * edition the rules were drawn from), and `resolution` — say *what* was checked
+ * and *against which dictionary*.
+ *
+ * The findings themselves come three ways. `findings` is the flat array in
+ * `lat-check` order (each `{rule, line?, group, desc, severity?}`). `byRule()`
+ * regroups them into the spec-rule map `{ "AGS Format Rule N": [...] }` for
+ * rule-oriented reporting. For machine output, `toJson()` and `toNdjson()` return
+ * strings byte-identical to `lat-check --json` / `--ndjson` (minted native-side),
+ * and `toString()` gives a one-line human summary.
+ *
+ * @see {@link validate} — the verb that produces a `Report`.
+ */
 export class Report {
   readonly #r: ValidationReport;
   constructor(r: ValidationReport) {

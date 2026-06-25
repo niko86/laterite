@@ -1,13 +1,3 @@
-// A parsed AGS4 file — the Node port of laterite-py's `Ags4File`. The read
-// surface is **Arrow-direct**: `table(code)` decodes the native typed Arrow IPC
-// straight to an arrow-js Table (no DuckDB round-trip). Python routes reads
-// through DuckDB only because its pandas path is otherwise pyarrow-bound; Node
-// has no such reason, so the base read surface needs no engine at all.
-//
-// The OPTIONAL DuckDB layer — `sql()` / `at()` / `connection` — is lazy: the
-// engine spins up only on first use, and `@duckdb/node-api` is an optional peer
-// (absent → a helpful install error). These are async (the Neo client is
-// promise-based); everything else stays sync.
 import { writeFileSync } from "node:fs";
 import { type Table, tableFromIPC } from "apache-arrow";
 import { DuckEngine, type QueryOptions, quoteId, type Row } from "./duckdb";
@@ -15,6 +5,18 @@ import type { GroupMeta } from "./native";
 import { Reading } from "./native";
 import { AgsSubset, type Filter } from "./subset";
 
+/**
+ * A parsed AGS4 file — the Node port of laterite-py's `Ags4File`. The read
+ * surface is **Arrow-direct**: `table(code)` decodes the native typed Arrow IPC
+ * straight to an arrow-js Table (no DuckDB round-trip). Python routes reads
+ * through DuckDB only because its pandas path is otherwise pyarrow-bound; Node
+ * has no such reason, so the base read surface needs no engine at all.
+ *
+ * The OPTIONAL DuckDB layer — `sql()` / `at()` / `connection` — is lazy: the
+ * engine spins up only on first use, and `@duckdb/node-api` is an optional peer
+ * (absent → a helpful install error). These are async (the Neo client is
+ * promise-based); everything else stays sync.
+ */
 export class Ags4File {
   readonly #reading: Reading;
   // One arrow-js Table per group, decoded once on first `table(code)`.
@@ -47,12 +49,15 @@ export class Ags4File {
     return m;
   }
 
+  /** The HEADING-row codes of `code`, in file order. Throws if `code` isn't in the file. */
   headings(code: string): string[] {
     return this.#meta(code).headings;
   }
+  /** The UNIT row of `code`, one per heading. Throws if `code` isn't in the file. */
   units(code: string): string[] {
     return this.#meta(code).units;
   }
+  /** The TYPE row of `code` (the AGS data types), one per heading. Throws if `code` isn't in the file. */
   types(code: string): string[] {
     return this.#meta(code).types;
   }
@@ -65,6 +70,7 @@ export class Ags4File {
     return this.#meta(code).lineNumbers;
   }
 
+  /** Whether `code` is one of the file's groups — the cheap membership check `headings`/`table` would otherwise throw on. */
   has(code: string): boolean {
     return this.#reading.meta(code) !== null;
   }
@@ -98,7 +104,11 @@ export class Ags4File {
     return (this.#bytes ??= Buffer.from(this.text, "utf8"));
   }
 
-  /** Write the AGS4 to `path` (UTF-8); returns `path`. The inverse of `read`. */
+  /** Write the AGS4 to `path` (UTF-8) — the inverse of `read`. The bytes are
+   * byte-faithful to the source DATA values, re-emitted from the retained parse.
+   *
+   * @param path Filesystem path to write the UTF-8 AGS4 to.
+   * @returns The same `path`, for chaining. */
   save(path: string): string {
     writeFileSync(path, this.bytes);
     return path;
@@ -122,10 +132,13 @@ export class Ags4File {
 
   /** Run SQL over the file's groups by their clean names — e.g.
    * `await ags.sql("SELECT * FROM SAMP JOIN LOCA USING (LOCA_ID) WHERE …")`.
-   * Returns JS-native row objects by default, or a born-typed arrow-js `Table`
-   * with `{ arrow: true }` (loads the `arrow` community extension on first use).
-   * Any group may be referenced, so this loads them all. Needs the optional
-   * `@duckdb/node-api` peer. */
+   * Any group may be referenced, so this loads them all into the engine.
+   *
+   * @param query SQL referencing groups by their bare AGS code as table names.
+   * @param opts `{ arrow: true }` returns a born-typed arrow-js `Table` (loads the
+   *   `arrow` community extension on first use) instead of JS-native rows.
+   * @returns JS-native row objects by default, or a `Table` when `arrow` is set.
+   * @throws If the optional `@duckdb/node-api` peer is absent. */
   sql(query: string): Promise<Row[]>;
   sql(query: string, opts: { arrow: true }): Promise<Table>;
   sql(query: string, opts?: QueryOptions): Promise<Row[] | Table>;
@@ -139,7 +152,11 @@ export class Ags4File {
    * returns a view whose `table(code)` yields only the rows whose `{group}_ID`
    * is in `values`. Chain to narrow (`.at("SAMP", […])`); `sub.groups` is the
    * related groups, `sub.frames()` pulls them all. Groups carrying none of the
-   * keys pass through. For any other predicate, use `sql("… WHERE …")`. */
+   * keys pass through. For any other predicate, use `sql("… WHERE …")`.
+   *
+   * @param group The parent group whose `{group}_ID` key drives the filter.
+   * @param values The id values to keep (empty matches nothing).
+   * @returns An `AgsSubset` view; further `.at()` calls accumulate filters. */
   at(group: string, values: Iterable<unknown>): AgsSubset {
     return new AgsSubset(this, [[`${group}_ID`, [...values]]]);
   }
@@ -192,10 +209,12 @@ export class Ags4File {
     }
   }
 
+  /** `using f = read(…)` disposal hook — delegates to `close()`. */
   [Symbol.dispose](): void {
     this.close();
   }
 
+  /** A compact one-line summary — group count and `TRAN_AGS` — for logs and the REPL. */
   toString(): string {
     return `<Ags4File groups=${this.groups.length} tranAgs=${JSON.stringify(this.tranAgs)}>`;
   }

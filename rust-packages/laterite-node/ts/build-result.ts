@@ -1,6 +1,3 @@
-// The product of `buildAgs4()` — the Node port of laterite-py's `BuildResult`:
-// the AGS4 `bytes`, the validator `findings` on those bytes (post-fix in AutoFix
-// mode), and the count of safe fixes applied.
 import { writeFileSync } from "node:fs";
 
 /** A flattened build finding — `rule` plus whatever rich keys the validator set. */
@@ -12,6 +9,27 @@ export interface BuildFinding {
   [key: string]: unknown;
 }
 
+/**
+ * The product of {@link buildAgs4} — the data→AGS4 door's return value, and the
+ * Node port of laterite-py's `BuildResult`. Where `read` hands you an *existing*
+ * file, `buildAgs4` *constructs* one from your data and then runs the output back
+ * through the validator; this object is what falls out of that round trip. It is
+ * a plain, inert carrier — no DuckDB, no native handle to hold open — so you can
+ * keep it, pass it around, or persist it at leisure.
+ *
+ * It carries three things. {@link BuildResult.bytes | `bytes`} is the AGS4
+ * document as the validator emitted it (UTF-8); reach for {@link BuildResult.text
+ * | `text`} when you want it decoded as a string, or {@link BuildResult.save |
+ * `save(path)`} to write the bytes straight to disk (it returns the path).
+ * {@link BuildResult.findings | `findings`} is the *residual* set of validator
+ * findings — what the build could **not** clear given the `mode` it ran under
+ * (e.g. `"autofix"` applies the safe fixes and leaves only what it can't touch,
+ * `"report"` records everything); each is a flat {@link BuildFinding} of `rule`
+ * plus whatever rich keys the validator set. {@link BuildResult.fixesApplied |
+ * `fixesApplied`} counts how many safe fixes were applied along the way. A clean
+ * build is an empty `findings` array; a non-empty one tells you exactly what the
+ * emitted document still trips on.
+ */
 export class BuildResult {
   constructor(
     readonly bytes: Buffer,

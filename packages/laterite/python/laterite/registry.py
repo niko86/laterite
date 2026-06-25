@@ -25,6 +25,15 @@ HeadingStatus = Literal["KEY", "REQUIRED", "OTHER", "KEY+REQUIRED", "DEPRECATED"
 
 @dataclass(frozen=True, slots=True)
 class Heading:
+    """One heading (column) of an AGS group, as the dictionary defines it.
+
+    Frozen because the registry is read-only — a ``Heading`` is a fact
+    about the AGS spec, not mutable state. ``status`` keeps the
+    dictionary's own vocabulary verbatim, including the combined
+    ``"KEY+REQUIRED"`` and the ``"DEPRECATED"`` marker; use ``is_key``
+    rather than an ``==`` test so those combined forms are handled.
+    """
+
     name: str
     status: HeadingStatus
     type: str
@@ -34,16 +43,33 @@ class Heading:
 
     @property
     def py_name(self) -> str:
+        """The heading name lower-cased — the identifier the typed
+        classes and DuckDB columns use, where the dictionary's
+        upper-case form isn't a legal attribute/column name."""
         return self.name.lower()
 
     @property
     def is_key(self) -> bool:
-        # KEY iff "KEY" is one of the `+`-separated status parts.
+        """Whether this heading is a KEY column. Tests the
+        ``+``-separated parts of ``status`` so the combined
+        ``"KEY+REQUIRED"`` form counts, where a plain ``== "KEY"``
+        would miss it."""
         return any(p.strip().upper() == "KEY" for p in self.status.split("+"))
 
 
 @dataclass(frozen=True, slots=True)
 class GroupDescriptor:
+    """The full spec of one AGS group: its 4-letter ``code``, the
+    dictionary's prose ``contents``, the ``parent`` code that places it
+    in the PROJ tree (``None`` at the root), and its ``headings`` in
+    dictionary order.
+
+    Frozen for the same reason as ``Heading`` — this describes the AGS
+    dictionary, which is fixed at Rust crate load. The ``table``/``view``
+    getters give the conventional DuckDB names a ``.ags5db`` store uses
+    for the group.
+    """
+
     code: str
     contents: str
     parent: str | None
@@ -52,18 +78,27 @@ class GroupDescriptor:
 
     @property
     def table(self) -> str:
+        """The group's physical table name in a ``.ags5db`` store —
+        ``g_<code>`` lower-cased."""
         return f"g_{self.code.lower()}"
 
     @property
     def view(self) -> str:
+        """The group's view name in a ``.ags5db`` store — ``v_<code>``
+        lower-cased — the parent-joined view that complements the raw
+        ``table``."""
         return f"v_{self.code.lower()}"
 
     @property
     def key_headings(self) -> tuple[Heading, ...]:
+        """The KEY headings — the columns that identify a row in this
+        group — in dictionary order."""
         return tuple(h for h in self.headings if h.is_key)
 
     @property
     def non_key_headings(self) -> tuple[Heading, ...]:
+        """The non-KEY headings — every column that doesn't take part
+        in identifying a row — in dictionary order."""
         return tuple(h for h in self.headings if not h.is_key)
 
 
@@ -116,9 +151,16 @@ def ancestor_chain(code: str) -> list[str]:
 
 
 def inherited_key_names(code: str) -> set[str]:
-    """KEY heading names a group inherits from its parent (matches
-    ``ags5_db._ddl._inherited_key_names``). Returns a set; the Rust
-    side gives a sorted list for determinism, which we wrap."""
+    """The KEY heading names this group shares with its direct
+    parent — the keys it inherits rather than declaring fresh.
+
+    The intersection of this group's KEY headings with its immediate
+    parent's (only the direct parent, not the whole ancestor chain),
+    computed in Rust against the static registry. Rust returns a
+    sorted list for determinism; we hand it back as a set since order
+    carries no meaning to callers. Empty when the group is a root or
+    its parent is unknown.
+    """
     return set(_native.registry_inherited_key_names(code))
 
 

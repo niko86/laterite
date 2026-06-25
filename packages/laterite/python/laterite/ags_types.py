@@ -60,10 +60,30 @@ def display_hint(ags_type: str) -> str | None:
 
 
 def parse_value(raw: Any, ags_type: str) -> Any:
-    """Parse an AGS4-shaped raw string into the canonical Python type.
+    """Parse an AGS4-shaped raw string into its canonical Python type.
 
-    Permissive: unparseable values return ``None``. The single source
-    of truth for AGS4 ingest (the Rust base path).
+    Permissive by design — this is the single source of truth for AGS4
+    ingest (the Rust base path), so it never raises on bad data: an
+    unparseable value, or an empty / whitespace-only string, comes back
+    as ``None`` rather than an error. Anything that isn't already a
+    string is stringified first, mirroring the original pure-Python
+    implementation's ``isinstance(s, str)`` guards.
+
+    Args:
+        raw: The raw AGS4 field value. ``None`` (explicit null) returns
+            ``None`` untouched; non-string input is coerced with
+            ``str()`` before parsing.
+        ags_type: The AGS spec type code (e.g. ``'2DP'``, ``'DT'``,
+            ``'YN'``, ``'ID'``) that selects the canonical category.
+
+    Returns:
+        The value in its canonical Python type, keyed off the type code:
+        ``int`` (INTEGER), ``float`` (DECIMAL), ``bool`` (BOOL),
+        ``datetime.datetime`` (DATETIME), ``datetime.date`` (DATE),
+        ``datetime.time`` (TIME), and ``str`` (STRING / ENUM). An
+        unknown AGS code passes the trimmed string through unchanged.
+        ``None`` for a null, empty, whitespace-only, or unparseable
+        value.
     """
     # Accept any input PyO3 won't coerce directly (e.g. an int passed
     # by a careless caller) — match the Python implementation's
