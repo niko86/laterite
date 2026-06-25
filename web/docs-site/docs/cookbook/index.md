@@ -1,39 +1,44 @@
 # Cookbook
 
-A task-indexed map of "how do I…?" — each entry points to the worked example (and the Learn page) that answers it. Skim for your task; follow the link for the runnable recipe.
+Task-indexed recipes. Each one is a runnable block you can lift straight into your code — the snippet
+on the page is the *exact* file the CI gate executes, so the output is real. New here? the
+[Learn path](../learn/index.md) walks the same ground in order; this page is for *"how do I…?"*.
 
 ## Reading & typing
 
-- **Get one group as a typed frame** — read a group straight into a polars frame whose dtypes *are* the AGS types. See [Read a group as a typed frame](../learn/read.md).
-- **Read XN columns as numbers / explore the registry** — pull `XN`-typed columns as numeric and browse the group/heading registry. See [Explore the registry & XN columns](../learn/query.md).
+- [**Get one group as a typed frame**](get-typed-frame.md) — `read(...)["LOCA"]`, born-typed.
+- [**Read XN columns as numeric**](read-xn-numeric.md) — opt-in `xn="numeric"` for the AGS numeric-or-text type.
+- [**Explore the registry & KEY chain**](explore-registry.md) — `child_groups` / `inherited_key_names`.
 
 ## Validating
 
-- **Validate a file in Python** — run the numbered-rule engine and read the `Report`. See [Validate in Python](../learn/validate.md).
-- **List the rules / report the edition** — enumerate the validator's rules and the dictionary edition a file resolved to. See [Rules & the dictionary](../learn/validate.md).
-- **Validate from the command line** — `lat-check FILE` for a clean/findings verdict (and `--json`). See the [CLI reference](../reference/cli.md).
+- [**Validate a delivery**](validate-a-delivery.md) — in Python and on the `lat-check` CLI (+ exit codes).
+- [**List the rules / report the edition**](list-rules.md) — `list_rules()` and `dict_for()`.
 
 ## Querying
 
-- **Filter & select within one group** — build a lazy query, narrow rows and columns, then materialise. See [Query a group](../learn/query.md).
-- **Join across groups with SQL** — run SQL over the whole file (DuckDB under the hood). See [SQL across groups](../learn/query.md).
-- **Pull a borehole's record set** — fan out from `LOCA` to its child groups and grab the frames. See [Fan-out from a location](../learn/query.md).
+- [**Filter & select one group**](filter-select.md) — the lazy `.query().filter().select()` builder.
+- [**SQL across groups**](sql-across-groups.md) — `.sql(...)` joins on the shared keys.
+- [**Pull one borehole's record set**](borehole-record-set.md) — `.at(...)` fan-out → `.frames()`.
+- [**Splice your own step (`.pipe`)**](pipe.md) — drop a function into the chain.
 
 ## Producing AGS4
 
-- **Build AGS4 from frames** — assemble a `BuildResult` from a dict of frames, then `.text` / `.bytes` / `.save`. See [Produce AGS4](../learn/produce.md).
-- **Build AGS4 from a typed graph** — construct the `PROJ` typed-class tree and emit it. See [Produce AGS4](../learn/produce.md).
+- [**Build from frames**](build-from-frames.md) — `build_ags4({code: frame})`.
+- [**Build from a typed graph**](build-from-typed-graph.md) — `build_ags4(PROJ(...))` (#214).
 
-## Repairing
+## Repairing & comparing
 
-- **Fix a dirty file** — apply safe repairs to a non-conforming delivery and re-emit. Validate first ([Validate in Python](../learn/validate.md)), then fix what's reported.
+- [**Fix a dirty file**](fix-a-dirty-file.md) — `.fix()` → a new, repaired handle.
+- [**Diff two revisions**](diff-revisions.md) — KEY-aware, type-aware.
+- [**Certify a clean file**](certify.md) — mint an `.ags.idx` and skip re-validation.
 
-## Comparing, certifying & sharing
+## Sharing & migrating
 
-- **Diff two revisions** — compare two versions of a file group-by-group to see what moved between deliveries.
-- **Certify a clean file** — mint an `.ags.idx` certificate so a later `.validate()` can skip the rule engine. See the [certify CLI](../reference/cli.md).
-- **Pack & encrypt for transport** — `pack` / `lock` a file (and `unlock` / `unpack`) for handing off.
+- [**Pack / encrypt for transport**](transport.md) — zstd + optional age encryption.
+- [**Drop-in for python-ags4**](compat.md) — `from laterite import compat as AGS4`.
 
-## Migrating
-
-- **Drop-in for python-ags4** — swap `python_ags4` for `laterite.compat` with minimal edits, keeping the pandas backend. See [Install & import](../learn/install.md).
+!!! tip
+    Want to see the whole fluent API assembled from these parts? The [Chaining showcase](../chaining/index.md)
+    climbs a power ladder from a one-line `read().validate()` to raw SQL, your own functions, and the
+    certify fast-path.

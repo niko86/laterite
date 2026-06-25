@@ -59,6 +59,7 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
       node: ${{ steps.filter.outputs.node }}
+      docs: ${{ steps.filter.outputs.docs }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
@@ -66,9 +67,13 @@ jobs:
         with:
           # `code` = anything that can change a Rust/Python test outcome: the
           # crates, the wheels (source + tests), the deps, this workflow, the
-          # build-accel action, and the pyi generator (its drift test lives in
-          # the python job). tools/assets/docs/release-tooling deliberately don't.
+          # build-accel action, the pyi generator (its drift test lives in the
+          # python job), and the docs EXAMPLES + their shared fixture
+          # (tests/test_docs_examples.py runs them in the python job). The docs
+          # *pages* deliberately DON'T trip `code` — they're link-gated by the
+          # cheap `docs` job below; tools/assets/release-tooling don't either.
           # `node` = the laterite-node crate + TS package (drives the `node` job).
+          # `docs` = the MkDocs site (drives the `docs` strict-build link gate).
           filters: |
             code:
               - 'rust-packages/**'
@@ -79,6 +84,8 @@ jobs:
               - 'tools/generate_pyi.py'
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
+              - 'web/docs-site/examples/**'  # docs example sources — test_docs_examples.py executes these
+              - 'examples/sample_site.ags'   # the fixture that gate reads (subprocess cwd = repo root)
             node:
               # The napi addon links sibling crates — laterite-ags4-validator,
               # laterite-types, laterite-ags4-emit (see laterite-node/Cargo.toml) —
@@ -91,6 +98,13 @@ jobs:
               - 'rust-packages/**'
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
+            docs:
+              # The MkDocs site + its nav/config drive the `docs` job's
+              # `mkdocs build --strict` link gate. The examples under
+              # web/docs-site/examples/** ALSO sit in `code`, so the python job
+              # re-runs the RUNTIME example gate — link half here, runtime there.
+              - 'web/docs-site/**'
+              - '.github/workflows/ci.yml'
 
   rust:
     needs: changes
@@ -483,3 +497,25 @@ jobs:
         if: always()
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
+  # Docs-site link gate (#201). The MkDocs site under web/docs-site/ is
+  # example-led: every page `--8<--`-includes a file from examples/, and
+  # `--strict` turns ANY broken internal link, missing nav page, or unresolved
+  # snippet file into a build failure — so the published docs can't silently rot.
+  # This IS the "PR-time `mkdocs build --strict` gate" deploy-validator.yml
+  # defers to (its mirror build is non-strict so a link nit never blocks the app
+  # deploy). Cheap by design: an ephemeral mkdocs-material, no project sync, no
+  # laterite wheel. The examples' RUNTIME behaviour is the other half — gated by
+  # tests/test_docs_examples.py in the `python` job (which has the compiled
+  # wheel) and now re-run when an example or the shared fixture changes (`code`).
+  docs:
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.docs == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - name: mkdocs build --strict
+        working-directory: web/docs-site
+        run: uv run --no-project --with mkdocs-material mkdocs build --strict

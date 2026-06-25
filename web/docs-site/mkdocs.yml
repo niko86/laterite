@@ -86,9 +86,38 @@ nav:
       - 5. Produce AGS4: learn/produce.md
   - Cookbook:
       - cookbook/index.md
+      - Reading & typing:
+          - Get one group as a typed frame: cookbook/get-typed-frame.md
+          - Read XN columns as numeric: cookbook/read-xn-numeric.md
+          - Explore the registry & KEY chain: cookbook/explore-registry.md
+      - Validating:
+          - Validate a delivery: cookbook/validate-a-delivery.md
+          - List the rules / report the edition: cookbook/list-rules.md
+      - Querying:
+          - Filter & select one group: cookbook/filter-select.md
+          - SQL across groups: cookbook/sql-across-groups.md
+          - Pull one borehole's record set: cookbook/borehole-record-set.md
+          - Splice your own step (.pipe): cookbook/pipe.md
+      - Producing AGS4:
+          - Build from frames: cookbook/build-from-frames.md
+          - Build from a typed graph: cookbook/build-from-typed-graph.md
+      - Repairing & comparing:
+          - Fix a dirty file: cookbook/fix-a-dirty-file.md
+          - Diff two revisions: cookbook/diff-revisions.md
+          - Certify a clean file: cookbook/certify.md
+      - Sharing & migrating:
+          - Pack / encrypt for transport: cookbook/transport.md
+          - Drop-in for python-ags4: cookbook/compat.md
   - Chaining: chaining/index.md
   - Concepts:
       - Born-typed reads: concepts/born-typed.md
+      - The fluent model: concepts/fluent-model.md
+      - One engine, many doors: concepts/one-engine-many-doors.md
+      - The .ags.idx certificate: concepts/certificate-lifecycle.md
+      - Content-addressed join keys: concepts/content-addressed-keys.md
+      - Dictionary auto-selection: concepts/dictionary-selection.md
+      - Severity tiers: concepts/severity-tiers.md
+      - Dependency shape: concepts/dependency-shape.md
   - Reference:
       - CLI (lat-check): reference/cli.md
       - Python cheatsheet: reference/cheatsheet.md
