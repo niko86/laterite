@@ -75,19 +75,19 @@ def read_typed(ags4: str | PathLike[str]) -> Any:
     parent reference points at nothing.
 
     Groups present in the file but absent from the standard dictionary flow through
-    the :mod:`laterite.dynamic` factory: they become runtime classes parented to
+    the `laterite.dynamic` factory: they become runtime classes parented to
     LOCA, every heading OTHER-status carrying the file's declared AGS type (an empty
     type padded to ``X``).
 
     Args:
         ags4: Path to the ``.ags`` source file (a ``str`` or any
-            :class:`os.PathLike`).
+            `os.PathLike`).
 
     Returns:
         The root PROJ instance, with descendant groups attached under their
         ``<child code lower>s`` lists. Standard groups are the compiled
         ``#[pyclass]`` types; custom / passthrough groups are dynamic classes minted
-        via :func:`laterite.dynamic.get_or_register`.
+        via `laterite.dynamic.get_or_register`.
 
     Raises:
         FileNotFoundError: if ``ags4`` does not exist.

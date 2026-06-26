@@ -52,6 +52,27 @@ theme:
 plugins:
   - search
   - tags
+  # API reference — mkdocstrings introspects the *installed* `laterite` wheel
+  # (runtime handler), so the docs build needs the workspace wheel present
+  # (`uv sync` builds the local working-tree wheel the docs track). The
+  # docstrings are Sphinx/reST style (`:param:`/`:returns:`/`:class:`).
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: sphinx
+            show_source: false
+            show_if_no_docstring: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            merge_init_into_class: true
+            filters: ["!^_"]
 
 markdown_extensions:
   - abbr
@@ -120,4 +141,6 @@ nav:
       - Dependency shape: concepts/dependency-shape.md
   - Reference:
       - CLI (lat-check): reference/cli.md
+      - Python API: reference/api.md
+      - Support modules: reference/modules.md
       - Python cheatsheet: reference/cheatsheet.md

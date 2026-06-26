@@ -148,7 +148,7 @@ def _resolve_source(
 
 def _source_bytes(source: Any) -> bytes:
     """Resolve any diff input — a path, AGS4 text, raw bytes, file-like, or an
-    :class:`Ags4File` — to the raw bytes the native ``diff_files`` parses."""
+    [`Ags4File`][laterite.Ags4File] — to the raw bytes the native ``diff_files`` parses."""
     if isinstance(source, Ags4File):
         return source.bytes
     p, txt, raw = _resolve_source(source)
@@ -164,28 +164,28 @@ def _source_bytes(source: Any) -> bytes:
 class Report:
     """The verdict the validate door hands back — *is this a conformant AGS4 file, and where does it break the rules?*
 
-    A ``Report`` is what :func:`validate` returns once the AGS4.1 numbered-rules
-    engine has run over a file; it is also minted by :meth:`from_cert` for the
+    A ``Report`` is what [`validate`][laterite.validate] returns once the AGS4.1 numbered-rules
+    engine has run over a file; it is also minted by [`from_cert`][laterite.Report.from_cert] for the
     engine-skipped path, where a fresh, byte-matching ``.ags.idx`` certificate
-    stands in for a fresh run (then :attr:`resolution` is the sentinel
-    ``"certified"`` and :attr:`count` is 0). Either way it is an immutable read-out,
+    stands in for a fresh run (then [`resolution`][laterite.Report.resolution] is the sentinel
+    ``"certified"`` and [`count`][laterite.Report.count] is 0). Either way it is an immutable read-out,
     not a live handle: it carries the answer, you don't act *through* it.
 
-    Read the headline off :attr:`is_valid` / :attr:`count` (conformant when the
-    finding count is 0), with :attr:`exit_code` mirroring what the ``lat-check``
-    binary would return. :attr:`file` and :attr:`dict_version` say *what* was
-    judged and *against which* AGS dictionary edition, and :attr:`resolution`
+    Read the headline off [`is_valid`][laterite.Report.is_valid] / [`count`][laterite.Report.count] (conformant when the
+    finding count is 0), with [`exit_code`][laterite.Report.exit_code] mirroring what the ``lat-check``
+    binary would return. [`file`][laterite.Report.file] and [`dict_version`][laterite.Report.dict_version] say *what* was
+    judged and *against which* AGS dictionary edition, and [`resolution`][laterite.Report.resolution]
     records *how* that edition was chosen — ``"exact"`` / ``"fallback"`` /
     ``"forced"`` from the engine, or ``"certified"`` when the verdict came from a
     certificate rather than a rules pass.
 
     The detail comes three ways, all over the same findings, so you reach for the
-    shape that fits your tool. :attr:`findings` is a flat **polars** frame, one row
+    shape that fits your tool. [`findings`][laterite.Report.findings] is a flat **polars** frame, one row
     per finding (rule / line / group / desc / severity / target and the pinned
     location columns) — ideal for filtering and slicing the warning/fyi tiers in a
-    dataframe. :meth:`by_rule` regroups those same findings under their spec rule
+    dataframe. [`by_rule`][laterite.Report.by_rule] regroups those same findings under their spec rule
     (``{"AGS Format Rule N": [...]}``, sorted like the Rust BTreeMap, carrying the
-    editor-oriented ``char_span``). :meth:`to_json` and :meth:`to_ndjson` are the
+    editor-oriented ``char_span``). [`to_json`][laterite.Report.to_json] and [`to_ndjson`][laterite.Report.to_ndjson] are the
     serialised forms, byte-identical to ``lat-check --json`` / ``--ndjson`` — for
     handing the verdict to another process unchanged.
 
@@ -194,7 +194,7 @@ class Report:
         dict_version: The AGS dictionary edition the rules were resolved against.
         resolution: How that edition was resolved — ``"exact"`` / ``"fallback"`` / ``"forced"``, or ``"certified"`` for a certificate-backed verdict.
         count: Number of findings (0 ⇒ conformant).
-        is_valid: ``True`` when :attr:`count` is 0.
+        is_valid: ``True`` when [`count`][laterite.Report.count] is 0.
         exit_code: Process exit code mirroring the ``lat-check`` binary.
         findings: Flat polars frame, one row per finding (rule, line, group, desc, severity, target, heading, field_index, data_row).
     """
@@ -207,8 +207,8 @@ class Report:
     @classmethod
     def from_cert(cls, cert, src=None) -> Report:
         """Synthesise a clean report from a fresh certificate — the engine-skipped
-        outcome of ``.validate()`` on an ``index=``-certified file. :attr:`resolution`
-        is the sentinel ``"certified"`` (the engine never emits it), :attr:`count`
+        outcome of ``.validate()`` on an ``index=``-certified file. [`resolution`][laterite.Report.resolution]
+        is the sentinel ``"certified"`` (the engine never emits it), [`count`][laterite.Report.count]
         is 0, and the edition is the cert's. The clean verdict's provenance is the
         certificate's stamp (``cert.validator`` / ``cert.checked_at``)."""
         import json
@@ -277,7 +277,7 @@ class Report:
           pins them (else null).
 
         The within-line character span (``char_span``) is editor-oriented and lives on
-        :meth:`by_rule` / :meth:`to_json` / :meth:`to_ndjson`, not this flat frame."""
+        [`by_rule`][laterite.Report.by_rule] / [`to_json`][laterite.Report.to_json] / [`to_ndjson`][laterite.Report.to_ndjson], not this flat frame."""
         items = self._r["findings"]
         return pl.DataFrame(
             {
@@ -423,20 +423,20 @@ class Ags4File:
     @property
     def groups(self) -> list[str]:
         """The 4-letter group codes present, in source order — the read order of the
-        original file, which :attr:`text` / :meth:`save` preserve."""
+        original file, which [`text`][laterite.Ags4File.text] / [`save`][laterite.Ags4File.save] preserve."""
         return list(self._p["group_order"])
 
     @property
     def backend(self) -> str:
         """The frame type a materialising call (``ags["LOCA"]``, ``.frame()``) hands
-        back — ``"polars"`` (default) or ``"pandas"``, as fixed at :func:`read` time."""
+        back — ``"polars"`` (default) or ``"pandas"``, as fixed at [`read`][laterite.read] time."""
         return self._backend
 
     @property
     def tran_ags(self) -> str | None:
         """The file's declared AGS edition — its ``TRAN_AGS`` stamp (e.g. ``"4.1"``),
         or ``None`` if the file declares no edition. This is what resolves the
-        dictionary a bare :meth:`validate` (no ``dict_version``) projects the rules from."""
+        dictionary a bare [`validate`][laterite.validate] (no ``dict_version``) projects the rules from."""
         return self._p.get("tran_ags")
 
     def _g(self, code: str) -> dict:
@@ -560,7 +560,7 @@ class Ags4File:
 
     def at(self, group: str, values) -> AgsQuery:
         """Filter to a parent entity's records — ``ags.at("LOCA", ["BH01", "BH02"])``
-        returns an :class:`AgsQuery` whose ``sub[code]`` yields only the rows of each
+        returns an [`AgsQuery`][laterite.AgsQuery] whose ``sub[code]`` yields only the rows of each
         group whose ``{group}_ID`` (e.g. ``LOCA_ID``) is in ``values``, materialising
         only the matching rows (explore a huge file without a huge frame). Chain to
         narrow further (``.at("SAMP", […])``); ``sub.groups`` is the related groups and
@@ -570,8 +570,8 @@ class Ags4File:
 
     def query(self, sql: str) -> AgsQuery:
         """Start a lazy, chainable query over the file's groups by clean name — the
-        fluent counterpart to :meth:`sql`. Where ``sql()`` hands back a raw DuckDB
-        relation (ending the chain), ``query()`` returns an :class:`AgsQuery` you keep
+        fluent counterpart to [`sql`][laterite.Ags4File.sql]. Where ``sql()`` hands back a raw DuckDB
+        relation (ending the chain), ``query()`` returns an [`AgsQuery`][laterite.AgsQuery] you keep
         building (``.filter()``, ``.select()``, ``.at()``) and cash out with a terminal
         (``.frame()`` / ``.to_polars()`` / ``.to_pandas()`` / ``.relation()``)."""
         return AgsQuery(self, base=sql)
@@ -627,7 +627,7 @@ class Ags4File:
 
     @property
     def bytes(self) -> bytes:
-        """:attr:`text` encoded UTF-8 — the on-disk / wire form :meth:`save` writes.
+        """[`text`][laterite.Ags4File.text] encoded UTF-8 — the on-disk / wire form [`save`][laterite.Ags4File.save] writes.
         AGS4 is a text format, so ``bytes`` is just ``text.encode("utf-8")``. Memoised."""
         if self._bytes is None:
             self._bytes = self.text.encode("utf-8")
@@ -642,8 +642,8 @@ class Ags4File:
         check_files: bool = False,
     ) -> Self:
         """Validate this file against the AGS4 rules and return ``self`` (chainable —
-        ``read(p).validate().query(...)``); the outcome lands on :attr:`report`. Same
-        engine as the module-level :func:`validate`, run on the source this handle was
+        ``read(p).validate().query(...)``); the outcome lands on [`report`][laterite.Ags4File.report]. Same
+        engine as the module-level [`validate`][laterite.validate], run on the source this handle was
         read from (so line numbers match the original file). A handle built without a
         retained source validates its spec-correct re-emit instead.
 
@@ -653,10 +653,10 @@ class Ags4File:
         shim keeps its own python-ags4-faithful defaults, unaffected by this.)
 
         **Certificate short-circuit:** if this handle carries a fresh ``index=``
-        certificate (from :func:`read`) **minted by the current validator engine**,
+        certificate (from [`read`][laterite.read]) **minted by the current validator engine**,
         and you ask for an errors-only check, the rule engine is skipped — the cert
-        already proves the file validated clean — and :attr:`report` is the
-        synthesised certified report (:meth:`Report.from_cert`). A cert from a
+        already proves the file validated clean — and [`report`][laterite.Ags4File.report] is the
+        synthesised certified report ([`Report.from_cert`][laterite.Report.from_cert]). A cert from a
         *different/older* engine is re-validated, not trusted (its clean verdict may
         not reproduce under today's rules). Asking for more than the cert vouches for
         runs the engine — which now includes the **default** check, since a cert
@@ -693,7 +693,7 @@ class Ags4File:
 
     @property
     def report(self) -> Report:
-        """The :class:`Report` from the most recent :meth:`validate` (raises if
+        """The [`Report`][laterite.Report] from the most recent [`validate`][laterite.validate] (raises if
         ``validate()`` has not been called on this handle yet)."""
         if self._report is None:
             raise AttributeError("call .validate() before reading .report")
@@ -701,7 +701,7 @@ class Ags4File:
 
     def _source_bytes(self) -> bytes:
         """The ORIGINAL source bytes this handle was read from — what a certificate
-        indexes and fingerprints. NOT the spec-correct re-emit :attr:`bytes`, which
+        indexes and fingerprints. NOT the spec-correct re-emit [`bytes`][laterite.Ags4File.bytes], which
         can differ from a non-canonically-formatted on-disk file. A path re-reads the
         file; raw ``data=`` is returned as-is; ``text=`` is UTF-8-encoded; a
         synthesised handle (no retained source) falls back to the re-emit."""
@@ -717,8 +717,8 @@ class Ags4File:
     def certify(self, path: str | Path | None = None) -> Path:
         """Mint this file's ``.ags.idx`` validity **certificate** — a clean-validation
         proof plus a byte-offset index — and write it beside the file. REQUIRES a prior
-        clean :meth:`validate`: ``certify`` *vouches for* a passed validation, it does
-        not run one. Raises if :meth:`validate` was not called, or found finding(s); a
+        clean [`validate`][laterite.validate]: ``certify`` *vouches for* a passed validation, it does
+        not run one. Raises if [`validate`][laterite.validate] was not called, or found finding(s); a
         later ``read(..., index=...)`` consumes the cert to skip re-validation.
 
         ``path`` defaults to ``<source>.idx`` (``delivery.ags`` → ``delivery.ags.idx``);
@@ -758,8 +758,8 @@ class Ags4File:
         return path
 
     def save(self, path: str | Path) -> Path:
-        """Write spec-correct AGS4 to ``path`` (UTF-8 — :attr:`bytes`); returns the
-        ``Path``. The inverse of :func:`read`."""
+        """Write spec-correct AGS4 to ``path`` (UTF-8 — [`bytes`][laterite.Ags4File.bytes]); returns the
+        ``Path``. The inverse of [`read`][laterite.read]."""
         path = Path(path)
         path.write_bytes(self.bytes)
         return path
@@ -773,9 +773,9 @@ class Ags4File:
         Rust-backed via ``laterite_excel`` (``rust_xlsxwriter``); openpyxl and
         pyarrow never enter the dep graph. Sheets carry the AGS HEADING / UNIT /
         TYPE / DATA layout. ``groups`` optionally fixes the sheet order (a subset or
-        re-ordering of :attr:`groups`); default is source order. The workbook is
-        written from this handle's spec-correct :attr:`bytes`, so it round-trips
-        through :func:`from_excel` regardless of how the handle was read."""
+        re-ordering of [`groups`][laterite.Ags4File.groups]); default is source order. The workbook is
+        written from this handle's spec-correct [`bytes`][laterite.Ags4File.bytes], so it round-trips
+        through [`from_excel`][laterite.from_excel] regardless of how the handle was read."""
         import tempfile
 
         with tempfile.TemporaryDirectory() as d:
@@ -785,13 +785,13 @@ class Ags4File:
 
     @property
     def fix_report(self) -> FixResult | None:
-        """The :class:`FixResult` from the :meth:`fix` that produced this handle —
+        """The [`FixResult`][laterite.FixResult] from the [`fix`][laterite.fix] that produced this handle —
         what was applied and the findings that could **not** be mechanically fixed —
-        or ``None`` for a handle not produced by :meth:`fix`."""
+        or ``None`` for a handle not produced by [`fix`][laterite.fix]."""
         return self._fix_report
 
     def fix(self, *, risky: bool = False) -> Ags4File:
-        """Repair this file and return a new, repaired :class:`Ags4File` — the fluent
+        """Repair this file and return a new, repaired [`Ags4File`][laterite.Ags4File] — the fluent
         transform, so ``read(path).fix().validate().save(out)`` reads as one chain.
         The **safe** mechanical fixes (CRLF / BOM / embedded-CR / short-row pad /
         numeric reformat / TRAN delimiter+concatenator rows) are applied; ``risky=True``
@@ -799,11 +799,11 @@ class Ags4File:
         canonicalisation, typography). The same engine the browser fix UI uses.
 
         Non-destructive — the source on disk is untouched; persist the repaired handle
-        with :meth:`save`. The :class:`FixResult` — what was applied and the residual
-        findings — rides on the returned handle's :attr:`fix_report`. The new handle
+        with [`save`][laterite.Ags4File.save]. The [`FixResult`][laterite.FixResult] — what was applied and the residual
+        findings — rides on the returned handle's [`fix_report`][laterite.Ags4File.fix_report]. The new handle
         inherits this one's ``backend`` / ``xn``. For the report itself (and the
         ``in_place=`` / ``out=`` write options) instead of a handle, call the free
-        :func:`fix`."""
+        [`fix`][laterite.fix]."""
         if self._src is not None:
             p, t, d = self._src
         else:
@@ -816,8 +816,8 @@ class Ags4File:
 
     def diff(self, other: Any, *, dict_version: str | None = None) -> dict:
         """Compare this file (the **baseline**) against ``other`` (the **revision** —
-        a path, AGS4 text, bytes, or another :class:`Ags4File`); returns the
-        :func:`diff` ``RevisionDelta`` dict. Rows are matched by the group's KEY
+        a path, AGS4 text, bytes, or another [`Ags4File`][laterite.Ags4File]); returns the
+        [`diff`][laterite.diff] ``RevisionDelta`` dict. Rows are matched by the group's KEY
         headings, cells compared through the typed value."""
         return diff(self, other, dict_version=dict_version)
 
@@ -829,8 +829,8 @@ class Ags4File:
 
 
 class AgsQuery:
-    """A lazy, chainable view over an :class:`Ags4File`'s DuckDB engine — the single
-    query type returned by :meth:`Ags4File.at` and :meth:`Ags4File.query`. Nothing
+    """A lazy, chainable view over an [`Ags4File`][laterite.Ags4File]'s DuckDB engine — the single
+    query type returned by [`Ags4File.at`][laterite.Ags4File.at] and [`Ags4File.query`][laterite.Ags4File.query]. Nothing
     runs until a terminal. Two modes share the type:
 
     **Multi-group fan-out** (from ``.at()``) — key-filter several related groups at
@@ -923,7 +923,7 @@ class AgsQuery:
         hatch to slot a custom step into a query chain without leaving the fluent flow.
 
         Args:
-            fn: A callable taking this :class:`AgsQuery` as its first argument.
+            fn: A callable taking this [`AgsQuery`][laterite.AgsQuery] as its first argument.
             *args: Extra positional arguments forwarded to ``fn``.
             **kwargs: Extra keyword arguments forwarded to ``fn``.
 
@@ -993,8 +993,8 @@ class AgsQuery:
 
     def relation(self):
         """The built DuckDB relation (lazy — ``.df()`` / ``pl.from_arrow`` to
-        materialise, or chain more SQL). Requires a base set via :meth:`Ags4File.query`
-        / :meth:`query`; ``.at()`` filters and ``.filter()`` predicates that apply to
+        materialise, or chain more SQL). Requires a base set via [`Ags4File.query`][laterite.Ags4File.query]
+        / [`query`][laterite.AgsQuery.query]; ``.at()`` filters and ``.filter()`` predicates that apply to
         the base's columns narrow it, and ``.select()`` projects."""
         p = self._parent
         if self._base is None:
@@ -1056,20 +1056,20 @@ def validate(
     check_files: bool = False,
 ) -> Report:
     """Run the AGS4.1 numbered-rules engine over a file and return its verdict as a
-    :class:`Report`. This is the validate door: it answers *is this a conformant
-    AGS4 file, and where does it break the rules?* — distinct from :func:`read`
-    (which loads the data into an :class:`Ags4File` over DuckDB) and
-    :func:`build_ags4` (which emits AGS4 from your own data).
+    [`Report`][laterite.Report]. This is the validate door: it answers *is this a conformant
+    AGS4 file, and where does it break the rules?* — distinct from [`read`][laterite.read]
+    (which loads the data into an [`Ags4File`][laterite.Ags4File] over DuckDB) and
+    [`build_ags4`][laterite.build_ags4] (which emits AGS4 from your own data).
 
     The distinction the door draws is **un-validatable input vs rule violations**.
     Input that can't even be assessed — a missing path, bytes that aren't AGS4 or
     aren't UTF-8, a recognised-but-unsupported edition, an unknown
     ``dict_version`` — *raises*, because there is no meaningful verdict to give.
     Genuine *violations* of a parseable AGS4 file never raise: they come back as
-    findings in the :class:`Report` (a clean file is a :class:`Report` with
+    findings in the [`Report`][laterite.Report] (a clean file is a [`Report`][laterite.Report] with
     ``count == 0``).
 
-    ``source`` is auto-detected the same way :func:`read` does it: a single
+    ``source`` is auto-detected the same way [`read`][laterite.read] does it: a single
     positional argument is sniffed as a path (when it exists on disk — the
     unambiguous case), a file-like (``.read()``), raw bytes, or in-memory AGS4
     text. Pass ``text=`` to be explicit for an ambiguous string (e.g. AGS4 content
@@ -1079,9 +1079,9 @@ def validate(
     reading a delivery: **errors and WARNINGs surface by default**
     (``warnings=True``). Pass ``warnings=False`` for an errors-only verdict, and
     ``fyi=True`` to add the low-signal FYI tier on top. The tiers are also carried
-    on each row of :attr:`Report.findings` (``severity``), so a single
+    on each row of [`Report.findings`][laterite.Report.findings] (``severity``), so a single
     ``validate(warnings=True, fyi=True)`` run can be split back apart downstream.
-    (The :mod:`laterite.compat` python-ags4 shim keeps its own faithful
+    (The `laterite.compat` python-ags4 shim keeps its own faithful
     defaults — ``check_files`` and the FYI tier on — rather than these.)
 
     Args:
@@ -1091,16 +1091,16 @@ def validate(
             sniff for an ambiguous string.
         dict_version: The AGS edition whose dictionary the rules are projected
             from (e.g. ``"4.1"``); ``None`` resolves the edition from the file
-            (see :attr:`Report.resolution`). An unknown value raises
-            :class:`BadDictError`.
+            (see [`Report.resolution`][laterite.Report.resolution]). An unknown value raises
+            [`BadDictError`][laterite.BadDictError].
         warnings: Include WARNING-tier findings alongside errors (default
-            ``True``); ``False`` gives an errors-only :class:`Report`.
+            ``True``); ``False`` gives an errors-only [`Report`][laterite.Report].
         fyi: Also include the low-signal FYI tier (default ``False``).
         check_files: Run Rule 20 FILE-attachment checks against files on disk
             (default ``False``).
 
     Returns:
-        A :class:`Report` — ``count`` / ``is_valid`` for the verdict at a glance,
+        A [`Report`][laterite.Report] — ``count`` / ``is_valid`` for the verdict at a glance,
         and ``findings`` (a polars frame, one row per violation) for the detail.
 
     Raises:
@@ -1137,11 +1137,11 @@ def read(
     xn: str = "string",
 ) -> Ags4File:
     """Read AGS4 — from a path, a file-like, raw bytes, or in-memory text — into
-    an :class:`Ags4File` over an in-memory DuckDB engine. This is the front door
-    to the read surface: the inverse of :meth:`Ags4File.save`, and the source of
-    the handle every later verb (``ags[code]`` / :meth:`Ags4File.validate` /
-    :meth:`Ags4File.certify` / ``sql`` / ``at``) hangs off. To build AGS4 *from*
-    your own data rather than parse it, reach for :func:`build_ags4` instead.
+    an [`Ags4File`][laterite.Ags4File] over an in-memory DuckDB engine. This is the front door
+    to the read surface: the inverse of [`Ags4File.save`][laterite.Ags4File.save], and the source of
+    the handle every later verb (``ags[code]`` / [`Ags4File.validate`][laterite.Ags4File.validate] /
+    [`Ags4File.certify`][laterite.Ags4File.certify] / ``sql`` / ``at``) hangs off. To build AGS4 *from*
+    your own data rather than parse it, reach for [`build_ags4`][laterite.build_ags4] instead.
 
     One positional ``source`` is auto-detected (path / file-like / bytes / AGS4
     text); when an input is ambiguous, name it with the keyword-only ``path=`` /
@@ -1155,17 +1155,17 @@ def read(
     non-numeric qualifier — ``NP`` / ``<5`` / ``>100``). ``"string"`` (default)
     keeps them byte-faithful as text; ``"numeric"`` casts them to ``Float64``
     across the whole handle (``ags[code]`` / ``sql`` / ``at``), with non-numeric
-    tokens becoming null. This is read-side only — :meth:`Ags4File.save` and the
+    tokens becoming null. This is read-side only — [`Ags4File.save`][laterite.Ags4File.save] and the
     ``.text`` / ``.bytes`` doors stay byte-faithful regardless of the setting.
     (A fuller bidirectional XN treatment is future work.)
 
     ``index`` is the explicit path to this file's ``.ags.idx`` certificate (minted
-    by :meth:`Ags4File.certify`). It is strictly opt-in — there is no
+    by [`Ags4File.certify`][laterite.Ags4File.certify]). It is strictly opt-in — there is no
     autodiscovery — because naming it asserts the cert belongs to *this* file.
     When given, the cert is loaded and freshness-checked against the source bytes
     (format version + size + SHA-256): a **fresh** cert is carried so a later
-    default :meth:`Ags4File.validate` can skip the rule engine, while a **stale**
-    one fails fast with :class:`StaleCertError`.
+    default [`Ags4File.validate`][laterite.Ags4File.validate] can skip the rule engine, while a **stale**
+    one fails fast with [`StaleCertError`][laterite.StaleCertError].
 
     Args:
         source: The AGS4 to read, auto-detected as a path, a file-like, raw
@@ -1177,7 +1177,7 @@ def read(
         data: Explicit raw AGS4 bytes (keyword-only).
         index: Path to this file's ``.ags.idx`` certificate (keyword-only).
             Opt-in, no autodiscovery; a fresh cert is carried to let a later
-            :meth:`Ags4File.validate` skip the rule engine.
+            [`Ags4File.validate`][laterite.Ags4File.validate] skip the rule engine.
         encoding: WHATWG encoding label for bytes / path input (keyword-only);
             defaults to UTF-8. Ignored for ``text=``.
         backend: Default frame type for ``ags[code]`` — ``"polars"`` (default)
@@ -1218,7 +1218,7 @@ source = read
 def _excel_convert(fn, *args) -> dict:
     """Call a native AGS4↔XLSX conversion fn and normalise its outcome: the stats
     PyDict becomes a plain ``dict``; the engine's "no valid AGS4 data" RuntimeError
-    is re-raised as :class:`NotAgs4Error` to match the rest of the read surface."""
+    is re-raised as [`NotAgs4Error`][laterite.NotAgs4Error] to match the rest of the read surface."""
     try:
         return dict(fn(*args))
     except RuntimeError as exc:
@@ -1240,8 +1240,8 @@ def to_excel(
     writer's stats (``{"sheets_written", "rows_written", "warnings"}``).
 
     Rust-backed via ``laterite_excel`` (``rust_xlsxwriter``); openpyxl and pyarrow
-    never enter the dep graph. ``source`` is anything :func:`read` accepts (a path /
-    file-like / bytes / AGS4 text) or an already-:func:`read` :class:`Ags4File`;
+    never enter the dep graph. ``source`` is anything [`read`][laterite.read] accepts (a path /
+    file-like / bytes / AGS4 text) or an already-[`read`][laterite.read] [`Ags4File`][laterite.Ags4File];
     ``output`` is the ``.xlsx`` path to write. ``groups`` optionally fixes the sheet
     order (a subset or re-ordering of the file's groups); default is source order."""
     if output is None:
@@ -1270,7 +1270,7 @@ def from_excel(
     ``HEADING`` column becomes one group; columns not matching Rule 19's heading
     pattern are dropped. With ``output`` given, writes an AGS4 file and returns the
     Rust converter's stats; with ``output=None`` (default), returns a parsed
-    :class:`Ags4File` read straight from the conversion. ``format_numeric_columns``
+    [`Ags4File`][laterite.Ags4File] read straight from the conversion. ``format_numeric_columns``
     (default ``True``) re-formats DATA cells to their column's TYPE precision so
     floats from XLSX keep trailing zeros; ``backend`` / ``xn`` apply only to the
     returned-handle form."""
@@ -1302,7 +1302,7 @@ def list_rules() -> list[dict]:
     """The rule catalogue the engine enforces — one dict per AGS4 rule with
     ``rule`` (e.g. ``"10c"``), ``title``, ``checks`` (a plain-English summary),
     ``severity`` (``"error"`` / ``"fyi"`` / ``"mixed"``), ``fixable`` (whether
-    :func:`fix` can repair it), and ``observations`` (the cited ``O-N`` divergence
+    [`fix`][laterite.fix] can repair it), and ``observations`` (the cited ``O-N`` divergence
     notes). Read-only and file-independent — sourced from the engine's gated rule
     metadata, so it always matches the rules ``validate`` actually runs."""
     import json
@@ -1311,29 +1311,29 @@ def list_rules() -> list[dict]:
 
 
 class BuildResult:
-    """What :func:`build_ags4` hands back: a finished AGS4 file plus the verdict on it.
+    """What [`build_ags4`][laterite.build_ags4] hands back: a finished AGS4 file plus the verdict on it.
 
-    Where :func:`read` opens a file someone else wrote and :func:`validate` judges
+    Where [`read`][laterite.read] opens a file someone else wrote and [`validate`][laterite.validate] judges
     one, ``build_ags4`` *constructs* a fresh AGS4 file from your own per-group data —
     and this is what it returns. The whole point of a result object is that building
     and judging happen together: the same call that emits the bytes also runs them
     back through the validator, so you never hold output you haven't checked.
 
-    The file lives in :attr:`bytes` (the canonical form — UTF-8, byte-faithful AGS4).
-    Reach for :attr:`text` when you want it as a ``str`` for display or diffing, and
-    :meth:`save` when you want it on disk; ``save`` writes the bytes verbatim and
-    returns the :class:`~pathlib.Path` it wrote, so it composes in a pipeline.
+    The file lives in [`bytes`][laterite.BuildResult.bytes] (the canonical form — UTF-8, byte-faithful AGS4).
+    Reach for [`text`][laterite.BuildResult.text] when you want it as a ``str`` for display or diffing, and
+    [`save`][laterite.BuildResult.save] when you want it on disk; ``save`` writes the bytes verbatim and
+    returns the `~pathlib.Path` it wrote, so it composes in a pipeline.
 
-    :attr:`findings` and :attr:`fixes_applied` are the verdict, and what they hold
+    [`findings`][laterite.BuildResult.findings] and [`fixes_applied`][laterite.BuildResult.fixes_applied] are the verdict, and what they hold
     depends on the ``mode`` you built under. In the default ``"autofix"`` mode the
     emitter applies the *safe* mechanical repairs first — padding decimals,
-    normalising — counts them in :attr:`fixes_applied`, and leaves only what it
-    couldn't safely fix (a missing required heading, say) in :attr:`findings`; so a
+    normalising — counts them in [`fixes_applied`][laterite.BuildResult.fixes_applied], and leaves only what it
+    couldn't safely fix (a missing required heading, say) in [`findings`][laterite.BuildResult.findings]; so a
     clean autofix build comes back with empty findings and a non-zero fix count. In
-    ``"report"`` mode nothing is touched, :attr:`fixes_applied` is ``0``, and every
+    ``"report"`` mode nothing is touched, [`fixes_applied`][laterite.BuildResult.fixes_applied] is ``0``, and every
     finding the validator raised is yours to act on. (``"strict"`` mode never yields
     a result with error-severity findings — it raises instead.) Each entry in
-    :attr:`findings` is a dict carrying its ``rule`` alongside the validator's
+    [`findings`][laterite.BuildResult.findings] is a dict carrying its ``rule`` alongside the validator's
     per-finding detail.
 
     Attributes:
@@ -1396,7 +1396,7 @@ def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
     of the tree, so the walk yields only PROJ's subtree; under the default
     ``"autofix"`` mode the emitter then synthesizes the missing UNIT/TYPE/TRAN
     metadata groups (and ABBR when the data uses PA codes; see
-    :func:`build_ags4`). Coverage for
+    [`build_ags4`][laterite.build_ags4]). Coverage for
     standard groups is identical to Node's walk by construction (same dictionary
     parent→child map); additionally — a Python-only superset, since Node has no
     passthrough surface — a custom group that ``read_typed`` hangs off a parent
@@ -1483,9 +1483,9 @@ def build_ags4(
 ) -> BuildResult:
     """Build valid AGS4 from your own per-group data — the data→AGS4 door.
 
-    Where :func:`read` loads an *existing* file, ``build_ags4`` *constructs* a new
+    Where [`read`][laterite.read] loads an *existing* file, ``build_ags4`` *constructs* a new
     one (and autofixes + validates it); persist the result with
-    :meth:`BuildResult.save`.
+    [`BuildResult.save`][laterite.BuildResult.save].
 
     ``groups`` arrives in one of two shapes — the same two laterite-node's
     ``buildAgs4`` accepts:
@@ -1516,7 +1516,7 @@ def build_ags4(
 
     Args:
         groups: The source data. Either a typed-graph ``PROJ`` root (any compiled
-            ``#[pyclass]`` group or a :mod:`laterite.dynamic` passthrough node with
+            ``#[pyclass]`` group or a `laterite.dynamic` passthrough node with
             its children attached), a mapping of ``{code: frame}``, or a list of
             ``(code, frame)`` pairs. Each ``frame`` is a polars or pandas
             ``DataFrame`` whose column names are the AGS headings.
@@ -1532,7 +1532,7 @@ def build_ags4(
             any error-severity rule.
 
     Returns:
-        A :class:`BuildResult` carrying the AGS4 ``bytes``, the validator
+        A [`BuildResult`][laterite.BuildResult] carrying the AGS4 ``bytes``, the validator
         ``findings`` on those bytes (post-fix in ``"autofix"`` mode), and
         ``fixes_applied`` — the count of safe fixes made. ``.text`` decodes the
         bytes; ``.save(path)`` writes them.
@@ -1582,28 +1582,28 @@ def build_ags4(
 
 
 class FixResult:
-    """The product of :func:`fix` — and the same object carried on
-    :attr:`Ags4File.fix_report` after a handle is repaired.
+    """The product of [`fix`][laterite.fix] — and the same object carried on
+    [`Ags4File.fix_report`][laterite.Ags4File.fix_report] after a handle is repaired.
 
-    Where :class:`Report` tells you what is *wrong* with a file, ``FixResult`` is
+    Where [`Report`][laterite.Report] tells you what is *wrong* with a file, ``FixResult`` is
     the answer after the fixer has had its turn: the mechanically repaired AGS4
     document plus an honest account of what it could and could not put right. The
-    headline payload is :attr:`bytes` — the rewritten file, always UTF-8 with no
+    headline payload is `bytes` — the rewritten file, always UTF-8 with no
     BOM, so a single fix run that targets a CRLF or encoding fault also normalises
-    the file's line endings and encoding as a side effect. :attr:`text` decodes
-    those bytes for you, and :meth:`save` writes them to a path (returning the
-    :class:`~pathlib.Path` it wrote), for the common case where :func:`fix` was
+    the file's line endings and encoding as a side effect. `text` decodes
+    those bytes for you, and `save` writes them to a path (returning the
+    `~pathlib.Path` it wrote), for the common case where [`fix`][laterite.fix] was
     called without ``in_place`` / ``out`` and you decide where the output lands.
 
-    The result is deliberately two-sided about success. :attr:`applied` is the
+    The result is deliberately two-sided about success. `applied` is the
     ledger of every repair that was made — each a ``{kind, label, rule, line,
-    risk}`` record, and :attr:`fixes_applied` is just its length — so you can show
-    or audit exactly what changed. :attr:`findings` is the complement: the
+    risk}`` record, and [`fixes_applied`][laterite.BuildResult.fixes_applied] is just its length — so you can show
+    or audit exactly what changed. `findings` is the complement: the
     fixer re-validates its own output, so these are the issues that **survived**
     the repair and still need a human (each finding carries its ``rule`` alongside
     the usual per-rule fields). A run that leaves ``findings`` empty fixed
     everything; a run with entries did what it mechanically could and is telling
-    you what it couldn't guess. :attr:`dict_version` records the AGS dictionary
+    you what it couldn't guess. [`dict_version`][laterite.Report.dict_version] records the AGS dictionary
     edition the repaired bytes were validated against, whether you pinned it or it
     was derived from the file's ``TRAN_AGS``.
 
@@ -1662,27 +1662,27 @@ def fix(
     in_place: bool = False,
     out: str | os.PathLike[str] | None = None,
 ) -> FixResult:
-    """Mechanically repair an existing AGS4 file and return a :class:`FixResult`.
+    """Mechanically repair an existing AGS4 file and return a [`FixResult`][laterite.FixResult].
 
     The same fix engine the browser uses, run headless: ``source`` is anything
-    :func:`read` accepts (path / file-like / bytes / AGS4 text), or name the input
+    [`read`][laterite.read] accepts (path / file-like / bytes / AGS4 text), or name the input
     explicitly with one of the ``path`` / ``text`` / ``data`` doors. The **safe**
     fixes (CRLF / BOM / embedded-CR / short-row pad / numeric reformat / the TRAN
     delimiter+concatenator rows) are always applied; ``risky=True`` also applies the
     intent-guessing ones (duplicate-heading rename, ``dd/mm`` datetime
     canonicalisation, smart-quote→ASCII typography). The repaired bytes are
-    re-validated, so :attr:`FixResult.findings` is what could **not** be
+    re-validated, so [`FixResult.findings`][laterite.FixResult.findings] is what could **not** be
     mechanically fixed.
 
     Non-destructive by default — the fixed bytes come back on the result and are
     written only if you ask: ``in_place=True`` overwrites the source file (which
     requires a path source), or ``out=<path>`` writes there; the two are mutually
-    exclusive. Otherwise call :meth:`FixResult.save`. The output is always UTF-8
+    exclusive. Otherwise call [`FixResult.save`][laterite.FixResult.save]. The output is always UTF-8
     with no BOM, so fixing a non-UTF-8 file also normalises its encoding.
 
     Args:
         source: The AGS4 input, given positionally — a path, file-like, raw bytes,
-            or AGS4 text (anything :func:`read` accepts). Leave unset to name the
+            or AGS4 text (anything [`read`][laterite.read] accepts). Leave unset to name the
             input via the ``path`` / ``text`` / ``data`` keywords instead.
         path: Explicit filesystem path to the source file, as an alternative to
             passing it positionally.
@@ -1710,7 +1710,7 @@ def fix(
     Raises:
         TypeError: If both ``in_place=True`` and ``out`` are given.
         Ags4Error: If ``in_place=True`` but the source is not a path (so there is
-            nothing to overwrite) — use ``out=<path>`` or :meth:`FixResult.save`
+            nothing to overwrite) — use ``out=<path>`` or [`FixResult.save`][laterite.FixResult.save]
             instead.
     """
     import json
@@ -1753,8 +1753,8 @@ def diff(
 ) -> dict:
     """Compare two AGS4 documents and return their **revision diff**.
 
-    ``a`` (the baseline) and ``b`` (the revision) are each anything :func:`read`
-    accepts — a path, AGS4 text, raw bytes, a file-like, or an :class:`Ags4File`.
+    ``a`` (the baseline) and ``b`` (the revision) are each anything [`read`][laterite.read]
+    accepts — a path, AGS4 text, raw bytes, a file-like, or an [`Ags4File`][laterite.Ags4File].
     The door answers the question "what actually changed between this submission and
     the last one" in *AGS terms*, not text terms.
 
@@ -1775,7 +1775,7 @@ def diff(
 
     Args:
         a: The baseline document — a path, AGS4 text, raw bytes, a file-like, or an
-            :class:`Ags4File` (anything :func:`read` accepts).
+            [`Ags4File`][laterite.Ags4File] (anything [`read`][laterite.read] accepts).
         b: The revision document, in any of the same forms as ``a``.
         dict_version: Dictionary edition (e.g. ``"4.1"``) used to resolve each group's
             KEY headings. Defaults to ``None``, which takes the edition from the

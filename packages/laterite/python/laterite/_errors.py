@@ -44,7 +44,7 @@ class BadDictError(Ags4Error):
 class StaleCertError(Ags4Error):
     """A passed ``index=`` certificate (``.ags.idx``) does not match the file it
     was read for — its size/SHA-256 differ, so its byte offsets and clean verdict
-    are now lies. Raised at :func:`read` time (fail-fast): an explicit ``index=``
+    are now lies. Raised at [`read`][laterite.read] time (fail-fast): an explicit ``index=``
     asserts "this cert is for this file", so a mismatch is an error, never a silent
     fall-back to re-validation. Rebuild it (``read(p).validate().certify()``).
     """

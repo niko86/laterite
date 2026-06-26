@@ -512,9 +512,9 @@ def convert_to_text(dataframe: Any, dictionary: str | None = None) -> Any:
     / ``"Standard_dictionary_4_1.ags"``). When supplied, UNIT/TYPE rows
     are recovered from the standard dictionary for columns whose
     headings are defined there — useful after
-    :func:`convert_to_numeric` (which drops UNIT/TYPE). Genuinely
+    `convert_to_numeric` (which drops UNIT/TYPE). Genuinely
     external dict files (not one of the bundled paths) still raise
-    :class:`BadDictError` per O-28.
+    [`BadDictError`][laterite.BadDictError] per O-28.
     """
     import polars as pl
 
@@ -884,7 +884,7 @@ def excel_to_AGS4(
             to AGS4 via Rust, then the dictionary's UNIT/TYPE rows
             override the XLSX-provided ones and DATA cells are
             reformatted to the dict's TYPE precision per
-            :func:`convert_to_text`. Mirrors python-ags4's
+            `convert_to_text`. Mirrors python-ags4's
             ``excel_to_AGS4(dictionary=...)`` behaviour.
 
     Raises:

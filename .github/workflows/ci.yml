@@ -100,10 +100,14 @@ jobs:
               - '.github/actions/build-accel/**'
             docs:
               # The MkDocs site + its nav/config drive the `docs` job's
-              # `mkdocs build --strict` link gate. The examples under
+              # `mkdocs build --strict` build. The examples under
               # web/docs-site/examples/** ALSO sit in `code`, so the python job
-              # re-runs the RUNTIME example gate — link half here, runtime there.
+              # re-runs the RUNTIME example gate — link/autodoc half here, example
+              # runtime there. The importable Python source is here too because
+              # the mkdocstrings API reference introspects it: a docstring edit
+              # that renames/removes a cross-ref target must re-run --strict.
               - 'web/docs-site/**'
+              - 'packages/laterite/python/**'
               - '.github/workflows/ci.yml'
 
   rust:
@@ -498,24 +502,41 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
-  # Docs-site link gate (#201). The MkDocs site under web/docs-site/ is
-  # example-led: every page `--8<--`-includes a file from examples/, and
-  # `--strict` turns ANY broken internal link, missing nav page, or unresolved
-  # snippet file into a build failure — so the published docs can't silently rot.
-  # This IS the "PR-time `mkdocs build --strict` gate" deploy-validator.yml
-  # defers to (its mirror build is non-strict so a link nit never blocks the app
-  # deploy). Cheap by design: an ephemeral mkdocs-material, no project sync, no
-  # laterite wheel. The examples' RUNTIME behaviour is the other half — gated by
-  # tests/test_docs_examples.py in the `python` job (which has the compiled
-  # wheel) and now re-run when an example or the shared fixture changes (`code`).
+  # Docs-site gate (#201). The MkDocs site under web/docs-site/ is example-led
+  # (every page `--8<--`-includes a file from examples/) AND carries the
+  # mkdocstrings Python API reference, which introspects the *installed*
+  # `laterite` wheel at build time. So `--strict` here catches BOTH a broken
+  # link / missing nav page / unresolved snippet file AND a broken autodoc
+  # cross-reference (e.g. a docstring `[`x`][laterite.x]` whose target moved) —
+  # the published docs can't silently rot. This IS the "PR-time `mkdocs build
+  # --strict` gate" deploy-validator.yml defers to (its mirror build is
+  # non-strict so a link nit never blocks the app deploy).
+  #
+  # `uv sync --group docs` builds the local working-tree wheel (the docs track
+  # HEAD, not the last release — the owner's call) + installs mkdocs-material +
+  # mkdocstrings; the Rust toolchain + sccache make the maturin build a warm-
+  # cache hit. The examples' RUNTIME behaviour is gated separately by
+  # tests/test_docs_examples.py in the `python` job (also `code`-filtered, so an
+  # example or fixture edit re-runs it there).
   docs:
     needs: changes
     if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.docs == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+      - uses: ./.github/actions/build-accel
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - name: Build the working-tree wheel + docs deps
+        run: uv sync --group docs
       - name: mkdocs build --strict
         working-directory: web/docs-site
-        run: uv run --no-project --with mkdocs-material mkdocs build --strict
+        run: uv run --no-sync mkdocs build --strict
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
