@@ -84,7 +84,7 @@ in-process from Python, or at the shell with `lat-check`.
     }
     ```
 
-Both doors run the same clean-room rule engine and pick the dictionary edition
+Both doors run the same rule engine and pick the dictionary edition
 from the file's `TRAN_AGS` — the Python `.report` and the CLI's `--json` carry
 identical findings. Reach for the CLI in a build gate (exit `1` fails the
 build); reach for `.validate()` when you want to keep working with the parsed

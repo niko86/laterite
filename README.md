@@ -20,7 +20,7 @@ A faster drop-in for [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-p
 
 ## Part of the laterite suite
 
-One clean-room Rust AGS4 engine, surfaced for every stack:
+One Rust AGS4 engine, surfaced for every stack:
 
 | Surface | Package | Get it |
 |---|---|---|
@@ -40,7 +40,7 @@ Requires Python ≥ 3.12.
 
 ## Use
 
-The same clean-room engine drives every surface — pick your stack.
+The same engine drives every surface — pick your stack.
 
 ### Python
 
@@ -177,9 +177,9 @@ Full breakdown:
 - [docs/parity-coverage-map.md](docs/parity-coverage-map.md) — test-
   level map of laterite ↔ python-ags4
 
-The validator is **clean-room**: every rule is written from the AGS4
-spec, not copied from python-ags4 source. python-ags4 is LGPL-3.0; the
-clean-room separation lets laterite ship under MIT.
+The validator is **clean-room** — every rule written from the AGS4 spec,
+not copied from python-ags4 (LGPL-3.0) source — which is what lets laterite
+ship under MIT.
 
 ## Contributing
 

@@ -9,7 +9,7 @@ produce byte-faithful AGS4 back out. Work through them in order — each page en
    `lat-check` CLI in one line.
 2. **[Read](./read.md)** — `read()` a path, text, or bytes; AGS types arrive as polars
    dtypes (every column is [born typed](../concepts/born-typed.md)).
-3. **[Validate](./validate.md)** — run the clean-room numbered-rules engine and read the
+3. **[Validate](./validate.md)** — run the numbered-rules engine and read the
    `Report` of findings.
 4. **[Query](./query.md)** — fan out a group with `.at()`, chain the lazy `AgsQuery`
    builder, or drop to `.sql()` over DuckDB.

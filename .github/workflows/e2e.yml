@@ -11,11 +11,15 @@
 name: e2e (web)
 
 on:
+  # `!web/docs-site/**` subtracts the docs site from `web/**`: the MkDocs docs
+  # live under web/ but don't touch the validator app, so a docs-only change
+  # must NOT run the app's e2e (the docs have their own `docs` gate in ci.yml,
+  # and the deploy still publishes them). The negation must follow `web/**`.
   push:
     branches: [main]
-    paths: ["web/**", "rust-packages/laterite-ags4-wasm/**", ".github/workflows/e2e.yml"]
+    paths: ["web/**", "!web/docs-site/**", "rust-packages/laterite-ags4-wasm/**", ".github/workflows/e2e.yml"]
   pull_request:
-    paths: ["web/**", "rust-packages/laterite-ags4-wasm/**", ".github/workflows/e2e.yml"]
+    paths: ["web/**", "!web/docs-site/**", "rust-packages/laterite-ags4-wasm/**", ".github/workflows/e2e.yml"]
   workflow_dispatch:
     inputs:
       runner:

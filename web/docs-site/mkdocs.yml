@@ -16,7 +16,7 @@ site_description: >-
 site_url: https://niko86.github.io/laterite/docs/
 repo_url: https://github.com/niko86/laterite
 repo_name: niko86/laterite
-copyright: laterite — MIT, clean-room AGS4
+copyright: laterite — MIT-licensed AGS4 tooling
 
 docs_dir: docs
 site_dir: ../dist/docs
@@ -52,6 +52,15 @@ theme:
 plugins:
   - search
   - tags
+  # Group catalogue (#201) — one page per AGS4 group generated at build time
+  # from the shipped `laterite.registry` (which inherits the JSON→registry
+  # faithfulness gate). literate-nav builds the family-bucketed sub-nav from the
+  # generated SUMMARY.md. Pages are NOT committed (no 174-file churn per dict edit).
+  - gen-files:
+      scripts:
+        - scripts/gen_groups.py
+  - literate-nav:
+      nav_file: SUMMARY.md
   # API reference — mkdocstrings introspects the *installed* `laterite` wheel
   # (runtime handler), so the docs build needs the workspace wheel present
   # (`uv sync` builds the local working-tree wheel the docs track). The
@@ -95,6 +104,13 @@ markdown_extensions:
       # files tests/test_docs_examples.py executes, so page == test.
       base_path: [examples]
       check_paths: true
+
+# Group-catalogue master table: filter + 20-per-page pagination + family-card
+# filtering (vanilla JS, no third-party dependency — keeps the docs CDN-free).
+extra_javascript:
+  - javascripts/catalogue.js
+extra_css:
+  - stylesheets/catalogue.css
 
 nav:
   - Home: index.md
@@ -142,5 +158,6 @@ nav:
   - Reference:
       - CLI (lat-check): reference/cli.md
       - Python API: reference/api.md
+      - Group catalogue: reference/groups/
       - Support modules: reference/modules.md
       - Python cheatsheet: reference/cheatsheet.md

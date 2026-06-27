@@ -110,25 +110,33 @@ jobs:
           npm ci
           npm run build
 
-      # The docs site publishes ONLY to the public mirror's Pages
-      # (https://niko86.github.io/laterite/docs/) — never the private laterite
-      # preview — so both steps are gated on the repo. mkdocs builds into
+      # The docs build runs on BOTH deploy targets: the private `laterite`
+      # Pages (https://niko86.github.io/laterite/docs/) is the DEV PREVIEW —
+      # "the purpose for dev to try things out" — and the public mirror
+      # (https://niko86.github.io/laterite/docs/) is production. (This relaxes the
+      # earlier mirror-only gate now that the docs are mature and dev is the
+      # preview env; production exposure is still owner-gated by the manual mirror
+      # sync, so merging here only previews on dev.) mkdocs builds into
       # web/dist/docs (its site_dir), riding the SAME Pages artifact as the app;
       # run AFTER the Vite build so it doesn't clobber web/dist.
       #
       # `uv sync --group docs` builds the local working-tree `laterite` wheel +
-      # installs mkdocs-material + mkdocstrings, because the API reference
-      # introspects the installed wheel at build time. The Rust toolchain is
-      # already present (wasm-pack installed it above; the host target builds the
-      # PyO3 wheel). Non-strict on purpose: a docs link nit must never block the
-      # app deploy — the PR-time `docs` job (ci.yml) is the strict gate.
-      - name: Set up uv (docs build, public mirror only)
-        if: github.repository == 'niko86/laterite'
+      # installs mkdocs-material + mkdocstrings (the API reference introspects the
+      # installed wheel) + gen-files/literate-nav (the group catalogue). The Rust
+      # toolchain is already present (wasm-pack installed it above; the host
+      # target builds the PyO3 wheel). Non-strict on purpose: a docs link nit must
+      # never block the app deploy — the PR-time `docs` job (ci.yml) is the strict
+      # gate. (mkdocs `site_url` is the production path; nav/asset links are
+      # relative under `use_directory_urls`, so the dev-preview path resolves too.)
+      - name: Set up uv (docs build)
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
-      - name: Build docs (public mirror only)
-        if: github.repository == 'niko86/laterite'
+      - name: Build docs
         run: |
           uv sync --group docs
+          # uv sync installs laterite editable but does NOT build the PyO3 cdylib;
+          # mkdocstrings' runtime import + the catalogue generator need it built +
+          # co-located, so run maturin develop (same as the ci.yml docs job).
+          (cd packages/laterite && uv run --no-sync maturin develop --uv)
           cd web/docs-site && uv run --no-sync mkdocs build
 
       - name: Upload Pages artifact

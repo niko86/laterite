@@ -533,6 +533,14 @@ jobs:
       - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
       - name: Build the working-tree wheel + docs deps
         run: uv sync --group docs
+      # `uv sync` installs laterite EDITABLE but does NOT build the PyO3 cdylib
+      # (same gotcha the python job documents) — so mkdocstrings' runtime import
+      # AND the group-catalogue generator need an explicit maturin develop to
+      # build + co-locate `_laterite_native` into the package source tree.
+      # Without this the docs build only works on a warm uv cache (it did in #286
+      # by luck; a cold runner fails to import laterite).
+      - name: Build native extension (maturin develop)
+        run: (cd packages/laterite && uv run --no-sync maturin develop --uv)
       - name: mkdocs build --strict
         working-directory: web/docs-site
         run: uv run --no-sync mkdocs build --strict

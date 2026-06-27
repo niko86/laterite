@@ -1,0 +1,44 @@
+/* Group-catalogue master table: filter box + pager (see javascripts/catalogue.js). */
+.group-table .group-filter {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.7rem;
+  margin: 0.4rem 0 0.8rem;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 0.2rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  font-size: 0.78rem;
+}
+
+.group-table .group-filter:focus {
+  outline: none;
+  border-color: var(--md-accent-fg-color);
+}
+
+.group-pager {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin: 0.8rem 0;
+}
+
+.group-pager button {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--md-default-fg-color--lighter);
+  border-radius: 0.2rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-primary-fg-color);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.group-pager button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.group-pager-info {
+  color: var(--md-default-fg-color--light);
+  font-size: 0.72rem;
+}
