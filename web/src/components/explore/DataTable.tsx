@@ -38,7 +38,9 @@ export const DataTable: Component<{
       const t = await run(
         `SELECT * FROM "${key.code}" LIMIT ${PAGE} OFFSET ${key.page * PAGE}`,
       );
-      return arrowResult(t);
+      // Hide the synthetic _id/_parent_id key columns from the group grid (they
+      // stay in the engine for the SQL console's cross-group joins). (#303)
+      return arrowResult(t, undefined, true);
     },
   );
 

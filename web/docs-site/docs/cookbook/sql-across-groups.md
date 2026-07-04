@@ -1,63 +1,131 @@
 # SQL across groups
 
+**Available in:** Python · Node · DuckDB · Browser
+
 **When:** you need a real join across two or more groups — counts, lookups,
 aggregates — that a single-group query can't express. Drop to SQL.
 
+=== "Python"
+
+    ```python
+    --8<-- "python/ex06_sql_join.py"
+    ```
+
+    ```text
+    shape: (14, 2)
+    ┌─────────┬─────┐
+    │ LOCA_ID ┆ n   │
+    │ ---     ┆ --- │
+    │ str     ┆ i64 │
+    ╞═════════╪═════╡
+    │ BH01    ┆ 4   │
+    │ BH02    ┆ 2   │
+    │ BH03    ┆ 3   │
+    │ BH04    ┆ 4   │
+    │ BH05    ┆ 2   │
+    │ …       ┆ …   │
+    │ BH10    ┆ 3   │
+    │ BH11    ┆ 3   │
+    │ BH12    ┆ 3   │
+    │ BH13    ┆ 4   │
+    │ BH14    ┆ 4   │
+    └─────────┴─────┘
+    ```
+
+    `.sql(...)` exposes every group in the file as a DuckDB table named by its
+    four-letter code, so `SAMP s JOIN LOCA l USING (LOCA_ID)` joins on the
+    shared key with no setup — the columns are already born-typed, so
+    `count(*)`, `GROUP BY`, and numeric comparisons mean what they say.
+
+    `.sql()` is a **terminal** — it returns a `DuckDBPyRelation`, not an
+    `AgsQuery`. Finish it by materialising into the frame library you want:
+
+    - `.pl()` → polars (shown above)
+    - `.df()` → pandas
+    - `.arrow()` → an Arrow table
+
+    One variation — fold a third group in with another `JOIN` and pull real
+    columns instead of a count:
+
+    ```python
+    rel = ags.sql(
+        "SELECT l.LOCA_ID, s.SAMP_REF, g.GEOL_GEOL "
+        "FROM SAMP s JOIN LOCA l USING (LOCA_ID) JOIN GEOL g USING (LOCA_ID, SAMP_TOP)"
+    )
+    df = rel.df()
+    ```
+
+=== "Node"
+
+    ```js
+    --8<-- "node/ex06_sql_join.mjs"
+    ```
+
+    ```text
+    [
+      { LOCA_ID: 'BH01', n: 4n },
+      { LOCA_ID: 'BH02', n: 2n },
+      { LOCA_ID: 'BH03', n: 3n },
+      { LOCA_ID: 'BH04', n: 4n },
+      { LOCA_ID: 'BH05', n: 2n },
+      { LOCA_ID: 'BH06', n: 2n },
+      { LOCA_ID: 'BH07', n: 3n },
+      { LOCA_ID: 'BH08', n: 2n },
+      { LOCA_ID: 'BH09', n: 2n },
+      { LOCA_ID: 'BH10', n: 3n },
+      { LOCA_ID: 'BH11', n: 3n },
+      { LOCA_ID: 'BH12', n: 3n },
+      { LOCA_ID: 'BH13', n: 4n },
+      { LOCA_ID: 'BH14', n: 4n }
+    ]
+    ```
+
+    Identical SQL, identical table names. `sql()` is `async` and returns plain
+    row objects (note DuckDB's `BIGINT` arrives as JS `BigInt` — the `4n`);
+    pass `{ arrow: true }` for an arrow-js `Table` instead. The SQL door is
+    the one Node feature behind an **optional peer** — `npm i @duckdb/node-api`
+    — so services that only read/validate/fix never pull a database in.
+    `close()` (or `using`) releases the connection.
+
+=== "DuckDB"
+
+    ```sql
+    --8<-- "duckdb/ex06_sql_join.sql"
+    ```
+
+    In DuckDB itself there's nothing to leave — each group is a `read_ags()`
+    table function and the join is plain SQL. The same born-typed columns
+    apply, and `load_ags_script(path)` can materialise every group as an
+    `ags_<code>` table when you'd rather query a warehouse than a file.
+
+=== "Browser"
+
+    The [web app](../surfaces/browser.md)'s **Explore** pane has a SQL box
+    over the same engine (DuckDB-wasm fed by the wasm reader's Arrow output) —
+    the identical `SAMP s JOIN LOCA l USING (LOCA_ID)` runs client-side over
+    the file you dropped in.
+
+### Join without knowing the keys
+
+Every group also carries two synthetic **content-addressed** columns in the
+engine — `_id` and `_parent_id` — so a parent/child join is the *same* column
+pair for every edge, with no `USING (…)` to look up per group:
+
 ```python
---8<-- "python/ex06_sql_join.py"
+rel = ags.sql("SELECT * FROM SAMP s JOIN LOCA l ON s._parent_id = l._id")
 ```
 
-```text
-shape: (14, 2)
-┌─────────┬─────┐
-│ LOCA_ID ┆ n   │
-│ ---     ┆ --- │
-│ str     ┆ i64 │
-╞═════════╪═════╡
-│ BH01    ┆ 4   │
-│ BH02    ┆ 2   │
-│ BH03    ┆ 3   │
-│ BH04    ┆ 4   │
-│ BH05    ┆ 2   │
-│ …       ┆ …   │
-│ BH10    ┆ 3   │
-│ BH11    ┆ 3   │
-│ BH12    ┆ 3   │
-│ BH13    ┆ 4   │
-│ BH14    ┆ 4   │
-└─────────┴─────┘
-```
-
-`.sql(...)` exposes every group in the file as a DuckDB table named by its
-four-letter code, so `SAMP s JOIN LOCA l USING (LOCA_ID)` joins on the shared
-key with no setup — the columns are already born-typed, so `count(*)`, `GROUP
-BY`, and numeric comparisons mean what they say. The join key is the AGS
-parent/child link: `LOCA_ID` lives on every `SAMP` row and points back at its
-borehole.
-
-`.sql()` is a **terminal** — it returns a `DuckDBPyRelation`, not an `AgsQuery`.
-Finish it by materialising into the frame library you want:
-
-- `.pl()` → polars (shown above)
-- `.df()` → pandas
-- `.arrow()` → an Arrow table
-
-One variation — fold a third group in with another `JOIN` and pull real
-columns instead of a count:
-
-```python
-rel = ags.sql(
-    "SELECT l.LOCA_ID, s.SAMP_REF, g.GEOL_GEOL "
-    "FROM SAMP s JOIN LOCA l USING (LOCA_ID) JOIN GEOL g USING (LOCA_ID, SAMP_TOP)"
-)
-df = rel.df()
-```
+These live only in the relational layer; `ags["SAMP"]` frames drop them unless
+you ask with `ags.table("SAMP", keys=True)` (Node:
+`file.table("SAMP", { keys: true })`). See
+[content-addressed keys](../concepts/content-addressed-keys.md) for the full
+model.
 
 **Gotcha:** `.sql()` is the escape hatch, not the guard-railed builder. Use
 [`.query()`](./filter-select.md) for narrowing and selecting within one group —
-it keeps you in the typed `AgsQuery` chain and stays lazy until a terminal. Reach
-for `.sql()` only when you need a cross-group join or aggregate. Both share the
-same DuckDB engine, so the type fidelity is identical.
+it keeps you in the typed `AgsQuery` chain and stays lazy until a terminal.
+Reach for `.sql()` only when you need a cross-group join or aggregate. Both
+share the same DuckDB engine, so the type fidelity is identical.
 
 See also: [Filter & select](./filter-select.md) ·
 [Borehole record set](./borehole-record-set.md)

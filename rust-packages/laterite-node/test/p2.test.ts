@@ -7,6 +7,7 @@ import {
   Ags4File,
   type BuildResult,
   FileNotFoundError,
+  type GroupData,
   NotAgs4Error,
   type Report,
   buildAgs4,
@@ -188,6 +189,28 @@ describe("buildAgs4 → data → AGS4", () => {
     ]);
   });
 
+  it("BuildResult.applied is the safe-fix ledger (#294 F#7)", () => {
+    // A string "1.0" under the 2DP LOCA_GL heading is a safe Rule 8 reformat
+    // AutoFix applies during the build — so `applied` carries its record (same
+    // {kind,label,rule,line,risk} shape FixResult.applied uses), and
+    // fixesApplied is exactly its length.
+    const proj = tableFromArrays({ PROJ_ID: ["P1"] });
+    const loca = tableFromArrays({ LOCA_ID: ["BH1"], LOCA_GL: ["1.0"] });
+    const groups = new Map<string, Table>([
+      ["PROJ", proj],
+      ["LOCA", loca],
+    ]);
+    const res = buildAgs4(groups, { dictVersion: "4.1.1", mode: "autofix" });
+    expect(res.fixesApplied).toBe(res.applied.length);
+    expect(res.applied.length).toBeGreaterThan(0);
+    expect(res.applied[0]).toMatchObject({ rule: "AGS Format Rule 8", risk: "safe" });
+    expect(typeof res.applied[0]?.kind).toBe("string");
+    // report mode touches nothing -> empty ledger.
+    const rep = buildAgs4(groups, { mode: "report" });
+    expect(rep.applied).toEqual([]);
+    expect(rep.fixesApplied).toBe(0);
+  });
+
   it("accepts row-objects (transposed to a typed Table)", () => {
     const res = buildAgs4([
       ["PROJ", [{ PROJ_ID: "P1", PROJ_NAME: "Demo" }]],
@@ -201,5 +224,30 @@ describe("buildAgs4 → data → AGS4", () => {
     ]);
     expect(res.text).toMatch(/"DATA","BH01","12\.30"/);
     expect(read(undefined, { text: res.text }).table("LOCA").numRows).toBe(2);
+  });
+
+  it("units/types override per heading (#294 F#9)", () => {
+    // LOCA_XTRA is a custom heading the dictionary doesn't know; the override
+    // gives it a real UNIT/TYPE while LOCA_GL still fills from the dict.
+    const groups: Array<[string, GroupData]> = [
+      ["PROJ", [{ PROJ_ID: "P1" }]],
+      ["LOCA", [{ LOCA_ID: "BH1", LOCA_GL: 1.0, LOCA_XTRA: "9" }]],
+    ];
+    const res = buildAgs4(groups, {
+      mode: "report",
+      units: { LOCA: { LOCA_XTRA: "kPa" } },
+      types: { LOCA: { LOCA_XTRA: "3DP" } },
+    });
+    const loca = res.text.split('"GROUP","LOCA"')[1] ?? "";
+    expect(loca).toContain('"UNIT","","m","kPa"'); // LOCA_GL from dict, LOCA_XTRA overridden
+    expect(loca).toContain('"TYPE","ID","2DP","3DP"');
+  });
+
+  it("units/types reject an unknown group or heading (#294 F#9)", () => {
+    const groups: Array<[string, GroupData]> = [["LOCA", [{ LOCA_ID: "BH1" }]]];
+    expect(() => buildAgs4(groups, { units: { NOPE: { X: "m" } } })).toThrow(/unknown group/);
+    expect(() => buildAgs4(groups, { types: { LOCA: { NOSUCH: "3DP" } } })).toThrow(
+      /no heading/,
+    );
   });
 });

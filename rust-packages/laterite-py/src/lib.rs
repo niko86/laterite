@@ -21,7 +21,7 @@ use laterite_ags4_core::index::{Sidecar as CoreSidecar, ValidationStamp};
 use laterite_ags4_validator::findings::{Severity, Target};
 use laterite_ags4_validator::fixes::FixRisk;
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, Dictionary, Findings, Fix, ValidatorError, fix_document,
+    CheckOptions, DictVersion, Dictionary, Findings, Fix, ValidatorError, fix_document_selective,
 };
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -52,7 +52,7 @@ pub(crate) fn map_cli_err(e: CliError) -> PyErr {
 
 /// Map a `--dict-version` string to the optional override. `None` /
 /// `"auto"` ⇒ no override (TRAN_AGS auto-pick). Unknown ⇒ `Err`.
-fn parse_dv(s: Option<&str>) -> Result<Option<DictVersion>, String> {
+pub(crate) fn parse_dv(s: Option<&str>) -> Result<Option<DictVersion>, String> {
     match s {
         None | Some("auto") | Some("") => Ok(None),
         Some("4.0.3") => Ok(Some(DictVersion::V4_0_3)),
@@ -329,6 +329,34 @@ fn run_check<'py>(
     }
 }
 
+/// Serialise a slice of [`Fix`] into the Python `applied`-ledger shape — one
+/// `{kind, label, rule, line, risk}` dict per fix — shared by `fix()`'s
+/// `FixResult.applied` and `build_ags4`'s `BuildResult.applied` so both surfaces
+/// present an identical record (#294 F#7).
+pub(crate) fn fixes_to_pylist<'py>(py: Python<'py>, fixes: &[Fix]) -> PyResult<Bound<'py, PyList>> {
+    let list = PyList::empty(py);
+    for f in fixes {
+        let o = PyDict::new(py);
+        let kind = serde_json::to_value(f.kind)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_string))
+            .unwrap_or_default();
+        o.set_item("kind", kind)?;
+        o.set_item("label", &f.label)?;
+        o.set_item("rule", &f.rule)?;
+        o.set_item("line", f.line)?;
+        o.set_item(
+            "risk",
+            match f.risk {
+                FixRisk::Safe => "safe",
+                FixRisk::Risky => "risky",
+            },
+        )?;
+        list.append(o)?;
+    }
+    Ok(list)
+}
+
 /// Headless one-shot mechanical repair of a delivered AGS4 file (the same engine
 /// the browser fix UI uses, applied without a UI). Reads from path/text/data,
 /// computes fixes against the file's own findings, applies the *safe* set (plus
@@ -337,7 +365,7 @@ fn run_check<'py>(
 /// resolution)` or the `(exit_code, kind, msg)` error triple. Mirrors the
 /// AutoFix path in `laterite-ags4-emit::emit`, but on a file's own bytes rather
 /// than freshly-built data.
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn fix_core(
     path: Option<&str>,
     text: Option<&str>,
@@ -345,7 +373,9 @@ fn fix_core(
     dvr: Option<&str>,
     encoding: Option<&str>,
     include_risky: bool,
-) -> Result<(Vec<u8>, Findings, Vec<Fix>, String, String), (i32, String, String)> {
+    only: Option<&[String]>,
+    exclude: &[String],
+) -> Result<(Vec<u8>, Findings, Vec<Fix>, String, String, usize), (i32, String, String)> {
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
     let enc = match encoding {
         None | Some("") => encoding_rs::UTF_8,
@@ -382,21 +412,26 @@ fn fix_core(
 
     // The orchestration (parse → run → compute → apply → re-validate) lives once,
     // in the validator's `fix_document`; the CLI shares it.
+    // The residual re-validation tier matches `validate()`'s default (errors +
+    // warnings) so a fix reports what it left behind at the same tier the user
+    // sees on validate — was errors + FYI, which both under- and over-reported
+    // vs the other surfaces (#294 Batch C).
     let opts = CheckOptions {
         dict_version: over,
         custom_dict: None,
-        include_warnings: false,
-        include_fyi: true,
+        include_warnings: true,
+        include_fyi: false,
         check_files: false,
         encoding: enc,
     };
-    let out = fix_document(&raw, &opts, include_risky).map_err(map_err)?;
+    let out = fix_document_selective(&raw, &opts, include_risky, only, exclude).map_err(map_err)?;
     Ok((
         out.fixed,
         out.residual,
         out.applied,
         out.dict_version.as_str().to_string(),
         out.resolution.as_str().to_string(),
+        out.risky_available,
     ))
 }
 
@@ -406,7 +441,8 @@ fn fix_core(
 /// un-fixable input returns the same `{ok:false, …}` shape as `run_check`, so
 /// the Python layer raises the mapped exception.
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, encoding=None, include_risky=false))]
+#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, encoding=None, include_risky=false, only=None, exclude=None))]
+#[allow(clippy::too_many_arguments)]
 fn fix_file<'py>(
     py: Python<'py>,
     path: Option<String>,
@@ -415,7 +451,10 @@ fn fix_file<'py>(
     dict_version: Option<String>,
     encoding: Option<String>,
     include_risky: bool,
+    only: Option<Vec<String>>,
+    exclude: Option<Vec<String>>,
 ) -> PyResult<Bound<'py, PyDict>> {
+    let exclude = exclude.unwrap_or_default();
     match fix_core(
         path.as_deref(),
         text.as_deref(),
@@ -423,40 +462,23 @@ fn fix_file<'py>(
         dict_version.as_deref(),
         encoding.as_deref(),
         include_risky,
+        only.as_deref(),
+        &exclude,
     ) {
         Err((code, kind, msg)) => err_dict(py, code, &kind, &msg),
-        Ok((bytes, residual, applied, dv, res)) => {
+        Ok((bytes, residual, applied, dv, res, risky_available)) => {
             let d = PyDict::new(py);
             d.set_item("ok", true)?;
             d.set_item("fixed", PyBytes::new(py, &bytes))?;
             d.set_item("dict_version", dv)?;
             d.set_item("resolution", res)?;
+            d.set_item("risky_available", risky_available)?;
             d.set_item(
                 "findings_json",
                 serde_json::to_string(&residual).unwrap_or_else(|_| "{}".into()),
             )?;
             d.set_item("fixes_applied", applied.len())?;
-            let applist = PyList::empty(py);
-            for f in &applied {
-                let o = PyDict::new(py);
-                let kind = serde_json::to_value(f.kind)
-                    .ok()
-                    .and_then(|v| v.as_str().map(str::to_string))
-                    .unwrap_or_default();
-                o.set_item("kind", kind)?;
-                o.set_item("label", &f.label)?;
-                o.set_item("rule", &f.rule)?;
-                o.set_item("line", f.line)?;
-                o.set_item(
-                    "risk",
-                    match f.risk {
-                        FixRisk::Safe => "safe",
-                        FixRisk::Risky => "risky",
-                    },
-                )?;
-                applist.append(o)?;
-            }
-            d.set_item("applied", applist)?;
+            d.set_item("applied", fixes_to_pylist(py, &applied)?)?;
             Ok(d)
         }
     }
@@ -673,12 +695,37 @@ impl Reading {
         let Some(g) = self.parsed.groups.get(code) else {
             return Ok(None);
         };
-        let batch = laterite_types::arrow_cols::build_record_batch(
-            &g.headings,
-            &g.types,
-            g.rows.len(),
-            |col, row| g.cell(col, row),
-        )
+        // Relational layer is **always-keyed**: a KNOWN group's batch carries the
+        // two content-addressed key columns (`_id` col 0, `_parent_id` col 1) so a
+        // cross-group join in `.sql()` works with no opt-in — the Python frame
+        // accessor strips them by default. The ids come from the one shared
+        // keychain (`group_row_ids` → `keychain::row_ids`), so they are byte-
+        // identical to the `.ags5db` extension's. A custom/passthrough group is
+        // absent from the registry → it has no spec keys → unkeyed batch (#303).
+        let reg = laterite_ags4_core::registry::registry();
+        let batch = if reg.get(code).is_some() {
+            let ids = laterite_ags4_core::keychain::group_row_ids(
+                reg,
+                code,
+                &g.headings,
+                g.rows.len(),
+                |col, row| g.cell(col, row),
+            );
+            laterite_types::arrow_cols::build_record_batch_with_ids(
+                &ids,
+                &g.headings,
+                &g.types,
+                g.rows.len(),
+                |col, row| g.cell(col, row),
+            )
+        } else {
+            laterite_types::arrow_cols::build_record_batch(
+                &g.headings,
+                &g.types,
+                g.rows.len(),
+                |col, row| g.cell(col, row),
+            )
+        }
         .map_err(|e| PyRuntimeError::new_err(format!("arrow batch for {code}: {e}")))?;
         let schema = batch.schema();
         Ok(Some(PyTable::try_new(vec![batch], schema)?))

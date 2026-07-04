@@ -61,11 +61,11 @@ from ._frames import (
 # python-ags4. A misidentified validator is much harder to debug than
 # a parity test failing.
 PYTHON_AGS4_COMPAT = "1.2.0"
-__version__ = f"0.5.1+compat.python-ags4.{PYTHON_AGS4_COMPAT}"
+__version__ = f"0.6.0+compat.python-ags4.{PYTHON_AGS4_COMPAT}"
 
 # Human-readable Metadata.Checker — same intent, prose form.
 _CHECKER_STRING = (
-    "laterite 0.5.1 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine"
+    "laterite 0.6.0 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine"
 )
 
 # python-ags4 maps these version strings → bundled standard dict files;
@@ -133,7 +133,7 @@ def _strict_pre_check(filepath_or_buffer: Any, encoding: str) -> None:
         if hasattr(filepath_or_buffer, "seek"):
             try:
                 filepath_or_buffer.seek(0)
-            except OSError, ValueError:
+            except (OSError, ValueError):
                 pass
     else:
         with open(filepath_or_buffer, encoding=encoding, errors="replace") as fh:
@@ -573,7 +573,7 @@ def convert_to_text(dataframe: Any, dictionary: str | None = None) -> Any:
             return ""
         try:
             x = float(v)
-        except TypeError, ValueError:
+        except (TypeError, ValueError):
             return str(v)
         if "DP" in t:
             return f"{x:.{int(t.strip('DP') or 0)}f}"
@@ -1319,7 +1319,7 @@ def format_numeric_column(dataframe: Any, column_name: str, TYPE: str) -> Any:
         elif "SF" in TYPE:
             mask = (df.HEADING == "DATA") & df[col].notna()
             df.loc[mask, [col]] = df.loc[mask, [col]].map(lambda x: _format_sf(x, TYPE))
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         # python-ags4 silently logs and returns the unmodified frame
         # when a column has non-numeric entries. Match that behaviour
         # rather than letting the user see a traceback.

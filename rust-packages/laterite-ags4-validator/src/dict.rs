@@ -198,6 +198,85 @@ impl Dictionary {
     }
 }
 
+// --- Serialisable dictionary snapshot (the `dictionary(edition)` accessor) ----
+// One shared `{ags_edition, groups:[{code, contents, parent, headings:[…]}]}`
+// view of a bundled edition, so the browser (wasm), `laterite.registry.
+// dictionary()` (PyO3) and Node's `registry.dictionary()` render it identically
+// from ONE builder instead of three copies (#294 F#6). Serialize only — each
+// surface does its own JSON (serde_json / serde_wasm_bindgen).
+
+#[derive(serde::Serialize)]
+pub struct DictHeadingDto {
+    pub name: String,
+    pub status: String,
+    #[serde(rename = "type")]
+    pub ags_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    pub description: String,
+}
+
+#[derive(serde::Serialize)]
+pub struct DictGroupDto {
+    pub code: String,
+    /// The group's standard description (its "contents"/name).
+    pub contents: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    pub headings: Vec<DictHeadingDto>,
+}
+
+#[derive(serde::Serialize)]
+pub struct DictionaryDto {
+    pub ags_edition: String,
+    pub groups: Vec<DictGroupDto>,
+}
+
+/// Build the serialisable snapshot of one bundled standard-dictionary edition:
+/// groups sorted by code, each group's headings in canonical dictionary order.
+/// The single source the wasm / PyO3 / Node `dictionary(edition)` accessors share.
+pub fn dictionary_dto(version: DictVersion) -> DictionaryDto {
+    let d = Dictionary::bundled(version);
+    let mut codes: Vec<&'static str> = d.group_codes().collect();
+    codes.sort_unstable();
+    let groups = codes
+        .into_iter()
+        .map(|code| {
+            let gm = d.group(code);
+            let headings = d
+                .group_headings(code)
+                .iter()
+                .map(|&h| {
+                    let e = d.heading(code, h);
+                    DictHeadingDto {
+                        name: h.to_string(),
+                        status: e.map(|x| x.status).unwrap_or("").to_string(),
+                        ags_type: e.map(|x| x.ags_type).unwrap_or("").to_string(),
+                        unit: e
+                            .map(|x| x.unit)
+                            .filter(|u| !u.is_empty())
+                            .map(str::to_string),
+                        description: e.map(|x| x.desc).unwrap_or("").to_string(),
+                    }
+                })
+                .collect();
+            DictGroupDto {
+                code: code.to_string(),
+                contents: gm.map(|m| m.desc).unwrap_or("").to_string(),
+                parent: gm
+                    .map(|m| m.parent)
+                    .filter(|p| !p.is_empty())
+                    .map(str::to_string),
+                headings,
+            }
+        })
+        .collect();
+    DictionaryDto {
+        ags_edition: version.as_str().to_string(),
+        groups,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

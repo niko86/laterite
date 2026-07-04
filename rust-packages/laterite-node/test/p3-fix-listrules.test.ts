@@ -35,6 +35,21 @@ describe("fix() — mechanical repair (the Node mirror of laterite.fix)", () => 
     expect(r.fixesApplied).toBeGreaterThan(0);
     expect(Buffer.isBuffer(r.bytes)).toBe(true);
   });
+
+  it("residual re-validation reports at the errors+warnings tier (#294 Batch C)", () => {
+    // Unrecognised TRAN_AGS "9.9" -> the O-44 Rule 14 WARNING; bare-LF endings ->
+    // a Rule 2a fix so the fixer runs. The warning must survive into the residual
+    // — proving errors+warnings, not the old errors-only Node default (which
+    // dropped it, drifting from Python/CLI).
+    const src =
+      '"GROUP","PROJ"\n"HEADING","PROJ_ID"\n"UNIT",""\n"TYPE","ID"\n"DATA","P1"\n' +
+      '"GROUP","TRAN"\n"HEADING","TRAN_AGS"\n"UNIT",""\n"TYPE","X"\n"DATA","9.9"\n';
+    const r = fix(undefined, { text: src });
+    expect(r.fixesApplied).toBeGreaterThan(0);
+    const severities = new Set(r.findings.map((f) => f.severity));
+    expect(severities.has("warning")).toBe(true);
+    expect(r.findings.some((f) => f.rule === "Warning (Related to Rule 14)")).toBe(true);
+  });
 });
 
 describe("listRules() — the gated rule catalogue (mirror of laterite.list_rules)", () => {

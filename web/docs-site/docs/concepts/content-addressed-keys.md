@@ -33,6 +33,45 @@ Both return the same rows. The difference is that the second join holds for
 to know that `SAMP` hangs off `LOCA` by `LOCA_ID`, or that `GEOL` hangs off `SAMP`
 by `(LOCA_ID, SAMP_TOP)`. The key-chain is baked into `_parent_id`.
 
+## Where the keys live
+
+The keys are **core on every surface** — the Python wheel, the Node package, the
+browser (wasm), and the DuckDB extension — and they are **byte-identical** across
+them, because all four compute them through the one shared keychain. The same file
+read anywhere yields the same `_id`/`_parent_id`.
+
+Two rules govern where you see them:
+
+- **The relational layer always carries them.** `ags.sql(...)` / `ags.at(...)`
+  expose `_id`/`_parent_id` on every group, so the content-addressed join above
+  needs no opt-in.
+- **Frames strip them by default.** `ags["LOCA"]` / `ags.table("LOCA")` return the
+  AGS columns only — the synthetic keys don't clutter a data frame. Ask for them
+  with `keys=True`:
+
+```python
+import laterite as L
+ags = L.read("delivery.ags")
+
+ags["LOCA"]                    # AGS columns only
+ags.table("LOCA", keys=True)   # + _id / _parent_id
+L.read("delivery.ags", keys=True)["LOCA"]   # handle-wide default
+
+# joins work regardless of the flag — the engine always has the keys
+ags.sql("SELECT * FROM SAMP s JOIN LOCA l ON s._parent_id = l._id")
+```
+
+In Node it is the same shape — `ags.table("LOCA", { keys: true })` and
+`await ags.sql("… ON s._parent_id = l._id")`.
+
+Because the ids live in the Arrow columns themselves (with `keys=True`), a join
+needs **no engine** — hand the keyed frame to any Arrow tool (polars, arrow-js,
+DuckDB, …) and match `_parent_id` to `_id`.
+
+**Emit never writes them.** `save()` / `build_ags4(...)` stay byte-faithful to the
+AGS data, so a `keys=True` frame round-tripped back to AGS4 drops the synthetic
+columns — they live only in the read model.
+
 !!! note "Why it matters"
     Content-addressing turns the AGS parent/child tree into a stable graph that
     survives independent reads, partial files, and re-emission. Same content, same

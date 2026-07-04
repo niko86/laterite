@@ -74,13 +74,13 @@ arrow = "59"
 # carries plain primitives, not pyo3-polars (no per-CPython polars ABI coupling).
 # The floor is 3.12, not lower, because the generated #[pyclass(dict)] classes
 # need the 3.12 limited API (`dict` isn't exposed below it). Proven on
-pyo3 = { version = "0.28", features = ["extension-module", "chrono", "abi3-py312"] }
+pyo3 = { version = "0.29", features = ["extension-module", "chrono", "abi3-py312"] }
 # Zero-copy Arrow boundary for the read path: wraps the RecordBatch laterite-types
 # builds and hands it to Python as an Arrow PyCapsule (PyTable ->
-# __arrow_c_stream__), which polars ingests pyarrow-free. arrow 59 + pyo3 0.28
+# __arrow_c_stream__), which polars ingests pyarrow-free. arrow 59 + pyo3 0.29
 # match our pins; the capsule protocol is the Arrow C Data Interface (NOT the
 # pyo3-polars ABI coupling), so the single cp312-abi3 wheel still holds.
-pyo3-arrow = "0.18"
+pyo3-arrow = "0.19"
 # MUST mirror laterite-ags4-validator's serde_json feature set: the CLI's
 # `--json` output is built with `preserve_order` (insertion-ordered
 # Map). Byte-faithful CLI JSON parity depends on this matching.

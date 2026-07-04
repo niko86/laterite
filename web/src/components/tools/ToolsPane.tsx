@@ -8,6 +8,8 @@ import { TemplateGenerator } from "./TemplateGenerator";
 import { Anonymiser } from "./Anonymiser";
 import { Formatter } from "./Formatter";
 import { CoordinateTool } from "./CoordinateTool";
+import { ExcelConverter } from "./ExcelConverter";
+import { TransportTool } from "./TransportTool";
 
 export type Tool =
   | "dictionary"
@@ -16,7 +18,9 @@ export type Tool =
   | "template"
   | "anonymiser"
   | "formatter"
-  | "coords";
+  | "coords"
+  | "excel"
+  | "transport";
 
 // Grouped so it's obvious which tools need the loaded file and which don't.
 type Group = "Reference" | "This file" | "Compare";
@@ -28,6 +32,8 @@ const TOOLS: { id: Tool; label: string; group: Group }[] = [
   { id: "anonymiser", label: "Anonymiser", group: "This file" },
   { id: "formatter", label: "Formatter", group: "This file" },
   { id: "coords", label: "Coordinates", group: "This file" },
+  { id: "excel", label: "Excel", group: "This file" },
+  { id: "transport", label: "Transport", group: "This file" },
   { id: "revision", label: "Revision diff", group: "Compare" },
 ];
 
@@ -78,6 +84,12 @@ export const ToolsPane: Component = () => {
       </Show>
       <Show when={tool() === "coords"}>
         <CoordinateTool />
+      </Show>
+      <Show when={tool() === "excel"}>
+        <ExcelConverter />
+      </Show>
+      <Show when={tool() === "transport"}>
+        <TransportTool />
       </Show>
     </div>
   );

@@ -24,6 +24,30 @@ describe("registry.GROUPS", () => {
   });
 });
 
+describe("registry.dictionary(edition) — the per-edition STANDARD dictionary (#294 F#6)", () => {
+  it("returns the shared {ags_edition, groups[…]} snapshot", () => {
+    const d = registry.dictionary("4.2");
+    expect(d.ags_edition).toBe("4.2");
+    expect(d.groups.length).toBeGreaterThan(150);
+    const proj = d.groups.find((g) => g.code === "PROJ")!;
+    expect(proj.contents).toBeTruthy();
+    expect(proj.headings[0]).toMatchObject({ name: "PROJ_ID", status: expect.any(String) });
+    // `type`, not `ags_type` — the shared shape across surfaces.
+    expect(proj.headings[0]).toHaveProperty("type");
+  });
+
+  it("editions differ; auto/omitted fall back to the default", () => {
+    expect(registry.dictionary("4.0.3").groups.length).toBeLessThan(
+      registry.dictionary("4.2").groups.length,
+    );
+    expect(registry.dictionary().ags_edition).toBe(registry.dictionary("auto").ags_edition);
+  });
+
+  it("throws on an unknown edition", () => {
+    expect(() => registry.dictionary("9.9")).toThrow();
+  });
+});
+
 describe("registry traversal", () => {
   it("childGroups lists direct children alphabetically", () => {
     const children = registry.childGroups("PROJ").map((g) => g.code);

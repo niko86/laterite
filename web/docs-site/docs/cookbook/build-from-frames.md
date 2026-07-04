@@ -1,5 +1,7 @@
 # Build AGS4 from frames
 
+**Available in:** Python · Node · Browser
+
 **What / when:** you have your data as per-group dataframes (one frame per group, columns named for the AGS headings) and want a **valid** AGS4 file back — without hand-writing the `TRAN` / `UNIT` / `TYPE` boilerplate.
 
 ```python

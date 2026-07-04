@@ -83,6 +83,8 @@ const TOOLS_LIST = [
   "anonymiser",
   "formatter",
   "coords",
+  "excel",
+  "transport",
 ];
 
 export const [dictVersion, setDictVersion] = persisted<DictVersionOpt>(

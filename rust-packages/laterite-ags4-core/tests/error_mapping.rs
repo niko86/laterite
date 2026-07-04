@@ -1,11 +1,10 @@
-//! Phase 0 (#168 parser convergence): lock the EXACT `CliError` messages the
-//! lean core terminals produce today. Phase 5's `enforce_strict_structure` must
-//! reproduce the STRUCTURE messages byte-for-byte (the plan pre-greps these so a
-//! string-asserting ags5db/core test doesn't break). The non-UTF-8 message is
-//! the `csv` reader's OWN text and WILL change when csv is retired (the shared
-//! leaf returns `ParseError::NotUtf8` → a `CliError`), so it's asserted loosely
-//! (rejection + a utf-8 mention), not pinned to the csv wording — Phase 7
-//! ratifies that one wording change.
+//! Lock the EXACT `CliError` messages the lean core terminals produce (#168
+//! parser convergence). The STRUCTURE messages survived the convergence
+//! byte-for-byte (Phase 5's `enforce_strict_structure` reproduces them). The
+//! non-UTF-8 message was the retired `csv` reader's own text; it is now the shared
+//! leaf's `ParseError::NotUtf8` wording, **pinned here at #168 Phase 7 (O-46)** —
+//! the lean read path rejects non-UTF-8, where the validator decodes it lossily
+//! and flags Rule 1 (O-32).
 
 use laterite_ags4_core::ags4_codec::read_ags4_bytes;
 use laterite_ags4_core::error::CliError;
@@ -29,11 +28,11 @@ fn structure_error_messages_locked() {
     assert_eq!(schema_msg(b"\"GROUP\"\n"), "GROUP row missing group code");
 }
 
-/// Non-UTF-8 is rejected by the lean path. The exact message is the csv reader's
-/// own and is expected to CHANGE when csv is retired; only the rejection + a
-/// utf-8 mention are guaranteed.
+/// Non-UTF-8 is rejected by the lean read path with the shared leaf's exact
+/// wording — pinned at #168 Phase 7 (was asserted loosely while the convergence
+/// settled the message from the csv reader's own text). The validator path does
+/// NOT reject; it decodes lossily and reports Rule 1 (O-32 / O-46).
 #[test]
-fn non_utf8_is_rejected_message_may_change() {
-    let m = schema_msg(b"\xff\xff").to_lowercase();
-    assert!(m.contains("utf-8") || m.contains("utf8"), "got {m:?}");
+fn non_utf8_is_rejected_with_pinned_message() {
+    assert_eq!(schema_msg(b"\xff\xff"), "input is not valid UTF-8");
 }

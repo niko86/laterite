@@ -1,4 +1,5 @@
 import { writeFileSync } from "node:fs";
+import type { AppliedFix } from "./native";
 
 /** A flattened build finding — `rule` plus whatever rich keys the validator set. */
 export interface BuildFinding {
@@ -26,14 +27,18 @@ export interface BuildFinding {
  * (e.g. `"autofix"` applies the safe fixes and leaves only what it can't touch,
  * `"report"` records everything); each is a flat {@link BuildFinding} of `rule`
  * plus whatever rich keys the validator set. {@link BuildResult.fixesApplied |
- * `fixesApplied`} counts how many safe fixes were applied along the way. A clean
- * build is an empty `findings` array; a non-empty one tells you exactly what the
- * emitted document still trips on.
+ * `fixesApplied`} counts how many safe fixes were applied along the way, and
+ * {@link BuildResult.applied | `applied`} is the ledger of those fixes (each a
+ * `{kind, label, rule, line?, risk}` record, the same shape `fix()`'s
+ * `FixResult.applied` carries). A clean build is an empty `findings` array; a
+ * non-empty one tells you exactly what the emitted document still trips on.
  */
 export class BuildResult {
   constructor(
     readonly bytes: Buffer,
     readonly findings: BuildFinding[],
+    /** The safe fixes AutoFix applied (`{kind, label, rule, line?, risk}`); empty outside `"autofix"`. */
+    readonly applied: AppliedFix[],
     readonly fixesApplied: number,
   ) {}
 

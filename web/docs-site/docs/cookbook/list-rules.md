@@ -1,5 +1,7 @@
 # List the validation rules
 
+**Available in:** Python · Node · CLI · Browser
+
 Enumerate the validator's numbered rules in Python, and ask which dictionary
 edition a file resolves to.
 

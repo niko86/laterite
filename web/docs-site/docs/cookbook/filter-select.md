@@ -1,5 +1,7 @@
 # Filter & select one group
 
+**Available in:** Python · Node · DuckDB · Browser
+
 Narrow one group to the rows and columns you want — lazily, with nothing run until you ask for a frame.
 
 ```python

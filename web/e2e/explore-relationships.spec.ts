@@ -61,6 +61,22 @@ test("Explore: a sample below all strata still shows (LEFT join keeps it, stratu
   await expect(page.getByText("BH01-S4", { exact: true })).toBeVisible({ timeout: 30_000 });
 });
 
+test("Explore: the content-addressed keys join a child to its parent (SAMP._parent_id = LOCA._id)", async ({
+  page,
+}) => {
+  await exploreSqlStrata(page);
+  // #303: duckdb-wasm carries the synthetic _id/_parent_id columns, so a
+  // parent/child join needs no AGS-key knowledge — every SAMP on BH01 resolves
+  // to that LOCA row (same rows as `USING (LOCA_ID)`, one column pair for every
+  // edge). This used to raise a Binder Error: the keys were extension-only.
+  await runSql(
+    page,
+    `SELECT l."LOCA_ID" AS loca FROM "SAMP" s JOIN "LOCA" l ON s."_parent_id" = l."_id"`,
+  );
+  await expect(page.getByText(/SQL error/)).toHaveCount(0);
+  await expect(page.getByText("BH01", { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+});
+
 test("Explore: SqlBuilder auto depth-band joins SAMP→GEOL, and LIKE wildcards inject %", async ({
   page,
 }) => {

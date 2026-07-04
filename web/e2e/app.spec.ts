@@ -190,6 +190,102 @@ test("Tools → Coordinates converts LOCA grid and exports GeoJSON (Helmert + OS
   expect(precise.metadata.attribution).toMatch(/Ordnance Survey/);
 });
 
+test("Tools → Excel round-trips AGS4 → .xlsx → AGS4, client-side", async ({
+  page,
+}) => {
+  await ready(page);
+  await page.locator('input[type="file"]').setInputFiles(fixture("coords.ags"));
+  await tab(page, "Tools").click();
+  await page.getByRole("button", { name: /^Excel$/ }).click();
+
+  // AGS4 → .xlsx: download the workbook, assert it's a real zip (PK magic) and
+  // the success note reports the sheet/row counts.
+  const [xlsxDl] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: /Download as Excel/ }).click(),
+  ]);
+  expect(xlsxDl.suggestedFilename()).toMatch(/\.xlsx$/);
+  const xlsxBytes = readFileSync(await xlsxDl.path());
+  expect(xlsxBytes.subarray(0, 2).toString("latin1")).toBe("PK");
+  await expect(page.getByText(/→ \.xlsx/)).toBeVisible();
+
+  // .xlsx → AGS4: feed that workbook back into the import input; selecting a
+  // file triggers the conversion + download. Assert the emitted AGS4 carries
+  // the LOCA group back (a full client-side round trip).
+  const [agsDl] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator('input[accept*="xlsx"]').setInputFiles(await xlsxDl.path()),
+  ]);
+  expect(agsDl.suggestedFilename()).toMatch(/\.ags$/);
+  const agsText = readFileSync(await agsDl.path(), "utf8");
+  expect(agsText).toContain("GROUP");
+  expect(agsText).toContain("LOCA");
+});
+
+test("Tools → Transport round-trips a file through .zst.age, client-side", async ({
+  page,
+}) => {
+  // The passphrase KDF is scrypt log_N 18 — deliberately expensive, and slow on
+  // a memory-starved CI runner (256 MiB buffer). Give it plenty of room.
+  test.setTimeout(180_000);
+  await ready(page);
+  await page.locator('input[type="file"]').setInputFiles(fixture("coords.ags"));
+  const original = readFileSync(fixture("coords.ags"));
+  await tab(page, "Tools").click();
+  await page.getByRole("button", { name: /^Transport$/ }).click();
+
+  // Encrypt the loaded file with a passphrase → a real age file (magic bytes).
+  await page.getByPlaceholder("Passphrase").first().fill("correct horse battery");
+  const [ageDl] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: /Encrypt & download/ }).click(),
+  ]);
+  expect(ageDl.suggestedFilename()).toMatch(/\.zst\.age$/);
+  const lockedPath = await ageDl.path();
+  expect(readFileSync(lockedPath).subarray(0, 18).toString("latin1")).toBe(
+    "age-encryption.org",
+  );
+
+  // Decrypt it back and assert byte-for-byte recovery of the original.
+  await page.locator('input[accept*="age"]').setInputFiles(lockedPath);
+  await page.getByPlaceholder("Passphrase").nth(1).fill("correct horse battery");
+  const [outDl] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: /Decrypt & download/ }).click(),
+  ]);
+  expect(readFileSync(await outDl.path()).equals(original)).toBe(true);
+});
+
+test("Tools → Anonymiser pseudonymises IDs (cross-refs intact) + hashes PROJ_ID", async ({
+  page,
+}) => {
+  await ready(page);
+  // strata.ags carries LOCA_ID across LOCA/GEOL/SAMP/TREG — a real cross-ref set.
+  await page.locator('input[type="file"]').setInputFiles(fixture("strata.ags"));
+  await tab(page, "Tools").click();
+  await page.getByRole("button", { name: /^Anonymiser$/ }).click();
+
+  // Default preset "All identifying" → download the redacted file.
+  const [dl] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByRole("button", { name: /Download redacted/ }).click(),
+  ]);
+  expect(dl.suggestedFilename()).toMatch(/\.anon\.ags$/);
+  const out = readFileSync(await dl.path(), "utf8");
+
+  // The real LOCA_ID "BH01" is gone EVERYWHERE — replaced by one stable
+  // pseudonym (ID000N) shared across every group it keyed, so cross-references
+  // survive. The token appears more than once (multiple group sections).
+  expect(out).not.toContain('"BH01"');
+  const m = out.match(/"ID\d{4}"/);
+  expect(m).not.toBeNull();
+  expect(out.split(m![0]).length - 1).toBeGreaterThan(1);
+
+  // PROJ_ID "P1" → a 16-hex content hash, not the original.
+  expect(out).not.toMatch(/"DATA","P1"/);
+  expect(out).toMatch(/[0-9a-f]{16}/);
+});
+
 test("an empty pane's 'Go to Validate' button jumps to the Validate tab", async ({
   page,
 }) => {

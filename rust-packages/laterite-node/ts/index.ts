@@ -1,16 +1,30 @@
 // The `laterite` package surface — the Node port of laterite-py's `__init__.py`.
 // P2 is the engine-free read/validate/emit core (Arrow-direct); the optional
 // DuckDB `sql()`/`at()` layer + typed-graph + transport land in P3.
+import { readFileSync } from "node:fs";
 import { type Table, tableFromArrays, tableToIPC } from "apache-arrow";
 import { Ags4File } from "./ags4-file";
 import { BuildResult } from "./build-result";
-import { Ags4Error, fromNativeError, makeError, raiseFor } from "./errors";
+import { stripSynthKeys } from "./duckdb";
+import {
+  Ags4Error,
+  FileNotFoundError,
+  StaleCertError,
+  fromNativeError,
+  makeError,
+  raiseFor,
+} from "./errors";
 import { FixResult } from "./fix-result";
 import {
+  type ExcelStats,
   type GroupIpc,
+  Sidecar,
+  ags4ToExcel,
   emitAgs4FromIpc,
+  excelToAgs4,
   fixFile,
   listRules as nativeListRules,
+  nativeDiff,
   parseArrow,
   runCheck,
 } from "./native";
@@ -23,6 +37,11 @@ export interface ReadOptions {
   text?: string;
   /** Source encoding label (`"utf-8"` default, `"windows-1252"`, …). */
   encoding?: string;
+  /** Path to this file's `.ags.idx` certificate (minted by `Ags4File.certify()`).
+   * Opt-in, no autodiscovery — naming it asserts the cert is for THIS file. A
+   * fresh cert is carried so a later errors-only `.validate()` skips the rule
+   * engine; a size/SHA mismatch throws {@link StaleCertError}. (#294 Batch E / #14) */
+  index?: string;
 }
 
 /**
@@ -53,11 +72,35 @@ export interface ReadOptions {
 export function read(source?: string | Uint8Array, opts: ReadOptions = {}): Ags4File {
   const path = typeof source === "string" ? source : undefined;
   const data = typeof source === "string" || source == null ? undefined : source;
+  let handle: Ags4File;
   try {
-    return new Ags4File(parseArrow(path, opts.text, data, opts.encoding));
+    // Retain the source so the chained verbs (`ags.validate()`/`fix()`/`diff()`)
+    // re-run against the TRUE bytes + read encoding, not the `.bytes` re-emit.
+    handle = new Ags4File(parseArrow(path, opts.text, data, opts.encoding), {
+      path,
+      text: opts.text,
+      data,
+      encoding: opts.encoding,
+    });
   } catch (e) {
     throw fromNativeError(e);
   }
+  if (opts.index !== undefined) {
+    // A fresh cert is carried so a later errors-only `.validate()` skips the rule
+    // engine. An explicit `index=` asserts the cert is for THIS file, so a size /
+    // SHA-256 mismatch fails fast rather than silently re-validating. (#294 E/#14)
+    const cert = Sidecar.fromJson(readFileSync(opts.index));
+    const srcBytes =
+      data ?? (path !== undefined ? readFileSync(path) : Buffer.from(opts.text ?? "", "utf8"));
+    if (!cert.isFreshFor(srcBytes)) {
+      throw new StaleCertError(
+        `certificate ${opts.index} is stale for this file — its size / SHA-256 differ; ` +
+          "rebuild it with read(...).validate().certify()",
+      );
+    }
+    handle._attachCert(cert);
+  }
+  return handle;
 }
 
 export interface ValidateOptions extends ReadOptions {
@@ -121,6 +164,12 @@ export interface EmitOptions {
   dictVersion?: string;
   /** `"autofix"` (default) | `"report"` | `"strict"`. */
   mode?: "autofix" | "report" | "strict";
+  /** Per-heading UNIT overrides, keyed `{ code: { heading: unit } }` (#294 F#9)
+   *  — e.g. `{ LOCA: { LOCA_XTRA: "kPa" } }`. Name only the headings you want to
+   *  set; the rest fill from the dictionary. Throws on an unknown code/heading. */
+  units?: Record<string, Record<string, string>>;
+  /** Per-heading AGS data-TYPE overrides, same `{ code: { heading: type } }` shape. */
+  types?: Record<string, Record<string, string>>;
 }
 
 /** Transpose row objects → an arrow-js Table (column types inferred from the
@@ -181,6 +230,30 @@ function walkTree(root: AgsGroup): Array<[string, GroupRows]> {
   return [...buckets];
 }
 
+/** Validate a `{code: {heading: value}}` UNIT/TYPE override map (#294 F#9)
+ * against the groups actually being built — an unknown group code or a heading
+ * not in that group is a caller typo we surface, not a silent no-op. */
+function checkMeta(
+  meta: Record<string, Record<string, string>> | undefined,
+  name: string,
+  columns: Map<string, Set<string>>,
+): void {
+  if (meta === undefined) return;
+  for (const [code, hmap] of Object.entries(meta)) {
+    const known = columns.get(code);
+    if (known === undefined) {
+      throw new Ags4Error(`buildAgs4 ${name}: unknown group ${JSON.stringify(code)}`);
+    }
+    for (const heading of Object.keys(hmap)) {
+      if (!known.has(heading)) {
+        throw new Ags4Error(
+          `buildAgs4 ${name}: group ${JSON.stringify(code)} has no heading ${JSON.stringify(heading)}`,
+        );
+      }
+    }
+  }
+}
+
 /**
  * Build valid AGS4 from your own data — the data→AGS4 door. Where `read` loads
  * an *existing* file, `buildAgs4` *constructs* a new one: it lays the groups out
@@ -220,16 +293,24 @@ export function buildAgs4(
       : groups instanceof Map
         ? [...groups]
         : groups;
-  const ipcGroups: GroupIpc[] = items.map(([code, data]) => {
-    const table = Array.isArray(data) ? rowsToTable(data) : data;
-    return { code, ipc: Buffer.from(tableToIPC(table, "stream")) };
-  });
-  const res = emitAgs4FromIpc(ipcGroups, opts.dictVersion, opts.mode);
+  const ipcGroups: GroupIpc[] = [];
+  const columns = new Map<string, Set<string>>();
+  for (const [code, data] of items) {
+    // Never emit a read(...).table(code, { keys: true }) _id/_parent_id.
+    const table = stripSynthKeys(Array.isArray(data) ? rowsToTable(data) : data);
+    columns.set(code, new Set(table.schema.fields.map((f) => f.name)));
+    ipcGroups.push({ code, ipc: Buffer.from(tableToIPC(table, "stream")) });
+  }
+  // Per-heading UNIT/TYPE overrides (#294 F#9): an unknown group code or a
+  // heading not in that group is a typo to surface, not a silent no-op.
+  checkMeta(opts.units, "units", columns);
+  checkMeta(opts.types, "types", columns);
+  const res = emitAgs4FromIpc(ipcGroups, opts.dictVersion, opts.mode, opts.units, opts.types);
   const byRule = JSON.parse(res.findingsJson) as Record<string, Array<Record<string, unknown>>>;
   const findings = Object.entries(byRule).flatMap(([rule, list]) =>
     list.map((f) => ({ rule, ...f })),
   );
-  return new BuildResult(res.bytes, findings, res.fixesApplied);
+  return new BuildResult(res.bytes, findings, res.applied, res.fixesApplied);
 }
 
 /** One cited divergence observation on a rule (`{id, note}`). */
@@ -310,6 +391,141 @@ export function fix(source?: string | Uint8Array, opts: FixOptions = {}): FixRes
   return new FixResult(r.fixed, r.residual, r.applied, r.dictVersion);
 }
 
+// --- diff (revision comparison) -----------------------------------------
+
+/** One changed cell of a matched row (`kind === "changed"`). `type` is the AGS
+ * data type; `a`/`b` are the raw values on each side (`null` if that side's row
+ * is shorter than the heading list). Snake_case fields mirror the wire shape the
+ * shared `laterite-ags4-diff` leaf serialises — identical to Python's dict. */
+export interface CellDelta {
+  heading: string;
+  type: string;
+  a: string | null;
+  b: string | null;
+}
+
+/** One row's verdict: `added` (only in `b`), `removed` (only in `a`), or
+ * `changed` (matched by KEY, ≥1 typed cell differs). `key` is the KEY values (or
+ * whole-row tuple when unkeyed); `cells` is populated only for `changed`. */
+export interface RowDelta {
+  kind: "added" | "removed" | "changed";
+  key: string[];
+  line_a: number | null;
+  line_b: number | null;
+  cells: CellDelta[];
+}
+
+/** A group's deltas. `added`/`removed`/`changed` are true totals; `keyed` is
+ * false when matched on the whole-row tuple (no dictionary KEY headings). */
+export interface GroupDelta {
+  code: string;
+  added: number;
+  removed: number;
+  changed: number;
+  headings_added: string[];
+  headings_removed: string[];
+  keyed: boolean;
+  key_headings: string[];
+  rows: RowDelta[];
+}
+
+/** The revision diff — the shape `diff()` returns (parsed from the shared
+ * `laterite-ags4-diff` leaf's JSON; byte-identical to Python / wasm / `lat-check
+ * --diff`). */
+export interface RevisionDelta {
+  groups: GroupDelta[];
+  groups_added: string[];
+  groups_removed: string[];
+  total_added: number;
+  total_removed: number;
+  total_changed: number;
+}
+
+export interface DiffOptions {
+  /** Force the edition used to resolve each group's KEY headings (`"4.0.3"`…
+   * `"4.2"`); default takes it from the revision's `TRAN_AGS`. */
+  dictVersion?: string;
+  /** Source encoding label for path / bytes inputs (default `"utf-8"`). */
+  encoding?: string;
+}
+
+/** A diff input: a file path (`string`), raw bytes, or an already-read `Ags4File`. */
+export type DiffSource = string | Uint8Array | Ags4File;
+
+/** Resolve a diff input to bytes — the Node analog of Python's `_source_bytes`.
+ * A string is a filesystem path (read here so a missing one throws the mapped
+ * `FileNotFoundError`, not a raw `ENOENT`); an `Ags4File` contributes its
+ * byte-faithful re-emit. */
+function diffBytes(x: DiffSource): Uint8Array {
+  if (x instanceof Ags4File) return x.bytes;
+  if (typeof x !== "string") return x;
+  try {
+    return readFileSync(x);
+  } catch (e) {
+    if (e && typeof e === "object" && (e as { code?: string }).code === "ENOENT") {
+      throw new FileNotFoundError(`No such file or directory: ${x}`, 3);
+    }
+    throw e;
+  }
+}
+
+/** Compare two AGS4 documents and return their **revision diff** — the Node port
+ * of `laterite.diff()` and the browser's revision-diff tool, over the SAME shared
+ * `laterite-ags4-diff` engine `lat-check --diff` uses.
+ *
+ * `a` (baseline) and `b` (revision) are each a path, raw `Uint8Array`/`Buffer`
+ * bytes, or an already-read `Ags4File`. Two choices make the diff meaningful
+ * rather than noisy: rows are matched by the group's dictionary **KEY** headings
+ * (not line order — re-sorted boreholes still pair up), and cells are compared
+ * through the **typed** value (a formatting-only edit like `"1.0"` → `"1.00"` is
+ * not a diff). The KEY-heading edition is the revision's `TRAN_AGS` unless pinned
+ * with `opts.dictVersion`.
+ *
+ * @param a - The baseline document (path / bytes / `Ags4File`).
+ * @param b - The revision document, in any of the same forms.
+ * @param opts - {@link DiffOptions} — the `dictVersion` pin and source `encoding`.
+ * @returns A {@link RevisionDelta}: per-group row/heading deltas, `groups_added`/
+ *   `groups_removed`, and the `total_added`/`total_removed`/`total_changed` counts.
+ * @throws {FileNotFoundError} a path input could not be opened.
+ * @throws {NotAgs4Error} either side is not decodable AGS4.
+ * @throws {BadDictError} an invalid `opts.dictVersion`.
+ */
+export function diff(a: DiffSource, b: DiffSource, opts: DiffOptions = {}): RevisionDelta {
+  const aBytes = diffBytes(a);
+  const bBytes = diffBytes(b);
+  try {
+    return JSON.parse(nativeDiff(aBytes, bBytes, opts.dictVersion, opts.encoding)) as RevisionDelta;
+  } catch (e) {
+    throw fromNativeError(e);
+  }
+}
+
+/**
+ * Write an AGS4 file's groups to an `.xlsx` — one worksheet per group (the
+ * Node analog of Python's `to_excel`). `groups` forces the worksheet order;
+ * otherwise AGS4 source order is preserved. Returns the conversion stats.
+ */
+export function toExcel(
+  agsPath: string,
+  xlsxPath: string,
+  opts: { groups?: string[] } = {},
+): ExcelStats {
+  return ags4ToExcel(agsPath, xlsxPath, opts.groups);
+}
+
+/**
+ * Read an `.xlsx` back into an AGS4 file (the Node analog of `from_excel`).
+ * `formatNumericColumns` (default true) re-applies AGS4 numeric formatting to
+ * numeric-looking columns. Returns the conversion stats.
+ */
+export function fromExcel(
+  xlsxPath: string,
+  agsPath: string,
+  opts: { formatNumericColumns?: boolean } = {},
+): ExcelStats {
+  return excelToAgs4(xlsxPath, agsPath, opts.formatNumericColumns);
+}
+
 export { Ags4File } from "./ags4-file";
 export { AgsSubset, type Filter } from "./subset";
 export type { QueryOptions, Row } from "./duckdb";
@@ -320,11 +536,12 @@ export {
   BadDictError,
   FileNotFoundError,
   NotAgs4Error,
+  StaleCertError,
   UnsupportedEditionError,
 } from "./errors";
 export { Report, type RuleFinding } from "./report";
 export { version } from "./native";
-export type { Finding, GroupMeta } from "./native";
+export type { ExcelStats, Finding, GroupMeta, Sidecar } from "./native";
 // AGS type-system helpers, as a namespace (mirrors Python's `laterite.ags_types`).
 export * as agsTypes from "./ags-types";
 export type { AgsValue, CanonicalType } from "./ags-types";

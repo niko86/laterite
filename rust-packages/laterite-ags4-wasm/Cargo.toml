@@ -48,6 +48,13 @@ wasm-opt = ['-O', '-all']
 [dependencies]
 # The engine — pure-Rust, wasm-safe leaf after the Phase 0 CLI split.
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# The content-addressed keychain (#303): `registry()` + `keychain::group_row_ids`
+# so `arrow_ipc(code, keys=true)` carries the `_id`/`_parent_id` columns from the
+# ONE shared id maths every surface uses (byte-identical to the extension + wheel
+# + Node). `default-features = false` drops core's `transport` module — its `age`
+# pulls getrandom, which won't build on wasm32, and the crypto has no place in a
+# browser binary. The keychain itself is RNG-free (sha2 + uuid-v8-from-bytes).
+laterite-ags4-core = { path = "../laterite-ags4-core", default-features = false }
 # The shared parse leaf (#168 Phase 3): `parse_bytes` + the parse types +
 # `field_span` come straight from the leaf (encoding_rs + memchr only — wasm-safe).
 # Its `ParseError` → ValidatorError via the Phase-2 `From` bridge so the
@@ -65,6 +72,15 @@ laterite-ags4-emit = { path = "../laterite-ags4-emit", features = ["arrow"] }
 # is shared by wasm + PyO3 + the CLI. Depends only on the parse leaf +
 # validator dict + laterite-types, all already pulled here — no new weight.
 laterite-ags4-diff = { path = "../laterite-ags4-diff" }
+# AGS4 ↔ XLSX conversion (#359). Its FS-free `ags4_bytes_to_xlsx` /
+# `xlsx_bytes_to_ags4` cores back the browser Excel surface. calamine +
+# rust_xlsxwriter (+ zip / flate2 / zopfli) are wasm-clean; laterite-excel takes
+# core with `default-features = false`, so `age` / getrandom never enters this
+# binary (the same guard this crate applies to its own core dep above). The
+# `wasm` feature swaps rust_xlsxwriter's clock to `js_sys::Date::now()` — its
+# default `SystemTime::now()` traps on wasm32 when stamping the workbook's
+# creation time.
+laterite-excel = { path = "../laterite-excel", features = ["wasm"] }
 # The AGS type system — SAME canonical_type / parse_value / parse_datetime
 # the native .ags5db conversion uses, so the explorer casts identically
 # (parity by construction). The `arrow` feature pulls in arrow_cols, the

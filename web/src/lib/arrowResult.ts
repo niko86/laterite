@@ -41,8 +41,15 @@ function arrowSqlType(field: Field): string {
   return "VARCHAR";
 }
 
-export function arrowResult(table: Table, cap?: number): ResultSet {
-  const columns: ResultColumn[] = table.schema.fields.map((f) => ({
+export function arrowResult(table: Table, cap?: number, dropSynthKeys = false): ResultSet {
+  // `dropSynthKeys` hides the content-addressed `_id`/`_parent_id` key columns —
+  // the group-grid view passes it so those synthetic columns don't clutter a
+  // data table, while the SQL console leaves them visible (a query that SELECTs
+  // `_id` should show it). AGS headings never start with `_`. (#303)
+  const fields = dropSynthKeys
+    ? table.schema.fields.filter((f) => !f.name.startsWith("_"))
+    : table.schema.fields;
+  const columns: ResultColumn[] = fields.map((f) => ({
     name: f.name,
     sqlType: arrowSqlType(f),
   }));

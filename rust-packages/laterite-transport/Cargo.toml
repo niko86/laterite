@@ -1,0 +1,32 @@
+# The shared transport leaf (#327). zstd compression + age passphrase
+# encryption over raw file bytes — the pack/unpack/lock/unlock envelope. Sits
+# below BOTH laterite-ags4-core (which re-exports it behind its `transport`
+# feature, mapping TransportError→CliError) and laterite-node (which binds it
+# to napi directly), so the age/zstd logic lives in ONE place instead of the
+# two copies that the age 0.10→0.11 migration had to touch. Same pattern as the
+# laterite-ags4-parse convergence leaf. Content-agnostic (any file) and
+# FS-only — no AGS knowledge, deps `age` + `zstd` + `thiserror` only. The age
+# envelope is interoperable with the Python `pyrage` library (same on-disk
+# format, same underlying `age` crate) AND the browser `age-encryption` JS lib
+# (the #295 web transport surface) — lock pins the scrypt work factor to log_N
+# 18 (see src/lib.rs::SCRYPT_LOG_N) so conservative age decoders that cap the
+# factor can open the file, instead of age's machine-calibrated 20+.
+[package]
+name = "laterite-transport"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "Shared zstd + age passphrase file transport (pack/unpack/lock/unlock)"
+license = "MIT"
+publish = false
+
+[dependencies]
+# libzstd (auto-bundled). The AGS sweet spot is level 9 (see pack()).
+zstd = "0.13"
+# The audited X25519 + ChaCha20-Poly1305 format; we use its scrypt passphrase
+# mode. `age::secrecy` is re-exported, so no direct `secrecy` dep is needed.
+age = "0.11"
+thiserror = "1"
+
+[dev-dependencies]
+tempfile = "3"

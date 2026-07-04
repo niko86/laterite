@@ -1,15 +1,15 @@
 [project]
 name = "laterite-workspace"
-version = "0.5.1"
+version = "0.6.0"
 description = "uv workspace root for the laterite AGS toolkit (dev monorepo aggregator; ships no wheel)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "laterite",
-    "duckdb>=1.5.2",
-    "polars>=1.40.1",
+    "duckdb>=1.5.4",
+    "polars>=1.42.0",
     "pyarrow>=24.0.0",
-    "lxml>=6.1.0",
+    "lxml>=6.1.1",
 ]
 
 [tool.uv.workspace]
@@ -30,15 +30,15 @@ laterite = { workspace = true }
 # so the shipped wheel never gains marimo). pandas<3 stays — python-ags4 needs
 # it and ags5_ags4/codec.py imports it directly.
 dev = [
-    "marimo>=0.10",
+    "marimo>=0.23.11",
     "pandas<3",
-    "pytest>=9.0.3",
+    "pytest>=9.1.1",
     "pytest-benchmark>=5.2.3",
     # Property-based testing. Drives `parse_value` totality + the
     # Ags4File text round-trip with generated input the example-based
     # tests don't reach (the laterite-base tests in
     # packages/laterite/tests/test_ags_types.py + test_ags4file.py).
-    "hypothesis>=6.100",
+    "hypothesis>=6.155.7",
     # Parallel test execution. The laterite + ags5 suites are
     # file/DuckDB-heavy (per-test tmp_path isolation), so they fan out
     # cleanly across workers. CI runs `-n 4` to roughly halve the suite
@@ -49,12 +49,18 @@ dev = [
     # [tool.coverage] config below scopes it to the two packages. Plays
     # with xdist (combines per-worker data automatically).
     "pytest-cov>=5",
-    "ruff>=0.7",
+    "ruff>=0.15.20",
+    # Astral's type checker (preview) — the type-faithfulness gate (#303 Phase 1):
+    # proves the shipped `laterite` package's type hints don't lie. Same toolchain
+    # as ruff/uv (Rust-fast). Run in the project venv (`uv run ty check`, NOT
+    # `uvx`) so it resolves polars/duckdb + the generated `_laterite_native.pyi`;
+    # config + scope in [tool.ty] below. CI step sits beside `ruff check`.
+    "ty>=0.0.55",
     # Build backend for the `laterite` package (PyO3 extension compiled
     # from rust-packages/laterite-py). In the dev group so a workspace
     # `uv sync` builds the native module; not a runtime dep of any
     # ags5-* package.
-    "maturin>=1.7,<2",
+    "maturin>=1.14.1,<2",
     # Lets maturin set the cdylib rpath during `maturin develop` (the
     # editable build) on Linux; without it maturin warns "Failed to set
     # rpath … Failed to execute 'patchelf'". Installed into the workspace
@@ -75,7 +81,7 @@ dev = [
     # Declarative version bumping (the maintained bumpversion successor):
     # stamps the release version across every site + rolls the CHANGELOG in
     # one command. Config in [tool.bumpversion] below; policy in RELEASING.md.
-    "bump-my-version>=0.28",
+    "bump-my-version>=1.4.1",
 ]
 
 # Docs site (#201, Phase 1): MkDocs + Material. A separate group so the core
@@ -88,7 +94,7 @@ dev = [
 # present — `uv sync` builds it (the local working-tree build the docs track).
 docs = [
     "mkdocs-material>=9.5",
-    "mkdocstrings[python]>=0.27",
+    "mkdocstrings[python]>=1.0.4",
     "mkdocs-gen-files>=0.5",
     "mkdocs-literate-nav>=0.6",
 ]
@@ -147,6 +153,22 @@ ignore = [
 # B018: a marimo cell's bare last expression IS its rendered output.
 "examples/**" = ["E402", "B018"]
 
+# --- Type-faithfulness gate (#303 Phase 1) --------------------------------
+# Astral `ty` (preview). Scoped to the SHIPPED `laterite` package only — the
+# gate is about the surface users import, not the dev/tools/dormant-ags5 code
+# (ruff's wider workspace net already covers those). Resolves polars/duckdb +
+# the generated `_laterite_native.pyi` from the project venv, so it must run as
+# `uv run ty check` (NOT `uvx`, which has no project deps). CI runs it beside
+# `ruff check`; pairs with tests/test_free_chained_parity.py + the package's
+# test_type_faithfulness.py which assert behaviour, not just declared types.
+[tool.ty.src]
+include = ["packages/laterite/python"]
+
+[tool.ty.environment]
+# Check against the wheel's real floor (abi3-py312 / requires-python >=3.12),
+# NOT the dev env's 3.14 — so a 3.13+-only API leaking into shipped code is caught.
+python-version = "3.12"
+
 # --- Release version management -------------------------------------------
 # `bump-my-version` stamps the release version across EVERY site in one command
 # and rolls the CHANGELOG. LOCKSTEP: both wheels + the umbrella always share one
@@ -156,7 +178,7 @@ ignore = [
 #   uv run bump-my-version bump --new-version 0.2.0rc1   # explicit pre-release
 #   uv run bump-my-version bump minor --dry-run -v       # preview, no writes
 [tool.bumpversion]
-current_version = "0.5.1"
+current_version = "0.6.0"
 # Parse accepts PEP 440 canonical pre-releases (0.2.0rc1 / 0.2.0dev1, no hyphen
 # — PyPI rejects hyphens) so an explicit `bump --new-version 0.2.0rc1` round-
 # trips. `bump major|minor|patch` produces a FINAL release (e.g. 0.2.0); cut a
@@ -212,11 +234,42 @@ replace = "compare/v{new_version}...HEAD\n[{new_version}]: https://github.com/ni
 
 # Rust crate suite: single-sourced via [workspace.package] version (every
 # member inherits it with version.workspace = true). Stamped here so a
-# `bump-my-version bump` moves the engine crates + both binaries (lat-check,
-# lat-db) in lockstep with the Python wheels — preventing the kind of
-# Python/Rust version drift this single-sourcing fixed. The only
-# `version = "X"` literal in that file is the [workspace.package] line.
+# `bump-my-version bump` moves the engine crates + the `lat-check` binary in
+# lockstep with the Python wheels — preventing the kind of Python/Rust version
+# drift this single-sourcing fixed. (The `lat-db` binary is dormant under
+# `ags5/`, #177 — not built or shipped.) The only `version = "X"` literal in
+# that file is the [workspace.package] line.
 [[tool.bumpversion.files]]
 filename = "rust-packages/Cargo.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
+
+# Node / npm (`laterite`): unified onto the single version (#372). The package
+# version + its three `@laterite/native-*` optionalDeps must move together — a
+# mismatch makes `laterite` resolve a stale native addon. Stamped per-key
+# (distinct search strings) so no other `0.x` pin in the manifest is caught.
+# NOT stamped, by design: the generated napi loader `index.js` (refreshed by
+# `napi build`; its version check is env-gated off, so a stale literal is
+# inert), `package-lock.json` + the Rust/Python locks (regenerated by
+# tools/release/bump-version.sh), and `web/src/wasm/package.json` (gitignored;
+# wasm-pack regenerates it from the crate version). test_version_faithful.py
+# gates the tracked set.
+[[tool.bumpversion.files]]
+filename = "rust-packages/laterite-node/package.json"
+search = '"version": "{current_version}"'
+replace = '"version": "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "rust-packages/laterite-node/package.json"
+search = '"@laterite/native-darwin-arm64": "{current_version}"'
+replace = '"@laterite/native-darwin-arm64": "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "rust-packages/laterite-node/package.json"
+search = '"@laterite/native-linux-x64-gnu": "{current_version}"'
+replace = '"@laterite/native-linux-x64-gnu": "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "rust-packages/laterite-node/package.json"
+search = '"@laterite/native-win32-x64-msvc": "{current_version}"'
+replace = '"@laterite/native-win32-x64-msvc": "{new_version}"'

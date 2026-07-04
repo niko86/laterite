@@ -1,10 +1,15 @@
 """Generate one reference page per AGS4 group from the shipped registry (#201).
 
-Runs at `mkdocs build` (mkdocs-gen-files). The group + heading + KEY-chain data
-comes from `laterite.registry` — the same projection the shipped wheel exposes,
-so the catalogue inherits the JSON->registry faithfulness gate, and gets the
-real KEY tuples (which are NOT just the dictionary's per-heading `status==KEY`:
-e.g. PROJ_ID / DICT_TYPE / ERES_CODE are keys the raw status field omits).
+Runs at `mkdocs build` (mkdocs-gen-files). Group + heading + KEY-chain data come
+from `laterite.registry` — the same projection the shipped wheel exposes, so the
+catalogue inherits the JSON->registry faithfulness gate, and gets the real KEY
+tuples (which are NOT just the dictionary's per-heading `status==KEY`: e.g.
+PROJ_ID / DICT_TYPE / ERES_CODE are keys the raw status field omits).
+
+Edition PROVENANCE (added / removed in 4.x) and the FAMILY taxonomy + the type
+glossary links come from `catalogue_data` (which reads the single-source union
+dictionary directly — the registry serves only the latest-edition union and
+drops per-edition membership). See that module for the data contract.
 
 WHY a subprocess: mkdocs-gen-files executes this file via `runpy.run_path`, and
 in an editable `uv sync` install (CI) importing the compiled
@@ -12,10 +17,6 @@ in an editable `uv sync` install (CI) importing the compiled
 error. A clean child `python -c` import (the same path mkdocstrings uses
 successfully) sidesteps it. The wheel is server-side (built by
 `uv sync --group docs`), so the no-Pyodide-wheel constraint is respected.
-
-PROTOTYPE NOTE: the `code -> family` bucketing below is a *draft heuristic* — it
-is the human-meaningful nav axis (the PROJ tree is too lopsided: 164/174 hang
-off PROJ, LOCA has 50 children). The final mapping is owner-curated (#201 Q2).
 """
 
 from __future__ import annotations
@@ -23,8 +24,14 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 import mkdocs_gen_files
+
+# `catalogue_data` sits beside this script; runpy.run_path does not put the
+# script's dir on sys.path for a plain file, so add it explicitly.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import catalogue_data as cd  # noqa: E402
 
 # Dump the whole registry from a clean child interpreter (see module docstring).
 _DUMP = r"""
@@ -57,78 +64,67 @@ GROUPS: dict = json.loads(
     ).stdout
 )
 
-# Metadata / housekeeping groups, mapped by code (no useful keyword).
-_META = {"PROJ", "TRAN", "ABBR", "DICT", "FILE", "TYPE", "UNIT", "STND"}
+_DICT = cd.load_dict()
+_ALL_EDS = cd.editions()
 
 
-def family(code: str, contents: str) -> str:
-    """Draft heuristic bucketing (owner-curated later — #201 Q2)."""
-    c = contents.lower()
-    if code in _META:
-        return "Project & housekeeping"
-    if code == "LOCA" or "location" in c or "traverse" in c:
-        return "Location & field"
-    if "sampl" in c:
-        return "Sampling"
-    if any(k in c for k in (
-        "drill", "flush", "casing", "chisel", "backfill", "core", "coring",
-        "hole ", "water strike", "progress by", "advancement", "observation",
-        "depth related", "diameter by depth", "orientation", "inclination",
-        "construction", "custody", "schedule",
-    )):
-        return "Field, drilling & logging"
-    if any(k in c for k in (
-        "geolog", "stratum", "strata", "rock ", "weather", "discontinu",
-        "fracture", "litholog",
-    )):
-        return "Geology & logging"
-    if any(k in c for k in (
-        "monitor", "installation", "piezomet", "groundwater", "standpipe",
-        "gas", "instrument", "headspace", "ionisation", "contaminant",
-    )):
-        return "Monitoring & instrumentation"
-    if any(k in c for k in (
-        "penetration", "cone", "pressuremet", "vane", "plate", "dilatometer",
-        "soakaway", "pumping", "geohydraulic", "point load", "schmidt",
-        "scleroscope", "in situ", "in-situ", "dissipation", "field geo",
-    )):
-        return "In-situ testing"
-    if any(k in c for k in (
-        "laborator", "triaxial", "consolidat", "classif", "chemical",
-        "compaction", "shrink", "swell", "cbr", "california bearing",
-        "particle", "plasticity", "density", "moisture", "strength", "oedomet",
-        "shear box", "resonant", "liquid and plastic", "suction", "mcv",
-        "frost", "lime", "ten per cent", "aggregate", "abrasion", "crushing",
-        "slake", "durability", "polished", "elongation", "flakiness", "impact",
-        "soundness", "absorption", "chalk", "permeab",
-    )):
-        return "Laboratory testing"
-    if "test" in c:
-        return "Other testing"
-    return "Other"
+def _type_cell(type_code: str) -> str:
+    """A type code linked to its glossary entry (folds 2DP->#ndp, etc.)."""
+    key = cd.glossary_key(type_code)
+    code = f"`{type_code}`"
+    return f"[{code}](../types.md#{key})" if key else code
 
 
-def _heading_rows(g: dict) -> str:
-    rows = ["| Heading | Status | Type | Unit | Description |",
-            "|---|:--|:--|:--|---|"]
+def _heading_rows(code: str, g: dict) -> str:
+    """Heading table; gains an 'Editions' column only when some heading's edition
+    span differs from its group's (a heading added/removed mid-life)."""
+    jgroup = _DICT["groups"].get(code, {})
+    group_eds = jgroup.get("eds", _ALL_EDS)
+    jh_by_name = {h["name"]: h for h in jgroup.get("headings", [])}
+
+    provs = {}
+    for h in g["headings"]:
+        jh = jh_by_name.get(h["name"])
+        provs[h["name"]] = (
+            cd.heading_provenance(group_eds, jh, _ALL_EDS) if jh
+            else {"differs": False}
+        )
+    show_eds = any(p.get("differs") for p in provs.values())
+
+    head = "| Heading | Status | Type | Unit | Description |"
+    sep = "|---|:--|:--|:--|---|"
+    if show_eds:
+        head = "| Heading | Status | Type | Unit | Editions | Description |"
+        sep = "|---|:--|:--|:--|:--|---|"
+    rows = [head, sep]
     for h in g["headings"]:
         mark = " **(key)**" if h["is_key"] else ""
-        rows.append(
-            f"| `{h['name']}`{mark} | {h['status']} | `{h['type']}` | "
-            f"{h['unit'] or ''} | {h['description']} |"
-        )
+        cells = [f"`{h['name']}`{mark}", h["status"], _type_cell(h["type"]),
+                 h["unit"] or ""]
+        if show_eds:
+            p = provs[h["name"]]
+            if p.get("added_in"):
+                cells.append(f"since {p['added_in']}")
+            elif p.get("removed_in"):
+                cells.append(f"removed {p['removed_in']}")
+            else:
+                cells.append("")
+        cells.append(h["description"])
+        rows.append("| " + " | ".join(cells) + " |")
     return "\n".join(rows)
 
 
 nav = mkdocs_gen_files.Nav()
-index_rows: list[tuple[str, str, str, str, int]] = []
+# (code, contents, family, parent, n_headings, edition_label)
+index_rows: list[tuple[str, str, str, str, int, str]] = []
 
 for code in sorted(GROUPS):
     g = GROUPS[code]
-    fam = family(code, g["contents"])
+    fam = cd.family(code)
+    prov = cd.group_provenance(code)
+    edlabel = cd.edition_label(prov)
     index_rows.append((code, g["contents"], fam, g["parent"] or "—",
-                       len(g["headings"])))
-    nav[(fam, code)] = f"{code}.md"
+                       len(g["headings"]), edlabel))
 
     crumb = " → ".join(f"[{c}]({c}.md)" for c in reversed(g["ancestors"]))
     own = g["key_headings"]
@@ -137,6 +133,18 @@ for code in sorted(GROUPS):
     out = [f"# {code} — {g['contents']}", ""]
     out.append(f"**Path:** {crumb}  ·  **Family:** {fam}")
     out.append("")
+    out.append(f"**Editions:** {edlabel}")
+    out.append("")
+    if prov["added_in"]:
+        out.append(f'!!! info "New in AGS {prov["added_in"]}"')
+        out.append(f"    This group was introduced in AGS edition "
+                   f"{prov['added_in']}.")
+        out.append("")
+    elif prov["removed_in"]:
+        out.append(f'!!! warning "Removed in AGS {prov["removed_in"]}"')
+        out.append(f"    This group was defined up to AGS {prov['span'][1]} and "
+                   f"removed in {prov['removed_in']}.")
+        out.append("")
     out.append('!!! note "Key chain"')
     own_s = "`, `".join(own) if own else "(none)"
     if inh:
@@ -146,7 +154,7 @@ for code in sorted(GROUPS):
         out.append(f"    Identified by `{own_s}`. Root-level under the project "
                    f"— inherits no parent key.")
     out.append("")
-    out.append(_heading_rows(g))
+    out.append(_heading_rows(code, g))
     out.append("")
 
     kids = g["children"]
@@ -167,27 +175,38 @@ for code in sorted(GROUPS):
 # --- landing: family cards (filter the table) + ONE paginated master table ---
 # Pagination + filter + the family-card wiring are in docs/javascripts/catalogue.js
 # (vanilla JS). Each card carries `data-family` so a click filters the table; the
-# href degrades to a jump to the table if JS is off.
-families = sorted({r[2] for r in index_rows})
+# href degrades to a jump to the table if JS is off. Families render in the
+# curated order from catalogue_data (not alphabetical).
 land = ["# Group catalogue", "",
         f"All **{len(GROUPS)} AGS4 groups** — every group is one searchable, "
         "deep-linkable page. Pick a family to filter, type in the box, or page "
-        "through the table (20 at a time). The left sidebar lists them by family "
-        "too.", "",
+        "through the table (20 at a time). The **Editions** column shows the AGS "
+        "edition span each group covers — so a group added in 4.2, or removed in "
+        "4.2, stands out. The left sidebar lists them by family too.", "",
         '<div class="grid cards" markdown>', ""]
-for fam in families:
+for fam, desc in cd.FAMILIES:
     n = sum(1 for r in index_rows if r[2] == fam)
-    land.append(f'- [**{fam}** — {n} groups](#group-table){{ data-family="{fam}" }}')
+    if not n:
+        continue
+    label = f"**{fam}** — {n} groups"
+    land.append(f'- [{label}](#group-table){{ data-family="{fam}" }}'
+                + (f'<br><small>{desc}</small>' if desc else ''))
 land += ["", "</div>", "",
          '<div class="group-table" id="group-table" markdown>', "",
-         "| Code | Group | Family | Parent | Headings |",
-         "|---|---|---|:--|--:|"]
-for code, contents, fam, parent, n in index_rows:
+         "| Code | Group | Family | Parent | Headings | Editions |",
+         "|---|---|---|:--|--:|:--|"]
+for code, contents, fam, parent, n, edlabel in index_rows:
     land.append(f"| [`{code}`]({code}.md) | {contents} | {fam} | "
-                f"{parent} | {n} |")
+                f"{parent} | {n} | {edlabel} |")
 land += ["", "</div>"]
 with mkdocs_gen_files.open("reference/groups/index.md", "w") as fd:
     fd.write("\n".join(land))
+
+# Sidebar nav follows the curated FAMILIES order (then code within a family), so
+# it matches the landing cards rather than ordering families by first-seen code.
+for fam, _desc in cd.FAMILIES:
+    for code in sorted(c for c in GROUPS if cd.family(c) == fam):
+        nav[(fam, code)] = f"{code}.md"
 
 with mkdocs_gen_files.open("reference/groups/SUMMARY.md", "w") as fd:
     fd.write("- [Overview](index.md)\n")

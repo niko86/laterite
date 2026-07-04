@@ -18,6 +18,15 @@
 
 name: release
 
+# Least-privilege default: read-only for any job that doesn't declare its own
+# `permissions:`, so a future job added here can't silently inherit a broad
+# token (the other workflows already set a top-level default; this was the last
+# one without one). The build jobs (build-wheels/binaries/node) need only this
+# (checkout); the publish jobs escalate explicitly at the job level —
+# github-release: `contents: write`, pypi/npm-publish: `id-token: write`.
+permissions:
+  contents: read
+
 on:
   push:
     # `v*` drives the Python release (wheels + binaries + PyPI); `node-v*` drives

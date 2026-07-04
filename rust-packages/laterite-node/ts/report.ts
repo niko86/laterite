@@ -1,4 +1,4 @@
-import type { Finding, ValidationReport } from "./native";
+import type { Finding, Sidecar, ValidationReport } from "./native";
 
 /** One finding without its `rule` key — the value shape `byRule()` groups. */
 export type RuleFinding = Omit<Finding, "rule">;
@@ -34,6 +34,24 @@ export class Report {
   readonly #r: ValidationReport;
   constructor(r: ValidationReport) {
     this.#r = r;
+  }
+
+  /** Synthesise a clean report from a fresh certificate — the engine-skipped
+   * outcome of `Ags4File.validate()` on an `index=`-certified file. `resolution`
+   * is the sentinel `"certified"` (the engine never emits it), `count` is 0, and
+   * the edition is the cert's. Mirrors laterite-py's `Report.from_cert`. */
+  static fromCert(cert: Sidecar, label: string): Report {
+    return new Report({
+      ok: true,
+      exitCode: 0,
+      file: label,
+      dictVersion: cert.edition,
+      resolution: "certified",
+      count: 0,
+      findings: [],
+      json: JSON.stringify({ file: label, findings: {} }),
+      ndjson: "",
+    });
   }
 
   get file(): string {

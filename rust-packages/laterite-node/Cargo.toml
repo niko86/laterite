@@ -27,8 +27,8 @@ crate-type = ["cdylib"]
 # `serde-json` lets `parseValue` return a `serde_json::Value` straight across the
 # boundary as native JS (number/string/bool/null) — the AGS type system's own
 # output shape, no hand-rolled union.
-napi = { version = "2", default-features = false, features = ["napi8", "serde-json"] }
-napi-derive = "2"
+napi = { version = "3", default-features = false, features = ["napi8", "serde-json"] }
+napi-derive = "3"
 # The engine — all DuckDB-free, pure Rust (same crates laterite-py + laterite-ags4-wasm
 # wrap). laterite-types `arrow` feature pulls the shared typed-Arrow builder
 # (arrow_cols); `arrow` ipc frames each group's batch as an IPC stream Buffer.
@@ -38,18 +38,33 @@ laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 # the `thrown`/`classify` exit-code map is unchanged. Validator dep stays for
 # the FS entry (`parse_file_with_encoding`), rules, and ValidatorError.
 laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+# The shared revision-diff leaf (#294 Batch E / #4): the KEY-aware, type-aware
+# comparison PyO3 + the CLI + wasm already reuse. This wrapper only parses,
+# resolves the dictionary edition, and serialises the `RevisionDelta` to JSON.
+laterite-ags4-diff = { path = "../laterite-ags4-diff" }
 laterite-types = { path = "../laterite-types", features = ["arrow"] }
 # The shared producer (write_ags4 for byte-faithful emit; emit_ags4 +
 # group_from_arrow for the data→AGS4 path) — `arrow` feature for the IPC input.
 laterite-ags4-emit = { path = "../laterite-ags4-emit", features = ["arrow"] }
+# AGS4 ↔ XLSX converter (#358) — the same crate laterite-py binds for
+# to_excel/from_excel. Pure Rust (calamine + rust_xlsxwriter), DuckDB-free.
+laterite-excel = { path = "../laterite-excel" }
+# The content-addressed keychain (#303): `registry()` + `keychain::group_row_ids`
+# so `table_ipc` prepends the `_id`/`_parent_id` columns from the ONE shared id
+# maths every surface uses (byte-identical to the .ags5db extension). Pure +
+# DuckDB-free; Excel/csv moved out to laterite-excel (2026-06-18), so this is a
+# light dep now — sha2 + uuid + the dictionary. `default-features = false` drops
+# core's `transport` feature (we bind the leaf directly below), so core pulls
+# neither age nor zstd for us.
+laterite-ags4-core = { path = "../laterite-ags4-core", default-features = false }
 arrow = { version = "59", default-features = false, features = ["ipc"] }
 encoding_rs = "0.8"
-# Transport (pack/unpack/lock/unlock) — zstd + age passphrase, reimplemented
-# directly (NOT via laterite-ags4-core, which would drag in Excel/csv/sha2 for a niche
-# feature). Same crates laterite-ags4-core links, so the age envelope stays
-# interoperable with the Python side (pyrage).
-zstd = "0.13"
-age = "0.10"
+# Transport (pack/unpack/lock/unlock) — zstd + age passphrase, the shared
+# laterite-transport leaf (#327). One copy of the age/zstd envelope, bound to
+# napi in transport_fns.rs; laterite-ags4-core binds the same leaf (behind its
+# `transport` feature), so a transport dep bump is one migration, not two. The
+# age envelope stays interoperable with the Python side (pyrage).
+laterite-transport = { path = "../laterite-transport" }
 # `preserve_order` MUST mirror laterite-ags4-validator / laterite-py: the validator's
 # `--json`/`--ndjson` insertion order is load-bearing (byte-faithful to the
 # `lat-check` binary), and `Report.toJson()` re-exposes it verbatim.

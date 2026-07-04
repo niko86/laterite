@@ -25,6 +25,7 @@ import { Controls } from "./Controls";
 import { SummaryBanner } from "./SummaryBanner";
 import { FilterBar, type Severity } from "./FilterBar";
 import { FindingsView } from "./FindingsView";
+import { DownloadCertificate } from "./DownloadCertificate";
 import { DownloadReport } from "./DownloadReport";
 import { SampleLoader } from "./SampleLoader";
 import { Spinner } from "../Spinner";
@@ -275,6 +276,15 @@ export const ValidatePane: Component = () => {
           {(r) => (
             <>
               <SummaryBanner report={r()} name={name()} />
+
+              <Show when={r().ok}>
+                <DownloadCertificate
+                  bytes={canonicalBytes}
+                  name={name()}
+                  dict={dictVersion()}
+                  encoding={encoding()}
+                />
+              </Show>
 
               <Show when={r().findings.length > 0}>
                 <DownloadReport

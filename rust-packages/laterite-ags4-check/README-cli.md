@@ -53,6 +53,12 @@ Rule violations in a file.
     --list-rules         print the AGS4 rule catalogue (title / severity /
                          fixable / cited observations) and exit; add --json
                          for the full machine-readable form. No input file.
+    --emit-index         after a clean check, mint the .ags.idx validity
+                         certificate (byte-offset index + validation
+                         provenance) beside the file. Skipped if the file
+                         still has errors; warnings/FYI don't block it.
+    --index-out <path>   with --emit-index: write the certificate to <path>
+                         instead of <file>.ags.idx
     --quiet              suppress the progress spinner
     --tui                interactive findings browser (needs the
                          `tui` build feature + an interactive terminal)
@@ -92,6 +98,7 @@ nested `{file, findings:{rule:[{line,group,desc}]}}` document;
     lat-check delivery.ags --fix                # → delivery.fixed.ags
     lat-check delivery.ags --fix --in-place     # repair in place
     lat-check delivery.ags --fix-risky --fix-out clean.ags
+    lat-check delivery.ags --emit-index         # → delivery.ags.idx (if clean)
 
 > The clean-room boundary, licence, and bundled-dictionary provenance
 > are documented in the crate's `README.md` and `data/PROVENANCE.md`.

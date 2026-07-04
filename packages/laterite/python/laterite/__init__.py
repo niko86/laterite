@@ -12,14 +12,22 @@ AGS4``. For the CLI use ``lat-check`` (byte-faithful to the Rust binary).
 
 from __future__ import annotations
 
+import builtins
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import Any, Literal, Self
 
 import polars as pl
 
 from . import _laterite_native as _native
+
+# The 174 AGS4 typed-graph classes (`PROJ`, `LOCA`, …) live in the sibling
+# `laterite.groups` submodule, keeping the four-letter codes out of this
+# top-level namespace (which carries the read / validate / build API). Loaded
+# here (under a private alias — several functions below take a `groups=` param)
+# so `laterite.groups` resolves after a bare `import laterite`, like `registry`.
+from . import groups as _groups  # noqa: F401
 from ._errors import (
     Ags4Error,
     BadDictError,
@@ -32,22 +40,12 @@ from ._frames import ArrowStream, frame_from_arrow
 from .registry import GROUPS as _GROUPS
 from .registry import child_groups as _child_groups
 
-# Re-export the typed-graph classes for ergonomic
-# `from laterite import PROJ, LOCA, SAMP, ...`. The class objects live in the
-# compiled Rust extension `_laterite_native`; this loop aliases them onto the
-# package root at runtime.
-_TYPED_CLASS_NAMES: tuple[str, ...] = tuple(sorted(_GROUPS))
-for _code in _TYPED_CLASS_NAMES:
-    globals()[_code] = getattr(_native, _code)
-del _code
-
-# The runtime loop above is invisible to static analysers, so without this they
-# flag `from laterite import PROJ` as an unknown symbol — no IDE autocomplete and
-# spurious type errors. Re-importing the classes here (type-check time only,
-# never executed) makes them statically visible; the star is restricted to the
-# typed-graph classes by `_laterite_native.pyi`'s generated `__all__`.
-if TYPE_CHECKING:
-    from ._laterite_native import *  # noqa: F403
+#: The AGS Format Rule labels whose findings [`fix`][laterite.fix] can repair — the
+#: valid values for ``fix(only=…, exclude=…)``. Kept in lock-step with the engine's
+#: fixable set by ``test_fix_selection`` (which gates it against
+#: [`fixable_rules`][laterite.fixable_rules], itself gated against the Rust
+#: ``FIXABLE_RULE_LABELS``).
+FixableRule = Literal["1", "2a", "4", "6", "7", "8", "11a", "11b"]
 
 __all__ = [
     "validate",
@@ -56,6 +54,12 @@ __all__ = [
     "to_excel",
     "from_excel",
     "fix",
+    "fixable_rules",
+    "FixableRule",
+    "Backend",
+    "XnMode",
+    "BuildMode",
+    "Edition",
     "FixResult",
     "build_ags4",
     "BuildResult",
@@ -70,7 +74,6 @@ __all__ = [
     "UnsupportedEditionError",
     "BadDictError",
     "StaleCertError",
-    *_TYPED_CLASS_NAMES,
 ]
 
 # Frame backends `read(..., backend=)` / `ags[code]` can return. Both are
@@ -84,6 +87,25 @@ _BACKENDS = ("polars", "pandas")
 # default; "numeric" gives a Float64 read-side view (qualifiers → null). A fuller
 # bidirectional/typed XN treatment is future work (see issue tracker).
 _XN_MODES = ("string", "numeric")
+
+#: Frame backend for `read(..., backend=)` — the dataframe library `ags[code]`
+#: returns. Both are pyarrow-free. Gated against `_BACKENDS` in tests.
+Backend = Literal["polars", "pandas"]
+
+#: XN-column read mode for `read(..., xn=)`: byte-faithful `"string"` (default) or
+#: a `"numeric"` Float64 view (qualifiers → null). Gated against `_XN_MODES`.
+XnMode = Literal["string", "numeric"]
+
+#: How [`build_ags4`][laterite.build_ags4] handles findings on the emitted bytes:
+#: `"autofix"` (default — synthesise UNIT/TYPE/TRAN, reformat), `"report"` (emit
+#: unchanged + return findings), `"strict"` (raise on any violation). Matches the
+#: engine's `EmitMode`.
+BuildMode = Literal["autofix", "report", "strict"]
+
+#: An AGS4 dictionary edition — the values accepted by every `dict_version=`
+#: argument (omit / `None` auto-detects from `TRAN_AGS`). Gated against the
+#: dictionary's own `editions` list, so a new bundled edition updates it.
+Edition = Literal["4.0.3", "4.0.4", "4.1", "4.1.1", "4.2"]
 
 
 def _looks_like_ags_text(s: str) -> bool:
@@ -158,6 +180,7 @@ def _source_bytes(source: Any) -> bytes:
         return txt.encode("utf-8")
     from pathlib import Path
 
+    assert p is not None  # raw/txt both None => the source resolved to a path
     return Path(p).read_bytes()
 
 
@@ -353,7 +376,9 @@ class Ags4File:
         "_bytes",
         "_cert",
         "_con",
+        "_encoding",
         "_fix_report",
+        "_keys",
         "_last_check_files",
         "_last_forced",
         "_p",
@@ -367,10 +392,11 @@ class Ags4File:
     def __init__(
         self,
         parsed: dict,
-        backend: str = "polars",
+        backend: Backend = "polars",
         *,
-        xn: str = "string",
-        _src: tuple[str | None, str | None, bytes | None] | None = None,
+        xn: XnMode = "string",
+        keys: bool = False,
+        _src: tuple[str | None, str | None, builtins.bytes | None] | None = None,
     ) -> None:
         # Guard the common `read(path)` vs `Ags4File(path)` mix-up: the ctor takes
         # the parsed mapping `parse_arrow` returns, not a path. Without this a bad
@@ -393,17 +419,27 @@ class Ags4File:
         if xn not in _XN_MODES:
             raise ValueError(f"xn must be one of {_XN_MODES} (got {xn!r})")
         self._p = parsed
-        self._backend = backend
+        self._backend: Backend = backend
         # XN-column read mode: "string" (byte-faithful, default) or "numeric"
         # (XN-typed columns cast to Float64 in the engine; non-numeric tokens →
         # null). Read-side only — write-back stays byte-faithful from the parse.
-        self._xn = xn
+        self._xn: XnMode = xn
+        # Whether the frame accessor (`ags[code]` / `.table()`) INCLUDES the two
+        # content-addressed key columns `_id`/`_parent_id`. Default False → they're
+        # stripped from frames (but the relational `.sql()` layer always carries
+        # them). Read-side only; emit always strips. (#303)
+        self._keys: bool = keys
         self._con = None  # lazy DuckDB engine (first group access / sql / connection)
         self._registered: set[str] = set()  # groups loaded into _con
         # The (path, text, data) this handle was read from — lets chainable
         # `.validate()` run the rule engine on the ORIGINAL source (matching line
         # numbers), not a re-emit. None for a synthesised handle (falls back to emit).
         self._src = _src
+        # The encoding `read()` decoded this handle's bytes with, so chained
+        # `.validate()`/`.fix()`/`.diff()` re-read the source faithfully (a cp1252
+        # file stays cp1252) instead of silently assuming UTF-8. None = auto/UTF-8;
+        # `read()` sets it after construction.
+        self._encoding: str | None = None
         self._report: Report | None = None  # last `.validate()` outcome
         self._text: str | None = None  # memoised AGS4 re-emit (.text)
         self._bytes: bytes | None = None  # memoised UTF-8 of .text (.bytes)
@@ -533,12 +569,27 @@ class Ags4File:
             return rel.df()
         return frame_from_arrow(rel)
 
-    def __getitem__(self, code: str):
-        """One group, materialised to the handle's backend (born-typed)."""
-        self._register(code)
-        return self._materialize(self._engine().sql(f'SELECT * FROM "{code}"'))
+    def _frame_select(self, code: str) -> str:
+        """Projection that DROPS the synthetic key columns for a FRAME. The
+        relational table always carries ``_id``/``_parent_id`` (see ``_register``);
+        the frame accessor hides them unless asked. A passthrough group (absent
+        from the dictionary) never had them, so it's a plain ``*``."""
+        return "* EXCLUDE (_id, _parent_id)" if _GROUPS.get(code) is not None else "*"
 
-    table = __getitem__
+    def table(self, code: str, *, keys: bool | None = None):
+        """One group, materialised to the handle's backend (born-typed). By
+        default the synthetic ``_id``/``_parent_id`` key columns are dropped; pass
+        ``keys=True`` (or ``read(..., keys=True)`` for the handle default) to keep
+        them. The relational ``.sql()`` layer carries them regardless."""
+        want = self._keys if keys is None else keys
+        self._register(code)
+        select = "*" if want else self._frame_select(code)
+        return self._materialize(self._engine().sql(f'SELECT {select} FROM "{code}"'))
+
+    def __getitem__(self, code: str):
+        """One group, materialised to the handle's backend (born-typed) — the
+        handle's ``keys=`` default governs whether ``_id``/``_parent_id`` show."""
+        return self.table(code)
 
     @property
     def connection(self):
@@ -626,7 +677,7 @@ class Ags4File:
         return self._text
 
     @property
-    def bytes(self) -> bytes:
+    def bytes(self) -> builtins.bytes:
         """[`text`][laterite.Ags4File.text] encoded UTF-8 — the on-disk / wire form [`save`][laterite.Ags4File.save] writes.
         AGS4 is a text format, so ``bytes`` is just ``text.encode("utf-8")``. Memoised."""
         if self._bytes is None:
@@ -636,10 +687,11 @@ class Ags4File:
     def validate(
         self,
         *,
-        dict_version: str | None = None,
+        dict_version: Edition | None = None,
         warnings: bool = True,
         fyi: bool = False,
         check_files: bool = False,
+        encoding: str | None = None,
     ) -> Self:
         """Validate this file against the AGS4 rules and return ``self`` (chainable —
         ``read(p).validate().query(...)``); the outcome lands on [`report`][laterite.Ags4File.report]. Same
@@ -687,6 +739,7 @@ class Ags4File:
             include_warnings=warnings,
             include_fyi=fyi,
             check_files=check_files,
+            encoding=encoding if encoding is not None else self._encoding,
         )
         self._report = Report(raise_for(r))
         return self
@@ -699,7 +752,7 @@ class Ags4File:
             raise AttributeError("call .validate() before reading .report")
         return self._report
 
-    def _source_bytes(self) -> bytes:
+    def _source_bytes(self) -> builtins.bytes:
         """The ORIGINAL source bytes this handle was read from — what a certificate
         indexes and fingerprints. NOT the spec-correct re-emit [`bytes`][laterite.Ags4File.bytes], which
         can differ from a non-canonically-formatted on-disk file. A path re-reads the
@@ -712,7 +765,8 @@ class Ags4File:
             return Path(path).read_bytes()
         if data is not None:
             return data
-        return text.encode("utf-8")  # type: ignore[union-attr]
+        assert text is not None  # path/data both None => this handle was read from text=
+        return text.encode("utf-8")
 
     def certify(self, path: str | Path | None = None) -> Path:
         """Mint this file's ``.ags.idx`` validity **certificate** — a clean-validation
@@ -721,10 +775,13 @@ class Ags4File:
         not run one. Raises if [`validate`][laterite.validate] was not called, or found finding(s); a
         later ``read(..., index=...)`` consumes the cert to skip re-validation.
 
-        ``path`` defaults to ``<source>.idx`` (``delivery.ags`` → ``delivery.ags.idx``);
-        a handle read from text/bytes has no source path, so pass ``path=`` explicitly.
-        Returns the written ``Path``. The certificate indexes the original source bytes,
-        which must be UTF-8 (the byte index rejects other encodings)."""
+        ``path`` is the certificate's **output** location and defaults to
+        ``<source>.idx`` (``delivery.ags`` → ``delivery.ags.idx``); a handle read from
+        text/bytes has no source path, so pass ``path=`` explicitly. It is *not* a file
+        to certify — certify refuses to overwrite the source file or any existing
+        non-certificate file, so ``certify(p)`` reusing your ``.ags`` path can't destroy
+        it. Returns the written ``Path``. The certificate indexes the original source
+        bytes, which must be UTF-8 (the byte index rejects other encodings)."""
         if self._report is None:
             raise Ags4Error(
                 "call .validate() before .certify() — certify records a passed "
@@ -735,8 +792,8 @@ class Ags4File:
                 f"cannot certify a file with {self._report.count} finding(s); fix "
                 "them and re-validate clean first"
             )
+        src_path = self._src[0] if self._src is not None else None
         if path is None:
-            src_path = self._src[0] if self._src is not None else None
             if src_path is None:
                 raise Ags4Error(
                     "no source path to derive the .ags.idx location from; pass "
@@ -744,6 +801,26 @@ class Ags4File:
                 )
             path = f"{src_path}.idx"
         path = Path(path)
+        # `path` is where the .ags.idx is WRITTEN, never a file to certify. Guard the
+        # data-loss footgun `read(p).validate().certify(p)` (reusing the source path),
+        # and more generally refuse to clobber any existing non-certificate file —
+        # certify only ever writes or replaces an .ags.idx.
+        if src_path is not None and path.resolve() == Path(src_path).resolve():
+            raise Ags4Error(
+                f"certify(path=...) is the .ags.idx OUTPUT location, not the file to "
+                f"certify — refusing to overwrite the source file {path}. Omit path to "
+                f"write <source>.ags.idx, or pass an explicit .idx output path."
+            )
+        if (
+            path.is_file()
+            and path.stat().st_size
+            and not path.read_bytes()[:64].lstrip().startswith(b"{")
+        ):
+            raise Ags4Error(
+                f"refusing to overwrite {path}: it is not a laterite certificate "
+                "(certify writes or replaces an .ags.idx). Pass a new path, or the "
+                "existing .ags.idx to replace."
+            )
         from datetime import UTC, datetime
 
         checked_at = datetime.now(UTC).isoformat()
@@ -757,7 +834,7 @@ class Ags4File:
         path.write_bytes(cert.to_json())
         return path
 
-    def save(self, path: str | Path) -> Path:
+    def save(self, path: str | os.PathLike[str]) -> Path:
         """Write spec-correct AGS4 to ``path`` (UTF-8 — [`bytes`][laterite.Ags4File.bytes]); returns the
         ``Path``. The inverse of [`read`][laterite.read]."""
         path = Path(path)
@@ -790,13 +867,27 @@ class Ags4File:
         or ``None`` for a handle not produced by [`fix`][laterite.fix]."""
         return self._fix_report
 
-    def fix(self, *, risky: bool = False) -> Ags4File:
+    def fix(
+        self,
+        *,
+        risky: bool = False,
+        only: list[FixableRule] | None = None,
+        exclude: list[FixableRule] | None = None,
+        dict_version: Edition | None = None,
+        encoding: str | None = None,
+    ) -> Ags4File:
         """Repair this file and return a new, repaired [`Ags4File`][laterite.Ags4File] — the fluent
         transform, so ``read(path).fix().validate().save(out)`` reads as one chain.
         The **safe** mechanical fixes (CRLF / BOM / embedded-CR / short-row pad /
         numeric reformat / TRAN delimiter+concatenator rows) are applied; ``risky=True``
         also applies the intent-guessing ones (duplicate-heading rename, datetime
-        canonicalisation, typography). The same engine the browser fix UI uses.
+        canonicalisation, typography). ``only`` / ``exclude`` restrict which rules'
+        fixes are applied — rule labels from [`fixable_rules`][laterite.fixable_rules]
+        (the risk gate still applies, so a rule whose only fix is risky needs
+        ``risky=True`` even when named in ``only``). ``dict_version`` / ``encoding``
+        override the edition / source encoding — ``encoding`` defaults to the one this
+        handle was [`read`][laterite.read] with, so a cp1252 file is re-read as cp1252.
+        The same engine the browser fix UI uses.
 
         Non-destructive — the source on disk is untouched; persist the repaired handle
         with [`save`][laterite.Ags4File.save]. The [`FixResult`][laterite.FixResult] — what was applied and the residual
@@ -809,17 +900,38 @@ class Ags4File:
         else:
             # A synthesised handle has no retained source — fix its re-emit.
             p, t, d = None, None, self.bytes
-        report = fix(path=p, text=t, data=d, risky=risky)
+        report = fix(
+            path=p,
+            text=t,
+            data=d,
+            risky=risky,
+            only=only,
+            exclude=exclude,
+            dict_version=dict_version,
+            encoding=encoding if encoding is not None else self._encoding,
+        )
         repaired = read(data=report.bytes, backend=self._backend, xn=self._xn)
         repaired._fix_report = report
         return repaired
 
-    def diff(self, other: Any, *, dict_version: str | None = None) -> dict:
+    def diff(
+        self,
+        other: Any,
+        *,
+        dict_version: Edition | None = None,
+        encoding: str | None = None,
+    ) -> dict:
         """Compare this file (the **baseline**) against ``other`` (the **revision** —
         a path, AGS4 text, bytes, or another [`Ags4File`][laterite.Ags4File]); returns the
         [`diff`][laterite.diff] ``RevisionDelta`` dict. Rows are matched by the group's KEY
-        headings, cells compared through the typed value."""
-        return diff(self, other, dict_version=dict_version)
+        headings, cells compared through the typed value. ``encoding`` defaults to the
+        one this handle was [`read`][laterite.read] with."""
+        return diff(
+            self,
+            other,
+            dict_version=dict_version,
+            encoding=encoding if encoding is not None else self._encoding,
+        )
 
     def __repr__(self) -> str:
         return (
@@ -976,8 +1088,11 @@ class AgsQuery:
         p = self._parent
         p._register(code)
         where, params = self._key_where(set(p.headings(code)))
+        # Strip the synthetic _id/_parent_id for the frame unless the handle was
+        # read(keys=True) — same default as the direct accessor (#303).
+        select = "*" if p._keys else p._frame_select(code)
         rel = p._engine().sql(
-            f'SELECT * FROM "{code}" WHERE {where}', params=params or None
+            f'SELECT {select} FROM "{code}" WHERE {where}', params=params or None
         )
         return p._materialize(rel)
 
@@ -1050,10 +1165,11 @@ def validate(
     source: Any = None,
     *,
     text: str | None = None,
-    dict_version: str | None = None,
+    dict_version: Edition | None = None,
     warnings: bool = True,
     fyi: bool = False,
     check_files: bool = False,
+    encoding: str | None = None,
 ) -> Report:
     """Run the AGS4.1 numbered-rules engine over a file and return its verdict as a
     [`Report`][laterite.Report]. This is the validate door: it answers *is this a conformant
@@ -1098,6 +1214,10 @@ def validate(
         fyi: Also include the low-signal FYI tier (default ``False``).
         check_files: Run Rule 20 FILE-attachment checks against files on disk
             (default ``False``).
+        encoding: WHATWG encoding label for path / bytes input (default UTF-8;
+            ignored for ``text=``). Set it for legacy ``cp1252`` / ``latin1``
+            deliveries so extended-ASCII cells decode correctly rather than
+            surfacing as Rule 1 findings.
 
     Returns:
         A [`Report`][laterite.Report] — ``count`` / ``is_valid`` for the verdict at a glance,
@@ -1121,6 +1241,7 @@ def validate(
         include_warnings=warnings,
         include_fyi=fyi,
         check_files=check_files,
+        encoding=encoding,
     )
     return Report(raise_for(r))
 
@@ -1133,8 +1254,9 @@ def read(
     data: bytes | bytearray | memoryview | None = None,
     index: str | os.PathLike[str] | None = None,
     encoding: str | None = None,
-    backend: str = "polars",
-    xn: str = "string",
+    backend: Backend = "polars",
+    xn: XnMode = "string",
+    keys: bool = False,
 ) -> Ags4File:
     """Read AGS4 — from a path, a file-like, raw bytes, or in-memory text — into
     an [`Ags4File`][laterite.Ags4File] over an in-memory DuckDB engine. This is the front door
@@ -1185,6 +1307,12 @@ def read(
         xn: Read-side handling of ``XN`` columns — ``"string"`` (default,
             byte-faithful) or ``"numeric"`` (cast to ``Float64``, non-numeric
             tokens to null) (keyword-only).
+        keys: Whether ``ags[code]`` / ``ags.table(code)`` frames INCLUDE the two
+            synthetic content-addressed key columns ``_id`` / ``_parent_id``
+            (keyword-only). Default ``False`` — frames carry AGS columns only. The
+            relational ``.sql()`` layer always exposes the keys regardless, so
+            cross-group joins (``s._parent_id = l._id``) work either way; a frame
+            can opt in per call with ``ags.table(code, keys=True)``.
 
     Returns:
         Ags4File: A handle over an in-memory DuckDB engine, carrying a fresh
@@ -1197,7 +1325,8 @@ def read(
     """
     p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
     res = _native.parse_arrow(path=p, text=txt, data=raw, encoding=encoding)
-    handle = Ags4File(raise_for(res), backend=backend, xn=xn, _src=(p, txt, raw))
+    handle = Ags4File(raise_for(res), backend=backend, xn=xn, keys=keys, _src=(p, txt, raw))
+    handle._encoding = encoding  # so chained .validate()/.fix()/.diff() stay faithful
     if index is not None:
         cert = _native.Sidecar.from_json(Path(index).read_bytes())
         if not cert.is_fresh_for(handle._source_bytes()):
@@ -1261,8 +1390,8 @@ def from_excel(
     output: str | os.PathLike[str] | None = None,
     *,
     format_numeric_columns: bool = True,
-    backend: str = "polars",
-    xn: str = "string",
+    backend: Backend = "polars",
+    xn: XnMode = "string",
 ) -> dict | Ags4File:
     """Convert an AGS4-shaped XLSX workbook to AGS4.
 
@@ -1310,6 +1439,33 @@ def list_rules() -> list[dict]:
     return json.loads(_native.list_rules())["rules"]
 
 
+def fixable_rules() -> list[dict]:
+    """The AGS Format Rules whose findings [`fix`][laterite.fix] can repair — the
+    subset of [`list_rules`][laterite.list_rules] with ``fixable=True`` (each a
+    ``rule`` / ``title`` / ``severity`` dict). The ``rule`` labels are exactly the
+    valid values for ``fix(only=…, exclude=…)`` and the [`FixableRule`][laterite.FixableRule]
+    type, so you can discover what's fixable without memorising the list. Sourced
+    from the same gated rule metadata as ``list_rules`` (which the engine gates
+    against the fix engine's own ``FIXABLE_RULE_LABELS``)."""
+    return [r for r in list_rules() if r.get("fixable")]
+
+
+def _validate_fixable(names: list[FixableRule] | None, kw: str) -> list[FixableRule] | None:
+    """Reject a ``fix(only=…)`` / ``exclude=…`` label that isn't fixable, with a
+    helpful message — the static [`FixableRule`][laterite.FixableRule] type catches
+    it at type-check time, this catches a dynamic value at runtime."""
+    if names is None:
+        return None
+    valid = {r["rule"] for r in fixable_rules()}
+    bad = sorted(set(names) - valid)
+    if bad:
+        raise ValueError(
+            f"fix({kw}=…): {bad} are not fixable rules; fixable rules are "
+            f"{sorted(valid, key=lambda s: (int(''.join(filter(str.isdigit, s)) or 0), s))}"
+        )
+    return list(names)
+
+
 class BuildResult:
     """What [`build_ags4`][laterite.build_ags4] hands back: a finished AGS4 file plus the verdict on it.
 
@@ -1341,23 +1497,27 @@ class BuildResult:
         findings: The validator findings on those bytes — post-fix in ``"autofix"``
             mode, the full set in ``"report"`` mode. Each is a dict with a ``rule``
             key plus the validator's per-finding fields.
-        fixes_applied: Count of safe mechanical fixes applied during the build
-            (``0`` outside ``"autofix"`` mode).
+        applied: The ledger of safe mechanical fixes made during the build — each a
+            ``{kind, label, rule, line, risk}`` dict, the same shape
+            [`FixResult.applied`][laterite.FixResult.applied] carries (empty outside ``"autofix"`` mode).
+        fixes_applied: Count of safe mechanical fixes applied during the build — just
+            ``len(applied)`` (``0`` outside ``"autofix"`` mode).
         text: The bytes decoded as a UTF-8 ``str`` (read-only property).
     """
 
-    __slots__ = ("bytes", "findings", "fixes_applied")
+    __slots__ = ("bytes", "findings", "applied", "fixes_applied")
 
-    def __init__(self, data: bytes, findings: list[dict], fixes_applied: int) -> None:
+    def __init__(self, data: bytes, findings: list[dict], applied: list[dict]) -> None:
         self.bytes = data
         self.findings = findings
-        self.fixes_applied = fixes_applied
+        self.applied = applied
+        self.fixes_applied = len(applied)
 
     @property
     def text(self) -> str:
         return self.bytes.decode("utf-8")
 
-    def save(self, path: str | Path) -> Path:
+    def save(self, path: str | os.PathLike[str]) -> Path:
         path = Path(path)
         path.write_bytes(self.bytes)
         return path
@@ -1475,11 +1635,30 @@ def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
     return items
 
 
+def _drop_synth_keys(frame):
+    """Drop the synthetic ``_``-prefixed key columns (``_id`` / ``_parent_id``) a
+    user frame may carry from ``read(keys=True)[code]`` — AGS4 emit is byte-faithful
+    to the DATA and must never write a synthetic column out. AGS headings never
+    start with ``_``, so this is safe; a frame with none is returned unchanged.
+    Handles polars and pandas (the two frame types ``read`` ever hands back). (#303)"""
+    cols = getattr(frame, "columns", None)
+    if cols is None:
+        return frame  # not a columnar frame (e.g. an Arrow capsule) — nothing to strip
+    synth = [c for c in cols if isinstance(c, str) and c.startswith("_")]
+    if not synth:
+        return frame
+    if isinstance(frame, pl.DataFrame):
+        return frame.drop(synth)
+    return frame.drop(columns=synth)  # pandas
+
+
 def build_ags4(
     groups: Mapping[str, Any] | list[tuple[str, Any]] | Any,
     *,
-    dict_version: str | None = None,
-    mode: str = "autofix",
+    dict_version: Edition | None = None,
+    mode: BuildMode = "autofix",
+    units: Mapping[str, Mapping[str, str]] | None = None,
+    types: Mapping[str, Mapping[str, str]] | None = None,
 ) -> BuildResult:
     """Build valid AGS4 from your own per-group data — the data→AGS4 door.
 
@@ -1530,6 +1709,13 @@ def build_ags4(
             ``BuildResult.findings``. ``"report"`` builds unchanged and returns the
             findings for you to act on. ``"strict"`` raises if the output violates
             any error-severity rule.
+        units: Per-heading UNIT overrides, keyed ``{code: {heading: unit}}`` — e.g.
+            ``{"LOCA": {"LOCA_XTRA": "kPa"}}``. Name only the headings you want to set;
+            every other heading fills from the dictionary as usual. Handy for giving a
+            *custom* heading (one the standard dictionary doesn't know) a real unit.
+            Raises ``ValueError`` if a code or heading isn't in the data.
+        types: Per-heading AGS data-TYPE overrides, same ``{code: {heading: type}}``
+            shape (e.g. ``{"LOCA": {"LOCA_XTRA": "3DP"}}``).
 
     Returns:
         A [`BuildResult`][laterite.BuildResult] carrying the AGS4 ``bytes``, the validator
@@ -1554,6 +1740,33 @@ def build_ags4(
         items = list(groups.items())
     else:
         items = list(groups)
+
+    # Per-heading UNIT/TYPE overrides (#294 F#9): a `{code: {heading: value}}`
+    # map. Validate up front — an unknown group code or a heading not in that
+    # group is a typo the caller wants to hear about, not a silent no-op.
+    _codes = {code for code, _ in items}
+    _cols = {
+        code: set(cols)
+        for code, frame in items
+        if (cols := getattr(frame, "columns", None)) is not None
+    }
+
+    def _check_meta(meta: Mapping[str, Mapping[str, str]] | None, name: str) -> None:
+        if meta is None:
+            return
+        for code, hmap in meta.items():
+            if code not in _codes:
+                raise ValueError(f"build_ags4 {name}=: unknown group {code!r}")
+            known = _cols.get(code)
+            if known is not None:
+                for heading in hmap:
+                    if heading not in known:
+                        raise ValueError(
+                            f"build_ags4 {name}=: group {code!r} has no heading {heading!r}"
+                        )
+
+    _check_meta(units, "units")
+    _check_meta(types, "types")
     # Hand each frame straight to Rust via its Arrow C-stream PyCapsule
     # (`__arrow_c_stream__`) — pyo3-arrow reads it with NO pyarrow, so the polars
     # path stays a base feature. polars always exposes the capsule; pandas does
@@ -1565,6 +1778,7 @@ def build_ags4(
     tables = []
     con = None
     for i, (code, frame) in enumerate(items):
+        frame = _drop_synth_keys(frame)  # never emit a read(keys=True) _id/_parent_id
         if hasattr(frame, "__arrow_c_stream__"):
             tables.append((code, frame))
             continue
@@ -1575,10 +1789,16 @@ def build_ags4(
         name = f"_emit_{i}"
         con.register(name, frame)
         tables.append((code, con.sql(f'SELECT * FROM "{name}"')))
-    data, findings_json, fixes = _native.emit_ags4_from_arrow(tables, dict_version, mode)
+    data, findings_json, applied, _fixes = _native.emit_ags4_from_arrow(
+        tables,
+        dict_version,
+        mode,
+        {k: dict(v) for k, v in units.items()} if units else None,
+        {k: dict(v) for k, v in types.items()} if types else None,
+    )
     by_rule: dict[str, list[dict]] = json.loads(findings_json)
     findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
-    return BuildResult(data, findings, fixes)
+    return BuildResult(data, findings, list(applied))
 
 
 class FixResult:
@@ -1617,18 +1837,28 @@ class FixResult:
         dict_version (str): The AGS dictionary edition the repaired bytes were
             validated against.
         fixes_applied (int): Count of applied fixes — ``len(applied)``.
+        risky_available (int): How many further fixes ``risky=True`` would apply
+            (intent-guessing fixes withheld from the safe set); ``0`` when ``risky``
+            was passed. A discoverability signal — non-zero means more is repairable
+            without your having to guess that an opt-in tier exists.
         text (str): The repaired bytes decoded as UTF-8.
     """
 
-    __slots__ = ("applied", "bytes", "dict_version", "findings")
+    __slots__ = ("applied", "bytes", "dict_version", "findings", "risky_available")
 
     def __init__(
-        self, data: bytes, findings: list[dict], applied: list[dict], dict_version: str
+        self,
+        data: bytes,
+        findings: list[dict],
+        applied: list[dict],
+        dict_version: str,
+        risky_available: int = 0,
     ) -> None:
         self.bytes = data
         self.findings = findings
         self.applied = applied
         self.dict_version = dict_version
+        self.risky_available = risky_available
 
     @property
     def fixes_applied(self) -> int:
@@ -1638,15 +1868,18 @@ class FixResult:
     def text(self) -> str:
         return self.bytes.decode("utf-8")
 
-    def save(self, path: str | Path) -> Path:
+    def save(self, path: str | os.PathLike[str]) -> Path:
         path = Path(path)
         path.write_bytes(self.bytes)
         return path
 
     def __repr__(self) -> str:
+        risky = (
+            f", {self.risky_available} more with risky=True" if self.risky_available else ""
+        )
         return (
             f"<FixResult {len(self.bytes)} bytes, applied={self.fixes_applied}, "
-            f"{len(self.findings)} residual finding(s)>"
+            f"{len(self.findings)} residual finding(s){risky}>"
         )
 
 
@@ -1656,9 +1889,11 @@ def fix(
     path: str | os.PathLike[str] | None = None,
     text: str | None = None,
     data: bytes | bytearray | memoryview | None = None,
-    dict_version: str | None = None,
+    dict_version: Edition | None = None,
     encoding: str | None = None,
     risky: bool = False,
+    only: list[FixableRule] | None = None,
+    exclude: list[FixableRule] | None = None,
     in_place: bool = False,
     out: str | os.PathLike[str] | None = None,
 ) -> FixResult:
@@ -1696,6 +1931,12 @@ def fix(
         risky: When ``True``, also apply the intent-guessing fixes (duplicate-heading
             rename, datetime canonicalisation, typography) on top of the always-on
             safe set. Defaults to ``False``.
+        only: If given, apply *only* the fixes for these AGS Format Rule labels
+            (the labels from [`fixable_rules`][laterite.fixable_rules]); fixes for
+            other rules are left for you to handle.
+        exclude: AGS Format Rule labels whose fixes to skip. Combines with ``only``
+            (``only`` narrows the set, then ``exclude`` removes from it). The risk
+            gate still applies, so a rule whose only fix is risky needs ``risky=True``.
         in_place: When ``True``, write the repaired bytes back over the source file.
             Requires a path source and is mutually exclusive with ``out``. Defaults
             to ``False``.
@@ -1709,6 +1950,7 @@ def fix(
 
     Raises:
         TypeError: If both ``in_place=True`` and ``out`` are given.
+        ValueError: If ``only`` / ``exclude`` name a rule that is not fixable.
         Ags4Error: If ``in_place=True`` but the source is not a path (so there is
             nothing to overwrite) — use ``out=<path>`` or [`FixResult.save`][laterite.FixResult.save]
             instead.
@@ -1717,6 +1959,8 @@ def fix(
 
     if in_place and out is not None:
         raise TypeError("pass only one of in_place=True / out=<path>")
+    only = _validate_fixable(only, "only")
+    exclude = _validate_fixable(exclude, "exclude")
     p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
     res = raise_for(
         _native.fix_file(
@@ -1726,11 +1970,19 @@ def fix(
             dict_version=dict_version,
             encoding=encoding,
             include_risky=risky,
+            only=only,
+            exclude=exclude,
         )
     )
     by_rule: dict[str, list[dict]] = json.loads(res["findings_json"])
     findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
-    result = FixResult(res["fixed"], findings, list(res["applied"]), res["dict_version"])
+    result = FixResult(
+        res["fixed"],
+        findings,
+        list(res["applied"]),
+        res["dict_version"],
+        res.get("risky_available", 0),
+    )
 
     if in_place:
         if p is None:
@@ -1748,7 +2000,7 @@ def diff(
     a: Any,
     b: Any,
     *,
-    dict_version: str | None = None,
+    dict_version: Edition | None = None,
     encoding: str | None = None,
 ) -> dict:
     """Compare two AGS4 documents and return their **revision diff**.

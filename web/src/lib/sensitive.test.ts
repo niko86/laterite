@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { prefillCodes, categoryOf, type SensitiveDoc } from "./sensitive";
+import {
+  prefillCodes,
+  categoryOf,
+  actionOf,
+  codesForPreset,
+  type SensitiveDoc,
+} from "./sensitive";
 
 const doc: SensitiveDoc = {
   categories: {
@@ -26,15 +32,15 @@ const doc: SensitiveDoc = {
 };
 
 describe("sensitive", () => {
-  it("pre-fills redactable categories but excludes the identifier ones", () => {
+  it("pre-fills ALL classified categories, incl. IDs (now pseudonymised)", () => {
     const pre = prefillCodes(doc);
     expect(pre.has("LLPL_LAB")).toBe(true);
     expect(pre.has("LOCA_NATE")).toBe(true);
     expect(pre.has("GEOL_FORM")).toBe(true);
-    // The web tool blanks values; it can't pseudonymise, so blanking these
-    // cross-referenced keys would break the file → not pre-ticked.
-    expect(pre.has("LOCA_ID")).toBe(false);
-    expect(pre.has("PROJ_ID")).toBe(false);
+    // The tool now pseudonymises IDs / hashes PROJ_ID instead of blanking, so
+    // they're safe to include (cross-references stay intact).
+    expect(pre.has("LOCA_ID")).toBe(true);
+    expect(pre.has("PROJ_ID")).toBe(true);
   });
 
   it("maps heading code → category for the UI hint", () => {
@@ -42,5 +48,19 @@ describe("sensitive", () => {
     expect(c.get("LLPL_LAB")).toBe("lab");
     expect(c.get("LOCA_ID")).toBe("location_id");
     expect(c.get("GEOL_FORM")).toBe("geology");
+  });
+
+  it("maps heading code → its scrub_policy action", () => {
+    const a = actionOf(doc);
+    expect(a.get("LOCA_ID")).toBe("pseudonym");
+    expect(a.get("PROJ_ID")).toBe("filehash");
+    expect(a.get("LOCA_NATE")).toBe("blank");
+    expect(a.get("LLPL_LAB")).toBe("token");
+  });
+
+  it("scopes preset pre-ticks by category", () => {
+    expect([...codesForPreset(doc, "coords")]).toEqual(["LOCA_NATE"]);
+    // 'all' is every classified heading.
+    expect(codesForPreset(doc, "all").size).toBe(5);
   });
 });

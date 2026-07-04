@@ -55,16 +55,22 @@ fn parse_mode(s: Option<&str>) -> PyResult<EmitMode> {
 /// `tables` is an ordered list of `(group_code, arrow_table)` — each
 /// `arrow_table` is anything exposing the Arrow C-stream interface (a
 /// DuckDB relation, a polars frame, …); its column names are the AGS
-/// headings. Returns `(bytes, findings_json, fixes_applied)` where
-/// `findings_json` is the validator's `{rule: [finding, …]}` map.
+/// headings. Returns `(bytes, findings_json, applied, fixes_applied)` where
+/// `findings_json` is the validator's `{rule: [finding, …]}` map and `applied`
+/// is the safe-fix ledger (the same `{kind,label,rule,line,risk}` shape `fix()`
+/// returns) AutoFix made — `fixes_applied` is its length (#294 F#7).
 #[pyfunction]
-#[pyo3(signature = (tables, edition=None, mode=None))]
-pub fn emit_ags4_from_arrow(
-    py: Python<'_>,
+#[pyo3(signature = (tables, edition=None, mode=None, units=None, types=None))]
+pub fn emit_ags4_from_arrow<'py>(
+    py: Python<'py>,
     tables: Vec<(String, PyTable)>,
     edition: Option<String>,
     mode: Option<String>,
-) -> PyResult<(Py<PyBytes>, String, usize)> {
+    // Per-heading UNIT/TYPE overrides, keyed `{code → {heading → value}}` (#294
+    // F#9). A group/heading absent from the map keeps the dictionary default.
+    units: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+    types: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+) -> PyResult<(Py<PyBytes>, String, Bound<'py, pyo3::types::PyList>, usize)> {
     let opts = EmitOpts {
         mode: parse_mode(mode.as_deref())?,
         edition: parse_edition(edition.as_deref())?,
@@ -73,18 +79,23 @@ pub fn emit_ags4_from_arrow(
     let mut groups: Vec<GroupInput> = Vec::with_capacity(tables.len());
     for (code, table) in tables {
         let (batches, schema) = table.into_inner();
+        let u = units.as_ref().and_then(|m| m.get(&code));
+        let t = types.as_ref().and_then(|m| m.get(&code));
         // The Arrow→Value transpose is shared with the wasm host in laterite-ags4-emit.
-        groups.push(laterite_ags4_emit::group_from_arrow(
+        groups.push(laterite_ags4_emit::group_from_arrow_with_meta(
             code,
             schema.as_ref(),
             &batches,
+            u,
+            t,
         ));
     }
 
     let res = emit_ags4(&groups, &opts).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let findings_json = serde_json::to_string(&res.findings).unwrap_or_else(|_| "{}".into());
     let bytes = PyBytes::new(py, &res.bytes).unbind();
-    Ok((bytes, findings_json, res.fixes_applied))
+    let applied = crate::fixes_to_pylist(py, &res.applied)?;
+    Ok((bytes, findings_json, applied, res.fixes_applied))
 }
 
 /// Reproduce python-ags4's `"" if v is None else str(v)` for `compat`'s

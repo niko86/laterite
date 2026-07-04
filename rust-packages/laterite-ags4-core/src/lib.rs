@@ -28,4 +28,9 @@ pub mod error;
 pub mod index;
 pub mod keychain;
 pub mod registry;
+// `transport` (pack/unpack/lock/unlock) is behind the default-on `transport`
+// feature — its `age` dep pulls getrandom, which doesn't build on wasm32. A
+// wasm-safe consumer takes `default-features = false` for the pure keychain /
+// registry / codec. (#303 Phase 5)
+#[cfg(feature = "transport")]
 pub mod transport;

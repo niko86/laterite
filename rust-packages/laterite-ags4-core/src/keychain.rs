@@ -100,6 +100,44 @@ pub fn row_ids(
     (id, parent_id)
 }
 
+/// Stringified `(_id, _parent_id)` for every row of a group — ready to prepend
+/// as the two Arrow key columns (see
+/// `laterite_types::arrow_cols::build_record_batch_with_ids`). Mirrors that
+/// builder's `(headings, n_rows, cell)` interface deliberately: a host computes
+/// the ids and the typed batch from the **same** inputs, so the two can never
+/// misalign. Each pair is [`row_ids`] stringified; `_parent_id` is `None`
+/// (→ a NULL Arrow cell) for a root group. Returns an empty `Vec` when `code`
+/// is not a known group — a custom / passthrough group carries no spec keys, so
+/// it gets no content-addressed ids (the caller then builds an unkeyed batch).
+pub fn group_row_ids<'a, F>(
+    reg: &Registry,
+    code: &str,
+    headings: &[String],
+    n_rows: usize,
+    cell: F,
+) -> Vec<(String, Option<String>)>
+where
+    F: Fn(usize, usize) -> Option<&'a str>,
+{
+    let Some(g) = reg.get(code) else {
+        return Vec::new();
+    };
+    (0..n_rows)
+        .map(|row| {
+            // row_ids reads KEY values BY NAME, so reconstruct this row's
+            // heading→value map. A short/ragged row leaves a heading absent →
+            // `value_of` resolves it to "" (so a partial key can't alias).
+            let map: HashMap<String, String> = headings
+                .iter()
+                .enumerate()
+                .map(|(col, h)| (h.clone(), cell(col, row).unwrap_or("").to_string()))
+                .collect();
+            let (id, parent) = row_ids(reg, g, &map);
+            (id.to_string(), parent.map(|u| u.to_string()))
+        })
+        .collect()
+}
+
 /// The deterministic id of a (group, key-chain): UUIDv8 over the first 128
 /// bits of `SHA-256(canonical_encode(...))`. `Uuid::new_v8` sets the version
 /// nibble to 8 (RFC 9562's custom/application version — the correct choice
@@ -201,6 +239,37 @@ mod tests {
         let id = content_id("LOCA", &chain(&[("LOCA_ID", "BH01")]));
         assert_eq!(id.get_version_num(), 8);
         assert_eq!(id.get_variant(), uuid::Variant::RFC4122);
+    }
+
+    #[test]
+    fn content_id_pins_the_cross_surface_golden() {
+        // The SINGLE SOURCE of the golden UUIDv8s that the Python / Node / wasm
+        // surface tests all assert — `test_content_keys.py`, `p3-content-keys.test.ts`,
+        // and `arrow_ipc_keys_match_the_shared_golden_and_default_strips`. Every host
+        // reads its `_id`/`_parent_id` through THIS `row_ids`, so pinning the exact
+        // strings here proves cross-surface parity by construction: change the id
+        // maths and every surface's test fails together. Fixture (shared): a root
+        // PROJ keyed PROJ_ID=P1, and a LOCA child carrying PROJ_ID=P1 + LOCA_ID=BH1.
+        // (#303 Phase 6)
+        let reg = registry();
+        let map = |pairs: &[(&str, &str)]| -> HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect()
+        };
+        let (proj_id, proj_parent) =
+            row_ids(reg, reg.get("PROJ").unwrap(), &map(&[("PROJ_ID", "P1")]));
+        assert_eq!(proj_id.to_string(), "ac30a95d-e0ca-85f9-83c8-37a64af2762b");
+        assert!(proj_parent.is_none(), "PROJ is root");
+
+        let (loca_id, loca_parent) = row_ids(
+            reg,
+            reg.get("LOCA").unwrap(),
+            &map(&[("PROJ_ID", "P1"), ("LOCA_ID", "BH1")]),
+        );
+        assert_eq!(loca_id.to_string(), "a7025a6f-d9b8-83b6-8fad-81c0c744edbc");
+        assert_eq!(loca_parent, Some(proj_id), "LOCA._parent_id == PROJ._id");
     }
 
     #[test]
@@ -320,5 +389,55 @@ mod tests {
         let proj = reg.get("PROJ").unwrap();
         let (_, parent_id) = row_ids(reg, proj, &HashMap::new());
         assert!(parent_id.is_none());
+    }
+
+    #[test]
+    fn group_row_ids_wraps_row_ids_and_links_child_to_parent() {
+        let reg = registry();
+
+        // PROJ (root): one row keyed PROJ_ID=P1 → _parent_id NULL.
+        let proj_h = ["PROJ_ID".to_string()];
+        let proj_rows = [["P1"]];
+        let proj_ids = group_row_ids(reg, "PROJ", &proj_h, proj_rows.len(), |c, r| {
+            proj_rows.get(r).and_then(|row| row.get(c)).copied()
+        });
+        assert_eq!(proj_ids.len(), 1);
+        assert!(proj_ids[0].1.is_none(), "PROJ is root → _parent_id is None");
+
+        // LOCA (child of PROJ): carries PROJ_ID=P1 plus its own key LOCA_ID.
+        let loca_h = ["PROJ_ID".to_string(), "LOCA_ID".to_string()];
+        let loca_rows = [["P1", "BH01"]];
+        let loca_ids = group_row_ids(reg, "LOCA", &loca_h, loca_rows.len(), |c, r| {
+            loca_rows.get(r).and_then(|row| row.get(c)).copied()
+        });
+        assert_eq!(loca_ids.len(), 1);
+
+        // (1) Faithful wrapper: identical to a direct row_ids over the same map.
+        let map: HashMap<String, String> = loca_h
+            .iter()
+            .cloned()
+            .zip(loca_rows[0].iter().map(|s| s.to_string()))
+            .collect();
+        let (id, parent) = row_ids(reg, reg.get("LOCA").unwrap(), &map);
+        assert_eq!(loca_ids[0].0, id.to_string());
+        assert_eq!(loca_ids[0].1, parent.map(|u| u.to_string()));
+
+        // (2) The cross-group join property THROUGH the helper: a LOCA row's
+        // _parent_id is byte-identical to the PROJ row's own _id.
+        assert_eq!(
+            loca_ids[0].1.as_deref(),
+            Some(proj_ids[0].0.as_str()),
+            "LOCA._parent_id must equal PROJ._id by construction",
+        );
+    }
+
+    #[test]
+    fn group_row_ids_empty_for_unknown_group() {
+        let reg = registry();
+        let ids = group_row_ids(reg, "ZZZZ", &["ZZZZ_ID".to_string()], 1, |_, _| Some("x"));
+        assert!(
+            ids.is_empty(),
+            "a custom/passthrough group carries no spec keys → no content ids"
+        );
     }
 }

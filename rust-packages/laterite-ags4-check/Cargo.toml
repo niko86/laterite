@@ -42,6 +42,14 @@ laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 # KEY-aware/type-aware revision delta via the laterite-ags4-diff leaf.
 laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 laterite-ags4-diff = { path = "../laterite-ags4-diff" }
+# `--emit-index` (#294 F#10): mint an `.ags.idx` validity certificate after a
+# clean check (`Sidecar::assemble`). `default-features = false` drops core's
+# `transport` feature, so the CLI does NOT pull age/zstd — only the index +
+# registry it needs.
+laterite-ags4-core = { path = "../laterite-ags4-core", default-features = false }
+# Timestamp the certificate (`ValidationStamp.checked_at`, RFC-3339). Already in
+# the tree via the validator; declared here to stamp the mint directly.
+chrono = "0.4"
 # Same encoding_rs as the validator so `&'static Encoding` types match
 # across the `CheckOptions::encoding` boundary.
 encoding_rs = "0.8"
@@ -52,7 +60,7 @@ encoding_rs = "0.8"
 # detection; none of that touches the validator library now.
 laterite-cliutil = { path = "../laterite-cliutil" }
 comfy-table = "7"
-indicatif = "0.17"
+indicatif = "0.18"
 serde_json = { version = "1", features = ["preserve_order"] }
 # Optional, behind the `tui` feature — the interactive findings browser
 # (`lat-check --tui`). crossterm arrives via ratatui::crossterm so the

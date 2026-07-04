@@ -814,6 +814,12 @@ pub struct FixOutcome {
     pub applied: Fixes,
     pub dict_version: crate::DictVersion,
     pub resolution: crate::DictResolution,
+    /// How many *risky* fixes (after any `only`/`exclude` selection) were withheld
+    /// because `include_risky` was false — i.e. how many more `risky=true` would
+    /// apply. `0` when `include_risky` is true. A discoverability signal so a
+    /// caller can surface "N more fixable with risky" rather than leaving the user
+    /// to guess that an opt-in tier exists.
+    pub risky_available: usize,
 }
 
 /// Headless one-shot repair of a delivered AGS4 document's bytes — the single
@@ -831,6 +837,22 @@ pub fn fix_document(
     opts: &crate::CheckOptions,
     include_risky: bool,
 ) -> Result<FixOutcome, crate::ValidatorError> {
+    fix_document_selective(raw, opts, include_risky, None, &[])
+}
+
+/// Like [`fix_document`] but restricts which rules' fixes are applied: `only`
+/// (when `Some`) keeps just those rule labels, then `exclude` drops any of them.
+/// Labels are the short forms (`"8"`, `"2a"`) used by [`FIXABLE_RULE_LABELS`],
+/// matched against each fix's `rule` with the `"AGS Format Rule "` prefix
+/// stripped. The risk gate still applies first, so a rule whose only fix is
+/// risky still needs `include_risky` to apply even when named in `only`.
+pub fn fix_document_selective(
+    raw: &[u8],
+    opts: &crate::CheckOptions,
+    include_risky: bool,
+    only: Option<&[String]>,
+    exclude: &[String],
+) -> Result<FixOutcome, crate::ValidatorError> {
     let has_bom = raw.starts_with(&[0xEF, 0xBB, 0xBF]);
     let pf = crate::parse::parse_bytes(raw, opts.encoding)?;
     let tran = crate::tran_ags_of(&pf);
@@ -840,6 +862,20 @@ pub fn fix_document(
     crate::rules::run_all(&pf, &dict, opts, None, &mut found);
 
     let mut selected = compute_fixes(&pf, &found);
+    // Per-rule selection applies to the full computed set first (short label).
+    if only.is_some() || !exclude.is_empty() {
+        selected.retain(|f| {
+            let short = f.rule.trim_start_matches("AGS Format Rule ");
+            only.is_none_or(|o| o.iter().any(|r| r == short)) && !exclude.iter().any(|r| r == short)
+        });
+    }
+    // Risky fixes (within the selection) withheld for lack of `include_risky` —
+    // surfaced on the outcome so a caller learns `risky=true` would repair more.
+    let risky_available = if include_risky {
+        0
+    } else {
+        selected.iter().filter(|f| f.risk == FixRisk::Risky).count()
+    };
     if !include_risky {
         selected.retain(|f| f.risk == FixRisk::Safe);
     }
@@ -850,6 +886,7 @@ pub fn fix_document(
             applied: Vec::new(),
             dict_version: dv,
             resolution: res,
+            risky_available,
         });
     }
 
@@ -870,6 +907,7 @@ pub fn fix_document(
         applied: selected,
         dict_version: dv2,
         resolution: res2,
+        risky_available,
     })
 }
 
@@ -1431,6 +1469,32 @@ mod tests {
             !out.residual.contains_key("AGS Format Rule 2a"),
             "the CRLF finding is resolved in the residual"
         );
+    }
+
+    #[test]
+    fn fix_document_selective_filters_by_rule() {
+        // LF-only line 1 → Rule 2a (NormalizeCrlf) is the one safe fix here.
+        let raw = HEAD.replacen("\r\n", "\n", 1);
+        let opts = CheckOptions::default();
+        // `exclude` the rule → nothing applied, bytes returned verbatim.
+        let excl = fix_document_selective(raw.as_bytes(), &opts, false, None, &["2a".to_string()])
+            .expect("fixes");
+        assert!(excl.applied.is_empty());
+        assert_eq!(
+            excl.fixed,
+            raw.as_bytes(),
+            "an excluded fix leaves the bytes untouched"
+        );
+        // `only` a *different* rule → the 2a fix is withheld too.
+        let other =
+            fix_document_selective(raw.as_bytes(), &opts, false, Some(&["8".to_string()]), &[])
+                .expect("fixes");
+        assert!(other.applied.is_empty());
+        // `only` the matching rule → it applies.
+        let matched =
+            fix_document_selective(raw.as_bytes(), &opts, false, Some(&["2a".to_string()]), &[])
+                .expect("fixes");
+        assert_eq!(kinds(&matched.applied), vec![FixKind::NormalizeCrlf]);
     }
 
     #[test]

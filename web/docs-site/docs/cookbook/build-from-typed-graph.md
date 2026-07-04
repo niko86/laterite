@@ -1,5 +1,7 @@
 # Build AGS4 from a typed graph
 
+**Available in:** Python · Node · Browser
+
 Construct a `PROJ` typed-class tree, attach its children, and hand the whole
 graph to `build_ags4` — use this when your data is already a graph in memory
 (objects, not tables) rather than `{code: frame}` mappings.

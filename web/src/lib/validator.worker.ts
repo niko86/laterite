@@ -12,12 +12,15 @@
 
 import init, {
   validate,
+  certify,
   compute_fixes,
   apply_fixes,
   read,
   diff,
   dictionary,
   build_ags4,
+  ags4_to_xlsx,
+  xlsx_to_ags4,
 } from "../wasm/ags4_wasm.js";
 import type { ParsedDataset } from "../wasm/ags4_wasm.js";
 import wasmUrl from "../wasm/ags4_wasm_bg.wasm?url";
@@ -52,6 +55,17 @@ export interface ComputeFixesReq {
   dict: string | null;
   encoding: string;
 }
+/** Mint a `.ags.idx` certificate for a clean file (Validate → download).
+ *  Carries the file bytes + the browser's RFC-3339 timestamp (wasm has no
+ *  clock, so the caller supplies `checkedAt`). */
+export interface CertifyReq {
+  id: number;
+  kind: "certify";
+  bytes: ArrayBuffer;
+  dict: string | null;
+  encoding: string;
+  checkedAt: string;
+}
 /** Apply a selected subset of fixes; the worker returns the new file as
  *  UTF-8 bytes (transferred back, so the buffer never copies twice). */
 export interface ApplyFixesReq {
@@ -76,6 +90,8 @@ export interface ArrowReq {
   id: number;
   kind: "arrowIpc";
   code: string;
+  /** Include the content-addressed `_id`/`_parent_id` key columns (#303). */
+  keys?: boolean;
 }
 /** Compare two AGS4 files (Tools → Revision diff). Carries both buffers,
  *  transferred; returns the KEY-aware, type-aware structured delta. */
@@ -107,20 +123,38 @@ export interface ToAgs4Req {
   /** autofix | report | strict. */
   mode: string;
 }
+/** AGS4 bytes → an `.xlsx` workbook (Tools → Excel, export direction). */
+export interface ExcelExportReq {
+  id: number;
+  kind: "excelExport";
+  bytes: ArrayBuffer;
+}
+/** An `.xlsx` workbook's bytes → AGS4 (Tools → Excel, import direction).
+ *  `formatNumeric` re-pads DATA cells to their column's TYPE. */
+export interface ExcelImportReq {
+  id: number;
+  kind: "excelImport";
+  bytes: ArrayBuffer;
+  formatNumeric: boolean;
+}
 export type WorkerReq =
   | ValidateReq
+  | CertifyReq
   | ComputeFixesReq
   | ApplyFixesReq
   | ParseReq
   | ArrowReq
   | RevisionDiffReq
   | DictionaryReq
-  | ToAgs4Req;
+  | ToAgs4Req
+  | ExcelExportReq
+  | ExcelImportReq;
 
 export type WorkerRes =
   | { type: "ready" }
   | { type: "initError"; error: string }
   | { id: number; ok: true; kind: "report"; report: ValidationReport }
+  | { id: number; ok: true; kind: "cert"; json: string }
   | { id: number; ok: true; kind: "gzip"; bytes: ArrayBuffer; report: ReportMeta }
   | { id: number; ok: true; kind: "fixes"; fixes: Fix[] }
   | { id: number; ok: true; kind: "applied"; bytes: ArrayBuffer }
@@ -129,6 +163,16 @@ export type WorkerRes =
   | { id: number; ok: true; kind: "revisionDelta"; delta: RevisionDelta }
   | { id: number; ok: true; kind: "dictionary"; dict: StandardDict }
   | { id: number; ok: true; kind: "toAgs4"; result: ExportResult }
+  | {
+      id: number;
+      ok: true;
+      kind: "excel";
+      /** The `.xlsx` (export) or `.ags` (import) bytes, transferred. */
+      bytes: ArrayBuffer;
+      warnings: string[];
+      sheets: number;
+      rows: number;
+    }
   | { id: number; ok: false; error: string };
 
 /** The header counts of a report, sent alongside gzipped bytes so the UI
@@ -219,7 +263,10 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
 
     if (req.kind === "arrowIpc") {
       if (!dataset) throw new Error("no parsed dataset — call parse first");
-      const out = dataset.arrow_ipc(req.code) as Uint8Array;
+      // keys (default false): include the content-addressed _id/_parent_id
+      // columns. The Explore ingest passes true so duckdb-wasm carries them and
+      // cross-group joins resolve; the group grid strips them for display. (#303)
+      const out = dataset.arrow_ipc(req.code, req.keys ?? false) as Uint8Array;
       const buf = out.slice().buffer;
       reply({ id: req.id, ok: true, kind: "arrow", code: req.code, bytes: buf }, [
         buf,
@@ -252,6 +299,35 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
         req.mode,
       ) as ExportResult;
       reply({ id: req.id, ok: true, kind: "toAgs4", result });
+      return;
+    }
+
+    if (req.kind === "certify") {
+      // `certify` throws (a JsError) on a dirty/unparseable file; the outer
+      // catch turns that into an `ok: false` reply the client rejects.
+      const json = certify(new Uint8Array(req.bytes), req.dict, req.encoding, req.checkedAt);
+      reply({ id: req.id, ok: true, kind: "cert", json });
+      return;
+    }
+
+    if (req.kind === "excelExport" || req.kind === "excelImport") {
+      // Both directions return a wasm `ExcelResult` (bytes + warnings + counts);
+      // the conversion fns throw (JsError) on empty/invalid input → outer catch.
+      // Read the fields, free the wasm struct, transfer the bytes back.
+      const res =
+        req.kind === "excelExport"
+          ? ags4_to_xlsx(new Uint8Array(req.bytes))
+          : xlsx_to_ags4(new Uint8Array(req.bytes), req.formatNumeric);
+      const outBytes = res.bytes;
+      const warnings = res.warnings;
+      const sheets = res.sheets;
+      const rows = res.rows;
+      res.free();
+      const buf = outBytes.slice().buffer;
+      reply(
+        { id: req.id, ok: true, kind: "excel", bytes: buf, warnings, sheets, rows },
+        [buf],
+      );
       return;
     }
 

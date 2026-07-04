@@ -86,6 +86,7 @@ jobs:
               - '.github/actions/build-accel/**'
               - 'web/docs-site/examples/**'  # docs example sources — test_docs_examples.py executes these
               - 'examples/sample_site.ags'   # the fixture that gate reads (subprocess cwd = repo root)
+              - 'web/docs-site/scripts/**'   # catalogue_data/gen_* — its drift gate (test_groups_catalogue_faithful) runs in the python job
             node:
               # The napi addon links sibling crates — laterite-ags4-validator,
               # laterite-types, laterite-ags4-emit (see laterite-node/Cargo.toml) —
@@ -98,6 +99,8 @@ jobs:
               - 'rust-packages/**'
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
+              - 'web/docs-site/examples/node/**'  # docs Node snippets — test/docs-examples.test.ts executes these in vitest
+              - 'examples/sample_site.ags'        # the fixture those snippets read (subprocess cwd = repo root)
             docs:
               # The MkDocs site + its nav/config drive the `docs` job's
               # `mkdocs build --strict` build. The examples under
@@ -109,6 +112,26 @@ jobs:
               - 'web/docs-site/**'
               - 'packages/laterite/python/**'
               - '.github/workflows/ci.yml'
+
+  # Supply-chain gate: RustSec advisories + the permissive-license policy +
+  # crates.io-only sources + duplicate-version warnings. Config + the documented
+  # advisory exceptions live in rust-packages/deny.toml. Fast — no compilation.
+  deny:
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: rust toolchain (cargo-deny shells out to `cargo metadata`)
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - name: install cargo-deny
+        uses: taiki-e/install-action@bffeee26d4db9be238a4ea78d8826604ebcb594d # v2.82.5
+        with:
+          tool: cargo-deny
+      - name: cargo deny check
+        working-directory: rust-packages
+        run: cargo deny check
 
   rust:
     needs: changes
@@ -284,9 +307,14 @@ jobs:
   # FLOOR, ratchet up over time.
   #
   # Scope: the workspace minus laterite-ags4-wasm (a wasm32 cdylib, built elsewhere)
-  # and the PyO3 glue crate laterite-py — exercised by the Python suite in the
-  # `python` job, never by `cargo test`, so including it would measure ~0%
-  # binding glue and let unrelated PyO3 growth trip the gate. The 62 floor has
+  # and the host-runtime binding cdylibs laterite-py (PyO3) + laterite-node
+  # (napi-rs) — exercised by the Python / Node suites in the `python` / `node`
+  # jobs, never by `cargo test`, so including them would measure ~0% binding glue
+  # and let unrelated PyO3/napi growth trip the gate. (laterite-node further
+  # *can't* link a standalone lib-test under napi 3: napi's `Error::drop`
+  # references N-API symbols — `napi_delete_reference` etc. — that only exist
+  # once the Node host loads the addon; the same reason its tests live in vitest,
+  # not `cargo test`.) The 62 floor has
   # ample headroom: since the AGS5 crates (laterite-ags5-db's Python-tested
   # CLI/query, which held the number down to ~68%) were decoupled to ags5/, the
   # kept crates (validator/types/core at 95-97%) lift the workspace number clear.
@@ -313,7 +341,7 @@ jobs:
       - name: Install cargo-llvm-cov
         # Prebuilt binary (no compile, no runner-image rebuild). SHA-pinned
         # per the supply-chain policy; Dependabot bumps it.
-        uses: taiki-e/install-action@9e1e5806d4a4822de933115878265be9aaa786d9 # v2.82.2
+        uses: taiki-e/install-action@bffeee26d4db9be238a4ea78d8826604ebcb594d # v2.82.5
         with:
           tool: cargo-llvm-cov
 
@@ -325,7 +353,8 @@ jobs:
         run: |
           cargo llvm-cov --no-report --workspace \
             --exclude laterite-ags4-wasm \
-            --exclude laterite-py
+            --exclude laterite-py \
+            --exclude laterite-node
 
       - name: cargo llvm-cov (line-coverage floor)
         working-directory: rust-packages
@@ -446,6 +475,17 @@ jobs:
 
       - name: ruff check
         run: uv run ruff check .
+
+      - name: ty check (type-faithfulness gate)
+        # Astral `ty` over the SHIPPED `laterite` package (scope + the abi3-py312
+        # floor are set in pyproject `[tool.ty]`). Runs in the project venv (`uv
+        # run`, NOT `uvx`) so it resolves polars/duckdb + the generated
+        # `_laterite_native.pyi` and checks the hints against real types — the
+        # #303 Phase-1 gate that the type hints can't lie. Beside `ruff check`:
+        # both Astral, both fast. Blocking from the start — the surface is clean
+        # (its first run caught 3 py3.14-only `except A, B:` clauses that are a
+        # SyntaxError on the 3.12/3.13 the wheel ships to; now parenthesized).
+        run: uv run ty check
 
       - name: pytest (+ coverage floor)
         # -n 4: parallel across 4 xdist workers (the host has 8 cores;

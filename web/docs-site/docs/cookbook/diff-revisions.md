@@ -1,5 +1,7 @@
 # Diff two revisions
 
+**Available in:** Python · Node · Browser
+
 **When:** a resubmission lands and you need to know *what actually changed* between
 Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
 

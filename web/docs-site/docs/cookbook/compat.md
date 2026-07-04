@@ -1,5 +1,8 @@
 # Drop-in for python-ags4
 
+**Available in:** Python (by design — the whole point is the pandas-shaped
+python-ags4 surface; see the [capability matrix](../surfaces/index.md#what-each-door-can-do))
+
 Already have code built on `python-ags4`? Swap the import for `laterite.compat`
 and the existing `AGS4_to_dataframe` call works unchanged — same `(tables,
 headings)` 2-tuple, same pandas frames.

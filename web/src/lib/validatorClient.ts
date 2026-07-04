@@ -19,6 +19,7 @@ import type { GroupMeta } from "./duckTypes";
 
 type Pending =
   | { kind: "report"; resolve: (r: ValidationReport) => void; reject: (e: Error) => void }
+  | { kind: "cert"; resolve: (json: string) => void; reject: (e: Error) => void }
   | { kind: "gzip"; resolve: (r: GzipResult) => void; reject: (e: Error) => void }
   | { kind: "fixes"; resolve: (r: Fix[]) => void; reject: (e: Error) => void }
   | { kind: "applied"; resolve: (r: Uint8Array) => void; reject: (e: Error) => void }
@@ -26,11 +27,23 @@ type Pending =
   | { kind: "arrow"; resolve: (b: Uint8Array) => void; reject: (e: Error) => void }
   | { kind: "revisionDelta"; resolve: (d: RevisionDelta) => void; reject: (e: Error) => void }
   | { kind: "dictionary"; resolve: (d: StandardDict) => void; reject: (e: Error) => void }
-  | { kind: "toAgs4"; resolve: (r: ExportResult) => void; reject: (e: Error) => void };
+  | { kind: "toAgs4"; resolve: (r: ExportResult) => void; reject: (e: Error) => void }
+  | { kind: "excel"; resolve: (r: ExcelConversion) => void; reject: (e: Error) => void };
 
 export interface GzipResult {
   bytes: ArrayBuffer;
   meta: ReportMeta;
+}
+
+/** The result of an Excel conversion: the output file bytes (`.xlsx` for
+ *  export, `.ags` for import) plus the engine's warnings and sheet/row counts.
+ *  `bytes` is an ArrayBuffer (a `BlobPart`, ready for `downloadBlob`), matching
+ *  the gzip-download path. */
+export interface ExcelConversion {
+  bytes: ArrayBuffer;
+  warnings: string[];
+  sheets: number;
+  rows: number;
 }
 
 const worker = new Worker(
@@ -68,6 +81,8 @@ worker.addEventListener("message", (e: MessageEvent<WorkerRes>) => {
     p.reject(new Error(msg.error));
   } else if (msg.kind === "report" && p.kind === "report") {
     p.resolve(msg.report);
+  } else if (msg.kind === "cert" && p.kind === "cert") {
+    p.resolve(msg.json);
   } else if (msg.kind === "gzip" && p.kind === "gzip") {
     p.resolve({ bytes: msg.bytes, meta: msg.report });
   } else if (msg.kind === "fixes" && p.kind === "fixes") {
@@ -84,6 +99,13 @@ worker.addEventListener("message", (e: MessageEvent<WorkerRes>) => {
     p.resolve(msg.dict);
   } else if (msg.kind === "toAgs4" && p.kind === "toAgs4") {
     p.resolve(msg.result);
+  } else if (msg.kind === "excel" && p.kind === "excel") {
+    p.resolve({
+      bytes: msg.bytes,
+      warnings: msg.warnings,
+      sheets: msg.sheets,
+      rows: msg.rows,
+    });
   } else {
     p.reject(new Error(`unexpected ${msg.kind} response for ${p.kind} request`));
   }
@@ -189,6 +211,29 @@ export function validateGzip(
   });
 }
 
+/** Mint a `.ags.idx` certificate for a clean file. Round-trips through the
+ *  worker (the only wasm owner). Rejects if the file has findings or can't be
+ *  parsed. The browser supplies the timestamp — wasm has no clock. */
+export function certify(
+  bytes: Uint8Array,
+  dictVersion: DictVersionOpt,
+  encoding: EncodingOpt,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const id = post(
+      {
+        kind: "certify",
+        bytes: new ArrayBuffer(0),
+        dict: dictVersion === "auto" ? null : dictVersion,
+        encoding,
+        checkedAt: new Date().toISOString(),
+      },
+      bytes,
+    );
+    pending.set(id, { kind: "cert", resolve, reject });
+  });
+}
+
 /** Compute the safe fixes for a file. Round-trips through the worker (the
  *  only wasm owner), so it's async. Resolves to [] on a parse error (the
  *  engine returns no fixes for an un-parseable file). */
@@ -251,10 +296,12 @@ export function parseDataset(
 }
 
 /** Pull one group's typed Arrow IPC stream (Uint8Array) from the worker-
- *  held dataset set by the last parseDataset(). */
-export function arrowIpc(code: string): Promise<Uint8Array> {
+ *  held dataset set by the last parseDataset(). `keys=true` includes the
+ *  content-addressed `_id`/`_parent_id` columns — pass it when ingesting into
+ *  duckdb-wasm so cross-group joins resolve (#303). */
+export function arrowIpc(code: string, keys = false): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    const id = postBare({ kind: "arrowIpc", code });
+    const id = postBare({ kind: "arrowIpc", code, keys });
     pending.set(id, { kind: "arrow", resolve, reject });
   });
 }
@@ -296,6 +343,32 @@ export function dictionary(
       edition: edition && edition !== "auto" ? edition : null,
     });
     pending.set(id, { kind: "dictionary", resolve, reject });
+  });
+}
+
+/** AGS4 bytes → an `.xlsx` workbook (Tools → Excel, export). One sheet per
+ *  group, python-ags4's layout. Rejects if the file has no valid AGS4 groups. */
+export function excelExport(bytes: Uint8Array): Promise<ExcelConversion> {
+  return new Promise((resolve, reject) => {
+    const id = post({ kind: "excelExport", bytes: new ArrayBuffer(0) }, bytes);
+    pending.set(id, { kind: "excel", resolve, reject });
+  });
+}
+
+/** An `.xlsx` workbook's bytes → AGS4 (Tools → Excel, import). Non-Rule-19
+ *  columns and non-UNIT/TYPE/DATA rows are dropped (surfaced in `warnings`).
+ *  `formatNumeric` re-pads DATA cells to their column's TYPE. Rejects if no
+ *  sheet yields a valid group. */
+export function excelImport(
+  bytes: Uint8Array,
+  formatNumeric: boolean,
+): Promise<ExcelConversion> {
+  return new Promise((resolve, reject) => {
+    const id = post(
+      { kind: "excelImport", bytes: new ArrayBuffer(0), formatNumeric },
+      bytes,
+    );
+    pending.set(id, { kind: "excel", resolve, reject });
   });
 }
 

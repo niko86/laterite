@@ -1,10 +1,16 @@
-# Releasing `laterite` (npm)
+# Releasing `laterite` (npm) — platform setup + publish gotchas
 
-The Node package (`rust-packages/laterite-node`) ships as **`laterite`** on npm,
-with three per-platform native packages (`@laterite/native-darwin-arm64`,
-`@laterite/native-linux-x64-gnu`, `@laterite/native-win32-x64-msvc`) pulled in as
-`optionalDependencies`. `release.yml`'s `build-node` + `npm-publish` jobs do the
-work on a final `v*` tag — but only after the **one-time owner setup** below.
+**Companion to [`RELEASING.md`](RELEASING.md).** The npm `laterite` package
+(`rust-packages/laterite-node`) ships with three per-platform native packages
+(`@laterite/native-darwin-arm64`, `@laterite/native-linux-x64-gnu`,
+`@laterite/native-win32-x64-msvc`) as `optionalDependencies`. As of #372 it
+**shares the single project version** with the wheel + CLI:
+`tools/release/bump-version.sh` stamps `package.json` + the three native pins and
+regenerates `package-lock.json`, so the version bump is covered in RELEASING.md —
+including how to cut the `node-v*` tag on the mirror. **This doc keeps only the
+npm-specific one-time owner setup and the publish-path gotchas** (they bit us on
+the 0.1.0 shakedown). `release.yml`'s `build-node` + `npm-publish` jobs do the
+work on a final `node-v*` tag — but only after the **one-time owner setup** below.
 
 ## One-time npm setup (owner)
 
@@ -47,31 +53,16 @@ Once the four packages exist on npm:
    publisher when `id-token` is present). You can then **delete the `NPM_TOKEN`
    secret**.
 
-## Cutting a release
+## What the `node-v*` tag triggers
 
-The npm package releases on its **own tag namespace, `node-v*`** — fully
-independent of the Python `v*` tags (a `node-v*` tag never builds wheels; a `v*`
-tag never publishes to npm). So the Node version is decoupled from the Python
-packages' versions; it starts at `0.1.0`.
+The npm package publishes on its own tag namespace, **`node-v*`** (a `node-v*`
+tag never builds wheels; a `v*` tag never publishes to npm) — but the version
+number is now unified, so you cut `node-v0.6.0` alongside `v0.6.0` from the same
+release (RELEASING.md step 3). The tag must match `package.json` `"version"` —
+`npm-publish`'s tag-check asserts it; `napi prepublish` syncs the three platform
+packages to that version automatically.
 
-The version lives in `rust-packages/laterite-node/package.json`, and the tag must
-match it (`node-v<version>`) — `npm-publish`'s tag-check asserts it. `napi
-prepublish` syncs the three platform packages to the same version automatically.
-
-> **Public repo:** releases run from the public mirror (`niko86/laterite`), which
-> is also where npm + the `npm` environment are configured. Cut the `node-v*` tag
-> there (after the public-tree sync), not on the private dev repo.
-
-1. Bump `rust-packages/laterite-node/package.json` `"version"` (e.g. 0.1.0 →
-   0.1.1), commit, and let the public-tree sync carry it to `niko86/laterite`.
-2. On **`niko86/laterite`** → **Releases → Draft a new release**:
-   - **Choose a tag** → type **`node-v0.1.1`** → *Create new tag on publish*.
-   - **Target**: the default branch (the synced commit).
-   - **Publish release.**
-
-The workflow accepts both the web-UI `release` event and a `git push` of the tag
-(if you have a checkout): `git tag -m "…" node-v0.1.1 && git push origin
-node-v0.1.1`. Either way, the `node-v0.1.1` tag triggers `release.yml`:
+The `node-v*` tag triggers `release.yml`:
 
 - **`build-node`** — builds `laterite-node.<triple>.node` on each of the three
   platform runners (linux/macOS/windows), uploads them as `node-<target>`
@@ -109,11 +100,14 @@ the packaging smoke in the `node` CI job), the **Automation** token (2FA/`EOTP`)
 and `publishConfig.access=public` (scoped-private `E402`). Next: wire OIDC
 trusted publishers and delete `NPM_TOKEN`.
 
-> **After any publish — regenerate the lockfile.** The `@laterite/native-*`
+> **The `package-lock.json` regen (now automatic).** The `@laterite/native-*`
 > optional deps are pinned to the package version. While a version is unpublished
 > the lockfile records them as *unresolved*; once published, `npm ci` resolves
-> them against the registry and the empty lockfile entry no longer matches →
-> **`EUSAGE` "lock file ... does not satisfy"**. So after a release: `cd
-> rust-packages/laterite-node && npm install`, then commit the updated
-> `package-lock.json`. (Don't use `npm ci --omit=optional` to dodge it — that
-> also drops rollup's own platform binary and breaks the `tsup` build.)
+> them against the registry and a stale lockfile entry no longer matches →
+> **`EUSAGE` "lock file ... does not satisfy"**. `tools/release/bump-version.sh`
+> now regenerates `package-lock.json` as part of the bump (via `npm install
+> --package-lock-only`), so a routine release no longer needs a manual step. If
+> you ever hit `EUSAGE` out-of-band, `cd rust-packages/laterite-node && npm
+> install` and commit the updated lock. (Don't use `npm ci --omit=optional` to
+> dodge it — that also drops rollup's own platform binary and breaks the `tsup`
+> build.)

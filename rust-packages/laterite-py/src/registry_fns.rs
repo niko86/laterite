@@ -71,10 +71,28 @@ fn registry_inherited_key_names(code: &str) -> PyResult<Vec<String>> {
     Ok(names)
 }
 
+/// The bundled standard dictionary for `edition`, serialised as JSON — the
+/// `{ags_edition, groups:[{code, contents, parent, headings:[…]}]}` shape the
+/// browser and Node's `registry.dictionary()` also render, from the ONE shared
+/// `dict::dictionary_dto` builder (#294 F#6). `edition` `None`/`"auto"` → the
+/// fallback edition; else `4.0.3|4.0.4|4.1|4.1.1|4.2`. Raises `ValueError` on an
+/// unknown edition. (The union `GROUPS` stays the default registry; this is the
+/// per-edition, standard-dictionary view.)
+#[pyfunction]
+#[pyo3(signature = (edition=None))]
+fn registry_dictionary_json(edition: Option<String>) -> PyResult<String> {
+    let version = crate::parse_dv(edition.as_deref())
+        .map_err(PyValueError::new_err)?
+        .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
+    let dto = laterite_ags4_validator::dict::dictionary_dto(version);
+    Ok(serde_json::to_string(&dto).expect("dictionary serialises"))
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_groups_json, m)?)?;
     m.add_function(wrap_pyfunction!(registry_get_group, m)?)?;
     m.add_function(wrap_pyfunction!(registry_ancestor_chain, m)?)?;
     m.add_function(wrap_pyfunction!(registry_inherited_key_names, m)?)?;
+    m.add_function(wrap_pyfunction!(registry_dictionary_json, m)?)?;
     Ok(())
 }

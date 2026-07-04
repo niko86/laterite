@@ -19,6 +19,29 @@ def test_groups_loaded() -> None:
         assert code in latreg.GROUPS
 
 
+def test_dictionary_per_edition() -> None:
+    # The per-edition STANDARD dictionary accessor (#294 F#6) — distinct from the
+    # union GROUPS. Shape mirrors the browser/Node dictionary().
+    d = latreg.dictionary("4.2")
+    assert d["ags_edition"] == "4.2"
+    assert isinstance(d["groups"], list) and len(d["groups"]) > 150
+    proj = next(g for g in d["groups"] if g["code"] == "PROJ")
+    assert proj["contents"]  # the group's standard description
+    h0 = proj["headings"][0]
+    assert h0["name"] == "PROJ_ID"
+    assert {"name", "status", "type", "description"} <= set(h0)  # `type`, not `ags_type`
+
+    # Editions genuinely differ (4.0.3 has fewer groups than 4.2).
+    assert len(latreg.dictionary("4.0.3")["groups"]) < len(d["groups"])
+    # None / "auto" fall back to the default edition; both agree.
+    assert latreg.dictionary()["ags_edition"] == latreg.dictionary("auto")["ags_edition"]
+
+
+def test_dictionary_rejects_unknown_edition() -> None:
+    with pytest.raises(ValueError):
+        latreg.dictionary("9.9")
+
+
 def test_group_descriptor_shape() -> None:
     proj = latreg.GROUPS["PROJ"]
     assert isinstance(proj, latreg.GroupDescriptor)

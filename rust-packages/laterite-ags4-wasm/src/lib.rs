@@ -295,6 +295,29 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
     for b in reader {
         batches.push(b.map_err(|e| format!("arrow ipc batch: {e}"))?);
     }
+    // Never emit a synthetic content-addressed key column: drop any `_`-prefixed
+    // column a `read(keys=true)` frame might carry back into build. AGS headings
+    // never start with "_", so this is safe (a no-op when none are present). (#303)
+    let keep: Vec<usize> = (0..schema.fields().len())
+        .filter(|&i| !schema.field(i).name().starts_with('_'))
+        .collect();
+    if keep.len() != schema.fields().len() {
+        let pschema = std::sync::Arc::new(
+            schema
+                .project(&keep)
+                .map_err(|e| format!("arrow project schema: {e}"))?,
+        );
+        let pbatches: Vec<arrow::record_batch::RecordBatch> = batches
+            .iter()
+            .map(|b| b.project(&keep))
+            .collect::<Result<_, _>>()
+            .map_err(|e| format!("arrow project batch: {e}"))?;
+        return Ok(laterite_ags4_emit::group_from_arrow(
+            code,
+            pschema.as_ref(),
+            &pbatches,
+        ));
+    }
     Ok(laterite_ags4_emit::group_from_arrow(
         code,
         schema.as_ref(),
@@ -518,6 +541,69 @@ pub fn validate(
     report
         .serialize(&serializer)
         .expect("ValidationReport is plain data and always serialises")
+}
+
+/// Mint a `.ags.idx` validity certificate for a file that validates clean,
+/// entirely client-side (#360). Returns the certificate JSON for the browser
+/// to download.
+///
+/// * `checked_at` — an RFC-3339 timestamp from the browser (`new Date()
+///   .toISOString()`): wasm has no clock, so the caller supplies it.
+///
+/// Errors if the file can't be parsed, or has any findings — a certificate
+/// attests a *clean* validation. The mint is errors-only (like `lat-check
+/// --emit-index` / Python `.certify()`), so the stamp records `warnings=0,
+/// fyi=0`. The stamped engine version is the shared validator's, so the cert
+/// is comparable across surfaces.
+#[wasm_bindgen]
+pub fn certify(
+    data: &[u8],
+    dict_version: Option<String>,
+    encoding_label: Option<String>,
+    checked_at: String,
+) -> Result<String, JsError> {
+    use laterite_ags4_core::index::{Sidecar, ValidationStamp};
+
+    console_error_panic_hook::set_once();
+
+    let dict_over = resolve_dict_override(dict_version.as_deref()).map_err(|m| JsError::new(&m))?;
+    let encoding = resolve_encoding(encoding_label.as_deref());
+    let parsed = parse_bytes(data, encoding)
+        .map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
+    let (dv, _) = resolve_dict_version(dict_over, tran_ags_of(&parsed).as_deref())
+        .map_err(|e| JsError::new(&e.to_string()))?;
+
+    // Errors-only validation: a cert vouches for the error-clean property.
+    let dict = Dictionary::bundled(dv);
+    let opts = CheckOptions {
+        dict_version: dict_over,
+        encoding,
+        ..CheckOptions::default()
+    };
+    let mut found = findings::Findings::new();
+    rules::run_all(&parsed, &dict, &opts, None, &mut found);
+    if findings::count(&found) > 0 {
+        return Err(JsError::new(
+            "cannot certify: the file has findings — a certificate attests a clean validation",
+        ));
+    }
+
+    let stamp = ValidationStamp {
+        validator: "laterite-ags4-wasm".to_string(),
+        validator_version: laterite_ags4_validator::VERSION.to_string(),
+        compat: None,
+        check_files: false, // the wasm sandbox has no filesystem
+        edition_forced: dict_over.is_some(),
+        checked_at,
+        warnings: 0,
+        fyi: 0,
+    };
+    let sidecar = Sidecar::assemble(data, dv.as_str().to_string(), stamp)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    let json = sidecar
+        .to_json()
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    String::from_utf8(json).map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// The AGS4 rule catalogue as the gated `rules_meta.json` JSON string — the
@@ -753,6 +839,77 @@ pub fn apply_fixes(data: &[u8], encoding_label: Option<String>, fixes_json: JsVa
 }
 
 // ---------------------------------------------------------------------
+// AGS4 ↔ XLSX (#359). The FS-free laterite-excel cores (`ags4_bytes_to_xlsx` /
+// `xlsx_bytes_to_ags4`) drive the browser Excel surface: the Tools pane hands
+// us bytes and gets bytes + warnings back, no filesystem. calamine reads and
+// rust_xlsxwriter writes — both pure-Rust and wasm-clean.
+// ---------------------------------------------------------------------
+
+/// The result of an Excel conversion: the output `bytes` (a JS `Uint8Array` —
+/// the `.xlsx` or `.ags` file), plus the `warnings` and counts the UI surfaces
+/// (dropped non-Rule-19 columns, skipped sheets, …).
+#[wasm_bindgen]
+pub struct ExcelResult {
+    bytes: Vec<u8>,
+    warnings: Vec<String>,
+    sheets: usize,
+    rows: usize,
+}
+
+#[wasm_bindgen]
+impl ExcelResult {
+    #[wasm_bindgen(getter)]
+    pub fn bytes(&self) -> Vec<u8> {
+        self.bytes.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn warnings(&self) -> Vec<String> {
+        self.warnings.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn sheets(&self) -> usize {
+        self.sheets
+    }
+    #[wasm_bindgen(getter)]
+    pub fn rows(&self) -> usize {
+        self.rows
+    }
+}
+
+/// AGS4 bytes → an `.xlsx` workbook (one sheet per group, python-ags4's
+/// layout). `JsError` if the input carries no valid AGS4 groups.
+#[wasm_bindgen]
+pub fn ags4_to_xlsx(data: &[u8]) -> Result<ExcelResult, JsError> {
+    console_error_panic_hook::set_once();
+    let (bytes, stats) =
+        laterite_excel::ags4_bytes_to_xlsx(data, None).map_err(|e| JsError::new(&e.to_string()))?;
+    Ok(ExcelResult {
+        bytes,
+        warnings: stats.warnings,
+        sheets: stats.sheets_written,
+        rows: stats.rows_written,
+    })
+}
+
+/// An `.xlsx` workbook's bytes → AGS4 bytes. Each sheet with a `HEADING` column
+/// becomes a group; non-Rule-19 columns and non-`UNIT`/`TYPE`/`DATA` rows are
+/// dropped (surfaced in `warnings`). `format_numeric` re-pads DATA cells to
+/// their column's TYPE (mirrors python-ags4's `convert_to_text`). `JsError` if
+/// no sheet yields a valid group.
+#[wasm_bindgen]
+pub fn xlsx_to_ags4(data: &[u8], format_numeric: bool) -> Result<ExcelResult, JsError> {
+    console_error_panic_hook::set_once();
+    let (bytes, stats) = laterite_excel::xlsx_bytes_to_ags4(data, format_numeric)
+        .map_err(|e| JsError::new(&e.to_string()))?;
+    Ok(ExcelResult {
+        bytes,
+        warnings: stats.warnings,
+        sheets: stats.sheets_written,
+        rows: stats.rows_written,
+    })
+}
+
+// ---------------------------------------------------------------------
 // Phase 2: read() -> typed Arrow IPC for the DuckDB-wasm data explorer.
 //
 // AGS4 isn't a format DuckDB reads natively. We parse it in Rust, build
@@ -824,7 +981,14 @@ impl ParsedDataset {
 
     /// One group's rows as an Arrow IPC **stream** (Uint8Array), columns
     /// already correctly typed. Built lazily here and dropped on return.
-    pub fn arrow_ipc(&self, code: &str) -> Result<Vec<u8>, JsError> {
+    ///
+    /// `keys` (default `false`) prepends the two content-addressed key columns
+    /// `_id`/`_parent_id` — the SAME UUIDv8s the wheel / Node / `.ags5db`
+    /// extension produce (via the one shared keychain). Pass `true` when feeding
+    /// duckdb-wasm so cross-group joins (`s._parent_id = l._id`) resolve; leave
+    /// it off (the default) for a plain typed frame. A custom/passthrough group
+    /// carries no keys, so `keys` is a no-op for it. (#303)
+    pub fn arrow_ipc(&self, code: &str, keys: Option<bool>) -> Result<Vec<u8>, JsError> {
         let group = self
             .parsed
             .groups
@@ -836,12 +1000,30 @@ impl ParsedDataset {
         // — the SAME composition the napi host frames, so the browser, Node and
         // Python type a file byte-identically by construction. Framed here only
         // for duckdb-wasm.
-        let buf = laterite_types::ipc::build_group_ipc(
-            &group.headings,
-            &group.types,
-            group.rows.len(),
-            |col, row| group.cell(col, row),
-        )
+        let reg = laterite_ags4_core::registry::registry();
+        let buf = if keys.unwrap_or(false) && reg.get(code).is_some() {
+            let ids = laterite_ags4_core::keychain::group_row_ids(
+                reg,
+                code,
+                &group.headings,
+                group.rows.len(),
+                |col, row| group.cell(col, row),
+            );
+            laterite_types::ipc::build_group_ipc_with_ids(
+                &ids,
+                &group.headings,
+                &group.types,
+                group.rows.len(),
+                |col, row| group.cell(col, row),
+            )
+        } else {
+            laterite_types::ipc::build_group_ipc(
+                &group.headings,
+                &group.types,
+                group.rows.len(),
+                |col, row| group.cell(col, row),
+            )
+        }
         .map_err(|e| JsError::new(&format!("arrow ipc for {code}: {e}")))?;
         Ok(buf)
     }
@@ -906,83 +1088,19 @@ pub fn diff(
 // 4.0.3 … 4.2 (the same data the engine validates against).
 // ---------------------------------------------------------------------
 
-#[derive(Serialize)]
-struct DictHeadingDto {
-    name: String,
-    status: String,
-    #[serde(rename = "type")]
-    ags_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    unit: Option<String>,
-    description: String,
-}
-
-#[derive(Serialize)]
-struct DictGroupDto {
-    code: String,
-    /// The group's standard description (its "contents"/name).
-    contents: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    parent: Option<String>,
-    headings: Vec<DictHeadingDto>,
-}
-
-#[derive(Serialize)]
-struct DictDto {
-    ags_edition: String,
-    groups: Vec<DictGroupDto>,
-}
-
 /// Serialise the bundled standard dictionary for `dict_version`
 /// (`None`/`"auto"` → the [`FALLBACK`] edition; else `4.0.3|4.0.4|4.1|4.1.1|
 /// 4.2`). Groups are sorted by code; each group's headings keep the canonical
 /// dictionary order. Returns the web reference UI's `{ags_edition, groups:[…]}`
-/// shape.
+/// shape — built by the shared `dict::dictionary_dto` (#294 F#6), the same
+/// source `laterite.registry.dictionary()` and Node's render.
 #[wasm_bindgen]
 pub fn dictionary(dict_version: Option<String>) -> Result<JsValue, JsError> {
     console_error_panic_hook::set_once();
     let version = resolve_dict_override(dict_version.as_deref())
         .map_err(|e| JsError::new(&e))?
         .unwrap_or(FALLBACK);
-    let d = Dictionary::bundled(version);
-    let mut codes: Vec<&'static str> = d.group_codes().collect();
-    codes.sort_unstable();
-    let groups: Vec<DictGroupDto> = codes
-        .into_iter()
-        .map(|code| {
-            let gm = d.group(code);
-            let headings = d
-                .group_headings(code)
-                .iter()
-                .map(|&h| {
-                    let e = d.heading(code, h);
-                    DictHeadingDto {
-                        name: h.to_string(),
-                        status: e.map(|x| x.status).unwrap_or("").to_string(),
-                        ags_type: e.map(|x| x.ags_type).unwrap_or("").to_string(),
-                        unit: e
-                            .map(|x| x.unit)
-                            .filter(|u| !u.is_empty())
-                            .map(str::to_string),
-                        description: e.map(|x| x.desc).unwrap_or("").to_string(),
-                    }
-                })
-                .collect();
-            DictGroupDto {
-                code: code.to_string(),
-                contents: gm.map(|m| m.desc).unwrap_or("").to_string(),
-                parent: gm
-                    .map(|m| m.parent)
-                    .filter(|p| !p.is_empty())
-                    .map(str::to_string),
-                headings,
-            }
-        })
-        .collect();
-    let dto = DictDto {
-        ags_edition: version.as_str().to_string(),
-        groups,
-    };
+    let dto = laterite_ags4_validator::dict::dictionary_dto(version);
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();
     dto.serialize(&serializer)
         .map_err(|e| JsError::new(&e.to_string()))
@@ -1230,6 +1348,63 @@ mod tests {
         assert!(
             n_42 >= n_403,
             "4.2 should have at least as many groups as 4.0.3"
+        );
+    }
+
+    #[test]
+    fn arrow_ipc_keys_match_the_shared_golden_and_default_strips() {
+        // SAME fixture + golden UUIDv8s as the Python (test_content_keys.py) and
+        // Node (p3-content-keys.test.ts) tests — the ids come from the ONE shared
+        // keychain, so matching here proves the wasm produces byte-identical keys
+        // (a cross-surface parity check, ahead of Phase 6's full proof). (#303)
+        const SRC: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\
+\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"PROJ_ID\"\r\n\"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"ID\"\r\n\"DATA\",\"BH1\",\"P1\"\r\n";
+        let ds = ParsedDataset {
+            parsed: parse_bytes(SRC, encoding_rs::UTF_8).expect("parses"),
+        };
+
+        // First-row string cell of `col` in an IPC stream, or None (missing col / null).
+        let first = |ipc: &[u8], col: &str| -> Option<String> {
+            let mut r =
+                arrow::ipc::reader::StreamReader::try_new(std::io::Cursor::new(ipc.to_vec()), None)
+                    .unwrap();
+            let batch = r.next().unwrap().unwrap();
+            let i = batch.schema().index_of(col).ok()?;
+            let a = batch
+                .column(i)
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap();
+            if a.is_null(0) {
+                None
+            } else {
+                Some(a.value(0).to_string())
+            }
+        };
+
+        // keys=true → the golden UUIDv8s; child._parent_id links to parent._id;
+        // a root group's _parent_id is NULL.
+        let proj = ds.arrow_ipc("PROJ", Some(true)).ok().expect("PROJ keyed");
+        let loca = ds.arrow_ipc("LOCA", Some(true)).ok().expect("LOCA keyed");
+        assert_eq!(
+            first(&proj, "_id").as_deref(),
+            Some("ac30a95d-e0ca-85f9-83c8-37a64af2762b"),
+        );
+        assert_eq!(
+            first(&loca, "_id").as_deref(),
+            Some("a7025a6f-d9b8-83b6-8fad-81c0c744edbc"),
+        );
+        assert_eq!(
+            first(&loca, "_parent_id").as_deref(),
+            Some("ac30a95d-e0ca-85f9-83c8-37a64af2762b"),
+        );
+        assert_eq!(first(&proj, "_parent_id"), None);
+
+        // The default (no keys) strips: a plain frame carries no `_id` column.
+        let plain = ds.arrow_ipc("PROJ", None).ok().expect("PROJ plain");
+        assert!(
+            first(&plain, "_id").is_none(),
+            "default arrow_ipc must not carry _id",
         );
     }
 }

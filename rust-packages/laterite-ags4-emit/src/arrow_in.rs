@@ -14,6 +14,8 @@ use arrow::array::{
     Array, BooleanArray, Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array,
     LargeStringArray, StringArray, UInt8Array, UInt16Array, UInt32Array, UInt64Array,
 };
+use std::collections::HashMap;
+
 use arrow::datatypes::{DataType, Schema};
 use arrow::record_batch::RecordBatch;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
@@ -102,6 +104,23 @@ pub fn cell_value(array: &dyn Array, row: usize) -> Value {
 /// are the transposed cells. `schema` is passed explicitly so a 0-batch group
 /// still emits its (empty) section with the right headings.
 pub fn group_from_arrow(code: String, schema: &Schema, batches: &[RecordBatch]) -> GroupInput {
+    group_from_arrow_with_meta(code, schema, batches, None, None)
+}
+
+/// Like [`group_from_arrow`] but with per-heading UNIT/TYPE **overrides**: a
+/// `{heading → value}` map (#294 F#9). The map is aligned to the group's
+/// headings into the per-heading `Option<Vec<String>>` [`GroupInput`] wants — a
+/// heading named in the map takes that value, any other heading gets a blank
+/// entry ("fill from the dictionary"). `None` leaves the whole tier to the
+/// dictionary (identical to `group_from_arrow`). Order-independent: it keys off
+/// the heading name, not the column position.
+pub fn group_from_arrow_with_meta(
+    code: String,
+    schema: &Schema,
+    batches: &[RecordBatch],
+    units: Option<&HashMap<String, String>>,
+    types: Option<&HashMap<String, String>>,
+) -> GroupInput {
     let headings: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
     let mut rows: Vec<Vec<Value>> = Vec::new();
     for batch in batches {
@@ -114,11 +133,23 @@ pub fn group_from_arrow(code: String, schema: &Schema, batches: &[RecordBatch]) 
             rows.push(row);
         }
     }
+    // Align a {heading → value} override map to the heading order; a heading not
+    // in the map gets "" (the emit orchestrator reads that as "fill from dict").
+    let align = |m: Option<&HashMap<String, String>>| -> Option<Vec<String>> {
+        m.map(|map| {
+            headings
+                .iter()
+                .map(|h| map.get(h).cloned().unwrap_or_default())
+                .collect()
+        })
+    };
+    let units = align(units);
+    let types = align(types);
     GroupInput {
         code,
         headings,
-        units: None,
-        types: None,
+        units,
+        types,
         rows,
     }
 }

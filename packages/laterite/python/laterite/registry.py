@@ -14,9 +14,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from . import _laterite_native as _native
+
+if TYPE_CHECKING:
+    from . import Edition
 
 # The official AGS dictionary uses combined statuses (e.g. "KEY+REQUIRED")
 # and a "DEPRECATED" marker alongside the base KEY/REQUIRED/OTHER.
@@ -138,6 +141,34 @@ def get(code: str) -> GroupDescriptor | None:
     """Single-group lookup. ``None`` for unknown codes (mirrors
     ``GROUPS.get(code)``)."""
     return GROUPS.get(code)
+
+
+def dictionary(edition: Edition | None = None) -> dict[str, Any]:
+    """The bundled STANDARD dictionary for one AGS **edition** — the per-edition
+    view of the official dictionary.
+
+    Where the module-level :data:`GROUPS` is the *union* registry across all
+    editions (the typed-graph / DDL model, and the default), this is a single
+    edition's standard dictionary: canonical group + heading names, descriptions,
+    UNIT/TYPE, and status. It's the same content the browser's dictionary
+    reference and Node's ``registry.dictionary()`` render, built from one shared
+    Rust builder (``dict::dictionary_dto``).
+
+    The shape is ``{ags_edition, groups: [{code, contents, parent, headings:
+    [{name, status, type, unit?, description}]}]}`` — groups sorted by code, each
+    group's headings in canonical dictionary order.
+
+    Args:
+        edition: One of ``"4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2"``. ``None``
+            (or ``"auto"``) uses the fallback edition.
+
+    Returns:
+        The dictionary snapshot as a nested ``dict``.
+
+    Raises:
+        ValueError: If ``edition`` is not a recognised edition.
+    """
+    return json.loads(_native.registry_dictionary_json(edition))
 
 
 def ancestor_chain(code: str) -> list[str]:

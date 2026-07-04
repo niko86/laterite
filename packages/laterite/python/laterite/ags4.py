@@ -35,11 +35,10 @@ declared AGS type — matching ``convert.rs::build_passthrough_descriptors``.
 from __future__ import annotations
 
 from os import PathLike
-from pathlib import Path
 from typing import Any
 
 from laterite import _laterite_native as _native
-from laterite import dynamic
+from laterite import _resolve_source, dynamic, raise_for
 from laterite.ags_types import parse_value
 from laterite.registry import GROUPS, GroupDescriptor, Heading
 
@@ -56,14 +55,28 @@ _PASSTHROUGH_PARENT = "LOCA"
 _KEY_SEP = "\n\0"
 
 
-def read_typed(ags4: str | PathLike[str]) -> Any:
-    """Read an AGS4 transfer file and return its typed PROJ tree.
+def read_typed(
+    source: Any = None,
+    *,
+    path: str | PathLike[str] | None = None,
+    text: str | None = None,
+    data: bytes | bytearray | memoryview | None = None,
+    encoding: str | None = None,
+) -> Any:
+    """Read an AGS4 transfer — from a path, a file-like, raw bytes, or in-memory
+    text — and return its typed PROJ tree.
 
-    The base AGS4 typed read: hand it a ``.ags`` file and get the whole transfer
-    back as a single live object graph, rooted at its PROJ row, with every group
-    already cast to its AGS data type. This is the *base* door — it stands the PROJ
-    tree up from the pure-string parser, the dictionary registry, and ``parse_value``
-    alone, so it works on a plain ``pip install laterite`` with no DuckDB on the path.
+    The base AGS4 typed read: hand it AGS4 and get the whole transfer back as a
+    single live object graph, rooted at its PROJ row, with every group already cast
+    to its AGS data type. This is the *base* door — it stands the PROJ tree up from
+    the pure-string parser, the dictionary registry, and ``parse_value`` alone, so it
+    works on a plain ``pip install laterite`` with no DuckDB on the path.
+
+    Input is resolved exactly as [`read`][laterite.read]: one positional ``source``
+    is auto-detected (path / file-like / bytes / AGS4 text), and the keyword-only
+    ``path=`` / ``text=`` / ``data=`` doors name an ambiguous input to skip the
+    sniff. ``encoding`` (a WHATWG label, default UTF-8) governs how bytes / path
+    input is decoded — ``text=`` is already a string and is untouched.
 
     The shape it hands back mirrors the standard's parent/child model rather than the
     file's flat ``GROUP`` / ``HEADING`` / ``DATA`` blocks: the one PROJ instance is the
@@ -80,8 +93,15 @@ def read_typed(ags4: str | PathLike[str]) -> Any:
     type padded to ``X``).
 
     Args:
-        ags4: Path to the ``.ags`` source file (a ``str`` or any
-            `os.PathLike`).
+        source: The AGS4 to read, auto-detected as a path, a file-like, raw bytes,
+            or in-memory AGS4 text. Leave as ``None`` and use one of the keyword
+            doors below to be explicit.
+        path: Explicit on-disk path to an AGS4 file (keyword-only).
+        text: Explicit already-decoded AGS4 text (keyword-only); not subject to
+            ``encoding``.
+        data: Explicit raw AGS4 bytes (keyword-only).
+        encoding: WHATWG encoding label for bytes / path input (keyword-only);
+            defaults to UTF-8. Ignored for ``text=``.
 
     Returns:
         The root PROJ instance, with descendant groups attached under their
@@ -90,17 +110,15 @@ def read_typed(ags4: str | PathLike[str]) -> Any:
         via `laterite.dynamic.get_or_register`.
 
     Raises:
-        FileNotFoundError: if ``ags4`` does not exist.
-        RuntimeError: if the file fails to parse, or contains no PROJ row
-            (every AGS4 transfer must have exactly one).
+        FileNotFoundError: if a resolved path does not exist.
+        NotAgs4Error: if the input is not valid AGS4.
+        RuntimeError: if the file parses but contains no PROJ row (every AGS4
+            transfer must have exactly one).
     """
-    ags4 = Path(ags4)
-    if not ags4.exists():
-        raise FileNotFoundError(str(ags4))
-
-    parsed = _native.parse_primitives(path=str(ags4))
-    if not parsed.get("ok"):
-        raise RuntimeError(parsed.get("error") or f"failed to parse {ags4}")
+    p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
+    parsed = raise_for(
+        _native.parse_primitives(path=p, text=txt, data=raw, encoding=encoding)
+    )
 
     file_groups: dict[str, Any] = parsed["groups"]
     order: list[str] = parsed["group_order"]

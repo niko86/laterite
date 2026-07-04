@@ -299,3 +299,39 @@ def test_compat_provenance_field_round_trips(tmp_path):
     assert back.compat == "python-ags4-0.5.0"
     # a compat-minted cert is NOT the native checker identity
     assert back.matches_native_validator() is False
+
+
+# --- certify must never destroy a data file (the certify(path=<.ags>) footgun) ---
+
+
+def test_certify_refuses_to_overwrite_the_source_file(tmp_path):
+    """`read(p).validate().certify(p)` reuses the source path — certify must NOT
+    write the certificate over the .ags (data loss). It raises and leaves the
+    source byte-for-byte intact (verifies the OUTPUT, not just that it ran)."""
+    src = _write(tmp_path)
+    before = src.read_bytes()
+    h = lat.read(src).validate()
+    with pytest.raises(Ags4Error):
+        h.certify(path=src)
+    assert src.read_bytes() == before  # untouched — no clobber
+
+
+def test_certify_refuses_to_overwrite_another_ags_file(tmp_path):
+    """certify won't clobber ANY existing non-certificate file, not just the source."""
+    src = _write(tmp_path)
+    other = _write(tmp_path, name="other.ags")
+    before = other.read_bytes()
+    h = lat.read(src).validate()
+    with pytest.raises(Ags4Error):
+        h.certify(path=other)
+    assert other.read_bytes() == before
+
+
+def test_certify_overwrites_an_existing_certificate(tmp_path):
+    """Re-certifying replaces an existing .ags.idx (it IS a certificate) — allowed,
+    so the guard protects data files without blocking the normal re-cert flow."""
+    src = _write(tmp_path)
+    first = lat.read(src).validate().certify()
+    assert first.is_file() and first.read_bytes()[:1] == b"{"
+    again = lat.read(src).validate().certify()  # overwrite the existing cert
+    assert again == first and first.is_file()

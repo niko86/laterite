@@ -48,25 +48,33 @@ serde = { version = "1", features = ["derive"] }
 # Python's dict-preserving json.dumps. Same rationale as ags5db's pin.
 serde_json = { version = "1", features = ["preserve_order"] }
 thiserror = "1"
-# `zstd` for the `pack`/`unpack` transport. The crate wraps libzstd
-# via zstd-safe; bundling libzstd is automatic (no system dep).
-zstd = "0.13"
-# Encryption for `lock`/`unlock`. `age` is the audited X25519 +
-# ChaCha20-Poly1305 format; we use its scrypt passphrase mode.
-# `rpassword` for no-echo TTY passphrase prompts. `secrecy` is
-# transitively used by `age::scrypt::Identity::new(Secret<...>)`.
-age = "0.10"
-rpassword = "7"
-secrecy = "0.8"
+# The pack/unpack/lock/unlock envelope, now the shared laterite-transport leaf
+# (#327) — one copy of the age/zstd logic instead of two. Behind the default-on
+# `transport` feature (see [features]) so wasm-safe consumers can drop it: the
+# leaf's `age` dep pulls getrandom, which does NOT build on wasm32. core's
+# transport.rs is a thin CliError-returning face over it (mapping
+# TransportError→CliError); the age/zstd/rpassword/secrecy direct deps left with
+# the logic.
+laterite-transport = { path = "../laterite-transport", optional = true }
 # The deterministic keychain (keychain.rs) hashes the spec key-chain with
 # SHA-256 → UUIDv8. (calamine + rust_xlsxwriter + hex left with excel.rs when
 # the Excel I/O moved out to the laterite-excel crate, 2026-06-18.)
-sha2 = "0.10"
+sha2 = "0.11"
 # Deterministic content-addressed row keys (keychain.rs): SHA-256 over the
 # spec key-chain → UUIDv8. `v8` is RFC 9562's custom/application version —
 # the correct choice for app-defined deterministic UUIDs (contrast ags5-db's
 # random, clock-seeded `v7`, which cannot agree across calls).
 uuid = { version = "1", features = ["v8"] }
+
+[features]
+# `transport` is default-ON — the host consumers (laterite-py binds pack/unpack/
+# lock/unlock) get it transparently. wasm (and any other wasm-safe / size-
+# sensitive consumer) takes `default-features = false` to compile just the pure
+# keychain / registry / codec: `age` pulls getrandom, which won't build on
+# wasm32-unknown-unknown, and the crypto has no place in a browser binary. The
+# keychain itself is RNG-free (sha2 + uuid-v8-from-bytes). (#303 Phase 5)
+default = ["transport"]
+transport = ["dep:laterite-transport"]
 
 [dev-dependencies]
 # `ags4_codec.rs` test creates an on-disk fixture (temp dir) to exercise

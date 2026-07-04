@@ -55,6 +55,18 @@ export function quoteId(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
+/** Drop the synthetic `_id`/`_parent_id` content-addressed key columns from an
+ * arrow-js `Table` — for a FRAME (the accessor) or for EMIT (`buildAgs4`, which
+ * is byte-faithful to the DATA and must never write a synthetic column). AGS
+ * headings never start with `_`, so this is safe; a table with none is returned
+ * unchanged. (#303) */
+export function stripSynthKeys(table: Table): Table {
+  const dataCols = table.schema.fields
+    .filter((f) => !f.name.startsWith("_"))
+    .map((f) => f.name);
+  return dataCols.length === table.numCols ? table : table.select(dataCols);
+}
+
 // Resolved lazily, once, on first sql()/at(). The string-variable import keeps
 // TS from statically resolving (and thus requiring) the optional peer's types.
 const DUCK_PACKAGE = "@duckdb/node-api";
@@ -106,13 +118,25 @@ export class DuckEngine {
    * rows appended from the born-typed arrow-js Table). Idempotent per code. */
   async register(code: string, meta: GroupMeta, table: Table): Promise<void> {
     if (this.registered.has(code)) return;
-    const cols = meta.headings
-      .map((h, i) => `${quoteId(h)} ${meta.sqlTypes[i]}`)
-      .join(", ");
+    // A KNOWN group's Table carries the two content-addressed key columns (`_id`,
+    // `_parent_id`) first (see `table_ipc`). Prepend them to the relational table
+    // as VARCHAR so cross-group joins work in `sql()`/`at()` — the user `table()`
+    // accessor strips them, but the ENGINE always keeps them. (#303)
+    const keyCols = table.schema.fields.some((f) => f.name === "_id")
+      ? ["_id", "_parent_id"]
+      : [];
+    const cols = [
+      ...keyCols.map((k) => `${quoteId(k)} VARCHAR`),
+      ...meta.headings.map((h, i) => `${quoteId(h)} ${meta.sqlTypes[i]}`),
+    ].join(", ");
     await this.#con.run(`CREATE TABLE ${quoteId(code)} (${cols})`);
     const appender = await this.#con.createAppender(code);
+    const keyVectors = keyCols.map((k) => table.getChild(k));
     const vectors = meta.headings.map((h) => table.getChild(h));
     for (let r = 0; r < table.numRows; r++) {
+      for (let c = 0; c < keyCols.length; c++) {
+        this.#appendCell(appender, "VARCHAR", keyVectors[c]?.get(r));
+      }
       for (let c = 0; c < meta.headings.length; c++) {
         this.#appendCell(appender, meta.sqlTypes[c] ?? "VARCHAR", vectors[c]?.get(r));
       }

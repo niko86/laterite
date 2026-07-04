@@ -1,5 +1,8 @@
 # Explore the registry & KEY chain
 
+**Available in:** Python (`laterite.registry` is a Python-only module — see the
+[capability matrix](../surfaces/index.md#what-each-door-can-do))
+
 Ask the AGS dictionary itself which groups hang off a parent, and which KEY
 headings a child inherits — without opening a file. The registry is the
 in-memory AGS group graph; reach for it to drive UI, build joins, or validate a

@@ -26,6 +26,14 @@ recipe set. Cross-references below are clickable.
 
 ::: laterite.diff
 
+## Rules
+
+::: laterite.list_rules
+
+::: laterite.fixable_rules
+
+::: laterite.FixableRule
+
 ## Querying
 
 ::: laterite.AgsQuery
@@ -45,3 +53,17 @@ recipe set. Cross-references below are clickable.
 ::: laterite.StaleCertError
 
 ::: laterite.UnsupportedEditionError
+
+## Type aliases
+
+The enumerated string choices accepted by the API, as `Literal` types — so editors
+autocomplete the valid values and type-checkers reject typos. Each is gated in the
+test suite against its source of truth.
+
+::: laterite.Edition
+
+::: laterite.Backend
+
+::: laterite.XnMode
+
+::: laterite.BuildMode

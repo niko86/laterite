@@ -20,7 +20,7 @@
 
 use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};
-use laterite_ags4_validator::fixes::{FixRisk, apply_fixes, compute_fixes};
+use laterite_ags4_validator::fixes::{Fix, FixRisk, apply_fixes, compute_fixes};
 use laterite_ags4_validator::parse::parse_bytes;
 use laterite_ags4_validator::{CheckOptions, DictVersion, rules};
 use laterite_types::ags4_str;
@@ -77,11 +77,13 @@ impl Default for EmitOpts {
 }
 
 /// The emit result. `findings` are on the *returned* bytes (so, post-fix
-/// for AutoFix) — empty means clean. `fixes_applied` is the count of safe
-/// fixes AutoFix applied (0 for Strict/Report).
+/// for AutoFix) — empty means clean. `applied` is the list of safe fixes
+/// AutoFix made (empty for Strict/Report); `fixes_applied` is its length,
+/// kept as a convenience so a caller can report a count without the detail.
 pub struct EmitResult {
     pub bytes: Vec<u8>,
     pub findings: Findings,
+    pub applied: Vec<Fix>,
     pub fixes_applied: usize,
 }
 
@@ -161,6 +163,7 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
         EmitMode::Report => Ok(EmitResult {
             bytes,
             findings: found,
+            applied: Vec::new(),
             fixes_applied: 0,
         }),
         EmitMode::Strict => {
@@ -175,6 +178,7 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
                 Ok(EmitResult {
                     bytes,
                     findings: found,
+                    applied: Vec::new(),
                     fixes_applied: 0,
                 })
             }
@@ -193,6 +197,7 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
                 return Ok(EmitResult {
                     bytes,
                     findings: found,
+                    applied: Vec::new(),
                     fixes_applied: 0,
                 });
             }
@@ -205,6 +210,7 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
                 bytes: fixed_bytes,
                 findings: residual,
                 fixes_applied: safe.len(),
+                applied: safe,
             })
         }
     }

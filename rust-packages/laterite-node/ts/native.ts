@@ -11,8 +11,11 @@ export {
   runCheck,
   fixFile,
   listRules,
+  registryDictionaryJson,
+  diff as nativeDiff,
   emitAgs4FromIpc,
   Reading,
+  Sidecar,
   canonicalType,
   displayHint,
   parseValue,
@@ -20,6 +23,8 @@ export {
   transportUnpack,
   transportLock,
   transportUnlock,
+  ags4ToExcel,
+  excelToAgs4,
 } from "#native";
 export type {
   GroupMeta,
@@ -31,4 +36,5 @@ export type {
   EmitResult as NativeEmitResult,
   PackStats,
   UnpackStats,
+  ExcelStats,
 } from "#native";

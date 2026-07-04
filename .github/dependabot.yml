@@ -1,10 +1,13 @@
-# Keep the GitHub Actions we depend on current. Once third-party actions are
-# SHA-pinned (a follow-up hardening PR), Dependabot bumps the pinned SHA and
-# puts the human-readable version in the PR; for tag-pinned actions it proposes
-# the next version. All action updates are grouped into one weekly PR to keep
-# churn low.
+# Keep our dependencies + the GitHub Actions we depend on current. Each CODE
+# ecosystem groups its weekly MINOR + PATCH updates into one PR (low churn) and
+# opens MAJOR updates INDIVIDUALLY — so a single breaking bump can't drag a whole
+# batch red (which is exactly what sank the first cargo/npm grouped-everything
+# PRs). Actions stay fully grouped (they rarely break). GitHub's security updates
+# still arrive promptly, outside the schedule. Once third-party actions are
+# SHA-pinned, Dependabot bumps the pinned SHA with the human-readable version.
 version: 2
 updates:
+  # GitHub Actions used by the workflows.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -14,3 +17,38 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+
+  # Rust crates — the workspace under rust-packages/.
+  - package-ecosystem: cargo
+    directory: /rust-packages
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    groups:
+      cargo:
+        update-types: ["minor", "patch"]
+
+  # Python deps — the uv workspace (pyproject.toml + uv.lock at the repo root).
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    groups:
+      python:
+        update-types: ["minor", "patch"]
+
+  # npm packages — the Node addon + the SolidJS web frontend.
+  - package-ecosystem: npm
+    directories:
+      - /rust-packages/laterite-node
+      - /web
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    groups:
+      npm:
+        update-types: ["minor", "patch"]

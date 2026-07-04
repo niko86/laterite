@@ -1158,6 +1158,37 @@ divergence (not a defect) · **[NOTE]** behavioural observation.
   divergence is this file; laterite avoids the 150 phantom orphans).
   - **Reported**: laterite#222 (2026-06-22).
 
+### O-46 [NOTE] The lean read path rejects non-UTF-8 input ("input is not valid UTF-8"); the validator decodes it lossily and flags Rule 1 (O-32) — the deliberate encoding fork, wording pinned at #168 Phase 7
+- **Observed**: after the parser convergence (#168), core's lean read path
+  (`ags4_codec::read_ags4_bytes` — which backs the `.ags.idx` byte index and the
+  DuckDB extension's `read_ags`/`certify_ags`) REJECTS a non-UTF-8 file, returning
+  `ParseError::NotUtf8` surfaced as the message **"input is not valid UTF-8"**.
+  Before the convergence that rejection came from the `csv` reader with its own
+  wording ("AGS4 CSV: CSV parse error … invalid utf-8"); the shared parse leaf now
+  owns it. The validator path does NOT reject — it decodes lossily (see O-32).
+- **Spec**: Rule 1 — an AGS4 transfer file "shall be entirely composed of
+  characters from the ASCII character set." A non-UTF-8 byte cannot be ASCII, so
+  the input is out-of-spec either way; what differs is how each surface *surfaces*
+  that.
+- **Assessment**: this is a deliberate laterite encoding **fork**, not a python-ags4
+  divergence. The shared leaf carries a per-call policy: the **validator +
+  bindings** decode lossily (`from_utf8_lossy` → `U+FFFD` → a Rule 1 finding, which
+  is exactly python-ags4's `errors="replace"` behaviour — **O-32**), while the
+  **lean read path** rejects. The rationale is per-consumer: a validator must
+  produce a COMPLETE report (so it decodes and flags), whereas a reader assumes an
+  already-valid file and the `.ags.idx` byte index is only meaningful over the
+  exact source bytes — so a loud reject is the honest failure mode there. The
+  python-facing surface already AGREES with python (via O-32); this fork lives
+  entirely inside laterite's own surfaces.
+- **Upstream-reportable**: No — internal cross-surface design. The python-parity path is
+  O-32 (lossy decode → Rule 1); nothing here diverges from python-ags4.
+- **Our decision** (#168 Phase 7): ratify the wording. The lean read path's non-UTF-8
+  rejection message is pinned to the shared leaf's **"input is not valid UTF-8"**
+  (the retired `csv` reader's message is gone), and `error_mapping.rs` now asserts
+  that exact wording instead of the loose "mentions utf-8" check it carried while
+  the convergence settled. The fork itself — lean `Reject`, validator/bindings
+  `LossyReplace` (O-32) — is retained as intended.
+
 ## Post-V8 — laterite-originated checks (no python-ags4 equivalent)
 
 ### O-43 [VARIANCE] A self-declared but non-standard PA abbreviation is a laterite-originated FYI (Related to Rule 16); python-ags4 has no such check

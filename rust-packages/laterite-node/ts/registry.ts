@@ -7,6 +7,7 @@
  * @module
  */
 import { Ags4Error } from "./errors";
+import { registryDictionaryJson } from "./native";
 import {
   GROUPS_DATA,
   type GeneratedGroup,
@@ -74,6 +75,43 @@ export const GROUPS: Readonly<Record<string, GroupDescriptor>> = Object.freeze(
 /** Single-group lookup; `undefined` for unknown codes. */
 export function get(code: string): GroupDescriptor | undefined {
   return GROUPS[code];
+}
+
+/** One heading in a {@link DictionarySnapshot} group (`type` is the AGS data type). */
+export interface DictHeading {
+  name: string;
+  status: string;
+  type: string;
+  unit?: string;
+  description: string;
+}
+/** One group in a {@link DictionarySnapshot}. */
+export interface DictGroup {
+  code: string;
+  contents: string;
+  parent?: string;
+  headings: DictHeading[];
+}
+/** The bundled standard dictionary for one edition. */
+export interface DictionarySnapshot {
+  ags_edition: string;
+  groups: DictGroup[];
+}
+
+/**
+ * The bundled STANDARD dictionary for one AGS `edition` — the per-edition view
+ * of the official dictionary (canonical group + heading names, descriptions,
+ * UNIT/TYPE, status). Where {@link GROUPS} is the *union* registry across all
+ * editions (the default), this is a single edition's standard dictionary — the
+ * same content the browser and `laterite.registry.dictionary()` render, from
+ * one shared Rust builder (#294 F#6).
+ *
+ * @param edition `"4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2"`; omit (or
+ *   `"auto"`) for the fallback edition.
+ * @throws {Error} if `edition` is not a recognised edition.
+ */
+export function dictionary(edition?: string): DictionarySnapshot {
+  return JSON.parse(registryDictionaryJson(edition)) as DictionarySnapshot;
 }
 
 /** Every direct child group of `parentCode`, alphabetically. */

@@ -26,12 +26,58 @@ def test_emit_fills_unit_and_type_from_dict():
     assert '"UNIT","","m"' in text
 
 
+def test_build_units_types_override():
+    # LOCA_XTRA is a custom heading the dictionary doesn't know (default TYPE X);
+    # the heading-keyed override (#294 F#9) gives it a real UNIT/TYPE, while the
+    # standard headings still fill from the dict.
+    loca = pl.DataFrame({"LOCA_ID": ["BH1"], "LOCA_GL": [1.0], "LOCA_XTRA": ["9"]})
+    res = laterite.build_ags4(
+        {"PROJ": _proj(), "LOCA": loca},
+        mode="report",
+        units={"LOCA": {"LOCA_XTRA": "kPa"}},
+        types={"LOCA": {"LOCA_XTRA": "3DP"}},
+    )
+    loca_section = res.text.split('"GROUP","LOCA"')[1]
+    assert '"UNIT","","m","kPa"' in loca_section  # LOCA_GL from dict, LOCA_XTRA overridden
+    assert '"TYPE","ID","2DP","3DP"' in loca_section
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"units": {"NOPE": {"X": "m"}}},  # unknown group
+        {"types": {"LOCA": {"NOSUCH": "3DP"}}},  # unknown heading
+    ],
+)
+def test_build_units_types_reject_unknown(bad):
+    loca = pl.DataFrame({"LOCA_ID": ["BH1"], "LOCA_GL": [1.0]})
+    with pytest.raises(ValueError):
+        laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, **bad)
+
+
 def test_typed_float_is_canonical_by_construction():
     # A native float under a 2DP heading formats to "12.30" with no fixing.
     loca = pd.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
     res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca})
     assert '"DATA","BH01","12.30"' in res.text
     assert res.fixes_applied == 0
+
+
+def test_build_result_applied_ledger():
+    # A string "1.0" under a 2DP heading is a safe Rule 8 reformat AutoFix applies
+    # during the build — so `applied` carries its record (#294 F#7), the same
+    # {kind,label,rule,line,risk} shape FixResult.applied uses, and fixes_applied
+    # is exactly its length.
+    loca = pl.DataFrame({"LOCA_ID": ["BH1"], "LOCA_GL": ["1.0"]})
+    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, mode="autofix")
+    assert res.fixes_applied == len(res.applied) >= 1
+    fix = res.applied[0]
+    assert set(fix) >= {"kind", "label", "rule", "line", "risk"}
+    assert fix["rule"] == "AGS Format Rule 8"
+    assert fix["risk"] == "safe"
+    # report mode touches nothing -> empty ledger.
+    rep = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, mode="report")
+    assert rep.applied == [] and rep.fixes_applied == 0
 
 
 def test_polars_backend_works_pyarrow_free():
@@ -121,9 +167,9 @@ def test_accepts_ordered_pairs_too():
 
 def test_typed_graph_root_builds():
     # The #214 repro: a hand-built PROJ tree used to raise TypeError.
-    proj = laterite.PROJ(proj_id="P1", proj_name="Demo project")
-    proj.locas.append(laterite.LOCA(loca_id="BH01", loca_gl=12.34))
-    proj.locas.append(laterite.LOCA(loca_id="BH02", loca_gl=8.0))
+    proj = laterite.groups.PROJ(proj_id="P1", proj_name="Demo project")
+    proj.locas.append(laterite.groups.LOCA(loca_id="BH01", loca_gl=12.34))
+    proj.locas.append(laterite.groups.LOCA(loca_id="BH02", loca_gl=8.0))
     res = laterite.build_ags4(proj)
     assert res.text.startswith('"GROUP","PROJ"')
     assert '"GROUP","LOCA"' in res.text
@@ -132,9 +178,9 @@ def test_typed_graph_root_builds():
 def test_typed_graph_native_floats_canonicalise():
     # Native floats carried on the typed node format to their 2DP heading with
     # no fixing — the same born-typed guarantee the frames door gives.
-    proj = laterite.PROJ(proj_id="P1")
-    proj.locas.append(laterite.LOCA(loca_id="BH01", loca_gl=12.34))
-    proj.locas.append(laterite.LOCA(loca_id="BH02", loca_gl=8.0))
+    proj = laterite.groups.PROJ(proj_id="P1")
+    proj.locas.append(laterite.groups.LOCA(loca_id="BH01", loca_gl=12.34))
+    proj.locas.append(laterite.groups.LOCA(loca_id="BH02", loca_gl=8.0))
     res = laterite.build_ags4(proj)
     assert '"DATA","BH01"' in res.text
     assert '"12.34"' in res.text
@@ -142,9 +188,9 @@ def test_typed_graph_native_floats_canonicalise():
 
 
 def test_typed_graph_round_trips_through_read():
-    proj = laterite.PROJ(proj_id="P1", proj_name="Demo project")
-    proj.locas.append(laterite.LOCA(loca_id="BH01", loca_gl=12.34))
-    proj.locas.append(laterite.LOCA(loca_id="BH02", loca_gl=8.0))
+    proj = laterite.groups.PROJ(proj_id="P1", proj_name="Demo project")
+    proj.locas.append(laterite.groups.LOCA(loca_id="BH01", loca_gl=12.34))
+    proj.locas.append(laterite.groups.LOCA(loca_id="BH02", loca_gl=8.0))
     back = laterite.read(data=laterite.build_ags4(proj).bytes)
     assert sorted(back.groups) == ["LOCA", "PROJ", "TRAN", "TYPE", "UNIT"]
     loca = back["LOCA"]
@@ -155,7 +201,7 @@ def test_typed_graph_round_trips_through_read():
 def test_typed_graph_recurses_deeply():
     # The walk follows the registry's parent→child links to any depth:
     # PROJ → LOCA → SAMP → LLPL (the four-level chain in the dictionary).
-    from laterite import LLPL, LOCA, PROJ, SAMP
+    from laterite.groups import LLPL, LOCA, PROJ, SAMP
 
     proj = PROJ(proj_id="P1", proj_name="Deep tree")
     loca = LOCA(loca_id="BH01")
@@ -192,7 +238,7 @@ def test_typed_graph_round_trips_via_read_typed(tmp_path):
 
 
 def test_typed_graph_childless_root_builds():
-    res = laterite.build_ags4(laterite.PROJ(proj_id="P1", proj_name="Solo"))
+    res = laterite.build_ags4(laterite.groups.PROJ(proj_id="P1", proj_name="Solo"))
     back = laterite.read(data=res.bytes)
     assert sorted(back.groups) == ["PROJ", "TRAN", "TYPE", "UNIT"]
     assert back["PROJ"]["PROJ_ID"].to_list() == ["P1"]
@@ -227,8 +273,8 @@ def test_typed_graph_emits_only_set_columns():
     # door), not the full union schema — so a sparse node builds clean at the
     # default edition instead of dragging in ~45 blank columns (whose unset
     # edition-specific / PA headings would trip Rule 9 / 16).
-    proj = laterite.PROJ(proj_id="LAT-DEMO", proj_name="Demo")
-    proj.locas.append(laterite.LOCA(loca_id="BH01", loca_gl=12.50))
+    proj = laterite.groups.PROJ(proj_id="LAT-DEMO", proj_name="Demo")
+    proj.locas.append(laterite.groups.LOCA(loca_id="BH01", loca_gl=12.50))
     res = laterite.build_ags4(proj)
     hdr = next(ln for ln in res.text.splitlines() if ln.startswith('"HEADING","LOCA_ID"'))
     assert hdr == '"HEADING","LOCA_ID","LOCA_GL"'  # only the two set columns, in order
@@ -236,8 +282,8 @@ def test_typed_graph_emits_only_set_columns():
 
     # No data loss: a deliberately-set heading survives the prune (here a
     # 4.2-only one — flagged at 4.1.1, clean at 4.2, value kept either way).
-    p2 = laterite.PROJ(proj_id="P", proj_name="x")
-    p2.locas.append(laterite.LOCA(loca_id="BH01", loca_gl=12.5, loca_vssl="MV Demo"))
+    p2 = laterite.groups.PROJ(proj_id="P", proj_name="x")
+    p2.locas.append(laterite.groups.LOCA(loca_id="BH01", loca_gl=12.5, loca_vssl="MV Demo"))
     assert "LOCA_VSSL" in laterite.build_ags4(p2).text
     assert not laterite.build_ags4(p2, dict_version="4.2").findings
 
@@ -245,7 +291,7 @@ def test_typed_graph_emits_only_set_columns():
 def test_typed_graph_non_group_child_raises():
     # A foreign object hung off a child accessor is caught with a clear message,
     # not a confusing downstream failure (mirrors Node's walkTree guard).
-    proj = laterite.PROJ(proj_id="P1")
+    proj = laterite.groups.PROJ(proj_id="P1")
     proj.locas.append(object())  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="not a known typed AGS group instance"):
         laterite.build_ags4(proj)

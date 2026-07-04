@@ -1,5 +1,8 @@
 # Read XN columns as numeric
 
+**Available in:** Python (the `xn=` knob is a frame-materialisation option; on
+other surfaces `XN` columns read as text and cast in SQL)
+
 AGS `XN` headings are *numeric-or-text* on disk — laterite reads them as
 `String` by default. Pass `xn="numeric"` to coerce them to `Float64` at the door.
 

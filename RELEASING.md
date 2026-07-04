@@ -21,53 +21,75 @@ for when we deliberately want to signal "stable — I'll keep compatibility."
 
 ## Cutting a release
 
-The version lives in one logical place, stamped everywhere by
-[`bump-my-version`](https://callowayproject.github.io/bump-my-version/) (config
-in the root `pyproject.toml` `[tool.bumpversion]`). **Never hand-edit a version
-string** — the guard test + the release tag-check will catch drift.
+**Every published surface shares one version** (#372): the Python wheel, the
+Rust workspace (so the `lat-check` binary), the npm `laterite` package with its
+three `@laterite/native-*` addons, and the `laterite_ags4` DuckDB extension all
+move on one number. `tools/release/bump-version.sh` drives the in-repo bump
+(wrapping [`bump-my-version`](https://callowayproject.github.io/bump-my-version/),
+config in the root `pyproject.toml` `[tool.bumpversion]`, plus lockfile
+regeneration); the DuckDB extension lives in its own repo and takes the same
+number when you cut it (below). The **docs site** carries the version too — it's
+derived at build and republishes on merge. **Never hand-edit a version string**
+— `test_version_faithful.py`, the compat guard, and the `release.yml` tag-check
+all catch drift.
 
 > [!IMPORTANT] **Releases PUBLISH FROM THE PUBLIC MIRROR `niko86/laterite`, NOT this
 > repo.** `laterite`'s `release.yml` builds + tests the matrix, but only the
 > *mirror's* `release.yml` publishes — the PyPI/npm trusted publishers are configured
 > for `niko86/laterite`. **Do NOT `git push --tags` to `laterite`**: it builds, then
-> the publish step fails with `invalid-publisher` (by design). The release tag goes on
-> the **mirror** (see step 4).
+> the publish step fails with `invalid-publisher` (by design). The release tags go on
+> the **mirror** (see step 3).
+
+Before bumping, finish the `CHANGELOG.md` `[Unreleased]` section (the bump rolls
+it into the dated release). Then:
 
 ```bash
-# 1. Preview the bump (per the policy above):
-uv run bump-my-version bump minor --dry-run -v       # or: patch
+# 1. On a release branch (the script refuses to run on master or a dirty tree),
+#    bump every surface + regenerate uv.lock / Cargo.lock / package-lock.json,
+#    verify the drift-gate, and make one "release: X" commit (no tag, no push):
+git switch -c release/0.6.0
+tools/release/bump-version.sh minor          # or: patch  ·  --new-version 0.6.0rc1
+#    (DRY_RUN=1 tools/release/bump-version.sh minor  stamps + regenerates without committing)
 
-# 2. Apply it — stamps every version site + rolls CHANGELOG + commits "release: X":
-uv run bump-my-version bump minor
-uv lock                                              # the version touches uv.lock + Cargo.lock —
-git commit --amend --no-edit -a                      #   fold them into the one "release: X" commit
-#   (node release only: ALSO regen rust-packages/laterite-node/package-lock.json — see
-#    RELEASING-node.md — or `npm ci` fails with EUSAGE at publish.)
+# 2. master is PROTECTED → land the bump via a release PR (merge-commit, NOT squash):
+git push -u origin release/0.6.0
+gh pr create -B master -t "release: 0.6.0" -b "version bump"   # merge once CI is green
 
-# 3. master is PROTECTED → land the bump via a release PR (merge-commit, NOT squash):
-git switch -c release/vX && git push -u origin release/vX
-gh pr create -B master -t "release: X" -b "version bump"   # merge once CI is green
+# 3. Sync the bumped tree to the mirror, then cut BOTH tags THERE:
+tools/release/push-public-tree.sh --push     # carries the bump → niko86/laterite
+gh release create v0.6.0      --repo niko86/laterite   # wheels + sdist → PyPI, CLI → GH release
+gh release create node-v0.6.0 --repo niko86/laterite   # npm addon + @laterite/native-*
+# 4. Approve the `pypi` / `npm` environments in the resulting Actions runs (the OIDC gates).
 
-# 4. Sync the bumped tree to the mirror, then cut the release THERE:
-./tools/release/push-public-tree.sh --push           # carries the bump → niko86/laterite
-#   then on niko86/laterite: Releases → Draft a new release → tag vX
-#   (or: gh release create vX --repo niko86/laterite --target main)
-#   → fires the MIRROR's release.yml → wheels + sdist → PyPI. (node: tag node-vX likewise.)
-# 5. Approve the `pypi` environment in the resulting Actions run (the OIDC publish gate).
+# 5. Cut the DuckDB extension at the SAME version (its own repo — see below):
+cd <the niko86/laterite-duckdb checkout> && bash scripts/release.sh 0.6.0
+# 6. Confirm the docs republished: /laterite/docs/ Reference → Changelog shows 0.6.0.
 ```
+
+The two tags stay separate because `release.yml` has independent `v*` (Python +
+CLI) and `node-v*` (npm) build/publish paths — but the **number** is now one, so
+you cut `v0.6.0` and `node-v0.6.0` from the same release. A Python-only patch can
+still skip the `node-v*` tag; the version simply doesn't move on npm until you do.
 
 > Cutting a release on a **new** tag fires **two** workflow runs — a `push` (tag) run
 > and a `release` run — because GitHub raises both events. That's expected: the `push`
-> run builds + publishes; the `release` run no-ops (Python jobs skip on `release`). They
-> no longer cancel each other (the concurrency key includes `github.event_name`;
+> run builds + publishes; the `release` run no-ops (jobs skip on `release`). They no
+> longer cancel each other (the concurrency key includes `github.event_name`;
 > laterite#264). If you ever see the build run *cancelled* at ~3s, that regression is
 > back — re-run the `push` run.
 
-`bump-my-version` updates, atomically: the `laterite` wheel `pyproject.toml` + the
-root umbrella, `compat.py`'s `__version__` base + Checker banner (preserving the
-`+compat.python-ags4.<pin>` pin), the Rust workspace version, and rolls
-`CHANGELOG.md`'s `[Unreleased]` into the new dated section. It does **not** touch
-the lockfiles or the npm `package-lock.json` — see steps 2.
+`bump-version.sh` stamps, atomically in one commit: the `laterite` wheel
+`pyproject.toml` + the root umbrella, `compat.py`'s `__version__` base + Checker
+banner (preserving the `+compat.python-ags4.<pin>` pin), the Rust workspace
+version, the npm `package.json` version + its three `@laterite/native-*`
+optionalDeps, and rolls `CHANGELOG.md`'s `[Unreleased]` into the new dated
+section — then regenerates `uv.lock`, `Cargo.lock`, the npm `package-lock.json`
+(the last one avoids the `EUSAGE` failure `npm ci` throws at publish against a
+stale lock), and the generated napi loader `index.js` (the node CI job runs
+`napi build` + `git diff --exit-code`, so the committed loader's version literals
+must match a fresh build — a stale one reds that guard). `web/src/wasm/package.json`
+is gitignored and wasm-pack regenerates it from the crate version; the docs
+Changelog page derives its version at build. Neither needs stamping.
 
 ### Pre-releases (RC / dev)
 
@@ -75,40 +97,49 @@ The API may still change pre-1.0, so cut a release candidate first when in doubt
 Use the **explicit** form (PEP 440 canonical — no hyphen):
 
 ```bash
-uv run bump-my-version bump --new-version 0.2.0rc1     # then rc2, rc3, ...
-uv run bump-my-version bump --new-version 0.2.0         # promote to final
+tools/release/bump-version.sh --new-version 0.6.0rc1     # then rc2, rc3, ...
+tools/release/bump-version.sh --new-version 0.6.0         # promote to final
 ```
 
-### The npm `laterite` (node) track — separate, manual
+## The DuckDB extension (`laterite_ags4`)
 
-The npm `laterite` package (+ the three `@laterite/native-*` platform packages) is
-versioned on its **own `node-v*` tag track**, *independent* of the Python wheel.
-`bump-my-version` does **not** touch `rust-packages/laterite-node/package.json` (the
-napi crate's *Cargo* version rides the workspace, but the published npm version does
-not), so a Python `v0.5.0` release leaves npm `laterite` at its current version until a
-node release is cut separately. To cut one:
+The extension is a **separate repo, `niko86/laterite-duckdb`**, published through
+DuckDB **community-extensions** — not from this repo and not from the mirror. As
+of #372 it **tracks the laterite version**: cut it at the same number, as step 5
+above. Its own `.github/workflows/release.yml` fires on a `v*` tag to build +
+test the release artifact and pin the community descriptor to the tag's commit;
+`scripts/release.sh <version>` (version is a **required** arg) stamps its
+`Cargo.toml` + `description.yml`, tags, and updates the community PR. That repo's
+CI asserts `Cargo.toml` == `description.yml`; the number-tracks-laterite part is
+a convention this runbook enforces (a laterite drift-gate can't reach a
+foreign repo, and the extension legitimately lags in the window between a
+laterite release and its own). A laterite bump with no extension-relevant change
+doesn't force an extension release — cut one when the extension actually changes,
+at whatever laterite version is then current.
 
-```bash
-# 1. Bump package.json "version" AND the three optionalDependencies pins
-#    (@laterite/native-*) to the new node version — they must match.
-# 2. Commit, then tag node-v<version> and push the tag (triggers release.yml's
-#    npm publish, which checks the tag == package.json version):
-git tag node-v0.5.0 && git push origin node-v0.5.0
-```
+## The docs site
 
-Keep the npm version aligned with the wheels when practical (the last alignment was a
-deliberate manual commit), but a Python release does **not** require a simultaneous node
-release.
+The docs (`web/docs-site/`) deploy to `/laterite/docs/` on **every master push**
+(`deploy-validator.yml`) — deliberately *not* gated on the release tag, so a doc
+fix ships immediately. The **Changelog page** (`reference/changelog.md`, generated
+by `scripts/gen_changelog.py`) renders the root `CHANGELOG.md` and stamps the
+shipped version, both **derived at build**. So merging the release PR to master
+republishes the docs with the new version + notes automatically — step 6 is just
+a confirmation, nothing to run.
 
 ## What keeps it honest
 
+- **Drift-gate** `test_version_faithful.py`: reads the source files (no build)
+  and fails CI if the shipped wheel version, the Rust workspace version, the npm
+  `package.json` version, its three `@laterite/native-*` pins, or the `compat.py`
+  prefix ever disagree — the net for a bump that missed a surface.
 - **Guard test** `test_compat_python_ags4_pin_stays_in_sync`: fails CI if the
   shipped version carries a PEP 440 `+local` segment (PyPI rejects those), if
   `compat.__version__`'s prefix drifts from the shipped version, or if the
   python-ags4 pin desyncs. It's phase-aware (see below).
-- **`release.yml` tag-check**: on a `v*` tag, asserts the tag matches the
-  pyproject version before building — so you can't tag `v0.2.0` against a stale
-  `0.1.0` source.
+- **`release.yml` tag-check**: on a `v*` / `node-v*` tag, asserts the tag matches
+  the pyproject / `package.json` version before building — so you can't tag
+  `v0.6.0` against a stale `0.5.1` source.
 
 ## PyPI project + trusted publisher
 

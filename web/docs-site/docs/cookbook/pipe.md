@@ -1,5 +1,7 @@
 # Splice your own step with `.pipe()`
 
+**Available in:** Python (a fluent-chain idiom of the Python handle)
+
 **When:** the chain doesn't have a method for the thing you want to do next —
 inline a function without breaking out of the flow. `.pipe(fn, *args)` passes the
 handle as `fn`'s first argument and returns whatever `fn` returns.

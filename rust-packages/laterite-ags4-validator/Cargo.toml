@@ -59,7 +59,7 @@ serde_json = "1"
 # Perf guard: bench check_file on the 23 MB workspace fixture. The
 # bench skips cleanly when the fixture is absent (it is gitignored
 # working space), so CI without it still passes.
-criterion = "0.5"
+criterion = "0.8"
 # The cp1252/lossy-decode tests need a real on-disk path (parse_file
 # takes &Path) but MUST NOT live in tests/fixtures/ — corpus-qa's
 # e2e.rs crawls that dir and asserts hard_error==0, and a non-UTF-8

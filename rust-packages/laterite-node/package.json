@@ -1,6 +1,6 @@
 {
   "name": "laterite",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "AGS4 geotechnical data for Node.js — read, validate, produce, and query (the Node port of the laterite Python toolkit, Rust-backed).",
   "license": "MIT",
   "author": "niko86",
@@ -34,18 +34,14 @@
     "access": "public"
   },
   "napi": {
-    "name": "laterite-node",
-    "package": {
-      "name": "@laterite/native"
-    },
-    "triples": {
-      "defaults": false,
-      "additional": [
-        "x86_64-unknown-linux-gnu",
-        "aarch64-apple-darwin",
-        "x86_64-pc-windows-msvc"
-      ]
-    }
+    "binaryName": "laterite-node",
+    "packageName": "@laterite/native",
+    "targets": [
+      "x86_64-unknown-linux-gnu",
+      "aarch64-apple-darwin",
+      "x86_64-pc-windows-msvc"
+    ],
+    "enableDefaultTargets": false
   },
   "engines": {
     "node": ">=18"
@@ -64,9 +60,9 @@
     "apache-arrow": "^21.1.0"
   },
   "optionalDependencies": {
-    "@laterite/native-darwin-arm64": "0.5.1",
-    "@laterite/native-linux-x64-gnu": "0.5.1",
-    "@laterite/native-win32-x64-msvc": "0.5.1"
+    "@laterite/native-darwin-arm64": "0.6.0",
+    "@laterite/native-linux-x64-gnu": "0.6.0",
+    "@laterite/native-win32-x64-msvc": "0.6.0"
   },
   "peerDependencies": {
     "@duckdb/node-api": ">=1.5.0"
@@ -78,8 +74,8 @@
   },
   "devDependencies": {
     "@duckdb/node-api": "^1.5.3-r.3",
-    "@napi-rs/cli": "^2.18.4",
-    "@types/node": "^25.9.3",
+    "@napi-rs/cli": "^3.7.2",
+    "@types/node": "^26.0.1",
     "tsup": "^8.5.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8"

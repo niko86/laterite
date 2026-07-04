@@ -1,5 +1,7 @@
 # Pull one borehole record set
 
+**Available in:** Python · Node · DuckDB · Browser
+
 Fan out from a `LOCA` location to everything that hangs off it — samples, tests,
 the lot — as a dict of typed frames keyed by group code. Reach for this when you
 want a single borehole's whole story, not one group at a time.

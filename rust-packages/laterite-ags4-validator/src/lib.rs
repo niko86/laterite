@@ -50,6 +50,7 @@ pub use error::ValidatorError;
 pub use findings::{Finding, Findings};
 pub use fixes::{
     Fix, FixKind, FixOutcome, Fixes, SpanEdit, apply_fixes, compute_fixes, fix_document,
+    fix_document_selective,
 };
 
 /// Validation options. `Default` = **auto-detect** the dictionary from

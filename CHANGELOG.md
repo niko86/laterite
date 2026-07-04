@@ -7,6 +7,183 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-07-04
+
+0.6.0 completes the cross-surface story. The browser and Node now reach every
+capability except the `python-ags4` compat shim: Node and browser Excel I/O,
+in-browser certificate minting, and browser transport (zstd + age) all land
+here, alongside the Anonymiser's pseudonymise/preset upgrade and finer
+fix-control across Python, Node and the CLI. One breaking change — the
+typed-graph classes moved to `laterite.groups` — is what bumps the minor
+pre-1.0. The npm package unifies onto this single version (the separate `node-v*`
+number is retired), and a new cross-surface drift-gate
+(`tests/test_version_faithful.py`) keeps every surface's version in lockstep.
+
+### Added
+
+- **Node Excel I/O — `toExcel()` / `fromExcel()`.** The Node addon binds the
+  shared `laterite-excel` engine, so AGS4 ↔ `.xlsx` round-trips from Node the
+  same way Python's `to_excel` / `from_excel` and the browser do — one sheet per
+  group, born-typed columns, an `ExcelStats` summary. Closes the last
+  non-compat blank in the Node capability column. (#361)
+- **Browser Excel — AGS4 ↔ `.xlsx`, client-side.** The web app's Tools pane
+  gains a two-way Excel converter running entirely in the browser (wasm) — no
+  upload. Backed by a new FS-free bytes API in `laterite-excel`
+  (`ags4_bytes_to_xlsx` / `xlsx_bytes_to_ags4`), so one engine drives Python,
+  Node and the browser. (#367, #368)
+- **Browser certificate minting — "Download certificate" in Validate.** A clean
+  validation in the web app now offers the `.ags.idx` certificate as a
+  download, minted client-side by a new wasm `certify()` over the shared core
+  `Sidecar` — byte-compatible with the certificates Python, Node, the DuckDB
+  extension and `lat-check --emit-index` produce. (#363, #364)
+- **Browser transport — lock / unlock in Tools.** The web app seals and opens
+  files client-side: zstd inside a passphrase-based `age` envelope
+  (`.zst.age`), byte-compatible with `laterite.transport.lock`, the Node
+  `transport` namespace and `pyrage` — so a file sealed in the browser opens
+  with stock `age` + `zstd` given the passphrase. The scrypt work factor is
+  pinned (log₂N = 18) for age-ecosystem interop. (#369, #370)
+- **Anonymiser upgrade — pseudonymise, don't just blank.** The web Anonymiser
+  gains per-category actions: location and sample IDs can be *pseudonymised*
+  into stable, reference-preserving tokens (a cross-group join still works after
+  scrubbing) instead of blanked, `PROJ_ID` maps to a content hash, coordinates
+  blank, and a preset dropdown applies a common policy in one click. (#371)
+- **Fix control — per-rule selection + a discoverable fixable-rule catalogue.**
+  `fix()` takes `rules=` to apply only chosen repairs, and `list_rules()` /
+  `fixable_rules()` expose which rules the engine can mechanically fix (a
+  generated `FixableRule` `Literal`, drift-gated against the engine). On Python,
+  Node and the CLI. (#297)
+- **"N more fixable with `risky=True`" signal.** A `FixResult` (and the CLI's
+  `--fix` summary) now reports how many further findings the risky,
+  intent-guessing tier could repair beyond the safe pass — so you know a
+  stronger fix exists without running it blind. (#298)
+- **`Literal` types for enumerated string parameters.** Enumerated string knobs
+  (`mode`, `xn`, `backend`, encoding labels, …) are now typed as `Literal`s /
+  TypeScript string-unions, so an IDE completes the valid values and a typo is a
+  type error rather than a runtime one. (#299)
+- **`read()` remembers its encoding for the chained verbs.** A handle retains
+  the encoding it was read with, so chained `.validate()` / `.fix()` / `.diff()`
+  re-run against the true bytes with matching line numbers — no need to re-pass
+  `encoding=`. On Python and Node. (#300)
+- **Node certificate lifecycle — `Ags4File.certify()` + `read(f, { index })`.** Node
+  gains the `.ags.idx` validity certificate the other surfaces have. After a clean
+  `.validate()`, `ags.certify()` mints the certificate (a byte-offset index + a
+  validation stamp) beside the file — refusing to overwrite the source or any
+  non-certificate file — and `read(f, { index })` consumes it, freshness-checking
+  size + SHA-256 (a mismatch throws `StaleCertError`). A fresh, engine-matching cert
+  lets a later errors-only `.validate()` **skip the rule engine** (the report's
+  `resolution` is the sentinel `"certified"`). The cert wraps the ONE core `Sidecar`,
+  so a Node-minted `.ags.idx` is **byte-compatible + checker-compatible** with
+  Python / `lat-check --emit-index` / the DuckDB extension (verified: a Node-minted
+  cert reads fresh + engine-matching from Python). Exposes the `Sidecar` class and
+  `StaleCertError`. (#294 Batch E / #14)
+- **Node fluent chained layer — `Ags4File.validate()` / `.fix()` / `.diff()`.** The
+  Node `Ags4File` gains the chained verbs, so `read(p).fix().validate()` reads as one
+  chain (Python-parity). `.validate(opts?)` returns the handle (chainable) with the
+  `Report` on `.report`; `.fix(opts?)` returns a NEW repaired `Ags4File` with its
+  `FixResult` on `.fixReport` (non-destructive); `.diff(other, opts?)` returns the
+  `RevisionDelta`. A handle now **retains its read source** (path / text / bytes +
+  encoding), so the chained verbs re-run against the true bytes — matching original
+  line numbers — and default `encoding` to the one it was read with. (#294 Batch E)
+- **Node revision diff — `diff(a, b)`.** The Node port of `laterite.diff()`, over the
+  SAME shared `laterite-ags4-diff` engine Python / the browser / `lat-check --diff`
+  use, so the `RevisionDelta` is byte-identical across surfaces. `a` (baseline) and
+  `b` (revision) are each a path, raw bytes, or an already-read `Ags4File`. Rows are
+  matched by the group's dictionary KEY headings (not line order) and cells compared
+  through the typed value (a formatting-only edit like `"1.0"` → `"1.00"` is not a
+  diff); the KEY-heading edition comes from the revision's `TRAN_AGS` unless pinned
+  with `dictVersion`. Returns per-group row/heading deltas plus `groups_added` /
+  `groups_removed` and the `total_*` counts. Node had no revision-diff at all before.
+  (#294 Batch E / #4)
+- **`read_typed` reads text and bytes, not just a path.** `laterite.ags4.read_typed`
+  now takes the same inputs as `read()` — a positional `source` auto-detected as a
+  path / file-like / bytes / AGS4 text, plus keyword-only `path=` / `text=` / `data=`
+  doors and an `encoding=` label (WHATWG, default UTF-8) for bytes / path input. It
+  was path-and-UTF-8-only before, so an in-memory or non-UTF-8 transfer couldn't reach
+  the base typed read. (#294 Batch B / #13)
+- **`build_ags4` per-heading UNIT/TYPE overrides.** Pass `units` / `types` as a
+  `{code: {heading: value}}` map to override what a heading emits, instead of
+  always filling from the standard dictionary — e.g.
+  `build_ags4({"LOCA": df}, units={"LOCA": {"LOCA_XTRA": "kPa"}}, types={"LOCA": {"LOCA_XTRA": "3DP"}})`.
+  Handy for giving a *custom* heading (one the dictionary doesn't know) a real
+  unit/type. Name only the headings you want to set; the rest still fill from the
+  dictionary. On Python (`units=`/`types=`) and Node (`EmitOptions.units`/`types`);
+  an unknown group or heading raises. The browser build already carried this. (#294 Batch F)
+- **`registry.dictionary(edition)` — the per-edition standard dictionary, headless.**
+  Python `laterite.registry.dictionary(edition)` and Node `registry.dictionary(edition)`
+  return one AGS edition's bundled standard dictionary — canonical group + heading
+  names, descriptions, UNIT/TYPE, status — as `{ags_edition, groups: [{code,
+  contents, parent, headings: […]}]}`, the same shape (and now the same shared Rust
+  builder) the browser reference already used. The module-level union `GROUPS` stays
+  the default; this is the single-edition view (`"4.0.3"…"4.2"`, or `None`/`"auto"`
+  → fallback). (#294 Batch F)
+- **`lat-check --emit-index` — mint an `.ags.idx` certificate from the CLI.** After
+  a clean check, `lat-check <file> --emit-index` writes the file's validity
+  certificate (a byte-offset index + validation provenance) beside it, or to
+  `--index-out <path>`. It's skipped (with a note) if the file still has errors —
+  a certificate attests a clean validation — while warnings/FYI ride on the stamp
+  as counts without blocking it. This joins the existing minting layers (Python's
+  `.certify()`, the DuckDB extension's `ags_index`), which the `index` module's
+  docs already named. (#294 Batch F)
+- **`BuildResult.applied` — the build's safe-fix ledger.** `build_ags4`'s autofix
+  already computed the full list of safe fixes it applied, then discarded it to a
+  bare count. It now surfaces `applied` — one `{kind, label, rule, line, risk}`
+  record per fix, the *same* shape `fix()`'s `FixResult.applied` carries — on both
+  Python (`BuildResult.applied`) and Node (`BuildResult.applied`), with
+  `fixes_applied` / `fixesApplied` now just its length. So a data→AGS4 build can
+  show or audit exactly what it normalised, not only how many. (#294 Batch F)
+- **Content-addressed `_id` / `_parent_id` keys are now core on every surface —
+  Python, Node, and the browser (wasm), not just the DuckDB extension.** Every
+  group read carries two synthetic UUIDv8 columns in the relational layer — `_id`
+  and, for a child group, `_parent_id` equal to its parent row's `_id` — so
+  stateless cross-group joins, merge and dedup work in `.sql()` with no opt-in:
+  `ags.sql("SELECT * FROM SAMP s JOIN LOCA l ON s._parent_id = l._id")` (this used
+  to raise *Binder Error: no column "_parent_id"*). The ids are deterministic
+  (re-reading a file yields identical values) and come from the one shared Rust
+  keychain — a golden-UUID test pins them **byte-identical across Python, Node,
+  wasm and the `.ags5db` extension**. Frames strip the two columns by **default**
+  — `ags["LOCA"]` is AGS columns only — and re-include them on request:
+  `read(..., keys=True)` / `ags.table("LOCA", keys=True)` (Python),
+  `ags.table("LOCA", { keys: true })` (Node), `arrow_ipc(code, true)` (wasm). Emit
+  never writes them. (#303)
+- **Type-faithfulness gate (`ty`).** A CI step runs Astral's type checker
+  (`uv run ty check`) over the shipped `laterite` package against its real
+  abi3-py312 floor — the first static type gate in the project (previously only
+  `ruff`). Paired with a new `tests/test_type_faithfulness.py` that asserts the
+  hints hold at *runtime* (declared return types, every `Literal` value accepted,
+  unknown kwargs rejected, the chained `Ags4File` `-> Self` contract). Config in
+  `[tool.ty]`. (#303)
+
+### Changed
+
+- **The 174 typed-graph classes moved to the `laterite.groups` submodule.**
+  `from laterite import PROJ, LOCA, …` is now `from laterite.groups import PROJ, LOCA, …`.
+  This keeps the four-letter AGS codes out of the top-level `laterite` namespace, which
+  drops from ~200 to 26 public names — so `laterite.<TAB>` and `from laterite import *`
+  now surface only the read / validate / build API, not 174 group codes. The classes
+  themselves are unchanged (still compiled into `_laterite_native`); `read_typed` and
+  `build_ags4(<typed graph>)` are unaffected, and `laterite.groups` is reachable after a
+  bare `import laterite`. A clean break with no deprecation shim — breaking, but pre-1.0
+  with no external users (same rationale as the 0.5.1 removals). (#302)
+
+### Fixed
+
+- **`certify()` never overwrites the source `.ags`.** A `certify(path=…)` that
+  pointed at the source file (or any non-certificate) could clobber it; it now
+  refuses, writing only the `.ags.idx` sidecar — a data-loss guard. (#296)
+- **`fix()`'s residual findings now report at the same errors+warnings tier on
+  every surface.** The re-validation that produces a fix's *residual* (what could
+  not be mechanically repaired) had drifted: Python reported errors+FYI, Node
+  errors-only, the CLI errors+warnings. All three now match each surface's own
+  `validate()` default (errors+warnings), so a warning a fix leaves behind — e.g.
+  the O-44 unrecognised-`TRAN_AGS` warning — is reported consistently instead of
+  silently dropped by Node/Python. The set of fixes *applied* is unchanged (every
+  fixable rule is error-tier). (#294 Batch C)
+- **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except`
+  clauses used the unparenthesized multi-exception form (`except A, B:`) that PEP 758
+  only made valid in 3.14, so importing `laterite.compat` crashed on the 3.12 / 3.13
+  the wheel ships to (the dev env is 3.14, which masked it). Now parenthesized —
+  behaviour unchanged on every version. Caught by the new `ty` gate's first run. (#303)
+
 ## [0.5.1] — 2026-06-24
 
 A Python patch release: completes one cross-surface parity gap, fixes IDE/type-checker
@@ -352,7 +529,8 @@ Initial public release.
 - 9 python-ags4 parity tests fail by design; see
   [`docs/parity-coverage-map.md`](docs/parity-coverage-map.md).
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/niko86/laterite/releases/tag/v0.6.0
 [0.5.1]: https://github.com/niko86/laterite/releases/tag/v0.5.1
 [0.5.0]: https://github.com/niko86/laterite/releases/tag/v0.5.0
 [0.4.0]: https://github.com/niko86/laterite/releases/tag/v0.4.0

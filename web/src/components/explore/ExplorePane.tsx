@@ -102,7 +102,10 @@ export const ExplorePane: Component = () => {
       const out: GroupInfo[] = [];
       for (const g of groups) {
         setStage(`Loading tables… ${out.length + 1}/${groups.length} (${g.code})`);
-        const ipc = await arrowIpc(g.code);
+        // keys=true: ingest the content-addressed _id/_parent_id columns into
+        // duckdb-wasm so the SQL console's cross-group joins resolve; the group
+        // grid (DataTable) strips them from display. (#303)
+        const ipc = await arrowIpc(g.code, true);
         if (stale()) return null;
         await ingestGroup(g.code, ipc);
         if (stale()) return null;

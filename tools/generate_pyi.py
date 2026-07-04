@@ -105,6 +105,83 @@ def _emit_class(g: dict, children: list[str]) -> str:
     return "\n".join(parts)
 
 
+def _stub_params(text_sig: str) -> str:
+    """A PyO3 ``__text_signature__`` like ``($self, data, level=9)`` → a stub
+    parameter list ``self, data: Any, level: Any = ...``. Types are ``Any`` (PyO3
+    exposes names + defaults, not types) and defaults collapse to ``...`` — enough
+    to resolve the call and check arity without inventing types. Defaults here are
+    scalars (None / ints / bools), so a plain ``, `` split is safe."""
+    inner = text_sig.strip()[1:-1].strip()
+    if not inner:
+        return ""
+    out: list[str] = []
+    for raw in inner.split(", "):
+        p = raw.strip()
+        if p == "$self":
+            out.append("self")
+        elif p in ("*", "/"):  # positional-only / keyword-only markers
+            out.append(p)
+        elif p.startswith("*"):  # *args / **kwargs
+            out.append(f"{p}: Any")
+        elif "=" in p:
+            out.append(f"{p.split('=', 1)[0]}: Any = ...")
+        else:
+            out.append(f"{p}: Any")
+    return ", ".join(out)
+
+
+def _emit_native_function(name: str, obj: object) -> str:
+    ts = getattr(obj, "__text_signature__", None)
+    params = _stub_params(ts) if ts else "*args: Any, **kwargs: Any"
+    return f"def {name}({params}) -> Any: ..."
+
+
+def _emit_native_class(name: str, cls: type) -> str:
+    """Stub a native (non-group) class — e.g. the ``Sidecar`` certificate. getset
+    descriptors become ``Any`` attributes; a method whose signature has no leading
+    ``self`` (a PyO3 ``#[staticmethod]``, called on the type) gets ``@staticmethod``."""
+    parts = [f"class {name}:"]
+    members = [m for m in sorted(dir(cls)) if not m.startswith("__")]
+    if not members:
+        parts.append("    ...")
+    for mname in members:
+        mobj = getattr(cls, mname)
+        ts = getattr(mobj, "__text_signature__", None)
+        if ts is None and not callable(mobj):  # getset_descriptor (a property)
+            parts.append(f"    {mname}: Any")
+            continue
+        params = _stub_params(ts) if ts else "self, *args: Any, **kwargs: Any"
+        if params.split(",", 1)[0].strip() == "self":
+            parts.append(f"    def {mname}({params}) -> Any: ...")
+        else:  # no self → static/class method invoked on the type
+            parts.append("    @staticmethod")
+            parts.append(f"    def {mname}({params}) -> Any: ...")
+    return "\n".join(parts)
+
+
+def _emit_native_members(skip: set[str]) -> str:
+    """Stub the native module's non-group public members — the internal functions
+    (``run_check`` / ``parse_*`` / ``fix_file`` / emit + excel + transport helpers)
+    and the ``Sidecar`` class — by introspecting the COMPILED module, so the
+    names/signatures are single-sourced from the Rust ``#[pyfunction]`` /
+    ``#[pymethods]`` and can't drift from a hand-written table."""
+    import laterite._laterite_native as native  # the compiled module is the SoT
+
+    funcs: list[str] = []
+    classes: list[str] = []
+    for name in sorted(dir(native)):
+        if name.startswith("_") or name in skip:
+            continue
+        obj = getattr(native, name)
+        if isinstance(obj, type):
+            classes.append(name)
+        elif callable(obj):
+            funcs.append(name)
+    blocks = [_emit_native_function(n, getattr(native, n)) for n in funcs]
+    blocks += [_emit_native_class(n, getattr(native, n)) for n in classes]
+    return "\n".join(blocks)
+
+
 def generate() -> str:
     """Build the full `.pyi` content from the dictionary."""
     data = json.loads(DICT_JSON.read_text(encoding="utf-8"))
@@ -125,12 +202,13 @@ def generate() -> str:
         "#\n"
         "# Type-stub file for the compiled `laterite._laterite_native`\n"
         "# extension. IDEs and type-checkers consult this to type-check\n"
-        "# code that imports the standard AGS4 typed-graph classes\n"
-        "# (`from laterite import PROJ, LOCA, ...`). The module's internal\n"
-        "# functions (run_check / fix_file / list_rules / parse_* / the\n"
-        "# excel + transport helpers / Sidecar) are reached through the\n"
-        "# typed Python wrappers in `laterite/__init__.py`, which carry the\n"
-        "# annotations, so they are not stubbed here.\n"
+        "# the standard AGS4 typed-graph classes (`from laterite.groups import\n"
+        "# PROJ, LOCA, ...`) AND the internal `_native.<fn>` calls inside\n"
+        "# `laterite/__init__.py`. The module's functions (run_check / fix_file /\n"
+        "# parse_* / the excel + transport helpers) and the `Sidecar` certificate\n"
+        "# class are stubbed by INTROSPECTING the compiled module (param names +\n"
+        "# defaults; types are `Any` — PyO3 doesn't expose them), so the calls\n"
+        "# resolve without a hand-maintained, drift-prone signature table.\n"
         "#\n"
         "# Custom / passthrough groups built at runtime via\n"
         "# `laterite.dynamic.get_or_register` are NOT typed in this stub —\n"
@@ -154,21 +232,35 @@ def generate() -> str:
     # the module's internal functions out of the package namespace.
     all_names = [g["code"] for g in groups_sorted]
     all_block = (
-        "\n# Re-exported to the package root for `from laterite import PROJ, ...`\n"
-        "# (see laterite/__init__.py). DO NOT EDIT BY HAND.\n"
+        "\n# Re-exported by `laterite.groups` (its TYPE_CHECKING star import) for\n"
+        "# `from laterite.groups import PROJ, ...`. DO NOT EDIT BY HAND.\n"
         "__all__ = [\n"
         + "".join(f"    {name!r},\n" for name in all_names)
         + "]\n"
     )
 
-    # Only the typed-graph classes are stubbed. The native module's internal
-    # functions (run_check / fix_file / list_rules / parse_* / excel /
-    # transport / Sidecar) are reached through the typed Python wrappers in
-    # `laterite/__init__.py`, which carry the annotations — so they are
-    # deliberately not stubbed here. (The old `ags5db_*` stubs were removed:
-    # the AGS5 surface was decoupled in #177, so they typed symbols the
-    # module no longer registers.)
-    return header + "\n".join(body_blocks) + all_block
+    # The native module's internal functions + the Sidecar certificate class,
+    # introspected from the compiled module so they resolve for type-checkers
+    # without a hand-maintained (drift-prone) table. NOT in `__all__` — they stay
+    # internal, reached only as `_native.<name>` from laterite/__init__.py.
+    native_header = (
+        "\n"
+        "# --- Internal native surface (functions + Sidecar) -----------------------\n"
+        "# Introspected from the compiled module; single-sourced from the Rust\n"
+        "# #[pyfunction] / #[pymethods]. Types are `Any` (PyO3 exposes names +\n"
+        "# defaults, not types). Reached as `_native.<name>`; kept out of __all__.\n"
+        "\n"
+    )
+    native_block = _emit_native_members(set(all_names))
+
+    return (
+        header
+        + "\n".join(body_blocks)
+        + native_header
+        + native_block
+        + "\n"
+        + all_block
+    )
 
 
 def main() -> int:

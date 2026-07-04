@@ -1,5 +1,6 @@
 import laterite
-from laterite import LOCA, PROJ, build_ags4
+from laterite import build_ags4
+from laterite.groups import LOCA, PROJ
 
 # A typed PROJ graph — children attach via .append or the constructor kwarg.
 p = PROJ(proj_id="LAT-DEMO", proj_name="Built from a typed graph")

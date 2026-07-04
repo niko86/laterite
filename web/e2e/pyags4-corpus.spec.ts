@@ -105,9 +105,19 @@ test("python-ags4 .ags corpus through the wasm validator (opt-in)", async ({
     const exp = expectedNum(f.name);
     const matched = exp == null ? null : new Set(surfaced.flatMap(numsIn)).has(exp);
     rows.push({ file: f.name, outcome, total, expected: exp, matched, surfaced });
-    console.log(
-      `${f.name.padEnd(28)} ${outcome.padEnd(9)} n=${String(total).padStart(5)} exp=${exp ?? "-"} match=${matched} :: ${surfaced.join(" | ")}`,
-    );
+    // Log ANOMALIES only, not a line per file. The filename-vs-rule `match` is a
+    // heuristic (the filename lies: an `…OK` fixture is clean, a `rule18` file
+    // legitimately trips Rule 7/9, a file python can't parse yields nothing) — it
+    // is NOT the findings safety net and a `match=false` line is not a failure.
+    // The real per-file findings gates live elsewhere: the #169 compliance
+    // harness (cross-surface floor identity, per-PR) and parity.yml (the ≥122
+    // python-ags4 oracle). What THIS spec uniquely guards is that the wasm UI
+    // survives every real fixture — so the only line worth surfacing is a
+    // `no-report`: neither findings nor a clean banner appeared (a refusal, hang
+    // or crash worth an eyeball). Full per-file detail still lands in the JSON.
+    if (outcome === "no-report") {
+      console.log(`  ⚠ no-report: ${f.name} — neither findings nor a clean banner`);
+    }
   }
 
   writeFileSync("/tmp/pyags4_report.json", JSON.stringify(rows, null, 2));

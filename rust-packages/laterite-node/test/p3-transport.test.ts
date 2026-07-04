@@ -33,19 +33,34 @@ describe("pack / unpack (zstd)", () => {
   });
 });
 
-describe("lock / unlock (zstd + age passphrase)", () => {
-  it("round-trips with the right passphrase", () => {
-    const src = p("secret.ags");
-    writeFileSync(src, PAYLOAD);
-    transport.lock(src, p("secret.zst.age"), "correct horse");
-    transport.unlock(p("secret.zst.age"), p("secret.back.ags"), "correct horse");
-    expect(readFileSync(p("secret.back.ags"), "utf8")).toBe(PAYLOAD);
-  });
+// The passphrase path pins scrypt log_N 18 (laterite-transport SCRYPT_LOG_N,
+// for age-ecosystem interop). That's a deliberately expensive KDF — ~256 MiB /
+// sub-second on a normal box, but many seconds on a memory-starved CI container
+// (the 256 MiB scrypt buffer thrashes), so these round-trips need far more than
+// vitest's 5 s default. lock + unlock is two scrypt derivations each.
+const SCRYPT_TIMEOUT_MS = 90_000;
 
-  it("fails to unlock with the wrong passphrase", () => {
-    const src = p("secret2.ags");
-    writeFileSync(src, PAYLOAD);
-    transport.lock(src, p("secret2.zst.age"), "right");
-    expect(() => transport.unlock(p("secret2.zst.age"), p("nope.ags"), "wrong")).toThrow();
-  });
+describe("lock / unlock (zstd + age passphrase)", () => {
+  it(
+    "round-trips with the right passphrase",
+    () => {
+      const src = p("secret.ags");
+      writeFileSync(src, PAYLOAD);
+      transport.lock(src, p("secret.zst.age"), "correct horse");
+      transport.unlock(p("secret.zst.age"), p("secret.back.ags"), "correct horse");
+      expect(readFileSync(p("secret.back.ags"), "utf8")).toBe(PAYLOAD);
+    },
+    SCRYPT_TIMEOUT_MS,
+  );
+
+  it(
+    "fails to unlock with the wrong passphrase",
+    () => {
+      const src = p("secret2.ags");
+      writeFileSync(src, PAYLOAD);
+      transport.lock(src, p("secret2.zst.age"), "right");
+      expect(() => transport.unlock(p("secret2.zst.age"), p("nope.ags"), "wrong")).toThrow();
+    },
+    SCRYPT_TIMEOUT_MS,
+  );
 });

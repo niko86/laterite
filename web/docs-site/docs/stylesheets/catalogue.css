@@ -1,3 +1,16 @@
+/* Docs tables fill the content column. Material renders a table `inline-block`
+   inside its `.md-typeset__table` wrapper, so a table narrower than the column
+   left-aligns and dumps all its slack on the RIGHT — an asymmetric gutter (the
+   3-col type quick-reference was the worst offender). Making the wrapper a block
+   and the table `min-width: 100%` fills the column for narrow tables while still
+   letting a genuinely wide table overflow-scroll (min-width, not width). */
+.md-typeset__table {
+  display: block;
+}
+.md-typeset__table > table {
+  min-width: 100%;
+}
+
 /* Group-catalogue master table: filter box + pager (see javascripts/catalogue.js). */
 .group-table .group-filter {
   width: 100%;
@@ -36,6 +49,14 @@
 .group-pager button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* "Show all N" sits at the far end of the pager row and reads as the active
+   way back to the unfiltered table. */
+.group-pager .group-clear {
+  margin-left: auto;
+  border-color: var(--md-accent-fg-color);
+  color: var(--md-accent-fg-color);
 }
 
 .group-pager-info {

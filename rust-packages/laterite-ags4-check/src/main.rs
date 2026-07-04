@@ -26,8 +26,10 @@ use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
+use laterite_ags4_core::index::{Sidecar, ValidationStamp};
 use laterite_ags4_parse::parse_bytes;
 use laterite_ags4_validator::dict::{Dictionary, FALLBACK};
+use laterite_ags4_validator::findings::Severity;
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, Findings, ValidatorError, check_file, findings, fix_document,
     resolve_dict_version, tran_ags_of,
@@ -113,6 +115,12 @@ usage: lat-check <file.ags> [options]
                             severity / fixable / cited observations) and
                             exit; add --json for the full machine form.
                             No input file needed.
+  --emit-index              after a clean check, mint the .ags.idx validity
+                            certificate (a byte-offset index + validation
+                            provenance) beside the file. Skipped if the file
+                            still has errors. Warnings/FYI don't block it.
+  --index-out <path>        with --emit-index: write the certificate to
+                            <path> instead of <file>.ags.idx
   --quiet                   suppress the progress spinner
   --tui                     interactive findings browser (needs the
                             `tui` build feature + an interactive terminal)
@@ -151,6 +159,10 @@ fn main() {
     // `--list-rules` (#197): informational, no input file — print the rule
     // catalogue and exit (the `--json` flag selects machine-readable output).
     let mut list_rules = false;
+    // `--emit-index [--index-out <path>]` (#294 F#10): after a clean check, mint
+    // the `.ags.idx` validity certificate beside the file (or at --index-out).
+    let mut emit_index = false;
+    let mut index_out: Option<PathBuf> = None;
     // Only declared/used with the `tui` feature; without it, `--tui`
     // is an unknown option (exit 5) — guardrail G6.
     #[cfg(feature = "tui")]
@@ -181,6 +193,14 @@ fn main() {
             },
             "--quiet" => quiet = true,
             "--list-rules" => list_rules = true,
+            "--emit-index" => emit_index = true,
+            "--index-out" => match argv.next() {
+                Some(p) => index_out = Some(PathBuf::from(p)),
+                None => {
+                    eprintln!("error: --index-out expects a path");
+                    exit(5);
+                }
+            },
             "--fix" => fix = true,
             "--fix-risky" => {
                 fix = true;
@@ -275,6 +295,11 @@ fn main() {
         exit(5);
     }
 
+    if index_out.is_some() && !emit_index {
+        eprintln!("error: --index-out only applies with --emit-index");
+        exit(5);
+    }
+
     // `--diff <b>`: compare the input file against another and exit (never falls
     // through to the validate-report below).
     if let Some(other) = diff_path.as_deref() {
@@ -331,6 +356,28 @@ fn main() {
 
             let code = if n == 0 { 0 } else { 1 };
 
+            // `--emit-index` (#294 F#10): mint the `.ags.idx` certificate once the
+            // file validated ERROR-clean (a cert vouches for error-clean; warnings/
+            // fyi ride on the stamp as counts). Skipped with a note on a file that
+            // still has errors — a certificate attests a clean validation.
+            if emit_index {
+                let (errors, warnings, fyi) = count_severities(&found);
+                if errors > 0 {
+                    eprintln!(
+                        "note: --emit-index skipped — {errors} error(s); \
+                         a certificate attests a clean validation"
+                    );
+                } else {
+                    match mint_index(&path, &opts, warnings, fyi, index_out.as_deref()) {
+                        Ok(dest) => eprintln!("note: certificate written to {}", dest.display()),
+                        Err(e) => {
+                            eprintln!("error: --emit-index: {e}");
+                            exit(3);
+                        }
+                    }
+                }
+            }
+
             // `--json-out`: always tee a JSON artifact, independent of
             // the stdout format. The normal report below still prints.
             if let Some(p) = &json_out_path {
@@ -382,6 +429,66 @@ fn main() {
             });
         }
     }
+}
+
+/// Count findings by severity — errors gate `--emit-index` (a certificate
+/// attests an error-clean file); warnings/fyi ride on the stamp as counts.
+fn count_severities(found: &Findings) -> (u32, u32, u32) {
+    let (mut errors, mut warnings, mut fyi) = (0u32, 0u32, 0u32);
+    for f in found.values().flatten() {
+        match f.severity {
+            Severity::Error => errors += 1,
+            Severity::Warning => warnings += 1,
+            Severity::Fyi => fyi += 1,
+        }
+    }
+    (errors, warnings, fyi)
+}
+
+/// `<source>.ags.idx` — the certificate path Python's `.certify()` and the
+/// DuckDB `ags_index` also use: append `.idx` to the full filename, so
+/// `delivery.ags` → `delivery.ags.idx`.
+fn default_index_path(path: &Path) -> PathBuf {
+    let mut s = path.as_os_str().to_os_string();
+    s.push(".idx");
+    PathBuf::from(s)
+}
+
+/// Mint the `.ags.idx` validity certificate for an error-clean `path`: re-index
+/// the bytes, stamp the engine identity + edition + advisory counts, and write
+/// it (to `index_out`, else `<path>.ags.idx`). Core owns the format; this
+/// validator-aware binding is the opt-in minting layer the `index` module names.
+fn mint_index(
+    path: &Path,
+    opts: &CheckOptions,
+    warnings: u32,
+    fyi: u32,
+    index_out: Option<&Path>,
+) -> Result<PathBuf, String> {
+    let bytes = std::fs::read(path).map_err(|e| format!("read {}: {e}", path.display()))?;
+    let pf = parse_bytes(&bytes, opts.encoding).map_err(|e| ValidatorError::from(e).to_string())?;
+    let dv = resolve_dict_version(opts.dict_version, tran_ags_of(&pf).as_deref())
+        .map(|(dv, _)| dv)
+        .unwrap_or(FALLBACK);
+    let stamp = ValidationStamp {
+        validator: "lat-check".to_string(),
+        // The ENGINE version (comparable across surfaces), not this CLI's crate.
+        validator_version: laterite_ags4_validator::VERSION.to_string(),
+        compat: None,
+        check_files: opts.check_files,
+        edition_forced: opts.dict_version.is_some(),
+        checked_at: chrono::Utc::now().to_rfc3339(),
+        warnings,
+        fyi,
+    };
+    let sidecar =
+        Sidecar::assemble(&bytes, dv.as_str().to_string(), stamp).map_err(|e| e.to_string())?;
+    let dest = index_out
+        .map(PathBuf::from)
+        .unwrap_or_else(|| default_index_path(path));
+    let json = sidecar.to_json().map_err(|e| e.to_string())?;
+    write_atomic(&dest, &json).map_err(|e| format!("write {}: {e}", dest.display()))?;
+    Ok(dest)
 }
 
 /// `--fix`: mechanically repair the file via the validator's shared
@@ -516,6 +623,12 @@ fn run_fix(
             "applied {n_applied} fix(es) [{}] → {}",
             kinds.join(", "),
             dest.display()
+        );
+    }
+    if !risky && outcome.risky_available > 0 {
+        println!(
+            "{} more fixable with --fix-risky (intent-guessing fixes withheld)",
+            outcome.risky_available
         );
     }
     let n_residual = findings::count(&outcome.residual);
@@ -734,5 +847,57 @@ mod tests {
         );
         let p = plain_string(Path::new("x.ags"), &sample(), 2);
         assert!(p.contains("2 finding(s)") && p.contains("LOCA"));
+    }
+
+    // --- `--emit-index` (#294 F#10) --------------------------------------
+
+    #[test]
+    fn default_index_path_appends_ags_idx() {
+        // `delivery.ags` → `delivery.ags.idx` (append, matching Python .certify()).
+        assert_eq!(
+            default_index_path(Path::new("/data/delivery.ags")),
+            PathBuf::from("/data/delivery.ags.idx")
+        );
+    }
+
+    #[test]
+    fn count_severities_gates_on_errors() {
+        // sample() is two error-severity findings → errors gate the mint.
+        assert_eq!(count_severities(&sample()), (2, 0, 0));
+        assert_eq!(count_severities(&Findings::new()), (0, 0, 0));
+    }
+
+    // The shared hand-authored ERROR-clean AGS4 fixture (CRLF, enforced by
+    // .gitattributes `*.ags eol=crlf`). Referenced, not copied — one source.
+    const CLEAN_AGS: &str =
+        include_str!("../../laterite-ags4-validator/tests/fixtures/clean_minimal.ags");
+
+    #[test]
+    fn mint_index_writes_a_parseable_certificate() {
+        let dir = std::env::temp_dir();
+        let src = dir.join(format!("lat_emit_index_{}.ags", std::process::id()));
+        std::fs::write(&src, CLEAN_AGS).unwrap();
+        let opts = CheckOptions {
+            include_warnings: true,
+            ..CheckOptions::default()
+        };
+        // Sanity: the fixture really is error-clean (else the mint would be a lie).
+        let found = check_file(&src, &opts).unwrap();
+        assert_eq!(count_severities(&found).0, 0, "fixture must be error-clean");
+
+        let dest = mint_index(&src, &opts, 0, 0, None).unwrap();
+        assert_eq!(dest, default_index_path(&src));
+        let json = std::fs::read(&dest).unwrap();
+        let sidecar = Sidecar::from_json(&json).unwrap();
+        assert_eq!(sidecar.validation.validator, "lat-check");
+        assert_eq!(sidecar.file.edition, "4.2");
+        for g in ["PROJ", "TRAN", "UNIT", "TYPE"] {
+            assert!(sidecar.groups.contains_key(g), "missing group {g}");
+        }
+        // The cert vouches for THESE bytes: it verifies fresh against them.
+        assert!(sidecar.is_fresh_for(CLEAN_AGS.as_bytes()));
+
+        let _ = std::fs::remove_file(&src);
+        let _ = std::fs::remove_file(&dest);
     }
 }

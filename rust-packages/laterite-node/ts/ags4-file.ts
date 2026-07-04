@@ -1,9 +1,38 @@
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { type Table, tableFromIPC } from "apache-arrow";
-import { DuckEngine, type QueryOptions, quoteId, type Row } from "./duckdb";
+import { DuckEngine, type QueryOptions, quoteId, type Row, stripSynthKeys } from "./duckdb";
+import { Ags4Error } from "./errors";
+// The chained verbs (`validate`/`fix`/`diff`) reuse the free functions with this
+// handle's retained source, so the ONE engine call + error mapping lives in one
+// place. index.ts imports Ags4File, so this is a deliberate cycle — safe because
+// the free fns are referenced only inside method bodies (resolved at call time,
+// never at module-eval time), the standard ESM live-binding pattern.
+import {
+  type DiffOptions,
+  type DiffSource,
+  type FixOptions,
+  type RevisionDelta,
+  type ValidateOptions,
+  diff as diffFree,
+  fix as fixFree,
+  validate as validateFree,
+} from "./index";
+import type { FixResult } from "./fix-result";
 import type { GroupMeta } from "./native";
-import { Reading } from "./native";
+import { Reading, Sidecar, parseArrow } from "./native";
+import { Report } from "./report";
 import { AgsSubset, type Filter } from "./subset";
+
+/** The source a handle was read from — retained so the chained `validate`/`fix`/
+ * `diff` verbs re-run against the TRUE bytes (matching original line numbers),
+ * not the byte-faithful `.bytes` re-emit. A synthesised handle has none. */
+export interface Ags4Source {
+  path?: string;
+  text?: string;
+  data?: Uint8Array;
+  encoding?: string;
+}
 
 /**
  * A parsed AGS4 file — the Node port of laterite-py's `Ags4File`. The read
@@ -19,16 +48,38 @@ import { AgsSubset, type Filter } from "./subset";
  */
 export class Ags4File {
   readonly #reading: Reading;
-  // One arrow-js Table per group, decoded once on first `table(code)`.
+  // One RAW keyed arrow-js Table per group, decoded once (with _id/_parent_id
+  // for known groups). The relational `#register` reads these.
   readonly #tables = new Map<string, Table>();
+  // The key-stripped frame VIEW per group (a zero-copy projection of the raw
+  // Table), memoised so `table(code)` keeps returning the same instance.
+  readonly #stripped = new Map<string, Table>();
   // The DuckDB engine — created lazily on first sql()/at()/connection.
   #engine: DuckEngine | null = null;
   // Memoised AGS4 re-emit (the `text`/`bytes` getters; the emit is O(size)).
   #text?: string;
   #bytes?: Buffer;
+  // The retained read source (for faithful chained re-runs) + the last verb
+  // outcomes: `#report` from `.validate()`, `#fixReport` on a `.fix()` result.
+  readonly #src?: Ags4Source;
+  #report?: Report;
+  #fixReport?: FixResult;
+  // The `.ags.idx` certificate carried from `read(..., { index })`, and the check
+  // profile of the last `.validate()` engine run — so a following `.certify()`
+  // stamps what was actually checked (#294 Batch E / #14).
+  #cert?: Sidecar;
+  #lastCheckFiles = false;
+  #lastForced = false;
 
-  constructor(reading: Reading) {
+  constructor(reading: Reading, src?: Ags4Source) {
     this.#reading = reading;
+    this.#src = src;
+  }
+
+  /** @internal — `read(..., { index })` attaches a freshness-checked certificate
+   * so a later errors-only `.validate()` can skip the rule engine. */
+  _attachCert(cert: Sidecar): void {
+    this.#cert = cert;
   }
 
   // --- metadata (no Arrow decode) ------------------------------------------
@@ -77,11 +128,10 @@ export class Ags4File {
 
   // --- born-typed data (Arrow-direct) --------------------------------------
 
-  /** One group as a born-typed arrow-js `Table` (a 2DP heading is Float64, an ID
-   * Utf8, a DT a Timestamp) — the SAME typing the Python/wasm hosts produce,
-   * byte-identical by construction (one shared `build_record_batch`). Cached per
-   * group. Throws if `code` isn't in the file. */
-  table(code: string): Table {
+  /** The raw keyed Table straight from IPC — a KNOWN group carries the two
+   * content-addressed key columns `_id`/`_parent_id` first (#303). Cached; both
+   * the frame accessor and the relational `#register` read it. */
+  #rawTable(code: string): Table {
     const cached = this.#tables.get(code);
     if (cached !== undefined) return cached;
     const ipc = this.#reading.tableIpc(code);
@@ -89,6 +139,25 @@ export class Ags4File {
     const table = tableFromIPC(ipc);
     this.#tables.set(code, table);
     return table;
+  }
+
+  /** One group as a born-typed arrow-js `Table` (a 2DP heading is Float64, an ID
+   * Utf8, a DT a Timestamp) — the SAME typing the Python/wasm hosts produce,
+   * byte-identical by construction (one shared `build_record_batch`). Cached per
+   * group. Throws if `code` isn't in the file.
+   *
+   * By default the synthetic `_id`/`_parent_id` key columns are **dropped**; pass
+   * `{ keys: true }` to include them (the relational `sql()`/`at()` layer always
+   * carries them regardless — that's what makes cross-group joins work). */
+  table(code: string, opts?: { keys?: boolean }): Table {
+    const raw = this.#rawTable(code);
+    if (opts?.keys) return raw;
+    let stripped = this.#stripped.get(code);
+    if (stripped === undefined) {
+      stripped = stripSynthKeys(raw);
+      this.#stripped.set(code, stripped);
+    }
+    return stripped;
   }
 
   // --- emit / save ---------------------------------------------------------
@@ -114,6 +183,174 @@ export class Ags4File {
     return path;
   }
 
+  // --- fluent verbs (validate / fix / diff) --------------------------------
+
+  /** Resolve this handle to the `(source, opts)` the free fns take: the retained
+   * read source (so line numbers match the original), or the re-emit for a
+   * synthesised handle. `text` is not re-encoded; a path/bytes source carries its
+   * read `encoding`. */
+  #freeSource(): [string | Uint8Array | undefined, { text?: string; encoding?: string }] {
+    const s = this.#src;
+    if (s?.path !== undefined) return [s.path, { encoding: s.encoding }];
+    if (s?.text !== undefined) return [undefined, { text: s.text }];
+    if (s?.data !== undefined) return [s.data, { encoding: s.encoding }];
+    return [this.bytes, {}]; // no retained source → validate/fix the re-emit
+  }
+
+  /** The last `.validate()` outcome (`undefined` until validated). */
+  get report(): Report | undefined {
+    return this.#report;
+  }
+
+  /** The `FixResult` on a handle returned by `.fix()` (`undefined` otherwise). */
+  get fixReport(): FixResult | undefined {
+    return this.#fixReport;
+  }
+
+  /** Validate this file against the AGS4 rules and return `this` (chainable —
+   * `read(p).validate().sql(...)`); the outcome lands on `.report`. Same engine as
+   * the free `validate()`, run on the source this handle was read from so line
+   * numbers match the original. Errors + WARNINGs by default (`warnings`); `fyi`
+   * adds the low-signal tier. `encoding` defaults to the one this handle was read
+   * with. Mirrors `laterite.Ags4File.validate()`. */
+  validate(opts: Omit<ValidateOptions, "text"> = {}): this {
+    const warnings = opts.warnings ?? true;
+    const fyi = opts.fyi ?? false;
+    const checkFiles = opts.checkFiles ?? false;
+    // Certificate short-circuit: a fresh cert minted by the CURRENT native engine
+    // already proves the file validated clean, so an errors-only request skips the
+    // rule engine (a cert records only the error verdict, not the warning/FYI list;
+    // ask for those and the engine runs). A cert from a different/older engine is
+    // re-validated, not trusted. (#294 Batch E / #14)
+    if (
+      this.#cert !== undefined &&
+      !warnings &&
+      !fyi &&
+      this.#cert.matchesNativeValidator() &&
+      this.#cert.profileCovers(checkFiles, opts.dictVersion)
+    ) {
+      this.#report = Report.fromCert(this.#cert, this.#srcLabel());
+      return this;
+    }
+    // Engine run — remember the check profile so a following `.certify()` stamps
+    // it into the cert (errors-only default ⇒ both false).
+    this.#lastCheckFiles = checkFiles;
+    this.#lastForced = opts.dictVersion !== undefined;
+    const [source, base] = this.#freeSource();
+    this.#report = validateFree(source, {
+      ...base,
+      ...opts,
+      encoding: opts.encoding ?? base.encoding,
+    });
+    return this;
+  }
+
+  /** Mechanically repair this file and return a NEW, repaired `Ags4File` — the
+   * fluent transform, so `read(p).fix().validate().save(out)` reads as one chain.
+   * The `FixResult` (what was applied + residual findings) rides on the returned
+   * handle's `.fixReport`. Safe fixes always apply; `risky` adds the intent-
+   * guessing set. `encoding` defaults to this handle's read encoding. Non-
+   * destructive — the source on disk is untouched. Mirrors
+   * `laterite.Ags4File.fix()`. */
+  fix(opts: Omit<FixOptions, "text"> = {}): Ags4File {
+    const [source, base] = this.#freeSource();
+    const result = fixFree(source, { ...base, ...opts, encoding: opts.encoding ?? base.encoding });
+    // The repaired handle's source IS the repaired UTF-8 bytes (BOM-stripped).
+    const repaired = new Ags4File(parseArrow(undefined, undefined, result.bytes, undefined), {
+      data: result.bytes,
+    });
+    repaired.#fixReport = result;
+    return repaired;
+  }
+
+  /** Compare this file (the baseline) against `other` (the revision) — the
+   * `RevisionDelta` the free `diff()` returns. `other` is a path, bytes, or another
+   * `Ags4File`. `encoding` defaults to this handle's read encoding. Mirrors
+   * `laterite.Ags4File.diff()`. */
+  diff(other: DiffSource, opts: DiffOptions = {}): RevisionDelta {
+    return diffFree(this, other, { ...opts, encoding: opts.encoding ?? this.#src?.encoding });
+  }
+
+  // --- certificate (.ags.idx) ----------------------------------------------
+
+  /** The ORIGINAL source bytes — what a certificate indexes + fingerprints, NOT
+   * the spec-correct re-emit (which can differ from a non-canonically-formatted
+   * on-disk file). A path is re-read, raw bytes returned as-is, text UTF-8-encoded;
+   * a synthesised handle falls back to the re-emit. Mirrors `_source_bytes`. */
+  #sourceBytes(): Uint8Array {
+    const s = this.#src;
+    if (s?.path !== undefined) return readFileSync(s.path);
+    if (s?.data !== undefined) return s.data;
+    if (s?.text !== undefined) return Buffer.from(s.text, "utf8");
+    return this.bytes;
+  }
+
+  /** The `Report.fromCert` label for a certified verdict: the path, or a bytes/
+   * text sentinel. */
+  #srcLabel(): string {
+    const s = this.#src;
+    if (s?.path !== undefined) return s.path;
+    if (s?.data !== undefined) return "<bytes>";
+    return "<text>";
+  }
+
+  /** Mint this file's `.ags.idx` validity certificate — a clean-validation proof
+   * plus a byte-offset index — and write it beside the file. REQUIRES a prior
+   * clean `.validate()`: certify *vouches for* a passed validation, it does not run
+   * one. `path` is the certificate's OUTPUT location (default `<source>.idx`), not
+   * a file to certify — it refuses to overwrite the source or any existing
+   * non-certificate file. Returns the written path. The cert is byte-identical to
+   * Python's / `lat-check --emit-index`'s, so `lat-check` reads it, and a later
+   * `read(f, { index })` consumes it to skip re-validation. Mirrors
+   * `laterite.Ags4File.certify()`. */
+  certify(path?: string): string {
+    if (this.#report === undefined) {
+      throw new Ags4Error(
+        "call .validate() before .certify() — certify records a passed validation, it does not run one",
+      );
+    }
+    if (!this.#report.isValid) {
+      throw new Ags4Error(
+        `cannot certify a file with ${this.#report.count} finding(s); fix them and re-validate clean first`,
+      );
+    }
+    const srcPath = this.#src?.path;
+    const out = path ?? (srcPath !== undefined ? `${srcPath}.idx` : undefined);
+    if (out === undefined) {
+      throw new Ags4Error(
+        "no source path to derive the .ags.idx location from; pass certify(path) for a handle read from text/bytes",
+      );
+    }
+    // `out` is where the .ags.idx is WRITTEN, never a file to certify. Guard the
+    // data-loss footgun read(p).validate().certify(p), and refuse to clobber any
+    // existing non-certificate file — certify only ever writes/replaces an .ags.idx.
+    if (srcPath !== undefined && resolve(out) === resolve(srcPath)) {
+      throw new Ags4Error(
+        `certify(path) is the .ags.idx OUTPUT location, not the file to certify — refusing to overwrite the source ${out}`,
+      );
+    }
+    if (existsSync(out) && statSync(out).size > 0) {
+      const head = readFileSync(out).subarray(0, 64).toString("utf8").trimStart();
+      if (!head.startsWith("{")) {
+        throw new Ags4Error(
+          `refusing to overwrite ${out}: it is not a laterite certificate (certify writes or replaces an .ags.idx)`,
+        );
+      }
+    }
+    const cert = Sidecar.assemble(
+      this.#sourceBytes(),
+      this.#report.dictVersion,
+      new Date().toISOString(),
+      undefined,
+      undefined,
+      undefined,
+      this.#lastCheckFiles,
+      this.#lastForced,
+    );
+    writeFileSync(out, cert.toJson());
+    return out;
+  }
+
   // --- optional DuckDB engine (sql / at / connection) ----------------------
 
   async #getEngine(): Promise<DuckEngine> {
@@ -121,9 +358,11 @@ export class Ags4File {
     return this.#engine;
   }
 
-  /** Load one group into the engine on demand (CTAS from its born-typed Table). */
+  /** Load one group into the engine on demand (CTAS from its born-typed Table).
+   * Uses the RAW keyed Table so the relational layer carries `_id`/`_parent_id`
+   * (the accessor strips them; the engine keeps them for joins). */
   async #register(code: string, engine: DuckEngine): Promise<void> {
-    await engine.register(code, this.#meta(code), this.table(code));
+    await engine.register(code, this.#meta(code), this.#rawTable(code));
   }
 
   async #registerAll(engine: DuckEngine): Promise<void> {
@@ -193,7 +432,12 @@ export class Ags4File {
       }
     }
     const where = clauses.length > 0 ? clauses.join(" AND ") : "TRUE";
-    const sql = `SELECT * FROM ${quoteId(code)} WHERE ${where}`;
+    // Strip the synthetic key columns from this FRAME surface (the engine table
+    // keeps them for joins; the `.at()` accessor returns AGS data). A passthrough
+    // group has none, so a plain `*`. (#303)
+    const keyed = this.#rawTable(code).schema.fields.some((f) => f.name === "_id");
+    const select = keyed ? "* EXCLUDE (_id, _parent_id)" : "*";
+    const sql = `SELECT ${select} FROM ${quoteId(code)} WHERE ${where}`;
     return opts.arrow ? engine.queryArrow(sql, params) : engine.query(sql, params);
   }
 

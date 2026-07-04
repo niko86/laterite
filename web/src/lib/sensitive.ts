@@ -29,20 +29,47 @@ export function loadSensitive(): Promise<SensitiveDoc> {
   return cache;
 }
 
-// The web Anonymiser blanks/tokenises whole cell VALUES — it can't
-// pseudonymise — so it must NOT pre-tick identifier columns whose values are
-// cross-referenced: blanking them would break the file. (The corpus `censor`
-// pseudonymises these instead; same list, different action.)
-const NON_PREFILL = new Set(["location_id", "project_id"]);
+/** The redaction action for a heading, taken from the SSOT's `scrub_policy`
+ *  (the same category→action map the corpus `censor` uses): `pseudonym` for
+ *  location IDs (a stable per-column token, cross-references intact), `filehash`
+ *  for PROJ_ID (the file's content hash), `blank` for coordinates, `token` for
+ *  names/labs/etc., `brackets` for free-text `[units]`. */
+export type Action = "filehash" | "pseudonym" | "blank" | "token" | "brackets";
 
-/** Heading codes to pre-select for redaction: every classified heading except
- *  the identifier categories the web tool can't safely blank. */
-export function prefillCodes(doc: SensitiveDoc): Set<string> {
+/** Pre-tick scopes for the Anonymiser. */
+export type Preset = "coords" | "coords-text" | "all";
+
+const PRESET_CATEGORIES: Record<Preset, ReadonlySet<string> | "all"> = {
+  coords: new Set(["coordinate"]),
+  "coords-text": new Set(["coordinate", "remark", "freetext"]),
+  all: "all",
+};
+
+/** Heading codes to pre-tick for a preset, by their SSOT category. */
+export function codesForPreset(doc: SensitiveDoc, preset: Preset): Set<string> {
+  const cats = PRESET_CATEGORIES[preset];
   const out = new Set<string>();
   for (const [code, h] of Object.entries(doc.headings)) {
-    if (!NON_PREFILL.has(h.category)) out.add(code);
+    if (cats === "all" || cats.has(h.category)) out.add(code);
   }
   return out;
+}
+
+/** All classified sensitive headings — the default ("all identifying") pre-tick.
+ *  Now includes the identifier categories: the Anonymiser pseudonymises IDs and
+ *  hashes PROJ_ID (rather than blanking), so cross-references stay intact. */
+export function prefillCodes(doc: SensitiveDoc): Set<string> {
+  return codesForPreset(doc, "all");
+}
+
+/** Heading code → its redaction action (via category → `scrub_policy`). */
+export function actionOf(doc: SensitiveDoc): Map<string, Action> {
+  const m = new Map<string, Action>();
+  for (const [code, h] of Object.entries(doc.headings)) {
+    const a = doc.scrub_policy[h.category];
+    if (a) m.set(code, a as Action);
+  }
+  return m;
 }
 
 /** Heading code → category, for the per-column UI hint. */

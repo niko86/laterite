@@ -103,7 +103,7 @@ _EXERCISE = textwrap.dedent(
         from laterite.ags_types import canonical_type, parse_value
         assert parse_value("12.50", "2DP") == 12.5 and canonical_type("2DP")
     def t_typed_classes():
-        from laterite import LOCA, PROJ
+        from laterite.groups import LOCA, PROJ
         p = PROJ(proj_id="P1", locas=[LOCA(loca_id="BH01")])
         assert p.proj_id == "P1" and p.locas[0].loca_id == "BH01"
     def t_dict_for():

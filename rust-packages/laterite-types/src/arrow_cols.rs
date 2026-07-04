@@ -39,17 +39,80 @@ pub fn build_record_batch<'a, F>(
 where
     F: Fn(usize, usize) -> Option<&'a str>,
 {
-    let ncols = headings.len();
-    let mut fields = Vec::with_capacity(ncols);
-    let mut columns: Vec<ArrayRef> = Vec::with_capacity(ncols);
+    let mut fields = Vec::with_capacity(headings.len());
+    let mut columns: Vec<ArrayRef> = Vec::with_capacity(headings.len());
+    append_heading_columns(&mut fields, &mut columns, headings, ags_types, n_rows, cell);
+    let schema = Arc::new(Schema::new(fields));
+    RecordBatch::try_new(schema, columns)
+}
+
+/// Like [`build_record_batch`], but prepends the two content-addressed key
+/// columns — `_id` (col 0) and `_parent_id` (col 1, NULL for a root group) —
+/// from caller-computed ids, then the heading columns. The column order, the
+/// `Utf8` type, and the root-NULL exactly match the `.ags5db` DuckDB
+/// extension's `read_ags` recipe, so a file's keys are byte-identical whether
+/// they come from the extension or any host wheel. `ids[row]` is the
+/// `(_id, _parent_id)` pair (see `laterite_ags4_core::keychain::group_row_ids`,
+/// which wraps the one `keychain::row_ids` the extension also calls); a row past
+/// the end of `ids` (defensive — callers pass `ids.len() == n_rows`) yields a
+/// null id pair. This leaf stays **keychain-free**: the caller owns the id
+/// computation, so `laterite-types` keeps its minimal wasm-safe dependency set.
+pub fn build_record_batch_with_ids<'a, F>(
+    ids: &[(String, Option<String>)],
+    headings: &[String],
+    ags_types: &[String],
+    n_rows: usize,
+    cell: F,
+) -> Result<RecordBatch, ArrowError>
+where
+    F: Fn(usize, usize) -> Option<&'a str>,
+{
+    let mut fields = Vec::with_capacity(headings.len() + 2);
+    let mut columns: Vec<ArrayRef> = Vec::with_capacity(headings.len() + 2);
+
+    let mut id_b = StringBuilder::with_capacity(n_rows, n_rows * 36);
+    let mut pid_b = StringBuilder::with_capacity(n_rows, n_rows * 36);
+    for row in 0..n_rows {
+        match ids.get(row) {
+            Some((id, parent)) => {
+                id_b.append_value(id);
+                pid_b.append_option(parent.as_deref());
+            }
+            // Defensive: ids shorter than n_rows → null pair (never a panic).
+            None => {
+                id_b.append_null();
+                pid_b.append_null();
+            }
+        }
+    }
+    fields.push(Field::new("_id", DataType::Utf8, true));
+    columns.push(Arc::new(id_b.finish()) as ArrayRef);
+    fields.push(Field::new("_parent_id", DataType::Utf8, true));
+    columns.push(Arc::new(pid_b.finish()) as ArrayRef);
+
+    append_heading_columns(&mut fields, &mut columns, headings, ags_types, n_rows, cell);
+    let schema = Arc::new(Schema::new(fields));
+    RecordBatch::try_new(schema, columns)
+}
+
+/// Build one typed column per heading and push its field + array. Shared by the
+/// keyed and unkeyed batch builders so the casting is identical between them.
+fn append_heading_columns<'a, F>(
+    fields: &mut Vec<Field>,
+    columns: &mut Vec<ArrayRef>,
+    headings: &[String],
+    ags_types: &[String],
+    n_rows: usize,
+    cell: F,
+) where
+    F: Fn(usize, usize) -> Option<&'a str>,
+{
     for (col, heading) in headings.iter().enumerate() {
         let ags_type = ags_types.get(col).map(String::as_str).unwrap_or("X");
         let (array, dt) = build_column(n_rows, ags_type, |row| cell(col, row));
         fields.push(Field::new(heading, dt, true));
         columns.push(array);
     }
-    let schema = Arc::new(Schema::new(fields));
-    RecordBatch::try_new(schema, columns)
 }
 
 /// Build one typed Arrow column of `n_rows` cells, reading each via

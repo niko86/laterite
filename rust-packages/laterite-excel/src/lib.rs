@@ -19,12 +19,13 @@
 //! Stage 2b of the python-ags4 parity arc.
 
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::path::Path;
 
-use calamine::{Data, Reader, open_workbook_auto};
+use calamine::{Data, Reader, open_workbook_auto_from_rs};
 use rust_xlsxwriter::Workbook;
 
-use laterite_ags4_core::ags4_codec::{AgsGroup, read_ags4};
+use laterite_ags4_core::ags4_codec::{AgsGroup, read_ags4_bytes};
 use laterite_ags4_core::error::CliError;
 use laterite_ags4_emit::{EmitGroup, write_ags4};
 
@@ -49,7 +50,26 @@ pub fn ags4_to_excel(
     output: &Path,
     ordered_keys: Option<Vec<String>>,
 ) -> Result<ExcelStats, CliError> {
-    let parsed = read_ags4(input)?;
+    let bytes = std::fs::read(input)
+        .map_err(|e| CliError::Schema(format!("read {}: {e}", input.display())))?;
+    let (xlsx, stats) = ags4_bytes_to_xlsx(&bytes, ordered_keys)?;
+    std::fs::write(output, xlsx)
+        .map_err(|e| CliError::Schema(format!("save xlsx {}: {e}", output.display())))?;
+    Ok(stats)
+}
+
+/// AGS4 bytes → XLSX bytes — the **FS-free core** the wasm surface (#359) and
+/// the path wrapper above both call. Each group becomes a worksheet in
+/// python-ags4's layout.
+///
+/// `ordered_keys`: if `Some`, write groups in this exact order (the caller
+/// ensures every key exists in the parsed file); if `None`, preserve the AGS4
+/// source order.
+pub fn ags4_bytes_to_xlsx(
+    input: &[u8],
+    ordered_keys: Option<Vec<String>>,
+) -> Result<(Vec<u8>, ExcelStats), CliError> {
+    let parsed = read_ags4_bytes(input)?;
     let order: Vec<String> = ordered_keys.unwrap_or_else(|| parsed.order.clone());
 
     if order.is_empty() {
@@ -122,14 +142,17 @@ pub fn ags4_to_excel(
         sheets_written += 1;
     }
 
-    workbook
-        .save(output)
-        .map_err(|e| CliError::Schema(format!("save xlsx {}: {e}", output.display())))?;
-    Ok(ExcelStats {
-        sheets_written,
-        rows_written,
-        warnings,
-    })
+    let buf = workbook
+        .save_to_buffer()
+        .map_err(|e| CliError::Schema(format!("build xlsx: {e}")))?;
+    Ok((
+        buf,
+        ExcelStats {
+            sheets_written,
+            rows_written,
+            warnings,
+        },
+    ))
 }
 
 /// Pad a row's cells to the heading count and write at row index `r`.
@@ -197,8 +220,26 @@ pub fn excel_to_ags4(
     output: &Path,
     format_numeric_columns: bool,
 ) -> Result<ExcelStats, CliError> {
-    let mut workbook = open_workbook_auto(input)
-        .map_err(|e| CliError::Schema(format!("open xlsx {}: {e}", input.display())))?;
+    let bytes = std::fs::read(input)
+        .map_err(|e| CliError::Schema(format!("read {}: {e}", input.display())))?;
+    let (ags4, stats) = xlsx_bytes_to_ags4(&bytes, format_numeric_columns)?;
+    std::fs::write(output, ags4)
+        .map_err(|e| CliError::Schema(format!("create {}: {e}", output.display())))?;
+    Ok(stats)
+}
+
+/// XLSX bytes → AGS4 bytes — the **FS-free core** the wasm surface (#359) and
+/// the path wrapper above both call. Each worksheet with a `HEADING` column
+/// becomes one AGS4 group; columns not matching Rule 19's
+/// `[A-Z0-9]{4}_[A-Z0-9]{1,4}` are dropped (with a warning); rows whose HEADING
+/// isn't `UNIT`/`TYPE`/`DATA` are dropped. See [`excel_to_ags4`] for the
+/// `format_numeric_columns` semantics.
+pub fn xlsx_bytes_to_ags4(
+    input: &[u8],
+    format_numeric_columns: bool,
+) -> Result<(Vec<u8>, ExcelStats), CliError> {
+    let mut workbook = open_workbook_auto_from_rs(Cursor::new(input))
+        .map_err(|e| CliError::Schema(format!("open xlsx: {e}")))?;
 
     let sheet_names: Vec<String> = workbook.sheet_names().to_vec();
     let mut emit_groups: Vec<AgsGroup> = Vec::new();
@@ -333,15 +374,17 @@ pub fn excel_to_ags4(
         })
         .collect();
 
-    let mut out_file = std::fs::File::create(output)
-        .map_err(|e| CliError::Schema(format!("create {}: {e}", output.display())))?;
-    write_ags4(&mut out_file, &emit_views)?;
+    let mut out: Vec<u8> = Vec::new();
+    write_ags4(&mut out, &emit_views)?;
 
-    Ok(ExcelStats {
-        sheets_written: emit_groups.len(),
-        rows_written,
-        warnings,
-    })
+    Ok((
+        out,
+        ExcelStats {
+            sheets_written: emit_groups.len(),
+            rows_written,
+            warnings,
+        },
+    ))
 }
 
 /// Re-format every DATA cell whose column's TYPE row declares a
@@ -497,6 +540,9 @@ fn matches_rule_19_heading(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // The path round-trip tests re-parse the emitted file to assert its data;
+    // the non-test code path now reads bytes, so this is test-only.
+    use laterite_ags4_core::ags4_codec::read_ags4;
     use tempfile::tempdir;
 
     // --- Rule 19 heading guard ------------------------------------
@@ -668,6 +714,29 @@ mod tests {
         assert_eq!(loca.rows.len(), 2);
         assert_eq!(loca.rows[0]["LOCA_ID"], "BH01");
         // 2DP numeric formatting preserved through the round trip.
+        assert_eq!(loca.rows[0]["LOCA_NATE"], "523145.10");
+    }
+
+    #[test]
+    fn bytes_round_trips_with_no_filesystem() {
+        // The FS-free path the wasm surface (#359) drives: bytes in, bytes out,
+        // no temp files. Must match the path round-trip exactly.
+        let (xlsx, w) = ags4_bytes_to_xlsx(SAMPLE_AGS4.as_bytes(), None).unwrap();
+        assert_eq!(w.sheets_written, 2);
+        assert_eq!(w.rows_written, 3); // 1 PROJ + 2 LOCA
+        // A real .xlsx is a zip container — the magic bytes are "PK".
+        assert_eq!(&xlsx[0..2], b"PK");
+
+        let (ags4, r) = xlsx_bytes_to_ags4(&xlsx, true).unwrap();
+        assert_eq!(r.sheets_written, 2);
+        assert_eq!(r.rows_written, 3);
+
+        let reparsed = read_ags4_bytes(&ags4).unwrap();
+        assert!(reparsed.groups.contains_key("PROJ"));
+        let loca = &reparsed.groups["LOCA"];
+        assert_eq!(loca.rows.len(), 2);
+        assert_eq!(loca.rows[0]["LOCA_ID"], "BH01");
+        // 2DP numeric formatting survives the FS-free round trip too.
         assert_eq!(loca.rows[0]["LOCA_NATE"], "523145.10");
     }
 

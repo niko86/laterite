@@ -35,6 +35,10 @@ rust-packages/**/target/
 # covered by the global `dist/` entry above.
 web/node_modules/
 web/src/wasm/
+# The docs Node-snippet gate (laterite-node/test/docs-examples.test.ts) drops a
+# node_modules/laterite symlink beside the examples so their literal
+# `import … from "laterite"` resolves to the local build — never committed.
+web/docs-site/examples/node/node_modules/
 
 # Claude Code local settings
 .claude/

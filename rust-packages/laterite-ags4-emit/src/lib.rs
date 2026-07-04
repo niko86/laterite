@@ -14,7 +14,7 @@ mod error;
 mod writer;
 
 #[cfg(feature = "arrow")]
-pub use arrow_in::{cell_value, group_from_arrow};
+pub use arrow_in::{cell_value, group_from_arrow, group_from_arrow_with_meta};
 pub use emit::{EmitMode, EmitOpts, EmitResult, GroupInput, emit_ags4};
 pub use error::EmitError;
 pub use writer::{EmitGroup, write_ags4};
