@@ -682,11 +682,11 @@ jobs:
           merge-multiple: true
       - name: Assemble platform packages + dist
         run: |
-          npx napi create-npm-dir -t .
+          npx napi create-npm-dirs
           npx napi artifacts -d artifacts
           npm run build:ts
 
-      # Publish the platform packages (napi prepublish: also syncs the main
+      # Publish the platform packages (napi pre-publish: also syncs the main
       # package's optionalDependencies to this version), then the main package.
       # `--provenance` attaches the build provenance attestation.
       #

@@ -52,7 +52,7 @@
     "build:ts": "tsup",
     "artifacts": "napi artifacts",
     "smoke:pack": "node tools/pack-smoke.mjs",
-    "prepublish:napi": "napi prepublish -t npm --skip-gh-release",
+    "prepublish:napi": "napi pre-publish -t npm",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
