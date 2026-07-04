@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@bokuweb/zstd-wasm": "0.0.27",
-    "@duckdb/duckdb-wasm": "^1.33.1-dev45.0",
+    "@duckdb/duckdb-wasm": "^1.33.1-dev57.0",
     "@tanstack/solid-virtual": "^3.13.30",
     "@types/leaflet": "^1.9.21",
     "@types/proj4": "^2.19.0",
