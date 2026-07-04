@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-07-04
+
+### Fixed
+
+- **The risky Rule-1 fix now transliterates *all* non-ASCII characters, not just
+  typography.** `fix(risky=True)` / `lat-check --fix-risky` folds `µ→u`,
+  `°→deg`, `ß→ss`, `Ø→O`, accents→base letter (via `deunicode`), and maps the
+  un-representable — including the `U+FFFD` replacement character that marks
+  mojibake / already-lost data — to `?`. So a file whose only defect is
+  non-ASCII content can be folded Rule-1-clean and then **certified**, where
+  before only a curated typographic subset was fixed and the rest blocked the
+  `read → fix → certify` flow. Applies on every surface (Python, Node, CLI,
+  browser). Still opt-in (risky), since transliteration is a lossy guess.
+
 ## [0.6.0] — 2026-07-04
 
 0.6.0 completes the cross-surface story. The browser and Node now reach every
@@ -529,7 +543,8 @@ Initial public release.
 - 9 python-ags4 parity tests fail by design; see
   [`docs/parity-coverage-map.md`](docs/parity-coverage-map.md).
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/niko86/laterite/releases/tag/v0.6.1
 [0.6.0]: https://github.com/niko86/laterite/releases/tag/v0.6.0
 [0.5.1]: https://github.com/niko86/laterite/releases/tag/v0.5.1
 [0.5.0]: https://github.com/niko86/laterite/releases/tag/v0.5.0

@@ -12,9 +12,11 @@
 //! correct rewrite is unambiguous from the file alone:
 //!
 //!  * **Rule 2a** — normalise every line ending to CRLF (byte-level).
-//!  * **Rule 1 (BOM)** — strip a leading UTF-8 BOM (byte-level). The
-//!    non-ASCII >255 arm of Rule 1 is *not* fixable (no safe substitution
-//!    for a smart-quote/em-dash without guessing intent) — skipped.
+//!  * **Rule 1 (BOM)** — strip a leading UTF-8 BOM (byte-level, safe).
+//!  * **Rule 1 (non-ASCII)** — RISKY transliterate: `ascii_fold` (deunicode)
+//!    folds every non-ASCII char to a sensible ASCII equivalent (µ→"u",
+//!    °→"deg", ß→"ss", accents→base) and the un-representable — incl. the
+//!    U+FFFD corruption marker — to "?". A guess, so opt-in only.
 //!  * **Rule 6** — delete an embedded CR inside a row.
 //!  * **Rule 7** — rename a duplicate HEADING `X` to `X_1` (or `X_2` …).
 //!    *Conditionally* safe: it can surface a Rule 9 unknown-heading
@@ -401,13 +403,13 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
         }
     }
 
-    // -- Rule 1 (non-ASCII): RISKY typographic→ASCII substitution. The
-    //    non-ASCII arm of Rule 1 was previously left unfixed — there's no
-    //    *safe* rewrite for an arbitrary >255 character without guessing
-    //    intent. The risk field lets us offer it opt-in instead of
-    //    withholding it: we touch only characters with an unambiguous ASCII
-    //    intent (smart quotes, dashes, ellipsis, bullet) and leave any other
-    //    non-ASCII char for the user. Each substitution is its own
+    // -- Rule 1 (non-ASCII): RISKY transliterate→ASCII. The non-ASCII arm of
+    //    Rule 1 was previously left unfixed — there's no *safe* rewrite for an
+    //    arbitrary >127 character without guessing intent. The risk field lets
+    //    us offer it opt-in instead of withholding it: `ascii_fold` (deunicode)
+    //    picks a sensible ASCII equivalent for every non-ASCII char (µ→"u",
+    //    °→"deg", ß→"ss", accents→base) and folds the un-representable — incl.
+    //    the U+FFFD corruption marker — to "?". Each substitution is its own
     //    expected-guarded SpanEdit, so a stale line simply no-ops.
     if let Some(items) = found.get(RULE_1) {
         for f in items {
@@ -419,7 +421,7 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                 .chars()
                 .enumerate()
                 .filter_map(|(i, c)| {
-                    typographic_ascii(c).map(|repl| SpanEdit {
+                    ascii_fold(c).map(|repl| SpanEdit {
                         line,
                         start: i as u32,
                         end: i as u32 + 1,
@@ -429,13 +431,13 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                 })
                 .collect();
             if edits.is_empty() {
-                continue; // no recognised typographic char → not auto-fixable
+                continue; // line has no non-ASCII char → nothing to fold
             }
             let n = edits.len();
             fixes.push(Fix {
                 kind: FixKind::NormalizeTypography,
                 label: format!(
-                    "Replace {n} typographic character{} with ASCII on line {line} (Rule 1)",
+                    "Replace {n} non-ASCII character{} with ASCII on line {line} (Rule 1)",
                     if n == 1 { "" } else { "s" }
                 ),
                 rule: RULE_1.to_string(),
@@ -575,16 +577,21 @@ fn row_is_clean(line: &str) -> bool {
 /// Map a common typographic Unicode character (code point > 255) to its
 /// plain-ASCII intent, or `None` for any other non-ASCII char (no
 /// unambiguous substitution — left untouched). Drives the RISKY
-/// [`FixKind::NormalizeTypography`] fix.
-fn typographic_ascii(c: char) -> Option<&'static str> {
-    Some(match c {
-        '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}' => "'", // ‘ ’ ‚ ‛
-        '\u{201C}' | '\u{201D}' | '\u{201E}' | '\u{201F}' => "\"", // “ ” „ ‟
-        '\u{2013}' | '\u{2014}' | '\u{2015}' | '\u{2212}' => "-", // – — ― −
-        '\u{2026}' => "...",                                      // …
-        '\u{2022}' => "*",                                        // •
-        _ => return None,
-    })
+/// Fold one character to ASCII for the Rule-1 [`FixKind::NormalizeTypography`]
+/// fix. `None` for characters already ASCII (nothing to do). Otherwise
+/// `deunicode` picks a sensible ASCII equivalent for a *real* character —
+/// `µ`→"u", `°`→"deg", `±`→"+-", `ß`→"ss", `Ø`→"O", accents→base letter, even
+/// CJK→romanised — with no corpus-biased hand map to keep current. A character
+/// with no ASCII form folds to "?", including the `U+FFFD` replacement marker
+/// that stands for *already-lost* data (deunicode maps `U+FFFD`→"?" itself). So
+/// the file can be folded Rule-1-clean while leaving a visible breadcrumb
+/// wherever a value was corrupted upstream. A bare combining mark folds to ""
+/// (dropped), which is correct — its base letter is handled on its own.
+fn ascii_fold(c: char) -> Option<&'static str> {
+    if c.is_ascii() {
+        return None;
+    }
+    Some(deunicode::deunicode_char(c).unwrap_or("?"))
 }
 
 /// Build the right numeric-reformat closure for a declared TYPE code, or
@@ -1239,31 +1246,55 @@ mod tests {
     }
 
     #[test]
-    fn typography_fix_is_risky_and_substitutes_ascii() {
-        // A right single quote (U+2019) + em-dash (U+2014) — both cp > 255 —
-        // in a DATA cell trip Rule 1. The non-ASCII arm is now offered as a
-        // RISKY typographic→ASCII fix (previously withheld entirely).
+    fn nonascii_fold_is_risky_and_transliterates() {
+        // A right single quote (U+2019) + em-dash (U+2014) in a DATA cell trip
+        // Rule 1. The non-ASCII arm is a RISKY transliterate→ASCII fix
+        // (previously withheld entirely).
         let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
                    \"DATA\",\"P1\",\"O\u{2019}Brien em\u{2014}dash\"\r\n";
         let (parsed, found) = check(src);
         let fixes = compute_fixes(&parsed, &found);
-        let typo = fixes
+        let fix = fixes
             .iter()
             .find(|f| f.kind == FixKind::NormalizeTypography)
-            .expect("a typography fix");
-        assert_eq!(typo.risk, FixRisk::Risky, "typography is opt-in only");
-        assert_eq!(typo.edits.len(), 2, "the ’ and the — are both substituted");
-        let out = apply_fixes(src, parsed.has_bom, &[typo.clone()]);
-        assert!(out.contains("\"O'Brien em-dash\""), "got: {out:?}");
+            .expect("a non-ASCII fold fix");
+        assert_eq!(fix.risk, FixRisk::Risky, "transliteration is opt-in only");
+        assert_eq!(fix.edits.len(), 2, "the ’ and the — are both folded");
+        let out = apply_fixes(src, parsed.has_bom, &[fix.clone()]);
+        // deunicode: ’→"'", em-dash→"--".
+        assert!(out.contains("\"O'Brien em--dash\""), "got: {out:?}");
         // It must never be in the safe set fix-all-safe applies.
         assert!(
             fixes
                 .iter()
                 .filter(|f| f.kind == FixKind::NormalizeTypography)
                 .all(|f| f.risk == FixRisk::Risky),
-            "typography must always be risky"
+            "the non-ASCII fold must always be risky"
         );
+    }
+
+    #[test]
+    fn nonascii_fold_handles_symbols_accents_and_corruption() {
+        // The real-world case: a micro sign, a degree sign, a German ß, an
+        // accented name, and a U+FFFD replacement char (mojibake — already-lost
+        // data). deunicode transliterates the real characters and folds the
+        // un-representable U+FFFD to "?", so the cell becomes Rule-1 clean.
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   \"DATA\",\"P1\",\"12\u{00B5}S 30\u{00B0}C Gro\u{00DF} caf\u{00E9} x\u{FFFD}y\"\r\n";
+        let (parsed, found) = check(src);
+        let fix = compute_fixes(&parsed, &found)
+            .into_iter()
+            .find(|f| f.kind == FixKind::NormalizeTypography)
+            .expect("a non-ASCII fold fix");
+        let out = apply_fixes(src, parsed.has_bom, &[fix]);
+        assert!(
+            out.contains("\"12uS 30degC Gross cafe x?y\""),
+            "got: {out:?}"
+        );
+        // Nothing non-ASCII must survive the fold — the whole point.
+        assert!(out.is_ascii(), "folded output must be pure ASCII: {out:?}");
     }
 
     #[test]

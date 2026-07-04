@@ -1,6 +1,6 @@
 [project]
 name = "laterite"
-version = "0.6.0"
+version = "0.6.1"
 description = "Rust-backed AGS4 reader/writer/validator — a fast, drop-in replacement for python-ags4 with born-typed polars/pandas reads (pyarrow-free)"
 readme = "README.md"
 license = "MIT"

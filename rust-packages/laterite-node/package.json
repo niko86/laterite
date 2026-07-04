@@ -1,6 +1,6 @@
 {
   "name": "laterite",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "AGS4 geotechnical data for Node.js — read, validate, produce, and query (the Node port of the laterite Python toolkit, Rust-backed).",
   "license": "MIT",
   "author": "niko86",
@@ -60,9 +60,9 @@
     "apache-arrow": "^21.1.0"
   },
   "optionalDependencies": {
-    "@laterite/native-darwin-arm64": "0.6.0",
-    "@laterite/native-linux-x64-gnu": "0.6.0",
-    "@laterite/native-win32-x64-msvc": "0.6.0"
+    "@laterite/native-darwin-arm64": "0.6.1",
+    "@laterite/native-linux-x64-gnu": "0.6.1",
+    "@laterite/native-win32-x64-msvc": "0.6.1"
   },
   "peerDependencies": {
     "@duckdb/node-api": ">=1.5.0"

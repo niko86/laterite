@@ -24,6 +24,12 @@ path = "src/lib.rs"
 # tuples, so dict keys are composite "GROUP\u{1f}HEADING" strings.
 phf = "0.13"
 thiserror = "1"
+# Rule 1 risky fix: transliterate any non-ASCII character to a sensible ASCII
+# equivalent (µ→"u", °→"deg", ß→"ss", accents→base letter) so a file can be
+# folded Rule-1-clean without a corpus-biased hand map. Pure-Rust static table,
+# no_std-friendly → rides into wasm too (a modest bundle bump, accepted). Chars
+# with no ASCII form (incl. the U+FFFD replacement marker) fall back to "?".
+deunicode = "1"
 # The shared parse leaf (#168 Phase 2): the validator's `parse` module
 # re-exports its types/tokenizer (`pub use`) + wraps parse_bytes/parse_str/
 # parse_file* to keep returning ValidatorError (so every consumer is
