@@ -27,6 +27,7 @@ One Rust AGS4 engine, surfaced for every stack:
 | **Python** | [`laterite`](https://pypi.org/project/laterite/) — PyPI | `pip install laterite` |
 | **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm | `npm install laterite` |
 | **Rust / CLI** | [`lat-check`](https://github.com/niko86/laterite/releases) | GitHub Releases |
+| **DuckDB** | [`laterite_ags4`](https://community-extensions.duckdb.org/extensions/laterite_ags4.html) — community extension | `INSTALL laterite_ags4 FROM community;` |
 | **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser |
 
 ## Install

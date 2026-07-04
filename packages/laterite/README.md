@@ -4,49 +4,94 @@
 
 # laterite
 
-A Rust-backed AGS4 reader, writer and validator for Python.
-
-A faster drop-in for
+A Rust-backed reader, writer and validator for the
+[AGS4](https://www.ags.org.uk/data-format/) geotechnical data format, with a
+modern, born-typed **polars** API. A faster drop-in for
 [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library)'s
-`AGS4` module (1.2.0 parity-pinned, 122/131 tests) — swap
-`from python_ags4 import AGS4` for `from laterite import compat as AGS4`.
-The native API returns born-typed **polars** frames by default (or
-**pandas** with `read(..., backend="pandas")`) — both **pyarrow-free**,
-read back from a Python-owned in-memory DuckDB engine.
+`AGS4` module — swap `from python_ags4 import AGS4` for
+`from laterite import compat as AGS4`.
 
 [![ci](https://github.com/niko86/laterite/actions/workflows/ci.yml/badge.svg)](https://github.com/niko86/laterite/actions/workflows/ci.yml)
-[![rust cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=rust&label=rust%20cov)](https://codecov.io/gh/niko86/laterite)
 [![python cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=python&label=python%20cov)](https://codecov.io/gh/niko86/laterite)
-[![web cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=web&label=web%20cov)](https://codecov.io/gh/niko86/laterite)
 [![PyPI](https://img.shields.io/pypi/v/laterite.svg)](https://pypi.org/project/laterite/)
 [![Python versions](https://img.shields.io/pypi/pyversions/laterite.svg)](https://pypi.org/project/laterite/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/niko86/laterite/blob/main/LICENSE)
+
+## Install
 
 ```bash
 pip install laterite                  # base AGS4 (polars + duckdb, pyarrow-free)
 pip install "laterite[compat]"        # + pandas (python-ags4 drop-in)
 ```
 
+Requires Python ≥ 3.12.
+
+## Use
+
 ```python
 import laterite
 
-result = laterite.validate("delivery.ags")
-for rule, findings in result.by_rule().items():
+# Validate — errors + warnings by default (FYI is opt-in)
+report = laterite.validate("delivery.ags")
+report.is_valid
+for rule, findings in report.by_rule().items():
     print(rule, len(findings))
 
-# python-ags4 drop-in
-from laterite import compat as AGS4
-tables, _ = AGS4.AGS4_to_dataframe("delivery.ags")
+# Read born-typed columns: a 2DP heading is a float, a DT a datetime
+ags = laterite.read("delivery.ags")
+ags.groups                       # ['PROJ', 'LOCA', 'SAMP', …]
+ags["LOCA"]["LOCA_GL"][0]        # → 12.3  (a polars DataFrame per group)
 
-# Or a typed view of the file
+# Repair a dirty file into a fresh handle, then keep working with it
+fixed = ags.fix(risky=True)      # pads short rows, transliterates non-ASCII, …
+
+# Typed graph: PROJ → LOCA → SAMP → …
 from laterite.ags4 import read_typed
 proj = read_typed("delivery.ags")
+for loca in proj.locas:
+    print(loca.loca_id, loca.loca_gl)
+
+# python-ags4 drop-in — swap the import, keep your code
+from laterite import compat as AGS4
+tables, headings = AGS4.AGS4_to_dataframe("delivery.ags")
+AGS4.dataframe_to_AGS4(tables, headings, "round-trip.ags")
 ```
 
-The validator engine is clean-room from the AGS4 spec. python-ags4
-is LGPL-3.0; the clean-room separation lets laterite ship under MIT.
+The native API returns born-typed **polars** frames by default (or **pandas**
+with `read(..., backend="pandas")`) — both **pyarrow-free**, read back from a
+Python-owned in-memory DuckDB engine.
 
-Requires Python ≥ 3.12.
+## One engine, every stack
 
-Full docs, parity catalogue and observations at
-<https://github.com/niko86/laterite>.
+`laterite` on PyPI is the **Python** surface of one Rust AGS4 engine, shared
+across:
+
+| Surface | Package | Get it |
+|---|---|---|
+| **Python** | [`laterite`](https://pypi.org/project/laterite/) — PyPI | `pip install laterite` |
+| **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm | `npm install laterite` |
+| **Rust / CLI** | [`lat-check`](https://github.com/niko86/laterite/releases) | GitHub Releases |
+| **DuckDB** | [`laterite_ags4`](https://community-extensions.duckdb.org/extensions/laterite_ags4.html) — community extension | `INSTALL laterite_ags4 FROM community;` |
+| **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser |
+
+## Faster than python-ags4
+
+Validation throughput vs `python-ags4` 1.2.0 (macOS arm64), agreeing on the
+**same findings** — speed not at the cost of diagnostic coverage: **~17× on a
+512 KB file, ~8× from 50 MB to 1 GB** (a 557 MB file validates in ~6.5 s vs
+~53 s). Full tables + methodology in the
+[repo README](https://github.com/niko86/laterite#performance).
+
+## Parity + clean-room
+
+122 / 131 of python-ags4 1.2.0's own test suite passes through
+`laterite.compat` (the 9 remaining are deliberate non-closures). The validator
+is **clean-room** from the AGS4 spec — python-ags4 is LGPL-3.0, and the
+separation is what lets laterite ship under MIT. Details:
+[COMPAT.md](https://github.com/niko86/laterite/blob/main/COMPAT.md) ·
+[OBSERVATIONS.md](https://github.com/niko86/laterite/blob/main/OBSERVATIONS.md).
+
+## Docs
+
+Full documentation — Learn, Cookbook, Concepts, and the Python API reference —
+at **<https://niko86.github.io/laterite/docs/>**.
