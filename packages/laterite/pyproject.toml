@@ -47,7 +47,7 @@ requires-python = ">=3.12"
 # pyarrow. pandas is an optional extra; a python-ags4 install pulls pandas in
 # unconditionally, laterite does not.
 dependencies = [
-    "polars>=1.40.1",
+    "polars>=1.42.1",
     "duckdb>=1.4.0",
 ]
 
