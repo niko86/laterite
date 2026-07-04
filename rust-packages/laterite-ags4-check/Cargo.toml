@@ -66,4 +66,4 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # (`lat-check --tui`). crossterm arrives via ratatui::crossterm so the
 # backend/event types are version-matched to the linked ratatui.
 ratatui = { version = "0.29", optional = true }
-crossterm = { version = "0.28", optional = true }
+crossterm = { version = "0.29", optional = true }
