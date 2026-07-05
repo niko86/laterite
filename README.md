@@ -128,7 +128,7 @@ cross-surface toolchain on top:
 | Read → typed data | ✅ born-typed (polars) | pandas (all strings) |
 | Build / write AGS4 | ✅ | ✅ |
 | Excel ↔ AGS4 | ✅ | ✅ |
-| Repair engine (`fix`) — CRLF / BOM / short-row / numeric… | ✅ | — |
+| Repair engine (`fix`) — CRLF / BOM / short-row pad / embedded-CR… | ✅ | — |
 | SQL across groups | ✅ (DuckDB) | — |
 | Revision diff | ✅ | — |
 | Validity certificates (`.ags.idx`) | ✅ | — |
