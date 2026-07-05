@@ -93,6 +93,13 @@ export declare class Sidecar {
 }
 
 /**
+ * AGS4 bytes → `.xlsx` workbook bytes (one worksheet per group). `orderedKeys`
+ * forces the worksheet order; otherwise AGS4 source order. The bytes twin of
+ * `ags4ToExcel`.
+ */
+export declare function ags4BytesToXlsx(data: Uint8Array, orderedKeys?: Array<string> | undefined | null): ExcelBytesResult
+
+/**
  * Write an AGS4 file's groups to an `.xlsx` — one worksheet per group.
  * `orderedKeys` forces the worksheet order; otherwise AGS4 source order.
  */
@@ -155,6 +162,19 @@ export interface EmitResult {
   fixesApplied: number
 }
 
+/**
+ * An in-memory Excel conversion result: the produced `bytes` (an `.xlsx`
+ * workbook or an `.ags` document) plus the same conversion stats. The bytes
+ * twin of the path functions, so an uploaded workbook / a fixed handle needn't
+ * hit disk — the same FS-free cores the browser surface uses.
+ */
+export interface ExcelBytesResult {
+  bytes: Buffer
+  sheetsWritten: number
+  rowsWritten: number
+  warnings: Array<string>
+}
+
 /** The outcome of an Excel conversion (mirrors `laterite_excel::ExcelStats`). */
 export interface ExcelStats {
   /** Worksheets written (AGS4→XLSX) or read (XLSX→AGS4). */
@@ -182,12 +202,14 @@ export interface Finding {
 
 /**
  * Mechanically repair an AGS4 file (`path`) / `text` / `data`: apply the SAFE
- * fixes (plus the risky set when `includeRisky`), re-validate, and return the
- * fixed bytes + residual findings. Mirrors laterite-py's `fix()` /
- * `lat-check --fix`; the single `fix_document` orchestration is shared. The TS
- * layer wraps this into a `FixResult` (`.bytes` / `.text` / `.save(path)`).
+ * fixes (plus the risky set when `includeRisky`, narrowed by `only` / widened-
+ * back by `exclude`), re-validate, and return the fixed bytes + residual
+ * findings. Mirrors laterite-py's `fix()` / `lat-check --fix`; the single
+ * `fix_document_selective` orchestration is shared. The TS layer wraps this into
+ * a `FixResult` (`.bytes` / `.text` / `.save(path)`) and adds `inPlace` / `out`
+ * write-back on top.
  */
-export declare function fixFile(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, includeRisky?: boolean | undefined | null): FixReport
+export declare function fixFile(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, includeRisky?: boolean | undefined | null, only?: Array<string> | undefined | null, exclude?: Array<string> | undefined | null): FixReport
 
 /**
  * The repair report — the Node mirror of laterite-py's `fix_file` dict. `ok` is
@@ -293,8 +315,17 @@ export declare function runCheck(path?: string | undefined | null, text?: string
  */
 export declare function transportLock(src: string, dest: string, password: string, level?: number | undefined | null): PackStats
 
+/**
+ * zstd-compress, then age-encrypt `data` with `password` in memory → bytes —
+ * no plaintext on disk. `level` is 1–22 (default 9).
+ */
+export declare function transportLockBytes(data: Uint8Array, password: string, level?: number | undefined | null): Buffer
+
 /** zstd-compress `src` → `dest`. `level` is 1–22 (default 9, the AGS sweet spot). */
 export declare function transportPack(src: string, dest: string, level?: number | undefined | null): PackStats
+
+/** zstd-compress `data` in memory → bytes. `level` is 1–22 (default 9). */
+export declare function transportPackBytes(data: Uint8Array, level?: number | undefined | null): Buffer
 
 /**
  * age-decrypt with `password`, then zstd-decompress → `dest`. Wrong passphrase
@@ -302,8 +333,17 @@ export declare function transportPack(src: string, dest: string, level?: number 
  */
 export declare function transportUnlock(src: string, dest: string, password: string): UnpackStats
 
+/**
+ * age-decrypt with `password`, then zstd-decompress `data` in memory → bytes.
+ * Wrong passphrase / non-passphrase envelopes surface as an error.
+ */
+export declare function transportUnlockBytes(data: Uint8Array, password: string): Buffer
+
 /** zstd-decompress `src` → `dest`. */
 export declare function transportUnpack(src: string, dest: string): UnpackStats
+
+/** zstd-decompress `data` in memory → bytes (the twin of `transportPackBytes`). */
+export declare function transportUnpackBytes(data: Uint8Array): Buffer
 
 /** Result of `transportUnpack` / `transportUnlock`: output size, elapsed seconds. */
 export interface UnpackStats {
@@ -342,3 +382,10 @@ export interface ValidationReport {
 
 /** The crate version. */
 export declare function version(): string
+
+/**
+ * `.xlsx` workbook bytes → AGS4 bytes. `formatNumericColumns` (default true)
+ * re-applies AGS4 numeric formatting to numeric-looking columns. The bytes twin
+ * of `excelToAgs4`.
+ */
+export declare function xlsxBytesToAgs4(data: Uint8Array, formatNumericColumns?: boolean | undefined | null): ExcelBytesResult

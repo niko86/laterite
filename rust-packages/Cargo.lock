@@ -1696,7 +1696,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-check"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "chrono",
  "comfy-table",
@@ -1714,7 +1714,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-core"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "chrono",
  "laterite-ags4-emit",
@@ -1731,7 +1731,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-diff"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-validator",
@@ -1741,7 +1741,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-emit"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "arrow",
  "encoding_rs",
@@ -1752,7 +1752,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-parse"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "encoding_rs",
  "memchr",
@@ -1762,7 +1762,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-validator"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "chrono",
  "criterion",
@@ -1781,7 +1781,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-wasm"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "arrow",
  "chrono",
@@ -1803,7 +1803,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-cliutil"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "clap",
  "comfy-table",
@@ -1815,7 +1815,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-excel"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "calamine",
  "laterite-ags4-core",
@@ -1826,7 +1826,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-node"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "arrow",
  "encoding_rs",
@@ -1846,7 +1846,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-py"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "arrow",
  "chrono",
@@ -1865,7 +1865,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-transport"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "age",
  "tempfile",
@@ -1875,7 +1875,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-types"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "arrow",
  "chrono",

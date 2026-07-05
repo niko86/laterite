@@ -1,7 +1,7 @@
 // The `laterite` package surface — the Node port of laterite-py's `__init__.py`.
 // P2 is the engine-free read/validate/emit core (Arrow-direct); the optional
 // DuckDB `sql()`/`at()` layer + typed-graph + transport land in P3.
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { type Table, tableFromArrays, tableToIPC } from "apache-arrow";
 import { Ags4File } from "./ags4-file";
 import { BuildResult } from "./build-result";
@@ -16,9 +16,11 @@ import {
 } from "./errors";
 import { FixResult } from "./fix-result";
 import {
+  type ExcelBytesResult,
   type ExcelStats,
   type GroupIpc,
   Sidecar,
+  ags4BytesToXlsx,
   ags4ToExcel,
   emitAgs4FromIpc,
   excelToAgs4,
@@ -27,6 +29,7 @@ import {
   nativeDiff,
   parseArrow,
   runCheck,
+  xlsxBytesToAgs4,
 } from "./native";
 import * as registry from "./registry";
 import { Report } from "./report";
@@ -347,6 +350,12 @@ export function listRules(): RuleMeta[] {
   return (JSON.parse(nativeListRules()) as { rules: RuleMeta[] }).rules;
 }
 
+/** The AGS Format Rule labels whose fixes {@link fix} can apply — the values for
+ * `only` / `exclude`. Mirrors laterite-py's `FixableRule`; kept in lockstep with
+ * the engine's `fixable_rules()` by a cross-surface drift gate
+ * (`test_typed_choices.py`). Use {@link listRules} (`fixable: true`) at runtime. */
+export type FixableRule = "1" | "2a" | "4" | "6" | "7" | "8" | "11a" | "11b";
+
 export interface FixOptions {
   /** Repair in-memory `text` instead of a file path. */
   text?: string;
@@ -356,6 +365,18 @@ export interface FixOptions {
   encoding?: string;
   /** Also apply the intent-guessing (risky) fixes, not just the safe set. */
   risky?: boolean;
+  /** Apply *only* these rules' fixes (by {@link FixableRule} label); others are
+   * left in place. The risk gate still applies, so a rule whose only fix is risky
+   * needs `risky: true` even when named here. */
+  only?: FixableRule[];
+  /** Skip these rules' fixes. Combines with `only` (`only` narrows the set, then
+   * `exclude` removes from it). */
+  exclude?: FixableRule[];
+  /** Write the repaired bytes back over the source file. Requires a path
+   * `source`; mutually exclusive with `out`. Non-destructive by default. */
+  inPlace?: boolean;
+  /** Write the repaired bytes to this path. Mutually exclusive with `inPlace`. */
+  out?: string;
 }
 
 /** Mechanically repair AGS4 — the headless twin of the browser's Fix engine.
@@ -367,15 +388,19 @@ export interface FixOptions {
  * typography). The repaired bytes are re-validated, so `FixResult.findings` is
  * what could NOT be mechanically fixed.
  *
- * Non-destructive: nothing is written here — the repaired bytes come back on the
- * result (`.bytes` / `.text` / `.save(path)`), already UTF-8 with no BOM, so
- * fixing a non-UTF-8 file also normalises its encoding. Mirrors `laterite.fix()`
- * / `lat-check --fix`.
+ * Non-destructive by default — the repaired bytes come back on the result
+ * (`.bytes` / `.text` / `.save(path)`), already UTF-8 with no BOM, so fixing a
+ * non-UTF-8 file also normalises its encoding. Pass `inPlace` to overwrite the
+ * source or `out` to write elsewhere (the two are mutually exclusive). `only` /
+ * `exclude` restrict which rules' fixes are applied. Mirrors `laterite.fix()` /
+ * `lat-check --fix`.
  *
  * @param source - The AGS4 input: a filesystem path (`string`) or raw bytes
  *   (`Uint8Array`/`Buffer`). Omit to repair `opts.text` instead.
- * @param opts - {@link FixOptions} — `text` source, `risky` fixes, `dictVersion`
+ * @param opts - {@link FixOptions} — `text` source, `risky` fixes, `only` /
+ *   `exclude` rule selection, `inPlace` / `out` write-back, `dictVersion`
  *   override, and source `encoding`.
+ * @throws {TypeError} If both `inPlace` and `out` are given.
  * @returns A {@link FixResult} carrying the repaired `bytes` (and `.text` /
  *   `.save`), the `applied` fixes (with `fixesApplied` count), the residual
  *   `findings` left after re-validation, and the resolved `dictVersion`.
@@ -384,11 +409,49 @@ export interface FixOptions {
  *   for un-fixable input, carrying the matching `lat-check` exit code.
  */
 export function fix(source?: string | Uint8Array, opts: FixOptions = {}): FixResult {
+  if (opts.inPlace && opts.out !== undefined) {
+    throw new TypeError("fix(): `inPlace` and `out` are mutually exclusive");
+  }
+  // Reject non-fixable rule labels up front (mirrors laterite-py's
+  // `_validate_fixable`) — the native selector silently ignores an unknown label,
+  // so without this a typo like only:["9"] would quietly repair nothing. The
+  // fixable set comes from the engine (`listRules`), never a hand-list.
+  if (opts.only !== undefined || opts.exclude !== undefined) {
+    const fixable = new Set(listRules().filter((r) => r.fixable).map((r) => r.rule));
+    for (const [kw, labels] of [["only", opts.only], ["exclude", opts.exclude]] as const) {
+      for (const label of labels ?? []) {
+        if (!fixable.has(label)) {
+          throw new TypeError(
+            `fix(): ${kw} names rule "${label}", which is not fixable — see listRules() (fixable: true)`,
+          );
+        }
+      }
+    }
+  }
   const path = typeof source === "string" ? source : undefined;
   const data = typeof source === "string" || source == null ? undefined : source;
-  const r = fixFile(path, opts.text, data, opts.dictVersion, opts.encoding, opts.risky);
+  if (opts.inPlace && path === undefined) {
+    // Nothing on disk to overwrite — mirror laterite-py's Ags4Error guard.
+    throw makeError("bad_args", 5, "fix(): `inPlace` needs a path source; use `out` or `.save(path)`");
+  }
+  const r = fixFile(
+    path,
+    opts.text,
+    data,
+    opts.dictVersion,
+    opts.encoding,
+    opts.risky,
+    opts.only,
+    opts.exclude,
+  );
   if (!r.ok) throw makeError(r.errorKind ?? "", r.exitCode, r.error ?? "unknown error");
-  return new FixResult(r.fixed, r.residual, r.applied, r.dictVersion);
+  const result = new FixResult(r.fixed, r.residual, r.applied, r.dictVersion);
+  // Write-back (opt-in, non-destructive by default): `inPlace` overwrites the
+  // source path, `out` writes elsewhere — the repaired bytes are always UTF-8
+  // with no BOM. Mirrors laterite-py's free `fix(in_place=, out=)`.
+  const dest = opts.inPlace ? path : opts.out;
+  if (dest !== undefined) writeFileSync(dest, result.bytes);
+  return result;
 }
 
 // --- diff (revision comparison) -----------------------------------------
@@ -500,30 +563,79 @@ export function diff(a: DiffSource, b: DiffSource, opts: DiffOptions = {}): Revi
   }
 }
 
-/**
- * Write an AGS4 file's groups to an `.xlsx` — one worksheet per group (the
- * Node analog of Python's `to_excel`). `groups` forces the worksheet order;
- * otherwise AGS4 source order is preserved. Returns the conversion stats.
- */
-export function toExcel(
-  agsPath: string,
-  xlsxPath: string,
-  opts: { groups?: string[] } = {},
-): ExcelStats {
-  return ags4ToExcel(agsPath, xlsxPath, opts.groups);
+/** Pick the three stat fields out of an in-memory conversion result. */
+function excelStatsOf(r: ExcelBytesResult): ExcelStats {
+  return { sheetsWritten: r.sheetsWritten, rowsWritten: r.rowsWritten, warnings: r.warnings };
 }
 
 /**
- * Read an `.xlsx` back into an AGS4 file (the Node analog of `from_excel`).
- * `formatNumericColumns` (default true) re-applies AGS4 numeric formatting to
- * numeric-looking columns. Returns the conversion stats.
+ * Convert AGS4 to an `.xlsx` workbook — one worksheet per group (the Node analog
+ * of Python's `to_excel`). `source` is an AGS4 file path or raw `Uint8Array`
+ * bytes; `groups` forces the worksheet order (else AGS4 source order).
+ *
+ * With `xlsxPath` given the workbook is written there and the conversion stats
+ * are returned; omit `xlsxPath` to get the `.xlsx` **bytes** back (the FS-free
+ * form — an uploaded/in-memory AGS4 needn't hit disk). Bytes both ways drive the
+ * same core the browser Excel tools use.
+ */
+export function toExcel(
+  source: string | Uint8Array,
+  xlsxPath: string,
+  opts?: { groups?: string[] },
+): ExcelStats;
+export function toExcel(
+  source: string | Uint8Array,
+  xlsxPath?: undefined,
+  opts?: { groups?: string[] },
+): Buffer;
+export function toExcel(
+  source: string | Uint8Array,
+  xlsxPath?: string,
+  opts: { groups?: string[] } = {},
+): ExcelStats | Buffer {
+  // Fast path: a real AGS4 file → an `.xlsx` file, straight through the path core.
+  if (typeof source === "string" && xlsxPath !== undefined) {
+    return ags4ToExcel(source, xlsxPath, opts.groups);
+  }
+  const agsBytes = typeof source === "string" ? readFileSync(source) : source;
+  const r = ags4BytesToXlsx(agsBytes, opts.groups);
+  if (xlsxPath === undefined) return r.bytes; // bytes-out
+  writeFileSync(xlsxPath, r.bytes); // bytes-in → file
+  return excelStatsOf(r);
+}
+
+/**
+ * Convert an AGS4-shaped `.xlsx` workbook to AGS4 (the Node analog of
+ * `from_excel`). `source` is an `.xlsx` file path or raw `Uint8Array` bytes;
+ * `formatNumericColumns` (default true) re-applies AGS4 numeric formatting.
+ *
+ * With `agsPath` given the AGS4 is written there and the conversion stats are
+ * returned; omit `agsPath` to get the AGS4 **bytes** back — so an uploaded `.xlsx`
+ * never has to touch disk.
  */
 export function fromExcel(
-  xlsxPath: string,
+  source: string | Uint8Array,
   agsPath: string,
+  opts?: { formatNumericColumns?: boolean },
+): ExcelStats;
+export function fromExcel(
+  source: string | Uint8Array,
+  agsPath?: undefined,
+  opts?: { formatNumericColumns?: boolean },
+): Buffer;
+export function fromExcel(
+  source: string | Uint8Array,
+  agsPath?: string,
   opts: { formatNumericColumns?: boolean } = {},
-): ExcelStats {
-  return excelToAgs4(xlsxPath, agsPath, opts.formatNumericColumns);
+): ExcelStats | Buffer {
+  if (typeof source === "string" && agsPath !== undefined) {
+    return excelToAgs4(source, agsPath, opts.formatNumericColumns);
+  }
+  const xlsxBytes = typeof source === "string" ? readFileSync(source) : source;
+  const r = xlsxBytesToAgs4(xlsxBytes, opts.formatNumericColumns);
+  if (agsPath === undefined) return r.bytes; // bytes-out
+  writeFileSync(agsPath, r.bytes); // bytes-in → file
+  return excelStatsOf(r);
 }
 
 export { Ags4File } from "./ags4-file";

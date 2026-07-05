@@ -17,7 +17,7 @@ use laterite_ags4_validator::fixes::Fix;
 use laterite_ags4_parse::{ParsedFile, parse_bytes, parse_str};
 use laterite_ags4_validator::parse::parse_file_with_encoding;
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, ValidatorError, check_file_with_dict, fix_document,
+    CheckOptions, DictVersion, ValidatorError, check_file_with_dict, fix_document_selective,
     resolve_dict_version, rule_metadata_json, rules, tran_ags_of,
 };
 use laterite_types::sql_type;
@@ -763,10 +763,12 @@ impl FixReport {
 }
 
 /// Mechanically repair an AGS4 file (`path`) / `text` / `data`: apply the SAFE
-/// fixes (plus the risky set when `includeRisky`), re-validate, and return the
-/// fixed bytes + residual findings. Mirrors laterite-py's `fix()` /
-/// `lat-check --fix`; the single `fix_document` orchestration is shared. The TS
-/// layer wraps this into a `FixResult` (`.bytes` / `.text` / `.save(path)`).
+/// fixes (plus the risky set when `includeRisky`, narrowed by `only` / widened-
+/// back by `exclude`), re-validate, and return the fixed bytes + residual
+/// findings. Mirrors laterite-py's `fix()` / `lat-check --fix`; the single
+/// `fix_document_selective` orchestration is shared. The TS layer wraps this into
+/// a `FixResult` (`.bytes` / `.text` / `.save(path)`) and adds `inPlace` / `out`
+/// write-back on top.
 #[napi]
 #[allow(clippy::too_many_arguments)]
 pub fn fix_file(
@@ -776,6 +778,13 @@ pub fn fix_file(
     dict_version: Option<String>,
     encoding: Option<String>,
     include_risky: Option<bool>,
+    // Per-rule selection (#394): `only` (when set) keeps just those fixable-rule
+    // labels, then `exclude` drops any of them — the same short labels
+    // (`"8"`, `"2a"`) laterite-py's `fix(only=, exclude=)` takes. The shared
+    // `fix_document_selective` applies the risk gate first, so a rule whose only
+    // fix is risky still needs `include_risky` even when named in `only`.
+    only: Option<Vec<String>>,
+    exclude: Option<Vec<String>>,
 ) -> Result<FixReport> {
     let raw: Vec<u8> = if let Some(t) = text {
         t.into_bytes()
@@ -807,7 +816,14 @@ pub fn fix_file(
         include_fyi: false,
         ..CheckOptions::default()
     };
-    let outcome = match fix_document(&raw, &opts, include_risky.unwrap_or(false)) {
+    let exclude = exclude.unwrap_or_default();
+    let outcome = match fix_document_selective(
+        &raw,
+        &opts,
+        include_risky.unwrap_or(false),
+        only.as_deref(),
+        &exclude,
+    ) {
         Ok(o) => o,
         Err(e) => {
             let (code, kind) = classify(&e);
@@ -1018,4 +1034,53 @@ pub fn excel_to_ags4(
     )
     .map(ExcelStats::from)
     .map_err(|e| Error::from_reason(e.to_string()))
+}
+
+/// An in-memory Excel conversion result: the produced `bytes` (an `.xlsx`
+/// workbook or an `.ags` document) plus the same conversion stats. The bytes
+/// twin of the path functions, so an uploaded workbook / a fixed handle needn't
+/// hit disk — the same FS-free cores the browser surface uses.
+#[napi(object)]
+pub struct ExcelBytesResult {
+    pub bytes: Buffer,
+    pub sheets_written: u32,
+    pub rows_written: u32,
+    pub warnings: Vec<String>,
+}
+
+/// AGS4 bytes → `.xlsx` workbook bytes (one worksheet per group). `orderedKeys`
+/// forces the worksheet order; otherwise AGS4 source order. The bytes twin of
+/// `ags4ToExcel`.
+#[napi]
+pub fn ags4_bytes_to_xlsx(
+    data: Uint8Array,
+    ordered_keys: Option<Vec<String>>,
+) -> Result<ExcelBytesResult> {
+    let (xlsx, stats) = laterite_excel::ags4_bytes_to_xlsx(&data, ordered_keys)
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+    Ok(ExcelBytesResult {
+        bytes: Buffer::from(xlsx),
+        sheets_written: stats.sheets_written as u32,
+        rows_written: stats.rows_written as u32,
+        warnings: stats.warnings,
+    })
+}
+
+/// `.xlsx` workbook bytes → AGS4 bytes. `formatNumericColumns` (default true)
+/// re-applies AGS4 numeric formatting to numeric-looking columns. The bytes twin
+/// of `excelToAgs4`.
+#[napi]
+pub fn xlsx_bytes_to_ags4(
+    data: Uint8Array,
+    format_numeric_columns: Option<bool>,
+) -> Result<ExcelBytesResult> {
+    let (ags, stats) =
+        laterite_excel::xlsx_bytes_to_ags4(&data, format_numeric_columns.unwrap_or(true))
+            .map_err(|e| Error::from_reason(e.to_string()))?;
+    Ok(ExcelBytesResult {
+        bytes: Buffer::from(ags),
+        sheets_written: stats.sheets_written as u32,
+        rows_written: stats.rows_written as u32,
+        warnings: stats.warnings,
+    })
 }

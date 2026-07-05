@@ -50,3 +50,25 @@ pub fn lock(src: &Path, dest: &Path, password: &str, level: i32) -> Result<PackS
 pub fn unlock(src: &Path, dest: &Path, password: &str) -> Result<UnpackStats, CliError> {
     Ok(laterite_transport::unlock(src, dest, password)?)
 }
+
+/// zstd-compress bytes → bytes in memory (the filesystem-free form of [`pack`]).
+pub fn pack_bytes(data: &[u8], level: i32) -> Result<Vec<u8>, CliError> {
+    Ok(laterite_transport::pack_bytes(data, level)?)
+}
+
+/// zstd-decompress bytes → bytes in memory (the filesystem-free form of [`unpack`]).
+pub fn unpack_bytes(data: &[u8]) -> Result<Vec<u8>, CliError> {
+    Ok(laterite_transport::unpack_bytes(data)?)
+}
+
+/// zstd-compress + age-encrypt bytes → bytes in memory (the filesystem-free
+/// form of [`lock`] — no plaintext ever hits disk).
+pub fn lock_bytes(data: &[u8], password: &str, level: i32) -> Result<Vec<u8>, CliError> {
+    Ok(laterite_transport::lock_bytes(data, password, level)?)
+}
+
+/// age-decrypt + zstd-decompress bytes → bytes in memory (the filesystem-free
+/// form of [`unlock`]).
+pub fn unlock_bytes(data: &[u8], password: &str) -> Result<Vec<u8>, CliError> {
+    Ok(laterite_transport::unlock_bytes(data, password)?)
+}

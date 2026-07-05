@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { FixResult, fix, listRules } from "../ts/index";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, describe, expect, it } from "vitest";
+import { type FixableRule, FixResult, fix, listRules } from "../ts/index";
 
 // LOCA_GL is typed 2DP but "12.3" carries one decimal — a SAFE mechanical fix
 // (numeric reformat) → "12.30". CRLF line endings (AGS4 canonical).
@@ -49,6 +52,73 @@ describe("fix() — mechanical repair (the Node mirror of laterite.fix)", () => 
     const severities = new Set(r.findings.map((f) => f.severity));
     expect(severities.has("warning")).toBe(true);
     expect(r.findings.some((f) => f.rule === "Warning (Related to Rule 14)")).toBe(true);
+  });
+});
+
+// #394 — per-rule selection (only/exclude) + inPlace/out write-back, the Node
+// mirror of laterite-py's free fix(). A file with TWO fixable defects: Rule 2a
+// (bare-LF endings) + Rule 8 (a 2DP value at 1 dp).
+const TWO_DEFECTS =
+  '"GROUP","LOCA"\n"HEADING","LOCA_ID","LOCA_GL"\n"UNIT","","m"\n' +
+  '"TYPE","ID","2DP"\n"DATA","BH1","1.0"\n';
+
+describe("fix() — per-rule selection (only/exclude)", () => {
+  it("only:['8'] applies just the precision fix and leaves the line endings", () => {
+    const r = fix(undefined, { text: TWO_DEFECTS, only: ["8"] });
+    // Only the numeric reformat ran (Rule 2a's CRLF fix was NOT selected).
+    expect(r.applied.map((a) => a.kind)).toEqual(["reformat_numeric"]);
+    expect(r.text).toMatch(/"BH1","1\.00"/); // 1.0 → padded 2DP
+  });
+
+  it("exclude:['8'] leaves the precision value unfixed", () => {
+    const r = fix(undefined, { text: TWO_DEFECTS, exclude: ["8"] });
+    expect(r.applied.some((a) => a.kind === "reformat_numeric")).toBe(false);
+    expect(r.text).toMatch(/"BH1","1\.0"/); // untouched
+  });
+
+  it("rejects a non-fixable rule label (mirrors laterite-py _validate_fixable)", () => {
+    // The static FixableRule type already blocks these at compile time; the casts
+    // deliberately bypass it to prove the RUNTIME guard also rejects a bad label
+    // (e.g. a value that slipped in untyped from JSON / a JS caller).
+    const bad = (labels: string[]) => labels as unknown as FixableRule[];
+    expect(() => fix(undefined, { text: TWO_DEFECTS, only: bad(["99"]) })).toThrow(/not fixable/);
+    expect(() => fix(undefined, { text: TWO_DEFECTS, exclude: bad(["nope"]) })).toThrow(/not fixable/);
+  });
+});
+
+describe("fix() — inPlace / out write-back", () => {
+  const dir = mkdtempSync(join(tmpdir(), "laterite-fix-"));
+  afterAll(() => {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+  });
+
+  it("inPlace overwrites the source file with the repaired bytes", () => {
+    const p = join(dir, "inplace.ags");
+    writeFileSync(p, TWO_DEFECTS);
+    const r = fix(p, { inPlace: true });
+    expect(readFileSync(p, "utf8")).toBe(r.text); // disk == repaired
+    expect(readFileSync(p, "utf8")).toMatch(/"BH1","1\.00"/);
+  });
+
+  it("out writes the repaired bytes elsewhere, leaving the source untouched", () => {
+    const src = join(dir, "src.ags");
+    const dst = join(dir, "out.ags");
+    writeFileSync(src, TWO_DEFECTS);
+    const r = fix(src, { out: dst });
+    expect(readFileSync(src, "utf8")).toBe(TWO_DEFECTS); // source untouched
+    expect(readFileSync(dst, "utf8")).toBe(r.text); // written to dst
+  });
+
+  it("inPlace and out are mutually exclusive", () => {
+    expect(() => fix("x.ags", { inPlace: true, out: "y.ags" })).toThrow(/mutually exclusive/);
+  });
+
+  it("inPlace needs a path source (bytes/text have nothing to overwrite)", () => {
+    expect(() => fix(undefined, { text: TWO_DEFECTS, inPlace: true })).toThrow(/path source/);
   });
 });
 

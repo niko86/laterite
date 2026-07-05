@@ -45,9 +45,9 @@ _MATRIX: dict[str, tuple] = {
         L.fix,
         {"source", "path", "text", "data", "in_place", "out"},
         "FixOptions",
-        # Node's fix has no per-rule selection yet (Batch A shipped it on
-        # Python/CLI; Node's is a follow-up now the fluent layer exists).
-        {"only": "Node fix() has no rule-selection yet", "exclude": "ditto"},
+        # only/exclude landed on Node in #394 — the allowlist shrank to empty
+        # (the whole point: closing the gap removes its by-design entry).
+        {},
     ),
     "diff": (L.diff, {"a", "b"}, "DiffOptions", {}),
     "build": (L.build_ags4, {"groups"}, "EmitOptions", {}),
@@ -89,8 +89,9 @@ def _ts_interface_fields(src: str, name: str, _seen: set[str] | None = None) -> 
 
 # Node option fields that are input/IO selectors, not behavioural knobs (the
 # analog of the Python `drop` sets) — `text` is an input door, `index` is a cert
-# path (an IO knob with no Python-free-fn analog on these verbs).
-_NODE_IO = {"text", "index"}
+# path, and `inPlace`/`out` are fix write-back destinations (the camelCase twins
+# of Python's dropped `in_place`/`out`). None is a behavioural knob to compare.
+_NODE_IO = {"text", "index", "inPlace", "out"}
 
 
 @pytest.mark.parametrize("op", list(_MATRIX))

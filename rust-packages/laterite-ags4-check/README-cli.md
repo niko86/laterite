@@ -59,6 +59,13 @@ Rule violations in a file.
                          still has errors; warnings/FYI don't block it.
     --index-out <path>   with --emit-index: write the certificate to <path>
                          instead of <file>.ags.idx
+    --index <path>       CONSUME an .ags.idx certificate: a fresh (bytes
+                         unchanged), same-engine, profile-covering cert lets
+                         the check SKIP the rule engine and report the
+                         certified verdict; a stale / foreign / insufficient
+                         cert is re-validated. Mirrors the library's
+                         read(index=) short-circuit. Mutually exclusive with
+                         --emit-index.
     --quiet              suppress the progress spinner
     --tui                interactive findings browser (needs the
                          `tui` build feature + an interactive terminal)
@@ -99,6 +106,7 @@ nested `{file, findings:{rule:[{line,group,desc}]}}` document;
     lat-check delivery.ags --fix --in-place     # repair in place
     lat-check delivery.ags --fix-risky --fix-out clean.ags
     lat-check delivery.ags --emit-index         # → delivery.ags.idx (if clean)
+    lat-check delivery.ags --index delivery.ags.idx  # skip the engine if fresh
 
 > The clean-room boundary, licence, and bundled-dictionary provenance
 > are documented in the crate's `README.md` and `data/PROVENANCE.md`.

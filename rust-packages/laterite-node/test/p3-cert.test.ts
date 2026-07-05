@@ -59,6 +59,44 @@ describe("certify → .ags.idx (#294 Batch E / #14)", () => {
   });
 });
 
+describe("certifyBytes → in-memory cert (#390)", () => {
+  it("returns the certificate bytes without writing a file", () => {
+    const f = tmpFile("clean.ags", CLEAN);
+    const blob = read(f).validate({ warnings: false }).certifyBytes();
+    expect(Buffer.isBuffer(blob)).toBe(true);
+    const cert = JSON.parse(blob.toString("utf8"));
+    expect(cert.validation.validator).toBe("laterite_ags4");
+    expect(cert.file.size).toBe(CLEAN.length);
+  });
+
+  it("produces a usable cert — write it out and read({ index }) skips the engine", () => {
+    const f = tmpFile("clean.ags", CLEAN);
+    const blob = read(f).validate({ warnings: false }).certifyBytes();
+    const idx = `${f}.idx`;
+    writeFileSync(idx, blob);
+    const rep = read(f, { index: idx }).validate({ warnings: false }).report;
+    expect(rep?.resolution).toBe("certified");
+    expect(rep?.isValid).toBe(true);
+  });
+
+  it("matches the file certify() bar the mint timestamp (same file + groups)", () => {
+    const f = tmpFile("clean.ags", CLEAN);
+    const onDisk = JSON.parse(readFileSync(read(f).validate({ warnings: false }).certify(), "utf8"));
+    const inMem = JSON.parse(
+      read(f).validate({ warnings: false }).certifyBytes().toString("utf8"),
+    );
+    expect(inMem.file).toEqual(onDisk.file);
+    expect(inMem.groups).toEqual(onDisk.groups);
+  });
+
+  it("refuses without a prior clean validate", () => {
+    const f = tmpFile("clean.ags", CLEAN);
+    expect(() => read(f).certifyBytes()).toThrow(/call \.validate\(\)/);
+    const dirty = tmpFile("dirty.ags", Buffer.from('"GROUP","LOCA"\r\n'));
+    expect(() => read(dirty).validate().certifyBytes()).toThrow(/cannot certify/);
+  });
+});
+
 describe("certify guards", () => {
   it("refuses without a prior validate, and with findings", () => {
     const f = tmpFile("clean.ags", CLEAN);

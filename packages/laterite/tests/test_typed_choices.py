@@ -9,6 +9,7 @@ proves it equals the runtime set.)
 from __future__ import annotations
 
 import json
+import re
 import typing
 from pathlib import Path
 
@@ -56,3 +57,27 @@ def test_buildmode_literal_matches_the_engine_modes():
     for mode in typing.get_args(L.BuildMode):
         assert accepts(mode), f"engine rejected documented BuildMode {mode!r}"
     assert not accepts("nope"), "engine should reject an unknown mode"
+
+
+_INDEX_TS = (
+    Path(__file__).resolve().parents[3]
+    / "rust-packages"
+    / "laterite-node"
+    / "ts"
+    / "index.ts"
+)
+
+
+def test_node_fixablerule_union_matches_python():
+    """The Node `FixableRule` TS union (`only`/`exclude` labels, #394) must equal
+    Python's `FixableRule` — which is itself gated to the engine's `fixable_rules()`
+    (test_fix_selection). So Node's typed choices can't drift from what the shared
+    fix engine actually repairs, without hand-listing rules on the Node side."""
+    src = _INDEX_TS.read_text(encoding="utf-8")
+    m = re.search(r"export type FixableRule =\s*([^;]+);", src)
+    assert m is not None, "FixableRule union not found in index.ts"
+    node = set(re.findall(r'"([^"]+)"', m.group(1)))
+    assert node == set(typing.get_args(L.FixableRule)), (
+        f"Node FixableRule {sorted(node)} != Python {sorted(typing.get_args(L.FixableRule))} "
+        "— update the Node union in index.ts (it mirrors the engine's fixable set)"
+    )

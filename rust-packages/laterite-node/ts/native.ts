@@ -23,8 +23,14 @@ export {
   transportUnpack,
   transportLock,
   transportUnlock,
+  transportPackBytes,
+  transportUnpackBytes,
+  transportLockBytes,
+  transportUnlockBytes,
   ags4ToExcel,
   excelToAgs4,
+  ags4BytesToXlsx,
+  xlsxBytesToAgs4,
 } from "#native";
 export type {
   GroupMeta,
@@ -37,4 +43,5 @@ export type {
   PackStats,
   UnpackStats,
   ExcelStats,
+  ExcelBytesResult,
 } from "#native";

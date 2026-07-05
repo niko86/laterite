@@ -82,6 +82,35 @@ def test_lock_both_levels_work(ags_file: Path, tmp_path: Path) -> None:
     assert out1.exists() and out9.exists()
 
 
+# --- in-memory (bytes) forms ------------------------------------------------
+
+def test_pack_bytes_round_trip() -> None:
+    packed = transport.pack_bytes(_AGS * 20)
+    assert packed[:4] == bytes.fromhex("28B52FFD")       # zstd magic
+    assert len(packed) < len(_AGS * 20)                  # repetitive → shrinks
+    assert transport.unpack_bytes(packed) == _AGS * 20
+
+
+def test_lock_bytes_round_trip_and_wrong_password() -> None:
+    sealed = transport.lock_bytes(_AGS, password="hunter2")
+    assert sealed != _AGS                                # encrypted
+    assert transport.unlock_bytes(sealed, password="hunter2") == _AGS
+    with pytest.raises(RuntimeError):
+        transport.unlock_bytes(sealed, password="wrong")
+
+
+def test_bytes_and_file_forms_interoperate(ags_file: Path, tmp_path: Path) -> None:
+    # The parity guarantee: a lock_bytes blob opens with the file unlock, and a
+    # file lock opens with unlock_bytes — same envelope either way.
+    data = ags_file.read_bytes()
+
+    (tmp_path / "b.zst.age").write_bytes(transport.lock_bytes(data, password="pw"))
+    assert transport.unlock(tmp_path / "b.zst.age", password="pw").read_bytes() == data
+
+    locked = transport.lock(ags_file, password="pw")
+    assert transport.unlock_bytes(locked.read_bytes(), password="pw") == data
+
+
 # --- non-path guard ---------------------------------------------------------
 
 def test_non_path_arg_raises_actionable_typeerror() -> None:

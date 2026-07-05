@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use laterite_excel::ExcelStats;
 use pyo3::Bound;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyModule};
+use pyo3::types::{PyBytes, PyDict, PyList, PyModule};
 use pyo3::wrap_pyfunction;
 
 use crate::map_cli_err;
@@ -62,8 +62,40 @@ fn excel_to_ags4<'py>(
     stats_to_pydict(py, stats)
 }
 
+/// AGS4 bytes → XLSX bytes, in memory (no filesystem). The bytes twin of
+/// `ags4_to_excel` — the same FS-free core the wasm/browser surface uses. Returns
+/// `(xlsx_bytes, stats)` so a caller who wants the workbook without a temp file
+/// (e.g. streaming it to an upload) gets both.
+#[pyfunction]
+#[pyo3(signature = (data, ordered_keys=None))]
+fn ags4_bytes_to_xlsx<'py>(
+    py: Python<'py>,
+    data: &[u8],
+    ordered_keys: Option<Vec<String>>,
+) -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyDict>)> {
+    let (xlsx, stats) =
+        laterite_excel::ags4_bytes_to_xlsx(data, ordered_keys).map_err(map_cli_err)?;
+    Ok((PyBytes::new(py, &xlsx), stats_to_pydict(py, stats)?))
+}
+
+/// XLSX bytes → AGS4 bytes, in memory (no filesystem). The bytes twin of
+/// `excel_to_ags4`. Returns `(ags_bytes, stats)`.
+#[pyfunction]
+#[pyo3(signature = (data, format_numeric_columns=true))]
+fn xlsx_bytes_to_ags4<'py>(
+    py: Python<'py>,
+    data: &[u8],
+    format_numeric_columns: bool,
+) -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyDict>)> {
+    let (ags, stats) =
+        laterite_excel::xlsx_bytes_to_ags4(data, format_numeric_columns).map_err(map_cli_err)?;
+    Ok((PyBytes::new(py, &ags), stats_to_pydict(py, stats)?))
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ags4_to_excel, m)?)?;
     m.add_function(wrap_pyfunction!(excel_to_ags4, m)?)?;
+    m.add_function(wrap_pyfunction!(ags4_bytes_to_xlsx, m)?)?;
+    m.add_function(wrap_pyfunction!(xlsx_bytes_to_ags4, m)?)?;
     Ok(())
 }

@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] — 2026-07-05
+
+A round of **cross-surface I/O-form** additions from the modality audit — every
+capability offered in the same *forms* (path / bytes / text) on every surface it
+makes sense on. All additive; nothing existing changes.
+
+### Added
+
+- **In-memory (bytes) transport — `pack_bytes` / `unpack_bytes` / `lock_bytes` /
+  `unlock_bytes`.** The filesystem-free counterparts of `pack` / `unpack` /
+  `lock` / `unlock`, so you can package a value you already hold in memory (e.g.
+  `read(...).fix(...).bytes`) straight to an upload — and, crucially,
+  `lock_bytes` seals sensitive data **without ever writing the plaintext to
+  disk**. Same envelopes as the file forms (a `*_bytes` blob interops with the
+  file API and vice versa — standard zstd / age). Closes a Python↔browser parity
+  gap: the browser transported in-memory bytes, Python could only do files. (#389)
+- **Node in-memory transport — `packBytes` / `unpackBytes` / `lockBytes` /
+  `unlockBytes`.** The Node mirror of the Python bytes API above, over the same
+  shared `laterite-transport` leaf, so a Node backend can seal
+  `read().fix().bytes` straight to an upload — `lockBytes` never writes the
+  plaintext to disk. A blob sealed in memory interops with the file
+  `unpack`/`unlock` and with `pyrage` / the browser. (#389)
+- **In-memory certificate output — `certify_bytes()` (Python) / `certifyBytes()`
+  (Node).** The filesystem-free twin of `certify()`: mint an `.ags.idx`
+  certificate and get its bytes back instead of a file, so a web backend can hand
+  the cert straight to an upload with no temp-file round-trip. The bytes are
+  exactly what `certify()` writes, so they interop with `read(index=…)`, the CLI
+  `--index`, and the browser. The certify analog of `transport.lock_bytes`. (#390)
+- **Excel bytes ↔ bytes — Python `to_excel(output=None)` / `from_excel(bytes)`,
+  Node `toExcel`/`fromExcel` bytes forms + `Ags4File.toExcel()`.** AGS4 ↔ `.xlsx`
+  now round-trips entirely in memory on the library surfaces, so an uploaded
+  `.xlsx` (or an in-memory AGS4 workbook) needn't hit disk — the door the browser
+  already offered. Backed by the existing FS-free `laterite-excel` cores, exposed
+  through the Python and Node bindings. (#391)
+- **`lat-check --index <file>.ags.idx` — consume a certificate.** The CLI could
+  *mint* an `.ags.idx` (`--emit-index`); now it can *consume* one — a fresh,
+  same-engine, profile-covering certificate skips the rule engine and reports the
+  certified verdict (a stale / foreign / insufficient cert is re-validated).
+  Mirrors the library's `read(index=…)` short-circuit; the CLI joins Python, Node
+  and DuckDB in offering a cert-input door. (#393)
+- **Node `fix()` write-back + per-rule selection.** `fix()` gains `inPlace` / `out`
+  (write the repaired file back over the source or to a path) and `only` /
+  `exclude` (restrict which fixable rules apply, typed by a new `FixableRule`
+  union), matching Python's free `fix`. (#394)
+- **DuckDB `validate_ags_text` / `certify_ags_text` + `encoding` on
+  `certify_ags`.** The content (VARCHAR) twins of `validate_ags` / `certify_ags`
+  — the siblings of `read_ags_text` — validate and certify AGS4 that isn't a file
+  you can hand the VFS; `certify_ags_text` returns the certificate JSON in a
+  `cert` column rather than writing an `.ags.idx`. `certify_ags` also gains the
+  `encoding` named param the other path verbs take, for non-UTF-8 sources. (#392)
+
 ## [0.6.1] — 2026-07-04
 
 ### Fixed
@@ -543,7 +594,8 @@ Initial public release.
 - 9 python-ags4 parity tests fail by design; see
   [`docs/parity-coverage-map.md`](docs/parity-coverage-map.md).
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/niko86/laterite/releases/tag/v0.6.2
 [0.6.1]: https://github.com/niko86/laterite/releases/tag/v0.6.1
 [0.6.0]: https://github.com/niko86/laterite/releases/tag/v0.6.0
 [0.5.1]: https://github.com/niko86/laterite/releases/tag/v0.5.1

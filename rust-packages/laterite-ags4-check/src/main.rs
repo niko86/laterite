@@ -121,6 +121,12 @@ usage: lat-check <file.ags> [options]
                             still has errors. Warnings/FYI don't block it.
   --index-out <path>        with --emit-index: write the certificate to
                             <path> instead of <file>.ags.idx
+  --index <path>            CONSUME an .ags.idx certificate: if it is fresh
+                            (bytes unchanged), was minted by this engine, and
+                            covers the requested profile, SKIP the rule engine
+                            and report the certified verdict. A stale / foreign
+                            / insufficient cert is re-validated. Mutually
+                            exclusive with --emit-index.
   --quiet                   suppress the progress spinner
   --tui                     interactive findings browser (needs the
                             `tui` build feature + an interactive terminal)
@@ -163,6 +169,12 @@ fn main() {
     // the `.ags.idx` validity certificate beside the file (or at --index-out).
     let mut emit_index = false;
     let mut index_out: Option<PathBuf> = None;
+    // `--index <path>` (#393): CONSUME a `.ags.idx` — the mirror of `--emit-index`.
+    // A fresh, same-engine, profile-covering certificate lets the check SKIP the
+    // rule engine (the library's `read(index=)`+`validate()` short-circuit). The
+    // sibling surfaces already offer a cert-input door (Python `read(index=)`,
+    // Node `read({index})`, DuckDB `.idx` autodiscovery); the CLI could only mint.
+    let mut use_index: Option<PathBuf> = None;
     // Only declared/used with the `tui` feature; without it, `--tui`
     // is an unknown option (exit 5) — guardrail G6.
     #[cfg(feature = "tui")]
@@ -198,6 +210,13 @@ fn main() {
                 Some(p) => index_out = Some(PathBuf::from(p)),
                 None => {
                     eprintln!("error: --index-out expects a path");
+                    exit(5);
+                }
+            },
+            "--index" => match argv.next() {
+                Some(p) => use_index = Some(PathBuf::from(p)),
+                None => {
+                    eprintln!("error: --index expects a path to the .ags.idx certificate");
                     exit(5);
                 }
             },
@@ -300,6 +319,20 @@ fn main() {
         exit(5);
     }
 
+    // `--index` (consume) is the opposite of `--emit-index` (mint) — asking to
+    // both skip via a cert and mint one in the same run is contradictory. It also
+    // only applies to the validate path (`--fix`/`--diff` exit before it).
+    if use_index.is_some() && emit_index {
+        eprintln!(
+            "error: --index (consume a certificate) and --emit-index (mint one) are mutually exclusive"
+        );
+        exit(5);
+    }
+    if use_index.is_some() && (fix || diff_path.is_some()) {
+        eprintln!("error: --index only applies to a validation run, not --fix / --diff");
+        exit(5);
+    }
+
     // `--diff <b>`: compare the input file against another and exit (never falls
     // through to the validate-report below).
     if let Some(other) = diff_path.as_deref() {
@@ -316,10 +349,32 @@ fn main() {
     }
 
     let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("file");
-    let spinner = Spinner::start(&format!("validating {name}..."), quiet);
 
-    let result = check_file(&path, &opts);
-    drop(spinner); // clear the animation before any output
+    // `--index <cert>` (#393): try the certificate short-circuit before touching
+    // the rule engine. A skip yields an empty `Findings` (the cert attests
+    // error-clean); a non-skip falls through to a normal engine run with a note
+    // saying why the cert wasn't trusted.
+    let result = match use_index.as_deref() {
+        Some(cert_path) => match try_certified_skip(&path, &opts, cert_path) {
+            CertOutcome::Skip(stamp) => {
+                report_certified_skip(&stamp, opts.include_warnings, opts.include_fyi);
+                Ok(Findings::new())
+            }
+            CertOutcome::Revalidate(reason) => {
+                eprintln!("note: --index not used ({reason}); running the full check");
+                let spinner = Spinner::start(&format!("validating {name}..."), quiet);
+                let r = check_file(&path, &opts);
+                drop(spinner);
+                r
+            }
+        },
+        None => {
+            let spinner = Spinner::start(&format!("validating {name}..."), quiet);
+            let r = check_file(&path, &opts);
+            drop(spinner); // clear the animation before any output
+            r
+        }
+    };
 
     match result {
         Ok(found) => {
@@ -489,6 +544,113 @@ fn mint_index(
     let json = sidecar.to_json().map_err(|e| e.to_string())?;
     write_atomic(&dest, &json).map_err(|e| format!("write {}: {e}", dest.display()))?;
     Ok(dest)
+}
+
+/// Outcome of a `--index` certificate consume ([`try_certified_skip`]): either the
+/// rule engine is skipped (the cert vouches for a clean validation) or we
+/// re-validate, carrying the human reason the cert wasn't trusted.
+enum CertOutcome {
+    /// Trusted: skip the engine, reporting the cert's stamp.
+    Skip(ValidationStamp),
+    /// Not trusted for this request — re-run the engine. The `String` says why.
+    Revalidate(String),
+}
+
+/// `--index <cert>` (#393): decide whether a `.ags.idx` certificate can stand in
+/// for a fresh validation of `path`. This is the CONSUME mirror of [`mint_index`]
+/// and the CLI analog of the library's `read(index=)` + `.validate()` skip: a
+/// clean verdict is trusted **only** when all three hold —
+///
+/// 1. the cert is byte-fresh ([`Sidecar::is_fresh_for`] — same size + SHA-256),
+/// 2. it was minted by THIS engine identity (`lat-check` + the validator
+///    [`VERSION`](laterite_ags4_validator::VERSION)), and
+/// 3. its check profile covers the request ([`Sidecar::profile_covers`] —
+///    `--check-files` / `--dict-version`).
+///
+/// Any miss ⇒ [`CertOutcome::Revalidate`] with the reason: a verdict today's rules
+/// (or a different checker) might not reproduce is never trusted — the cert is a
+/// fast-path, not an override.
+fn try_certified_skip(path: &Path, opts: &CheckOptions, cert_path: &Path) -> CertOutcome {
+    let bytes = match std::fs::read(path) {
+        Ok(b) => b,
+        // Let the normal validate path surface the unreadable-source error with
+        // its own exit code — here we just decline the skip.
+        Err(e) => return CertOutcome::Revalidate(format!("cannot read the source file: {e}")),
+    };
+    let cert_bytes = match std::fs::read(cert_path) {
+        Ok(b) => b,
+        Err(e) => {
+            return CertOutcome::Revalidate(format!(
+                "cannot read certificate {}: {e}",
+                cert_path.display()
+            ));
+        }
+    };
+    let sidecar = match Sidecar::from_json(&cert_bytes) {
+        Ok(s) => s,
+        Err(e) => {
+            return CertOutcome::Revalidate(format!(
+                "{} is not a valid .ags.idx certificate: {e}",
+                cert_path.display()
+            ));
+        }
+    };
+    if !sidecar.is_fresh_for(&bytes) {
+        return CertOutcome::Revalidate(
+            "certificate is stale — the file changed since it was minted".to_string(),
+        );
+    }
+    // Same-engine check: a cert minted by another surface (Python stamps
+    // `laterite_ags4`, the DuckDB extension its own) or an older engine version is
+    // byte-fresh but checker-stale — re-validate rather than trust a verdict our
+    // rules might not reproduce.
+    if !sidecar.checker_matches("lat-check", laterite_ags4_validator::VERSION, None) {
+        return CertOutcome::Revalidate(format!(
+            "certificate was minted by {} {} (compat {:?}), not lat-check {}",
+            sidecar.validation.validator,
+            sidecar.validation.validator_version,
+            sidecar.validation.compat.as_deref(),
+            laterite_ags4_validator::VERSION
+        ));
+    }
+    let forced_edition = opts.dict_version.map(|dv| dv.as_str());
+    if !sidecar.profile_covers(opts.check_files, forced_edition) {
+        return CertOutcome::Revalidate(
+            "certificate's validation profile does not cover this request \
+             (--check-files / --dict-version)"
+                .to_string(),
+        );
+    }
+    CertOutcome::Skip(sidecar.validation.clone())
+}
+
+/// Print the provenance note for a trusted `--index` skip. A certificate attests
+/// the **error** verdict (error-clean by construction) and carries the WARNING /
+/// FYI *counts* present at mint — but not the findings themselves, so to see the
+/// individual warnings, re-run without `--index`. The `include_*` flags mirror
+/// the active report tiers so the note only points at counts the user asked for.
+fn report_certified_skip(stamp: &ValidationStamp, include_warnings: bool, include_fyi: bool) {
+    let mut advisory = Vec::new();
+    if include_warnings {
+        advisory.push(format!("{} warning(s)", stamp.warnings));
+    }
+    if include_fyi {
+        advisory.push(format!("{} fyi", stamp.fyi));
+    }
+    let recorded = if advisory.is_empty() {
+        String::new()
+    } else {
+        let hint = if (include_warnings && stamp.warnings > 0) || (include_fyi && stamp.fyi > 0) {
+            " — run without --index to list them"
+        } else {
+            ""
+        };
+        format!("; cert recorded {}{hint}", advisory.join(", "))
+    };
+    eprintln!(
+        "note: certified clean by {} at {} — rule engine skipped{recorded}",
+        stamp.validator, stamp.checked_at
+    );
 }
 
 /// `--fix`: mechanically repair the file via the validator's shared
@@ -899,5 +1061,104 @@ mod tests {
 
         let _ = std::fs::remove_file(&src);
         let _ = std::fs::remove_file(&dest);
+    }
+
+    // --- `--index` consume (#393) ----------------------------------------
+
+    #[test]
+    fn certified_skip_trusts_a_fresh_own_engine_cert() {
+        let dir = std::env::temp_dir();
+        let src = dir.join(format!("lat_use_index_ok_{}.ags", std::process::id()));
+        std::fs::write(&src, CLEAN_AGS).unwrap();
+        let opts = CheckOptions {
+            include_warnings: true,
+            ..CheckOptions::default()
+        };
+        let cert = mint_index(&src, &opts, 0, 0, None).unwrap();
+
+        // Fresh + minted by this engine (lat-check) + auto/no-check-files profile
+        // covers a default request → SKIP.
+        match try_certified_skip(&src, &opts, &cert) {
+            CertOutcome::Skip(stamp) => {
+                assert_eq!(stamp.validator, "lat-check");
+                assert_eq!(stamp.warnings, 0);
+            }
+            CertOutcome::Revalidate(why) => panic!("expected skip, got revalidate: {why}"),
+        }
+
+        let _ = std::fs::remove_file(&src);
+        let _ = std::fs::remove_file(&cert);
+    }
+
+    #[test]
+    fn certified_skip_declines_a_stale_cert() {
+        let dir = std::env::temp_dir();
+        let src = dir.join(format!("lat_use_index_stale_{}.ags", std::process::id()));
+        std::fs::write(&src, CLEAN_AGS).unwrap();
+        let opts = CheckOptions {
+            include_warnings: true,
+            ..CheckOptions::default()
+        };
+        let cert = mint_index(&src, &opts, 0, 0, None).unwrap();
+
+        // Mutate the source AFTER minting → the cert no longer matches its bytes.
+        std::fs::write(&src, format!("{CLEAN_AGS}\r\n\"GROUP\",\"EXTRA\"\r\n")).unwrap();
+        assert!(
+            matches!(try_certified_skip(&src, &opts, &cert), CertOutcome::Revalidate(w) if w.contains("stale")),
+            "a changed file must decline the skip"
+        );
+
+        let _ = std::fs::remove_file(&src);
+        let _ = std::fs::remove_file(&cert);
+    }
+
+    #[test]
+    fn certified_skip_declines_when_profile_insufficient() {
+        let dir = std::env::temp_dir();
+        let src = dir.join(format!("lat_use_index_profile_{}.ags", std::process::id()));
+        std::fs::write(&src, CLEAN_AGS).unwrap();
+        // Mint WITHOUT the on-disk file check…
+        let mint_opts = CheckOptions {
+            include_warnings: true,
+            ..CheckOptions::default()
+        };
+        let cert = mint_index(&src, &mint_opts, 0, 0, None).unwrap();
+        // …then ask for it: a weaker cert can't cover a --check-files request.
+        let want = CheckOptions {
+            include_warnings: true,
+            check_files: true,
+            ..CheckOptions::default()
+        };
+        assert!(
+            matches!(try_certified_skip(&src, &want, &cert), CertOutcome::Revalidate(w) if w.contains("profile")),
+            "a cert minted without --check-files must not cover a --check-files request"
+        );
+
+        let _ = std::fs::remove_file(&src);
+        let _ = std::fs::remove_file(&cert);
+    }
+
+    #[test]
+    fn certified_skip_declines_a_missing_or_bogus_cert() {
+        let dir = std::env::temp_dir();
+        let src = dir.join(format!("lat_use_index_bogus_{}.ags", std::process::id()));
+        std::fs::write(&src, CLEAN_AGS).unwrap();
+        let opts = CheckOptions::default();
+        // Nonexistent cert path.
+        let missing = dir.join(format!("lat_use_index_missing_{}.idx", std::process::id()));
+        assert!(matches!(
+            try_certified_skip(&src, &opts, &missing),
+            CertOutcome::Revalidate(_)
+        ));
+        // Present but not a certificate.
+        let junk = dir.join(format!("lat_use_index_junk_{}.idx", std::process::id()));
+        std::fs::write(&junk, b"not json").unwrap();
+        assert!(
+            matches!(try_certified_skip(&src, &opts, &junk), CertOutcome::Revalidate(w) if w.contains("valid .ags.idx")),
+            "a non-certificate file must decline the skip"
+        );
+
+        let _ = std::fs::remove_file(&src);
+        let _ = std::fs::remove_file(&junk);
     }
 }

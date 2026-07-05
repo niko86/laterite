@@ -6,9 +6,13 @@ import {
   type PackStats,
   type UnpackStats,
   transportLock,
+  transportLockBytes,
   transportPack,
+  transportPackBytes,
   transportUnlock,
+  transportUnlockBytes,
   transportUnpack,
+  transportUnpackBytes,
 } from "./native";
 
 export type { PackStats, UnpackStats };
@@ -66,4 +70,66 @@ export function lock(src: string, dest: string, password: string, level?: number
  */
 export function unlock(src: string, dest: string, password: string): UnpackStats {
   return transportUnlock(src, dest, password);
+}
+
+// --- in-memory (bytes) forms -------------------------------------------------
+// The filesystem-free counterparts of pack/unpack/lock/unlock — the Node mirror
+// of laterite-py's `pack_bytes`/…. They package a value you already hold in
+// memory (e.g. `read(...).fix().bytes`) straight to an upload; crucially
+// `lockBytes` never writes the plaintext to disk. Each produces the SAME
+// envelope as its file form, so a `*Bytes` blob interops with the file API
+// (write it out, then unpack/unlock) and with `pyrage`/the browser.
+
+/**
+ * zstd-compress `data` → bytes in memory (zstd only) — no filesystem. The
+ * in-memory form of {@link pack}; the output is a standard zstd frame, so it
+ * opens with {@link unpackBytes}, {@link unpack} (write it out first), or stock
+ * `zstd`.
+ *
+ * @param data - The bytes to compress.
+ * @param level - zstd level 1–22 (default 9).
+ * @returns The compressed bytes.
+ */
+export function packBytes(data: Uint8Array, level?: number): Buffer {
+  return transportPackBytes(data, level);
+}
+
+/**
+ * zstd-decompress bytes → bytes in memory — the in-memory form of {@link unpack}.
+ *
+ * @param data - The zstd-compressed bytes (e.g. from {@link packBytes}).
+ * @returns The decompressed bytes.
+ */
+export function unpackBytes(data: Uint8Array): Buffer {
+  return transportUnpackBytes(data);
+}
+
+/**
+ * zstd-compress + age-passphrase-encrypt `data` → bytes in memory — no plaintext
+ * on disk. The in-memory form of {@link lock}, ideal for sealing sensitive data
+ * you hold in memory (e.g. a fixed `Ags4File`'s `.bytes`) without ever writing
+ * the plaintext out. The `.zst.age` envelope matches {@link lock}'s, so the
+ * result opens with {@link unlockBytes}, {@link unlock}, `pyrage`, or the
+ * browser, given the passphrase.
+ *
+ * @param data - The bytes to compress and encrypt.
+ * @param password - The age passphrase. Required — there is no agent-key path.
+ * @param level - zstd level 1–22 (default 9).
+ * @returns The sealed bytes.
+ */
+export function lockBytes(data: Uint8Array, password: string, level?: number): Buffer {
+  return transportLockBytes(data, password, level);
+}
+
+/**
+ * age-passphrase-decrypt + zstd-decompress `.zst.age` bytes → bytes in memory —
+ * the in-memory form of {@link unlock}.
+ *
+ * @param data - The sealed bytes (e.g. from {@link lockBytes}).
+ * @param password - The age passphrase the envelope was sealed with.
+ * @returns The original bytes.
+ * @throws If the passphrase is wrong or the input is not a passphrase envelope.
+ */
+export function unlockBytes(data: Uint8Array, password: string): Buffer {
+  return transportUnlockBytes(data, password);
 }

@@ -781,17 +781,9 @@ class Ags4File:
         to certify — certify refuses to overwrite the source file or any existing
         non-certificate file, so ``certify(p)`` reusing your ``.ags`` path can't destroy
         it. Returns the written ``Path``. The certificate indexes the original source
-        bytes, which must be UTF-8 (the byte index rejects other encodings)."""
-        if self._report is None:
-            raise Ags4Error(
-                "call .validate() before .certify() — certify records a passed "
-                "validation, it does not run one"
-            )
-        if not self._report.is_valid:
-            raise Ags4Error(
-                f"cannot certify a file with {self._report.count} finding(s); fix "
-                "them and re-validate clean first"
-            )
+        bytes, which must be UTF-8 (the byte index rejects other encodings). For the
+        certificate **bytes** in memory (no file), use [`certify_bytes`][laterite.Ags4File.certify_bytes]."""
+        report = self._require_clean_validation()
         src_path = self._src[0] if self._src is not None else None
         if path is None:
             if src_path is None:
@@ -821,18 +813,55 @@ class Ags4File:
                 "(certify writes or replaces an .ags.idx). Pass a new path, or the "
                 "existing .ags.idx to replace."
             )
+        path.write_bytes(self._mint_cert(report).to_json())
+        return path
+
+    def certify_bytes(self) -> builtins.bytes:
+        """Mint this file's ``.ags.idx`` validity **certificate** and return its bytes
+        in memory — the filesystem-free twin of [`certify`][laterite.Ags4File.certify]. Same
+        precondition (a prior clean [`validate`][laterite.validate]; ``certify_bytes`` vouches for it,
+        it does not run one) and same output — the bytes are exactly what ``certify``
+        would write, so they interop with ``read(index=...)``, the CLI ``--index``, and
+        the browser cert.
+
+        Ideal for a web backend that wants to hand the certificate straight to an
+        upload or object store without a temp-file round-trip — the certify analog of
+        [`transport.lock_bytes`][laterite.transport.lock_bytes]. Returns the certificate JSON as ``bytes``.
+
+        Raises:
+            Ags4Error: If [`validate`][laterite.validate] was not called, or it found finding(s).
+        """
+        return self._mint_cert(self._require_clean_validation()).to_json()
+
+    def _require_clean_validation(self) -> Report:
+        """Shared precondition for ``certify`` / ``certify_bytes``: a certificate
+        vouches for a *passed* validation, so one must have run and found nothing.
+        Returns the validated [`Report`][laterite.Report] (narrowed non-``None``) for the mint step."""
+        if self._report is None:
+            raise Ags4Error(
+                "call .validate() before .certify() — certify records a passed "
+                "validation, it does not run one"
+            )
+        if not self._report.is_valid:
+            raise Ags4Error(
+                f"cannot certify a file with {self._report.count} finding(s); fix "
+                "them and re-validate clean first"
+            )
+        return self._report
+
+    def _mint_cert(self, report: Report):
+        """Assemble the ``Sidecar`` certificate over the original source bytes,
+        stamping the profile the last ``validate`` actually ran (``check_files`` /
+        forced edition). ``report`` comes from [`_require_clean_validation`][laterite.Ags4File._require_clean_validation]."""
         from datetime import UTC, datetime
 
-        checked_at = datetime.now(UTC).isoformat()
-        cert = _native.Sidecar.assemble(
+        return _native.Sidecar.assemble(
             self._source_bytes(),
-            self._report.dict_version,
-            checked_at,
+            report.dict_version,
+            datetime.now(UTC).isoformat(),
             check_files=self._last_check_files,
             edition_forced=self._last_forced,
         )
-        path.write_bytes(cert.to_json())
-        return path
 
     def save(self, path: str | os.PathLike[str]) -> Path:
         """Write spec-correct AGS4 to ``path`` (UTF-8 — [`bytes`][laterite.Ags4File.bytes]); returns the
@@ -842,10 +871,14 @@ class Ags4File:
         return path
 
     def to_excel(
-        self, path: str | os.PathLike[str], *, groups: list[str] | None = None
-    ) -> dict:
-        """Write this file to an XLSX workbook — one sheet per group — and return the
-        Rust writer's stats (``{"sheets_written", "rows_written", "warnings"}``).
+        self, path: str | os.PathLike[str] | None = None, *, groups: list[str] | None = None
+    ) -> dict | builtins.bytes:
+        """Write this file to an XLSX workbook — one sheet per group.
+
+        With ``path`` given, writes the ``.xlsx`` there and returns the Rust
+        writer's stats (``{"sheets_written", "rows_written", "warnings"}``); with
+        ``path=None`` returns the ``.xlsx`` **bytes** in memory (no filesystem) — so
+        an uploaded/in-memory AGS4 needn't hit disk.
 
         Rust-backed via ``laterite_excel`` (``rust_xlsxwriter``); openpyxl and
         pyarrow never enter the dep graph. Sheets carry the AGS HEADING / UNIT /
@@ -853,12 +886,12 @@ class Ags4File:
         re-ordering of [`groups`][laterite.Ags4File.groups]); default is source order. The workbook is
         written from this handle's spec-correct [`bytes`][laterite.Ags4File.bytes], so it round-trips
         through [`from_excel`][laterite.from_excel] regardless of how the handle was read."""
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as d:
-            tmp = Path(d) / "_to_excel.ags"
-            tmp.write_bytes(self.bytes)
-            return _excel_convert(_native.ags4_to_excel, str(tmp), os.fspath(path), groups)
+        # One FS-free pass over the spec-correct bytes — no temp file either way.
+        xlsx, stats = _native.ags4_bytes_to_xlsx(self.bytes, groups)
+        if path is None:
+            return xlsx
+        Path(path).write_bytes(xlsx)
+        return dict(stats)
 
     @property
     def fix_report(self) -> FixResult | None:
@@ -1356,6 +1389,20 @@ def _excel_convert(fn, *args) -> dict:
         raise
 
 
+def _excel_bytes_convert(fn, *args) -> tuple[bytes, dict]:
+    """The in-memory twin of [`_excel_convert`][laterite._excel_convert] for the
+    ``(bytes, stats)``-returning FS-free cores: normalise the stats to a plain
+    ``dict`` and map the engine's "no valid AGS4 data" RuntimeError to
+    [`NotAgs4Error`][laterite.NotAgs4Error]."""
+    try:
+        blob, stats = fn(*args)
+        return blob, dict(stats)
+    except RuntimeError as exc:
+        if "No valid AGS4 data" in str(exc):
+            raise NotAgs4Error(str(exc)) from exc
+        raise
+
+
 def to_excel(
     source: Any = None,
     output: str | os.PathLike[str] | None = None,
@@ -1364,29 +1411,32 @@ def to_excel(
     text: str | None = None,
     data: bytes | bytearray | memoryview | None = None,
     groups: list[str] | None = None,
-) -> dict:
-    """Convert AGS4 to an XLSX workbook — one sheet per group — and return the Rust
-    writer's stats (``{"sheets_written", "rows_written", "warnings"}``).
+) -> dict | bytes:
+    """Convert AGS4 to an XLSX workbook — one sheet per group.
+
+    With ``output`` given, writes the ``.xlsx`` there and returns the Rust writer's
+    stats (``{"sheets_written", "rows_written", "warnings"}``); with ``output=None``
+    returns the ``.xlsx`` **bytes** in memory (no filesystem) — so an in-memory
+    AGS4 workbook needn't hit disk on the way to an upload.
 
     Rust-backed via ``laterite_excel`` (``rust_xlsxwriter``); openpyxl and pyarrow
     never enter the dep graph. ``source`` is anything [`read`][laterite.read] accepts (a path /
     file-like / bytes / AGS4 text) or an already-[`read`][laterite.read] [`Ags4File`][laterite.Ags4File];
-    ``output`` is the ``.xlsx`` path to write. ``groups`` optionally fixes the sheet
-    order (a subset or re-ordering of the file's groups); default is source order."""
-    if output is None:
-        raise TypeError("to_excel() requires an output path (the .xlsx to write)")
+    ``groups`` optionally fixes the sheet order (a subset or re-ordering of the
+    file's groups); default is source order."""
     if isinstance(source, Ags4File):
         return source.to_excel(output, groups=groups)
     p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
-    if p is not None:
+    if output is not None and p is not None:
         # A real on-disk AGS4 file → one Rust pass straight to XLSX (no re-emit).
         return _excel_convert(_native.ags4_to_excel, os.fspath(p), os.fspath(output), groups)
-    # text / bytes → parse then write from the spec-correct re-emit.
-    return read(text=txt, data=raw).to_excel(output, groups=groups)
+    # bytes-out (output None) or a text/bytes source → go through a handle, whose
+    # to_excel writes the spec-correct re-emit or returns the workbook bytes.
+    return read(path=p, text=txt, data=raw).to_excel(output, groups=groups)
 
 
 def from_excel(
-    source: str | os.PathLike[str],
+    source: str | os.PathLike[str] | bytes | bytearray | memoryview,
     output: str | os.PathLike[str] | None = None,
     *,
     format_numeric_columns: bool = True,
@@ -1397,22 +1447,29 @@ def from_excel(
 
     Rust-backed via ``laterite_excel`` (``calamine``). Each worksheet with a
     ``HEADING`` column becomes one group; columns not matching Rule 19's heading
-    pattern are dropped. With ``output`` given, writes an AGS4 file and returns the
-    Rust converter's stats; with ``output=None`` (default), returns a parsed
-    [`Ags4File`][laterite.Ags4File] read straight from the conversion. ``format_numeric_columns``
-    (default ``True``) re-formats DATA cells to their column's TYPE precision so
-    floats from XLSX keep trailing zeros; ``backend`` / ``xn`` apply only to the
-    returned-handle form."""
+    pattern are dropped. ``source`` is the ``.xlsx`` as a path **or raw workbook
+    bytes** — so an uploaded ``.xlsx`` needn't hit disk. With ``output`` given,
+    writes an AGS4 file and returns the Rust converter's stats; with
+    ``output=None`` (default), returns a parsed [`Ags4File`][laterite.Ags4File] read straight from
+    the conversion. ``format_numeric_columns`` (default ``True``) re-formats DATA
+    cells to their column's TYPE precision so floats from XLSX keep trailing zeros;
+    ``backend`` / ``xn`` apply only to the returned-handle form."""
+    fmt = bool(format_numeric_columns)
+    if isinstance(source, (bytes, bytearray, memoryview)):
+        # XLSX bytes → AGS4 bytes, in memory (no temp file at either end).
+        ags, stats = _excel_bytes_convert(_native.xlsx_bytes_to_ags4, bytes(source), fmt)
+        if output is not None:
+            Path(output).write_bytes(ags)
+            return stats
+        return read(data=ags, backend=backend, xn=xn)
     src = os.fspath(source)
     if output is not None:
-        return _excel_convert(
-            _native.excel_to_ags4, src, os.fspath(output), bool(format_numeric_columns)
-        )
+        return _excel_convert(_native.excel_to_ags4, src, os.fspath(output), fmt)
     import tempfile
 
     with tempfile.TemporaryDirectory() as d:
         tmp = Path(d) / "_from_excel.ags"
-        _excel_convert(_native.excel_to_ags4, src, str(tmp), bool(format_numeric_columns))
+        _excel_convert(_native.excel_to_ags4, src, str(tmp), fmt)
         raw = tmp.read_bytes()
     # Read from bytes (not the now-deleted temp path) so the handle is self-contained
     # — its `.validate()` / `.certify()` don't depend on a vanished file.

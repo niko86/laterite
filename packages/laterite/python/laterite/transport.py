@@ -29,7 +29,16 @@ from pathlib import Path
 
 from . import _laterite_native as _native
 
-__all__ = ["lock", "pack", "unlock", "unpack"]
+__all__ = [
+    "lock",
+    "lock_bytes",
+    "pack",
+    "pack_bytes",
+    "unlock",
+    "unlock_bytes",
+    "unpack",
+    "unpack_bytes",
+]
 
 
 def _src_path(src, *, fn: str) -> Path:
@@ -197,3 +206,87 @@ def unlock(
     out = Path(dest) if dest is not None else _default_unlock_out(src_path)
     _native.transport_unlock(str(src_path), str(out), password)
     return out
+
+
+# --- in-memory (bytes) forms -------------------------------------------------
+# The filesystem-free counterparts of pack/unpack/lock/unlock, for packaging a
+# value you already hold in memory (e.g. `read(...).fix(...).bytes`) straight to
+# an upload — crucially, `lock_bytes` never writes the plaintext to disk. Each
+# produces the same envelope as its file form, so a `*_bytes` blob interops with
+# the file API (write it out, then unpack/unlock) and vice versa.
+
+
+def pack_bytes(data: bytes, *, level: int = 9) -> bytes:
+    """Compress bytes → bytes in memory (zstd only) — no filesystem.
+
+    The in-memory form of :func:`pack`. Output is a standard zstd frame, so it
+    opens with :func:`unpack_bytes`, :func:`unpack` (write it to a file first),
+    or stock ``zstd``.
+
+    Args:
+        data: The bytes to compress.
+        level: zstd level, 1 (fastest) to 22 (highest ratio). Defaults to 9.
+
+    Returns:
+        The compressed bytes.
+
+    Raises:
+        RuntimeError: If the underlying zstd operation fails.
+    """
+    return _native.transport_pack_bytes(data, level)
+
+
+def unpack_bytes(data: bytes) -> bytes:
+    """Decompress zstd bytes → bytes in memory — the in-memory form of :func:`unpack`.
+
+    Args:
+        data: The zstd-compressed bytes (e.g. from :func:`pack_bytes`).
+
+    Returns:
+        The decompressed bytes.
+
+    Raises:
+        RuntimeError: If the input is not valid zstd or the operation fails.
+    """
+    return _native.transport_unpack_bytes(data)
+
+
+def lock_bytes(data: bytes, *, password: str, level: int = 9) -> bytes:
+    """Compress + age-passphrase-encrypt bytes → bytes in memory — no plaintext on disk.
+
+    The in-memory form of :func:`lock` (zstd, then age scrypt +
+    ChaCha20-Poly1305). Ideal for sealing sensitive data you hold in memory —
+    e.g. a fixed ``Ags4File``'s ``.bytes`` — without ever writing the plaintext
+    out. The ``.zst.age`` envelope matches :func:`lock`'s, so the result opens
+    with :func:`unlock_bytes`, :func:`unlock` (write it out first), ``pyrage``,
+    or the browser, given the passphrase.
+
+    Args:
+        data: The bytes to compress and encrypt.
+        password: The age passphrase. Required — there is no agent-key path.
+        level: zstd level, 1 (fastest) to 22 (highest ratio). Defaults to 9.
+
+    Returns:
+        The sealed bytes.
+
+    Raises:
+        RuntimeError: If the underlying zstd or age operation fails.
+    """
+    return _native.transport_lock_bytes(data, password, level)
+
+
+def unlock_bytes(data: bytes, *, password: str) -> bytes:
+    """Decrypt + decompress ``.zst.age`` bytes → bytes — the in-memory form of :func:`unlock`.
+
+    Args:
+        data: The sealed bytes (e.g. from :func:`lock_bytes`).
+        password: The age passphrase used to seal them.
+
+    Returns:
+        The original bytes.
+
+    Raises:
+        RuntimeError: If the passphrase is wrong, the envelope is not a
+            passphrase envelope, or decompression fails.
+    """
+    return _native.transport_unlock_bytes(data, password)

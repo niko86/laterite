@@ -68,17 +68,32 @@ fn write_out(dest: &Path, bytes: &[u8]) -> Result<(), TransportError> {
     fs::write(dest, bytes).map_err(|e| TransportError::Write(e.to_string()))
 }
 
+/// zstd-compress `data` in memory. `level` is 1-22 (9 is the empirical sweet
+/// spot on AGS data). The filesystem-free core of [`pack`] — same output bytes
+/// for the same input, so a `pack_bytes` blob opens with `unpack` / `unpack_bytes`
+/// / stock `zstd` interchangeably.
+pub fn pack_bytes(data: &[u8], level: i32) -> Result<Vec<u8>, TransportError> {
+    zstd::encode_all(Cursor::new(data), level).map_err(|e| TransportError::Zstd {
+        op: "encode",
+        detail: e.to_string(),
+    })
+}
+
+/// zstd-decompress `data` in memory — the filesystem-free core of [`unpack`].
+pub fn unpack_bytes(data: &[u8]) -> Result<Vec<u8>, TransportError> {
+    zstd::decode_all(Cursor::new(data)).map_err(|e| TransportError::Zstd {
+        op: "decode",
+        detail: e.to_string(),
+    })
+}
+
 /// zstd-compress `src` → `dest`. `level` is 1-22 (9 is the empirical
 /// sweet spot on AGS data).
 pub fn pack(src: &Path, dest: &Path, level: i32) -> Result<PackStats, TransportError> {
     let t0 = Instant::now();
     let src_bytes = read_existing(src)?;
     let src_size = src_bytes.len() as u64;
-    let compressed =
-        zstd::encode_all(Cursor::new(&src_bytes), level).map_err(|e| TransportError::Zstd {
-            op: "encode",
-            detail: e.to_string(),
-        })?;
+    let compressed = pack_bytes(&src_bytes, level)?;
     write_out(dest, &compressed)?;
     let out_size = compressed.len() as u64;
     Ok(PackStats {
@@ -92,11 +107,7 @@ pub fn pack(src: &Path, dest: &Path, level: i32) -> Result<PackStats, TransportE
 pub fn unpack(src: &Path, dest: &Path) -> Result<UnpackStats, TransportError> {
     let t0 = Instant::now();
     let compressed = read_existing(src)?;
-    let decompressed =
-        zstd::decode_all(Cursor::new(&compressed)).map_err(|e| TransportError::Zstd {
-            op: "decode",
-            detail: e.to_string(),
-        })?;
+    let decompressed = unpack_bytes(&compressed)?;
     write_out(dest, &decompressed)?;
     Ok(UnpackStats {
         bytes: decompressed.len() as u64,
@@ -116,12 +127,7 @@ pub fn lock(
     let t0 = Instant::now();
     let src_bytes = read_existing(src)?;
     let src_size = src_bytes.len() as u64;
-    let compressed =
-        zstd::encode_all(Cursor::new(&src_bytes), level).map_err(|e| TransportError::Zstd {
-            op: "encode",
-            detail: e.to_string(),
-        })?;
-    let encrypted = encrypt_with_passphrase(&compressed, password)?;
+    let encrypted = lock_bytes(&src_bytes, password, level)?;
     write_out(dest, &encrypted)?;
     let out_size = encrypted.len() as u64;
     Ok(PackStats {
@@ -135,17 +141,30 @@ pub fn lock(
 pub fn unlock(src: &Path, dest: &Path, password: &str) -> Result<UnpackStats, TransportError> {
     let t0 = Instant::now();
     let encrypted = read_existing(src)?;
-    let decrypted = decrypt_with_passphrase(&encrypted, password)?;
-    let decompressed =
-        zstd::decode_all(Cursor::new(&decrypted)).map_err(|e| TransportError::Zstd {
-            op: "decode",
-            detail: e.to_string(),
-        })?;
+    let decompressed = unlock_bytes(&encrypted, password)?;
     write_out(dest, &decompressed)?;
     Ok(UnpackStats {
         bytes: decompressed.len() as u64,
         elapsed_s: t0.elapsed().as_secs_f64(),
     })
+}
+
+/// zstd-compress then age-encrypt `data` in memory — the filesystem-free core
+/// of [`lock`]. The compress-then-encrypt order is load-bearing (zstd needs
+/// low-entropy input; encrypted bytes are random). Same `.zst.age` envelope a
+/// `lock` file carries, so a `lock_bytes` blob opens with `unlock` /
+/// `unlock_bytes` / `pyrage` / the browser, given the passphrase — never
+/// touching a plaintext file on disk.
+pub fn lock_bytes(data: &[u8], password: &str, level: i32) -> Result<Vec<u8>, TransportError> {
+    let compressed = pack_bytes(data, level)?;
+    encrypt_with_passphrase(&compressed, password)
+}
+
+/// age-decrypt then zstd-decompress `data` in memory — the filesystem-free
+/// core of [`unlock`].
+pub fn unlock_bytes(data: &[u8], password: &str) -> Result<Vec<u8>, TransportError> {
+    let decrypted = decrypt_with_passphrase(data, password)?;
+    unpack_bytes(&decrypted)
 }
 
 /// The scrypt work factor (`log2(N)`) laterite pins for passphrase locking.
@@ -294,6 +313,46 @@ mod tests {
         assert_ne!(sealed, msg, "ciphertext must differ from plaintext");
         assert_eq!(decrypt_with_passphrase(&sealed, "pw").unwrap(), msg);
         assert!(decrypt_with_passphrase(&sealed, "nope").is_err());
+    }
+
+    #[test]
+    fn pack_bytes_unpack_bytes_round_trip() {
+        let payload = b"\"GROUP\",\"PROJ\"\r\nrepetitive AGS-ish content ".repeat(80);
+        let packed = pack_bytes(&payload, 9).unwrap();
+        assert!(packed.len() < payload.len(), "repetitive input must shrink");
+        assert_eq!(unpack_bytes(&packed).unwrap(), payload);
+    }
+
+    #[test]
+    fn lock_bytes_unlock_bytes_round_trip_and_rejects_wrong_password() {
+        let payload = b"sensitive AGS payload ".repeat(60);
+        let sealed = lock_bytes(&payload, "hunter2", 9).unwrap();
+        assert_ne!(sealed, payload, "sealed bytes differ from plaintext");
+        assert!(unlock_bytes(&sealed, "wrong").is_err());
+        assert_eq!(unlock_bytes(&sealed, "hunter2").unwrap(), payload);
+    }
+
+    #[test]
+    fn bytes_and_file_apis_are_interoperable() {
+        // The parity guarantee: a `lock_bytes` blob opens with the file `unlock`,
+        // and a file `lock` opens with `unlock_bytes` — same envelope either way.
+        let payload = b"\"GROUP\",\"LOCA\"\r\nrepetitive ".repeat(50);
+
+        let sealed = lock_bytes(&payload, "pw", 9).unwrap();
+        let (locked, out) = (tmp("i.age"), tmp("i.out"));
+        fs::write(&locked, &sealed).unwrap();
+        unlock(&locked, &out, "pw").unwrap();
+        assert_eq!(fs::read(&out).unwrap(), payload, "lock_bytes → file unlock");
+
+        let (src, locked2) = (tmp("i.src"), tmp("i2.age"));
+        fs::write(&src, &payload).unwrap();
+        lock(&src, &locked2, "pw", 9).unwrap();
+        let opened = unlock_bytes(&fs::read(&locked2).unwrap(), "pw").unwrap();
+        assert_eq!(opened, payload, "file lock → unlock_bytes");
+
+        for p in [locked, out, src, locked2] {
+            let _ = fs::remove_file(p);
+        }
     }
 
     #[test]

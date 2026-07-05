@@ -968,11 +968,39 @@ def test_to_excel_groups_subset_orders_sheets(tmp_path):
     assert list(sheets.keys()) == ["LOCA", "PROJ"]
 
 
-def test_to_excel_requires_output():
-    """Calling to_excel without an output path is a clear TypeError, not a cryptic
-    native error."""
-    with pytest.raises(TypeError, match="output path"):
-        laterite.to_excel(str(_PY_AGS4_TEST_DATA))
+def test_to_excel_no_output_returns_xlsx_bytes():
+    """to_excel(source) with no output path returns the .xlsx bytes in memory
+    (#391) — the FS-free door, so an in-memory AGS4 needn't hit disk."""
+    blob = laterite.to_excel(str(_PY_AGS4_TEST_DATA))
+    assert isinstance(blob, bytes)
+    assert blob[:2] == b"PK"  # xlsx is a zip (PK magic)
+    # the bytes are a real workbook: from_excel(bytes) round-trips the groups
+    back = laterite.from_excel(blob)
+    assert isinstance(back, laterite.Ags4File)
+    assert sorted(back.groups) == sorted(laterite.read(str(_PY_AGS4_TEST_DATA)).groups)
+
+
+def test_to_excel_handle_bytes(tmp_path):
+    """Ags4File.to_excel() with no path returns the workbook bytes."""
+    handle = laterite.read(str(_PY_AGS4_TEST_DATA))
+    blob = handle.to_excel()
+    assert isinstance(blob, bytes) and blob[:2] == b"PK"
+    # equal to the on-disk form (bar zip mtime noise, the group set round-trips)
+    assert sorted(laterite.from_excel(blob).groups) == sorted(handle.groups)
+
+
+def test_from_excel_bytes_in(tmp_path):
+    """from_excel accepts raw .xlsx bytes (bytes-in, #391) — no temp file. With an
+    output path it writes AGS4 + returns stats; without, returns a handle."""
+    xlsx_bytes = laterite.to_excel(str(_PY_AGS4_TEST_DATA))  # in-memory workbook
+    assert isinstance(xlsx_bytes, bytes)
+    # bytes-in → handle
+    handle = laterite.from_excel(xlsx_bytes)
+    assert isinstance(handle, laterite.Ags4File)
+    # bytes-in → file + stats
+    out = tmp_path / "frombytes.ags"
+    stats = laterite.from_excel(xlsx_bytes, str(out))
+    assert isinstance(stats, dict) and out.stat().st_size > 0
 
 
 def test_from_excel_to_file_returns_stats(tmp_path):

@@ -16,10 +16,11 @@ import {
   type ValidateOptions,
   diff as diffFree,
   fix as fixFree,
+  toExcel as toExcelFree,
   validate as validateFree,
 } from "./index";
 import type { FixResult } from "./fix-result";
-import type { GroupMeta } from "./native";
+import type { ExcelStats, GroupMeta } from "./native";
 import { Reading, Sidecar, parseArrow } from "./native";
 import { Report } from "./report";
 import { AgsSubset, type Filter } from "./subset";
@@ -183,6 +184,20 @@ export class Ags4File {
     return path;
   }
 
+  /** Write this file's groups to an `.xlsx` workbook — one worksheet per group,
+   * from the spec-correct {@link bytes}. With `xlsxPath` given the workbook is
+   * written there and the conversion stats returned; omit it to get the `.xlsx`
+   * **bytes** back. Mirrors `laterite.Ags4File.to_excel()` and the free
+   * {@link toExcel}. `groups` fixes the worksheet order (default source order). */
+  toExcel(xlsxPath: string, opts?: { groups?: string[] }): ExcelStats;
+  toExcel(xlsxPath?: undefined, opts?: { groups?: string[] }): Buffer;
+  toExcel(xlsxPath?: string, opts: { groups?: string[] } = {}): ExcelStats | Buffer {
+    // Delegate to the free verb with this handle's bytes — one write path.
+    return xlsxPath === undefined
+      ? toExcelFree(this.bytes, undefined, opts)
+      : toExcelFree(this.bytes, xlsxPath, opts);
+  }
+
   // --- fluent verbs (validate / fix / diff) --------------------------------
 
   /** Resolve this handle to the `(source, opts)` the free fns take: the retained
@@ -304,16 +319,7 @@ export class Ags4File {
    * `read(f, { index })` consumes it to skip re-validation. Mirrors
    * `laterite.Ags4File.certify()`. */
   certify(path?: string): string {
-    if (this.#report === undefined) {
-      throw new Ags4Error(
-        "call .validate() before .certify() — certify records a passed validation, it does not run one",
-      );
-    }
-    if (!this.#report.isValid) {
-      throw new Ags4Error(
-        `cannot certify a file with ${this.#report.count} finding(s); fix them and re-validate clean first`,
-      );
-    }
+    const report = this.#requireCleanValidation();
     const srcPath = this.#src?.path;
     const out = path ?? (srcPath !== undefined ? `${srcPath}.idx` : undefined);
     if (out === undefined) {
@@ -337,9 +343,46 @@ export class Ags4File {
         );
       }
     }
-    const cert = Sidecar.assemble(
+    writeFileSync(out, this.#mintCert(report).toJson());
+    return out;
+  }
+
+  /** Mint this file's `.ags.idx` certificate and return its **bytes** in memory —
+   * the filesystem-free twin of {@link certify}. Same precondition (a prior clean
+   * `.validate()`; it vouches for a passed validation, does not run one) and same
+   * output: the bytes are exactly what `certify` would write, so they interop with
+   * `read({ index })`, the CLI `--index`, and the browser cert. Ideal for handing
+   * the certificate straight to an upload/object store without a temp file — the
+   * certify analog of `transport.lockBytes`. Mirrors
+   * `laterite.Ags4File.certify_bytes()`. */
+  certifyBytes(): Buffer {
+    return this.#mintCert(this.#requireCleanValidation()).toJson();
+  }
+
+  /** Shared precondition for `certify` / `certifyBytes`: a certificate vouches for
+   * a *passed* validation, so one must have run and found nothing. Returns the
+   * validated `Report` (narrowed non-undefined) for the minting step. */
+  #requireCleanValidation(): Report {
+    if (this.#report === undefined) {
+      throw new Ags4Error(
+        "call .validate() before .certify() — certify records a passed validation, it does not run one",
+      );
+    }
+    if (!this.#report.isValid) {
+      throw new Ags4Error(
+        `cannot certify a file with ${this.#report.count} finding(s); fix them and re-validate clean first`,
+      );
+    }
+    return this.#report;
+  }
+
+  /** Assemble the `Sidecar` certificate over the original source bytes, stamping
+   * the profile the last `.validate()` actually ran. `report` comes from
+   * `#requireCleanValidation`. */
+  #mintCert(report: Report): Sidecar {
+    return Sidecar.assemble(
       this.#sourceBytes(),
-      this.#report.dictVersion,
+      report.dictVersion,
       new Date().toISOString(),
       undefined,
       undefined,
@@ -347,8 +390,6 @@ export class Ags4File {
       this.#lastCheckFiles,
       this.#lastForced,
     );
-    writeFileSync(out, cert.toJson());
-    return out;
   }
 
   // --- optional DuckDB engine (sql / at / connection) ----------------------

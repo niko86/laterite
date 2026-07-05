@@ -110,6 +110,52 @@ def test_certify_from_text_needs_an_explicit_path(tmp_path):
     assert h.certify(path=dst) == dst
 
 
+# --- mint in-memory (certify_bytes, #390) ----------------------------------
+
+
+def test_certify_bytes_returns_cert_bytes_in_memory(tmp_path):
+    src = _write(tmp_path)
+    blob = lat.read(src).validate().certify_bytes()
+    assert isinstance(blob, bytes)
+    assert blob.lstrip().startswith(b"{")  # the .ags.idx JSON, no file written
+    assert not (tmp_path / "delivery.ags.idx").exists()  # nothing on disk
+
+
+def test_certify_bytes_are_a_usable_cert(tmp_path):
+    # The in-memory bytes are exactly a certificate: write them out and a later
+    # read(index=) consumes them to skip the engine (the whole point — no temp
+    # file needed at MINT time, so a web backend can hand them to an upload).
+    src = _write(tmp_path)
+    blob = lat.read(src).validate().certify_bytes()
+    idx = tmp_path / "inmem.ags.idx"
+    idx.write_bytes(blob)
+    rep = lat.read(src, index=idx).validate(warnings=False).report
+    assert rep.resolution == "certified" and rep.is_valid
+
+
+def test_certify_bytes_matches_the_file_certify(tmp_path):
+    # certify() and certify_bytes() mint the SAME certificate for the same handle
+    # (bar the mint timestamp) — the .ags.idx is JSON, so compare the freshness
+    # fingerprint (file section) + the byte-offset index (groups).
+    import json
+
+    src = _write(tmp_path)
+    on_disk = json.loads(lat.read(src).validate().certify().read_bytes())
+    in_mem = json.loads(lat.read(src).validate().certify_bytes())
+    assert in_mem["file"] == on_disk["file"]  # size / sha256 / edition
+    assert in_mem["groups"] == on_disk["groups"]  # same byte-offset index
+
+
+def test_certify_bytes_requires_a_prior_clean_validate(tmp_path):
+    src = _write(tmp_path)
+    with pytest.raises(Ags4Error, match="call .validate.. before .certify"):
+        lat.read(src).certify_bytes()  # no .validate()
+    dirty = CLEAN.split('"GROUP","TRAN"')[0]  # PROJ only → not clean
+    h = lat.read(_write(tmp_path, name="dirty.ags", text=dirty)).validate()
+    with pytest.raises(Ags4Error, match="cannot certify"):
+        h.certify_bytes()
+
+
 # --- consume (validate-skip) -----------------------------------------------
 
 

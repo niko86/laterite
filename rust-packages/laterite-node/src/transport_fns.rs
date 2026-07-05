@@ -93,10 +93,55 @@ pub fn transport_unlock(src: String, dest: String, password: String) -> Result<U
     })
 }
 
+// --- in-memory (bytes) forms ------------------------------------------------
+// The filesystem-free twins of pack/unpack/lock/unlock — the Node mirror of
+// laterite-py's `pack_bytes`/…. They seal a value already held in memory (e.g. a
+// fixed `Ags4File.bytes`) straight to an upload; crucially `transportLockBytes`
+// never writes the plaintext to disk. Each produces the SAME envelope as its
+// path form (both call the one shared leaf), so a `*Bytes` blob interops with
+// the file API and `pyrage`/the browser. `Uint8Array` in, `Buffer` out (the
+// napi bytes-in/bytes-out convention used across this crate).
+
+/// zstd-compress `data` in memory → bytes. `level` is 1–22 (default 9).
+#[napi]
+pub fn transport_pack_bytes(data: Uint8Array, level: Option<i32>) -> Result<Buffer> {
+    let out = laterite_transport::pack_bytes(&data, level.unwrap_or(9)).map_err(napi_err)?;
+    Ok(Buffer::from(out))
+}
+
+/// zstd-decompress `data` in memory → bytes (the twin of `transportPackBytes`).
+#[napi]
+pub fn transport_unpack_bytes(data: Uint8Array) -> Result<Buffer> {
+    let out = laterite_transport::unpack_bytes(&data).map_err(napi_err)?;
+    Ok(Buffer::from(out))
+}
+
+/// zstd-compress, then age-encrypt `data` with `password` in memory → bytes —
+/// no plaintext on disk. `level` is 1–22 (default 9).
+#[napi]
+pub fn transport_lock_bytes(
+    data: Uint8Array,
+    password: String,
+    level: Option<i32>,
+) -> Result<Buffer> {
+    let out =
+        laterite_transport::lock_bytes(&data, &password, level.unwrap_or(9)).map_err(napi_err)?;
+    Ok(Buffer::from(out))
+}
+
+/// age-decrypt with `password`, then zstd-decompress `data` in memory → bytes.
+/// Wrong passphrase / non-passphrase envelopes surface as an error.
+#[napi]
+pub fn transport_unlock_bytes(data: Uint8Array, password: String) -> Result<Buffer> {
+    let out = laterite_transport::unlock_bytes(&data, &password).map_err(napi_err)?;
+    Ok(Buffer::from(out))
+}
+
 // No `#[cfg(test)]` here: napi 3's `Error::drop` references N-API symbols the
 // Node host provides only at load, so `cargo test -p laterite-node` can't link
 // a standalone harness (this crate is excluded from the coverage job for the
 // same reason). The envelope round-trip is pinned in the leaf's own Rust tests
-// (`laterite-transport`), and this napi boundary — pack/unpack/lock/unlock +
-// the BigInt stats + wrong-password rejection — is covered end-to-end through
-// the real `.node` addon by `test/p3-transport.test.ts` (vitest).
+// (`laterite-transport`), and this napi boundary — pack/unpack/lock/unlock (+
+// the `*Bytes` in-memory twins), the BigInt stats + wrong-password rejection —
+// is covered end-to-end through the real `.node` addon by
+// `test/p3-transport.test.ts` (vitest).
