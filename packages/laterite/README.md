@@ -4,12 +4,15 @@
 
 # laterite
 
-A Rust-backed reader, writer and validator for the
-[AGS4](https://www.ags.org.uk/data-format/) geotechnical data format, with a
-modern, born-typed **polars** API. A faster drop-in for
-[`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library)'s
-`AGS4` module — swap `from python_ags4 import AGS4` for
-`from laterite import compat as AGS4`.
+A Rust-backed **AGS4 toolchain** for the
+[AGS4](https://www.ags.org.uk/data-format/) geotechnical data format —
+validate, read as typed data, query, build, fix, diff, certify, and convert ↔
+Excel — with a modern, born-typed **polars** API.
+
+Coming from [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library)?
+`laterite` is a faster, faithful drop-in for its `AGS4` module — swap
+`from python_ags4 import AGS4` for `from laterite import compat as AGS4`, keep
+your code — and a full toolchain beyond it.
 
 [![ci](https://github.com/niko86/laterite/actions/workflows/ci.yml/badge.svg)](https://github.com/niko86/laterite/actions/workflows/ci.yml)
 [![python cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=python&label=python%20cov)](https://codecov.io/gh/niko86/laterite)
@@ -74,12 +77,25 @@ across:
 | **DuckDB** | [`laterite_ags4`](https://community-extensions.duckdb.org/extensions/laterite_ags4.html) — community extension | `INSTALL laterite_ags4 FROM community;` |
 | **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser |
 
-## Faster than python-ags4
+## More than a faster `python-ags4`
 
-Validation throughput vs `python-ags4` 1.2.0 (macOS arm64), agreeing on the
-**same findings** — speed not at the cost of diagnostic coverage: **~17× on a
-512 KB file, ~8× from 50 MB to 1 GB** (a 557 MB file validates in ~6.5 s vs
-~53 s). Full tables + methodology in the
+[`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library) is the
+reference **Python** library for AGS4 — validation plus pandas read/write.
+`laterite` is a faithful, faster drop-in for that, and a cross-surface toolchain
+on top:
+
+| | `laterite` | `python-ags4` |
+|---|:---:|:---:|
+| Runs on | Python · Node · CLI · DuckDB · browser | Python |
+| Validate — numbered AGS4 rules | ✅ | ✅ |
+| Read → typed data | ✅ born-typed (polars) | pandas (all strings) |
+| Build / write · Excel ↔ AGS4 | ✅ | ✅ |
+| Repair engine (`fix`) · revision diff · `.ags.idx` certificates | ✅ | — |
+| SQL across groups (DuckDB) · zstd+age transport · typed graph | ✅ | — |
+
+**And faster:** validation agrees on the same findings but runs **~17× on a
+512 KB file, ~8× from 50 MB to 1 GB** (a 557 MB file in ~6.5 s vs ~53 s) — full
+tables + methodology in the
 [repo README](https://github.com/niko86/laterite#performance).
 
 ## Parity + clean-room

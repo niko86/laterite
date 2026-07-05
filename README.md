@@ -4,11 +4,16 @@
 
 # laterite
 
-A Rust-backed reader, writer and validator for the
-[AGS4](https://www.ags.org.uk/data-format/) geotechnical data format.
-A faster drop-in for [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library)'s
-`AGS4` module — swap `from python_ags4 import AGS4` for
-`from laterite import compat as AGS4` — with a modern, born-typed polars API.
+A Rust-backed **AGS4 toolchain** for the
+[AGS4](https://www.ags.org.uk/data-format/) geotechnical data format —
+**validate, read as typed data, query, build, fix, diff, certify, and convert
+↔ Excel** — surfaced natively for **Python, Node.js, the CLI, DuckDB and the
+browser**, all on one clean-room Rust engine.
+
+Coming from [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library)?
+`laterite` is a faster, faithful drop-in for its `AGS4` module — swap
+`from python_ags4 import AGS4` for `from laterite import compat as AGS4`, keep
+your code — and a full toolchain beyond it ([what that means](#more-than-a-faster-python-ags4)).
 
 [![ci](https://github.com/niko86/laterite/actions/workflows/ci.yml/badge.svg)](https://github.com/niko86/laterite/actions/workflows/ci.yml)
 [![rust cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=rust&label=rust%20cov)](https://codecov.io/gh/niko86/laterite)
@@ -107,6 +112,32 @@ lat-check --list-rules                 # the AGS4 rule catalogue (no input neede
 
 Exit codes: `0` clean · `1` findings · `3` unreadable · `4` not AGS4 · `5` bad args.
 Run `lat-check --readme` for the full guide.
+
+## More than a faster `python-ags4`
+
+[`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library) is the
+reference **Python** library for AGS4 — validation plus pandas read/write.
+`laterite` is a faithful, faster drop-in for that
+([parity](#parity-with-python-ags4) · [speed](#performance)) **and** a
+cross-surface toolchain on top:
+
+| | `laterite` | `python-ags4` |
+|---|:---:|:---:|
+| Runs on | Python · Node · CLI · DuckDB · browser | Python |
+| Validate — numbered AGS4 rules | ✅ | ✅ |
+| Read → typed data | ✅ born-typed (polars) | pandas (all strings) |
+| Build / write AGS4 | ✅ | ✅ |
+| Excel ↔ AGS4 | ✅ | ✅ |
+| Repair engine (`fix`) — CRLF / BOM / short-row / numeric… | ✅ | — |
+| SQL across groups | ✅ (DuckDB) | — |
+| Revision diff | ✅ | — |
+| Validity certificates (`.ags.idx`) | ✅ | — |
+| Transport — compress + encrypt | ✅ | — |
+| Typed PROJ → LOCA → SAMP graph | ✅ | — |
+| Shipped as a standalone binary CLI | ✅ (`lat-check`) | — |
+
+The two agree on the findings that matter — the drop-in is faithful, not just
+fast (see [Parity](#parity-with-python-ags4)).
 
 ## Performance
 
