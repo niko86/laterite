@@ -207,16 +207,20 @@ enum QuotingDeviation {
 /// separation and inter-field newlines surface via Rule 5 / structural
 /// rules; this is the one independent Rule 6 check worth making.)
 fn rule_6(line: &str, n: u32, found: &mut Findings) {
-    // The first embedded CR is the anchor for the highlight; its char
-    // offset is its char position (CR is one scalar) so [i, i+1) spans it.
-    if let Some(i) = line.chars().position(|c| c == '\r') {
+    // A CR or LF surviving in the line body is EMBEDDED: the quote-aware
+    // splitter keeps an in-quote newline in the field (a row is NOT torn on
+    // it — #422), and every legitimate terminator is consumed, so any CR/LF
+    // left here is illegal *within* a row (§4.1.1 Rule 6 bans both). Anchor on
+    // the first one; its char offset is its char position (CR/LF is one scalar)
+    // so [i, i+1) spans it.
+    if let Some(i) = line.chars().position(|c| c == '\r' || c == '\n') {
         let i = i as u32;
         add_at(
             found,
             RULE_6,
             Some(n),
             "",
-            "Row contains an embedded carriage return (ASCII 13). \
+            "Row contains an embedded carriage return or line feed (ASCII 13 / 10). \
              CR/LF are not allowed within or between data variables.",
             Location {
                 char_span: Some((i, i + 1)),
@@ -381,6 +385,18 @@ mod tests {
         let src = format!("{HEAD}\"DATA\",\"a\rb\"\r\n");
         let f = run(&src, false);
         assert!(f.contains_key(RULE_6), "embedded CR not caught: {f:?}");
+        assert_eq!(f[RULE_6][0].line, Some(6));
+    }
+
+    #[test]
+    fn rule_6_flags_embedded_lf() {
+        // A LF inside a quoted field is kept in-field by the quote-aware
+        // splitter (not a terminator, #422) and is illegal within a row — Rule
+        // 6 (§4.1.1) bans LF as well as CR. Pure-LF was previously missed
+        // because the `\n`-only walk split on it before Rule 6 ever saw it.
+        let src = format!("{HEAD}\"DATA\",\"a\nb\"\r\n");
+        let f = run(&src, false);
+        assert!(f.contains_key(RULE_6), "embedded LF not caught: {f:?}");
         assert_eq!(f[RULE_6][0].line, Some(6));
     }
 

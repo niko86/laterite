@@ -1,4 +1,4 @@
-//! The rule catalogue — the single source for `lat-check --list-rules` and
+//! The rule catalogue — the single source for `lat rules` and
 //! (via the follow-up that repoints it) the web RuleExplainer.
 //!
 //! Two facts combine here, reconciled by the gate tests so they cannot drift:

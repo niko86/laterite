@@ -58,3 +58,7 @@ rust-packages/**/*.profraw
 
 # marimo session/cache snapshots
 __marimo__/
+
+# proptest saved-failure seeds — regenerated locally per run; not committed
+# (consistent with the existing proptest suites, which commit none).
+*.proptest-regressions

@@ -7,7 +7,7 @@ engine on top: a parsed AGS4 file becomes born-typed DuckDB tables, and
 **pandas** frames — both pyarrow-free.
 
 For a literal ``python_ags4`` swap-in use ``from laterite import compat as
-AGS4``. For the CLI use ``lat-check`` (byte-faithful to the Rust binary).
+AGS4``. For the CLI use ``lat`` (byte-faithful to the Rust binary).
 """
 
 from __future__ import annotations
@@ -195,7 +195,7 @@ class Report:
     not a live handle: it carries the answer, you don't act *through* it.
 
     Read the headline off [`is_valid`][laterite.Report.is_valid] / [`count`][laterite.Report.count] (conformant when the
-    finding count is 0), with [`exit_code`][laterite.Report.exit_code] mirroring what the ``lat-check``
+    finding count is 0), with [`exit_code`][laterite.Report.exit_code] mirroring what the ``lat``
     binary would return. [`file`][laterite.Report.file] and [`dict_version`][laterite.Report.dict_version] say *what* was
     judged and *against which* AGS dictionary edition, and [`resolution`][laterite.Report.resolution]
     records *how* that edition was chosen — ``"exact"`` / ``"fallback"`` /
@@ -209,7 +209,7 @@ class Report:
     dataframe. [`by_rule`][laterite.Report.by_rule] regroups those same findings under their spec rule
     (``{"AGS Format Rule N": [...]}``, sorted like the Rust BTreeMap, carrying the
     editor-oriented ``char_span``). [`to_json`][laterite.Report.to_json] and [`to_ndjson`][laterite.Report.to_ndjson] are the
-    serialised forms, byte-identical to ``lat-check --json`` / ``--ndjson`` — for
+    serialised forms, byte-identical to ``lat validate --json`` / ``--ndjson`` — for
     handing the verdict to another process unchanged.
 
     Attributes:
@@ -218,7 +218,7 @@ class Report:
         resolution: How that edition was resolved — ``"exact"`` / ``"fallback"`` / ``"forced"``, or ``"certified"`` for a certificate-backed verdict.
         count: Number of findings (0 ⇒ conformant).
         is_valid: ``True`` when [`count`][laterite.Report.count] is 0.
-        exit_code: Process exit code mirroring the ``lat-check`` binary.
+        exit_code: Process exit code mirroring the ``lat`` binary.
         findings: Flat polars frame, one row per finding (rule, line, group, desc, severity, target, heading, field_index, data_row).
     """
 
@@ -341,12 +341,12 @@ class Report:
 
     def to_json(self) -> str:
         """``{file, findings:{"AGS Format Rule N":[{line,group,desc}]}}`` —
-        byte-identical to ``lat-check --json``."""
+        byte-identical to ``lat validate --json``."""
         return self._r["json"]
 
     def to_ndjson(self) -> str:
         """One flat ``{rule,line,group,desc}`` per line — byte-identical to
-        ``lat-check --ndjson``."""
+        ``lat validate --ndjson``."""
         return self._r["ndjson"]
 
     def __repr__(self) -> str:
@@ -2080,7 +2080,7 @@ def diff(
     Returns a ``RevisionDelta`` dict — ``groups`` (a per-group list of row/heading
     deltas) plus ``groups_added`` / ``groups_removed`` and the
     ``total_added`` / ``total_removed`` / ``total_changed`` counts. This is the same
-    engine the browser's revision-diff tool and ``lat-check <a> --diff <b>`` use.
+    engine the browser's revision-diff tool and ``lat diff <a> <b>`` use.
 
     Args:
         a: The baseline document — a path, AGS4 text, raw bytes, a file-like, or an

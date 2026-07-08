@@ -52,10 +52,18 @@ export function unpack(src: string, dest: string): UnpackStats {
  * @param dest - Path the encrypted output is written to.
  * @param password - Passphrase for the age envelope (scrypt + ChaCha20-Poly1305).
  * @param level - zstd level 1–22 (default 9).
+ * @param logN - scrypt work factor (`log2(N)`); omit for the pinned default (18,
+ *   openable everywhere). Lower is faster but weaker; must be `1..=20`.
  * @returns The output size, compression ratio vs source, and elapsed seconds.
  */
-export function lock(src: string, dest: string, password: string, level?: number): PackStats {
-  return transportLock(src, dest, password, level);
+export function lock(
+  src: string,
+  dest: string,
+  password: string,
+  level?: number,
+  logN?: number,
+): PackStats {
+  return transportLock(src, dest, password, level, logN);
 }
 
 /**
@@ -115,10 +123,17 @@ export function unpackBytes(data: Uint8Array): Buffer {
  * @param data - The bytes to compress and encrypt.
  * @param password - The age passphrase. Required — there is no agent-key path.
  * @param level - zstd level 1–22 (default 9).
+ * @param logN - scrypt work factor (`log2(N)`); omit for the pinned default (18).
+ *   Lower is faster but weaker; must be `1..=20`.
  * @returns The sealed bytes.
  */
-export function lockBytes(data: Uint8Array, password: string, level?: number): Buffer {
-  return transportLockBytes(data, password, level);
+export function lockBytes(
+  data: Uint8Array,
+  password: string,
+  level?: number,
+  logN?: number,
+): Buffer {
+  return transportLockBytes(data, password, level, logN);
 }
 
 /**

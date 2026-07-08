@@ -18,8 +18,27 @@ One clean-room Rust AGS4 engine, surfaced for every stack:
 |---|---|---|
 | **Python** | [`laterite`](https://pypi.org/project/laterite/) — PyPI | `pip install laterite` |
 | **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm | `npm install laterite` |
-| **Rust / CLI** | [`lat-db` + `lat-check`](https://github.com/niko86/laterite/releases) | GitHub Releases |
+| **Rust / CLI** | [`lat-db` + `lat`](https://github.com/niko86/laterite/releases) | GitHub Releases |
 | **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser |
+
+## Command line — `npx laterite`
+
+The package ships the **`lat`** CLI too — the same AGS4 tool as the Rust binary and
+`uvx --from laterite lat`, one launcher per ecosystem:
+
+```bash
+npx laterite validate delivery.ags          # or `lat …` after a global install
+npx laterite read delivery.ags LOCA --csv    # dump a group (raw file cells)
+npx laterite diff old.ags new.ags            # revision delta
+npx laterite pack delivery.ags delivery.ags.zst
+npx laterite excel delivery.ags delivery.xlsx
+```
+
+Verbs: `validate` (the default — a bare `lat <file>` runs it) · `read` · `fix` ·
+`diff` · `certify` · `rules` · `pack` / `unpack` / `lock` / `unlock` · `excel`. The
+scriptable outputs (`validate --json` / `--ndjson`, `read --json` / `--csv`,
+`rules --json`) are **byte-identical** to the Rust binary; `lock` / `unlock` take
+the passphrase from `--password-file` or `$LAT_TRANSPORT_PASSWORD` (never a flag).
 
 ## Read & validate
 
@@ -34,7 +53,7 @@ loca.getChild("LOCA_GL")?.get(0);         // → 12.3 (a number)
 const report = validate("delivery.ags");
 report.isValid;                           // boolean
 report.findings;                          // [{ rule, line?, group, desc, severity? }]
-report.toJson();                          // byte-identical to `lat-check --json`
+report.toJson();                          // byte-identical to `lat validate --json`
 ```
 
 ## Produce AGS4

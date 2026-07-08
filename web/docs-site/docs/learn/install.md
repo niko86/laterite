@@ -4,7 +4,7 @@
 pip install laterite
 ```
 
-That one line gives you the library **and** the `lat-check` CLI. The base
+That one line gives you the library **and** the `lat` CLI. The base
 install is **polars + duckdb** — pyarrow-free, no pandas. Two optional extras
 add drop-in surfaces only if you want them:
 
@@ -15,10 +15,10 @@ pip install laterite[pyarrow]   # the Arrow backend (adds pyarrow)
 
 ## First validate, from the command line
 
-Point `lat-check` at an AGS4 file. A clean file says so and exits `0`:
+Point `lat` at an AGS4 file. A clean file says so and exits `0`:
 
 ```bash
-lat-check examples/sample_site.ags
+lat validate examples/sample_site.ags
 ```
 
 ```text
@@ -29,7 +29,7 @@ Break one value — say a `2DP` easting that isn't a number — and the same
 command prints a findings table and exits `1`:
 
 ```bash
-lat-check sample_site_typo.ags
+lat validate sample_site_typo.ags
 ```
 
 ```text
@@ -47,7 +47,7 @@ Need machine-readable output? Add `--json` — `findings` is an empty object whe
 the file is clean:
 
 ```bash
-lat-check examples/sample_site.ags --json
+lat validate examples/sample_site.ags --json
 ```
 
 ```text
@@ -58,9 +58,9 @@ lat-check examples/sample_site.ags --json
 ```
 
 !!! note "The exit-code contract"
-    `lat-check` exits **`0`** when the file is clean and **`1`** when there are
+    `lat` exits **`0`** when the file is clean and **`1`** when there are
     findings — nothing else. That makes it a drop-in gate for CI or a pre-commit
-    hook: `lat-check delivery.ags` fails the step the moment a rule fires, no
+    hook: `lat validate delivery.ags` fails the step the moment a rule fires, no
     output parsing required.
 
 Next → [Read & explore a file](./read.md)

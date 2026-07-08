@@ -10,5 +10,5 @@ printf '%s\r\n' \
   '"DATA","121415"' \
   > delivery.ags
 # --8<-- [start:cmd]
-lat-check delivery.ags
+lat validate delivery.ags
 # --8<-- [end:cmd]

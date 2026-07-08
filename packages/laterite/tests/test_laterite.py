@@ -2,7 +2,7 @@
 
 Engine parity is the load-bearing gate: `compat` / the nice API /
 the CLI all wrap the *same* clean-room `laterite_ags4_validator`, so they must
-agree with each other and with the Rust `lat-check` binary
+agree with each other and with the Rust `lat` binary
 byte-for-byte. python-ags4 agreement is reported but the documented
 O-N clean-room divergences are expected (the engine, not laterite,
 owns them).
@@ -30,7 +30,7 @@ _FIX = (
     / "fixtures"
 )
 _RUST_BIN = (
-    Path(__file__).parents[3] / "rust-packages" / "target" / "release" / "lat-check"
+    Path(__file__).parents[3] / "rust-packages" / "target" / "release" / "lat"
 )
 _FIXTURES = sorted(_FIX.glob("*.ags"))
 _CLEAN = _FIX / "clean_minimal.ags"
@@ -293,7 +293,7 @@ def test_compat_desc_translator_unit():
 def test_compat_check_file_opt_out_returns_laterite_wording():
     """match_python_ags4_wording=False yields the engine's native
     (more precise) phrasings — the same strings laterite.Validator
-    and lat-check CLI return."""
+    and lat CLI return."""
     # _CLEAN passes all rules so check on a fixture that fires Rule 19
     # in python-ags4's repo, if available; otherwise just confirm the
     # opt-out exists and changes behaviour on Rule-1 ASCII path.
@@ -395,7 +395,7 @@ def test_compat_roundtrip_matches_python_ags4(tmp_path):
 
 
 def _run_py_cli(args: list[str]) -> tuple[str, int]:
-    """Drive the Python `lat-check` CLI *in-process* (covers
+    """Drive the Python `lat` CLI *in-process* (covers
     `laterite._cli`, the actual shipped entrypoint) instead of paying
     for a cold interpreter start per fixture. Returns (stdout, exit).
 
@@ -409,7 +409,7 @@ def _run_py_cli(args: list[str]) -> tuple[str, int]:
     return buf.getvalue(), code
 
 
-@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat-check not built")
+@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat not built")
 @pytest.mark.parametrize("fx", _FIXTURES, ids=lambda p: p.name)
 def test_cli_json_ndjson_exit_byte_parity(fx):
     def run_rust(cmd):
@@ -479,13 +479,13 @@ def test_cli_plain_report_and_out_file(tmp_path):
 
 
 def test_cli_fix_writes_sibling_and_exit_codes(tmp_path):
-    """`lat-check --fix` (Python CLI): sibling output by default, in-place /
+    """`lat fix` (Python CLI): sibling output by default, in-place /
     --fix-out variants, and exit 0 clean vs 1 residual."""
     lf = tmp_path / "delivery.ags"
     lf.write_bytes(_CLEAN.read_bytes().replace(b"\r\n", b"\n"))  # LF-only → fixable clean
 
     # Default: writes delivery.fixed.ags, source untouched, exit 0 (clean).
-    out, code = _run_py_cli([str(lf)] + ["--fix"])
+    out, code = _run_py_cli(["fix", str(lf)])
     sibling = tmp_path / "delivery.fixed.ags"
     assert code == 0
     assert sibling.exists() and b"\r\n" in sibling.read_bytes()
@@ -493,29 +493,29 @@ def test_cli_fix_writes_sibling_and_exit_codes(tmp_path):
     assert "applied 1 fix(es)" in out and "clean (0 findings)" in out
 
     # --in-place overwrites the source.
-    _, code = _run_py_cli([str(lf), "--fix", "--in-place"])
+    _, code = _run_py_cli(["fix", str(lf), "--in-place"])
     assert code == 0 and b"\r\n" in lf.read_bytes()
 
     # A file with non-fixable findings → exit 1, findings remain.
-    _, code = _run_py_cli([str(_RULE8_PRECISION), "--fix", "--fix-out", str(tmp_path / "r8.ags")])
+    _, code = _run_py_cli(["fix", str(_RULE8_PRECISION), "--fix-out", str(tmp_path / "r8.ags")])
     assert code == 1
     assert (tmp_path / "r8.ags").exists()
 
 
 def test_cli_fix_misuse_and_errors(tmp_path):
-    """--in-place/--fix-out without --fix, conflicting dest, and bad input."""
-    assert _run_py_cli([str(_CLEAN), "--in-place"])[1] == 5  # --in-place needs --fix
-    assert _run_py_cli([str(_CLEAN), "--fix", "--in-place", "--fix-out", "x"])[1] == 5
-    assert _run_py_cli(["/no/such.ags", "--fix"])[1] == 3  # not found
+    """`fix` conflicting dest and bad input. (The old "--in-place without --fix"
+    misuse is gone structurally — --in-place lives only on the `fix` subcommand.)"""
+    assert _run_py_cli(["fix", str(_CLEAN), "--in-place", "--fix-out", "x"])[1] == 5
+    assert _run_py_cli(["fix", "/no/such.ags"])[1] == 3  # not found
 
 
-@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat-check not built")
+@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat not built")
 def test_cli_fix_rust_binary_parity(tmp_path):
     """The standalone Rust binary's --fix agrees with the Python CLI: same
     sibling-write behaviour and exit code."""
     lf = tmp_path / "d.ags"
     lf.write_bytes(_CLEAN.read_bytes().replace(b"\r\n", b"\n"))
-    r = subprocess.run([str(_RUST_BIN), str(lf), "--fix"], capture_output=True, text=True)
+    r = subprocess.run([str(_RUST_BIN), "fix", str(lf)], capture_output=True, text=True)
     assert r.returncode == 0
     assert (tmp_path / "d.fixed.ags").read_bytes().count(b"\r\n") >= 1
 
@@ -541,25 +541,99 @@ def test_list_rules_fixable_matches_fix_engine():
 
 
 def test_cli_list_rules_table_and_json():
-    """`lat-check --list-rules` (Python CLI): table by default, JSON with --json,
+    """`lat rules` (Python CLI): table by default, JSON with --json,
     no input file needed, exit 0."""
-    out, code = _run_py_cli(["--list-rules"])
+    out, code = _run_py_cli(["rules"])
     assert code == 0 and "Rule" in out and "Character Set" in out
 
-    out, code = _run_py_cli(["--list-rules", "--json"])
+    out, code = _run_py_cli(["rules", "--json"])
     assert code == 0
     doc = json.loads(out)
     assert len(doc["rules"]) == 27
 
 
-@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat-check not built")
+@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat not built")
 def test_cli_list_rules_rust_binary_json_matches_python():
     """The standalone Rust binary's --list-rules --json is byte-identical to the
     Python CLI's — both stream the same compile-time-embedded rules_meta.json."""
-    r = subprocess.run([str(_RUST_BIN), "--list-rules", "--json"], capture_output=True, text=True)
+    r = subprocess.run([str(_RUST_BIN), "rules", "--json"], capture_output=True, text=True)
     assert r.returncode == 0
-    py, _ = _run_py_cli(["--list-rules", "--json"])
+    py, _ = _run_py_cli(["rules", "--json"])
     assert r.stdout == py  # byte-identical, not merely structurally equal
+
+
+@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat not built")
+def test_cli_read_rust_binary_byte_parity():
+    """`lat read` is byte-coherent across the Rust binary and the Python CLI for
+    the group listing and --json / --csv (raw file cells, #430 PR 2). The human
+    --table is each surface's own presentation and is not compared."""
+    f = str(_CLEAN)
+    # the group listing
+    r = subprocess.run([str(_RUST_BIN), "read", f], capture_output=True, text=True)
+    py, _ = _run_py_cli(["read", f])
+    assert r.returncode == 0 and r.stdout == py, "read (list codes) diverged"
+    # a group dumped as --json and --csv (PROJ is present in the clean fixture)
+    for extra in (["--json"], ["--csv"]):
+        r = subprocess.run(
+            [str(_RUST_BIN), "read", f, "PROJ", *extra], capture_output=True, text=True
+        )
+        py, _ = _run_py_cli(["read", f, "PROJ", *extra])
+        assert r.returncode == 0 and r.stdout == py, f"read PROJ {extra} diverged"
+
+
+def test_cli_transport_pack_unpack_round_trip(tmp_path):
+    """`lat pack` / `unpack` via the Python CLI — a lossless zstd round-trip."""
+    from laterite import _cli
+
+    z, out = tmp_path / "p.zst", tmp_path / "restored.ags"
+    assert _cli.main(["pack", str(_CLEAN), str(z)]) == 0
+    assert _cli.main(["unpack", str(z), str(out)]) == 0
+    assert out.read_bytes() == _CLEAN.read_bytes()
+
+
+def test_cli_transport_lock_unlock_round_trip(tmp_path, monkeypatch):
+    """`lat lock` / `unlock` — age passphrase round-trip (env-var password, low
+    scrypt factor for speed); a wrong passphrase → exit 6 (#430 PR 3)."""
+    from laterite import _cli
+
+    monkeypatch.setenv("LAT_TRANSPORT_PASSWORD", "s3cret")
+    age, out = tmp_path / "l.age", tmp_path / "u.ags"
+    assert _cli.main(["lock", str(_CLEAN), str(age), "--log-n", "10"]) == 0
+    assert _cli.main(["unlock", str(age), str(out)]) == 0
+    assert out.read_bytes() == _CLEAN.read_bytes()
+    monkeypatch.setenv("LAT_TRANSPORT_PASSWORD", "wrong")
+    assert _cli.main(["unlock", str(age), str(tmp_path / "x.ags")]) == 6
+
+
+def test_cli_transport_password_file_and_missing_input(tmp_path):
+    """`--password-file` is honoured (trailing newline stripped); missing input → 3."""
+    from laterite import _cli
+
+    pw = tmp_path / "pw.txt"
+    pw.write_text("hunter2\n")
+    age, out = tmp_path / "l.age", tmp_path / "u.ags"
+    assert (
+        _cli.main(["lock", str(_CLEAN), str(age), "--log-n", "10", "--password-file", str(pw)])
+        == 0
+    )
+    assert _cli.main(["unlock", str(age), str(out), "--password-file", str(pw)]) == 0
+    assert out.read_bytes() == _CLEAN.read_bytes()
+    assert _cli.main(["pack", str(tmp_path / "nope.ags"), str(tmp_path / "x.zst")]) == 3
+
+
+def test_cli_excel_round_trip(tmp_path):
+    """`lat excel` via the Python CLI — export (.ags→.xlsx) then import
+    (.xlsx→.ags), direction inferred from the output extension; the group set
+    survives. Ambiguous extension → exit 5, missing input → 3 (#430 PR 4)."""
+    from laterite import _cli, read
+
+    xlsx, back = tmp_path / "out.xlsx", tmp_path / "back.ags"
+    assert _cli.main(["excel", str(_CLEAN), str(xlsx)]) == 0
+    assert xlsx.exists()
+    assert _cli.main(["excel", str(xlsx), str(back)]) == 0
+    assert set(read(str(back)).groups) == set(read(str(_CLEAN)).groups)
+    assert _cli.main(["excel", str(_CLEAN), str(tmp_path / "x.dat")]) == 5  # ambiguous
+    assert _cli.main(["excel", str(tmp_path / "none.ags"), str(tmp_path / "y.xlsx")]) == 3
 
 
 def test_cli_readme_and_help_flags():

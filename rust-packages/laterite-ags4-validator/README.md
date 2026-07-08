@@ -8,12 +8,12 @@ the same capability [python-ags4](https://gitlab.com/ags-data-format-wg/ags-pyth
 five bundled standard dictionaries (build-time `phf` codegen, zero
 startup cost) with per-file `TRAN_AGS` edition auto-selection, the
 public API (`check_file` / `check_file_with_dict` / `is_valid` /
-`CheckOptions`), the `lat-check` CLI, and the full numbered-rule set
+`CheckOptions`), the `lat` CLI, and the full numbered-rule set
 (Rules 1–20) are implemented, regression-tested, and dogfooded
 against real-world deliveries + cross-checked vs `python-ags4`.
 Deliberate divergences from python are logged in `OBSERVATIONS.md`.
 For end-user CLI usage see [`README-cli.md`](README-cli.md) (or
-`lat-check --readme`).
+`lat --readme`).
 
 ## Licence & clean-room boundary (important)
 

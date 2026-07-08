@@ -4,5 +4,5 @@
 # expect-exit: 0
 cp examples/sample_site.ags site.ags
 # --8<-- [start:cmd]
-lat-check site.ags --emit-index
+lat certify site.ags
 # --8<-- [end:cmd]

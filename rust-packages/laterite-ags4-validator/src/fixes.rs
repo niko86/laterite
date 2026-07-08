@@ -27,8 +27,10 @@
 //!    precision, but *only* when the cell actually parses as `f64` (never
 //!    touch a non-numeric cell — that's a different, unsafe defect). A DT cell
 //!    in an ISO-declared column whose value parses as a recognisable date but
-//!    isn't ISO gets a **risky** canonicalisation to ISO 8601 instead (a slash
-//!    date is read dd/mm, the AGS/UK convention — a guess, hence opt-in).
+//!    isn't ISO gets a canonicalisation to ISO 8601 instead, **Safe** when the
+//!    day-first reading is unambiguous (day > 12, day == month, ISO/year-first,
+//!    or a spelled month) and **Risky/opt-in** only when a numeric day-month
+//!    value is genuinely mm/dd-ambiguous (day ≤ 12 and day ≠ month — a guess).
 //!
 //! Apply ordering + the expected-value guard live in [`apply_fixes`]: a
 //! span carries the text it *expects* to find, so a stale/over-applied
@@ -168,15 +170,28 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
         });
     }
 
-    // -- Rule 6: delete each embedded CR (the finding carries its span).
+    // -- Rule 6: delete each embedded CR/LF (the finding carries its span).
+    //    Rule 6 bans both CR and LF within a row, and the quote-aware splitter
+    //    now keeps an embedded LF in the field too (#422) — so delete exactly
+    //    the char that's there (`expected` must match on apply, else the LF
+    //    left after stripping a CR of a `\r\n` pair would never converge). The
+    //    per-char fix iterates: `\r\n` strips over two passes (well within the
+    //    bounded-fixpoint budget).
     if let Some(items) = found.get(RULE_6) {
         for f in items {
             let (Some(line), Some((s, e))) = (f.line, f.location.char_span) else {
                 continue;
             };
+            let Some(ch) = line_text
+                .get(&line)
+                .and_then(|t| t.chars().nth(s as usize))
+                .filter(|c| *c == '\r' || *c == '\n')
+            else {
+                continue; // span doesn't point at a CR/LF (stale) → skip
+            };
             fixes.push(Fix {
                 kind: FixKind::StripEmbeddedCr,
-                label: format!("Delete embedded carriage return on line {line} (Rule 6)"),
+                label: format!("Delete embedded CR/LF on line {line} (Rule 6)"),
                 rule: RULE_6.to_string(),
                 line: Some(line),
                 risk: FixRisk::Safe,
@@ -185,7 +200,7 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                     start: s,
                     end: e,
                     replacement: String::new(),
-                    expected: "\r".to_string(),
+                    expected: ch.to_string(),
                 }],
             });
         }
@@ -356,10 +371,12 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                 .collect();
 
             // Two reformats hang off a Rule 8 cell finding. A numeric cell that
-            // parses as f64 gets a SAFE reprecision. A DT cell whose value
-            // parses as a recognisable date but isn't ISO gets a RISKY
-            // canonicalisation to ISO 8601 — risky because a slash date like
-            // 01/02/2020 is read dd/mm (the AGS/UK convention), which is a guess.
+            // parses as f64 gets a SAFE reprecision. A DT cell whose value parses
+            // as a recognisable date but isn't ISO gets an ISO canonicalisation
+            // whose risk is PER-VALUE: Safe when the day-first reading is
+            // unambiguous (day > 12, day == month, ISO/year-first, or a spelled
+            // month), Risky only when a numeric day-month value is genuinely
+            // mm/dd-ambiguous (day <= 12 && day != month) — see `datetime_to_iso`.
             let (new_val, kind, risk) = if let Some(reformat) = numeric_reformat(ty) {
                 let Ok(v) = cur.trim().parse::<f64>() else {
                     continue; // not numeric → unsafe to reformat, skip
@@ -371,10 +388,10 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                     .get(ci as usize)
                     .map(String::as_str)
                     .unwrap_or("");
-                let Some(iso) = datetime_to_iso(unit, cur.trim()) else {
+                let Some((iso, risk)) = datetime_to_iso(unit, cur.trim()) else {
                     continue; // non-ISO declared UNIT, or value isn't a real date
                 };
-                (iso, FixKind::CanonicalizeDatetime, FixRisk::Risky)
+                (iso, FixKind::CanonicalizeDatetime, risk)
             } else {
                 continue; // ID/T/U/YN/DMS/X/… have no value reformat
             };
@@ -425,7 +442,12 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                         line,
                         start: i as u32,
                         end: i as u32 + 1,
-                        replacement: repl.to_string(),
+                        // A fold that yields `"` (e.g. a curly double-quote →
+                        // straight quote) sits INSIDE a quoted AGS field, where a
+                        // bare `"` reads as an early field terminator — truncating
+                        // the cell and dropping everything after it. AGS4 escapes a
+                        // literal quote by doubling it, so double any `"` produced.
+                        replacement: repl.replace('"', "\"\""),
                         expected: c.to_string(),
                     })
                 })
@@ -587,11 +609,22 @@ fn row_is_clean(line: &str) -> bool {
 /// the file can be folded Rule-1-clean while leaving a visible breadcrumb
 /// wherever a value was corrupted upstream. A bare combining mark folds to ""
 /// (dropped), which is correct — its base letter is handled on its own.
+///
+/// The result is guaranteed line-break-free: `deunicode` maps the Unicode
+/// line/paragraph separators (U+2028 / U+2029, and NEL U+0085) to `"\n"`, but
+/// this fold is spliced INTO a single AGS record where a raw newline would split
+/// the line — so any `\r`/`\n` it would produce is folded to a space instead
+/// (they are whitespace separators). The produced-`"` case is escaped at the
+/// SpanEdit; between them the fold can never break a record's structure.
 fn ascii_fold(c: char) -> Option<&'static str> {
     if c.is_ascii() {
         return None;
     }
-    Some(deunicode::deunicode_char(c).unwrap_or("?"))
+    let r = deunicode::deunicode_char(c).unwrap_or("?");
+    if r.contains('\n') || r.contains('\r') {
+        return Some(" ");
+    }
+    Some(r)
 }
 
 /// Build the right numeric-reformat closure for a declared TYPE code, or
@@ -620,22 +653,51 @@ fn numeric_reformat(code: &str) -> Option<Box<dyn Fn(f64) -> String>> {
     None
 }
 
-/// Canonicalise a DT cell value to ISO 8601 — the RISKY datetime fixer.
+/// Which family of layout a loose datetime parsed as — decides whether an ISO
+/// canonicalisation is a *guess* (see [`datetime_is_ambiguous`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DateLayout {
+    /// Numeric day-first (`%d/%m/%y`, `%d-%m-%Y`, `%d.%m.%Y`, …) — the ONLY
+    /// family whose day/month could have been transposed (a mm/dd reading).
+    DayFirstNumeric,
+    /// ISO / year-first (`%Y-%m-%d`, `%Y/%m/%d`, `%Y-%m-%dT…`) — field order is
+    /// fixed by shape, never transposable.
+    YearFirst,
+    /// Spelled-month (`%d-%b-%Y`, `%d %B %Y`) — the month is a name, so the day
+    /// can never be confused with it.
+    TextualMonth,
+}
+
+/// Whether canonicalising this parsed date is a GUESS. Genuinely mm/dd-ambiguous
+/// IFF it came from a numeric day-first layout, `day <= 12` (the day could equally
+/// read as a month) and `day != month` (swapping yields a *different* date). A
+/// `day > 12` forces day-first; `day == month` is transpose-invariant; ISO and
+/// spelled-month layouts are never transposable. The swap is always VALID when
+/// `day <= 12` — the month field is already in `1..=12`, a valid day for any
+/// month — so no extra range check is needed. Everything this returns `false` for
+/// is SAFE to auto-apply.
+fn datetime_is_ambiguous(layout: DateLayout, day: u32, month: u32) -> bool {
+    layout == DateLayout::DayFirstNumeric && day <= 12 && day != month
+}
+
+/// Canonicalise a DT cell value to ISO 8601, tagged with its per-value fix risk.
 ///
 /// Only fires when the column's UNIT declares an ISO pattern (`yyyy-mm-dd`,
-/// optionally with a time part): the value is *meant* to be ISO but isn't.
-/// The value is parsed by trying a battery of common layouts (a slash/dotted
-/// date is read **dd/mm**, the AGS/UK convention — that's the guess that makes
-/// this risky), then re-emitted as `yyyy-mm-dd`, or `yyyy-mm-ddThh:mm:ss` when
-/// the UNIT carries a time. `None` when the UNIT isn't ISO, the value doesn't
-/// parse as a real date, or it's already canonical.
-fn datetime_to_iso(unit: &str, value: &str) -> Option<String> {
+/// optionally with a time part): the value is *meant* to be ISO but isn't. The
+/// value is parsed by trying a battery of common layouts, re-emitted as
+/// `yyyy-mm-dd` (or `yyyy-mm-ddThh:mm:ss` when the UNIT carries a time), and
+/// classified [`FixRisk::Safe`] — so `fix()` applies it by default — UNLESS the
+/// source was a genuinely mm/dd-ambiguous numeric day-first value
+/// ([`datetime_is_ambiguous`]), which stays [`FixRisk::Risky`] (opt-in) because
+/// the day-first reading is then a guess. `None` when the UNIT isn't ISO, the
+/// value doesn't parse as a real date, or it's already canonical.
+fn datetime_to_iso(unit: &str, value: &str) -> Option<(String, FixRisk)> {
     use chrono::{Datelike, Timelike};
     let unit = unit.trim();
     if !unit.starts_with("yyyy-mm-dd") {
         return None; // a non-ISO declared column is out of scope for this fix
     }
-    let dt = parse_loose_datetime(value)?;
+    let (dt, layout) = parse_loose_datetime(value)?;
     let out = if unit.len() > "yyyy-mm-dd".len() {
         format!(
             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
@@ -649,15 +711,25 @@ fn datetime_to_iso(unit: &str, value: &str) -> Option<String> {
     } else {
         format!("{:04}-{:02}-{:02}", dt.year(), dt.month(), dt.day())
     };
-    (out != value).then_some(out)
+    if out == value {
+        return None; // already canonical → no fix regardless of risk
+    }
+    let risk = if datetime_is_ambiguous(layout, dt.day(), dt.month()) {
+        FixRisk::Risky
+    } else {
+        FixRisk::Safe
+    };
+    Some((out, risk))
 }
 
-/// Parse a datetime that FAILED Rule 8 by trying common non-ISO layouts.
-/// Datetime layouts (with a time) are tried before date-only ones; a slash or
-/// dotted date is day-first (`%d/%m/%Y`). chrono validates the fields, so an
-/// impossible date (month 13, day 32) yields `None` — we never invent a bogus
-/// "canonical" value to offer.
-fn parse_loose_datetime(s: &str) -> Option<chrono::NaiveDateTime> {
+/// Parse a datetime that FAILED Rule 8 by trying common non-ISO layouts, also
+/// reporting which [`DateLayout`] family matched (so the fixer can tell an
+/// ambiguous dd/mm guess from an unambiguous one). Datetime layouts (with a time)
+/// are tried before date-only ones; a slash/dash/dotted numeric date is day-first
+/// (`%d/%m/%Y`). chrono validates the fields, so an impossible date (month 13,
+/// day 32) yields `None` — we never invent a bogus "canonical" value to offer.
+fn parse_loose_datetime(s: &str) -> Option<(chrono::NaiveDateTime, DateLayout)> {
+    use DateLayout::*;
     use chrono::{NaiveDate, NaiveDateTime};
     // Ordering matters: a day-first / 2-digit-year (`%y`) layout is tried
     // before the year-first / 4-digit (`%Y`) one for the same separator, so
@@ -665,30 +737,40 @@ fn parse_loose_datetime(s: &str) -> Option<chrono::NaiveDateTime> {
     // as year 18 by a greedy "%Y". chrono's parse_from_str requires the WHOLE
     // string to match, which is what lets "18/08/2020" fall through to the %Y
     // variant while "18/08/20" stops at %y.
-    const WITH_TIME: &[&str] = &[
-        "%d/%m/%y %H:%M:%S",
-        "%d/%m/%y %H:%M",
-        "%d/%m/%Y %H:%M:%S",
-        "%d/%m/%Y %H:%M",
-        "%d-%m-%Y %H:%M:%S",
-        "%d-%m-%Y %H:%M",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%dT%H:%M",
-        "%Y-%m-%d %H:%M",
+    const WITH_TIME: &[(&str, DateLayout)] = &[
+        ("%d/%m/%y %H:%M:%S", DayFirstNumeric),
+        ("%d/%m/%y %H:%M", DayFirstNumeric),
+        ("%d/%m/%Y %H:%M:%S", DayFirstNumeric),
+        ("%d/%m/%Y %H:%M", DayFirstNumeric),
+        ("%d-%m-%Y %H:%M:%S", DayFirstNumeric),
+        ("%d-%m-%Y %H:%M", DayFirstNumeric),
+        ("%Y-%m-%dT%H:%M:%S", YearFirst),
+        ("%Y-%m-%d %H:%M:%S", YearFirst),
+        ("%Y-%m-%dT%H:%M", YearFirst),
+        ("%Y-%m-%d %H:%M", YearFirst),
     ];
-    for f in WITH_TIME {
+    for (f, layout) in WITH_TIME {
         if let Ok(dt) = NaiveDateTime::parse_from_str(s, f) {
-            return Some(dt);
+            return Some((dt, *layout));
         }
     }
-    const DATE_ONLY: &[&str] = &[
-        "%d/%m/%y", "%d/%m/%Y", "%d-%m-%y", "%d-%m-%Y", "%d.%m.%y", "%d.%m.%Y", "%d-%b-%y",
-        "%d-%b-%Y", "%d %b %Y", "%d %B %Y", "%Y-%m-%d", "%Y/%m/%d",
+    const DATE_ONLY: &[(&str, DateLayout)] = &[
+        ("%d/%m/%y", DayFirstNumeric),
+        ("%d/%m/%Y", DayFirstNumeric),
+        ("%d-%m-%y", DayFirstNumeric),
+        ("%d-%m-%Y", DayFirstNumeric),
+        ("%d.%m.%y", DayFirstNumeric),
+        ("%d.%m.%Y", DayFirstNumeric),
+        ("%d-%b-%y", TextualMonth),
+        ("%d-%b-%Y", TextualMonth),
+        ("%d %b %Y", TextualMonth),
+        ("%d %B %Y", TextualMonth),
+        ("%Y-%m-%d", YearFirst),
+        ("%Y/%m/%d", YearFirst),
     ];
-    for f in DATE_ONLY {
+    for (f, layout) in DATE_ONLY {
         if let Ok(d) = NaiveDate::parse_from_str(s, f) {
-            return d.and_hms_opt(0, 0, 0);
+            return Some((d.and_hms_opt(0, 0, 0)?, *layout));
         }
     }
     None
@@ -727,19 +809,22 @@ pub fn apply_fixes(text: &str, has_bom: bool, selected: &[Fix]) -> String {
         }
     }
 
-    // Rebuild the text line-by-line so each edit's char offsets stay
-    // local to its own line (offsets are per-line, as field_span yields).
-    // `split('\n')` then re-join preserves blank/CR state identically to
-    // the parser; the trailing `\r` is part of the line text here so a CR
-    // strip operates on raw content, never the terminator.
-    let mut out_lines: Vec<String> = Vec::new();
-    for (i, raw) in text.split('\n').enumerate() {
+    // Rebuild the text line-by-line so each edit's char offsets stay local to
+    // its own line (offsets are per-line, as field_span yields). Re-split with
+    // the SAME quote-aware line model the parser used (`parse::line_spans`), so
+    // a fix's line number lands on the same line here even for `\r`/lone-`\n`-
+    // terminated or embedded-newline files — a plain `split('\n')` would number
+    // those lines differently and misplace the edit (#422). Each line's
+    // ORIGINAL terminator is re-emitted verbatim, so a well-formed file
+    // round-trips byte-for-byte; the terminator is never inside `body`, so a CR
+    // strip only ever touches embedded content.
+    let mut result = String::with_capacity(text.len());
+    let src = text.as_bytes();
+    for (i, span) in crate::parse::line_spans(src).enumerate() {
         let number = (i + 1) as u32;
-        // Operate on the line WITHOUT its trailing CR terminator, so a
-        // legitimate CRLF terminator survives untouched and only embedded
-        // content is edited. Re-attach the CR after editing.
-        let had_cr = raw.ends_with('\r');
-        let body = raw.strip_suffix('\r').unwrap_or(raw);
+        // Every terminator/delimiter is ASCII, so `start..body_end` is a valid
+        // char boundary of `text`.
+        let body = &text[span.start..span.body_end];
 
         let edited = match by_line.get(&number) {
             None => body.to_string(),
@@ -770,13 +855,9 @@ pub fn apply_fixes(text: &str, has_bom: bool, selected: &[Fix]) -> String {
                 chars.into_iter().collect()
             }
         };
-        out_lines.push(if had_cr {
-            format!("{edited}\r")
-        } else {
-            edited
-        });
+        result.push_str(&edited);
+        result.push_str(span.term.as_str());
     }
-    let mut result = out_lines.join("\n");
 
     // Byte-level fixes last. NOTE on the BOM: callers (the wasm layer)
     // hand us text already decoded via `encoding_rs`, which transparently
@@ -811,8 +892,9 @@ pub fn apply_fixes(text: &str, has_bom: bool, selected: &[Fix]) -> String {
     result
 }
 
-/// The outcome of [`fix_document`]: the repaired `fixed` bytes (UTF-8; the
-/// original bytes verbatim when nothing was applicable), the `residual`
+/// The outcome of [`fix_document`]: the repaired `fixed` bytes (always valid
+/// UTF-8 — a UTF-8 source with nothing to fix is returned verbatim, a non-UTF-8
+/// source is transcoded even when nothing else changed), the `residual`
 /// findings that remain *after* the fixes, the `applied` fixes, and the edition
 /// the residual was validated against.
 pub struct FixOutcome {
@@ -830,15 +912,19 @@ pub struct FixOutcome {
 }
 
 /// Headless one-shot repair of a delivered AGS4 document's bytes — the single
-/// orchestration shared by the PyO3 `fix()` verb and the `lat-check --fix` CLI
+/// orchestration shared by the PyO3 `fix()` verb and the `lat fix` CLI
 /// (and the natural home for any future surface). Parses, runs the rules,
 /// [`compute_fixes`], applies the **safe** set (plus the intent-guessing
 /// **risky** set when `include_risky`), then re-validates the result so
 /// [`FixOutcome::residual`] is what could *not* be mechanically fixed.
 ///
 /// The applier re-emits UTF-8 (BOM-sniffed via `opts.encoding`), so repairing a
-/// non-UTF-8 / BOM'd / CRLF-broken file also normalises those. When no fix is
-/// applicable the input bytes are returned verbatim (no silent re-encode).
+/// non-UTF-8 / BOM'd / CRLF-broken file also normalises those. The output is
+/// always valid UTF-8: when no fix is applicable a UTF-8 source is returned
+/// verbatim (byte-for-byte idempotent), but a non-UTF-8 source is still
+/// transcoded to UTF-8 — otherwise the "output is always UTF-8" promise would
+/// leak raw source bytes, and re-reading them as UTF-8 would diverge from how
+/// the source was read.
 pub fn fix_document(
     raw: &[u8],
     opts: &crate::CheckOptions,
@@ -887,8 +973,33 @@ pub fn fix_document_selective(
         selected.retain(|f| f.risk == FixRisk::Safe);
     }
     if selected.is_empty() {
+        // Even with nothing to fix the output must honor the "always UTF-8"
+        // contract. An *already-valid* UTF-8 source is returned verbatim (a no-op
+        // fix stays byte-for-byte idempotent — the common case). Everything else
+        // is transcoded: returning its raw bytes would leak a non-UTF-8 stream and,
+        // once re-read as UTF-8, make `read(enc).fix().validate()` disagree with
+        // `read(enc).validate()`. Decode the way the parser did
+        // (`decode_without_bom_handling`, BOM stripped) so the emitted bytes
+        // re-parse to the same findings. The UTF-8-label case still needs this
+        // else-branch when `raw` ISN'T valid UTF-8: the encoding sniffer resolves
+        // an unlabelled non-UTF-8 file to UTF_8 and the parser lossy-decodes it, so
+        // `raw.to_vec()` there would emit the invalid bytes verbatim (0x80 etc.) —
+        // the exact contract breach #416 meant to close, reached via the default
+        // `encoding=None` path rather than an explicit non-UTF-8 label.
+        let fixed = if std::ptr::eq(opts.encoding, encoding_rs::UTF_8)
+            && std::str::from_utf8(raw).is_ok()
+        {
+            raw.to_vec()
+        } else {
+            let body = raw.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(raw);
+            opts.encoding
+                .decode_without_bom_handling(body)
+                .0
+                .into_owned()
+                .into_bytes()
+        };
         return Ok(FixOutcome {
-            fixed: raw.to_vec(),
+            fixed,
             residual: found,
             applied: Vec::new(),
             dict_version: dv,
@@ -1275,6 +1386,62 @@ mod tests {
     }
 
     #[test]
+    fn ascii_fold_output_is_ascii_and_line_break_free_over_all_chars() {
+        // Exhaustive: every scalar the fold maps must yield pure ASCII with no
+        // line break. A fold to `\r`/`\n` would split a record; the `"`/`,`
+        // producers are separately escaped at the SpanEdit (the quote test below
+        // + the property suite's cell-preservation invariant cover that).
+        for cp in 0u32..=0x10FFFF {
+            let Some(c) = char::from_u32(cp) else {
+                continue;
+            };
+            if let Some(r) = ascii_fold(c) {
+                assert!(r.is_ascii(), "fold of U+{cp:04X} is not ASCII: {r:?}");
+                assert!(
+                    !r.contains('\r') && !r.contains('\n'),
+                    "fold of U+{cp:04X} contains a line break: {r:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn nonascii_fold_escapes_produced_double_quote() {
+        // A curly DOUBLE quote (U+201C/U+201D) folds to a straight `"`. Since the
+        // fold rewrites the raw line in place, and the character sits inside a
+        // quoted AGS field, that `"` must be DOUBLED (`""`) or the tokenizer reads
+        // it as an early field terminator and TRUNCATES the cell (dropping every
+        // character after it). Regression for that data-loss bug.
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                   \"DATA\",\"P1\",\"say \u{201C}hi\u{201D} now\"\r\n";
+        let (parsed, found) = check(src);
+        let fix = compute_fixes(&parsed, &found)
+            .into_iter()
+            .find(|f| f.kind == FixKind::NormalizeTypography)
+            .expect("a non-ASCII fold fix");
+        let out = apply_fixes(src, parsed.has_bom, &[fix]);
+        // The produced straight quotes are AGS-escaped (doubled) in the raw text.
+        assert!(
+            out.contains("\"say \"\"hi\"\" now\""),
+            "quote not escaped (cell would truncate): {out:?}"
+        );
+        // And the field round-trips with no data loss — the trailing " now" is
+        // still there (it vanished before the escape fix).
+        let (reparsed, _) = check(&out);
+        let proj = reparsed.groups.get("PROJ").expect("PROJ group");
+        let row = proj
+            .rows
+            .iter()
+            .find(|r| r.values.first().map(String::as_str) == Some("P1"))
+            .expect("the P1 DATA row");
+        assert_eq!(
+            row.values[1], "say \"hi\" now",
+            "cell truncated / mis-escaped"
+        );
+    }
+
+    #[test]
     fn nonascii_fold_handles_symbols_accents_and_corruption() {
         // The real-world case: a micro sign, a degree sign, a German ß, an
         // accented name, and a U+FFFD replacement char (mojibake — already-lost
@@ -1409,29 +1576,29 @@ mod tests {
 
     #[test]
     fn datetime_to_iso_canonicalises_common_layouts() {
-        // dd/mm/yyyy (UK/AGS day-first) into an ISO-declared column.
+        // All five are UNAMBIGUOUS → Safe: day > 12 forces dd/mm, or the layout
+        // is spelled-month / year-first (never transposable).
         assert_eq!(
-            datetime_to_iso("yyyy-mm-dd", "18/08/2020").as_deref(),
-            Some("2020-08-18")
-        );
-        // 2-digit year, dashed, dotted, and month-name layouts.
-        assert_eq!(
-            datetime_to_iso("yyyy-mm-dd", "18/08/20").as_deref(),
-            Some("2020-08-18")
+            datetime_to_iso("yyyy-mm-dd", "18/08/2020"),
+            Some(("2020-08-18".to_string(), FixRisk::Safe))
         );
         assert_eq!(
-            datetime_to_iso("yyyy-mm-dd", "1-Feb-2020").as_deref(),
-            Some("2020-02-01")
+            datetime_to_iso("yyyy-mm-dd", "18/08/20"),
+            Some(("2020-08-18".to_string(), FixRisk::Safe))
+        );
+        assert_eq!(
+            datetime_to_iso("yyyy-mm-dd", "1-Feb-2020"),
+            Some(("2020-02-01".to_string(), FixRisk::Safe))
         );
         // A time-bearing ISO UNIT keeps the time.
         assert_eq!(
-            datetime_to_iso("yyyy-mm-ddThh:mm:ss", "18/08/2020 13:45:00").as_deref(),
-            Some("2020-08-18T13:45:00")
+            datetime_to_iso("yyyy-mm-ddThh:mm:ss", "18/08/2020 13:45:00"),
+            Some(("2020-08-18T13:45:00".to_string(), FixRisk::Safe))
         );
-        // Missing zero-padding in an otherwise-ISO value.
+        // Missing zero-padding in an otherwise-ISO (year-first) value.
         assert_eq!(
-            datetime_to_iso("yyyy-mm-dd", "2020-8-1").as_deref(),
-            Some("2020-08-01")
+            datetime_to_iso("yyyy-mm-dd", "2020-8-1"),
+            Some(("2020-08-01".to_string(), FixRisk::Safe))
         );
     }
 
@@ -1448,9 +1615,53 @@ mod tests {
     }
 
     #[test]
-    fn datetime_fix_is_risky_and_applies_iso() {
-        // A TRAN_DATE DT cell (UNIT yyyy-mm-dd) holding a dd/mm/yyyy value is a
-        // Rule 8 miss; the canonicaliser offers an opt-in ISO rewrite.
+    fn datetime_is_ambiguous_predicate() {
+        use DateLayout::*;
+        assert!(datetime_is_ambiguous(DayFirstNumeric, 5, 6)); // both ≤12, differ
+        assert!(datetime_is_ambiguous(DayFirstNumeric, 1, 2));
+        assert!(!datetime_is_ambiguous(DayFirstNumeric, 18, 8)); // day > 12 → forced
+        assert!(!datetime_is_ambiguous(DayFirstNumeric, 5, 5)); // day == month → invariant
+        assert!(!datetime_is_ambiguous(YearFirst, 1, 8)); // year-first never transposable
+        assert!(!datetime_is_ambiguous(TextualMonth, 1, 2)); // spelled month never
+    }
+
+    #[test]
+    fn datetime_to_iso_risk_matrix() {
+        let iso = |v: &str| datetime_to_iso("yyyy-mm-dd", v);
+        // Both components ≤ 12 and unequal → genuine dd/mm guess → Risky.
+        assert_eq!(
+            iso("05/06/2020"),
+            Some(("2020-06-05".to_string(), FixRisk::Risky))
+        );
+        assert_eq!(
+            iso("01-02-2020"),
+            Some(("2020-02-01".to_string(), FixRisk::Risky))
+        );
+        // day == month is transpose-invariant → Safe.
+        assert_eq!(
+            iso("05/05/2020"),
+            Some(("2020-05-05".to_string(), FixRisk::Safe))
+        );
+        // day > 12 forces day-first, year-first never ambiguous → Safe.
+        assert_eq!(
+            iso("18/08/20"),
+            Some(("2020-08-18".to_string(), FixRisk::Safe))
+        );
+        assert_eq!(
+            iso("2020-8-1"),
+            Some(("2020-08-01".to_string(), FixRisk::Safe))
+        );
+        // Risk survives a time part.
+        assert_eq!(
+            datetime_to_iso("yyyy-mm-dd hh:mm:ss", "05/06/2020 14:30:00"),
+            Some(("2020-06-05T14:30:00".to_string(), FixRisk::Risky))
+        );
+    }
+
+    #[test]
+    fn datetime_fix_unambiguous_is_safe_and_applies_iso() {
+        // day 18 > 12 forces dd/mm (mm can't be 18) → UNAMBIGUOUS → Safe, so
+        // fix-all-safe now canonicalises it BY DEFAULT (the core new behaviour).
         let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\
                    \"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\
                    \"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_DATE\"\r\n\
@@ -1463,28 +1674,120 @@ mod tests {
             .expect("a datetime canonicalisation fix");
         assert_eq!(
             dt.risk,
-            FixRisk::Risky,
-            "dd/mm is a guess → opt-in, excluded from fix-all-safe"
+            FixRisk::Safe,
+            "day 18 > 12 → unambiguous dd/mm → safe by default"
         );
         assert_eq!(dt.edits.len(), 1);
         assert_eq!(dt.edits[0].replacement, "2020-08-18");
         assert_eq!(dt.edits[0].expected, "18/08/2020");
 
-        let out = apply_fixes(src, parsed.has_bom, std::slice::from_ref(dt));
-        assert!(out.contains("\"2020-08-18\""), "applied ISO date: {out:?}");
-        assert!(!out.contains("18/08/2020"));
+        // Pins the behaviour change: the safe canonicalisation lands in the
+        // DEFAULT (include_risky = false) fix tier.
+        let out = fix_document(src.as_bytes(), &CheckOptions::default(), false).expect("fix");
+        assert!(
+            !out.applied.is_empty(),
+            "safe datetime fix applied by default"
+        );
+        assert!(
+            String::from_utf8_lossy(&out.fixed).contains("2020-08-18"),
+            "default fix canonicalises the unambiguous date"
+        );
+    }
+
+    #[test]
+    fn datetime_fix_ambiguous_stays_risky() {
+        // 01/02/2020: both ≤ 12 and day != month → genuinely mm/dd-ambiguous →
+        // Risky (opt-in), withheld from fix-all-safe.
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\
+                   \"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\
+                   \"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_DATE\"\r\n\
+                   \"UNIT\",\"yyyy-mm-dd\"\r\n\"TYPE\",\"DT\"\r\n\"DATA\",\"01/02/2020\"\r\n";
+        let (parsed, found) = check(src);
+        let dt = compute_fixes(&parsed, &found)
+            .into_iter()
+            .find(|f| f.kind == FixKind::CanonicalizeDatetime)
+            .expect("a datetime canonicalisation fix");
+        assert_eq!(dt.risk, FixRisk::Risky, "01/02 is a genuine dd/mm guess");
+        assert_eq!(dt.edits[0].replacement, "2020-02-01");
+        assert_eq!(dt.edits[0].expected, "01/02/2020");
     }
 
     #[test]
     fn fix_document_noop_returns_original_bytes_verbatim() {
-        // Nothing fixable in HEAD → fix_document must return the input untouched
-        // (no silent decode/re-encode round-trip).
+        // Nothing fixable in HEAD, and it is UTF-8 → fix_document returns the
+        // input untouched (a no-op stays byte-for-byte idempotent). The non-UTF-8
+        // no-op case still transcodes — see the test below.
         let raw = HEAD.as_bytes();
         let out = fix_document(raw, &CheckOptions::default(), false).expect("fixes");
         assert!(out.applied.is_empty());
         assert_eq!(
             out.fixed, raw,
-            "a no-op fix returns the source byte-for-byte"
+            "a no-op fix on a UTF-8 source returns it byte-for-byte"
+        );
+    }
+
+    #[test]
+    fn fix_document_noop_transcodes_non_utf8_to_utf8() {
+        // The no-op path must STILL honor "output is always UTF-8": a clean
+        // windows-1252 source (nothing fixable — the é is FYI-only, no safe fix)
+        // is transcoded to UTF-8, not passed through as raw non-UTF-8 bytes.
+        // Regression for `read(enc).fix().validate()` diverging from
+        // `read(enc).validate()`, and for the output silently being invalid UTF-8.
+        let utf8 = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                    \"DATA\",\"P1\",\"Caf\u{00E9}\"\r\n";
+        let raw = encoding_rs::WINDOWS_1252.encode(utf8).0.into_owned();
+        assert!(
+            std::str::from_utf8(&raw).is_err(),
+            "the source is genuinely cp1252 (é = 0xE9, not valid UTF-8)"
+        );
+        let opts = CheckOptions {
+            encoding: encoding_rs::WINDOWS_1252,
+            ..CheckOptions::default()
+        };
+        let out = fix_document(&raw, &opts, false).expect("fixes");
+        assert!(out.applied.is_empty(), "expected a no-op (é is FYI-only)");
+        let s = std::str::from_utf8(&out.fixed).expect("no-op output must be valid UTF-8");
+        assert!(
+            s.contains("Caf\u{00E9}"),
+            "decoded content preserved: {s:?}"
+        );
+        assert_ne!(
+            out.fixed, raw,
+            "a non-UTF-8 source must be transcoded, not returned verbatim"
+        );
+    }
+
+    #[test]
+    fn fix_document_noop_emits_valid_utf8_even_under_a_utf8_label() {
+        // The gap #416 left: the no-op fast-path keyed on the encoding *label*
+        // (UTF_8 → return verbatim), but the sniffer resolves an unlabelled
+        // non-UTF-8 file to UTF_8 and the parser lossy-decodes it — so `raw` can
+        // be invalid UTF-8 while `opts.encoding == UTF_8`. Returning it verbatim
+        // leaked 0x80 into the "always UTF-8" output (caught by the Python
+        // fix-chain property on the default `encoding=None` path). Now the
+        // fast-path also requires `raw` to already be valid UTF-8; otherwise the
+        // bytes are lossy-decoded the way the parser saw them (0x80 → U+FFFD), so
+        // `fix()` output re-parses to the same findings the read did.
+        // Build the invalid byte at runtime (a lone 0x80) so it isn't a literal
+        // clippy can const-fold into "always errors".
+        let mut raw = b"\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                        \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                        \"DATA\",\"P1\",\"a"
+            .to_vec();
+        raw.push(0x80);
+        raw.extend_from_slice(b"b\"\r\n");
+        assert!(
+            std::str::from_utf8(&raw).is_err(),
+            "0x80 is not valid UTF-8"
+        );
+        // encoding == UTF_8 (the default sniff), but the bytes are NOT valid UTF-8.
+        let out = fix_document(&raw, &CheckOptions::default(), false).expect("fixes");
+        std::str::from_utf8(&out.fixed)
+            .expect("no-op output under a UTF-8 label must still be valid UTF-8");
+        assert_ne!(
+            out.fixed, raw,
+            "invalid-UTF-8 bytes must not be returned verbatim"
         );
     }
 

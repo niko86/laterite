@@ -123,11 +123,12 @@ pub fn lock(
     dest: &Path,
     password: &str,
     level: i32,
+    log_n: u8,
 ) -> Result<PackStats, TransportError> {
     let t0 = Instant::now();
     let src_bytes = read_existing(src)?;
     let src_size = src_bytes.len() as u64;
-    let encrypted = lock_bytes(&src_bytes, password, level)?;
+    let encrypted = lock_bytes(&src_bytes, password, level, log_n)?;
     write_out(dest, &encrypted)?;
     let out_size = encrypted.len() as u64;
     Ok(PackStats {
@@ -155,9 +156,14 @@ pub fn unlock(src: &Path, dest: &Path, password: &str) -> Result<UnpackStats, Tr
 /// `lock` file carries, so a `lock_bytes` blob opens with `unlock` /
 /// `unlock_bytes` / `pyrage` / the browser, given the passphrase — never
 /// touching a plaintext file on disk.
-pub fn lock_bytes(data: &[u8], password: &str, level: i32) -> Result<Vec<u8>, TransportError> {
+pub fn lock_bytes(
+    data: &[u8],
+    password: &str,
+    level: i32,
+    log_n: u8,
+) -> Result<Vec<u8>, TransportError> {
     let compressed = pack_bytes(data, level)?;
-    encrypt_with_passphrase(&compressed, password)
+    encrypt_with_passphrase(&compressed, password, log_n)
 }
 
 /// age-decrypt then zstd-decompress `data` in memory — the filesystem-free
@@ -179,17 +185,29 @@ pub fn unlock_bytes(data: &[u8], password: &str) -> Result<Vec<u8>, TransportErr
 /// everywhere (CLI, `pyrage`, browser) AND makes the work factor deterministic
 /// instead of machine-dependent. ~256 MiB / ~0.1–0.5 s to derive: a strong
 /// passphrase KDF. (Decryption accepts any factor the file declares, unchanged.)
-const SCRYPT_LOG_N: u8 = 18;
+/// The default work factor when a caller doesn't override `log_n`; a lower value
+/// trades KDF strength for speed (tests use it to avoid a slow scrypt per case).
+pub const SCRYPT_LOG_N: u8 = 18;
 
 /// Encrypt `plaintext` with `passphrase` via age 0.11's scrypt passphrase
-/// recipient, pinned to [`SCRYPT_LOG_N`] (not age's machine-calibrated default).
+/// recipient at work factor `log_n` (`log2(N)`). Pass [`SCRYPT_LOG_N`] for the
+/// default; a lower value is cheaper. Rejects `log_n` outside `1..=20` — `0` is
+/// invalid and `> 20` yields a file the browser `age-encryption` decoder refuses
+/// (breaking the "openable everywhere" guarantee [`SCRYPT_LOG_N`] documents).
 pub fn encrypt_with_passphrase(
     plaintext: &[u8],
     passphrase: &str,
+    log_n: u8,
 ) -> Result<Vec<u8>, TransportError> {
+    if !(1..=20).contains(&log_n) {
+        return Err(TransportError::Age {
+            op: "work_factor",
+            detail: format!("scrypt log_n must be 1..=20, got {log_n}"),
+        });
+    }
     let secret = SecretString::new(passphrase.to_owned().into_boxed_str());
     let mut recipient = age::scrypt::Recipient::new(secret);
-    recipient.set_work_factor(SCRYPT_LOG_N);
+    recipient.set_work_factor(log_n);
     let encryptor =
         age::Encryptor::with_recipients(std::iter::once(&recipient as &dyn age::Recipient))
             .map_err(|e| TransportError::Age {
@@ -233,7 +251,14 @@ pub fn decrypt_with_passphrase(
     if !decryptor.is_scrypt() {
         return Err(TransportError::NotPassphrase);
     }
-    let identity = age::scrypt::Identity::new(secret);
+    let mut identity = age::scrypt::Identity::new(secret);
+    // #432: age's default `max_work_factor` is `target_work_factor + 4`, a machine-
+    // SPEED heuristic — on a slow / memory-starved machine (e.g. a CI container) it
+    // drops below our `SCRYPT_LOG_N` (18) and refuses our OWN files with "Excessive
+    // work parameter". Pin it to the encrypt cap (20) so decrypt accepts anything we
+    // can produce, machine-independently — the "accepts any factor the file declares"
+    // contract this module documents.
+    identity.set_max_work_factor(20);
     let mut reader = decryptor
         .decrypt(std::iter::once(&identity as &dyn age::Identity))
         .map_err(|e| TransportError::Age {
@@ -286,7 +311,7 @@ mod tests {
         let payload = b"sensitive AGS payload ".repeat(60);
         fs::write(&src, &payload).unwrap();
 
-        lock(&src, &locked, "hunter2", 9).unwrap();
+        lock(&src, &locked, "hunter2", 9, SCRYPT_LOG_N).unwrap();
 
         // wrong passphrase must fail
         assert!(unlock(&locked, &out, "wrong").is_err());
@@ -309,10 +334,36 @@ mod tests {
     fn plaintext_bytes_round_trip_through_the_age_envelope() {
         // The byte-level path the consumers reuse directly.
         let msg = b"the quick brown fox jumps over 13 lazy dogs";
-        let sealed = encrypt_with_passphrase(msg, "pw").unwrap();
+        let sealed = encrypt_with_passphrase(msg, "pw", SCRYPT_LOG_N).unwrap();
         assert_ne!(sealed, msg, "ciphertext must differ from plaintext");
         assert_eq!(decrypt_with_passphrase(&sealed, "pw").unwrap(), msg);
         assert!(decrypt_with_passphrase(&sealed, "nope").is_err());
+    }
+
+    #[test]
+    fn decrypt_pins_max_work_factor_so_our_files_open_on_any_machine() {
+        // #432: age's default decrypt cap is a machine-SPEED heuristic; on a slow /
+        // memory-starved container it drops below our SCRYPT_LOG_N (18) and refuses
+        // our OWN files. Prove the mechanism machine-independently: a cap BELOW the
+        // file's factor rejects (the bug), while `decrypt_with_passphrase` — which
+        // pins the cap at the encrypt max (20) — accepts.
+        let sealed = encrypt_with_passphrase(b"secret", "pw", SCRYPT_LOG_N).unwrap();
+
+        // Simulate a starved machine: an identity capped below the file's factor
+        // refuses it, exactly as the CI runner did.
+        let decryptor = age::Decryptor::new(&sealed[..]).unwrap();
+        let mut capped =
+            age::scrypt::Identity::new(SecretString::new("pw".to_owned().into_boxed_str()));
+        capped.set_max_work_factor(SCRYPT_LOG_N - 1);
+        assert!(
+            decryptor
+                .decrypt(std::iter::once(&capped as &dyn age::Identity))
+                .is_err(),
+            "a cap below the file's work factor must reject — this is the #432 failure"
+        );
+
+        // Our decrypt pins the cap at the encrypt max, so it opens regardless.
+        assert_eq!(decrypt_with_passphrase(&sealed, "pw").unwrap(), b"secret");
     }
 
     #[test]
@@ -326,7 +377,7 @@ mod tests {
     #[test]
     fn lock_bytes_unlock_bytes_round_trip_and_rejects_wrong_password() {
         let payload = b"sensitive AGS payload ".repeat(60);
-        let sealed = lock_bytes(&payload, "hunter2", 9).unwrap();
+        let sealed = lock_bytes(&payload, "hunter2", 9, SCRYPT_LOG_N).unwrap();
         assert_ne!(sealed, payload, "sealed bytes differ from plaintext");
         assert!(unlock_bytes(&sealed, "wrong").is_err());
         assert_eq!(unlock_bytes(&sealed, "hunter2").unwrap(), payload);
@@ -338,7 +389,7 @@ mod tests {
         // and a file `lock` opens with `unlock_bytes` — same envelope either way.
         let payload = b"\"GROUP\",\"LOCA\"\r\nrepetitive ".repeat(50);
 
-        let sealed = lock_bytes(&payload, "pw", 9).unwrap();
+        let sealed = lock_bytes(&payload, "pw", 9, SCRYPT_LOG_N).unwrap();
         let (locked, out) = (tmp("i.age"), tmp("i.out"));
         fs::write(&locked, &sealed).unwrap();
         unlock(&locked, &out, "pw").unwrap();
@@ -346,7 +397,7 @@ mod tests {
 
         let (src, locked2) = (tmp("i.src"), tmp("i2.age"));
         fs::write(&src, &payload).unwrap();
-        lock(&src, &locked2, "pw", 9).unwrap();
+        lock(&src, &locked2, "pw", 9, SCRYPT_LOG_N).unwrap();
         let opened = unlock_bytes(&fs::read(&locked2).unwrap(), "pw").unwrap();
         assert_eq!(opened, payload, "file lock → unlock_bytes");
 
@@ -363,7 +414,7 @@ mod tests {
         // the browser `age-encryption` lib refuses log_N > 20. Parse the emitted
         // stanza and assert it's SCRYPT_LOG_N, so a fast CI box can't silently
         // calibrate above the interop ceiling.
-        let sealed = encrypt_with_passphrase(b"x", "pw").unwrap();
+        let sealed = encrypt_with_passphrase(b"x", "pw", SCRYPT_LOG_N).unwrap();
         let header = String::from_utf8_lossy(&sealed[..sealed.len().min(200)]);
         let stanza = header
             .lines()

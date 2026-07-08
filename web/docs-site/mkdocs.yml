@@ -66,6 +66,9 @@ plugins:
         # Release notes — renders the repo-root CHANGELOG.md into the site and
         # stamps the shipped version (both derived at build, so no drift).
         - scripts/gen_changelog.py
+        # `lat` command reference — rendered from the shipped README-cli.md
+        # (`lat --readme`), so a new verb never leaves the docs stale.
+        - scripts/gen_cli.py
   - literate-nav:
       nav_file: SUMMARY.md
   # API reference — mkdocstrings introspects the *installed* `laterite` wheel
@@ -132,6 +135,7 @@ nav:
       - cookbook/index.md
       - Reading & typing:
           - Get one group as a typed frame: cookbook/get-typed-frame.md
+          - Read a group at the shell: cookbook/read-a-group.md
           - Read XN columns as numeric: cookbook/read-xn-numeric.md
           - Explore the registry & KEY chain: cookbook/explore-registry.md
       - Validating:
@@ -150,6 +154,7 @@ nav:
           - Diff two revisions: cookbook/diff-revisions.md
           - Certify a clean file: cookbook/certify.md
       - Sharing & migrating:
+          - Excel ↔ AGS4: cookbook/excel.md
           - Pack / encrypt for transport: cookbook/transport.md
           - Drop-in for python-ags4: cookbook/compat.md
   - Chaining: chaining/index.md
@@ -164,7 +169,7 @@ nav:
       - Dependency shape: concepts/dependency-shape.md
       - Cross-surface parity: concepts/cross-surface-parity.md
   - Reference:
-      - CLI (lat-check): reference/cli.md
+      - CLI (lat): reference/cli.md
       - Python API: reference/api.md
       - Node API: reference/node-api.md
       - DuckDB functions: reference/duckdb-functions.md
@@ -179,6 +184,5 @@ nav:
       - Python (laterite): surfaces/python.md
       - Node (npm): node/index.md
       - DuckDB (SQL): duckdb/index.md
-      - CLI (lat-check): surfaces/cli.md
+      - CLI (lat): surfaces/cli.md
       - Browser (web app): surfaces/browser.md
-      - Validate anywhere (synced tabs): validate-anywhere.md

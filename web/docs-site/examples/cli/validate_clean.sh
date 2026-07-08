@@ -3,5 +3,5 @@
 # temp dir with the fixture copied under examples/ (so the path text is real).
 # expect-exit: 0
 # --8<-- [start:cmd]
-lat-check examples/sample_site.ags
+lat validate examples/sample_site.ags
 # --8<-- [end:cmd]

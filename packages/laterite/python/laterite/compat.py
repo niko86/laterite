@@ -61,11 +61,11 @@ from ._frames import (
 # python-ags4. A misidentified validator is much harder to debug than
 # a parity test failing.
 PYTHON_AGS4_COMPAT = "1.2.0"
-__version__ = f"0.6.2+compat.python-ags4.{PYTHON_AGS4_COMPAT}"
+__version__ = f"0.7.0+compat.python-ags4.{PYTHON_AGS4_COMPAT}"
 
 # Human-readable Metadata.Checker — same intent, prose form.
 _CHECKER_STRING = (
-    "laterite 0.6.2 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine"
+    "laterite 0.7.0 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine"
 )
 
 # python-ags4 maps these version strings → bundled standard dict files;
@@ -659,7 +659,7 @@ def check_file(
     strings are translated into python-ags4's phrasings — what callers
     porting from python-ags4 want. Pass ``False`` to see laterite's
     own (more precise) wording, which is what the native API
-    (``laterite.Validator``) and the Rust ``lat-check`` CLI return."""
+    (``laterite.Validator``) and the Rust ``lat`` CLI return."""
     dv = _dict_version_arg(standard_AGS4_dictionary)
 
     is_path = not hasattr(filepath_or_buffer, "read")

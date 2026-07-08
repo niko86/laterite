@@ -10,14 +10,14 @@
 //! Two error-JSON shapes are deliberately preserved (see the package
 //! README): the Rust-CLI shape `{file, findings:{rule:[...]}}` is
 //! built *here* with the same `serde_json` (`preserve_order`) calls
-//! the `lat-check` binary uses, so `--json`/`--ndjson` are
+//! the `lat` binary uses, so `--json`/`--ndjson` are
 //! byte-faithful; the python-ags4 `check_file` dict (with
 //! `Metadata`/`Summary`) is assembled in `laterite/compat.py`.
 
 use std::path::Path;
 
 use laterite_ags4_core::error::CliError;
-use laterite_ags4_core::index::{Sidecar as CoreSidecar, ValidationStamp};
+use laterite_ags4_core::index::{ENGINE_IDENTITY, Sidecar as CoreSidecar, ValidationStamp};
 use laterite_ags4_validator::findings::{Severity, Target};
 use laterite_ags4_validator::fixes::FixRisk;
 use laterite_ags4_validator::{
@@ -55,30 +55,21 @@ pub(crate) fn map_cli_err(e: CliError) -> PyErr {
 pub(crate) fn parse_dv(s: Option<&str>) -> Result<Option<DictVersion>, String> {
     match s {
         None | Some("auto") | Some("") => Ok(None),
-        Some("4.0.3") => Ok(Some(DictVersion::V4_0_3)),
-        Some("4.0.4") => Ok(Some(DictVersion::V4_0_4)),
-        Some("4.1") => Ok(Some(DictVersion::V4_1)),
-        Some("4.1.1") => Ok(Some(DictVersion::V4_1_1)),
-        Some("4.2") => Ok(Some(DictVersion::V4_2)),
-        Some(other) => Err(format!(
-            "unknown --dict-version {other:?} (expected auto|4.0.3|4.0.4|4.1|4.1.1|4.2)"
-        )),
+        Some(other) => DictVersion::from_edition(other).map(Some).ok_or_else(|| {
+            format!(
+                "unknown --dict-version {other:?} (expected auto|{})",
+                laterite_ags4_validator::editions_joined("|")
+            )
+        }),
     }
 }
 
 /// (exit_code, error_kind, message) for a validator error — exit codes
-/// mirror the `lat-check` binary exactly (3 not-found/io, 4
+/// mirror the `lat` binary exactly (3 not-found/io, 4
 /// not-utf8/not-ags4/unsupported-edition, 5 bad-dict).
 fn map_err(e: ValidatorError) -> (i32, String, String) {
-    let msg = e.to_string();
-    let (code, kind) = match e {
-        ValidatorError::NotFound(_) => (3, "not_found"),
-        ValidatorError::Io { .. } => (3, "io"),
-        ValidatorError::NotAgs4(_) => (4, "not_ags4"),
-        ValidatorError::UnsupportedEdition { .. } => (4, "unsupported_edition"),
-        ValidatorError::BadDict { .. } => (5, "bad_dict"),
-    };
-    (code, kind.to_string(), msg)
+    // Delegate to the single producers so codes/kinds can't drift.
+    (e.exit_code(), e.kind().to_string(), e.to_string())
 }
 
 /// Run the validator from a path, in-memory text, or raw bytes. Returns
@@ -96,16 +87,13 @@ fn validate(
     encoding: Option<&str>,
 ) -> Result<(String, String, String, Findings), (i32, String, String)> {
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
-    let enc = match encoding {
-        None | Some("") => encoding_rs::UTF_8,
-        Some(label) => encoding_rs::Encoding::for_label(label.as_bytes()).ok_or_else(|| {
-            (
-                5,
-                "bad_args".to_string(),
-                format!("unknown encoding {label:?}"),
-            )
-        })?,
-    };
+    let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
+        (
+            5,
+            "bad_args".to_string(),
+            format!("unknown encoding {:?}", encoding.unwrap_or("")),
+        )
+    })?;
     let opts = CheckOptions {
         dict_version: over,
         custom_dict: None,
@@ -180,17 +168,14 @@ fn target_str(t: Target) -> &'static str {
     }
 }
 
-/// Lowercase serde-name of a [`Severity`] for the structured PyDict.
+/// Lowercase serde-name of a [`Severity`] for the structured PyDict — delegates
+/// to the single producer so it can't drift from the serde token.
 fn severity_str(s: Severity) -> &'static str {
-    match s {
-        Severity::Error => "error",
-        Severity::Warning => "warning",
-        Severity::Fyi => "fyi",
-    }
+    s.as_str()
 }
 
 /// `{file, findings:{ "AGS Format Rule N":[{line,group,desc}] }}` —
-/// the exact `serde_json` value + insertion order the `lat-check`
+/// the exact `serde_json` value + insertion order the `lat`
 /// binary's `json_value`/`json_string` produce. `preserve_order` (set
 /// in Cargo.toml, matching the validator) keeps the key order stable.
 fn findings_json(file: &str, found: &Findings) -> String {
@@ -377,16 +362,13 @@ fn fix_core(
     exclude: &[String],
 ) -> Result<(Vec<u8>, Findings, Vec<Fix>, String, String, usize), (i32, String, String)> {
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
-    let enc = match encoding {
-        None | Some("") => encoding_rs::UTF_8,
-        Some(label) => encoding_rs::Encoding::for_label(label.as_bytes()).ok_or_else(|| {
-            (
-                5,
-                "bad_args".to_string(),
-                format!("unknown encoding {label:?}"),
-            )
-        })?,
-    };
+    let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
+        (
+            5,
+            "bad_args".to_string(),
+            format!("unknown encoding {:?}", encoding.unwrap_or("")),
+        )
+    })?;
     // The source bytes — fix needs the raw document to apply byte/char edits to,
     // so unlike `validate` we always materialise bytes (a path is read here).
     let raw: Vec<u8> = if let Some(p) = path {
@@ -507,16 +489,13 @@ fn diff_core(
     encoding: Option<&str>,
 ) -> Result<String, (i32, String, String)> {
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
-    let enc = match encoding {
-        None | Some("") => encoding_rs::UTF_8,
-        Some(label) => encoding_rs::Encoding::for_label(label.as_bytes()).ok_or_else(|| {
-            (
-                5,
-                "bad_args".to_string(),
-                format!("unknown encoding {label:?}"),
-            )
-        })?,
-    };
+    let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
+        (
+            5,
+            "bad_args".to_string(),
+            format!("unknown encoding {:?}", encoding.unwrap_or("")),
+        )
+    })?;
     let pa = laterite_ags4_parse::parse_bytes(a, enc)
         .map_err(ValidatorError::from)
         .map_err(map_err)?;
@@ -571,14 +550,12 @@ fn parse_primitives<'py>(
     data: Option<Vec<u8>>,
     encoding: Option<String>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let enc = match encoding.as_deref() {
-        None | Some("") => encoding_rs::UTF_8,
-        Some(label) => match encoding_rs::Encoding::for_label(label.as_bytes()) {
-            Some(e) => e,
-            None => {
-                return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}"));
-            }
-        },
+    let enc = match laterite_ags4_parse::resolve_encoding(encoding.as_deref()) {
+        Some(e) => e,
+        None => {
+            let label = encoding.as_deref().unwrap_or("");
+            return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}"));
+        }
     };
     let parsed = match (path.as_deref(), text.as_deref(), data.as_deref()) {
         (Some(p), _, _) => {
@@ -768,7 +745,7 @@ impl PySidecar {
         edition_forced: bool,
     ) -> PyResult<Self> {
         let stamp = ValidationStamp {
-            validator: "laterite_ags4".to_string(),
+            validator: ENGINE_IDENTITY.to_string(),
             // The ENGINE version (not this wheel's), so the cert is comparable
             // across surfaces (e.g. a cert minted by the DuckDB extension).
             validator_version: laterite_ags4_validator::VERSION.to_string(),
@@ -878,7 +855,7 @@ impl PySidecar {
     /// holds — a cert from an older engine is re-validated, not trusted.
     fn matches_native_validator(&self) -> bool {
         self.inner
-            .checker_matches("laterite_ags4", laterite_ags4_validator::VERSION, None)
+            .checker_matches(ENGINE_IDENTITY, laterite_ags4_validator::VERSION, None)
     }
 
     /// Does this cert's check profile cover a request's? (`check_files`: the cert
@@ -932,12 +909,12 @@ fn parse_arrow<'py>(
     data: Option<Vec<u8>>,
     encoding: Option<String>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let enc = match encoding.as_deref() {
-        None | Some("") => encoding_rs::UTF_8,
-        Some(label) => match encoding_rs::Encoding::for_label(label.as_bytes()) {
-            Some(e) => e,
-            None => return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}")),
-        },
+    let enc = match laterite_ags4_parse::resolve_encoding(encoding.as_deref()) {
+        Some(e) => e,
+        None => {
+            let label = encoding.as_deref().unwrap_or("");
+            return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}"));
+        }
     };
     let parsed = match (path.as_deref(), text.as_deref(), data.as_deref()) {
         (Some(p), _, _) => {
@@ -1027,9 +1004,10 @@ fn dict_group_unit_type<'py>(
     let dv = parse_dv(Some(edition))
         .map_err(pyo3::exceptions::PyValueError::new_err)?
         .ok_or_else(|| {
-            pyo3::exceptions::PyValueError::new_err(
-                "edition cannot be empty/auto; pass one of 4.0.3/4.0.4/4.1/4.1.1/4.2",
-            )
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "edition cannot be empty/auto; pass one of {}",
+                laterite_ags4_validator::editions_joined("/")
+            ))
         })?;
     let dict = laterite_ags4_validator::dict::Dictionary::bundled(dv);
     let out = pyo3::types::PyDict::new(py);
@@ -1041,6 +1019,38 @@ fn dict_group_unit_type<'py>(
     Ok(out)
 }
 
+/// Raw group cells for the CLI `lat read` — the group `order` + per-group
+/// `{headings, rows}` (rows as string lists in heading order), straight from
+/// core's read codec (no typing). So the Rust binary and the Python `lat read`
+/// agree byte-for-byte on `read --json` / `--csv` (#430 PR 2).
+#[pyfunction]
+fn read_groups_raw<'py>(py: Python<'py>, path: String) -> PyResult<Bound<'py, PyDict>> {
+    let parsed = laterite_ags4_core::ags4_codec::read_ags4(std::path::Path::new(&path))
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+    let d = PyDict::new(py);
+    d.set_item("order", PyList::new(py, &parsed.order)?)?;
+    let groups = PyDict::new(py);
+    for code in &parsed.order {
+        if let Some(g) = parsed.get(code) {
+            let gd = PyDict::new(py);
+            gd.set_item("headings", PyList::new(py, &g.headings)?)?;
+            let rows = PyList::empty(py);
+            for row in &g.rows {
+                let cells: Vec<&str> = g
+                    .headings
+                    .iter()
+                    .map(|h| row.get(h).map(String::as_str).unwrap_or(""))
+                    .collect();
+                rows.append(PyList::new(py, &cells)?)?;
+            }
+            gd.set_item("rows", rows)?;
+            groups.set_item(code, gd)?;
+        }
+    }
+    d.set_item("groups", groups)?;
+    Ok(d)
+}
+
 #[pymodule]
 fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_check, m)?)?;
@@ -1049,6 +1059,7 @@ fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(diff_files, m)?)?;
     m.add_function(wrap_pyfunction!(parse_primitives, m)?)?;
     m.add_function(wrap_pyfunction!(parse_arrow, m)?)?;
+    m.add_function(wrap_pyfunction!(read_groups_raw, m)?)?;
     m.add_function(wrap_pyfunction!(resolve_dict, m)?)?;
     m.add_function(wrap_pyfunction!(dict_group_unit_type, m)?)?;
     m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_from_arrow, m)?)?;

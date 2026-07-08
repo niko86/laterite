@@ -4,7 +4,7 @@ The Rust module never raises for un-validatable input — it returns
 ``{"ok": False, "error_kind", "error", "exit_code"}``. The nice API
 and ``compat`` translate that into Python exceptions here; the CLI
 reads ``exit_code`` directly. ``exit_code`` mirrors the Rust
-``lat-check`` binary (3 not-found/io, 4 not-utf8/not-ags4/
+``lat`` binary (3 not-found/io, 4 not-utf8/not-ags4/
 unsupported-edition, 5 bad-dict/bad-args).
 """
 

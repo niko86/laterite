@@ -31,7 +31,7 @@ One Rust AGS4 engine, surfaced for every stack:
 |---|---|---|
 | **Python** | [`laterite`](https://pypi.org/project/laterite/) — PyPI | `pip install laterite` |
 | **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm | `npm install laterite` |
-| **Rust / CLI** | [`lat-check`](https://github.com/niko86/laterite/releases) | GitHub Releases |
+| **Rust / CLI** | [`lat`](https://github.com/niko86/laterite/releases) | GitHub Releases |
 | **DuckDB** | [`laterite_ags4`](https://community-extensions.duckdb.org/extensions/laterite_ags4.html) — community extension | `INSTALL laterite_ags4 FROM community;` |
 | **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser |
 
@@ -87,7 +87,7 @@ ags.table("LOCA").getChild("LOCA_GL")?.get(0);   // → 12.3 (born-typed apache-
 
 const report = validate("delivery.ags");
 report.isValid;                        // boolean
-report.toJson();                       // byte-identical to `lat-check --json`
+report.toJson();                       // byte-identical to `lat validate --json`
 
 // Produce valid AGS4 from plain rows (or a typed PROJ/LOCA graph)
 const res = buildAgs4(new Map([
@@ -99,19 +99,21 @@ res.save("out.ags");
 
 Cross-group SQL (`ags.sql(...)` / `ags.at(...)`) needs the optional peer `@duckdb/node-api`.
 
-### CLI (`lat-check`)
+### CLI (`lat`)
 
 ```bash
-lat-check delivery.ags                 # human report; exit 0 clean / 1 findings
-lat-check delivery.ags --json          # machine-readable findings (pretty JSON)
-lat-check delivery.ags --no-warnings   # errors only (warnings show by default)
-lat-check delivery.ags --fix           # repair → sibling .fixed.ags (safe fixes)
-lat-check old.ags --diff new.ags       # KEY-aware revision delta (+added -removed ~changed)
-lat-check --list-rules                 # the AGS4 rule catalogue (no input needed)
+lat validate delivery.ags              # human report; exit 0 clean / 1 findings
+lat delivery.ags                       # shorthand for `lat validate delivery.ags`
+lat validate delivery.ags --json       # machine-readable findings (pretty JSON)
+lat validate delivery.ags --no-warnings   # errors only (warnings show by default)
+lat fix delivery.ags                   # repair → sibling .fixed.ags (safe fixes)
+lat diff old.ags new.ags               # KEY-aware revision delta (+added -removed ~changed)
+lat certify delivery.ags               # mint delivery.ags.idx if clean
+lat rules                              # the AGS4 rule catalogue (no input needed)
 ```
 
-Exit codes: `0` clean · `1` findings · `3` unreadable · `4` not AGS4 · `5` bad args.
-Run `lat-check --readme` for the full guide.
+Exit codes: `0` clean · `1` findings · `3` unreadable · `4` not AGS4 · `5` bad args · `6` schema.
+Run `lat --readme` for the full guide.
 
 ## More than a faster `python-ags4`
 
@@ -134,7 +136,7 @@ cross-surface toolchain on top:
 | Validity certificates (`.ags.idx`) | ✅ | — |
 | Transport — compress + encrypt | ✅ | — |
 | Typed PROJ → LOCA → SAMP graph | ✅ | — |
-| Shipped as a standalone binary CLI | ✅ (`lat-check`) | — |
+| Shipped as a standalone binary CLI | ✅ (`lat`) | — |
 
 The two agree on the findings that matter — the drop-in is faithful, not just
 fast (see [Parity](#parity-with-python-ags4)).
@@ -157,7 +159,7 @@ exactly (2DP rounded to 2 decimals, valid `yyyy-mm-dd` dates).
 Real-world files look closer to this. ~15 baseline findings from
 fixed-cost rules:
 
-| Size | python-ags4 | `laterite.validate` | `lat-check` (CLI) | speedup |
+| Size | python-ags4 | `laterite.validate` | `lat` (CLI) | speedup |
 |---:|---:|---:|---:|---:|
 |   512 KB |    84 ms |   **5 ms** |   10 ms | **17×** |
 |     5 MB |   489 ms |  **57 ms** |   61 ms |  **9×** |
@@ -170,7 +172,7 @@ numeric cells that fails AGS4 Rule 8 (TYPE precision). Every cell
 triggers a finding; exercises the validator's per-finding
 accumulation + output-rendering paths fully:
 
-| Size | python-ags4 | `laterite.validate` | `lat-check` (CLI) | Findings | speedup |
+| Size | python-ags4 | `laterite.validate` | `lat` (CLI) | Findings | speedup |
 |---:|---:|---:|---:|---:|---:|
 |   512 KB |    90 ms |   **7 ms** |   13 ms |     1 129 | **13×** |
 |     5 MB |   547 ms |  **67 ms** |   92 ms |    11 485 |  **8×** |
@@ -180,12 +182,12 @@ accumulation + output-rendering paths fully:
 
 Notes on the CLI:
 
-- `lat-check --json` writes findings to stdout as JSON
+- `lat validate --json` writes findings to stdout as JSON
   (~80 bytes/finding). On the worst-case 1 GB file (2.4 M findings)
   that's ~190 MB of JSON. The native PyO3 path skips this
   serialisation step — for "validate then process findings in
   Python", use `laterite.validate`; for "validate then pipe to
-  downstream tools", use `lat-check`. On clean files the gap is
+  downstream tools", use `lat`. On clean files the gap is
   single-digit %.
 - Native PyO3 returns findings as native Python objects (no Arrow
   boundary — findings are few); `rep.findings` assembles them into a

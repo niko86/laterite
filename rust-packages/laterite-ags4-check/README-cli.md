@@ -1,112 +1,158 @@
-# lat-check
+# lat
 
-A clean-room Rust validator for the **AGS4** geotechnical
-transfer-format — the capability `python-ags4`'s `AGS4.check_file()`
-provides, with no Python at runtime. Reports the numbered AGS Format
-Rule violations in a file.
+A clean-room Rust tool for the **AGS4** geotechnical transfer format —
+validate / read / fix / diff / certify a file, and pack / lock it for transport,
+with no Python at runtime. The `validate` capability is what `python-ags4`'s
+`AGS4.check_file()` provides. A bare `lat <file.ags>` is shorthand for
+`lat validate <file.ags>`.
 
 ## Usage
 
-    lat-check <file.ags> [options]
-    lat-check --readme        # this document
+    lat <command> [options]
+    lat <file.ags>            # shorthand for: lat validate <file.ags>
+    lat <command> --help      # help for one command
+    lat --readme              # this document
 
-## Options
+## Commands
 
-    --dict-version <V>   bundled dictionary edition:
-                         auto (default — picked from the file's
+    validate <file>   run the numbered AGS Format Rules and report (the default)
+    read <file> [grp] dump a group's rows (table / --csv / --json), or list codes
+    fix <file>        mechanically repair the file (safe fixes; --risky for more)
+    diff <a> <b>      KEY-aware / type-aware revision delta between two files
+    certify <file>    mint the .ags.idx validity certificate for a clean file
+    rules             print the AGS4 rule catalogue (no input file needed)
+    pack <in> <out>   zstd-compress any file for transport (unpack reverses it)
+    unpack <in> <out> restore a packed file
+    lock <in> <out>   zstd + age passphrase-encrypt (unlock reverses it)
+    unlock <in> <out> decrypt + decompress a locked file
+    excel <in> <out>  convert AGS4 ↔ Excel (direction from the output extension)
+
+## Global options
+
+    --json            machine-readable findings (pretty JSON)
+    --ndjson          one flat JSON object per finding per line
+    --quiet           suppress the progress spinner
+
+## validate <file>
+
+    --dict-version <V>   bundled edition: auto (default — picked from the file's
                          TRAN_AGS) | 4.0.3 | 4.0.4 | 4.1 | 4.1.1 | 4.2
     --dict <path>        external dictionary override (not supported)
-    --json               machine-readable findings (pretty JSON)
-    --ndjson             one flat JSON object per finding per line
-    --out <path>         write the active format to <path> instead of
-                         stdout (prints a one-line confirmation)
-    --json-out <path>    also tee the JSON report to <path>
-    --fix                mechanically repair the file: apply the SAFE
-                         fixes (CRLF / BOM / embedded-CR / short-row pad /
-                         numeric reformat / TRAN delimiter+concatenator
-                         rows) and write the result. Non-destructive —
-                         writes a sibling <file>.fixed.ags by default.
-                         Exit 0 if the repaired file is clean, 1 if
-                         findings remain that can't be auto-fixed.
-    --fix-risky          like --fix but ALSO applies the intent-guessing
-                         fixes (duplicate-heading rename, dd/mm date
-                         canonicalisation, smart-quote→ASCII typography)
-    --in-place           with --fix: overwrite the source file in place
-    --fix-out <path>     with --fix: write the repaired file to <path>
-    --diff <other.ags>   compare the input file against <other> and print the
-                         KEY-aware/type-aware revision delta (per-group
-                         +added -removed ~changed; --json for the full delta)
-    --no-warnings        errors only — suppress the WARNING tier, which is
-                         shown by default (malformed DICT, nonstandard
-                         abbreviations, unrecognised TRAN_AGS edition)
+    --encoding <name>    source encoding: utf-8 (default) | cp1252 | latin1 |
+                         iso-8859-1 | iso-8859-15 (latin1 ≈ Windows-1252)
+    --no-warnings        errors only — suppress the WARNING tier (shown by default)
     --show-fyi           include FYI-severity findings (e.g. Rule 1)
-    --check-files        also run Rule 20's on-disk check: the sidecar
-                         FILE/<fset>/<name> tree must exist next to the
-                         .ags. Default OFF — data-level Rule 20 is
-                         path-independent (the library default); enable
-                         for a packaging/QA pass on a real delivery.
-    --encoding <name>    source text encoding for legacy extended-ASCII
-                         files: utf-8 (default) | cp1252 | latin1 |
-                         iso-8859-1 | iso-8859-15. latin1 / iso-8859-1
-                         map to Windows-1252 (the CP1252 superset
-                         python-ags4 uses by default).
-    --list-rules         print the AGS4 rule catalogue (title / severity /
-                         fixable / cited observations) and exit; add --json
-                         for the full machine-readable form. No input file.
-    --emit-index         after a clean check, mint the .ags.idx validity
-                         certificate (byte-offset index + validation
-                         provenance) beside the file. Skipped if the file
-                         still has errors; warnings/FYI don't block it.
-    --index-out <path>   with --emit-index: write the certificate to <path>
-                         instead of <file>.ags.idx
-    --index <path>       CONSUME an .ags.idx certificate: a fresh (bytes
-                         unchanged), same-engine, profile-covering cert lets
-                         the check SKIP the rule engine and report the
-                         certified verdict; a stale / foreign / insufficient
-                         cert is re-validated. Mirrors the library's
-                         read(index=) short-circuit. Mutually exclusive with
-                         --emit-index.
-    --quiet              suppress the progress spinner
-    --tui                interactive findings browser (needs the
-                         `tui` build feature + an interactive terminal)
-    --readme             print this document and exit
-    -h, --help           short usage
+    --check-files        also run Rule 20's on-disk FILE/<fset>/<name> check
+    --out <path>         write the active format to <path> instead of stdout
+    --json-out <path>    also tee the JSON report to <path>
+    --index <path>       CONSUME an .ags.idx: a fresh (bytes unchanged), same-
+                         engine, profile-covering cert lets the check SKIP the
+                         rule engine; a stale / foreign cert is re-validated
+    --tui                interactive findings browser (needs the `tui` build feature)
+
+## read <file> [group]
+
+    Dump one group's rows as an aligned table (default), `--csv`, or `--json`;
+    omit the group to list the file's group codes. Raw file cells (faithful to the
+    bytes); `--csv` / `--json` are byte-identical to the Python `lat read`.
+
+    --csv                CSV output (RFC-4180 quoting) instead of the table
+    --out <path>         write to <path> instead of stdout
+
+## fix <file>
+
+    --risky              also apply the intent-guessing fixes (duplicate-heading
+                         rename, ambiguous dd/mm date canonicalisation, smart-
+                         quote→ASCII). Default: the SAFE fixes only.
+    --in-place           overwrite the source file in place
+    --fix-out <path>     write the repaired file to <path>
+                         (default: a sibling <file>.fixed.ags)
+                         (also honours --dict-version / --dict / --encoding)
+
+## diff <a> <b>
+
+    Compares <a> (baseline) against <b> (revision): a per-group
+    +added -removed ~changed summary, or the full RevisionDelta with --json.
+    (also honours --dict-version / --dict / --encoding)
+
+## certify <file>
+
+    --check-files        record Rule 20's on-disk check in the cert profile
+    --out <path>         write the certificate to <path> (default <file>.ags.idx)
+                         (also honours --dict-version / --dict / --encoding)
+
+## rules
+
+    --json               emit the raw machine-readable rules_meta.json
+
+## transport — pack / unpack / lock / unlock
+
+    Package any file (`.ags`, `.ags5db`, anything) for storage or transfer.
+    `pack` / `unpack` are zstd; `lock` / `unlock` add an age passphrase envelope
+    (zstd inside a standard age file — recoverable with stock `age` + `zstd`). The
+    passphrase is NEVER a flag (argv leaks into `ps` + shell history): the
+    precedence is `--password-file` → `$LAT_TRANSPORT_PASSWORD` → an interactive
+    prompt. On by default; a `--no-default-features` build drops age/zstd entirely.
+
+    pack <in> <out> [--level N]           zstd level 1–22 (default 9)
+    unpack <in> <out>
+    lock <in> <out> [--level N] [--log-n N] [--password-file <path>]
+                     scrypt work factor log2(N) default 18 (the interop tier)
+    unlock <in> <out> [--password-file <path>]
+
+## excel <in> <out>
+
+    Convert between AGS4 and Excel. The direction is inferred from the OUTPUT
+    extension: `.xlsx` ⇒ export (AGS4 → Excel, one sheet per group), `.ags` ⇒
+    import (Excel → AGS4). On by default; `--no-default-features` drops it.
+
+    --export             force AGS4 → Excel (else inferred from the output)
+    --import             force Excel → AGS4
+    --no-format-numeric  (import) leave numeric-looking columns as text
 
 ## Dictionary auto-selection
 
-By default the edition is chosen **per file from its `TRAN_AGS`**:
-an exact bundled match wins (`4.0.3/4.0.4/4.1/4.1.1/4.2`), else the
-newest bundled patch of that `major.minor` (`4.0`→4.0.4, `4.1.5`→
-4.1.1), else a fallback to 4.1.1 (matching python-ags4's
-`LATEST_DICT_VERSION`). AGS 3.x is refused (exit 4) rather than
-silently validated against an AGS4 schema. `--dict-version` forces
+By default the edition is chosen **per file from its `TRAN_AGS`**: an exact
+bundled match wins (`4.0.3/4.0.4/4.1/4.1.1/4.2`), else the newest bundled patch
+of that `major.minor` (`4.0`→4.0.4, `4.1.5`→4.1.1), else a fallback to 4.1.1
+(matching python-ags4's `LATEST_DICT_VERSION`). AGS 3.x is refused (exit 4)
+rather than silently validated against an AGS4 schema. `--dict-version` forces
 one edition regardless.
 
 ## Output
 
-Human table on a TTY (coloured unless `NO_COLOR`); `--json` for a
-nested `{file, findings:{rule:[{line,group,desc}]}}` document;
-`--ndjson` for a stream. Progress is on stderr; the report on stdout.
+Human table on a TTY (coloured unless `NO_COLOR`); `--json` for a nested
+`{file, findings:{rule:[{line,group,desc}]}}` document; `--ndjson` for a stream.
+Progress is on stderr; the report on stdout.
 
 ## Exit codes
 
     0  clean (no findings)
     1  findings present
     3  file not found / unreadable
-    4  not UTF-8 / not an AGS4 file / unsupported AGS edition (3.x)
-    5  bad arguments / bad dictionary
+    4  not UTF-8 / not an AGS4 file / unsupported AGS edition (3.x) / bad input
+    5  bad arguments
+    6  schema violation
 
 ## Examples
 
-    lat-check delivery.ags                 # human table
-    lat-check delivery.ags --json | jq .   # machine-readable
-    lat-check delivery.ags --dict-version 4.2   # force an edition
-    lat-check delivery.ags --show-fyi --out report.txt
-    lat-check delivery.ags --fix                # → delivery.fixed.ags
-    lat-check delivery.ags --fix --in-place     # repair in place
-    lat-check delivery.ags --fix-risky --fix-out clean.ags
-    lat-check delivery.ags --emit-index         # → delivery.ags.idx (if clean)
-    lat-check delivery.ags --index delivery.ags.idx  # skip the engine if fresh
+    lat delivery.ags                        # human table (= lat validate)
+    lat validate delivery.ags --json | jq . # machine-readable
+    lat validate delivery.ags --dict-version 4.2
+    lat fix delivery.ags                    # → delivery.fixed.ags
+    lat fix delivery.ags --in-place         # repair in place
+    lat fix delivery.ags --risky --fix-out clean.ags
+    lat read delivery.ags                   # list the group codes
+    lat read delivery.ags LOCA --csv        # dump one group as CSV
+    lat diff old.ags new.ags                # revision delta
+    lat certify delivery.ags                # → delivery.ags.idx (if clean)
+    lat validate delivery.ags --index delivery.ags.idx  # skip the engine if fresh
+    lat rules                               # the rule catalogue
+    lat pack delivery.ags delivery.ags.zst  # zstd-compress for transport
+    lat lock delivery.ags delivery.ags.age  # + age passphrase (prompts)
+    lat unlock delivery.ags.age out.ags --password-file pw.txt
+    lat excel delivery.ags delivery.xlsx    # AGS4 → Excel (one sheet per group)
+    lat excel delivery.xlsx out.ags         # Excel → AGS4
 
-> The clean-room boundary, licence, and bundled-dictionary provenance
-> are documented in the crate's `README.md` and `data/PROVENANCE.md`.
+> The clean-room boundary, licence, and bundled-dictionary provenance are
+> documented in the crate's `README.md` and `data/PROVENANCE.md`.

@@ -211,6 +211,31 @@ pub fn parse_str(text: &str) -> Result<ParsedFile, ParseError> {
     parse_bytes_opts(text.as_bytes(), ParseOptions::validating())
 }
 
+/// Resolve a caller-supplied encoding label to an `encoding_rs` encoding — the
+/// single source of truth every surface (`read`/`validate`/`fix` on Python,
+/// Node, and the browser) shares, so a label means the same thing everywhere.
+///
+/// `None` or empty ⇒ UTF-8. The common legacy-producer spellings are accepted
+/// explicitly, **including the hyphenated `latin-1`** — which is NOT a WHATWG
+/// label, so `Encoding::for_label` rejects it (the divergence this unifies: it
+/// used to error on Python, silently fall back to UTF-8 on Node, and map to
+/// Windows-1252 only in the browser). Any other label flows through
+/// `for_label`. Returns `None` for a genuinely unknown label; the caller
+/// decides the policy — the library surfaces raise, the browser UI falls back
+/// to UTF-8.
+pub fn resolve_encoding(label: Option<&str>) -> Option<&'static encoding_rs::Encoding> {
+    let Some(label) = label else {
+        return Some(encoding_rs::UTF_8);
+    };
+    match label.trim().to_ascii_lowercase().as_str() {
+        "" | "utf-8" | "utf8" => Some(encoding_rs::UTF_8),
+        "cp1252" | "windows-1252" | "latin1" | "latin-1" | "iso-8859-1" => {
+            Some(encoding_rs::WINDOWS_1252)
+        }
+        other => encoding_rs::Encoding::for_label(other.as_bytes()),
+    }
+}
+
 // --- the one-pass byte+line+char walk (§3.4) ------------------------
 
 const BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
@@ -233,6 +258,242 @@ fn decode_line(
     Ok((cow.into_owned(), had_repl, borrowed))
 }
 
+// --- the shared quote-aware line splitter (#422) --------------------
+
+/// How a line was terminated. AGS4 Rule 2a mandates `Crlf`; `Lf` (Unix) and
+/// `Cr` (classic-Mac) are non-conforming terminators the reader still splits on
+/// but the validator flags. `Unterminated` is a final line with no terminator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum LineTerminator {
+    /// `\r\n` — the only AGS4-conforming terminator.
+    Crlf,
+    /// lone `\n` (Unix) — Rule 2a.
+    Lf,
+    /// lone `\r` (classic Mac) — Rule 2a. Recognised as a terminator here so a
+    /// lone-CR row separator is not mistaken for an *embedded* CR (#422).
+    Cr,
+    /// End of input with no terminator (unterminated final line).
+    Unterminated,
+}
+
+impl LineTerminator {
+    /// The bytes to re-emit for this terminator — lets a faithful reconstruction
+    /// (e.g. `apply_fixes`) round-trip the original terminator exactly.
+    pub fn as_bytes(self) -> &'static [u8] {
+        self.as_str().as_bytes()
+    }
+
+    /// The terminator as a string (all terminators are ASCII).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LineTerminator::Crlf => "\r\n",
+            LineTerminator::Lf => "\n",
+            LineTerminator::Cr => "\r",
+            LineTerminator::Unterminated => "",
+        }
+    }
+}
+
+/// One line located by the quote-aware walk: the byte range of its body (the
+/// terminator excluded) in the buffer, how it was terminated, and where to
+/// resume. `start..body_end` is always a valid slice; for a `&str` buffer it is
+/// also a char boundary (every delimiter is ASCII).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LineSpan {
+    /// Byte offset of the line body start.
+    pub start: usize,
+    /// Byte offset one past the body (before any terminator).
+    pub body_end: usize,
+    pub term: LineTerminator,
+    /// Byte offset to resume the walk from (past the terminator).
+    pub next: usize,
+}
+
+/// The five data descriptors as they open a row (`"GROUP"`, …). Used only by the
+/// unterminated-quote recovery backstop below.
+const QUOTED_DESCRIPTORS: [&[u8]; 5] = [
+    b"\"GROUP\"",
+    b"\"HEADING\"",
+    b"\"UNIT\"",
+    b"\"TYPE\"",
+    b"\"DATA\"",
+];
+
+/// Does the buffer at `at` begin a new row (a quoted data descriptor)? The
+/// recovery backstop: an *unterminated* quote would otherwise swallow every
+/// following row as embedded content; AGS4's fixed descriptor vocabulary lets us
+/// resync at the next obvious row boundary, bounding the runaway to one row.
+fn starts_with_descriptor(bytes: &[u8], at: usize) -> bool {
+    let rest = &bytes[at.min(bytes.len())..];
+    QUOTED_DESCRIPTORS.iter().any(|d| rest.starts_with(d))
+}
+
+/// Byte offset just past the terminator at `j` (`\r\n` is two bytes, else one).
+fn terminator_end(bytes: &[u8], j: usize) -> usize {
+    if bytes[j] == b'\r' && bytes.get(j + 1) == Some(&b'\n') {
+        j + 2
+    } else {
+        j + 1
+    }
+}
+
+/// Build the `LineSpan` ending at the terminator byte `j` (in `start..`).
+fn terminate_at(bytes: &[u8], start: usize, j: usize) -> LineSpan {
+    let term = if bytes[j] == b'\r' {
+        if bytes.get(j + 1) == Some(&b'\n') {
+            LineTerminator::Crlf
+        } else {
+            LineTerminator::Cr
+        }
+    } else {
+        LineTerminator::Lf
+    };
+    LineSpan {
+        start,
+        body_end: j,
+        term,
+        next: terminator_end(bytes, j),
+    }
+}
+
+/// The states of AGS4's CSV grammar, mirroring [`split_ags_line`]: a `"` only
+/// *opens* a field at a field boundary; after a field's closing `"` we skip junk
+/// to the next comma **quote-blind**. Tracking the same states here means a CR/LF
+/// is classed as a line terminator in exactly the positions where `split_ags_line`
+/// treats it as between/after fields — so line boundaries and field boundaries
+/// never disagree (the property `split_ags_line` ⇄ splitter agreement pins).
+#[derive(Clone, Copy)]
+enum QState {
+    /// At the start of a field (line start, or just after a comma).
+    FieldStart,
+    /// Inside a quoted field — a CR/LF here is embedded content, not a boundary.
+    Quoted,
+    /// After a quoted field closed; skipping junk to the next comma (quote-blind).
+    AfterClose,
+    /// Inside an unquoted field; reading to the next comma.
+    Unquoted,
+}
+
+/// Find the next line starting at `start`, **quote-aware and universal-newline**:
+/// a CR/LF *outside* a quoted field terminates the line (`\r\n`/`\n`/lone `\r`);
+/// a CR/LF *inside* a quoted field is embedded content and does NOT split —
+/// UNLESS the next line begins with a data descriptor (the unterminated-quote
+/// backstop). `memchr3` keeps the scan at SIMD speed on the common (long,
+/// delimiter-sparse) runs.
+fn next_line(bytes: &[u8], start: usize) -> LineSpan {
+    let n = bytes.len();
+    let eof = || LineSpan {
+        start,
+        body_end: n,
+        term: LineTerminator::Unterminated,
+        next: n,
+    };
+    let mut i = start;
+    let mut state = QState::FieldStart;
+    loop {
+        match state {
+            QState::FieldStart => {
+                if i >= n {
+                    return eof();
+                }
+                match bytes[i] {
+                    b'"' => {
+                        state = QState::Quoted;
+                        i += 1;
+                    }
+                    b'\r' | b'\n' => return terminate_at(bytes, start, i),
+                    // Any other byte begins an unquoted field; reprocess it there.
+                    _ => state = QState::Unquoted,
+                }
+            }
+            QState::Quoted => match memchr::memchr3(b'"', b'\r', b'\n', &bytes[i..]) {
+                None => return eof(),
+                Some(off) => {
+                    let j = i + off;
+                    if bytes[j] == b'"' {
+                        if bytes.get(j + 1) == Some(&b'"') {
+                            i = j + 2; // doubled "" — escaped quote, stay in the field
+                        } else {
+                            state = QState::AfterClose; // closing quote
+                            i = j + 1;
+                        }
+                    } else {
+                        // CR/LF inside quotes → embedded content, unless the next
+                        // line is clearly a new row (unterminated-quote recovery).
+                        if starts_with_descriptor(bytes, terminator_end(bytes, j)) {
+                            return terminate_at(bytes, start, j);
+                        }
+                        i = j + 1;
+                    }
+                }
+            },
+            QState::AfterClose => match memchr::memchr3(b',', b'\r', b'\n', &bytes[i..]) {
+                None => return eof(),
+                Some(off) => {
+                    let j = i + off;
+                    if bytes[j] == b',' {
+                        state = QState::FieldStart;
+                        i = j + 1;
+                    } else {
+                        return terminate_at(bytes, start, j); // CR/LF outside quotes
+                    }
+                }
+            },
+            QState::Unquoted => match memchr::memchr3(b',', b'\r', b'\n', &bytes[i..]) {
+                None => return eof(),
+                Some(off) => {
+                    let j = i + off;
+                    if bytes[j] == b',' {
+                        state = QState::FieldStart;
+                        i = j + 1;
+                    } else {
+                        return terminate_at(bytes, start, j);
+                    }
+                }
+            },
+        }
+    }
+}
+
+/// Iterator over the quote-aware [`LineSpan`]s of a buffer — the ONE line model
+/// the parser and `apply_fixes` share, so their line numbering agrees by
+/// construction (fix edits carry parser line numbers and must land on the same
+/// line the fixer reconstructs). A buffer that ends exactly at a terminator
+/// yields no phantom trailing blank line.
+pub struct LineSpans<'a> {
+    bytes: &'a [u8],
+    pos: usize,
+    done: bool,
+}
+
+impl Iterator for LineSpans<'_> {
+    type Item = LineSpan;
+    fn next(&mut self) -> Option<LineSpan> {
+        if self.done || self.pos > self.bytes.len() {
+            return None;
+        }
+        if self.pos == self.bytes.len() {
+            // An empty buffer yields nothing; a non-empty one has already
+            // emitted its last line (its terminator ended at len).
+            self.done = true;
+            return None;
+        }
+        let span = next_line(self.bytes, self.pos);
+        self.pos = span.next;
+        Some(span)
+    }
+}
+
+/// Quote-aware line spans over raw bytes (the parser's entry).
+pub fn line_spans(bytes: &[u8]) -> LineSpans<'_> {
+    LineSpans {
+        bytes,
+        pos: 0,
+        done: false,
+    }
+}
+
 /// The unified parser. Drives [`split_ags_line`] over the raw bytes,
 /// decoding each line, so every record carries its absolute source-byte
 /// offset while line/char positions are against the decoded text.
@@ -247,22 +508,17 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     let mut looks_ags3 = false;
     let mut source_true = true;
 
-    let mut pos = 0usize;
     let mut number = 0u32;
-    while pos < bytes.len() {
-        let rel = memchr::memchr(b'\n', &bytes[pos..]);
-        let (line_bytes, next) = match rel {
-            Some(i) => (&bytes[pos..pos + i], pos + i + 1),
-            None => (&bytes[pos..], bytes.len()),
-        };
-        let byte_offset = pos as u64; // absolute, BOM included
+    for span in line_spans(bytes) {
+        let byte_offset = span.start as u64; // absolute, BOM included
         number += 1;
-        let had_crlf = line_bytes.last() == Some(&b'\r');
-        let mut body = if had_crlf {
-            &line_bytes[..line_bytes.len() - 1]
-        } else {
-            line_bytes
-        };
+        // `had_crlf` stays "was this CRLF-terminated" (Rule 2a). A lone `\r`
+        // (classic Mac) or lone `\n` (Unix) terminator is now a genuine split
+        // point like `\r\n`, but reported as improper rather than swallowed as
+        // an embedded CR — #422. An embedded CR/LF *inside* a quoted field is
+        // NOT a terminator, so it stays in `body` for Rule 6 to flag (O-2).
+        let had_crlf = span.term == LineTerminator::Crlf;
+        let mut body = &bytes[span.start..span.body_end];
         // Strip a leading BOM for DECODE only; byte_offset stays 0.
         if number == 1 && body.starts_with(BOM) {
             body = &body[BOM.len()..];
@@ -272,9 +528,9 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
             source_true = false;
         }
 
-        // (parse_str parity) skip a phantom trailing blank — but the
-        // memchr walk never emits one: a file ending in `\n` leaves
-        // pos == len after its last real line, so the loop just exits.
+        // No phantom trailing blank: `line_spans` stops when the buffer ends
+        // exactly at a terminator (a file ending in `\r\n`/`\n`/`\r` yields no
+        // extra empty line), matching the old memchr walk's behaviour.
 
         let trimmed_empty = text.trim().is_empty();
         if !trimmed_empty {
@@ -363,7 +619,6 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                 byte_offset,
             });
         }
-        pos = next;
     }
 
     if group_order.is_empty() {

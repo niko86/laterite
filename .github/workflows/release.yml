@@ -5,7 +5,7 @@
 #                    Builds the laterite wheel via maturin, plus a source
 #                    distribution once on the Linux leg (so unsupported
 #                    platforms `pip install` from source — #175).
-#   build-binaries — same matrix; builds the lat-check Rust CLI binary.
+#   build-binaries — same matrix; builds the `lat` Rust CLI binary.
 #   github-release — collects every artefact + cuts a GitHub release.
 #   pypi-publish   — the base `laterite` wheels + the sdist. (The experimental
 #                    laterite-ags5 companion was decoupled to the dormant
@@ -357,7 +357,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p out
-          cp rust-packages/target/${{ matrix.target }}/release/lat-check${{ matrix.ext }} out/
+          cp rust-packages/target/${{ matrix.target }}/release/lat${{ matrix.ext }} out/
           tar -czf laterite-binaries-${{ matrix.target }}.tar.gz -C out .
 
       - if: runner.os == 'Windows'
@@ -368,7 +368,7 @@ jobs:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
           New-Item -ItemType Directory -Path out -Force | Out-Null
-          Copy-Item "rust-packages\target\${{ matrix.target }}\release\lat-check${{ matrix.ext }}" out\
+          Copy-Item "rust-packages\target\${{ matrix.target }}\release\lat${{ matrix.ext }}" out\
           Compress-Archive -Path out\* -DestinationPath "laterite-binaries-${{ matrix.target }}.zip" -Force
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

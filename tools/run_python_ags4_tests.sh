@@ -140,7 +140,7 @@ PYEOF
 # --project flag.
 cd "$PY_AGS4_ROOT"
 # test_cli.py is out of scope: laterite has no `ags4_cli` Click
-# command mirror (we ship a different CLI, `ags5db` + `lat-check`).
+# command mirror (we ship a different CLI, `ags5db` + `lat`).
 # Ignoring at the runner level keeps the failure-list focused on
 # actual compat surface gaps.
 exec uv run --project "$REPO_ROOT" --no-sync pytest tests \

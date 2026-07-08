@@ -130,6 +130,19 @@ describe("read/validate from raw bytes (the V8 string-cap door)", () => {
     const proj = read(w1252, { encoding: "windows-1252" }).table("PROJ");
     expect(proj.getChild("PROJ_ID")!.get(0)).toBe("Pré");
   });
+
+  it("the hyphenated 'latin-1' label resolves to windows-1252", () => {
+    // 'latin-1' is not a WHATWG label, so it used to fall through to a silent
+    // UTF-8 fallback here (mojibaking 0xE9) — the cross-surface divergence the
+    // shared resolver closes. It must now decode as windows-1252, same as the
+    // 'windows-1252' / 'latin1' spellings.
+    const w1252 = Buffer.from(
+      '"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n"DATA","Pré"\r\n',
+      "latin1",
+    );
+    const proj = read(w1252, { encoding: "latin-1" }).table("PROJ");
+    expect(proj.getChild("PROJ_ID")!.get(0)).toBe("Pré");
+  });
 });
 
 describe("native failure → mapped exception", () => {

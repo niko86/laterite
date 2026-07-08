@@ -53,5 +53,10 @@ it.each(examples)(
       encoding: "utf8",
     });
   },
-  30_000, // fresh node + debug-addon load per example
+  // Most examples finish in well under a second, but ex17_lock does two scrypt
+  // log_N-18 derivations (lock + unlock) — sub-second locally, but the 256 MiB
+  // KDF buffer thrashes on a memory-starved CI container (the #369 lesson from
+  // p3-transport.test.ts). The timeout is a ceiling, not a delay, so this is
+  // free for the fast examples.
+  90_000,
 );

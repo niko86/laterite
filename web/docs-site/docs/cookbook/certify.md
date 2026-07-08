@@ -42,7 +42,7 @@ skip the rule engine.
     `validate()` mints `<path>.ags.idx`, and `read(path, { index })` +
     `validate()` resolves from it with `report.resolution === "certified"`.
     The cert wraps the one core `Sidecar`, so a Node-minted `.ags.idx` is
-    byte-compatible with the ones Python, DuckDB and `lat-check` mint — any
+    byte-compatible with the ones Python, DuckDB and `lat` mint — any
     surface can consume any surface's cert.
 
 === "DuckDB"
@@ -67,9 +67,9 @@ skip the rule engine.
     --8<-- "cli/certify_emit_index.out"
     ```
 
-    `--emit-index` mints the certificate after the check comes back clean (a
+    `certify` mints the certificate after the check comes back clean (a
     `note: certificate written to site.ags.idx` line reports where; point it
-    elsewhere with `--index-out`). A dirty file gets no cert — the findings
+    elsewhere with `--out`). A dirty file gets no cert — the findings
     table and exit `1` come back instead.
 
 === "Browser"

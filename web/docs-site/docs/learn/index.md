@@ -6,7 +6,7 @@ produce byte-faithful AGS4 back out. Work through them in order — each page en
 **Next →** to the following step.
 
 1. **[Install](./install.md)** — `pip install laterite`, the optional extras, and the
-   `lat-check` CLI in one line.
+   `lat` CLI in one line.
 2. **[Read](./read.md)** — `read()` a path, text, or bytes; AGS types arrive as polars
    dtypes (every column is [born typed](../concepts/born-typed.md)).
 3. **[Validate](./validate.md)** — run the numbered-rules engine and read the

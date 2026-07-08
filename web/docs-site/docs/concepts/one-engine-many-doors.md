@@ -14,7 +14,7 @@ and inside DuckDB — same dtypes, same findings, same rule numbers. There is no
 several front doors:
 
 - **Python** — `import laterite` (this site).
-- **`lat-check` CLI** — `lat-check delivery.ags --json` (see the [CLI reference](../reference/cli.md)).
+- **`lat` CLI** — `lat validate delivery.ags --json` (see the [CLI reference](../reference/cli.md)).
 - **Node** — `@laterite/*` on npm.
 - **DuckDB** — the `laterite_ags4` loadable extension.
 
@@ -67,7 +67,7 @@ data came from.
 
 !!! note "Why it matters"
     Identical behaviour across surfaces is a guarantee, not a coincidence:
-    validate in CI with `lat-check`, then read the same file in Python and get
+    validate in CI with `lat`, then read the same file in Python and get
     the same verdict. And because the input doors converge, a web upload
     (`data=`), a pasted snippet (`text=`), and a file (path) all flow through
     one code path — no special-casing.

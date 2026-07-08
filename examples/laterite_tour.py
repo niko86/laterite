@@ -686,18 +686,18 @@ def _(mo):
                 'ags.table("LOCA").getChild("LOCA_GL")?.get(0);   // 12.3 (born-typed)\n\n'
                 'const report = validate("site.ags");\n'
                 "report.isValid;\n"
-                "report.toJson();                      // byte-identical to lat-check --json\n"
+                "report.toJson();                      // byte-identical to lat validate --json\n"
                 "```\n"
                 "`npm install laterite` · a runnable script lives at "
                 "`examples/node_tour.mjs`."
             ),
-            "⌨️ CLI — `lat-check` (the Rust binary)": mo.md(
+            "⌨️ CLI — `lat` (the Rust binary)": mo.md(
                 "```bash\n"
-                "pip install laterite          # installs the lat-check command\n\n"
-                "lat-check site.ags            # human report; exit 0 clean / 1 findings\n"
-                "lat-check site.ags --json     # machine-readable findings\n"
-                "lat-check site.ags --fix      # repair → sibling .fixed.ags\n"
-                "lat-check old.ags --diff new.ags   # KEY-aware revision delta\n"
+                "pip install laterite          # installs the lat command\n\n"
+                "lat validate site.ags         # human report; exit 0 clean / 1 findings\n"
+                "lat validate site.ags --json  # machine-readable findings\n"
+                "lat fix site.ags              # repair → sibling .fixed.ags\n"
+                "lat diff old.ags new.ags      # KEY-aware revision delta\n"
                 "```\n"
                 "Exit codes: `0` clean · `1` findings · `3` unreadable · `4` not AGS4."
             ),

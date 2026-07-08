@@ -1,0 +1,178 @@
+//! Findings presentation — the plain table / `--json` / `--ndjson` shaping,
+//! lifted **verbatim** from the pre-rework `main.rs` so validate/fix output is
+//! byte-identical (the `test_cli_*` byte-parity gate depends on it). One model
+//! (`Finding`) serialised everywhere; line-only findings still emit exactly
+//! `{line,group,desc}`, migrated ones additively gain the rich keys.
+
+use std::io;
+use std::path::Path;
+
+use laterite_ags4_validator::Findings;
+use laterite_ags4_validator::findings::Severity;
+use laterite_cliutil::{colour_enabled, styled_table, write_json_pretty};
+use serde_json::{Map, Value};
+
+/// Count findings by severity — errors gate `certify` (a certificate attests an
+/// error-clean file); warnings/fyi ride on the stamp as counts.
+pub fn count_severities(found: &Findings) -> (u32, u32, u32) {
+    let (mut errors, mut warnings, mut fyi) = (0u32, 0u32, 0u32);
+    for f in found.values().flatten() {
+        match f.severity {
+            Severity::Error => errors += 1,
+            Severity::Warning => warnings += 1,
+            Severity::Fyi => fyi += 1,
+        }
+    }
+    (errors, warnings, fyi)
+}
+
+/// Findings flattened to one row per finding, in spec-rule order (the `Findings`
+/// map is a `BTreeMap`, so deterministic), rendered through the shared
+/// `laterite-cliutil` `UTF8_FULL` grid. `use_color` off → no ANSI (for `--out`
+/// plain files / piped); on → the house TTY style.
+pub fn findings_table(found: &Findings, use_color: bool) -> String {
+    let rows: Vec<Vec<String>> = found
+        .iter()
+        .flat_map(|(rule, items)| {
+            // "AGS Format Rule 8" → "8" keeps the column tight; the full label
+            // is redundant once it's a column.
+            let short = rule
+                .strip_prefix("AGS Format Rule ")
+                .unwrap_or(rule)
+                .to_string();
+            items.iter().map(move |f| {
+                let line = f.line.map(|l| l.to_string()).unwrap_or_else(|| "-".into());
+                vec![short.clone(), line, f.group.clone(), f.desc.clone()]
+            })
+        })
+        .collect();
+    styled_table(&["Rule", "Line", "Group", "Description"], rows, use_color).to_string()
+}
+
+pub fn report_table(path: &Path, found: &Findings, n: usize) {
+    println!("{}: {n} finding(s)", path.display());
+    println!("{}", findings_table(found, colour_enabled(false)));
+}
+
+/// The nested report value `{file, findings:{rule:[{line,group,desc}]}}`. Shared
+/// by the stdout `--json` path and the `--out`/`--json-out` file writers so they
+/// never disagree.
+pub fn json_value(path: &Path, found: &Findings) -> Value {
+    let mut fmap = Map::new();
+    for (rule, items) in found {
+        let arr: Vec<Value> = items
+            .iter()
+            .map(|f| serde_json::to_value(f).unwrap_or(Value::Null))
+            .collect();
+        fmap.insert(rule.clone(), Value::Array(arr));
+    }
+    let mut root = Map::new();
+    root.insert("file".into(), Value::from(path.display().to_string()));
+    root.insert("findings".into(), Value::Object(fmap));
+    Value::Object(root)
+}
+
+/// Plain pretty JSON (never coloured) — for files (`--out`/`--json-out`).
+pub fn json_string(path: &Path, found: &Findings) -> String {
+    serde_json::to_string_pretty(&json_value(path, found)).unwrap_or_default()
+}
+
+/// One flat JSON object per finding per line (NDJSON). Stream/grep friendly;
+/// identical whether it goes to stdout or a file (no colour). Empty (no lines)
+/// when there are zero findings.
+pub fn ndjson_string(found: &Findings) -> String {
+    let mut s = String::new();
+    for (rule, items) in found {
+        for f in items {
+            // Build `rule`-first (the historical NDJSON key position), then
+            // splice in the serialized `Finding` body so line-only findings stay
+            // `{rule,line,group,desc}` byte-for-byte.
+            let mut o = Map::new();
+            o.insert("rule".into(), Value::from(rule.clone()));
+            if let Value::Object(body) = serde_json::to_value(f).unwrap_or(Value::Null) {
+                o.extend(body);
+            }
+            s.push_str(&serde_json::to_string(&Value::Object(o)).unwrap_or_default());
+            s.push('\n');
+        }
+    }
+    s
+}
+
+/// The plain report rendered to a `String` (no colour) — for `--out` when
+/// neither `--json` nor `--ndjson` is active.
+pub fn plain_string(path: &Path, found: &Findings, n: usize) -> String {
+    if n == 0 {
+        return format!("{}: clean (0 findings)\n", path.display());
+    }
+    format!(
+        "{}: {n} finding(s)\n{}\n",
+        path.display(),
+        findings_table(found, false)
+    )
+}
+
+/// `--json` to stdout: the report value rendered rich-style (coloured on a TTY)
+/// or plain pretty otherwise, via the shared writer.
+pub fn emit_json(path: &Path, found: &Findings) {
+    let v = json_value(path, found);
+    let mut out = io::stdout().lock();
+    let _ = write_json_pretty(&mut out, &v, colour_enabled(false));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use laterite_ags4_validator::findings::add;
+
+    fn sample() -> Findings {
+        let mut f = Findings::new();
+        add(
+            &mut f,
+            "AGS Format Rule 8",
+            Some(5),
+            "LOCA",
+            "bad \"value\"",
+        );
+        add(&mut f, "AGS Format Rule 9", None, "SAMP", "x");
+        f
+    }
+
+    #[test]
+    fn ndjson_is_one_object_per_finding() {
+        let s = ndjson_string(&sample());
+        let lines: Vec<&str> = s.lines().collect();
+        assert_eq!(lines.len(), 2);
+        let a: Value = serde_json::from_str(lines[0]).unwrap();
+        assert_eq!(a["rule"], "AGS Format Rule 8");
+        assert_eq!(a["line"], 5);
+        assert_eq!(a["group"], "LOCA");
+        assert_eq!(a["desc"], "bad \"value\""); // quotes escaped correctly
+        let b: Value = serde_json::from_str(lines[1]).unwrap();
+        assert!(b["line"].is_null()); // None → null
+        assert_eq!(ndjson_string(&Findings::new()), ""); // zero findings → empty
+    }
+
+    #[test]
+    fn json_string_round_trips() {
+        let v: Value = serde_json::from_str(&json_string(Path::new("x.ags"), &sample())).unwrap();
+        assert_eq!(v["file"], "x.ags");
+        assert!(v["findings"]["AGS Format Rule 8"].is_array());
+    }
+
+    #[test]
+    fn plain_string_reports_clean_and_findings() {
+        assert!(
+            plain_string(Path::new("x.ags"), &Findings::new(), 0).contains("clean (0 findings)")
+        );
+        let p = plain_string(Path::new("x.ags"), &sample(), 2);
+        assert!(p.contains("2 finding(s)") && p.contains("LOCA"));
+    }
+
+    #[test]
+    fn count_severities_counts_by_tier() {
+        // sample() is two error-severity findings.
+        assert_eq!(count_severities(&sample()), (2, 0, 0));
+        assert_eq!(count_severities(&Findings::new()), (0, 0, 0));
+    }
+}

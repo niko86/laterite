@@ -66,12 +66,14 @@ pub fn transport_lock(
     dest: String,
     password: String,
     level: Option<i32>,
+    log_n: Option<u8>,
 ) -> Result<PackStats> {
     let s = laterite_transport::lock(
         Path::new(&src),
         Path::new(&dest),
         &password,
         level.unwrap_or(9),
+        log_n.unwrap_or(laterite_transport::SCRYPT_LOG_N),
     )
     .map_err(napi_err)?;
     Ok(PackStats {
@@ -123,9 +125,15 @@ pub fn transport_lock_bytes(
     data: Uint8Array,
     password: String,
     level: Option<i32>,
+    log_n: Option<u8>,
 ) -> Result<Buffer> {
-    let out =
-        laterite_transport::lock_bytes(&data, &password, level.unwrap_or(9)).map_err(napi_err)?;
+    let out = laterite_transport::lock_bytes(
+        &data,
+        &password,
+        level.unwrap_or(9),
+        log_n.unwrap_or(laterite_transport::SCRYPT_LOG_N),
+    )
+    .map_err(napi_err)?;
     Ok(Buffer::from(out))
 }
 

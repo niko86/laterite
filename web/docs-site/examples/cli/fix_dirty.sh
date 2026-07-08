@@ -10,5 +10,5 @@ printf '%s\r\n' \
   '"DATA","BH01","BH"' \
   > delivery.ags
 # --8<-- [start:cmd]
-lat-check delivery.ags --fix --fix-out repaired.ags
+lat fix delivery.ags --fix-out repaired.ags
 # --8<-- [end:cmd]

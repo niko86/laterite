@@ -4,8 +4,11 @@
 # Manual `workflow_dispatch` + scheduled monthly so an upstream
 # silent behavioural drift surfaces before it bites a user.
 #
-# Fails if the pass count drops below 122 — that's the line we hold
-# (see docs/parity-coverage-map.md for the 9 deliberate non-closures).
+# Fails if the pass count drops below 121 — that's the line we hold
+# (see docs/history/python_ags4_parity_baseline.md for the 10 deliberate
+# non-closures; O-47 lowered the floor 122→121 when the quote-aware parser
+# made test_rule_6_2 a correct divergence — laterite reports Rule 6 on an
+# embedded newline where python tears the row into Rule 4/5).
 
 name: parity
 
@@ -26,7 +29,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   PYTHON_AGS4_VERSION: "1.2.0"
-  PARITY_MIN_PASSING: "122"
+  PARITY_MIN_PASSING: "121"
 
 # Least privilege: the job only checks out, clones a public repo, and runs tests.
 permissions:

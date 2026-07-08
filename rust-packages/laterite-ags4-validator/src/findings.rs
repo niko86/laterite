@@ -68,6 +68,21 @@ pub enum Severity {
     Fyi,
 }
 
+impl Severity {
+    /// The lowercase token, identical to the serde `rename_all = "snake_case"`
+    /// wire form — the single PRODUCER of the severity value domain, so Node/wasm
+    /// stop deriving it from `format!("{:?}").to_lowercase()` (a different code
+    /// path that would silently diverge on any future multi-word variant). Gated
+    /// against the serde rename in the tests below.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Severity::Error => "error",
+            Severity::Warning => "warning",
+            Severity::Fyi => "fyi",
+        }
+    }
+}
+
 fn is_error_severity(s: &Severity) -> bool {
     *s == Severity::Error
 }
@@ -167,6 +182,16 @@ pub fn count_by_group(findings: &Findings) -> Vec<(String, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn severity_as_str_matches_the_serde_token() {
+        // `as_str` is the single producer; pin it to the serde wire form so the
+        // two can never drift (a rename here without an as_str change fails).
+        for s in [Severity::Error, Severity::Warning, Severity::Fyi] {
+            let json = serde_json::to_value(s).expect("severity serializes");
+            assert_eq!(json.as_str().expect("a JSON string"), s.as_str());
+        }
+    }
 
     fn sample() -> Findings {
         let mut f = Findings::new();

@@ -32,8 +32,11 @@ fn eof_terminators_total_lines_and_last_crlf() {
     let no_term = full5("\n").trim_end_matches('\n').to_string();
     assert_eq!(last(&no_term), (5, Some((5, false)))); // no trailing terminator
 
-    // A lone trailing CR (no LF) is currently treated as had_crlf=true — locked.
-    assert_eq!(last(&(no_term + "\r")), (5, Some((5, true))));
+    // A lone trailing CR (classic-Mac terminator) is now recognised as a
+    // non-CRLF terminator → had_crlf=false, so Rule 2a fires (matching python).
+    // The old `\n`-only walk mislabelled it had_crlf=true, as if properly
+    // terminated (#422). total_lines still stays 5 (no phantom final line).
+    assert_eq!(last(&(no_term + "\r")), (5, Some((5, false))));
 }
 
 /// The per-group descriptor line numbers for missing / out-of-order descriptor

@@ -384,7 +384,7 @@ export interface FixOptions {
  * in-memory text. The *safe* fixes — CRLF / BOM / embedded-CR normalisation,
  * short-row padding, numeric reformatting, and the TRAN delimiter+concatenator
  * rows — are always applied; pass `risky` to also run the intent-guessing set
- * (duplicate-heading rename, `dd/mm` datetime canonicalisation, smart-quote→ASCII
+ * (duplicate-heading rename, ambiguous `dd/mm` datetime canonicalisation, smart-quote→ASCII
  * typography). The repaired bytes are re-validated, so `FixResult.findings` is
  * what could NOT be mechanically fixed.
  *

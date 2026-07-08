@@ -22,7 +22,7 @@ for when we deliberately want to signal "stable — I'll keep compatibility."
 ## Cutting a release
 
 **Every published surface shares one version** (#372): the Python wheel, the
-Rust workspace (so the `lat-check` binary), the npm `laterite` package with its
+Rust workspace (so the `lat` binary), the npm `laterite` package with its
 three `@laterite/native-*` addons, and the `laterite_ags4` DuckDB extension all
 move on one number. `tools/release/bump-version.sh` drives the in-repo bump
 (wrapping [`bump-my-version`](https://callowayproject.github.io/bump-my-version/),

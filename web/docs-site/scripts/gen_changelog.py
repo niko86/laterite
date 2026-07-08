@@ -44,7 +44,7 @@ _page = f"""# Changelog
 
 Current release: **laterite {_version}** — `pip install laterite` ·
 `npm install laterite`. The same numbered version ships the Python wheel, the
-`lat-check` CLI, the npm package, and (as `laterite_ags4`) the DuckDB extension.
+`lat` CLI, the npm package, and (as `laterite_ags4`) the DuckDB extension.
 {_body}"""
 
 with mkdocs_gen_files.open("reference/changelog.md", "w") as fd:

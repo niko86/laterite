@@ -449,8 +449,11 @@ _TYPE_CHOICES = ("ID", "X", "2DP", "3DP", "0DP")
 def _cell_for(ags_type: str) -> st.SearchStrategy[str]:
     """A DATA cell for a column of this TYPE: numeric columns draw a mix of
     conforming and dirty values (so the override path is exercised); text
-    columns draw printable tokens (no quote / whitespace-edge / CR-LF, which
-    re-quote differently and are a separate concern)."""
+    columns draw printable ASCII tokens WIDENED with the Unicode dimension the
+    ASCII-only alphabet missed — accents, symbols, CJK, emoji — each of which must
+    survive read→write→read byte-identically. `"` and CR/LF stay out: they
+    re-quote / re-split and are pinned by the Rust writer round-trip, not this
+    read-side value-preservation test."""
     if ags_type in ("2DP", "3DP", "0DP"):
         return st.one_of(
             st.sampled_from(_DIRTY_NUMERIC),
@@ -460,8 +463,11 @@ def _cell_for(ags_type: str) -> st.SearchStrategy[str]:
             ).map(lambda x: f"{x:.2f}"),
         )
     return st.text(
-        alphabet=st.characters(
-            min_codepoint=33, max_codepoint=126, blacklist_characters='"'
+        alphabet=st.one_of(
+            st.characters(
+                min_codepoint=33, max_codepoint=126, blacklist_characters='"'
+            ),
+            st.sampled_from("éàüßÇµ°±§日本語漢字→★🌍🚀"),
         ),
         min_size=0,
         max_size=8,

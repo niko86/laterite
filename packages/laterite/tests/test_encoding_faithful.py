@@ -64,3 +64,34 @@ def test_chained_fix_inherits_read_encoding(tmp_path):
     assert b"\r\n" in fixed.bytes  # Rule 2a fix applied
     assert b"\xc2\xb0" in fixed.bytes  # ° decoded from cp1252, re-emitted as UTF-8
     assert "AGS Format Rule 1" not in {f["rule"] for f in fixed.fix_report.findings}
+
+
+def _severities(handle) -> tuple[int, int, int]:
+    rep = handle.report
+    if not rep.count:
+        return (0, 0, 0)
+    s = rep.findings["severity"].to_list()
+    return (s.count("error"), s.count("warning"), s.count("fyi"))
+
+
+def test_noop_fix_on_clean_cp1252_still_emits_utf8(tmp_path):
+    """The *no-op* fix path (nothing safe to fix) must STILL honor "output is
+    always UTF-8". `_CP1252` is clean but for an FYI-level degree sign, so the
+    default `fix()` applies nothing — and used to pass the raw bytes straight
+    through, leaking the invalid-UTF-8 0xB0. Now the no-op transcodes it."""
+    p = _write(tmp_path)
+    res = L.fix(str(p), encoding="cp1252")  # free fix → FixResult
+    assert res.fixes_applied == 0  # genuinely a no-op
+    res.bytes.decode("utf-8")  # must NOT raise — the contract is valid UTF-8
+    assert b"\xc2\xb0" in res.bytes  # ° transcoded cp1252 → UTF-8, not raw 0xB0
+
+
+def test_noop_fix_preserves_the_validation_verdict(tmp_path):
+    """A no-op fix must not change the validation verdict. Before the transcode
+    fix, `read(cp1252).fix()` handed back the raw bytes, which the fluent re-read
+    then decoded as UTF-8 — flipping the clean FYI degree sign into a Rule 1
+    error. So a no-op silently changed the outcome; assert it no longer does."""
+    p = _write(tmp_path)
+    before = L.read(str(p), encoding="cp1252").validate(fyi=True)
+    after = L.read(str(p), encoding="cp1252").fix().validate(fyi=True)
+    assert _severities(before) == _severities(after)

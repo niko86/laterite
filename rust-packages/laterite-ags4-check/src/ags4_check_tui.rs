@@ -1,4 +1,4 @@
-//! `lat-check --tui` — interactive findings browser (experiment).
+//! `lat --tui` — interactive findings browser (experiment).
 //!
 //! Compiled in ONLY with `--features tui`. A pure, read-only consumer
 //! of the `Findings` value `check_file` already produced: validate
@@ -231,7 +231,9 @@ fn setup() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
     Terminal::new(CrosstermBackend::new(out))
 }
 
-fn restore<B: Backend + std::io::Write>(t: &mut Terminal<B>) -> io::Result<()> {
+// ratatui 0.30 gave Backend an associated Error; pin it to io::Error (what
+// CrosstermBackend yields) so `?` keeps unifying with io::Result here.
+fn restore<B: Backend<Error = io::Error> + std::io::Write>(t: &mut Terminal<B>) -> io::Result<()> {
     disable_raw_mode()?;
     execute!(t.backend_mut(), LeaveAlternateScreen)?;
     t.show_cursor()?;
@@ -250,7 +252,10 @@ fn install_panic_hook() {
     }));
 }
 
-fn event_loop<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<()> {
+fn event_loop<B: Backend<Error = io::Error>>(
+    terminal: &mut Terminal<B>,
+    mut app: App,
+) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, &mut app))?;
         // Blocking read — nothing animates, validation is already done,

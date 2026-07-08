@@ -1,4 +1,4 @@
-# `lat-check` — the CLI front-end for the clean-room AGS4 validator.
+# `lat` — the CLI front-end for the clean-room AGS4 validator.
 #
 # Split out of `laterite-ags4-validator` so the engine library stays a lean,
 # wasm-safe leaf (phf + thiserror + chrono + encoding_rs). All the
@@ -21,7 +21,7 @@ publish = false
 autobins = false
 
 [[bin]]
-name = "lat-check"
+name = "lat"
 path = "src/main.rs"
 
 [features]
@@ -29,7 +29,15 @@ path = "src/main.rs"
 # binary is provably unaffected (the `--tui` flag isn't even compiled
 # in; it falls into "unknown option → exit 5"). Build the experiment
 # with `cargo build --release --features tui`.
-default = []
+default = ["transport", "excel"]
+# The pack / unpack / lock / unlock verbs — turn on core's `transport` feature
+# (age + zstd) + rpassword for the interactive passphrase prompt. On by default;
+# `--no-default-features` gives a lean validate/read/fix/diff/certify/rules build
+# with NO age/zstd, exactly as before these verbs existed.
+transport = ["laterite-ags4-core/transport", "dep:rpassword"]
+# The `excel` verb — AGS4 ↔ XLSX via laterite-excel (calamine + rust_xlsxwriter).
+# On by default; those are heavy deps, so `--no-default-features` drops them.
+excel = ["dep:laterite-excel"]
 tui = ["dep:ratatui", "dep:crossterm"]
 
 [dependencies]
@@ -58,12 +66,20 @@ encoding_rs = "0.8"
 # JSON — via the shared `laterite-cliutil` crate (single source of truth,
 # serde_json + (transitively) crossterm for terminal capability
 # detection; none of that touches the validator library now.
-laterite-cliutil = { path = "../laterite-cliutil" }
+laterite-cliutil = { path = "../laterite-cliutil", features = ["clap"] }
 comfy-table = "7"
 indicatif = "0.18"
 serde_json = { version = "1", features = ["preserve_order"] }
+clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
+# Interactive passphrase prompt for `lock` / `unlock` (behind `transport`). We
+# NEVER take a --password flag (argv leaks into `ps`/history); the precedence is
+# --password-file → $LAT_TRANSPORT_PASSWORD → this TTY prompt.
+rpassword = { version = "7", optional = true }
+# The `excel` verb — AGS4 ↔ XLSX. Kept behind the `excel` feature so the
+# calamine / rust_xlsxwriter deps don't ride into a lean build.
+laterite-excel = { path = "../laterite-excel", optional = true }
 # Optional, behind the `tui` feature — the interactive findings browser
-# (`lat-check --tui`). crossterm arrives via ratatui::crossterm so the
+# (`lat --tui`). crossterm arrives via ratatui::crossterm so the
 # backend/event types are version-matched to the linked ratatui.
-ratatui = { version = "0.29", optional = true }
-crossterm = { version = "0.28", optional = true }
+ratatui = { version = "0.30", optional = true }
+crossterm = { version = "0.29", optional = true }

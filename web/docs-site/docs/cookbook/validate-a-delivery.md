@@ -4,7 +4,7 @@
 
 Run the numbered AGS Format Rules over a transfer file and get a verdict —
 in-process from Python or Node, in SQL from DuckDB, at the shell with
-`lat-check`, or drag-and-drop in the browser.
+`lat`, or drag-and-drop in the browser.
 
 === "Python"
 
@@ -40,7 +40,7 @@ in-process from Python or Node, in SQL from DuckDB, at the shell with
     Same engine, camelCase verbs: the free `validate()` returns a `Report`
     whose `isValid` / `count` / `dictVersion` / `resolution` mirror the Python
     properties one-for-one, and `report.toJson()` is byte-identical to
-    `lat-check --json`, so a Node service and a CI gate can share downstream
+    `lat validate --json`, so a Node service and a CI gate can share downstream
     tooling. For the chaining style, `read(path).validate()` returns the
     [`Ags4File`](../node/index.md) with the verdict on `.report` — exactly the
     Python shape.
@@ -114,4 +114,4 @@ file's `TRAN_AGS` — the Python/Node `report`, DuckDB's rows, and the CLI's
 fails the build); reach for `.validate()` when you want to keep working with
 the parsed file in the same process.
 
-See also: [lat-check CLI](../reference/cli.md) · [Certify a file](./certify.md)
+See also: [lat CLI](../reference/cli.md) · [Certify a file](./certify.md)

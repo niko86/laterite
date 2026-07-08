@@ -134,7 +134,46 @@ def _load() -> dict[str, GroupDescriptor]:
     return out
 
 
-GROUPS: dict[str, GroupDescriptor] = _load()
+class _ReadOnlyGroups(dict):
+    """A read-only ``dict`` for the module-level registry.
+
+    It **is** a ``dict`` (so ``isinstance(GROUPS, dict)`` holds and the
+    ``dict[str, GroupDescriptor]`` type stays honest for callers + the ``ty``
+    gate) but every mutator raises — sealing the process-global registry *in
+    place*, the same guarantee ``laterite-node``'s ``registry.ts`` gives with
+    ``Object.freeze``. ``GROUPS`` is the projection of the single-source
+    ``ags_dictionary.json``; a stray ``GROUPS[code] = …`` / ``.clear()`` by any
+    importer would silently corrupt it for the whole process. The values are
+    already ``frozen=True`` dataclasses, so this shallow container seal is
+    effectively deep. (It does not stop *rebinding the name* ``registry.GROUPS``
+    — nothing can — only mutating the mapping's contents.)
+    """
+
+    __slots__ = ()
+
+    def _readonly(self, *_args: Any, **_kwargs: Any) -> Any:
+        raise TypeError(
+            "laterite.registry.GROUPS is read-only (the union AGS4 registry, "
+            "projected from ags_dictionary.json). Register a custom group at "
+            "runtime with laterite.dynamic.get_or_register() instead."
+        )
+
+    __setitem__ = _readonly
+    __delitem__ = _readonly
+    __ior__ = _readonly
+    clear = _readonly
+    pop = _readonly
+    popitem = _readonly
+    setdefault = _readonly
+    update = _readonly
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        # Preserve the read-only type across pickle: dict.__init__ populates at
+        # the C level, bypassing the sealed __setitem__.
+        return (self.__class__, (dict(self),))
+
+
+GROUPS: dict[str, GroupDescriptor] = _ReadOnlyGroups(_load())
 
 
 def get(code: str) -> GroupDescriptor | None:

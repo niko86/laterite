@@ -44,7 +44,7 @@ pub enum CliError {
     /// failed the bundled validator. Exit code 10 so CI / agents can
     /// distinguish "emitted but not spec-conformant" from a write error.
     #[error(
-        "validation failed: {findings} finding(s) in {file} (run `lat-check {file}` for detail)"
+        "validation failed: {findings} finding(s) in {file} (run `lat validate {file}` for detail)"
     )]
     Validation { findings: usize, file: String },
 }
@@ -67,9 +67,10 @@ impl CliError {
 
 /// The AGS4 writer/emitter lives in the `laterite-ags4-emit` leaf now; map its
 /// error back onto `CliError` so `laterite-ags4-core`'s excel + `ags5db`'s
-/// db-to-ags4 callers keep using `?` over `write_ags4`. `write_ags4`
-/// only ever yields `Write`; the other variants come from `emit_ags4`'s
-/// validity modes (not used by these callers) but are mapped for totality.
+/// db-to-ags4 callers keep using `?` over `write_ags4`. `write_ags4` yields
+/// `Write` or `EmbeddedNewline` (a cell carrying a raw CR/LF, #423); the
+/// `Reparse` / `Invalid` variants come from `emit_ags4`'s validity modes
+/// (not used by these callers) but are mapped for totality.
 impl From<laterite_ags4_emit::EmitError> for CliError {
     fn from(e: laterite_ags4_emit::EmitError) -> Self {
         match e {
@@ -83,6 +84,9 @@ impl From<laterite_ags4_emit::EmitError> for CliError {
                 CliError::Schema(format!(
                     "ags4 emit: strict mode rejected output ({n} finding(s))"
                 ))
+            }
+            e @ laterite_ags4_emit::EmitError::EmbeddedNewline { .. } => {
+                CliError::Schema(format!("ags4 write: {e}"))
             }
         }
     }

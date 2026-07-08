@@ -12,7 +12,7 @@
 //!
 //! Mechanism: shell `cargo tree -p laterite-ags4-validator -e normal` and assert
 //! none of the forbidden crates appear. Since the CLI split (the
-//! `lat-check` crate now owns comfy-table/indicatif and the optional
+//! `lat` crate now owns comfy-table/indicatif and the optional
 //! ratatui/crossterm TUI), the validator is a pure library leaf — its
 //! normal graph is just phf/thiserror/chrono/encoding_rs + their deps.
 //! `cargo tree` only resolves; it does not build, so there is no
@@ -29,7 +29,7 @@ use std::process::Command;
 /// - `polars` — Rust↔Python ABI coupling the engine must stay free of.
 /// - `walkdir` / `rayon` — dev/QA-only crates (corpus-qa/forge) that
 ///   would bloat the engine if they leaked in.
-/// - `ratatui` — the TUI framework; it lives in the `lat-check` crate
+/// - `ratatui` — the TUI framework; it lives in the `lat` crate
 ///   behind that crate's opt-in `tui` feature. Since the CLI split the
 ///   validator has no dependency path to it at all; this entry stays as
 ///   a guard against it ever creeping back into the engine.
@@ -37,7 +37,7 @@ use std::process::Command;
 /// `crossterm` is deliberately NOT listed: historically it arrived
 /// transitively via `laterite-cliutil → comfy-table` (terminal capability
 /// detection for the findings table). That whole chain moved to
-/// `lat-check` in the CLI split, so it no longer appears in the
+/// `lat` in the CLI split, so it no longer appears in the
 /// validator's normal graph — but it was never a forbidden crate.
 const FORBIDDEN: &[&str] = &["pyo3", "polars", "walkdir", "rayon", "ratatui"];
 

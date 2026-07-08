@@ -38,15 +38,14 @@ def test_pack_default_dest_on_ags4(ags_file: Path) -> None:
     assert out.read_bytes()[:4] == bytes.fromhex("28B52FFD")
 
 
-def test_pack_explicit_dest(ags_file: Path, tmp_path: Path) -> None:
-    dest = tmp_path / "elsewhere.zst"
-    out = transport.pack(ags_file, dest=dest)
-    assert out == dest and dest.exists()
-
-
 def test_pack_unpack_round_trip(ags_file: Path, tmp_path: Path) -> None:
+    # Folds in the old presence-only `test_pack_explicit_dest`: pack to an EXPLICIT
+    # dest, then round-trip through it — a stronger check than "the dest file
+    # exists" (it also proves the bytes at that dest actually decompress).
     src_bytes = ags_file.read_bytes()
-    zst = transport.pack(ags_file, level=3)
+    dest = tmp_path / "elsewhere.zst"
+    zst = transport.pack(ags_file, level=3, dest=dest)
+    assert zst == dest and dest.exists()
     restored = tmp_path / "restored.ags"
     transport.unpack(zst, dest=restored)
     assert restored.read_bytes() == src_bytes
@@ -80,6 +79,33 @@ def test_lock_both_levels_work(ags_file: Path, tmp_path: Path) -> None:
     out1 = transport.lock(ags_file, password="p", level=1, dest=tmp_path / "l1.age")
     out9 = transport.lock(ags_file, password="p", level=9, dest=tmp_path / "l9.age")
     assert out1.exists() and out9.exists()
+
+
+def test_lock_bytes_honours_log_n_and_still_round_trips() -> None:
+    # The `log_n` knob sets the scrypt work factor in the age header. Pin an
+    # explicit factor, read it back out of the ASCII `-> scrypt <salt> <log_N>`
+    # stanza, and confirm the envelope still opens with our own unlock.
+    sealed = transport.lock_bytes(_AGS, password="pw", log_n=12)
+    stanza = next(
+        line for line in sealed[:200].split(b"\n") if line.startswith(b"-> scrypt ")
+    )
+    assert int(stanza.rsplit(b" ", 1)[1]) == 12  # the factor we asked for
+    assert transport.unlock_bytes(sealed, password="pw") == _AGS
+    # Default (log_n=None) pins the standard tier 18.
+    default = transport.lock_bytes(_AGS, password="pw")
+    dstanza = next(
+        line for line in default[:200].split(b"\n") if line.startswith(b"-> scrypt ")
+    )
+    assert int(dstanza.rsplit(b" ", 1)[1]) == 18
+
+
+@pytest.mark.parametrize("bad", [0, 21, 25])
+def test_lock_rejects_out_of_range_log_n(bad: int) -> None:
+    # >20 would make a file the browser age decoder refuses; 0 is invalid. The
+    # guard lives once in Rust (encrypt_with_passphrase) so both bytes + file
+    # forms inherit it.
+    with pytest.raises(RuntimeError, match="log_n must be"):
+        transport.lock_bytes(_AGS, password="pw", log_n=bad)
 
 
 # --- in-memory (bytes) forms ------------------------------------------------

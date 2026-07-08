@@ -67,7 +67,7 @@ encoding_rs = "0.8"
 laterite-transport = { path = "../laterite-transport" }
 # `preserve_order` MUST mirror laterite-ags4-validator / laterite-py: the validator's
 # `--json`/`--ndjson` insertion order is load-bearing (byte-faithful to the
-# `lat-check` binary), and `Report.toJson()` re-exposes it verbatim.
+# `lat` binary), and `Report.toJson()` re-exposes it verbatim.
 serde_json = { version = "1", features = ["preserve_order"] }
 
 [build-dependencies]

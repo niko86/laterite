@@ -186,7 +186,7 @@ pub fn check(
     rule_20(parsed, found);
     // Opt-in (default off, O-27): the on-disk sidecar tree. Library /
     // `db-to-ags4 --validate` callers stay path-independent; the
-    // corpus-qa dogfood + `lat-check --check-files` enable it to match
+    // corpus-qa dogfood + `lat validate --check-files` enable it to match
     // python-ags4's always-on filesystem stat.
     if check_files {
         if let Some(src) = source {

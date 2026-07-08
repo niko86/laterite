@@ -146,6 +146,7 @@ def lock(
     *,
     password: str,
     level: int = 9,
+    log_n: int | None = None,
     dest: str | PathLike[str] | None = None,
 ) -> Path:
     """Compress + age-passphrase-encrypt any file to ``<src>.zst.age``.
@@ -161,6 +162,10 @@ def lock(
         password: The age passphrase. Required — there is no agent-key path.
         level: zstd compression level, 1 (fastest) to 22 (highest ratio).
             Defaults to 9.
+        log_n: scrypt work factor (``log2(N)``) for the age passphrase KDF.
+            ``None`` uses the pinned default (18 — age's standard tier, openable
+            everywhere). A lower value is faster but weaker; must be ``1..=20``
+            (``>20`` produces a file the browser age decoder refuses).
         dest: Output path. Defaults to ``<src>.zst.age`` (flagging both the
             compression and encryption layers).
 
@@ -169,11 +174,12 @@ def lock(
 
     Raises:
         TypeError: If ``src`` is not a path-like.
-        RuntimeError: If the underlying zstd or age operation fails.
+        RuntimeError: If the underlying zstd or age operation fails, or ``log_n``
+            is outside ``1..=20``.
     """
     src_path = _src_path(src, fn="lock")
     out = Path(dest) if dest is not None else _default_lock_out(src_path)
-    _native.transport_lock(str(src_path), str(out), password, level)
+    _native.transport_lock(str(src_path), str(out), password, level, log_n)
     return out
 
 
@@ -251,7 +257,7 @@ def unpack_bytes(data: bytes) -> bytes:
     return _native.transport_unpack_bytes(data)
 
 
-def lock_bytes(data: bytes, *, password: str, level: int = 9) -> bytes:
+def lock_bytes(data: bytes, *, password: str, level: int = 9, log_n: int | None = None) -> bytes:
     """Compress + age-passphrase-encrypt bytes → bytes in memory — no plaintext on disk.
 
     The in-memory form of :func:`lock` (zstd, then age scrypt +
@@ -265,14 +271,17 @@ def lock_bytes(data: bytes, *, password: str, level: int = 9) -> bytes:
         data: The bytes to compress and encrypt.
         password: The age passphrase. Required — there is no agent-key path.
         level: zstd level, 1 (fastest) to 22 (highest ratio). Defaults to 9.
+        log_n: scrypt work factor (``log2(N)``). ``None`` uses the pinned default
+            (18); a lower value is faster but weaker; must be ``1..=20``.
 
     Returns:
         The sealed bytes.
 
     Raises:
-        RuntimeError: If the underlying zstd or age operation fails.
+        RuntimeError: If the underlying zstd or age operation fails, or ``log_n``
+            is outside ``1..=20``.
     """
-    return _native.transport_lock_bytes(data, password, level)
+    return _native.transport_lock_bytes(data, password, level, log_n)
 
 
 def unlock_bytes(data: bytes, *, password: str) -> bytes:

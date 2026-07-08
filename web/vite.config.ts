@@ -66,7 +66,7 @@ export default defineConfig({
     // PRECACHE (downloaded at install, ~5.85 MiB, then served offline) = the
     // full app shell: EVERY JS/CSS chunk — including the Explore/Charts/
     // Coordinates UI and the DuckDB *worker* glue — plus the reference JSONs,
-    // the sample files, and the 2.2 MB *validator* wasm. So Validate/Fix/the
+    // the sample files, and the ~6.6 MB *validator* wasm. So Validate/Fix/the
     // dictionary work fully offline after one visit, and the Explore/Charts/
     // Coordinates UIs render offline too; only their heavy *engines* are
     // deferred. NEVER precached: the DuckDB engine wasm (36 MB EH + 41 MB MVP)
@@ -122,12 +122,13 @@ export default defineConfig({
         // Belt-and-braces with the runtimeCaching rules below: keep the heavy
         // assets out of the install precache no matter how the globs evolve.
         globIgnores: ["assets/duckdb-*.wasm", "grids/**", "**/*.map"],
-        // 6 MiB clears the ~4.8 MB validator wasm (the content-addressed keychain
-        // — #303 Phase 5 — added ~0.8 MB: laterite-ags4-core's dictionary registry;
-        // gzip is ~1.15 MB) but still sits far below the 36 MB DuckDB wasm, so even
-        // if a glob slipped, the engine can't precache. Was 4 MiB / ~3.3 MB when
-        // the AGS4 producer (to_ags4 + to_ags4_ipc) was the last size bump.
-        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        // 8 MiB clears the ~6.6 MB validator wasm (the Excel converter — calamine
+        // + rust_xlsxwriter for xlsx_to_ags4/ags4_to_xlsx — pushed it past the old
+        // 6 MiB cap, which silently failed the whole SW build) but still sits far
+        // below the 36 MB DuckDB wasm, so even if a glob slipped, the engine can't
+        // precache. Size history: 4 MiB/~3.3 MB (AGS4 producer) → 6 MiB/~4.8 MB
+        // (content-addressed keychain, #303) → 8 MiB/~6.6 MB (Excel).
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         // First-install SW controls the page immediately, so an offline reload
         // right after the first visit is already served from cache.

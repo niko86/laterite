@@ -121,6 +121,16 @@ pub fn parse_group_slice(bytes: &[u8], range: Range, code: &str) -> Result<AgsGr
 /// Format version of the `.ags.idx` sidecar.
 pub const SIDECAR_VERSION: u32 = 1;
 
+/// The shared **engine identity** every surface stamps into a certificate's
+/// [`ValidationStamp::validator`]. All surfaces run the same
+/// `laterite_ags4_validator` rule engine, so a clean verdict is portable: a cert
+/// minted by one door (Python, Node, the CLI, wasm, the DuckDB extension) is
+/// trusted by another. The *string* is trust-inert provenance — real trust gates
+/// on `validator_version` + `compat` + the check profile ([`Sidecar::checker_matches`]
+/// / [`Sidecar::profile_covers`]) — so unifying it removes an accidental per-binding
+/// silo without weakening any real trust boundary.
+pub const ENGINE_IDENTITY: &str = "laterite_ags4";
+
 /// The source file a [`Sidecar`] certifies.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FileMeta {
@@ -159,7 +169,9 @@ pub struct FileMeta {
 /// (validation lives in the validator crate, above core).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ValidationStamp {
-    /// What validated it (e.g. "lat-check", "laterite_ags4").
+    /// What validated it — the shared [`ENGINE_IDENTITY`] engine string, so a
+    /// clean cert minted by any surface is trusted by the others (trust also
+    /// gates on `validator_version` + `compat` + profile).
     pub validator: String,
     /// The validation **engine** version (`laterite_ags4_validator::VERSION`),
     /// NOT the minting binding's crate version — so a cert is comparable across
@@ -175,7 +187,7 @@ pub struct ValidationStamp {
     #[serde(default)]
     pub compat: Option<String>,
     /// Whether the validation ran Rule 20's **on-disk** half (the sibling `FILE/`
-    /// tree must exist) — `lat-check --check-files`. Part of the check PROFILE: a
+    /// tree must exist) — `lat validate --check-files`. Part of the check PROFILE: a
     /// missing on-disk file is an error, so a cert minted *without* this must not
     /// be trusted to skip a request that *wants* it ([`Sidecar::profile_covers`]).
     #[serde(default)]
@@ -204,8 +216,8 @@ pub struct ValidationStamp {
 /// Core owns the *format* (this struct, its JSON (de)serialise, and the
 /// [`Sidecar::is_fresh_for`] staleness check) and can *read* a sidecar with no
 /// validator. **Minting** one — validate, and only if clean assemble + stamp +
-/// write — is an **opt-in** action of a validator-aware layer (`lat-check
-/// --emit-index`, the `laterite_ags4` extension's `ags_index`), never automatic;
+/// write — is an **opt-in** action of a validator-aware layer (`lat
+/// certify`, the `laterite_ags4` extension's `ags_index`), never automatic;
 /// core does not depend on the validator so it cannot mint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Sidecar {
@@ -595,6 +607,15 @@ mod tests {
             matches!(err, CliError::Schema(ref m) if m.contains("missing group code")),
             "expected a 'missing group code' schema error, got {err:?}"
         );
+    }
+
+    /// The shared engine identity is the load-bearing cross-surface contract:
+    /// Python/Node/wasm (and the DuckDB extension) all stamp THIS exact string,
+    /// so a clean cert minted by one door is trusted by another. Changing it
+    /// silently re-silos the surfaces — pin it. (#430 PR 1a)
+    #[test]
+    fn engine_identity_is_the_shared_cross_surface_string() {
+        assert_eq!(ENGINE_IDENTITY, "laterite_ags4");
     }
 
     fn stamp() -> ValidationStamp {

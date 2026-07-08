@@ -6,7 +6,7 @@ import { defineConfig } from "tsup";
 // external: the loader requires the platform `.node` package, apache-arrow is a
 // runtime dep, and @duckdb/node-api is the optional peer (lazy-imported).
 export default defineConfig({
-  entry: ["ts/index.ts"],
+  entry: ["ts/index.ts", "ts/cli.ts"],
   format: ["esm", "cjs"],
   dts: true,
   clean: true,

@@ -64,7 +64,7 @@ impl OutputMode {
 
 /// Off when `no_color` is set, the `NO_COLOR` env var is present, or
 /// stdout isn't a TTY — the convention every Unix tool uses. `ags5db`
-/// and `lat-check` use the env+TTY form; the explicit `no_color`
+/// and `lat` use the env+TTY form; the explicit `no_color`
 /// argument lets a CLI with a `--no-color` flag fold it in.
 pub fn colour_enabled(no_color: bool) -> bool {
     !no_color && std::env::var_os("NO_COLOR").is_none() && io::stdout().is_terminal()

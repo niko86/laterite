@@ -2,7 +2,7 @@
 
 laterite reads, validates, queries and **produces** AGS4 geotechnical data. Files come back as
 **born-typed** polars frames — the polars dtype *is* the AGS type — wired into a fluent, chainable
-API. One engine drives Python, the `lat-check` CLI, Node and DuckDB, and it's a drop-in for
+API. One engine drives Python, the `lat` CLI, Node and DuckDB, and it's a drop-in for
 python-ags4 that runs **7–17× faster**.
 
 ```bash
@@ -32,4 +32,4 @@ straight back so the chain keeps flowing, with the verdict on `.report`. The dic
 - **New here? → [Learn](learn/install.md)** — install, then read → validate → query → produce, one step at a time.
 - **Need to get something done? → [Cookbook](cookbook/index.md)** — task-shaped recipes you can lift wholesale.
 - **Show me what it can do? → [Chaining](chaining/index.md)** — the fluent API end to end, one chain at a time.
-- **Looking up a function? → [Reference](reference/cheatsheet.md)** — the cheatsheet and the `lat-check` CLI.
+- **Looking up a function? → [Reference](reference/cheatsheet.md)** — the cheatsheet and the `lat` CLI.

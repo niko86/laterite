@@ -57,16 +57,23 @@ fn transport_unpack<'py>(
 /// `{bytes, ratio, elapsed_s}`. The age envelope is interoperable
 /// with `pyrage`.
 #[pyfunction]
-#[pyo3(signature = (src, dest, password, level = 9))]
+#[pyo3(signature = (src, dest, password, level = 9, log_n = None))]
 fn transport_lock<'py>(
     py: Python<'py>,
     src: String,
     dest: String,
     password: String,
     level: i32,
+    log_n: Option<u8>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let stats = transport::lock(Path::new(&src), Path::new(&dest), &password, level)
-        .map_err(map_cli_err)?;
+    let stats = transport::lock(
+        Path::new(&src),
+        Path::new(&dest),
+        &password,
+        level,
+        log_n.unwrap_or(transport::SCRYPT_LOG_N),
+    )
+    .map_err(map_cli_err)?;
     let d = PyDict::new(py);
     d.set_item("bytes", stats.bytes)?;
     d.set_item("ratio", stats.ratio)?;
@@ -120,14 +127,21 @@ fn transport_unpack_bytes<'py>(py: Python<'py>, data: &[u8]) -> PyResult<Bound<'
 
 /// zstd-compress + age-passphrase-encrypt bytes → bytes.
 #[pyfunction]
-#[pyo3(signature = (data, password, level = 9))]
+#[pyo3(signature = (data, password, level = 9, log_n = None))]
 fn transport_lock_bytes<'py>(
     py: Python<'py>,
     data: &[u8],
     password: String,
     level: i32,
+    log_n: Option<u8>,
 ) -> PyResult<Bound<'py, PyBytes>> {
-    let out = transport::lock_bytes(data, &password, level).map_err(map_cli_err)?;
+    let out = transport::lock_bytes(
+        data,
+        &password,
+        level,
+        log_n.unwrap_or(transport::SCRYPT_LOG_N),
+    )
+    .map_err(map_cli_err)?;
     Ok(PyBytes::new(py, &out))
 }
 

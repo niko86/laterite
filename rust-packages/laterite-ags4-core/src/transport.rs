@@ -14,7 +14,7 @@ use std::path::Path;
 use crate::error::CliError;
 // Re-export the stat shapes so `core::transport::PackStats` still resolves for
 // existing callers (laterite-py reads the fields directly).
-pub use laterite_transport::{PackStats, UnpackStats};
+pub use laterite_transport::{PackStats, SCRYPT_LOG_N, UnpackStats};
 
 /// `FileNotFound` keeps its dedicated variant (exit code 3); every other
 /// transport failure is a schema-level error whose Display is already the
@@ -42,8 +42,14 @@ pub fn unpack(src: &Path, dest: &Path) -> Result<UnpackStats, CliError> {
 /// zstd-compress, then age-encrypt with `password`. Output goes to `dest`
 /// (suffix `.zst.age` conventional). The compress-then-encrypt order is
 /// load-bearing: zstd needs low-entropy input; encrypted bytes are random.
-pub fn lock(src: &Path, dest: &Path, password: &str, level: i32) -> Result<PackStats, CliError> {
-    Ok(laterite_transport::lock(src, dest, password, level)?)
+pub fn lock(
+    src: &Path,
+    dest: &Path,
+    password: &str,
+    level: i32,
+    log_n: u8,
+) -> Result<PackStats, CliError> {
+    Ok(laterite_transport::lock(src, dest, password, level, log_n)?)
 }
 
 /// age-decrypt with `password`, then zstd-decompress.
@@ -63,8 +69,10 @@ pub fn unpack_bytes(data: &[u8]) -> Result<Vec<u8>, CliError> {
 
 /// zstd-compress + age-encrypt bytes → bytes in memory (the filesystem-free
 /// form of [`lock`] — no plaintext ever hits disk).
-pub fn lock_bytes(data: &[u8], password: &str, level: i32) -> Result<Vec<u8>, CliError> {
-    Ok(laterite_transport::lock_bytes(data, password, level)?)
+pub fn lock_bytes(data: &[u8], password: &str, level: i32, log_n: u8) -> Result<Vec<u8>, CliError> {
+    Ok(laterite_transport::lock_bytes(
+        data, password, level, log_n,
+    )?)
 }
 
 /// age-decrypt + zstd-decompress bytes → bytes in memory (the filesystem-free

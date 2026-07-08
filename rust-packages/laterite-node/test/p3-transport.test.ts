@@ -119,4 +119,23 @@ describe("lockBytes / unlockBytes (zstd + age passphrase, in-memory)", () => {
     },
     SCRYPT_TIMEOUT_MS,
   );
+
+  it("honours a low logN (fast) and still round-trips", () => {
+    // The logN knob (parity with Python transport.lock_bytes log_n) sets the
+    // scrypt work factor in the age header. A low factor is cheap — no big
+    // timeout needed — but the header must declare it and the envelope must
+    // still open with our unlock.
+    const sealed = transport.lockBytes(BYTES, "correct horse", undefined, 12);
+    const header = sealed.subarray(0, 200).toString("latin1");
+    const stanza = header.split("\n").find((l) => l.startsWith("-> scrypt "));
+    expect(stanza?.trim().split(" ").pop()).toBe("12");
+    expect(Buffer.from(transport.unlockBytes(sealed, "correct horse")).equals(BYTES)).toBe(true);
+  });
+
+  it("rejects an out-of-range logN", () => {
+    // >20 makes a file the browser age decoder refuses; 0 is invalid. Guard lives
+    // once in Rust (encrypt_with_passphrase), inherited by both surfaces.
+    expect(() => transport.lockBytes(BYTES, "pw", undefined, 25)).toThrow();
+    expect(() => transport.lockBytes(BYTES, "pw", undefined, 0)).toThrow();
+  });
 });

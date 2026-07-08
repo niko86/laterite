@@ -17,19 +17,33 @@ def _proj() -> pd.DataFrame:
     return pd.DataFrame({"PROJ_ID": ["P1"], "PROJ_NAME": ["Demo project"]})
 
 
+def _group_rows(text: str, code: str) -> dict[str, list[str]]:
+    """Reparse `text` and return the group's UNIT/TYPE/HEADING rows as cell lists —
+    a structural assertion (the parser agrees these are the UNIT/TYPE rows) rather
+    than a substring that a coincidental match elsewhere could satisfy."""
+    from laterite import _laterite_native as _native
+
+    g = _native.parse_primitives(text=text)["groups"][code]
+    return {"headings": g["headings"], "types": g["types"], "units": g["units"]}
+
+
 def test_emit_fills_unit_and_type_from_dict():
-    # Columns are the AGS headings; UNIT/TYPE come from the 4.1.1 dict.
+    # Columns are the AGS headings; UNIT/TYPE come from the 4.1.1 dict. Assert via a
+    # reparse of the emitted file, not a substring: the parser must agree LOCA's
+    # TYPE row is [ID, 2DP] and its UNIT row is ["", m] against the declared headings.
     loca = pd.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
     res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca})
-    text = res.text
-    assert '"TYPE","ID","2DP"' in text
-    assert '"UNIT","","m"' in text
+    rows = _group_rows(res.text, "LOCA")
+    assert rows["headings"] == ["LOCA_ID", "LOCA_GL"]
+    assert rows["types"] == ["ID", "2DP"]
+    assert rows["units"] == ["", "m"]
 
 
 def test_build_units_types_override():
     # LOCA_XTRA is a custom heading the dictionary doesn't know (default TYPE X);
     # the heading-keyed override (#294 F#9) gives it a real UNIT/TYPE, while the
-    # standard headings still fill from the dict.
+    # standard headings still fill from the dict. Reparse so the override lands in
+    # the right column against LOCA_XTRA, not merely somewhere in the text.
     loca = pl.DataFrame({"LOCA_ID": ["BH1"], "LOCA_GL": [1.0], "LOCA_XTRA": ["9"]})
     res = laterite.build_ags4(
         {"PROJ": _proj(), "LOCA": loca},
@@ -37,9 +51,10 @@ def test_build_units_types_override():
         units={"LOCA": {"LOCA_XTRA": "kPa"}},
         types={"LOCA": {"LOCA_XTRA": "3DP"}},
     )
-    loca_section = res.text.split('"GROUP","LOCA"')[1]
-    assert '"UNIT","","m","kPa"' in loca_section  # LOCA_GL from dict, LOCA_XTRA overridden
-    assert '"TYPE","ID","2DP","3DP"' in loca_section
+    rows = _group_rows(res.text, "LOCA")
+    assert rows["headings"] == ["LOCA_ID", "LOCA_GL", "LOCA_XTRA"]
+    assert rows["types"] == ["ID", "2DP", "3DP"]  # LOCA_GL from dict, LOCA_XTRA overridden
+    assert rows["units"] == ["", "m", "kPa"]
 
 
 @pytest.mark.parametrize(

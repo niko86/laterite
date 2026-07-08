@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-07-08
+
+The **`lat` CLI** — one AGS4 tool with three launchers (the native binary,
+`uvx --from laterite lat`, and `npx laterite`), the full verb set, and
+byte-identical scriptable output — plus a round of parser / emit / fix
+correctness fixes.
+
+### Added
+
+- **`lat read <file> [group]`** — a data-out verb for the CLI: dump one group's
+  rows as an aligned table (default), `--csv`, or `--json`, or list the file's
+  group codes when no group is named. Raw file cells, faithful to the bytes;
+  `--csv` / `--json` are **byte-identical** across the native `lat` binary,
+  `uvx --from laterite lat`, and the Python console-script (backed by a new
+  native raw-read). `--out <path>` writes to a file. (#430 PR 2)
+- **`lat pack` / `unpack` / `lock` / `unlock`** — transport verbs on the CLI:
+  zstd-compress any file for transfer (`pack` / `unpack`), or add an age
+  passphrase envelope (`lock` / `unlock`, standard zstd-inside-age). The
+  passphrase is **never** a flag — precedence is `--password-file` →
+  `$LAT_TRANSPORT_PASSWORD` → an interactive prompt. `--level` tunes the zstd
+  ratio and `--log-n` the scrypt tier (default 18). On by default;
+  `--no-default-features` builds a lean, age/zstd-free tool. Mirrored on the
+  Python console-script. (#430 PR 3)
+- **`lat excel <in> <out>`** — convert AGS4 ↔ Excel on the CLI. The direction is
+  inferred from the output extension (`.xlsx` ⇒ export, one sheet per group;
+  `.ags` ⇒ import), or forced with `--export` / `--import`; `--no-format-numeric`
+  keeps imported columns as text. On by default; `--no-default-features` drops the
+  calamine / rust_xlsxwriter deps. Mirrored on the Python console-script. With
+  this the `lat` verb set is complete. (#430 PR 4)
+- **`lat` on npm — `npx laterite`** — the Node CLI, the third launcher of the one
+  AGS4 tool (alongside the Rust binary and `uvx --from laterite lat`). All the same
+  verbs — validate / read / fix / diff / certify / rules / transport / excel — over
+  the public API; scriptable outputs (`validate --json` / `--ndjson`,
+  `read --json` / `--csv`, `rules --json`) are byte-identical to the binary. Ships
+  as a `bin` on the `laterite` npm package. (#430)
+- **Unified `.ags.idx` certificate identity across surfaces.** A certificate
+  minted by any surface (the `lat` CLI, the `laterite` wheel, Node, the DuckDB
+  extension) now carries one shared engine identity, so a cert minted by one is
+  trusted by all. (#430 PR 1a)
+- **`log_n` scrypt work factor on `lock` / `unlock`** (library, plus the CLI
+  `--log-n`; default 18) — an optional tuning knob, pinned on decrypt so
+  `log_N`-18 files open on any machine. (#432)
+
+### Changed
+
+- **The CLI binary and Python console-script are renamed `lat-check` → `lat`.**
+  The tool grew well beyond "check" (read / transport / excel / diff / certify),
+  so it is now just `lat`. **Breaking:** scripts invoking `lat-check` must switch
+  to `lat`. (#430 PR 1)
+- **`fix()` canonicalises unambiguous dates by default.** Date normalisation is
+  now assessed per value — an unambiguous date is a safe fix, where before it
+  needed `risky=True`.
+
+### Fixed
+
+- **Parser: old-Mac (lone `CR`) line endings split correctly.** The line splitter
+  is now quote-aware and universal-newline, so a bare `\r` is a break outside
+  quotes and a literal inside them. (#422)
+- **Emit: a cell carrying a raw `CR` / `LF` is rejected**, not written into an
+  illegal AGS4 file. (#423)
+- **Emit: the fix no-op path always produces valid UTF-8**, even when the source
+  carried a UTF-8 label.
+- **Fix: quotes produced by Rule 1 transliteration are AGS-escaped**, so a
+  transliterated value stays a valid quoted field.
+- **Encoding: one shared encoding-label resolver across all surfaces** — the same
+  WHATWG label maps to the same encoding everywhere.
+- **`registry.GROUPS` is sealed read-only** — mutating the shared registry mapping
+  now raises instead of corrupting it for later calls.
+
 ## [0.6.2] — 2026-07-05
 
 A round of **cross-surface I/O-form** additions from the modality audit — every
@@ -594,7 +663,8 @@ Initial public release.
 - 9 python-ags4 parity tests fail by design; see
   [`docs/parity-coverage-map.md`](docs/parity-coverage-map.md).
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/niko86/laterite/releases/tag/v0.7.0
 [0.6.2]: https://github.com/niko86/laterite/releases/tag/v0.6.2
 [0.6.1]: https://github.com/niko86/laterite/releases/tag/v0.6.1
 [0.6.0]: https://github.com/niko86/laterite/releases/tag/v0.6.0

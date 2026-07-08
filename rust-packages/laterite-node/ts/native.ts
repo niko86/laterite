@@ -13,6 +13,7 @@ export {
   listRules,
   registryDictionaryJson,
   diff as nativeDiff,
+  readGroupsRaw,
   emitAgs4FromIpc,
   Reading,
   Sidecar,

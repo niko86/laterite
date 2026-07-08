@@ -1,13 +1,13 @@
 [project]
 name = "laterite-workspace"
-version = "0.6.2"
+version = "0.7.0"
 description = "uv workspace root for the laterite AGS toolkit (dev monorepo aggregator; ships no wheel)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "laterite",
     "duckdb>=1.5.4",
-    "polars>=1.42.0",
+    "polars>=1.42.1",
     "pyarrow>=24.0.0",
     "lxml>=6.1.1",
 ]
@@ -30,7 +30,7 @@ laterite = { workspace = true }
 # so the shipped wheel never gains marimo). pandas<3 stays — python-ags4 needs
 # it and ags5_ags4/codec.py imports it directly.
 dev = [
-    "marimo>=0.23.11",
+    "marimo>=0.23.13",
     "pandas<3",
     "pytest>=9.1.1",
     "pytest-benchmark>=5.2.3",
@@ -38,7 +38,7 @@ dev = [
     # Ags4File text round-trip with generated input the example-based
     # tests don't reach (the laterite-base tests in
     # packages/laterite/tests/test_ags_types.py + test_ags4file.py).
-    "hypothesis>=6.155.7",
+    "hypothesis>=6.156.1",
     # Parallel test execution. The laterite + ags5 suites are
     # file/DuckDB-heavy (per-test tmp_path isolation), so they fan out
     # cleanly across workers. CI runs `-n 4` to roughly halve the suite
@@ -55,7 +55,7 @@ dev = [
     # as ruff/uv (Rust-fast). Run in the project venv (`uv run ty check`, NOT
     # `uvx`) so it resolves polars/duckdb + the generated `_laterite_native.pyi`;
     # config + scope in [tool.ty] below. CI step sits beside `ruff check`.
-    "ty>=0.0.55",
+    "ty>=0.0.56",
     # Build backend for the `laterite` package (PyO3 extension compiled
     # from rust-packages/laterite-py). In the dev group so a workspace
     # `uv sync` builds the native module; not a runtime dep of any
@@ -82,6 +82,13 @@ dev = [
     # stamps the release version across every site + rolls the CHANGELOG in
     # one command. Config in [tool.bumpversion] below; policy in RELEASING.md.
     "bump-my-version>=1.4.1",
+    # Independent `age` implementation (Rust `age` crate via PyO3), used only
+    # by test_transport_interop.py as an INTEROP ORACLE: it decrypts what our
+    # laterite.transport.lock() produced and encrypts what our unlock() reads.
+    # A hard dep (not importorskip) because the whole point is to prove our
+    # envelope is standard-age, not self-consistent — a skipped oracle proves
+    # nothing. Wheels ship for macOS + manylinux (confirmed `uv sync`).
+    "pyrage>=1.2",
 ]
 
 # Docs site (#201, Phase 1): MkDocs + Material. A separate group so the core
@@ -178,7 +185,7 @@ python-version = "3.12"
 #   uv run bump-my-version bump --new-version 0.2.0rc1   # explicit pre-release
 #   uv run bump-my-version bump minor --dry-run -v       # preview, no writes
 [tool.bumpversion]
-current_version = "0.6.2"
+current_version = "0.7.0"
 # Parse accepts PEP 440 canonical pre-releases (0.2.0rc1 / 0.2.0dev1, no hyphen
 # — PyPI rejects hyphens) so an explicit `bump --new-version 0.2.0rc1` round-
 # trips. `bump major|minor|patch` produces a FINAL release (e.g. 0.2.0); cut a
@@ -234,7 +241,7 @@ replace = "compare/v{new_version}...HEAD\n[{new_version}]: https://github.com/ni
 
 # Rust crate suite: single-sourced via [workspace.package] version (every
 # member inherits it with version.workspace = true). Stamped here so a
-# `bump-my-version bump` moves the engine crates + the `lat-check` binary in
+# `bump-my-version bump` moves the engine crates + the `lat` binary in
 # lockstep with the Python wheels — preventing the kind of Python/Rust version
 # drift this single-sourcing fixed. (The `lat-db` binary is dormant under
 # `ags5/`, #177 — not built or shipped.) The only `version = "X"` literal in

@@ -7,15 +7,59 @@ the Rust crate's `to_groups_json` returns.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 from laterite import registry as latreg
 
+# The dictionary JSON the union GROUPS + per-edition views are all generated from —
+# its `editions` list is the authority for which editions the union spans.
+_CORE_DICT = (
+    Path(__file__).resolve().parents[3]
+    / "rust-packages"
+    / "laterite-ags4-core"
+    / "data"
+    / "ags_dictionary.json"
+)
 
-def test_groups_loaded() -> None:
+
+def test_groups_is_read_only_but_still_a_dict() -> None:
+    # GROUPS is a process-global singleton projected from the single-source
+    # dictionary — sealed against mutation (the Python analogue of laterite-node's
+    # Object.freeze on its own GROUPS), while STAYING an isinstance(dict) so the
+    # type + the ty gate stay honest. Reads are unaffected; every mutator raises.
     assert isinstance(latreg.GROUPS, dict)
-    # The consolidated UNION of the official 4.0.3-4.2 dictionary (~174 groups).
-    assert len(latreg.GROUPS) > 150, f"expected the full official union, got {len(latreg.GROUPS)}"
-    for code in ("PROJ", "LOCA", "SAMP", "CPTG"):  # CPTG was missing from the old curated subset
+    assert latreg.GROUPS.get("NOPE") is None  # read surface intact
+    for mutate in (
+        lambda: latreg.GROUPS.__setitem__("XXXX", None),
+        lambda: latreg.GROUPS.__delitem__("PROJ"),
+        latreg.GROUPS.clear,
+        lambda: latreg.GROUPS.update({"XXXX": None}),
+        lambda: latreg.GROUPS.setdefault("XXXX", None),
+        lambda: latreg.GROUPS.pop("PROJ"),
+    ):
+        with pytest.raises(TypeError, match="read-only"):
+            mutate()
+    # The registry survived every rejected mutation untouched.
+    assert "XXXX" not in latreg.GROUPS
+    assert "PROJ" in latreg.GROUPS
+
+
+def test_groups_is_exactly_the_union_of_the_per_edition_codes() -> None:
+    # GROUPS is DEFINED as the union across editions 4.0.3-4.2, so pin that exact
+    # relationship — `set(GROUPS) == ⋃ per-edition codes` — rather than a `>150`
+    # magic number that neither proves the union is complete nor catches a group
+    # that leaks into GROUPS without belonging to any edition. This is the real
+    # invariant the union codegen must uphold, and it drifts loudly if it breaks.
+    assert isinstance(latreg.GROUPS, dict)
+    editions = json.loads(_CORE_DICT.read_text(encoding="utf-8"))["editions"]
+    union = set().union(
+        *({g["code"] for g in latreg.dictionary(ed)["groups"]} for ed in editions)
+    )
+    assert set(latreg.GROUPS) == union
+    # A couple of anchors so a total collapse (empty union == empty GROUPS) still fails.
+    for code in ("PROJ", "LOCA", "SAMP", "CPTG"):
         assert code in latreg.GROUPS
 
 
@@ -24,7 +68,7 @@ def test_dictionary_per_edition() -> None:
     # union GROUPS. Shape mirrors the browser/Node dictionary().
     d = latreg.dictionary("4.2")
     assert d["ags_edition"] == "4.2"
-    assert isinstance(d["groups"], list) and len(d["groups"]) > 150
+    assert isinstance(d["groups"], list) and d["groups"]
     proj = next(g for g in d["groups"] if g["code"] == "PROJ")
     assert proj["contents"]  # the group's standard description
     h0 = proj["headings"][0]

@@ -120,30 +120,24 @@ impl ValidationReport {
 /// as a Rule 1 finding), and we never set `custom_dict` (so no `BadDict`) —
 /// but we map every arm so the `match` is total and future-proof.
 fn classify(e: &ValidatorError) -> (&'static str, String) {
+    // Delegate to the single producer `ValidatorError::kind()`, except the
+    // deliberate, allowlisted divergence: with no filesystem, `NotFound`/`Io` are
+    // unreachable, so they collapse to `"io"` here (vs the producer's
+    // `"not_found"`) purely to keep the match total. Gated in the tests below.
     let kind = match e {
-        ValidatorError::NotAgs4(_) => "not_ags4",
-        ValidatorError::UnsupportedEdition { .. } => "unsupported_edition",
-        ValidatorError::BadDict { .. } => "bad_dict",
         ValidatorError::NotFound(_) | ValidatorError::Io { .. } => "io",
+        other => other.kind(),
     };
     (kind, e.to_string())
 }
 
-/// Resolve a UI encoding label to an `encoding_rs` encoding. The select
-/// offers UTF-8 + Windows-1252 (the legacy producer); any other WHATWG
-/// label flows through `for_label`. Default + unknown → UTF-8, matching
-/// the validator's historical `from_utf8_lossy` behaviour.
+/// Resolve a UI encoding label to an `encoding_rs` encoding, via the shared
+/// label table in the parse leaf so a label means the same thing on every
+/// surface. The select offers UTF-8 + Windows-1252 (the legacy producer);
+/// default + unknown → UTF-8, matching the validator's historical
+/// `from_utf8_lossy` behaviour.
 fn resolve_encoding(label: Option<&str>) -> &'static encoding_rs::Encoding {
-    let Some(label) = label else {
-        return encoding_rs::UTF_8;
-    };
-    match label.trim().to_ascii_lowercase().as_str() {
-        "" | "utf-8" | "utf8" => encoding_rs::UTF_8,
-        "cp1252" | "windows-1252" | "latin1" | "latin-1" | "iso-8859-1" => {
-            encoding_rs::WINDOWS_1252
-        }
-        other => encoding_rs::Encoding::for_label(other.as_bytes()).unwrap_or(encoding_rs::UTF_8),
-    }
+    laterite_ags4_parse::resolve_encoding(label).unwrap_or(encoding_rs::UTF_8)
 }
 
 /// Map a UI dict-version string to a forced edition. `None` / `"auto"`
@@ -151,22 +145,13 @@ fn resolve_encoding(label: Option<&str>) -> &'static encoding_rs::Encoding {
 /// returns `Err(message)` (the caller turns it into a `bad_args`
 /// report); we return the short message rather than the whole report so
 /// the `Err` variant stays small (clippy `result_large_err`).
-/// `"4.0.3|4.0.4|4.1|4.1.1|4.2"` for error messages — from the generated set.
-fn editions_pipe() -> String {
-    DictVersion::ALL
-        .iter()
-        .map(|v| v.as_str())
-        .collect::<Vec<_>>()
-        .join("|")
-}
-
 fn resolve_dict_override(s: Option<&str>) -> Result<Option<DictVersion>, String> {
     match s.map(str::trim) {
         None | Some("") | Some("auto") => Ok(None),
         Some(other) => DictVersion::from_edition(other).map(Some).ok_or_else(|| {
             format!(
                 "unknown dict_version {other:?}; expected auto|{}",
-                editions_pipe()
+                laterite_ags4_validator::editions_joined("|")
             )
         }),
     }
@@ -212,8 +197,12 @@ struct BuildAgs4Report {
 fn emit_edition(s: Option<&str>) -> Result<DictVersion, String> {
     match s.map(str::trim) {
         None | Some("") | Some("auto") => Ok(FALLBACK),
-        Some(other) => DictVersion::from_edition(other)
-            .ok_or_else(|| format!("unknown edition {other:?}; expected {}", editions_pipe())),
+        Some(other) => DictVersion::from_edition(other).ok_or_else(|| {
+            format!(
+                "unknown edition {other:?}; expected {}",
+                laterite_ags4_validator::editions_joined("|")
+            )
+        }),
     }
 }
 
@@ -273,7 +262,7 @@ fn emit_report(
                 desc: f.desc.clone(),
                 severity: match f.severity {
                     findings::Severity::Error => None,
-                    s => Some(format!("{s:?}").to_lowercase()),
+                    s => Some(s.as_str().to_string()),
                 },
             })
         })
@@ -551,8 +540,8 @@ pub fn validate(
 ///   .toISOString()`): wasm has no clock, so the caller supplies it.
 ///
 /// Errors if the file can't be parsed, or has any findings — a certificate
-/// attests a *clean* validation. The mint is errors-only (like `lat-check
-/// --emit-index` / Python `.certify()`), so the stamp records `warnings=0,
+/// attests a *clean* validation. The mint is errors-only (like `lat
+/// certify` / Python `.certify()`), so the stamp records `warnings=0,
 /// fyi=0`. The stamped engine version is the shared validator's, so the cert
 /// is comparable across surfaces.
 #[wasm_bindgen]
@@ -562,7 +551,7 @@ pub fn certify(
     encoding_label: Option<String>,
     checked_at: String,
 ) -> Result<String, JsError> {
-    use laterite_ags4_core::index::{Sidecar, ValidationStamp};
+    use laterite_ags4_core::index::{ENGINE_IDENTITY, Sidecar, ValidationStamp};
 
     console_error_panic_hook::set_once();
 
@@ -589,7 +578,9 @@ pub fn certify(
     }
 
     let stamp = ValidationStamp {
-        validator: "laterite-ags4-wasm".to_string(),
+        // Unified engine identity (#430 PR 1a) — was "laterite-ags4-wasm", which
+        // siloed browser-minted certs; now portable to Python/Node/CLI/DuckDB.
+        validator: ENGINE_IDENTITY.to_string(),
         validator_version: laterite_ags4_validator::VERSION.to_string(),
         compat: None,
         check_files: false, // the wasm sandbox has no filesystem
@@ -608,7 +599,7 @@ pub fn certify(
 
 /// The AGS4 rule catalogue as the gated `rules_meta.json` JSON string — the
 /// browser parses it into typed rule entries. Mirrors `laterite.list_rules()` /
-/// `lat-check --list-rules`. No input.
+/// `lat rules`. No input.
 #[wasm_bindgen]
 pub fn list_rules() -> String {
     laterite_ags4_validator::rule_metadata_json().to_string()
@@ -717,14 +708,12 @@ fn run(
                             findings::Target::Cell => Some("cell".to_string()),
                             findings::Target::Group => Some("group".to_string()),
                         };
-                        // severity emitted as the lowercase token — taken from
-                        // `Severity`'s own serde rename (the ONE source) rather
-                        // than re-spelling error/warning/fyi here. Harmless that
-                        // it's optional (TS treats it so) and lets the UI pick
-                        // the row-band colour without inferring a default.
-                        let severity = serde_json::to_value(f.severity)
-                            .ok()
-                            .and_then(|v| v.as_str().map(str::to_string));
+                        // severity emitted as the lowercase token via the single
+                        // producer `Severity::as_str` (gated == the serde rename),
+                        // rather than re-spelling error/warning/fyi here. Optional
+                        // (TS treats it so) and lets the UI pick the row-band
+                        // colour without inferring a default.
+                        let severity = Some(f.severity.as_str().to_string());
                         // Span precedence: a finding-carried span (Rules 1/6)
                         // wins; otherwise, for a field-targeted finding,
                         // compute the inner-value span from the raw line so
@@ -1181,6 +1170,24 @@ mod tests {
             .timestamp_micros()
     }
 
+    /// A wasm-minted certificate now carries the shared engine identity — it used
+    /// to stamp "laterite-ags4-wasm", which siloed browser certs from every other
+    /// surface. Now a cert downloaded from the web app is trusted by
+    /// Python/Node/CLI/DuckDB (given fresh + profile-covers). (#430 PR 1a)
+    #[test]
+    fn certify_stamps_the_unified_engine_identity() {
+        const CLEAN: &[u8] =
+            include_bytes!("../../laterite-ags4-validator/tests/fixtures/clean_minimal.ags");
+        let json = match certify(CLEAN, None, None, "2020-01-01T00:00:00Z".to_string()) {
+            Ok(s) => s,
+            Err(_) => panic!("a clean minimal AGS4 file must certify"),
+        };
+        assert!(
+            json.contains("laterite_ags4") && !json.contains("laterite-ags4-wasm"),
+            "wasm cert must stamp the unified engine identity, got: {json}"
+        );
+    }
+
     #[test]
     fn id_and_x_are_utf8() {
         let file = parsed();
@@ -1284,6 +1291,48 @@ mod tests {
         }
         // An unknown label falls back to UTF-8 (lossy), not an error.
         assert_eq!(resolve_encoding(Some("not-a-charset")).name(), "UTF-8");
+    }
+
+    #[test]
+    fn classify_collapses_notfound_and_io_to_io() {
+        // The deliberate, allowlisted divergence from the producer: with no
+        // filesystem `NotFound`/`Io` are unreachable, so both collapse to "io"
+        // (the producer's `kind()` returns "not_found" for `NotFound`). Everything
+        // else delegates verbatim. Pins the divergence in-crate.
+        assert_eq!(classify(&ValidatorError::NotFound("x".into())).0, "io");
+        assert_eq!(
+            classify(&ValidatorError::Io {
+                path: "x".into(),
+                source: std::io::Error::other("x"),
+            })
+            .0,
+            "io"
+        );
+        assert_eq!(classify(&ValidatorError::NotAgs4("x".into())).0, "not_ags4");
+    }
+
+    #[test]
+    fn resolve_dict_override_accepts_every_bundled_edition() {
+        use laterite_ags4_validator::DictVersion;
+        for ed in DictVersion::ALL {
+            assert!(
+                resolve_dict_override(Some(ed.as_str())).is_ok(),
+                "bundled edition {} must resolve",
+                ed.as_str()
+            );
+        }
+        assert!(resolve_dict_override(Some("auto")).unwrap().is_none());
+        assert!(resolve_dict_override(None).unwrap().is_none());
+        // A bogus label errors, and the message lists EVERY bundled edition —
+        // proving it derives from `DictVersion::ALL`, not a stale hand-list.
+        let err = resolve_dict_override(Some("9.9")).unwrap_err();
+        for ed in DictVersion::ALL {
+            assert!(
+                err.contains(ed.as_str()),
+                "message must list {}",
+                ed.as_str()
+            );
+        }
     }
 
     #[test]

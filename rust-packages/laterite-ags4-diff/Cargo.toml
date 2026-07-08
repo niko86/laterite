@@ -5,7 +5,7 @@
 # compared through the canonical type system so formatting-only changes are
 # suppressed. Extracted as a leaf so the SAME engine-consistent diff is shared
 # by every host — wasm (browser Tools tab), PyO3 (the `laterite` wheel) and the
-# `lat-check` CLI — rather than living only inside `laterite-ags4-wasm`.
+# `lat` CLI — rather than living only inside `laterite-ags4-wasm`.
 #
 # Reuses the shipped, well-tested pieces; the only new code is the diff
 # orchestration:

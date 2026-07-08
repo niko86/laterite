@@ -60,12 +60,12 @@ fresh handle.
     --8<-- "cli/fix_dirty.out"
     ```
 
-    `--fix` applies the same safe-repair pass and writes the repaired file
+    `fix` applies the same safe-repair pass and writes the repaired file
     where `--fix-out` points (omit it for a sibling `<file>.fixed.ags`, or use
     `--in-place` to overwrite the source). The summary names each applied kind
     and counts what remains for a human — here the padded row was fixed, while
     the missing `TRAN`/`UNIT`/`TYPE` groups can't be invented, so the exit code
-    stays `1`. Add `--fix-risky` for the intent-guessing tier.
+    stays `1`. Add `--risky` for the intent-guessing tier.
 
 === "Browser"
 

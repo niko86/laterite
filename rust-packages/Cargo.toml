@@ -2,8 +2,8 @@
 #
 # Members:
 #   laterite-ags4-validator    Clean-room Rust AGS4 validator — library only
-#                     (lean, wasm-safe leaf). The CLI is `lat-check`.
-#   laterite-ags4-check  The `lat-check` CLI front-end for the validator
+#                     (lean, wasm-safe leaf). The CLI is `lat`.
+#   laterite-ags4-check  The `lat` CLI front-end for the validator
 #                     (owns the comfy-table/indicatif + optional TUI
 #                     deps). Depends on the validator library API only.
 #   laterite-ags4-wasm         Browser wasm (cdylib) wrapper around the validator
@@ -48,13 +48,13 @@ members = [
 ]
 
 # Single-sourced crate version: every member inherits this via
-# `version.workspace = true`, so the whole engine + the `lat-check` binary
+# `version.workspace = true`, so the whole engine + the `lat` binary
 # move in one line. Two-tier scheme: this is the
 # internal/engine tier (also stamped by bump-my-version alongside the
 # Python wheels — see root pyproject [tool.bumpversion]); the published
 # npm `laterite` versions on its own `node-v*` track.
 [workspace.package]
-version = "0.6.2"
+version = "0.7.0"
 
 # Release profile lives at the workspace root — cargo only honours
 # profile settings declared here and silently ignores them on member

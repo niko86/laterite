@@ -490,13 +490,14 @@ test("Fix tab offers a RISKY datetime canonicalisation for a non-ISO DT cell", a
   page,
 }) => {
   await ready(page);
-  // datetime.ags has TRAN_DATE = "18/08/2020" in a yyyy-mm-dd column — a Rule 8
-  // miss the new fixer rewrites to ISO. It's risky (dd/mm is a guess), so it
-  // lands in the opt-in section, not fix-all-safe.
+  // datetime.ags has TRAN_DATE = "05/06/2020" in a yyyy-mm-dd column — a Rule 8
+  // miss the fixer rewrites to ISO. Both components are ≤ 12 and differ, so the
+  // dd/mm reading is a genuine guess → RISKY, landing in the opt-in section, not
+  // fix-all-safe. (An unambiguous date like 18/08/2020 would be safe-by-default.)
   await page.locator('input[type="file"]').setInputFiles(fixture("datetime.ags"));
   await tab(page, "Fix").click();
   await expect(page.getByText(/Canonicalise datetime/)).toBeVisible();
-  await expect(page.getByText(/2020-08-18/).first()).toBeVisible();
+  await expect(page.getByText(/2020-06-05/).first()).toBeVisible();
 });
 
 test("Explore on a low-end device asks before downloading the engine, then loads on confirm", async ({

@@ -17,7 +17,7 @@ A file whose only blemish is an out-of-range `TRAN_AGS` edition (`4.9.9`) carrie
 a single **warning** — nothing in the error tier:
 
 ```bash
-lat-check site.ags
+lat validate site.ags
 ```
 
 ```text
@@ -31,7 +31,7 @@ Drop the warning tier and the *same file* reads clean — and the exit code flip
 from `1` to `0`:
 
 ```bash
-lat-check --no-warnings site.ags
+lat validate --no-warnings site.ags
 ```
 
 ```text

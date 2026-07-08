@@ -85,7 +85,7 @@ def test_ags4file_diff_method_and_bytes_input():
 
 
 def test_cli_diff(tmp_path, capsys):
-    """`lat-check <a> --diff <b>` via the Python `_cli` — the summary + `--json`."""
+    """`lat diff <a> <b>` via the Python `_cli` — the summary + `--json`."""
     import json
 
     from laterite import _cli
@@ -93,10 +93,10 @@ def test_cli_diff(tmp_path, capsys):
     a, b = tmp_path / "a.ags", tmp_path / "b.ags"
     a.write_text(_BASE)
     b.write_text(_REV)
-    assert _cli.main([str(a), "--diff", str(b)]) == 0
+    assert _cli.main(["diff", str(a), str(b)]) == 0
     out = capsys.readouterr().out
     assert "LOCA" in out and "+1 -1 ~1" in out
-    assert _cli.main([str(a), "--diff", str(b), "--json"]) == 0
+    assert _cli.main(["diff", str(a), str(b), "--json"]) == 0
     delta = json.loads(capsys.readouterr().out)
     assert (delta["total_changed"], delta["total_added"], delta["total_removed"]) == (
         1,

@@ -45,6 +45,11 @@ encoding_rs = "0.8"
 # csv/json/ipc/prettyprint→comfy-table); v59 matches every other arrow pin.
 arrow = { version = "59", default-features = false, optional = true }
 
+[dev-dependencies]
+# Property tests for the writer's quote-escaping round-trip. Already vendored +
+# cargo-deny-cleared (dev-dep of the validator / parse / types crates too).
+proptest = "1"
+
 [features]
 # Typed-Arrow input support (the `arrow_in` transpose). Off by default so
 # JSON-only consumers don't pull arrow.

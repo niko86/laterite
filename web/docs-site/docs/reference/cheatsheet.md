@@ -92,7 +92,7 @@ Parked on `Ags4File.report` after `.validate()`.
 | `.dict_version` | `str` | AGS edition the rules resolved to |
 | `.resolution` | `str` | how that edition was chosen |
 | `.findings` | `list[Finding]` | rule · line · group · description |
-| `.to_json()` | `str` | JSON, same shape as `lat-check --json` |
+| `.to_json()` | `str` | JSON, same shape as `lat validate --json` |
 
 → worked example: [Validate](../learn/validate.md) ([ex02](../learn/validate.md)).
 
@@ -115,5 +115,5 @@ Parked on `Ags4File.report` after `.validate()`.
 
 ---
 
-See also: the [CLI reference](./cli.md) for `lat-check`, and the
+See also: the [CLI reference](./cli.md) for `lat`, and the
 [Cookbook](../cookbook/index.md) for end-to-end recipes.

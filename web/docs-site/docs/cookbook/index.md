@@ -12,7 +12,7 @@ on the page is the *exact* file the CI gate executes, so the output is real. New
 
 ## Validating
 
-- [**Validate a delivery**](validate-a-delivery.md) — in Python and on the `lat-check` CLI (+ exit codes).
+- [**Validate a delivery**](validate-a-delivery.md) — in Python and on the `lat` CLI (+ exit codes).
 - [**List the rules / report the edition**](list-rules.md) — `list_rules()` and `dict_for()`.
 
 ## Querying

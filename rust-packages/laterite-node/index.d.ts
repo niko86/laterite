@@ -35,7 +35,7 @@ export declare class Reading {
  * The `.ags.idx` validity certificate — the Node mirror of laterite-py's
  * `Sidecar` pyclass, wrapping the ONE core `laterite_ags4_core::index::Sidecar`
  * so a Node-minted cert is byte-identical + checker-compatible with Python,
- * `lat-check --emit-index`, and the DuckDB extension. `Ags4File.certify()` mints
+ * `lat certify`, and the DuckDB extension. `Ags4File.certify()` mints
  * one; `read(file, {index})` consumes it; a fresh + engine-matching cert lets a
  * later `.validate()` skip the rule engine.
  */
@@ -204,7 +204,7 @@ export interface Finding {
  * Mechanically repair an AGS4 file (`path`) / `text` / `data`: apply the SAFE
  * fixes (plus the risky set when `includeRisky`, narrowed by `only` / widened-
  * back by `exclude`), re-validate, and return the fixed bytes + residual
- * findings. Mirrors laterite-py's `fix()` / `lat-check --fix`; the single
+ * findings. Mirrors laterite-py's `fix()` / `lat fix`; the single
  * `fix_document_selective` orchestration is shared. The TS layer wraps this into
  * a `FixResult` (`.bytes` / `.text` / `.save(path)`) and adds `inPlace` / `out`
  * write-back on top.
@@ -256,7 +256,7 @@ export interface GroupMeta {
 
 /**
  * The AGS4 rule catalogue as the gated `rules_meta.json` — byte-identical to
- * laterite-py's `list_rules()` and `lat-check --list-rules --json`. The TS
+ * laterite-py's `list_rules()` and `lat rules --json`. The TS
  * layer parses it into typed `RuleMeta[]`. No input file.
  */
 export declare function listRules(): string
@@ -289,6 +289,14 @@ export declare function parseArrow(path?: string | undefined | null, text?: stri
 export declare function parseValue(raw: string | undefined | null, agsType: string): any
 
 /**
+ * Raw group cells for the Node CLI `lat read` — a JSON string
+ * `{"order":[...],"groups":{code:{"headings":[...],"rows":[[cell,...]]}}}`,
+ * straight from core's read codec (no typing), so `lat read --json` / `--csv`
+ * match the Rust binary and Python byte-for-byte (#430).
+ */
+export declare function readGroupsRaw(path: string): string
+
+/**
  * The bundled standard dictionary for `edition` as JSON — the
  * `{ags_edition, groups:[{code, contents, parent, headings:[…]}]}` shape the
  * browser and `laterite.registry.dictionary()` also render, from the ONE shared
@@ -313,13 +321,13 @@ export declare function runCheck(path?: string | undefined | null, text?: string
  * zstd-compress, then age-encrypt with `password` → `dest`. Compress-then-
  * encrypt is load-bearing: zstd needs low-entropy input; ciphertext is random.
  */
-export declare function transportLock(src: string, dest: string, password: string, level?: number | undefined | null): PackStats
+export declare function transportLock(src: string, dest: string, password: string, level?: number | undefined | null, logN?: number | undefined | null): PackStats
 
 /**
  * zstd-compress, then age-encrypt `data` with `password` in memory → bytes —
  * no plaintext on disk. `level` is 1–22 (default 9).
  */
-export declare function transportLockBytes(data: Uint8Array, password: string, level?: number | undefined | null): Buffer
+export declare function transportLockBytes(data: Uint8Array, password: string, level?: number | undefined | null, logN?: number | undefined | null): Buffer
 
 /** zstd-compress `src` → `dest`. `level` is 1–22 (default 9, the AGS sweet spot). */
 export declare function transportPack(src: string, dest: string, level?: number | undefined | null): PackStats
@@ -356,7 +364,7 @@ export interface UnpackStats {
  * `ok` is **false only for un-validatable input** (the TS `raiseFor` raises
  * then); rule *violations* come back in `findings` with `ok:true`. `Report`'s
  * `isValid` is the separate `count == 0`. `json`/`ndjson` are byte-identical
- * to `lat-check --json` / `--ndjson`.
+ * to `lat validate --json` / `--ndjson`.
  */
 export interface ValidationReport {
   ok: boolean
@@ -367,7 +375,7 @@ export interface ValidationReport {
   errorKind?: string
   error?: string
   /**
-   * Mirrors the `lat-check` binary: 0 valid / 1 findings on success;
+   * Mirrors the `lat` binary: 0 valid / 1 findings on success;
    * 3 not-found/io, 4 not-utf8/not-ags4/bad-edition, 5 bad-dict on failure.
    */
   exitCode: number

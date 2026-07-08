@@ -53,6 +53,17 @@ pub use fixes::{
     fix_document_selective,
 };
 
+/// The bundled AGS4 editions joined with `sep` — the single source for every
+/// surface's "expected auto|4.0.3|…" / "pass one of 4.0.3/…" message, so no
+/// hand-written list can drift from `DictVersion::ALL`.
+pub fn editions_joined(sep: &str) -> String {
+    DictVersion::ALL
+        .iter()
+        .map(|v| v.as_str())
+        .collect::<Vec<_>>()
+        .join(sep)
+}
+
 /// Validation options. `Default` = **auto-detect** the dictionary from
 /// the file's `TRAN_AGS`, errors only.
 #[derive(Debug, Clone)]
@@ -80,7 +91,7 @@ pub struct CheckOptions {
     /// `.ags`. **Default `false`**: the data-level Rule 20 is
     /// path-independent and deterministic (what a library validator
     /// and `db-to-ags4 --validate` need); the filesystem stat is a
-    /// packaging/QA concern, enabled explicitly (`lat-check
+    /// packaging/QA concern, enabled explicitly (`lat validate
     /// --check-files`) and by the corpus-qa dogfood so it matches
     /// python-ags4's always-on behaviour. std-only — no new dep.
     pub check_files: bool,

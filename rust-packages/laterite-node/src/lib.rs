@@ -34,7 +34,7 @@ mod transport_fns;
 // dict + `_errors.py::raise_for`. Hard failures (missing / not-AGS4 / bad
 // edition) carry a `kind` + `exit_code` so the TS layer maps them to the right
 // `Ags4Error` subclass WITHOUT brittle message-matching — byte-faithful to the
-// `lat-check` exit codes (3 not-found/io, 4 not-utf8/not-ags4/unsupported-
+// `lat` exit codes (3 not-found/io, 4 not-utf8/not-ags4/unsupported-
 // edition, 5 bad-dict/bad-args). `runCheck` returns the failure as data (an
 // object, mirroring Python's dict); `parseArrow` returns a `Reading` *handle*,
 // so it can't carry an `{ok}` field and instead THROWS this — a `\u{1f}`
@@ -43,16 +43,11 @@ mod transport_fns;
 
 const SEP: char = '\u{1f}';
 
-/// `(exit_code, error_kind)` for a `ValidatorError` — mirrors laterite-py's
-/// `map_err`. The message is the error's `Display`.
+/// `(exit_code, error_kind)` for a `ValidatorError` — a thin alias over the
+/// single producers `ValidatorError::exit_code()` / `::kind()` so the codes and
+/// tokens can't drift from the validator crate. The message is the `Display`.
 fn classify(e: &ValidatorError) -> (i32, &'static str) {
-    match e {
-        ValidatorError::NotFound(_) => (3, "not_found"),
-        ValidatorError::Io { .. } => (3, "io"),
-        ValidatorError::NotAgs4(_) => (4, "not_ags4"),
-        ValidatorError::UnsupportedEdition { .. } => (4, "unsupported_edition"),
-        ValidatorError::BadDict { .. } => (5, "bad_dict"),
-    }
+    (e.exit_code(), e.kind())
 }
 
 /// A `ValidatorError` as a thrown napi error (for the handle-returning
@@ -282,7 +277,7 @@ pub struct Finding {
 /// `ok` is **false only for un-validatable input** (the TS `raiseFor` raises
 /// then); rule *violations* come back in `findings` with `ok:true`. `Report`'s
 /// `isValid` is the separate `count == 0`. `json`/`ndjson` are byte-identical
-/// to `lat-check --json` / `--ndjson`.
+/// to `lat validate --json` / `--ndjson`.
 #[napi(object)]
 pub struct ValidationReport {
     pub ok: bool,
@@ -290,7 +285,7 @@ pub struct ValidationReport {
     /// `raiseFor` maps to an exception (`not_ags4`, `unsupported_edition`, …).
     pub error_kind: Option<String>,
     pub error: Option<String>,
-    /// Mirrors the `lat-check` binary: 0 valid / 1 findings on success;
+    /// Mirrors the `lat` binary: 0 valid / 1 findings on success;
     /// 3 not-found/io, 4 not-utf8/not-ags4/bad-edition, 5 bad-dict on failure.
     pub exit_code: i32,
     pub file: String,
@@ -323,7 +318,7 @@ impl ValidationReport {
 }
 
 /// `{file, findings:{ "AGS Format Rule N":[{line,group,desc}] }}` pretty-JSON —
-/// byte-identical to `lat-check --json` (ported verbatim from laterite-py's
+/// byte-identical to `lat validate --json` (ported verbatim from laterite-py's
 /// `findings_json`; `preserve_order` keeps the key order stable).
 fn findings_json(file: &str, found: &Findings) -> String {
     let mut fmap = Map::new();
@@ -341,7 +336,7 @@ fn findings_json(file: &str, found: &Findings) -> String {
 }
 
 /// One flat `{rule, …}` JSON object per finding per line — byte-identical to
-/// `lat-check --ndjson` (ported verbatim from laterite-py's `findings_ndjson`).
+/// `lat validate --ndjson` (ported verbatim from laterite-py's `findings_ndjson`).
 fn findings_ndjson(found: &Findings) -> String {
     let mut s = String::new();
     for (rule, items) in found {
@@ -425,7 +420,7 @@ fn validate_inner(
 /// returned by default (`includeWarnings` defaults to `true`); pass `false` for
 /// errors-only. `includeFyi` (default `false`) adds the low-signal FYI tier.
 #[napi]
-#[allow(clippy::too_many_arguments)] // the napi surface mirrors lat-check's flags
+#[allow(clippy::too_many_arguments)] // the napi surface mirrors lat's flags
 pub fn run_check(
     path: Option<String>,
     text: Option<String>,
@@ -468,7 +463,7 @@ pub fn run_check(
                 desc: f.desc.clone(),
                 severity: match f.severity {
                     Severity::Error => None,
-                    s => Some(format!("{s:?}").to_lowercase()),
+                    s => Some(s.as_str().to_string()),
                 },
             })
         })
@@ -492,7 +487,7 @@ pub fn run_check(
 // --- fix (mechanical repair) + rule catalogue ---------------------------
 
 /// The AGS4 rule catalogue as the gated `rules_meta.json` — byte-identical to
-/// laterite-py's `list_rules()` and `lat-check --list-rules --json`. The TS
+/// laterite-py's `list_rules()` and `lat rules --json`. The TS
 /// layer parses it into typed `RuleMeta[]`. No input file.
 #[napi]
 pub fn list_rules() -> String {
@@ -551,12 +546,45 @@ pub fn diff(
     serde_json::to_string(&delta).map_err(|e| Error::from_reason(e.to_string()))
 }
 
+/// Raw group cells for the Node CLI `lat read` — a JSON string
+/// `{"order":[...],"groups":{code:{"headings":[...],"rows":[[cell,...]]}}}`,
+/// straight from core's read codec (no typing), so `lat read --json` / `--csv`
+/// match the Rust binary and Python byte-for-byte (#430).
+#[napi]
+pub fn read_groups_raw(path: String) -> Result<String> {
+    let parsed = laterite_ags4_core::ags4_codec::read_ags4(Path::new(&path))
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+    let mut groups = Map::new();
+    for code in &parsed.order {
+        if let Some(g) = parsed.get(code) {
+            let rows: Vec<Value> = g
+                .rows
+                .iter()
+                .map(|row| {
+                    Value::Array(
+                        g.headings
+                            .iter()
+                            .map(|h| Value::from(row.get(h).cloned().unwrap_or_default()))
+                            .collect(),
+                    )
+                })
+                .collect();
+            let mut gd = Map::new();
+            gd.insert("headings".to_string(), Value::from(g.headings.clone()));
+            gd.insert("rows".to_string(), Value::Array(rows));
+            groups.insert(code.clone(), Value::Object(gd));
+        }
+    }
+    let out = serde_json::json!({ "order": parsed.order, "groups": Value::Object(groups) });
+    serde_json::to_string(&out).map_err(|e| Error::from_reason(e.to_string()))
+}
+
 // --- the .ags.idx certificate (#294 Batch E / #14) ----------------------
 
 /// The `.ags.idx` validity certificate — the Node mirror of laterite-py's
 /// `Sidecar` pyclass, wrapping the ONE core `laterite_ags4_core::index::Sidecar`
 /// so a Node-minted cert is byte-identical + checker-compatible with Python,
-/// `lat-check --emit-index`, and the DuckDB extension. `Ags4File.certify()` mints
+/// `lat certify`, and the DuckDB extension. `Ags4File.certify()` mints
 /// one; `read(file, {index})` consumes it; a fresh + engine-matching cert lets a
 /// later `.validate()` skip the rule engine.
 #[napi]
@@ -586,7 +614,7 @@ impl Sidecar {
         edition_forced: Option<bool>,
     ) -> Result<Sidecar> {
         let stamp = laterite_ags4_core::index::ValidationStamp {
-            validator: "laterite_ags4".to_string(),
+            validator: laterite_ags4_core::index::ENGINE_IDENTITY.to_string(),
             // The ENGINE version (not this addon's), so the cert is comparable
             // across surfaces (a cert minted by Python / the DuckDB extension).
             validator_version: laterite_ags4_validator::VERSION.to_string(),
@@ -632,8 +660,11 @@ impl Sidecar {
     /// carried cert only when this holds AND it's fresh.
     #[napi]
     pub fn matches_native_validator(&self) -> bool {
-        self.inner
-            .checker_matches("laterite_ags4", laterite_ags4_validator::VERSION, None)
+        self.inner.checker_matches(
+            laterite_ags4_core::index::ENGINE_IDENTITY,
+            laterite_ags4_validator::VERSION,
+            None,
+        )
     }
 
     /// Does this cert's check profile cover a request's? (`checkFiles`: the cert ran
@@ -765,7 +796,7 @@ impl FixReport {
 /// Mechanically repair an AGS4 file (`path`) / `text` / `data`: apply the SAFE
 /// fixes (plus the risky set when `includeRisky`, narrowed by `only` / widened-
 /// back by `exclude`), re-validate, and return the fixed bytes + residual
-/// findings. Mirrors laterite-py's `fix()` / `lat-check --fix`; the single
+/// findings. Mirrors laterite-py's `fix()` / `lat fix`; the single
 /// `fix_document_selective` orchestration is shared. The TS layer wraps this into
 /// a `FixResult` (`.bytes` / `.text` / `.save(path)`) and adds `inPlace` / `out`
 /// write-back on top.
@@ -842,7 +873,7 @@ pub fn fix_file(
                 desc: f.desc.clone(),
                 severity: match f.severity {
                     Severity::Error => None,
-                    s => Some(format!("{s:?}").to_lowercase()),
+                    s => Some(s.as_str().to_string()),
                 },
             })
         })
@@ -944,13 +975,10 @@ fn group_from_ipc(
 // --- helpers ------------------------------------------------------------
 
 fn resolve_encoding(label: Option<&str>) -> &'static encoding_rs::Encoding {
-    match label.map(|s| s.trim().to_ascii_lowercase()).as_deref() {
-        None | Some("") | Some("utf-8") | Some("utf8") => encoding_rs::UTF_8,
-        Some("windows-1252") | Some("cp1252") | Some("latin1") => encoding_rs::WINDOWS_1252,
-        Some(other) => {
-            encoding_rs::Encoding::for_label(other.as_bytes()).unwrap_or(encoding_rs::UTF_8)
-        }
-    }
+    // Shared label table (the parse leaf) so a label resolves the same way on
+    // every surface — including the hyphenated `latin-1`, which this used to
+    // fall through to UTF-8. An unrecognised label keeps Node's UTF-8 fallback.
+    laterite_ags4_parse::resolve_encoding(label).unwrap_or(encoding_rs::UTF_8)
 }
 
 /// Plain-`String` error (not napi) so `run_check` can surface a bad edition as
@@ -958,14 +986,12 @@ fn resolve_encoding(label: Option<&str>) -> &'static encoding_rs::Encoding {
 fn resolve_edition(s: Option<&str>) -> std::result::Result<Option<DictVersion>, String> {
     match s.map(str::trim) {
         None | Some("") | Some("auto") => Ok(None),
-        Some("4.0.3") => Ok(Some(DictVersion::V4_0_3)),
-        Some("4.0.4") => Ok(Some(DictVersion::V4_0_4)),
-        Some("4.1") => Ok(Some(DictVersion::V4_1)),
-        Some("4.1.1") => Ok(Some(DictVersion::V4_1_1)),
-        Some("4.2") => Ok(Some(DictVersion::V4_2)),
-        Some(o) => Err(format!(
-            "unknown dict_version {o:?}; expected auto|4.0.3|4.0.4|4.1|4.1.1|4.2"
-        )),
+        Some(o) => DictVersion::from_edition(o).map(Some).ok_or_else(|| {
+            format!(
+                "unknown dict_version {o:?}; expected auto|{}",
+                laterite_ags4_validator::editions_joined("|")
+            )
+        }),
     }
 }
 

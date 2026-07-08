@@ -19,6 +19,15 @@ pub enum EmitError {
     /// error-severity AGS4 rules. Carries the findings so the caller sees
     /// exactly what was rejected.
     Invalid(Findings),
+    /// A cell value contains an embedded carriage return or line feed.
+    /// AGS4 (Rule 6) forbids CR/LF *within* a field and offers no in-field
+    /// escape, so writing the bytes raw would split the row on re-parse —
+    /// an illegal file (#423). The writer refuses rather than silently fold
+    /// the value: a caller that wants it cleaned should fix it first (fold
+    /// CR/LF → space via the fix engine), so the mutation is explicit.
+    /// `tag` is the row's descriptor; `field` is the offending cell's index
+    /// (`0` = the descriptor itself, `1` = the first data value).
+    EmbeddedNewline { tag: String, field: usize },
 }
 
 impl fmt::Display for EmitError {
@@ -32,6 +41,13 @@ impl fmt::Display for EmitError {
                 let n: usize = found.values().map(Vec::len).sum();
                 write!(f, "ags4 emit: strict mode rejected output ({n} finding(s))")
             }
+            EmitError::EmbeddedNewline { tag, field } => write!(
+                f,
+                "ags4 emit: cell contains an embedded CR/LF (field {field} of a \
+                 \"{tag}\" row); AGS4 Rule 6 forbids newlines within a field and \
+                 there is no in-field escape — fix the value (fold CR/LF to a space) \
+                 before emitting"
+            ),
         }
     }
 }
