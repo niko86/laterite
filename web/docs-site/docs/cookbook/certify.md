@@ -1,6 +1,6 @@
 # Certify a clean file & skip re-validation
 
-**Available in:** Python · Node · DuckDB · CLI · Browser
+**Available in:** Python · Node · CLI · Browser
 
 Mint an `.ags.idx` certificate from a clean validation, then reopen with it to
 skip the rule engine.
@@ -47,15 +47,11 @@ skip the rule engine.
 
 === "DuckDB"
 
-    ```sql
-    --8<-- "duckdb/ex08_certify.sql"
-    ```
-
-    `certify_ags()` validates and, on a clean result, writes the same
-    `<path>.ags.idx` beside the file — one row back: `certified` (did it
-    pass?), `groups` (how many were indexed), `errors`. Because the cert is the
-    shared format, a nightly SQL job can pre-certify deliveries that Python or
-    Node consumers then open on the fast path.
+    The `laterite_ags4` DuckDB extension is a **read-only reader** — it doesn't
+    mint certificates. Certify with `lat certify` or the library (the tabs
+    above); `read_ags` then *consumes* the resulting `<path>.ags.idx` beside the
+    file to range-read a single group's bytes instead of parsing the whole file.
+    See the [DuckDB function reference](../reference/duckdb-functions.md).
 
 === "CLI"
 

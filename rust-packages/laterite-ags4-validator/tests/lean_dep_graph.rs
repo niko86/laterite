@@ -1,6 +1,8 @@
 //! Lean dep-graph guard (the engine-purity invariant).
 //!
 //! `laterite-ags4-validator` is the clean-room engine that everything embeds —
+//! the shipped `lat-db` binary, `ags4-parity`, `ags4-corpus-qa`,
+//! `ags4-forge`, and (via PyO3) `laterite-py`. Dependencies are
 //! transitive: if any of these heavy / FFI-coupling crates leaked into
 //! the engine's *normal* dep graph, every consumer would inherit it —
 //! most damagingly, `pyo3` would make the shipped `lat-db` binary link

@@ -69,8 +69,8 @@ single borehole's whole story, not one group at a time.
     the shared KEY yourself. Each group is a `read_ags()` table function and the
     columns are born-typed, so `samp_top` sorts numerically. To pull every
     related group at once, add a `read_ags(...)` and `JOIN` per code, or reach
-    for `load_ags_script(path)` to materialise them all as `ags_<code>` tables
-    first.
+    for `load_ags(path)` to emit the DDL that materialises them all as
+    `ags_<code>` tables first.
 
 === "Browser"
 

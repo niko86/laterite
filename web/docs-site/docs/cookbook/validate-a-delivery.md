@@ -1,6 +1,6 @@
 # Validate a delivery
 
-**Available in:** Python · Node · DuckDB · CLI · Browser
+**Available in:** Python · Node · CLI · Browser
 
 Run the numbered AGS Format Rules over a transfer file and get a verdict —
 in-process from Python or Node, in SQL from DuckDB, at the shell with
@@ -47,21 +47,12 @@ in-process from Python or Node, in SQL from DuckDB, at the shell with
 
 === "DuckDB"
 
-    ```sql
-    --8<-- "duckdb/_install.sql"
-    ```
-
-    ```sql
-    --8<-- "duckdb/ex02_validate.sql"
-    ```
-
-    `validate_ags()` is a table function: **one row per finding**, so a clean
-    file returns zero rows and the verdict composes in plain SQL —
-    `count(*) = 0` is your gate, `WHERE rule = '4'` is your triage. `group` and
-    `desc` are quoted because they're SQL keywords. The edition is picked from
-    the file's `TRAN_AGS` exactly as on every other surface; pass
-    `dict_version := '4.2'` only to override it. See the
-    [DuckDB function reference](../reference/duckdb-functions.md).
+    The `laterite_ags4` DuckDB extension is a **read-only reader** — it has no
+    `validate` function. Run the numbered rules with the [`lat`
+    CLI](../reference/cli.md) or the `laterite` library (the Python/Node tabs
+    above); the extension then *reads* the file and can *consume* an
+    externally-minted `.ags.idx` (from `lat certify`) for fast single-group
+    reads. See the [DuckDB function reference](../reference/duckdb-functions.md).
 
 === "CLI"
 
@@ -108,8 +99,8 @@ in-process from Python or Node, in SQL from DuckDB, at the shell with
     arrive grouped by rule with the resolved edition and severity tiers, and
     you can carry the same file straight into the **Fix** or **Explore** panes.
 
-Every door runs the same rule engine and picks the dictionary edition from the
-file's `TRAN_AGS` — the Python/Node `report`, DuckDB's rows, and the CLI's
+Every validating door runs the same rule engine and picks the dictionary
+edition from the file's `TRAN_AGS` — the Python/Node `report` and the CLI's
 `--json` carry identical findings. Reach for the CLI in a build gate (exit `1`
 fails the build); reach for `.validate()` when you want to keep working with
 the parsed file in the same process.

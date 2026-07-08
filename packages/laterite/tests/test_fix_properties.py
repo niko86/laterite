@@ -24,6 +24,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 _ROOT = Path(__file__).resolve().parents[3]  # …/laterite
+_CORPUS = _ROOT / "rust-packages" / "ags4-forge" / "vendor" / "pyags4-tests"
 
 # A curated, deterministic subset: the encoding trio (the non-UTF-8 exercise) plus
 # a spread of rule fixtures whose faults the fixer actually touches (CRLF, BOM,

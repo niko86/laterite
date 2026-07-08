@@ -16,6 +16,7 @@ output/
 # Real-world deliveries may be confidential; never tracked.
 corpus/
 
+# ags4-forge evolutionary dogfood run dir (default --out-dir) +
 # its cross-run confidence ledger. Regenerated; never tracked.
 forge-runs/
 

@@ -69,6 +69,7 @@ dev = [
     # differently) and marker-gated so cross-platform syncs skip it.
     "patchelf; sys_platform == 'linux'",
     # Oracle PIN, not a floor: the Rust↔python parity catalogue
+    # (OBSERVATIONS O-1..O-34 + ags4-corpus-qa parity.rs reconcile arms
     # O-2/O-3/O-26/O-27/O-30/O-34) is encoded against python-ags4 1.2.0
     # *source behaviour* (e.g. rule_6 no-op, rule_20 on-disk, default
     # rename_duplicate_headers shielding O-8). A silent minor bump would

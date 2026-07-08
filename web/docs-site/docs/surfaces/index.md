@@ -23,13 +23,13 @@ browser is a product. This grid is the honest map:
 
 | Capability | Python | Node | DuckDB | CLI | Browser |
 |---|:--:|:--:|:--:|:--:|:--:|
-| **validate** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **validate** | ✅ | ✅ | — | ✅ | ✅ |
 | **read** — a group's rows | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **query** across groups | ✅ | ✅ | ✅ | — | ✅ |
 | **build / emit** AGS4 | ✅ | ✅ | — | — | ✅ |
 | **fix** | ✅ | ✅ | — | ✅ | ✅ |
 | **diff** revisions | ✅ | ✅ | — | ✅ | ✅ |
-| **certify** (`.ags.idx`) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **certify** (`.ags.idx`) | ✅ | ✅ | — | ✅ | ✅ |
 | **Excel** ↔ AGS4 | ✅ | ✅ | — | ✅ | ✅ |
 | **transport** (pack / lock) | ✅ | ✅ | — | ✅ | ✅ |
 | **python-ags4 compat** | ✅ | — | — | — | — |
@@ -41,8 +41,10 @@ Every capability is now either supported (`✅`) or a deliberate by-design blank
 former Excel, `certify` and `transport` gaps are all closed (transport encrypts
 in a Web Worker with the same `zstd + age` envelope the CLI reads). *By design
 (`—`):* the CLI is a validator + inspect/repair tool (no query/build); DuckDB is
-a SQL surface (no mutate-and-write ops); the `python-ags4` compat shim is a
-Python-only concern.
+a **read-only** SQL reader — it queries and joins but doesn't validate, certify,
+or mutate (validation and certification live in the CLI + library; the extension
+only *consumes* an externally-minted `.ags.idx`); the `python-ags4` compat shim
+is a Python-only concern.
 
 ## The shared vocabulary
 

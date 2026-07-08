@@ -133,6 +133,7 @@ impl Dictionary {
     /// `heading` (the picklist), in the map's iteration order; empty if
     /// the heading has no picklist. The keys are the `heading\u{1f}code`
     /// composites [`abbr_desc`](Self::abbr_desc) looks up. Exposed so a
+    /// generator (ags4-forge) can sample realistic, *valid* PA values
     /// from the single-source dictionary rather than a hardcoded list.
     pub fn abbr_codes(&self, heading: &str) -> Vec<&'static str> {
         self.abbrs

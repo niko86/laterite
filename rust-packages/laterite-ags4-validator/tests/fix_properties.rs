@@ -355,6 +355,7 @@ proptest! {
 #[test]
 fn fixture_corpus_upholds_the_invariants() {
     let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ags4-forge/vendor/pyags4-tests");
     if !dir.is_dir() {
         eprintln!("skipping fixture sweep: {} absent", dir.display());
         return;

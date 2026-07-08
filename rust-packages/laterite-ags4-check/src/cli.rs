@@ -1,5 +1,6 @@
 //! Command-line surface (clap derive) for `lat` — the reworked AGS4 tool.
 //!
+//! Follows the workspace CLI lineage (`ags4-forge` / `ags4-corpus-qa`): a few
 //! **global** flags valid before/after the subcommand, results to **stdout**,
 //! progress to **stderr**, typed exit codes in `after_help`. Each verb owns its
 //! flags, so the six imperative mutual-exclusion checks the old flat parser

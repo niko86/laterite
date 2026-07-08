@@ -1,6 +1,7 @@
 """Base read-path performance baselines via pytest-benchmark.
 
 Tracks the operations the 1.0 Arrow engine redesign changes (see
+``redacted-wiki/ags5-design/api-surface-1.0.md``): cold read, group-frame access,
 numeric coercion, and validation (Rust-on-text — a control that stays
 unchanged). They don't assert wall-clock (machines vary); pytest-benchmark
 records timings and ``--benchmark-save`` / ``--benchmark-compare`` flag

@@ -406,6 +406,7 @@ O-N below is an internal decision or behavioural note, not for external circulat
 
 ### O-27 [NOTE] Rule 20 on-disk checks are implemented as opt-in (`--check-files`)
 - **python-ags4** (`rule_20`): besides the data-level check (every `FILE_FSET` used must be defined in the FILE group), it stats the filesystem — a `FILE/` sub-folder beside the `.ags`, a `FILE/<fset>/` per defined FSET, and each `FILE_NAME` on disk.
+- **Us**: the **data-level** check always runs; the **on-disk** half is `references::rule_20_on_disk`, gated by `check_files` (CLI `lat validate --check-files`). **Default off** — a library validator must stay deterministic and path-independent; `ags4-corpus-qa validate` turns it on by default so the dogfood matches python-ags4's always-on stat.
 - **Assessment**: no longer a standing variance — with `check_files` on, Rust and python **agree** on Rule 20; with it off, only the portable data-level core runs, a documented opt-out.
 - **Upstream-reportable**: no — implementation/scope choice.
 - **Our decision**: data-level always + on-disk opt-in; the corpus-qa dogfood enables it, so the prior `parity.rs` O-27 reconcile arm was removed (no longer a divergence). `db-to-ags4` reconstructs the `FILE/<fset>/<name>` sidecar tree from stored blobs so an exported delivery passes `--check-files`.
@@ -475,11 +476,13 @@ O-N below is an internal decision or behavioural note, not for external circulat
 
 ### O-35 [NOTE] Presence-only `reconcile` can't whittle a python parse-layer cascade
 - **python-ags4**: its parsing layer turns one malformed construct into a *multi-rule* result — a lone embedded CR → universal-newline record split → Rule 2a+3+5 (`rule_6` itself is a no-op, O-2); a valid extended char → Rust FYI-only / python silent (O-1); an unquoted field → python Rule 3 *or* 4 by position vs Rust Rule 5 (O-3).
+- **Us** (`ags4-corpus-qa/src/parity.rs`): `reconcile` matches single documented rule-swaps (O-2/O-3/O-26) and only when the *entire* symmetric diff is consumed, so a cascade leaves residue and a known root cause classifies as a false `RUST_ONLY` / `PYTHON_ONLY` ACTION.
 - **Assessment**: a real limitation of presence-only parity, not a validator defect. Generic widening is unsafe (Rules 2a/3/5/9/18 fire for many legitimate reasons); only *signature-narrow* arms (à la the O-34 triple-guard) are acceptable.
 - **Upstream-reportable**: no — harness / methodology.
 - **Our decision**: document it; do **not** broaden `reconcile` generically. Signature-narrow arms (`rust=={Rule 6} ∧ py⊆{2a,3,5} → O-2`, etc.) are the sanctioned follow-up.
 
 ### O-36 [NOTE] Parity differential is triage-biased by default
+- **Us** (`ags4-corpus-qa/src/parity.rs`): the parity set is `triage ∪ reservoir(rest, --parity-sample)` and `--parity-sample` **defaults to 0**, so by default only files the Rust side already flagged odd are cross-checked against python-ags4. A file Rust handles confidently-but-wrongly (plausible `Findings`) is never sent to the oracle — silent agreement on a wrong verdict is invisible.
 - **Assessment**: a sampling bias in the dogfood, not a validator defect — but it overstates the strength of the parity claim.
 - **Upstream-reportable**: no — harness / methodology.
 - **Our decision**: keep `--parity-sample` (perf), but treat triage-only as the floor, not the ceiling — a non-zero default sample and a per-rule "rules with zero parity evidence" report are the sanctioned follow-ups.

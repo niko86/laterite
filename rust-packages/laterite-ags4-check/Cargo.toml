@@ -64,12 +64,15 @@ encoding_rs = "0.8"
 # CLI presentation parity with `ags5db` (laterite-ags5-db/src/output.rs): the
 # animated spinner, the aligned UTF8 finding table, rich-style coloured
 # JSON — via the shared `laterite-cliutil` crate (single source of truth,
+# also used by `ags4-corpus-qa`). It pulls comfy-table/indicatif/
 # serde_json + (transitively) crossterm for terminal capability
 # detection; none of that touches the validator library now.
 laterite-cliutil = { path = "../laterite-cliutil", features = ["clap"] }
 comfy-table = "7"
 indicatif = "0.18"
 serde_json = { version = "1", features = ["preserve_order"] }
+# The subcommand parser (#430). Same version the sibling CLIs (ags4-forge /
+# ags4-corpus-qa) use; `env` keeps the NO_COLOR-style env wiring available.
 clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
 # Interactive passphrase prompt for `lock` / `unlock` (behind `transport`). We
 # NEVER take a --password flag (argv leaks into `ps`/history); the precedence is

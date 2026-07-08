@@ -95,7 +95,7 @@ aggregates — that a single-group query can't express. Drop to SQL.
 
     In DuckDB itself there's nothing to leave — each group is a `read_ags()`
     table function and the join is plain SQL. The same born-typed columns
-    apply, and `load_ags_script(path)` can materialise every group as an
+    apply, and `load_ags(path)` emits the DDL to materialise every group as an
     `ags_<code>` table when you'd rather query a warehouse than a file.
 
 === "Browser"

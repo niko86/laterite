@@ -1,6 +1,7 @@
 //! Shared CLI presentation for the workspace's Rust binaries.
 //!
 //! This is the de-duplication of code that was previously copied
+//! verbatim between `lat` and `ags4-corpus-qa` (and is mirrored
 //! again in `ags5db`/`ags5db`, which stays on its own copy for now —
 //! it's binary-only with no lib target). The behaviour here is
 //! deliberately byte-identical to those copies so all the CLIs in the
@@ -25,6 +26,7 @@ use serde_json::Value;
 
 /// The `Ctx` + `Report` + `emit` + `Plan` report-document scaffold
 /// (the gogcli/ags5db output contract), lifted here from
+/// `ags4-corpus-qa/src/output.rs` so every CLI shares one copy.
 pub mod report;
 
 // --- output mode ------------------------------------------------------

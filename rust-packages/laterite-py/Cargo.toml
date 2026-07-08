@@ -2,6 +2,7 @@
 #
 # This is the ONLY crate in the workspace that links pyo3. It depends
 # on `laterite-ags4-validator` (never the reverse) — exactly the wrapper
+# pattern `ags4-parity` established — so the validator library's lean
 # phf+thiserror+chrono dep-graph guarantee is untouched. The compiled
 # cdylib is loaded by Python as `laterite._laterite_native` (see
 # packages/laterite/pyproject.toml [tool.maturin]).

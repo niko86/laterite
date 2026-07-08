@@ -71,6 +71,7 @@ criterion = "0.8"
 # e2e.rs crawls that dir and asserts hard_error==0, and a non-UTF-8
 # fixture would also defeat the whole point of the lossy decode. So
 # those tests write a temp file instead. Dev-dep only + already in the
+# workspace lockfile via ags4-corpus-qa → the library's lean dep-graph
 # guarantee (no walkdir/rayon/ratatui) is untouched.
 tempfile = "3"
 # serde_json: DEV-ONLY — the findings.rs byte-identity test serializes a

@@ -3,12 +3,15 @@
 # Single source of truth for the loading/activity animation, the
 # aligned UTF8 table, the colour gate, atomic file writes, and the
 # rich-style coloured JSON / output-mode dispatch. Previously these
+# were copied verbatim across `laterite-ags4-check` and `ags4-corpus-qa`
 # ("copied, not imported" because they lived in bins) — this crate is
 # the de-duplication.
 #
 # Every dependency is ALREADY in rust-packages/Cargo.lock (comfy-table
 # + indicatif + serde_json/serde via the validator's bin; clap via
+# ags4-corpus-qa), so extracting this adds ZERO new external surface.
 # `serde` is the `report` module's only addition (the `Report:
+# Serialize` scaffold lifted from ags4-corpus-qa/src/output.rs).
 # It pulls NONE of walkdir/rayon/ratatui — the validator library's
 # documented lean dep-graph guarantee is unaffected. The `clap`
 # ValueEnum derive is feature-gated so `lat` (which hand-parses
@@ -26,6 +29,7 @@ publish = false
 [features]
 default = []
 # Derive `clap::ValueEnum` on `OutputMode` (for clap-based CLIs like
+# ags4-corpus-qa). Off by default so argv-hand-parsing bins (lat)
 # don't link clap.
 clap = ["dep:clap"]
 

@@ -8,14 +8,16 @@ INSTALL laterite_ags4 FROM community;
 LOAD laterite_ags4;
 ```
 
-## Validate & certify
+## Validation & certification live elsewhere
 
-| Function | Returns |
-|---|---|
-| `validate_ags(path)` | one row per finding: `rule, line, group, severity, desc`. Zero rows = clean. |
-| `certify_ags(path)` | mints `<path>.ags.idx` (a validity certificate) for a clean file. |
+This extension is a **read-only reader** — there is no `validate_ags` /
+`certify_ags` in SQL. Run the numbered rules and mint an `.ags.idx` certificate
+with the [`lat` CLI](cli.md) (`lat validate` / `lat certify`) or the `laterite`
+Python/Node library. `read_ags` then **consumes** an externally-minted `.ags.idx`
+beside the file to range-read a single group's bytes instead of parsing the
+whole file.
 
-Both accept `encoding := 'windows-1252'` to decode legacy files.
+`read_ags` accepts `encoding := 'windows-1252'` to decode a legacy file.
 
 ## Read
 
@@ -56,7 +58,7 @@ The AGS4 dictionary ships *inside* the extension — no download.
 SELECT heading, unit, data_type FROM ags_dictionary() WHERE "group" = 'LOCA';
 ```
 
-!!! note "Read/validate/query surface"
-    DuckDB is a **query** door — it reads, validates, certifies, and inspects, but
-    doesn't `fix`, `diff`, or emit AGS4 (those are the library and CLI surfaces).
-    See the [capability matrix](../surfaces/index.md#what-each-door-can-do).
+!!! note "Read-only query surface"
+    DuckDB is a **read** door — it reads and inspects, but doesn't validate,
+    certify, `fix`, `diff`, or emit AGS4 (those are the library and CLI
+    surfaces). See the [capability matrix](../surfaces/index.md#what-each-door-can-do).
