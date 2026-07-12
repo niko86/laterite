@@ -67,12 +67,12 @@ Changelog = "https://github.com/niko86/laterite/blob/main/CHANGELOG.md"
 # uses), so the extra is just pandas. `pyarrow` stays for callers who explicitly want
 # the Arrow backend (the only thing that pulls pyarrow).
 compat = ["pandas<3"]
-pyarrow = ["pyarrow>=24.0.0"]
+pyarrow = ["pyarrow>=25.0.0"]
 # The experimental DuckDB-backed `.ags5db` surface was decoupled from the
 # shipped AGS4 product (#177) — it now lives in the dormant `ags5/` holding
 # folder and is no longer installable as an extra. The future AGS5 strand
 # will publish it as a separate library.
-all = ["pandas<3", "pyarrow>=24.0.0"]
+all = ["pandas<3", "pyarrow>=25.0.0"]
 
 [project.scripts]
 # `lat` — the Python face of the same CLI, byte-faithful to the Rust `lat`

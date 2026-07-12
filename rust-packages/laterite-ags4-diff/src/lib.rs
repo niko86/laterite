@@ -14,7 +14,7 @@
 //! changed row there shows as a remove + add pair (and `keyed` is false).
 
 use laterite_ags4_parse::{DataRow, ParsedFile, ParsedGroup};
-use laterite_ags4_validator::dict::Dictionary;
+use laterite_ags4_reference::dict::Dictionary;
 use laterite_types::parse_value;
 use serde::Serialize;
 
@@ -345,7 +345,7 @@ pub fn diff_parsed(
 mod tests {
     use super::*;
     use laterite_ags4_parse::parse_str;
-    use laterite_ags4_validator::DictVersion;
+    use laterite_ags4_reference::dict::DictVersion;
 
     #[test]
     fn diff_group_is_key_aware_and_type_aware() {

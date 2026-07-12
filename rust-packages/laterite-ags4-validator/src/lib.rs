@@ -37,7 +37,6 @@ use std::path::{Path, PathBuf};
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod catalogue;
-pub mod dict;
 pub mod error;
 pub mod findings;
 pub mod fixes;
@@ -52,6 +51,12 @@ pub use fixes::{
     Fix, FixKind, FixOutcome, Fixes, SpanEdit, apply_fixes, compute_fixes, fix_document,
     fix_document_selective,
 };
+// The phf-projected dictionary (`Dictionary`, `DictVersion`, `dictionary_dto`,
+// …) moved into the reference leaf (#475 PR2). Re-exported as a module (not
+// just the three names above) so every existing `crate::dict::…` /
+// `laterite_ags4_validator::dict::…` path throughout this crate + its
+// consumers (laterite-py, laterite-node, wasm) keeps resolving unchanged.
+pub use laterite_ags4_reference::dict;
 
 /// The bundled AGS4 editions joined with `sep` — the single source for every
 /// surface's "expected auto|4.0.3|…" / "pass one of 4.0.3/…" message, so no

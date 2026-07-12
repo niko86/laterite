@@ -222,53 +222,6 @@ pub fn ags4_str(value: &Value, ags_type: &str) -> String {
     }
 }
 
-/// Format a DT-shaped value string to match the precision declared by
-/// the column's UNIT row. AGS4 Rule 8 checks that DT values match their
-/// declared format both ways:
-///
-///   * Too-long: a value with seconds (`2023-02-22T10:24:00`) under a
-///     no-seconds unit (`yyyy-mm-ddThh:mm`) is rejected. We truncate.
-///     **Lossy** when the trimmed suffix is non-zero
-///     (`2023-02-22T10:24:37` → `2023-02-22T10:24`).
-///   * Too-short: a date-only value (`2022-09-21`) under a unit
-///     demanding time (`yyyy-mm-ddThh:mm`) is also rejected. We pad
-///     with a `T` separator + zero-time portion so the result still
-///     parses (`2022-09-21` → `2022-09-21T00:00`). Lossless — the
-///     padded time is structural, not data.
-///
-/// Returns the input unchanged if the unit isn't a recognised DT format.
-pub fn truncate_dt_to_unit(value: &str, unit: &str) -> String {
-    let u = unit.trim();
-    // Quick guards: a non-DT-shaped unit (e.g. "m", "%", "") leaves the
-    // value alone.
-    if !u.starts_with("yyyy") {
-        return value.to_string();
-    }
-    let target_len = match () {
-        _ if u == "yyyy-mm-dd" => 10,
-        // 16 chars: "yyyy-mm-ddThh:mm" or "yyyy-mm-dd hh:mm"
-        _ if u.ends_with(":mm") && !u.ends_with(":mm:ss") => 16,
-        // 19 chars: "yyyy-mm-ddThh:mm:ss"
-        _ if u.ends_with(":ss") => 19,
-        _ => return value.to_string(),
-    };
-    if value.len() == target_len {
-        return value.to_string();
-    }
-    if value.len() > target_len {
-        return value[..target_len].to_string();
-    }
-    // value.len() < target_len: pad with the "T<zero-time>" suffix the
-    // unit asks for. We only handle date-only → datetime promotion;
-    // partial/odd-length inputs (e.g. "2023-02") aren't legal AGS4 DT
-    // values to start with, so leave them as-is.
-    if value.len() != 10 {
-        return value.to_string();
-    }
-    let pad = &"T00:00:00"[..target_len - 10];
-    format!("{}{}", value, pad)
-}
-
 /// Presentation hint for a numeric AGS type: `'2DP'` → `Some("%.2f")`,
 /// `'3SF'` → `Some("%.3g")`, `'1SCI'` → `Some("%.1e")`. Mirrors Python's
 /// `display_hint`. String/datetime/bool types return `None`.
@@ -337,8 +290,8 @@ pub fn parse_value(raw: Option<&str>, ags_type: &str) -> Value {
             // `NaiveDateTime::parse_from_str` can't build a datetime from
             // a time-less string, so without this the value silently
             // dropped to NULL (data loss; the date-only formats listed in
-            // DATETIME_FORMATS were dead). On export `ags4_str` +
-            // `truncate_dt_to_unit` render it back to date-only form.
+            // DATETIME_FORMATS were dead). On export the value is rendered
+            // back to date-only form.
             NaiveDateTime::parse_from_str(s, fmt)
                 .ok()
                 .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
@@ -484,46 +437,6 @@ mod tests {
     }
 
     #[test]
-    fn truncate_dt_strips_to_date_only_unit() {
-        assert_eq!(
-            truncate_dt_to_unit("2023-02-22T10:24:00", "yyyy-mm-dd"),
-            "2023-02-22",
-        );
-        // Date-only value under a date-only unit: no-op.
-        assert_eq!(
-            truncate_dt_to_unit("2023-02-22", "yyyy-mm-dd"),
-            "2023-02-22"
-        );
-    }
-
-    #[test]
-    fn truncate_dt_strips_seconds_for_minute_precision_unit() {
-        assert_eq!(
-            truncate_dt_to_unit("2023-02-22T10:24:00", "yyyy-mm-ddThh:mm"),
-            "2023-02-22T10:24",
-        );
-        // Lossy case: source had non-zero seconds; we drop them to
-        // match the declared unit precision.
-        assert_eq!(
-            truncate_dt_to_unit("2023-02-22T10:24:37", "yyyy-mm-ddThh:mm"),
-            "2023-02-22T10:24",
-        );
-    }
-
-    #[test]
-    fn truncate_dt_strips_fractional_seconds_for_second_precision_unit() {
-        assert_eq!(
-            truncate_dt_to_unit("2023-02-22T10:24:00.000", "yyyy-mm-ddThh:mm:ss"),
-            "2023-02-22T10:24:00",
-        );
-        // No-op when value already matches.
-        assert_eq!(
-            truncate_dt_to_unit("2023-02-22T10:24:00", "yyyy-mm-ddThh:mm:ss"),
-            "2023-02-22T10:24:00",
-        );
-    }
-
-    #[test]
     fn nsf_emits_fixed_point_for_small_values() {
         // Match python-ags4 validator's expected form: 3SF of 0.002 is
         // "0.00200" (fixed-point, three sig figs visible), not "2.00e-3".
@@ -541,28 +454,6 @@ mod tests {
         assert_eq!(ags4_str(&Value::from(100.0), "2SF"), "100");
         assert_eq!(ags4_str(&Value::from(1234.0), "3SF"), "1230");
         assert_eq!(ags4_str(&Value::from(10.0), "1SF"), "10");
-    }
-
-    #[test]
-    fn truncate_dt_pads_date_only_to_minute_precision() {
-        // Date-only value under a minute-precision unit: pad with
-        // T00:00 so the result satisfies the declared format. The
-        // padded time is structural (matches the unit), not fake data.
-        assert_eq!(
-            truncate_dt_to_unit("2022-09-21", "yyyy-mm-ddThh:mm"),
-            "2022-09-21T00:00",
-        );
-        assert_eq!(
-            truncate_dt_to_unit("2022-09-21", "yyyy-mm-ddThh:mm:ss"),
-            "2022-09-21T00:00:00",
-        );
-    }
-
-    #[test]
-    fn truncate_dt_passthrough_on_non_dt_units() {
-        assert_eq!(truncate_dt_to_unit("100.50", "m"), "100.50");
-        assert_eq!(truncate_dt_to_unit("anything", ""), "anything");
-        assert_eq!(truncate_dt_to_unit("anything", "%"), "anything");
     }
 
     // --- CanonicalType label / SQL-type mapping ---------------------
@@ -940,28 +831,6 @@ mod proptest_suite {
             } else {
                 prop_assert!(false, "DT of a valid datetime should be a String, got {first:?}");
             }
-        }
-
-        /// `truncate_dt_to_unit` is idempotent: truncating an
-        /// already-truncated value to the same unit is a no-op.
-        #[test]
-        fn truncate_dt_to_unit_idempotent(
-            y in 1900i32..2200,
-            mo in 1u32..=12,
-            d in 1u32..=28,
-            h in 0u32..=23,
-            mi in 0u32..=59,
-            se in 0u32..=59,
-            unit in prop::sample::select(vec![
-                "yyyy-mm-dd",
-                "yyyy-mm-ddThh:mm",
-                "yyyy-mm-ddThh:mm:ss",
-            ]),
-        ) {
-            let value = format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{se:02}");
-            let once = truncate_dt_to_unit(&value, unit);
-            let twice = truncate_dt_to_unit(&once, unit);
-            prop_assert_eq!(twice, once);
         }
     }
 }

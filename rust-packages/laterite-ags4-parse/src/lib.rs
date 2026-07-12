@@ -28,7 +28,6 @@ use std::collections::BTreeMap;
 /// One physical source line (rich overlay; retained only when
 /// [`ParseOptions::retain_raw_lines`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RawLine {
     /// 1-indexed, matching how editors + the AGS4 validator report.
     pub number: u32,
@@ -44,7 +43,6 @@ pub struct RawLine {
 
 /// One DATA row.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DataRow {
     /// 1-indexed physical line (the validator's findings/fixes join key).
     pub line: u32,
@@ -57,7 +55,6 @@ pub struct DataRow {
 
 /// One GROUP and its descriptor rows + data.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ParsedGroup {
     pub code: String,
     pub group_line: u32,
@@ -95,7 +92,6 @@ impl ParsedGroup {
 /// A parsed AGS4 file. The validator's `ParsedFile` plus byte fields,
 /// `total_bytes`, and `byte_offsets_source_true`.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ParsedFile {
     /// First-seen wins on duplicate GROUP codes.
     pub groups: BTreeMap<String, ParsedGroup>,
@@ -264,7 +260,6 @@ fn decode_line(
 /// `Cr` (classic-Mac) are non-conforming terminators the reader still splits on
 /// but the validator flags. `Unterminated` is a final line with no terminator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum LineTerminator {
     /// `\r\n` — the only AGS4-conforming terminator.
     Crlf,
@@ -278,12 +273,6 @@ pub enum LineTerminator {
 }
 
 impl LineTerminator {
-    /// The bytes to re-emit for this terminator — lets a faithful reconstruction
-    /// (e.g. `apply_fixes`) round-trip the original terminator exactly.
-    pub fn as_bytes(self) -> &'static [u8] {
-        self.as_str().as_bytes()
-    }
-
     /// The terminator as a string (all terminators are ASCII).
     pub fn as_str(self) -> &'static str {
         match self {

@@ -1,7 +1,7 @@
 // Generate the registry data + the typed-graph classes from the AGS4 union
 // dictionary — the TS analog of `tools/generate_pyi.py`. Single source of truth:
-// `rust-packages/laterite-ags4-core/data/ags_dictionary.json`. Run after a dictionary
-// edit; `test/p3-typed-graph.test.ts` is the CI drift guard (byte-equality).
+// `rust-packages/laterite-ags4-reference/data/ags_dictionary.json`. Run after a
+// dictionary edit; `test/p3-typed-graph.test.ts` is the CI drift guard (byte-equality).
 //
 //   node tools/generate-typed-graph.mjs        # rewrite the generated files
 //
@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const DICT_PATH = join(HERE, "..", "..", "laterite-ags4-core", "data", "ags_dictionary.json");
+const DICT_PATH = join(HERE, "..", "..", "laterite-ags4-reference", "data", "ags_dictionary.json");
 const REGISTRY_OUT = join(HERE, "..", "ts", "registry.generated.ts");
 const TYPED_OUT = join(HERE, "..", "ts", "typed-graph.generated.ts");
 

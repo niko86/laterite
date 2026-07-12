@@ -22,8 +22,7 @@ use std::path::Path;
 use crate::error::ValidatorError;
 
 pub use laterite_ags4_parse::{
-    DataRow, InvalidUtf8, LineSpan, LineSpans, LineTerminator, ParseError, ParseOptions,
-    ParsedFile, ParsedGroup, RawLine, field_span, line_spans, parse_bytes_opts, split_ags_line,
+    DataRow, ParseError, ParsedFile, ParsedGroup, RawLine, field_span, line_spans, split_ags_line,
 };
 
 /// Parse an AGS4 file from disk (UTF-8). Invalid UTF-8 is decoded lossily

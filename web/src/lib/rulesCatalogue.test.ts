@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 // Drift gate: web/public/rules-catalogue.json — the static asset the
 // RuleExplainer tool fetches — must stay a faithful copy of the single source
-// of truth, rust-packages/laterite-ags4-validator/data/rules_meta.json (the
+// of truth, rust-packages/laterite-ags4-reference/data/rules_meta.json (the
 // editorial rule metadata the validator embeds and exposes via --list-rules).
 //
 // scripts/sync-rules.mjs copies the canonical file verbatim on every
@@ -20,7 +20,7 @@ const COMMITTED = readFileSync(
 const CANONICAL = readFileSync(
   fileURLToPath(
     new URL(
-      "../../../rust-packages/laterite-ags4-validator/data/rules_meta.json",
+      "../../../rust-packages/laterite-ags4-reference/data/rules_meta.json",
       import.meta.url,
     ),
   ),

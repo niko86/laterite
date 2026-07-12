@@ -27,6 +27,3 @@ zstd = "0.13"
 # mode. `age::secrecy` is re-exported, so no direct `secrecy` dep is needed.
 age = "0.11"
 thiserror = "1"
-
-[dev-dependencies]
-tempfile = "3"

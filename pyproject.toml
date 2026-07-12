@@ -8,7 +8,7 @@ dependencies = [
     "laterite",
     "duckdb>=1.5.4",
     "polars>=1.42.1",
-    "pyarrow>=24.0.0",
+    "pyarrow>=25.0.0",
     "lxml>=6.1.1",
 ]
 
@@ -30,7 +30,7 @@ laterite = { workspace = true }
 # so the shipped wheel never gains marimo). pandas<3 stays — python-ags4 needs
 # it and ags5_ags4/codec.py imports it directly.
 dev = [
-    "marimo>=0.23.13",
+    "marimo>=0.23.14",
     "pandas<3",
     "pytest>=9.1.1",
     "pytest-benchmark>=5.2.3",
@@ -38,7 +38,7 @@ dev = [
     # Ags4File text round-trip with generated input the example-based
     # tests don't reach (the laterite-base tests in
     # packages/laterite/tests/test_ags_types.py + test_ags4file.py).
-    "hypothesis>=6.156.1",
+    "hypothesis>=6.156.6",
     # Parallel test execution. The laterite + ags5 suites are
     # file/DuckDB-heavy (per-test tmp_path isolation), so they fan out
     # cleanly across workers. CI runs `-n 4` to roughly halve the suite
@@ -49,13 +49,13 @@ dev = [
     # [tool.coverage] config below scopes it to the two packages. Plays
     # with xdist (combines per-worker data automatically).
     "pytest-cov>=5",
-    "ruff>=0.15.20",
+    "ruff>=0.15.21",
     # Astral's type checker (preview) — the type-faithfulness gate (#303 Phase 1):
     # proves the shipped `laterite` package's type hints don't lie. Same toolchain
     # as ruff/uv (Rust-fast). Run in the project venv (`uv run ty check`, NOT
     # `uvx`) so it resolves polars/duckdb + the generated `_laterite_native.pyi`;
     # config + scope in [tool.ty] below. CI step sits beside `ruff check`.
-    "ty>=0.0.56",
+    "ty>=0.0.58",
     # Build backend for the `laterite` package (PyO3 extension compiled
     # from rust-packages/laterite-py). In the dev group so a workspace
     # `uv sync` builds the native module; not a runtime dep of any
@@ -102,7 +102,7 @@ dev = [
 # present — `uv sync` builds it (the local working-tree build the docs track).
 docs = [
     "mkdocs-material>=9.5",
-    "mkdocstrings[python]>=1.0.4",
+    "mkdocstrings[python]>=1.0.6",
     "mkdocs-gen-files>=0.5",
     "mkdocs-literate-nav>=0.6",
 ]

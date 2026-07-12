@@ -87,6 +87,19 @@ jobs:
               - 'web/docs-site/examples/**'  # docs example sources — test_docs_examples.py executes these
               - 'examples/sample_site.ags'   # the fixture that gate reads (subprocess cwd = repo root)
               - 'web/docs-site/scripts/**'   # catalogue_data/gen_* — its drift gate (test_groups_catalogue_faithful) runs in the python job
+              # SSOT→generator faithfulness gates whose canon lives at repo root /
+              # ags-wiki (NOT under packages|rust-packages|tests) — so an SSOT-only PR
+              # would otherwise skip the python job and never run the gate that guards
+              # it (the reliability audit's own "enforcement that doesn't run" hole).
+              - 'modality.json'                             # test_modality_faithful + test_modality_parity
+              - 'tools/gen_modality.py'                     # the generator — a render change must re-run it
+              - 'observations.json'                         # test_observations_faithful
+              - 'OBSERVATIONS.md'                           # its committed render
+              - 'tools/gen_observations.py'                 # the generator
+              - 'tools/vendor/laterite-duckdb-functions.json'          # test_duckdb_surface_faithful (the pinned duckdb fn manifest)
+              - 'web/docs-site/docs/reference/duckdb-functions.md'     # the guarded doc — a hand-edit must re-run the gate
+              - 'tools/gen_reference_groups.py'                        # test_reference_groups_faithful — the group tier generator (its SSOT, ags_dictionary.json, is already covered by rust-packages/**)
+              - 'tools/gen_crate_graph.py'                             # test_crate_graph_faithful — the crate-graph generator (its SSOT, the Cargo manifests, is already covered by rust-packages/**)
             node:
               # The napi addon links sibling crates — laterite-ags4-validator,
               # laterite-types, laterite-ags4-emit (see laterite-node/Cargo.toml) —
@@ -126,7 +139,7 @@ jobs:
       - name: rust toolchain (cargo-deny shells out to `cargo metadata`)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: install cargo-deny
-        uses: taiki-e/install-action@c93ccc03e00cd0e08e494f5fd058a6c55a6a1907 # v2.82.8
+        uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
         with:
           tool: cargo-deny
       - name: cargo deny check
@@ -341,7 +354,7 @@ jobs:
       - name: Install cargo-llvm-cov
         # Prebuilt binary (no compile, no runner-image rebuild). SHA-pinned
         # per the supply-chain policy; Dependabot bumps it.
-        uses: taiki-e/install-action@c93ccc03e00cd0e08e494f5fd058a6c55a6a1907 # v2.82.8
+        uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
         with:
           tool: cargo-llvm-cov
 
@@ -425,7 +438,7 @@ jobs:
         # persistent runner home, so resolution stays warm locally; the
         # GitHub cache round-trip (+ the Windows tar/gzip save quirk) was
         # avoidable overhead.
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
         with:
           enable-cache: false
 
@@ -570,7 +583,7 @@ jobs:
         with:
           toolchain: stable
       - uses: ./.github/actions/build-accel
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
       - name: Build the working-tree wheel + docs deps
         run: uv sync --group docs
       # `uv sync` installs laterite EDITABLE but does NOT build the PyO3 cdylib

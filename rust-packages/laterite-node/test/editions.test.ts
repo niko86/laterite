@@ -11,7 +11,7 @@ import { BadDictError, validate } from "../ts/index";
 // Read the bundled editions from the SAME JSON the dictionary is generated from.
 const DICT = JSON.parse(
   readFileSync(
-    new URL("../../laterite-ags4-core/data/ags_dictionary.json", import.meta.url),
+    new URL("../../laterite-ags4-reference/data/ags_dictionary.json", import.meta.url),
     "utf8",
   ),
 );

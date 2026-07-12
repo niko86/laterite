@@ -18,7 +18,7 @@ from laterite import registry as latreg
 _CORE_DICT = (
     Path(__file__).resolve().parents[3]
     / "rust-packages"
-    / "laterite-ags4-core"
+    / "laterite-ags4-reference"
     / "data"
     / "ags_dictionary.json"
 )
@@ -146,6 +146,6 @@ def test_inherited_key_names_root_is_empty() -> None:
 
 # `test_matches_ags5_models` retired with F2c-4: ags5-models gone,
 # so there's no second registry to cross-check against. The single
-# source of truth is `rust-packages/laterite-ags4-core/data/ags_dictionary.json`;
+# source of truth is `rust-packages/laterite-ags4-reference/data/ags_dictionary.json`;
 # `tests/test_pyi_stubs_match_generator.py` catches drift between
 # that JSON and the typed-graph .pyi.

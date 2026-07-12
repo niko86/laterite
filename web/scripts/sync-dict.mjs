@@ -1,5 +1,5 @@
 // Keep web/public/ags_dictionary.json in lock-step with the single source of
-// truth, rust-packages/laterite-ags4-core/data/ags_dictionary.json (the
+// truth, rust-packages/laterite-ags4-reference/data/ags_dictionary.json (the
 // canonical multi-edition UNION, itself generated from the official AGS .ags
 // dictionaries by tools/gen_dictionary.py). The web copy is a static asset Vite
 // serves verbatim (every dict consumer fetches it at runtime — see
@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const src = path.resolve(here, "../../rust-packages/laterite-ags4-core/data/ags_dictionary.json");
+const src = path.resolve(here, "../../rust-packages/laterite-ags4-reference/data/ags_dictionary.json");
 const dst = path.resolve(here, "../public/ags_dictionary.json");
 
 // Fail loudly rather than ship a stale dictionary: if the source can't be read

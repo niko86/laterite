@@ -1,0 +1,32 @@
+# AGS4 reference-data leaf (#475): the multi-edition dictionary, single-sourced
+# from ags_dictionary.json. PR1 carries the UNION registry projection (moved out
+# of laterite-ags4-core so consumers that only want the dictionary — the DuckDB
+# extension, laterite-ags4-diff — needn't pull the rest of core/validator). The
+# per-edition phf projection + the rules catalogue join it in PR2. A true leaf:
+# no workspace-crate deps.
+[package]
+name = "laterite-ags4-reference"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "AGS4 reference data: the multi-edition dictionary registry, single-sourced from ags_dictionary.json (a wasm-safe leaf)"
+license = "MIT"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+# preserve_order keeps to_groups_json's keys in declaration order, matching the
+# on-disk dictionary + Python's dict-preserving json.dumps (same pin as core).
+serde_json = { version = "1", features = ["preserve_order"] }
+# Compile-time perfect-hash maps for the bundled standard dictionaries —
+# zero startup cost, no runtime parse (moved from the validator, PR2 #475).
+# phf does NOT implement PhfHash for tuples, so dict keys are composite
+# "GROUP\u{1f}HEADING" strings.
+phf = "0.14"
+
+[build-dependencies]
+# build.rs projects each edition out of the consolidated union dictionary
+# (this leaf's own data/ags_dictionary.json) into phf static tables in
+# OUT_DIR/dict_data.rs. Moved from the validator (PR2 #475).
+phf_codegen = "0.14"
+serde_json = "1"

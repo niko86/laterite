@@ -31,7 +31,7 @@ from pathlib import Path
 # repo_root/rust-packages/... — this file is web/docs-site/scripts/catalogue_data.py
 _DICT_PATH = (
     Path(__file__).resolve().parents[3]
-    / "rust-packages/laterite-ags4-core/data/ags_dictionary.json"
+    / "rust-packages/laterite-ags4-reference/data/ags_dictionary.json"
 )
 
 

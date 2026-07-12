@@ -27,7 +27,7 @@ use rust_xlsxwriter::Workbook;
 
 use laterite_ags4_core::ags4_codec::{AgsGroup, read_ags4_bytes};
 use laterite_ags4_core::error::CliError;
-use laterite_ags4_emit::{EmitGroup, write_ags4};
+use laterite_ags4_emit::{EmitError, EmitGroup, write_ags4};
 
 /// Stats returned by both conversion helpers. The PyO3 layer surfaces
 /// these as a dict on the Python side.
@@ -375,7 +375,7 @@ pub fn xlsx_bytes_to_ags4(
         .collect();
 
     let mut out: Vec<u8> = Vec::new();
-    write_ags4(&mut out, &emit_views)?;
+    write_ags4(&mut out, &emit_views).map_err(emit_err)?;
 
     Ok((
         out,
@@ -385,6 +385,27 @@ pub fn xlsx_bytes_to_ags4(
             warnings,
         },
     ))
+}
+
+/// Map the AGS4 writer's error onto excel's `CliError` surface. This was
+/// `impl From<EmitError> for CliError` in `laterite-ags4-core`; inlined here
+/// (excel is its sole caller) so `core` no longer depends on the `emit` leaf —
+/// the `core → emit → validator` layering cut (#441). `write_ags4` only yields
+/// `Write` / `EmbeddedNewline`; the `Reparse` / `Invalid` arms are unreachable
+/// here but kept for totality, preserving the original messages verbatim.
+fn emit_err(e: EmitError) -> CliError {
+    match e {
+        // Preserve the historical "ags4 write: …" Schema message.
+        EmitError::Write(m) => CliError::Schema(format!("ags4 write: {m}")),
+        EmitError::Reparse(m) => CliError::Schema(format!("ags4 emit: {m}")),
+        EmitError::Invalid(found) => {
+            let n: usize = found.values().map(Vec::len).sum();
+            CliError::Schema(format!(
+                "ags4 emit: strict mode rejected output ({n} finding(s))"
+            ))
+        }
+        e @ EmitError::EmbeddedNewline { .. } => CliError::Schema(format!("ags4 write: {e}")),
+    }
 }
 
 /// Re-format every DATA cell whose column's TYPE row declares a

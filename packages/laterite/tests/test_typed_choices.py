@@ -19,7 +19,7 @@ import polars as pl
 _DICT = (
     Path(__file__).resolve().parents[3]
     / "rust-packages"
-    / "laterite-ags4-core"
+    / "laterite-ags4-reference"
     / "data"
     / "ags_dictionary.json"
 )

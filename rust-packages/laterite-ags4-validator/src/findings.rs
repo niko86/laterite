@@ -167,18 +167,6 @@ pub fn count_by_rule(findings: &Findings) -> Vec<(&str, usize)> {
         .collect()
 }
 
-/// Per-group counts aggregated across every rule, group-name sorted.
-/// Additive convenience for stats views; behaviour-neutral.
-pub fn count_by_group(findings: &Findings) -> Vec<(String, usize)> {
-    let mut m: BTreeMap<&str, usize> = BTreeMap::new();
-    for v in findings.values() {
-        for f in v {
-            *m.entry(f.group.as_str()).or_default() += 1;
-        }
-    }
-    m.into_iter().map(|(g, n)| (g.to_string(), n)).collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -210,16 +198,6 @@ mod tests {
             vec![("AGS Format Rule 8", 2), ("AGS Format Rule 9", 1)]
         );
         assert_eq!(by_rule.iter().map(|(_, n)| n).sum::<usize>(), count(&f));
-    }
-
-    #[test]
-    fn count_by_group_aggregates_across_rules() {
-        let by_group = count_by_group(&sample());
-        // LOCA: 2 (both Rule 8), SAMP: 1 (Rule 9); name-sorted.
-        assert_eq!(
-            by_group,
-            vec![("LOCA".to_string(), 2), ("SAMP".to_string(), 1)]
-        );
     }
 
     /// Byte-identity guard: a line-only finding (via `add`) must still

@@ -92,14 +92,11 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # NaiveDate / NaiveTime so `parse_value` returns native Python
 # datetime/date/time objects.
 chrono = "0.4"
-# Stage 7b: encoding name → `&'static encoding_rs::Encoding` lookup
-# for the `encoding=` kwarg on `run_check` / `parse_primitives`. The
-# crate is already a direct dep of `laterite-ags4-validator`, so no new
-# transitive surface — declaring it here lets `lib.rs` call
-# `encoding_rs::Encoding::for_label` directly without re-exports.
-encoding_rs = "0.8"
 
-# Used only by build.rs (Stage F2b-1 typed-graph codegen — reads
-# ../laterite-ags4-core/data/ags5_dictionary.json and emits OUT_DIR/typed_groups.rs).
+# Used only by build.rs (Stage F2b-1 typed-graph codegen): consumes the
+# reference leaf's `union` module (union_groups()) to emit OUT_DIR/typed_groups.rs
+# — the same union reconstruction the registry/DDL use, so this is no longer a
+# third independent reader of ags_dictionary.json (#475 follow-up). No direct
+# JSON parsing here any more, so serde_json is no longer a build-dependency.
 [build-dependencies]
-serde_json = "1"
+laterite-ags4-reference = { path = "../laterite-ags4-reference" }

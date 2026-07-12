@@ -13,7 +13,7 @@ of the dictionary the validator checks files against (Rules 7, 9, 16,
 
 These files are read by **one tool only** — `tools/gen_dictionary.py`,
 which projects all five editions into the single consolidated union
-`rust-packages/laterite-ags4-core/data/ags_dictionary.json`. The
+`rust-packages/laterite-ags4-reference/data/ags_dictionary.json`. The
 validator's `build.rs` then reads **that union** (not these `.ags`
 directly) and projects each edition back out into its compiled lookup
 tables; so does every other consumer (the typed-graph codegen, the web).

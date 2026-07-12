@@ -12,6 +12,7 @@
 - [ ] New behaviour covered by a test
 - [ ] Validator behaviour change → `OBSERVATIONS.md` updated
 - [ ] User-visible API change → `CHANGELOG.md` updated
+- [ ] Wiki updated — ags-wiki reflects any behaviour/architecture/build change (`lint.py --since` passes)
 
 ## Clean-room confirmation
 

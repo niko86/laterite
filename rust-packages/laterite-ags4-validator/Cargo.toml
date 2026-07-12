@@ -19,10 +19,11 @@ name = "laterite_ags4_validator"
 path = "src/lib.rs"
 
 [dependencies]
-# Compile-time perfect-hash maps for the bundled standard dictionaries —
-# zero startup cost, no runtime parse. phf does NOT implement PhfHash for
-# tuples, so dict keys are composite "GROUP\u{1f}HEADING" strings.
-phf = "0.13"
+# The phf-projected dictionary (Dictionary/DictVersion/dictionary_dto/…),
+# moved out of this crate's own build.rs into a wasm-safe leaf (#475 PR2) so
+# non-validator consumers (the DuckDB extension, laterite-ags4-diff) can
+# depend on the dictionary without pulling the rest of the rule engine.
+laterite-ags4-reference = { path = "../laterite-ags4-reference" }
 thiserror = "1"
 # Rule 1 risky fix: transliterate any non-ASCII character to a sensible ASCII
 # equivalent (µ→"u", °→"deg", ß→"ss", accents→base letter) so a file can be
@@ -53,13 +54,6 @@ encoding_rs = "0.8"
 # compiles clean on wasm32 (the wasm crate already links it). Not on the
 # lean-dep guard list (pyo3|polars|walkdir|rayon|ratatui).
 serde = { version = "1", features = ["derive"] }
-
-[build-dependencies]
-# build.rs projects each edition out of the consolidated union dictionary
-# (laterite-ags4-core/data/ags_dictionary.json) into phf static tables in
-# OUT_DIR/dict_data.rs.
-phf_codegen = "0.13"
-serde_json = "1"
 
 [dev-dependencies]
 # Perf guard: bench check_file on the 23 MB workspace fixture. The

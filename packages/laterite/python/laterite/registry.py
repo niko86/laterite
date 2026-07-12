@@ -42,7 +42,6 @@ class Heading:
     type: str
     unit: str | None = None
     description: str = ""
-    indexed: bool | None = None
 
     @property
     def py_name(self) -> str:
@@ -77,7 +76,6 @@ class GroupDescriptor:
     contents: str
     parent: str | None
     headings: tuple[Heading, ...]
-    index_parent: bool | None = None
 
     @property
     def table(self) -> str:
@@ -119,7 +117,6 @@ def _load() -> dict[str, GroupDescriptor]:
                 type=h["type"],
                 unit=h.get("unit"),
                 description=h.get("description", ""),
-                indexed=h.get("indexed"),
             )
             for h in g["headings"]
         )
@@ -128,7 +125,6 @@ def _load() -> dict[str, GroupDescriptor]:
             contents=g["contents"],
             parent=g.get("parent"),
             headings=headings,
-            index_parent=g.get("index_parent"),
         )
         out[desc.code] = desc
     return out

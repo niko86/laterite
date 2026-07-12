@@ -29,15 +29,6 @@ fn registry_groups_json() -> String {
     registry().to_groups_json()
 }
 
-/// Single-group JSON lookup. Returns `None` when the code isn't in the
-/// registry (Python equivalent: `GROUPS.get(code)`).
-#[pyfunction]
-fn registry_get_group(code: &str) -> Option<String> {
-    let reg = registry();
-    reg.get(code)
-        .map(|g| serde_json::to_string(g).expect("group serialises"))
-}
-
 /// Parent chain from `code` up to the registry root (`[code, parent,
 /// ..., root]`). Matches Python's `_ddl._ancestor_chain` direction.
 /// Raises `ValueError` if `code` isn't in the registry — distinguishes
@@ -90,7 +81,6 @@ fn registry_dictionary_json(edition: Option<String>) -> PyResult<String> {
 
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_groups_json, m)?)?;
-    m.add_function(wrap_pyfunction!(registry_get_group, m)?)?;
     m.add_function(wrap_pyfunction!(registry_ancestor_chain, m)?)?;
     m.add_function(wrap_pyfunction!(registry_inherited_key_names, m)?)?;
     m.add_function(wrap_pyfunction!(registry_dictionary_json, m)?)?;

@@ -187,16 +187,6 @@ impl Dictionary {
             .values()
             .flat_map(|hs| hs.iter().copied())
     }
-
-    /// Number of heading definitions — sanity-checkable in tests so a
-    /// broken build.rs codegen is caught immediately.
-    pub fn heading_count(&self) -> usize {
-        self.headings.len()
-    }
-
-    pub fn group_count(&self) -> usize {
-        self.groups.len()
-    }
 }
 
 // --- Serialisable dictionary snapshot (the `dictionary(edition)` accessor) ----
@@ -296,16 +286,16 @@ mod tests {
             // headings; assert a floor so an empty/broken codegen
             // fails loudly.
             assert!(
-                d.group_count() > 50,
+                d.groups.len() > 50,
                 "{:?}: only {} groups",
                 v,
-                d.group_count()
+                d.groups.len()
             );
             assert!(
-                d.heading_count() > 1000,
+                d.headings.len() > 1000,
                 "{:?}: only {} headings",
                 v,
-                d.heading_count()
+                d.headings.len()
             );
         }
     }
@@ -376,9 +366,9 @@ mod tests {
         assert_eq!(d.version(), DictVersion::V4_1);
         // group_codes() is the unordered key view the web reference UI
         // serialises; it must include the well-known groups and agree in
-        // length with group_count().
+        // length with the group count.
         let codes: Vec<&str> = d.group_codes().collect();
-        assert_eq!(codes.len(), d.group_count());
+        assert_eq!(codes.len(), d.groups.len());
         assert!(codes.contains(&"PROJ"));
         assert!(codes.contains(&"LOCA"));
     }

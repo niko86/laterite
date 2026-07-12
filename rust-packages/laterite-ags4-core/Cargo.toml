@@ -35,14 +35,10 @@ laterite-types = { path = "../laterite-types" }
 # absorbed leading blanks (see O-40). Pure leaf (encoding_rs + memchr). Phase 5
 # extends this dep to core's read path.
 laterite-ags4-parse = { path = "../laterite-ags4-parse" }
-# The AGS4 writer/emitter, lifted into its own wasm-safe leaf. laterite-ags4-core's
-# excel.rs + ags5db's db-to-ags4 reach it via the `ags4_writer` re-export
-# shim; `From<EmitError> for CliError` (error.rs) keeps their `?` working.
-laterite-ags4-emit = { path = "../laterite-ags4-emit" }
-# Calendar/clock checking for canonical-type validation (mirrors the
-# `chrono` use in laterite-ags4-validator). `serde` feature so DateTime types
-# round-trip through serde_json without an extra map.
-chrono = { version = "0.4", features = ["serde"] }
+# The AGS4 dictionary registry (union projection), extracted to its own leaf
+# (#475) so dictionary-only consumers needn't pull the rest of core. Re-exported
+# as `laterite_ags4_core::registry` (see registry.rs) — an API-preserving move.
+laterite-ags4-reference = { path = "../laterite-ags4-reference" }
 serde = { version = "1", features = ["derive"] }
 # preserve_order keeps JSON output keys in insertion order, matching
 # Python's dict-preserving json.dumps. Same rationale as ags5db's pin.

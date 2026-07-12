@@ -1,9 +1,12 @@
 //! Compile-time codegen: the consolidated union dictionary
-//! (`laterite-ags4-core/data/ags_dictionary.json`) → `phf` perfect-hash static
+//! (this leaf's own `data/ags_dictionary.json`) → `phf` perfect-hash static
 //! tables in `OUT_DIR/dict_data.rs`.
 //!
-//! Runs once per build. Output is `include!`d by `src/dict.rs`, so the validator
-//! pays zero startup cost and never parses the dictionary at runtime.
+//! Runs once per build. Output is `include!`d by `src/dict.rs`, so this leaf
+//! (and every consumer of its `dict` module — the validator, wasm, node)
+//! pays zero startup cost and never parses the dictionary at runtime. Moved
+//! here from `laterite-ags4-validator/build.rs` (#475 PR2) so a consumer that
+//! only wants the compiled dictionary needn't depend on the whole rule engine.
 //!
 //! SINGLE SOURCE OF TRUTH: the union JSON is the one machine-readable form of the
 //! AGS standard dictionary, generated from the official `.ags` files by
@@ -26,11 +29,10 @@ fn main() {
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR set by cargo");
     let dest = Path::new(&out_dir).join("dict_data.rs");
 
-    // The union lives in the sibling core crate. publish=false + a workspace-only
-    // crate, so a workspace-relative path is safe (it is preserved in the maturin
-    // sdist, which vendors path-dep crates as siblings).
+    // The union JSON now lives in this leaf's own data/ (#475 PR2 relocated it
+    // out of laterite-ags4-core).
     let manifest = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR set by cargo");
-    let union_path = Path::new(&manifest).join("../laterite-ags4-core/data/ags_dictionary.json");
+    let union_path = Path::new(&manifest).join("data/ags_dictionary.json");
     println!("cargo:rerun-if-changed={}", union_path.display());
 
     let text = fs::read_to_string(&union_path)

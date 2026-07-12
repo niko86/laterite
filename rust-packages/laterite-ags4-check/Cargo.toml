@@ -68,8 +68,6 @@ encoding_rs = "0.8"
 # serde_json + (transitively) crossterm for terminal capability
 # detection; none of that touches the validator library now.
 laterite-cliutil = { path = "../laterite-cliutil", features = ["clap"] }
-comfy-table = "7"
-indicatif = "0.18"
 serde_json = { version = "1", features = ["preserve_order"] }
 # The subcommand parser (#430). Same version the sibling CLIs (ags4-forge /
 # ags4-corpus-qa) use; `env` keeps the NO_COLOR-style env wiring available.

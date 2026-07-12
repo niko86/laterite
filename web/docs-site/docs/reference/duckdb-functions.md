@@ -42,8 +42,8 @@ JOIN read_ags('delivery.ags', 'GEOL') g USING (loca_id);
 
 | Function | Returns |
 |---|---|
-| `ags_groups(path)` | the group codes present in the file. |
-| `ags_headings(path, group)` | a group's headings, units, and types. |
+| `ags_groups(path)` | the groups present in the file, with per-group row and heading counts. |
+| `ags_headings(path)` | every group's headings — unit, `ags_type`, `sql_type`, `is_key` — with a `group` column to filter on. |
 
 ## Inspect the dictionary
 
@@ -53,9 +53,23 @@ The AGS4 dictionary ships *inside* the extension — no download.
 |---|---|
 | `ags_dictionary()` | every group/heading with its unit and data type. |
 | `ags_relationships()` | the group parent/child (KEY) graph. |
+| `ags_rules()` | the AGS4 numbered-rule catalogue (`rule`, `title`, `severity`, `fixable`) — the extension *lists* the rules; the CLI/library *run* them. |
 
 ```sql
-SELECT heading, unit, data_type FROM ags_dictionary() WHERE "group" = 'LOCA';
+SELECT heading, unit, ags_type, sql_type FROM ags_dictionary() WHERE "group" = 'LOCA';
+```
+
+## Materialise a store
+
+`load_ags` emits the `CREATE TABLE` DDL to persist every group as an indexed,
+repeat-/remote-queryable store — turning a one-shot read into a durable database.
+
+| Function | Returns |
+|---|---|
+| `load_ags(path)` | `(seq, stmt)` — ordered `CREATE TABLE` DDL, one statement per row. |
+
+```sql
+SELECT stmt FROM load_ags('delivery.ags') ORDER BY seq;
 ```
 
 !!! note "Read-only query surface"

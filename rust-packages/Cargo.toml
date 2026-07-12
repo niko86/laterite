@@ -34,6 +34,7 @@ resolver = "2"
 members = [
     "laterite-types",
     "laterite-ags4-parse",
+    "laterite-ags4-reference",
     "laterite-transport",
     "laterite-ags4-core",
     "laterite-excel",

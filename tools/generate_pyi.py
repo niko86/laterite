@@ -1,6 +1,6 @@
 """Generate `_laterite_native.pyi` from the AGS5 dictionary.
 
-Reads `rust-packages/laterite-ags4-core/data/ags_dictionary.json` and emits the
+Reads `rust-packages/laterite-ags4-reference/data/ags_dictionary.json` and emits the
 type-stub file that sits next to the compiled `_laterite_native.so`,
 giving IDE autocomplete and mypy/pyright type-checking on the standard
 AGS4 typed-graph classes (the union of the official 4.0.3-4.2 dictionary).
@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DICT_JSON = REPO_ROOT / "rust-packages" / "laterite-ags4-core" / "data" / "ags_dictionary.json"
+DICT_JSON = REPO_ROOT / "rust-packages" / "laterite-ags4-reference" / "data" / "ags_dictionary.json"
 OUT_PYI = (
     REPO_ROOT
     / "packages"
@@ -196,7 +196,7 @@ def generate() -> str:
     groups_sorted = sorted(groups, key=lambda g: g["code"])
 
     header = (
-        "# AUTO-GENERATED from rust-packages/laterite-ags4-core/data/ags_dictionary.json\n"
+        "# AUTO-GENERATED from rust-packages/laterite-ags4-reference/data/ags_dictionary.json\n"
         "# DO NOT EDIT BY HAND. Regenerate via:\n"
         "#   uv run python tools/generate_pyi.py\n"
         "#\n"

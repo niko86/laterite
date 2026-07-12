@@ -1,5 +1,5 @@
 // Keep web/public/rules-catalogue.json in lock-step with the single source of
-// truth, rust-packages/laterite-ags4-validator/data/rules_meta.json (the
+// truth, rust-packages/laterite-ags4-reference/data/rules_meta.json (the
 // editorial rule metadata the validator embeds and exposes via --list-rules).
 // The RuleExplainer tool fetches this static asset at runtime to render the
 // plain-English rule reference — the SAME 27 rules the engine emits, so the
@@ -14,7 +14,7 @@ import path from "node:path";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const src = path.resolve(
   here,
-  "../../rust-packages/laterite-ags4-validator/data/rules_meta.json",
+  "../../rust-packages/laterite-ags4-reference/data/rules_meta.json",
 );
 const dst = path.resolve(here, "../public/rules-catalogue.json");
 

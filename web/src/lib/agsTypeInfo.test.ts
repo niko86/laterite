@@ -10,7 +10,7 @@ const UNION = JSON.parse(
   readFileSync(
     fileURLToPath(
       new URL(
-        "../../../rust-packages/laterite-ags4-core/data/ags_dictionary.json",
+        "../../../rust-packages/laterite-ags4-reference/data/ags_dictionary.json",
         import.meta.url,
       ),
     ),

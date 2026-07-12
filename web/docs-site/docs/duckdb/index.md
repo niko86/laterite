@@ -44,9 +44,10 @@ path.
 |---|---|
 | `read_ags(path, group)` · `read_ags_text(text, group)` | one group, typed columns |
 | `ags_groups(path)` | the groups present in the file |
-| `ags_headings(path, group)` | a group's headings, units, and types |
+| `ags_headings(path)` | every group's headings, units, and types (a `group` column) |
 | `ags_dictionary()` | the bundled AGS4 dictionary |
 | `ags_relationships()` | the group parent/child (KEY) graph |
+| `ags_rules()` | the AGS4 numbered-rule catalogue (severity, fixability) |
 | `load_ags(path)` | CREATE TABLE DDL to materialise an indexed, keyed copy |
 
 ## Inspect the dictionary
@@ -54,7 +55,7 @@ path.
 The dictionary ships *inside* the extension — no download:
 
 ```sql
-SELECT "group", heading, unit, data_type
+SELECT "group", heading, unit, ags_type, sql_type
 FROM ags_dictionary()
 WHERE "group" = 'LOCA';
 ```
@@ -64,11 +65,12 @@ WHERE "group" = 'LOCA';
 A read-only reader plus DuckDB's own SQL is enough for multi-file, external-data
 and spatial work. These are illustrative — swap in your own file names.
 
-### Merge two deliveries, dedup by content key
+### Merge two deliveries, one row per location
 
-Union two phases of a site and collapse identical `LOCA` rows on `_id` — the
-content-addressed key means the same row from either file dedups with no key
-columns to name:
+Union two phases of a site. `_id` is content-addressed on a row's **identity** —
+its AGS key plus its parent chain, *not* its every value — so the same borehole
+from either file shares an `_id`, and `DISTINCT ON (_id)` collapses it to one row
+with no key columns to name:
 
 ```sql
 SELECT DISTINCT ON (_id) *
@@ -76,9 +78,10 @@ FROM (SELECT * FROM read_ags('phase1.ags', 'LOCA')
       UNION ALL SELECT * FROM read_ags('phase2.ags', 'LOCA'));
 ```
 
-When a location was *revised* between phases — same `LOCA_ID`, changed data —
-dedup on the AGS key instead and keep the later row. Carry a version column and
-let `QUALIFY` pick the winner per key:
+Because `_id` keys on identity, a location that was *revised* between phases
+(same `LOCA_ID`, changed data) shares that `_id` too — so `DISTINCT ON` keeps an
+**arbitrary** version. To keep a *specific* one, dedup on the AGS key instead:
+carry a version column and let `QUALIFY` pick the winner per key:
 
 ```sql
 SELECT * FROM (
