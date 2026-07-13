@@ -66,6 +66,16 @@ export class StaleCertError extends Ags4Error {
   }
 }
 
+/** A `merge()` could not be reconciled: two files typed the same heading
+ * differently (strict mode), or the merged output failed to emit. Pass
+ * `lenient: true` to widen a conflicting column to `X` (text) instead. */
+export class MergeConflictError extends Ags4Error {
+  constructor(message: string, exitCode = 6) {
+    super(message, exitCode);
+    this.name = "MergeConflictError";
+  }
+}
+
 /** Build the exception for a `(kind, exitCode, message)` failure — the data-
  * driven map (mirrors `_errors.py::_KIND_TO_EXC`), never message-matching. */
 export function makeError(kind: string, exitCode: number, message: string): Ags4Error {
@@ -81,6 +91,9 @@ export function makeError(kind: string, exitCode: number, message: string): Ags4
     case "bad_dict":
     case "bad_args":
       return new BadDictError(message, exitCode);
+    case "merge_conflict":
+    case "emit_error":
+      return new MergeConflictError(message, exitCode);
     default:
       return new Ags4Error(message, exitCode);
   }

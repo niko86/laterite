@@ -1870,6 +1870,7 @@ dependencies = [
  "encoding_rs",
  "laterite-ags4-core",
  "laterite-ags4-diff",
+ "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-validator",
  "laterite-cliutil",
@@ -1918,6 +1919,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "laterite-ags4-merge"
+version = "0.7.0"
+dependencies = [
+ "laterite-ags4-emit",
+ "laterite-ags4-parse",
+ "laterite-ags4-reference",
+ "laterite-types",
+ "proptest",
+ "serde_json",
+]
+
+[[package]]
 name = "laterite-ags4-parse"
 version = "0.7.0"
 dependencies = [
@@ -1934,6 +1947,8 @@ dependencies = [
  "phf_codegen 0.14.0",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
+ "uuid",
 ]
 
 [[package]]
@@ -1966,6 +1981,7 @@ dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-diff",
  "laterite-ags4-emit",
+ "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-validator",
  "laterite-excel",
@@ -2008,6 +2024,7 @@ dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-diff",
  "laterite-ags4-emit",
+ "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-validator",
  "laterite-excel",
@@ -2028,6 +2045,7 @@ dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-diff",
  "laterite-ags4-emit",
+ "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
  "laterite-ags4-validator",

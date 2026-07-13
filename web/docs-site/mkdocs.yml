@@ -152,6 +152,7 @@ nav:
       - Repairing & comparing:
           - Fix a dirty file: cookbook/fix-a-dirty-file.md
           - Diff two revisions: cookbook/diff-revisions.md
+          - Merge two deliveries: cookbook/merge-deliveries.md
           - Certify a clean file: cookbook/certify.md
       - Sharing & migrating:
           - Excel ↔ AGS4: cookbook/excel.md

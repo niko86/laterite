@@ -19,6 +19,7 @@ with no Python at runtime. The `validate` capability is what `python-ags4`'s
     read <file> [grp] dump a group's rows (table / --csv / --json), or list codes
     fix <file>        mechanically repair the file (safe fixes; --risky for more)
     diff <a> <b>      KEY-aware / type-aware revision delta between two files
+    merge <files...>  reconcile 2+ deliveries of one project into one file (--out)
     certify <file>    mint the .ags.idx validity certificate for a clean file
     rules             print the AGS4 rule catalogue (no input file needed)
     pack <in> <out>   zstd-compress any file for transport (unpack reverses it)
@@ -74,6 +75,27 @@ with no Python at runtime. The `validate` capability is what `python-ags4`'s
     Compares <a> (baseline) against <b> (revision): a per-group
     +added -removed ~changed summary, or the full RevisionDelta with --json.
     (also honours --dict-version / --dict / --encoding)
+
+## merge <files...>
+
+    Reconcile two or more deliveries of one project into a single file. Files
+    merge in argument order — a LATER file wins a KEY conflict — and rows are
+    matched by their dictionary KEY headings, so a re-sorted borehole list still
+    merges onto its prior self. The merge is a union: a row present in only one
+    file is kept (silence is not deletion). A column two files typed differently
+    ERRORS (strict, the default); --lenient widens it to X (text), keeping raw
+    values. --json emits the {warnings, revisions} audit.
+    (also honours --dict-version / --dict / --encoding)
+
+    --out <path>          write the merged file here (REQUIRED — never a default
+                          over an input)
+    --lenient             widen a TYPE conflict to X instead of erroring
+    --tran-issue <ISNO>   stamp a synthesised merge-TRAN (with --tran-date; records
+                          the inputs' ISNOs/dates in TRAN_REM for provenance)
+    --tran-date <DATE>    the merge-TRAN production date (yyyy-mm-dd)
+    --tran-producer <NAME>    TRAN_PROD for the merge-TRAN
+    --tran-recipient <NAME>   TRAN_RECV for the merge-TRAN
+    --tran-status <STATUS>    TRAN_STAT for the merge-TRAN
 
 ## certify <file>
 
@@ -145,6 +167,8 @@ Progress is on stderr; the report on stdout.
     lat read delivery.ags                   # list the group codes
     lat read delivery.ags LOCA --csv        # dump one group as CSV
     lat diff old.ags new.ags                # revision delta
+    lat merge phase1.ags phase2.ags --out all.ags        # reconcile deliveries
+    lat merge a.ags b.ags --out m.ags --lenient --json   # widen type clashes
     lat certify delivery.ags                # → delivery.ags.idx (if clean)
     lat validate delivery.ags --index delivery.ags.idx  # skip the engine if fresh
     lat rules                               # the rule catalogue

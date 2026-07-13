@@ -15,6 +15,8 @@
 
 use laterite_ags4_parse::{DataRow, ParsedFile, ParsedGroup};
 use laterite_ags4_reference::dict::Dictionary;
+use laterite_ags4_reference::keychain::key_heading_names;
+use laterite_ags4_reference::union::registry;
 use laterite_types::parse_value;
 use serde::Serialize;
 
@@ -131,28 +133,28 @@ fn changed_cells(
             .get(h.as_str())
             .and_then(|&i| row_b.values.get(i))
             .map(String::as_str);
-        // AGS type: the revision's file TYPE row first, then the baseline's,
-        // then the dictionary, then opaque string ("X") — so the typed
-        // comparison uses the most authoritative declared type.
-        let ty = idx_b
-            .get(h.as_str())
-            .and_then(|&i| types_b.get(i))
-            .map(String::as_str)
-            .or_else(|| {
-                idx_a
-                    .get(h.as_str())
-                    .and_then(|&i| types_a.get(i))
-                    .map(String::as_str)
-            })
-            .or_else(|| dict.heading(code, h).map(|e| e.ags_type))
-            .unwrap_or("X");
-        let va = parse_value(a, ty);
-        let vb = parse_value(b, ty);
+        // AGS type, resolved INDEPENDENTLY per side (own file TYPE row, then the
+        // dictionary, then opaque "X"), so a heading two files typed differently is
+        // compared on each side's real type rather than cross-contaminating through
+        // one shared type. (When both files agree on TYPE — the common case —
+        // ty_a == ty_b and this is identical to the old single-type comparison.)
+        let ty_for = |idx: &std::collections::HashMap<&str, usize>, types: &[String]| -> String {
+            idx.get(h.as_str())
+                .and_then(|&i| types.get(i))
+                .map(String::as_str)
+                .or_else(|| dict.heading(code, h).map(|e| e.ags_type))
+                .unwrap_or("X")
+                .to_string()
+        };
+        let ty_a = ty_for(idx_a, types_a);
+        let ty_b = ty_for(idx_b, types_b);
+        let va = parse_value(a, &ty_a);
+        let vb = parse_value(b, &ty_b);
         let typed_equal = !va.is_null() && va == vb;
         if a != b && !typed_equal {
             out.push(CellDelta {
                 heading: h.clone(),
-                ags_type: ty.to_string(),
+                ags_type: ty_b.clone(),
                 a: a.map(str::to_string),
                 b: b.map(str::to_string),
             });
@@ -189,17 +191,21 @@ fn diff_group(
         .cloned()
         .collect();
 
-    // KEY headings that exist on BOTH sides (so they can index either row).
-    let key_headings: Vec<String> = dict
-        .group_headings(code)
-        .iter()
-        .filter(|h| {
-            dict.heading(code, h)
-                .is_some_and(|e| e.status.contains("KEY"))
+    // KEY headings that exist on BOTH sides (so they can index either row), from
+    // the ONE shared definition (`key_heading_names`) that `laterite-ags4-merge`
+    // and the content-addressed `_id` also consume — diff no longer re-derives
+    // "what identifies a row" from per-edition status. Proven equivalent across
+    // every bundled edition by `union_key_headings_agree_with_per_edition_status`.
+    let key_headings: Vec<String> = registry()
+        .get(code)
+        .map(|g| {
+            key_heading_names(g)
+                .iter()
+                .filter(|h| set_a.contains(**h) && set_b.contains(**h))
+                .map(|h| h.to_string())
+                .collect()
         })
-        .filter(|h| set_a.contains(**h) && set_b.contains(**h))
-        .map(|h| h.to_string())
-        .collect();
+        .unwrap_or_default();
     let keyed = !key_headings.is_empty();
 
     let idx_a = heading_index(&ga.headings);
@@ -413,5 +419,68 @@ mod tests {
         assert_eq!(d.changed, 0);
         assert_eq!(d.added, 1);
         assert_eq!(d.removed, 1);
+    }
+
+    // 0c: each side of a matched row is typed by its OWN file, so a heading two
+    // files typed differently is compared on each side's real type rather than
+    // cross-contaminating through one shared type.
+    #[test]
+    fn changed_cells_type_each_side_independently() {
+        // LOCA_XY: baseline types it ID ("1.0" → the string "1.0"), revision types
+        // it 2DP ("1.00" → the number 1.0). One shared type (the old code) would
+        // parse BOTH under 2DP and suppress the change; per-side typing surfaces it.
+        let a = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"LOCA_XY\"\r\n\"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"ID\"\r\n\"DATA\",\"BH1\",\"1.0\"\r\n";
+        let b = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"LOCA_XY\"\r\n\"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"2DP\"\r\n\"DATA\",\"BH1\",\"1.00\"\r\n";
+        let pa = parse_str(a).unwrap();
+        let pb = parse_str(b).unwrap();
+        let dict = Dictionary::bundled(DictVersion::V4_1_1);
+        let d = diff_group("LOCA", &pa.groups["LOCA"], &pb.groups["LOCA"], &dict, None);
+        assert_eq!(
+            d.changed, 1,
+            "the ID→2DP retype of LOCA_XY is a real change"
+        );
+        let changed: Vec<_> = d.rows.iter().filter(|r| r.kind == "changed").collect();
+        assert_eq!(changed[0].cells[0].heading, "LOCA_XY");
+    }
+
+    // 0b migration gate: before repointing diff's KEY derivation at the shared
+    // `key_heading_names`, PROVE the union's KEY classification agrees with every
+    // bundled edition's own `status.contains("KEY")` for the headings that edition
+    // declares — a genuine old-vs-new comparison, not the function-vs-itself
+    // tautology. If this ever fails, the switch is NOT behaviour-neutral.
+    #[test]
+    fn union_key_headings_agree_with_per_edition_status() {
+        use laterite_ags4_reference::keychain::key_heading_names;
+        use laterite_ags4_reference::union::registry;
+        use std::collections::BTreeSet;
+
+        let reg = registry();
+        let mut mismatches: Vec<String> = Vec::new();
+        for &ed in DictVersion::ALL.iter() {
+            let d = Dictionary::bundled(ed);
+            let mut codes: Vec<&str> = d.group_codes().collect();
+            codes.sort_unstable();
+            for code in codes {
+                let union_keys: BTreeSet<&str> = reg
+                    .get(code)
+                    .map(|g| key_heading_names(g).into_iter().collect())
+                    .unwrap_or_default();
+                for &h in d.group_headings(code) {
+                    let old = d.heading(code, h).is_some_and(|e| e.status.contains("KEY"));
+                    let new = union_keys.contains(h);
+                    if old != new {
+                        mismatches.push(format!(
+                            "{}/{code}/{h}: edition KEY={old} union KEY={new}",
+                            ed.as_str()
+                        ));
+                    }
+                }
+            }
+        }
+        assert!(
+            mismatches.is_empty(),
+            "union vs per-edition KEY divergence:\n{}",
+            mismatches.join("\n")
+        );
     }
 }

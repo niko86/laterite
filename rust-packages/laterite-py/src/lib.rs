@@ -536,6 +536,176 @@ fn diff_files<'py>(
     }
 }
 
+/// Reconcile N AGS4 deliveries of one project into a single file (the same leaf
+/// `lat merge` uses). Files are merged in argument order — a later file wins a
+/// KEY conflict — with rows identified by their dictionary KEY headings, so a
+/// re-sorted borehole list still merges onto its prior self. A column two files
+/// typed differently errors in strict mode; `lenient` widens it to `X` (keeping
+/// raw values). Returns `(merged_bytes, warnings_json, revisions_json)` or the
+/// `(exit_code, kind, message)` failure triple. When `tran` carries an issue +
+/// date, a single merge-TRAN row is synthesised for the output.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+fn merge_core(
+    files: &[Vec<u8>],
+    lenient: bool,
+    dvr: Option<&str>,
+    encoding: Option<&str>,
+    tran: (
+        Option<&str>,
+        Option<&str>,
+        Option<&str>,
+        Option<&str>,
+        Option<&str>,
+    ),
+) -> Result<(Vec<u8>, String, String), (i32, String, String)> {
+    use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeMismatchMode, merge_parsed};
+
+    if files.len() < 2 {
+        return Err((
+            5,
+            "bad_args".to_string(),
+            "merge needs at least two files".to_string(),
+        ));
+    }
+    let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
+    let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
+        (
+            5,
+            "bad_args".to_string(),
+            format!("unknown encoding {:?}", encoding.unwrap_or("")),
+        )
+    })?;
+    let parsed: Vec<_> = files
+        .iter()
+        .map(|b| {
+            laterite_ags4_parse::parse_bytes(b, enc)
+                .map_err(ValidatorError::from)
+                .map_err(map_err)
+        })
+        .collect::<Result<_, _>>()?;
+
+    // Edition from the newest (last) file's TRAN_AGS, forced by dict_version —
+    // the same resolution the CLI and diff use.
+    let dv = laterite_ags4_validator::resolve_dict_version(
+        over,
+        parsed
+            .last()
+            .and_then(laterite_ags4_validator::tran_ags_of)
+            .as_deref(),
+    )
+    .map(|(dv, _)| dv)
+    .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
+
+    // A merge-TRAN is synthesised only when both an issue and a date are given.
+    let (isno, date, prod, recv, stat) = tran;
+    let tran = match (isno, date) {
+        (Some(isno), Some(date)) => Some(TranStamp {
+            isno: isno.to_string(),
+            date: date.to_string(),
+            prod: prod.unwrap_or_default().to_string(),
+            recv: recv.unwrap_or_default().to_string(),
+            stat: stat.unwrap_or_default().to_string(),
+            ags: dv.as_str().to_string(),
+        }),
+        _ => None,
+    };
+
+    let opts = MergeOpts {
+        type_mismatch: if lenient {
+            TypeMismatchMode::Lenient
+        } else {
+            TypeMismatchMode::Strict
+        },
+        edition: dv,
+        tran,
+        ..Default::default()
+    };
+
+    match merge_parsed(&parsed, &opts) {
+        Ok(res) => {
+            let warnings: Vec<_> = res
+                .warnings
+                .iter()
+                .map(|w| {
+                    serde_json::json!({
+                        "kind": w.kind,
+                        "group": w.group,
+                        "heading": w.heading,
+                        "message": w.message,
+                    })
+                })
+                .collect();
+            let revisions: Vec<_> = res
+                .revisions
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "group": r.group,
+                        "key": r.key,
+                        "changed": r.changed,
+                        "winner_file": r.winner_file,
+                    })
+                })
+                .collect();
+            Ok((
+                res.bytes,
+                serde_json::to_string(&warnings).unwrap_or_else(|_| "[]".to_string()),
+                serde_json::to_string(&revisions).unwrap_or_else(|_| "[]".to_string()),
+            ))
+        }
+        // A strict TYPE conflict / emit failure is a schema-level rejection (exit 6),
+        // matching the `lat merge` codes.
+        Err(e @ MergeError::TypeConflict { .. }) => {
+            Err((6, "type_conflict".to_string(), e.to_string()))
+        }
+        Err(e @ MergeError::Emit(_)) => Err((6, "emit_error".to_string(), e.to_string())),
+    }
+}
+
+/// Merge raw AGS4 documents (`files`, ≥2). Returns `{ok:true, merged (bytes),
+/// warnings_json, revisions_json}` — the Python layer parses the two JSON
+/// strings — or the `{ok:false, error_kind, exit_code, error}` failure dict.
+#[pyfunction]
+#[pyo3(signature = (files, lenient=false, dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None))]
+#[allow(clippy::too_many_arguments)]
+fn merge_files<'py>(
+    py: Python<'py>,
+    files: Vec<Vec<u8>>,
+    lenient: bool,
+    dict_version: Option<String>,
+    encoding: Option<String>,
+    tran_issue: Option<String>,
+    tran_date: Option<String>,
+    tran_producer: Option<String>,
+    tran_recipient: Option<String>,
+    tran_status: Option<String>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let tran = (
+        tran_issue.as_deref(),
+        tran_date.as_deref(),
+        tran_producer.as_deref(),
+        tran_recipient.as_deref(),
+        tran_status.as_deref(),
+    );
+    match merge_core(
+        &files,
+        lenient,
+        dict_version.as_deref(),
+        encoding.as_deref(),
+        tran,
+    ) {
+        Err((code, kind, msg)) => err_dict(py, code, &kind, &msg),
+        Ok((bytes, warnings_json, revisions_json)) => {
+            let d = PyDict::new(py);
+            d.set_item("ok", true)?;
+            d.set_item("merged", pyo3::types::PyBytes::new(py, &bytes))?;
+            d.set_item("warnings_json", warnings_json)?;
+            d.set_item("revisions_json", revisions_json)?;
+            Ok(d)
+        }
+    }
+}
+
 /// Parse `path` or `text` into per-group primitives (string cells —
 /// AGS4 is a text format). `headings`/`units`/`types`/row `values`
 /// exclude the leading row tag (matching `ParsedGroup`); the Python
@@ -1057,6 +1227,7 @@ fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(fix_file, m)?)?;
     m.add_function(wrap_pyfunction!(list_rules, m)?)?;
     m.add_function(wrap_pyfunction!(diff_files, m)?)?;
+    m.add_function(wrap_pyfunction!(merge_files, m)?)?;
     m.add_function(wrap_pyfunction!(parse_primitives, m)?)?;
     m.add_function(wrap_pyfunction!(parse_arrow, m)?)?;
     m.add_function(wrap_pyfunction!(read_groups_raw, m)?)?;

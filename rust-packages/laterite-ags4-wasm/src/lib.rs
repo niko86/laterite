@@ -1066,6 +1066,116 @@ pub fn diff(
         .map_err(|e| JsError::new(&e.to_string()))
 }
 
+/// The result of a merge: the reconciled `bytes` (a JS `Uint8Array` — the merged
+/// `.ags` file), plus `warnings_json` and `revisions_json` (the audit arrays the
+/// Tools UI parses — the same shape PyO3 / Node return).
+#[wasm_bindgen]
+pub struct MergeResult {
+    bytes: Vec<u8>,
+    warnings_json: String,
+    revisions_json: String,
+}
+
+#[wasm_bindgen]
+impl MergeResult {
+    #[wasm_bindgen(getter)]
+    pub fn bytes(&self) -> Vec<u8> {
+        self.bytes.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn warnings_json(&self) -> String {
+        self.warnings_json.clone()
+    }
+    #[wasm_bindgen(getter)]
+    pub fn revisions_json(&self) -> String {
+        self.revisions_json.clone()
+    }
+}
+
+/// Merge two AGS4 deliveries of one project into one file (`a` then `b` — `b`
+/// wins a KEY conflict). Rows are matched by their dictionary KEY headings. A
+/// heading the two files typed differently is a `JsError` unless `lenient`
+/// widens it to `X`. `tran_issue` + `tran_date` (both) stamp a synthesised
+/// merge-TRAN. The edition is `b`'s `TRAN_AGS`, falling back to the standard.
+#[allow(clippy::too_many_arguments)]
+#[wasm_bindgen]
+pub fn merge(
+    a: &[u8],
+    b: &[u8],
+    encoding_label: Option<String>,
+    lenient: Option<bool>,
+    tran_issue: Option<String>,
+    tran_date: Option<String>,
+    tran_producer: Option<String>,
+    tran_recipient: Option<String>,
+    tran_status: Option<String>,
+) -> Result<MergeResult, JsError> {
+    use laterite_ags4_merge::{MergeOpts, TranStamp, TypeMismatchMode, merge_parsed};
+
+    console_error_panic_hook::set_once();
+    let encoding = resolve_encoding(encoding_label.as_deref());
+    let pa =
+        parse_bytes(a, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
+    let pb =
+        parse_bytes(b, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
+
+    // Edition from the newest file (b)'s TRAN_AGS, falling back to the standard.
+    let dv = resolve_dict_version(None, tran_ags_of(&pb).as_deref())
+        .map(|(dv, _)| dv)
+        .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
+
+    // A merge-TRAN is synthesised only when both an issue and a date are given.
+    let tran = match (tran_issue, tran_date) {
+        (Some(isno), Some(date)) => Some(TranStamp {
+            isno,
+            date,
+            prod: tran_producer.unwrap_or_default(),
+            recv: tran_recipient.unwrap_or_default(),
+            stat: tran_status.unwrap_or_default(),
+            ags: dv.as_str().to_string(),
+        }),
+        _ => None,
+    };
+
+    let opts = MergeOpts {
+        type_mismatch: if lenient.unwrap_or(false) {
+            TypeMismatchMode::Lenient
+        } else {
+            TypeMismatchMode::Strict
+        },
+        edition: dv,
+        tran,
+        ..Default::default()
+    };
+
+    let res = merge_parsed(&[pa, pb], &opts).map_err(|e| JsError::new(&e.to_string()))?;
+    let warnings: Vec<_> = res
+        .warnings
+        .iter()
+        .map(|w| {
+            serde_json::json!({
+                "kind": w.kind, "group": w.group,
+                "heading": w.heading, "message": w.message,
+            })
+        })
+        .collect();
+    let revisions: Vec<_> = res
+        .revisions
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "group": r.group, "key": r.key,
+                "changed": r.changed, "winnerFile": r.winner_file,
+            })
+        })
+        .collect();
+    Ok(MergeResult {
+        bytes: res.bytes,
+        warnings_json: serde_json::to_string(&warnings).unwrap_or_else(|_| "[]".into()),
+        revisions_json: serde_json::to_string(&revisions).unwrap_or_else(|_| "[]".into()),
+    })
+}
+
 // ---------------------------------------------------------------------
 // dictionary() -> the bundled STANDARD dictionary for an edition.
 //

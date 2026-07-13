@@ -17,6 +17,7 @@ import init, {
   apply_fixes,
   read,
   diff,
+  merge,
   dictionary,
   build_ags4,
   ags4_to_xlsx,
@@ -104,6 +105,20 @@ export interface RevisionDiffReq {
   /** per-group cap on serialized row deltas (counts stay true totals). */
   maxRowsPerGroup: number | null;
 }
+/** Merge two AGS4 deliveries into one file (Tools → Merge). Carries both
+ *  buffers, transferred; `lenient` widens a TYPE conflict to X; the optional
+ *  `tran*` fields stamp a synthesised merge-TRAN. */
+export interface MergeReq {
+  id: number;
+  kind: "merge";
+  aBytes: ArrayBuffer;
+  bBytes: ArrayBuffer;
+  encoding: string;
+  lenient: boolean;
+  tranIssue: string | null;
+  tranDate: string | null;
+  tranProducer: string | null;
+}
 /** Load the bundled STANDARD dictionary for an edition (Tools reference).
  *  Carries no file bytes — it reads the engine's own per-edition dict. */
 export interface DictionaryReq {
@@ -145,6 +160,7 @@ export type WorkerReq =
   | ParseReq
   | ArrowReq
   | RevisionDiffReq
+  | MergeReq
   | DictionaryReq
   | ToAgs4Req
   | ExcelExportReq
@@ -161,6 +177,15 @@ export type WorkerRes =
   | { id: number; ok: true; kind: "parsed"; groups: GroupMeta[] }
   | { id: number; ok: true; kind: "arrow"; code: string; bytes: ArrayBuffer }
   | { id: number; ok: true; kind: "revisionDelta"; delta: RevisionDelta }
+  | {
+      id: number;
+      ok: true;
+      kind: "mergeResult";
+      /** The merged `.ags` bytes, transferred. */
+      bytes: ArrayBuffer;
+      warningsJson: string;
+      revisionsJson: string;
+    }
   | { id: number; ok: true; kind: "dictionary"; dict: StandardDict }
   | { id: number; ok: true; kind: "toAgs4"; result: ExportResult }
   | {
@@ -282,6 +307,32 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
         req.maxRowsPerGroup ?? undefined,
       ) as RevisionDelta;
       reply({ id: req.id, ok: true, kind: "revisionDelta", delta });
+      return;
+    }
+
+    if (req.kind === "merge") {
+      // Throws (→ caught below) on a strict TYPE conflict or unparseable input.
+      const out = merge(
+        new Uint8Array(req.aBytes),
+        new Uint8Array(req.bBytes),
+        req.encoding,
+        req.lenient,
+        req.tranIssue ?? undefined,
+        req.tranDate ?? undefined,
+        req.tranProducer ?? undefined,
+      );
+      const buf = out.bytes.slice().buffer;
+      reply(
+        {
+          id: req.id,
+          ok: true,
+          kind: "mergeResult",
+          bytes: buf,
+          warningsJson: out.warnings_json,
+          revisionsJson: out.revisions_json,
+        },
+        [buf],
+      );
       return;
     }
 

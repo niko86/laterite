@@ -9,6 +9,7 @@ pub mod diff;
 #[cfg(feature = "excel")]
 pub mod excel;
 pub mod fix;
+pub mod merge;
 pub mod read;
 pub mod rules;
 #[cfg(feature = "transport")]

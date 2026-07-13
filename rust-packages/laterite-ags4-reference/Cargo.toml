@@ -23,6 +23,12 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # phf does NOT implement PhfHash for tuples, so dict keys are composite
 # "GROUP\u{1f}HEADING" strings.
 phf = "0.14"
+# Content-addressed row keys (keychain.rs, relocated here in the row-identity
+# consolidation): SHA-256 over the injective key-chain encoding, then UUIDv8
+# from the first 128 bits. RNG-free (uuid v8 from bytes, no `rng` feature), and
+# core already ships both crates to wasm, so the leaf stays wasm-clean.
+sha2 = "0.11"
+uuid = { version = "1", features = ["v8"] }
 
 [build-dependencies]
 # build.rs projects each edition out of the consolidated union dictionary

@@ -31,6 +31,7 @@ from . import groups as _groups  # noqa: F401
 from ._errors import (
     Ags4Error,
     BadDictError,
+    MergeConflictError,
     NotAgs4Error,
     StaleCertError,
     UnsupportedEditionError,
@@ -66,6 +67,9 @@ __all__ = [
     "dict_for",
     "list_rules",
     "diff",
+    "merge",
+    "MergeResult",
+    "MergeConflictError",
     "Report",
     "Ags4File",
     "AgsQuery",
@@ -2106,3 +2110,153 @@ def diff(
         encoding=encoding,
     )
     return json.loads(raise_for(r)["delta_json"])
+
+
+class MergeResult:
+    """The product of [`merge`][laterite.merge] — the reconciled AGS4 document plus an
+    honest audit of what merging had to resolve.
+
+    The headline payload is `bytes` — the single merged file, spec-correct UTF-8
+    with no BOM. `text` decodes it and `save` writes it to a path (returning the
+    `~pathlib.Path` written), for the common case where you let ``merge`` build the
+    document and then decide where it lands.
+
+    The two report sides make the merge auditable rather than a black box.
+    `warnings` is the advisory ledger — each a ``{kind, group, heading, message}``
+    record for something merge resolved without failing: a recency contradiction
+    (a file stamped older carried the winning row), a non-``X`` type widen, or a
+    missing merge-TRAN stamp. `revisions` is the per-row change log — each a
+    ``{group, key, changed, winner_file}`` record naming a KEY-matched row whose
+    values a later file changed (compared through the typed value, so a
+    formatting-only edit is not reported) and which input (`winner_file`, an
+    argument index) supplied the winning content. An empty `revisions` means every
+    shared row agreed; entries are exactly the rows a human should eyeball.
+
+    Attributes:
+        bytes (bytes): The merged AGS4 document, spec-correct UTF-8 with no BOM.
+        warnings (list[dict]): Advisory notes, each ``{kind, group, heading,
+            message}`` — recency contradictions, non-``X`` type widens, a missing
+            merge-TRAN stamp.
+        revisions (list[dict]): Per-row content revisions, each ``{group, key,
+            changed, winner_file}`` — a later file changed a KEY-matched row.
+        text (str): The merged bytes decoded as UTF-8.
+    """
+
+    __slots__ = ("bytes", "revisions", "warnings")
+
+    def __init__(
+        self,
+        data: builtins.bytes,
+        warnings: list[dict],
+        revisions: list[dict],
+    ) -> None:
+        self.bytes = data
+        self.warnings = warnings
+        self.revisions = revisions
+
+    @property
+    def text(self) -> str:
+        """The merged bytes decoded as UTF-8."""
+        return self.bytes.decode("utf-8")
+
+    def save(self, path: Any) -> Any:
+        """Write the merged bytes to ``path``; return the `~pathlib.Path` written."""
+        from pathlib import Path
+
+        p = Path(path)
+        p.write_bytes(self.bytes)
+        return p
+
+    def __repr__(self) -> str:
+        return (
+            f"MergeResult({len(self.bytes)} bytes, "
+            f"{len(self.warnings)} warning(s), {len(self.revisions)} revision(s))"
+        )
+
+
+def merge(
+    *sources: Any,
+    lenient: bool = False,
+    dict_version: Edition | None = None,
+    encoding: str | None = None,
+    tran_issue: str | None = None,
+    tran_date: str | None = None,
+    tran_producer: str | None = None,
+    tran_recipient: str | None = None,
+    tran_status: str | None = None,
+) -> MergeResult:
+    """Reconcile two or more AGS4 deliveries of one project into a single file.
+
+    Each of ``sources`` is anything [`read`][laterite.read] accepts — a path, AGS4
+    text, raw bytes, a file-like, or an [`Ags4File`][laterite.Ags4File]. They are
+    merged **in argument order**, and that order *is* the authority: when two files
+    carry the same row, the later argument wins. Rows are identified by their
+    dictionary **KEY** headings, not line order, so a re-sorted borehole list still
+    merges each ``LOCA`` onto its prior self instead of duplicating it. The merge is
+    a **union** — a row present in one file and absent in another is kept, because
+    silence is not deletion.
+
+    Columns are reconciled per heading. When two files declare the same heading with
+    **different TYPEs**, strict mode (the default) refuses to guess and raises
+    [`MergeConflictError`][laterite.MergeConflictError]; pass ``lenient=True`` to
+    widen that column to ``X`` (text), keeping every raw value byte-for-byte. A
+    typed column widening around an unchanged value is *not* a revision.
+
+    The merged file genuinely *is* a new transmission, so pass ``tran_issue`` **and**
+    ``tran_date`` (both required together) to stamp it with a synthesised ``TRAN``
+    row that records the input issues/dates in ``TRAN_REM`` for provenance;
+    ``tran_producer`` / ``tran_recipient`` / ``tran_status`` fill the rest. Omit them
+    and the inputs' own ``TRAN`` rows are reconciled like any other group, with a
+    warning that no merge-transmission stamp was supplied.
+
+    Returns a [`MergeResult`][laterite.MergeResult] — the merged ``bytes`` plus the
+    ``warnings`` and per-row ``revisions`` audit. This is the same engine
+    ``lat merge`` uses.
+
+    Args:
+        *sources: Two or more documents to merge, each a path, AGS4 text, raw bytes,
+            a file-like, or an [`Ags4File`][laterite.Ags4File]. Order is authority —
+            a later argument wins a KEY conflict.
+        lenient: Widen a column two files typed differently to ``X`` instead of
+            raising. Defaults to ``False`` (strict — a TYPE conflict is an error).
+        dict_version: Dictionary edition used to resolve each group's KEY headings.
+            Defaults to ``None`` (taken from the newest file's ``TRAN_AGS``).
+        encoding: Source text encoding for every input. Defaults to ``None`` (sniffed).
+        tran_issue: ``TRAN_ISNO`` for the synthesised merge-TRAN. Requires
+            ``tran_date`` too; without both, no merge-TRAN is written.
+        tran_date: ``TRAN_DATE`` for the synthesised merge-TRAN (requires
+            ``tran_issue``).
+        tran_producer: ``TRAN_PROD`` for the synthesised merge-TRAN.
+        tran_recipient: ``TRAN_RECV`` for the synthesised merge-TRAN.
+        tran_status: ``TRAN_STAT`` for the synthesised merge-TRAN.
+
+    Returns:
+        A [`MergeResult`][laterite.MergeResult]: the merged ``bytes`` and the
+        ``warnings`` / ``revisions`` audit.
+
+    Raises:
+        MergeConflictError: A heading was typed differently by two files under strict
+            mode (the default), or the merged output failed to emit.
+        ValueError: Fewer than two sources were given.
+    """
+    if len(sources) < 2:
+        raise ValueError("merge needs at least two source documents")
+    import json
+
+    r = _native.merge_files(
+        [_source_bytes(s) for s in sources],
+        lenient=lenient,
+        dict_version=dict_version,
+        encoding=encoding,
+        tran_issue=tran_issue,
+        tran_date=tran_date,
+        tran_producer=tran_producer,
+        tran_recipient=tran_recipient,
+        tran_status=tran_status,
+    )
+    r = raise_for(r)
+    return MergeResult(
+        r["merged"],
+        json.loads(r["warnings_json"]),
+        json.loads(r["revisions_json"]),
+    )

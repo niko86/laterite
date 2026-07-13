@@ -27,6 +27,7 @@ import {
   fixFile,
   listRules as nativeListRules,
   nativeDiff,
+  nativeMerge,
   parseArrow,
   runCheck,
   xlsxBytesToAgs4,
@@ -563,6 +564,111 @@ export function diff(a: DiffSource, b: DiffSource, opts: DiffOptions = {}): Revi
   }
 }
 
+// --- merge (N-way reconciliation) ---------------------------------------
+
+/** One advisory note from a merge — something reconciled without failing (a
+ * recency contradiction, a non-`X` type widen, a missing merge-TRAN stamp).
+ * Snake_case fields mirror the wire shape, identical to Python's dict. */
+export interface MergeWarning {
+  kind: string;
+  group: string | null;
+  heading: string | null;
+  message: string;
+}
+
+/** One per-row content revision — a later file changed a KEY-matched row's
+ * values. `key` is the KEY tuple; `changed` names the headings whose typed value
+ * differed; `winnerFile` is the argument index that supplied the winning row. */
+export interface RevisionNote {
+  group: string;
+  key: string[];
+  changed: string[];
+  winnerFile: number;
+}
+
+/** What {@link merge} returns — the reconciled `bytes` plus the `warnings` and
+ * per-row `revisions` audit. `text` decodes the bytes as UTF-8. */
+export interface MergeResult {
+  bytes: Uint8Array;
+  warnings: MergeWarning[];
+  revisions: RevisionNote[];
+  text: string;
+}
+
+export interface MergeOptions {
+  /** Widen a column two files typed differently to `X` instead of throwing
+   * {@link MergeConflictError}. Default `false` (strict — a TYPE conflict errors). */
+  lenient?: boolean;
+  /** Force the edition used to resolve KEY headings; default takes it from the
+   * newest file's `TRAN_AGS`. */
+  dictVersion?: string;
+  /** Source encoding label for path / bytes inputs (default `"utf-8"`). */
+  encoding?: string;
+  /** `TRAN_ISNO` for a synthesised merge-TRAN. Requires `tranDate` too; without
+   * both, no merge-TRAN is written and the inputs' TRAN is reconciled instead. */
+  tranIssue?: string;
+  /** `TRAN_DATE` for the synthesised merge-TRAN (requires `tranIssue`). */
+  tranDate?: string;
+  /** `TRAN_PROD` for the synthesised merge-TRAN. */
+  tranProducer?: string;
+  /** `TRAN_RECV` for the synthesised merge-TRAN. */
+  tranRecipient?: string;
+  /** `TRAN_STAT` for the synthesised merge-TRAN. */
+  tranStatus?: string;
+}
+
+/** A merge input: a file path (`string`), raw bytes, or an already-read `Ags4File`. */
+export type MergeSource = string | Uint8Array | Ags4File;
+
+/** Reconcile two or more AGS4 deliveries of one project into a single file — the
+ * Node port of `laterite.merge()`, over the SAME shared `laterite-ags4-merge`
+ * engine `lat merge` uses.
+ *
+ * Each source is a path, raw `Uint8Array`/`Buffer` bytes, or an already-read
+ * `Ags4File`. Files merge **in argument order** — a later argument wins a KEY
+ * conflict. Rows are identified by their dictionary **KEY** headings (not line
+ * order), so a re-sorted borehole list still merges each `LOCA` onto its prior
+ * self; the merge is a **union** (a row in one file and absent in another is
+ * kept, since silence is not deletion). A heading two files typed differently
+ * throws {@link MergeConflictError} unless `opts.lenient` widens it to `X` (text,
+ * keeping raw values). Pass `opts.tranIssue` **and** `opts.tranDate` to stamp a
+ * synthesised merge-TRAN recording the inputs' issues/dates in `TRAN_REM`.
+ *
+ * @param sources - Two or more documents to merge (path / bytes / `Ags4File`).
+ * @param opts - {@link MergeOptions}.
+ * @returns A {@link MergeResult}: the merged `bytes` + `warnings` / `revisions` audit.
+ * @throws {MergeConflictError} a strict TYPE conflict, or the output failed to emit.
+ * @throws {NotAgs4Error} a source is not decodable AGS4.
+ * @throws {BadDictError} an invalid `opts.dictVersion`.
+ * @throws {RangeError} fewer than two sources.
+ */
+export function merge(sources: MergeSource[], opts: MergeOptions = {}): MergeResult {
+  if (sources.length < 2) throw new RangeError("merge needs at least two source documents");
+  const files = sources.map(diffBytes);
+  try {
+    const out = nativeMerge(
+      files,
+      opts.lenient,
+      opts.dictVersion,
+      opts.encoding,
+      opts.tranIssue,
+      opts.tranDate,
+      opts.tranProducer,
+      opts.tranRecipient,
+      opts.tranStatus,
+    );
+    const bytes = new Uint8Array(out.bytes);
+    return {
+      bytes,
+      warnings: JSON.parse(out.warningsJson) as MergeWarning[],
+      revisions: JSON.parse(out.revisionsJson) as RevisionNote[],
+      text: new TextDecoder().decode(bytes),
+    };
+  } catch (e) {
+    throw fromNativeError(e);
+  }
+}
+
 /** Pick the three stat fields out of an in-memory conversion result. */
 function excelStatsOf(r: ExcelBytesResult): ExcelStats {
   return { sheetsWritten: r.sheetsWritten, rowsWritten: r.rowsWritten, warnings: r.warnings };
@@ -647,6 +753,7 @@ export {
   Ags4Error,
   BadDictError,
   FileNotFoundError,
+  MergeConflictError,
   NotAgs4Error,
   StaleCertError,
   UnsupportedEditionError,

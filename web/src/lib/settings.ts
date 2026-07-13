@@ -79,6 +79,7 @@ const TOOLS_LIST = [
   "dictionary",
   "rules",
   "revision",
+  "merge",
   "template",
   "anonymiser",
   "formatter",

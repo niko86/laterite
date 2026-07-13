@@ -26,6 +26,7 @@ type Pending =
   | { kind: "parsed"; resolve: (g: GroupMeta[]) => void; reject: (e: Error) => void }
   | { kind: "arrow"; resolve: (b: Uint8Array) => void; reject: (e: Error) => void }
   | { kind: "revisionDelta"; resolve: (d: RevisionDelta) => void; reject: (e: Error) => void }
+  | { kind: "mergeResult"; resolve: (r: MergeConversion) => void; reject: (e: Error) => void }
   | { kind: "dictionary"; resolve: (d: StandardDict) => void; reject: (e: Error) => void }
   | { kind: "toAgs4"; resolve: (r: ExportResult) => void; reject: (e: Error) => void }
   | { kind: "excel"; resolve: (r: ExcelConversion) => void; reject: (e: Error) => void };
@@ -44,6 +45,32 @@ export interface ExcelConversion {
   warnings: string[];
   sheets: number;
   rows: number;
+}
+
+/** One advisory note from a merge (a recency contradiction, a non-X type widen,
+ *  a missing merge-TRAN stamp). Mirrors the wire shape the engine serialises. */
+export interface MergeWarning {
+  kind: string;
+  group: string | null;
+  heading: string | null;
+  message: string;
+}
+
+/** One per-row content revision — a later file changed a KEY-matched row. */
+export interface MergeRevision {
+  group: string;
+  key: string[];
+  changed: string[];
+  winnerFile: number;
+}
+
+/** The result of a merge: the reconciled `.ags` `bytes` (an ArrayBuffer, a
+ *  `BlobPart` ready for `downloadBlob`) plus the warnings and per-row revisions
+ *  audit the Tools UI surfaces. */
+export interface MergeConversion {
+  bytes: ArrayBuffer;
+  warnings: MergeWarning[];
+  revisions: MergeRevision[];
 }
 
 const worker = new Worker(
@@ -95,6 +122,12 @@ worker.addEventListener("message", (e: MessageEvent<WorkerRes>) => {
     p.resolve(new Uint8Array(msg.bytes));
   } else if (msg.kind === "revisionDelta" && p.kind === "revisionDelta") {
     p.resolve(msg.delta);
+  } else if (msg.kind === "mergeResult" && p.kind === "mergeResult") {
+    p.resolve({
+      bytes: msg.bytes,
+      warnings: JSON.parse(msg.warningsJson) as MergeWarning[],
+      revisions: JSON.parse(msg.revisionsJson) as MergeRevision[],
+    });
   } else if (msg.kind === "dictionary" && p.kind === "dictionary") {
     p.resolve(msg.dict);
   } else if (msg.kind === "toAgs4" && p.kind === "toAgs4") {
@@ -328,6 +361,40 @@ export function revisionDiff(
       b,
     );
     pending.set(id, { kind: "revisionDelta", resolve, reject });
+  });
+}
+
+/** Merge two AGS4 deliveries (`a` then `b`, `b` wins a KEY conflict) into one
+ *  file — the engine-consistent, KEY-aware reconciliation. `lenient` widens a
+ *  TYPE conflict to X (else it rejects); the optional `tran*` stamp a synthesised
+ *  merge-TRAN. Rejects (a strict conflict / parse error) with the engine message. */
+export function mergeFiles(
+  a: Uint8Array,
+  b: Uint8Array,
+  opts: {
+    encoding: EncodingOpt;
+    lenient: boolean;
+    tranIssue?: string | null;
+    tranDate?: string | null;
+    tranProducer?: string | null;
+  },
+): Promise<MergeConversion> {
+  return new Promise((resolve, reject) => {
+    const id = postDual(
+      {
+        kind: "merge",
+        aBytes: new ArrayBuffer(0), // replaced inside postDual()
+        bBytes: new ArrayBuffer(0), // replaced inside postDual()
+        encoding: opts.encoding,
+        lenient: opts.lenient,
+        tranIssue: opts.tranIssue ?? null,
+        tranDate: opts.tranDate ?? null,
+        tranProducer: opts.tranProducer ?? null,
+      },
+      a,
+      b,
+    );
+    pending.set(id, { kind: "mergeResult", resolve, reject });
   });
 }
 

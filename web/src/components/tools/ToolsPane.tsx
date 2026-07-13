@@ -4,6 +4,7 @@ import { toolsTool as tool, setToolsTool as setTool } from "../../lib/settings";
 import { DictionaryBrowser } from "./DictionaryBrowser";
 import { RuleExplainer } from "./RuleExplainer";
 import { RevisionDiff } from "./RevisionDiff";
+import { MergeTool } from "./MergeTool";
 import { TemplateGenerator } from "./TemplateGenerator";
 import { Anonymiser } from "./Anonymiser";
 import { Formatter } from "./Formatter";
@@ -15,6 +16,7 @@ export type Tool =
   | "dictionary"
   | "rules"
   | "revision"
+  | "merge"
   | "template"
   | "anonymiser"
   | "formatter"
@@ -35,6 +37,7 @@ const TOOLS: { id: Tool; label: string; group: Group }[] = [
   { id: "excel", label: "Excel", group: "This file" },
   { id: "transport", label: "Transport", group: "This file" },
   { id: "revision", label: "Revision diff", group: "Compare" },
+  { id: "merge", label: "Merge", group: "Compare" },
 ];
 
 // The Tools tab — client-side AGS4 utilities, grouped by what they act on:
@@ -72,6 +75,9 @@ export const ToolsPane: Component = () => {
       </Show>
       <Show when={tool() === "revision"}>
         <RevisionDiff />
+      </Show>
+      <Show when={tool() === "merge"}>
+        <MergeTool />
       </Show>
       <Show when={tool() === "template"}>
         <TemplateGenerator />

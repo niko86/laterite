@@ -14,4 +14,9 @@
 
 pub mod catalogue;
 pub mod dict;
+// Content-addressed row keys (`_id`/`_parent_id`) + the single `key_heading_names`
+// definition of row identity. Relocated from core (row-identity consolidation)
+// so `laterite-ags4-diff` — which depends on this leaf, not core — shares the
+// same KEY-heading derivation instead of re-deriving its own.
+pub mod keychain;
 pub mod union;

@@ -72,6 +72,10 @@ laterite-ags4-emit = { path = "../laterite-ags4-emit", features = ["arrow"] }
 # is shared by wasm + PyO3 + the CLI. Depends only on the parse leaf +
 # validator dict + laterite-types, all already pulled here — no new weight.
 laterite-ags4-diff = { path = "../laterite-ags4-diff" }
+# `merge()` — reconcile N deliveries into one file (KEY-aware, argument-order
+# recency, widen-to-X). Wasm-safe: it pulls only parse + emit + reference, all
+# already here — the same leaf PyO3 + Node + the CLI reuse.
+laterite-ags4-merge = { path = "../laterite-ags4-merge" }
 # AGS4 ↔ XLSX conversion (#359). Its FS-free `ags4_bytes_to_xlsx` /
 # `xlsx_bytes_to_ags4` cores back the browser Excel surface. calamine +
 # rust_xlsxwriter (+ zip / flate2 / zopfli) are wasm-clean; laterite-excel takes

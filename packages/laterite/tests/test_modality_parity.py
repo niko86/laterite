@@ -442,6 +442,7 @@ _WASM_VERB_CAP = {
     "build_ags4": "build",
     "build_ags4_ipc": "build",
     "diff": "diff",
+    "merge": "merge",
     "ags4_to_xlsx": "to_excel",
     "xlsx_to_ags4": "from_excel",
 }

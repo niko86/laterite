@@ -27,7 +27,12 @@ def _src(*parts: str) -> str:
 # decodes lossily, so it never surfaces) and `bad_args` (the arg/dispatch layer).
 _PRODUCER = {"not_found": 3, "io": 3, "not_ags4": 4, "unsupported_edition": 4, "bad_dict": 5}
 _CONSUMER_ONLY = {"not_utf8": 4, "bad_args": 5}
-_ALL = {**_PRODUCER, **_CONSUMER_ONLY}
+# The merge leaf (`laterite-ags4-merge::MergeError`) is a SECOND Rust producer,
+# distinct from `ValidatorError`: a strict TYPE conflict or a failed emit is a
+# schema-level rejection (exit 6). laterite-py's `merge_core` emits these two
+# kinds and `_errors.py` maps both to `MergeConflictError`.
+_MERGE = {"type_conflict": 6, "emit_error": 6}
+_ALL = {**_PRODUCER, **_CONSUMER_ONLY, **_MERGE}
 
 
 def test_python_kind_table_matches_canonical():

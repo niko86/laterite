@@ -50,6 +50,9 @@ laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 # KEY-aware/type-aware revision delta via the laterite-ags4-diff leaf.
 laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 laterite-ags4-diff = { path = "../laterite-ags4-diff" }
+# `lat merge` — reconcile N deliveries into one file (KEY-aware, argument-order
+# recency, widen-to-X). Reuses the same parse/emit/reference leaves.
+laterite-ags4-merge = { path = "../laterite-ags4-merge" }
 # `--emit-index` (#294 F#10): mint an `.ags.idx` validity certificate after a
 # clean check (`Sidecar::assemble`). `default-features = false` drops core's
 # `transport` feature, so the CLI does NOT pull age/zstd — only the index +

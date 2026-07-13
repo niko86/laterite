@@ -19,8 +19,8 @@ use clap::{ArgGroup, Args, Parser, Subcommand};
 /// The known subcommand names — the `main` default-subcommand pre-scan uses this
 /// to decide whether a bare `lat <file>` should have `validate` spliced in.
 pub const SUBCOMMANDS: &[&str] = &[
-    "validate", "read", "fix", "diff", "certify", "rules", "pack", "unpack", "lock", "unlock",
-    "excel",
+    "validate", "read", "fix", "diff", "merge", "certify", "rules", "pack", "unpack", "lock",
+    "unlock", "excel",
 ];
 
 #[derive(Parser)]
@@ -53,6 +53,9 @@ pub enum Commands {
     Fix(FixArgs),
     /// Compare two revisions — the KEY-aware / type-aware delta.
     Diff(DiffArgs),
+    /// Merge N deliveries of one project into a single file — KEY-aware,
+    /// argument-order recency, union-not-intersection.
+    Merge(MergeArgs),
     /// Mint the `.ags.idx` validity certificate for an error-clean file.
     Certify(CertifyArgs),
     /// Print the AGS4 rule catalogue (no input file needed).
@@ -241,6 +244,40 @@ pub struct DiffArgs {
     pub file: PathBuf,
     /// The revision .ags file to compare against.
     pub other: PathBuf,
+    #[command(flatten)]
+    pub dict: DictArgs,
+}
+
+#[derive(Args)]
+pub struct MergeArgs {
+    /// The .ags deliveries to merge, earliest first — the LAST file wins a KEY
+    /// conflict (argument order is authority). At least two.
+    #[arg(required = true, num_args = 2..)]
+    pub files: Vec<PathBuf>,
+    /// Where to write the merged .ags. A deliberate choice, so required — never a
+    /// silent default over one of the inputs.
+    #[arg(long, value_name = "PATH")]
+    pub out: PathBuf,
+    /// On a TYPE disagreement, widen the column to X (text) instead of erroring
+    /// (the default is strict — reconciling two producers' types is high-stakes).
+    #[arg(long)]
+    pub lenient: bool,
+    /// Issue reference (TRAN_ISNO) for the merged file's own synthesised TRAN.
+    /// With --tran-date, a fresh merge-transmission TRAN is written (recording
+    /// the inputs' ISNOs/dates in TRAN_REM); without it, TRAN is reconciled and
+    /// a warning notes no stamp was supplied.
+    #[arg(long, value_name = "ISNO")]
+    pub tran_issue: Option<String>,
+    /// Production date (TRAN_DATE, yyyy-mm-dd) for the merged file's TRAN.
+    #[arg(long, value_name = "DATE")]
+    pub tran_date: Option<String>,
+    /// Producer / recipient / status for the merged TRAN (optional).
+    #[arg(long, value_name = "NAME")]
+    pub tran_producer: Option<String>,
+    #[arg(long, value_name = "NAME")]
+    pub tran_recipient: Option<String>,
+    #[arg(long, value_name = "STATUS")]
+    pub tran_status: Option<String>,
     #[command(flatten)]
     pub dict: DictArgs,
 }

@@ -1,0 +1,4 @@
+merged 2 files → examples/merged.ags (6998 bytes)
+  warning [parent_revised_check_children]: PROJ was revised; verify child group(s) ["LOCA"] are still consistent (merge performs no cross-group consistency check)
+  1 row revision(s):
+    PROJ ["LAT-DEMO"]: changed ["PROJ_NAME"] (from file[1])

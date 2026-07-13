@@ -52,6 +52,15 @@ class StaleCertError(Ags4Error):
     exit_code = 4
 
 
+class MergeConflictError(Ags4Error):
+    """A [`merge`][laterite.merge] could not be reconciled. Either two files typed the
+    same heading differently and strict mode refused to guess (pass ``lenient=True``
+    to widen that column to ``X`` text, keeping every raw value), or the merged
+    output failed the emitter's own re-validation."""
+
+    exit_code = 6
+
+
 # error_kind (from the Rust layer) → exception. "not_found" maps to the
 # builtin FileNotFoundError so callers can `except FileNotFoundError`.
 _KIND_TO_EXC: dict[str, type[Ags4Error]] = {
@@ -60,6 +69,8 @@ _KIND_TO_EXC: dict[str, type[Ags4Error]] = {
     "unsupported_edition": UnsupportedEditionError,
     "bad_dict": BadDictError,
     "bad_args": BadDictError,
+    "type_conflict": MergeConflictError,
+    "emit_error": MergeConflictError,
 }
 
 

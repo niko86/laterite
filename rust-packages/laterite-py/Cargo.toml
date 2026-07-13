@@ -62,6 +62,10 @@ laterite-ags4-emit = { path = "../laterite-ags4-emit", features = ["arrow"] }
 # The KEY-aware/type-aware revision-diff leaf (#204): `diff_parsed` over two
 # parsed files + a Dictionary — the same diff wasm + the CLI use.
 laterite-ags4-diff = { path = "../laterite-ags4-diff" }
+# `merge()` — reconcile N deliveries of one project into a single file, KEY-aware
+# with argument-order recency and widen-to-X. The same leaf `lat merge` uses;
+# it pulls parse + emit (emit re-validates its output) but stays wasm-safe.
+laterite-ags4-merge = { path = "../laterite-ags4-merge" }
 # Direct dep for the shared typed-Arrow column builder (`arrow_cols`, behind
 # the `arrow` feature). Phase 1 of the 1.0 redesign emits typed Arrow per
 # group on the read path — the SAME emitter the wasm explorer frames as IPC.

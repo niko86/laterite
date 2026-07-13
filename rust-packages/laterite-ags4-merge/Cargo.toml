@@ -1,0 +1,42 @@
+# laterite-ags4-merge — reconcile N AGS4 deliveries of one project into one file.
+#
+# Reuses the shipped primitives; the only new code is the N-fold reconciliation:
+#   - laterite-ags4-parse      — ParsedFile/ParsedGroup/DataRow (the tokenised
+#                                rows merge folds over).
+#   - laterite-ags4-reference  — keychain::key_heading_names (THE one definition
+#                                of row identity, shared with laterite-ags4-diff)
+#                                + the union registry + DictVersion.
+#   - laterite-ags4-emit       — the byte-faithful writer the merged file is
+#                                emitted through (this transitively pulls the
+#                                validator, since emit validates its output — so
+#                                merge is NOT a reference-only leaf, but stays
+#                                wasm-safe, as every one of these deps already is).
+#   - laterite-types           — parse_value, the canonical cast that makes row
+#                                reconciliation type-aware (per-side, so files
+#                                that typed a column differently still compare).
+[package]
+name = "laterite-ags4-merge"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "AGS4 merge — reconcile N deliveries into one file (KEY-aware, recency by argument order, DuckDB-free)"
+license = "MIT"
+publish = false
+
+[lib]
+name = "laterite_ags4_merge"
+path = "src/lib.rs"
+
+[dependencies]
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+laterite-ags4-reference = { path = "../laterite-ags4-reference" }
+laterite-ags4-emit = { path = "../laterite-ags4-emit" }
+laterite-types = { path = "../laterite-types" }
+serde_json = "1"
+
+[dev-dependencies]
+# Property tests over generated deliveries: order-independence of the merged KEY
+# set + reformatted-idempotence (a re-send with cosmetically-different formatting
+# must collapse via TYPED matching, not report spurious revisions). DEV-ONLY —
+# proptest's rand pull never reaches the crate's runtime dep-graph.
+proptest = "1"

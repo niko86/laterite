@@ -546,6 +546,132 @@ pub fn diff(
     serde_json::to_string(&delta).map_err(|e| Error::from_reason(e.to_string()))
 }
 
+/// The merge result. `bytes` is the reconciled AGS4 document; `warningsJson` and
+/// `revisionsJson` are the advisory-notes and per-row-revision audits (arrays of
+/// `{kind,group,heading,message}` / `{group,key,changed,winnerFile}`) that the TS
+/// `merge()` parses — the same shape PyO3's `merge()` returns.
+#[napi(object)]
+pub struct MergeOutput {
+    pub bytes: Buffer,
+    pub warnings_json: String,
+    pub revisions_json: String,
+}
+
+/// Reconcile N AGS4 deliveries of one project into one file (raw `files` bytes,
+/// ≥2) — the Node port of laterite-py's `merge()`, over the SAME shared
+/// `laterite-ags4-merge` leaf the CLI uses. Files merge in argument order (a
+/// later file wins a KEY conflict); rows are identified by their dictionary KEY
+/// headings. A heading two files typed differently throws `MergeConflictError`
+/// unless `lenient` widens it to `X`. `tranIssue` + `tranDate` (both) stamp a
+/// synthesised merge-TRAN. The edition is the newest file's `TRAN_AGS` unless
+/// `dictVersion` forces it. Parse failure throws the mapped error.
+#[napi]
+#[allow(clippy::too_many_arguments)]
+pub fn merge(
+    files: Vec<Uint8Array>,
+    lenient: Option<bool>,
+    dict_version: Option<String>,
+    encoding: Option<String>,
+    tran_issue: Option<String>,
+    tran_date: Option<String>,
+    tran_producer: Option<String>,
+    tran_recipient: Option<String>,
+    tran_status: Option<String>,
+) -> Result<MergeOutput> {
+    use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeMismatchMode, merge_parsed};
+
+    if files.len() < 2 {
+        return Err(Error::from_reason(format!(
+            "bad_args{SEP}5{SEP}merge needs at least two files"
+        )));
+    }
+    let forced = resolve_edition(dict_version.as_deref())
+        .map_err(|m| Error::from_reason(format!("bad_dict{SEP}5{SEP}{m}")))?;
+    let enc = resolve_encoding(encoding.as_deref());
+    let parsed: Vec<_> = files
+        .iter()
+        .map(|b| {
+            parse_bytes(b.as_ref(), enc)
+                .map_err(ValidatorError::from)
+                .map_err(thrown)
+        })
+        .collect::<Result<_>>()?;
+
+    // Edition from the newest (last) file's TRAN_AGS, forced by dictVersion.
+    let dv = laterite_ags4_validator::resolve_dict_version(
+        forced,
+        parsed
+            .last()
+            .and_then(laterite_ags4_validator::tran_ags_of)
+            .as_deref(),
+    )
+    .map(|(dv, _)| dv)
+    .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
+
+    // A merge-TRAN is synthesised only when both an issue and a date are given.
+    let tran = match (tran_issue, tran_date) {
+        (Some(isno), Some(date)) => Some(TranStamp {
+            isno,
+            date,
+            prod: tran_producer.unwrap_or_default(),
+            recv: tran_recipient.unwrap_or_default(),
+            stat: tran_status.unwrap_or_default(),
+            ags: dv.as_str().to_string(),
+        }),
+        _ => None,
+    };
+
+    let opts = MergeOpts {
+        type_mismatch: if lenient.unwrap_or(false) {
+            TypeMismatchMode::Lenient
+        } else {
+            TypeMismatchMode::Strict
+        },
+        edition: dv,
+        tran,
+        ..Default::default()
+    };
+
+    match merge_parsed(&parsed, &opts) {
+        Ok(res) => {
+            let warnings: Vec<Value> = res
+                .warnings
+                .iter()
+                .map(|w| {
+                    serde_json::json!({
+                        "kind": w.kind,
+                        "group": w.group,
+                        "heading": w.heading,
+                        "message": w.message,
+                    })
+                })
+                .collect();
+            let revisions: Vec<Value> = res
+                .revisions
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "group": r.group,
+                        "key": r.key,
+                        "changed": r.changed,
+                        "winnerFile": r.winner_file,
+                    })
+                })
+                .collect();
+            Ok(MergeOutput {
+                bytes: res.bytes.into(),
+                warnings_json: serde_json::to_string(&warnings).unwrap_or_else(|_| "[]".into()),
+                revisions_json: serde_json::to_string(&revisions).unwrap_or_else(|_| "[]".into()),
+            })
+        }
+        // A strict TYPE conflict / emit failure is a schema-level rejection (exit 6);
+        // throw in the SEP form the TS `fromNativeError` maps to MergeConflictError.
+        Err(e @ (MergeError::TypeConflict { .. } | MergeError::Emit(_))) => {
+            Err(Error::from_reason(format!("merge_conflict{SEP}6{SEP}{e}")))
+        }
+    }
+}
+
 /// Raw group cells for the Node CLI `lat read` — a JSON string
 /// `{"order":[...],"groups":{code:{"headings":[...],"rows":[[cell,...]]}}}`,
 /// straight from core's read codec (no typing), so `lat read --json` / `--csv`

@@ -42,6 +42,9 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # comparison PyO3 + the CLI + wasm already reuse. This wrapper only parses,
 # resolves the dictionary edition, and serialises the `RevisionDelta` to JSON.
 laterite-ags4-diff = { path = "../laterite-ags4-diff" }
+# `merge()` — reconcile N deliveries of one project into one file (KEY-aware,
+# argument-order recency, widen-to-X). The same leaf PyO3 + the CLI reuse.
+laterite-ags4-merge = { path = "../laterite-ags4-merge" }
 laterite-types = { path = "../laterite-types", features = ["arrow"] }
 # The shared producer (write_ags4 for byte-faithful emit; emit_ags4 +
 # group_from_arrow for the data→AGS4 path) — `arrow` feature for the IPC input.

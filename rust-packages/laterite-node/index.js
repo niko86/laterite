@@ -598,6 +598,7 @@ module.exports.emitAgs4FromIpc = nativeBinding.emitAgs4FromIpc
 module.exports.excelToAgs4 = nativeBinding.excelToAgs4
 module.exports.fixFile = nativeBinding.fixFile
 module.exports.listRules = nativeBinding.listRules
+module.exports.merge = nativeBinding.merge
 module.exports.parseArrow = nativeBinding.parseArrow
 module.exports.parseValue = nativeBinding.parseValue
 module.exports.readGroupsRaw = nativeBinding.readGroupsRaw

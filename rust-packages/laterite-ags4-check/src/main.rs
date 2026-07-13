@@ -49,6 +49,7 @@ fn main() {
         Commands::Read(a) => commands::read::run(a, json),
         Commands::Fix(a) => commands::fix::run(a, quiet),
         Commands::Diff(a) => commands::diff::run(a, json, quiet),
+        Commands::Merge(a) => commands::merge::run(a, json, quiet),
         Commands::Certify(a) => commands::certify::run(a, quiet),
         Commands::Rules => commands::rules::run(json),
         #[cfg(feature = "transport")]

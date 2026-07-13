@@ -1,0 +1,12 @@
+"GROUP","PROJ"
+"HEADING","PROJ_ID","PROJ_NAME"
+"UNIT","",""
+"TYPE","ID","X"
+"DATA","P1","Demo Merge"
+
+"GROUP","LOCA"
+"HEADING","LOCA_ID","LOCA_GL"
+"UNIT","","m"
+"TYPE","ID","2DP"
+"DATA","BH1","10.00"
+"DATA","BH2","20.00"

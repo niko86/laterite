@@ -262,6 +262,30 @@ export interface GroupMeta {
 export declare function listRules(): string
 
 /**
+ * Reconcile N AGS4 deliveries of one project into one file (raw `files` bytes,
+ * ≥2) — the Node port of laterite-py's `merge()`, over the SAME shared
+ * `laterite-ags4-merge` leaf the CLI uses. Files merge in argument order (a
+ * later file wins a KEY conflict); rows are identified by their dictionary KEY
+ * headings. A heading two files typed differently throws `MergeConflictError`
+ * unless `lenient` widens it to `X`. `tranIssue` + `tranDate` (both) stamp a
+ * synthesised merge-TRAN. The edition is the newest file's `TRAN_AGS` unless
+ * `dictVersion` forces it. Parse failure throws the mapped error.
+ */
+export declare function merge(files: Array<Uint8Array>, lenient?: boolean | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, tranIssue?: string | undefined | null, tranDate?: string | undefined | null, tranProducer?: string | undefined | null, tranRecipient?: string | undefined | null, tranStatus?: string | undefined | null): MergeOutput
+
+/**
+ * The merge result. `bytes` is the reconciled AGS4 document; `warningsJson` and
+ * `revisionsJson` are the advisory-notes and per-row-revision audits (arrays of
+ * `{kind,group,heading,message}` / `{group,key,changed,winnerFile}`) that the TS
+ * `merge()` parses — the same shape PyO3's `merge()` returns.
+ */
+export interface MergeOutput {
+  bytes: Buffer
+  warningsJson: string
+  revisionsJson: string
+}
+
+/**
  * Result of `transportPack` / `transportLock`: output size, ratio vs source,
  * elapsed seconds.
  */
