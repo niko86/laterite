@@ -42,6 +42,7 @@ members = [
     "laterite-ags4-diff",
     "laterite-ags4-merge",
     "laterite-ags4-validator",
+    "laterite-ags4-trust",
     "laterite-ags4-check",
     "laterite-ags4-wasm",
     "laterite-cliutil",

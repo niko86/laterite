@@ -83,13 +83,21 @@ with no Python at runtime. The `validate` capability is what `python-ags4`'s
     matched by their dictionary KEY headings, so a re-sorted borehole list still
     merges onto its prior self. The merge is a union: a row present in only one
     file is kept (silence is not deletion). A column two files typed differently
-    ERRORS (strict, the default); --lenient widens it to X (text), keeping raw
-    values. --json emits the {warnings, revisions} audit.
+    ERRORS by default; --on-type-clash chooses how to settle it. A conflicting
+    UNIT is fatal in EVERY mode (TYPE has an absorber, X; UNIT has none).
+    --json emits the {warnings, revisions} audit.
     (also honours --dict-version / --dict / --encoding)
 
     --out <path>          write the merged file here (REQUIRED — never a default
                           over an input)
-    --lenient             widen a TYPE conflict to X instead of erroring
+    --on-type-clash <MODE>  how to settle a heading the files typed differently:
+                          error   refuse (default)
+                          widen   fall back to X (text) — raw values kept, but
+                                  the column's TYPE is thrown away
+                          promote keep the greatest precision when every code is
+                                  nDP (2DP + 5DP -> 5DP), zero-padding the coarser
+                                  values (10.00 -> 10.00000). Never rounds, never
+                                  demotes; nSF/nSCI fall back to widen
     --tran-issue <ISNO>   stamp a synthesised merge-TRAN (with --tran-date; records
                           the inputs' ISNOs/dates in TRAN_REM for provenance)
     --tran-date <DATE>    the merge-TRAN production date (yyyy-mm-dd)
@@ -168,7 +176,7 @@ Progress is on stderr; the report on stdout.
     lat read delivery.ags LOCA --csv        # dump one group as CSV
     lat diff old.ags new.ags                # revision delta
     lat merge phase1.ags phase2.ags --out all.ags        # reconcile deliveries
-    lat merge a.ags b.ags --out m.ags --lenient --json   # widen type clashes
+    lat merge a.ags b.ags --out m.ags --on-type-clash promote  # keep max nDP
     lat certify delivery.ags                # → delivery.ags.idx (if clean)
     lat validate delivery.ags --index delivery.ags.idx  # skip the engine if fresh
     lat rules                               # the rule catalogue

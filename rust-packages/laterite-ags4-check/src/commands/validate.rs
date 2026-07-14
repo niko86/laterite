@@ -5,11 +5,12 @@
 
 use std::process::exit;
 
-use laterite_ags4_validator::{CheckOptions, Findings, check_file, findings};
+use laterite_ags4_trust::{Request, check};
+use laterite_ags4_validator::{CheckOptions, WorldScope, findings};
 use laterite_cliutil::{Spinner, write_atomic};
 
 use crate::cli::ValidateArgs;
-use crate::commands::cert::{CertOutcome, report_certified_skip, try_certified_skip};
+use crate::commands::cert;
 use crate::commands::common::apply_dict_args;
 use crate::render;
 
@@ -41,30 +42,56 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
     let path = args.file.as_path();
     let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("file");
 
-    // `--index <cert>`: try the certificate short-circuit before touching the
-    // rule engine. A skip yields an empty `Findings`; a non-skip falls through to
-    // a normal engine run with a note saying why the cert wasn't trusted.
-    let result = match args.index.as_deref() {
-        Some(cert_path) => match try_certified_skip(path, &opts, cert_path) {
-            CertOutcome::Skip(stamp) => {
-                report_certified_skip(&stamp, opts.include_warnings, opts.include_fyi);
-                Ok(Findings::new())
-            }
-            CertOutcome::Revalidate(reason) => {
-                eprintln!("note: --index not used ({reason}); running the full check");
-                let spinner = Spinner::start(&format!("validating {name}..."), quiet);
-                let r = check_file(path, &opts);
-                drop(spinner);
-                r
-            }
-        },
-        None => {
-            let spinner = Spinner::start(&format!("validating {name}..."), quiet);
-            let r = check_file(path, &opts);
-            drop(spinner);
-            r
+    let bytes = match std::fs::read(path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("error: read {}: {e}", path.display());
+            exit(3);
         }
     };
+
+    // `--index <cert>` is OPT-IN and never auto-discovered: an `.ags.idx` lying beside a
+    // file is not consent to trust it. A cert that cannot be read is not fatal — it just
+    // doesn't help, and you pay for the validation you would have paid for anyway.
+    let sidecar = match args.index.as_deref() {
+        Some(cert_path) => match cert::load(cert_path) {
+            Ok(s) => Some(s),
+            Err(e) => {
+                eprintln!("note: --index not used ({e}); running the full check");
+                None
+            }
+        },
+        None => None,
+    };
+
+    let spinner = Spinner::start(&format!("validating {name}..."), quiet);
+    // The world is OnDisk because we have a real path — but `check` only looks at it if
+    // `--check-files` actually asked. Handing over a path is not the same as asking.
+    let outcome = check(Request {
+        bytes: &bytes,
+        opts: &opts,
+        cert: sidecar.as_ref(),
+        world: WorldScope::OnDisk(path.to_path_buf()),
+        compat: None,
+    });
+    drop(spinner);
+
+    let result = outcome.map(|o| {
+        if o.certified {
+            // The rule ENGINE was skipped. If --check-files was on, its on-disk half
+            // still ran — say so, so nobody reads "certified" as "unexamined".
+            cert::report_certified_skip(
+                sidecar.as_ref().expect("certified implies a cert"),
+                opts.check_files,
+            );
+        } else if let Some(reason) = o.revalidate_reason {
+            eprintln!(
+                "note: --index not used ({}); running the full check",
+                cert::why(reason)
+            );
+        }
+        o.findings
+    });
 
     match result {
         Ok(found) => {

@@ -2,7 +2,7 @@
 //! re-emitted bytes re-parsed via `parse_bytes` — proving the reconciliation
 //! survives the real write path, not just an in-memory model.
 
-use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeMismatchMode, merge_parsed};
+use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeClashMode, merge_parsed};
 use laterite_ags4_parse::{DataRow, ParsedFile, ParsedGroup, parse_str};
 
 fn load(name: &str) -> ParsedFile {
@@ -24,7 +24,7 @@ fn stamp() -> TranStamp {
 
 fn lenient() -> MergeOpts {
     MergeOpts {
-        type_mismatch: TypeMismatchMode::Lenient,
+        on_type_clash: TypeClashMode::Widen,
         tran: Some(stamp()),
         ..Default::default()
     }
@@ -120,7 +120,7 @@ fn group_union_keeps_b_only_abbr() {
 fn strict_errors_on_type_mismatch() {
     let (a, b) = (load("delivery_a.ags"), load("delivery_b.ags"));
     let opts = MergeOpts {
-        type_mismatch: TypeMismatchMode::Strict,
+        on_type_clash: TypeClashMode::Error,
         tran: Some(stamp()),
         ..Default::default()
     };
@@ -183,7 +183,7 @@ fn non_x_vs_non_x_warns_under_lenient() {
     let res = merge_parsed(
         &[a, b],
         &MergeOpts {
-            type_mismatch: TypeMismatchMode::Lenient,
+            on_type_clash: TypeClashMode::Widen,
             ..Default::default()
         },
     )
@@ -207,7 +207,7 @@ fn non_x_vs_non_x_errors_under_strict() {
     let err = merge_parsed(
         &[a, b],
         &MergeOpts {
-            type_mismatch: TypeMismatchMode::Strict,
+            on_type_clash: TypeClashMode::Error,
             ..Default::default()
         },
     )

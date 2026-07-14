@@ -52,11 +52,28 @@ class StaleCertError(Ags4Error):
     exit_code = 4
 
 
+class WorldCheckRequiresSourceError(Ags4Error):
+    """``check_files=True`` was asked of an input with no path — [`read`][laterite.read]
+    of ``bytes`` or ``str``, where there is no directory for the sibling ``FILE/`` tree
+    to be in.
+
+    Rule 20's on-disk half is the one check that reads state the AGS4 bytes do not
+    contain, so it is the one check that cannot be answered from content alone. The
+    engine used to answer it anyway — by dropping the request and reporting Rule 20
+    clean. Passing a path (``read("delivery.ags")``) makes the question answerable;
+    dropping ``check_files`` makes it unasked. Both are honest; a silent clean was not.
+    """
+
+    exit_code = 5
+
+
 class MergeConflictError(Ags4Error):
     """A [`merge`][laterite.merge] could not be reconciled. Either two files typed the
-    same heading differently and strict mode refused to guess (pass ``lenient=True``
-    to widen that column to ``X`` text, keeping every raw value), or the merged
-    output failed the emitter's own re-validation."""
+    same heading differently and ``on_type_clash="error"`` (the default) refused to
+    guess — pass ``"promote"`` to keep the greatest ``nDP`` precision, or ``"widen"``
+    to fall back to ``X`` text; or two files declared conflicting **UNITs**, which is
+    fatal in every mode (no mode can absorb it — see below); or the merged output
+    failed the emitter's own re-validation."""
 
     exit_code = 6
 
@@ -69,7 +86,10 @@ _KIND_TO_EXC: dict[str, type[Ags4Error]] = {
     "unsupported_edition": UnsupportedEditionError,
     "bad_dict": BadDictError,
     "bad_args": BadDictError,
+    "world_check_requires_source": WorldCheckRequiresSourceError,
     "type_conflict": MergeConflictError,
+    # Fatal in EVERY merge mode — no `on_type_clash` value absorbs a unit clash (#501).
+    "unit_conflict": MergeConflictError,
     "emit_error": MergeConflictError,
 }
 

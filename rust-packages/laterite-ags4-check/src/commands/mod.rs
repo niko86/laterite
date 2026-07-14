@@ -2,6 +2,7 @@
 //! `exit`s with the contract code — so `main`'s dispatch match needs no result
 //! plumbing. Shared encoding/edition/path helpers live in `common`.
 
+pub mod census;
 pub mod cert;
 pub mod certify;
 pub mod common;

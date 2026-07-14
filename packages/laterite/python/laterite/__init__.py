@@ -35,6 +35,7 @@ from ._errors import (
     NotAgs4Error,
     StaleCertError,
     UnsupportedEditionError,
+    WorldCheckRequiresSourceError,
     raise_for,
 )
 from ._frames import ArrowStream, frame_from_arrow
@@ -78,6 +79,7 @@ __all__ = [
     "UnsupportedEditionError",
     "BadDictError",
     "StaleCertError",
+    "WorldCheckRequiresSourceError",
 ]
 
 # Frame backends `read(..., backend=)` / `ags[code]` can return. Both are
@@ -110,6 +112,13 @@ BuildMode = Literal["autofix", "report", "strict"]
 #: argument (omit / `None` auto-detects from `TRAN_AGS`). Gated against the
 #: dictionary's own `editions` list, so a new bundled edition updates it.
 Edition = Literal["4.0.3", "4.0.4", "4.1", "4.1.1", "4.2"]
+
+#: How [`merge`][laterite.merge] settles a heading two deliveries typed differently:
+#: `"error"` (default — refuse), `"widen"` (fall back to `X`; raw values kept, TYPE
+#: thrown away), or `"promote"` (keep the greatest precision when every clashing code
+#: is `nDP` — `2DP` + `5DP` → `5DP` — and zero-pad the coarser values; no digit is
+#: changed). Matches the engine's `TypeClashMode`.
+TypeClashMode = Literal["error", "widen", "promote"]
 
 
 def _looks_like_ags_text(s: str) -> bool:
@@ -192,19 +201,20 @@ class Report:
     """The verdict the validate door hands back — *is this a conformant AGS4 file, and where does it break the rules?*
 
     A ``Report`` is what [`validate`][laterite.validate] returns once the AGS4.1 numbered-rules
-    engine has run over a file; it is also minted by [`from_cert`][laterite.Report.from_cert] for the
-    engine-skipped path, where a fresh, byte-matching ``.ags.idx`` certificate
-    stands in for a fresh run (then [`resolution`][laterite.Report.resolution] is the sentinel
-    ``"certified"`` and [`count`][laterite.Report.count] is 0). Either way it is an immutable read-out,
-    not a live handle: it carries the answer, you don't act *through* it.
+    engine has run over a file. If an ``index=`` certificate was able to answer the
+    question completely, the rule engine is skipped and [`certified`][laterite.Report.certified]
+    is ``True`` — but the report is otherwise the same, and any world check (Rule 20's
+    on-disk half) still ran for real. Either way it is an immutable read-out, not a live
+    handle: it carries the answer, you don't act *through* it.
 
     Read the headline off [`is_valid`][laterite.Report.is_valid] / [`count`][laterite.Report.count] (conformant when the
     finding count is 0), with [`exit_code`][laterite.Report.exit_code] mirroring what the ``lat``
     binary would return. [`file`][laterite.Report.file] and [`dict_version`][laterite.Report.dict_version] say *what* was
     judged and *against which* AGS dictionary edition, and [`resolution`][laterite.Report.resolution]
-    records *how* that edition was chosen — ``"exact"`` / ``"fallback"`` /
-    ``"forced"`` from the engine, or ``"certified"`` when the verdict came from a
-    certificate rather than a rules pass.
+    records *how* that edition was chosen — ``"exact"`` / ``"guessed"`` / ``"fallback"``
+    / ``"forced"``. (It used to read ``"certified"`` when a cert had been used, which
+    overloaded one field with two facts; [`certified`][laterite.Report.certified] carries
+    that one now.)
 
     The detail comes three ways, all over the same findings, so you reach for the
     shape that fits your tool. [`findings`][laterite.Report.findings] is a flat **polars** frame, one row
@@ -219,7 +229,8 @@ class Report:
     Attributes:
         file: The file label that was validated (path, ``"<bytes>"``, or ``"<text>"``).
         dict_version: The AGS dictionary edition the rules were resolved against.
-        resolution: How that edition was resolved — ``"exact"`` / ``"fallback"`` / ``"forced"``, or ``"certified"`` for a certificate-backed verdict.
+        resolution: How that edition was resolved — ``"exact"`` / ``"guessed"`` / ``"fallback"`` / ``"forced"``.
+        certified: ``True`` when an ``index=`` certificate answered the content half and the rule engine was skipped.
         count: Number of findings (0 ⇒ conformant).
         is_valid: ``True`` when [`count`][laterite.Report.count] is 0.
         exit_code: Process exit code mirroring the ``lat`` binary.
@@ -230,35 +241,6 @@ class Report:
 
     def __init__(self, r: dict) -> None:
         self._r = r
-
-    @classmethod
-    def from_cert(cls, cert, src=None) -> Report:
-        """Synthesise a clean report from a fresh certificate — the engine-skipped
-        outcome of ``.validate()`` on an ``index=``-certified file. [`resolution`][laterite.Report.resolution]
-        is the sentinel ``"certified"`` (the engine never emits it), [`count`][laterite.Report.count]
-        is 0, and the edition is the cert's. The clean verdict's provenance is the
-        certificate's stamp (``cert.validator`` / ``cert.checked_at``)."""
-        import json
-
-        if src is not None and src[0] is not None:
-            label = src[0]
-        elif src is not None and src[2] is not None:
-            label = "<bytes>"
-        else:
-            label = "<text>"
-        return cls(
-            {
-                "ok": True,
-                "file": label,
-                "dict_version": cert.edition,
-                "resolution": "certified",
-                "count": 0,
-                "exit_code": 0,
-                "findings": [],
-                "json": json.dumps({"file": label, "findings": {}}),
-                "ndjson": "",
-            }
-        )
 
     @property
     def file(self) -> str:
@@ -278,6 +260,23 @@ class Report:
     @property
     def count(self) -> int:
         return self._r["count"]
+
+    @property
+    def certified(self) -> bool:
+        """Did an ``index=`` certificate stand in for the rule engine?
+
+        This is **not** "the file was not checked". A certificate can only ever remove the
+        CONTENT half of a validation — the part that is a pure function of the file's
+        bytes. Anything that reads the world outside those bytes (today: Rule 20's on-disk
+        ``FILE/`` tree, via ``check_files=True``) is re-run every time, certificate or not,
+        because a directory can change without the file changing.
+
+        ``resolution`` used to carry a ``"certified"`` sentinel instead of this flag, which
+        meant one field had to answer two questions — *which dictionary judged the file*
+        and *did we skip the engine* — and could only answer one. Now it answers the first,
+        and this answers the second.
+        """
+        return bool(self._r.get("certified", False))
 
     @property
     def is_valid(self) -> bool:
@@ -380,11 +379,11 @@ class Ags4File:
         "_bytes",
         "_cert",
         "_con",
+        "_content_hash",
         "_encoding",
         "_fix_report",
         "_keys",
-        "_last_check_files",
-        "_last_forced",
+        "_last_dict_version",
         "_p",
         "_registered",
         "_report",
@@ -400,6 +399,7 @@ class Ags4File:
         *,
         xn: XnMode = "string",
         keys: bool = False,
+        content_hash: bool = False,
         _src: tuple[str | None, str | None, builtins.bytes | None] | None = None,
     ) -> None:
         # Guard the common `read(path)` vs `Ags4File(path)` mix-up: the ctor takes
@@ -433,6 +433,14 @@ class Ags4File:
         # stripped from frames (but the relational `.sql()` layer always carries
         # them). Read-side only; emit always strips. (#303)
         self._keys: bool = keys
+        # Whether each group's relational table CARRIES a `_content_hash` column —
+        # the typed, blank-insensitive fingerprint of a row's whole VALUE (as
+        # against `_id`, which fingerprints its IDENTITY: two deliveries of the
+        # same borehole with a corrected level share an `_id` and differ here).
+        # Unlike `keys`, this is a BUILD flag, not a projection: hashing costs a
+        # parse + SHA-256 per row, so a caller who never asks pays nothing and the
+        # default batch — `.sql("SELECT *")` included — is byte-identical. (#448)
+        self._content_hash: bool = content_hash
         self._con = None  # lazy DuckDB engine (first group access / sql / connection)
         self._registered: set[str] = set()  # groups loaded into _con
         # The (path, text, data) this handle was read from — lets chainable
@@ -452,8 +460,11 @@ class Ags4File:
         self._cert = None
         # The check profile of the most recent `.validate()` engine run — what
         # `.certify()` stamps into the cert so a later skip can match profiles.
-        self._last_check_files = False
-        self._last_forced = False
+        # The edition the caller last asked for (None = auto-resolve from TRAN_AGS).
+        # Provenance for a following `.certify()`, so `validate(dict_version=X).certify()`
+        # mints a cert for the edition you actually validated against. NOT a trust claim —
+        # the mint re-validates; this only says which dictionary to re-validate with.
+        self._last_dict_version: Edition | None = None
         # The FixResult from the `.fix()` that produced this handle (what was
         # applied + the residual findings); None unless this came from `.fix()`.
         self._fix_report: FixResult | None = None
@@ -530,7 +541,7 @@ class Ags4File:
         con = self._engine()
         if code in self._registered:
             return
-        table = self._p["_handle"].table_for(code)
+        table = self._p["_handle"].table_for(code, self._content_hash)
         if table is None:
             raise KeyError(f"group {code!r} not in file")
         tmp = f"__arrow_{code}"
@@ -577,7 +588,11 @@ class Ags4File:
         """Projection that DROPS the synthetic key columns for a FRAME. The
         relational table always carries ``_id``/``_parent_id`` (see ``_register``);
         the frame accessor hides them unless asked. A passthrough group (absent
-        from the dictionary) never had them, so it's a plain ``*``."""
+        from the dictionary) never had them, so it's a plain ``*``.
+
+        ``_content_hash`` is deliberately NOT stripped: unlike the ids it is only
+        present when the caller explicitly asked for it at ``read()``, so hiding
+        it again would make the flag a no-op."""
         return "* EXCLUDE (_id, _parent_id)" if _GROUPS.get(code) is not None else "*"
 
     def table(self, code: str, *, keys: bool | None = None):
@@ -708,29 +723,26 @@ class Ags4File:
         errors-only, and ``fyi=True`` to add the low-signal FYI tier. (The ``compat``
         shim keeps its own python-ags4-faithful defaults, unaffected by this.)
 
-        **Certificate short-circuit:** if this handle carries a fresh ``index=``
-        certificate (from [`read`][laterite.read]) **minted by the current validator engine**,
-        and you ask for an errors-only check, the rule engine is skipped — the cert
-        already proves the file validated clean — and [`report`][laterite.Ags4File.report] is the
-        synthesised certified report ([`Report.from_cert`][laterite.Report.from_cert]). A cert from a
-        *different/older* engine is re-validated, not trusted (its clean verdict may
-        not reproduce under today's rules). Asking for more than the cert vouches for
-        runs the engine — which now includes the **default** check, since a cert
-        records only the error verdict, not the warning list; pass ``warnings=False``
-        to engage the skip on a known-clean file."""
-        if (
-            self._cert is not None
-            and self._cert.matches_native_validator()
-            and self._cert.profile_covers(check_files, dict_version)
-            and not warnings
-            and not fyi
-        ):
-            self._report = Report.from_cert(self._cert, self._src)
-            return self
-        # Engine run — remember the check profile so a following `.certify()`
-        # stamps it into the cert (errors-only default ⇒ both False).
-        self._last_check_files = check_files
-        self._last_forced = dict_version is not None
+        **Certificate short-circuit:** if this handle carries an ``index=`` certificate
+        (from [`read`][laterite.read]), it is offered to the engine, which decides whether
+        it can answer *this* question — and skips the rules only if it can answer it
+        **completely**. A cert vouches for a tier only when it actually **measured** that
+        tier and found it empty, so an errors-only check on a clean file skips, a
+        ``warnings=True`` check skips only if the cert measured zero warnings, and a cert
+        from a different rule engine is never trusted at all.
+
+        The decision is **not made here.** It is made once, in the shared trust model, for
+        every surface. This method used to make it itself, with its own conjunction of
+        predicates — and so did the CLI, the Node package, and the browser, each slightly
+        differently.
+
+        ``check_files=True`` is never answered from a certificate: Rule 20's on-disk
+        ``FILE/`` tree can be deleted without changing a byte of the ``.ags``, so no
+        statement about the file's bytes can speak for it. It runs live, every time — and
+        on a ``bytes``/``str`` handle, which has no directory to look in, it raises
+        [`WorldCheckRequiresSourceError`][laterite.WorldCheckRequiresSourceError] rather
+        than reporting Rule 20 clean."""
+        self._last_dict_version = dict_version
         if self._src is not None:
             path, txt, data = self._src
         else:
@@ -744,6 +756,7 @@ class Ags4File:
             include_fyi=fyi,
             check_files=check_files,
             encoding=encoding if encoding is not None else self._encoding,
+            cert=self._cert,
         )
         self._report = Report(raise_for(r))
         return self
@@ -772,12 +785,27 @@ class Ags4File:
         assert text is not None  # path/data both None => this handle was read from text=
         return text.encode("utf-8")
 
-    def certify(self, path: str | Path | None = None) -> Path:
-        """Mint this file's ``.ags.idx`` validity **certificate** — a clean-validation
-        proof plus a byte-offset index — and write it beside the file. REQUIRES a prior
-        clean [`validate`][laterite.validate]: ``certify`` *vouches for* a passed validation, it does
-        not run one. Raises if [`validate`][laterite.validate] was not called, or found finding(s); a
-        later ``read(..., index=...)`` consumes the cert to skip re-validation.
+    def certify(
+        self, path: str | Path | None = None, *, dict_version: Edition | None = None
+    ) -> Path:
+        """Mint this file's ``.ags.idx`` validity **certificate** — an error-clean
+        validation plus a byte-offset index — and write it beside the file.
+
+        ``certify`` **runs the validation itself**, with every severity tier on, and
+        records what the rules actually returned. It used to require a prior
+        [`validate`][laterite.validate] and then vouch for whatever that had found — which
+        meant the certificate's contents were an *assertion by the caller*, and the
+        caller got them wrong: the mint took ``warnings=0, fyi=0`` as default arguments
+        and nothing ever passed them, so every certificate this library produced claimed
+        to have measured zero warnings without having looked.
+
+        It refuses a file with **errors**. Warnings and FYI findings are *recorded*, not
+        fatal — a delivery may legitimately carry them, and a certificate that counted
+        them honestly can still answer an errors-only question.
+
+        Pass ``dict_version=`` to certify against a forced edition; by default it uses the
+        edition of the last [`validate`][laterite.validate] on this handle (or auto-resolves
+        from ``TRAN_AGS``). A later ``read(..., index=...)`` consumes the cert.
 
         ``path`` is the certificate's **output** location and defaults to
         ``<source>.idx`` (``delivery.ags`` → ``delivery.ags.idx``); a handle read from
@@ -787,7 +815,6 @@ class Ags4File:
         it. Returns the written ``Path``. The certificate indexes the original source
         bytes, which must be UTF-8 (the byte index rejects other encodings). For the
         certificate **bytes** in memory (no file), use [`certify_bytes`][laterite.Ags4File.certify_bytes]."""
-        report = self._require_clean_validation()
         src_path = self._src[0] if self._src is not None else None
         if path is None:
             if src_path is None:
@@ -817,55 +844,50 @@ class Ags4File:
                 "(certify writes or replaces an .ags.idx). Pass a new path, or the "
                 "existing .ags.idx to replace."
             )
-        path.write_bytes(self._mint_cert(report).to_json())
+        path.write_bytes(self._mint(dict_version).to_json())
         return path
 
-    def certify_bytes(self) -> builtins.bytes:
+    def certify_bytes(self, *, dict_version: Edition | None = None) -> builtins.bytes:
         """Mint this file's ``.ags.idx`` validity **certificate** and return its bytes
-        in memory — the filesystem-free twin of [`certify`][laterite.Ags4File.certify]. Same
-        precondition (a prior clean [`validate`][laterite.validate]; ``certify_bytes`` vouches for it,
-        it does not run one) and same output — the bytes are exactly what ``certify``
-        would write, so they interop with ``read(index=...)``, the CLI ``--index``, and
-        the browser cert.
+        in memory — the filesystem-free twin of [`certify`][laterite.Ags4File.certify].
+        Same behaviour (it runs the validation itself, refuses a file with errors, and
+        records the warning/FYI counts it measured) and the same output, so the bytes
+        interop with ``read(index=...)``, the CLI ``--index``, and the browser cert.
 
         Ideal for a web backend that wants to hand the certificate straight to an
         upload or object store without a temp-file round-trip — the certify analog of
         [`transport.lock_bytes`][laterite.transport.lock_bytes]. Returns the certificate JSON as ``bytes``.
 
         Raises:
-            Ags4Error: If [`validate`][laterite.validate] was not called, or it found finding(s).
+            Ags4Error: If the file has error-severity findings (it cannot be certified).
         """
-        return self._mint_cert(self._require_clean_validation()).to_json()
+        return self._mint(dict_version).to_json()
 
-    def _require_clean_validation(self) -> Report:
-        """Shared precondition for ``certify`` / ``certify_bytes``: a certificate
-        vouches for a *passed* validation, so one must have run and found nothing.
-        Returns the validated [`Report`][laterite.Report] (narrowed non-``None``) for the mint step."""
-        if self._report is None:
-            raise Ags4Error(
-                "call .validate() before .certify() — certify records a passed "
-                "validation, it does not run one"
-            )
-        if not self._report.is_valid:
-            raise Ags4Error(
-                f"cannot certify a file with {self._report.count} finding(s); fix "
-                "them and re-validate clean first"
-            )
-        return self._report
+    def _mint(self, dict_version: Edition | None):
+        """Mint the ``Sidecar`` over the ORIGINAL source bytes.
 
-    def _mint_cert(self, report: Report):
-        """Assemble the ``Sidecar`` certificate over the original source bytes,
-        stamping the profile the last ``validate`` actually ran (``check_files`` /
-        forced edition). ``report`` comes from [`_require_clean_validation`][laterite.Ags4File._require_clean_validation]."""
+        The mint validates; it is not told a verdict. There is no longer a parameter
+        through which a caller could assert one — which is what the old ``assemble``
+        signature (``warnings=0, fyi=0``) invited, and what every cert this library
+        minted got wrong.
+
+        The edition input is the caller's, not a guess: an explicit ``dict_version=``
+        wins, else the one the last [`validate`][laterite.validate] on this handle used,
+        else auto-resolution from ``TRAN_AGS``.
+        """
         from datetime import UTC, datetime
 
-        return _native.Sidecar.assemble(
-            self._source_bytes(),
-            report.dict_version,
-            datetime.now(UTC).isoformat(),
-            check_files=self._last_check_files,
-            edition_forced=self._last_forced,
-        )
+        try:
+            return _native.Sidecar.mint(
+                self._source_bytes(),
+                datetime.now(UTC).isoformat(),
+                dict_version=dict_version if dict_version is not None else self._last_dict_version,
+                encoding=self._encoding,
+            )
+        except ValueError as e:
+            # The native mint refuses an error-carrying file. Surface it as the library's
+            # own error type, not a bare ValueError.
+            raise Ags4Error(str(e)) from None
 
     def save(self, path: str | os.PathLike[str]) -> Path:
         """Write spec-correct AGS4 to ``path`` (UTF-8 — [`bytes`][laterite.Ags4File.bytes]); returns the
@@ -1294,6 +1316,7 @@ def read(
     backend: Backend = "polars",
     xn: XnMode = "string",
     keys: bool = False,
+    content_hash: bool = False,
 ) -> Ags4File:
     """Read AGS4 — from a path, a file-like, raw bytes, or in-memory text — into
     an [`Ags4File`][laterite.Ags4File] over an in-memory DuckDB engine. This is the front door
@@ -1317,6 +1340,23 @@ def read(
     tokens becoming null. This is read-side only — [`Ags4File.save`][laterite.Ags4File.save] and the
     ``.text`` / ``.bytes`` doors stay byte-faithful regardless of the setting.
     (A fuller bidirectional XN treatment is future work.)
+
+    ``content_hash`` adds a ``_content_hash`` column: a **typed, blank-insensitive
+    fingerprint of a row's whole value**, as against ``_id``, which fingerprints its
+    *identity*. Two deliveries of borehole ``BH01`` with a corrected ``LOCA_GL``
+    share an ``_id`` and differ in ``_content_hash`` — so ``DISTINCT ON
+    (_content_hash)`` collapses rows that are genuinely identical while keeping a
+    revised one. Cells are canonicalised through the same ``parse_value`` that
+    ``merge``'s revision report trusts, so a formatting-only re-emit (``10.0`` →
+    ``10.00``) is *not* a difference; a blank cell hashes as absent, so two
+    deliveries with different heading sets still dedup on the columns they share.
+
+    Two limits worth knowing before you rely on it. The hash is computed from one
+    file using **that file's own TYPE row**, so two deliveries that disagree on a
+    column's TYPE across the typed/free-text boundary (``2DP`` vs ``X``) will *not*
+    dedup identical bytes — reconcile those with [`merge`][laterite.merge] instead.
+    And it tells you *that* a row changed, never *which* cell — that is
+    ``merge``'s revision report and ``diff``.
 
     ``index`` is the explicit path to this file's ``.ags.idx`` certificate (minted
     by [`Ags4File.certify`][laterite.Ags4File.certify]). It is strictly opt-in — there is no
@@ -1362,7 +1402,14 @@ def read(
     """
     p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
     res = _native.parse_arrow(path=p, text=txt, data=raw, encoding=encoding)
-    handle = Ags4File(raise_for(res), backend=backend, xn=xn, keys=keys, _src=(p, txt, raw))
+    handle = Ags4File(
+        raise_for(res),
+        backend=backend,
+        xn=xn,
+        keys=keys,
+        content_hash=content_hash,
+        _src=(p, txt, raw),
+    )
     handle._encoding = encoding  # so chained .validate()/.fix()/.diff() stay faithful
     if index is not None:
         cert = _native.Sidecar.from_json(Path(index).read_bytes())
@@ -2176,7 +2223,7 @@ class MergeResult:
 
 def merge(
     *sources: Any,
-    lenient: bool = False,
+    on_type_clash: TypeClashMode = "error",
     dict_version: Edition | None = None,
     encoding: str | None = None,
     tran_issue: str | None = None,
@@ -2197,10 +2244,31 @@ def merge(
     silence is not deletion.
 
     Columns are reconciled per heading. When two files declare the same heading with
-    **different TYPEs**, strict mode (the default) refuses to guess and raises
-    [`MergeConflictError`][laterite.MergeConflictError]; pass ``lenient=True`` to
-    widen that column to ``X`` (text), keeping every raw value byte-for-byte. A
-    typed column widening around an unchanged value is *not* a revision.
+    **different TYPEs**, ``on_type_clash`` decides — and the default (``"error"``)
+    refuses to guess, raising [`MergeConflictError`][laterite.MergeConflictError]:
+
+    * ``"widen"`` falls back to ``X`` (text), keeping every raw value byte-for-byte.
+      Lossless on the bytes, but it **throws the column's TYPE away**.
+    * ``"promote"`` keeps the column *numeric* when every clashing code is in the
+      ``nDP`` family: it takes the greatest precision (``2DP`` + ``5DP`` → ``5DP``)
+      and zero-pads the coarser file's values (``10.00`` → ``10.00000``), so the
+      merged file satisfies Rule 8. No digit is ever changed — merge never rounds,
+      never demotes, and a value it cannot pad losslessly is kept verbatim and
+      warned about. ``nSF`` / ``nSCI`` and cross-family clashes fall back to
+      ``"widen"``, because padding *significant figures* would overstate the
+      precision the instrument actually measured.
+
+    ``"promote"`` is what lets a merged file still value-dedup against its own
+    inputs: [`_content_hash`][laterite.read] canonicalises ``10.00`` as a *number*
+    under ``2DP`` but as a *string* under ``X``, so a widened column no longer
+    matches its typed source while a promoted one does.
+
+    A typed column widening or promoting around an unchanged value is *not* a
+    revision — zero-padding changes the bytes but not the value.
+
+    A conflicting **UNIT** is fatal in every mode: ``TYPE`` has a universal absorber
+    (``X``), ``UNIT`` has none, and silently picking one would mislabel the other
+    file's values.
 
     The merged file genuinely *is* a new transmission, so pass ``tran_issue`` **and**
     ``tran_date`` (both required together) to stamp it with a synthesised ``TRAN``
@@ -2217,8 +2285,10 @@ def merge(
         *sources: Two or more documents to merge, each a path, AGS4 text, raw bytes,
             a file-like, or an [`Ags4File`][laterite.Ags4File]. Order is authority —
             a later argument wins a KEY conflict.
-        lenient: Widen a column two files typed differently to ``X`` instead of
-            raising. Defaults to ``False`` (strict — a TYPE conflict is an error).
+        on_type_clash: How to settle a heading two files typed differently —
+            ``"error"`` (default, refuse), ``"widen"`` (fall back to ``X``) or
+            ``"promote"`` (keep the greatest ``nDP`` precision, zero-padding the
+            coarser values).
         dict_version: Dictionary edition used to resolve each group's KEY headings.
             Defaults to ``None`` (taken from the newest file's ``TRAN_AGS``).
         encoding: Source text encoding for every input. Defaults to ``None`` (sniffed).
@@ -2235,8 +2305,10 @@ def merge(
         ``warnings`` / ``revisions`` audit.
 
     Raises:
-        MergeConflictError: A heading was typed differently by two files under strict
-            mode (the default), or the merged output failed to emit.
+        MergeConflictError: A heading was typed differently by two files and
+            ``on_type_clash="error"`` (the default) refused to settle it; two files
+            declared conflicting UNITs (fatal in every mode); or the merged output
+            failed to emit.
         ValueError: Fewer than two sources were given.
     """
     if len(sources) < 2:
@@ -2245,7 +2317,7 @@ def merge(
 
     r = _native.merge_files(
         [_source_bytes(s) for s in sources],
-        lenient=lenient,
+        on_type_clash=on_type_clash,
         dict_version=dict_version,
         encoding=encoding,
         tran_issue=tran_issue,

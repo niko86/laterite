@@ -42,6 +42,20 @@ pub enum ValidatorError {
          4.0.3/4.0.4/4.1/4.1.1/4.2 are bundled"
     )]
     UnsupportedEdition { found: String },
+
+    /// The caller asked for a WORLD check — Rule 20's on-disk half
+    /// (`CheckOptions::check_files`) — but handed us bytes/text, so there is
+    /// no directory to look beside. The sibling `FILE/` tree is not a function
+    /// of the AGS4 bytes, so we genuinely cannot answer; before this variant we
+    /// answered anyway, by silently skipping the check and reporting a clean
+    /// Rule 20 (a false clean with no certificate involved at all). Refusing is
+    /// the only honest reply: a question we cannot ask must not come back
+    /// "nothing wrong".
+    #[error(
+        "the on-disk FILE/ check (check_files) needs a source path to look \
+         beside — it cannot be run against bytes or text"
+    )]
+    WorldCheckRequiresSource,
 }
 
 impl ValidatorError {
@@ -56,17 +70,21 @@ impl ValidatorError {
             ValidatorError::NotAgs4(_) => "not_ags4",
             ValidatorError::BadDict { .. } => "bad_dict",
             ValidatorError::UnsupportedEdition { .. } => "unsupported_edition",
+            ValidatorError::WorldCheckRequiresSource => "world_check_requires_source",
         }
     }
 
     /// The process exit code each maps to — byte-faithful to `lat`'s
     /// contract (3 = unreadable / io, 4 = not-AGS4 / unsupported-edition, 5 =
-    /// bad-dict). The single producer of the exit-code value domain.
+    /// bad-dict / bad-args). The single producer of the exit-code value domain.
     pub fn exit_code(&self) -> i32 {
         match self {
             ValidatorError::NotFound(_) | ValidatorError::Io { .. } => 3,
             ValidatorError::NotAgs4(_) | ValidatorError::UnsupportedEdition { .. } => 4,
-            ValidatorError::BadDict { .. } => 5,
+            // 5 is the bad-*arguments* code, not merely bad-dict: asking for an
+            // on-disk check with nothing on disk to check is an incoherent request,
+            // the same class of mistake as a bogus --dict-version.
+            ValidatorError::BadDict { .. } | ValidatorError::WorldCheckRequiresSource => 5,
         }
     }
 }
@@ -122,6 +140,11 @@ mod tests {
                     reason: "x".into(),
                 },
                 "bad_dict",
+                5,
+            ),
+            (
+                ValidatorError::WorldCheckRequiresSource,
+                "world_check_requires_source",
                 5,
             ),
         ];

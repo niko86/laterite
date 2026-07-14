@@ -1,10 +1,10 @@
 //! `lat merge <files...> --out <merged.ags>` — reconcile N deliveries of one
-//! project into a single file (KEY-aware, argument-order recency, widen-to-X).
+//! project into a single file (KEY-aware, argument-order recency, type-clash lattice).
 
 use std::path::Path;
 use std::process::exit;
 
-use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeMismatchMode, merge_parsed};
+use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, merge_parsed};
 use laterite_ags4_parse::parse_bytes;
 use laterite_ags4_validator::dict::FALLBACK;
 use laterite_ags4_validator::{CheckOptions, ValidatorError, resolve_dict_version, tran_ags_of};
@@ -69,11 +69,7 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
     };
 
     let merge_opts = MergeOpts {
-        type_mismatch: if args.lenient {
-            TypeMismatchMode::Lenient
-        } else {
-            TypeMismatchMode::Strict
-        },
+        on_type_clash: args.on_type_clash,
         edition: dv,
         tran,
         ..Default::default()
@@ -134,7 +130,32 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
             types,
         }) => {
             eprintln!("error: TYPE conflict in {group}.{heading}: files declared {types:?}");
-            eprintln!("hint: pass --lenient to widen the column to X (text), keeping raw values");
+            // Both escape hatches, in lattice order — promote first, because it is
+            // the one that KEEPS the type. Offering only the lossy one would push
+            // every clash toward X, which is exactly what #500 set out to stop.
+            eprintln!(
+                "hint: --on-type-clash promote  keeps the greatest precision when every code is \
+                 nDP (e.g. 2DP + 5DP -> 5DP, coarser values zero-padded; no digit is changed)"
+            );
+            eprintln!(
+                "hint: --on-type-clash widen    falls back to X (free text) — raw values kept, \
+                 but the column's TYPE is thrown away"
+            );
+            exit(6);
+        }
+        Err(MergeError::UnitConflict {
+            group,
+            heading,
+            units,
+        }) => {
+            eprintln!("error: UNIT conflict in {group}.{heading}: files declared {units:?}");
+            // Deliberately NO mode hint here: no mode absorbs a unit clash.
+            // Offering one here would send the user in a circle (see #501).
+            eprintln!(
+                "hint: merge will not convert units, and no mode can absorb this — picking one \
+                 would silently mislabel the other file's values. Reconcile the UNIT row in the \
+                 source files, then merge."
+            );
             exit(6);
         }
         Err(MergeError::Emit(e)) => {

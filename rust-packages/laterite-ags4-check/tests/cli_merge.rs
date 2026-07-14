@@ -15,7 +15,7 @@ fn scratch() -> PathBuf {
 }
 
 #[test]
-fn merge_strict_errors_on_type_conflict_exit_6() {
+fn merge_errors_on_type_conflict_exit_6_and_offers_both_ways_out() {
     let d = scratch();
     let (a, b, out) = (d.join("a.ags"), d.join("b.ags"), d.join("strict.ags"));
     std::fs::write(&a, A).unwrap();
@@ -37,10 +37,17 @@ fn merge_strict_errors_on_type_conflict_exit_6() {
         err.contains("TYPE conflict in LOCA.LOCA_NATE"),
         "stderr: {err}"
     );
+    // Both escape hatches must be offered — naming only the lossy one would push
+    // every clash toward X, which is what the lattice (#500) set out to stop.
+    assert!(
+        err.contains("--on-type-clash promote"),
+        "offers promote: {err}"
+    );
+    assert!(err.contains("--on-type-clash widen"), "offers widen: {err}");
 }
 
 #[test]
-fn merge_lenient_writes_output_and_reports_the_real_revision() {
+fn merge_widen_writes_output_and_reports_the_real_revision() {
     let d = scratch();
     let (a, b, out) = (d.join("a2.ags"), d.join("b2.ags"), d.join("merged.ags"));
     std::fs::write(&a, A).unwrap();
@@ -51,7 +58,8 @@ fn merge_lenient_writes_output_and_reports_the_real_revision() {
         .arg("--out")
         .arg(&out)
         .args([
-            "--lenient",
+            "--on-type-clash",
+            "widen",
             "--tran-issue",
             "3",
             "--tran-date",
@@ -61,7 +69,7 @@ fn merge_lenient_writes_output_and_reports_the_real_revision() {
         .unwrap();
     assert!(
         o.status.success(),
-        "lenient merge succeeds: {}",
+        "widen merge succeeds: {}",
         String::from_utf8_lossy(&o.stderr)
     );
     let stdout = String::from_utf8_lossy(&o.stdout);
@@ -79,4 +87,79 @@ fn merge_lenient_writes_output_and_reports_the_real_revision() {
     // The merged file was actually written and re-parses as AGS4.
     let bytes = std::fs::read(&out).unwrap();
     assert!(bytes.starts_with(b"\"GROUP\""));
+}
+
+/// `--on-type-clash promote` — the nDP lattice join, end to end through the binary:
+/// the merged column keeps the greatest precision and the coarser value is padded.
+#[test]
+fn merge_promote_keeps_the_greatest_precision_and_pads() {
+    let d = scratch();
+    let (a, b, out) = (d.join("a3.ags"), d.join("b3.ags"), d.join("promoted.ags"));
+    // Same LOCA_GL column, typed 2DP in one delivery and 5DP in the other.
+    std::fs::write(&a, A).unwrap();
+    std::fs::write(
+        &b,
+        B.replace(r#""TYPE","ID","X","2DP""#, r#""TYPE","ID","2DP","5DP""#)
+            .replace(
+                r#""DATA","BH1","100.00","11.50""#,
+                r#""DATA","BH2","200.00","20.12345""#,
+            ),
+    )
+    .unwrap();
+
+    let o = Command::new(env!("CARGO_BIN_EXE_lat"))
+        .args(["merge"])
+        .args([&a, &b])
+        .arg("--out")
+        .arg(&out)
+        .args(["--on-type-clash", "promote"])
+        .output()
+        .unwrap();
+    assert!(
+        o.status.success(),
+        "promote merge succeeds: {}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+
+    let merged = String::from_utf8(std::fs::read(&out).unwrap()).unwrap();
+    assert!(
+        merged.contains(r#""TYPE","ID","2DP","5DP""#),
+        "LOCA_GL keeps 5DP, not X: {merged}"
+    );
+    assert!(
+        merged.contains(r#""DATA","BH1","100.00","10.00000""#),
+        "the 2DP value is zero-padded to 5 places: {merged}"
+    );
+    assert!(
+        merged.contains(r#""DATA","BH2","200.00","20.12345""#),
+        "the already-5DP value is untouched: {merged}"
+    );
+    let stdout = String::from_utf8_lossy(&o.stdout);
+    assert!(
+        stdout.contains("type_promoted"),
+        "the promote is announced: {stdout}"
+    );
+}
+
+/// The vocabulary is projected from `TypeClashMode::ALL`, so clap rejects anything
+/// else and lists exactly the modes the library accepts.
+#[test]
+fn merge_rejects_an_unknown_clash_mode() {
+    let d = scratch();
+    let (a, b, out) = (d.join("a4.ags"), d.join("b4.ags"), d.join("nope.ags"));
+    std::fs::write(&a, A).unwrap();
+    std::fs::write(&b, B).unwrap();
+    let o = Command::new(env!("CARGO_BIN_EXE_lat"))
+        .args(["merge"])
+        .args([&a, &b])
+        .arg("--out")
+        .arg(&out)
+        .args(["--on-type-clash", "yolo"])
+        .output()
+        .unwrap();
+    assert!(!o.status.success());
+    let err = String::from_utf8_lossy(&o.stderr);
+    for mode in ["error", "widen", "promote"] {
+        assert!(err.contains(mode), "lists {mode}: {err}");
+    }
 }

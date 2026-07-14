@@ -22,7 +22,7 @@ use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};
 use laterite_ags4_validator::fixes::{Fix, FixRisk, apply_fixes, compute_fixes};
 use laterite_ags4_validator::parse::parse_bytes;
-use laterite_ags4_validator::{CheckOptions, DictVersion, rules};
+use laterite_ags4_validator::{CheckOptions, DictVersion, WorldScope, check_parsed};
 use laterite_types::ags4_str;
 use serde_json::Value;
 use std::collections::BTreeSet;
@@ -264,6 +264,10 @@ fn format_cell(value: &Value, ags_type: &str) -> String {
 }
 
 /// Parse bytes + run all rules at the given edition, returning findings.
+///
+/// Content-only by construction: the emitter re-validates bytes it just produced
+/// in memory, which have no directory to sit beside, so there is no world to look
+/// at ([`WorldScope::None`]) and `check_files` stays default-off.
 fn validate(bytes: &[u8], edition: DictVersion) -> Result<Findings, EmitError> {
     let parsed =
         parse_bytes(bytes, encoding_rs::UTF_8).map_err(|e| EmitError::Reparse(e.to_string()))?;
@@ -272,9 +276,8 @@ fn validate(bytes: &[u8], edition: DictVersion) -> Result<Findings, EmitError> {
         dict_version: Some(edition),
         ..CheckOptions::default()
     };
-    let mut found = Findings::new();
-    rules::run_all(&parsed, &dict, &opts, None, &mut found);
-    Ok(found)
+    check_parsed(&parsed, &dict, &opts, &WorldScope::None)
+        .map_err(|e| EmitError::Reparse(e.to_string()))
 }
 
 /// Under AutoFix, synthesize whichever mandatory metadata catalog group is

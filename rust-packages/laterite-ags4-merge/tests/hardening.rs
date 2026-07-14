@@ -1,7 +1,7 @@
 //! Hardening tests: the gaps an adversarial review found in the POC, each with a
 //! real fix (or, where the gap is architecturally inherent, a pinned behaviour).
 
-use laterite_ags4_merge::{MergeOpts, TranStamp, TypeMismatchMode, merge_parsed};
+use laterite_ags4_merge::{MergeOpts, TranStamp, TypeClashMode, merge_parsed};
 use laterite_ags4_parse::{DataRow, ParsedFile, ParsedGroup, parse_str};
 
 fn p(text: &str) -> ParsedFile {
@@ -14,7 +14,7 @@ fn reparse(bytes: &[u8]) -> ParsedFile {
 
 fn lenient_no_tran() -> MergeOpts {
     MergeOpts {
-        type_mismatch: TypeMismatchMode::Lenient,
+        on_type_clash: TypeClashMode::Widen,
         tran: None,
         ..Default::default()
     }
@@ -264,7 +264,7 @@ fn type_widen_over_identical_value_is_not_a_revision() {
 fn merge_tran_stamp_lands_even_when_no_input_has_tran() {
     let f = "\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\"\n\"UNIT\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\"\n";
     let opts = MergeOpts {
-        type_mismatch: TypeMismatchMode::Lenient,
+        on_type_clash: TypeClashMode::Widen,
         tran: Some(TranStamp {
             isno: "9".into(),
             date: "2024-05-01".into(),

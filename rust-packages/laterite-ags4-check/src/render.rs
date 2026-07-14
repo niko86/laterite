@@ -8,23 +8,8 @@ use std::io;
 use std::path::Path;
 
 use laterite_ags4_validator::Findings;
-use laterite_ags4_validator::findings::Severity;
 use laterite_cliutil::{colour_enabled, styled_table, write_json_pretty};
 use serde_json::{Map, Value};
-
-/// Count findings by severity — errors gate `certify` (a certificate attests an
-/// error-clean file); warnings/fyi ride on the stamp as counts.
-pub fn count_severities(found: &Findings) -> (u32, u32, u32) {
-    let (mut errors, mut warnings, mut fyi) = (0u32, 0u32, 0u32);
-    for f in found.values().flatten() {
-        match f.severity {
-            Severity::Error => errors += 1,
-            Severity::Warning => warnings += 1,
-            Severity::Fyi => fyi += 1,
-        }
-    }
-    (errors, warnings, fyi)
-}
 
 /// Findings flattened to one row per finding, in spec-rule order (the `Findings`
 /// map is a `BTreeMap`, so deterministic), rendered through the shared
@@ -167,12 +152,5 @@ mod tests {
         );
         let p = plain_string(Path::new("x.ags"), &sample(), 2);
         assert!(p.contains("2 finding(s)") && p.contains("LOCA"));
-    }
-
-    #[test]
-    fn count_severities_counts_by_tier() {
-        // sample() is two error-severity findings.
-        assert_eq!(count_severities(&sample()), (2, 0, 0));
-        assert_eq!(count_severities(&Findings::new()), (0, 0, 0));
     }
 }

@@ -18,6 +18,14 @@ publish = false
 name = "laterite_ags4_validator"
 path = "src/lib.rs"
 
+[build-dependencies]
+# ENGINE_FINGERPRINT: a build-time SHA-256 over the rule sources + the bundled
+# dictionary/catalogue, so a certificate can name the engine that minted it by
+# what that engine ACTUALLY IS, not by a hand-bumped CARGO_PKG_VERSION that a
+# rule edit can leave behind. Build-only — never linked into the library, so the
+# lean runtime dep-graph guarantee (no pyo3/polars/walkdir/rayon/ratatui) holds.
+sha2 = "0.11"
+
 [dependencies]
 # The phf-projected dictionary (Dictionary/DictVersion/dictionary_dto/…),
 # moved out of this crate's own build.rs into a wasm-safe leaf (#475 PR2) so
@@ -49,10 +57,16 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 # (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee
 # is unchanged.
 encoding_rs = "0.8"
-# serde: deliberate lean/wasm-safe inclusion — derive only, NO serde_json
-# (bindings own serialization). derive-only is zero runtime cost and
-# compiles clean on wasm32 (the wasm crate already links it). Not on the
-# lean-dep guard list (pyo3|polars|walkdir|rayon|ratatui).
+# serde: deliberate lean/wasm-safe inclusion — derive only. This crate's own
+# code does no JSON serialization (bindings/CLIs own that), so it takes no
+# DIRECT serde_json dep. It does, however, LINK serde_json transitively: since
+# #475 the dictionary + rules catalogue live in laterite-ags4-reference, which
+# parses its two bundled JSON files. So "the validator's build has no
+# serde_json" is no longer true, even though "the validator's code writes no
+# JSON" still is — don't avoid serde_json here on dep-weight grounds; it is
+# already compiled in. derive-only is zero runtime cost and compiles clean on
+# wasm32 (as does serde_json). Neither is on the lean-dep guard list
+# (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee holds.
 serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
@@ -68,10 +82,12 @@ criterion = "0.8"
 # workspace lockfile via ags4-corpus-qa → the library's lean dep-graph
 # guarantee (no walkdir/rayon/ratatui) is untouched.
 tempfile = "3"
-# serde_json: DEV-ONLY — the findings.rs byte-identity test serializes a
-# Finding and asserts the exact JSON string. The engine itself owns no
-# serde_json (bindings/CLIs do their own serialization), so the runtime
-# lean-dep contract is untouched.
+# serde_json: a DIRECT dep only for tests — the findings.rs byte-identity test
+# serializes a Finding and asserts the exact JSON string. The engine's own code
+# writes no JSON (bindings/CLIs do their own serialization). Note this is about
+# *usage*, not dep weight: serde_json already rides into the normal build
+# transitively via laterite-ags4-reference (#475), so listing it here costs
+# nothing — see the note on `serde` above.
 serde_json = "1"
 # Property-based tests: the AGS4 field splitter round-trip + field_span
 # char-offset stability + the Rule 8 format↔validate inverses. DEV-ONLY;

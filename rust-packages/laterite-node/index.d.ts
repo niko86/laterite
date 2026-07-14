@@ -41,15 +41,20 @@ export declare class Reading {
  */
 export declare class Sidecar {
   /**
-   * Assemble a certificate for an ALREADY-clean file — the caller MUST have
-   * validated `data` clean (0 error findings); core trusts that, it cannot
-   * re-check. `edition` is the resolved AGS edition (e.g. `"4.1.1"`); `checkedAt`
-   * an RFC-3339 UTC timestamp (the TS side passes `new Date().toISOString()`);
-   * `warnings`/`fyi` the advisory counts present at validation. The validator
-   * name + engine version are stamped here. Throws if `data` isn't indexable
-   * AGS4 (e.g. non-UTF-8, which the byte index rejects).
+   * **Mint** a certificate for `data` — validating it here, first.
+   *
+   * This replaces `assemble`, whose signature was
+   * `(data, edition, checkedAt, warnings?, fyi?, …)`: the caller told it what the
+   * verdict had been, and the OPTIONAL counts defaulted to zero. Nothing on the TS
+   * side ever passed them. So every certificate this addon produced recorded "0
+   * warnings, 0 FYI" without anything having looked, and a later warnings request read
+   * that zero and skipped the engine.
+   *
+   * There is no parameter here through which a caller could assert a verdict. `mint`
+   * runs the rules itself, with both tiers on, and records what they returned. It
+   * refuses a file with ERRORS; warnings and FYI are recorded, not fatal.
    */
-  static assemble(data: Uint8Array, edition: string, checkedAt: string, warnings?: number | undefined | null, fyi?: number | undefined | null, compat?: string | undefined | null, checkFiles?: boolean | undefined | null, editionForced?: boolean | undefined | null): Sidecar
+  static mint(data: Uint8Array, checkedAt: string, dictVersion?: string | undefined | null, encoding?: string | undefined | null, compat?: string | undefined | null): Sidecar
   /**
    * Parse a certificate from its on-disk `.ags.idx` JSON bytes, rejecting an
    * unknown format version. Throws on malformed / unsupported JSON.
@@ -62,18 +67,6 @@ export declare class Sidecar {
    * byte length + SHA-256. A mismatch means the source changed under the cert.
    */
   isFreshFor(data: Uint8Array): boolean
-  /**
-   * Was this cert minted by the CURRENT native validator engine (same engine
-   * version, native — not a compat profile)? The `.validate()` skip trusts a
-   * carried cert only when this holds AND it's fresh.
-   */
-  matchesNativeValidator(): boolean
-  /**
-   * Does this cert's check profile cover a request's? (`checkFiles`: the cert ran
-   * at least what's asked; `forcedEdition`: a forced request needs the same
-   * forced edition, an auto request an auto cert.)
-   */
-  profileCovers(checkFiles: boolean, forcedEdition?: string | undefined | null): boolean
   get version(): number
   /**
    * The certified source's byte length (a JS number; AGS files are well within
@@ -81,15 +74,38 @@ export declare class Sidecar {
    */
   get size(): number
   get sha256(): string
+  /** The AGS edition the rules were run against. */
   get edition(): string
+  /**
+   * Was that edition FORCED (`dictVersion`), or auto-resolved from `TRAN_AGS`? One
+   * fact with the edition string, not two — a forced run and an auto run can name the
+   * same edition having applied different dictionaries.
+   */
+  get editionForced(): boolean
   get validator(): string
-  get validatorVersion(): string
+  /**
+   * The fingerprint of the rule engine that produced this verdict — a hash of the rule
+   * sources and the bundled dictionary, NOT the addon's version. A rule can change
+   * without a version bump; this cannot.
+   */
+  get engine(): string
   get compat(): string | null
   get checkedAt(): string
-  get checkFiles(): boolean
-  get editionForced(): boolean
-  get warnings(): number
-  get fyi(): number
+  /**
+   * The decoder the certified bytes were READ through (`"UTF-8"`, `"windows-1252"`, …).
+   * The rules judge the TEXT the bytes decode to, and two decoders can reach two
+   * verdicts on one unchanged file — so a cert minted under one does not answer a
+   * request made under another.
+   */
+  get encoding(): string
+  /**
+   * Findings of each tier that the validation **measured** — or `null` if it never ran
+   * that tier's rules. `null` is the point: the old format stored a plain number that
+   * defaulted to 0, so "found none" and "never looked" were the same value.
+   */
+  get errors(): number | null
+  get warnings(): number | null
+  get fyi(): number | null
 }
 
 /**
@@ -144,6 +160,17 @@ export declare function diff(a: Uint8Array, b: Uint8Array, dictVersion?: string 
 export declare function displayHint(agsType: string): string | null
 
 /**
+ * The bundled AGS4 editions, oldest first — `["4.0.3", … "4.2"]`.
+ *
+ * GENERATED all the way down: `DictVersion::ALL` is emitted by the reference leaf's
+ * build.rs from `ags_dictionary.json`. Exposed so no JS-side list of editions is
+ * hand-written — the CLI's `--dict-version` census reads this, and it is the same
+ * const the Rust binary and the Python wheel answer with, so the three launchers
+ * cannot disagree about which editions exist.
+ */
+export declare function editions(): Array<string>
+
+/**
  * Build valid AGS4 from per-group **Arrow IPC** streams (the columnar
  * producer; the read boundary reversed). = `laterite-ags4-wasm`'s `to_ags4_ipc`.
  */
@@ -190,6 +217,12 @@ export interface ExcelStats {
  * true) re-applies AGS4 numeric formatting to numeric-looking columns.
  */
 export declare function excelToAgs4(xlsxPath: string, agsPath: string, formatNumericColumns?: boolean | undefined | null): ExcelStats
+
+/**
+ * The edition `auto` falls back to when a file's `TRAN_AGS` is missing or
+ * unrecognised (the union's `fallback_edition`, generated).
+ */
+export declare function fallbackEdition(): string
 
 /** One rule violation (omitting `severity` ⇒ error, matching the engine). */
 export interface Finding {
@@ -267,11 +300,13 @@ export declare function listRules(): string
  * `laterite-ags4-merge` leaf the CLI uses. Files merge in argument order (a
  * later file wins a KEY conflict); rows are identified by their dictionary KEY
  * headings. A heading two files typed differently throws `MergeConflictError`
- * unless `lenient` widens it to `X`. `tranIssue` + `tranDate` (both) stamp a
+ * unless `onTypeClash` settles it — `"widen"` falls back to `X` (raw values kept),
+ * `"promote"` keeps the greatest nDP precision (zero-padding the coarser values).
+ * `tranIssue` + `tranDate` (both) stamp a
  * synthesised merge-TRAN. The edition is the newest file's `TRAN_AGS` unless
  * `dictVersion` forces it. Parse failure throws the mapped error.
  */
-export declare function merge(files: Array<Uint8Array>, lenient?: boolean | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, tranIssue?: string | undefined | null, tranDate?: string | undefined | null, tranProducer?: string | undefined | null, tranRecipient?: string | undefined | null, tranStatus?: string | undefined | null): MergeOutput
+export declare function merge(files: Array<Uint8Array>, onTypeClash?: string | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, tranIssue?: string | undefined | null, tranDate?: string | undefined | null, tranProducer?: string | undefined | null, tranRecipient?: string | undefined | null, tranStatus?: string | undefined | null): MergeOutput
 
 /**
  * The merge result. `bytes` is the reconciled AGS4 document; `warningsJson` and
@@ -331,6 +366,20 @@ export declare function readGroupsRaw(path: string): string
 export declare function registryDictionaryJson(edition?: string | undefined | null): string
 
 /**
+ * What THIS SURFACE resolves an encoding label to — the canonical `encoding_rs`
+ * name (`"UTF-8"`, `"windows-1252"`, `"ISO-8859-15"`), or `null` if it refuses.
+ *
+ * Deliberately routed through this crate's OWN `resolve_encoding` wrapper, not the
+ * parse leaf directly. That distinction is the whole point: the leaf was always
+ * correct, and the bug lived in the wrapper *above* it (`…resolve_encoding(label)
+ * .unwrap_or(UTF_8)`), which turned every unknown label into a silent UTF-8 decode.
+ * A census that asked the leaf would have agreed with itself and seen nothing. This
+ * reports what a Node caller actually gets, so a reintroduced fallback shows up as
+ * `"cp1252x" -> "UTF-8"` and the surface census fails.
+ */
+export declare function resolveEncodingLabel(label?: string | undefined | null): string | null
+
+/**
  * Validate an AGS4 file (`path`) or `text` against the AGS4 rules. `dict_version`
  * `None`/`"auto"` auto-detects from `TRAN_AGS`, else forces an edition. Returns
  * the `{ok:false}` failure report (not a throw) for un-validatable input.
@@ -339,7 +388,7 @@ export declare function registryDictionaryJson(edition?: string | undefined | nu
  * returned by default (`includeWarnings` defaults to `true`); pass `false` for
  * errors-only. `includeFyi` (default `false`) adds the low-signal FYI tier.
  */
-export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null): ValidationReport
+export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null, cert?: Sidecar | undefined | null): ValidationReport
 
 /**
  * zstd-compress, then age-encrypt with `password` → `dest`. Compress-then-
@@ -407,6 +456,11 @@ export interface ValidationReport {
   dictVersion: string
   resolution: string
   count: number
+  /**
+   * Did an `index` certificate stand in for the rule engine? Never "the file was not
+   * checked": a world check (Rule 20's on-disk half) runs even on a certified read.
+   */
+  certified: boolean
   findings: Array<Finding>
   json: string
   ndjson: string

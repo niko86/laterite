@@ -41,15 +41,25 @@ pub struct GroupMeta {
 /// edition and the O-30 fallback both resolve to `4.1.1`, so a plain
 /// version string can't tell "294 real 4.1.1 files" from "294 files
 /// with no parseable TRAN_AGS". Cross-ref O-30.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Serde-able because an `.ags.idx` certificate records it: a cert that vouched for a
+/// verdict has to be able to say which dictionary reached it AND how that dictionary was
+/// chosen, without re-parsing the file — re-parsing being the cost the certificate
+/// exists to avoid. The wire tokens are the `as_str` tokens; `serialized_names_match_as_str`
+/// pins that, so the JSON and the reported string can never drift apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DictResolution {
     /// Explicit `CheckOptions::dict_version` override.
+    #[serde(rename = "forced")]
     Forced,
     /// `TRAN_AGS` exactly matched a bundled edition (python-parity).
+    #[serde(rename = "exact")]
     ExactTranAgs,
     /// Newest bundled patch of the `TRAN_AGS` major.minor (O-30).
+    #[serde(rename = "guessed")]
     GuessedPatch,
     /// Missing / unparsable / unrecognised 4.x / future → FALLBACK.
+    #[serde(rename = "fallback")]
     Fallback,
 }
 
@@ -60,6 +70,25 @@ impl DictResolution {
             DictResolution::ExactTranAgs => "exact",
             DictResolution::GuessedPatch => "guessed",
             DictResolution::Fallback => "fallback",
+        }
+    }
+}
+
+#[cfg(test)]
+mod resolution_tests {
+    use super::DictResolution as R;
+
+    #[test]
+    fn serialized_names_match_as_str() {
+        // One value domain, two producers (serde and `as_str`). A rename on one side
+        // that isn't mirrored on the other would put a different token in the cert JSON
+        // than the surfaces report — and the cert would then name a resolution no
+        // consumer recognises.
+        for r in [R::Forced, R::ExactTranAgs, R::GuessedPatch, R::Fallback] {
+            let json = serde_json::to_string(&r).expect("serialises");
+            assert_eq!(json, format!("\"{}\"", r.as_str()));
+            let back: R = serde_json::from_str(&json).expect("round-trips");
+            assert_eq!(back, r);
         }
     }
 }

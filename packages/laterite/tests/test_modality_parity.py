@@ -401,11 +401,13 @@ def test_node_certify_output_forms():
     cell = _cell(doc, "certify", "node", "chained")
     ags4 = _read("ags4-file.ts")
     present, absent = set(), set()
-    m = re.search(r"certify\(path\?:\s*string\)\s*:\s*(\w+)", ags4)
+    # The signatures carry knobs now (`dictVersion`), so match the FORMS — the path-in
+    # and the return type — not the exact parameter list.
+    m = re.search(r"certify\(path\?:\s*string[^)]*\)\s*:\s*(\w+)", ags4)
     assert m is not None, "Ags4File.certify signature not found"
     (present if m.group(1) == "string" else absent).add("file")
-    # the in-memory bytes twin: certifyBytes(): Buffer.
-    has_bytes = re.search(r"certifyBytes\(\)\s*:\s*Buffer", ags4) is not None
+    # the in-memory bytes twin: certifyBytes() -> Buffer.
+    has_bytes = re.search(r"certifyBytes\([^)]*\)\s*:\s*Buffer", ags4) is not None
     (present if has_bytes else absent).add("bytes")
     _assert_reflection(cell, "out", present, absent)
 

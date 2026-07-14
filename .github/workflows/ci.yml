@@ -124,6 +124,15 @@ jobs:
               # that renames/removes a cross-ref target must re-run --strict.
               - 'web/docs-site/**'
               - 'packages/laterite/python/**'
+              # The docs DEPENDENCY set: the `docs` group here and the resolved
+              # lock. A dep/lock change silently alters what `mkdocs build` runs
+              # against, and this was the only job that would notice — so it must
+              # re-run. Learned the hard way: `properdocs` (an ad-injecting MkDocs
+              # fork pulled in transitively by mkdocs-gen-files/literate-nav)
+              # entered via a lock re-resolve and shipped unseen precisely because
+              # a lockfile change did not trigger the strict build.
+              - 'pyproject.toml'
+              - 'uv.lock'
               - '.github/workflows/ci.yml'
 
   # Supply-chain gate: RustSec advisories + the permissive-license policy +

@@ -3,13 +3,13 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
-use laterite_ags4_merge::{MergeOpts, TypeMismatchMode, merge_parsed};
+use laterite_ags4_merge::{MergeOpts, TypeClashMode, merge_parsed};
 use laterite_ags4_parse::{ParsedFile, parse_str};
 use proptest::prelude::*;
 
 fn opts() -> MergeOpts {
     MergeOpts {
-        type_mismatch: TypeMismatchMode::Lenient,
+        on_type_clash: TypeClashMode::Widen,
         tran: None,
         ..Default::default()
     }

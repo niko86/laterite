@@ -52,7 +52,11 @@ _KNOWN_RESOLUTIONS = [
     ("3DP", CanonicalType.DECIMAL),
     ("3SF", CanonicalType.DECIMAL),
     ("1SCI", CanonicalType.DECIMAL),
-    ("RL", CanonicalType.DECIMAL),
+    # RL is a delimited RECORD LINK (`GROUP|KEY1|KEY2`, AGS Rule 11) — text, not a
+    # number. This row asserted DECIMAL, which is how the bug survived: parsing a
+    # link as a float yields Null, so every RL column read back as an all-null f64
+    # and the link was destroyed (#503).
+    ("RL", CanonicalType.STRING),
     ("DT", CanonicalType.DATETIME),
     ("YN", CanonicalType.BOOL),
 ]
@@ -145,9 +149,9 @@ def test_display_hint_returns_usable_format_string(ags_type):
 
 # Real AGS type codes (covering every resolution branch) + deliberate junk.
 _AGS_TYPE_CODES = [
-    "X", "ID", "PA", "PT", "PU", "U", "T", "MC", "DMS", "XN",      # string
+    "X", "ID", "PA", "PT", "PU", "U", "T", "MC", "DMS", "XN", "RL",  # string
     "0DP",                                                          # integer
-    "2DP", "3DP", "5DP", "1SF", "3SF", "1SCI", "2SCI", "RL",        # decimal
+    "2DP", "3DP", "5DP", "1SF", "3SF", "1SCI", "2SCI",              # decimal
     "DT",                                                           # datetime
     "YN",                                                           # bool
     "ZZZ", "", "   ", "FLOAT", "2D", "garbage", "🙂",               # junk / passthrough

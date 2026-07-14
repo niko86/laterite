@@ -41,7 +41,6 @@
 //!   sidecar folder. Documented as a scoped variance (O-27).
 
 use std::collections::HashSet;
-use std::path::Path;
 
 use crate::dict::Dictionary;
 use crate::findings::{Findings, Location, Severity, Target, add, add_at};
@@ -49,20 +48,16 @@ use crate::parse::ParsedFile;
 use crate::rules::dictionary::collect_file_dict;
 
 const RULE_19B: &str = "AGS Format Rule 19b";
-const RULE_20: &str = "AGS Format Rule 20";
+/// Shared with [`crate::world`], which owns Rule 20's on-disk half — the two
+/// halves report under the same rule key, but only one of them reads the world.
+pub(crate) const RULE_20: &str = "AGS Format Rule 20";
 
 /// Dictionary-sanctioned prefix exceptions (the standard dictionary
 /// itself ships `SPEC_*`/`TEST_*` headings borrowed into other groups
 /// without a matching GROUP). python-ags4 hardcodes the same pair.
 const PREFIX_EXCEPTIONS: &[&str] = &["SPEC", "TEST"];
 
-pub fn check(
-    parsed: &ParsedFile,
-    dict: &Dictionary,
-    source: Option<&Path>,
-    check_files: bool,
-    found: &mut Findings,
-) {
+pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
     let file_dict = collect_file_dict(parsed);
 
     // Headings defined under each group = standard dict ∪ file DICT.
@@ -183,85 +178,11 @@ pub fn check(
         }
     }
 
+    // Rule 20, CONTENT half only: every FILE_FSET used is defined in the FILE
+    // group. Rule 20's other half stats the sibling FILE/ tree on disk — that is
+    // not a function of the AGS4 bytes, so it lives in `crate::world` and is run
+    // from the one door in lib.rs, never from inside the rule engine.
     rule_20(parsed, found);
-    // Opt-in (default off, O-27): the on-disk sidecar tree. Library /
-    // `db-to-ags4 --validate` callers stay path-independent; the
-    // corpus-qa dogfood + `lat validate --check-files` enable it to match
-    // python-ags4's always-on filesystem stat.
-    if check_files {
-        if let Some(src) = source {
-            rule_20_on_disk(parsed, src, found);
-        }
-    }
-}
-
-/// Rule 20 (on-disk, opt-in via [`crate::CheckOptions::check_files`]).
-/// The sidecar `FILE/<FILE_FSET>/<FILE_NAME>` tree must exist beside
-/// the `.ags`. `std::fs` only — no new dependency, no lifetime ripple
-/// (the `&Path` is borrowed strictly inside one call). Messages are
-/// clean-room; the dogfood compares rule-key presence, not wording.
-fn rule_20_on_disk(parsed: &ParsedFile, source: &Path, found: &mut Findings) {
-    // No FILE group → the data-level pass already spoke (or there are
-    // no attachments at all). Nothing on-disk to assert.
-    let Some(file_g) = parsed.groups.get("FILE") else {
-        return;
-    };
-    let dir = source.parent().unwrap_or_else(|| Path::new("."));
-    let file_root = dir.join("FILE");
-    if !file_root.is_dir() {
-        add(
-            found,
-            RULE_20,
-            None,
-            "FILE",
-            "Sidecar 'FILE' folder not found next to the AGS4 file; \
-             files declared in the FILE group cannot be located on disk."
-                .to_string(),
-        );
-        return; // no root → probing sub-folders adds only noise
-    }
-    let Some(fci) = file_g.headings.iter().position(|h| h == "FILE_FSET") else {
-        return; // FILE group without FILE_FSET → data-level territory
-    };
-    let nci = file_g.headings.iter().position(|h| h == "FILE_NAME");
-
-    for row in &file_g.rows {
-        let Some(fset) = row.values.get(fci).map(String::as_str) else {
-            continue;
-        };
-        if fset.is_empty() {
-            continue;
-        }
-        let fset_dir = file_root.join(fset);
-        if !fset_dir.is_dir() {
-            add(
-                found,
-                RULE_20,
-                Some(row.line),
-                "FILE",
-                format!("Declared FILE_FSET sub-folder 'FILE/{fset}' is missing on disk."),
-            );
-            continue;
-        }
-        let name = nci
-            .and_then(|c| row.values.get(c))
-            .map(String::as_str)
-            .unwrap_or("");
-        if name.is_empty() {
-            continue;
-        }
-        // FILE_NAME may carry sub-paths; normalise either separator.
-        let rel: std::path::PathBuf = name.split(['/', '\\']).collect();
-        if !fset_dir.join(&rel).is_file() {
-            add(
-                found,
-                RULE_20,
-                Some(row.line),
-                "FILE",
-                format!("Declared file 'FILE/{fset}/{name}' is missing on disk."),
-            );
-        }
-    }
 }
 
 /// Rule 20 (data level) — every FILE_FSET used must be defined in the
@@ -344,9 +265,8 @@ mod tests {
         let pf = parse_str(src).expect("fixture parses");
         let d = Dictionary::bundled(DictVersion::V4_2);
         let mut f = Findings::new();
-        // No source path / check_files off → on-disk half skipped
-        // (the default; data-level behaviour is unchanged).
-        check(&pf, &d, None, false, &mut f);
+        // Content only — Rule 20's on-disk half now lives in `crate::world`.
+        check(&pf, &d, &mut f);
         f
     }
 
@@ -508,106 +428,6 @@ mod tests {
                 .is_none_or(|v| !v.iter().any(|x| x.desc.contains("BADHDNG"))),
             "underscore-less heading must not be a 19b borrow finding: {:?}",
             r.get(RULE_19B)
-        );
-    }
-
-    #[test]
-    fn rule_20_on_disk_flags_missing_fset_subfolder_and_file() {
-        // check_files ON, FILE/ root exists but the declared FS1 sub-
-        // folder is absent → the "sub-folder … is missing on disk" arm.
-        // A second FILE row (FS2) has the sub-folder but not the named
-        // file → the "Declared file … is missing on disk" arm.
-        let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"FILE_FSET\"\r\n\
-                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
-                   \"DATA\",\"BH1\",\"FS1\"\r\n\"DATA\",\"BH2\",\"FS2\"\r\n\r\n\
-                   \"GROUP\",\"FILE\"\r\n\
-                   \"HEADING\",\"FILE_FSET\",\"FILE_NAME\"\r\n\
-                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\
-                   \"DATA\",\"FS1\",\"a.jpg\"\r\n\"DATA\",\"FS2\",\"b.jpg\"\r\n";
-        let pf = parse_str(src).expect("parses");
-        let d = Dictionary::bundled(DictVersion::V4_2);
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let ags = tmp.path().join("site.ags");
-
-        // Create FILE/ root and FILE/FS2 (but no file inside it). FS1
-        // sub-folder is deliberately absent.
-        std::fs::create_dir_all(tmp.path().join("FILE").join("FS2")).unwrap();
-
-        let mut f = Findings::new();
-        check(&pf, &d, Some(ags.as_path()), true, &mut f);
-        let r20 = f.get(RULE_20).expect("Rule 20 on-disk");
-        assert!(
-            r20.iter()
-                .any(|x| x.desc.contains("FILE/FS1") && x.desc.contains("missing on disk")),
-            "missing FS1 sub-folder must flag: {r20:?}"
-        );
-        assert!(
-            r20.iter()
-                .any(|x| x.desc.contains("FILE/FS2/b.jpg") && x.desc.contains("missing on disk")),
-            "missing file under present FS2 sub-folder must flag: {r20:?}"
-        );
-    }
-
-    #[test]
-    fn rule_20_on_disk_silent_without_file_group() {
-        // check_files ON, no FILE group at all → rule_20_on_disk early
-        // return (nothing on-disk to assert). The data-level pass is also
-        // silent (no FILE_FSET used).
-        let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
-                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH1\"\r\n";
-        let pf = parse_str(src).expect("parses");
-        let d = Dictionary::bundled(DictVersion::V4_2);
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let ags = tmp.path().join("site.ags");
-        let mut f = Findings::new();
-        check(&pf, &d, Some(ags.as_path()), true, &mut f);
-        assert!(
-            !f.contains_key(RULE_20),
-            "no FILE group → no Rule 20: {f:?}"
-        );
-    }
-
-    #[test]
-    fn rule_20_on_disk_opt_in_and_default_off() {
-        // Data-level-clean file with a FILE group (FS1/photo.jpg).
-        let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"FILE_FSET\"\r\n\
-                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
-                   \"DATA\",\"BH1\",\"FS1\"\r\n\r\n\
-                   \"GROUP\",\"FILE\"\r\n\
-                   \"HEADING\",\"FILE_FSET\",\"FILE_NAME\"\r\n\
-                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\
-                   \"DATA\",\"FS1\",\"photo.jpg\"\r\n";
-        let pf = parse_str(src).expect("parses");
-        let d = Dictionary::bundled(DictVersion::V4_2);
-        let tmp = tempfile::tempdir().expect("tempdir");
-        let ags = tmp.path().join("site.ags"); // need not exist on disk
-
-        // Default OFF: path-independent — no Rule 20 even with no tree.
-        let mut f = Findings::new();
-        check(&pf, &d, Some(ags.as_path()), false, &mut f);
-        assert!(
-            !f.contains_key(RULE_20),
-            "default must stay path-independent: {f:?}"
-        );
-
-        // Opt-in, tree absent → on-disk Rule 20 fires.
-        let mut f = Findings::new();
-        check(&pf, &d, Some(ags.as_path()), true, &mut f);
-        assert!(
-            f.get(RULE_20)
-                .is_some_and(|v| v.iter().any(|x| x.group == "FILE")),
-            "check_files + missing FILE/ tree must flag Rule 20: {f:?}"
-        );
-
-        // Materialise FILE/FS1/photo.jpg → opt-in now clean.
-        let leaf = tmp.path().join("FILE").join("FS1");
-        std::fs::create_dir_all(&leaf).unwrap();
-        std::fs::write(leaf.join("photo.jpg"), b"x").unwrap();
-        let mut f = Findings::new();
-        check(&pf, &d, Some(ags.as_path()), true, &mut f);
-        assert!(
-            !f.contains_key(RULE_20),
-            "tree present → Rule 20 clean: {f:?}"
         );
     }
 }

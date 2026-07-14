@@ -29,6 +29,15 @@ phf = "0.14"
 # core already ships both crates to wasm, so the leaf stays wasm-clean.
 sha2 = "0.11"
 uuid = { version = "1", features = ["v8"] }
+# `keychain::content_hash` canonicalises each cell through `parse_value` before
+# hashing, so a formatting-only re-emit (`1.0` → `1.00`) is not a value change.
+# That is the SAME canonicaliser laterite-ags4-merge's revision report and
+# laterite-ags4-diff already trust, so "are these two cells equal" has one
+# authority rather than three that agree by luck. types is a wasm-safe leaf and
+# does NOT depend on this crate, so the edge is cycle-free and keeps the
+# reference leaf wasm-clean (wasm consumes keychain for `_id`/`_parent_id`).
+# Default features only — the `arrow` feature stays off here.
+laterite-types = { path = "../laterite-types" }
 
 [build-dependencies]
 # build.rs projects each edition out of the consolidated union dictionary

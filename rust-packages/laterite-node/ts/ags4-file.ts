@@ -2,10 +2,12 @@ import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { type Table, tableFromIPC } from "apache-arrow";
 import { DuckEngine, type QueryOptions, quoteId, type Row, stripSynthKeys } from "./duckdb";
-import { Ags4Error } from "./errors";
-// The chained verbs (`validate`/`fix`/`diff`) reuse the free functions with this
+import { Ags4Error, raiseFor } from "./errors";
+// The chained verbs (`fix`/`diff`/`toExcel`) reuse the free functions with this
 // handle's retained source, so the ONE engine call + error mapping lives in one
-// place. index.ts imports Ags4File, so this is a deliberate cycle — safe because
+// place. (`validate` calls the native door directly — it has a certificate to hand
+// over, and that is not a public knob.) index.ts imports Ags4File, so this is a
+// deliberate cycle — safe because
 // the free fns are referenced only inside method bodies (resolved at call time,
 // never at module-eval time), the standard ESM live-binding pattern.
 import {
@@ -17,11 +19,10 @@ import {
   diff as diffFree,
   fix as fixFree,
   toExcel as toExcelFree,
-  validate as validateFree,
 } from "./index";
 import type { FixResult } from "./fix-result";
 import type { ExcelStats, GroupMeta } from "./native";
-import { Reading, Sidecar, parseArrow } from "./native";
+import { Reading, Sidecar, parseArrow, runCheck } from "./native";
 import { Report } from "./report";
 import { AgsSubset, type Filter } from "./subset";
 
@@ -65,12 +66,14 @@ export class Ags4File {
   readonly #src?: Ags4Source;
   #report?: Report;
   #fixReport?: FixResult;
-  // The `.ags.idx` certificate carried from `read(..., { index })`, and the check
-  // profile of the last `.validate()` engine run — so a following `.certify()`
-  // stamps what was actually checked (#294 Batch E / #14).
+  // The `.ags.idx` certificate carried from `read(..., { index })`. It is HANDED to the
+  // engine on `.validate()`; this class no longer decides whether it may be trusted.
   #cert?: Sidecar;
-  #lastCheckFiles = false;
-  #lastForced = false;
+  // The edition the caller last asked for. Provenance for a following `.certify()`, so
+  // `validate({dictVersion}).certify()` mints a cert for the edition you validated
+  // against. NOT a trust claim — the mint re-validates; this only says with which
+  // dictionary.
+  #lastDictVersion: string | undefined;
 
   constructor(reading: Reading, src?: Ags4Source) {
     this.#reading = reading;
@@ -229,34 +232,38 @@ export class Ags4File {
    * adds the low-signal tier. `encoding` defaults to the one this handle was read
    * with. Mirrors `laterite.Ags4File.validate()`. */
   validate(opts: Omit<ValidateOptions, "text"> = {}): this {
-    const warnings = opts.warnings ?? true;
-    const fyi = opts.fyi ?? false;
-    const checkFiles = opts.checkFiles ?? false;
-    // Certificate short-circuit: a fresh cert minted by the CURRENT native engine
-    // already proves the file validated clean, so an errors-only request skips the
-    // rule engine (a cert records only the error verdict, not the warning/FYI list;
-    // ask for those and the engine runs). A cert from a different/older engine is
-    // re-validated, not trusted. (#294 Batch E / #14)
-    if (
-      this.#cert !== undefined &&
-      !warnings &&
-      !fyi &&
-      this.#cert.matchesNativeValidator() &&
-      this.#cert.profileCovers(checkFiles, opts.dictVersion)
-    ) {
-      this.#report = Report.fromCert(this.#cert, this.#srcLabel());
-      return this;
-    }
-    // Engine run — remember the check profile so a following `.certify()` stamps
-    // it into the cert (errors-only default ⇒ both false).
-    this.#lastCheckFiles = checkFiles;
-    this.#lastForced = opts.dictVersion !== undefined;
+    // The certificate short-circuit used to live HERE, as this class's own conjunction of
+    // `matchesNativeValidator()` + `profileCovers()` + "errors only" — one of five such
+    // conjunctions across the surfaces, no two alike, four of them able to report a file
+    // clean that was not. The cert is now simply HANDED to the engine, which decides
+    // whether it can answer this question, and skips the rules only if it can answer it
+    // completely.
+    //
+    // `checkFiles` is never answered from a certificate: Rule 20's on-disk `FILE/` tree
+    // can be deleted without changing a byte of the .ags, so no statement about the file's
+    // bytes can speak for it. It runs live, every time.
+    this.#lastDictVersion = opts.dictVersion;
     const [source, base] = this.#freeSource();
-    this.#report = validateFree(source, {
-      ...base,
-      ...opts,
-      encoding: opts.encoding ?? base.encoding,
-    });
+    const path = typeof source === "string" ? source : undefined;
+    const data = typeof source === "string" || source == null ? undefined : source;
+    // Not the free `validate()`: the certificate is a HANDLE-scoped fact (it arrived with
+    // `read(..., { index })`), not a knob a caller passes, so it is not in the public
+    // `ValidateOptions`. Same native door, one extra argument. Mirrors laterite-py.
+    this.#report = new Report(
+      raiseFor(
+        runCheck(
+          path,
+          base.text,
+          data,
+          opts.dictVersion,
+          opts.warnings,
+          opts.fyi,
+          opts.checkFiles,
+          opts.encoding ?? base.encoding,
+          this.#cert,
+        ),
+      ),
+    );
     return this;
   }
 
@@ -300,26 +307,21 @@ export class Ags4File {
     return this.bytes;
   }
 
-  /** The `Report.fromCert` label for a certified verdict: the path, or a bytes/
-   * text sentinel. */
-  #srcLabel(): string {
-    const s = this.#src;
-    if (s?.path !== undefined) return s.path;
-    if (s?.data !== undefined) return "<bytes>";
-    return "<text>";
-  }
-
-  /** Mint this file's `.ags.idx` validity certificate — a clean-validation proof
-   * plus a byte-offset index — and write it beside the file. REQUIRES a prior
-   * clean `.validate()`: certify *vouches for* a passed validation, it does not run
-   * one. `path` is the certificate's OUTPUT location (default `<source>.idx`), not
-   * a file to certify — it refuses to overwrite the source or any existing
-   * non-certificate file. Returns the written path. The cert is byte-identical to
-   * Python's / `lat-check --emit-index`'s, so `lat-check` reads it, and a later
-   * `read(f, { index })` consumes it to skip re-validation. Mirrors
-   * `laterite.Ags4File.certify()`. */
-  certify(path?: string): string {
-    const report = this.#requireCleanValidation();
+  /** Mint this file's `.ags.idx` validity certificate — an error-clean validation plus a
+   * byte-offset index — and write it beside the file.
+   *
+   * `certify` **runs the validation itself**, with every tier on, and records what the
+   * rules actually returned. It used to require a prior `.validate()` and then vouch for
+   * whatever that found — which made the certificate's contents an assertion by the
+   * caller, and the caller got them wrong: the mint's `warnings`/`fyi` parameters were
+   * OPTIONAL and defaulted to zero, and nothing ever passed them.
+   *
+   * It refuses a file with **errors**. Warnings and FYI findings are recorded, not fatal.
+   *
+   * `path` is the certificate's OUTPUT location (default `<source>.idx`), not a file to
+   * certify — it refuses to overwrite the source or any existing non-certificate file.
+   * Mirrors `laterite.Ags4File.certify()`. */
+  certify(path?: string, opts: { dictVersion?: string } = {}): string {
     const srcPath = this.#src?.path;
     const out = path ?? (srcPath !== undefined ? `${srcPath}.idx` : undefined);
     if (out === undefined) {
@@ -328,8 +330,8 @@ export class Ags4File {
       );
     }
     // `out` is where the .ags.idx is WRITTEN, never a file to certify. Guard the
-    // data-loss footgun read(p).validate().certify(p), and refuse to clobber any
-    // existing non-certificate file — certify only ever writes/replaces an .ags.idx.
+    // data-loss footgun read(p).certify(p), and refuse to clobber any existing
+    // non-certificate file — certify only ever writes/replaces an .ags.idx.
     if (srcPath !== undefined && resolve(out) === resolve(srcPath)) {
       throw new Ags4Error(
         `certify(path) is the .ags.idx OUTPUT location, not the file to certify — refusing to overwrite the source ${out}`,
@@ -343,54 +345,33 @@ export class Ags4File {
         );
       }
     }
-    writeFileSync(out, this.#mintCert(report).toJson());
+    writeFileSync(out, this.#mint(opts.dictVersion).toJson());
     return out;
   }
 
-  /** Mint this file's `.ags.idx` certificate and return its **bytes** in memory —
-   * the filesystem-free twin of {@link certify}. Same precondition (a prior clean
-   * `.validate()`; it vouches for a passed validation, does not run one) and same
-   * output: the bytes are exactly what `certify` would write, so they interop with
-   * `read({ index })`, the CLI `--index`, and the browser cert. Ideal for handing
-   * the certificate straight to an upload/object store without a temp file — the
-   * certify analog of `transport.lockBytes`. Mirrors
+  /** Mint this file's `.ags.idx` certificate and return its **bytes** in memory — the
+   * filesystem-free twin of {@link certify}. Same behaviour (it validates, refuses a file
+   * with errors, and records the counts it measured) and the same output, so the bytes
+   * interop with `read({ index })`, the CLI `--index`, and the browser cert. Mirrors
    * `laterite.Ags4File.certify_bytes()`. */
-  certifyBytes(): Buffer {
-    return this.#mintCert(this.#requireCleanValidation()).toJson();
+  certifyBytes(opts: { dictVersion?: string } = {}): Buffer {
+    return this.#mint(opts.dictVersion).toJson();
   }
 
-  /** Shared precondition for `certify` / `certifyBytes`: a certificate vouches for
-   * a *passed* validation, so one must have run and found nothing. Returns the
-   * validated `Report` (narrowed non-undefined) for the minting step. */
-  #requireCleanValidation(): Report {
-    if (this.#report === undefined) {
-      throw new Ags4Error(
-        "call .validate() before .certify() — certify records a passed validation, it does not run one",
-      );
-    }
-    if (!this.#report.isValid) {
-      throw new Ags4Error(
-        `cannot certify a file with ${this.#report.count} finding(s); fix them and re-validate clean first`,
-      );
-    }
-    return this.#report;
-  }
-
-  /** Assemble the `Sidecar` certificate over the original source bytes, stamping
-   * the profile the last `.validate()` actually ran. `report` comes from
-   * `#requireCleanValidation`. */
-  #mintCert(report: Report): Sidecar {
-    return Sidecar.assemble(
+  /** Mint the `Sidecar` over the ORIGINAL source bytes.
+   *
+   * The mint validates; it is not told a verdict. There is no longer a parameter through
+   * which a caller could assert one. The edition input is the caller's: an explicit
+   * `dictVersion` wins, else the one the last `.validate()` used, else auto-resolution. */
+  #mint(dictVersion?: string): Sidecar {
+    return Sidecar.mint(
       this.#sourceBytes(),
-      report.dictVersion,
       new Date().toISOString(),
-      undefined,
-      undefined,
-      undefined,
-      this.#lastCheckFiles,
-      this.#lastForced,
+      dictVersion ?? this.#lastDictVersion,
+      this.#src?.encoding,
     );
   }
+
 
   // --- optional DuckDB engine (sql / at / connection) ----------------------
 

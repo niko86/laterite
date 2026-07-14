@@ -31,10 +31,16 @@ def _valid_accented_ags() -> str:
 
 
 def test_certify_rejects_a_non_utf8_source(tmp_path: Path) -> None:
-    """A handle that validates clean at errors-only but whose ORIGINAL bytes are
-    non-UTF-8 (read as cp1252) cannot be certified — the byte index is UTF-8-only.
-    The non-ASCII cell is FYI-severity (Rule 1), so it does NOT block the clean
-    errors-only validation; the UTF-8 guard is what fires."""
+    """A file that validates error-clean but whose ORIGINAL bytes are non-UTF-8 (read as
+    cp1252) cannot be certified — the byte index the certificate carries is UTF-8-only,
+    and an offset into bytes it cannot address is not a fact it can write down. The
+    non-ASCII cell is FYI-severity (Rule 1), so it does NOT block the validation; the
+    UTF-8 guard is what fires.
+
+    The refusal is an `Ags4Error` (it used to be a bare `ValueError` leaking out of the
+    native index step, while a file WITH errors was refused as an `Ags4Error` — one door,
+    two error families, depending on which way it failed).
+    """
     raw = _valid_accented_ags().encode("cp1252")
     with pytest.raises(UnicodeError):
         raw.decode("utf-8")  # precondition: the source really is non-UTF-8
@@ -42,7 +48,7 @@ def test_certify_rejects_a_non_utf8_source(tmp_path: Path) -> None:
     src.write_bytes(raw)
     f = L.read(src, encoding="cp1252").validate(warnings=False)
     assert not f.report.by_rule(), "errors-only validation must be clean to reach the guard"
-    with pytest.raises(ValueError, match="not valid UTF-8"):
+    with pytest.raises(L.Ags4Error, match="not valid UTF-8"):
         f.certify(path=tmp_path / "accented.ags.idx")
 
 
@@ -51,8 +57,7 @@ def test_certify_accepts_the_same_content_as_utf8(tmp_path: Path) -> None:
     the rejection above is about the encoding, not the accented content."""
     src = tmp_path / "utf8.ags"
     src.write_bytes(_valid_accented_ags().encode("utf-8"))
-    f = L.read(src).validate(warnings=False)
-    out = f.certify(path=tmp_path / "utf8.ags.idx")
+    out = L.read(src).certify(path=tmp_path / "utf8.ags.idx")
     assert out.exists() and out.read_bytes()[:1] == b"{"
 
 

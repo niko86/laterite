@@ -1,0 +1,39 @@
+# laterite-ags4-trust — the one door for "validate this file", and the only
+# place allowed to decide that a certificate may stand in for the engine.
+#
+# It exists because that decision was being made in five places (the `lat`
+# binary, laterite-py's Rust half, laterite-py's Python half, laterite-node's
+# TypeScript, and the wasm surface), each with its own conjunction of freshness
+# and profile checks, and each subtly different. Four of the five had a false
+# clean in them.
+#
+# Wasm-safe by construction (core with default-features = false → no age/zstd/
+# getrandom), because the browser is one of the surfaces that must come through
+# this door — and it is the surface that CANNOT be trusted to do the world half,
+# since it has no world.
+
+[package]
+name = "laterite-ags4-trust"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "The certificate trust model for AGS4: one door for check + mint"
+license = "MIT"
+publish = false
+
+[lib]
+name = "laterite_ags4_trust"
+path = "src/lib.rs"
+
+[dependencies]
+# The `.ags.idx` format: Sidecar, ValidationStamp, TierCoverage, EditionInput, and
+# `Sidecar::decide` — the trust rule itself. default-features = false: the age/zstd
+# transport is wasm-hostile and has nothing to do with trust.
+laterite-ags4-core = { path = "../laterite-ags4-core", default-features = false }
+# The rule engine + `WorldScope` + `ENGINE_FINGERPRINT`.
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# Parsing bytes/text without going through the validator's path-only entry point.
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+
+[dev-dependencies]
+tempfile = "3"

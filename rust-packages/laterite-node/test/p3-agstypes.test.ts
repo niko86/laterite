@@ -8,7 +8,11 @@ describe("agsTypes.canonicalType", () => {
     expect(agsTypes.canonicalType("ID")).toBe("string");
     expect(agsTypes.canonicalType("PA")).toBe("string"); // PA (pick-list) is a string type
     expect(agsTypes.canonicalType("2DP")).toBe("decimal");
-    expect(agsTypes.canonicalType("RL")).toBe("decimal");
+    // RL is a Record Link — `GROUP|KEY1|KEY2`, split on TRAN_DLIM (AGS Rule 11).
+    // The dictionary's own type list says so: {"code":"RL","description":"Record link"}.
+    // This line asserted "decimal", which made sql_type DOUBLE and parse_value Null:
+    // every record link was destroyed on read (#503). Third language to pin it.
+    expect(agsTypes.canonicalType("RL")).toBe("string");
     expect(agsTypes.canonicalType("0DP")).toBe("integer");
     expect(agsTypes.canonicalType("DT")).toBe("datetime");
     expect(agsTypes.canonicalType("YN")).toBe("bool");

@@ -17,12 +17,22 @@
 //!   free text (`X`) and only `TRAN_DATE` (`DT`) is machine-orderable, and even
 //!   that is file-level, blind to a per-row regression inside an overall-newer
 //!   file.
-//! - **Type disagreement widens to `X`.** `X` is the top of the AGS type lattice
-//!   (raw text holds any value faithfully), so a heading two files typed
-//!   differently resolves to `X` under [`TypeMismatchMode::Lenient`] (lossless at
-//!   the byte level) or errors under [`TypeMismatchMode::Strict`] (the default).
-//!   Widening is emission-only: it changes the merged TYPE row, never how rows
-//!   were matched (per-file `parse_value`) nor any content-addressed key.
+//! - **Type disagreement resolves up a lattice, never down.** A heading two files
+//!   typed differently is settled by [`TypeClashMode`]: [`Error`](TypeClashMode::Error)
+//!   refuses (the default), [`Widen`](TypeClashMode::Widen) falls back to `X` (the
+//!   top of the AGS type lattice — raw text holds any value faithfully), and
+//!   [`Promote`](TypeClashMode::Promote) keeps the column *numeric* by taking the
+//!   greatest precision in the `nDP` family and zero-padding the rest.
+//!
+//!   Widen is emission-only: it rewrites the merged TYPE row and nothing else.
+//!   Promote is the one place merge **rewrites a cell**, and it is confined to
+//!   appending zeros to a decimal (`laterite_types::pad_decimals` — string-only,
+//!   never via `f64`, never rounding). Neither changes how rows were *matched*
+//!   (that is per-file `parse_value`) nor any content-addressed key.
+//!
+//!   (Distinct from this: merge emits through [`laterite_ags4_emit`], whose
+//!   default [`EmitMode::AutoFix`] repairs Rule-8-invalid cells exactly as it does
+//!   for every other writer in the toolchain. That is emit's contract, not merge's.)
 //!
 //! Row identity comes from the ONE shared definition
 //! ([`laterite_ags4_reference::keychain::key_heading_names`]) that
@@ -37,21 +47,77 @@ use laterite_ags4_parse::{ParsedFile, ParsedGroup};
 use laterite_ags4_reference::dict::DictVersion;
 use laterite_ags4_reference::keychain::key_heading_names;
 use laterite_ags4_reference::union::registry;
-use laterite_types::parse_value;
+use laterite_types::{decimal_places, pad_decimals, parse_value};
 use serde_json::Value;
 
 /// What to do when two files declare a different AGS TYPE for the same heading.
+///
+/// The three modes trade *type information* against *byte fidelity*, and they sit
+/// in that order — see [`merged_type`] for the lattice itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum TypeMismatchMode {
-    /// Error on any type disagreement. Reconciling two independent producers'
-    /// declared types is high-stakes and less reversible than a single-file
-    /// fixup, so a lossy widen must be opted into — hence this is the default.
+pub enum TypeClashMode {
+    /// Refuse. Reconciling two independent producers' declared types is
+    /// high-stakes and less reversible than a single-file fixup, so any automatic
+    /// resolution must be opted into — hence this is the default.
     #[default]
-    Strict,
-    /// Widen the merged column's TYPE to `X` (keeping every value's raw bytes)
-    /// and carry on. Typed-vs-`X` widens silently (`X` trivially absorbs a typed
-    /// value); two *different* non-`X` types warn (a genuine disagreement).
-    Lenient,
+    Error,
+    /// Fall back to `X` (free text), keeping every value's raw bytes untouched.
+    /// Lossless at the byte level but it **throws the type away**, and `X` is the
+    /// least informative resolution available. Typed-vs-`X` resolves silently (`X`
+    /// trivially absorbs a typed value); two *different* non-`X` types warn.
+    Widen,
+    /// Keep the column numeric where that is possible without losing a digit: when
+    /// every clashing code is in the `nDP` family, take **max(n)** and zero-pad the
+    /// lower-precision files' cells. Anything else (`nSF`, `nSCI`, a cross-family
+    /// clash, anything involving `X`) falls back to [`Widen`](Self::Widen).
+    ///
+    /// **Promote, never demote.** Taking the *lower* precision would round
+    /// (`10.00123` → `10.00`) and destroy data, so max is the only admissible
+    /// direction — which also makes the outcome independent of argument order.
+    ///
+    /// This is the only mode in which merge rewrites a cell. The payoff is that a
+    /// promoted column stays comparable with its typed sources: `_content_hash`
+    /// canonicalises `10.00` as a *number* under `2DP` but as a *string* under `X`,
+    /// so a widened merge does not value-dedup against its own inputs, while a
+    /// promoted one does.
+    Promote,
+}
+
+impl TypeClashMode {
+    /// The wire name — the exact token every surface accepts and reports.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TypeClashMode::Error => "error",
+            TypeClashMode::Widen => "widen",
+            TypeClashMode::Promote => "promote",
+        }
+    }
+
+    /// Every accepted token, in lattice order (least → most resolution). The single
+    /// source for the CLI's value enum, the `.pyi` `Literal`, and the TS union — so
+    /// a surface cannot drift on the vocabulary.
+    pub const ALL: [TypeClashMode; 3] = [
+        TypeClashMode::Error,
+        TypeClashMode::Widen,
+        TypeClashMode::Promote,
+    ];
+}
+
+impl std::str::FromStr for TypeClashMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        TypeClashMode::ALL
+            .into_iter()
+            .find(|m| m.as_str() == s.trim().to_ascii_lowercase())
+            .ok_or_else(|| {
+                let allowed: Vec<&str> = TypeClashMode::ALL.iter().map(|m| m.as_str()).collect();
+                format!(
+                    "unknown on_type_clash {s:?}; expected one of {}",
+                    allowed.join(", ")
+                )
+            })
+    }
 }
 
 /// Caller-supplied metadata for the merged file's own TRAN row. The merged file
@@ -70,7 +136,7 @@ pub struct TranStamp {
 /// Merge options.
 #[derive(Debug, Clone)]
 pub struct MergeOpts {
-    pub type_mismatch: TypeMismatchMode,
+    pub on_type_clash: TypeClashMode,
     pub edition: DictVersion,
     pub emit_mode: EmitMode,
     /// When `Some`, the merged output carries one synthesised TRAN row from this
@@ -83,7 +149,7 @@ pub struct MergeOpts {
 impl Default for MergeOpts {
     fn default() -> Self {
         MergeOpts {
-            type_mismatch: TypeMismatchMode::Strict,
+            on_type_clash: TypeClashMode::Error,
             edition: DictVersion::V4_1_1,
             emit_mode: EmitMode::AutoFix,
             tran: None,
@@ -110,6 +176,15 @@ pub enum MergeError {
         heading: String,
         types: Vec<String>,
     },
+    /// Two files declare different (non-empty) UNITs for one heading. Fatal in
+    /// EVERY mode, unlike [`MergeError::TypeConflict`] — see [`merged_unit`] for
+    /// why there is no lenient path (no absorber exists, and picking one silently
+    /// mislabels the other file's values).
+    UnitConflict {
+        group: String,
+        heading: String,
+        units: Vec<String>,
+    },
     /// The byte-emission stage failed.
     Emit(String),
 }
@@ -123,7 +198,20 @@ impl std::fmt::Display for MergeError {
                 types,
             } => write!(
                 f,
-                "type conflict in {group}.{heading}: files declared {types:?} (STRICT mode)"
+                "type conflict in {group}.{heading}: files declared {types:?}. Resolve it in the \
+                 source files, or choose how merge should settle it: on_type_clash=promote keeps \
+                 the column numeric when every code is nDP (max precision, values zero-padded), \
+                 on_type_clash=widen falls back to X (free text, bytes untouched)."
+            ),
+            MergeError::UnitConflict {
+                group,
+                heading,
+                units,
+            } => write!(
+                f,
+                "unit conflict in {group}.{heading}: files declared {units:?}. Merge will not \
+                 convert units, and no mode can absorb this — picking one would silently mislabel \
+                 the other file's values. Reconcile the UNIT row in the source files."
             ),
             MergeError::Emit(e) => write!(f, "emit failed: {e}"),
         }
@@ -322,35 +410,132 @@ fn tran_field(f: &ParsedFile, heading: &str) -> Option<String> {
     cell(&idx, &row.values, heading).map(str::to_string)
 }
 
-/// Resolve the merged TYPE for one heading across the files that declare it.
-/// Returns the merged type string and pushes a warning for a non-`X`-vs-non-`X`
-/// widen; errors in Strict mode.
+/// The merged UNIT for a heading. **A genuine disagreement is fatal in EVERY
+/// mode — there is no lenient path.**
+///
+/// This is the one place merge is *less* forgiving than for TYPE, and the
+/// asymmetry is the whole point: **TYPE has a universal absorber, UNIT has
+/// none.** Two files that type a column differently can always fall back to `X`,
+/// which holds any bytes losslessly. There is no supertype of metres and
+/// millimetres. And merge must never *convert* — AGS units are free text, not a
+/// unit system.
+///
+/// So the only choices for a unit clash are (a) pick one and silently mislabel
+/// the other file's values, or (b) refuse. Merge used to do (a) — "first
+/// non-empty wins" — which is **undetectable data corruption**: given `LOCA_GL`
+/// in `m` (`10.00`) and in `mm` (`10500.00`), both values are valid `2DP`
+/// numbers under the surviving `m` label, so *nothing downstream can catch it*
+/// and the borehole's level silently becomes 10,500 metres. A `DT` clash
+/// (`yyyy-mm-dd` vs `dd/mm/yyyy`, whose format lives in the UNIT row) at least
+/// trips Rule 8 on the merged file; the numeric case trips nothing, ever. Hence
+/// (b), in every mode. (laterite#501.)
+///
+/// **Blank is not a disagreement.** An empty UNIT means "unspecified", so
+/// blank-vs-`m` resolves to `m` (and all-blank resolves to empty, letting emit
+/// fill it from the dictionary). Only two *different non-empty* units conflict.
+fn merged_unit(code: &str, heading: &str, declared: &[String]) -> Result<String, MergeError> {
+    let distinct: BTreeSet<&str> = declared
+        .iter()
+        .map(String::as_str)
+        .filter(|u| !u.is_empty())
+        .collect();
+    match distinct.len() {
+        0 => Ok(String::new()),
+        1 => Ok(distinct.iter().next().unwrap().to_string()),
+        _ => Err(MergeError::UnitConflict {
+            group: code.to_string(),
+            heading: heading.to_string(),
+            units: distinct.iter().map(|s| s.to_string()).collect(),
+        }),
+    }
+}
+
+/// How one heading's TYPE was resolved across the files that declare it.
+struct TypeResolution {
+    /// The TYPE the merged file declares for this column.
+    ty: String,
+    /// `Some(n)` → every cell in this column is re-rendered to exactly `n` decimal
+    /// places (promote). `None` → the producers' bytes are emitted untouched, which
+    /// is what every other mode does for every column.
+    pad_to: Option<usize>,
+}
+
+/// Resolve the merged TYPE for one heading — **the lattice join**, and the single
+/// decision point for [`TypeClashMode`].
+///
+/// Agreement (0 or 1 distinct declared code) is not a clash and never rewrites
+/// anything. On a genuine disagreement:
+///
+/// - [`Error`](TypeClashMode::Error) → [`MergeError::TypeConflict`].
+/// - [`Promote`](TypeClashMode::Promote) → if **every** clashing code is `nDP`,
+///   the join is `max(n)DP` and the column is padded to `n`. `max` (not `min`) is
+///   forced: it is the only direction that cannot round a value away, and it makes
+///   the result independent of argument order. Any non-`nDP` code present — `nSF`,
+///   `nSCI`, `DT`, `X`, … — drops through to `Widen`, because padding an `nSF`
+///   value would *overstate measured precision* (`3SF` → `5SF` asserts two digits
+///   the instrument never resolved), and there is no join for a cross-family clash.
+/// - [`Widen`](TypeClashMode::Widen) → `X`, bytes untouched. Silent for
+///   typed-vs-`X` (`X` trivially absorbs a typed value), warned for two genuinely
+///   different non-`X` types.
+///
+/// The promoted code is always one the inputs already declared, so its row in the
+/// file's `TYPE` abbreviation group arrives for free with the group union — which
+/// matters, because Rule 17 rejects a TYPE code the file doesn't declare.
 fn merged_type(
     code: &str,
     heading: &str,
     declared: &[String],
     opts: &MergeOpts,
     warnings: &mut Vec<MergeWarning>,
-) -> Result<String, MergeError> {
+) -> Result<TypeResolution, MergeError> {
+    let plain = |ty: String| TypeResolution { ty, pad_to: None };
+
     let distinct: BTreeSet<&str> = declared
         .iter()
         .map(String::as_str)
         .filter(|t| !t.is_empty())
         .collect();
     match distinct.len() {
-        0 => Ok(String::new()), // no declared type anywhere → let emit fill from dict
-        1 => Ok(distinct.iter().next().unwrap().to_string()),
+        0 => Ok(plain(String::new())), // no declared type anywhere → emit fills from dict
+        1 => Ok(plain(distinct.iter().next().unwrap().to_string())),
         _ => {
             // A genuine disagreement.
-            if opts.type_mismatch == TypeMismatchMode::Strict {
+            if opts.on_type_clash == TypeClashMode::Error {
                 return Err(MergeError::TypeConflict {
                     group: code.to_string(),
                     heading: heading.to_string(),
                     types: distinct.iter().map(|s| s.to_string()).collect(),
                 });
             }
-            // Lenient: widen to X. Silent when the only disagreement is typed-vs-X
-            // (X absorbs anything); warn when two *different* non-X types clash.
+
+            // Promote: only when the whole clash lives in the nDP family. `collect`
+            // into Option short-circuits to None the moment one code isn't nDP.
+            if opts.on_type_clash == TypeClashMode::Promote {
+                if let Some(places) = distinct
+                    .iter()
+                    .map(|t| decimal_places(t))
+                    .collect::<Option<Vec<usize>>>()
+                {
+                    let n = places.into_iter().max().expect("2+ distinct codes");
+                    let ty = format!("{n}DP");
+                    warnings.push(MergeWarning {
+                        kind: "type_promoted",
+                        group: Some(code.to_string()),
+                        heading: Some(heading.to_string()),
+                        message: format!(
+                            "files disagree on TYPE {distinct:?}; promoted to {ty} (the greatest \
+                             precision declared) and zero-padded the lower-precision values — no \
+                             digit is changed, but the merged file asserts {n} decimal places"
+                        ),
+                    });
+                    return Ok(TypeResolution {
+                        ty,
+                        pad_to: Some(n),
+                    });
+                }
+            }
+
+            // Widen — and promote's fallback for anything the nDP join can't reach.
             let non_x = distinct.iter().filter(|t| **t != "X").count();
             if non_x >= 2 {
                 warnings.push(MergeWarning {
@@ -362,7 +547,7 @@ fn merged_type(
                     ),
                 });
             }
-            Ok("X".to_string())
+            Ok(plain("X".to_string()))
         }
     }
 }
@@ -400,27 +585,29 @@ fn reconcile_group(
         .map(|(i, h)| (h.as_str(), i))
         .collect();
 
-    // Merged UNIT (first non-empty per heading) and TYPE (agree, else widen/err).
+    // Merged UNIT (must agree — see `merged_unit`) and TYPE (agree, else the
+    // lattice join — see `merged_type`, which may also hand back a pad instruction).
     let mut units: Vec<String> = vec![String::new(); union_h.len()];
     let mut types: Vec<String> = vec![String::new(); union_h.len()];
+    let mut pad: Vec<Option<usize>> = vec![None; union_h.len()];
     for (ui, h) in union_h.iter().enumerate() {
         let mut declared_types: Vec<String> = Vec::new();
+        let mut declared_units: Vec<String> = Vec::new();
         for (_, g) in &present {
             let hidx = heading_index(&g.headings);
             if let Some(&ci) = hidx.get(h.as_str()) {
-                if units[ui].is_empty() {
-                    if let Some(u) = g.units.get(ci) {
-                        if !u.is_empty() {
-                            units[ui] = u.clone();
-                        }
-                    }
+                if let Some(u) = g.units.get(ci) {
+                    declared_units.push(u.clone());
                 }
                 if let Some(t) = g.types.get(ci) {
                     declared_types.push(t.clone());
                 }
             }
         }
-        types[ui] = merged_type(code, h, &declared_types, opts, warnings)?;
+        units[ui] = merged_unit(code, h, &declared_units)?;
+        let resolved = merged_type(code, h, &declared_types, opts, warnings)?;
+        types[ui] = resolved.ty;
+        pad[ui] = resolved.pad_to;
     }
 
     // Row identity: the ONE shared definition (`key_heading_names`), filtered to
@@ -453,6 +640,7 @@ fn reconcile_group(
         &union_idx,
         &id_headings,
         keyed,
+        &pad,
         warnings,
         revisions,
     );
@@ -488,6 +676,7 @@ fn reconcile_rows(
     union_idx: &HashMap<&str, usize>,
     id_headings: &[&str],
     keyed: bool,
+    pad: &[Option<usize>],
     warnings: &mut Vec<MergeWarning>,
     revisions: &mut Vec<RevisionNote>,
 ) -> Vec<Vec<Value>> {
@@ -585,17 +774,62 @@ fn reconcile_rows(
         }
     }
 
-    // `Option<MCell>` cells → emit `Value`s: a carried cell is raw text (byte
-    // fidelity — merge never reformats), a not-carried cell is Null (→ blank).
-    order
+    // `Option<MCell>` cells → emit `Value`s. A not-carried cell is Null (→ blank);
+    // a carried cell is the producer's raw text, verbatim.
+    //
+    // The one exception is a PROMOTED column (`pad[ui] == Some(n)`) — the only
+    // place merge rewrites data. Each non-blank cell is zero-padded to n decimal
+    // places so it satisfies Rule 8 under the promoted TYPE. `pad_decimals` is
+    // string-only and refuses any pad it can't do losslessly, so a value it turns
+    // down is kept byte-for-byte rather than rounded.
+    let mut unpaddable: Vec<usize> = vec![0; union_h.len()];
+    let rows: Vec<Vec<Value>> = order
         .into_iter()
         .map(|cells| {
             cells
                 .into_iter()
-                .map(|c| c.map(|m| Value::String(m.value)).unwrap_or(Value::Null))
+                .enumerate()
+                .map(|(ui, c)| {
+                    let Some(m) = c else { return Value::Null };
+                    match pad[ui] {
+                        // Blank means "no opinion", not zero — never pad it into one.
+                        Some(n) if !m.value.trim().is_empty() => match pad_decimals(&m.value, n) {
+                            Some(padded) => Value::String(padded),
+                            None => {
+                                unpaddable[ui] += 1;
+                                Value::String(m.value)
+                            }
+                        },
+                        _ => Value::String(m.value),
+                    }
+                })
                 .collect()
         })
-        .collect()
+        .collect();
+
+    // A cell that refused the pad carried either non-numeric text or MORE decimal
+    // places than the promoted type — and since the promoted type is the greatest
+    // precision any file declared, that cell already violated its OWN declared TYPE
+    // upstream. Merge keeps it verbatim (rounding it would be the data loss promote
+    // exists to avoid) and says so, rather than letting it surface as a bare Rule 8
+    // error on the merged file with no explanation of where it came from.
+    for (ui, count) in unpaddable.iter().enumerate() {
+        if *count > 0 {
+            let n = pad[ui].expect("only a padded column can have unpaddable cells");
+            warnings.push(MergeWarning {
+                kind: "promote_value_kept_verbatim",
+                group: Some(code.to_string()),
+                heading: Some(union_h[ui].clone()),
+                message: format!(
+                    "{count} value(s) could not be zero-padded to the promoted TYPE {n}DP and were \
+                     kept byte-for-byte (merge never rounds). They were already invalid for the \
+                     TYPE their own file declared, and will trip Rule 8 on the merged file — fix \
+                     them at source"
+                ),
+            });
+        }
+    }
+    rows
 }
 
 /// Build the merged file's own single-row TRAN from the caller's stamp, recording

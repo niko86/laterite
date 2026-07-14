@@ -1,7 +1,7 @@
 //! Merge the two POC fixtures and print the result — a manual-inspection aid.
 //! `cargo run -p laterite-ags4-merge --example merge_demo`
 
-use laterite_ags4_merge::{MergeOpts, TranStamp, TypeMismatchMode, merge_parsed};
+use laterite_ags4_merge::{MergeOpts, TranStamp, TypeClashMode, merge_parsed};
 use laterite_ags4_parse::parse_str;
 
 fn main() {
@@ -16,7 +16,7 @@ fn main() {
     .unwrap();
 
     let opts = MergeOpts {
-        type_mismatch: TypeMismatchMode::Lenient,
+        on_type_clash: TypeClashMode::Widen,
         tran: Some(TranStamp {
             isno: "3".into(),
             date: "2024-03-01".into(),

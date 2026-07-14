@@ -1,59 +1,67 @@
 //! `lat certify <file>` — mint the `.ags.idx` validity certificate for an
-//! error-clean file (was `lat-check --emit-index`). Validates first; a file with
-//! errors can't be certified. The mint logic lives in `cert` (shared with the
-//! `validate --index` consume path).
+//! error-clean file.
+//!
+//! The command used to validate here, count the severities here, decide here whether
+//! the file was certifiable, and then hand the counts to a mint that wrote down
+//! whatever it was told. Now it reads the file and calls `trust::mint`, which validates
+//! and counts and decides for itself — because the caller getting those wrong is the
+//! whole history of this feature. (`laterite-py`'s mint took `warnings=0, fyi=0` as
+//! DEFAULT ARGUMENTS, and nothing ever passed them.)
 
 use std::process::exit;
 
-use laterite_ags4_validator::{CheckOptions, check_file};
+use laterite_ags4_trust::mint;
+use laterite_ags4_validator::CheckOptions;
 use laterite_cliutil::Spinner;
 
 use crate::cli::CertifyArgs;
-use crate::commands::cert::mint_index;
+use crate::commands::cert;
 use crate::commands::common::apply_dict_args;
-use crate::render::count_severities;
 
 pub fn run(args: &CertifyArgs, quiet: bool) -> ! {
-    // Record accurate advisory counts (warnings + fyi) in the cert, so check with
-    // both tiers on; `check_files` rides into the cert PROFILE.
-    let mut opts = apply_dict_args(
-        CheckOptions {
-            include_warnings: true,
-            include_fyi: true,
-            ..CheckOptions::default()
-        },
-        &args.dict,
-    );
-    if args.check_files {
-        opts.check_files = true;
-    }
+    // Only the CONTENT knobs. `mint` forces both tiers on regardless — a certificate
+    // that measured less than it could is a certificate that answers fewer questions —
+    // and it will not take a `check_files` at all: Rule 20's on-disk half reads a
+    // directory, and no statement about the certified bytes can speak for a directory.
+    let opts = apply_dict_args(CheckOptions::default(), &args.dict);
 
     let path = args.file.as_path();
     let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("file");
+
+    let bytes = match std::fs::read(path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("error: read {}: {e}", path.display());
+            exit(3);
+        }
+    };
+
     let spinner = Spinner::start(&format!("validating {name}..."), quiet);
-    let result = check_file(path, &opts);
+    let minted = mint(
+        &bytes,
+        &opts,
+        chrono::Utc::now().to_rfc3339(),
+        None, // the native engine, not the compat shim
+    );
     drop(spinner);
 
-    let found = match result {
-        Ok(f) => f,
+    let sidecar = match minted {
+        Ok(s) => s,
         Err(e) => {
-            eprintln!("error: {e}");
+            // A file with errors is not certifiable, and `mint` is the one that knows —
+            // it ran the rules. It says so in its own words, and carries its own exit
+            // code (1 for findings, like every other verb that reports them).
+            match e {
+                laterite_ags4_trust::MintError::NotCertifiable { .. } => {
+                    eprintln!("error: {e} (run `lat validate {name}` to see them)");
+                }
+                _ => eprintln!("error: {e}"),
+            }
             exit(e.exit_code());
         }
     };
 
-    // A certificate attests an ERROR-clean file; warnings/fyi ride on the stamp
-    // as counts but don't block it.
-    let (errors, warnings, fyi) = count_severities(&found);
-    if errors > 0 {
-        eprintln!(
-            "cannot certify: {errors} error(s) — a certificate attests a clean \
-             validation (run `lat validate {name}` to see them)"
-        );
-        exit(1);
-    }
-
-    match mint_index(path, &opts, warnings, fyi, args.out.as_deref()) {
+    match cert::write(&sidecar, path, args.out.as_deref()) {
         Ok(dest) => {
             println!("certificate written to {}", dest.display());
             exit(0);

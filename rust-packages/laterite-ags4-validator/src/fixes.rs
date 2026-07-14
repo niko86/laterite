@@ -952,7 +952,7 @@ pub fn fix_document_selective(
     let (dv, res) = crate::resolve_dict_version(opts.dict_version, tran.as_deref())?;
     let dict = crate::Dictionary::bundled(dv);
     let mut found = Findings::new();
-    crate::rules::run_all(&pf, &dict, opts, None, &mut found);
+    crate::rules::run_all(&pf, &dict, opts, &mut found);
 
     let mut selected = compute_fixes(&pf, &found);
     // Per-rule selection applies to the full computed set first (short label).
@@ -1017,7 +1017,7 @@ pub fn fix_document_selective(
     let (dv2, res2) = crate::resolve_dict_version(opts.dict_version, tran2.as_deref())?;
     let dict2 = crate::Dictionary::bundled(dv2);
     let mut residual = Findings::new();
-    crate::rules::run_all(&pf2, &dict2, opts, None, &mut residual);
+    crate::rules::run_all(&pf2, &dict2, opts, &mut residual);
 
     Ok(FixOutcome {
         fixed,
@@ -1047,7 +1047,7 @@ mod tests {
             ..Default::default()
         };
         let mut found = Findings::new();
-        rules::run_all(&parsed, &dict, &opts, None, &mut found);
+        rules::run_all(&parsed, &dict, &opts, &mut found);
         (parsed, found)
     }
 

@@ -72,7 +72,15 @@ impl CanonicalType {
     }
 }
 
-const STRING_AGS_TYPES: &[&str] = &["ID", "X", "PA", "PT", "PU", "T", "U", "DMS", "MC", "XN"];
+// `RL` (Record Link) belongs here, NOT with the numerics: an RL cell is a
+// DELIMITED REFERENCE — `GROUP|KEY1|KEY2`, split on `TRAN_DLIM` (AGS Rule 11) —
+// not a number. It was special-cased to `Decimal` (→ `sql_type` DOUBLE), which
+// silently DESTROYED every record link on read: `parse_value("SAMP|BH01|1.00", "RL")`
+// returned Null, so the column came back as an all-null f64. Two tests pinned the
+// wrong answer, which is how it survived (laterite#503).
+const STRING_AGS_TYPES: &[&str] = &[
+    "ID", "X", "PA", "PT", "PU", "T", "U", "DMS", "MC", "XN", "RL",
+];
 const INTEGER_AGS_TYPES: &[&str] = &["0DP"];
 const DATETIME_AGS_TYPES: &[&str] = &["DT"];
 const BOOL_AGS_TYPES: &[&str] = &["YN"];
@@ -94,9 +102,6 @@ pub fn canonical_type(ags_type: &str) -> Option<CanonicalType> {
     }
     if BOOL_AGS_TYPES.contains(&t.as_str()) {
         return Some(CanonicalType::Bool);
-    }
-    if t == "RL" {
-        return Some(CanonicalType::Decimal);
     }
     // nDP / nSF / nSCI numeric forms — split on the trailing letters,
     // validate the prefix is a positive integer.
@@ -238,6 +243,62 @@ pub fn display_hint(ags_type: &str) -> Option<String> {
     None
 }
 
+/// The **decimal-places family**: `Some(n)` iff the code is exactly `<digits>DP`
+/// (`"0DP"` → `0`, `"2DP"` → `2`). `None` for everything else.
+///
+/// Deliberately narrower than [`canonical_type`], which lumps `nDP`, `nSF` and
+/// `nSCI` together as [`CanonicalType::Decimal`]. They are *not* interchangeable:
+/// decimal places are largely a presentation convention, whereas significant
+/// figures and scientific notation are explicit claims about **measurement
+/// precision**. A caller that may rewrite values (merge's `promote`) must key off
+/// the code family, never the canonical class — hence this.
+pub fn decimal_places(ags_type: &str) -> Option<usize> {
+    let t = ags_type.trim().to_uppercase();
+    let prefix = t.strip_suffix("DP")?;
+    if prefix.is_empty() || !prefix.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    prefix.parse().ok()
+}
+
+/// Widen a raw AGS numeric cell to **exactly** `n` decimal places by appending
+/// zeros — the *lossless* half of a precision change (`"10.00"`, 5 → `"10.00000"`;
+/// `"10"`, 2 → `"10.00"`; `"-3"`, 1 → `"-3.0"`). Idempotent when the value already
+/// carries `n` places.
+///
+/// Returns `None` — meaning "keep the producer's bytes verbatim" — whenever the
+/// pad cannot be done without changing the number:
+///
+/// - **More** than `n` decimal places. Shortening would *round* (`"10.005"` → 2dp
+///   → `"10.00"`), and rounding is data loss. Padding only ever adds trailing
+///   zeros; it never demotes.
+/// - Blank, or anything outside the `-?\d+(\.\d*)?` grammar — there is no number
+///   to pad, so the raw text is left alone for the validator to judge.
+///
+/// **String-only, by design: no `f64` is ever constructed.** A float round-trip
+/// would silently perturb values beyond 2^53 (`"12345678901234567.00"` comes back
+/// as `…568`), and a *widen* that alters a digit is a contradiction in terms.
+/// Contrast the validator's `format_ndp`, which *is* an f64 round-and-render —
+/// correct for a Rule 8 **fix** (where rounding is the intent), wrong here.
+pub fn pad_decimals(raw: &str, n: usize) -> Option<String> {
+    let s = raw.trim();
+    let body = s.strip_prefix('-').unwrap_or(s);
+    let (int_part, frac) = body.split_once('.').unwrap_or((body, ""));
+    if int_part.is_empty()
+        || !int_part.chars().all(|c| c.is_ascii_digit())
+        || !frac.chars().all(|c| c.is_ascii_digit())
+        || frac.len() > n
+    {
+        return None;
+    }
+    let sign = if s.starts_with('-') { "-" } else { "" };
+    if n == 0 {
+        return Some(format!("{sign}{int_part}"));
+    }
+    let zeros = "0".repeat(n - frac.len());
+    Some(format!("{sign}{int_part}.{frac}{zeros}"))
+}
+
 const DATETIME_FORMATS: &[&str] = &[
     "%Y-%m-%d %H:%M:%S",
     "%Y-%m-%d %H:%M",
@@ -371,6 +432,62 @@ mod tests {
     use super::*;
 
     #[test]
+    fn decimal_places_matches_only_the_ndp_family() {
+        assert_eq!(decimal_places("0DP"), Some(0));
+        assert_eq!(decimal_places("2DP"), Some(2));
+        assert_eq!(decimal_places("12DP"), Some(12));
+        assert_eq!(decimal_places(" 3dp "), Some(3)); // trimmed + case-folded
+        // nSF / nSCI are Decimal to `canonical_type` but are NOT decimal places:
+        // they claim measurement precision, so they must never be zero-padded.
+        assert_eq!(decimal_places("3SF"), None);
+        assert_eq!(decimal_places("2SCI"), None);
+        assert_eq!(decimal_places("X"), None);
+        assert_eq!(decimal_places("DP"), None); // empty prefix
+        assert_eq!(decimal_places("XDP"), None); // non-digit prefix
+    }
+
+    #[test]
+    fn pad_decimals_appends_zeros_and_is_idempotent() {
+        assert_eq!(pad_decimals("10.00", 5).as_deref(), Some("10.00000"));
+        assert_eq!(pad_decimals("10", 2).as_deref(), Some("10.00")); // 0DP → 2DP
+        assert_eq!(pad_decimals("-3", 1).as_deref(), Some("-3.0"));
+        assert_eq!(pad_decimals("-0.5", 3).as_deref(), Some("-0.500"));
+        assert_eq!(pad_decimals("10.00", 2).as_deref(), Some("10.00")); // already n
+        assert_eq!(pad_decimals("7", 0).as_deref(), Some("7"));
+    }
+
+    #[test]
+    fn pad_decimals_refuses_anything_it_cannot_do_losslessly() {
+        // Would have to ROUND — that is data loss, so refuse and keep the bytes.
+        assert_eq!(pad_decimals("10.005", 2), None);
+        assert_eq!(pad_decimals("10.5", 0), None);
+        // Nothing to pad.
+        assert_eq!(pad_decimals("", 2), None);
+        assert_eq!(pad_decimals("   ", 2), None);
+        assert_eq!(pad_decimals("N/A", 2), None);
+        assert_eq!(pad_decimals("1.2e3", 2), None); // exponent is not the nDP grammar
+        assert_eq!(pad_decimals("+10", 2), None); // AGS nDP has no leading '+'
+        assert_eq!(pad_decimals("1,000.0", 2), None); // thousands separator
+    }
+
+    /// The reason `pad_decimals` is string-only. An f64 round-trip — which is what
+    /// the validator's `format_ndp` does, correctly, for a *fix* — cannot represent
+    /// this value, so a "widen" through a float would silently change a digit.
+    /// Padding must never alter the number it is padding.
+    #[test]
+    fn pad_decimals_never_perturbs_a_value_an_f64_would_mangle() {
+        let raw = "12345678901234567.00"; // 17 significant digits, > 2^53
+        let padded = pad_decimals(raw, 5).expect("pads");
+        assert_eq!(padded, "12345678901234567.00000");
+        // The digits the producer wrote survive verbatim...
+        assert!(padded.starts_with("12345678901234567."));
+        // ...whereas the float route loses the last one.
+        let via_f64 = format!("{:.5}", raw.parse::<f64>().unwrap());
+        assert_ne!(via_f64, padded);
+        assert_eq!(via_f64, "12345678901234568.00000");
+    }
+
+    #[test]
     fn ags_string_types_resolve() {
         assert_eq!(canonical_type("ID"), Some(CanonicalType::String));
         assert_eq!(canonical_type("X"), Some(CanonicalType::String));
@@ -491,15 +608,19 @@ mod tests {
         assert_eq!(sql_type("2DP"), "DOUBLE");
         assert_eq!(sql_type("DT"), "TIMESTAMP");
         assert_eq!(sql_type("YN"), "BOOLEAN");
-        // RL maps to Decimal -> DOUBLE.
-        assert_eq!(sql_type("RL"), "DOUBLE");
+        // RL is a delimited RECORD LINK (`GROUP|KEY1|KEY2`, AGS Rule 11), so it
+        // stores as text. It was DOUBLE — which nulled every link on read (#503).
+        assert_eq!(sql_type("RL"), "VARCHAR");
         // Unknown / passthrough code.
         assert_eq!(sql_type("BANANA"), "VARCHAR");
     }
 
     #[test]
-    fn canonical_type_rl_is_decimal() {
-        assert_eq!(canonical_type("RL"), Some(CanonicalType::Decimal));
+    fn canonical_type_rl_is_a_text_record_link_not_a_number() {
+        // #503: RL was Decimal. A record link is `SAMP|BH01|1.00` — parsing it as a
+        // float yields Null, so the column read back as an all-null f64 and the
+        // link was destroyed. This assertion previously pinned the bug.
+        assert_eq!(canonical_type("RL"), Some(CanonicalType::String));
         assert_eq!(canonical_type("DT"), Some(CanonicalType::Datetime));
         assert_eq!(canonical_type("YN"), Some(CanonicalType::Bool));
         assert_eq!(canonical_type("0DP"), Some(CanonicalType::Integer));

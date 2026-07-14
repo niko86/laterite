@@ -9,12 +9,13 @@ const tmp = mkdtempSync(join(tmpdir(), "laterite-docs-"));
 const site = join(tmp, "site.ags");
 copyFileSync("examples/sample_site.ags", site);
 
-// certify() needs a prior clean validate() on the same handle; it mints <path>.ags.idx.
-const idx = read(site).validate({ warnings: false }).certify();
+// certify() runs the validation itself and mints <path>.ags.idx for an error-clean file.
+const idx = read(site).certify();
 
-// Re-reading with the fresh cert lets validate() resolve without running the rule engine.
+// Re-reading with the fresh cert lets validate() answer without running the rule engine.
 const ags = read(site, { index: idx }).validate({ warnings: false });
-console.log(ags.report.resolution);
+// `certified` says the ENGINE was skipped; `dictVersion` still says which dictionary judged it.
+console.log(ags.report.certified, ags.report.dictVersion);
 
-assert.equal(ags.report.resolution, "certified");
+assert.equal(ags.report.certified, true);
 rmSync(tmp, { recursive: true, force: true });

@@ -13,6 +13,7 @@ import type {
   Fix,
   RevisionDelta,
   StandardDict,
+  TypeClashMode,
 } from "./validator";
 import type { WorkerReq, WorkerRes, ReportMeta } from "./validator.worker";
 import type { GroupMeta } from "./duckTypes";
@@ -365,15 +366,18 @@ export function revisionDiff(
 }
 
 /** Merge two AGS4 deliveries (`a` then `b`, `b` wins a KEY conflict) into one
- *  file — the engine-consistent, KEY-aware reconciliation. `lenient` widens a
- *  TYPE conflict to X (else it rejects); the optional `tran*` stamp a synthesised
- *  merge-TRAN. Rejects (a strict conflict / parse error) with the engine message. */
+ *  file — the engine-consistent, KEY-aware reconciliation. `onTypeClash` settles a
+ *  heading the two files typed differently: `"error"` rejects, `"widen"` falls back
+ *  to `X` (raw values kept, TYPE thrown away), `"promote"` keeps the greatest `nDP`
+ *  precision and zero-pads the coarser values. A conflicting UNIT is fatal in every
+ *  mode. The optional `tran*` stamp a synthesised merge-TRAN. Rejects (an unsettled
+ *  clash / parse error) with the engine message. */
 export function mergeFiles(
   a: Uint8Array,
   b: Uint8Array,
   opts: {
     encoding: EncodingOpt;
-    lenient: boolean;
+    onTypeClash: TypeClashMode;
     tranIssue?: string | null;
     tranDate?: string | null;
     tranProducer?: string | null;
@@ -386,7 +390,7 @@ export function mergeFiles(
         aBytes: new ArrayBuffer(0), // replaced inside postDual()
         bBytes: new ArrayBuffer(0), // replaced inside postDual()
         encoding: opts.encoding,
-        lenient: opts.lenient,
+        onTypeClash: opts.onTypeClash,
         tranIssue: opts.tranIssue ?? null,
         tranDate: opts.tranDate ?? null,
         tranProducer: opts.tranProducer ?? null,

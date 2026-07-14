@@ -14,7 +14,9 @@
 
 use std::path::PathBuf;
 
+use clap::builder::TypedValueParser; // for `.map()` on PossibleValuesParser
 use clap::{ArgGroup, Args, Parser, Subcommand};
+use laterite_ags4_merge::TypeClashMode;
 
 /// The known subcommand names — the `main` default-subcommand pre-scan uses this
 /// to decide whether a bare `lat <file>` should have `validate` spliced in.
@@ -60,6 +62,11 @@ pub enum Commands {
     Certify(CertifyArgs),
     /// Print the AGS4 rule catalogue (no input file needed).
     Rules,
+    /// Dump this binary's own parser as JSON — the AUTHORITY the surface census
+    /// diffs the uvx / npx launchers against (`tools/gen_census.py`). Hidden: a
+    /// machine door, not a user command.
+    #[command(hide = true)]
+    Census,
     /// Package a file for transport — zstd-compress (any file type).
     #[cfg(feature = "transport")]
     Pack(PackArgs),
@@ -258,10 +265,24 @@ pub struct MergeArgs {
     /// silent default over one of the inputs.
     #[arg(long, value_name = "PATH")]
     pub out: PathBuf,
-    /// On a TYPE disagreement, widen the column to X (text) instead of erroring
-    /// (the default is strict — reconciling two producers' types is high-stakes).
-    #[arg(long)]
-    pub lenient: bool,
+    /// How to settle a heading two deliveries typed differently:
+    ///
+    ///   error   — refuse (default; reconciling two producers' types is high-stakes)
+    ///   widen   — fall back to X (free text); raw values untouched, TYPE thrown away
+    ///   promote — keep the greatest precision when every code is nDP (e.g. 2DP + 5DP
+    ///             -> 5DP) and zero-pad the coarser values; falls back to widen for
+    ///             nSF/nSCI and cross-family clashes. The only mode that rewrites a cell.
+    ///
+    /// The allowed values are projected from `TypeClashMode::ALL`, so the CLI cannot
+    /// drift from the library's vocabulary.
+    #[arg(
+        long,
+        value_name = "MODE",
+        default_value = "error",
+        value_parser = clap::builder::PossibleValuesParser::new(TypeClashMode::ALL.map(|m| m.as_str()))
+            .map(|s| s.parse::<TypeClashMode>().expect("clap restricted the value")),
+    )]
+    pub on_type_clash: TypeClashMode,
     /// Issue reference (TRAN_ISNO) for the merged file's own synthesised TRAN.
     /// With --tran-date, a fresh merge-transmission TRAN is written (recording
     /// the inputs' ISNOs/dates in TRAN_REM); without it, TRAN is reconciled and
@@ -288,9 +309,13 @@ pub struct CertifyArgs {
     pub file: PathBuf,
     #[command(flatten)]
     pub dict: DictArgs,
-    /// Also run Rule 20's on-disk check — recorded in the cert profile.
-    #[arg(long)]
-    pub check_files: bool,
+    // `--check-files` was here. It recorded, in the certificate, that Rule 20's on-disk
+    // half had run — and a later `lat validate --check-files --index` read that record
+    // and skipped the check. Delete the FILE/ tree in between and the file still
+    // reported clean: the .ags bytes had not moved, so the certificate was still
+    // "valid". A certificate is a statement about bytes; the directory beside them is
+    // not one, and there is now nowhere in the format to pretend otherwise. Use
+    // `lat validate --check-files`, which runs it live, every time.
     /// Write the certificate to <path> instead of <file>.ags.idx.
     #[arg(long, value_name = "PATH")]
     pub out: Option<PathBuf>,

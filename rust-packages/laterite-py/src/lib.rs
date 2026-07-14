@@ -17,11 +17,12 @@
 use std::path::Path;
 
 use laterite_ags4_core::error::CliError;
-use laterite_ags4_core::index::{ENGINE_IDENTITY, Sidecar as CoreSidecar, ValidationStamp};
+use laterite_ags4_core::index::{Sidecar as CoreSidecar, TierCoverage};
 use laterite_ags4_validator::findings::{Severity, Target};
 use laterite_ags4_validator::fixes::FixRisk;
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, Dictionary, Findings, Fix, ValidatorError, fix_document_selective,
+    CheckOptions, DictVersion, Dictionary, Findings, Fix, ValidatorError, WorldScope,
+    fix_document_selective,
 };
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -72,10 +73,33 @@ fn map_err(e: ValidatorError) -> (i32, String, String) {
     (e.exit_code(), e.kind().to_string(), e.to_string())
 }
 
-/// Run the validator from a path, in-memory text, or raw bytes. Returns
-/// `(file, dict_version, resolution, findings)` or
-/// `(exit_code, error_kind, message)`.
-#[allow(clippy::type_complexity, clippy::too_many_arguments)]
+/// A `TierCoverage` as Python sees it: the count, or `None` if the tier was never run.
+fn tier_count(c: TierCoverage) -> Option<u32> {
+    match c {
+        TierCoverage::NotMeasured => None,
+        TierCoverage::Measured { count } => Some(count),
+    }
+}
+
+/// What a validation produced, plus whether a certificate stood in for the rule engine.
+struct Checked {
+    file: String,
+    dict_version: String,
+    resolution: String,
+    findings: Findings,
+    /// A cert answered the CONTENT half. The world half (Rule 20 on-disk) ran regardless.
+    certified: bool,
+}
+
+/// Run the validator from a path, in-memory text, or raw bytes — through the ONE door.
+///
+/// The three modalities used to be three code paths that each assembled the engine call
+/// themselves, and they did not agree (the bytes path skipped the O-42 edition guard;
+/// `check_files` evaporated silently on text and bytes). They are now one call: read to
+/// bytes, name the world you have, and hand it to `trust::check`. A path gets
+/// `WorldScope::OnDisk`; text and bytes get `None`, and if they ask for `check_files`
+/// anyway they are REFUSED rather than told the file is clean.
+#[allow(clippy::too_many_arguments)] // one door for three modalities; the knobs are lat's
 fn validate(
     path: Option<&str>,
     text: Option<&str>,
@@ -85,7 +109,8 @@ fn validate(
     fyi: bool,
     check_files: bool,
     encoding: Option<&str>,
-) -> Result<(String, String, String, Findings), (i32, String, String)> {
+    cert: Option<&CoreSidecar>,
+) -> Result<Checked, (i32, String, String)> {
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
     let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
         (
@@ -103,58 +128,53 @@ fn validate(
         encoding: enc,
     };
 
-    if let Some(p) = path {
-        match laterite_ags4_validator::check_file_with_dict(Path::new(p), &opts) {
-            Ok((found, dv, res)) => Ok((
-                p.to_string(),
-                dv.as_str().to_string(),
-                res.as_str().to_string(),
-                found,
-            )),
-            Err(e) => Err(map_err(e)),
-        }
+    // Bytes, whatever door they came through — a certificate is a statement about bytes.
+    let (label, bytes, world) = if let Some(p) = path {
+        let b = std::fs::read(Path::new(p)).map_err(|e| {
+            let kind = if e.kind() == std::io::ErrorKind::NotFound {
+                "not_found"
+            } else {
+                "io"
+            };
+            (3, kind.to_string(), format!("{p}: {e}"))
+        })?;
+        (
+            p.to_string(),
+            b,
+            WorldScope::OnDisk(std::path::PathBuf::from(p)),
+        )
     } else if let Some(t) = text {
-        let pf = laterite_ags4_parse::parse_str(t)
-            .map_err(ValidatorError::from)
-            .map_err(map_err)?;
-        let tran = laterite_ags4_validator::tran_ags_of(&pf);
-        let (dv, res) = laterite_ags4_validator::resolve_dict_version(over, tran.as_deref())
-            .map_err(map_err)?;
-        let dict = Dictionary::bundled(dv);
-        let mut found = Findings::new();
-        laterite_ags4_validator::rules::run_all(&pf, &dict, &opts, None, &mut found);
-        Ok((
+        (
             "<text>".to_string(),
-            dv.as_str().to_string(),
-            res.as_str().to_string(),
-            found,
-        ))
+            t.as_bytes().to_vec(),
+            WorldScope::None,
+        )
     } else if let Some(d) = data {
-        // bytes path: decode with `enc` (BOM-sniffed) then validate — the text
-        // branch's twin for callers that hold raw bytes (a web backend, an
-        // embedded host) with no file on disk. Same engine the wasm surface uses.
-        let pf = laterite_ags4_parse::parse_bytes(d, enc)
-            .map_err(ValidatorError::from)
-            .map_err(map_err)?;
-        let tran = laterite_ags4_validator::tran_ags_of(&pf);
-        let (dv, res) = laterite_ags4_validator::resolve_dict_version(over, tran.as_deref())
-            .map_err(map_err)?;
-        let dict = Dictionary::bundled(dv);
-        let mut found = Findings::new();
-        laterite_ags4_validator::rules::run_all(&pf, &dict, &opts, None, &mut found);
-        Ok((
-            "<bytes>".to_string(),
-            dv.as_str().to_string(),
-            res.as_str().to_string(),
-            found,
-        ))
+        ("<bytes>".to_string(), d.to_vec(), WorldScope::None)
     } else {
-        Err((
+        return Err((
             5,
             "bad_args".to_string(),
             "one of path, text, or data is required".to_string(),
-        ))
-    }
+        ));
+    };
+
+    let out = laterite_ags4_trust::check(laterite_ags4_trust::Request {
+        bytes: &bytes,
+        opts: &opts,
+        cert,
+        world,
+        compat: None,
+    })
+    .map_err(map_err)?;
+
+    Ok(Checked {
+        file: label,
+        dict_version: out.dict_version.as_str().to_string(),
+        resolution: out.resolution.as_str().to_string(),
+        findings: out.findings,
+        certified: out.certified,
+    })
 }
 
 /// Lowercase serde-name of a [`Target`] for the structured PyDict
@@ -237,7 +257,7 @@ fn err_dict<'py>(
 /// error, exit_code}` (the Python layer raises the mapped exception;
 /// the CLI uses `exit_code` directly).
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, check_files=false, encoding=None))]
+#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, check_files=false, encoding=None, cert=None))]
 #[allow(clippy::too_many_arguments)]
 fn run_check<'py>(
     py: Python<'py>,
@@ -249,6 +269,10 @@ fn run_check<'py>(
     include_fyi: bool,
     check_files: bool,
     encoding: Option<String>,
+    // The certificate, if the caller named one. The decision to trust it is NOT made in
+    // Python — it is made once, in `laterite_ags4_trust`, alongside every other surface.
+    // The Python layer used to make it itself, with its own conjunction of predicates.
+    cert: Option<PyRef<'py, PySidecar>>,
 ) -> PyResult<Bound<'py, PyDict>> {
     match validate(
         path.as_deref(),
@@ -259,14 +283,25 @@ fn run_check<'py>(
         include_fyi,
         check_files,
         encoding.as_deref(),
+        cert.as_ref().map(|c| &c.inner),
     ) {
         Err((code, kind, msg)) => err_dict(py, code, &kind, &msg),
-        Ok((file, dv, res, found)) => {
+        Ok(checked) => {
+            let Checked {
+                file,
+                dict_version: dv,
+                resolution: res,
+                findings: found,
+                certified,
+            } = checked;
             let d = PyDict::new(py);
             d.set_item("ok", true)?;
             d.set_item("file", &file)?;
             d.set_item("dict_version", dv)?;
             d.set_item("resolution", res)?;
+            // Whether the rule ENGINE was skipped. Never "whether the file was checked":
+            // a world check (Rule 20 on-disk) runs even on a certified read.
+            d.set_item("certified", certified)?;
 
             let mut count = 0usize;
             let items = PyList::empty(py);
@@ -540,14 +575,16 @@ fn diff_files<'py>(
 /// `lat merge` uses). Files are merged in argument order — a later file wins a
 /// KEY conflict — with rows identified by their dictionary KEY headings, so a
 /// re-sorted borehole list still merges onto its prior self. A column two files
-/// typed differently errors in strict mode; `lenient` widens it to `X` (keeping
-/// raw values). Returns `(merged_bytes, warnings_json, revisions_json)` or the
-/// `(exit_code, kind, message)` failure triple. When `tran` carries an issue +
-/// date, a single merge-TRAN row is synthesised for the output.
+/// typed differently is settled by `on_type_clash` — `"error"` (default), `"widen"`
+/// (fall back to `X`, raw values kept) or `"promote"` (keep the greatest nDP
+/// precision, zero-padding the coarser values). Returns `(merged_bytes,
+/// warnings_json, revisions_json)` or the `(exit_code, kind, message)` failure
+/// triple. When `tran` carries an issue + date, a single merge-TRAN row is
+/// synthesised for the output.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn merge_core(
     files: &[Vec<u8>],
-    lenient: bool,
+    on_type_clash: &str,
     dvr: Option<&str>,
     encoding: Option<&str>,
     tran: (
@@ -558,7 +595,7 @@ fn merge_core(
         Option<&str>,
     ),
 ) -> Result<(Vec<u8>, String, String), (i32, String, String)> {
-    use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeMismatchMode, merge_parsed};
+    use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeClashMode, merge_parsed};
 
     if files.len() < 2 {
         return Err((
@@ -567,6 +604,11 @@ fn merge_core(
             "merge needs at least two files".to_string(),
         ));
     }
+    // One vocabulary for every surface: the mode strings and this message come from
+    // the merge crate's FromStr, so Python cannot accept a token the CLI rejects.
+    let clash: TypeClashMode = on_type_clash
+        .parse()
+        .map_err(|m: String| (5, "bad_args".to_string(), m))?;
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
     let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
         (
@@ -611,11 +653,7 @@ fn merge_core(
     };
 
     let opts = MergeOpts {
-        type_mismatch: if lenient {
-            TypeMismatchMode::Lenient
-        } else {
-            TypeMismatchMode::Strict
-        },
+        on_type_clash: clash,
         edition: dv,
         tran,
         ..Default::default()
@@ -653,10 +691,17 @@ fn merge_core(
                 serde_json::to_string(&revisions).unwrap_or_else(|_| "[]".to_string()),
             ))
         }
-        // A strict TYPE conflict / emit failure is a schema-level rejection (exit 6),
-        // matching the `lat merge` codes.
+        // An unresolved TYPE conflict / emit failure is a schema-level rejection
+        // (exit 6), matching the `lat merge` codes.
         Err(e @ MergeError::TypeConflict { .. }) => {
             Err((6, "type_conflict".to_string(), e.to_string()))
+        }
+        // Fatal in EVERY mode — no `on_type_clash` value absorbs it (#501). Its own
+        // kind so a caller can tell "your files disagree on a column's TYPE, which
+        // widen/promote CAN settle" from "your files disagree on its UNIT, which
+        // nothing can" — the two need different fixes.
+        Err(e @ MergeError::UnitConflict { .. }) => {
+            Err((6, "unit_conflict".to_string(), e.to_string()))
         }
         Err(e @ MergeError::Emit(_)) => Err((6, "emit_error".to_string(), e.to_string())),
     }
@@ -666,12 +711,12 @@ fn merge_core(
 /// warnings_json, revisions_json}` — the Python layer parses the two JSON
 /// strings — or the `{ok:false, error_kind, exit_code, error}` failure dict.
 #[pyfunction]
-#[pyo3(signature = (files, lenient=false, dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None))]
+#[pyo3(signature = (files, on_type_clash="error", dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None))]
 #[allow(clippy::too_many_arguments)]
 fn merge_files<'py>(
     py: Python<'py>,
     files: Vec<Vec<u8>>,
-    lenient: bool,
+    on_type_clash: &str,
     dict_version: Option<String>,
     encoding: Option<String>,
     tran_issue: Option<String>,
@@ -689,7 +734,7 @@ fn merge_files<'py>(
     );
     match merge_core(
         &files,
-        lenient,
+        on_type_clash,
         dict_version.as_deref(),
         encoding.as_deref(),
         tran,
@@ -838,7 +883,16 @@ impl Reading {
     /// Same shared emitter (`laterite_types::arrow_cols`) as the old eager build —
     /// byte-identical columns, and still the SAME cast the browser's IPC path
     /// uses. The Python `Ags4File` memoises the result per code.
-    fn table_for(&self, code: &str) -> PyResult<Option<PyTable>> {
+    /// `content_hash` appends a trailing `_content_hash` column — the typed,
+    /// blank-insensitive fingerprint of the row's whole VALUE (keychain's
+    /// `content_hash`), as opposed to `_id`, which fingerprints its IDENTITY.
+    /// Opt-in at BUILD time, not projection: hashing every cell costs a
+    /// `parse_value` pass + a SHA-256 per row, so a caller who never asks pays
+    /// nothing and the default batch stays byte-identical (a `SELECT *` through
+    /// `.sql()` is unchanged — which projection-time stripping could not have
+    /// promised). Appended LAST so `_id`/`_parent_id` keep columns 0/1.
+    #[pyo3(signature = (code, content_hash=false))]
+    fn table_for(&self, code: &str, content_hash: bool) -> PyResult<Option<PyTable>> {
         let Some(g) = self.parsed.groups.get(code) else {
             return Ok(None);
         };
@@ -874,6 +928,38 @@ impl Reading {
             )
         }
         .map_err(|e| PyRuntimeError::new_err(format!("arrow batch for {code}: {e}")))?;
+
+        // Unlike the ids above, this needs NO registry — it hashes every
+        // heading rather than the spec key-chain, so a custom/passthrough group
+        // (which gets no `_id` at all) still gets a usable value fingerprint.
+        // Types come from the file's OWN TYPE row: canonicalisation is per-file,
+        // which is why two files that disagree on a column's TYPE may not dedup.
+        let batch = if content_hash {
+            let hashes = laterite_ags4_core::keychain::group_content_hashes(
+                code,
+                &g.headings,
+                &g.types,
+                g.rows.len(),
+                |col, row| g.cell(col, row),
+            );
+            let mut fields: Vec<std::sync::Arc<arrow::datatypes::Field>> =
+                batch.schema().fields().iter().cloned().collect();
+            fields.push(std::sync::Arc::new(arrow::datatypes::Field::new(
+                "_content_hash",
+                arrow::datatypes::DataType::Utf8,
+                false,
+            )));
+            let mut columns = batch.columns().to_vec();
+            columns.push(std::sync::Arc::new(arrow::array::StringArray::from(hashes)));
+            arrow::record_batch::RecordBatch::try_new(
+                std::sync::Arc::new(arrow::datatypes::Schema::new(fields)),
+                columns,
+            )
+            .map_err(|e| PyRuntimeError::new_err(format!("_content_hash for {code}: {e}")))?
+        } else {
+            batch
+        };
+
         let schema = batch.schema();
         Ok(Some(PyTable::try_new(vec![batch], schema)?))
     }
@@ -893,40 +979,42 @@ struct PySidecar {
 
 #[pymethods]
 impl PySidecar {
-    /// Assemble a certificate for an ALREADY-clean file: index `data`'s group
-    /// sections and stamp the validation. The caller MUST have validated `data`
-    /// clean (0 error findings) — core trusts that, it cannot re-check. `edition`
-    /// is the resolved AGS edition (e.g. "4.1.1"); `checked_at` an RFC-3339 UTC
-    /// timestamp; `warnings`/`fyi` the advisory counts present at validation
-    /// (errors are 0 by construction). The validator name + version are filled
-    /// here. Raises `ValueError` if `data` isn't indexable AGS4 (e.g. non-UTF-8,
-    /// which the byte index rejects).
+    /// **Mint** a certificate for `data` — validating it here, first.
+    ///
+    /// This replaces `assemble`, whose signature was
+    /// `(data, edition, checked_at, warnings=0, fyi=0, …)`: the caller told it what the
+    /// verdict had been, and the DEFAULTS asserted a clean one. Nothing in the Python
+    /// layer ever passed those two arguments, so every certificate this wheel ever
+    /// produced recorded "0 warnings, 0 FYI" without anything having looked. A later
+    /// `--show-warnings` request read the zero and skipped the engine.
+    ///
+    /// So there is no longer a parameter through which a caller can assert a verdict.
+    /// `mint` runs the rules itself, with both tiers on, and records what they returned.
+    /// It refuses a file with ERRORS (warnings are recorded, not fatal — a delivery may
+    /// legitimately carry them). Raises `ValueError` on an uncertifiable or unparseable
+    /// file.
     #[staticmethod]
-    #[pyo3(signature = (data, edition, checked_at, warnings=0, fyi=0, compat=None, check_files=false, edition_forced=false))]
-    #[allow(clippy::too_many_arguments)] // a builder-style mint API; all keyword-only from Python
-    fn assemble(
+    #[pyo3(signature = (data, checked_at, dict_version=None, encoding=None, compat=None))]
+    fn mint(
         data: &[u8],
-        edition: String,
         checked_at: String,
-        warnings: u32,
-        fyi: u32,
+        dict_version: Option<&str>,
+        encoding: Option<&str>,
         compat: Option<String>,
-        check_files: bool,
-        edition_forced: bool,
     ) -> PyResult<Self> {
-        let stamp = ValidationStamp {
-            validator: ENGINE_IDENTITY.to_string(),
-            // The ENGINE version (not this wheel's), so the cert is comparable
-            // across surfaces (e.g. a cert minted by the DuckDB extension).
-            validator_version: laterite_ags4_validator::VERSION.to_string(),
-            compat,
-            check_files,
-            edition_forced,
-            checked_at,
-            warnings,
-            fyi,
+        let over = parse_dv(dict_version).map_err(pyo3::exceptions::PyValueError::new_err)?;
+        let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "unknown encoding {:?}",
+                encoding.unwrap_or("")
+            ))
+        })?;
+        let opts = CheckOptions {
+            dict_version: over,
+            encoding: enc,
+            ..CheckOptions::default()
         };
-        let inner = CoreSidecar::assemble(data, edition, stamp)
+        let inner = laterite_ags4_trust::mint(data, &opts, checked_at, compat)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
         Ok(Self { inner })
     }
@@ -957,13 +1045,20 @@ impl PySidecar {
         Ok(pyo3::types::PyBytes::new(py, &bytes))
     }
 
-    /// The byte-offset index — `{group_code: (start, end)}` in file order (an
+    /// The byte-offset index — `{group_code: [(start, end), …]}` in file order (an
     /// insertion-ordered dict). Locates each group's bytes for a sliced read.
+    ///
+    /// A **list** of spans, not one span: a code can appear in more than one section,
+    /// and the single-span shape this replaces could only express the first — so a
+    /// sliced read of a redeclared group silently returned a subset of its rows. A
+    /// list with more than one entry means "re-parse the file"; it does not mean
+    /// "pick one".
     fn index<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let d = PyDict::new(py);
         for code in &self.inner.order {
-            if let Some((s, e)) = self.inner.groups.get(code) {
-                d.set_item(code, (*s, *e))?;
+            if let Some(spans) = self.inner.groups.get(code) {
+                let list: Vec<(u64, u64)> = spans.clone();
+                d.set_item(code, list)?;
             }
         }
         Ok(d)
@@ -981,17 +1076,29 @@ impl PySidecar {
     fn sha256(&self) -> &str {
         &self.inner.file.sha256
     }
+    /// The AGS edition the rules were run against.
     #[getter]
     fn edition(&self) -> &str {
-        &self.inner.file.edition
+        self.inner.validation.edition.edition()
+    }
+    /// Was that edition FORCED (`dict_version=`), or auto-resolved from `TRAN_AGS`?
+    /// One fact with the edition string, not two — a forced run and an auto run can
+    /// name the same edition having applied different dictionaries, and the predicate
+    /// this replaces compared the two apart.
+    #[getter]
+    fn edition_forced(&self) -> bool {
+        self.inner.validation.edition.is_forced()
     }
     #[getter]
     fn validator(&self) -> &str {
         &self.inner.validation.validator
     }
+    /// The fingerprint of the rule engine that produced this verdict — a hash of the
+    /// rule sources and the bundled dictionary, NOT the wheel's version. A rule can
+    /// change without a version bump; this cannot.
     #[getter]
-    fn validator_version(&self) -> &str {
-        &self.inner.validation.validator_version
+    fn engine(&self) -> &str {
+        &self.inner.validation.engine
     }
     #[getter]
     fn compat(&self) -> Option<&str> {
@@ -1001,14 +1108,14 @@ impl PySidecar {
     fn checked_at(&self) -> &str {
         &self.inner.validation.checked_at
     }
-
+    /// The decoder the certified bytes were READ through (`"UTF-8"`, `"windows-1252"`, …).
+    ///
+    /// Part of the verdict, not trivia: the rules judge the TEXT the bytes decode to, and
+    /// two decoders can reach two verdicts on one unchanged file. A certificate minted
+    /// under one decoder does not answer a request made under another.
     #[getter]
-    fn check_files(&self) -> bool {
-        self.inner.validation.check_files
-    }
-    #[getter]
-    fn edition_forced(&self) -> bool {
-        self.inner.validation.edition_forced
+    fn encoding(&self) -> &str {
+        &self.inner.validation.encoding
     }
     #[getter]
     fn etag(&self) -> Option<&str> {
@@ -1019,32 +1126,25 @@ impl PySidecar {
         self.inner.file.last_modified.as_deref()
     }
 
-    /// Was this cert minted by the CURRENT native validator engine (same engine
-    /// version, not the `laterite.compat` profile)? `.validate()` skips the rule
-    /// engine only when a carried cert is both fresh (bytes unchanged) AND this
-    /// holds — a cert from an older engine is re-validated, not trusted.
-    fn matches_native_validator(&self) -> bool {
-        self.inner
-            .checker_matches(ENGINE_IDENTITY, laterite_ags4_validator::VERSION, None)
+    /// Findings of each tier that the validation **measured** — or `None` if it never
+    /// ran that tier's rules.
+    ///
+    /// `None` is the point. The old format stored a bare `int` that defaulted to `0`, so
+    /// "I found no warnings" and "I never looked for warnings" were the same value, and
+    /// a consumer could not tell them apart. It read the zero and trusted it.
+    #[getter]
+    fn errors(&self) -> Option<u32> {
+        tier_count(self.inner.validation.errors)
+    }
+    #[getter]
+    fn warnings(&self) -> Option<u32> {
+        tier_count(self.inner.validation.warnings)
+    }
+    #[getter]
+    fn fyi(&self) -> Option<u32> {
+        tier_count(self.inner.validation.fyi)
     }
 
-    /// Does this cert's check profile cover a request's? (`check_files`: the cert
-    /// must have run at least what's asked; `forced_edition`: a forced request is
-    /// covered only by the same forced edition, an auto request only by an auto
-    /// cert.) The `.validate()` skip requires this alongside a fresh cert + engine
-    /// match.
-    #[pyo3(signature = (check_files, forced_edition=None))]
-    fn profile_covers(&self, check_files: bool, forced_edition: Option<&str>) -> bool {
-        self.inner.profile_covers(check_files, forced_edition)
-    }
-    #[getter]
-    fn warnings(&self) -> u32 {
-        self.inner.validation.warnings
-    }
-    #[getter]
-    fn fyi(&self) -> u32 {
-        self.inner.validation.fyi
-    }
     #[getter]
     fn order(&self) -> Vec<String> {
         self.inner.order.clone()
@@ -1052,13 +1152,13 @@ impl PySidecar {
 
     fn __repr__(&self) -> String {
         format!(
-            "<Sidecar v{} {} groups {} bytes edition={:?} by {} {}>",
+            "<Sidecar v{} {} groups {} bytes edition={:?} by {} engine {}>",
             self.inner.version,
             self.inner.order.len(),
             self.inner.file.size,
-            self.inner.file.edition,
+            self.inner.validation.edition.edition(),
             self.inner.validation.validator,
-            self.inner.validation.validator_version,
+            self.inner.validation.engine,
         )
     }
 }

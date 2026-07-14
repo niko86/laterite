@@ -14,8 +14,8 @@
 // (encoding_rs + memchr only — wasm-safe); the validator dep stays for rules.
 use laterite_ags4_parse::{ParsedFile, parse_bytes};
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, ValidatorError, dict::Dictionary, dict::FALLBACK, findings,
-    resolve_dict_version, rules, tran_ags_of,
+    CheckOptions, DictVersion, ValidatorError, WorldScope, check_parsed_with_dict,
+    dict::Dictionary, dict::FALLBACK, findings, resolve_dict_version, tran_ags_of,
 };
 use laterite_types::sql_type;
 use serde::{Deserialize, Serialize};
@@ -131,13 +131,21 @@ fn classify(e: &ValidatorError) -> (&'static str, String) {
     (kind, e.to_string())
 }
 
-/// Resolve a UI encoding label to an `encoding_rs` encoding, via the shared
-/// label table in the parse leaf so a label means the same thing on every
-/// surface. The select offers UTF-8 + Windows-1252 (the legacy producer);
-/// default + unknown → UTF-8, matching the validator's historical
-/// `from_utf8_lossy` behaviour.
-fn resolve_encoding(label: Option<&str>) -> &'static encoding_rs::Encoding {
-    laterite_ags4_parse::resolve_encoding(label).unwrap_or(encoding_rs::UTF_8)
+/// Resolve a UI encoding label to an `encoding_rs` encoding, via the shared label
+/// table in the parse leaf so a label means the same thing on every surface.
+///
+/// An unknown label is an ERROR, not a fallback. It used to return UTF-8 — which
+/// reads like leniency and behaves like corruption: `C3 A9` decodes cleanly as `é`
+/// in UTF-8 and `Ã©` in cp1252, so a caller who asked for the wrong label got the
+/// wrong text and a clean bill of health. Python raised on the same input. The
+/// browser's own select only offers UTF-8 / Windows-1252, so the UI cannot trip
+/// this; the wasm API is public, and a caller who names a charset we do not know
+/// deserves to be told so.
+fn resolve_encoding(
+    label: Option<&str>,
+) -> std::result::Result<&'static encoding_rs::Encoding, String> {
+    laterite_ags4_parse::resolve_encoding(label)
+        .ok_or_else(|| format!("unknown encoding {:?}", label.unwrap_or("")))
 }
 
 /// Map a UI dict-version string to a forced edition. `None` / `"auto"`
@@ -532,18 +540,25 @@ pub fn validate(
         .expect("ValidationReport is plain data and always serialises")
 }
 
-/// Mint a `.ags.idx` validity certificate for a file that validates clean,
-/// entirely client-side (#360). Returns the certificate JSON for the browser
-/// to download.
+/// Mint a `.ags.idx` validity certificate, entirely client-side (#360). Returns the
+/// certificate JSON for the browser to download.
 ///
 /// * `checked_at` — an RFC-3339 timestamp from the browser (`new Date()
 ///   .toISOString()`): wasm has no clock, so the caller supplies it.
 ///
-/// Errors if the file can't be parsed, or has any findings — a certificate
-/// attests a *clean* validation. The mint is errors-only (like `lat
-/// certify` / Python `.certify()`), so the stamp records `warnings=0,
-/// fyi=0`. The stamped engine version is the shared validator's, so the cert
-/// is comparable across surfaces.
+/// Errors if the file can't be parsed, or has **errors** — warnings and FYI findings are
+/// *measured and recorded*, not fatal.
+///
+/// The mint is the shared one (`laterite_ags4_trust::mint`), so a browser-minted
+/// certificate is byte-for-byte the same statement as one from `lat certify`. It used to
+/// be assembled here: this surface ran an ERRORS-ONLY validation and then wrote
+/// `warnings: 0, fyi: 0` into the stamp — a claim to have measured two tiers it had never
+/// looked at, which a later `validate --warnings --index` on any surface would have
+/// believed. The mint now measures every tier itself, and there is no parameter left
+/// through which this function could assert one.
+///
+/// It also cannot record an on-disk `FILE/` check: the wasm sandbox has no filesystem, and
+/// the stamp no longer has a field in which to say otherwise.
 #[wasm_bindgen]
 pub fn certify(
     data: &[u8],
@@ -551,45 +566,17 @@ pub fn certify(
     encoding_label: Option<String>,
     checked_at: String,
 ) -> Result<String, JsError> {
-    use laterite_ags4_core::index::{ENGINE_IDENTITY, Sidecar, ValidationStamp};
-
     console_error_panic_hook::set_once();
 
     let dict_over = resolve_dict_override(dict_version.as_deref()).map_err(|m| JsError::new(&m))?;
-    let encoding = resolve_encoding(encoding_label.as_deref());
-    let parsed = parse_bytes(data, encoding)
-        .map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
-    let (dv, _) = resolve_dict_version(dict_over, tran_ags_of(&parsed).as_deref())
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
 
-    // Errors-only validation: a cert vouches for the error-clean property.
-    let dict = Dictionary::bundled(dv);
     let opts = CheckOptions {
         dict_version: dict_over,
         encoding,
         ..CheckOptions::default()
     };
-    let mut found = findings::Findings::new();
-    rules::run_all(&parsed, &dict, &opts, None, &mut found);
-    if findings::count(&found) > 0 {
-        return Err(JsError::new(
-            "cannot certify: the file has findings — a certificate attests a clean validation",
-        ));
-    }
-
-    let stamp = ValidationStamp {
-        // Unified engine identity (#430 PR 1a) — was "laterite-ags4-wasm", which
-        // siloed browser-minted certs; now portable to Python/Node/CLI/DuckDB.
-        validator: ENGINE_IDENTITY.to_string(),
-        validator_version: laterite_ags4_validator::VERSION.to_string(),
-        compat: None,
-        check_files: false, // the wasm sandbox has no filesystem
-        edition_forced: dict_over.is_some(),
-        checked_at,
-        warnings: 0,
-        fyi: 0,
-    };
-    let sidecar = Sidecar::assemble(data, dv.as_str().to_string(), stamp)
+    let sidecar = laterite_ags4_trust::mint(data, &opts, checked_at, None)
         .map_err(|e| JsError::new(&e.to_string()))?;
     let json = sidecar
         .to_json()
@@ -617,7 +604,12 @@ fn run(
         Ok(v) => v,
         Err(message) => return ValidationReport::failure("bad_args", message),
     };
-    let encoding = resolve_encoding(encoding_label);
+    let encoding = match resolve_encoding(encoding_label) {
+        Ok(e) => e,
+        // Same channel a bad dict_version uses: the caller SEES the bad label,
+        // instead of getting findings that are artefacts of a UTF-8 fallback.
+        Err(message) => return ValidationReport::failure("bad_args", message),
+    };
 
     let parsed = match parse_bytes(data, encoding) {
         Ok(p) => p,
@@ -629,15 +621,6 @@ fn run(
         }
     };
 
-    let (dv, kind) = match resolve_dict_version(dict_over, tran_ags_of(&parsed).as_deref()) {
-        Ok(r) => r,
-        Err(e) => {
-            let (k, message) = classify(&e);
-            return ValidationReport::failure(k, message);
-        }
-    };
-
-    let dict = Dictionary::bundled(dv);
     let opts = CheckOptions {
         dict_version: dict_over,
         include_warnings,
@@ -646,12 +629,17 @@ fn run(
         ..CheckOptions::default()
     };
 
-    let mut found = findings::Findings::new();
-    // `source = None`: the data-level rules are path-independent and the
-    // opt-in on-disk Rule 20 is double-gated behind `check_files` (false
-    // here) AND `Some(source)`, so this is provably filesystem-free —
-    // the wasm sandbox has no filesystem.
-    rules::run_all(&parsed, &dict, &opts, None, &mut found);
+    // The one door: it resolves the edition, applies the O-42 4.0.3→4.0.4 content
+    // guard, runs the rules, and emits the transparency FYI. The browser used to
+    // assemble those steps itself and left the guard out, so a file mislabelled
+    // 4.0.3 was judged here against a different dictionary than `lat` used on the
+    // same bytes. `WorldScope::None` is the only scope the browser can name —
+    // `OnDisk` needs a path, and the wasm sandbox has no filesystem — so this run is
+    // filesystem-free by construction, not by a coincidentally-false flag.
+    let (found, dv, kind) = match check_parsed_with_dict(&parsed, &opts, &WorldScope::None) {
+        Ok(r) => r,
+        Err(e) => return ValidationReport::failure(e.kind(), e.to_string()),
+    };
 
     let finding_count = findings::count(&found);
     // Raw line text by 1-based line number — `raw_lines` is sequential
@@ -780,24 +768,29 @@ pub fn compute_fixes(
         Ok(v) => v,
         Err(_) => return empty.serialize(&serializer).unwrap(),
     };
-    let encoding = resolve_encoding(encoding_label.as_deref());
+    // An unknown label yields no fixes rather than fixes computed against the
+    // wrong decoding — this fn has no error channel, and silently "fixing" text
+    // we mis-decoded is the worst option on the table.
+    let Ok(encoding) = resolve_encoding(encoding_label.as_deref()) else {
+        return empty.serialize(&serializer).unwrap();
+    };
     let parsed = match parse_bytes(data, encoding) {
         Ok(p) => p,
         Err(_) => return empty.serialize(&serializer).unwrap(),
     };
-    let (dv, _kind) = match resolve_dict_version(dict_over, tran_ags_of(&parsed).as_deref()) {
-        Ok(r) => r,
-        Err(_) => return empty.serialize(&serializer).unwrap(),
-    };
-    let dict = Dictionary::bundled(dv);
     let opts = CheckOptions {
         dict_version: dict_over,
         include_fyi: true,
         encoding,
         ..CheckOptions::default()
     };
-    let mut found = findings::Findings::new();
-    rules::run_all(&parsed, &dict, &opts, None, &mut found);
+    // Through the door, so the fixes offered in the browser are computed against the
+    // same dictionary `lat fix` would use on the same bytes (the O-42 guard included).
+    // No error channel here: a failure yields no fixes rather than fixes derived from
+    // the wrong dictionary.
+    let Ok((found, _dv, _kind)) = check_parsed_with_dict(&parsed, &opts, &WorldScope::None) else {
+        return empty.serialize(&serializer).unwrap_or(JsValue::NULL);
+    };
 
     let fixes = laterite_ags4_validator::fixes::compute_fixes(&parsed, &found);
     fixes
@@ -811,10 +804,21 @@ pub fn compute_fixes(
 /// applied by the shared engine, and the result is always re-encoded as
 /// UTF-8 — so applying to a cp1252 file also normalises its encoding
 /// (Rule-1-friendly, and the caller resets its encoding select to utf-8).
+///
+/// Throws on an unknown `encoding_label`. This used to be infallible and fell back
+/// to UTF-8 — meaning it would REWRITE a file it had just mis-decoded, which is the
+/// one place a silent fallback does permanent damage. The worker already turns a
+/// throw into an `ok: false` reply, and the UI's encoding select is a closed union,
+/// so the browser cannot reach this path; a direct wasm caller can, and should be
+/// told rather than handed a corrupted file.
 #[wasm_bindgen]
-pub fn apply_fixes(data: &[u8], encoding_label: Option<String>, fixes_json: JsValue) -> Vec<u8> {
+pub fn apply_fixes(
+    data: &[u8],
+    encoding_label: Option<String>,
+    fixes_json: JsValue,
+) -> Result<Vec<u8>, JsError> {
     console_error_panic_hook::set_once();
-    let encoding = resolve_encoding(encoding_label.as_deref());
+    let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
     // Decode to text + capture the BOM the same way the engine does, so
     // apply_fixes can honour "keep the BOM" when StripBom isn't selected.
     let has_bom = data.starts_with(&[0xEF, 0xBB, 0xBF]);
@@ -824,7 +828,7 @@ pub fn apply_fixes(data: &[u8], encoding_label: Option<String>, fixes_json: JsVa
         serde_wasm_bindgen::from_value(fixes_json).unwrap_or_default();
 
     let out = laterite_ags4_validator::fixes::apply_fixes(&text, has_bom, &fixes);
-    out.into_bytes()
+    Ok(out.into_bytes())
 }
 
 // ---------------------------------------------------------------------
@@ -1025,7 +1029,7 @@ impl ParsedDataset {
 #[wasm_bindgen]
 pub fn read(data: &[u8], encoding_label: Option<String>) -> Result<ParsedDataset, JsError> {
     console_error_panic_hook::set_once();
-    let encoding = resolve_encoding(encoding_label.as_deref());
+    let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
     let parsed = parse_bytes(data, encoding)
         .map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
     Ok(ParsedDataset { parsed })
@@ -1042,7 +1046,7 @@ pub fn diff(
     max_rows_per_group: Option<u32>,
 ) -> Result<JsValue, JsError> {
     console_error_panic_hook::set_once();
-    let encoding = resolve_encoding(encoding_label.as_deref());
+    let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
     let pa =
         parse_bytes(a, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
     let pb =
@@ -1094,8 +1098,10 @@ impl MergeResult {
 
 /// Merge two AGS4 deliveries of one project into one file (`a` then `b` — `b`
 /// wins a KEY conflict). Rows are matched by their dictionary KEY headings. A
-/// heading the two files typed differently is a `JsError` unless `lenient`
-/// widens it to `X`. `tran_issue` + `tran_date` (both) stamp a synthesised
+/// heading the two files typed differently is a `JsError` unless `on_type_clash`
+/// settles it — `"widen"` falls back to `X` (raw values kept), `"promote"` keeps the
+/// greatest nDP precision (zero-padding the coarser values). `tran_issue` +
+/// `tran_date` (both) stamp a synthesised
 /// merge-TRAN. The edition is `b`'s `TRAN_AGS`, falling back to the standard.
 #[allow(clippy::too_many_arguments)]
 #[wasm_bindgen]
@@ -1103,17 +1109,17 @@ pub fn merge(
     a: &[u8],
     b: &[u8],
     encoding_label: Option<String>,
-    lenient: Option<bool>,
+    on_type_clash: Option<String>,
     tran_issue: Option<String>,
     tran_date: Option<String>,
     tran_producer: Option<String>,
     tran_recipient: Option<String>,
     tran_status: Option<String>,
 ) -> Result<MergeResult, JsError> {
-    use laterite_ags4_merge::{MergeOpts, TranStamp, TypeMismatchMode, merge_parsed};
+    use laterite_ags4_merge::{MergeOpts, TranStamp, TypeClashMode, merge_parsed};
 
     console_error_panic_hook::set_once();
-    let encoding = resolve_encoding(encoding_label.as_deref());
+    let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
     let pa =
         parse_bytes(a, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
     let pb =
@@ -1137,12 +1143,16 @@ pub fn merge(
         _ => None,
     };
 
+    // One vocabulary for every surface: accepted tokens + rejection message come
+    // from the merge crate's FromStr, so the browser cannot drift from the CLI.
+    let clash: TypeClashMode = on_type_clash
+        .as_deref()
+        .unwrap_or("error")
+        .parse()
+        .map_err(|m: String| JsError::new(&m))?;
+
     let opts = MergeOpts {
-        type_mismatch: if lenient.unwrap_or(false) {
-            TypeMismatchMode::Lenient
-        } else {
-            TypeMismatchMode::Strict
-        },
+        on_type_clash: clash,
         edition: dv,
         tran,
         ..Default::default()
@@ -1280,21 +1290,66 @@ mod tests {
             .timestamp_micros()
     }
 
+    const CLEAN_FIXTURE: &[u8] =
+        include_bytes!("../../laterite-ags4-validator/tests/fixtures/clean_minimal.ags");
+
     /// A wasm-minted certificate now carries the shared engine identity — it used
     /// to stamp "laterite-ags4-wasm", which siloed browser certs from every other
-    /// surface. Now a cert downloaded from the web app is trusted by
-    /// Python/Node/CLI/DuckDB (given fresh + profile-covers). (#430 PR 1a)
+    /// surface. Now a cert downloaded from the web app is one every surface can read.
+    /// (#430 PR 1a)
     #[test]
     fn certify_stamps_the_unified_engine_identity() {
-        const CLEAN: &[u8] =
-            include_bytes!("../../laterite-ags4-validator/tests/fixtures/clean_minimal.ags");
-        let json = match certify(CLEAN, None, None, "2020-01-01T00:00:00Z".to_string()) {
+        let json = match certify(
+            CLEAN_FIXTURE,
+            None,
+            None,
+            "2020-01-01T00:00:00Z".to_string(),
+        ) {
             Ok(s) => s,
             Err(_) => panic!("a clean minimal AGS4 file must certify"),
         };
         assert!(
             json.contains("laterite_ags4") && !json.contains("laterite-ags4-wasm"),
             "wasm cert must stamp the unified engine identity, got: {json}"
+        );
+    }
+
+    /// The browser used to run an ERRORS-ONLY validation and then write `warnings: 0,
+    /// fyi: 0` into the stamp — two tiers it had never measured, on a claim any other
+    /// surface would have believed. Every tier a wasm cert names, it looked at.
+    #[test]
+    fn a_browser_minted_certificate_measured_every_tier_it_names() {
+        let json = certify(
+            CLEAN_FIXTURE,
+            None,
+            None,
+            "2020-01-01T00:00:00Z".to_string(),
+        )
+        .unwrap_or_else(|_| panic!("a clean minimal AGS4 file must certify"));
+        let v: serde_json::Value = serde_json::from_str(&json).expect("the cert is JSON");
+        for tier in ["errors", "warnings", "fyi"] {
+            assert_eq!(
+                v["validation"][tier]["state"], "measured",
+                "the {tier} tier must be MEASURED, not asserted: {json}"
+            );
+            assert_eq!(v["validation"][tier]["count"], 0, "{tier}");
+        }
+    }
+
+    /// The sandbox has no filesystem, and the stamp has no field in which to pretend
+    /// otherwise: nothing a browser mints can claim Rule 20's on-disk half ran.
+    #[test]
+    fn a_browser_minted_certificate_cannot_claim_a_world_check() {
+        let json = certify(
+            CLEAN_FIXTURE,
+            None,
+            None,
+            "2020-01-01T00:00:00Z".to_string(),
+        )
+        .unwrap_or_else(|_| panic!("a clean minimal AGS4 file must certify"));
+        assert!(
+            !json.contains("check_files"),
+            "the stamp must carry no world claim at all: {json}"
         );
     }
 
@@ -1389,18 +1444,36 @@ mod tests {
 
     #[test]
     fn resolve_encoding_maps_the_offered_labels() {
-        assert_eq!(resolve_encoding(None).name(), "UTF-8");
-        assert_eq!(resolve_encoding(Some("")).name(), "UTF-8");
-        assert_eq!(resolve_encoding(Some("utf-8")).name(), "UTF-8");
+        assert_eq!(resolve_encoding(None).unwrap().name(), "UTF-8");
+        assert_eq!(resolve_encoding(Some("")).unwrap().name(), "UTF-8");
+        assert_eq!(resolve_encoding(Some("utf-8")).unwrap().name(), "UTF-8");
         for label in ["windows-1252", "CP1252", "latin1", "ISO-8859-1"] {
             assert_eq!(
-                resolve_encoding(Some(label)).name(),
+                resolve_encoding(Some(label)).unwrap().name(),
                 "windows-1252",
                 "{label}"
             );
         }
-        // An unknown label falls back to UTF-8 (lossy), not an error.
-        assert_eq!(resolve_encoding(Some("not-a-charset")).name(), "UTF-8");
+    }
+
+    /// An unknown label is an ERROR here, as it always was on Python.
+    ///
+    /// This assertion used to say the opposite — "an unknown label falls back to
+    /// UTF-8 (lossy), not an error" — which is how the bug survived: it was not an
+    /// oversight, it was *codified*. But the fallback is not lossy, it is silent:
+    /// `C3 A9` decodes cleanly as `é` in UTF-8 and `Ã©` in cp1252, so a caller who
+    /// typo'd their label got the wrong text and no error at all. `apply_fixes` would
+    /// then rewrite the file from that mis-decode.
+    #[test]
+    fn an_unknown_encoding_label_is_an_error_not_a_fallback() {
+        assert!(resolve_encoding(Some("not-a-charset")).is_err());
+        assert!(resolve_encoding(Some("cp1252x")).is_err());
+        // ...and the label is named, so the caller can see their typo.
+        assert!(
+            resolve_encoding(Some("cp1252x"))
+                .unwrap_err()
+                .contains("cp1252x")
+        );
     }
 
     #[test]
@@ -1448,13 +1521,15 @@ mod tests {
     #[test]
     fn byte_0xe9_is_replacement_under_utf8_but_e_acute_under_cp1252() {
         let data = [b'a', 0xE9, b'b']; // 0xE9 = 'é' in cp1252, invalid UTF-8
-        let (utf8, _, had_errors) = resolve_encoding(Some("utf-8")).decode(&data);
+        let (utf8, _, had_errors) = resolve_encoding(Some("utf-8")).unwrap().decode(&data);
         assert!(had_errors, "0xE9 is not valid UTF-8");
         assert!(
             utf8.contains('\u{FFFD}'),
             "lossy decode inserts U+FFFD: {utf8:?}"
         );
-        let (cp, _, had) = resolve_encoding(Some("windows-1252")).decode(&data);
+        let (cp, _, had) = resolve_encoding(Some("windows-1252"))
+            .unwrap()
+            .decode(&data);
         assert!(!had);
         assert_eq!(cp, "aéb");
     }
@@ -1465,7 +1540,7 @@ mod tests {
         // without the wasm-bindgen JsValue: a cp1252 0xE9 byte must come back as
         // the UTF-8 encoding of 'é' (0xC3 0xA9), even with no fixes selected.
         let data = [b'a', 0xE9, b'b'];
-        let encoding = resolve_encoding(Some("windows-1252"));
+        let encoding = resolve_encoding(Some("windows-1252")).unwrap();
         let (text, _, _) = encoding.decode(&data);
         let out = laterite_ags4_validator::fixes::apply_fixes(&text, false, &[]).into_bytes();
         assert_eq!(out, vec![b'a', 0xC3, 0xA9, b'b']);

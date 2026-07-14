@@ -3,14 +3,38 @@ import { mergeFiles, type MergeConversion } from "../../lib/validatorClient";
 import { fileStore } from "../../lib/fileStore";
 import { downloadBlob, baseName } from "../../lib/download";
 import { controlCompact } from "../../lib/controls";
+import type { TypeClashMode } from "../../lib/validator";
 
 // Merge: reconcile two AGS4 deliveries of one project into one file, in the
 // engine (not in JS). Rows are matched by their dictionary KEY headings (a
 // re-sorted borehole list still merges onto its prior self); a later file wins a
 // KEY conflict; the merge is a union (a row in one file and absent in another is
-// kept). A column the two files typed differently is a conflict — strict rejects
-// it, lenient widens it to X (text). The browser tool merges two files; the CLI
-// and the laterite/laterite-node libraries take N.
+// kept). A column the two files typed differently is settled by `onTypeClash`:
+// error (refuse), widen (fall back to X — raw values kept, TYPE thrown away), or
+// promote (keep the greatest nDP precision, zero-padding the coarser values). The
+// browser tool merges two files; the CLI and the laterite/laterite-node libraries
+// take N.
+
+/** The three ways to settle a TYPE clash, in lattice order — least resolution
+ *  first. Promote is listed before widen because it KEEPS the type; offering only
+ *  the lossy way out is what pushes every clash toward `X`. */
+const CLASH_MODES: { value: TypeClashMode; label: string; hint: string }[] = [
+  {
+    value: "error",
+    label: "Refuse (default)",
+    hint: "Reconciling two producers' declared types is high-stakes — merge will not guess.",
+  },
+  {
+    value: "promote",
+    label: "Keep the greatest precision",
+    hint: "2DP + 5DP → 5DP, coarser values zero-padded (10.00 → 10.00000). No digit changes. Significant figures (nSF) fall back to X.",
+  },
+  {
+    value: "widen",
+    label: "Widen to X (text)",
+    hint: "Every raw value is kept byte-for-byte, but the column's data type is thrown away.",
+  },
+];
 
 interface Picked {
   name: string;
@@ -24,7 +48,7 @@ async function readFile(f: File): Promise<Picked> {
 export const MergeTool: Component = () => {
   const [a, setA] = createSignal<Picked | null>(null);
   const [b, setB] = createSignal<Picked | null>(null);
-  const [lenient, setLenient] = createSignal(false);
+  const [onTypeClash, setOnTypeClash] = createSignal<TypeClashMode>("error");
   const [issue, setIssue] = createSignal("");
   const [date, setDate] = createSignal("");
   const [producer, setProducer] = createSignal("");
@@ -40,13 +64,20 @@ export const MergeTool: Component = () => {
       const y = b();
       // Re-run when the files or any option change.
       return x && y
-        ? { x, y, lenient: lenient(), issue: issue(), date: date(), producer: producer() }
+        ? {
+            x,
+            y,
+            onTypeClash: onTypeClash(),
+            issue: issue(),
+            date: date(),
+            producer: producer(),
+          }
         : null;
     },
-    ({ x, y, lenient, issue, date, producer }) =>
+    ({ x, y, onTypeClash, issue, date, producer }) =>
       mergeFiles(x.bytes, y.bytes, {
         encoding: "utf-8",
-        lenient,
+        onTypeClash,
         // A merge-TRAN is stamped only when both an issue and a date are given.
         tranIssue: issue.trim() || null,
         tranDate: date.trim() || null,
@@ -82,12 +113,16 @@ export const MergeTool: Component = () => {
 
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-fg-muted">
         <label class="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={lenient()}
-            onChange={(e) => setLenient(e.currentTarget.checked)}
-          />
-          Widen conflicting column types to <span class="mono">X</span> (lenient)
+          <span class="text-fg-dim">If the files type a column differently:</span>
+          <select
+            class={controlCompact}
+            value={onTypeClash()}
+            onChange={(e) => setOnTypeClash(e.currentTarget.value as TypeClashMode)}
+          >
+            <For each={CLASH_MODES}>
+              {(m) => <option value={m.value}>{m.label}</option>}
+            </For>
+          </select>
         </label>
         <span class="flex items-center gap-1.5">
           <span class="text-fg-dim">Stamp a merge transmission (optional):</span>
@@ -112,6 +147,10 @@ export const MergeTool: Component = () => {
         </span>
       </div>
 
+      <p class="-mt-2 text-xs text-fg-dim">
+        {CLASH_MODES.find((m) => m.value === onTypeClash())?.hint}
+      </p>
+
       <Show
         when={a() && b()}
         fallback={
@@ -124,7 +163,13 @@ export const MergeTool: Component = () => {
         >
           <Show
             when={!result.error}
-            fallback={<MergeError error={result.error} onLenient={() => setLenient(true)} lenient={lenient()} />}
+            fallback={
+              <MergeError
+                error={result.error}
+                mode={onTypeClash()}
+                onChoose={setOnTypeClash}
+              />
+            }
           >
             <Show when={result()}>
               {(r) => <MergeView result={r()} onDownload={download} />}
@@ -155,26 +200,50 @@ const FilePicker: Component<{
   </label>
 );
 
-const MergeError: Component<{ error: unknown; lenient: boolean; onLenient: () => void }> = (
-  props,
-) => (
-  <div class="rounded-lg border border-err/40 bg-err/5 p-4 text-sm">
-    <p class="text-err">Could not merge: {String(props.error)}</p>
-    <Show when={!props.lenient && String(props.error).toLowerCase().includes("type conflict")}>
-      <p class="mt-2 text-xs text-fg-muted">
-        The two files declare a column with different data types.{" "}
-        <button
-          type="button"
-          class="text-accent underline hover:no-underline"
-          onClick={() => props.onLenient()}
-        >
-          Widen it to X (lenient)
-        </button>{" "}
-        to keep every value, or reconcile the types and try again.
-      </p>
-    </Show>
-  </div>
-);
+/** A TYPE clash offers a way out; a UNIT clash deliberately does NOT (no mode can
+ *  absorb metres-vs-millimetres, and offering a button would send the user in a
+ *  circle — see #501). So only offer the modes when the engine says "type conflict". */
+const MergeError: Component<{
+  error: unknown;
+  mode: TypeClashMode;
+  onChoose: (m: TypeClashMode) => void;
+}> = (props) => {
+  const isTypeClash = () =>
+    String(props.error).toLowerCase().includes("type conflict");
+  // Promote first — it is the option that keeps the column's type.
+  const offers = () =>
+    CLASH_MODES.filter((m) => m.value !== "error" && m.value !== props.mode);
+
+  return (
+    <div class="rounded-lg border border-err/40 bg-err/5 p-4 text-sm">
+      <p class="text-err">Could not merge: {String(props.error)}</p>
+      <Show when={isTypeClash() && offers().length > 0}>
+        <p class="mt-2 text-xs text-fg-muted">
+          The two files declare a column with different data types. Settle it:
+        </p>
+        <ul class="mt-1.5 flex flex-col gap-1 text-xs text-fg-muted">
+          <For each={offers()}>
+            {(m) => (
+              <li>
+                <button
+                  type="button"
+                  class="text-accent underline hover:no-underline"
+                  onClick={() => props.onChoose(m.value)}
+                >
+                  {m.label}
+                </button>{" "}
+                <span class="text-fg-dim">— {m.hint}</span>
+              </li>
+            )}
+          </For>
+        </ul>
+        <p class="mt-1.5 text-xs text-fg-dim">
+          …or reconcile the types in the source files and try again.
+        </p>
+      </Show>
+    </div>
+  );
+};
 
 const MergeView: Component<{ result: MergeConversion; onDownload: () => void }> = (props) => {
   const r = props.result;

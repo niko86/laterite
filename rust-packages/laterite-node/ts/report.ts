@@ -1,4 +1,4 @@
-import type { Finding, Sidecar, ValidationReport } from "./native";
+import type { Finding, ValidationReport } from "./native";
 
 /** One finding without its `rule` key — the value shape `byRule()` groups. */
 export type RuleFinding = Omit<Finding, "rule">;
@@ -36,22 +36,19 @@ export class Report {
     this.#r = r;
   }
 
-  /** Synthesise a clean report from a fresh certificate — the engine-skipped
-   * outcome of `Ags4File.validate()` on an `index=`-certified file. `resolution`
-   * is the sentinel `"certified"` (the engine never emits it), `count` is 0, and
-   * the edition is the cert's. Mirrors laterite-py's `Report.from_cert`. */
-  static fromCert(cert: Sidecar, label: string): Report {
-    return new Report({
-      ok: true,
-      exitCode: 0,
-      file: label,
-      dictVersion: cert.edition,
-      resolution: "certified",
-      count: 0,
-      findings: [],
-      json: JSON.stringify({ file: label, findings: {} }),
-      ndjson: "",
-    });
+  /** Did an `index` certificate stand in for the rule engine?
+   *
+   * NOT "the file was not checked". A certificate can only remove the CONTENT half of a
+   * validation — the part that is a pure function of the file's bytes. Anything that
+   * reads the world outside them (Rule 20's on-disk `FILE/` tree, via `checkFiles`) is
+   * re-run every time, certificate or not, because a directory can change without the
+   * file changing.
+   *
+   * `resolution` used to carry a `"certified"` sentinel instead of this, which made one
+   * field answer two questions — *which dictionary judged the file* and *did we skip the
+   * engine* — and answer neither properly. */
+  get certified(): boolean {
+    return this.#r.certified ?? false;
   }
 
   get file(): string {

@@ -23,8 +23,6 @@ pub mod relational;
 pub mod structure;
 pub mod typed_values;
 
-use std::path::Path;
-
 use crate::CheckOptions;
 use crate::dict::Dictionary;
 use crate::findings::Findings;
@@ -33,11 +31,22 @@ use crate::parse::ParsedFile;
 /// Run every enabled rule against `parsed`, appending to `found`.
 /// Phases wire their family in here; ordering follows the AGS4 rule
 /// numbering so a report reads top-to-bottom like the spec.
-pub fn run_all(
+///
+/// **CONTENT only.** Every rule here is a pure function of `parsed` (and the
+/// dictionary + tier flags): same bytes in, same findings out. Nothing in this
+/// module may touch the filesystem, the clock, or the environment — the rules
+/// that must are in [`crate::world`], and they run from [`crate::check_parsed`],
+/// never from here. That purity is what makes an `.ags.idx` certificate able to
+/// stand in for this function's result.
+///
+/// `pub(crate)`, not `pub`: every out-of-crate caller goes through
+/// [`crate::check_parsed`], which is the only place that can refuse an
+/// incoherent request. Before, four surfaces called this directly with
+/// `check_files: true` in their options and got a silent false clean.
+pub(crate) fn run_all(
     parsed: &ParsedFile,
     dict: &Dictionary,
     opts: &CheckOptions,
-    source: Option<&Path>,
     found: &mut Findings,
 ) {
     line_format::check(parsed, opts, found); // Rules 1, 3, 5, 6
@@ -46,8 +55,7 @@ pub fn run_all(
     dictionary::check(parsed, dict, found); //   Rules 7, 9
     typed_values::check(parsed, found); //       Rule 8
     relational::check(parsed, dict, found); //   Rules 10a–10c, 11a–11c
-    // Rule 20's on-disk half (opt-in) needs the source path.
-    references::check(parsed, dict, source, opts.check_files, found); // 19b_2/3, 20
+    references::check(parsed, dict, found); //   Rules 19b_2/3, 20 (data level)
     // Rule 18 reads Rule 9's output — must run after dictionary::check.
     // Groups takes opts (for FYI gates) AND dict (for Rule 16's FYI
     // variant that compares the file's ABBR descs against the

@@ -89,6 +89,24 @@ impl ParsedGroup {
     }
 }
 
+/// One `"GROUP",…` record as it appears in the source — EVERY occurrence, including
+/// a code's second and later declarations.
+///
+/// [`ParsedFile::groups`] is first-seen-wins, which is right for the typed view (a
+/// redeclared group's rows all attach to the one entry). It is wrong for a *locator*:
+/// the byte index built from it spanned only the FIRST section, so slicing a
+/// redeclared group re-parsed part of the file and silently returned fewer rows than
+/// the whole-file parse — no error, no warning. A cert cannot vouch for a location it
+/// cannot state, so the index needs every span, and that means every record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GroupRecord {
+    pub code: String,
+    /// Byte offset of the `"GROUP"` record in the ORIGINAL bytes.
+    pub byte_offset: u64,
+    /// 1-indexed source line of the record.
+    pub line: u32,
+}
+
 /// A parsed AGS4 file. The validator's `ParsedFile` plus byte fields,
 /// `total_bytes`, and `byte_offsets_source_true`.
 #[derive(Debug, Clone)]
@@ -97,6 +115,10 @@ pub struct ParsedFile {
     pub groups: BTreeMap<String, ParsedGroup>,
     /// GROUP codes in appearance order.
     pub group_order: Vec<String>,
+    /// EVERY `"GROUP"` record, in source order — duplicates included. `group_order`
+    /// is the de-duplicated view of this; anything that needs to LOCATE bytes must
+    /// read this instead (see [`GroupRecord`]).
+    pub group_records: Vec<GroupRecord>,
     /// Every line — empty unless [`ParseOptions::retain_raw_lines`].
     pub raw_lines: Vec<RawLine>,
     pub total_lines: u32,
@@ -212,22 +234,34 @@ pub fn parse_str(text: &str) -> Result<ParsedFile, ParseError> {
 /// Node, and the browser) shares, so a label means the same thing everywhere.
 ///
 /// `None` or empty ⇒ UTF-8. The common legacy-producer spellings are accepted
-/// explicitly, **including the hyphenated `latin-1`** — which is NOT a WHATWG
-/// label, so `Encoding::for_label` rejects it (the divergence this unifies: it
-/// used to error on Python, silently fall back to UTF-8 on Node, and map to
-/// Windows-1252 only in the browser). Any other label flows through
-/// `for_label`. Returns `None` for a genuinely unknown label; the caller
-/// decides the policy — the library surfaces raise, the browser UI falls back
-/// to UTF-8.
+/// explicitly — the ones WHATWG's `for_label` does NOT know — and anything else
+/// flows through `for_label`. Returns `None` for a genuinely unknown label.
+///
+/// **An unknown label is an ERROR on every surface. Never a fallback.** A caller
+/// who asks for `cp1252x` has made a typo, and quietly decoding as UTF-8 instead is
+/// a corruption vector: the bytes `C3 A9` are `é` in UTF-8 and `Ã©` in cp1252, both
+/// decode cleanly, and the file then validates "clean" with the wrong text in it.
+/// Node and the browser used to fall back to UTF-8 here while Python raised.
+///
+/// The explicit arms exist because `for_label` rejects these spellings (probed, not
+/// assumed):
+///   * `latin-1` (hyphenated) — WHATWG knows `latin1`, not `latin-1`.
+///   * `latin9` / `latin-9` — WHATWG knows `l9`, `iso-8859-15`, `csisolatin9`, but
+///     neither of these. They were only accepted by a private table inside the `lat`
+///     CLI, so `--encoding latin-9` worked on the binary and was rejected by the
+///     Python library. Promoted here so one label means one thing everywhere.
 pub fn resolve_encoding(label: Option<&str>) -> Option<&'static encoding_rs::Encoding> {
     let Some(label) = label else {
         return Some(encoding_rs::UTF_8);
     };
     match label.trim().to_ascii_lowercase().as_str() {
         "" | "utf-8" | "utf8" => Some(encoding_rs::UTF_8),
+        // Latin-1 ≈ Windows-1252 except 0x80–0x9F; for AGS4 we treat them as the
+        // same, cp1252 being the strict superset python-ags4 uses.
         "cp1252" | "windows-1252" | "latin1" | "latin-1" | "iso-8859-1" => {
             Some(encoding_rs::WINDOWS_1252)
         }
+        "latin9" | "latin-9" => Some(encoding_rs::ISO_8859_15),
         other => encoding_rs::Encoding::for_label(other.as_bytes()),
     }
 }
@@ -492,6 +526,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
 
     let mut groups: BTreeMap<String, ParsedGroup> = BTreeMap::new();
     let mut group_order: Vec<String> = Vec::new();
+    let mut group_records: Vec<GroupRecord> = Vec::new();
     let mut raw_lines: Vec<RawLine> = Vec::new();
     let mut current: Option<String> = None;
     let mut looks_ags3 = false;
@@ -534,6 +569,13 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                                 "GROUP row missing group code".into(),
                             ));
                         }
+                        // EVERY occurrence, before the first-seen-wins insert below —
+                        // this is what a locator must be built from.
+                        group_records.push(GroupRecord {
+                            code: code.clone(),
+                            byte_offset,
+                            line: number,
+                        });
                         groups.entry(code.clone()).or_insert_with(|| {
                             group_order.push(code.clone());
                             ParsedGroup {
@@ -623,6 +665,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     Ok(ParsedFile {
         groups,
         group_order,
+        group_records,
         raw_lines,
         total_lines,
         has_bom,

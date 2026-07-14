@@ -142,6 +142,14 @@ export type DictVersionOpt =
   | "4.2";
 export type EncodingOpt = "utf-8" | "windows-1252";
 
+// --- merge (Tools → Merge): how to settle a heading two deliveries typed
+// differently. `error` refuses; `widen` falls back to X (raw values kept, but the
+// column's TYPE is thrown away); `promote` keeps the column numeric when every
+// clashing code is nDP — greatest precision wins (2DP + 5DP -> 5DP) and the coarser
+// values are zero-padded, so no digit changes and Rule 8 still holds. nSF/nSCI and
+// cross-family clashes fall back to `widen`. Mirrors the engine's TypeClashMode. ---
+export type TypeClashMode = "error" | "widen" | "promote";
+
 // --- AGS4 producer (Export tab): the `laterite-ags4-wasm` build_ags4(groups, edition, mode)
 // result — build valid AGS4 from data. `mode`: autofix (default) | report |
 // strict. ---

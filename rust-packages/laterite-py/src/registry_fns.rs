@@ -11,6 +11,7 @@
 //! side as an overlay merged with this base — see D4a in the plan.
 
 use laterite_ags4_core::registry::{ancestor_chain, inherited_key_names, registry};
+use laterite_ags4_validator::dict::DictVersion;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -79,10 +80,46 @@ fn registry_dictionary_json(edition: Option<String>) -> PyResult<String> {
     Ok(serde_json::to_string(&dto).expect("dictionary serialises"))
 }
 
+/// What THIS SURFACE resolves an encoding label to — the canonical `encoding_rs`
+/// name (`"UTF-8"`, `"windows-1252"`, `"ISO-8859-15"`), or `None` if it refuses.
+///
+/// The wheel's read/validate/fix paths call `laterite_ags4_parse::resolve_encoding`
+/// and raise on `None`; this reports the same answer without needing a file. The
+/// surface census diffs it against the other launchers, which is how a surface that
+/// quietly re-adds a UTF-8 fallback for unknown labels (Node had exactly that) shows
+/// up as `"cp1252x" -> "UTF-8"` instead of `None`.
+#[pyfunction]
+fn resolve_encoding_label(label: Option<&str>) -> Option<String> {
+    laterite_ags4_parse::resolve_encoding(label).map(|e| e.name().to_string())
+}
+
+/// The bundled AGS4 editions, oldest first — `["4.0.3", … "4.2"]`.
+///
+/// GENERATED, all the way down: `DictVersion::ALL` is emitted by the reference
+/// leaf's `build.rs` from `ags_dictionary.json`. Exposed so Python does not keep a
+/// hand-written copy of a set the dictionary already defines — it had three
+/// (`_cli.py`'s `--dict-version` choices, the `Edition` type, `registry.py`), and a
+/// new edition would have reached none of them.
+#[pyfunction]
+fn registry_editions() -> Vec<String> {
+    DictVersion::ALL.iter().map(|v| v.as_str().into()).collect()
+}
+
+/// The edition `auto` resolves to when a file's `TRAN_AGS` is missing or
+/// unrecognised (the union's `fallback_edition`, generated). Exposed for the same
+/// reason as [`registry_editions`]: so no surface hard-codes it.
+#[pyfunction]
+fn registry_fallback_edition() -> String {
+    laterite_ags4_validator::dict::FALLBACK.as_str().into()
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_groups_json, m)?)?;
     m.add_function(wrap_pyfunction!(registry_ancestor_chain, m)?)?;
     m.add_function(wrap_pyfunction!(registry_inherited_key_names, m)?)?;
     m.add_function(wrap_pyfunction!(registry_dictionary_json, m)?)?;
+    m.add_function(wrap_pyfunction!(registry_editions, m)?)?;
+    m.add_function(wrap_pyfunction!(resolve_encoding_label, m)?)?;
+    m.add_function(wrap_pyfunction!(registry_fallback_edition, m)?)?;
     Ok(())
 }

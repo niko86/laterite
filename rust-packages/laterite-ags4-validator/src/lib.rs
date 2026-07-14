@@ -10,8 +10,9 @@
 //!
 //! ## Status
 //!
-//! **Feature-complete.** All rule families are wired into
-//! [`rules::run_all`]. The five bundled standard dictionaries (AGS
+//! **Feature-complete.** All rule families are wired into the rule engine
+//! (`rules::run_all`, crate-private — reach it through [`check_parsed`]). The
+//! five bundled standard dictionaries (AGS
 //! 4.0.3/4.0.4/4.1/4.1.1/4.2) are compiled in (no runtime parse);
 //! [`check_file`] **auto-selects** the matching edition from the
 //! file's `TRAN_AGS` ([`resolve_dict_version`]) unless an explicit
@@ -22,6 +23,9 @@
 //! ## Entry points
 //!
 //! - [`check_file`] — parse + auto-pick the dictionary + run all rules.
+//! - [`check_parsed`] — the same rule run over an already-parsed file. The
+//!   **only** public way in for a caller holding bytes/text rather than a path,
+//!   and the only place that can refuse a request it cannot honestly answer.
 //! - [`is_valid`] — convenience boolean (zero findings).
 //! - [`resolve_dict_version`] / [`tran_ags_of`] — exposed so callers
 //!   (e.g. the corpus-QA harness) can *report* which edition a file
@@ -29,12 +33,22 @@
 
 use std::path::{Path, PathBuf};
 
-/// The validation **engine** version — the identity a `.ags.idx` certificate
-/// stamps so a clean verdict is only trusted (validation skipped) when the same
-/// engine would produce it. Distinct from any binding's crate version (the Python
-/// wheel, the DuckDB extension) so a cert minted on one surface is comparable on
-/// another: all bindings record THIS, not their own version.
+/// The validation **engine** version — a hand-bumped semver. Useful for humans,
+/// **useless as a cache key**: edit a rule without bumping the crate and this
+/// value is unchanged, so a certificate minted by the old engine still looks
+/// current. [`ENGINE_FINGERPRINT`] is the value a cert must stamp.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The identity of the *engine that produces verdicts* — a build-time SHA-256
+/// over every rule source file plus the dictionary and rules-catalogue data
+/// (see `build.rs`). Change a rule, change a dictionary entry, and this changes;
+/// forget to bump the crate version and this changes anyway.
+///
+/// This is what an `.ags.idx` certificate stamps, and what a later run compares
+/// against before it trusts a recorded verdict enough to skip re-validating. The
+/// question a cert answers is "would *this* engine, over *these* bytes, still say
+/// clean?" — and only a fingerprint of the engine's actual inputs can answer it.
+pub const ENGINE_FINGERPRINT: &str = env!("LATERITE_ENGINE_FINGERPRINT");
 
 pub mod catalogue;
 pub mod error;
@@ -42,6 +56,9 @@ pub mod findings;
 pub mod fixes;
 pub mod parse;
 pub mod rules;
+pub mod world;
+
+pub use world::WorldScope;
 
 pub use catalogue::{RULE_LABELS, rule_metadata_json};
 pub use dict::{DictResolution, DictVersion, Dictionary};
@@ -208,6 +225,47 @@ pub fn check_file(path: &Path, opts: &CheckOptions) -> Result<Findings, Validato
     check_file_with_dict(path, opts).map(|(f, _, _)| f)
 }
 
+/// Run the rules over an already-parsed file — **the one door into the engine**.
+///
+/// Two halves, and the split is the whole point:
+///
+/// * CONTENT (`rules::run_all`) — a pure function of `parsed`. Cacheable; an
+///   `.ags.idx` certificate may stand in for it.
+/// * WORLD ([`world::run`]) — reads state outside the bytes (today: Rule 20's
+///   sibling `FILE/` tree). Never cacheable, and here it is run *unconditionally*,
+///   outside any branch a future certificate-skip could hide behind.
+///
+/// `opts.check_files` is the request; `world` is the *ability* to honour it. When
+/// a caller asks for the on-disk check and supplies no path — every bytes/text
+/// read, and wasm always — the honest answer is
+/// [`ValidatorError::WorldCheckRequiresSource`], not a clean Rule 20. The engine
+/// used to give the clean one.
+pub fn check_parsed(
+    parsed: &parse::ParsedFile,
+    dict: &Dictionary,
+    opts: &CheckOptions,
+    world: &WorldScope,
+) -> Result<Findings, ValidatorError> {
+    if opts.check_files && matches!(world, WorldScope::None) {
+        return Err(ValidatorError::WorldCheckRequiresSource);
+    }
+    let mut found: Findings = Findings::new();
+    rules::run_all(parsed, dict, opts, &mut found);
+    world::run(parsed, world, &mut found);
+    Ok(found)
+}
+
+/// The world a caller with `source` and `opts` is entitled to look at: the
+/// on-disk tree iff they asked for it *and* there is a path to look beside.
+/// A caller with no path and `check_files` set gets `Err` — see [`check_parsed`].
+fn world_for(opts: &CheckOptions, source: Option<&Path>) -> Result<WorldScope, ValidatorError> {
+    match (opts.check_files, source) {
+        (true, Some(p)) => Ok(WorldScope::OnDisk(p.to_path_buf())),
+        (true, None) => Err(ValidatorError::WorldCheckRequiresSource),
+        (false, _) => Ok(WorldScope::None),
+    }
+}
+
 /// Headings introduced in AGS 4.0.4 that did **not** exist in 4.0.3. The two
 /// editions are otherwise identical — same 124 groups, no headings removed;
 /// the only other delta is PMTL's parent re-pointing PMTD→PMTG. So a file in
@@ -270,26 +328,39 @@ pub fn check_file_with_dict(
     path: &Path,
     opts: &CheckOptions,
 ) -> Result<(Findings, DictVersion, DictResolution), ValidatorError> {
-    if let Some(custom) = &opts.custom_dict {
-        return Err(ValidatorError::BadDict {
-            path: custom.clone(),
-            reason: "external --dict override is not implemented; use a bundled \
-                     --dict-version (4.0.3/4.0.4/4.1/4.1.1/4.2) or omit it for \
-                     TRAN_AGS auto-detection"
-                .to_string(),
-        });
-    }
-
+    reject_custom_dict(opts)?;
     let parsed = parse::parse_file_with_encoding(path, opts.encoding)?;
-    let (dv, kind) = resolve_dict_version(opts.dict_version, tran_ags_of(&parsed).as_deref())?;
-    let (dv, kind, upgraded_from_4_0_3) = guard_4_0_4(dv, kind, &parsed);
+    // We have a path, so `--check-files` is answerable: Rule 20's on-disk half
+    // can locate the sibling `FILE/` tree.
+    let world = world_for(opts, Some(path))?;
+    check_parsed_with_dict(&parsed, opts, &world)
+}
+
+/// **Pick the dictionary, then judge the file against it** — the whole of what
+/// `check_file_with_dict` does once the bytes are parsed, and the door every
+/// modality goes through.
+///
+/// It exists because "resolve the edition, then run the rules" is not two steps a
+/// caller can be trusted to assemble. It is four: resolve `TRAN_AGS`, apply the
+/// 4.0.3→4.0.4 content guard ([`guard_4_0_4`], O-42), run the rules, and emit the
+/// transparency FYI that says the file's declared edition and its actual vocabulary
+/// disagree. Every caller that hand-assembled it got the same two right and the same
+/// two wrong: `laterite-py`, `laterite-node` and the wasm surface each resolved and
+/// ran, and each skipped the guard. So a file whose `TRAN_AGS` said 4.0.3 while it
+/// used a 4.0.4-only heading was judged against **4.0.4 from a path and 4.0.3 from
+/// bytes** — same file, same flags, two dictionaries, and two phantom Rule 9
+/// findings on the bytes side. Not a knob that disagreed; an answer that did.
+pub fn check_parsed_with_dict(
+    parsed: &parse::ParsedFile,
+    opts: &CheckOptions,
+    world: &WorldScope,
+) -> Result<(Findings, DictVersion, DictResolution), ValidatorError> {
+    reject_custom_dict(opts)?;
+    let (dv, kind) = resolve_dict_version(opts.dict_version, tran_ags_of(parsed).as_deref())?;
+    let (dv, kind, upgraded_from_4_0_3) = guard_4_0_4(dv, kind, parsed);
     let dict = Dictionary::bundled(dv);
 
-    let mut found: Findings = Findings::new();
-    // `path` is owned for this whole fn — pass it so Rule 20's opt-in
-    // on-disk half can locate the sibling `FILE/` tree (no lifetime
-    // ripple: the borrow is strictly shorter than `path`).
-    rules::run_all(&parsed, &dict, opts, Some(path), &mut found);
+    let mut found = check_parsed(parsed, &dict, opts, world)?;
     // Transparency FYI (#222 / O-42): if we resolved UP from the file's
     // declared 4.0.3 to 4.0.4 because it uses 4.0.4-only vocabulary, say so —
     // TRAN_AGS and the file's content disagree, and the user may want to bump
@@ -310,6 +381,21 @@ pub fn check_file_with_dict(
         );
     }
     Ok((found, dv, kind))
+}
+
+/// The external `--dict <path>` override (O-28) is not implemented. Refused here
+/// rather than in each entry point, so no modality can quietly honour it.
+fn reject_custom_dict(opts: &CheckOptions) -> Result<(), ValidatorError> {
+    match &opts.custom_dict {
+        Some(custom) => Err(ValidatorError::BadDict {
+            path: custom.clone(),
+            reason: "external --dict override is not implemented; use a bundled \
+                     --dict-version (4.0.3/4.0.4/4.1/4.1.1/4.2) or omit it for \
+                     TRAN_AGS auto-detection"
+                .to_string(),
+        }),
+        None => Ok(()),
+    }
 }
 
 /// `true` iff `check_file` produced zero findings. What the CLI exit
@@ -475,5 +561,93 @@ mod tests {
         )
         .unwrap();
         assert_eq!(tran_ags_of(&pf2), None);
+    }
+
+    /// The AGS4 file the pathless tests validate: one FILE row declaring an
+    /// attachment. Rule 20's CONTENT half is satisfied (FS1 *is* defined in the
+    /// FILE group); only its WORLD half — does `FILE/FS1/photo.jpg` exist? —
+    /// has anything left to say.
+    const WITH_ATTACHMENT: &str = "\"GROUP\",\"LOCA\"\r\n\
+         \"HEADING\",\"LOCA_ID\",\"FILE_FSET\"\r\n\
+         \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+         \"DATA\",\"BH1\",\"FS1\"\r\n\r\n\
+         \"GROUP\",\"FILE\"\r\n\
+         \"HEADING\",\"FILE_FSET\",\"FILE_NAME\"\r\n\
+         \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\
+         \"DATA\",\"FS1\",\"photo.jpg\"\r\n";
+
+    #[test]
+    fn check_files_without_a_path_refuses_instead_of_reporting_clean() {
+        // THE BUG, pinned by its output value. A caller asks for the on-disk FILE/
+        // check but holds bytes, not a path — so there is no directory to look
+        // beside. The old engine dropped the request and returned Ok with ZERO
+        // Rule 20 findings: a clean bill of health for a check it never ran, on
+        // every bytes/text read, and in the browser always. No certificate needed.
+        let pf = parse::parse_str(WITH_ATTACHMENT).expect("parses");
+        let dict = Dictionary::bundled(V4_2);
+        let opts = CheckOptions {
+            check_files: true,
+            ..Default::default()
+        };
+
+        let err = check_parsed(&pf, &dict, &opts, &WorldScope::None)
+            .expect_err("a world check with no world must not succeed");
+        assert!(matches!(err, ValidatorError::WorldCheckRequiresSource));
+        assert_eq!(err.kind(), "world_check_requires_source");
+        assert_eq!(err.exit_code(), 5);
+    }
+
+    #[test]
+    fn the_same_request_with_a_path_actually_runs_the_world_check() {
+        // The other half of the proof: the refusal above is not the engine being
+        // unable to do the check — hand it a path and Rule 20 fires. What changed
+        // is that "I can't answer" no longer looks identical to "nothing wrong".
+        let pf = parse::parse_str(WITH_ATTACHMENT).expect("parses");
+        let dict = Dictionary::bundled(V4_2);
+        let opts = CheckOptions {
+            check_files: true,
+            ..Default::default()
+        };
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let ags = tmp.path().join("site.ags"); // no FILE/ tree beside it
+
+        let found = check_parsed(&pf, &dict, &opts, &WorldScope::OnDisk(ags))
+            .expect("a path makes the question answerable");
+        assert!(
+            found.contains_key("AGS Format Rule 20"),
+            "missing FILE/ tree must flag Rule 20: {found:?}"
+        );
+    }
+
+    #[test]
+    fn content_only_runs_are_unaffected() {
+        // Default opts (check_files off) + no world: the everyday library call.
+        // Rule 20's CONTENT half is happy, and nothing touches the filesystem.
+        let pf = parse::parse_str(WITH_ATTACHMENT).expect("parses");
+        let dict = Dictionary::bundled(V4_2);
+        let found = check_parsed(&pf, &dict, &CheckOptions::default(), &WorldScope::None)
+            .expect("content-only always answerable");
+        assert!(
+            !found.contains_key("AGS Format Rule 20"),
+            "content-only must stay path-independent: {found:?}"
+        );
+    }
+
+    #[test]
+    fn the_engine_fingerprint_identifies_the_engine_not_the_crate_version() {
+        // What a certificate stamps. 64 bits of the SHA-256 over the rule sources
+        // + the bundled dictionary — so a rule edit that forgets to bump the crate
+        // version still invalidates every cert minted by the old engine.
+        assert_eq!(ENGINE_FINGERPRINT.len(), 16, "{ENGINE_FINGERPRINT}");
+        assert!(
+            ENGINE_FINGERPRINT
+                .chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+            "must be lowercase hex: {ENGINE_FINGERPRINT}"
+        );
+        assert_ne!(
+            ENGINE_FINGERPRINT, VERSION,
+            "the engine's identity is not the crate's semver"
+        );
     }
 }

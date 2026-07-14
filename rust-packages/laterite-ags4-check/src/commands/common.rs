@@ -8,21 +8,15 @@ use laterite_ags4_validator::{CheckOptions, DictVersion};
 
 use crate::cli::DictArgs;
 
-/// Map an `--encoding <name>` label to an `encoding_rs` encoding. The label set
-/// is intentionally narrow: AGS4 prefers UTF-8 / ASCII; cp1252 and latin1 are
-/// the legacy producers. Other WHATWG labels flow through `Encoding::for_label`.
+/// Map an `--encoding <name>` label to an `encoding_rs` encoding.
+///
+/// Straight to the parse leaf — this used to be a PRIVATE table with a wider label
+/// set than the leaf's (it alone accepted `latin9` / `latin-9`), so
+/// `lat --encoding latin-9` worked on the binary while the Python library rejected
+/// the same label. Those two aliases were promoted into the leaf; there is now one
+/// table, and one label means one thing on every surface.
 pub fn resolve_encoding(label: &str) -> Option<&'static encoding_rs::Encoding> {
-    let trimmed = label.trim().to_ascii_lowercase();
-    let canonical = match trimmed.as_str() {
-        "utf-8" | "utf8" => Some(encoding_rs::UTF_8),
-        "cp1252" | "windows-1252" => Some(encoding_rs::WINDOWS_1252),
-        // Latin-1 ≈ Windows-1252 except the 0x80-0x9F range; for AGS4 we treat
-        // them as the same (cp1252 is the strict superset python-ags4 uses).
-        "latin1" | "latin-1" | "iso-8859-1" => Some(encoding_rs::WINDOWS_1252),
-        "iso-8859-15" | "latin9" | "latin-9" => Some(encoding_rs::ISO_8859_15),
-        _ => None,
-    };
-    canonical.or_else(|| encoding_rs::Encoding::for_label(label.as_bytes()))
+    laterite_ags4_parse::resolve_encoding(Some(label))
 }
 
 /// Fold the shared `--dict-version` / `--dict` / `--encoding` flags onto a base
@@ -31,27 +25,34 @@ pub fn apply_dict_args(mut opts: CheckOptions, d: &DictArgs) -> CheckOptions {
     if let Some(v) = d.dict_version.as_deref() {
         opts.dict_version = match v {
             "auto" => None,
-            "4.0.3" => Some(DictVersion::V4_0_3),
-            "4.0.4" => Some(DictVersion::V4_0_4),
-            "4.1" => Some(DictVersion::V4_1),
-            "4.1.1" => Some(DictVersion::V4_1_1),
-            "4.2" => Some(DictVersion::V4_2),
-            other => {
-                eprintln!(
-                    "error: --dict-version expects auto|{}, got {other:?}",
-                    laterite_ags4_validator::editions_joined("|")
-                );
-                exit(5);
-            }
+            // Ask the GENERATED `from_edition`, not a hand-written match. The error
+            // message below was already generated (`editions_joined`) while the arms
+            // above it were not — so a new edition in ags_dictionary.json would have
+            // produced a CLI that rejects `4.3` with a message advertising `4.3`.
+            other => match DictVersion::from_edition(other) {
+                Some(dv) => Some(dv),
+                None => {
+                    eprintln!(
+                        "error: --dict-version expects auto|{}, got {other:?}",
+                        laterite_ags4_validator::editions_joined("|")
+                    );
+                    exit(5);
+                }
+            },
         };
     }
     if let Some(label) = d.encoding.as_deref() {
         match resolve_encoding(label) {
             Some(enc) => opts.encoding = enc,
             None => {
+                // Name the labels AGS4 files actually turn up in, then say what the
+                // real rule is. The accepted set is every WHATWG label (via
+                // `Encoding::for_label`) plus the leaf's extra aliases, which is far
+                // too long to list and would rot the moment it was written down.
                 eprintln!(
                     "error: --encoding {label:?} not recognised \
-                     (try utf-8 / cp1252 / latin1 / iso-8859-1)"
+                     (common: utf-8 / cp1252 / latin1 / iso-8859-1 / latin-9; \
+                     any WHATWG encoding label is accepted)"
                 );
                 exit(5);
             }
@@ -85,6 +86,48 @@ pub fn sibling_fixed_path(path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every edition the DICTIONARY defines must be accepted by `--dict-version`.
+    ///
+    /// This is the assertion a hand-written match cannot survive. The old code listed
+    /// the editions by hand while deriving its *rejection message* from
+    /// `DictVersion::ALL` — so bundling a new edition would have produced a CLI that
+    /// rejects `4.3` and, in the same breath, tells you `4.3` is one of the values it
+    /// expects. Nothing failed, because nothing compared the two.
+    ///
+    /// It passes trivially today. It is written for the day `ALL` grows: if anyone
+    /// reintroduces a hand-list, this goes red the moment the dictionary moves past it.
+    #[test]
+    fn every_bundled_edition_is_accepted() {
+        for dv in DictVersion::ALL {
+            let args = DictArgs {
+                dict_version: Some(dv.as_str().to_string()),
+                dict: None,
+                encoding: None,
+            };
+            let opts = apply_dict_args(CheckOptions::default(), &args);
+            assert_eq!(
+                opts.dict_version,
+                Some(*dv),
+                "--dict-version {} was not accepted, but the dictionary bundles it",
+                dv.as_str()
+            );
+        }
+    }
+
+    /// `auto` means "decide from TRAN_AGS", i.e. force nothing.
+    #[test]
+    fn auto_forces_no_edition() {
+        let args = DictArgs {
+            dict_version: Some("auto".to_string()),
+            dict: None,
+            encoding: None,
+        };
+        assert_eq!(
+            apply_dict_args(CheckOptions::default(), &args).dict_version,
+            None
+        );
+    }
 
     #[test]
     fn default_index_path_appends_ags_idx() {

@@ -52,6 +52,7 @@ fn main() {
         Commands::Merge(a) => commands::merge::run(a, json, quiet),
         Commands::Certify(a) => commands::certify::run(a, quiet),
         Commands::Rules => commands::rules::run(json),
+        Commands::Census => commands::census::run(),
         #[cfg(feature = "transport")]
         Commands::Pack(a) => commands::transport::run_pack(a),
         #[cfg(feature = "transport")]
@@ -84,7 +85,16 @@ fn with_default_subcommand(mut argv: Vec<String>) -> Vec<String> {
         }
         // First positional: an explicit subcommand stays; anything else is a
         // file for `validate`.
-        if !cli::SUBCOMMANDS.contains(&a.as_str()) {
+        //
+        // Ask CLAP, not a hand-list. A hidden verb (`census`) is still a verb, and
+        // must not have `validate` spliced in front of it — which is exactly what a
+        // hand-list did the first time `lat census` ran. The user-facing
+        // `cli::SUBCOMMANDS` const answers a *different* question (what the README
+        // documents) and is gated against clap by `subcommands_const_is_faithful`.
+        let is_verb = <cli::Cli as clap::CommandFactory>::command()
+            .get_subcommands()
+            .any(|s| s.get_name() == a);
+        if !is_verb {
             argv.insert(i, "validate".to_string());
         }
         return argv;

@@ -22,16 +22,26 @@ def _src(*parts: str) -> str:
     return _ROOT.joinpath(*parts).read_text(encoding="utf-8")
 
 
-# The canonical PRODUCER table — the 5 `ValidatorError` variants. The surfaces
+# The canonical PRODUCER table — the 6 `ValidatorError` variants. The surfaces
 # add two consumer-only kinds no Rust producer emits: `not_utf8` (the validator
 # decodes lossily, so it never surfaces) and `bad_args` (the arg/dispatch layer).
-_PRODUCER = {"not_found": 3, "io": 3, "not_ags4": 4, "unsupported_edition": 4, "bad_dict": 5}
+# `world_check_requires_source` (5, a bad-*arguments* code): `check_files=True` asked
+# of an input with no path — a question about the on-disk `FILE/` tree that a
+# bytes/text read cannot answer, and must not answer with a clean Rule 20.
+_PRODUCER = {
+    "not_found": 3,
+    "io": 3,
+    "not_ags4": 4,
+    "unsupported_edition": 4,
+    "bad_dict": 5,
+    "world_check_requires_source": 5,
+}
 _CONSUMER_ONLY = {"not_utf8": 4, "bad_args": 5}
 # The merge leaf (`laterite-ags4-merge::MergeError`) is a SECOND Rust producer,
 # distinct from `ValidatorError`: a strict TYPE conflict or a failed emit is a
 # schema-level rejection (exit 6). laterite-py's `merge_core` emits these two
 # kinds and `_errors.py` maps both to `MergeConflictError`.
-_MERGE = {"type_conflict": 6, "emit_error": 6}
+_MERGE = {"type_conflict": 6, "unit_conflict": 6, "emit_error": 6}
 _ALL = {**_PRODUCER, **_CONSUMER_ONLY, **_MERGE}
 
 

@@ -26,6 +26,10 @@ recipe set. Cross-references below are clickable.
 
 ::: laterite.diff
 
+::: laterite.merge
+
+::: laterite.MergeResult
+
 ## Rules
 
 ::: laterite.list_rules
@@ -48,11 +52,15 @@ recipe set. Cross-references below are clickable.
 
 ::: laterite.BadDictError
 
+::: laterite.MergeConflictError
+
 ::: laterite.NotAgs4Error
 
 ::: laterite.StaleCertError
 
 ::: laterite.UnsupportedEditionError
+
+::: laterite.WorldCheckRequiresSourceError
 
 ## Type aliases
 

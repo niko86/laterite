@@ -66,9 +66,25 @@ export class StaleCertError extends Ags4Error {
   }
 }
 
+/** `checkFiles: true` was asked of an input with no path — a `read` of a `Buffer` or
+ * a string, where there is no directory for the sibling `FILE/` tree to be in.
+ *
+ * Rule 20's on-disk half is the one check that reads state the AGS4 bytes do not
+ * contain, so it is the one check that cannot be answered from content alone. The
+ * engine used to answer it anyway, by dropping the request and reporting Rule 20
+ * clean. Pass a path (`read("delivery.ags")`) to make the question answerable, or
+ * drop `checkFiles` to leave it unasked. */
+export class WorldCheckRequiresSourceError extends Ags4Error {
+  constructor(message: string, exitCode = 5) {
+    super(message, exitCode);
+    this.name = "WorldCheckRequiresSourceError";
+  }
+}
+
 /** A `merge()` could not be reconciled: two files typed the same heading
  * differently (strict mode), or the merged output failed to emit. Pass
- * `lenient: true` to widen a conflicting column to `X` (text) instead. */
+ * `onTypeClash: "promote"` to keep the greatest `nDP` precision, or `"widen"` to fall
+ * back to `X` (text). A conflicting UNIT is fatal in every mode. */
 export class MergeConflictError extends Ags4Error {
   constructor(message: string, exitCode = 6) {
     super(message, exitCode);
@@ -91,6 +107,8 @@ export function makeError(kind: string, exitCode: number, message: string): Ags4
     case "bad_dict":
     case "bad_args":
       return new BadDictError(message, exitCode);
+    case "world_check_requires_source":
+      return new WorldCheckRequiresSourceError(message, exitCode);
     case "merge_conflict":
     case "emit_error":
       return new MergeConflictError(message, exitCode);

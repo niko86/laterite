@@ -103,8 +103,20 @@ dev = [
 docs = [
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=1.0.6",
-    "mkdocs-gen-files>=0.5",
-    "mkdocs-literate-nav>=0.6",
+    # Capped BELOW the releases that added a hard `properdocs` dependency
+    # (gen-files 0.6.1, literate-nav 0.6.3). properdocs is the maintainer's own
+    # MkDocs fork; those releases call `properdocs.replacement_warning.setup()`
+    # at plugin load, so it executes during every `mkdocs build` purely to print
+    # a promotional "MkDocs is abandoned — switch to ProperDocs" notice. We take
+    # neither the advert nor an unrequested code-executing dep in the docs build.
+    #
+    # (The *substance* — MkDocs 1.x unmaintained, a plugin-breaking 2.0 coming —
+    # is real, and Material confirms it. But we're insulated: mkdocs-material
+    # caps `mkdocs<2` and uv.lock pins 1.6.1. The successor we'd actually follow
+    # is Material's own Zensical, not properdocs — so freezing these two plugins
+    # costs us nothing. Lift a cap only if a release drops the properdocs dep.)
+    "mkdocs-gen-files>=0.5,<0.6.1",
+    "mkdocs-literate-nav>=0.6,<0.6.3",
 ]
 
 [tool.pytest.ini_options]

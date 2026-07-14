@@ -21,15 +21,26 @@
 //!
 //! This is a *locator*, not a validator: it inspects only `"GROUP"` records, so it
 //! does not reproduce the parser's structural checks (it won't reject, e.g., a
-//! HEADING/DATA row before the first GROUP, which `parse_reader` errors on), and
-//! for a (rare, non-conforming) file that splits one group across two sections the
-//! first section wins and the later rows are not in the slice. So the lazy
-//! single-group path is for **well-formed files the parser already accepts**,
+//! HEADING/DATA row before the first GROUP, which `parse_reader` errors on). So the
+//! lazy single-group path is for **well-formed files the parser already accepts**,
 //! while the eager whole-file parse stays the validating, always-correct default.
+//!
+//! A file that splits one group across two sections used to be handled by keeping
+//! the FIRST section and dropping the rest — so a sliced read returned a strict
+//! subset of the whole-file parse's rows, silently. That was a locator stating a
+//! location it did not have. The index now records **every** span of every code
+//! ([`GroupIndex::spans`]), and [`GroupIndex::range`] returns `None` rather than
+//! guess when a code is ambiguous — a caller that cannot be told where a group is
+//! must re-parse the file, not read part of it and believe it read all of it.
 
 use std::collections::HashMap;
 
 use laterite_ags4_parse::{ParseOptions, parse_bytes_opts};
+// The certificate records HOW the edition was chosen, not just which one — a cert that
+// said "exact" for a file whose edition was actually guessed (O-42) would misreport the
+// one thing it exists to vouch for. The reference leaf owns the enum; core is already a
+// consumer of it.
+use laterite_ags4_reference::dict::DictResolution;
 use serde::{Deserialize, Serialize};
 
 use crate::ags4_codec::{AgsGroup, read_ags4_bytes};
@@ -41,16 +52,41 @@ pub type Range = (u64, u64);
 /// Where each group's section lives in an AGS4 file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GroupIndex {
-    /// Group code → its section's byte range.
-    pub groups: HashMap<String, Range>,
-    /// Section order as they appear in the file (matches `ParsedAgs4::order`).
+    /// Group code → EVERY section it occupies, in source order.
+    ///
+    /// A `Vec`, not a `Range`, because a code can legally-in-bytes appear twice.
+    /// The old single-`Range` map silently kept the FIRST section, so slicing a
+    /// redeclared group returned a strict SUBSET of the rows a whole-file parse
+    /// sees — with no error and no warning. A locator that cannot state where a
+    /// group is must say so, not guess.
+    pub groups: HashMap<String, Vec<Range>>,
+    /// Section order as they appear in the file (de-duplicated; matches
+    /// `ParsedAgs4::order`).
     pub order: Vec<String>,
 }
 
 impl GroupIndex {
-    /// The byte range of `code`'s section, if present.
+    /// Every byte range `code` occupies, in source order. Empty if absent.
+    pub fn spans(&self, code: &str) -> &[Range] {
+        self.groups.get(code).map(Vec::as_slice).unwrap_or(&[])
+    }
+
+    /// The byte range of `code`'s section — **only when it is unambiguous**.
+    ///
+    /// `None` for a redeclared group, deliberately: there is no single range, and
+    /// returning the first one is the truncation this type exists to prevent. A
+    /// caller that gets `None` must fall back to the whole-file parse.
     pub fn range(&self, code: &str) -> Option<Range> {
-        self.groups.get(code).copied()
+        match self.spans(code) {
+            [only] => Some(*only),
+            _ => None,
+        }
+    }
+
+    /// Is `code` present exactly once? (A caller deciding whether it may trust a
+    /// sliced read.)
+    pub fn is_unambiguous(&self, code: &str) -> bool {
+        self.spans(code).len() == 1
     }
 }
 
@@ -76,28 +112,39 @@ pub fn index_ags4_bytes(bytes: &[u8]) -> Result<GroupIndex, CliError> {
     }
 
     let total = parsed.total_bytes;
-    let mut groups: HashMap<String, Range> = HashMap::with_capacity(parsed.group_order.len());
-    let mut order: Vec<String> = Vec::with_capacity(parsed.group_order.len());
-    // `group_order` is already de-duplicated (the leaf keeps the first-seen GROUP
-    // for a repeated code), so each code resolves in `groups` exactly once.
-    for (i, code) in parsed.group_order.iter().enumerate() {
+    let mut groups: HashMap<String, Vec<Range>> = HashMap::with_capacity(parsed.group_order.len());
+
+    // Walk EVERY `"GROUP"` record, not the de-duplicated `group_order`. A section
+    // runs from its own record to the start of the NEXT record in source order —
+    // which for a redeclared code means it gets one span per occurrence rather than
+    // a single span silently covering only the first.
+    //
+    // Reading `group_order` here was the bug: it is first-seen-wins, so a file
+    // declaring LOCA twice indexed only the first LOCA section. A sliced read of
+    // that range returned a strict subset of the whole-file parse's rows, with no
+    // error — and the DuckDB extension consumes exactly this index.
+    for (i, rec) in parsed.group_records.iter().enumerate() {
         // A GROUP record with no code can't be located or sliced — reject it,
         // matching the retired csv index (and `ags4_codec::parse_reader`, which
         // still errors). The leaf yields an empty code for a bare `"GROUP"` row.
-        if code.is_empty() {
+        if rec.code.is_empty() {
             return Err(CliError::Schema("GROUP row missing group code".into()));
         }
-        let start = parsed.groups[code].group_byte;
-        // A section ends where the next one begins, or at EOF for the last.
         let end = parsed
-            .group_order
+            .group_records
             .get(i + 1)
-            .map(|next| parsed.groups[next].group_byte)
+            .map(|next| next.byte_offset)
             .unwrap_or(total);
-        order.push(code.clone());
-        groups.insert(code.clone(), (start, end));
+        groups
+            .entry(rec.code.clone())
+            .or_default()
+            .push((rec.byte_offset, end));
     }
-    Ok(GroupIndex { groups, order })
+
+    Ok(GroupIndex {
+        groups,
+        order: parsed.group_order,
+    })
 }
 
 /// Parse a single group from its indexed byte range, reusing the whole-file
@@ -119,17 +166,203 @@ pub fn parse_group_slice(bytes: &[u8], range: Range, code: &str) -> Result<AgsGr
 }
 
 /// Format version of the `.ags.idx` sidecar.
-pub const SIDECAR_VERSION: u32 = 1;
+///
+/// **2**: two changes, both retiring a way the format could lie.
+///
+/// * `groups` maps a code to EVERY span it occupies (`Vec<Range>`), not one — a v1
+///   cert recorded only a redeclared group's first section.
+/// * the [`ValidationStamp`] records, per severity tier, whether the tier was
+///   actually **measured** ([`TierCoverage`]) — v1 wrote `warnings: 0` whether it had
+///   looked or not — carries the [`EngineFingerprint`] of the engine that produced the
+///   verdict rather than a hand-bumped semver, and has **no `check_files` field at
+///   all**, because the on-disk `FILE/` tree is not a property of the certified bytes
+///   and no certificate may speak for it.
+///
+/// A v1 cert is refused, not migrated: every one of those fields is precisely the
+/// untruth this version exists to retire, so there is nothing in it worth carrying
+/// forward. Certificates are a regenerable cache and none are deployed, so an old one
+/// simply falls back to a full validation.
+pub const SIDECAR_VERSION: u32 = 2;
 
 /// The shared **engine identity** every surface stamps into a certificate's
 /// [`ValidationStamp::validator`]. All surfaces run the same
 /// `laterite_ags4_validator` rule engine, so a clean verdict is portable: a cert
 /// minted by one door (Python, Node, the CLI, wasm, the DuckDB extension) is
-/// trusted by another. The *string* is trust-inert provenance — real trust gates
-/// on `validator_version` + `compat` + the check profile ([`Sidecar::checker_matches`]
-/// / [`Sidecar::profile_covers`]) — so unifying it removes an accidental per-binding
-/// silo without weakening any real trust boundary.
+/// trusted by another. The *string* is trust-inert provenance — real trust gates on
+/// the [`EngineFingerprint`] and the tier coverage — so unifying it removes an
+/// accidental per-binding silo without weakening any real trust boundary.
 pub const ENGINE_IDENTITY: &str = "laterite_ags4";
+
+/// What a validation run actually **measured** for one severity tier.
+///
+/// Deliberately not a bare `u32`. "I looked for warnings and found none" and "I never
+/// looked for warnings" are different facts, and v1 could only express the first: its
+/// `warnings: u32` defaulted to `0`, so a mint that never ran the warning rules
+/// recorded a confident zero. Every certificate `laterite-py` ever produced said
+/// `warnings: 0` without having measured anything, and a later `--show-warnings`
+/// request read that zero and skipped the engine.
+///
+/// With this type, an unmeasured tier cannot be written as a clean one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum TierCoverage {
+    /// The rules for this tier were not run. The certificate has nothing to say about
+    /// it, and a request that wants it must re-validate.
+    NotMeasured,
+    /// The rules for this tier ran and found `count` findings.
+    Measured { count: u32 },
+}
+
+impl TierCoverage {
+    /// Did this tier run AND come back empty? The only state in which a certificate
+    /// can stand in for the engine — a cert stores counts, not findings, so it can
+    /// only reproduce a report that has nothing in it.
+    pub fn is_measured_clean(self) -> bool {
+        matches!(self, TierCoverage::Measured { count: 0 })
+    }
+}
+
+/// Which severity tier a [`RevalidateReason`] is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Tier {
+    Errors,
+    Warnings,
+    Fyi,
+}
+
+/// How the edition that judged the file was arrived at.
+///
+/// One indivisible fact, where v1 had two fields that could disagree: `FileMeta.edition`
+/// (a string) and `ValidationStamp.edition_forced` (a bool). A forced run and an
+/// auto-resolved run can land on the same edition string having applied *different*
+/// dictionaries — so the pair had to be compared together, and the old
+/// `profile_covers` compared them apart.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum EditionInput {
+    /// Resolved from the file's own `TRAN_AGS` (with the O-42 content guard). A later
+    /// run that also auto-resolves lands on the same edition — same bytes, same engine,
+    /// same policy — so these two fields are provenance, not part of the trust test.
+    Auto {
+        /// The edition the rules ran against.
+        resolved: String,
+        /// *How* it was arrived at — exact `TRAN_AGS` match, a guessed patch (O-30 /
+        /// O-42), or the fallback. Recorded because a surface reports it, and a cert
+        /// that had to re-derive it would have to re-parse — which is the cost the
+        /// certificate exists to avoid.
+        resolution: DictResolution,
+    },
+    /// The caller overrode the file's declared edition (`--dict-version X`). Only a
+    /// request forcing the SAME edition may be answered from this cert.
+    Forced { edition: String },
+}
+
+impl EditionInput {
+    /// The edition string the rules actually ran against, either way.
+    pub fn edition(&self) -> &str {
+        match self {
+            EditionInput::Auto { resolved, .. } => resolved,
+            EditionInput::Forced { edition } => edition,
+        }
+    }
+
+    /// How the edition was chosen, as the surfaces report it.
+    pub fn resolution(&self) -> DictResolution {
+        match self {
+            EditionInput::Auto { resolution, .. } => *resolution,
+            EditionInput::Forced { .. } => DictResolution::Forced,
+        }
+    }
+
+    /// Was it forced? (Provenance for the surfaces that report it.)
+    pub fn is_forced(&self) -> bool {
+        matches!(self, EditionInput::Forced { .. })
+    }
+}
+
+/// Who is asking, and with what engine — the identity a certificate must match before
+/// its verdict is worth anything.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EngineId {
+    /// [`ENGINE_IDENTITY`].
+    pub validator: String,
+    /// `laterite_ags4_validator::ENGINE_FINGERPRINT` — a SHA-256 over the rule sources
+    /// and the bundled dictionary. Not the crate's semver: a rule can change without
+    /// the semver moving, and then a stale cert still looks current.
+    pub fingerprint: String,
+    /// `Some(v)` when validating through the python-ags4 compat shim, whose behaviour
+    /// deliberately differs from the native engine. A compat verdict is not a native
+    /// verdict; neither may answer for the other.
+    pub compat: Option<String>,
+}
+
+/// The question a caller is asking of the file. A certificate may answer it only if it
+/// can answer it **completely** — see [`Sidecar::decide`].
+///
+/// The world (Rule 20's on-disk `FILE/` tree) is deliberately absent. It is not a
+/// question a certificate can be asked, because it is not a fact about the certified
+/// bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Question {
+    /// The caller wants WARNING-severity findings too.
+    pub want_warnings: bool,
+    /// The caller wants FYI-severity findings too.
+    pub want_fyi: bool,
+    /// `Some(ed)` iff the caller is forcing an edition; `None` means auto-resolve.
+    pub forced_edition: Option<String>,
+    /// The decoder the caller is reading the bytes through (`encoding_rs` canonical
+    /// name: `"UTF-8"`, `"windows-1252"`, …).
+    ///
+    /// It is here because the findings are a function of bytes **and decoder**, not
+    /// bytes alone — and a certificate seals only the bytes. The same UTF-8 file
+    /// containing `Ω` (bytes `CE A9`) is a Rule 1 **error** read as UTF-8 (one code
+    /// point, 937 — above the extended-ASCII range the rule tolerates) and merely an
+    /// **FYI** read as windows-1252 (two code points, 206 and 169 — both inside it).
+    /// Mint under the lenient decoder, then read under the strict one, and a cert that
+    /// compared everything *but* this would vouch for an error-clean file that has an
+    /// error in it.
+    pub encoding: String,
+}
+
+/// May the certificate stand in for the engine?
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Decision {
+    /// Yes — and because a vouched cert is by definition one whose every asked-for
+    /// tier was measured and found empty, the content findings it stands in for are
+    /// **none**. There is nothing to reconstruct.
+    Vouched,
+    /// No. Run the engine. The reason is carried so a surface can say *why* it did not
+    /// take the fast path (and so a test can assert which guard fired).
+    Revalidate(RevalidateReason),
+}
+
+/// Why a certificate could not answer the question asked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RevalidateReason {
+    /// Not a v2 cert.
+    FormatVersion,
+    /// The file is a different length than the one certified.
+    SizeChanged,
+    /// Same length, different bytes.
+    ContentChanged,
+    /// A different validator (or the compat shim vs the native engine).
+    DifferentValidator,
+    /// Same validator, different rules or dictionary — the fingerprint moved.
+    DifferentEngine,
+    /// The cert judged the file against a different dictionary than this request asks
+    /// for (forced-vs-auto, or forced to a different edition).
+    EditionDiffers,
+    /// The cert read the bytes through a different decoder than this request asks for.
+    /// The bytes are identical — the TEXT they become is not, and the rules judge text.
+    EncodingDiffers,
+    /// The caller asked about a tier the cert never ran. The old format could not even
+    /// represent this state, so it never fired — it silently answered `0`.
+    TierNotMeasured(Tier),
+    /// The cert measured the tier and found findings. It stores counts, not findings,
+    /// so it knows there is something to say but not what — the engine must speak.
+    TierNotClean(Tier),
+}
 
 /// The source file a [`Sidecar`] certifies.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -142,9 +375,12 @@ pub struct FileMeta {
     /// transport validators below (a local file has no ETag, and an ETag is only
     /// meaningful relative to the endpoint that issued it).
     pub sha256: String,
-    /// AGS edition resolved from the file's `TRAN_AGS` at validation time
-    /// (e.g. "4.1"); empty if the minting layer didn't resolve one.
-    pub edition: String,
+    // NOTE: the AGS edition used to live here. It is a property of the VALIDATION —
+    // which dictionary judged the file — not of the file's bytes, and it is
+    // meaningless apart from whether it was forced or auto-resolved. Both facts now
+    // live together in `ValidationStamp::edition` as one `EditionInput`, so they
+    // cannot be compared apart (which is how `profile_covers` came to trust a forced
+    // cert for an auto request).
     /// The remote origin's HTTP `ETag` observed at mint time, verbatim (`W/`
     /// weak prefix preserved), when minted from a remote (http/s3) source — else
     /// `None`. A *cheap* freshness shortcut: a HEAD whose ETag matches proves the
@@ -162,48 +398,53 @@ pub struct FileMeta {
     pub last_modified: Option<String>,
 }
 
-/// The validation a [`Sidecar`] registers. A sidecar is only minted for a file
-/// that validated **clean** (zero error-severity findings), so this records *who*
-/// validated it, *when*, and any non-blocking advisories that were present — it is
-/// a provenance record, not a re-derivable computation. Core cannot mint it
-/// (validation lives in the validator crate, above core).
+/// The validation a [`Sidecar`] registers: which engine judged which bytes against
+/// which dictionary, when, and — per severity tier — whether it actually looked.
+///
+/// A sidecar is minted only for a file with **zero error-severity findings**, so a
+/// cert's existence asserts error-cleanliness. It asserts nothing else. In particular
+/// it says nothing about the sibling `FILE/` tree: that is not a property of the
+/// certified bytes, it can change without the file changing, and so there is
+/// deliberately **no field here in which to record a claim about it**.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ValidationStamp {
-    /// What validated it — the shared [`ENGINE_IDENTITY`] engine string, so a
-    /// clean cert minted by any surface is trusted by the others (trust also
-    /// gates on `validator_version` + `compat` + profile).
+    /// What validated it — the shared [`ENGINE_IDENTITY`] string, so a clean cert
+    /// minted by any surface is comparable by the others.
     pub validator: String,
-    /// The validation **engine** version (`laterite_ags4_validator::VERSION`),
-    /// NOT the minting binding's crate version — so a cert is comparable across
-    /// surfaces (the Python wheel and the independently-versioned DuckDB extension
-    /// both stamp the engine version). A consumer trusts the clean verdict (skips
-    /// re-validation) only when this still matches its own engine.
-    pub validator_version: String,
+    /// The [`EngineId::fingerprint`] of the engine that produced this verdict: a
+    /// SHA-256 over the rule sources and the bundled dictionary.
+    ///
+    /// This replaces v1's `validator_version`, which was the validator crate's
+    /// hand-bumped semver — a value that does not move when a rule's logic does. Edit a
+    /// severity, fix a false positive, forget the bump, and every certificate minted by
+    /// the old engine kept claiming to be current and kept being trusted.
+    pub engine: String,
     /// The python-ags4 compatibility version when validated through the
-    /// `laterite.compat` drop-in (whose behaviour mimics that python-ags4
-    /// release), else `None` for the native validator. Part of the checker
-    /// identity: a compat-minted clean verdict isn't trusted by the native
-    /// validator (and vice versa), since the two can disagree on a file.
+    /// `laterite.compat` drop-in (whose behaviour deliberately mimics that python-ags4
+    /// release), else `None` for the native engine. A compat verdict is not a native
+    /// verdict — the two can disagree on a file — so neither answers for the other.
     #[serde(default)]
     pub compat: Option<String>,
-    /// Whether the validation ran Rule 20's **on-disk** half (the sibling `FILE/`
-    /// tree must exist) — `lat validate --check-files`. Part of the check PROFILE: a
-    /// missing on-disk file is an error, so a cert minted *without* this must not
-    /// be trusted to skip a request that *wants* it ([`Sidecar::profile_covers`]).
-    #[serde(default)]
-    pub check_files: bool,
-    /// Whether the edition was **forced** (`--dict-version X`) rather than
-    /// auto-resolved from `TRAN_AGS`. A forced cert and an auto cert can record the
-    /// same `edition` string yet have run different dictionaries when the file's
-    /// `TRAN_AGS` disagrees — so the skip only trusts a same-forcing request.
-    #[serde(default)]
-    pub edition_forced: bool,
     /// When, as an ISO-8601 / RFC-3339 UTC string, set by the minting layer.
     pub checked_at: String,
-    /// Non-blocking advisory counts present at validation. Errors are 0 by
-    /// construction — a sidecar is only minted for a clean file.
-    pub warnings: u32,
-    pub fyi: u32,
+    /// The dictionary this verdict was reached against, and how it was chosen.
+    pub edition: EditionInput,
+    /// The decoder the bytes were read through (`encoding_rs` canonical name).
+    ///
+    /// A certificate seals the BYTES — but the rules see TEXT, and which text the bytes
+    /// become is the decoder's answer, not the file's. Two decoders can reach two
+    /// verdicts on one unchanged file (see [`Question::encoding`]), so a verdict that
+    /// did not say which decoder produced it would be an incomplete statement about the
+    /// content it claims to have checked.
+    pub encoding: String,
+    /// Errors. A minted cert has always measured this tier (that is what it is FOR), so
+    /// in practice this is `Measured { count: 0 }` — but the type does not assume it,
+    /// because a type that assumes it is a type that can be lied to.
+    pub errors: TierCoverage,
+    /// Warnings — measured, or honestly recorded as unmeasured.
+    pub warnings: TierCoverage,
+    /// FYI — measured, or honestly recorded as unmeasured.
+    pub fyi: TierCoverage,
 }
 
 /// A persisted `.ags.idx`: a validity **certificate** + byte-offset index for one
@@ -228,7 +469,7 @@ pub struct Sidecar {
     /// The validation this registers.
     pub validation: ValidationStamp,
     /// Group code → byte range of its section in the source.
-    pub groups: HashMap<String, Range>,
+    pub groups: HashMap<String, Vec<Range>>,
     /// Section order as in the source file.
     pub order: Vec<String>,
 }
@@ -248,23 +489,22 @@ pub enum RemoteFreshness {
 }
 
 impl Sidecar {
-    /// Assemble a sidecar for an already-validated file. The CALLER must have
-    /// confirmed a clean validation (zero error findings) and supply the
-    /// `edition` + [`ValidationStamp`]; the byte index is computed here from
-    /// `bytes`. Core cannot validate, so it cannot enforce the precondition — it
-    /// trusts the caller, which is the (opt-in) validator-aware minting layer.
-    pub fn assemble(
-        bytes: &[u8],
-        edition: String,
-        validation: ValidationStamp,
-    ) -> Result<Sidecar, CliError> {
+    /// Assemble a sidecar for an already-validated file: hash the bytes, build the
+    /// byte index, and attach the caller's [`ValidationStamp`].
+    ///
+    /// Core cannot validate — the rule engine sits above it — so it cannot check that
+    /// the stamp is true. That is exactly why this is not a public minting door.
+    /// `laterite_ags4_trust::mint` is: it runs the engine itself, builds the stamp from
+    /// what the engine actually returned, and refuses a file with errors. Reach for
+    /// that. This stays public only for the byte-index consumers (and the tests) that
+    /// need a `Sidecar` without a verdict to trust.
+    pub fn assemble(bytes: &[u8], validation: ValidationStamp) -> Result<Sidecar, CliError> {
         let index = index_ags4_bytes(bytes)?;
         Ok(Sidecar {
             version: SIDECAR_VERSION,
             file: FileMeta {
                 size: bytes.len() as u64,
                 sha256: sha256_hex(bytes),
-                edition,
                 // Local mint by default; a remote-aware minting layer records the
                 // origin's HTTP validators via `with_origin`.
                 etag: None,
@@ -322,47 +562,89 @@ impl Sidecar {
         self.file.size == size
     }
 
-    /// Was this cert minted by the given checker identity? `is_fresh_for` proves
-    /// the *bytes* are unchanged; this proves the *checker* is the same — both
-    /// must hold before a consumer trusts the clean verdict and **skips**
-    /// re-validation. A cert from a different/older engine (or a different compat
-    /// profile) is byte-fresh but checker-stale: re-validate rather than trust a
-    /// verdict today's rules might not reproduce.
-    pub fn checker_matches(
-        &self,
-        validator: &str,
-        validator_version: &str,
-        compat: Option<&str>,
-    ) -> bool {
-        self.validation.validator == validator
-            && self.validation.validator_version == validator_version
-            && self.validation.compat.as_deref() == compat
-    }
+    /// **The trust rule.** May this certificate stand in for a run of the engine?
+    ///
+    /// > A certificate may answer a question only if it can answer it **completely**.
+    ///
+    /// That is the whole of it, and every clause below is a way of asking whether it
+    /// can. A cert records *counts*, not findings — so the only report it can
+    /// reproduce is an empty one, and the only question it can answer is one where
+    /// every tier the caller asked about was measured and came back clean. Anything
+    /// else and the engine runs.
+    ///
+    /// Six gates, cheapest first:
+    ///
+    /// 1. **format** — a v1 cert is not read (its fields are the untruths v2 retired).
+    /// 2. **size**, then 3. **content** — the certified bytes must be *these* bytes.
+    /// 4. **checker** — same validator, same compat profile, and the same
+    ///    [`EngineId::fingerprint`]: not the crate's semver but a hash of the rules and
+    ///    the dictionary, so a rule edit invalidates every cert that predates it even
+    ///    if nobody bumped a version.
+    /// 5. **edition** — the cert must have judged the file against the dictionary this
+    ///    request asks for. Auto answers only auto (same bytes + same engine ⇒ the same
+    ///    resolution, so its `resolved` value need not be compared); forced answers only
+    ///    the same forcing.
+    /// 6. **tiers** — for errors, and for warnings/FYI iff asked: measured, and clean.
+    ///
+    /// Note what is **not** here. There is no clause about Rule 20's on-disk `FILE/`
+    /// tree, because there is no field about it, because a certificate cannot speak for
+    /// the state of a directory it does not hash. World checks run live, every time,
+    /// outside this decision entirely — see `laterite_ags4_trust::check`.
+    pub fn decide(&self, bytes: &[u8], q: &Question, engine: &EngineId) -> Decision {
+        use RevalidateReason as R;
+        let v = &self.validation;
 
-    /// Does this cert's check **profile** cover a request's? A clean verdict is
-    /// only trustworthy for a request the cert validated *at least as strictly*:
-    ///
-    /// - it ran the on-disk file check if the request wants it
-    ///   (`cert.check_files >= want_check_files` — a stronger cert covers a weaker
-    ///   request, never the reverse), and
-    /// - its edition forcing matches: a *forced* request (`want_forced_edition =
-    ///   Some(ed)`) is covered only by a cert forced to the same edition; an *auto*
-    ///   request (`None`) only by an auto cert — because a forced and an
-    ///   auto-resolved run can apply different dictionaries to the same bytes.
-    ///
-    /// Pair with [`Sidecar::checker_matches`] (engine identity) and freshness
-    /// before skipping re-validation.
-    pub fn profile_covers(
-        &self,
-        want_check_files: bool,
-        want_forced_edition: Option<&str>,
-    ) -> bool {
-        let check_ok = self.validation.check_files >= want_check_files;
-        let edition_ok = match want_forced_edition {
-            Some(ed) => self.validation.edition_forced && self.file.edition == ed,
-            None => !self.validation.edition_forced,
-        };
-        check_ok && edition_ok
+        if self.version != SIDECAR_VERSION {
+            return Decision::Revalidate(R::FormatVersion);
+        }
+        if self.file.size != bytes.len() as u64 {
+            return Decision::Revalidate(R::SizeChanged);
+        }
+        if self.file.sha256 != sha256_hex(bytes) {
+            return Decision::Revalidate(R::ContentChanged);
+        }
+        if v.validator != engine.validator || v.compat != engine.compat {
+            return Decision::Revalidate(R::DifferentValidator);
+        }
+        if v.engine != engine.fingerprint {
+            return Decision::Revalidate(R::DifferentEngine);
+        }
+        // The bytes are sealed by the SHA above; the DECODER is not part of them. A cert
+        // minted through one decoder cannot answer a request made through another, because
+        // they are questions about two different texts.
+        if v.encoding != q.encoding {
+            return Decision::Revalidate(R::EncodingDiffers);
+        }
+        match (&v.edition, q.forced_edition.as_deref()) {
+            // Auto for auto: a later auto-resolve over the same bytes with the same
+            // engine reaches the same edition, so there is nothing to compare.
+            (EditionInput::Auto { .. }, None) => {}
+            (EditionInput::Forced { edition }, Some(want)) if edition == want => {}
+            _ => return Decision::Revalidate(R::EditionDiffers),
+        }
+        // Errors are always asked about — a report always reports them.
+        for (tier, coverage) in [
+            (Tier::Errors, v.errors),
+            (Tier::Warnings, v.warnings),
+            (Tier::Fyi, v.fyi),
+        ] {
+            let asked = match tier {
+                Tier::Errors => true,
+                Tier::Warnings => q.want_warnings,
+                Tier::Fyi => q.want_fyi,
+            };
+            if !asked {
+                continue;
+            }
+            match coverage {
+                TierCoverage::NotMeasured => return Decision::Revalidate(R::TierNotMeasured(tier)),
+                TierCoverage::Measured { count: 0 } => {}
+                TierCoverage::Measured { .. } => {
+                    return Decision::Revalidate(R::TierNotClean(tier));
+                }
+            }
+        }
+        Decision::Vouched
     }
 
     /// Cheap, **I/O-free** remote freshness check against a live HEAD's observed
@@ -488,9 +770,98 @@ mod tests {
         }
     }
 
+    /// A code declared TWICE, with another group between the two sections. The
+    /// whole-file parse merges both sections' rows into one group; the index must
+    /// therefore be able to SAY there are two places to look.
+    const REDECLARED: &str = r#""GROUP","PROJ"
+"HEADING","PROJ_ID"
+"UNIT",""
+"TYPE","ID"
+"DATA","P1"
+
+"GROUP","LOCA"
+"HEADING","LOCA_ID"
+"UNIT",""
+"TYPE","ID"
+"DATA","BH01"
+
+"GROUP","ABBR"
+"HEADING","ABBR_CODE"
+"UNIT",""
+"TYPE","X"
+"DATA","CP"
+
+"GROUP","LOCA"
+"HEADING","LOCA_ID"
+"UNIT",""
+"TYPE","ID"
+"DATA","BH02"
+"#;
+
     #[test]
     fn two_groups_lf() {
         assert_consistent(TWO);
+    }
+
+    /// The index records EVERY span of a redeclared code — not just the first.
+    ///
+    /// This is the locator lie: `groups` was `HashMap<String, Range>`, so a code
+    /// appearing twice kept only its first section. The DuckDB extension slices from
+    /// exactly this index, so it re-parsed the first section and returned BH01 alone
+    /// while the whole-file parse sees BH01 *and* BH02 — a silently truncated read.
+    #[test]
+    fn a_redeclared_group_records_every_span() {
+        let bytes = REDECLARED.as_bytes();
+        let idx = index_ags4_bytes(bytes).unwrap();
+
+        assert_eq!(idx.spans("LOCA").len(), 2, "LOCA occupies two sections");
+        assert_eq!(idx.spans("PROJ").len(), 1);
+        assert_eq!(idx.spans("ABBR").len(), 1);
+
+        // The two LOCA spans are disjoint and in source order, and the ABBR section
+        // sits between them — i.e. they are genuinely two places, not one range.
+        let loca = idx.spans("LOCA").to_vec();
+        assert!(loca[0].1 <= loca[1].0, "spans are disjoint and ordered");
+        let abbr = idx.range("ABBR").unwrap();
+        assert!(
+            loca[0].1 <= abbr.0 && abbr.1 <= loca[1].0,
+            "ABBR lies between the two LOCA sections — a single range could not span them"
+        );
+
+        // Each span, sliced and re-parsed, yields the row that section declared.
+        let first = parse_group_slice(bytes, loca[0], "LOCA").unwrap();
+        let second = parse_group_slice(bytes, loca[1], "LOCA").unwrap();
+        assert_eq!(first.rows[0]["LOCA_ID"], "BH01");
+        assert_eq!(second.rows[0]["LOCA_ID"], "BH02");
+    }
+
+    /// `range()` REFUSES an ambiguous code rather than handing back the first span.
+    ///
+    /// Returning the first is what made the truncation silent. A caller that cannot
+    /// be told where a group is must re-parse the file — so it is told `None`, not a
+    /// half-truth it has no way to detect.
+    #[test]
+    fn range_refuses_to_guess_for_a_redeclared_group() {
+        let idx = index_ags4_bytes(REDECLARED.as_bytes()).unwrap();
+
+        assert_eq!(idx.range("LOCA"), None, "ambiguous — must not pick one");
+        assert!(!idx.is_unambiguous("LOCA"));
+
+        // The unambiguous codes still resolve, so the refusal is targeted, not blunt.
+        assert!(idx.range("PROJ").is_some());
+        assert!(idx.is_unambiguous("PROJ"));
+    }
+
+    /// The whole-file parse merges a redeclared group's rows. Pinned here because it
+    /// is the reason the index must record both spans: the parse sees BH01+BH02, so
+    /// an index that can only point at BH01 disagrees with the parser about what the
+    /// file contains.
+    #[test]
+    fn the_whole_file_parse_sees_both_sections_rows() {
+        let whole = read_ags4_bytes(REDECLARED.as_bytes()).unwrap();
+        let loca = whole.get("LOCA").unwrap();
+        let ids: Vec<&str> = loca.rows.iter().map(|r| r["LOCA_ID"].as_str()).collect();
+        assert_eq!(ids, vec!["BH01", "BH02"]);
     }
 
     #[test]
@@ -621,20 +992,70 @@ mod tests {
     fn stamp() -> ValidationStamp {
         ValidationStamp {
             validator: "test".into(),
-            validator_version: "0.0.0".into(),
+            engine: "0000000000000000".into(),
             compat: None,
-            check_files: false,
-            edition_forced: false,
             checked_at: "2026-06-19T00:00:00Z".into(),
-            warnings: 0,
-            fyi: 1,
+            edition: EditionInput::Auto {
+                resolved: "4.1".into(),
+                resolution: DictResolution::ExactTranAgs,
+            },
+            encoding: "UTF-8".into(),
+            errors: TierCoverage::Measured { count: 0 },
+            warnings: TierCoverage::Measured { count: 0 },
+            fyi: TierCoverage::Measured { count: 1 },
         }
+    }
+
+    /// The engine that minted `stamp()` — the identity `decide` compares against.
+    fn asking_engine() -> EngineId {
+        EngineId {
+            validator: "test".into(),
+            fingerprint: "0000000000000000".into(),
+            compat: None,
+        }
+    }
+
+    fn errors_only() -> Question {
+        Question {
+            want_warnings: false,
+            want_fyi: false,
+            forced_edition: None,
+            encoding: "UTF-8".into(),
+        }
+    }
+
+    /// The bytes are sealed. The DECODER is not part of them — and the rules judge the
+    /// TEXT the decoder produces, not the bytes. A cert minted through one decoder must
+    /// not answer a question asked through another.
+    ///
+    /// This is not hypothetical: a UTF-8 file containing `Ω` (bytes `CE A9`) is a Rule 1
+    /// ERROR read as UTF-8 (one code point, 937) and only an FYI read as windows-1252
+    /// (two code points, 206 and 169). Certify it under the lenient decoder and, before
+    /// this gate, a default read of the very same bytes came back clean and certified.
+    #[test]
+    fn a_cert_minted_through_another_decoder_cannot_answer() {
+        let bytes = TWO.as_bytes();
+        let sc = Sidecar::assemble(bytes, stamp()).unwrap(); // stamped UTF-8
+        let cp1252 = Question {
+            encoding: "windows-1252".into(),
+            ..errors_only()
+        };
+        assert_eq!(
+            sc.decide(bytes, &cp1252, &asking_engine()),
+            Decision::Revalidate(RevalidateReason::EncodingDiffers),
+            "same bytes, different decoder — a different text, so a different question"
+        );
+        assert_eq!(
+            sc.decide(bytes, &errors_only(), &asking_engine()),
+            Decision::Vouched,
+            "the decoder it was minted under still answers"
+        );
     }
 
     #[test]
     fn sidecar_json_round_trips() {
         let bytes = TWO.as_bytes();
-        let sc = Sidecar::assemble(bytes, "4.1".into(), stamp()).unwrap();
+        let sc = Sidecar::assemble(bytes, stamp()).unwrap();
         let back = Sidecar::from_json(&sc.to_json().unwrap()).unwrap();
         assert_eq!(sc, back, "sidecar survives a JSON round-trip");
         // the embedded index matches a direct scan of the same bytes
@@ -645,7 +1066,7 @@ mod tests {
     #[test]
     fn sidecar_freshness_tracks_the_source() {
         let bytes = TWO.as_bytes();
-        let sc = Sidecar::assemble(bytes, "4.1".into(), stamp()).unwrap();
+        let sc = Sidecar::assemble(bytes, stamp()).unwrap();
         assert!(
             sc.is_fresh_for(bytes),
             "fresh for the bytes it was built from"
@@ -658,106 +1079,218 @@ mod tests {
     }
 
     #[test]
-    fn checker_matches_is_exact_on_identity() {
+    fn the_format_has_no_field_in_which_to_claim_a_world_check() {
+        // The strongest of the three defences: v1 had `check_files: bool`, and a
+        // consumer read it to conclude that a cert covered a `--check-files` request —
+        // for a `FILE/` tree that could have been deleted since. There is now nothing
+        // to read. Asserted on the SERIALISED form, because that is what a future
+        // consumer would parse.
+        let json = String::from_utf8(
+            Sidecar::assemble(TWO.as_bytes(), stamp())
+                .unwrap()
+                .to_json()
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(!json.contains("check_files"), "{json}");
+        assert!(!json.contains("edition_forced"), "{json}");
+        // ...and the tier counts cannot be written as bare zeros either.
+        assert!(json.contains("measured"), "{json}");
+    }
+
+    #[test]
+    fn decide_vouches_only_for_a_question_it_can_fully_answer() {
         let bytes = TWO.as_bytes();
-        let sc = Sidecar::assemble(bytes, "4.1".into(), stamp()).unwrap();
-        // stamp() is the native shape (validator "test", version "0.0.0", no compat)
-        assert!(
-            sc.checker_matches("test", "0.0.0", None),
-            "same checker trusted"
-        );
-        assert!(
-            !sc.checker_matches("test", "0.0.1", None),
-            "a newer engine version is NOT trusted (re-validate)"
-        );
-        assert!(
-            !sc.checker_matches("other", "0.0.0", None),
-            "a different validator is NOT trusted"
-        );
-        assert!(
-            !sc.checker_matches("test", "0.0.0", Some("python-ags4-0.5")),
-            "a compat consumer does NOT trust a native-minted cert"
+        let sc = Sidecar::assemble(bytes, stamp()).unwrap();
+        let e = asking_engine();
+
+        // errors-only: measured, clean → vouched.
+        assert_eq!(sc.decide(bytes, &errors_only(), &e), Decision::Vouched);
+
+        // warnings: measured (0) → still vouched.
+        let want_warn = Question {
+            want_warnings: true,
+            ..errors_only()
+        };
+        assert_eq!(sc.decide(bytes, &want_warn, &e), Decision::Vouched);
+
+        // fyi: measured, but there IS one (stamp() records fyi = 1). The cert stores a
+        // COUNT, not the finding — it knows there is something to say and cannot say
+        // it. So the engine must run.
+        let want_fyi = Question {
+            want_fyi: true,
+            ..errors_only()
+        };
+        assert_eq!(
+            sc.decide(bytes, &want_fyi, &e),
+            Decision::Revalidate(RevalidateReason::TierNotClean(Tier::Fyi))
         );
     }
 
     #[test]
-    fn compat_provenance_round_trips_and_defaults() {
+    fn decide_refuses_an_unmeasured_tier_rather_than_reading_a_zero() {
+        // The state v1 could not represent: it wrote `warnings: 0` whether or not the
+        // warning rules had run, so a `--show-warnings` request read that zero and
+        // skipped the engine.
+        let bytes = TWO.as_bytes();
+        let mut st = stamp();
+        st.warnings = TierCoverage::NotMeasured;
+        let sc = Sidecar::assemble(bytes, st).unwrap();
+        let e = asking_engine();
+
+        assert_eq!(sc.decide(bytes, &errors_only(), &e), Decision::Vouched);
+        assert_eq!(
+            sc.decide(
+                bytes,
+                &Question {
+                    want_warnings: true,
+                    ..errors_only()
+                },
+                &e
+            ),
+            Decision::Revalidate(RevalidateReason::TierNotMeasured(Tier::Warnings))
+        );
+    }
+
+    #[test]
+    fn decide_gates_on_the_engine_that_produced_the_verdict() {
+        let bytes = TWO.as_bytes();
+        let sc = Sidecar::assemble(bytes, stamp()).unwrap();
+
+        // A rule changed under the cert: same validator, different fingerprint.
+        let moved = EngineId {
+            fingerprint: "ffffffffffffffff".into(),
+            ..asking_engine()
+        };
+        assert_eq!(
+            sc.decide(bytes, &errors_only(), &moved),
+            Decision::Revalidate(RevalidateReason::DifferentEngine)
+        );
+
+        // A compat consumer does not trust a native-minted cert, nor the reverse.
+        let compat = EngineId {
+            compat: Some("python-ags4-0.5".into()),
+            ..asking_engine()
+        };
+        assert_eq!(
+            sc.decide(bytes, &errors_only(), &compat),
+            Decision::Revalidate(RevalidateReason::DifferentValidator)
+        );
+    }
+
+    #[test]
+    fn decide_gates_on_the_bytes() {
+        let bytes = TWO.as_bytes();
+        let sc = Sidecar::assemble(bytes, stamp()).unwrap();
+        let e = asking_engine();
+
+        let mut longer = bytes.to_vec();
+        longer.push(b'\n');
+        assert_eq!(
+            sc.decide(&longer, &errors_only(), &e),
+            Decision::Revalidate(RevalidateReason::SizeChanged)
+        );
+
+        // Same length, different content — the SHA is what catches this.
+        let mut same_len = bytes.to_vec();
+        let i = same_len.len() - 3;
+        same_len[i] = b'Z';
+        assert_eq!(
+            sc.decide(&same_len, &errors_only(), &e),
+            Decision::Revalidate(RevalidateReason::ContentChanged)
+        );
+    }
+
+    #[test]
+    fn an_auto_cert_and_a_forced_request_are_different_questions() {
+        // v1 kept the edition string and the forced flag in SEPARATE structs and
+        // compared them apart. They are one fact: a forced run ignores TRAN_AGS, so on
+        // a file whose declared edition disagrees with its content the two runs apply
+        // different dictionaries — even when the edition STRING is the same.
+        let bytes = TWO.as_bytes();
+        let auto = Sidecar::assemble(bytes, stamp()).unwrap();
+        let e = asking_engine();
+
+        assert_eq!(
+            auto.decide(
+                bytes,
+                &Question {
+                    forced_edition: Some("4.1".into()),
+                    ..errors_only()
+                },
+                &e
+            ),
+            Decision::Revalidate(RevalidateReason::EditionDiffers),
+            "same edition string, different question"
+        );
+
+        let mut st = stamp();
+        st.edition = EditionInput::Forced {
+            edition: "4.0.4".into(),
+        };
+        let forced = Sidecar::assemble(bytes, st).unwrap();
+        assert_eq!(
+            forced.decide(
+                bytes,
+                &Question {
+                    forced_edition: Some("4.0.4".into()),
+                    ..errors_only()
+                },
+                &e
+            ),
+            Decision::Vouched,
+            "the same forcing IS the same question"
+        );
+        assert_eq!(
+            forced.decide(bytes, &errors_only(), &e),
+            Decision::Revalidate(RevalidateReason::EditionDiffers),
+            "a forced cert does not answer an auto request"
+        );
+    }
+
+    #[test]
+    fn compat_provenance_round_trips() {
         let bytes = TWO.as_bytes();
         let mut st = stamp();
         st.compat = Some("python-ags4-0.5.0".into());
-        let sc = Sidecar::assemble(bytes, "4.1".into(), st).unwrap();
+        let sc = Sidecar::assemble(bytes, st).unwrap();
         let back = Sidecar::from_json(&sc.to_json().unwrap()).unwrap();
         assert_eq!(back.validation.compat.as_deref(), Some("python-ags4-0.5.0"));
-        assert!(back.checker_matches("test", "0.0.0", Some("python-ags4-0.5.0")));
-        // a legacy cert JSON without the field deserialises with compat = None
-        let legacy = r#"{"version":1,"file":{"size":1,"sha256":"x","edition":"4.1"},
-            "validation":{"validator":"v","validator_version":"1","checked_at":"t","warnings":0,"fyi":0},
-            "groups":{},"order":[]}"#;
         assert_eq!(
-            Sidecar::from_json(legacy.as_bytes())
-                .unwrap()
-                .validation
-                .compat,
-            None
+            back.decide(
+                bytes,
+                &errors_only(),
+                &EngineId {
+                    compat: Some("python-ags4-0.5.0".into()),
+                    ..asking_engine()
+                }
+            ),
+            Decision::Vouched
         );
     }
 
     #[test]
-    fn profile_covers_is_directional() {
-        let bytes = TWO.as_bytes();
-        // default cert: check_files=false, edition_forced=false, edition "4.1"
-        let def = Sidecar::assemble(bytes, "4.1".into(), stamp()).unwrap();
+    fn a_v1_cert_is_refused_not_migrated() {
+        // Every field v1 carried is one of the untruths v2 exists to retire, so there is
+        // nothing in it worth reading. It is a regenerable cache; refusing costs a
+        // re-validation and nothing else.
+        let v1 = br#"{"version":1,"file":{"size":1,"sha256":"x","edition":"4.1"},
+            "validation":{"validator":"v","validator_version":"1","checked_at":"t",
+            "check_files":true,"warnings":0,"fyi":0},"groups":{},"order":[]}"#;
         assert!(
-            def.profile_covers(false, None),
-            "default cert covers a default request"
+            Sidecar::from_json(v1).is_err(),
+            "a v1 cert is not read as a v2"
         );
-        assert!(
-            !def.profile_covers(true, None),
-            "a default cert does NOT cover a --check-files request"
-        );
-        assert!(
-            !def.profile_covers(false, Some("4.1")),
-            "an auto cert does NOT cover a forced-edition request (different dictionaries possible)"
-        );
-
-        // a stronger cert: ran the on-disk file check
-        let mut s = stamp();
-        s.check_files = true;
-        let strong = Sidecar::assemble(bytes, "4.1".into(), s).unwrap();
-        assert!(
-            strong.profile_covers(true, None),
-            "covers a --check-files request"
-        );
-        assert!(
-            strong.profile_covers(false, None),
-            "and still covers a weaker default request"
-        );
-
-        // a forced-edition cert covers only the SAME forced edition
-        let mut f = stamp();
-        f.edition_forced = true;
-        let forced = Sidecar::assemble(bytes, "4.0.4".into(), f).unwrap();
-        assert!(
-            forced.profile_covers(false, Some("4.0.4")),
-            "covers the same forced edition"
-        );
-        assert!(
-            !forced.profile_covers(false, Some("4.1")),
-            "not a different forced edition"
-        );
-        assert!(!forced.profile_covers(false, None), "not an auto request");
     }
 
     #[test]
     fn remote_freshness_grants_only_on_a_validator_match() {
         let bytes = TWO.as_bytes();
         let size = bytes.len() as u64;
-        let sc = Sidecar::assemble(bytes, "4.1".into(), stamp())
-            .unwrap()
-            .with_origin(
-                Some("\"abc123\"".into()),
-                Some("Wed, 19 Jun 2026 00:00:00 GMT".into()),
-            );
+        let sc = Sidecar::assemble(bytes, stamp()).unwrap().with_origin(
+            Some("\"abc123\"".into()),
+            Some("Wed, 19 Jun 2026 00:00:00 GMT".into()),
+        );
         // round-trips
         let sc = Sidecar::from_json(&sc.to_json().unwrap()).unwrap();
         assert_eq!(sc.file.etag.as_deref(), Some("\"abc123\""));
@@ -787,7 +1320,7 @@ mod tests {
             RemoteFreshness::MustRehash
         );
         // a purely-local cert (no transport validators) can't be cheaply confirmed
-        let local = Sidecar::assemble(bytes, "4.1".into(), stamp()).unwrap();
+        let local = Sidecar::assemble(bytes, stamp()).unwrap();
         assert_eq!(
             local.is_fresh_for_remote(size, None, None),
             RemoteFreshness::MustRehash
@@ -797,7 +1330,7 @@ mod tests {
     #[test]
     fn sidecar_rejects_unknown_version() {
         let bytes = TWO.as_bytes();
-        let mut sc = Sidecar::assemble(bytes, "4.1".into(), stamp()).unwrap();
+        let mut sc = Sidecar::assemble(bytes, stamp()).unwrap();
         sc.version = SIDECAR_VERSION + 1;
         assert!(
             Sidecar::from_json(&sc.to_json().unwrap()).is_err(),

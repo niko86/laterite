@@ -1872,6 +1872,7 @@ dependencies = [
  "laterite-ags4-diff",
  "laterite-ags4-merge",
  "laterite-ags4-parse",
+ "laterite-ags4-trust",
  "laterite-ags4-validator",
  "laterite-cliutil",
  "laterite-excel",
@@ -1943,12 +1944,23 @@ dependencies = [
 name = "laterite-ags4-reference"
 version = "0.7.0"
 dependencies = [
+ "laterite-types",
  "phf 0.14.0",
  "phf_codegen 0.14.0",
  "serde",
  "serde_json",
  "sha2 0.11.0",
  "uuid",
+]
+
+[[package]]
+name = "laterite-ags4-trust"
+version = "0.7.0"
+dependencies = [
+ "laterite-ags4-core",
+ "laterite-ags4-parse",
+ "laterite-ags4-validator",
+ "tempfile",
 ]
 
 [[package]]
@@ -1965,6 +1977,7 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "tempfile",
  "thiserror 1.0.69",
 ]
@@ -1983,6 +1996,7 @@ dependencies = [
  "laterite-ags4-emit",
  "laterite-ags4-merge",
  "laterite-ags4-parse",
+ "laterite-ags4-trust",
  "laterite-ags4-validator",
  "laterite-excel",
  "laterite-types",
@@ -2026,6 +2040,7 @@ dependencies = [
  "laterite-ags4-emit",
  "laterite-ags4-merge",
  "laterite-ags4-parse",
+ "laterite-ags4-trust",
  "laterite-ags4-validator",
  "laterite-excel",
  "laterite-transport",
@@ -2048,6 +2063,7 @@ dependencies = [
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
+ "laterite-ags4-trust",
  "laterite-ags4-validator",
  "laterite-excel",
  "laterite-types",

@@ -68,8 +68,18 @@ fn main() {
 
 /// Emit the `DictVersion` enum + `as_str`/`ALL`/`from_edition`/`tables` +
 /// `FALLBACK`, generated from the union's `editions`/`default_edition`/
-/// `fallback_edition`. This single-sources the edition SET: the validator, wasm,
-/// and web never hand-copy `["4.0.3" … "4.2"]` — they reference these.
+/// `fallback_edition`. These are the AUTHORITY for the edition set.
+///
+/// This comment used to *assert* that nothing hand-copies `["4.0.3" … "4.2"]`. It was
+/// aspiration, not fact: the set was hand-written in ~9 places, including a match in
+/// the `lat` CLI whose rejection MESSAGE was generated from `ALL` while its arms were
+/// not — so a new edition would have shipped a CLI rejecting `4.3` with a message
+/// advertising `4.3`. The three `lat` launchers now all reach `from_edition`/`ALL`,
+/// and the surface census (`tools/gen_census.py`) checks that they still do.
+///
+/// Not yet true of the **web app**, which still hand-lists the editions in four TS
+/// files. It is not a `lat` launcher, so the census cannot probe it — that
+/// convergence is its own change. Don't restore the blanket claim until it is done.
 fn emit_dict_version(out: &mut String, editions: &[String], default_ed: &str, fallback_ed: &str) {
     let variant = |ed: &str| format!("V{}", ed.replace('.', "_"));
 

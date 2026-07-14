@@ -6,7 +6,7 @@
 //! API on top. napi auto-camelCases names (`table_ipc` → `tableIpc`).
 
 use std::io::Cursor;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use arrow::ipc::reader::StreamReader;
 use laterite_ags4_validator::dict::Dictionary;
@@ -17,8 +17,8 @@ use laterite_ags4_validator::fixes::Fix;
 use laterite_ags4_parse::{ParsedFile, parse_bytes, parse_str};
 use laterite_ags4_validator::parse::parse_file_with_encoding;
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, ValidatorError, check_file_with_dict, fix_document_selective,
-    resolve_dict_version, rule_metadata_json, rules, tran_ags_of,
+    CheckOptions, DictVersion, ValidatorError, WorldScope, fix_document_selective,
+    rule_metadata_json, tran_ags_of,
 };
 use laterite_types::sql_type;
 use napi::bindgen_prelude::*;
@@ -246,12 +246,12 @@ pub fn parse_arrow(
             .map_err(ValidatorError::from)
             .map_err(thrown)?
     } else if let Some(d) = data {
-        let enc = resolve_encoding(encoding.as_deref());
+        let enc = resolve_encoding(encoding.as_deref()).map_err(bad_encoding)?;
         parse_bytes(d.as_ref(), enc)
             .map_err(ValidatorError::from)
             .map_err(thrown)?
     } else if let Some(p) = path {
-        let enc = resolve_encoding(encoding.as_deref());
+        let enc = resolve_encoding(encoding.as_deref()).map_err(bad_encoding)?;
         parse_file_with_encoding(Path::new(&p), enc).map_err(thrown)?
     } else {
         return Err(Error::from_reason(format!(
@@ -292,6 +292,9 @@ pub struct ValidationReport {
     pub dict_version: String,
     pub resolution: String,
     pub count: u32,
+    /// Did an `index` certificate stand in for the rule engine? Never "the file was not
+    /// checked": a world check (Rule 20's on-disk half) runs even on a certified read.
+    pub certified: bool,
     pub findings: Vec<Finding>,
     pub json: String,
     pub ndjson: String,
@@ -310,6 +313,7 @@ impl ValidationReport {
             dict_version: String::new(),
             resolution: String::new(),
             count: 0,
+            certified: false,
             findings: Vec::new(),
             json: String::new(),
             ndjson: String::new(),
@@ -353,63 +357,71 @@ fn findings_ndjson(found: &Findings) -> String {
     s
 }
 
-/// Run the validator from a `path` or in-memory `text` — mirrors laterite-py's
-/// `validate` helper (path → `check_file_with_dict` so Rule 20's on-disk half
-/// and the encoding are handled identically; text → `parse_str` + resolve +
-/// `run_all`). Returns `(file, dict_version, resolution, findings)` or the
+/// Run the validator from a `path`, in-memory `text`, or raw `data` — mirrors
+/// laterite-py's `validate` helper. Every modality reaches the same door: a path
+/// via `check_file_with_dict` (which can also answer `--check-files`), text/bytes
+/// via `check_parsed_with_dict` (which cannot, and says so). The edition is
+/// resolved INSIDE the door, so all three modalities agree on which dictionary
+/// judged the file. Returns `(file, dict_version, resolution, findings)` or the
 /// `(exit_code, error_kind, message)` of a hard failure.
 #[allow(clippy::type_complexity)]
 fn validate_inner(
     path: Option<&str>,
     text: Option<&str>,
     data: Option<&[u8]>,
-    forced: Option<DictVersion>,
     opts: CheckOptions,
-) -> std::result::Result<(String, String, String, Findings), (i32, &'static str, String)> {
+    cert: Option<&laterite_ags4_core::index::Sidecar>,
+) -> std::result::Result<(String, String, String, Findings, bool), (i32, &'static str, String)> {
     let map = |e: ValidatorError| {
         let (code, kind) = classify(&e);
         (code, kind, e.to_string())
     };
-    if let Some(t) = text {
-        let parsed = parse_str(t).map_err(ValidatorError::from).map_err(map)?;
-        let (dv, res) =
-            resolve_dict_version(forced, tran_ags_of(&parsed).as_deref()).map_err(map)?;
-        let dict = Dictionary::bundled(dv);
-        let mut found = Findings::new();
-        rules::run_all(&parsed, &dict, &opts, None, &mut found);
-        Ok((
+
+    // Bytes, whatever door they came through — a certificate is a statement about bytes.
+    // A path can answer `checkFiles` (there is a directory to look beside); text and
+    // bytes cannot, and the door REFUSES them rather than reporting Rule 20 clean.
+    let (label, bytes, world) = if let Some(p) = path {
+        let b = std::fs::read(Path::new(p)).map_err(|e| {
+            let kind = if e.kind() == std::io::ErrorKind::NotFound {
+                "not_found"
+            } else {
+                "io"
+            };
+            (3, kind, format!("{p}: {e}"))
+        })?;
+        (p.to_string(), b, WorldScope::OnDisk(PathBuf::from(p)))
+    } else if let Some(t) = text {
+        (
             "<text>".to_string(),
-            dv.as_str().to_string(),
-            res.as_str().to_string(),
-            found,
-        ))
+            t.as_bytes().to_vec(),
+            WorldScope::None,
+        )
     } else if let Some(d) = data {
-        // Raw bytes decode with the requested encoding, then the same rule run as text.
-        let parsed = parse_bytes(d, opts.encoding)
-            .map_err(ValidatorError::from)
-            .map_err(map)?;
-        let (dv, res) =
-            resolve_dict_version(forced, tran_ags_of(&parsed).as_deref()).map_err(map)?;
-        let dict = Dictionary::bundled(dv);
-        let mut found = Findings::new();
-        rules::run_all(&parsed, &dict, &opts, None, &mut found);
-        Ok((
-            "<bytes>".to_string(),
-            dv.as_str().to_string(),
-            res.as_str().to_string(),
-            found,
-        ))
-    } else if let Some(p) = path {
-        let (found, dv, res) = check_file_with_dict(Path::new(p), &opts).map_err(map)?;
-        Ok((
-            p.to_string(),
-            dv.as_str().to_string(),
-            res.as_str().to_string(),
-            found,
-        ))
+        ("<bytes>".to_string(), d.to_vec(), WorldScope::None)
     } else {
-        Err((5, "bad_args", "provide `path` or `text`".to_string()))
-    }
+        return Err((
+            5,
+            "bad_args",
+            "provide `path`, `text` or `data`".to_string(),
+        ));
+    };
+
+    let out = laterite_ags4_trust::check(laterite_ags4_trust::Request {
+        bytes: &bytes,
+        opts: &opts,
+        cert,
+        world,
+        compat: None,
+    })
+    .map_err(map)?;
+
+    Ok((
+        label,
+        out.dict_version.as_str().to_string(),
+        out.resolution.as_str().to_string(),
+        out.findings,
+        out.certified,
+    ))
 }
 
 /// Validate an AGS4 file (`path`) or `text` against the AGS4 rules. `dict_version`
@@ -430,25 +442,35 @@ pub fn run_check(
     include_fyi: Option<bool>,
     check_files: Option<bool>,
     encoding: Option<String>,
+    // The certificate, if the caller named one. Whether to TRUST it is not decided here,
+    // nor in TypeScript — it is decided once, in `laterite_ags4_trust`, for every surface.
+    cert: Option<&Sidecar>,
 ) -> Result<ValidationReport> {
     let forced = match resolve_edition(dict_version.as_deref()) {
         Ok(v) => v,
         Err(msg) => return Ok(ValidationReport::failure("bad_dict", 5, msg)),
+    };
+    // A bad ENCODING is reported the same way a bad EDITION is — as a failure the
+    // caller sees, not a silent fallback to UTF-8 (which used to hand back findings
+    // that were artefacts of the wrong decoder, blaming the file for a typo).
+    let enc = match resolve_encoding(encoding.as_deref()) {
+        Ok(e) => e,
+        Err(msg) => return Ok(ValidationReport::failure("bad_args", 5, msg)),
     };
     let opts = CheckOptions {
         dict_version: forced,
         include_warnings: include_warnings.unwrap_or(true),
         include_fyi: include_fyi.unwrap_or(false),
         check_files: check_files.unwrap_or(false),
-        encoding: resolve_encoding(encoding.as_deref()),
+        encoding: enc,
         ..CheckOptions::default()
     };
-    let (file, dv, res, found) = match validate_inner(
+    let (file, dv, res, found, certified) = match validate_inner(
         path.as_deref(),
         text.as_deref(),
         data.as_deref(),
-        forced,
         opts,
+        cert.map(|c| &c.inner),
     ) {
         Ok(t) => t,
         Err((code, kind, msg)) => return Ok(ValidationReport::failure(kind, code, msg)),
@@ -471,6 +493,7 @@ pub fn run_check(
     let count = findings.len() as u32;
     Ok(ValidationReport {
         ok: true,
+        certified,
         error_kind: None,
         error: None,
         exit_code: if count == 0 { 0 } else { 1 },
@@ -528,7 +551,7 @@ pub fn diff(
     // maps to BadDictError (parse errors below reuse `thrown` for the same reason).
     let forced = resolve_edition(dict_version.as_deref())
         .map_err(|m| Error::from_reason(format!("bad_dict{SEP}5{SEP}{m}")))?;
-    let enc = resolve_encoding(encoding.as_deref());
+    let enc = resolve_encoding(encoding.as_deref()).map_err(bad_encoding)?;
     let pa = parse_bytes(a.as_ref(), enc)
         .map_err(ValidatorError::from)
         .map_err(thrown)?;
@@ -562,14 +585,16 @@ pub struct MergeOutput {
 /// `laterite-ags4-merge` leaf the CLI uses. Files merge in argument order (a
 /// later file wins a KEY conflict); rows are identified by their dictionary KEY
 /// headings. A heading two files typed differently throws `MergeConflictError`
-/// unless `lenient` widens it to `X`. `tranIssue` + `tranDate` (both) stamp a
+/// unless `onTypeClash` settles it — `"widen"` falls back to `X` (raw values kept),
+/// `"promote"` keeps the greatest nDP precision (zero-padding the coarser values).
+/// `tranIssue` + `tranDate` (both) stamp a
 /// synthesised merge-TRAN. The edition is the newest file's `TRAN_AGS` unless
 /// `dictVersion` forces it. Parse failure throws the mapped error.
 #[napi]
 #[allow(clippy::too_many_arguments)]
 pub fn merge(
     files: Vec<Uint8Array>,
-    lenient: Option<bool>,
+    on_type_clash: Option<String>,
     dict_version: Option<String>,
     encoding: Option<String>,
     tran_issue: Option<String>,
@@ -578,7 +603,7 @@ pub fn merge(
     tran_recipient: Option<String>,
     tran_status: Option<String>,
 ) -> Result<MergeOutput> {
-    use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeMismatchMode, merge_parsed};
+    use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeClashMode, merge_parsed};
 
     if files.len() < 2 {
         return Err(Error::from_reason(format!(
@@ -587,7 +612,7 @@ pub fn merge(
     }
     let forced = resolve_edition(dict_version.as_deref())
         .map_err(|m| Error::from_reason(format!("bad_dict{SEP}5{SEP}{m}")))?;
-    let enc = resolve_encoding(encoding.as_deref());
+    let enc = resolve_encoding(encoding.as_deref()).map_err(bad_encoding)?;
     let parsed: Vec<_> = files
         .iter()
         .map(|b| {
@@ -621,12 +646,16 @@ pub fn merge(
         _ => None,
     };
 
+    // One vocabulary for every surface: the accepted tokens and the rejection
+    // message come from the merge crate's FromStr, so Node cannot drift from the CLI.
+    let clash: TypeClashMode = on_type_clash
+        .as_deref()
+        .unwrap_or("error")
+        .parse()
+        .map_err(|m: String| napi::Error::new(napi::Status::InvalidArg, m))?;
+
     let opts = MergeOpts {
-        type_mismatch: if lenient.unwrap_or(false) {
-            TypeMismatchMode::Lenient
-        } else {
-            TypeMismatchMode::Strict
-        },
+        on_type_clash: clash,
         edition: dv,
         tran,
         ..Default::default()
@@ -666,9 +695,15 @@ pub fn merge(
         }
         // A strict TYPE conflict / emit failure is a schema-level rejection (exit 6);
         // throw in the SEP form the TS `fromNativeError` maps to MergeConflictError.
-        Err(e @ (MergeError::TypeConflict { .. } | MergeError::Emit(_))) => {
-            Err(Error::from_reason(format!("merge_conflict{SEP}6{SEP}{e}")))
-        }
+        // UnitConflict rides the same channel: it is a schema-level rejection too,
+        // and the message carries the distinction (no mode absorbs a unit clash —
+        // #501). Grouped rather than split because the TS side has one
+        // MergeConflictError, and its `.message` is what a caller reads.
+        Err(
+            e @ (MergeError::TypeConflict { .. }
+            | MergeError::UnitConflict { .. }
+            | MergeError::Emit(_)),
+        ) => Err(Error::from_reason(format!("merge_conflict{SEP}6{SEP}{e}"))),
     }
 }
 
@@ -707,6 +742,14 @@ pub fn read_groups_raw(path: String) -> Result<String> {
 
 // --- the .ags.idx certificate (#294 Batch E / #14) ----------------------
 
+/// A `TierCoverage` as JS sees it: the count, or `null` if the tier was never run.
+fn tier_count(c: laterite_ags4_core::index::TierCoverage) -> Option<u32> {
+    match c {
+        laterite_ags4_core::index::TierCoverage::NotMeasured => None,
+        laterite_ags4_core::index::TierCoverage::Measured { count } => Some(count),
+    }
+}
+
 /// The `.ags.idx` validity certificate — the Node mirror of laterite-py's
 /// `Sidecar` pyclass, wrapping the ONE core `laterite_ags4_core::index::Sidecar`
 /// so a Node-minted cert is byte-identical + checker-compatible with Python,
@@ -720,38 +763,39 @@ pub struct Sidecar {
 
 #[napi]
 impl Sidecar {
-    /// Assemble a certificate for an ALREADY-clean file — the caller MUST have
-    /// validated `data` clean (0 error findings); core trusts that, it cannot
-    /// re-check. `edition` is the resolved AGS edition (e.g. `"4.1.1"`); `checkedAt`
-    /// an RFC-3339 UTC timestamp (the TS side passes `new Date().toISOString()`);
-    /// `warnings`/`fyi` the advisory counts present at validation. The validator
-    /// name + engine version are stamped here. Throws if `data` isn't indexable
-    /// AGS4 (e.g. non-UTF-8, which the byte index rejects).
+    /// **Mint** a certificate for `data` — validating it here, first.
+    ///
+    /// This replaces `assemble`, whose signature was
+    /// `(data, edition, checkedAt, warnings?, fyi?, …)`: the caller told it what the
+    /// verdict had been, and the OPTIONAL counts defaulted to zero. Nothing on the TS
+    /// side ever passed them. So every certificate this addon produced recorded "0
+    /// warnings, 0 FYI" without anything having looked, and a later warnings request read
+    /// that zero and skipped the engine.
+    ///
+    /// There is no parameter here through which a caller could assert a verdict. `mint`
+    /// runs the rules itself, with both tiers on, and records what they returned. It
+    /// refuses a file with ERRORS; warnings and FYI are recorded, not fatal.
     #[napi(factory)]
-    #[allow(clippy::too_many_arguments)] // a builder-style mint API; keyword-shaped from TS
-    pub fn assemble(
+    pub fn mint(
         data: Uint8Array,
-        edition: String,
         checked_at: String,
-        warnings: Option<u32>,
-        fyi: Option<u32>,
+        dict_version: Option<String>,
+        encoding: Option<String>,
         compat: Option<String>,
-        check_files: Option<bool>,
-        edition_forced: Option<bool>,
     ) -> Result<Sidecar> {
-        let stamp = laterite_ags4_core::index::ValidationStamp {
-            validator: laterite_ags4_core::index::ENGINE_IDENTITY.to_string(),
-            // The ENGINE version (not this addon's), so the cert is comparable
-            // across surfaces (a cert minted by Python / the DuckDB extension).
-            validator_version: laterite_ags4_validator::VERSION.to_string(),
-            compat,
-            check_files: check_files.unwrap_or(false),
-            edition_forced: edition_forced.unwrap_or(false),
-            checked_at,
-            warnings: warnings.unwrap_or(0),
-            fyi: fyi.unwrap_or(0),
+        let forced = resolve_edition(dict_version.as_deref()).map_err(Error::from_reason)?;
+        let enc = laterite_ags4_parse::resolve_encoding(encoding.as_deref()).ok_or_else(|| {
+            Error::from_reason(format!(
+                "unknown encoding {:?}",
+                encoding.unwrap_or_default()
+            ))
+        })?;
+        let opts = CheckOptions {
+            dict_version: forced,
+            encoding: enc,
+            ..CheckOptions::default()
         };
-        let inner = laterite_ags4_core::index::Sidecar::assemble(data.as_ref(), edition, stamp)
+        let inner = laterite_ags4_trust::mint(data.as_ref(), &opts, checked_at, compat)
             .map_err(|e| Error::from_reason(e.to_string()))?;
         Ok(Sidecar { inner })
     }
@@ -781,27 +825,6 @@ impl Sidecar {
         self.inner.is_fresh_for(data.as_ref())
     }
 
-    /// Was this cert minted by the CURRENT native validator engine (same engine
-    /// version, native — not a compat profile)? The `.validate()` skip trusts a
-    /// carried cert only when this holds AND it's fresh.
-    #[napi]
-    pub fn matches_native_validator(&self) -> bool {
-        self.inner.checker_matches(
-            laterite_ags4_core::index::ENGINE_IDENTITY,
-            laterite_ags4_validator::VERSION,
-            None,
-        )
-    }
-
-    /// Does this cert's check profile cover a request's? (`checkFiles`: the cert ran
-    /// at least what's asked; `forcedEdition`: a forced request needs the same
-    /// forced edition, an auto request an auto cert.)
-    #[napi]
-    pub fn profile_covers(&self, check_files: bool, forced_edition: Option<String>) -> bool {
-        self.inner
-            .profile_covers(check_files, forced_edition.as_deref())
-    }
-
     #[napi(getter)]
     pub fn version(&self) -> u32 {
         self.inner.version
@@ -816,17 +839,28 @@ impl Sidecar {
     pub fn sha256(&self) -> String {
         self.inner.file.sha256.clone()
     }
+    /// The AGS edition the rules were run against.
     #[napi(getter)]
     pub fn edition(&self) -> String {
-        self.inner.file.edition.clone()
+        self.inner.validation.edition.edition().to_string()
+    }
+    /// Was that edition FORCED (`dictVersion`), or auto-resolved from `TRAN_AGS`? One
+    /// fact with the edition string, not two — a forced run and an auto run can name the
+    /// same edition having applied different dictionaries.
+    #[napi(getter)]
+    pub fn edition_forced(&self) -> bool {
+        self.inner.validation.edition.is_forced()
     }
     #[napi(getter)]
     pub fn validator(&self) -> String {
         self.inner.validation.validator.clone()
     }
+    /// The fingerprint of the rule engine that produced this verdict — a hash of the rule
+    /// sources and the bundled dictionary, NOT the addon's version. A rule can change
+    /// without a version bump; this cannot.
     #[napi(getter)]
-    pub fn validator_version(&self) -> String {
-        self.inner.validation.validator_version.clone()
+    pub fn engine(&self) -> String {
+        self.inner.validation.engine.clone()
     }
     #[napi(getter)]
     pub fn compat(&self) -> Option<String> {
@@ -836,21 +870,29 @@ impl Sidecar {
     pub fn checked_at(&self) -> String {
         self.inner.validation.checked_at.clone()
     }
+    /// The decoder the certified bytes were READ through (`"UTF-8"`, `"windows-1252"`, …).
+    /// The rules judge the TEXT the bytes decode to, and two decoders can reach two
+    /// verdicts on one unchanged file — so a cert minted under one does not answer a
+    /// request made under another.
     #[napi(getter)]
-    pub fn check_files(&self) -> bool {
-        self.inner.validation.check_files
+    pub fn encoding(&self) -> String {
+        self.inner.validation.encoding.clone()
+    }
+
+    /// Findings of each tier that the validation **measured** — or `null` if it never ran
+    /// that tier's rules. `null` is the point: the old format stored a plain number that
+    /// defaulted to 0, so "found none" and "never looked" were the same value.
+    #[napi(getter)]
+    pub fn errors(&self) -> Option<u32> {
+        tier_count(self.inner.validation.errors)
     }
     #[napi(getter)]
-    pub fn edition_forced(&self) -> bool {
-        self.inner.validation.edition_forced
+    pub fn warnings(&self) -> Option<u32> {
+        tier_count(self.inner.validation.warnings)
     }
     #[napi(getter)]
-    pub fn warnings(&self) -> u32 {
-        self.inner.validation.warnings
-    }
-    #[napi(getter)]
-    pub fn fyi(&self) -> u32 {
-        self.inner.validation.fyi
+    pub fn fyi(&self) -> Option<u32> {
+        tier_count(self.inner.validation.fyi)
     }
 }
 
@@ -963,9 +1005,13 @@ pub fn fix_file(
         Ok(v) => v,
         Err(msg) => return Ok(FixReport::failure("bad_dict", 5, msg)),
     };
+    let enc = match resolve_encoding(encoding.as_deref()) {
+        Ok(e) => e,
+        Err(msg) => return Ok(FixReport::failure("bad_args", 5, msg)),
+    };
     let opts = CheckOptions {
         dict_version: forced,
-        encoding: resolve_encoding(encoding.as_deref()),
+        encoding: enc,
         // The residual re-validation tier matches this surface's `validate()`
         // default (errors + warnings) — not `CheckOptions::default()`'s
         // errors-only, which under-reported what the fix left behind (#294 C).
@@ -1100,11 +1146,24 @@ fn group_from_ipc(
 
 // --- helpers ------------------------------------------------------------
 
-fn resolve_encoding(label: Option<&str>) -> &'static encoding_rs::Encoding {
-    // Shared label table (the parse leaf) so a label resolves the same way on
-    // every surface — including the hyphenated `latin-1`, which this used to
-    // fall through to UTF-8. An unrecognised label keeps Node's UTF-8 fallback.
-    laterite_ags4_parse::resolve_encoding(label).unwrap_or(encoding_rs::UTF_8)
+/// Resolve an encoding label, or say why not.
+///
+/// This used to be infallible — `…resolve_encoding(label).unwrap_or(UTF_8)`. An
+/// unknown label silently became UTF-8, which is a corruption vector, not a
+/// convenience: `C3 A9` is `é` in UTF-8 and `Ã©` in cp1252, both decode cleanly, so
+/// a caller who typed `cp1252x` got the wrong text with no error at all — while the
+/// same typo raised on Python. Now it raises here too (`bad_args`, exit 5 — the same
+/// kind and code Python uses), so one label means one thing on every surface.
+fn resolve_encoding(
+    label: Option<&str>,
+) -> std::result::Result<&'static encoding_rs::Encoding, String> {
+    laterite_ags4_parse::resolve_encoding(label)
+        .ok_or_else(|| format!("unknown encoding {:?}", label.unwrap_or("")))
+}
+
+/// The `kind␟code␟message` shape TS's `fromNativeError` maps to a typed error.
+fn bad_encoding(msg: String) -> Error {
+    Error::from_reason(format!("bad_args{SEP}5{SEP}{msg}"))
 }
 
 /// Plain-`String` error (not napi) so `run_check` can surface a bad edition as
@@ -1235,4 +1294,43 @@ pub fn xlsx_bytes_to_ags4(
         rows_written: stats.rows_written as u32,
         warnings: stats.warnings,
     })
+}
+
+/// What THIS SURFACE resolves an encoding label to — the canonical `encoding_rs`
+/// name (`"UTF-8"`, `"windows-1252"`, `"ISO-8859-15"`), or `null` if it refuses.
+///
+/// Deliberately routed through this crate's OWN `resolve_encoding` wrapper, not the
+/// parse leaf directly. That distinction is the whole point: the leaf was always
+/// correct, and the bug lived in the wrapper *above* it (`…resolve_encoding(label)
+/// .unwrap_or(UTF_8)`), which turned every unknown label into a silent UTF-8 decode.
+/// A census that asked the leaf would have agreed with itself and seen nothing. This
+/// reports what a Node caller actually gets, so a reintroduced fallback shows up as
+/// `"cp1252x" -> "UTF-8"` and the surface census fails.
+#[napi]
+pub fn resolve_encoding_label(label: Option<String>) -> Option<String> {
+    resolve_encoding(label.as_deref())
+        .ok()
+        .map(|e| e.name().to_string())
+}
+
+/// The bundled AGS4 editions, oldest first — `["4.0.3", … "4.2"]`.
+///
+/// GENERATED all the way down: `DictVersion::ALL` is emitted by the reference leaf's
+/// build.rs from `ags_dictionary.json`. Exposed so no JS-side list of editions is
+/// hand-written — the CLI's `--dict-version` census reads this, and it is the same
+/// const the Rust binary and the Python wheel answer with, so the three launchers
+/// cannot disagree about which editions exist.
+#[napi]
+pub fn editions() -> Vec<String> {
+    laterite_ags4_validator::dict::DictVersion::ALL
+        .iter()
+        .map(|v| v.as_str().to_string())
+        .collect()
+}
+
+/// The edition `auto` falls back to when a file's `TRAN_AGS` is missing or
+/// unrecognised (the union's `fallback_edition`, generated).
+#[napi]
+pub fn fallback_edition() -> String {
+    laterite_ags4_validator::dict::FALLBACK.as_str().to_string()
 }

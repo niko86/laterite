@@ -26,6 +26,8 @@
 
 use std::collections::HashMap;
 
+use laterite_types::parse_value;
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
@@ -155,6 +157,117 @@ pub fn content_id(group_code: &str, chain: &[(String, String)]) -> Uuid {
     let mut bytes = [0u8; 16];
     bytes.copy_from_slice(&digest[..16]);
     Uuid::new_v8(bytes)
+}
+
+/// Domain tag mixed into the group code for [`content_hash`], so a value-hash
+/// can never collide with an *identity* [`content_id`]: a row whose only
+/// non-blank cell happens to be its single KEY would otherwise present the
+/// identical chain to both functions and hash to the same UUID. The version
+/// suffix is deliberate — the canonicalisation below IS the contract, so
+/// changing it must invalidate every previously-computed hash rather than
+/// silently reinterpret one.
+const CONTENT_HASH_DOMAIN: &str = "\u{1f}CONTENT1";
+
+/// A **typed, blank-insensitive** fingerprint of a row's whole *value* — the
+/// counterpart to [`content_id`], which fingerprints a row's *identity*.
+///
+/// The two answer different questions and must not be conflated: two deliveries
+/// of `LOCA BH01` with a corrected `LOCA_GL` share an `id` (same borehole) and
+/// differ in their `content_hash` (the data changed). That is precisely the
+/// distinction the DuckDB cookbook once got wrong.
+///
+/// **Why this hashes the PARSED value, where [`content_id`] hashes raw bytes.**
+/// The module note above explains why identity must hash the producer's bytes:
+/// a child denormalises the parent's `"1.50"` verbatim, so parsing would risk
+/// splitting identity across formatters. A *value* hash has the opposite need —
+/// a producer re-emitting `1.0` as `1.00` has changed nothing, and reporting it
+/// as a revision is a false positive. So values go through
+/// [`laterite_types::parse_value`], the same canonicaliser
+/// `laterite-ags4-merge` uses to decide a cell actually changed and
+/// `laterite-ags4-diff` uses to ignore formatting-only edits. One authority for
+/// "are these two cells the same", by construction rather than by coincidence.
+///
+/// The rules, in full:
+/// - Every heading is hashed, not just KEYs (so a changed non-key cell is
+///   visible), including custom/passthrough headings — whose unknown AGS type
+///   falls through `parse_value` to string, so they still count.
+/// - **A cell that canonicalises to `Null` is OMITTED.** `parse_value` maps an
+///   empty cell to `Value::Null`, so *blank ≡ absent* falls out of the existing
+///   canonicaliser rather than needing a special case. This is what lets two
+///   deliveries with different heading sets still dedup on the columns they
+///   share. The cost, stated plainly: a column that is absent and a column that
+///   is present-but-blank are indistinguishable to this hash.
+/// - Pairs are sorted by heading name, so column ORDER does not affect the hash.
+/// - The group code (domain-tagged) is hashed in, so identical values under two
+///   different groups can never collide.
+///
+/// **The sharp edge.** The hash is computed from ONE file, using THAT file's
+/// declared TYPE row. Two deliveries that disagree on a column's TYPE can
+/// canonicalise the same raw bytes differently (`"10.00"` as a number under
+/// `2DP` vs as a string under `X`) and therefore NOT dedup. This is inherent to
+/// a per-row column — it cannot know what the other file declared — and it is
+/// exactly the disagreement `laterite-ags4-merge` exists to reconcile.
+pub fn content_hash(group_code: &str, cells: &[(&str, &str, &str)]) -> Uuid {
+    let mut pairs: Vec<(String, String)> = cells
+        .iter()
+        .filter_map(
+            |(heading, ags_type, raw)| match parse_value(Some(raw), ags_type) {
+                // Blank ≡ absent. Dropping the pair (rather than hashing an empty
+                // string) is what makes the two shapes hash identically.
+                Value::Null => None,
+                // `to_string` is serde_json's compact form: type-tagged by
+                // construction (a String renders quoted, a Number bare), so the
+                // text `"10.0"` and the number `10.0` cannot alias.
+                v => Some(((*heading).to_string(), v.to_string())),
+            },
+        )
+        .collect();
+    pairs.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let domain = format!("{group_code}{CONTENT_HASH_DOMAIN}");
+    let digest = Sha256::digest(canonical_encode(&domain, &pairs));
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    Uuid::new_v8(bytes)
+}
+
+/// Stringified `_content_hash` for every row of a group — the value-side twin of
+/// [`group_row_ids`], and deliberately the same `(headings, n_rows, cell)`
+/// interface so a host computes ids, hashes and the typed batch from the **same**
+/// inputs and they cannot misalign.
+///
+/// Takes the file's own `TYPE` row (`types`, parallel to `headings`) because
+/// canonicalisation is per-file — see [`content_hash`]'s "sharp edge".
+///
+/// Unlike [`group_row_ids`] this needs **no `Registry`**: it hashes every
+/// heading rather than the spec key-chain, so an unknown custom/passthrough
+/// group still gets a usable hash where it would get no `_id` at all.
+pub fn group_content_hashes<'a, F>(
+    code: &str,
+    headings: &[String],
+    types: &[String],
+    n_rows: usize,
+    cell: F,
+) -> Vec<String>
+where
+    F: Fn(usize, usize) -> Option<&'a str>,
+{
+    (0..n_rows)
+        .map(|row| {
+            let cells: Vec<(&str, &str, &str)> = headings
+                .iter()
+                .enumerate()
+                .map(|(col, h)| {
+                    // A ragged/short row leaves a cell absent → "" → Null →
+                    // omitted, which is the same outcome as a blank cell. That
+                    // is the intended equivalence, not an accident.
+                    let ty = types.get(col).map(String::as_str).unwrap_or("");
+                    (h.as_str(), ty, cell(col, row).unwrap_or(""))
+                })
+                .collect();
+            content_hash(code, &cells).to_string()
+        })
+        .collect()
 }
 
 /// Injective, collision-proof encoding of a (group, key-chain). Every string
@@ -446,6 +559,185 @@ mod tests {
         assert!(
             ids.is_empty(),
             "a custom/passthrough group carries no spec keys → no content ids"
+        );
+    }
+
+    // ---- content_hash: the value-side twin. Each test pins one clause of the
+    // contract the feature was specified against; a failure here is a contract
+    // breach, not a style nit.
+
+    /// `(heading, type, value)` triples, for readability in the tests below.
+    fn cells<'a>(v: &'a [(&'a str, &'a str, &'a str)]) -> Vec<(&'a str, &'a str, &'a str)> {
+        v.to_vec()
+    }
+
+    #[test]
+    fn identical_rows_hash_identically_and_a_changed_cell_does_not() {
+        let a = content_hash(
+            "LOCA",
+            &cells(&[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", "2DP", "10.00")]),
+        );
+        let same = content_hash(
+            "LOCA",
+            &cells(&[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", "2DP", "10.00")]),
+        );
+        let revised = content_hash(
+            "LOCA",
+            &cells(&[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", "2DP", "11.50")]),
+        );
+        assert_eq!(a, same, "same values → same hash");
+        assert_ne!(a, revised, "a changed non-key value MUST change the hash");
+    }
+
+    #[test]
+    fn blank_equals_absent_so_differing_heading_sets_still_dedup() {
+        // File A has no LOCA_REM column at all. File B has one, left blank.
+        // The contract says these are the SAME row.
+        let file_a = content_hash(
+            "LOCA",
+            &cells(&[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", "2DP", "10.00")]),
+        );
+        let file_b = content_hash(
+            "LOCA",
+            &cells(&[
+                ("LOCA_ID", "ID", "BH01"),
+                ("LOCA_GL", "2DP", "10.00"),
+                ("LOCA_REM", "X", ""),
+            ]),
+        );
+        assert_eq!(
+            file_a, file_b,
+            "blank ≡ absent — else two deliveries with different heading sets never dedup"
+        );
+
+        // But a POPULATED extra column is a real difference.
+        let file_b_populated = content_hash(
+            "LOCA",
+            &cells(&[
+                ("LOCA_ID", "ID", "BH01"),
+                ("LOCA_GL", "2DP", "10.00"),
+                ("LOCA_REM", "X", "re-survey"),
+            ]),
+        );
+        assert_ne!(
+            file_a, file_b_populated,
+            "a populated extra column IS a value difference"
+        );
+    }
+
+    #[test]
+    fn formatting_only_change_does_not_alter_the_hash() {
+        let a = content_hash("LOCA", &cells(&[("LOCA_GL", "2DP", "10.0")]));
+        let b = content_hash("LOCA", &cells(&[("LOCA_GL", "2DP", "10.00")]));
+        assert_eq!(
+            a, b,
+            "`10.0` and `10.00` under 2DP are the same value — parse_value canonicalises"
+        );
+    }
+
+    #[test]
+    fn column_order_does_not_alter_the_hash() {
+        let a = content_hash(
+            "LOCA",
+            &cells(&[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", "2DP", "10.00")]),
+        );
+        let b = content_hash(
+            "LOCA",
+            &cells(&[("LOCA_GL", "2DP", "10.00"), ("LOCA_ID", "ID", "BH01")]),
+        );
+        assert_eq!(a, b, "pairs are sorted by heading name before encoding");
+    }
+
+    #[test]
+    fn a_string_value_cannot_alias_the_same_text_as_a_number() {
+        // serde_json's compact form is type-tagged (a String renders quoted),
+        // so the TEXT "10.0" and the NUMBER 10.0 must not collide.
+        let as_text = content_hash("LOCA", &cells(&[("LOCA_GL", "X", "10.0")]));
+        let as_number = content_hash("LOCA", &cells(&[("LOCA_GL", "2DP", "10.0")]));
+        assert_ne!(
+            as_text, as_number,
+            "type must be part of the fingerprint, not just the rendered text"
+        );
+    }
+
+    #[test]
+    fn the_same_values_under_two_groups_do_not_collide() {
+        let a = content_hash("LOCA", &cells(&[("X", "X", "v")]));
+        let b = content_hash("SAMP", &cells(&[("X", "X", "v")]));
+        assert_ne!(a, b, "the group code is hashed in");
+    }
+
+    #[test]
+    fn a_value_hash_never_collides_with_an_identity_id() {
+        // The collision this guards: a row whose ONLY non-blank cell is its
+        // single KEY presents the same (heading, value) chain to both
+        // functions. The domain tag is what keeps them apart.
+        let chain = vec![("PROJ_ID".to_string(), "\"P1\"".to_string())];
+        let id = content_id("PROJ", &chain);
+        let hash = content_hash("PROJ", &cells(&[("PROJ_ID", "ID", "P1")]));
+        assert_ne!(
+            id.to_string(),
+            hash.to_string(),
+            "identity and value hashes must live in separate domains"
+        );
+    }
+
+    #[test]
+    fn unknown_custom_group_still_hashes_even_though_it_has_no_id() {
+        // group_row_ids returns EMPTY for an unknown group (no spec keys).
+        // content_hash needs no Registry, so a passthrough group still gets a
+        // usable value fingerprint — a real capability difference, asserted.
+        let h = group_content_hashes(
+            "ZZZZ",
+            &["ZZZZ_VAL".to_string()],
+            &["X".to_string()],
+            2,
+            |_, row| Some(if row == 0 { "a" } else { "b" }),
+        );
+        assert_eq!(h.len(), 2);
+        assert_ne!(h[0], h[1], "distinct values → distinct hashes");
+    }
+
+    #[test]
+    fn group_content_hashes_is_deterministic_and_row_aligned() {
+        let headings = vec!["LOCA_ID".to_string(), "LOCA_GL".to_string()];
+        let types = vec!["ID".to_string(), "2DP".to_string()];
+        let data = [["BH01", "10.00"], ["BH02", "12.00"], ["BH01", "10.00"]];
+        let run = || {
+            group_content_hashes("LOCA", &headings, &types, 3, |col, row| {
+                Some(data[row][col])
+            })
+        };
+        let first = run();
+        assert_eq!(first, run(), "two independent computations must agree");
+        assert_eq!(
+            first[0], first[2],
+            "rows 0 and 2 carry identical values → identical hash (this IS the dedup)"
+        );
+        assert_ne!(first[0], first[1]);
+    }
+
+    /// The TYPE-pair behaviour I promised to REPORT rather than assume. This
+    /// asserts what actually happens when two files declare the same column
+    /// differently — the feature's sharpest edge. If a future `parse_value`
+    /// change moves any of these, this test fails loudly and the documented
+    /// contract must be updated with it.
+    #[test]
+    fn type_pair_behaviour_table() {
+        let h = |ty: &str, raw: &str| content_hash("LOCA", &cells(&[("LOCA_GL", ty, raw)]));
+
+        // Same canonical class, different declared precision → SAME hash.
+        assert_eq!(
+            h("2DP", "10.00"),
+            h("3DP", "10.000"),
+            "2DP/3DP both canonicalise to the same number → dedup works"
+        );
+        // Numeric vs free-text → DIFFERENT hash for identical bytes. This is
+        // the documented sharp edge: TYPE disagreement defeats dedup.
+        assert_ne!(
+            h("2DP", "10.00"),
+            h("X", "10.00"),
+            "typed-vs-X on identical bytes does NOT dedup — use `lat merge` for that case"
         );
     }
 }

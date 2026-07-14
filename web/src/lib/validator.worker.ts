@@ -31,6 +31,7 @@ import type {
   RevisionDelta,
   StandardDict,
   ExportResult,
+  TypeClashMode,
 } from "./validator";
 import type { GroupMeta } from "./duckTypes";
 
@@ -106,15 +107,16 @@ export interface RevisionDiffReq {
   maxRowsPerGroup: number | null;
 }
 /** Merge two AGS4 deliveries into one file (Tools → Merge). Carries both
- *  buffers, transferred; `lenient` widens a TYPE conflict to X; the optional
- *  `tran*` fields stamp a synthesised merge-TRAN. */
+ *  buffers, transferred; `onTypeClash` settles a TYPE disagreement ("error" |
+ *  "widen" → X | "promote" → greatest nDP precision, coarser values zero-padded);
+ *  the optional `tran*` fields stamp a synthesised merge-TRAN. */
 export interface MergeReq {
   id: number;
   kind: "merge";
   aBytes: ArrayBuffer;
   bBytes: ArrayBuffer;
   encoding: string;
-  lenient: boolean;
+  onTypeClash: TypeClashMode;
   tranIssue: string | null;
   tranDate: string | null;
   tranProducer: string | null;
@@ -311,12 +313,13 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
     }
 
     if (req.kind === "merge") {
-      // Throws (→ caught below) on a strict TYPE conflict or unparseable input.
+      // Throws (→ caught below) on an unsettled TYPE clash, a UNIT clash (fatal
+      // in every mode), or unparseable input.
       const out = merge(
         new Uint8Array(req.aBytes),
         new Uint8Array(req.bBytes),
         req.encoding,
-        req.lenient,
+        req.onTypeClash,
         req.tranIssue ?? undefined,
         req.tranDate ?? undefined,
         req.tranProducer ?? undefined,

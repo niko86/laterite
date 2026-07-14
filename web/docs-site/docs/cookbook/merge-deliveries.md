@@ -31,7 +31,8 @@ conflict — and the result is a **union**: a row present in only one file is ke
     `PROJ_NAME`, matched on the `PROJ_ID` KEY `LAT-DEMO` — and flags that a revised
     parent (`PROJ`) has child groups worth re-checking. When two files declare a
     column with *different* AGS types, `merge` errors (exit `6`) rather than guess;
-    pass `--lenient` to widen that column to `X` (text), keeping every raw value.
+    `--on-type-clash promote` or `--on-type-clash widen` settles it (see
+    [When the two files disagree on a type](#when-the-two-files-disagree-on-a-type)).
 
 === "Python"
 
@@ -51,8 +52,9 @@ conflict — and the result is a **union**: a row present in only one file is ke
     res.save("merged.ags")
     ```
 
-    A strict AGS-type clash between two files raises `MergeConflictError`; pass
-    `lenient=True` to widen the column to `X` instead. `res.text` decodes the merged
+    An AGS-type clash between two files raises `MergeConflictError` by default;
+    `on_type_clash="promote"` or `"widen"` settles it (see
+    [below](#when-the-two-files-disagree-on-a-type)). `res.text` decodes the merged
     bytes, and `res.save(path)` writes them.
 
 === "Node"
@@ -72,16 +74,75 @@ conflict — and the result is a **union**: a row present in only one file is ke
     ```
 
     A bare `string` is a **path** in Node, so pass a `Buffer` / `Uint8Array` when a
-    delivery only exists in memory. A strict type clash throws `MergeConflictError`;
-    `{ lenient: true }` widens the column to `X`.
+    delivery only exists in memory. A type clash throws `MergeConflictError`;
+    `{ onTypeClash: "promote" }` or `"widen"` settles it (see
+    [below](#when-the-two-files-disagree-on-a-type)).
 
 === "Browser"
 
     Open the [web app](../surfaces/browser.md)'s **Tools → Merge** tool, keep the
     file you already loaded as the base, and drop in the incoming delivery. The same
     reconciliation runs compiled to WebAssembly, entirely client-side: you get the
-    per-row revision audit and download the merged `.ags` — neither file leaves your
-    machine.
+    per-row revision audit, choose how to settle a type clash, and download the
+    merged `.ags` — neither file leaves your machine.
+
+## When the two files disagree on a type
+
+One delivery types `LOCA_GL` as `2DP`, the next types it `5DP`. Merge will not
+guess: by default it **errors** (exit `6` / `MergeConflictError`). You choose how
+to settle it.
+
+| mode | what the merged column becomes | your values |
+|---|---|---|
+| `error` *(default)* | — | merge refuses |
+| `widen` | `X` (free text) | kept byte-for-byte |
+| `promote` | the **greatest precision** — `2DP` + `5DP` → `5DP` | coarser values zero-padded: `10.00` → `10.00000` |
+
+`widen` is lossless on the bytes but **throws the type away**, and `X` is the
+least informative answer available. `promote` keeps the column *numeric*.
+
+=== "CLI"
+
+    ```bash
+    lat merge phase1.ags phase2.ags --out merged.ags --on-type-clash promote
+    ```
+
+=== "Python"
+
+    ```python
+    res = laterite.merge("phase1.ags", "phase2.ags", on_type_clash="promote")
+    ```
+
+=== "Node"
+
+    ```js
+    const res = merge(["phase1.ags", "phase2.ags"], { onTypeClash: "promote" });
+    ```
+
+**`promote` never rounds and never demotes.** It only ever *appends zeros*, so no
+digit you wrote is ever changed, and taking the **maximum** precision is the only
+direction that cannot destroy data — which also makes the result independent of
+argument order (unlike a KEY conflict, where the later file deliberately wins). A
+value it cannot pad losslessly is kept verbatim and warned about, never rounded.
+
+**It is deliberately limited to `nDP`.** Significant figures (`3SF`) and scientific
+notation (`2SCI`) fall back to `widen`, because decimal places are a formatting
+convention but significant figures are a claim about *measured* precision — padding
+`3SF` to `5SF` would assert two digits the instrument never resolved.
+
+!!! tip "Why promote matters downstream"
+
+    `_content_hash` fingerprints a row's *values*, canonicalised through the declared
+    type — so `10.00` hashes as a **number** under `2DP` but as a **string** under
+    `X`. A `widen`ed column therefore stops matching its own typed source, while a
+    `promote`d one still dedups against it.
+
+!!! warning "A conflicting UNIT is fatal in every mode"
+
+    `TYPE` has a universal absorber (`X`); `UNIT` has none. There is no supertype of
+    metres and millimetres, and merge will never *convert* — so if two files declare
+    different UNITs for one heading, merge refuses in **every** mode, `promote`
+    included. Reconcile the `UNIT` row at source.
 
 **One caveat everywhere:** identity is KEY-based, so *correcting* a KEY value
 (a `LOCA_ID` typo `BH1` → `BH01`) reads as a different row, not an edit — both

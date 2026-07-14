@@ -596,9 +596,24 @@ export interface MergeResult {
 }
 
 export interface MergeOptions {
-  /** Widen a column two files typed differently to `X` instead of throwing
-   * {@link MergeConflictError}. Default `false` (strict — a TYPE conflict errors). */
-  lenient?: boolean;
+  /** How to settle a heading two deliveries typed differently. Default `"error"`.
+   *
+   * - `"error"`   — refuse, throwing {@link MergeConflictError}.
+   * - `"widen"`   — fall back to `X` (free text). Raw values kept byte-for-byte,
+   *                 but the column's TYPE is thrown away.
+   * - `"promote"` — keep the column numeric when every clashing code is `nDP`: take
+   *                 the greatest precision (`2DP` + `5DP` → `5DP`) and zero-pad the
+   *                 coarser values (`10.00` → `10.00000`), so the merged file still
+   *                 satisfies Rule 8. Never rounds, never demotes. `nSF`/`nSCI` and
+   *                 cross-family clashes fall back to `"widen"` — padding
+   *                 significant figures would overstate measured precision.
+   *
+   * `"promote"` is what keeps a merged file value-comparable with its own inputs:
+   * `_content_hash` reads `10.00` as a number under `2DP` but as a string under `X`.
+   *
+   * A conflicting **UNIT** is fatal in every mode — `TYPE` has an absorber (`X`),
+   * `UNIT` has none. */
+  onTypeClash?: "error" | "widen" | "promote";
   /** Force the edition used to resolve KEY headings; default takes it from the
    * newest file's `TRAN_AGS`. */
   dictVersion?: string;
@@ -630,14 +645,16 @@ export type MergeSource = string | Uint8Array | Ags4File;
  * order), so a re-sorted borehole list still merges each `LOCA` onto its prior
  * self; the merge is a **union** (a row in one file and absent in another is
  * kept, since silence is not deletion). A heading two files typed differently
- * throws {@link MergeConflictError} unless `opts.lenient` widens it to `X` (text,
- * keeping raw values). Pass `opts.tranIssue` **and** `opts.tranDate` to stamp a
- * synthesised merge-TRAN recording the inputs' issues/dates in `TRAN_REM`.
+ * throws {@link MergeConflictError} unless `opts.onTypeClash` settles it — `"widen"`
+ * falls back to `X` (raw values kept), `"promote"` keeps the greatest `nDP` precision
+ * (zero-padding the coarser values). Pass `opts.tranIssue` **and** `opts.tranDate` to
+ * stamp a synthesised merge-TRAN recording the inputs' issues/dates in `TRAN_REM`.
  *
  * @param sources - Two or more documents to merge (path / bytes / `Ags4File`).
  * @param opts - {@link MergeOptions}.
  * @returns A {@link MergeResult}: the merged `bytes` + `warnings` / `revisions` audit.
- * @throws {MergeConflictError} a strict TYPE conflict, or the output failed to emit.
+ * @throws {MergeConflictError} an unsettled TYPE clash, a UNIT clash (fatal in every
+ *   mode), or the output failed to emit.
  * @throws {NotAgs4Error} a source is not decodable AGS4.
  * @throws {BadDictError} an invalid `opts.dictVersion`.
  * @throws {RangeError} fewer than two sources.
@@ -648,7 +665,7 @@ export function merge(sources: MergeSource[], opts: MergeOptions = {}): MergeRes
   try {
     const out = nativeMerge(
       files,
-      opts.lenient,
+      opts.onTypeClash,
       opts.dictVersion,
       opts.encoding,
       opts.tranIssue,
@@ -757,6 +774,7 @@ export {
   NotAgs4Error,
   StaleCertError,
   UnsupportedEditionError,
+  WorldCheckRequiresSourceError,
 } from "./errors";
 export { Report, type RuleFinding } from "./report";
 export { version } from "./native";

@@ -26,16 +26,21 @@ use pyo3_arrow::PyTable;
 use crate::emit::GroupBlock;
 
 fn parse_edition(s: Option<&str>) -> PyResult<DictVersion> {
+    // Both the accepted SET and the rejection message come from the dictionary:
+    // `from_edition` + `editions_joined` are generated from ags_dictionary.json.
+    // This was a hand-written match with a hand-written message listing the editions
+    // a second time — two copies of one set, in one function.
+    //
+    // `auto` resolves to FALLBACK (also generated: the union's `fallback_edition`),
+    // which is V4_1_1 — the value this used to hard-code.
     match s.map(str::trim) {
-        None | Some("") | Some("auto") => Ok(DictVersion::V4_1_1),
-        Some("4.0.3") => Ok(DictVersion::V4_0_3),
-        Some("4.0.4") => Ok(DictVersion::V4_0_4),
-        Some("4.1") => Ok(DictVersion::V4_1),
-        Some("4.1.1") => Ok(DictVersion::V4_1_1),
-        Some("4.2") => Ok(DictVersion::V4_2),
-        Some(other) => Err(PyRuntimeError::new_err(format!(
-            "unknown edition {other:?}; expected 4.0.3|4.0.4|4.1|4.1.1|4.2"
-        ))),
+        None | Some("") | Some("auto") => Ok(laterite_ags4_validator::dict::FALLBACK),
+        Some(other) => DictVersion::from_edition(other).ok_or_else(|| {
+            PyRuntimeError::new_err(format!(
+                "unknown edition {other:?}; expected {}",
+                laterite_ags4_validator::editions_joined("|")
+            ))
+        }),
     }
 }
 
