@@ -7,6 +7,7 @@
 // the human views are each surface's own presentation. A bare `lat <file>` is
 // shorthand for `lat validate <file>`.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, extname, join } from "node:path";
 
 import type { Report, ValidateOptions } from "./index";
 import { diff, fix, fromExcel, merge, read, toExcel, transport, validate } from "./index";
@@ -506,6 +507,19 @@ function runValidate(p: Parsed, json: boolean, ndjson: boolean): number {
   return report.exitCode;
 }
 
+// `delivery.ags` → `delivery.fixed.ags`; `data.txt` → `data.fixed.txt`; an
+// extension-less `foo` → `foo.fixed`. The default fix destination — MUST match
+// the Rust binary's `sibling_fixed_path` (common.rs) and uvx's
+// `src.with_name(f"{src.stem}.fixed{src.suffix}")` (_cli.py), so the three
+// launchers write the SAME filename. The old `file.replace(/(\.ags)?$/i, ".fixed.ags")`
+// matched `(\.ags)?` ZERO-WIDTH at end-of-string, so `data.txt` became
+// `data.txt.fixed.ags` and `data` became `data.fixed.ags` — npx alone.
+function siblingFixedPath(file: string): string {
+  const ext = extname(file); // ".txt" / ".ags" / "" — case preserved
+  const stem = basename(file, ext);
+  return join(dirname(file), ext ? `${stem}.fixed${ext}` : `${stem}.fixed`);
+}
+
 // ---- fix -------------------------------------------------------------
 function runFix(p: Parsed): number {
   const file = p.positionals[0];
@@ -523,7 +537,7 @@ function runFix(p: Parsed): number {
   }
   const dest = p.flags["in-place"]
     ? file
-    : (str(p.flags["fix-out"]) ?? file.replace(/(\.ags)?$/i, ".fixed.ags"));
+    : (str(p.flags["fix-out"]) ?? siblingFixedPath(file));
   result.save(dest);
   note(`${result.toString()} → ${dest}`);
   return result.findings.length === 0 ? 0 : 1;

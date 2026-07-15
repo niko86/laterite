@@ -165,8 +165,11 @@ pub fn content_id(group_code: &str, chain: &[(String, String)]) -> Uuid {
 /// identical chain to both functions and hash to the same UUID. The version
 /// suffix is deliberate — the canonicalisation below IS the contract, so
 /// changing it must invalidate every previously-computed hash rather than
-/// silently reinterpret one.
-const CONTENT_HASH_DOMAIN: &str = "\u{1f}CONTENT1";
+/// silently reinterpret one. Bumped `CONTENT1` → `CONTENT2` because V2
+/// additionally folds the cell's UNIT into the hash (V1 did not, so a `10.0
+/// m` and a `10.0 ft` cell used to alias) — old and new hashes must never be
+/// conflated, hence the bump rather than a silent behaviour change.
+const CONTENT_HASH_DOMAIN: &str = "\u{1f}CONTENT2";
 
 /// A **typed, blank-insensitive** fingerprint of a row's whole *value* — the
 /// counterpart to [`content_id`], which fingerprints a row's *identity*.
@@ -200,6 +203,14 @@ const CONTENT_HASH_DOMAIN: &str = "\u{1f}CONTENT1";
 /// - Pairs are sorted by heading name, so column ORDER does not affect the hash.
 /// - The group code (domain-tagged) is hashed in, so identical values under two
 ///   different groups can never collide.
+/// - **The UNIT is folded into the hash.** So a `10.0 m` and a `10.0 ft` cell
+///   never dedup — `laterite-ags4-merge` refuses that pair as irreconcilable
+///   (#501), and collapsing it here would be silent data loss. A blank unit
+///   means "unspecified": it trims to `""`, the same constant for every blank
+///   cell, matching `merged_unit`'s `filter(|u| !u.is_empty())` — so two
+///   blank-unit cells still dedup among themselves, but never against a
+///   stated unit (the conservative direction: failing to dedup is safe, a
+///   false dedup is not).
 ///
 /// **The sharp edge.** The hash is computed from ONE file, using THAT file's
 /// declared TYPE row. Two deliveries that disagree on a column's TYPE can
@@ -207,25 +218,32 @@ const CONTENT_HASH_DOMAIN: &str = "\u{1f}CONTENT1";
 /// `2DP` vs as a string under `X`) and therefore NOT dedup. This is inherent to
 /// a per-row column — it cannot know what the other file declared — and it is
 /// exactly the disagreement `laterite-ags4-merge` exists to reconcile.
-pub fn content_hash(group_code: &str, cells: &[(&str, &str, &str)]) -> Uuid {
-    let mut pairs: Vec<(String, String)> = cells
+pub fn content_hash(group_code: &str, cells: &[(&str, &str, &str, &str)]) -> Uuid {
+    let mut triples: Vec<(String, String, String)> = cells
         .iter()
-        .filter_map(
-            |(heading, ags_type, raw)| match parse_value(Some(raw), ags_type) {
-                // Blank ≡ absent. Dropping the pair (rather than hashing an empty
-                // string) is what makes the two shapes hash identically.
+        .filter_map(|(heading, unit, ags_type, raw)| {
+            match parse_value(Some(raw), ags_type) {
+                // Blank ≡ absent. Dropping the cell (rather than hashing an empty
+                // string) is what makes a blank and an absent column hash alike.
                 Value::Null => None,
-                // `to_string` is serde_json's compact form: type-tagged by
-                // construction (a String renders quoted, a Number bare), so the
-                // text `"10.0"` and the number `10.0` cannot alias.
-                v => Some(((*heading).to_string(), v.to_string())),
-            },
-        )
+                v => Some((
+                    (*heading).to_string(),
+                    // UNIT folded in so `10.0 m` and `10.0 ft` never dedup — merge
+                    // refuses that pair as irreconcilable (#501); collapsing it
+                    // would be silent data loss. A blank unit is "unspecified" and
+                    // trims to "" (constant for every blank), matching
+                    // `merged_unit`'s `filter(|u| !u.is_empty())`: blanks dedup
+                    // among themselves and never with a stated unit.
+                    (*unit).trim().to_string(),
+                    v.to_string(),
+                )),
+            }
+        })
         .collect();
-    pairs.sort_by(|a, b| a.0.cmp(&b.0));
+    triples.sort_by(|a, b| a.0.cmp(&b.0));
 
     let domain = format!("{group_code}{CONTENT_HASH_DOMAIN}");
-    let digest = Sha256::digest(canonical_encode(&domain, &pairs));
+    let digest = Sha256::digest(content_encode(&domain, &triples));
     let mut bytes = [0u8; 16];
     bytes.copy_from_slice(&digest[..16]);
     Uuid::new_v8(bytes)
@@ -237,7 +255,9 @@ pub fn content_hash(group_code: &str, cells: &[(&str, &str, &str)]) -> Uuid {
 /// inputs and they cannot misalign.
 ///
 /// Takes the file's own `TYPE` row (`types`, parallel to `headings`) because
-/// canonicalisation is per-file — see [`content_hash`]'s "sharp edge".
+/// canonicalisation is per-file — see [`content_hash`]'s "sharp edge" — and its
+/// own `UNIT` row (`units`, also parallel to `headings`), because the UNIT is
+/// folded into the hash (see [`content_hash`]'s UNIT rule).
 ///
 /// Unlike [`group_row_ids`] this needs **no `Registry`**: it hashes every
 /// heading rather than the spec key-chain, so an unknown custom/passthrough
@@ -245,6 +265,7 @@ pub fn content_hash(group_code: &str, cells: &[(&str, &str, &str)]) -> Uuid {
 pub fn group_content_hashes<'a, F>(
     code: &str,
     headings: &[String],
+    units: &[String],
     types: &[String],
     n_rows: usize,
     cell: F,
@@ -254,15 +275,16 @@ where
 {
     (0..n_rows)
         .map(|row| {
-            let cells: Vec<(&str, &str, &str)> = headings
+            let cells: Vec<(&str, &str, &str, &str)> = headings
                 .iter()
                 .enumerate()
                 .map(|(col, h)| {
                     // A ragged/short row leaves a cell absent → "" → Null →
                     // omitted, which is the same outcome as a blank cell. That
                     // is the intended equivalence, not an accident.
+                    let unit = units.get(col).map(String::as_str).unwrap_or("");
                     let ty = types.get(col).map(String::as_str).unwrap_or("");
-                    (h.as_str(), ty, cell(col, row).unwrap_or(""))
+                    (h.as_str(), unit, ty, cell(col, row).unwrap_or(""))
                 })
                 .collect();
             content_hash(code, &cells).to_string()
@@ -284,6 +306,23 @@ pub fn canonical_encode(group_code: &str, chain: &[(String, String)]) -> Vec<u8>
     out.extend_from_slice(&(chain.len() as u32).to_le_bytes());
     for (name, value) in chain {
         put_lp(&mut out, name);
+        put_lp(&mut out, value);
+    }
+    out
+}
+
+/// Injective encoding for the value hash's `(heading, unit, value)` triples —
+/// the twin of [`canonical_encode`]. The UNIT is length-prefixed as its own
+/// field alongside the value, so `10.0 m` and `10.0 ft` can never encode alike.
+/// Kept separate from `canonical_encode` so a change to the value hash's shape
+/// can never perturb the identity hash.
+fn content_encode(domain: &str, triples: &[(String, String, String)]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(8 + domain.len() + triples.len() * 24);
+    put_lp(&mut out, domain);
+    out.extend_from_slice(&(triples.len() as u32).to_le_bytes());
+    for (name, unit, value) in triples {
+        put_lp(&mut out, name);
+        put_lp(&mut out, unit);
         put_lp(&mut out, value);
     }
     out
@@ -566,8 +605,12 @@ mod tests {
     // contract the feature was specified against; a failure here is a contract
     // breach, not a style nit.
 
-    /// `(heading, type, value)` triples, for readability in the tests below.
-    fn cells<'a>(v: &'a [(&'a str, &'a str, &'a str)]) -> Vec<(&'a str, &'a str, &'a str)> {
+    /// `(heading, unit, type, value)` 4-tuples, for readability in the tests
+    /// below. No existing test here is *about* units, so every call site below
+    /// passes `""` — [`content_hash_folds_unit`] is the one that isn't.
+    fn cells<'a>(
+        v: &'a [(&'a str, &'a str, &'a str, &'a str)],
+    ) -> Vec<(&'a str, &'a str, &'a str, &'a str)> {
         v.to_vec()
     }
 
@@ -575,15 +618,24 @@ mod tests {
     fn identical_rows_hash_identically_and_a_changed_cell_does_not() {
         let a = content_hash(
             "LOCA",
-            &cells(&[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", "2DP", "10.00")]),
+            &cells(&[
+                ("LOCA_ID", "", "ID", "BH01"),
+                ("LOCA_GL", "", "2DP", "10.00"),
+            ]),
         );
         let same = content_hash(
             "LOCA",
-            &cells(&[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", "2DP", "10.00")]),
+            &cells(&[
+                ("LOCA_ID", "", "ID", "BH01"),
+                ("LOCA_GL", "", "2DP", "10.00"),
+            ]),
         );
         let revised = content_hash(
             "LOCA",
-            &cells(&[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", "2DP", "11.50")]),
+            &cells(&[
+                ("LOCA_ID", "", "ID", "BH01"),
+                ("LOCA_GL", "", "2DP", "11.50"),
+            ]),
         );
         assert_eq!(a, same, "same values → same hash");
         assert_ne!(a, revised, "a changed non-key value MUST change the hash");
@@ -595,14 +647,17 @@ mod tests {
         // The contract says these are the SAME row.
         let file_a = content_hash(
             "LOCA",
-            &cells(&[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", "2DP", "10.00")]),
+            &cells(&[
+                ("LOCA_ID", "", "ID", "BH01"),
+                ("LOCA_GL", "", "2DP", "10.00"),
+            ]),
         );
         let file_b = content_hash(
             "LOCA",
             &cells(&[
-                ("LOCA_ID", "ID", "BH01"),
-                ("LOCA_GL", "2DP", "10.00"),
-                ("LOCA_REM", "X", ""),
+                ("LOCA_ID", "", "ID", "BH01"),
+                ("LOCA_GL", "", "2DP", "10.00"),
+                ("LOCA_REM", "", "X", ""),
             ]),
         );
         assert_eq!(
@@ -614,9 +669,9 @@ mod tests {
         let file_b_populated = content_hash(
             "LOCA",
             &cells(&[
-                ("LOCA_ID", "ID", "BH01"),
-                ("LOCA_GL", "2DP", "10.00"),
-                ("LOCA_REM", "X", "re-survey"),
+                ("LOCA_ID", "", "ID", "BH01"),
+                ("LOCA_GL", "", "2DP", "10.00"),
+                ("LOCA_REM", "", "X", "re-survey"),
             ]),
         );
         assert_ne!(
@@ -627,8 +682,8 @@ mod tests {
 
     #[test]
     fn formatting_only_change_does_not_alter_the_hash() {
-        let a = content_hash("LOCA", &cells(&[("LOCA_GL", "2DP", "10.0")]));
-        let b = content_hash("LOCA", &cells(&[("LOCA_GL", "2DP", "10.00")]));
+        let a = content_hash("LOCA", &cells(&[("LOCA_GL", "", "2DP", "10.0")]));
+        let b = content_hash("LOCA", &cells(&[("LOCA_GL", "", "2DP", "10.00")]));
         assert_eq!(
             a, b,
             "`10.0` and `10.00` under 2DP are the same value — parse_value canonicalises"
@@ -639,11 +694,17 @@ mod tests {
     fn column_order_does_not_alter_the_hash() {
         let a = content_hash(
             "LOCA",
-            &cells(&[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", "2DP", "10.00")]),
+            &cells(&[
+                ("LOCA_ID", "", "ID", "BH01"),
+                ("LOCA_GL", "", "2DP", "10.00"),
+            ]),
         );
         let b = content_hash(
             "LOCA",
-            &cells(&[("LOCA_GL", "2DP", "10.00"), ("LOCA_ID", "ID", "BH01")]),
+            &cells(&[
+                ("LOCA_GL", "", "2DP", "10.00"),
+                ("LOCA_ID", "", "ID", "BH01"),
+            ]),
         );
         assert_eq!(a, b, "pairs are sorted by heading name before encoding");
     }
@@ -652,8 +713,8 @@ mod tests {
     fn a_string_value_cannot_alias_the_same_text_as_a_number() {
         // serde_json's compact form is type-tagged (a String renders quoted),
         // so the TEXT "10.0" and the NUMBER 10.0 must not collide.
-        let as_text = content_hash("LOCA", &cells(&[("LOCA_GL", "X", "10.0")]));
-        let as_number = content_hash("LOCA", &cells(&[("LOCA_GL", "2DP", "10.0")]));
+        let as_text = content_hash("LOCA", &cells(&[("LOCA_GL", "", "X", "10.0")]));
+        let as_number = content_hash("LOCA", &cells(&[("LOCA_GL", "", "2DP", "10.0")]));
         assert_ne!(
             as_text, as_number,
             "type must be part of the fingerprint, not just the rendered text"
@@ -662,8 +723,8 @@ mod tests {
 
     #[test]
     fn the_same_values_under_two_groups_do_not_collide() {
-        let a = content_hash("LOCA", &cells(&[("X", "X", "v")]));
-        let b = content_hash("SAMP", &cells(&[("X", "X", "v")]));
+        let a = content_hash("LOCA", &cells(&[("X", "", "X", "v")]));
+        let b = content_hash("SAMP", &cells(&[("X", "", "X", "v")]));
         assert_ne!(a, b, "the group code is hashed in");
     }
 
@@ -674,7 +735,7 @@ mod tests {
         // functions. The domain tag is what keeps them apart.
         let chain = vec![("PROJ_ID".to_string(), "\"P1\"".to_string())];
         let id = content_id("PROJ", &chain);
-        let hash = content_hash("PROJ", &cells(&[("PROJ_ID", "ID", "P1")]));
+        let hash = content_hash("PROJ", &cells(&[("PROJ_ID", "", "ID", "P1")]));
         assert_ne!(
             id.to_string(),
             hash.to_string(),
@@ -687,9 +748,11 @@ mod tests {
         // group_row_ids returns EMPTY for an unknown group (no spec keys).
         // content_hash needs no Registry, so a passthrough group still gets a
         // usable value fingerprint — a real capability difference, asserted.
+        let units = vec![String::new()];
         let h = group_content_hashes(
             "ZZZZ",
             &["ZZZZ_VAL".to_string()],
+            &units,
             &["X".to_string()],
             2,
             |_, row| Some(if row == 0 { "a" } else { "b" }),
@@ -701,10 +764,11 @@ mod tests {
     #[test]
     fn group_content_hashes_is_deterministic_and_row_aligned() {
         let headings = vec!["LOCA_ID".to_string(), "LOCA_GL".to_string()];
+        let units = vec![String::new(); headings.len()];
         let types = vec!["ID".to_string(), "2DP".to_string()];
         let data = [["BH01", "10.00"], ["BH02", "12.00"], ["BH01", "10.00"]];
         let run = || {
-            group_content_hashes("LOCA", &headings, &types, 3, |col, row| {
+            group_content_hashes("LOCA", &headings, &units, &types, 3, |col, row| {
                 Some(data[row][col])
             })
         };
@@ -717,6 +781,77 @@ mod tests {
         assert_ne!(first[0], first[1]);
     }
 
+    /// **The value-hash contract, pinned to literal UUIDs.** The behavioural
+    /// tests above prove the RELATIONSHIPS (equal values → equal hash, a changed
+    /// cell → a changed hash); this pins the ABSOLUTE output, so a change to the
+    /// canonicalisation, the domain tag (`CONTENT_HASH_DOMAIN`), or the encoding
+    /// is caught even when it preserves every relationship. If these literals
+    /// move — because you bumped the domain, or `parse_value` changed (see the
+    /// twin pin-table `parse_value_canonical_form_is_pinned_for_the_content_hash_contract`
+    /// in `laterite-types`) — updating them here is the deliberate, reviewable
+    /// record that every previously-computed hash just changed.
+    #[test]
+    fn content_hash_golden_literals() {
+        // A single row's value-hash …
+        let one = content_hash(
+            "LOCA",
+            &cells(&[
+                ("LOCA_ID", "", "ID", "BH01"),
+                ("LOCA_GL", "", "2DP", "10.00"),
+            ]),
+        )
+        .to_string();
+        assert_eq!(one, "60eed2bb-66b4-8ffd-b920-1adc741badc7");
+
+        // … equals row 0 of the same values hashed through the group entry
+        // point (same inputs → same hash, by construction), and row 1 differs.
+        let headings = vec!["LOCA_ID".to_string(), "LOCA_GL".to_string()];
+        let units = vec![String::new(); headings.len()];
+        let types = vec!["ID".to_string(), "2DP".to_string()];
+        let data = [["BH01", "10.00"], ["BH02", "12.34"]];
+        let hashes = group_content_hashes("LOCA", &headings, &units, &types, 2, |col, row| {
+            Some(data[row][col])
+        });
+        assert_eq!(
+            hashes,
+            vec![
+                "60eed2bb-66b4-8ffd-b920-1adc741badc7".to_string(),
+                "38fbe590-7453-8ad7-a9dd-07a01e96f064".to_string()
+            ],
+        );
+    }
+
+    /// The UNIT rule, pinned: a stated unit distinguishes, a blank unit is
+    /// "unspecified" and dedups only against other blanks, and re-emitting
+    /// the SAME unit still dedups. See [`content_hash`]'s UNIT rule and #501.
+    #[test]
+    fn content_hash_folds_unit() {
+        let metres = content_hash("LOCA", &cells(&[("LOCA_GL", "m", "2DP", "10.00")]));
+        let feet = content_hash("LOCA", &cells(&[("LOCA_GL", "ft", "2DP", "10.00")]));
+        assert_ne!(
+            metres, feet,
+            "same value, different non-blank unit — must NOT dedup (#501)"
+        );
+
+        let blank = content_hash("LOCA", &cells(&[("LOCA_GL", "", "2DP", "10.00")]));
+        assert_ne!(
+            blank, metres,
+            "a blank unit ('unspecified') must not dedup against a stated unit"
+        );
+
+        let blank_again = content_hash("LOCA", &cells(&[("LOCA_GL", "", "2DP", "10.00")]));
+        assert_eq!(
+            blank, blank_again,
+            "two blank-unit cells with the same value must still dedup among themselves"
+        );
+
+        let metres_reemit = content_hash("LOCA", &cells(&[("LOCA_GL", "m", "2DP", "10.0")]));
+        assert_eq!(
+            metres, metres_reemit,
+            "a re-emit within the SAME unit is a formatting change, not a unit change"
+        );
+    }
+
     /// The TYPE-pair behaviour I promised to REPORT rather than assume. This
     /// asserts what actually happens when two files declare the same column
     /// differently — the feature's sharpest edge. If a future `parse_value`
@@ -724,7 +859,7 @@ mod tests {
     /// contract must be updated with it.
     #[test]
     fn type_pair_behaviour_table() {
-        let h = |ty: &str, raw: &str| content_hash("LOCA", &cells(&[("LOCA_GL", ty, raw)]));
+        let h = |ty: &str, raw: &str| content_hash("LOCA", &cells(&[("LOCA_GL", "", ty, raw)]));
 
         // Same canonical class, different declared precision → SAME hash.
         assert_eq!(

@@ -4,7 +4,7 @@
 // against the Rust binary in the repo's cross-surface gates; here we assert each
 // verb works and the exit codes follow the binary's scheme.
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,6 +76,27 @@ describe("lat node CLI", () => {
     expect(run(["read", "/no/such/file.ags"]).code).toBe(3);
     expect(run(["excel", CLEAN, join(tmpdir(), "x.dat")]).code).toBe(5);
     expect(run(["read", CLEAN, "NOPE"]).code).toBe(4);
+  });
+
+  // --- fix default destination: stem.fixed.ext, matching the other launchers ----
+  // npx once wrote `data.txt.fixed.ags` where the Rust binary and uvx write
+  // `data.fixed.txt` — the `file.replace(/(\.ags)?$/i, ".fixed.ags")` matched
+  // `(\.ags)?` ZERO-WIDTH at end-of-string. The cross-surface value gate's
+  // `cli.fix.dest.*` cases catch it across launchers; this pins the fix here.
+  describe("fix default destination", () => {
+    for (const [name, expected] of [
+      ["data.txt", "data.fixed.txt"],
+      ["data.ags", "data.fixed.ags"],
+      ["data.AGS", "data.fixed.AGS"], // extension case preserved
+      ["data", "data.fixed"], // extension-less
+    ] as const) {
+      it(`${name} → ${expected}`, () => {
+        const dir = mkdtempSync(join(tmpdir(), "lat-fix-"));
+        copyFileSync(CLEAN, join(dir, name));
+        expect(run(["fix", join(dir, name)]).code).toBe(0);
+        expect(existsSync(join(dir, expected))).toBe(true);
+      });
+    }
   });
 
   // --- merge: the verb this launcher SHIPPED WITHOUT ---------------------

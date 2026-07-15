@@ -333,7 +333,10 @@ fn a_blank_cell_is_not_padded_into_a_zero() {
 fn a_promoted_row_still_content_hashes_equal_to_its_typed_source() {
     let source = content_hash(
         "LOCA",
-        &[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", "2DP", "10.00")],
+        &[
+            ("LOCA_ID", "", "ID", "BH01"),
+            ("LOCA_GL", "", "2DP", "10.00"),
+        ],
     );
 
     let promoted = merge(
@@ -345,8 +348,8 @@ fn a_promoted_row_still_content_hashes_equal_to_its_typed_source() {
     let ph = content_hash(
         "LOCA",
         &[
-            ("LOCA_ID", "ID", "BH01"),
-            ("LOCA_GL", &pty, &prows[0].1), // 5DP / "10.00000"
+            ("LOCA_ID", "", "ID", "BH01"),
+            ("LOCA_GL", "", &pty, &prows[0].1), // 5DP / "10.00000"
         ],
     );
     assert_eq!(
@@ -363,7 +366,10 @@ fn a_promoted_row_still_content_hashes_equal_to_its_typed_source() {
     let (wty, wrows) = loca_gl(&widened);
     let wh = content_hash(
         "LOCA",
-        &[("LOCA_ID", "ID", "BH01"), ("LOCA_GL", &wty, &wrows[0].1)], // X / "10.00"
+        &[
+            ("LOCA_ID", "", "ID", "BH01"),
+            ("LOCA_GL", "", &wty, &wrows[0].1), // X / "10.00"
+        ],
     );
     assert_ne!(
         wh, source,

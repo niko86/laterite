@@ -17,7 +17,7 @@ mod writer;
 pub use arrow_in::{cell_value, group_from_arrow, group_from_arrow_with_meta};
 pub use emit::{EmitMode, EmitOpts, EmitResult, GroupInput, emit_ags4};
 pub use error::EmitError;
-pub use writer::{EmitGroup, write_ags4};
+pub use writer::{EmitGroup, write_ags4, write_ags4_matrix};
 
 // Re-export the edition enum so callers configure emit without taking a
 // direct `laterite-ags4-validator` dependency just for the type.

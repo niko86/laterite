@@ -626,6 +626,55 @@ mod tests {
         assert_eq!(canonical_type("0DP"), Some(CanonicalType::Integer));
     }
 
+    /// **The `_content_hash` canonicalisation contract, pinned literally.**
+    ///
+    /// `parse_value`'s output is exactly what `keychain::content_hash` hashes
+    /// (through `serde_json::Value::to_string`), yet the two crates are bound
+    /// only by this behaviour — nothing at compile time couples them. So a
+    /// change to any literal below silently re-computes every `_content_hash`
+    /// already in the wild: the #503 RL episode did precisely this (RL went
+    /// Decimal→String, the hashed form of every record-link cell changed, and
+    /// no test failed). If you move one of these deliberately you MUST bump
+    /// `keychain::CONTENT_HASH_DOMAIN` in the same change, so an old hash and a
+    /// new one can never be conflated. This table is the tripwire that says so.
+    #[test]
+    fn parse_value_canonical_form_is_pinned_for_the_content_hash_contract() {
+        let pv = |ty: &str, raw: &str| parse_value(Some(raw), ty).to_string();
+
+        // String family — quoted, verbatim. RL is a record LINK (text), never a
+        // number: `SAMP|BH01|1.00` stays a string (#503).
+        assert_eq!(pv("X", "silty CLAY"), "\"silty CLAY\"");
+        assert_eq!(pv("ID", "BH01"), "\"BH01\"");
+        assert_eq!(pv("PA", "CU"), "\"CU\"");
+        assert_eq!(pv("RL", "SAMP|BH01|1.00"), "\"SAMP|BH01|1.00\"");
+
+        // Integer — an i64; "5.0" is tolerated as 5 (Python `int(float(s))`).
+        assert_eq!(pv("0DP", "5"), "5");
+        assert_eq!(pv("0DP", "5.0"), "5");
+
+        // Decimal — an f64. Trailing-zero precision collapses, so "10.00",
+        // "10.0" and "10" hash alike (a re-emit is not a value change).
+        assert_eq!(pv("2DP", "10.00"), "10.0");
+        assert_eq!(pv("2DP", "10.0"), "10.0");
+        assert_eq!(pv("3SF", "0.00"), "0.0");
+
+        // Datetime — normalised to "%Y-%m-%d %H:%M:%S"; a date-only cell is
+        // promoted to midnight.
+        assert_eq!(pv("DT", "2020-08-18 09:30:00"), "\"2020-08-18 09:30:00\"");
+        assert_eq!(pv("DT", "2020-08-18"), "\"2020-08-18 00:00:00\"");
+
+        // Bool.
+        assert_eq!(pv("YN", "Y"), "true");
+        assert_eq!(pv("YN", "N"), "false");
+
+        // Blank ≡ absent → Null → the pair is DROPPED from the hash entirely.
+        assert_eq!(pv("X", ""), "null");
+        assert_eq!(pv("2DP", "   "), "null");
+
+        // Unknown / passthrough code → falls through to String.
+        assert_eq!(pv("BANANA", "whatever"), "\"whatever\"");
+    }
+
     #[test]
     fn canonical_type_rejects_malformed_numeric_prefix() {
         // Trailing-letter forms with a non-digit / empty prefix are NOT

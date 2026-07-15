@@ -333,7 +333,7 @@ def render(ssot: dict) -> str:
         '  gate_python: "repo:tests/test_census_faithful.py"',
         '  gate_node: "repo:rust-packages/laterite-node/test/census.test.ts"',
         '  authority: "repo:rust-packages/laterite-ags4-check/src/commands/census.rs"',
-        "related: [modality-register, crate-map, agent-first-cli-contract, parity-model, start-here]",
+        "related: [modality-register, crate-map, agent-first-cli-contract, parity-model, start-here, ags4-output-value-gate]",
         "sources: []",
         "---",
         "",
@@ -534,8 +534,10 @@ def render(ssot: dict) -> str:
         "  compares streams.",
         "",
         "Closing that class means comparing what the surfaces *produce*, not what they",
-        "advertise. That is the next phase; see [[modality-register]] for the I/O-form axis",
-        "and `output/output-value-gate-plan.md` for the plan.",
+        "advertise. That gate has since landed: [[ags4-output-value-gate]] (#519-525) pushes a",
+        "committed case manifest through every surface and compares the observed *values*, with",
+        "the in-process Rust leaf as an authority column. See [[modality-register]] for the",
+        "I/O-form axis the value gate does not cover.",
         "",
     ]
     return "\n".join(lines)

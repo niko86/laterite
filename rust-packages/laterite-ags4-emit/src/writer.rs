@@ -63,6 +63,52 @@ pub fn write_ags4<W: Write>(out: &mut W, groups: &[EmitGroup<'_>]) -> Result<(),
     Ok(())
 }
 
+/// Write AGS4 from a **pre-shaped cell matrix**, one group at a time, verbatim.
+///
+/// Where [`write_ags4`] is a *structured* writer (it owns the `HEADING`/`UNIT`/`TYPE`/
+/// `DATA` tags, aligns columns, and defaults a missing TYPE to `X`), this is a *dumb*
+/// serializer: it quotes and CRLF-terminates exactly the rows it is handed, adding
+/// nothing. Each group is a `(code, matrix)` where `matrix[0]` is the full HEADING line
+/// (including the literal `"HEADING"` first cell) and every later row already carries its
+/// `UNIT`/`TYPE`/`DATA` tag in column 0 — i.e. python-ags4's dataframe shape.
+///
+/// It exists so the `laterite.compat` drop-in can stay **byte-faithful to python-ags4**
+/// (which serializes its dataframe with no structural interpretation and no `X` default),
+/// while still going through the ONE guarded [`write_row`] — the reason this was moved out
+/// of `laterite-py`'s own private emitter, which lacked the embedded-CR/LF guard and so
+/// could split a DATA row across two physical lines (#423). Every consumer now shares that
+/// guard; there is no unguarded emitter left.
+///
+/// `trailing_blank_line` appends one blank CRLF line after the final group — the shape
+/// python-ags4's `dataframe_to_AGS4` produces (`compat` passes `true`; the structured
+/// re-emit that backs `Ags4File.text` passes `false`, matching every other surface).
+pub fn write_ags4_matrix<W: Write>(
+    out: &mut W,
+    groups: &[(String, Vec<Vec<String>>)],
+    trailing_blank_line: bool,
+) -> Result<(), EmitError> {
+    for (i, (code, matrix)) in groups.iter().enumerate() {
+        // Blank line BETWEEN groups (both shapes) — the section separator, same as
+        // `write_ags4`'s `if i > 0`. The private emitter folded this into a per-group
+        // trailing blank, which is why dropping that blank for `.text` also needs this
+        // to keep the separator.
+        if i > 0 {
+            out.write_all(b"\r\n").map_err(io_err)?;
+        }
+        write_row(out, &["GROUP", code])?;
+        for row in matrix {
+            let cells: Vec<&str> = row.iter().map(String::as_str).collect();
+            write_row(out, &cells)?;
+        }
+    }
+    // python-ags4 appends a blank line AFTER the final group too; the canonical shape
+    // does not. This is the only byte-level difference between the two.
+    if trailing_blank_line && !groups.is_empty() {
+        out.write_all(b"\r\n").map_err(io_err)?;
+    }
+    Ok(())
+}
+
 fn write_aligned<W: Write>(
     out: &mut W,
     tag: &str,
@@ -136,6 +182,73 @@ fn io_err(e: std::io::Error) -> EmitError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn matrix_two_groups() -> Vec<(String, Vec<Vec<String>>)> {
+        let g = |code: &str, id: &str| {
+            (
+                code.to_string(),
+                vec![
+                    vec!["HEADING".into(), format!("{code}_ID")],
+                    vec!["UNIT".into(), "".into()],
+                    vec!["TYPE".into(), "ID".into()],
+                    vec!["DATA".into(), id.into()],
+                ],
+            )
+        };
+        vec![g("PROJ", "P1"), g("LOCA", "BH01")]
+    }
+
+    /// The canonical shape (`.text`, every non-compat surface): a blank line BETWEEN
+    /// groups, and NONE after the last.
+    #[test]
+    fn matrix_canonical_shape_has_no_trailing_blank() {
+        let mut out = Vec::new();
+        write_ags4_matrix(&mut out, &matrix_two_groups(), false).unwrap();
+        let s = String::from_utf8(out).unwrap();
+        assert!(
+            s.contains("\"DATA\",\"P1\"\r\n\r\n\"GROUP\",\"LOCA\""),
+            "one blank BETWEEN"
+        );
+        assert!(
+            s.ends_with("\"DATA\",\"BH01\"\r\n"),
+            "no trailing blank: {s:?}"
+        );
+        assert!(!s.ends_with("\r\n\r\n"));
+    }
+
+    /// The python-ags4 shape (`compat`): additionally a blank line AFTER the final group.
+    #[test]
+    fn matrix_python_shape_adds_a_trailing_blank() {
+        let mut out = Vec::new();
+        write_ags4_matrix(&mut out, &matrix_two_groups(), true).unwrap();
+        let s = String::from_utf8(out).unwrap();
+        assert!(
+            s.ends_with("\"DATA\",\"BH01\"\r\n\r\n"),
+            "trailing blank present: {s:?}"
+        );
+        // The two shapes differ by EXACTLY that one trailing CRLF.
+        let mut canonical = Vec::new();
+        write_ags4_matrix(&mut canonical, &matrix_two_groups(), false).unwrap();
+        assert_eq!(s, format!("{}\r\n", String::from_utf8(canonical).unwrap()));
+    }
+
+    /// The whole reason this moved into the shared crate: the verbatim path is now GUARDED.
+    /// A cell with an embedded newline is refused, not serialized into a torn, illegal file.
+    #[test]
+    fn matrix_refuses_an_embedded_newline() {
+        let groups = vec![(
+            "PROJ".to_string(),
+            vec![
+                vec!["HEADING".into(), "PROJ_ID".into()],
+                vec!["UNIT".into(), "".into()],
+                vec!["TYPE".into(), "ID".into()],
+                vec!["DATA".into(), "line1\r\nline2".into()],
+            ],
+        )];
+        let mut out = Vec::new();
+        let err = write_ags4_matrix(&mut out, &groups, true).expect_err("must refuse");
+        assert!(matches!(err, EmitError::EmbeddedNewline { .. }));
+    }
 
     #[test]
     fn round_trip_via_reader() {

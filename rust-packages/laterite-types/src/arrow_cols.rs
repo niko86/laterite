@@ -25,6 +25,75 @@ use serde_json::Value;
 
 use crate::{CanonicalType, canonical_type, parse_datetime, parse_value};
 
+/// Caller-computed synthetic columns folded into a batch in ONE place, rather
+/// than bolted on per host afterward. `ids` prepends `_id` (col 0) / `_parent_id`
+/// (col 1); `hashes` appends `_content_hash` LAST (after the headings — the
+/// settled trailing position, so heading indices are invariant whether or not
+/// the hash is present). The two are independent: a passthrough group has no
+/// `_id` but can still carry a `_content_hash` (`ids: None, hashes: Some`) — the
+/// 2×2 keyed×hashed case a single-purpose builder would silently drop.
+#[derive(Default)]
+pub struct SynthColumns<'a> {
+    pub ids: Option<&'a [(String, Option<String>)]>,
+    pub hashes: Option<&'a [String]>,
+}
+
+/// Build a group's typed Arrow `RecordBatch` with optional synthetic columns.
+/// The one place `_id`/`_parent_id`/`_content_hash` are attached, so every host
+/// gets identical column order and types by construction.
+pub fn build_record_batch_synth<'a, F>(
+    synth: &SynthColumns,
+    headings: &[String],
+    ags_types: &[String],
+    n_rows: usize,
+    cell: F,
+) -> Result<RecordBatch, ArrowError>
+where
+    F: Fn(usize, usize) -> Option<&'a str>,
+{
+    let cap = headings.len() + 3;
+    let mut fields = Vec::with_capacity(cap);
+    let mut columns: Vec<ArrayRef> = Vec::with_capacity(cap);
+
+    if let Some(ids) = synth.ids {
+        let mut id_b = StringBuilder::with_capacity(n_rows, n_rows * 36);
+        let mut pid_b = StringBuilder::with_capacity(n_rows, n_rows * 36);
+        for row in 0..n_rows {
+            match ids.get(row) {
+                Some((id, parent)) => {
+                    id_b.append_value(id);
+                    pid_b.append_option(parent.as_deref());
+                }
+                // Defensive: ids shorter than n_rows → null pair (never a panic).
+                None => {
+                    id_b.append_null();
+                    pid_b.append_null();
+                }
+            }
+        }
+        fields.push(Field::new("_id", DataType::Utf8, true));
+        columns.push(Arc::new(id_b.finish()) as ArrayRef);
+        fields.push(Field::new("_parent_id", DataType::Utf8, true));
+        columns.push(Arc::new(pid_b.finish()) as ArrayRef);
+    }
+
+    append_heading_columns(&mut fields, &mut columns, headings, ags_types, n_rows, cell);
+
+    if let Some(hashes) = synth.hashes {
+        let mut h_b = StringBuilder::with_capacity(n_rows, n_rows * 36);
+        for row in 0..n_rows {
+            // Callers pass hashes.len() == n_rows; the fallback keeps the column
+            // non-null (never a panic) for a defensively-short slice.
+            h_b.append_value(hashes.get(row).map(String::as_str).unwrap_or(""));
+        }
+        fields.push(Field::new("_content_hash", DataType::Utf8, false));
+        columns.push(Arc::new(h_b.finish()) as ArrayRef);
+    }
+
+    let schema = Arc::new(Schema::new(fields));
+    RecordBatch::try_new(schema, columns)
+}
+
 /// Build one group's typed Arrow `RecordBatch`: one column per heading,
 /// each cast through the canonical-type machinery. `cell(col, row)`
 /// returns the raw string for a cell, or `None` for a short/ragged row
@@ -39,11 +108,7 @@ pub fn build_record_batch<'a, F>(
 where
     F: Fn(usize, usize) -> Option<&'a str>,
 {
-    let mut fields = Vec::with_capacity(headings.len());
-    let mut columns: Vec<ArrayRef> = Vec::with_capacity(headings.len());
-    append_heading_columns(&mut fields, &mut columns, headings, ags_types, n_rows, cell);
-    let schema = Arc::new(Schema::new(fields));
-    RecordBatch::try_new(schema, columns)
+    build_record_batch_synth(&SynthColumns::default(), headings, ags_types, n_rows, cell)
 }
 
 /// Like [`build_record_batch`], but prepends the two content-addressed key
@@ -67,32 +132,16 @@ pub fn build_record_batch_with_ids<'a, F>(
 where
     F: Fn(usize, usize) -> Option<&'a str>,
 {
-    let mut fields = Vec::with_capacity(headings.len() + 2);
-    let mut columns: Vec<ArrayRef> = Vec::with_capacity(headings.len() + 2);
-
-    let mut id_b = StringBuilder::with_capacity(n_rows, n_rows * 36);
-    let mut pid_b = StringBuilder::with_capacity(n_rows, n_rows * 36);
-    for row in 0..n_rows {
-        match ids.get(row) {
-            Some((id, parent)) => {
-                id_b.append_value(id);
-                pid_b.append_option(parent.as_deref());
-            }
-            // Defensive: ids shorter than n_rows → null pair (never a panic).
-            None => {
-                id_b.append_null();
-                pid_b.append_null();
-            }
-        }
-    }
-    fields.push(Field::new("_id", DataType::Utf8, true));
-    columns.push(Arc::new(id_b.finish()) as ArrayRef);
-    fields.push(Field::new("_parent_id", DataType::Utf8, true));
-    columns.push(Arc::new(pid_b.finish()) as ArrayRef);
-
-    append_heading_columns(&mut fields, &mut columns, headings, ags_types, n_rows, cell);
-    let schema = Arc::new(Schema::new(fields));
-    RecordBatch::try_new(schema, columns)
+    build_record_batch_synth(
+        &SynthColumns {
+            ids: Some(ids),
+            hashes: None,
+        },
+        headings,
+        ags_types,
+        n_rows,
+        cell,
+    )
 }
 
 /// Build one typed column per heading and push its field + array. Shared by the
@@ -187,5 +236,109 @@ where
             }
             (Arc::new(b.finish()) as ArrayRef, DataType::Utf8)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The 2×2 the single-purpose builders would have silently dropped:
+    /// keyed×hashed are independent knobs, so all four combinations must
+    /// produce the expected column set — in particular `ids: None, hashes:
+    /// Some` (a passthrough group carrying a content hash but no `_id`).
+    #[test]
+    fn synth_columns_cover_the_2x2() {
+        let headings = vec!["LOCA_ID".to_string(), "LOCA_GL".to_string()];
+        let ags_types = vec!["ID".to_string(), "2DP".to_string()];
+        let n_rows = 2;
+        let cell = |col: usize, row: usize| -> Option<&'static str> {
+            match (col, row) {
+                (0, 0) => Some("BH1"),
+                (0, 1) => Some("BH2"),
+                (1, 0) => Some("1.23"),
+                (1, 1) => Some("4.56"),
+                _ => None,
+            }
+        };
+        let ids = vec![
+            ("id0".to_string(), None),
+            ("id1".to_string(), Some("p1".to_string())),
+        ];
+        let hashes = vec!["h0".to_string(), "h1".to_string()];
+
+        let field_names = |batch: &RecordBatch| -> Vec<String> {
+            batch
+                .schema()
+                .fields()
+                .iter()
+                .map(|f| f.name().clone())
+                .collect()
+        };
+
+        // No synth columns.
+        let batch = build_record_batch_synth(
+            &SynthColumns::default(),
+            &headings,
+            &ags_types,
+            n_rows,
+            cell,
+        )
+        .unwrap();
+        assert_eq!(field_names(&batch), vec!["LOCA_ID", "LOCA_GL"]);
+
+        // ids only.
+        let batch = build_record_batch_synth(
+            &SynthColumns {
+                ids: Some(&ids),
+                hashes: None,
+            },
+            &headings,
+            &ags_types,
+            n_rows,
+            cell,
+        )
+        .unwrap();
+        assert_eq!(
+            field_names(&batch),
+            vec!["_id", "_parent_id", "LOCA_ID", "LOCA_GL"]
+        );
+        assert!(batch.schema().field(0).is_nullable());
+
+        // hashes only — the passthrough-with-hash case: no `_id`, but a
+        // `_content_hash` still appears.
+        let batch = build_record_batch_synth(
+            &SynthColumns {
+                ids: None,
+                hashes: Some(&hashes),
+            },
+            &headings,
+            &ags_types,
+            n_rows,
+            cell,
+        )
+        .unwrap();
+        assert_eq!(
+            field_names(&batch),
+            vec!["LOCA_ID", "LOCA_GL", "_content_hash"]
+        );
+        assert!(!batch.schema().field(2).is_nullable());
+
+        // both.
+        let batch = build_record_batch_synth(
+            &SynthColumns {
+                ids: Some(&ids),
+                hashes: Some(&hashes),
+            },
+            &headings,
+            &ags_types,
+            n_rows,
+            cell,
+        )
+        .unwrap();
+        assert_eq!(
+            field_names(&batch),
+            vec!["_id", "_parent_id", "LOCA_ID", "LOCA_GL", "_content_hash"]
+        );
     }
 }

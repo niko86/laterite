@@ -872,3 +872,168 @@ mod tests {
         assert!(matches!(err, CliError::Schema(_)));
     }
 }
+
+/// **The numeric-formatter authority gate.**
+///
+/// AGS4's numeric spelling (`"0.00"`, `"1.23e4"`, `"1230"` …) is defined by ONE function,
+/// [`laterite_types::ags4_str`]. This crate's [`NumericFormat`] is a *hand-copy* of that
+/// logic — it deps `laterite-types` nowhere at runtime — and a hand-copy is a thing that
+/// drifts. It has: excel spells `nSCI` with an **uppercase `E`** where the authority uses
+/// lowercase `e`, and excel spells `nSF` of zero as a bare `"0"` where the authority pads
+/// to the figure count (`"0.00"`).
+///
+/// Those two divergences are real today, and this test does not hide them — it **explains**
+/// them, each by a *rule*. A divergence that matches its rule is a known, registered fact;
+/// a divergence that does **not** — excel drifting further from the authority on some third
+/// value — is a hard failure. That is the whole point: an opaque allowlist of
+/// `(value, spec)` pairs would go green the moment excel broke a *fourth* way on a listed
+/// pair, because the pair was already "expected to differ". A rule cannot be fooled that
+/// way.
+///
+/// Why this bug class needs its own gate: no cross-surface value test can see it. Every
+/// surface (Python, Node, wasm, CLI) calls each of these formatters as ONE shared Rust
+/// function, so they agree with each other forever — while the two *paths* (a direct
+/// `build_ags4` through `ags4_str`, and an Excel round-trip through `NumericFormat`)
+/// disagree. N-way equality is green by construction; only comparing each formatter to the
+/// single authority finds it.
+///
+/// **Owner-decidable, deliberately surfaced, NOT silently ratified here:** whether excel
+/// *should* match the canonical emitter (so an Excel round-trip preserves numeric spelling)
+/// or *should* keep matching python-ags4's openpyxl output (uppercase `E`, bare `0`) is a
+/// product call. This gate makes the divergence visible and bounded; it does not decide it.
+#[cfg(test)]
+mod formatter_authority {
+    use super::{NumericFormat, format_sf};
+    use laterite_types::ags4_str;
+    use serde_json::json;
+
+    /// Format `value` under `spec` the way the canonical AGS4 emitter does.
+    fn authority(value: f64, spec: &str) -> String {
+        ags4_str(&json!(value), spec)
+    }
+
+    /// Format `value` under `spec` the way an Excel round-trip does.
+    fn candidate(spec: &str, value: f64) -> String {
+        NumericFormat::from_spec(spec)
+            .unwrap_or_else(|| panic!("excel has no formatter for spec {spec:?}"))
+            .format(value)
+    }
+
+    /// Every `(value, spec)` the gate compares. Chosen to exercise each branch and each
+    /// known divergence: DP (plain), SF (zero, sub-1 magnitude, integer rounding, exact),
+    /// SCI (zero, large, small, negative).
+    const MATRIX: &[(f64, &str)] = &[
+        // DP — expected to AGREE (both `{:.n}`).
+        (0.0, "0DP"),
+        (1.5, "1DP"),
+        (-2.345, "2DP"),
+        (100.0, "3DP"),
+        // SF — zero DIVERGES; the rest AGREE.
+        (0.0, "2SF"),
+        (0.0, "3SF"),
+        (0.002, "3SF"),
+        (1234.0, "3SF"),
+        (100.0, "3SF"),
+        (-5.5, "2SF"),
+        // SCI — the exponent-marker case DIVERGES on every non-... value.
+        (0.0, "1SCI"),
+        (12345.0, "2SCI"),
+        (0.00012, "3SCI"),
+        (-678.9, "2SCI"),
+    ];
+
+    /// A registered divergence: excel's output, related to the authority's by a *rule*.
+    /// If the rule holds, the divergence is the known one; if it does not, the formatters
+    /// have drifted in a NEW way and the gate fails.
+    enum Verdict {
+        /// Byte-identical to the authority.
+        Agrees,
+        /// `nSCI`: excel uppercases the exponent marker and nothing else.
+        /// (`1.23e4` → `1.23E4`.) Owner-decidable; see the module doc.
+        ExcelUppercasesSciExponent,
+        /// `nSF` of exactly zero: excel emits a bare `"0"` where the authority pads to the
+        /// figure count. Owner-decidable; see the module doc.
+        ExcelDropsSfZeroPadding,
+    }
+
+    /// Classify a `(candidate, authority)` pair — or panic if the difference is not one of
+    /// the two registered rules. This is the ratchet: a third kind of drift has no arm.
+    fn classify(value: f64, spec: &str, cand: &str, auth: &str) -> Verdict {
+        if cand == auth {
+            return Verdict::Agrees;
+        }
+        let upper = spec.to_ascii_uppercase();
+        if upper.ends_with("SCI") && cand.replace('E', "e") == auth {
+            return Verdict::ExcelUppercasesSciExponent;
+        }
+        if upper.ends_with("SF") && value == 0.0 && cand == "0" {
+            return Verdict::ExcelDropsSfZeroPadding;
+        }
+        panic!(
+            "UNREGISTERED formatter drift: {value} under {spec:?} — authority {auth:?}, \
+             excel {cand:?}. If this is a deliberate change, add a rule to `classify` (and \
+             update the module doc); do not just widen the matrix."
+        );
+    }
+
+    #[test]
+    fn every_matrix_point_is_explained() {
+        for &(value, spec) in MATRIX {
+            let auth = authority(value, spec);
+            let cand = candidate(spec, value);
+            // The classify() call is the assertion: it panics on an unregistered drift.
+            let _ = classify(value, spec, &cand, &auth);
+        }
+    }
+
+    /// The two known divergences must ACTUALLY be exercised — otherwise a future edit that
+    /// silently makes excel match the authority would leave two dead `Verdict` arms and a
+    /// weaker gate than the module doc claims. So we assert the divergence set is non-empty
+    /// on both its axes: at least one SCI point and the SF-zero point diverge today.
+    #[test]
+    fn the_known_divergences_are_present_and_bounded() {
+        let mut sci = 0usize;
+        let mut sf_zero = 0usize;
+        let mut agree = 0usize;
+        for &(value, spec) in MATRIX {
+            match classify(
+                value,
+                spec,
+                &candidate(spec, value),
+                &authority(value, spec),
+            ) {
+                Verdict::Agrees => agree += 1,
+                Verdict::ExcelUppercasesSciExponent => sci += 1,
+                Verdict::ExcelDropsSfZeroPadding => sf_zero += 1,
+            }
+        }
+        assert!(
+            sci >= 1,
+            "the SCI uppercase-E divergence is no longer exercised"
+        );
+        assert_eq!(
+            sf_zero, 2,
+            "both SF-zero matrix points must diverge (2SF, 3SF)"
+        );
+        assert!(
+            agree >= 5,
+            "the AGREE cases vanished — the authority itself may have moved"
+        );
+    }
+
+    /// Pin the AUTHORITY to concrete strings. Without this, a change that broke `ags4_str`
+    /// to match excel would make the gate go green for the wrong reason — the two would
+    /// "agree" at a value neither should produce. These are the canonical AGS4 spellings.
+    #[test]
+    fn the_authority_produces_the_canonical_spellings() {
+        assert_eq!(authority(0.0, "3SF"), "0.00");
+        assert_eq!(authority(0.002, "3SF"), "0.00200");
+        assert_eq!(authority(1234.0, "3SF"), "1230");
+        assert_eq!(authority(12345.0, "2SCI"), "1.23e4");
+        assert_eq!(authority(-2.345, "2DP"), "-2.35");
+        // And excel's actual output at the two divergence points, so the rules above are
+        // anchored to real values, not just to a transform.
+        assert_eq!(format_sf(0.0, 3), "0");
+        assert_eq!(candidate("2SCI", 12345.0), "1.23E4");
+    }
+}

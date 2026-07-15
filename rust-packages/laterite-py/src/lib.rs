@@ -34,7 +34,6 @@ use serde_json::{Map, Value};
 // `laterite-py-ags5` cdylib. Base wheel ships without DuckDB; the
 // AGS5 surface is gated behind the `laterite[ags5]` extra.
 mod ags_types_fns;
-mod emit;
 mod emit_typed;
 mod excel_fns;
 mod registry_fns;
@@ -840,7 +839,7 @@ impl Reading {
     /// every field quoted, blank line between groups) — byte-faithful to
     /// the source DATA values it re-emits.
     fn emit(&self) -> String {
-        let blocks: Vec<emit::GroupBlock> = self
+        let blocks: Vec<(String, Vec<Vec<String>>)> = self
             .parsed
             .group_order
             .iter()
@@ -867,13 +866,20 @@ impl Reading {
                 for r in &g.rows {
                     matrix.push(pad("DATA", &r.values));
                 }
-                Some(emit::GroupBlock {
-                    code: code.clone(),
-                    matrix,
-                })
+                Some((code.clone(), matrix))
             })
             .collect();
-        emit::emit(&blocks)
+        // The ONE guarded verbatim writer (was this crate's private `emit::emit`, now
+        // gone). `trailing_blank_line = false` — the canonical shape every other surface
+        // emits, so `.text` no longer carries the trailing blank line that made the Python
+        // re-emit disagree with Node's. `.expect` is sound: these cells come from a PARSED
+        // AGS4 file, whose tokeniser already split on CR/LF, so no cell can contain one —
+        // the guard has nothing to fire on. (`compat`, which accepts arbitrary frames, is
+        // the fallible caller.)
+        let mut out = Vec::new();
+        laterite_ags4_emit::write_ags4_matrix(&mut out, &blocks, false)
+            .expect("re-emitted parsed cells cannot contain an embedded CR/LF");
+        String::from_utf8(out).expect("AGS4 re-emit is valid UTF-8")
     }
 
     /// Build ONE group's typed Arrow table on demand. The read path is
@@ -902,63 +908,50 @@ impl Reading {
         // accessor strips them by default. The ids come from the one shared
         // keychain (`group_row_ids` → `keychain::row_ids`), so they are byte-
         // identical to the `.ags5db` extension's. A custom/passthrough group is
-        // absent from the registry → it has no spec keys → unkeyed batch (#303).
+        // absent from the registry → it has no spec keys → unkeyed (`ids: None`,
+        // #303).
+        //
+        // The hash needs NO registry — it hashes every heading rather than the
+        // spec key-chain, so a custom/passthrough group (which gets no `_id` at
+        // all) still gets a usable value fingerprint. Types come from the file's
+        // OWN TYPE row: canonicalisation is per-file, which is why two files that
+        // disagree on a column's TYPE may not dedup. Keying and hashing are
+        // independent knobs, both folded in by the ONE shared
+        // `build_record_batch_synth` (`_id`/`_parent_id` col 0/1, `_content_hash`
+        // trailing) so every host gets identical column order by construction.
         let reg = laterite_ags4_core::registry::registry();
-        let batch = if reg.get(code).is_some() {
-            let ids = laterite_ags4_core::keychain::group_row_ids(
+        let ids = reg.get(code).map(|_| {
+            laterite_ags4_core::keychain::group_row_ids(
                 reg,
                 code,
                 &g.headings,
                 g.rows.len(),
                 |col, row| g.cell(col, row),
-            );
-            laterite_types::arrow_cols::build_record_batch_with_ids(
-                &ids,
-                &g.headings,
-                &g.types,
-                g.rows.len(),
-                |col, row| g.cell(col, row),
             )
-        } else {
-            laterite_types::arrow_cols::build_record_batch(
-                &g.headings,
-                &g.types,
-                g.rows.len(),
-                |col, row| g.cell(col, row),
-            )
-        }
-        .map_err(|e| PyRuntimeError::new_err(format!("arrow batch for {code}: {e}")))?;
-
-        // Unlike the ids above, this needs NO registry — it hashes every
-        // heading rather than the spec key-chain, so a custom/passthrough group
-        // (which gets no `_id` at all) still gets a usable value fingerprint.
-        // Types come from the file's OWN TYPE row: canonicalisation is per-file,
-        // which is why two files that disagree on a column's TYPE may not dedup.
-        let batch = if content_hash {
-            let hashes = laterite_ags4_core::keychain::group_content_hashes(
+        });
+        let hashes = if content_hash {
+            Some(laterite_ags4_core::keychain::group_content_hashes(
                 code,
                 &g.headings,
+                &g.units,
                 &g.types,
                 g.rows.len(),
                 |col, row| g.cell(col, row),
-            );
-            let mut fields: Vec<std::sync::Arc<arrow::datatypes::Field>> =
-                batch.schema().fields().iter().cloned().collect();
-            fields.push(std::sync::Arc::new(arrow::datatypes::Field::new(
-                "_content_hash",
-                arrow::datatypes::DataType::Utf8,
-                false,
-            )));
-            let mut columns = batch.columns().to_vec();
-            columns.push(std::sync::Arc::new(arrow::array::StringArray::from(hashes)));
-            arrow::record_batch::RecordBatch::try_new(
-                std::sync::Arc::new(arrow::datatypes::Schema::new(fields)),
-                columns,
-            )
-            .map_err(|e| PyRuntimeError::new_err(format!("_content_hash for {code}: {e}")))?
+            ))
         } else {
-            batch
+            None
         };
+        let batch = laterite_types::arrow_cols::build_record_batch_synth(
+            &laterite_types::arrow_cols::SynthColumns {
+                ids: ids.as_deref(),
+                hashes: hashes.as_deref(),
+            },
+            &g.headings,
+            &g.types,
+            g.rows.len(),
+            |col, row| g.cell(col, row),
+        )
+        .map_err(|e| PyRuntimeError::new_err(format!("arrow batch for {code}: {e}")))?;
 
         let schema = batch.schema();
         Ok(Some(PyTable::try_new(vec![batch], schema)?))

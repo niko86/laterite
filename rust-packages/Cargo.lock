@@ -2025,7 +2025,9 @@ dependencies = [
  "calamine",
  "laterite-ags4-core",
  "laterite-ags4-emit",
+ "laterite-types",
  "rust_xlsxwriter",
+ "serde_json",
  "tempfile",
 ]
 

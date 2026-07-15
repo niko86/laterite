@@ -23,8 +23,6 @@ use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3_arrow::PyTable;
 
-use crate::emit::GroupBlock;
-
 fn parse_edition(s: Option<&str>) -> PyResult<DictVersion> {
     // Both the accepted SET and the rejection message come from the dictionary:
     // `from_edition` + `editions_joined` are generated from ags_dictionary.json.
@@ -197,7 +195,7 @@ fn py_float_str(f: f64) -> String {
 /// field order *is* the AGS heading order.
 #[pyfunction]
 pub fn emit_ags4_compat(tables: Vec<(String, PyTable)>) -> PyResult<String> {
-    let mut blocks: Vec<GroupBlock> = Vec::with_capacity(tables.len());
+    let mut blocks: Vec<(String, Vec<Vec<String>>)> = Vec::with_capacity(tables.len());
     for (code, table) in tables {
         let (batches, schema) = table.into_inner();
         let header: Vec<String> = schema
@@ -216,7 +214,15 @@ pub fn emit_ags4_compat(tables: Vec<(String, PyTable)>) -> PyResult<String> {
                 matrix.push(cells);
             }
         }
-        blocks.push(GroupBlock { code, matrix });
+        blocks.push((code, matrix));
     }
-    Ok(crate::emit::emit(&blocks))
+    // The shared, GUARDED verbatim writer (was `laterite-py`'s own private emitter, which
+    // lacked the embedded-CR/LF guard and could split a DATA row across two lines, #423).
+    // `trailing_blank_line = true` keeps `compat` byte-faithful to python-ags4's
+    // `dataframe_to_AGS4`; the guard is the only behaviour change — a cell containing a
+    // newline is now REFUSED, not silently torn into an illegal file.
+    let mut out = Vec::new();
+    laterite_ags4_emit::write_ags4_matrix(&mut out, &blocks, true)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+    String::from_utf8(out).map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
