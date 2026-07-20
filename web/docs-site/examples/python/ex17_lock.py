@@ -12,8 +12,12 @@ with tempfile.TemporaryDirectory() as tmp:
 
     # lock = zstd pack + age passphrase encrypt (scrypt KDF + ChaCha20-Poly1305).
     # Omit dest and it writes <src>.zst.age alongside the source.
-    sealed = lock(src, password="correct horse battery staple", dest=tmp / "site.ags.zst.age")
-    restored = unlock(sealed, password="correct horse battery staple", dest=tmp / "restored.ags")
+    sealed = lock(
+        src, password="correct horse battery staple", dest=tmp / "site.ags.zst.age"
+    )
+    restored = unlock(
+        sealed, password="correct horse battery staple", dest=tmp / "restored.ags"
+    )
 
     print(f"sealed: {sealed.name}")
     print(f"round-trip byte-identical: {restored.read_bytes() == src.read_bytes()}")

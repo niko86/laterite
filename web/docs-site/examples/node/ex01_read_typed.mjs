@@ -8,8 +8,14 @@ const ags = read("examples/sample_site.ags");
 const loca = ags.table("LOCA");
 const dtype = (name) =>
   String(loca.schema.fields.find((f) => f.name === name).type);
-console.log(`LOCA_ID[0]=${loca.getChild("LOCA_ID").get(0)} LOCA_GL[0]=${loca.getChild("LOCA_GL").get(0)}`);
-console.log({ LOCA_ID: dtype("LOCA_ID"), LOCA_NATE: dtype("LOCA_NATE"), LOCA_GL: dtype("LOCA_GL") });
+console.log(
+  `LOCA_ID[0]=${loca.getChild("LOCA_ID").get(0)} LOCA_GL[0]=${loca.getChild("LOCA_GL").get(0)}`,
+);
+console.log({
+  LOCA_ID: dtype("LOCA_ID"),
+  LOCA_NATE: dtype("LOCA_NATE"),
+  LOCA_GL: dtype("LOCA_GL"),
+});
 
 assert.equal(dtype("LOCA_GL"), "Float64"); // 2DP → Float64 (no manual cast)
 assert.equal(dtype("LOCA_NATE"), "Float64"); // 2DP → Float64

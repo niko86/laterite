@@ -62,7 +62,7 @@ _KNOWN_RESOLUTIONS = [
 ]
 
 
-@pytest.mark.parametrize("ags_type,expected", _KNOWN_RESOLUTIONS)
+@pytest.mark.parametrize(("ags_type", "expected"), _KNOWN_RESOLUTIONS)
 def test_canonical_type_resolves_known_codes(ags_type, expected):
     result = canonical_type(ags_type)
     # `is` — the StrEnum identity callers rely on (`x is CanonicalType.DECIMAL`).
@@ -90,8 +90,14 @@ def test_canonical_type_storage_only_members_exist_and_round_trip():
     assert CanonicalType("enum") is CanonicalType.ENUM
     # All eight members carry their lowercase-label value.
     assert {m.value for m in CanonicalType} == {
-        "string", "integer", "decimal", "datetime",
-        "date", "time", "bool", "enum",
+        "string",
+        "integer",
+        "decimal",
+        "datetime",
+        "date",
+        "time",
+        "bool",
+        "enum",
     }
 
 
@@ -105,15 +111,19 @@ def test_canonical_type_raises_on_unknown_code(bad):
 # display_hint
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("ags_type,expected", [
-    ("2DP", "%.2f"),
-    ("0DP", "%.0f"),
-    ("5DP", "%.5f"),
-    ("3SF", "%.3g"),
-    ("1SF", "%.1g"),
-    ("1SCI", "%.1e"),
-    ("2SCI", "%.2e"),
-])
+
+@pytest.mark.parametrize(
+    ("ags_type", "expected"),
+    [
+        ("2DP", "%.2f"),
+        ("0DP", "%.0f"),
+        ("5DP", "%.5f"),
+        ("3SF", "%.3g"),
+        ("1SF", "%.1g"),
+        ("1SCI", "%.1e"),
+        ("2SCI", "%.2e"),
+    ],
+)
 def test_display_hint_numeric_codes(ags_type, expected):
     assert display_hint(ags_type) == expected
 
@@ -123,7 +133,9 @@ def test_display_hint_non_numeric_is_none(ags_type):
     assert display_hint(ags_type) is None
 
 
-@pytest.mark.parametrize("ags_type", ["2DP", "0DP", "5DP", "3SF", "1SF", "1SCI", "2SCI"])
+@pytest.mark.parametrize(
+    "ags_type", ["2DP", "0DP", "5DP", "3SF", "1SF", "1SCI", "2SCI"]
+)
 def test_display_hint_returns_usable_format_string(ags_type):
     """The returned hint must be a working printf-style format — applying
     it to a float must not raise and must produce a string."""
@@ -139,7 +151,7 @@ def test_display_hint_returns_usable_format_string(ags_type):
 # ---------------------------------------------------------------------------
 # parse_value — totality property
 #
-# `parse_value` is the single source of truth for AGS4 + .agsx ingest. It
+# `parse_value` is the single source of truth for AGS4 ingest. It
 # is *permissive by contract*: unparseable input returns None, it never
 # raises. The property below asserts that totality + the type-shape
 # invariant (the return is always one of the documented native types)
@@ -149,18 +161,46 @@ def test_display_hint_returns_usable_format_string(ags_type):
 
 # Real AGS type codes (covering every resolution branch) + deliberate junk.
 _AGS_TYPE_CODES = [
-    "X", "ID", "PA", "PT", "PU", "U", "T", "MC", "DMS", "XN", "RL",  # string
-    "0DP",                                                          # integer
-    "2DP", "3DP", "5DP", "1SF", "3SF", "1SCI", "2SCI",              # decimal
-    "DT",                                                           # datetime
-    "YN",                                                           # bool
-    "ZZZ", "", "   ", "FLOAT", "2D", "garbage", "🙂",               # junk / passthrough
+    "X",
+    "ID",
+    "PA",
+    "PT",
+    "PU",
+    "U",
+    "T",
+    "MC",
+    "DMS",
+    "XN",
+    "RL",  # string
+    "0DP",  # integer
+    "2DP",
+    "3DP",
+    "5DP",
+    "1SF",
+    "3SF",
+    "1SCI",
+    "2SCI",  # decimal
+    "DT",  # datetime
+    "YN",  # bool
+    "ZZZ",
+    "",
+    "   ",
+    "FLOAT",
+    "2D",
+    "garbage",
+    "🙂",  # junk / passthrough
 ]
 
 # The closed set of types parse_value is documented to return.
 _ALLOWED_RETURN_TYPES = (
-    type(None), int, float, bool,
-    _dt.datetime, _dt.date, _dt.time, str,
+    type(None),
+    int,
+    float,
+    bool,
+    _dt.datetime,
+    _dt.date,
+    _dt.time,
+    str,
 )
 
 _RAW_STRATEGY = st.one_of(
@@ -168,12 +208,38 @@ _RAW_STRATEGY = st.one_of(
     st.text(),
     # Bias towards inputs that *look* parseable so the numeric / datetime /
     # bool branches are actually exercised, not just the None-on-junk path.
-    st.sampled_from([
-        "", "  ", "0", "5", "5.0", "-3.14", "1e9", "NaN", "inf", "-inf",
-        "1,234", "  42  ", "Y", "N", "y", "n", "true", "TRUE", "1",
-        "2024-03-15", "2024-03-15 09:30", "2024-03-15 09:30:00",
-        "15/03/2024", "not a date", "<LOD", "NA", "n/a", "-",
-    ]),
+    st.sampled_from(
+        [
+            "",
+            "  ",
+            "0",
+            "5",
+            "5.0",
+            "-3.14",
+            "1e9",
+            "NaN",
+            "inf",
+            "-inf",
+            "1,234",
+            "  42  ",
+            "Y",
+            "N",
+            "y",
+            "n",
+            "true",
+            "TRUE",
+            "1",
+            "2024-03-15",
+            "2024-03-15 09:30",
+            "2024-03-15 09:30:00",
+            "15/03/2024",
+            "not a date",
+            "<LOD",
+            "NA",
+            "n/a",
+            "-",
+        ]
+    ),
 )
 
 
@@ -198,7 +264,9 @@ def test_parse_value_string_codes_return_str_or_none(raw):
     assert not isinstance(result, bool)
 
 
-@given(raw=st.text(alphabet=st.characters(min_codepoint=33, max_codepoint=126), min_size=1))
+@given(
+    raw=st.text(alphabet=st.characters(min_codepoint=33, max_codepoint=126), min_size=1)
+)
 def test_parse_value_string_code_non_blank_ascii_round_trips_to_str(raw):
     """A non-blank printable-ASCII value under a string code always parses
     back to a non-None `str` (the common, well-defined case)."""
@@ -215,3 +283,51 @@ def test_parse_value_integer_code_round_trips(n):
     result = parse_value(str(n), "0DP")
     assert result == n
     assert isinstance(result, int)
+
+
+# ---------------------------------------------------------------------------
+# parse_value — exact canonical values (the #531 single-source guard)
+#
+# The PyO3 wrapper no longer re-implements the format tables / typed parsers:
+# it dispatches on `canonical_type` and calls the SAME `parse_datetime` /
+# `parse_date` / `parse_time` / `parse_bool` that back the Rust leaf's own
+# `parse_value` (the one that feeds `_content_hash`). These pins mirror the
+# leaf's `parse_value_canonical_form_is_pinned_...` test through the Python
+# return-type mapping, so a drift on either side of that one source is loud.
+# ---------------------------------------------------------------------------
+
+
+def test_parse_value_datetime_exact_values():
+    # Full datetime.
+    assert parse_value("2020-08-18 09:30:00", "DT") == _dt.datetime(
+        2020, 8, 18, 9, 30, 0
+    )
+    # Date-only DT → promoted to midnight (the shared parse_datetime rule).
+    assert parse_value("2020-08-18", "DT") == _dt.datetime(2020, 8, 18, 0, 0, 0)
+    # dd/mm/yyyy date-only under DT normalises the same way.
+    assert parse_value("15/03/2024", "DT") == _dt.datetime(2024, 3, 15, 0, 0, 0)
+    # Unparseable → None (permissive, never raises).
+    assert parse_value("not a date", "DT") is None
+
+
+def test_parse_value_bool_exact_values():
+    for token in ("Y", "YES", "TRUE", "1", "y", "true"):
+        assert parse_value(token, "YN") is True
+    for token in ("N", "NO", "FALSE", "0", "n", "false"):
+        assert parse_value(token, "YN") is False
+    assert parse_value("maybe", "YN") is None
+
+
+def test_parse_value_numeric_exact_values():
+    # Decimal → float; trailing-zero precision is a float, not the string.
+    assert parse_value("10.00", "2DP") == 10.0
+    assert isinstance(parse_value("10.00", "2DP"), float)
+    # Integer → int; "5.0" notation tolerated.
+    assert parse_value("5.0", "0DP") == 5
+    assert isinstance(parse_value("5.0", "0DP"), int)
+
+
+def test_parse_value_record_link_stays_string():
+    # RL is a delimited record LINK (text), never a number — the #503 guard.
+    assert parse_value("SAMP|BH01|1.00", "RL") == "SAMP|BH01|1.00"
+    assert isinstance(parse_value("SAMP|BH01|1.00", "RL"), str)

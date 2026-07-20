@@ -5,11 +5,24 @@
 //! by `build.rs` as `phf` perfect-hash maps — zero startup cost, no
 //! runtime parse. This module owns the public value types the generated
 //! tables instantiate, plus the version selector + lookup surface the
-//! rule modules (V3+) will use.
+//! rule modules (V3+) use.
+//!
+//! [`Dictionary`] is a lifetime-parametric enum (#568): `Bundled` is the
+//! zero-cost `&'static` phf handle used everywhere today; `Layered` overlays
+//! a runtime-owned [`OwnedDelta`](crate::overlay::OwnedDelta) (a custom `--dict`)
+//! on a bundled base, consulting the tiny delta first and falling through to the
+//! phf base. The enum stays `Copy` (both arms are refs/statics), so every existing
+//! by-value `Dictionary` site is unaffected. Lookups return small `Copy` view
+//! structs ([`HeadingRef`]/[`GroupRef`]) rather than `&'static DictEntry`, so the
+//! two arms share one return type.
 //!
 //! phf does not implement `PhfHash` for tuples, so heading keys are the
 //! composite string `"GROUP\u{1f}HEADING"` (US — unit separator, never
 //! valid inside an AGS4 name). Build it via [`heading_key`].
+
+use std::borrow::Cow;
+
+use crate::overlay::OwnedDelta;
 
 /// One heading's dictionary definition. All `&'static str` so the phf
 /// tables live entirely in the binary's read-only segment and the
@@ -30,6 +43,25 @@ pub struct GroupMeta {
     pub desc: &'static str,
 }
 
+/// A borrowed view of one heading's definition, shared by the bundled
+/// (`&'static`) and layered (owned-delta) arms of [`Dictionary`]. Field names
+/// mirror [`DictEntry`], so every `e.ags_type` / `e.status.contains("KEY")`
+/// reader is source-compatible. `Copy` and cheap — four `&str`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeadingRef<'a> {
+    pub ags_type: &'a str,
+    pub unit: &'a str,
+    pub status: &'a str,
+    pub desc: &'a str,
+}
+
+/// A borrowed view of one group's metadata (mirrors [`GroupMeta`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GroupRef<'a> {
+    pub parent: &'a str,
+    pub desc: &'a str,
+}
+
 // `DictVersion` (the bundled-edition enum) + `as_str` / `ALL` / `from_edition` /
 // `tables` / `FALLBACK` are GENERATED from ags_dictionary.json by build.rs — see
 // the `include!` below. Add an edition to the official source dictionaries +
@@ -40,7 +72,7 @@ pub struct GroupMeta {
 /// policy. The dogfood blind spot this fixes: a genuine `TRAN_AGS`
 /// edition and the O-30 fallback both resolve to `4.1.1`, so a plain
 /// version string can't tell "294 real 4.1.1 files" from "294 files
-/// with no parseable TRAN_AGS". Cross-ref O-30.
+/// with no parseable `TRAN_AGS`". Cross-ref O-30.
 ///
 /// Serde-able because an `.ags.idx` certificate records it: a cert that vouched for a
 /// verdict has to be able to say which dictionary reached it AND how that dictionary was
@@ -61,15 +93,26 @@ pub enum DictResolution {
     /// Missing / unparsable / unrecognised 4.x / future → FALLBACK.
     #[serde(rename = "fallback")]
     Fallback,
+    /// A custom `--dict` overlay whose base edition was detected structurally
+    /// from the dictionary itself (#568 §2 `detect_base`).
+    #[serde(rename = "structural")]
+    StructuralBase,
+    /// A custom `--dict --dict-replace` full replacement — no base edition
+    /// contributes (#568 §2).
+    #[serde(rename = "replacement")]
+    Replacement,
 }
 
 impl DictResolution {
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             DictResolution::Forced => "forced",
             DictResolution::ExactTranAgs => "exact",
             DictResolution::GuessedPatch => "guessed",
             DictResolution::Fallback => "fallback",
+            DictResolution::StructuralBase => "structural",
+            DictResolution::Replacement => "replacement",
         }
     }
 }
@@ -84,7 +127,14 @@ mod resolution_tests {
         // that isn't mirrored on the other would put a different token in the cert JSON
         // than the surfaces report — and the cert would then name a resolution no
         // consumer recognises.
-        for r in [R::Forced, R::ExactTranAgs, R::GuessedPatch, R::Fallback] {
+        for r in [
+            R::Forced,
+            R::ExactTranAgs,
+            R::GuessedPatch,
+            R::Fallback,
+            R::StructuralBase,
+            R::Replacement,
+        ] {
             let json = serde_json::to_string(&r).expect("serialises");
             assert_eq!(json, format!("\"{}\"", r.as_str()));
             let back: R = serde_json::from_str(&json).expect("round-trips");
@@ -98,9 +148,26 @@ mod resolution_tests {
 //   pub const FALLBACK: DictVersion   (the python-parity auto-select fallback,
 //                                       sourced from the union's fallback_edition)
 //   per version: DICT_<v>_HEADINGS / _GROUPS / _GROUP_HEADINGS / _ABBRS / _TRAN_AGS
-include!(concat!(env!("OUT_DIR"), "/dict_data.rs"));
+//
+// An outer `#[allow(clippy::pedantic)]` directly on the `include!` is a no-op
+// (clippy still flags the generated items — `include!` isn't attribute-macro-aware,
+// so rustc reports the attribute itself as unused). Wrapping in a private module
+// scopes the allow correctly; fixes would vanish on the next build.rs regen anyway
+// (chore/clippy-pedantic). `pub use` (not `pub(crate)`) preserves the existing
+// `dict::DictVersion` / `dict::FALLBACK` paths other crates (validator, laterite-py,
+// laterite-node, …) depend on.
+#[allow(clippy::pedantic)]
+mod dict_data {
+    // The generated statics instantiate `DictEntry`/`GroupMeta`, defined
+    // in the parent module.
+    use super::{DictEntry, GroupMeta};
+
+    include!(concat!(env!("OUT_DIR"), "/dict_data.rs"));
+}
+pub use dict_data::*;
 
 /// Composite key for a heading lookup. Group + heading joined by U+001F.
+#[must_use]
 pub fn heading_key(group: &str, heading: &str) -> String {
     let mut k = String::with_capacity(group.len() + 1 + heading.len());
     k.push_str(group);
@@ -110,9 +177,11 @@ pub fn heading_key(group: &str, heading: &str) -> String {
 }
 
 /// Read-only handle onto one bundled standard dictionary. Cheap to copy
-/// (just two static map refs + a str).
+/// (just static map refs + a str). This is today's `Dictionary` verbatim,
+/// renamed (#568): the hot path only ever touches this, and `build.rs` /
+/// the phf codegen are unchanged.
 #[derive(Debug, Clone, Copy)]
-pub struct Dictionary {
+pub struct BundledDict {
     headings: &'static phf::Map<&'static str, DictEntry>,
     groups: &'static phf::Map<&'static str, GroupMeta>,
     /// Per-group heading names in dictionary order (Rule 7). The
@@ -128,12 +197,13 @@ pub struct Dictionary {
     version: DictVersion,
 }
 
-impl Dictionary {
+impl BundledDict {
+    #[must_use]
     pub fn bundled(version: DictVersion) -> Self {
         // `tables()` (generated by build.rs) maps the edition to its five
         // compiled lookup tables — so the edition set lives in ONE place.
         let (headings, groups, group_headings, abbrs, tran_ags) = version.tables();
-        Dictionary {
+        BundledDict {
             headings,
             groups,
             group_headings,
@@ -143,29 +213,124 @@ impl Dictionary {
         }
     }
 
-    /// Canonical description for an abbreviation in the bundled
-    /// standard ABBR table. Returns `None` if the (heading, code)
-    /// isn't listed in the standard — rule_16's main check already
-    /// handles "abbreviation not defined anywhere" so this FYI
-    /// variant only fires when both the file and the standard
-    /// define the same (heading, code) but with different descs.
-    pub fn abbr_desc(&self, heading: &str, code: &str) -> Option<&'static str> {
-        // Key shape mirrors `heading_key` — composite "H\u{1f}C".
+    // The bundled-arm primitives. Each returns a `'static` result (the data lives
+    // in `.rodata`, not in `&self`), so callers may invoke them on a temporary
+    // `BundledDict` and keep the result. The enum widens `'static` to `'a`.
+
+    fn heading_ref(&self, key: &str) -> Option<HeadingRef<'static>> {
+        self.headings.get(key).map(|e| HeadingRef {
+            ags_type: e.ags_type,
+            unit: e.unit,
+            status: e.status,
+            desc: e.desc,
+        })
+    }
+
+    fn group_ref(&self, code: &str) -> Option<GroupRef<'static>> {
+        self.groups.get(code).map(|g| GroupRef {
+            parent: g.parent,
+            desc: g.desc,
+        })
+    }
+
+    fn group_headings_slice(&self, code: &str) -> &'static [&'static str] {
+        self.group_headings.get(code).copied().unwrap_or(&[])
+    }
+
+    /// Every heading in this edition as `(name, HeadingRef)` — the composite phf
+    /// key `"GROUP\u{1f}HEADING"` reduced to its heading name. `detect_base`
+    /// (#568 §2) scores a custom dict's headings against an edition by NAME,
+    /// ignoring which group each lives under, so it needs name + (type, status)
+    /// flat. A name that appears under several groups yields one tuple each.
+    pub(crate) fn iter_headings(
+        &self,
+    ) -> impl Iterator<Item = (&'static str, HeadingRef<'static>)> {
+        self.headings.entries().map(|(k, e)| {
+            let name = k.rsplit('\u{1f}').next().unwrap_or(k);
+            (
+                name,
+                HeadingRef {
+                    ags_type: e.ags_type,
+                    unit: e.unit,
+                    status: e.status,
+                    desc: e.desc,
+                },
+            )
+        })
+    }
+}
+
+/// Read-only dictionary handle. `Bundled` is the zero-cost `&'static` phf edition
+/// used everywhere; `Layered` overlays a runtime-owned custom-dict delta (#568).
+/// `Copy` (both arms are refs/statics), so every by-value `dict: Dictionary` site
+/// is unaffected by the enum change.
+#[derive(Debug, Clone, Copy)]
+pub enum Dictionary<'a> {
+    Bundled(BundledDict),
+    Layered {
+        base: BundledDict,
+        delta: &'a OwnedDelta,
+    },
+}
+
+impl<'a> Dictionary<'a> {
+    /// A bundled standard edition — the constructor every existing surface uses.
+    /// Returns `Dictionary<'static>` (borrows nothing), so `resolve_dict_version`,
+    /// wasm/node/py and `fixes.rs` are unchanged.
+    #[must_use]
+    pub fn bundled(version: DictVersion) -> Dictionary<'static> {
+        Dictionary::Bundled(BundledDict::bundled(version))
+    }
+
+    /// Overlay a runtime custom-dict `delta` on its (already-detected) base edition.
+    /// Nothing constructs a delta before #568 Phase 2; the arm compiles now.
+    #[must_use]
+    pub fn layered(delta: &'a OwnedDelta) -> Dictionary<'a> {
+        Dictionary::Layered {
+            base: BundledDict::bundled(delta.base_version),
+            delta,
+        }
+    }
+
+    /// The base bundled edition (Copy handle) under either arm.
+    fn base(&self) -> BundledDict {
+        match self {
+            Dictionary::Bundled(b) => *b,
+            Dictionary::Layered { base, .. } => *base,
+        }
+    }
+
+    /// The overlay delta, if this is a layered dictionary.
+    fn delta(&self) -> Option<&'a OwnedDelta> {
+        match self {
+            Dictionary::Bundled(_) => None,
+            Dictionary::Layered { delta, .. } => Some(delta),
+        }
+    }
+
+    /// Whether lookups fall through to the base (true for bundled + overlay;
+    /// false only for a full-replacement custom dict).
+    fn falls_through(&self) -> bool {
+        self.delta().is_none_or(|d| d.fall_through)
+    }
+
+    /// Canonical description for an abbreviation in the standard ABBR table.
+    /// v1: always the base's picklist — custom ABBR is a v2 cut (#568 §6).
+    #[must_use]
+    pub fn abbr_desc(&self, heading: &str, code: &str) -> Option<&'a str> {
         let mut k = String::with_capacity(heading.len() + 1 + code.len());
         k.push_str(heading);
         k.push('\u{1f}');
         k.push_str(code);
-        self.abbrs.get(k.as_str()).copied()
+        self.base().abbrs.get(k.as_str()).copied()
     }
 
-    /// Every `ABBR_CODE` the bundled standard ABBR table lists for
-    /// `heading` (the picklist), in the map's iteration order; empty if
-    /// the heading has no picklist. The keys are the `heading\u{1f}code`
-    /// composites [`abbr_desc`](Self::abbr_desc) looks up. Exposed so a
-    /// generator (ags4-forge) can sample realistic, *valid* PA values
-    /// from the single-source dictionary rather than a hardcoded list.
-    pub fn abbr_codes(&self, heading: &str) -> Vec<&'static str> {
-        self.abbrs
+    /// Every `ABBR_CODE` the standard ABBR table lists for `heading` (the
+    /// picklist), in the map's iteration order; empty if none. v1: base only.
+    #[must_use]
+    pub fn abbr_codes(&self, heading: &str) -> Vec<&'a str> {
+        let base = self.base();
+        base.abbrs
             .keys()
             .filter_map(|k| {
                 let (h, code) = k.split_once('\u{1f}')?;
@@ -174,47 +339,120 @@ impl Dictionary {
             .collect()
     }
 
+    #[must_use]
     pub fn version(&self) -> DictVersion {
-        self.version
+        self.base().version
     }
 
-    /// The TRAN_AGS value this dictionary edition expects (Rule 14).
-    pub fn tran_ags(&self) -> &'static str {
-        self.tran_ags
+    /// The `TRAN_AGS` value this dictionary edition expects (Rule 14). v1: the
+    /// base's — custom `TRAN_AGS` is a v2 cut (#568 §6).
+    #[must_use]
+    pub fn tran_ags(&self) -> &'a str {
+        self.base().tran_ags
     }
 
-    /// Definition for `GROUP.HEADING`, or `None` if the heading isn't in
-    /// the standard dictionary (Rule 9 / 17 territory).
-    pub fn heading(&self, group: &str, heading: &str) -> Option<&'static DictEntry> {
-        self.headings.get(heading_key(group, heading).as_str())
+    /// Definition for `GROUP.HEADING`, or `None` if not in the effective
+    /// dictionary. Layered: the delta's override first, then the base.
+    #[must_use]
+    pub fn heading(&self, group: &str, heading: &str) -> Option<HeadingRef<'a>> {
+        let key = heading_key(group, heading);
+        if let Some(d) = self.delta() {
+            if let Some(h) = d.heading(&key) {
+                return Some(h);
+            }
+            if !d.fall_through {
+                return None;
+            }
+        }
+        self.base().heading_ref(&key)
     }
 
-    /// Metadata for a group code, or `None` if not a standard group.
-    pub fn group(&self, code: &str) -> Option<&'static GroupMeta> {
-        self.groups.get(code)
+    /// Metadata for a group code, or `None` if not a standard/overlaid group.
+    #[must_use]
+    pub fn group(&self, code: &str) -> Option<GroupRef<'a>> {
+        if let Some(d) = self.delta() {
+            if let Some(g) = d.group(code) {
+                return Some(g);
+            }
+            if !d.fall_through {
+                return None;
+            }
+        }
+        self.base().group_ref(code)
     }
 
-    /// Every standard group code in this edition (unordered — the phf map
-    /// iteration order). Callers that need a stable order should sort. Used to
-    /// serialise the whole per-edition dictionary out to the web reference UI.
-    pub fn group_codes(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.groups.keys().copied()
+    /// Every group code in the effective dictionary (unordered). Callers that
+    /// need a stable order should sort.
+    pub fn group_codes(&self) -> impl Iterator<Item = &'a str> + 'a {
+        let base = self.base();
+        let delta = self.delta();
+        let include_base = self.falls_through();
+        let base_codes = base.groups.keys().copied();
+        let base_iter = include_base
+            .then_some(base_codes)
+            .into_iter()
+            .flatten()
+            .map(|s| -> &'a str { s });
+        let delta_iter = delta.into_iter().flat_map(move |d| {
+            // Replacement: every delta group. Overlay: only brand-new codes
+            // (overrides of a base group are already listed by base_iter).
+            d.groups
+                .keys()
+                .filter(move |c| !d.fall_through || !base.groups.contains_key(c.as_str()))
+                .map(|s| -> &'a str { s.as_str() })
+        });
+        base_iter.chain(delta_iter)
     }
 
-    /// This group's standard headings, in the canonical dictionary
-    /// order Rule 7 enforces. Empty slice for an unknown group (its
-    /// headings then fall to Rule 9 / the file's own DICT group).
-    pub fn group_headings(&self, code: &str) -> &'static [&'static str] {
-        self.group_headings.get(code).copied().unwrap_or(&[])
+    /// This group's headings in canonical dictionary order (Rule 7). Empty for
+    /// an unknown group. Layered: the base's order with the delta's added names
+    /// appended for a touched group; a new group returns the delta's alone.
+    /// `Cow::Borrowed` (zero-cost) for an untouched/bundled group.
+    pub fn group_headings(&self, code: &str) -> Cow<'a, [&'a str]> {
+        let base = self.base();
+        let base_slice = base.group_headings_slice(code);
+        match self.delta() {
+            None => Cow::Borrowed(base_slice),
+            Some(d) => {
+                let added = d.added_headings(code);
+                if d.fall_through && added.is_empty() {
+                    Cow::Borrowed(base_slice)
+                } else if !d.fall_through && added.is_empty() {
+                    Cow::Owned(Vec::new())
+                } else {
+                    let mut v: Vec<&'a str> = Vec::new();
+                    if d.fall_through {
+                        v.extend(base_slice.iter().copied().map(|s| -> &'a str { s }));
+                    }
+                    v.extend(added.iter().map(String::as_str));
+                    Cow::Owned(v)
+                }
+            }
+        }
     }
 
-    /// Every heading name defined anywhere in the standard dictionary
-    /// (across all groups, with cross-group borrows repeated). Rule
-    /// 19b_3 (V8) needs "is this heading defined under *some* group".
-    pub fn all_heading_names(&self) -> impl Iterator<Item = &'static str> + '_ {
-        self.group_headings
+    /// Every heading name defined anywhere in the effective dictionary (across
+    /// all groups, cross-group borrows repeated). Rule `19b_3` (V8) needs "is this
+    /// heading defined under *some* group".
+    pub fn all_heading_names(&self) -> impl Iterator<Item = &'a str> + 'a {
+        let base = self.base();
+        let delta = self.delta();
+        let include_base = self.falls_through();
+        let base_names = base
+            .group_headings
             .values()
-            .flat_map(|hs| hs.iter().copied())
+            .flat_map(|hs| hs.iter().copied());
+        let base_iter = include_base
+            .then_some(base_names)
+            .into_iter()
+            .flatten()
+            .map(|s| -> &'a str { s });
+        let delta_iter = delta.into_iter().flat_map(|d| {
+            d.group_headings
+                .values()
+                .flat_map(|hs| hs.iter().map(String::as_str))
+        });
+        base_iter.chain(delta_iter)
     }
 }
 
@@ -255,6 +493,7 @@ pub struct DictionaryDto {
 /// Build the serialisable snapshot of one bundled standard-dictionary edition:
 /// groups sorted by code, each group's headings in canonical dictionary order.
 /// The single source the wasm / PyO3 / Node `dictionary(edition)` accessors share.
+#[must_use]
 pub fn dictionary_dto(version: DictVersion) -> DictionaryDto {
     let d = Dictionary::bundled(version);
     let mut codes: Vec<&'static str> = d.group_codes().collect();
@@ -270,19 +509,19 @@ pub fn dictionary_dto(version: DictVersion) -> DictionaryDto {
                     let e = d.heading(code, h);
                     DictHeadingDto {
                         name: h.to_string(),
-                        status: e.map(|x| x.status).unwrap_or("").to_string(),
-                        ags_type: e.map(|x| x.ags_type).unwrap_or("").to_string(),
+                        status: e.map_or("", |x| x.status).to_string(),
+                        ags_type: e.map_or("", |x| x.ags_type).to_string(),
                         unit: e
                             .map(|x| x.unit)
                             .filter(|u| !u.is_empty())
                             .map(str::to_string),
-                        description: e.map(|x| x.desc).unwrap_or("").to_string(),
+                        description: e.map_or("", |x| x.desc).to_string(),
                     }
                 })
                 .collect();
             DictGroupDto {
                 code: code.to_string(),
-                contents: gm.map(|m| m.desc).unwrap_or("").to_string(),
+                contents: gm.map_or("", |m| m.desc).to_string(),
                 parent: gm
                     .map(|m| m.parent)
                     .filter(|p| !p.is_empty())
@@ -310,21 +549,22 @@ mod tests {
             DictVersion::V4_1_1,
             DictVersion::V4_2,
         ] {
-            let d = Dictionary::bundled(v);
+            // The private phf tables live on BundledDict; poke it directly.
+            let b = BundledDict::bundled(v);
             // Every bundled AGS4 edition has >50 groups and >1000
             // headings; assert a floor so an empty/broken codegen
             // fails loudly.
             assert!(
-                d.groups.len() > 50,
+                b.groups.len() > 50,
                 "{:?}: only {} groups",
                 v,
-                d.groups.len()
+                b.groups.len()
             );
             assert!(
-                d.headings.len() > 1000,
+                b.headings.len() > 1000,
                 "{:?}: only {} headings",
                 v,
-                d.headings.len()
+                b.headings.len()
             );
         }
     }
@@ -369,7 +609,7 @@ mod tests {
         assert!(id < name, "PROJ order wrong: {proj:?}");
         // Every ordered name must also resolve in the membership map
         // (the two tables are built from the same rows).
-        for h in proj {
+        for h in proj.iter() {
             assert!(
                 d.heading("PROJ", h).is_some(),
                 "{h} missing from headings map"
@@ -397,7 +637,8 @@ mod tests {
         // serialises; it must include the well-known groups and agree in
         // length with the group count.
         let codes: Vec<&str> = d.group_codes().collect();
-        assert_eq!(codes.len(), d.groups.len());
+        let b = BundledDict::bundled(DictVersion::V4_1);
+        assert_eq!(codes.len(), b.groups.len());
         assert!(codes.contains(&"PROJ"));
         assert!(codes.contains(&"LOCA"));
     }

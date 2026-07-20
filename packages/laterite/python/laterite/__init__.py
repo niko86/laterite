@@ -12,11 +12,10 @@ AGS4``. For the CLI use ``lat`` (byte-faithful to the Rust binary).
 
 from __future__ import annotations
 
-import builtins
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 import polars as pl
 
@@ -42,6 +41,9 @@ from ._frames import ArrowStream, frame_from_arrow
 from .registry import GROUPS as _GROUPS
 from .registry import child_groups as _child_groups
 
+if TYPE_CHECKING:
+    import builtins
+
 #: The AGS Format Rule labels whose findings [`fix`][laterite.fix] can repair — the
 #: valid values for ``fix(only=…, exclude=…)``. Kept in lock-step with the engine's
 #: fixable set by ``test_fix_selection`` (which gates it against
@@ -50,36 +52,36 @@ from .registry import child_groups as _child_groups
 FixableRule = Literal["1", "2a", "4", "6", "7", "8", "11a", "11b"]
 
 __all__ = [
-    "validate",
+    "Ags4Error",
+    "Ags4File",
+    "AgsQuery",
+    "Backend",
+    "BadDictError",
+    "BuildMode",
+    "BuildResult",
+    "Edition",
+    "FixResult",
+    "FixableRule",
+    "MergeConflictError",
+    "MergeResult",
+    "NotAgs4Error",
+    "Report",
+    "StaleCertError",
+    "UnsupportedEditionError",
+    "WorldCheckRequiresSourceError",
+    "XnMode",
+    "build_ags4",
+    "dict_for",
+    "diff",
+    "fix",
+    "fixable_rules",
+    "from_excel",
+    "list_rules",
+    "merge",
     "read",
     "source",
     "to_excel",
-    "from_excel",
-    "fix",
-    "fixable_rules",
-    "FixableRule",
-    "Backend",
-    "XnMode",
-    "BuildMode",
-    "Edition",
-    "FixResult",
-    "build_ags4",
-    "BuildResult",
-    "dict_for",
-    "list_rules",
-    "diff",
-    "merge",
-    "MergeResult",
-    "MergeConflictError",
-    "Report",
-    "Ags4File",
-    "AgsQuery",
-    "Ags4Error",
-    "NotAgs4Error",
-    "UnsupportedEditionError",
-    "BadDictError",
-    "StaleCertError",
-    "WorldCheckRequiresSourceError",
+    "validate",
 ]
 
 # Frame backends `read(..., backend=)` / `ags[code]` can return. Both are
@@ -129,6 +131,22 @@ def _looks_like_ags_text(s: str) -> bool:
     return head.startswith('"GROUP"') or "\n" in s[:512]
 
 
+def _split_dict(
+    dictionary: str | os.PathLike[str] | bytes | bytearray | memoryview | None,
+) -> tuple[str | None, bytes | None]:
+    """Normalise a ``dictionary=`` custom-dict override (#568) to the
+    ``(dict_path, dict_bytes)`` pair the native call takes. A str/PathLike is a
+    filesystem path; raw bytes are the in-memory spelling (the portable one — wasm
+    has no FS). ``None`` in ⇒ ``(None, None)`` (no override)."""
+    if dictionary is None:
+        return None, None
+    if isinstance(dictionary, (bytes, bytearray, memoryview)):
+        return None, bytes(dictionary)
+    return os.fspath(dictionary) if isinstance(
+        dictionary, os.PathLike
+    ) else dictionary, None
+
+
 def _resolve_source(
     source: Any = None,
     *,
@@ -169,7 +187,7 @@ def _resolve_source(
     s = os.fspath(source) if isinstance(source, os.PathLike) else source
     if isinstance(s, str):
         try:
-            if os.path.exists(s):  # a path that exists on disk is unambiguous
+            if Path(s).exists():  # a path that exists on disk is unambiguous
                 return s, None, None
         except OSError:
             pass  # interior NUL / over-long → not a usable path; fall through
@@ -279,6 +297,19 @@ class Report:
         return bool(self._r.get("certified", False))
 
     @property
+    def revalidate_reason(self) -> str | None:
+        """Why a proffered ``index=`` certificate did **not** stand in for the engine, as a
+        stable token (``"content_changed"``, ``"dictionary_changed"``, ``"edition_differs"``,
+        ``"encoding_differs"``, ``"tier_not_measured_warnings"``, …), or ``None``.
+
+        ``None`` in the two ordinary cases: no certificate was offered, or one was offered
+        and vouched (then [`certified`][laterite.Report.certified] is ``True``). A non-``None``
+        value means a cert *was* offered but couldn't answer — the token says which guard
+        fired, so you can see why you paid for a full validation instead of a fast one. This
+        is the terse twin of the ``lat`` binary's human sentence for the same reasons."""
+        return self._r.get("revalidate_reason")
+
+    @property
     def is_valid(self) -> bool:
         return self._r["count"] == 0
 
@@ -319,11 +350,15 @@ class Report:
                 "target": pl.Series(
                     [f.get("target", "line") for f in items], dtype=pl.String
                 ),
-                "heading": pl.Series([f.get("heading") for f in items], dtype=pl.String),
+                "heading": pl.Series(
+                    [f.get("heading") for f in items], dtype=pl.String
+                ),
                 "field_index": pl.Series(
                     [f.get("field_index") for f in items], dtype=pl.Int64
                 ),
-                "data_row": pl.Series([f.get("data_row") for f in items], dtype=pl.Int64),
+                "data_row": pl.Series(
+                    [f.get("data_row") for f in items], dtype=pl.Int64
+                ),
             }
         )
 
@@ -383,7 +418,9 @@ class Ags4File:
         "_encoding",
         "_fix_report",
         "_keys",
+        "_last_dict_replace",
         "_last_dict_version",
+        "_last_dictionary",
         "_p",
         "_registered",
         "_report",
@@ -465,6 +502,12 @@ class Ags4File:
         # mints a cert for the edition you actually validated against. NOT a trust claim —
         # the mint re-validates; this only says which dictionary to re-validate with.
         self._last_dict_version: Edition | None = None
+        # Same provenance for a `--dict` custom overlay (#568): the dictionary the last
+        # `.validate()` overlaid and whether it replaced the base, so a following
+        # `.certify()` mints against the same effective dictionary (and stamps its
+        # {name, hash}) rather than flagging the file's bespoke groups as unknown.
+        self._last_dictionary: str | Path | builtins.bytes | None = None
+        self._last_dict_replace: bool = False
         # The FixResult from the `.fix()` that produced this handle (what was
         # applied + the residual findings); None unless this came from `.fix()`.
         self._fix_report: FixResult | None = None
@@ -565,7 +608,9 @@ class Ags4File:
         xn_headings = {h.name for h in g.headings if h.type == "XN"}
         if not xn_headings:
             return "*"
-        present = {row[0] for row in con.execute(f'DESCRIBE SELECT * FROM "{tmp}"').fetchall()}
+        present = {
+            row[0] for row in con.execute(f'DESCRIBE SELECT * FROM "{tmp}"').fetchall()
+        }
         cols = [c for c in present if c in xn_headings]
         if not cols:
             return "*"
@@ -711,6 +756,8 @@ class Ags4File:
         fyi: bool = False,
         check_files: bool = False,
         encoding: str | None = None,
+        dictionary: str | Path | builtins.bytes | None = None,
+        dict_replace: bool = False,
     ) -> Self:
         """Validate this file against the AGS4 rules and return ``self`` (chainable —
         ``read(p).validate().query(...)``); the outcome lands on [`report`][laterite.Ags4File.report]. Same
@@ -741,12 +788,22 @@ class Ags4File:
         statement about the file's bytes can speak for it. It runs live, every time — and
         on a ``bytes``/``str`` handle, which has no directory to look in, it raises
         [`WorldCheckRequiresSourceError`][laterite.WorldCheckRequiresSourceError] rather
-        than reporting Rule 20 clean."""
+        than reporting Rule 20 clean.
+
+        ``dictionary=`` overlays a custom AGS4 dictionary (#568) — a path or the raw
+        ``.ags``/JSON bytes of one — so a bespoke group hung off a standard one validates
+        as first-class rather than being flagged unknown. The base edition is detected from
+        the dictionary itself; ``dict_version=`` forces it, or ``dict_replace=True`` drops
+        it for a full replacement (the two cannot be combined). Re-parenting or overriding a
+        standard heading is honoured **and** reported as a warning."""
         self._last_dict_version = dict_version
+        self._last_dictionary = dictionary
+        self._last_dict_replace = dict_replace
         if self._src is not None:
             path, txt, data = self._src
         else:
             path, txt, data = None, self.text, None
+        dict_path, dict_bytes = _split_dict(dictionary)
         r = _native.run_check(
             path=path,
             text=txt,
@@ -756,6 +813,9 @@ class Ags4File:
             include_fyi=fyi,
             check_files=check_files,
             encoding=encoding if encoding is not None else self._encoding,
+            dict_path=dict_path,
+            dict_bytes=dict_bytes,
+            dict_replace=dict_replace,
             cert=self._cert,
         )
         self._report = Report(raise_for(r))
@@ -782,11 +842,18 @@ class Ags4File:
             return Path(path).read_bytes()
         if data is not None:
             return data
-        assert text is not None  # path/data both None => this handle was read from text=
+        assert (
+            text is not None
+        )  # path/data both None => this handle was read from text=
         return text.encode("utf-8")
 
     def certify(
-        self, path: str | Path | None = None, *, dict_version: Edition | None = None
+        self,
+        path: str | Path | None = None,
+        *,
+        dict_version: Edition | None = None,
+        dictionary: str | Path | builtins.bytes | None = None,
+        dict_replace: bool = False,
     ) -> Path:
         """Mint this file's ``.ags.idx`` validity **certificate** — an error-clean
         validation plus a byte-offset index — and write it beside the file.
@@ -805,7 +872,11 @@ class Ags4File:
 
         Pass ``dict_version=`` to certify against a forced edition; by default it uses the
         edition of the last [`validate`][laterite.validate] on this handle (or auto-resolves
-        from ``TRAN_AGS``). A later ``read(..., index=...)`` consumes the cert.
+        from ``TRAN_AGS``). ``dictionary=`` / ``dict_replace=`` certify against a custom
+        ``--dict`` overlay (#568) and stamp its identity into the cert, so a later
+        ``read(index=...)`` that names a different dictionary revalidates rather than
+        inheriting a stale verdict; both default to the last ``validate`` on this handle.
+        A later ``read(..., index=...)`` consumes the cert.
 
         ``path`` is the certificate's **output** location and defaults to
         ``<source>.idx`` (``delivery.ags`` → ``delivery.ags.idx``); a handle read from
@@ -844,10 +915,16 @@ class Ags4File:
                 "(certify writes or replaces an .ags.idx). Pass a new path, or the "
                 "existing .ags.idx to replace."
             )
-        path.write_bytes(self._mint(dict_version).to_json())
+        path.write_bytes(self._mint(dict_version, dictionary, dict_replace).to_json())
         return path
 
-    def certify_bytes(self, *, dict_version: Edition | None = None) -> builtins.bytes:
+    def certify_bytes(
+        self,
+        *,
+        dict_version: Edition | None = None,
+        dictionary: str | Path | builtins.bytes | None = None,
+        dict_replace: bool = False,
+    ) -> builtins.bytes:
         """Mint this file's ``.ags.idx`` validity **certificate** and return its bytes
         in memory — the filesystem-free twin of [`certify`][laterite.Ags4File.certify].
         Same behaviour (it runs the validation itself, refuses a file with errors, and
@@ -861,9 +938,14 @@ class Ags4File:
         Raises:
             Ags4Error: If the file has error-severity findings (it cannot be certified).
         """
-        return self._mint(dict_version).to_json()
+        return self._mint(dict_version, dictionary, dict_replace).to_json()
 
-    def _mint(self, dict_version: Edition | None):
+    def _mint(
+        self,
+        dict_version: Edition | None,
+        dictionary: str | Path | builtins.bytes | None = None,
+        dict_replace: bool = False,
+    ):
         """Mint the ``Sidecar`` over the ORIGINAL source bytes.
 
         The mint validates; it is not told a verdict. There is no longer a parameter
@@ -873,16 +955,28 @@ class Ags4File:
 
         The edition input is the caller's, not a guess: an explicit ``dict_version=``
         wins, else the one the last [`validate`][laterite.validate] on this handle used,
-        else auto-resolution from ``TRAN_AGS``.
+        else auto-resolution from ``TRAN_AGS``. The custom ``--dict`` overlay follows the
+        same rule — an explicit ``dictionary=`` wins, else the last validate's.
         """
         from datetime import UTC, datetime
 
+        # An explicit `dictionary=` brings its own `dict_replace`; falling back to the last
+        # validate's overlay inherits that run's replace flag too.
+        if dictionary is None:
+            dictionary = self._last_dictionary
+            dict_replace = dict_replace or self._last_dict_replace
+        dict_path, dict_bytes = _split_dict(dictionary)
         try:
             return _native.Sidecar.mint(
                 self._source_bytes(),
                 datetime.now(UTC).isoformat(),
-                dict_version=dict_version if dict_version is not None else self._last_dict_version,
+                dict_version=dict_version
+                if dict_version is not None
+                else self._last_dict_version,
                 encoding=self._encoding,
+                dict_path=dict_path,
+                dict_bytes=dict_bytes,
+                dict_replace=dict_replace,
             )
         except ValueError as e:
             # The native mint refuses an error-carrying file. Surface it as the library's
@@ -897,7 +991,10 @@ class Ags4File:
         return path
 
     def to_excel(
-        self, path: str | os.PathLike[str] | None = None, *, groups: list[str] | None = None
+        self,
+        path: str | os.PathLike[str] | None = None,
+        *,
+        groups: list[str] | None = None,
     ) -> dict | builtins.bytes:
         """Write this file to an XLSX workbook — one sheet per group.
 
@@ -1229,6 +1326,8 @@ def validate(
     fyi: bool = False,
     check_files: bool = False,
     encoding: str | None = None,
+    dictionary: str | Path | builtins.bytes | None = None,
+    dict_replace: bool = False,
 ) -> Report:
     """Run the AGS4.1 numbered-rules engine over a file and return its verdict as a
     [`Report`][laterite.Report]. This is the validate door: it answers *is this a conformant
@@ -1277,6 +1376,15 @@ def validate(
             ignored for ``text=``). Set it for legacy ``cp1252`` / ``latin1``
             deliveries so extended-ASCII cells decode correctly rather than
             surfacing as Rule 1 findings.
+        dictionary: A custom AGS4 dictionary to overlay (#568) — a path or the raw
+            ``.ags``/JSON bytes of one — so a bespoke group (or a re-parented or
+            overridden standard heading) validates as first-class instead of being
+            flagged unknown. The base edition is detected from the dictionary itself
+            unless ``dict_version`` forces it or ``dict_replace`` drops it. Overrides
+            of standard headings are honoured **and** reported as warnings.
+        dict_replace: Treat ``dictionary`` as a full replacement — drop the bundled
+            base entirely rather than overlaying it (default ``False``). Cannot be
+            combined with ``dict_version``.
 
     Returns:
         A [`Report`][laterite.Report] — ``count`` / ``is_valid`` for the verdict at a glance,
@@ -1289,9 +1397,11 @@ def validate(
             valid UTF-8.
         UnsupportedEditionError: The input is a recognised but unsupported
             edition (e.g. AGS3).
-        BadDictError: ``dict_version`` is not a known edition.
+        BadDictError: ``dict_version`` is not a known edition, or ``dictionary`` is
+            malformed / contradicts ``dict_replace``.
     """
     path, txt, data = _resolve_source(source, text=text)
+    dict_path, dict_bytes = _split_dict(dictionary)
     r = _native.run_check(
         path=path,
         text=txt,
@@ -1301,6 +1411,9 @@ def validate(
         include_fyi=fyi,
         check_files=check_files,
         encoding=encoding,
+        dict_path=dict_path,
+        dict_bytes=dict_bytes,
+        dict_replace=dict_replace,
     )
     return Report(raise_for(r))
 
@@ -1480,7 +1593,9 @@ def to_excel(
     p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
     if output is not None and p is not None:
         # A real on-disk AGS4 file → one Rust pass straight to XLSX (no re-emit).
-        return _excel_convert(_native.ags4_to_excel, os.fspath(p), os.fspath(output), groups)
+        return _excel_convert(
+            _native.ags4_to_excel, os.fspath(p), os.fspath(output), groups
+        )
     # bytes-out (output None) or a text/bytes source → go through a handle, whose
     # to_excel writes the spec-correct re-emit or returns the workbook bytes.
     return read(path=p, text=txt, data=raw).to_excel(output, groups=groups)
@@ -1508,7 +1623,9 @@ def from_excel(
     fmt = bool(format_numeric_columns)
     if isinstance(source, (bytes, bytearray, memoryview)):
         # XLSX bytes → AGS4 bytes, in memory (no temp file at either end).
-        ags, stats = _excel_bytes_convert(_native.xlsx_bytes_to_ags4, bytes(source), fmt)
+        ags, stats = _excel_bytes_convert(
+            _native.xlsx_bytes_to_ags4, bytes(source), fmt
+        )
         if output is not None:
             Path(output).write_bytes(ags)
             return stats
@@ -1558,7 +1675,9 @@ def fixable_rules() -> list[dict]:
     return [r for r in list_rules() if r.get("fixable")]
 
 
-def _validate_fixable(names: list[FixableRule] | None, kw: str) -> list[FixableRule] | None:
+def _validate_fixable(
+    names: list[FixableRule] | None, kw: str
+) -> list[FixableRule] | None:
     """Reject a ``fix(only=…)`` / ``exclude=…`` label that isn't fixable, with a
     helpful message — the static [`FixableRule`][laterite.FixableRule] type catches
     it at type-check time, this catches a dynamic value at runtime."""
@@ -1613,7 +1732,7 @@ class BuildResult:
         text: The bytes decoded as a UTF-8 ``str`` (read-only property).
     """
 
-    __slots__ = ("bytes", "findings", "applied", "fixes_applied")
+    __slots__ = ("applied", "bytes", "findings", "fixes_applied")
 
     def __init__(self, data: bytes, findings: list[dict], applied: list[dict]) -> None:
         self.bytes = data
@@ -1729,7 +1848,9 @@ def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
         if desc is not None:
             keys = {h.name for h in desc.headings if "KEY" in (h.status or "").upper()}
             drop = [
-                c for c, dtype in df.schema.items() if dtype == pl.Null and c not in keys
+                c
+                for c, dtype in df.schema.items()
+                if dtype == pl.Null and c not in keys
             ]
             if drop:
                 df = df.drop(drop)
@@ -1983,7 +2104,9 @@ class FixResult:
 
     def __repr__(self) -> str:
         risky = (
-            f", {self.risky_available} more with risky=True" if self.risky_available else ""
+            f", {self.risky_available} more with risky=True"
+            if self.risky_available
+            else ""
         )
         return (
             f"<FixResult {len(self.bytes)} bytes, applied={self.fixes_applied}, "

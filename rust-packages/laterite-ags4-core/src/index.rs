@@ -68,7 +68,7 @@ pub struct GroupIndex {
 impl GroupIndex {
     /// Every byte range `code` occupies, in source order. Empty if absent.
     pub fn spans(&self, code: &str) -> &[Range] {
-        self.groups.get(code).map(Vec::as_slice).unwrap_or(&[])
+        self.groups.get(code).map_or(&[], Vec::as_slice)
     }
 
     /// The byte range of `code`'s section — **only when it is unambiguous**.
@@ -76,6 +76,7 @@ impl GroupIndex {
     /// `None` for a redeclared group, deliberately: there is no single range, and
     /// returning the first one is the truncation this type exists to prevent. A
     /// caller that gets `None` must fall back to the whole-file parse.
+    #[must_use]
     pub fn range(&self, code: &str) -> Option<Range> {
         match self.spans(code) {
             [only] => Some(*only),
@@ -85,6 +86,7 @@ impl GroupIndex {
 
     /// Is `code` present exactly once? (A caller deciding whether it may trust a
     /// sliced read.)
+    #[must_use]
     pub fn is_unambiguous(&self, code: &str) -> bool {
         self.spans(code).len() == 1
     }
@@ -133,8 +135,7 @@ pub fn index_ags4_bytes(bytes: &[u8]) -> Result<GroupIndex, CliError> {
         let end = parsed
             .group_records
             .get(i + 1)
-            .map(|next| next.byte_offset)
-            .unwrap_or(total);
+            .map_or(total, |next| next.byte_offset);
         groups
             .entry(rec.code.clone())
             .or_default()
@@ -152,6 +153,9 @@ pub fn index_ags4_bytes(bytes: &[u8]) -> Result<GroupIndex, CliError> {
 /// parser sees a self-contained one-group file.
 pub fn parse_group_slice(bytes: &[u8], range: Range, code: &str) -> Result<AgsGroup, CliError> {
     let (start, end) = range;
+    // Byte offsets are u64; every shipped target is 64-bit (usize == u64),
+    // so this is a no-op there. Bounds are still checked below via `.get()`.
+    #[allow(clippy::cast_possible_truncation)]
     let slice = bytes.get(start as usize..end as usize).ok_or_else(|| {
         CliError::Schema(format!(
             "index range {start}..{end} out of bounds for {} bytes",
@@ -184,13 +188,20 @@ pub fn parse_group_slice(bytes: &[u8], range: Range, code: &str) -> Result<AgsGr
 /// simply falls back to a full validation.
 pub const SIDECAR_VERSION: u32 = 2;
 
-/// The shared **engine identity** every surface stamps into a certificate's
-/// [`ValidationStamp::validator`]. All surfaces run the same
+/// The shared **engine identity** every minting surface stamps into a
+/// certificate's [`ValidationStamp::validator`]. They all run the same
 /// `laterite_ags4_validator` rule engine, so a clean verdict is portable: a cert
-/// minted by one door (Python, Node, the CLI, wasm, the DuckDB extension) is
-/// trusted by another. The *string* is trust-inert provenance — real trust gates on
-/// the [`EngineFingerprint`] and the tier coverage — so unifying it removes an
+/// minted by one door (Python, Node, the CLI, wasm) is trusted by another. The
+/// *string* is trust-inert provenance — real trust gates on the
+/// [`EngineFingerprint`] and the tier coverage — so unifying it removes an
 /// accidental per-binding silo without weakening any real trust boundary.
+///
+/// The DuckDB extension is **not** in that list: it is read-only and mints
+/// nothing (its own `cert.rs` says so — "minting lives *outside* this read-only
+/// extension"). It is a pure consumer, and a narrower one than the doors above —
+/// it uses the sidecar's byte-offset index for a sliced read and gates on **size**
+/// alone, never reaching the fingerprint comparison, because re-hashing a remote
+/// object to read one group would mean downloading it and defeating the point.
 pub const ENGINE_IDENTITY: &str = "laterite_ags4";
 
 /// What a validation run actually **measured** for one severity tier.
@@ -217,6 +228,7 @@ impl TierCoverage {
     /// Did this tier run AND come back empty? The only state in which a certificate
     /// can stand in for the engine — a cert stores counts, not findings, so it can
     /// only reproduce a report that has nothing in it.
+    #[must_use]
     pub fn is_measured_clean(self) -> bool {
         matches!(self, TierCoverage::Measured { count: 0 })
     }
@@ -260,6 +272,7 @@ pub enum EditionInput {
 
 impl EditionInput {
     /// The edition string the rules actually ran against, either way.
+    #[must_use]
     pub fn edition(&self) -> &str {
         match self {
             EditionInput::Auto { resolved, .. } => resolved,
@@ -268,6 +281,7 @@ impl EditionInput {
     }
 
     /// How the edition was chosen, as the surfaces report it.
+    #[must_use]
     pub fn resolution(&self) -> DictResolution {
         match self {
             EditionInput::Auto { resolution, .. } => *resolution,
@@ -276,6 +290,7 @@ impl EditionInput {
     }
 
     /// Was it forced? (Provenance for the surfaces that report it.)
+    #[must_use]
     pub fn is_forced(&self) -> bool {
         matches!(self, EditionInput::Forced { .. })
     }
@@ -295,6 +310,21 @@ pub struct EngineId {
     /// deliberately differs from the native engine. A compat verdict is not a native
     /// verdict; neither may answer for the other.
     pub compat: Option<String>,
+}
+
+/// The custom dictionary (#568 `--dict`) a verdict was reached against, recorded
+/// on the certificate. It is a RECORD, not a contract: a mismatch — different
+/// content, or a cert that names a dict the request doesn't supply (or vice
+/// versa) — means "revalidate", never "hard-fail". The index vouches for what
+/// happened; it does not bind the caller (cert-trust-v2, O-48). `name` is a human
+/// label, advisory only; `hash` is the authority on identity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CustomDictRef {
+    /// Advisory label — a declared name or the dict filename's basename, never a path.
+    pub name: String,
+    /// Hex SHA-256 over (normalised delta ⊕ base edition ⊕ mode): the identity that
+    /// decides whether two requests used the same effective dictionary.
+    pub hash: String,
 }
 
 /// The question a caller is asking of the file. A certificate may answer it only if it
@@ -323,6 +353,10 @@ pub struct Question {
     /// compared everything *but* this would vouch for an error-clean file that has an
     /// error in it.
     pub encoding: String,
+    /// The custom `--dict` overlay (#568) this request supplies, or `None` for the
+    /// bundled path. Compared against the cert's own record in [`Sidecar::decide`]:
+    /// a difference revalidates (never hard-fails).
+    pub custom_dict: Option<CustomDictRef>,
 }
 
 /// May the certificate stand in for the engine?
@@ -362,6 +396,41 @@ pub enum RevalidateReason {
     /// The cert measured the tier and found findings. It stores counts, not findings,
     /// so it knows there is something to say but not what — the engine must speak.
     TierNotClean(Tier),
+    /// The cert and this request name a different custom `--dict` overlay (#568) —
+    /// one supplies a dict the other doesn't, or the same-named dict has different
+    /// content. The effective dictionary changed, so the verdict may differ.
+    DictionaryChanged,
+}
+
+impl RevalidateReason {
+    /// A stable machine token for this reason — the single source the bindings surface
+    /// (`report.revalidate_reason` on py/node/wasm) when a cert could not answer. The
+    /// CLI's `why()` renders human prose for the same variants; this is its terse twin,
+    /// so a caller can branch on the reason without parsing a sentence. Tokens are
+    /// `snake_case` and match the tier suffix `Tier` serialises to.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RevalidateReason::FormatVersion => "format_version",
+            RevalidateReason::SizeChanged => "size_changed",
+            RevalidateReason::ContentChanged => "content_changed",
+            RevalidateReason::DifferentValidator => "different_validator",
+            RevalidateReason::DifferentEngine => "different_engine",
+            RevalidateReason::EditionDiffers => "edition_differs",
+            RevalidateReason::EncodingDiffers => "encoding_differs",
+            RevalidateReason::TierNotMeasured(t) => match t {
+                Tier::Errors => "tier_not_measured_errors",
+                Tier::Warnings => "tier_not_measured_warnings",
+                Tier::Fyi => "tier_not_measured_fyi",
+            },
+            RevalidateReason::TierNotClean(t) => match t {
+                Tier::Errors => "tier_not_clean_errors",
+                Tier::Warnings => "tier_not_clean_warnings",
+                Tier::Fyi => "tier_not_clean_fyi",
+            },
+            RevalidateReason::DictionaryChanged => "dictionary_changed",
+        }
+    }
 }
 
 /// The source file a [`Sidecar`] certifies.
@@ -372,7 +441,7 @@ pub struct FileMeta {
     /// Hex-encoded SHA-256 of the source bytes — the strong, portable,
     /// origin-independent staleness fingerprint, and the ground truth any cheaper
     /// check falls back to. Always present; never superseded by the optional
-    /// transport validators below (a local file has no ETag, and an ETag is only
+    /// transport validators below (a local file has no `ETag`, and an `ETag` is only
     /// meaningful relative to the endpoint that issued it).
     pub sha256: String,
     // NOTE: the AGS edition used to live here. It is a property of the VALIDATION —
@@ -383,7 +452,7 @@ pub struct FileMeta {
     // cert for an auto request).
     /// The remote origin's HTTP `ETag` observed at mint time, verbatim (`W/`
     /// weak prefix preserved), when minted from a remote (http/s3) source — else
-    /// `None`. A *cheap* freshness shortcut: a HEAD whose ETag matches proves the
+    /// `None`. A *cheap* freshness shortcut: a HEAD whose `ETag` matches proves the
     /// object is byte-identical, so a remote reader can trust the SHA + byte
     /// offsets WITHOUT re-downloading to re-hash. Only ever grants trust on a
     /// match; absence/mismatch downgrades to the SHA path (see
@@ -391,8 +460,8 @@ pub struct FileMeta {
     #[serde(default)]
     pub etag: Option<String>,
     /// The remote origin's HTTP `Last-Modified` at mint time, when known — the
-    /// weak fallback (paired with `size`) for stores that return no usable ETag.
-    /// Weaker than the ETag (second granularity), so it gates the cheap ranged
+    /// weak fallback (paired with `size`) for stores that return no usable `ETag`.
+    /// Weaker than the `ETag` (second granularity), so it gates the cheap ranged
     /// read but never the strong verdict on its own.
     #[serde(default)]
     pub last_modified: Option<String>,
@@ -437,6 +506,11 @@ pub struct ValidationStamp {
     /// did not say which decoder produced it would be an incomplete statement about the
     /// content it claims to have checked.
     pub encoding: String,
+    /// The custom `--dict` overlay (#568) this verdict was reached against, or `None`
+    /// for the bundled path. `#[serde(default)]`: certs minted before #568 have no
+    /// such field and correctly deserialise to `None` (a bundled verdict).
+    #[serde(default)]
+    pub custom_dict: Option<CustomDictRef>,
     /// Errors. A minted cert has always measured this tier (that is what it is FOR), so
     /// in practice this is `Measured { count: 0 }` — but the type does not assume it,
     /// because a type that assumes it is a type that can be lied to.
@@ -477,7 +551,7 @@ pub struct Sidecar {
 /// Verdict of a cheap, I/O-free remote freshness check ([`Sidecar::is_fresh_for_remote`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RemoteFreshness {
-    /// A strong validator (ETag) matched — the object is byte-identical; trust the
+    /// A strong validator (`ETag`) matched — the object is byte-identical; trust the
     /// SHA + byte offsets without re-downloading.
     Trusted,
     /// Only weak signals (size + Last-Modified) matched — probably fresh; fine to
@@ -520,6 +594,7 @@ impl Sidecar {
     /// observed at mint time, so a remote consumer can confirm freshness with a
     /// HEAD instead of re-downloading to re-hash. Builder; a local mint leaves both
     /// `None` (and the SHA stays the authoritative check regardless).
+    #[must_use]
     pub fn with_origin(mut self, etag: Option<String>, last_modified: Option<String>) -> Self {
         self.file.etag = etag;
         self.file.last_modified = last_modified;
@@ -549,6 +624,7 @@ impl Sidecar {
     /// SHA-256. A mismatch means the source changed under the sidecar — its byte
     /// offsets are now lies, so rebuild rather than trust them (`.ags.idx` is a
     /// pure cache: stale ⇒ ignore + regenerate).
+    #[must_use]
     pub fn is_fresh_for(&self, bytes: &[u8]) -> bool {
         self.version == SIDECAR_VERSION
             && self.file.size == bytes.len() as u64
@@ -558,6 +634,7 @@ impl Sidecar {
     /// Cheap size-only freshness pre-check — for a remote source where re-hashing
     /// would mean re-downloading. Necessary but not sufficient; pair it with an
     /// ETag/Last-Modified check at the call site.
+    #[must_use]
     pub fn size_matches(&self, size: u64) -> bool {
         self.file.size == size
     }
@@ -590,6 +667,7 @@ impl Sidecar {
     /// tree, because there is no field about it, because a certificate cannot speak for
     /// the state of a directory it does not hash. World checks run live, every time,
     /// outside this decision entirely — see `laterite_ags4_trust::check`.
+    #[must_use]
     pub fn decide(&self, bytes: &[u8], q: &Question, engine: &EngineId) -> Decision {
         use RevalidateReason as R;
         let v = &self.validation;
@@ -621,6 +699,15 @@ impl Sidecar {
             (EditionInput::Auto { .. }, None) => {}
             (EditionInput::Forced { edition }, Some(want)) if edition == want => {}
             _ => return Decision::Revalidate(R::EditionDiffers),
+        }
+        // The custom `--dict` overlay (#568). A difference — different content, or one
+        // side present and the other absent — changes the effective dictionary, so the
+        // cert answers a different question. This match is hand-written, not
+        // exhaustiveness-checked, so this arm is deliberate: warn-and-revalidate, NOT a
+        // hard error, because the index is a record of what happened, not a contract the
+        // caller must honour (O-48).
+        if v.custom_dict != q.custom_dict {
+            return Decision::Revalidate(R::DictionaryChanged);
         }
         // Errors are always asked about — a report always reports them.
         for (tier, coverage) in [
@@ -654,6 +741,7 @@ impl Sidecar {
     /// trust on a match; absence or mismatch downgrades toward the strong SHA path
     /// ([`Sidecar::is_fresh_for`]), never the reverse — so they can never make a
     /// stale cert look fresh.
+    #[must_use]
     pub fn is_fresh_for_remote(
         &self,
         observed_size: u64,
@@ -687,6 +775,7 @@ impl Sidecar {
     }
 
     /// The byte-offset index view (for locating / slicing groups).
+    #[must_use]
     pub fn index(&self) -> GroupIndex {
         GroupIndex {
             groups: self.groups.clone(),
@@ -710,6 +799,8 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
+
     use super::*;
 
     // A normal two-group file (LF line endings, a blank-line separator).
@@ -925,13 +1016,13 @@ mod tests {
                 let mut s = String::new();
                 for g in 0..n_groups {
                     // arbitrary 4-char codes G000..; the index is registry-free.
-                    s.push_str(&format!("\"GROUP\",\"G{g:03}\"\n"));
+                    let _ = writeln!(s, "\"GROUP\",\"G{g:03}\"");
                     s.push_str("\"HEADING\",\"A_ID\",\"A_VAL\"\n");
                     s.push_str("\"UNIT\",\"\",\"\"\n");
                     s.push_str("\"TYPE\",\"ID\",\"X\"\n");
                     // vary row counts per group so ranges differ in size
                     for r in 0..(g * row_step) {
-                        s.push_str(&format!("\"DATA\",\"K{g}_{r}\",\"v{r}\"\n"));
+                        let _ = writeln!(s, "\"DATA\",\"K{g}_{r}\",\"v{r}\"");
                     }
                     s.push('\n'); // blank separator
                 }
@@ -1000,6 +1091,7 @@ mod tests {
                 resolution: DictResolution::ExactTranAgs,
             },
             encoding: "UTF-8".into(),
+            custom_dict: None,
             errors: TierCoverage::Measured { count: 0 },
             warnings: TierCoverage::Measured { count: 0 },
             fyi: TierCoverage::Measured { count: 1 },
@@ -1021,6 +1113,7 @@ mod tests {
             want_fyi: false,
             forced_edition: None,
             encoding: "UTF-8".into(),
+            custom_dict: None,
         }
     }
 
@@ -1050,6 +1143,85 @@ mod tests {
             Decision::Vouched,
             "the decoder it was minted under still answers"
         );
+    }
+
+    /// The custom-dict comparison arm in `decide` is hand-written, NOT
+    /// exhaustiveness-checked (`decide` is a sequence of `if`s), so a forgotten
+    /// arm would silently reopen O-48. This pins all four cases — and pins that a
+    /// difference REVALIDATES, never hard-fails (the index is a record, #568 §4).
+    #[test]
+    fn a_custom_dict_difference_revalidates_rather_than_hard_fails() {
+        use RevalidateReason as R;
+        let bytes = TWO.as_bytes();
+        let e = asking_engine();
+        let dref = |hash: &str| CustomDictRef {
+            name: "mine".into(),
+            hash: hash.into(),
+        };
+
+        // A cert minted WITH a custom dict.
+        let mut minted_with = stamp();
+        minted_with.custom_dict = Some(dref("aaaa"));
+        let sc = Sidecar::assemble(bytes, minted_with).unwrap();
+
+        // Same dict → the mismatch arm does not fire (and the cert is otherwise
+        // clean, so it vouches).
+        let same = Question {
+            custom_dict: Some(dref("aaaa")),
+            ..errors_only()
+        };
+        assert_eq!(sc.decide(bytes, &same, &e), Decision::Vouched);
+
+        // Different content → revalidate.
+        let other = Question {
+            custom_dict: Some(dref("bbbb")),
+            ..errors_only()
+        };
+        assert_eq!(
+            sc.decide(bytes, &other, &e),
+            Decision::Revalidate(R::DictionaryChanged),
+            "a different custom dict is a different question"
+        );
+
+        // Cert has a dict, request supplies none → revalidate (NOT a hard error).
+        let none = Question {
+            custom_dict: None,
+            ..errors_only()
+        };
+        assert_eq!(
+            sc.decide(bytes, &none, &e),
+            Decision::Revalidate(R::DictionaryChanged),
+            "a bare request cannot inherit a custom-dict verdict — but it revalidates, \
+             it is not refused"
+        );
+
+        // Symmetric: a bundled cert cannot answer a custom-dict request.
+        let bundled = Sidecar::assemble(bytes, stamp()).unwrap(); // stamp() has no dict
+        let wants_dict = Question {
+            custom_dict: Some(dref("aaaa")),
+            ..errors_only()
+        };
+        assert_eq!(
+            bundled.decide(bytes, &wants_dict, &e),
+            Decision::Revalidate(R::DictionaryChanged)
+        );
+    }
+
+    #[test]
+    fn revalidate_reason_tokens_are_stable() {
+        use RevalidateReason as R;
+        // The bindings (py/node/wasm) surface these tokens verbatim, so a rename here is
+        // an API break — this pins the ones a caller is most likely to branch on. The
+        // match in `as_str` is exhaustive, so a NEW variant fails to compile until it is
+        // given a token; this guards the spelling of the ones already shipped.
+        assert_eq!(R::DictionaryChanged.as_str(), "dictionary_changed");
+        assert_eq!(R::EditionDiffers.as_str(), "edition_differs");
+        assert_eq!(R::ContentChanged.as_str(), "content_changed");
+        assert_eq!(
+            R::TierNotMeasured(Tier::Errors).as_str(),
+            "tier_not_measured_errors"
+        );
+        assert_eq!(R::TierNotClean(Tier::Fyi).as_str(), "tier_not_clean_fyi");
     }
 
     #[test]

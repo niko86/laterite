@@ -23,8 +23,8 @@ LLPL_PL dtype: Float64
 their parent — 50 of them, from `BKFL` through `CDIA` to `CHIS`. Each descriptor
 carries the static facts for one group: `.code`, `.parent`, `.headings`, and
 `.key_headings` / `.non_key_headings`. None of this needs a delivery loaded —
-it's projected from the single-source dictionary, so it answers "what *could* be
-here" rather than "what *is* here".
+it's projected from the single-source dictionary, so it answers "what _could_ be
+here" rather than "what _is_ here".
 
 `inherited_key_names("SAMP")` walks the parent chain and returns the KEY
 headings a child inherits from its **direct** parent: a `SAMP` sample is located
@@ -50,7 +50,7 @@ print([g.code for g in child_groups("PROJ")])   # top of the tree
 Gotcha: `child_groups` is **one level** of the tree, not the full subtree —
 `SAMP` is a `LOCA` child but `LLPL` (which hangs off `SAMP`) is not in
 `child_groups("LOCA")`. Recurse on `.code` if you want the whole branch.
-Likewise `inherited_key_names` returns the *direct* parent's KEY only, not the
+Likewise `inherited_key_names` returns the _direct_ parent's KEY only, not the
 full ancestor chain.
 
 See also: [Read XN as numbers](./read-xn-numeric.md) ·

@@ -33,14 +33,19 @@ export class AgsSubset {
    * @returns A new `AgsSubset` carrying this filter plus all the existing ones.
    */
   at(group: string, values: Iterable<unknown>): AgsSubset {
-    return new AgsSubset(this.#parent, [...this.#filters, [`${group}_ID`, [...values]]]);
+    return new AgsSubset(this.#parent, [
+      ...this.#filters,
+      [`${group}_ID`, [...values]],
+    ]);
   }
 
   /** The related groups — those carrying at least one filter's key column. */
   get groups(): string[] {
     const keys = new Set(this.#filters.map(([k]) => k));
     return this.#parent.groups.filter(
-      (g) => this.#parent.has(g) && this.#parent.headings(g).some((h) => keys.has(h)),
+      (g) =>
+        this.#parent.has(g) &&
+        this.#parent.headings(g).some((h) => keys.has(h)),
     );
   }
 
@@ -78,7 +83,9 @@ export class AgsSubset {
   frames(): Promise<Record<string, Row[]>>;
   frames(opts: { arrow: true }): Promise<Record<string, Table>>;
   frames(opts?: QueryOptions): Promise<Record<string, Row[] | Table>>;
-  async frames(opts: QueryOptions = {}): Promise<Record<string, Row[] | Table>> {
+  async frames(
+    opts: QueryOptions = {},
+  ): Promise<Record<string, Row[] | Table>> {
     const out: Record<string, Row[] | Table> = {};
     for (const g of this.groups) out[g] = await this.table(g, opts);
     return out;

@@ -7,28 +7,30 @@ import {
   Show,
   type Component,
 } from "solid-js";
-import { splitAgsFields, quoteAgsField } from "../../lib/agsline";
+import { splitAgsFields } from "../../lib/agsline";
 import { fileStore } from "../../lib/fileStore";
 import { downloadBlob, baseName } from "../../lib/download";
 import { controlCompact } from "../../lib/controls";
+import { censorFile, type CensorResult } from "../../lib/validatorClient";
 import {
   loadSensitive,
-  categoryOf,
   actionOf,
   codesForPreset,
   type Action,
   type Preset,
 } from "../../lib/sensitive";
 
-// Anonymiser / redactor: strip identifying data before sharing a file. Each
-// column's action comes from the sensitive-headings SSOT (sensitive_headings.json,
-// the SAME classification the corpus `censor` uses) — location IDs are
-// PSEUDONYMISED (a stable per-column token, so cross-group references survive),
-// PROJ_ID → the file's content hash, coordinates blanked, names/labs/etc →
-// a token, free-text `[units]` stripped. A preset dropdown pre-ticks by scope;
-// the checklist stays editable. Fully client-side; only selected DATA cell
-// values change (everything else reproduced verbatim via the lossless
-// splitAgsFields round-trip); output is canonical CRLF.
+// Anonymiser / redactor: strip identifying data before sharing a file. The
+// scrub runs in the shared `laterite-ags4-censor` engine (#581) via the
+// validator worker — the SAME engine the corpus `censor` tool drives, so the
+// two can't drift. Each column's action comes from the sensitive-headings SSOT
+// (sensitive_headings.json): location IDs are PSEUDONYMISED (a stable per-column
+// token, cross-group references intact), PROJ_ID → the file's content hash,
+// coordinates blanked, names/labs/etc → a token, free-text `[units]` stripped.
+// The engine also drops custom (non-dictionary) groups/columns and tokenises
+// sensitive ABBR pick-lists. A preset dropdown pre-ticks by scope; the checklist
+// stays editable. Fully client-side; line endings + untouched cells are
+// preserved byte-for-byte (the engine is cell-surgical), nothing is uploaded.
 
 interface FileGroup {
   code: string;
@@ -38,8 +40,10 @@ interface FileGroup {
 const decode = (b: Uint8Array) =>
   new TextDecoder("utf-8", { fatal: false }).decode(b);
 
-const fieldValue = (cps: string[], f: { valueStart: number; valueEnd: number }) =>
-  cps.slice(f.valueStart, f.valueEnd).join("");
+const fieldValue = (
+  cps: string[],
+  f: { valueStart: number; valueEnd: number } | undefined,
+) => (f ? cps.slice(f.valueStart, f.valueEnd).join("") : "");
 
 /** First-seen group → its HEADING-row names. */
 function parseGroups(text: string): FileGroup[] {
@@ -48,7 +52,7 @@ function parseGroups(text: string): FileGroup[] {
   for (const line of text.split(/\r?\n/)) {
     if (line.trim() === "") continue;
     const fields = splitAgsFields(line);
-    const cps = [...line];
+    const cps = Array.from(line);
     const tag = fieldValue(cps, fields[0]);
     if (tag === "GROUP") {
       const code = fields[1] ? fieldValue(cps, fields[1]) : "";
@@ -63,43 +67,6 @@ function parseGroups(text: string): FileGroup[] {
 
 const colKey = (group: string, heading: string) => `${group}.${heading}`;
 const headOf = (key: string) => key.slice(key.indexOf(".") + 1);
-
-/** First 8 bytes of SHA-256, hex — a short, stable, anonymous content id for
- *  PROJ_ID (mirrors the corpus censor's file-hash id). */
-async function sha16(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", bytes.slice().buffer);
-  return [...new Uint8Array(digest)]
-    .slice(0, 8)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-/** Rewrite one DATA line: for every selected column, replace the inner value
- *  via `redact(heading, value)` (null ⇒ leave verbatim); everything else
- *  (quoting, commas, unselected cells) is reproduced byte-for-byte. */
-function redactLine(
-  raw: string,
-  headings: string[],
-  selected: Set<string>,
-  redact: (heading: string, value: string) => string | null,
-): { line: string; cells: number } {
-  const fields = splitAgsFields(raw);
-  const cps = [...raw];
-  let cells = 0;
-  const line = fields
-    .map((f, i) => {
-      if (i < 1) return f.text;
-      const h = headings[i - 1];
-      if (!h || !selected.has(h)) return f.text;
-      const out = redact(h, fieldValue(cps, f));
-      if (out === null) return f.text;
-      cells++;
-      const comma = f.text.endsWith(",") ? "," : "";
-      return quoteAgsField(out) + comma;
-    })
-    .join("");
-  return { line, cells };
-}
 
 const PRESETS: { id: Preset | "custom"; label: string }[] = [
   { id: "all", label: "All identifying" },
@@ -125,10 +92,6 @@ export const Anonymiser: Component = () => {
   const groups = createMemo(() => (text() ? parseGroups(text()) : []));
 
   const [ssot] = createResource(loadSensitive);
-  const cats = createMemo(() => {
-    const d = ssot();
-    return d ? categoryOf(d) : new Map<string, string>();
-  });
   const acts = createMemo(() => {
     const d = ssot();
     return d ? actionOf(d) : new Map<string, Action>();
@@ -138,6 +101,10 @@ export const Anonymiser: Component = () => {
   const [preset, setPreset] = createSignal<Preset | "custom">("all");
   const [selected, setSelected] = createSignal<Set<string>>(new Set());
   const [token, setToken] = createSignal("REDACTED");
+  // Drop custom (non-dictionary) groups/columns — a real anonymisation gain
+  // (bespoke columns can hold un-classified client data), so ON by default; a
+  // toggle since it removes data. The shared engine's `drop_custom`.
+  const [dropCustom, setDropCustom] = createSignal(true);
 
   // (Re)seed the selection whenever the preset or the file/SSOT changes — the
   // columns present in THIS file whose heading is in the preset's code set.
@@ -179,7 +146,7 @@ export const Anonymiser: Component = () => {
     for (const line of t.split(/\r?\n/)) {
       if (line.trim() === "") continue;
       const fields = splitAgsFields(line);
-      const cps = [...line];
+      const cps = Array.from(line);
       const tag = fieldValue(cps, fields[0]);
       if (tag === "GROUP") {
         curGroup = fields[1] ? fieldValue(cps, fields[1]) : "";
@@ -193,107 +160,25 @@ export const Anonymiser: Component = () => {
     return n;
   });
 
-  // Build the anonymised text. Async because PROJ_ID hashing uses Web Crypto,
-  // and pseudonyms need a first pass to assign stable per-column tokens.
-  const anonymise = async (): Promise<{ text: string; cells: number }> => {
-    const t = text();
+  // Anonymise via the shared scrub engine in the validator worker (#581) — the
+  // SAME `laterite-ags4-censor` engine the corpus `censor` tool drives. A batch
+  // action (Download), so it rides the worker asynchronously; the file hash,
+  // pseudonym maps, custom-group dropping and quoting all live in the engine.
+  const anonymise = async (): Promise<CensorResult | null> => {
     const raw = fileStore.bytes();
-    if (!t || !raw) return { text: "", cells: 0 };
-    const sel = selected();
-    const action = acts();
-    const tok = token();
-
-    const selHeads = (group: string) => {
-      const s = new Set<string>();
-      for (const key of sel)
-        if (key.startsWith(`${group}.`)) s.add(headOf(key));
-      return s;
-    };
-
-    // Precompute the file-hash only if a hashed column is actually selected.
-    const needHash = [...sel].some((k) => action.get(headOf(k)) === "filehash");
-    const fileHash = needHash ? await sha16(raw) : "";
-
-    const lines = t.split(/\r?\n/);
-    // A trailing newline yields one empty segment — drop it so the final CRLF
-    // re-adds exactly one, rather than doubling it.
-    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-
-    // PASS 1: assign pseudonyms. Per heading-CODE map (shared across groups, so
-    // a KEY that appears in several groups gets the SAME token → cross-refs
-    // survive), populated in source order: first-seen value → `{SUFFIX}{0001}`.
-    const pseudo = new Map<string, Map<string, string>>();
-    {
-      let curGroup = "";
-      let headings: string[] = [];
-      for (const line of lines) {
-        if (line.trim() === "") continue;
-        const fields = splitAgsFields(line);
-        const cps = [...line];
-        const tag = fieldValue(cps, fields[0]);
-        if (tag === "GROUP") {
-          curGroup = fields[1] ? fieldValue(cps, fields[1]) : "";
-          headings = [];
-        } else if (tag === "HEADING") {
-          headings = fields.slice(1).map((f) => fieldValue(cps, f));
-        } else if (tag === "DATA") {
-          const sh = selHeads(curGroup);
-          headings.forEach((h, i) => {
-            if (!sh.has(h) || action.get(h) !== "pseudonym") return;
-            const val = fieldValue(cps, fields[i + 1] ?? { valueStart: 0, valueEnd: 0 });
-            if (!val) return;
-            const map = pseudo.get(h) ?? pseudo.set(h, new Map()).get(h)!;
-            if (!map.has(val)) {
-              const suffix = (h.split("_").pop() ?? "ANON").toUpperCase();
-              map.set(val, `${suffix}${String(map.size + 1).padStart(4, "0")}`);
-            }
-          });
-        }
-      }
-    }
-
-    const redact = (h: string, value: string): string | null => {
-      const a = action.get(h);
-      switch (a) {
-        case "pseudonym":
-          return value === "" ? null : (pseudo.get(h)?.get(value) ?? value);
-        case "filehash":
-          return value === "" ? null : fileHash;
-        case "blank":
-          return "";
-        case "brackets":
-          return value.replace(/\[[^\]]*\]/g, `[${tok}]`);
-        // token, and any manually-ticked unclassified column, → the token.
-        default:
-          return tok;
-      }
-    };
-
-    let cells = 0;
-    let curGroup = "";
-    let headings: string[] = [];
-    const out = lines.map((line) => {
-      if (line.trim() === "") return line;
-      const fields = splitAgsFields(line);
-      const cps = [...line];
-      const tag = fieldValue(cps, fields[0]);
-      if (tag === "GROUP") {
-        curGroup = fields[1] ? fieldValue(cps, fields[1]) : "";
-        headings = [];
-        return line;
-      }
-      if (tag === "HEADING") {
-        headings = fields.slice(1).map((f) => fieldValue(cps, f));
-        return line;
-      }
-      if (tag === "DATA") {
-        const r = redactLine(line, headings, selHeads(curGroup), redact);
-        cells += r.cells;
-        return r.line;
-      }
-      return line;
+    const d = ssot();
+    if (!raw || !d) return null;
+    // The selection is per (group, heading); the engine scrubs by heading CODE
+    // (a shared KEY gets the SAME pseudonym across groups), so collapse to the
+    // set of selected codes and restrict the policy to them.
+    const selectedCodes = [...new Set([...selected()].map(headOf))];
+    return censorFile(raw, {
+      sensitiveJson: JSON.stringify(d),
+      selectedCodes,
+      token: token(),
+      dropCustom: dropCustom(),
+      includeFreetext: false,
     });
-    return { text: out.join("\r\n") + "\r\n", cells };
   };
 
   const save = async () => {
@@ -303,12 +188,22 @@ export const Anonymiser: Component = () => {
     setNote(null);
     try {
       const r = await anonymise();
+      if (!r) return;
       downloadBlob(
         r.text,
         `${baseName(fileStore.name())}.anon.ags`,
         "text/plain;charset=utf-8",
       );
-      setNote(`Redacted ${r.cells} cell${r.cells === 1 ? "" : "s"} → .anon.ags`);
+      const t = r.tally;
+      const cells = t.pseudonym + t.blank + t.token + t.brackets;
+      const dropped = t.dropped_groups + t.dropped_cols;
+      const extra =
+        dropped > 0
+          ? `, dropped ${dropped} custom item${dropped === 1 ? "" : "s"}`
+          : "";
+      setNote(
+        `Redacted ${cells} cell${cells === 1 ? "" : "s"}${extra} → .anon.ags`,
+      );
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -333,9 +228,9 @@ export const Anonymiser: Component = () => {
       <div class="flex min-w-0 flex-col gap-3">
         <p class="text-sm text-fg-soft">
           Each column's action comes from its category (see the badge): location
-          IDs are <span class="text-accent">pseudonymised</span> (cross-references
-          stay intact), <span class="mono">PROJ_ID</span> is hashed, coordinates
-          blanked, names/labs tokenised.
+          IDs are <span class="text-accent">pseudonymised</span>{" "}
+          (cross-references stay intact), <span class="mono">PROJ_ID</span> is
+          hashed, coordinates blanked, names/labs tokenised.
         </p>
 
         <div class="flex flex-wrap items-center gap-3 text-sm">
@@ -344,7 +239,9 @@ export const Anonymiser: Component = () => {
             <select
               class={controlCompact}
               value={preset()}
-              onChange={(e) => setPreset(e.currentTarget.value as Preset | "custom")}
+              onChange={(e) =>
+                setPreset(e.currentTarget.value as Preset | "custom")
+              }
             >
               <For each={PRESETS}>
                 {(p) => <option value={p.id}>{p.label}</option>}
@@ -355,9 +252,11 @@ export const Anonymiser: Component = () => {
             type="button"
             class="rounded bg-emerald-600/80 px-3 py-1.5 font-medium text-emerald-50 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
             disabled={busy() || selected().size === 0}
-            onClick={save}
+            onClick={() => void save()}
           >
-            {busy() ? "Redacting…" : `Download redacted (${selectedCells()} cells)`}
+            {busy()
+              ? "Redacting…"
+              : `Download redacted (${selectedCells()} cells)`}
           </button>
           <label class="flex items-center gap-1.5 text-xs text-fg-muted">
             token
@@ -366,6 +265,14 @@ export const Anonymiser: Component = () => {
               value={token()}
               onInput={(e) => setToken(e.currentTarget.value)}
             />
+          </label>
+          <label class="flex items-center gap-1.5 text-xs text-fg-muted">
+            <input
+              type="checkbox"
+              checked={dropCustom()}
+              onChange={(e) => setDropCustom(e.currentTarget.checked)}
+            />
+            drop non-standard groups
           </label>
         </div>
 
@@ -391,7 +298,9 @@ export const Anonymiser: Component = () => {
                           <input
                             type="checkbox"
                             checked={selected().has(key)}
-                            onChange={() => toggle(key)}
+                            onChange={() => {
+                              toggle(key);
+                            }}
                           />
                           <span
                             class="mono"

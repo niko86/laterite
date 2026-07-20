@@ -10,9 +10,11 @@
 //   1. build the dual ESM/CJS dist from the *committed* loader (no `napi build`),
 //   2. `npm pack` and assert the tarball carries the runtime loader + dist,
 //   3. extract it, drop in the locally-built platform `.node` (the bit a real
-//      install pulls from `@laterite/native-*`), and
+//      install pulls from `@laterite/native-*`),
 //   4. require the packed CJS *and* import the packed ESM, exercising
-//      read / table (born-typed) / validate / buildAgs4 end to end.
+//      read / table (born-typed) / validate / buildAgs4 end to end, and
+//   5. spawn the packed `lat` console script (bin.mjs → dist/cli.mjs) so the
+//      [bin] entry point — a real `npm install` puts on PATH — is proven to run.
 //
 // apache-arrow (a real runtime dep) is resolved via NODE_PATH from the dev
 // node_modules — the stand-in for it being installed alongside the package.
@@ -46,6 +48,12 @@ const required = [
   "dist/index.cjs",
   "dist/index.mjs",
   "dist/index.d.ts",
+  // The `lat` console script (`bin: { lat: "./bin.mjs" }`) and the CLI module it
+  // imports `main()` from. `npm install laterite` puts `lat` on PATH via bin.mjs,
+  // so a tarball that ships the library but drops these publishes a broken `lat`
+  // — a gap the library-only smoke below never saw (#554).
+  "bin.mjs",
+  "dist/cli.mjs",
 ];
 for (const f of required) {
   if (!entries.includes(f)) {
@@ -62,7 +70,8 @@ try {
   const localNode = readdirSync(pkgDir).find(
     (f) => f.startsWith("laterite-node.") && f.endsWith(".node"),
   );
-  if (!localNode) throw new Error("no locally-built laterite-node.*.node found");
+  if (!localNode)
+    throw new Error("no locally-built laterite-node.*.node found");
   copyFileSync(join(pkgDir, localNode), join(root, localNode));
   // The package's runtime deps (apache-arrow) sit in node_modules next to it in
   // a real install — mirror that so BOTH require (CJS) and import (ESM, which
@@ -110,7 +119,30 @@ try {
   );
   run("node", ["_smoke-esm.cjs"], { cwd: root, stdio: "inherit" });
 
-  console.log("packaging smoke: the packed library loads and runs ✓");
+  // 5 — spawn the packed `lat` console script. `bin.mjs` imports `main()` from
+  // `dist/cli.mjs`; running it end-to-end (through the dropped-in native `.node`)
+  // proves the [bin] entry point resolves and runs from the tarball — a DIFFERENT
+  // resolution path than the library `import`/`require` above (#554: the console
+  // script rots while the library gate stays green).
+  writeFileSync(join(root, "_cli-fixture.ags"), ags);
+  const cliOut = run(
+    "node",
+    ["bin.mjs", "read", "_cli-fixture.ags", "--json"],
+    {
+      cwd: root,
+    },
+  );
+  const groups = JSON.parse(cliOut);
+  if (!Array.isArray(groups) || !groups.includes("LOCA")) {
+    throw new Error(
+      `packed lat CLI: unexpected \`read --json\` output: ${cliOut}`,
+    );
+  }
+  console.log("  CLI: packed `lat read --json` OK ✓");
+
+  console.log(
+    "packaging smoke: the packed library AND `lat` CLI load and run ✓",
+  );
 } finally {
   rmSync(work, { recursive: true, force: true });
   if (existsSync(join(pkgDir, tgz))) rmSync(join(pkgDir, tgz));

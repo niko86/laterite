@@ -4,26 +4,57 @@ import { chartSql, selectSql, lit, likeLiteral, type JoinSpec } from "./sqlgen";
 describe("chartSql", () => {
   it("composes a scatter query (raw X/Y, both non-null)", () => {
     expect(
-      chartSql({ table: "LOCA", x: "LOCA_NATE", y: "LOCA_NATN", chartType: "scatter", agg: "none", rowCap: 5000 }),
+      chartSql({
+        table: "LOCA",
+        x: "LOCA_NATE",
+        y: "LOCA_NATN",
+        chartType: "scatter",
+        agg: "none",
+        rowCap: 5000,
+      }),
     ).toBe(
       `SELECT "LOCA_NATE" AS x, "LOCA_NATN" AS y FROM "LOCA" WHERE "LOCA_NATE" IS NOT NULL AND "LOCA_NATN" IS NOT NULL LIMIT 5000`,
     );
   });
 
   it("orders a line chart by X", () => {
-    const s = chartSql({ table: "T", x: "d", y: "v", chartType: "line", agg: "none", rowCap: 10 });
+    const s = chartSql({
+      table: "T",
+      x: "d",
+      y: "v",
+      chartType: "line",
+      agg: "none",
+      rowCap: 10,
+    });
     expect(s).toContain(`ORDER BY "d" LIMIT 10`);
   });
 
   it("bar + count needs no Y and emits COUNT(*) grouped by X", () => {
     expect(
-      chartSql({ table: "GEOL", x: "GEOL_LEG", y: "", chartType: "bar", agg: "count", rowCap: 5000 }),
-    ).toBe(`SELECT "GEOL_LEG" AS x, COUNT(*) AS y FROM "GEOL" GROUP BY "GEOL_LEG" ORDER BY x LIMIT 5000`);
+      chartSql({
+        table: "GEOL",
+        x: "GEOL_LEG",
+        y: "",
+        chartType: "bar",
+        agg: "count",
+        rowCap: 5000,
+      }),
+    ).toBe(
+      `SELECT "GEOL_LEG" AS x, COUNT(*) AS y FROM "GEOL" GROUP BY "GEOL_LEG" ORDER BY x LIMIT 5000`,
+    );
   });
 
   it("bar + avg + colour groups by X and the colour column", () => {
     expect(
-      chartSql({ table: "T", x: "g", y: "v", colour: "k", chartType: "bar", agg: "avg", rowCap: 100 }),
+      chartSql({
+        table: "T",
+        x: "g",
+        y: "v",
+        colour: "k",
+        chartType: "bar",
+        agg: "avg",
+        rowCap: 100,
+      }),
     ).toBe(
       `SELECT "g" AS x, AVG("v") AS y, "k" AS c FROM "T" WHERE "v" IS NOT NULL GROUP BY "g", "k" ORDER BY x LIMIT 100`,
     );
@@ -31,33 +62,90 @@ describe("chartSql", () => {
 
   it("bar + count + colour: COUNT(*), no Y filter, grouped by X and colour", () => {
     expect(
-      chartSql({ table: "T", x: "g", y: "", colour: "k", chartType: "bar", agg: "count", rowCap: 100 }),
-    ).toBe(`SELECT "g" AS x, COUNT(*) AS y, "k" AS c FROM "T" GROUP BY "g", "k" ORDER BY x LIMIT 100`);
+      chartSql({
+        table: "T",
+        x: "g",
+        y: "",
+        colour: "k",
+        chartType: "bar",
+        agg: "count",
+        rowCap: 100,
+      }),
+    ).toBe(
+      `SELECT "g" AS x, COUNT(*) AS y, "k" AS c FROM "T" GROUP BY "g", "k" ORDER BY x LIMIT 100`,
+    );
   });
 
   it("returns '' when the selection is incomplete", () => {
-    expect(chartSql({ table: "", x: "a", y: "b", chartType: "scatter", agg: "none", rowCap: 9 })).toBe("");
-    expect(chartSql({ table: "T", x: "", y: "b", chartType: "scatter", agg: "none", rowCap: 9 })).toBe("");
+    expect(
+      chartSql({
+        table: "",
+        x: "a",
+        y: "b",
+        chartType: "scatter",
+        agg: "none",
+        rowCap: 9,
+      }),
+    ).toBe("");
+    expect(
+      chartSql({
+        table: "T",
+        x: "",
+        y: "b",
+        chartType: "scatter",
+        agg: "none",
+        rowCap: 9,
+      }),
+    ).toBe("");
     // non-counting needs a Y
-    expect(chartSql({ table: "T", x: "a", y: "", chartType: "scatter", agg: "none", rowCap: 9 })).toBe("");
+    expect(
+      chartSql({
+        table: "T",
+        x: "a",
+        y: "",
+        chartType: "scatter",
+        agg: "none",
+        rowCap: 9,
+      }),
+    ).toBe("");
   });
 
   it("quotes identifiers so a rogue quote can't break out", () => {
-    const s = chartSql({ table: "T", x: 'a"b', y: "v", chartType: "scatter", agg: "none", rowCap: 5 });
+    const s = chartSql({
+      table: "T",
+      x: 'a"b',
+      y: "v",
+      chartType: "scatter",
+      agg: "none",
+      rowCap: 5,
+    });
     expect(s).toContain(`"a""b"`);
   });
 });
 
 describe("selectSql", () => {
   it("SELECT * when no columns are picked", () => {
-    expect(selectSql({ table: "LOCA", columns: [], conditions: [], orderDir: "ASC", limit: 100 })).toBe(
-      `SELECT *\nFROM "LOCA"\nLIMIT 100`,
-    );
+    expect(
+      selectSql({
+        table: "LOCA",
+        columns: [],
+        conditions: [],
+        orderDir: "ASC",
+        limit: 100,
+      }),
+    ).toBe(`SELECT *\nFROM "LOCA"\nLIMIT 100`);
   });
 
   it("selects specific columns + ORDER BY + LIMIT", () => {
     expect(
-      selectSql({ table: "T", columns: ["a", "b"], conditions: [], orderBy: "a", orderDir: "DESC", limit: 50 }),
+      selectSql({
+        table: "T",
+        columns: ["a", "b"],
+        conditions: [],
+        orderBy: "a",
+        orderDir: "DESC",
+        limit: 50,
+      }),
     ).toBe(`SELECT "a", "b"\nFROM "T"\nORDER BY "a" DESC\nLIMIT 50`);
   });
 
@@ -73,11 +161,21 @@ describe("selectSql", () => {
       orderDir: "ASC",
       limit: 0,
     });
-    expect(s).toBe(`SELECT *\nFROM "T"\nWHERE "n" > 5\n  AND "s" = 'BH01'\n  AND "x" IS NULL`);
+    expect(s).toBe(
+      `SELECT *\nFROM "T"\nWHERE "n" > 5\n  AND "s" = 'BH01'\n  AND "x" IS NULL`,
+    );
   });
 
   it("omits LIMIT when 0 and returns '' with no table", () => {
-    expect(selectSql({ table: "", columns: [], conditions: [], orderDir: "ASC", limit: 10 })).toBe("");
+    expect(
+      selectSql({
+        table: "",
+        columns: [],
+        conditions: [],
+        orderDir: "ASC",
+        limit: 10,
+      }),
+    ).toBe("");
   });
 
   it("skips an incomplete value-condition (no `\"COL\" = ''`)", () => {
@@ -94,7 +192,9 @@ describe("selectSql", () => {
       orderDir: "ASC",
       limit: 100,
     });
-    expect(s).toBe(`SELECT *\nFROM "LOCA"\nWHERE "LOCA_ID" = 'BH01'\nLIMIT 100`);
+    expect(s).toBe(
+      `SELECT *\nFROM "LOCA"\nWHERE "LOCA_ID" = 'BH01'\nLIMIT 100`,
+    );
     // All-incomplete ⇒ no WHERE clause at all (valid query, returns rows).
     const none = selectSql({
       table: "LOCA",
@@ -140,11 +240,15 @@ describe("selectSql — LIKE in the single-table path", () => {
     const s = selectSql({
       table: "GEOL",
       columns: [],
-      conditions: [{ col: "GEOL_DESC", op: "LIKE", val: "CLAY", wildcard: "starts" }],
+      conditions: [
+        { col: "GEOL_DESC", op: "LIKE", val: "CLAY", wildcard: "starts" },
+      ],
       orderDir: "ASC",
       limit: 0,
     });
-    expect(s).toBe(`SELECT *\nFROM "GEOL"\nWHERE "GEOL_DESC" LIKE 'CLAY%' ESCAPE '\\'`);
+    expect(s).toBe(
+      `SELECT *\nFROM "GEOL"\nWHERE "GEOL_DESC" LIKE 'CLAY%' ESCAPE '\\'`,
+    );
   });
 });
 
@@ -217,7 +321,12 @@ describe("selectSql — join mode", () => {
       kind: "LEFT",
       leftAlias: "t",
       on: [{ left: "LOCA_ID", right: "LOCA_ID" }],
-      range: { baseAlias: "t", baseCol: "SPEC_DPTH", top: "GEOL_TOP", base: "GEOL_BASE" },
+      range: {
+        baseAlias: "t",
+        baseCol: "SPEC_DPTH",
+        top: "GEOL_TOP",
+        base: "GEOL_BASE",
+      },
     };
     const s = selectSql({
       table: "TREG",
@@ -268,7 +377,12 @@ describe("chartSql — join mode", () => {
       kind: "LEFT",
       leftAlias: "t",
       on: [{ left: "LOCA_ID", right: "LOCA_ID" }],
-      range: { baseAlias: "t", baseCol: "SPEC_DPTH", top: "GEOL_TOP", base: "GEOL_BASE" },
+      range: {
+        baseAlias: "t",
+        baseCol: "SPEC_DPTH",
+        top: "GEOL_TOP",
+        base: "GEOL_BASE",
+      },
     };
     const s = chartSql({
       table: "TREL",
@@ -281,8 +395,12 @@ describe("chartSql — join mode", () => {
       agg: "none",
       rowCap: 5000,
     });
-    expect(s).toContain(`SELECT t."SPEC_DPTH" AS x, t."TREL_MNUM" AS y, g."GEOL_LEG" AS c`);
+    expect(s).toContain(
+      `SELECT t."SPEC_DPTH" AS x, t."TREL_MNUM" AS y, g."GEOL_LEG" AS c`,
+    );
     expect(s).toContain(`LEFT JOIN "GEOL" g ON t."LOCA_ID" = g."LOCA_ID"`);
-    expect(s).toContain(`t."SPEC_DPTH" >= g."GEOL_TOP" AND t."SPEC_DPTH" < g."GEOL_BASE"`);
+    expect(s).toContain(
+      `t."SPEC_DPTH" >= g."GEOL_TOP" AND t."SPEC_DPTH" < g."GEOL_BASE"`,
+    );
   });
 });

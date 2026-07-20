@@ -53,7 +53,11 @@ def test_build_units_types_override():
     )
     rows = _group_rows(res.text, "LOCA")
     assert rows["headings"] == ["LOCA_ID", "LOCA_GL", "LOCA_XTRA"]
-    assert rows["types"] == ["ID", "2DP", "3DP"]  # LOCA_GL from dict, LOCA_XTRA overridden
+    assert rows["types"] == [
+        "ID",
+        "2DP",
+        "3DP",
+    ]  # LOCA_GL from dict, LOCA_XTRA overridden
     assert rows["units"] == ["", "m", "kPa"]
 
 
@@ -66,7 +70,7 @@ def test_build_units_types_override():
 )
 def test_build_units_types_reject_unknown(bad):
     loca = pl.DataFrame({"LOCA_ID": ["BH1"], "LOCA_GL": [1.0]})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=r"^build_ags4 "):
         laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, **bad)
 
 
@@ -227,7 +231,15 @@ def test_typed_graph_recurses_deeply():
 
     back = laterite.read(data=laterite.build_ags4(proj).bytes)
     # the four walked groups + the autofix-synthesized metadata catalogs
-    assert sorted(back.groups) == ["LLPL", "LOCA", "PROJ", "SAMP", "TRAN", "TYPE", "UNIT"]
+    assert sorted(back.groups) == [
+        "LLPL",
+        "LOCA",
+        "PROJ",
+        "SAMP",
+        "TRAN",
+        "TYPE",
+        "UNIT",
+    ]
 
 
 def test_typed_graph_round_trips_via_read_typed(tmp_path):
@@ -291,14 +303,18 @@ def test_typed_graph_emits_only_set_columns():
     proj = laterite.groups.PROJ(proj_id="LAT-DEMO", proj_name="Demo")
     proj.locas.append(laterite.groups.LOCA(loca_id="BH01", loca_gl=12.50))
     res = laterite.build_ags4(proj)
-    hdr = next(ln for ln in res.text.splitlines() if ln.startswith('"HEADING","LOCA_ID"'))
+    hdr = next(
+        ln for ln in res.text.splitlines() if ln.startswith('"HEADING","LOCA_ID"')
+    )
     assert hdr == '"HEADING","LOCA_ID","LOCA_GL"'  # only the two set columns, in order
     assert not res.findings  # valid at the default 4.1.1
 
     # No data loss: a deliberately-set heading survives the prune (here a
     # 4.2-only one — flagged at 4.1.1, clean at 4.2, value kept either way).
     p2 = laterite.groups.PROJ(proj_id="P", proj_name="x")
-    p2.locas.append(laterite.groups.LOCA(loca_id="BH01", loca_gl=12.5, loca_vssl="MV Demo"))
+    p2.locas.append(
+        laterite.groups.LOCA(loca_id="BH01", loca_gl=12.5, loca_vssl="MV Demo")
+    )
     assert "LOCA_VSSL" in laterite.build_ags4(p2).text
     assert not laterite.build_ags4(p2, dict_version="4.2").findings
 

@@ -64,8 +64,7 @@ export async function loadDict(): Promise<DictMap> {
 /** A DictMap is structurally a DictKeyMap (parent+keys); this hands it to the
  *  analytics orphan-finder without a second fetch. (Map is invariant in TS, so
  *  the cast is needed; it is runtime-safe — DictGroupInfo ⊇ GroupKeyInfo.) */
-export const asKeyMap = (d: DictMap): DictKeyMap =>
-  d as unknown as DictKeyMap;
+export const asKeyMap = (d: DictMap): DictKeyMap => d;
 
 /** True if `anc` is `code` or appears on `code`'s parent chain. */
 export function isAncestor(anc: string, code: string, dict: DictMap): boolean {
@@ -145,7 +144,10 @@ export function relatedGroups(
   for (const code of loadedCodes) {
     if (claimed.has(code)) continue;
     const shared = (dict.get(code)?.keys ?? []).filter((k) => baseKeys.has(k));
-    if (shared.length > 1 || (shared.length === 1 && isDepthRangeGroup(code, dict))) {
+    if (
+      shared.length > 1 ||
+      (shared.length === 1 && isDepthRangeGroup(code, dict))
+    ) {
       out.push({ code, direction: "related", distance: 1 });
       claimed.add(code);
     }
@@ -212,7 +214,11 @@ export function depthRangeOf(
   // an inherited parent `*_TOP` (e.g. TREG's SAMP_TOP) that must not pair with
   // an unrelated `*_BASE` (SPEC_BASE) into an incoherent [SAMP_TOP, SPEC_BASE).
   for (const h of info.headings) {
-    if (!/_TOP$/.test(h.name) || h.type !== DEPTH_TYPE || !isKeyStatus(h.status))
+    if (
+      !/_TOP$/.test(h.name) ||
+      h.type !== DEPTH_TYPE ||
+      !isKeyStatus(h.status)
+    )
       continue;
     const baseName = `${h.name.slice(0, -"_TOP".length)}_BASE`;
     const hasBase = info.headings.some(
@@ -312,7 +318,12 @@ export function geologyTemplate(
     kind: "LEFT",
     leftAlias: "t",
     on: pairs,
-    range: { baseAlias: "t", baseCol: depth.col, top: range.top, base: range.base },
+    range: {
+      baseAlias: "t",
+      baseCol: depth.col,
+      top: range.top,
+      base: range.base,
+    },
   };
   return {
     name: `${base.code} × ${geolCode} stratum`,
@@ -345,7 +356,8 @@ export function relExamples(
   for (const m of metas) {
     const parent = dict.get(m.code)?.parent;
     if (!parent || !present.has(parent)) continue;
-    const pm = byCode.get(parent)!;
+    const pm = byCode.get(parent);
+    if (!pm) continue;
     const pairs = joinKeys(
       { code: m.code, cols: m.headings },
       { code: parent, cols: pm.headings },
@@ -356,7 +368,9 @@ export function relExamples(
       m.headings.includes(k),
     );
     const parentKeySet = new Set(dict.get(parent)?.keys ?? []);
-    const parentExtra = pm.headings.filter((h) => !parentKeySet.has(h)).slice(0, 3);
+    const parentExtra = pm.headings
+      .filter((h) => !parentKeySet.has(h))
+      .slice(0, 3);
     const select: QualifiedCol[] = [
       ...childKeys.map((col) => ({ alias: "c", col })),
       ...parentExtra.map((col) => ({ alias: "p", col })),

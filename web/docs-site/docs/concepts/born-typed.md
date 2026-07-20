@@ -1,7 +1,7 @@
 # Born-typed reads
 
 Every AGS group ships a `TYPE` row — `2DP`, `ID`, `DT`, … — declaring what each
-column *is*. laterite reads that row and hands each column the matching polars
+column _is_. laterite reads that row and hands each column the matching polars
 dtype, so the frame is typed at the door. No `.cast()`, no `pd.to_numeric`, no
 guessing.
 
@@ -28,9 +28,9 @@ heading like `TRAN_DATE` reads as `Datetime(time_unit='us')` (LOCA has no `DT`
 column, so it doesn't appear here).
 
 !!! note "Why it matters"
-    A born-typed frame means arithmetic, sorting, and joins just work. Add a
-    depth to a ground level, sort boreholes by easting, join `SAMP` to `LOCA` on
-    `LOCA_ID` — no per-column casting, and no silent string-vs-number bugs from
-    AGS data arriving as text.
+A born-typed frame means arithmetic, sorting, and joins just work. Add a
+depth to a ground level, sort boreholes by easting, join `SAMP` to `LOCA` on
+`LOCA_ID` — no per-column casting, and no silent string-vs-number bugs from
+AGS data arriving as text.
 
 ← Back to [Read](../learn/read.md)

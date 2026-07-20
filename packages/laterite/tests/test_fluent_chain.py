@@ -142,11 +142,7 @@ def test_pipe_applies_function_and_returns_its_result():
         "SAMP",
     ]
     # pipe also exists on AgsQuery
-    n = (
-        lat.read(text=AGS)
-        .query("SELECT * FROM LOCA")
-        .pipe(lambda q: q.frame().height)
-    )
+    n = lat.read(text=AGS).query("SELECT * FROM LOCA").pipe(lambda q: q.frame().height)
     assert n == 3
 
 

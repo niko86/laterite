@@ -14,7 +14,11 @@ import {
   isKeyStatus,
   isRequiredStatus,
 } from "../../lib/dict";
-import type { DictGroup, DictHeading, DictVersionOpt } from "../../lib/validator";
+import type {
+  DictGroup,
+  DictHeading,
+  DictVersionOpt,
+} from "../../lib/validator";
 import { dictVersion, setDictVersion } from "../../lib/settings";
 import { controlClass } from "../../lib/controls";
 
@@ -87,8 +91,9 @@ export const TemplateGenerator: Component = () => {
     return blocks.join("\r\n\r\n") + "\r\n";
   });
 
-  const save = () =>
+  const save = () => {
     downloadBlob(template(), "template.ags", "text/plain;charset=utf-8");
+  };
 
   return (
     <div class="flex min-w-0 flex-col gap-3">
@@ -117,7 +122,9 @@ export const TemplateGenerator: Component = () => {
           <select
             class={controlClass}
             value={dictVersion()}
-            onChange={(e) => setDictVersion(e.currentTarget.value as DictVersionOpt)}
+            onChange={(e) => {
+              setDictVersion(e.currentTarget.value as DictVersionOpt);
+            }}
           >
             <For each={["auto", ...(editionMeta()?.editions ?? [])]}>
               {(ed) => (
@@ -168,9 +175,7 @@ export const TemplateGenerator: Component = () => {
                 />
                 <span class="min-w-0">
                   <span class="mono font-medium text-fg">{g.code}</span>
-                  <span class="ml-1.5 text-xs text-fg-muted">
-                    {g.contents}
-                  </span>
+                  <span class="ml-1.5 text-xs text-fg-muted">{g.contents}</span>
                 </span>
               </label>
             )}

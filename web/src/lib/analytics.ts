@@ -4,7 +4,7 @@
 // (so this stays free of the duck/apache-arrow imports; AnalyseView passes
 // duck.run, keeping those behind the lazy Explore boundary).
 
-import type { GroupMeta } from "./duckTypes";
+import { scalarText, type GroupMeta } from "./duckTypes";
 import type { Table } from "apache-arrow";
 
 type Run = (sql: string) => Promise<Table>;
@@ -13,7 +13,7 @@ type Run = (sql: string) => Promise<Table>;
 const q = (id: string) => `"${id.replace(/"/g, '""')}"`;
 
 /** Display a sample cell value (KEY values are ids/numbers; tame bigint/null). */
-const fmt = (v: unknown): string => (v == null ? "" : String(v));
+const fmt = (v: unknown): string => scalarText(v);
 
 const num = (t: Table, col = "n"): number =>
   Number((t.toArray()[0] as Record<string, unknown>)[col]);
@@ -58,14 +58,19 @@ export async function referentialIntegrity(
     const childCols = new Set(m.headings);
     const parentCols = new Set(parentMeta.headings);
     // The link columns: the parent's KEY headings that the child carries too.
-    const shared = parentKeys.filter((k) => childCols.has(k) && parentCols.has(k));
-    if (shared.length === 0) continue;
+    const shared = parentKeys.filter(
+      (k) => childCols.has(k) && parentCols.has(k),
+    );
+    const firstKey = shared[0];
+    if (firstKey === undefined) continue;
     links++;
 
     const on = shared.map((k) => `c.${q(k)} = p.${q(k)}`).join(" AND ");
-    const childNotNull = shared.map((k) => `c.${q(k)} IS NOT NULL`).join(" AND ");
+    const childNotNull = shared
+      .map((k) => `c.${q(k)} IS NOT NULL`)
+      .join(" AND ");
     // An orphan: the child key tuple is fully populated but matches no parent.
-    const where = `p.${q(shared[0])} IS NULL AND ${childNotNull}`;
+    const where = `p.${q(firstKey)} IS NULL AND ${childNotNull}`;
     const base = `FROM ${q(m.code)} c LEFT JOIN ${q(info.parent)} p ON ${on} WHERE ${where}`;
 
     const orphanCount = num(await run(`SELECT count(*) AS n ${base}`));
@@ -124,7 +129,9 @@ export async function completeness(
   for (const m of metas) {
     if (m.headings.length === 0) continue;
     // One pass: total rows + non-null count per column (count(col) skips null).
-    const counts = m.headings.map((h, i) => `count(${q(h)}) AS c${i}`).join(", ");
+    const counts = m.headings
+      .map((h, i) => `count(${q(h)}) AS c${i}`)
+      .join(", ");
     const row = (
       await run(`SELECT count(*) AS n, ${counts} FROM ${q(m.code)}`)
     ).toArray()[0] as Record<string, unknown>;
@@ -139,7 +146,9 @@ export async function completeness(
         pct: total ? filled / total : 0,
       };
     });
-    const emptyCols = cols.filter((c) => total > 0 && c.filled === 0).map((c) => c.heading);
+    const emptyCols = cols
+      .filter((c) => total > 0 && c.filled === 0)
+      .map((c) => c.heading);
     const overall = cols.length
       ? cols.reduce((s, c) => s + c.pct, 0) / cols.length
       : 0;

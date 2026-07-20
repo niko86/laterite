@@ -1,35 +1,31 @@
-# Build the Rust read-side `lat-db` CLI in release mode.
+# Build the Rust `lat` AGS4 CLI in release mode.
 #
-# Why this script exists: the Rust binary is the small-and-fast counterpart
-# to the Python CLI (`ags5db-py`, installed via `uv tool install ./packages/ags5-db`).
-# It ships at ~25-30 MB and starts in <100 ms, replacing the PyInstaller
-# bundle (117.8 MB / 7.6 s cold) for the read-side commands.
+# Windows sibling of build-rust.sh. `lat` is the shipped standalone binary —
+# the small, fast AGS4 validator/reader (validate, read, fix, diff, merge,
+# certify, pack/lock, …). The Python `laterite` wheel is the primary library
+# surface; this script is for the CLI on its own.
 #
 # Run from repo root:
 #     .\tools\build-rust.ps1
 #
 # Output:
-#     dist\lat-db.exe                       the canonical read-side binary
+#     dist\lat.exe                          the AGS4 CLI binary
 #     rust-packages\target\release\         cargo build cache (gitignored)
 #
-# Requires: cargo (Rust toolchain). Installed via `rustup`. The first
-# build compiles bundled libduckdb from source and takes ~5-10 min;
-# incremental builds are ~10 s.
+# Requires: cargo (Rust toolchain, install via `rustup`). The CLI is DuckDB-free,
+# so a cold build is a couple of minutes; incremental builds are ~10 s.
 
 $ErrorActionPreference = "Stop"
 
 Push-Location rust-packages
 try {
     # Run cargo bare (not `2>&1 |`); cargo writes progress to stderr and
-    # ErrorActionPreference + pipeline-redirect makes that fatal. See the
-    # same workaround in build-exe-pyapp.ps1.
+    # ErrorActionPreference + pipeline-redirect makes that fatal.
     #
-    # `--bin lat-db` builds only the binary crate. The sibling
-    # `laterite-ags4-validator` placeholder is part of the workspace but not
-    # needed for shipping the CLI.
+    # `-p laterite-ags4-check` builds the crate that carries the `lat` binary.
     $prev_ea = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
-    cargo build --release --bin lat-db
+    cargo build --release -p laterite-ags4-check
     $cargo_exit = $LASTEXITCODE
     $ErrorActionPreference = $prev_ea
     if ($cargo_exit -ne 0) {
@@ -40,8 +36,8 @@ finally {
     Pop-Location
 }
 
-$src = "rust-packages\target\release\lat-db.exe"
-$dst = "dist\lat-db.exe"
+$src = "rust-packages\target\release\lat.exe"
+$dst = "dist\lat.exe"
 if (-not (Test-Path $src)) {
     Write-Error "Build reported success but $src is missing."
     exit 1

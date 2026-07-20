@@ -36,13 +36,19 @@ describe("sql() — cross-group JOIN, row objects", () => {
     expect(rows[2]!.LOCA_CKED).toBe(false);
     // DT → JS Date (both rows have a date; only BH02's LOCA_GL was empty).
     expect(rows[0]!.LOCA_STAR).toBeInstanceOf(Date);
-    expect((rows[0]!.LOCA_STAR as Date).toISOString()).toBe("2023-02-22T00:00:00.000Z");
-    expect((rows[2]!.LOCA_STAR as Date).toISOString()).toBe("2023-03-01T00:00:00.000Z");
+    expect((rows[0]!.LOCA_STAR as Date).toISOString()).toBe(
+      "2023-02-22T00:00:00.000Z",
+    );
+    expect((rows[2]!.LOCA_STAR as Date).toISOString()).toBe(
+      "2023-03-01T00:00:00.000Z",
+    );
   });
 
   it("a WHERE pushes into the engine", async () => {
     using ags = read(undefined, { text: AGS });
-    const rows = await ags.sql(`SELECT COUNT(*) AS n FROM SAMP WHERE LOCA_ID = 'BH01'`);
+    const rows = await ags.sql(
+      `SELECT COUNT(*) AS n FROM SAMP WHERE LOCA_ID = 'BH01'`,
+    );
     expect(Number(rows[0]!.n)).toBe(2);
   });
 });
@@ -89,10 +95,16 @@ describe("at() / AgsSubset — key filtering across related groups", () => {
   it("chaining accumulates filters (LOCA_ID AND SAMP_ID on SAMP)", async () => {
     using ags = read(undefined, { text: AGS });
     // LOCA_ID ∈ {BH01,BH02} AND SAMP_ID ∈ {S1,S3} → S1 (BH01) + S3 (BH02).
-    const rows = await ags.at("LOCA", ["BH01", "BH02"]).at("SAMP", ["S1", "S3"]).table("SAMP");
+    const rows = await ags
+      .at("LOCA", ["BH01", "BH02"])
+      .at("SAMP", ["S1", "S3"])
+      .table("SAMP");
     expect(rows.map((r) => r.SAMP_ID).sort()).toEqual(["S1", "S3"]);
     // LOCA only carries LOCA_ID, so the SAMP_ID filter is ignored there.
-    const loca = await ags.at("LOCA", ["BH01", "BH02"]).at("SAMP", ["S1", "S3"]).table("LOCA");
+    const loca = await ags
+      .at("LOCA", ["BH01", "BH02"])
+      .at("SAMP", ["S1", "S3"])
+      .table("LOCA");
     expect(loca.map((r) => r.LOCA_ID).sort()).toEqual(["BH01", "BH02"]);
   });
 });
@@ -103,7 +115,9 @@ describe("connection — raw escape hatch", () => {
     const con = await ags.connection;
     expect(con).toBeDefined();
     const reader = await (
-      con as { runAndReadAll(s: string): Promise<{ getRowObjectsJS(): unknown[] }> }
+      con as {
+        runAndReadAll(s: string): Promise<{ getRowObjectsJS(): unknown[] }>;
+      }
     ).runAndReadAll("SELECT COUNT(*) AS n FROM LOCA");
     expect(reader.getRowObjectsJS()).toHaveLength(1);
   });

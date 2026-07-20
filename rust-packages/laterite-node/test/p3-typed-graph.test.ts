@@ -52,12 +52,18 @@ describe("generator drift guard", () => {
   const groups = loadDictionary();
 
   it("registry.generated.ts is up to date", () => {
-    const onDisk = readFileSync(new URL("../ts/registry.generated.ts", import.meta.url), "utf8");
+    const onDisk = readFileSync(
+      new URL("../ts/registry.generated.ts", import.meta.url),
+      "utf8",
+    );
     expect(generateRegistry(groups)).toBe(onDisk);
   });
 
   it("typed-graph.generated.ts is up to date", () => {
-    const onDisk = readFileSync(new URL("../ts/typed-graph.generated.ts", import.meta.url), "utf8");
+    const onDisk = readFileSync(
+      new URL("../ts/typed-graph.generated.ts", import.meta.url),
+      "utf8",
+    );
     expect(generateTypedGraph(groups)).toBe(onDisk);
   });
 });

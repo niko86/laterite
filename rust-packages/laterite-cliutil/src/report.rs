@@ -1,4 +1,4 @@
-//! Report dispatch — the gogcli/ags5db output contract, in crate form.
+//! Report dispatch — the CLI output contract, in crate form.
 //!
 //! Each subcommand builds a *report document* and hands it to [`emit`]:
 //! it goes to **stdout** in the resolved [`OutputMode`] (`table` = the
@@ -10,7 +10,7 @@
 //! machine consumption.
 //!
 //! `Ctx` is resolved once in `main` and threaded through every
-//! `run()` — the same pattern `ags5db` uses, so command modules never
+//! `run()` — the same pattern the CLI uses, so command modules never
 //! re-parse the CLI. Lifted verbatim from
 //! `ags4-corpus-qa/src/output.rs` into the one shared UX crate so
 //! `ags4-corpus-qa` and `ags4-forge` share a single report contract
@@ -39,6 +39,7 @@ impl Ctx {
     /// Colour is on only for `table`/`json` on a TTY without
     /// `--no-color`/`NO_COLOR`. `ndjson` is never coloured (it's the
     /// machine stream).
+    #[must_use]
     pub fn colour(&self) -> bool {
         self.mode != OutputMode::Ndjson && colour_enabled(self.no_color)
     }
@@ -147,6 +148,7 @@ pub fn note(msg: impl AsRef<str>) {
 /// `serde_json::Value` with the named keys removed (top-level object
 /// only) — the building block for `--compact` projections that drop a
 /// heavy per-file array while keeping schema/summary/counts.
+#[must_use]
 pub fn without_keys(mut v: Value, keys: &[&str]) -> Value {
     if let Some(obj) = v.as_object_mut() {
         for k in keys {

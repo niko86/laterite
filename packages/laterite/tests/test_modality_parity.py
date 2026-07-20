@@ -53,14 +53,16 @@ TS = REPO / "rust-packages" / "laterite-node" / "ts"
 WASM_LIB = REPO / "rust-packages" / "laterite-ags4-wasm" / "src" / "lib.rs"
 WEB_TRANSPORT = REPO / "web" / "src" / "lib" / "transportClient.ts"
 
-_AGS = "\r\n".join([
-    '"GROUP","PROJ"',
-    '"HEADING","PROJ_ID","PROJ_NAME"',
-    '"UNIT","",""',
-    '"TYPE","ID","X"',
-    '"DATA","P1","modality probe"',
-    "",
-])
+_AGS = "\r\n".join(
+    [
+        '"GROUP","PROJ"',
+        '"HEADING","PROJ_ID","PROJ_NAME"',
+        '"UNIT","",""',
+        '"TYPE","ID","X"',
+        '"DATA","P1","modality probe"',
+        "",
+    ]
+)
 _AGS_BYTES = _AGS.encode("utf-8")
 
 
@@ -73,12 +75,16 @@ def _doc() -> dict:
     return json.loads(REGISTER.read_text(encoding="utf-8"))
 
 
-def _cell(doc: dict, capability: str, surface: str, spelling: str | None = None) -> dict:
+def _cell(
+    doc: dict, capability: str, surface: str, spelling: str | None = None
+) -> dict:
     for cap in doc["capabilities"]:
         if cap["capability"] != capability:
             continue
         for cell in cap["cells"]:
-            if cell["surface"] == surface and (spelling is None or cell.get("spelling") == spelling):
+            if cell["surface"] == surface and (
+                spelling is None or cell.get("spelling") == spelling
+            ):
                 return cell
     raise AssertionError(f"no register cell for {capability}/{surface}/{spelling}")
 
@@ -89,7 +95,9 @@ def _offered(cell: dict, direction: str) -> set[str]:
     return {f for f, st in cell.get(dd, {}).items() if st in ("present", "divergent")}
 
 
-def _assert_reflection(cell: dict, direction: str, present: set[str], absent: set[str]) -> None:
+def _assert_reflection(
+    cell: dict, direction: str, present: set[str], absent: set[str]
+) -> None:
     """The bidirectional bite: observed-present must be credited; observed-absent
     must not be credited. Names the cell + the fix in the message."""
     offered = _offered(cell, direction)
@@ -110,6 +118,7 @@ def _assert_reflection(cell: dict, direction: str, present: set[str], absent: se
 # well-formedness (the register is its own contract — no separate faithfulness gate)
 # --------------------------------------------------------------------------- #
 
+
 def test_register_well_formed():
     doc = _doc()
     forms = doc["forms"]
@@ -126,12 +135,18 @@ def test_register_well_formed():
             for d, dd in (("in", "input"), ("out", "output")):
                 for f, st in cell.get(dd, {}).items():
                     assert f in declared[d], f"{key}: {dd} form {f!r} not declared"
-                    assert st in ("present", "absent", "divergent"), f"{key}: {dd}[{f}]={st!r}"
+                    assert st in ("present", "absent", "divergent"), (
+                        f"{key}: {dd}[{f}]={st!r}"
+                    )
                 for v in cell.get("verbs", []):
                     for f in v.get("in_forms", []):
-                        assert f in declared["in"], f"{key}: verb {v['name']} bad in_form {f!r}"
+                        assert f in declared["in"], (
+                            f"{key}: verb {v['name']} bad in_form {f!r}"
+                        )
                     for f in v.get("out_forms", []):
-                        assert f in declared["out"], f"{key}: verb {v['name']} bad out_form {f!r}"
+                        assert f in declared["out"], (
+                            f"{key}: verb {v['name']} bad out_form {f!r}"
+                        )
             for g in cell.get("gaps", []):
                 dd = "input" if g["direction"] == "in" else "output"
                 st = cell.get(dd, {}).get(g["form"])
@@ -140,18 +155,27 @@ def test_register_well_formed():
                     f"flip its form to present, not linger as a 'gap' label"
                 )
                 assert g["verdict"] in ("gap", "by-design"), f"{key}: bad verdict"
-                assert g["priority"] in ("P1", "P2", "P3", "by-design"), f"{key}: bad priority"
-                assert g.get("reason", "").strip(), f"{key}: gap needs a non-empty reason"
+                assert g["priority"] in ("P1", "P2", "P3", "by-design"), (
+                    f"{key}: bad priority"
+                )
+                assert g.get("reason", "").strip(), (
+                    f"{key}: gap needs a non-empty reason"
+                )
                 # by-design ⇔ no work planned; a real gap always carries a work priority.
                 if g["verdict"] == "by-design":
-                    assert g["priority"] == "by-design", f"{key}: by-design needs by-design priority"
+                    assert g["priority"] == "by-design", (
+                        f"{key}: by-design needs by-design priority"
+                    )
                 else:
-                    assert g["priority"] != "by-design", f"{key}: a gap needs a P1/P2/P3 priority"
+                    assert g["priority"] != "by-design", (
+                        f"{key}: a gap needs a P1/P2/P3 priority"
+                    )
 
 
 # --------------------------------------------------------------------------- #
 # Python — executed probes + inspect + attr presence
 # --------------------------------------------------------------------------- #
+
 
 def test_python_read_input_doors():
     """The source-sniff doors, EXECUTED (invisible to inspect.signature)."""
@@ -161,13 +185,14 @@ def test_python_read_input_doors():
 
     # path
     import tempfile
+
     with tempfile.NamedTemporaryFile("wb", suffix=".ags", delete=False) as fh:
         fh.write(_AGS_BYTES)
         p = fh.name
     try:
         L.read(p)
         present.add("path")
-    except Exception:  # noqa: BLE001
+    except Exception:
         absent.add("path")
     finally:
         Path(p).unlink(missing_ok=True)
@@ -176,21 +201,21 @@ def test_python_read_input_doors():
     try:
         L.read(_AGS)
         present.add("text")
-    except Exception:  # noqa: BLE001
+    except Exception:
         absent.add("text")
 
     # bytes
     try:
         L.read(_AGS_BYTES)
         present.add("bytes")
-    except Exception:  # noqa: BLE001
+    except Exception:
         absent.add("bytes")
 
     # file-like (.read())
     try:
         L.read(io.BytesIO(_AGS_BYTES))
         present.add("file-like")
-    except Exception:  # noqa: BLE001
+    except Exception:
         absent.add("file-like")
 
     # cert (keyword door — inspect is honest here, the param is explicit)
@@ -215,8 +240,12 @@ def test_python_transport_forms():
     (present if {"pack", "unpack"} <= exports else absent).add("path")
     (present if {"pack_bytes", "unpack_bytes"} <= exports else absent).add("bytes")
     _assert_reflection(pack, "in", present, absent)
-    _assert_reflection(pack, "out", {"file"} if "path" in present else set(),
-                       {"file"} if "path" in absent else set())
+    _assert_reflection(
+        pack,
+        "out",
+        {"file"} if "path" in present else set(),
+        {"file"} if "path" in absent else set(),
+    )
 
     # transport-lock: lock/unlock (path) + lock_bytes/unlock_bytes (bytes)
     lock = _cell(doc, "transport-lock", "python", "free")
@@ -244,7 +273,9 @@ def test_python_emit_and_certify_output_forms():
     present, absent = set(), set()
     (present if callable(getattr(handle, "certify", None)) else absent).add("file")
     # the in-memory cert-bytes form: certify_bytes() returns the cert bytes (#390).
-    (present if callable(getattr(handle, "certify_bytes", None)) else absent).add("bytes")
+    (present if callable(getattr(handle, "certify_bytes", None)) else absent).add(
+        "bytes"
+    )
     _assert_reflection(certify, "out", present, absent)
 
 
@@ -275,18 +306,23 @@ def test_python_excel_bytes_forms():
 # Node — focused TS parser
 # --------------------------------------------------------------------------- #
 
+
 def _read(name: str) -> str:
     return (TS / name).read_text(encoding="utf-8")
 
 
-def _ts_interface_fields(src: str, name: str, _seen: set[str] | None = None) -> set[str]:
+def _ts_interface_fields(
+    src: str, name: str, _seen: set[str] | None = None
+) -> set[str]:
     """Field names of a TS interface, following one `extends` chain (lifted from
     test_cross_surface_parity — used only for the text/index option doors)."""
     _seen = _seen or set()
     if name in _seen:
         return set()
     _seen.add(name)
-    m = re.search(rf"export interface {name}(?: extends (\w+))?\s*\{{(.*?)\n\}}", src, re.DOTALL)
+    m = re.search(
+        rf"export interface {name}(?: extends (\w+))?\s*\{{(.*?)\n\}}", src, re.DOTALL
+    )
     assert m is not None, f"interface {name} not found"
     parent, body = m.group(1), m.group(2)
     fields = set(re.findall(r"^\s*(\w+)\??\s*:", body, re.MULTILINE))
@@ -315,10 +351,17 @@ def _split_top_union(type_str: str) -> list[str]:
 
 
 # TS source-type identifier → input modality form.
-_TS_FORM = {"string": "path", "Uint8Array": "bytes", "Buffer": "bytes", "Ags4File": "handle"}
+_TS_FORM = {
+    "string": "path",
+    "Uint8Array": "bytes",
+    "Buffer": "bytes",
+    "Ags4File": "handle",
+}
 
 
-def _node_source_forms(src: str, fn: str, alias: dict[str, str] | None = None) -> set[str]:
+def _node_source_forms(
+    src: str, fn: str, alias: dict[str, str] | None = None
+) -> set[str]:
     """The input forms carried by an exported fn's FIRST parameter type union.
     Resolves a single type alias (e.g. `DiffSource`)."""
     m = re.search(rf"export function {fn}\(\s*\w+\??\s*:\s*([^,)]+)", src)
@@ -423,7 +466,7 @@ def test_node_excel_bytes_forms():
         forms = _node_source_forms(idx, fn)  # string|Uint8Array → {path, bytes}
         _assert_reflection(cell, "in", forms, {"path", "bytes"} - forms)
     # the handle method must exist for the register's Ags4File.toExcel verb.
-    assert re.search(r"toExcel\(xlsxPath\?:\s*string", _read("ags4-file.ts")), (
+    assert re.search(r"toExcel\(\s*xlsxPath\?:\s*string", _read("ags4-file.ts")), (
         "Ags4File.toExcel() handle method missing — register credits it (#391)"
     )
 
@@ -445,12 +488,18 @@ _WASM_VERB_CAP = {
     "build_ags4_ipc": "build",
     "diff": "diff",
     "merge": "merge",
+    "censor": "censor",
     "ags4_to_xlsx": "to_excel",
     "xlsx_to_ags4": "from_excel",
 }
-# Verbs with no file-I/O modality (catalogue/dictionary lookups) — the by-design
-# allowlist, hygiene-checked below so it can't mask a removed verb.
-_WASM_META_ALLOW = {"list_rules", "dictionary"}
+# Verbs with no file-I/O modality (catalogue/dictionary lookups, build metadata) —
+# the by-design allowlist, hygiene-checked below so it can't mask a removed verb.
+# `version` reports CARGO_PKG_VERSION, mirroring Node's `version()`; it takes no
+# input and touches no file, so it has no I/O modality to register. Added in #556,
+# where `ags4-compliance`'s wasm runner had HARD-CODED `version: "0.5.1"` because
+# wasm exported nothing to ask — the report then claimed the wasm leg tested a
+# two-minor-old build while the gate called it 4-laterite identity.
+_WASM_META_ALLOW = {"list_rules", "dictionary", "version"}
 
 _WEB_VERB_CAP = {"lock": "transport-lock", "unlock": "transport-lock"}
 _WEB_ALLOW = {"ready"}  # worker readiness handshake, not a capability verb

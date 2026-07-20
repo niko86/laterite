@@ -40,3 +40,6 @@ laterite-ags4-reference = { path = "../laterite-ags4-reference" }
 laterite-types = { path = "../laterite-types" }
 # RevisionDelta + nested structs serialise to JS/JSON unchanged across hosts.
 serde = { version = "1", features = ["derive"] }
+
+[lints]
+workspace = true

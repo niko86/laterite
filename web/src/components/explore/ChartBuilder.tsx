@@ -7,7 +7,7 @@ import {
   Show,
   type Component,
 } from "solid-js";
-import type { GroupMeta } from "../../lib/duckTypes";
+import { scalarText, type GroupMeta } from "../../lib/duckTypes";
 import {
   chartSql,
   type Agg,
@@ -35,13 +35,14 @@ import {
 // plot. With a related group, X/Y/colour can come from either table — e.g. a
 // test value vs depth coloured by GEOL_LEG (the stratum, via the depth band).
 
-const NUMERIC = /DOUBLE|BIGINT|DECIMAL|HUGEINT|FLOAT|INTEGER|REAL|SMALLINT|TINYINT/i;
-const isNumeric = (sqlType: string | undefined) => !!sqlType && NUMERIC.test(sqlType);
+const NUMERIC =
+  /DOUBLE|BIGINT|DECIMAL|HUGEINT|FLOAT|INTEGER|REAL|SMALLINT|TINYINT/i;
+const isNumeric = (sqlType: string | undefined) =>
+  !!sqlType && NUMERIC.test(sqlType);
 
 const num = (v: unknown): number =>
   typeof v === "bigint" ? Number(v) : typeof v === "number" ? v : Number(v);
-const str = (v: unknown): string =>
-  v === null || v === undefined ? "" : typeof v === "bigint" ? v.toString() : String(v);
+const str = (v: unknown): string => scalarText(v);
 
 // Plotting thousands of points per-symbol with entry animation melts a weak
 // GPU/CPU — halve the cap on a low-end device (export/SQL still see everything).
@@ -66,7 +67,8 @@ export const ChartBuilder: Component<{
   const [table, setTable] = createSignal<string>("");
   const [joinCode, setJoinCode] = createSignal(""); // "" = single-table
   createEffect(() => {
-    if (!table() && codes().length) setTable(codes()[0]);
+    const first = codes()[0];
+    if (!table() && first !== undefined) setTable(first);
   });
 
   const baseMeta = () => props.groups.find((g) => g.code === table());
@@ -95,7 +97,13 @@ export const ChartBuilder: Component<{
     const dr = depthRangeOf(joinCode(), props.dict, j.headings);
     const dc = dr ? depthColumnFor(b.code, b.headings, props.dict) : null;
     return dr && dc
-      ? { baseAlias: BASE, baseCol: dc.col, top: dr.top, base: dr.base, level: dc.level }
+      ? {
+          baseAlias: BASE,
+          baseCol: dc.col,
+          top: dr.top,
+          base: dr.base,
+          level: dc.level,
+        }
       : null;
   });
 
@@ -110,8 +118,9 @@ export const ChartBuilder: Component<{
       key: `${BASE}.${col}`,
       label: joined() ? `${b.code}.${col}` : col,
     }));
-    if (!joined()) return base;
-    const j = joinMeta()!;
+    const j = joinMeta();
+    // `joined()` is `!!joinCode() && !!joinMeta()`, inlined here so `j` narrows.
+    if (!joinCode() || !j) return base;
     return [
       ...base,
       ...j.headings.map((col, i) => ({
@@ -139,10 +148,13 @@ export const ChartBuilder: Component<{
     if (!cols.length) return;
     if (!cols.some((c) => c.key === xCol())) setXCol(cols[0]?.key ?? "");
     if (!cols.some((c) => c.key === yCol())) {
-      const firstNum = cols.find((c) => isNumeric(c.sqlType) && c.key !== cols[0]?.key);
+      const firstNum = cols.find(
+        (c) => isNumeric(c.sqlType) && c.key !== cols[0]?.key,
+      );
       setYCol(firstNum?.key ?? cols[1]?.key ?? cols[0]?.key ?? "");
     }
-    if (colourCol() && !cols.some((c) => c.key === colourCol())) setColourCol("");
+    if (colourCol() && !cols.some((c) => c.key === colourCol()))
+      setColourCol("");
   });
 
   const aggregating = () => chartType() === "bar" && agg() !== "none";
@@ -169,7 +181,12 @@ export const ChartBuilder: Component<{
           leftAlias: BASE,
           on: joinPairs(),
           range: rp
-            ? { baseAlias: rp.baseAlias, baseCol: rp.baseCol, top: rp.top, base: rp.base }
+            ? {
+                baseAlias: rp.baseAlias,
+                baseCol: rp.baseCol,
+                top: rp.top,
+                base: rp.base,
+              }
             : undefined,
         },
       ];
@@ -212,7 +229,11 @@ export const ChartBuilder: Component<{
     const bySeries = new Map<string, [unknown, number][]>();
     for (const r of data) {
       const key = hasColour ? str(r.c) : "";
-      const arr = bySeries.get(key) ?? bySeries.set(key, []).get(key)!;
+      let arr = bySeries.get(key);
+      if (!arr) {
+        arr = [];
+        bySeries.set(key, arr);
+      }
       arr.push([cType === "bar" || !xNumeric ? str(r.x) : num(r.x), num(r.y)]);
     }
 
@@ -248,17 +269,16 @@ export const ChartBuilder: Component<{
       },
       yAxis: {
         type: "value",
-        name: counting() ? "count" : `${agg() !== "none" ? agg() + " " : ""}${yName}`,
+        name: counting()
+          ? "count"
+          : `${agg() !== "none" ? agg() + " " : ""}${yName}`,
         nameLocation: "middle",
         nameGap: 46,
         scale: true,
       },
       dataZoom: catAxis
         ? undefined
-        : [
-            { type: "inside" },
-            { type: "slider", height: 18, bottom: 20 },
-          ],
+        : [{ type: "inside" }, { type: "slider", height: 18, bottom: 20 }],
       series,
     };
   });
@@ -277,7 +297,9 @@ export const ChartBuilder: Component<{
         aria-label={sp.ariaLabel ?? sp.label}
         class={controlClass}
         value={sp.value}
-        onChange={(e) => sp.onChange(e.currentTarget.value)}
+        onChange={(e) => {
+          sp.onChange(e.currentTarget.value);
+        }}
       >
         <Show when={sp.allowEmpty !== undefined}>
           <option value="">{sp.allowEmpty}</option>
@@ -290,7 +312,10 @@ export const ChartBuilder: Component<{
   );
 
   const colOptions = () =>
-    allCols().map((c) => ({ value: c.key, label: `${c.label} (${c.sqlType})` }));
+    allCols().map((c) => ({
+      value: c.key,
+      label: `${c.label} (${c.sqlType})`,
+    }));
 
   return (
     <div class="flex min-w-0 flex-col gap-4">
@@ -307,7 +332,10 @@ export const ChartBuilder: Component<{
             ariaLabel="related group"
             value={joinCode()}
             onChange={setJoinCode}
-            options={related().map((r) => ({ value: r.code, label: `${r.code} (${r.direction})` }))}
+            options={related().map((r) => ({
+              value: r.code,
+              label: `${r.code} (${r.direction})`,
+            }))}
             allowEmpty="(none)"
           />
         </Show>
@@ -321,9 +349,21 @@ export const ChartBuilder: Component<{
             { value: "bar", label: "Bar" },
           ]}
         />
-        <Select label="X axis" ariaLabel="x axis" value={xCol()} onChange={setXCol} options={colOptions()} />
+        <Select
+          label="X axis"
+          ariaLabel="x axis"
+          value={xCol()}
+          onChange={setXCol}
+          options={colOptions()}
+        />
         <Show when={!counting()}>
-          <Select label="Y axis" ariaLabel="y axis" value={yCol()} onChange={setYCol} options={colOptions()} />
+          <Select
+            label="Y axis"
+            ariaLabel="y axis"
+            value={yCol()}
+            onChange={setYCol}
+            options={colOptions()}
+          />
         </Show>
         <Show when={chartType() === "bar"}>
           <Select
@@ -354,8 +394,9 @@ export const ChartBuilder: Component<{
         {(rp) => (
           <p class="text-xs text-fg-faint">
             Depth-band join: <span class="mono">{rp().baseCol}</span> within{" "}
-            <span class="mono">{rp().top}</span>…<span class="mono">{rp().base}</span>{" "}
-            ({rp().level}-level) — colour by a {joinCode()} column to band the plot by stratum.
+            <span class="mono">{rp().top}</span>…
+            <span class="mono">{rp().base}</span> ({rp().level}-level) — colour
+            by a {joinCode()} column to band the plot by stratum.
           </p>
         )}
       </Show>
@@ -368,14 +409,19 @@ export const ChartBuilder: Component<{
           </p>
         }
       >
-        <Show when={rows.error}>
-          <p class="text-sm text-err">Chart query error: {String(rows.error)}</p>
+        <Show when={Boolean(rows.error)}>
+          <p class="text-sm text-err">
+            Chart query error: {String(rows.error)}
+          </p>
         </Show>
         <Show
           when={option()}
           fallback={
             <span class="text-sm text-fg-muted">
-              <Show when={rows.loading} fallback="No rows to plot for this selection.">
+              <Show
+                when={rows.loading}
+                fallback="No rows to plot for this selection."
+              >
                 <Spinner label="Querying…" />
               </Show>
             </span>

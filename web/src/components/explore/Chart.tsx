@@ -1,17 +1,17 @@
 import { createEffect, onCleanup, onMount, type Component } from "solid-js";
+import type { EChartsType } from "echarts/core";
 
 // Generic ECharts host. echarts is multi-MB, so it's dynamically imported
 // (tree-shaken via echarts/core + .use of only the charts/components we need)
 // — it loads only when the Charts view first mounts, never on the validate or
-// table-browse paths. The instance is typed loosely (`any`) — it's a 3rd-party
-// canvas object, and the tree-shaken core types are awkward to pin.
+// table-browse paths. The instance holds echarts' own `EChartsType` via a
+// type-only import — no runtime echarts in the entry chunk.
 export const Chart: Component<{
   option: () => Record<string, unknown> | null;
   height?: string;
 }> = (props) => {
   let el!: HTMLDivElement;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let chart: any = null;
+  let chart: EChartsType | null = null;
 
   onMount(() => {
     let disposed = false;
@@ -21,6 +21,7 @@ export const Chart: Component<{
       import("echarts/charts"),
       import("echarts/components"),
       import("echarts/renderers"),
+      // eslint-disable-next-line solid/reactivity -- one-shot init after the dynamic import; the reactive redraw is the createEffect below, not this .then callback
     ]).then(([core, charts, components, renderers]) => {
       if (disposed) return;
       core.use([
@@ -57,9 +58,6 @@ export const Chart: Component<{
   });
 
   return (
-    <div
-      ref={el}
-      style={{ width: "100%", height: props.height ?? "340px" }}
-    />
+    <div ref={el} style={{ width: "100%", height: props.height ?? "340px" }} />
   );
 };

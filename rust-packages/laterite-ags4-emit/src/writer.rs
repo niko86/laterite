@@ -10,7 +10,7 @@
 //!   "TYPE","<t1>","<t2>",...
 //!   "DATA","<v1>","<v2>",...
 //!   <blank line>
-//!   "GROUP","<NEXT_CODE>"
+//!   "GROUP","<`NEXT_CODE`>"
 //!   ...
 //!
 //! Each cell is double-quote-wrapped (Rule 5); embedded `"` becomes
@@ -39,7 +39,7 @@ pub fn write_ags4<W: Write>(out: &mut W, groups: &[EmitGroup<'_>]) -> Result<(),
             // Blank line separator (AGS4 doesn't strictly require this,
             // but every emitter I've seen produces it and python-ags4 +
             // our own reader treat the blank as a section break).
-            out.write_all(b"\r\n").map_err(io_err)?;
+            out.write_all(b"\r\n").map_err(|e| io_err(&e))?;
         }
         // GROUP row
         write_row(out, &["GROUP", g.code])?;
@@ -93,7 +93,7 @@ pub fn write_ags4_matrix<W: Write>(
         // trailing blank, which is why dropping that blank for `.text` also needs this
         // to keep the separator.
         if i > 0 {
-            out.write_all(b"\r\n").map_err(io_err)?;
+            out.write_all(b"\r\n").map_err(|e| io_err(&e))?;
         }
         write_row(out, &["GROUP", code])?;
         for row in matrix {
@@ -104,7 +104,7 @@ pub fn write_ags4_matrix<W: Write>(
     // python-ags4 appends a blank line AFTER the final group too; the canonical shape
     // does not. This is the only byte-level difference between the two.
     if trailing_blank_line && !groups.is_empty() {
-        out.write_all(b"\r\n").map_err(io_err)?;
+        out.write_all(b"\r\n").map_err(|e| io_err(&e))?;
     }
     Ok(())
 }
@@ -159,23 +159,19 @@ fn write_row<W: Write>(out: &mut W, cells: &[&str]) -> Result<(), EmitError> {
     }
     for (i, c) in cells.iter().enumerate() {
         if i > 0 {
-            out.write_all(b",").map_err(io_err)?;
+            out.write_all(b",").map_err(|e| io_err(&e))?;
         }
-        out.write_all(b"\"").map_err(io_err)?;
-        // Escape embedded `"` → `""`.
-        if c.contains('"') {
-            let escaped = c.replace('"', "\"\"");
-            out.write_all(escaped.as_bytes()).map_err(io_err)?;
-        } else {
-            out.write_all(c.as_bytes()).map_err(io_err)?;
-        }
-        out.write_all(b"\"").map_err(io_err)?;
+        // One shared authority for AGS4 field quoting (laterite-types) — the
+        // exact primitive the browser tokenizer's wasm calls, so the escaping
+        // rule can't drift between the writer and the browser (#533). Streams
+        // straight into `out`, so the writer's hot path stays allocation-free.
+        laterite_types::write_quoted_field(out, c).map_err(|e| io_err(&e))?;
     }
-    out.write_all(b"\r\n").map_err(io_err)?;
+    out.write_all(b"\r\n").map_err(|e| io_err(&e))?;
     Ok(())
 }
 
-fn io_err(e: std::io::Error) -> EmitError {
+fn io_err(e: &std::io::Error) -> EmitError {
     EmitError::Write(e.to_string())
 }
 
@@ -189,7 +185,7 @@ mod tests {
                 code.to_string(),
                 vec![
                     vec!["HEADING".into(), format!("{code}_ID")],
-                    vec!["UNIT".into(), "".into()],
+                    vec!["UNIT".into(), String::new()],
                     vec!["TYPE".into(), "ID".into()],
                     vec!["DATA".into(), id.into()],
                 ],
@@ -240,7 +236,7 @@ mod tests {
             "PROJ".to_string(),
             vec![
                 vec!["HEADING".into(), "PROJ_ID".into()],
-                vec!["UNIT".into(), "".into()],
+                vec!["UNIT".into(), String::new()],
                 vec!["TYPE".into(), "ID".into()],
                 vec!["DATA".into(), "line1\r\nline2".into()],
             ],
@@ -282,7 +278,7 @@ mod tests {
         let mut buf: Vec<u8> = Vec::new();
         write_ags4(&mut buf, &groups).unwrap();
         let text = String::from_utf8(buf).unwrap();
-        assert!(text.contains(r#""he said ""hello""""#), "got: {}", text);
+        assert!(text.contains(r#""he said ""hello""""#), "got: {text}");
     }
 
     /// #423: a cell carrying a raw CR/LF has no faithful AGS4 encoding (Rule 6
@@ -342,6 +338,6 @@ mod tests {
         let mut buf: Vec<u8> = Vec::new();
         write_ags4(&mut buf, &groups).expect("no CR/LF, so nothing to reject");
         let text = String::from_utf8(buf).unwrap();
-        assert!(text.contains("\"line one \t line two\""), "got: {}", text);
+        assert!(text.contains("\"line one \t line two\""), "got: {text}");
     }
 }

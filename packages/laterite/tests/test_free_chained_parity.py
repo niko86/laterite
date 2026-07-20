@@ -100,7 +100,9 @@ def test_allowlist_entries_exist():
     masking a real knob."""
     for name, (free_fn, chained_fn, free_only, chained_only) in _PAIRS.items():
         free, chained = set(_params(free_fn)), set(_params(chained_fn))
-        assert free_only <= free, f"{name}: stale free-only entry {sorted(free_only - free)}"
+        assert free_only <= free, (
+            f"{name}: stale free-only entry {sorted(free_only - free)}"
+        )
         assert chained_only <= chained, (
             f"{name}: stale chained-only entry {sorted(chained_only - chained)}"
         )

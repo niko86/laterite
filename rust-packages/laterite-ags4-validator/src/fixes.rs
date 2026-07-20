@@ -61,7 +61,7 @@ pub struct SpanEdit {
 
 /// Which kind of fix this is — drives the UI grouping/label and tells the
 /// applier whether the work is byte-level (BOM / CRLF, no spans) or a set
-/// of in-line [`SpanEdit`]s. snake_case in JSON to match the TS union.
+/// of in-line [`SpanEdit`]s. `snake_case` in JSON to match the TS union.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FixKind {
@@ -83,7 +83,7 @@ pub enum FixKind {
 /// the UI surfaces them separately for explicit opt-in. The field is what
 /// lets the engine offer fixes that were previously skipped as "unsafe to
 /// auto-apply" (e.g. typographic→ASCII substitution) instead of withholding
-/// them entirely. snake_case in JSON to match the TS union.
+/// them entirely. `snake_case` in JSON to match the TS union.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FixRisk {
@@ -250,6 +250,10 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
             let Some(raw) = line_text.get(&line) else {
                 continue;
             };
+            // `ci` is a heading's column index within one AGS4 group — bounded
+            // by that group's heading count (dictionary-bounded, a few dozen
+            // at most), nowhere near u32::MAX.
+            #[allow(clippy::cast_possible_truncation)]
             let Some((s, e)) = field_span(raw, ci as u32) else {
                 continue;
             };
@@ -293,10 +297,14 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                     // finding fired). field_span gives the inner span — for
                     // an empty `""` field that's a zero-width point just
                     // inside the quotes, exactly where the value belongs.
-                    let cur = data.values.get(ci).map(String::as_str).unwrap_or("");
+                    let cur = data.values.get(ci).map_or("", String::as_str);
                     if !cur.is_empty() {
                         return;
                     }
+                    // `ci` is TRAN_DLIM/TRAN_RCON's column index within the
+                    // TRAN group — bounded by TRAN's heading count
+                    // (dictionary-bounded), nowhere near u32::MAX.
+                    #[allow(clippy::cast_possible_truncation)]
                     let Some((s, e)) = field_span(raw, ci as u32) else {
                         return;
                     };
@@ -350,11 +358,7 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
             let Some(group) = parsed.groups.get(&f.group) else {
                 continue;
             };
-            let ty = group
-                .types
-                .get(ci as usize)
-                .map(String::as_str)
-                .unwrap_or("");
+            let ty = group.types.get(ci as usize).map_or("", String::as_str);
             let raw = match line_text.get(&line) {
                 Some(r) => *r,
                 None => continue,
@@ -383,11 +387,7 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
                 };
                 (reformat(v), FixKind::ReformatNumeric, FixRisk::Safe)
             } else if ty == "DT" {
-                let unit = group
-                    .units
-                    .get(ci as usize)
-                    .map(String::as_str)
-                    .unwrap_or("");
+                let unit = group.units.get(ci as usize).map_or("", String::as_str);
                 let Some((iso, risk)) = datetime_to_iso(unit, cur.trim()) else {
                     continue; // non-ISO declared UNIT, or value isn't a real date
                 };
@@ -434,6 +434,10 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
             let Some(raw) = line_text.get(&line) else {
                 continue;
             };
+            // `i` is a char offset within ONE AGS4 line — bounded by that
+            // line's length, which cannot realistically reach u32::MAX
+            // chars for real geotechnical data.
+            #[allow(clippy::cast_possible_truncation)]
             let edits: Vec<SpanEdit> = raw
                 .chars()
                 .enumerate()
@@ -503,6 +507,8 @@ pub fn compute_fixes(parsed: &ParsedFile, found: &Findings) -> Fixes {
             }
             // Append at the end of the line body (CR already stripped in
             // raw_lines), as an empty-slice replacement guarded by "".
+            // A char count of ONE AGS4 line — bounded well under u32::MAX.
+            #[allow(clippy::cast_possible_truncation)]
             let end = raw.chars().count() as u32;
             let missing = want - have;
             // A trailing comma already opens the slot for one empty field that
@@ -615,7 +621,7 @@ fn row_is_clean(line: &str) -> bool {
 /// this fold is spliced INTO a single AGS record where a raw newline would split
 /// the line — so any `\r`/`\n` it would produce is folded to a space instead
 /// (they are whitespace separators). The produced-`"` case is escaped at the
-/// SpanEdit; between them the fold can never break a record's structure.
+/// `SpanEdit`; between them the fold can never break a record's structure.
 fn ascii_fold(c: char) -> Option<&'static str> {
     if c.is_ascii() {
         return None;
@@ -729,7 +735,7 @@ fn datetime_to_iso(unit: &str, value: &str) -> Option<(String, FixRisk)> {
 /// (`%d/%m/%Y`). chrono validates the fields, so an impossible date (month 13,
 /// day 32) yields `None` — we never invent a bogus "canonical" value to offer.
 fn parse_loose_datetime(s: &str) -> Option<(chrono::NaiveDateTime, DateLayout)> {
-    use DateLayout::*;
+    use DateLayout::{DayFirstNumeric, TextualMonth, YearFirst};
     use chrono::{NaiveDate, NaiveDateTime};
     // Ordering matters: a day-first / 2-digit-year (`%y`) layout is tried
     // before the year-first / 4-digit (`%Y`) one for the same separator, so
@@ -749,11 +755,6 @@ fn parse_loose_datetime(s: &str) -> Option<(chrono::NaiveDateTime, DateLayout)> 
         ("%Y-%m-%dT%H:%M", YearFirst),
         ("%Y-%m-%d %H:%M", YearFirst),
     ];
-    for (f, layout) in WITH_TIME {
-        if let Ok(dt) = NaiveDateTime::parse_from_str(s, f) {
-            return Some((dt, *layout));
-        }
-    }
     const DATE_ONLY: &[(&str, DateLayout)] = &[
         ("%d/%m/%y", DayFirstNumeric),
         ("%d/%m/%Y", DayFirstNumeric),
@@ -768,6 +769,11 @@ fn parse_loose_datetime(s: &str) -> Option<(chrono::NaiveDateTime, DateLayout)> 
         ("%Y-%m-%d", YearFirst),
         ("%Y/%m/%d", YearFirst),
     ];
+    for (f, layout) in WITH_TIME {
+        if let Ok(dt) = NaiveDateTime::parse_from_str(s, f) {
+            return Some((dt, *layout));
+        }
+    }
     for (f, layout) in DATE_ONLY {
         if let Ok(d) = NaiveDate::parse_from_str(s, f) {
             return Some((d.and_hms_opt(0, 0, 0)?, *layout));
@@ -792,6 +798,7 @@ fn parse_loose_datetime(s: &str) -> Option<(chrono::NaiveDateTime, DateLayout)> 
 ///
 /// Char slicing is code-point correct throughout (`chars()` collected to a
 /// `Vec<char>`), so a multibyte line (`°`, `±`) can never be split.
+#[must_use]
 pub fn apply_fixes(text: &str, has_bom: bool, selected: &[Fix]) -> String {
     // Group in-line edits by line.
     let mut by_line: HashMap<u32, Vec<&SpanEdit>> = HashMap::new();
@@ -821,6 +828,10 @@ pub fn apply_fixes(text: &str, has_bom: bool, selected: &[Fix]) -> String {
     let mut result = String::with_capacity(text.len());
     let src = text.as_bytes();
     for (i, span) in crate::parse::line_spans(src).enumerate() {
+        // A 1-based line number for one input file — reaching u32::MAX
+        // lines would need ~40+ GB of file content, far beyond any real or
+        // stress-test AGS4 file (the perf matrix tops out at ~1GB).
+        #[allow(clippy::cast_possible_truncation)]
         let number = (i + 1) as u32;
         // Every terminator/delimiter is ASCII, so `start..body_end` is a valid
         // char boundary of `text`.
@@ -1098,7 +1109,7 @@ mod tests {
         assert!(kinds(&fixes).contains(&FixKind::StripEmbeddedCr));
         let out = apply_fixes(&src, parsed.has_bom, &fixes);
         // The embedded CR (between a and b) is gone; the terminator stays.
-        assert!(out.contains("\"a\rb\"") == false);
+        assert!(!out.contains("\"a\rb\""));
         assert!(out.contains("\"ab\""), "got: {out:?}");
     }
 
@@ -1372,7 +1383,7 @@ mod tests {
             .expect("a non-ASCII fold fix");
         assert_eq!(fix.risk, FixRisk::Risky, "transliteration is opt-in only");
         assert_eq!(fix.edits.len(), 2, "the ’ and the — are both folded");
-        let out = apply_fixes(src, parsed.has_bom, &[fix.clone()]);
+        let out = apply_fixes(src, parsed.has_bom, std::slice::from_ref(fix));
         // deunicode: ’→"'", em-dash→"--".
         assert!(out.contains("\"O'Brien em--dash\""), "got: {out:?}");
         // It must never be in the safe set fix-all-safe applies.
@@ -1391,7 +1402,7 @@ mod tests {
         // line break. A fold to `\r`/`\n` would split a record; the `"`/`,`
         // producers are separately escaped at the SpanEdit (the quote test below
         // + the property suite's cell-preservation invariant cover that).
-        for cp in 0u32..=0x10FFFF {
+        for cp in 0u32..=0x0010_FFFF {
             let Some(c) = char::from_u32(cp) else {
                 continue;
             };
@@ -1509,7 +1520,7 @@ mod tests {
             .find(|f| f.kind == FixKind::PadShortRow)
             .expect("a pad-short-row fix");
         assert_eq!(pad.risk, FixRisk::Safe);
-        let out = apply_fixes(src, parsed.has_bom, &[pad.clone()]);
+        let out = apply_fixes(src, parsed.has_bom, std::slice::from_ref(pad));
         assert!(out.contains("\"DATA\",\"BH01\",\"\""), "got: {out:?}");
     }
 
@@ -1540,7 +1551,7 @@ mod tests {
             .iter()
             .find(|f| f.kind == FixKind::PadShortRow)
             .expect("a pad-short-row fix");
-        let out = apply_fixes(src, parsed.has_bom, &[pad.clone()]);
+        let out = apply_fixes(src, parsed.has_bom, std::slice::from_ref(pad));
         assert!(out.contains("\"DATA\",\"BH01\",\"\""), "got: {out:?}");
         assert!(!out.contains(",,"), "over-padded a trailing comma: {out:?}");
         // The padded row now re-parses to exactly the 2 heading columns.
@@ -1842,8 +1853,10 @@ mod tests {
         .iter()
         .map(|l| l.trim_start_matches("AGS Format Rule ").to_string())
         .collect();
-        let exported: std::collections::BTreeSet<String> =
-            FIXABLE_RULE_LABELS.iter().map(|s| s.to_string()).collect();
+        let exported: std::collections::BTreeSet<String> = FIXABLE_RULE_LABELS
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
         assert_eq!(exported, from_consts);
     }
 }

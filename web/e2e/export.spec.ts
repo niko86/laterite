@@ -5,7 +5,9 @@ import { ready, tab } from "./helpers";
 // The Export tab is the browser/offline half of the AGS4-output feature:
 // per-group data (JSON) → the wasm `to_ags4` producer → a downloadable .ags.
 
-test("Export tab builds & downloads a valid .ags from the example", async ({ page }) => {
+test("Export tab builds & downloads a valid .ags from the example", async ({
+  page,
+}) => {
   await ready(page);
   await tab(page, "Export").click();
 
@@ -25,7 +27,9 @@ test("Export tab builds & downloads a valid .ags from the example", async ({ pag
   await expect(page.getByText(/safe fix\(es\) applied/)).toBeVisible();
 });
 
-test("Export Strict mode surfaces an error for an incomplete file", async ({ page }) => {
+test("Export Strict mode surfaces an error for an incomplete file", async ({
+  page,
+}) => {
   await ready(page);
   await tab(page, "Export").click();
 

@@ -1,7 +1,7 @@
 # laterite-excel — AGS4 ↔ XLSX conversion, extracted out of laterite-ags4-core
 # (2026-06-18) so the "core" crate stops dragging calamine + rust_xlsxwriter
 # (~1.5 MB) into every consumer that never touches Excel (the DuckDB
-# extension, laterite-ags5-db, ags4-perf). Sole consumer today: laterite-py
+# extension, ags4-perf). Sole consumer today: laterite-py
 # (the `laterite.compat` AGS4_to_excel / excel_to_AGS4 surface).
 #
 # FLAGGED FOR REWRITE: the current contents are AGS4-specific; the intent is
@@ -59,3 +59,6 @@ tempfile = "3"
 laterite-types = { path = "../laterite-types" }
 # `ags4_str` takes a `serde_json::Value`; the gate builds one with `json!`.
 serde_json = "1"
+
+[lints]
+workspace = true

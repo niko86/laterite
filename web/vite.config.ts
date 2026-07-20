@@ -114,10 +114,15 @@ export default defineConfig({
       },
       workbox: {
         // App-shell precache. `ags` pulls in the tiny sample files (offline
-        // "load sample"); the validator wasm is named in explicitly.
+        // "load sample"); the two validator wasms are named in explicitly (the
+        // `.wasm` extension is deliberately NOT in the glob above so the heavy
+        // DuckDB engine can't slip in). The tiny tokenizer wasm (#533) is
+        // boot-critical — the app gates first render on it — so it MUST be
+        // precached or the app never renders offline.
         globPatterns: [
           "**/*.{js,css,html,ico,svg,json,webmanifest,ags,txt,png,woff,woff2}",
           "assets/ags4_wasm_bg-*.wasm",
+          "assets/ags4_tokenizer_bg-*.wasm",
         ],
         // Belt-and-braces with the runtimeCaching rules below: keep the heavy
         // assets out of the install precache no matter how the globs evolve.

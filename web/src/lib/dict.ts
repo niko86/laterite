@@ -24,7 +24,8 @@ import type { StandardDict, DictGroup, DictHeading } from "./validator";
 const hasStatus = (status: string, part: string): boolean =>
   status.split("+").some((p) => p.trim().toUpperCase() === part);
 export const isKeyStatus = (s: string): boolean => hasStatus(s, "KEY");
-export const isRequiredStatus = (s: string): boolean => hasStatus(s, "REQUIRED");
+export const isRequiredStatus = (s: string): boolean =>
+  hasStatus(s, "REQUIRED");
 
 /** Older-edition overrides for a heading whose definition differs from the
  *  latest-edition (flat) value. */
@@ -99,31 +100,33 @@ function resolveEdition(
  *  preserved; groups are sorted by code (as the prior wasm export did). */
 export function projectEdition(raw: RawUnion, edition: string): StandardDict {
   const ed = resolveEdition(raw, edition);
-  const codes = Object.keys(raw.groups)
-    .filter((code) => inEdition(raw.groups[code].eds, ed))
-    .sort();
-  const groups: DictGroup[] = codes.map((code) => {
-    const g = raw.groups[code];
-    const headings: DictHeading[] = g.headings
-      .filter((h) => inEdition(h.eds, ed))
-      .map((h) => {
-        const o = h.by_ed?.[ed];
-        const unit = o && "unit" in o ? o.unit : h.unit;
-        return {
-          name: h.name,
-          status: o?.status ?? h.status,
-          type: o?.type ?? h.type,
-          ...(unit ? { unit } : {}),
-          description: o?.description ?? h.description ?? "",
-        };
-      });
-    return {
-      code,
-      contents: g.description ?? "",
-      ...(g.parent ? { parent: g.parent } : {}),
-      headings,
-    };
-  });
+  // Object.entries carries each group value alongside its code, so there's no
+  // indexed re-lookup (and no non-null assertion) below; the sort replicates the
+  // prior `.sort()` default lexicographic order on the codes.
+  const groups: DictGroup[] = Object.entries(raw.groups)
+    .filter(([, g]) => inEdition(g.eds, ed))
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([code, g]) => {
+      const headings: DictHeading[] = g.headings
+        .filter((h) => inEdition(h.eds, ed))
+        .map((h) => {
+          const o = h.by_ed?.[ed];
+          const unit = o && "unit" in o ? o.unit : h.unit;
+          return {
+            name: h.name,
+            status: o?.status ?? h.status,
+            type: o?.type ?? h.type,
+            ...(unit ? { unit } : {}),
+            description: o?.description ?? h.description ?? "",
+          };
+        });
+      return {
+        code,
+        contents: g.description ?? "",
+        ...(g.parent ? { parent: g.parent } : {}),
+        headings,
+      };
+    });
   return { ags_edition: ed, groups };
 }
 

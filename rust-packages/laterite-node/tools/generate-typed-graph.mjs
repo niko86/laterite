@@ -12,7 +12,14 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const DICT_PATH = join(HERE, "..", "..", "laterite-ags4-reference", "data", "ags_dictionary.json");
+const DICT_PATH = join(
+  HERE,
+  "..",
+  "..",
+  "laterite-ags4-reference",
+  "data",
+  "ags_dictionary.json",
+);
 const REGISTRY_OUT = join(HERE, "..", "ts", "registry.generated.ts");
 const TYPED_OUT = join(HERE, "..", "ts", "typed-graph.generated.ts");
 
@@ -21,7 +28,18 @@ const HEADER =
   "// DO NOT EDIT — re-run the generator after a dictionary change.\n\n";
 
 // Port of `generate_pyi.py::_STRING_TYPES` / `_py_type`, to TS.
-const STRING_TYPES = new Set(["ID", "X", "PA", "PT", "PU", "T", "U", "DMS", "MC", "XN"]);
+const STRING_TYPES = new Set([
+  "ID",
+  "X",
+  "PA",
+  "PT",
+  "PU",
+  "T",
+  "U",
+  "DMS",
+  "MC",
+  "XN",
+]);
 
 /** AGS spec type code → the TS type a typed-graph field carries. */
 export function tsType(agsType) {
@@ -110,7 +128,8 @@ function emitClass(g, childCodes) {
     `export class ${g.code} extends AgsGroup {`,
     `  static readonly code = ${JSON.stringify(g.code)};`,
   ];
-  for (const h of g.headings) lines.push(`  ${h.name}: ${tsType(h.type)} | null = null;`);
+  for (const h of g.headings)
+    lines.push(`  ${h.name}: ${tsType(h.type)} | null = null;`);
   for (const c of childCodes) lines.push(`  ${c.toLowerCase()}s: ${c}[] = [];`);
   lines.push(`  constructor(init: Partial<${g.code}> = {}) {`);
   lines.push(`    super();`);
@@ -134,5 +153,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const groups = loadDictionary();
   writeFileSync(REGISTRY_OUT, generateRegistry(groups));
   writeFileSync(TYPED_OUT, generateTypedGraph(groups));
-  console.log(`generated ${groups.length} groups → registry.generated.ts + typed-graph.generated.ts`);
+  console.log(
+    `generated ${groups.length} groups → registry.generated.ts + typed-graph.generated.ts`,
+  );
 }

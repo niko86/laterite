@@ -76,16 +76,22 @@ describe("toGeoJson", () => {
   });
 
   it("includes the OS attribution only when OSTN15 was actually used", () => {
-    const precise = JSON.parse(toGeoJson(rows, { system: "osgb", precise: true }));
+    const precise = JSON.parse(
+      toGeoJson(rows, { system: "osgb", precise: true }),
+    );
     expect(precise.metadata.attribution).toBe(OS_ATTRIBUTION);
     expect(precise.metadata.transform).toMatch(/OSTN15/);
 
-    const helmert = JSON.parse(toGeoJson(rows, { system: "osgb", precise: false }));
+    const helmert = JSON.parse(
+      toGeoJson(rows, { system: "osgb", precise: false }),
+    );
     expect(helmert.metadata.attribution).toBeUndefined();
     expect(helmert.metadata.transform).toMatch(/Helmert/);
 
     // Irish + precise requested still degrades to Helmert (no grid) → no attr.
-    const irish = JSON.parse(toGeoJson(rows, { system: "irish", precise: true }));
+    const irish = JSON.parse(
+      toGeoJson(rows, { system: "irish", precise: true }),
+    );
     expect(irish.metadata.attribution).toBeUndefined();
   });
 });
@@ -99,12 +105,12 @@ describe("toGeoJson", () => {
 // (OSTN15_TestInput/Output_OSGBtoETRS), reproduced under the OSI BSD Licence —
 // Contains OS data © Crown copyright and database rights, Ordnance Survey 2016.
 const OS_VECTORS: { e: number; n: number; lat: number; lon: number }[] = [
-  { e: 91492.146, n: 11318.804, lat: 49.92226393730, lon: -6.29977752014 }, // TP01
-  { e: 241124.584, n: 220332.641, lat: 51.85890896400, lon: -4.30852476960 }, // TP10
-  { e: 422242.186, n: 433818.701, lat: 53.80021519630, lon: -1.66379168242 }, // TP20
-  { e: 267056.768, n: 846176.972, lat: 57.48625000720, lon: -4.21926398555 }, // TP30
-  { e: 395999.668, n: 1138728.951, lat: 60.13308091660, lon: -2.07382822798 }, // TP40
-  { e: 639821.835, n: 169565.858, lat: 51.37447025550, lon: 1.44454730409 }, // TP07 (east)
+  { e: 91492.146, n: 11318.804, lat: 49.9222639373, lon: -6.29977752014 }, // TP01
+  { e: 241124.584, n: 220332.641, lat: 51.858908964, lon: -4.3085247696 }, // TP10
+  { e: 422242.186, n: 433818.701, lat: 53.8002151963, lon: -1.66379168242 }, // TP20
+  { e: 267056.768, n: 846176.972, lat: 57.4862500072, lon: -4.21926398555 }, // TP30
+  { e: 395999.668, n: 1138728.951, lat: 60.1330809166, lon: -2.07382822798 }, // TP40
+  { e: 639821.835, n: 169565.858, lat: 51.3744702555, lon: 1.44454730409 }, // TP07 (east)
 ];
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -114,7 +120,10 @@ const hasGrid = existsSync(gridPath);
 describe.skipIf(!hasGrid)("OSTN15 transform vs OS official vectors", () => {
   it("reproduces all OS test points to sub-metre", () => {
     const buf = readFileSync(gridPath);
-    const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+    const ab = buf.buffer.slice(
+      buf.byteOffset,
+      buf.byteOffset + buf.byteLength,
+    );
     registerOstn15(proj4, ab);
     applyDefs(proj4, true);
 

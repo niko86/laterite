@@ -20,6 +20,7 @@ map with `LATERITE_REGEN_DIVERGENCES=1 pytest -s ...` and copy the printed dict.
 python-ags4 is pinned, so its side is frozen; a mismatch there flags an
 unexpected upstream/version change.
 """
+
 import json
 import os
 import re
@@ -28,8 +29,8 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("python_ags4", reason="parity oracle needs the python-ags4 dev dep")
-import laterite.compat as compat  # noqa: E402
-from python_ags4 import AGS4  # noqa: E402
+import laterite.compat as compat
+from python_ags4 import AGS4
 
 PROBES = Path(__file__).resolve().parents[3] / "ags-wiki" / ".bootstrap" / "probes"
 _RULE = re.compile(r"^AGS Format Rule (\S+)$")
@@ -39,36 +40,45 @@ _RULE = re.compile(r"^AGS Format Rule (\S+)$")
 EXPECTED = {
     "probe-o8-dup-heading.ags": {
         "note": "O-8: duplicate HEADING. compat reports it cleanly; python-ags4 "
-                "renames + flags it as a non-standard heading (Rule 9/18).",
+        "renames + flags it as a non-standard heading (Rule 9/18).",
         "compat": {"7": 1},
         "python": {"7": 2, "9": 1, "18": 1},
     },
     "probe-o27-file-ondisk.ags": {
         "note": "O-27: Rule 20 on-disk FILE check — different count (data-level "
-                "vs on-disk interpretation).",
+        "vs on-disk interpretation).",
         "compat": {"20": 1},
         "python": {"20": 2},
     },
     "probe-rule6-embedded-cr.ags": {
         "note": "O-2: a lone embedded CR. python-ags4's universal-newline split "
-                "turns it into Rule 2a+3+5; laterite attributes it to Rule 6 "
-                "(which python-ags4's rule_6 leaves a no-op).",
+        "turns it into Rule 2a+3+5; laterite attributes it to Rule 6 "
+        "(which python-ags4's rule_6 leaves a no-op).",
         "compat": {"6": 1},
         "python": {"2a": 1, "3": 1, "5": 2},
     },
     "probe-rule19-digit.ags": {
         "note": "Rule 19 name-format: laterite flags a leading-digit GROUP/HEADING "
-                "name (Rule 19/19b) that python-ags4 does not.",
+        "name (Rule 19/19b) that python-ags4 does not.",
         "compat": {"7": 1, "9": 1, "10b": 4, "10c": 1, "18": 1, "19": 1, "19b": 1},
         "python": {"7": 1, "9": 1, "10b": 4, "10c": 1, "18": 1},
     },
     "probe-o42-edition-4-0-alias.ags": {
         "note": "O-42: TRAN_AGS=4.0 file using 4.0.4 vocabulary. python-ags4's "
-                "stale 4.0->4.0.3 alias over-reports (false Rule 9 on SAMP_RECL, "
-                "Rule 10c on PMTL, Rule 18); laterite resolves 4.0->4.0.4 and omits them.",
+        "stale 4.0->4.0.3 alias over-reports (false Rule 9 on SAMP_RECL, "
+        "Rule 10c on PMTL, Rule 18); laterite resolves 4.0->4.0.4 and omits them.",
         "compat": {"7": 2, "10a": 1, "10b": 5, "15": 1, "16": 1, "17": 1},
-        "python": {"7": 3, "9": 1, "10a": 1, "10b": 5, "10c": 1, "15": 1,
-                   "16": 1, "17": 1, "18": 1},
+        "python": {
+            "7": 3,
+            "9": 1,
+            "10a": 1,
+            "10b": 5,
+            "10c": 1,
+            "15": 1,
+            "16": 1,
+            "17": 1,
+            "18": 1,
+        },
     },
 }
 
@@ -95,8 +105,10 @@ def test_regen_divergence_map():
     out = {}
     for name in EXPECTED:
         p = PROBES / name
-        out[name] = {"compat": _verdict(compat.check_file, p),
-                     "python": _verdict(AGS4.check_file, p)}
+        out[name] = {
+            "compat": _verdict(compat.check_file, p),
+            "python": _verdict(AGS4.check_file, p),
+        }
     print(json.dumps(out, indent=2, sort_keys=True))
 
 
@@ -116,4 +128,6 @@ def test_documented_divergence_holds(name):
         f"  expected {spec['python']}\n  got      {got_python}"
     )
     # The divergence must still BE a divergence (guards against silent closure).
-    assert got_compat != got_python, f"{name}: divergence closed — update EXPECTED + OBSERVATIONS"
+    assert got_compat != got_python, (
+        f"{name}: divergence closed — update EXPECTED + OBSERVATIONS"
+    )

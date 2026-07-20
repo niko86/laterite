@@ -45,8 +45,8 @@ laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # S3b (release/v0.1.0-prep): pure-string AGS modules from laterite-ags4-core —
 # registry, ags_types, transport, ddl, ags4_codec, ags4_writer, error.
-# No DuckDB. The DuckDB-bound ags5db_fns + typed_graph read/write live in the
-# separate `laterite-py-ags5` cdylib, which was decoupled to the dormant
+# No DuckDB. The DuckDB-bound function module + typed_graph read/write live in
+# the separate `laterite-py-ags5` cdylib, which was decoupled to the dormant
 # `ags5/` holding folder (#177) — the base wheel ships AGS4-only.
 laterite-ags4-core = { path = "../laterite-ags4-core" }
 # The certificate trust model — ONE decision about whether a cert may stand in for
@@ -99,6 +99,12 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # NaiveDate / NaiveTime so `parse_value` returns native Python
 # datetime/date/time objects.
 chrono = "0.4"
+# Already compiled transitively via laterite-ags4-parse; named as a DIRECT dep so the
+# `--dict` overlay helper (#568) can spell `&'static encoding_rs::Encoding` and resolve the
+# source encoding once, in the caller, instead of re-resolving the label inside. A direct
+# dep costs nothing at build/link time (the crate is already in the tree) — it just lets
+# this crate name a type it now legitimately uses. (Revived from the reliquary in #568.)
+encoding_rs = "0.8"
 
 # Used only by build.rs (Stage F2b-1 typed-graph codegen): consumes the
 # reference leaf's `union` module (union_groups()) to emit OUT_DIR/typed_groups.rs
@@ -107,3 +113,6 @@ chrono = "0.4"
 # JSON parsing here any more, so serde_json is no longer a build-dependency.
 [build-dependencies]
 laterite-ags4-reference = { path = "../laterite-ags4-reference" }
+
+[lints]
+workspace = true

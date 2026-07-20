@@ -1,8 +1,10 @@
 # what this shows: laterite.diff(a, b) — a KEY-aware, type-aware revision diff between two AGS4 texts.
+from pathlib import Path
+
 import laterite
 
 # Two revisions of the same submission, differing in one PROJ cell (PROJ_NAME).
-baseline = open("examples/sample_site.ags").read()
+baseline = Path("examples/sample_site.ags").read_text()
 revision = baseline.replace(
     "laterite demo site (synthetic starter - replace me)",
     "laterite demo site (Rev B)",

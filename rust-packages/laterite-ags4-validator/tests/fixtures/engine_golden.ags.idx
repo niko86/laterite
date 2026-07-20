@@ -1,0 +1,65 @@
+{
+  "version": 2,
+  "file": {
+    "size": 726,
+    "sha256": "808577e41d6608a7044b6d6e79e5822c050c339f57d4a71d83c3888207197198",
+    "etag": null,
+    "last_modified": null
+  },
+  "validation": {
+    "validator": "laterite_ags4",
+    "engine": "5f725e53c36f7074",
+    "compat": null,
+    "checked_at": "2026-07-16T20:52:37.339043+00:00",
+    "edition": {
+      "mode": "auto",
+      "resolved": "4.2",
+      "resolution": "exact"
+    },
+    "encoding": "UTF-8",
+    "errors": {
+      "state": "measured",
+      "count": 0
+    },
+    "warnings": {
+      "state": "measured",
+      "count": 0
+    },
+    "fyi": {
+      "state": "measured",
+      "count": 0
+    }
+  },
+  "groups": {
+    "PROJ": [
+      [
+        0,
+        151
+      ]
+    ],
+    "TRAN": [
+      [
+        151,
+        443
+      ]
+    ],
+    "TYPE": [
+      [
+        564,
+        726
+      ]
+    ],
+    "UNIT": [
+      [
+        443,
+        564
+      ]
+    ]
+  },
+  "order": [
+    "PROJ",
+    "TRAN",
+    "UNIT",
+    "TYPE"
+  ]
+}

@@ -2,7 +2,7 @@
 //!
 //! This is the de-duplication of code that was previously copied
 //! verbatim between `lat` and `ags4-corpus-qa` (and is mirrored
-//! again in `ags5db`/`ags5db`, which stays on its own copy for now —
+//! again in another workspace CLI, which stays on its own copy for now —
 //! it's binary-only with no lib target). The behaviour here is
 //! deliberately byte-identical to those copies so all the CLIs in the
 //! toolkit "look and feel like one tool": the same `indicatif`
@@ -25,7 +25,7 @@ use comfy_table::{Attribute, Cell, Color, ContentArrangement, Table, presets::UT
 use serde_json::Value;
 
 /// The `Ctx` + `Report` + `emit` + `Plan` report-document scaffold
-/// (the gogcli/ags5db output contract), lifted here from
+/// (the CLI output contract), lifted here from
 /// `ags4-corpus-qa/src/output.rs` so every CLI shares one copy.
 pub mod report;
 
@@ -52,7 +52,8 @@ pub enum OutputMode {
 
 impl OutputMode {
     /// `table` in a TTY, `ndjson` when piped — agent-friendly with no
-    /// flag (the ags5db / cli-printing-press auto-JSON convention).
+    /// flag (the auto-JSON convention shared with cli-printing-press).
+    #[must_use]
     pub fn auto() -> Self {
         if io::stdout().is_terminal() {
             Self::Table
@@ -65,9 +66,10 @@ impl OutputMode {
 // --- colour gate ------------------------------------------------------
 
 /// Off when `no_color` is set, the `NO_COLOR` env var is present, or
-/// stdout isn't a TTY — the convention every Unix tool uses. `ags5db`
-/// and `lat` use the env+TTY form; the explicit `no_color`
+/// stdout isn't a TTY — the convention every Unix tool uses. `lat`
+/// and its sibling CLIs use the env+TTY form; the explicit `no_color`
 /// argument lets a CLI with a `--no-color` flag fold it in.
+#[must_use]
 pub fn colour_enabled(no_color: bool) -> bool {
     !no_color && std::env::var_os("NO_COLOR").is_none() && io::stdout().is_terminal()
 }
@@ -78,6 +80,7 @@ pub fn colour_enabled(no_color: bool) -> bool {
 /// header, alternating dim data rows, dynamic column arrangement.
 /// `use_color` off → no ANSI (for files / piped / `NO_COLOR`).
 /// `headers` then `rows` of equal width.
+#[must_use]
 pub fn styled_table(headers: &[&str], rows: Vec<Vec<String>>, use_color: bool) -> Table {
     let mut t = Table::new();
     t.load_preset(UTF8_FULL)
@@ -127,6 +130,7 @@ enum Kind {
 }
 
 impl Spinner {
+    #[must_use]
     pub fn start(msg: &str, quiet: bool) -> Self {
         if quiet {
             return Self { inner: Kind::Quiet };
@@ -163,6 +167,7 @@ impl Drop for Spinner {
 
 /// A determinate bar for batch passes (live on a stderr TTY, hidden
 /// otherwise — i.e. piped/CI/`--quiet`). `len` items.
+#[must_use]
 pub fn progress_bar(len: u64, quiet: bool) -> indicatif::ProgressBar {
     if quiet || !io::stderr().is_terminal() {
         return indicatif::ProgressBar::hidden();
@@ -205,6 +210,7 @@ enum MultiKind {
 impl MultiLine {
     /// `lines` worker lines under `header`. Gating mirrors
     /// [`Spinner::start`] exactly.
+    #[must_use]
     pub fn start(header: &str, lines: usize, quiet: bool) -> Self {
         if quiet {
             return Self {
@@ -289,6 +295,7 @@ impl Drop for MultiLine {
 /// stderr isn't a terminal (piped/CI) or the size is unknown. Used to
 /// fit a live progress label to the real width instead of a fixed
 /// cap. `console` is an indicatif transitive dep — no new surface.
+#[must_use]
 pub fn term_cols() -> Option<usize> {
     // console::Term::size_checked() → Some((rows, cols)).
     console::Term::stderr()
@@ -335,8 +342,8 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
 
 // --- coloured JSON ----------------------------------------------------
 
-// Rich-style JSON token palette — identical to laterite-ags5-db/src/output.rs
-// so every CLI's JSON output is visually the same.
+// Rich-style JSON token palette — identical across every CLI in the
+// workspace so their JSON output is visually the same.
 const C_RESET: &str = "\x1b[0m";
 const C_KEY: &str = "\x1b[1;36m"; // bold cyan
 const C_STRING: &str = "\x1b[32m"; // green
@@ -526,7 +533,7 @@ mod tests {
 
     #[test]
     fn readme_arg_present_detects_flag_before_double_dash() {
-        let v = |xs: &[&str]| readme_arg_present(xs.iter().map(|s| s.to_string()));
+        let v = |xs: &[&str]| readme_arg_present(xs.iter().map(std::string::ToString::to_string));
         assert!(v(&["--readme"]));
         assert!(v(&["validate", "--quiet", "--readme"]));
         assert!(!v(&["validate", "--quiet"]));

@@ -138,39 +138,18 @@ cross-surface toolchain on top:
 | Typed PROJ → LOCA → SAMP graph | ✅ | — |
 | Shipped as a standalone binary CLI | ✅ (`lat`) | — |
 
-The two agree on the findings that matter — the drop-in is faithful, not just
-fast (see [Parity](#parity-with-python-ags4)).
+laterite reports the same findings as `python-ags4`, with 10 documented
+exceptions (see [Parity](#parity-with-python-ags4)).
 
 ## Performance
 
-Validation throughput vs `python-ags4` 1.2.0, on synthetic AGS4 files
-of increasing size. Wall-clock after warmup, macOS arm64. All four
-laterite paths agree on the **same findings** here, matching
-`python-ags4`'s on these files — speed not at the cost of diagnostic
-coverage. (The [Parity](#parity-with-python-ags4) section has the full
-comparison: 122 / 131 of python-ags4's own test suite, divergences
-documented.)
-
-The files are LOCA-heavy (40-column real-schema LOCA group, with
-`ID`/`PA`/`2DP`/`DT` TYPE columns) generated in two profiles:
-
-**Clean** — values pre-formatted to match their declared TYPE
-exactly (2DP rounded to 2 decimals, valid `yyyy-mm-dd` dates).
-Real-world files look closer to this. ~15 baseline findings from
-fixed-cost rules:
-
-| Size | python-ags4 | `laterite.validate` | `lat` (CLI) | speedup |
-|---:|---:|---:|---:|---:|
-|   512 KB |    84 ms |   **5 ms** |   10 ms | **17×** |
-|     5 MB |   489 ms |  **57 ms** |   61 ms |  **9×** |
-|    50 MB |   5.27 s |  **0.62 s** | 0.64 s |  **8×** |
-|   500 MB |  53.43 s |  **6.5 s** |  6.6 s |  **8×** |
-|     1 GB | 117.27 s | **15.1 s** |  16.5 s |  **8×** |
-
-**Worst case** — same files but with floating-point noise in
-numeric cells that fails AGS4 Rule 8 (TYPE precision). Every cell
-triggers a finding; exercises the validator's per-finding
-accumulation + output-rendering paths fully:
+Validation throughput vs `python-ags4` 1.2.0, on synthetic AGS4 files of
+increasing size (wall-clock after warmup, macOS arm64). The files are
+LOCA-heavy — a 40-column real-schema LOCA group with `ID`/`PA`/`2DP`/`DT`
+columns — carrying floating-point noise in the numeric cells that fails
+AGS4 Rule 8, so **every cell triggers a finding**. This is the worst case:
+it exercises the validator's per-finding accumulation and output-rendering
+paths in full. laterite reports the same findings as `python-ags4` here.
 
 | Size | python-ags4 | `laterite.validate` | `lat` (CLI) | Findings | speedup |
 |---:|---:|---:|---:|---:|---:|
@@ -201,15 +180,13 @@ ns/byte for python-ags4.
 
 ## Parity with python-ags4
 
-122 / 131 of python-ags4 1.2.0's own test suite passes through
-`laterite.compat` (93 %). The 9 remaining are deliberate non-closures.
-Full breakdown:
+121 / 131 of python-ags4 1.2.0's own test suite passes through
+`laterite.compat` (92 %). The 10 remaining are deliberate non-closures,
+documented rule by rule:
 
-- [COMPAT.md](COMPAT.md) — rule-by-rule differences with rationale
-- [OBSERVATIONS.md](OBSERVATIONS.md) — the engineering record (every
-  observation, 5-field house style)
-- [docs/parity-coverage-map.md](docs/parity-coverage-map.md) — test-
-  level map of laterite ↔ python-ags4
+- [COMPAT.md](COMPAT.md) — the rule-by-rule differences and why
+- [docs/parity-coverage-map.md](docs/parity-coverage-map.md) — the
+  test-level map of laterite ↔ python-ags4
 
 The validator is **clean-room** — every rule written from the AGS4 spec,
 not copied from python-ags4 (LGPL-3.0) source — which is what lets laterite

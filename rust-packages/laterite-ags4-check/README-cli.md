@@ -30,20 +30,30 @@ with no Python at runtime. The `validate` capability is what `python-ags4`'s
 
 ## Global options
 
-    --json            machine-readable findings (pretty JSON)
-    --ndjson          one flat JSON object per finding per line
     --quiet           suppress the progress spinner
+
+`--json` / `--ndjson` are per-verb, not global: a verb that renders a report
+declares them, one that cannot never sees the flag. `validate` takes both;
+`read` / `diff` / `merge` / `fix` / `rules` take `--json`. The verbs with no
+report (certify / pack / unpack / lock / unlock / excel) reject them.
 
 ## validate <file>
 
     --dict-version <V>   bundled edition: auto (default — picked from the file's
-                         TRAN_AGS) | 4.0.3 | 4.0.4 | 4.1 | 4.1.1 | 4.2
-    --dict <path>        external dictionary override (not supported)
+                         TRAN_AGS) | 4.0.3 | 4.0.4 | 4.1 | 4.1.1 | 4.2.
+                         With --dict, selects the overlay base.
+    --dict <path>        custom dictionary (.ags or JSON) layered over a base
+                         edition detected from the dictionary itself; overrides
+                         of standard definitions are honoured with a warning
+    --dict-replace       (with --dict) treat it as a FULL REPLACEMENT — no base
+                         edition contributes (cannot combine with --dict-version)
     --encoding <name>    source encoding: utf-8 (default) | cp1252 | latin1 |
                          iso-8859-1 | iso-8859-15 (latin1 ≈ Windows-1252)
     --no-warnings        errors only — suppress the WARNING tier (shown by default)
     --show-fyi           include FYI-severity findings (e.g. Rule 1)
     --check-files        also run Rule 20's on-disk FILE/<fset>/<name> check
+    --json               machine-readable findings (pretty JSON)
+    --ndjson             one flat JSON object per finding per line
     --out <path>         write the active format to <path> instead of stdout
     --json-out <path>    also tee the JSON report to <path>
     --index <path>       CONSUME an .ags.idx: a fresh (bytes unchanged), same-
@@ -69,6 +79,8 @@ with no Python at runtime. The `validate` capability is what `python-ags4`'s
     --fix-out <path>     write the repaired file to <path>
                          (default: a sibling <file>.fixed.ags)
                          (also honours --dict-version / --dict / --encoding)
+    --json               machine-readable {file, dest, applied, residual} report
+                         (the file is written either way; exit 0 clean / 1 residual)
 
 ## diff <a> <b>
 
@@ -117,7 +129,7 @@ with no Python at runtime. The `validate` capability is what `python-ags4`'s
 
 ## transport — pack / unpack / lock / unlock
 
-    Package any file (`.ags`, `.ags5db`, anything) for storage or transfer.
+    Package any file (`.ags`, anything) for storage or transfer.
     `pack` / `unpack` are zstd; `lock` / `unlock` add an age passphrase envelope
     (zstd inside a standard age file — recoverable with stock `age` + `zstd`). The
     passphrase is NEVER a flag (argv leaks into `ps` + shell history): the

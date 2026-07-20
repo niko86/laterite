@@ -4,7 +4,13 @@
 // against the Rust binary in the repo's cross-surface gates; here we assert each
 // verb works and the exit codes follow the binary's scheme.
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,7 +18,13 @@ import { describe, expect, it } from "vitest";
 
 const pkgDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const BIN = join(pkgDir, "bin.mjs");
-const FIX = resolve(pkgDir, "..", "laterite-ags4-validator", "tests", "fixtures");
+const FIX = resolve(
+  pkgDir,
+  "..",
+  "laterite-ags4-validator",
+  "tests",
+  "fixtures",
+);
 const CLEAN = join(FIX, "clean_minimal.ags");
 
 function run(args: string[]): { stdout: string; stderr: string; code: number } {
@@ -20,7 +32,15 @@ function run(args: string[]): { stdout: string; stderr: string; code: number } {
   // execFileSync hands back stdout only — a test that cannot see stderr cannot tell a
   // certificate that fired from one that did nothing at all.
   const r = spawnSync("node", [BIN, ...args], { encoding: "utf8" });
-  return { stdout: r.stdout ?? "", stderr: r.stderr ?? "", code: r.status ?? 1 };
+  return {
+    // @types/node types stdout/stderr as string, but spawnSync yields null when
+    // the child fails to spawn — keep the guards (r.status is already null-typed).
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    stdout: r.stdout ?? "",
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    stderr: r.stderr ?? "",
+    code: r.status ?? 1,
+  };
 }
 
 describe("lat node CLI", () => {
@@ -62,14 +82,18 @@ describe("lat node CLI", () => {
   it("pack / unpack: lossless round-trip", () => {
     const dir = mkdtempSync(join(tmpdir(), "lat-cli-"));
     expect(run(["pack", CLEAN, join(dir, "p.zst")]).code).toBe(0);
-    expect(run(["unpack", join(dir, "p.zst"), join(dir, "back.ags")]).code).toBe(0);
+    expect(
+      run(["unpack", join(dir, "p.zst"), join(dir, "back.ags")]).code,
+    ).toBe(0);
     expect(readFileSync(join(dir, "back.ags"))).toEqual(readFileSync(CLEAN));
   });
 
   it("excel: export → import round-trip", () => {
     const dir = mkdtempSync(join(tmpdir(), "lat-cli-"));
     expect(run(["excel", CLEAN, join(dir, "o.xlsx")]).code).toBe(0);
-    expect(run(["excel", join(dir, "o.xlsx"), join(dir, "back.ags")]).code).toBe(0);
+    expect(
+      run(["excel", join(dir, "o.xlsx"), join(dir, "back.ags")]).code,
+    ).toBe(0);
   });
 
   it("exit codes follow the binary: missing → 3, ambiguous excel → 5, bad group → 4", () => {
@@ -105,7 +129,13 @@ describe("lat node CLI", () => {
   // These pin the verb's OUTPUT, not just its existence: the merged bytes and the
   // `--json` wire summary are contractually identical across all three launchers.
   describe("merge", () => {
-    const MFIX = resolve(pkgDir, "..", "laterite-ags4-merge", "tests", "fixtures");
+    const MFIX = resolve(
+      pkgDir,
+      "..",
+      "laterite-ags4-merge",
+      "tests",
+      "fixtures",
+    );
     const A = join(MFIX, "delivery_a.ags");
     const B = join(MFIX, "delivery_b.ags");
 
@@ -120,17 +150,20 @@ describe("lat node CLI", () => {
     const rulesFiring = (f: string): Set<string> => {
       const { stdout } = run(["validate", f, "--json"]);
       const findings = JSON.parse(stdout).findings as
-        | Record<string, unknown[]>
-        | { rule: string }[];
+        Record<string, unknown[]> | { rule: string }[];
       return new Set(
-        Array.isArray(findings) ? findings.map((x) => x.rule) : Object.keys(findings),
+        Array.isArray(findings)
+          ? findings.map((x) => x.rule)
+          : Object.keys(findings),
       );
     };
 
     it("--on-type-clash promote merges, and the result satisfies Rule 8", () => {
       const dir = mkdtempSync(join(tmpdir(), "lat-cli-"));
       const out = join(dir, "m.ags");
-      expect(run(["merge", A, B, "--out", out, "--on-type-clash", "promote"]).code).toBe(0);
+      expect(
+        run(["merge", A, B, "--out", out, "--on-type-clash", "promote"]).code,
+      ).toBe(0);
       // Promote zero-pads the coarser column to the greatest precision, so every
       // value still matches its declared TYPE. Rule 8 is the rule that would catch a
       // value which does not — its absence IS the guarantee.
@@ -144,7 +177,9 @@ describe("lat node CLI", () => {
     it("merge never makes a file worse — its findings are a subset of the inputs'", () => {
       const dir = mkdtempSync(join(tmpdir(), "lat-cli-"));
       const out = join(dir, "m.ags");
-      expect(run(["merge", A, B, "--out", out, "--on-type-clash", "promote"]).code).toBe(0);
+      expect(
+        run(["merge", A, B, "--out", out, "--on-type-clash", "promote"]).code,
+      ).toBe(0);
       const before = new Set([...rulesFiring(A), ...rulesFiring(B)]);
       for (const rule of rulesFiring(out)) {
         expect(before.has(rule), `merge INTRODUCED ${rule}`).toBe(true);
@@ -154,7 +189,14 @@ describe("lat node CLI", () => {
     it("--json uses the WIRE spelling `winner_file`, not the TS API's `winnerFile`", () => {
       const dir = mkdtempSync(join(tmpdir(), "lat-cli-"));
       const { stdout, code } = run([
-        "merge", A, B, "--out", join(dir, "m.ags"), "--on-type-clash", "promote", "--json",
+        "merge",
+        A,
+        B,
+        "--out",
+        join(dir, "m.ags"),
+        "--on-type-clash",
+        "promote",
+        "--json",
       ]);
       expect(code).toBe(0);
       const summary = JSON.parse(stdout);
@@ -175,7 +217,13 @@ describe("lat node CLI", () => {
     it("a typo'd mode is rejected, not silently treated as `error`", () => {
       const dir = mkdtempSync(join(tmpdir(), "lat-cli-"));
       const { code } = run([
-        "merge", A, B, "--out", join(dir, "m.ags"), "--on-type-clash", "promot",
+        "merge",
+        A,
+        B,
+        "--out",
+        join(dir, "m.ags"),
+        "--on-type-clash",
+        "promot",
       ]);
       expect(code).toBe(5); // bad args — NOT 6, which would look like a real clash
     });
@@ -213,7 +261,10 @@ describe("lat node CLI", () => {
       const f = JSON.parse(stdout).findings as unknown;
       return Array.isArray(f)
         ? f.length
-        : Object.values(f as Record<string, unknown[]>).reduce((n, v) => n + v.length, 0);
+        : Object.values(f as Record<string, unknown[]>).reduce(
+            (n, v) => n + v.length,
+            0,
+          );
     };
 
     it("is HONOURED, not merely accepted — it changes the findings", () => {
@@ -236,7 +287,10 @@ describe("lat node CLI", () => {
     it("`latin-9` works here too — it used to work only in the native binary", () => {
       const f = cp1252File();
       for (const label of ["latin9", "latin-9", "iso-8859-15"]) {
-        expect(run(["validate", f, "--encoding", label]).code, label).not.toBe(5);
+        expect(
+          run(["validate", f, "--encoding", label]).code,
+          `${label} must be accepted`,
+        ).not.toBe(5);
       }
     });
 
@@ -288,7 +342,13 @@ describe("lat node CLI — validate --index", () => {
 
   it("a fresh cert SKIPS the rule engine", () => {
     const { src, cert } = mint();
-    const { stderr, code } = run(["validate", src, "--index", cert, "--no-warnings"]);
+    const { stderr, code } = run([
+      "validate",
+      src,
+      "--index",
+      cert,
+      "--no-warnings",
+    ]);
     expect(code).toBe(0);
     // The proof. Without it this assertion would pass on a `--index` that did nothing.
     // The note says "rule engine skipped", never "not checked": a `--check-files` run
@@ -319,7 +379,13 @@ describe("lat node CLI — validate --index", () => {
     const other = join(mkdtempSync(join(tmpdir(), "lat-cert-")), "other.ags");
     writeFileSync(other, `${readFileSync(CLEAN, "utf8")}\r\n`);
 
-    const { stderr, code } = run(["validate", other, "--index", cert, "--no-warnings"]);
+    const { stderr, code } = run([
+      "validate",
+      other,
+      "--index",
+      cert,
+      "--no-warnings",
+    ]);
     expect(code).toBe(0);
     // NOT certified — the cert's SHA-256 is for another file's bytes.
     expect(stderr).not.toContain("rule engine skipped");

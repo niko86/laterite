@@ -9,9 +9,9 @@
 //! construction**, with no shared state: two independent reads of the same
 //! file agree on every id, which is exactly what lets a DuckDB table
 //! function join `read_ags(f,'SAMP')` to `read_ags(f,'LOCA')` across
-//! separate calls — and what would let two separately-written `.ags5db`
-//! files merge with no reconciliation (contrast the writer's random-UUID7 +
-//! lookup-table path in `laterite-ags5-db`, which *cannot* agree across
+//! separate calls — and what would let two separately-written database
+//! files merge with no reconciliation (contrast a writer using random
+//! UUID7 + lookup-table keys, which *cannot* agree across
 //! calls because the keys are minted from the clock + RNG).
 //!
 //! **Why hash the raw string, never the parsed value.** The parent stores a
@@ -25,6 +25,7 @@
 //! every host.
 
 use std::collections::HashMap;
+use std::hash::BuildHasher;
 
 use laterite_types::parse_value;
 use serde_json::Value;
@@ -37,6 +38,7 @@ use crate::union::{GroupDescriptor, Registry};
 /// "what identifies a row", so the content-addressed `_id` (via
 /// [`key_chain_values`]) and `laterite-ags4-diff`'s row matcher read the same
 /// list instead of each re-deriving it. Row-identity lives here, once.
+#[must_use]
 pub fn key_heading_names(g: &GroupDescriptor) -> Vec<&str> {
     g.key_headings().map(|h| h.name.as_str()).collect()
 }
@@ -47,9 +49,10 @@ pub fn key_heading_names(g: &GroupDescriptor) -> Vec<&str> {
 /// `[LOCA_ID, SAMP_TOP, SAMP_REF, SAMP_TYPE, SAMP_ID]`), so this *is* the
 /// full identifying tuple. Missing values resolve to `""` so a partial-key
 /// row can't silently alias a complete one.
-pub fn key_chain_values(
+#[must_use]
+pub fn key_chain_values<S: BuildHasher>(
     g: &GroupDescriptor,
-    row: &HashMap<String, String>,
+    row: &HashMap<String, String, S>,
 ) -> Vec<(String, String)> {
     g.key_headings()
         .map(|h| (h.name.clone(), value_of(row, &h.name)))
@@ -63,10 +66,11 @@ pub fn key_chain_values(
 /// `MOND_REF` where its parent `MONG` keys on `PIPE_REF`) a parent KEY name
 /// is absent from the child and resolves to `""`; such a `parent_id` will
 /// not match and is surfaced (see [`shared_keys`]) rather than fabricated.
-pub fn parent_chain_values(
+#[must_use]
+pub fn parent_chain_values<S: BuildHasher>(
     reg: &Registry,
     g: &GroupDescriptor,
-    row: &HashMap<String, String>,
+    row: &HashMap<String, String, S>,
 ) -> Option<Vec<(String, String)>> {
     let parent = reg.get(g.parent.as_deref()?)?;
     Some(
@@ -81,10 +85,10 @@ pub fn parent_chain_values(
 /// links a child to its parent). Empty ⇒ the relationship is unresolvable
 /// from the data (key drift with no shared name); the extension surfaces
 /// this in `ags_relationships` rather than emitting a dangling `parent_id`.
+#[must_use]
 pub fn shared_keys(reg: &Registry, g: &GroupDescriptor) -> Vec<String> {
-    let parent = match g.parent.as_deref().and_then(|p| reg.get(p)) {
-        Some(p) => p,
-        None => return Vec::new(),
+    let Some(parent) = g.parent.as_deref().and_then(|p| reg.get(p)) else {
+        return Vec::new();
     };
     let child: std::collections::HashSet<&str> =
         g.key_headings().map(|h| h.name.as_str()).collect();
@@ -97,10 +101,11 @@ pub fn shared_keys(reg: &Registry, g: &GroupDescriptor) -> Vec<String> {
 
 /// Both ids for a row in one pass: `(id, parent_id)`. `parent_id` is `None`
 /// for a root group.
-pub fn row_ids(
+#[must_use]
+pub fn row_ids<S: BuildHasher>(
     reg: &Registry,
     g: &GroupDescriptor,
-    row: &HashMap<String, String>,
+    row: &HashMap<String, String, S>,
 ) -> (Uuid, Option<Uuid>) {
     let id = content_id(&g.code, &key_chain_values(g, row));
     let parent_id = match (g.parent.as_deref(), parent_chain_values(reg, g, row)) {
@@ -152,6 +157,7 @@ where
 /// bits of `SHA-256(canonical_encode(...))`. `Uuid::new_v8` sets the version
 /// nibble to 8 (RFC 9562's custom/application version — the correct choice
 /// for app-defined deterministic UUIDs) and the RFC variant bits.
+#[must_use]
 pub fn content_id(group_code: &str, chain: &[(String, String)]) -> Uuid {
     let digest = Sha256::digest(canonical_encode(group_code, chain));
     let mut bytes = [0u8; 16];
@@ -218,6 +224,7 @@ const CONTENT_HASH_DOMAIN: &str = "\u{1f}CONTENT2";
 /// `2DP` vs as a string under `X`) and therefore NOT dedup. This is inherent to
 /// a per-row column — it cannot know what the other file declared — and it is
 /// exactly the disagreement `laterite-ags4-merge` exists to reconcile.
+#[must_use]
 pub fn content_hash(group_code: &str, cells: &[(&str, &str, &str, &str)]) -> Uuid {
     let mut triples: Vec<(String, String, String)> = cells
         .iter()
@@ -282,8 +289,8 @@ where
                     // A ragged/short row leaves a cell absent → "" → Null →
                     // omitted, which is the same outcome as a blank cell. That
                     // is the intended equivalence, not an accident.
-                    let unit = units.get(col).map(String::as_str).unwrap_or("");
-                    let ty = types.get(col).map(String::as_str).unwrap_or("");
+                    let unit = units.get(col).map_or("", String::as_str);
+                    let ty = types.get(col).map_or("", String::as_str);
                     (h.as_str(), unit, ty, cell(col, row).unwrap_or(""))
                 })
                 .collect();
@@ -300,10 +307,15 @@ where
 /// in (so a trailing empty key can't alias a shorter chain). This is the
 /// reason a plain `"\n\0"` join (the legacy `encode_shared_tuple`) is *not*
 /// reused: that join is not injective for arbitrary content.
+#[must_use]
 pub fn canonical_encode(group_code: &str, chain: &[(String, String)]) -> Vec<u8> {
     let mut out = Vec::with_capacity(8 + group_code.len() + chain.len() * 16);
     put_lp(&mut out, group_code);
-    out.extend_from_slice(&(chain.len() as u32).to_le_bytes());
+    // `chain` is one AGS4 group's KEY-heading tuple (a handful of entries by
+    // dictionary construction), nowhere near u32::MAX.
+    #[allow(clippy::cast_possible_truncation)]
+    let chain_len = chain.len() as u32;
+    out.extend_from_slice(&chain_len.to_le_bytes());
     for (name, value) in chain {
         put_lp(&mut out, name);
         put_lp(&mut out, value);
@@ -319,7 +331,12 @@ pub fn canonical_encode(group_code: &str, chain: &[(String, String)]) -> Vec<u8>
 fn content_encode(domain: &str, triples: &[(String, String, String)]) -> Vec<u8> {
     let mut out = Vec::with_capacity(8 + domain.len() + triples.len() * 24);
     put_lp(&mut out, domain);
-    out.extend_from_slice(&(triples.len() as u32).to_le_bytes());
+    // `triples` is one row's (heading, unit, value) tuples for a single AGS4
+    // group — bounded by that group's heading count (dictionary-bounded, a
+    // few dozen at most), nowhere near u32::MAX.
+    #[allow(clippy::cast_possible_truncation)]
+    let triples_len = triples.len() as u32;
+    out.extend_from_slice(&triples_len.to_le_bytes());
     for (name, unit, value) in triples {
         put_lp(&mut out, name);
         put_lp(&mut out, unit);
@@ -331,13 +348,17 @@ fn content_encode(domain: &str, triples: &[(String, String, String)]) -> Vec<u8>
 /// Read a KEY value from a row by name, trimmed; absent ⇒ `""`. The codec
 /// already trims on parse; trimming here keeps the key stable regardless of
 /// how the caller built the row.
-fn value_of(row: &HashMap<String, String>, name: &str) -> String {
+fn value_of<S: BuildHasher>(row: &HashMap<String, String, S>, name: &str) -> String {
     row.get(name)
         .map(|v| v.trim().to_string())
         .unwrap_or_default()
 }
 
 /// Append a length-prefixed string: `u32` LE byte length, then the bytes.
+// `s` is a group code, a heading name, or a single AGS4 field's cell value —
+// bounded by that field's own line, which (per the parse leaf's tokenizer)
+// cannot realistically reach u32::MAX bytes for real geotechnical data.
+#[allow(clippy::cast_possible_truncation)]
 fn put_lp(out: &mut Vec<u8>, s: &str) {
     out.extend_from_slice(&(s.len() as u32).to_le_bytes());
     out.extend_from_slice(s.as_bytes());
@@ -576,7 +597,7 @@ mod tests {
         let map: HashMap<String, String> = loca_h
             .iter()
             .cloned()
-            .zip(loca_rows[0].iter().map(|s| s.to_string()))
+            .zip(loca_rows[0].iter().map(std::string::ToString::to_string))
             .collect();
         let (id, parent) = row_ids(reg, reg.get("LOCA").unwrap(), &map);
         assert_eq!(loca_ids[0].0, id.to_string());

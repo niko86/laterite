@@ -25,6 +25,10 @@ pub enum Target {
     Group,
 }
 
+// serde's `skip_serializing_if` calls this as `fn(&Target) -> bool` — the
+// macro-generated call site fixes the by-ref signature, so a by-value fix
+// would not compile.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_default_target(t: &Target) -> bool {
     *t == Target::Line
 }
@@ -74,6 +78,7 @@ impl Severity {
     /// stop deriving it from `format!("{:?}").to_lowercase()` (a different code
     /// path that would silently diverge on any future multi-word variant). Gated
     /// against the serde rename in the tests below.
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Severity::Error => "error",
@@ -83,6 +88,8 @@ impl Severity {
     }
 }
 
+// Same serde-mandated by-ref signature as `is_default_target` above.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_error_severity(s: &Severity) -> bool {
     *s == Severity::Error
 }
@@ -108,6 +115,70 @@ pub struct Finding {
 /// Findings keyed by rule label, e.g. `"AGS Format Rule 8"`. `BTreeMap`
 /// keeps reports deterministic / diffable across runs.
 pub type Findings = BTreeMap<String, Vec<Finding>>;
+
+// --- the findings renderers -------------------------------------------
+//
+// ONE renderer per format, living next to the type it renders. The `lat`
+// binary, laterite-py and laterite-node each used to carry their own copy,
+// kept in sync only by "byte-identical to the binary's ndjson_string" /
+// "ported verbatim from laterite-py's findings_ndjson" comments — three
+// chances for `--json` to mean three different things (#530). They now all
+// call these.
+//
+// Key ORDER is part of the output contract and depends on serde_json's
+// `preserve_order` (declared in Cargo.toml — see the note there).
+
+/// The nested report value `{file, findings:{rule:[{line,group,desc}]}}`.
+/// Returned as a `Value` (not a string) because the CLI's `--json` stdout path
+/// renders it rich/coloured; `findings_json` is the plain-string form.
+#[must_use]
+pub fn findings_json_value(file: &str, found: &Findings) -> serde_json::Value {
+    use serde_json::{Map, Value};
+    let mut fmap = Map::new();
+    for (rule, items) in found {
+        // Serialize the engine `Finding` directly. Unset location/severity
+        // fields skip, so line-only findings stay `{line,group,desc}` and
+        // migrated ones additively gain the rich keys.
+        let arr: Vec<Value> = items
+            .iter()
+            .map(|f| serde_json::to_value(f).unwrap_or(Value::Null))
+            .collect();
+        fmap.insert(rule.clone(), Value::Array(arr));
+    }
+    let mut root = Map::new();
+    root.insert("file".into(), Value::from(file.to_string()));
+    root.insert("findings".into(), Value::Object(fmap));
+    Value::Object(root)
+}
+
+/// Pretty JSON of [`findings_json_value`] — the `--json` file/report form.
+#[must_use]
+pub fn findings_json(file: &str, found: &Findings) -> String {
+    serde_json::to_string_pretty(&findings_json_value(file, found)).unwrap_or_default()
+}
+
+/// One flat JSON object per finding per line (NDJSON). Stream/grep friendly,
+/// never coloured; empty (no lines) when there are zero findings.
+#[must_use]
+pub fn findings_ndjson(found: &Findings) -> String {
+    use serde_json::{Map, Value};
+    let mut s = String::new();
+    for (rule, items) in found {
+        for f in items {
+            // `rule`-first (the historical NDJSON key position), then splice in
+            // the serialized `Finding` body so line-only findings stay
+            // `{rule,line,group,desc}` byte-for-byte.
+            let mut o = Map::new();
+            o.insert("rule".into(), Value::from(rule.clone()));
+            if let Value::Object(body) = serde_json::to_value(f).unwrap_or(Value::Null) {
+                o.extend(body);
+            }
+            s.push_str(&serde_json::to_string(&Value::Object(o)).unwrap_or_default());
+            s.push('\n');
+        }
+    }
+    s
+}
 
 /// Append a finding under `rule`, creating the bucket on first use.
 /// Rule modules call this rather than poking the map directly so the
@@ -160,6 +231,7 @@ pub fn count(findings: &Findings) -> usize {
 /// the full rule labels as stored (`"AGS Format Rule 8"`); the values
 /// sum to [`count`]. Additive convenience for summary/stats views (the
 /// `--tui` browser); does not change any existing behaviour.
+#[must_use]
 pub fn count_by_rule(findings: &Findings) -> Vec<(&str, usize)> {
     findings
         .iter()
@@ -203,8 +275,8 @@ mod tests {
     /// Byte-identity guard: a line-only finding (via `add`) must still
     /// serialize as exactly `{"line":…,"group":…,"desc":…}` — no
     /// `target`/`severity`/etc. keys — so the historical JSON shape is
-    /// preserved for every rule not yet migrated to `add_at`. serde_json
-    /// is a dev-only dep here; the engine itself owns no serde_json.
+    /// preserved for every rule not yet migrated to `add_at`. `serde_json`
+    /// is a dev-only dep here; the engine itself owns no `serde_json`.
     #[test]
     fn line_only_finding_serializes_minimally() {
         let mut f = Findings::new();

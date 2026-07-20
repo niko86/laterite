@@ -20,11 +20,19 @@ path = "src/lib.rs"
 
 [build-dependencies]
 # ENGINE_FINGERPRINT: a build-time SHA-256 over the rule sources + the bundled
-# dictionary/catalogue, so a certificate can name the engine that minted it by
-# what that engine ACTUALLY IS, not by a hand-bumped CARGO_PKG_VERSION that a
-# rule edit can leave behind. Build-only — never linked into the library, so the
-# lean runtime dep-graph guarantee (no pyo3/polars/walkdir/rayon/ratatui) holds.
-sha2 = "0.11"
+# dictionary/catalogue + every in-workspace crate the verdict runs through, so a
+# certificate can name the engine that minted it by what that engine ACTUALLY IS,
+# not by a hand-bumped CARGO_PKG_VERSION that a rule edit can leave behind.
+# Build-only — never linked into the library, so the lean runtime dep-graph
+# guarantee (no pyo3/polars/walkdir/rayon/ratatui) holds.
+sha2 = "0.10"
+# Reads THIS manifest's `[dependencies]` to discover the in-workspace path deps to
+# cover (#550) — a hand-written file list is exactly how the fingerprint came to
+# miss the crates that decide Rule 8, field boundaries, and the edition tables.
+# Build-only, same as sha2. A hand-rolled scan would be smaller but would re-create
+# the failure this whole crate is about: a parser that quietly matches less than it
+# should, hashing fewer files while still emitting a confident digest.
+toml = "1"
 
 [dependencies]
 # The phf-projected dictionary (Dictionary/DictVersion/dictionary_dto/…),
@@ -32,7 +40,17 @@ sha2 = "0.11"
 # non-validator consumers (the DuckDB extension, laterite-ags4-diff) can
 # depend on the dictionary without pulling the rest of the rule engine.
 laterite-ags4-reference = { path = "../laterite-ags4-reference" }
-thiserror = "1"
+# The AGS type-system leaf: Rule 8 + the fixes engine re-export its numeric
+# expected-forms (format_ndp/format_nsf/format_nsci) instead of hand-porting
+# them, so the formatter that JUDGES a typed value is the same one that WRITES
+# it via ags4_str (#528 — the port agreed but nothing gated it). Costs nothing:
+# already in this crate's build graph transitively via laterite-ags4-reference,
+# and its only deps are chrono (the same minimal std-only build listed below)
+# + serde_json (already linked transitively — see the serde note). Arrow is
+# OPTIONAL in that crate and stays off here, so the lean/wasm-safe dep-graph
+# guarantee (no pyo3|polars|walkdir|rayon|ratatui) is untouched.
+laterite-types = { path = "../laterite-types" }
+thiserror = "2"
 # Rule 1 risky fix: transliterate any non-ASCII character to a sensible ASCII
 # equivalent (µ→"u", °→"deg", ß→"ss", accents→base letter) so a file can be
 # folded Rule-1-clean without a corpus-biased hand map. Pure-Rust static table,
@@ -47,7 +65,7 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # Rule 8 DT/T validity: pandas-equivalent calendar/clock checking
 # (python-ags4 uses pandas.to_datetime). default-features off keeps it
 # lean — no clock, no serde; just the Naive parsers. Already in the
-# workspace lockfile via ags5db, so no new external surface.
+# workspace lockfile via other crates, so no new external surface.
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 # Stage 7b: non-UTF-8 file encodings (cp1252 / latin1 / iso-8859-x) —
 # Mozilla's encoding_rs is the standard way to do this in Rust. The
@@ -57,17 +75,27 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 # (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee
 # is unchanged.
 encoding_rs = "0.8"
-# serde: deliberate lean/wasm-safe inclusion — derive only. This crate's own
-# code does no JSON serialization (bindings/CLIs own that), so it takes no
-# DIRECT serde_json dep. It does, however, LINK serde_json transitively: since
-# #475 the dictionary + rules catalogue live in laterite-ags4-reference, which
-# parses its two bundled JSON files. So "the validator's build has no
-# serde_json" is no longer true, even though "the validator's code writes no
-# JSON" still is — don't avoid serde_json here on dep-weight grounds; it is
-# already compiled in. derive-only is zero runtime cost and compiles clean on
-# wasm32 (as does serde_json). Neither is on the lean-dep guard list
-# (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee holds.
+# serde: deliberate lean/wasm-safe inclusion — derive only, for `Finding`.
 serde = { version = "1", features = ["derive"] }
+# serde_json: this crate RENDERS its own findings (`findings::findings_json` /
+# `findings_ndjson`). It used to be a rule that "bindings/CLIs own
+# serialization" and this crate wrote no JSON — but that rule is exactly what
+# produced THREE hand-copied renderers (the CLI's render.rs, laterite-py's and
+# laterite-node's, synced only by "byte-identical"/"ported verbatim" comments),
+# so #530 moved the renderer next to the type it renders and the copies were
+# deleted. Costs nothing: serde_json already rode into this crate's build
+# transitively via laterite-ags4-reference (#475), which parses its two bundled
+# JSON files; it compiles clean on wasm32 and is not on the lean-dep guard list
+# (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee holds.
+#
+# `preserve_order` is LOAD-BEARING, not a preference: the NDJSON object is built
+# `rule`-first and then splices in the serialized Finding body, and the report
+# root is `{file, findings}`. Without insertion order, serde_json::Map sorts
+# alphabetically and BOTH key orders change — i.e. the rendered bytes change.
+# Every consumer (laterite-ags4-check, laterite-py, laterite-node) already
+# enables it, so today it arrives by feature unification; declaring it here
+# makes the guarantee explicit instead of accidental.
+serde_json = { version = "1", features = ["preserve_order"] }
 
 [dev-dependencies]
 # Perf guard: bench check_file on the 23 MB workspace fixture. The
@@ -82,13 +110,8 @@ criterion = "0.8"
 # workspace lockfile via ags4-corpus-qa → the library's lean dep-graph
 # guarantee (no walkdir/rayon/ratatui) is untouched.
 tempfile = "3"
-# serde_json: a DIRECT dep only for tests — the findings.rs byte-identity test
-# serializes a Finding and asserts the exact JSON string. The engine's own code
-# writes no JSON (bindings/CLIs do their own serialization). Note this is about
-# *usage*, not dep weight: serde_json already rides into the normal build
-# transitively via laterite-ags4-reference (#475), so listing it here costs
-# nothing — see the note on `serde` above.
-serde_json = "1"
+# (serde_json is a normal dependency now — see the note above — so the
+# findings.rs byte-identity tests reach it without a dev-dep entry.)
 # Property-based tests: the AGS4 field splitter round-trip + field_span
 # char-offset stability + the Rule 8 format↔validate inverses. DEV-ONLY;
 # proptest's rand pull never reaches the lean runtime dep-graph
@@ -105,3 +128,6 @@ laterite-ags4-core = { path = "../laterite-ags4-core" }
 [[bench]]
 name = "validate_large_fixture"
 harness = false
+
+[lints]
+workspace = true

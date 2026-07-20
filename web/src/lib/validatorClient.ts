@@ -15,26 +15,89 @@ import type {
   StandardDict,
   TypeClashMode,
 } from "./validator";
-import type { WorkerReq, WorkerRes, ReportMeta } from "./validator.worker";
+import type {
+  WorkerReq,
+  WorkerRes,
+  ReportMeta,
+  CensorTally,
+} from "./validator.worker";
 import type { GroupMeta } from "./duckTypes";
 
 type Pending =
-  | { kind: "report"; resolve: (r: ValidationReport) => void; reject: (e: Error) => void }
-  | { kind: "cert"; resolve: (json: string) => void; reject: (e: Error) => void }
-  | { kind: "gzip"; resolve: (r: GzipResult) => void; reject: (e: Error) => void }
+  | {
+      kind: "report";
+      resolve: (r: ValidationReport) => void;
+      reject: (e: Error) => void;
+    }
+  | {
+      kind: "cert";
+      resolve: (json: string) => void;
+      reject: (e: Error) => void;
+    }
+  | {
+      kind: "gzip";
+      resolve: (r: GzipResult) => void;
+      reject: (e: Error) => void;
+    }
   | { kind: "fixes"; resolve: (r: Fix[]) => void; reject: (e: Error) => void }
-  | { kind: "applied"; resolve: (r: Uint8Array) => void; reject: (e: Error) => void }
-  | { kind: "parsed"; resolve: (g: GroupMeta[]) => void; reject: (e: Error) => void }
-  | { kind: "arrow"; resolve: (b: Uint8Array) => void; reject: (e: Error) => void }
-  | { kind: "revisionDelta"; resolve: (d: RevisionDelta) => void; reject: (e: Error) => void }
-  | { kind: "mergeResult"; resolve: (r: MergeConversion) => void; reject: (e: Error) => void }
-  | { kind: "dictionary"; resolve: (d: StandardDict) => void; reject: (e: Error) => void }
-  | { kind: "toAgs4"; resolve: (r: ExportResult) => void; reject: (e: Error) => void }
-  | { kind: "excel"; resolve: (r: ExcelConversion) => void; reject: (e: Error) => void };
+  | {
+      kind: "applied";
+      resolve: (r: Uint8Array) => void;
+      reject: (e: Error) => void;
+    }
+  | {
+      kind: "parsed";
+      resolve: (g: GroupMeta[]) => void;
+      reject: (e: Error) => void;
+    }
+  | {
+      kind: "arrow";
+      resolve: (b: Uint8Array) => void;
+      reject: (e: Error) => void;
+    }
+  | {
+      kind: "revisionDelta";
+      resolve: (d: RevisionDelta) => void;
+      reject: (e: Error) => void;
+    }
+  | {
+      kind: "mergeResult";
+      resolve: (r: MergeConversion) => void;
+      reject: (e: Error) => void;
+    }
+  | {
+      kind: "censor";
+      resolve: (r: CensorResult) => void;
+      reject: (e: Error) => void;
+    }
+  | {
+      kind: "dictionary";
+      resolve: (d: StandardDict) => void;
+      reject: (e: Error) => void;
+    }
+  | {
+      kind: "toAgs4";
+      resolve: (r: ExportResult) => void;
+      reject: (e: Error) => void;
+    }
+  | {
+      kind: "excel";
+      resolve: (r: ExcelConversion) => void;
+      reject: (e: Error) => void;
+    };
 
 export interface GzipResult {
   bytes: ArrayBuffer;
   meta: ReportMeta;
+}
+
+/** A runtime custom AGS4 dictionary (#568) for `validate`/`certify`: raw `.ags` or
+ *  JSON `bytes` (the browser's only form — no filesystem), and `replace` to drop the
+ *  bundled base so the dict fully replaces the standard rather than overlaying it.
+ *  Omit the argument entirely to validate against the bundled edition. */
+export interface CustomDict {
+  bytes: Uint8Array;
+  replace?: boolean;
 }
 
 /** The result of an Excel conversion: the output file bytes (`.xlsx` for
@@ -74,10 +137,17 @@ export interface MergeConversion {
   revisions: MergeRevision[];
 }
 
-const worker = new Worker(
-  new URL("./validator.worker.ts", import.meta.url),
-  { type: "module" },
-);
+/** The result of an anonymise: the scrubbed file `text` (a `BlobPart` for
+ *  `downloadBlob`) plus the per-action `tally` (cells pseudonymised/blanked/
+ *  tokenised/bracket-stripped, and custom groups/columns dropped). */
+export interface CensorResult {
+  text: string;
+  tally: CensorTally;
+}
+
+const worker = new Worker(new URL("./validator.worker.ts", import.meta.url), {
+  type: "module",
+});
 
 let nextId = 1;
 const pending = new Map<number, Pending>();
@@ -91,6 +161,7 @@ const readyPromise = new Promise<void>((resolve, reject) => {
     if ("type" in msg && msg.type === "ready") {
       worker.removeEventListener("message", onInit);
       resolve();
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker messages are a runtime boundary; keep the explicit check though the type narrows to it
     } else if ("type" in msg && msg.type === "initError") {
       worker.removeEventListener("message", onInit);
       reject(new Error(msg.error));
@@ -131,6 +202,8 @@ worker.addEventListener("message", (e: MessageEvent<WorkerRes>) => {
     });
   } else if (msg.kind === "dictionary" && p.kind === "dictionary") {
     p.resolve(msg.dict);
+  } else if (msg.kind === "censor" && p.kind === "censor") {
+    p.resolve({ text: msg.text, tally: msg.tally });
   } else if (msg.kind === "toAgs4" && p.kind === "toAgs4") {
     p.resolve(msg.result);
   } else if (msg.kind === "excel" && p.kind === "excel") {
@@ -141,7 +214,9 @@ worker.addEventListener("message", (e: MessageEvent<WorkerRes>) => {
       rows: msg.rows,
     });
   } else {
-    p.reject(new Error(`unexpected ${msg.kind} response for ${p.kind} request`));
+    p.reject(
+      new Error(`unexpected ${msg.kind} response for ${p.kind} request`),
+    );
   }
 });
 
@@ -170,7 +245,7 @@ type ReqInit = DistributiveOmit<WorkerReq, "id">;
 function post(req: ReqInit, bytes: Uint8Array): number {
   const id = nextId++;
   const copy = bytes.slice().buffer;
-  worker.postMessage({ ...req, id, bytes: copy } as WorkerReq, [copy]);
+  worker.postMessage({ ...req, id, bytes: copy }, [copy]);
   return id;
 }
 
@@ -178,7 +253,7 @@ function post(req: ReqInit, bytes: Uint8Array): number {
 // held dataset). No transfer list.
 function postBare(req: ReqInit): number {
   const id = nextId++;
-  worker.postMessage({ ...req, id } as WorkerReq);
+  worker.postMessage({ ...req, id });
   return id;
 }
 
@@ -188,7 +263,7 @@ function postDual(req: ReqInit, a: Uint8Array, b: Uint8Array): number {
   const id = nextId++;
   const aCopy = a.slice().buffer;
   const bCopy = b.slice().buffer;
-  worker.postMessage({ ...req, id, aBytes: aCopy, bBytes: bCopy } as WorkerReq, [
+  worker.postMessage({ ...req, id, aBytes: aCopy, bBytes: bCopy }, [
     aCopy,
     bCopy,
   ]);
@@ -202,6 +277,7 @@ export function validate(
   includeFyi: boolean,
   encoding: EncodingOpt,
   maxPerRule: number | null,
+  dict?: CustomDict,
 ): Promise<ValidationReport> {
   return new Promise((resolve, reject) => {
     const id = post(
@@ -212,6 +288,8 @@ export function validate(
         includeFyi,
         encoding,
         maxPerRule,
+        dictBytes: dict?.bytes,
+        dictReplace: dict?.replace ?? false,
       },
       bytes,
     );
@@ -227,6 +305,7 @@ export function validateGzip(
   dictVersion: DictVersionOpt,
   includeFyi: boolean,
   encoding: EncodingOpt,
+  dict?: CustomDict,
 ): Promise<GzipResult> {
   return new Promise((resolve, reject) => {
     const id = post(
@@ -238,6 +317,8 @@ export function validateGzip(
         encoding,
         maxPerRule: null,
         gzip: true,
+        dictBytes: dict?.bytes,
+        dictReplace: dict?.replace ?? false,
       },
       bytes,
     );
@@ -252,6 +333,7 @@ export function certify(
   bytes: Uint8Array,
   dictVersion: DictVersionOpt,
   encoding: EncodingOpt,
+  dict?: CustomDict,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const id = post(
@@ -261,6 +343,8 @@ export function certify(
         dict: dictVersion === "auto" ? null : dictVersion,
         encoding,
         checkedAt: new Date().toISOString(),
+        dictBytes: dict?.bytes,
+        dictReplace: dict?.replace ?? false,
       },
       bytes,
     );
@@ -332,10 +416,15 @@ export function parseDataset(
 /** Pull one group's typed Arrow IPC stream (Uint8Array) from the worker-
  *  held dataset set by the last parseDataset(). `keys=true` includes the
  *  content-addressed `_id`/`_parent_id` columns — pass it when ingesting into
- *  duckdb-wasm so cross-group joins resolve (#303). */
-export function arrowIpc(code: string, keys = false): Promise<Uint8Array> {
+ *  duckdb-wasm so cross-group joins resolve (#303). `contentHash=true` appends
+ *  the trailing `_content_hash` value fingerprint, same opt-in shape (#448). */
+export function arrowIpc(
+  code: string,
+  keys = false,
+  contentHash = false,
+): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    const id = postBare({ kind: "arrowIpc", code, keys });
+    const id = postBare({ kind: "arrowIpc", code, keys, contentHash });
     pending.set(id, { kind: "arrow", resolve, reject });
   });
 }
@@ -399,6 +488,40 @@ export function mergeFiles(
       b,
     );
     pending.set(id, { kind: "mergeResult", resolve, reject });
+  });
+}
+
+/** Anonymise a file with the shared scrub engine (Tools → Anonymiser, #581) —
+ *  the same `laterite-ags4-censor` engine the corpus tool drives. `sensitiveJson`
+ *  is the classification SSOT text; `selectedCodes` (null = every classified
+ *  heading) restricts scrubbing to the user's ticked columns; `token` is the
+ *  replacement; `dropCustom` removes non-dictionary groups/columns;
+ *  `includeFreetext` tokenises descriptions instead of stripping `[units]`.
+ *  Resolves to the scrubbed text + the per-action tally. */
+export function censorFile(
+  bytes: Uint8Array,
+  opts: {
+    sensitiveJson: string;
+    selectedCodes: string[] | null;
+    token: string;
+    dropCustom: boolean;
+    includeFreetext: boolean;
+  },
+): Promise<CensorResult> {
+  return new Promise((resolve, reject) => {
+    const id = post(
+      {
+        kind: "censor",
+        bytes: new ArrayBuffer(0), // replaced inside post()
+        sensitiveJson: opts.sensitiveJson,
+        selectedCodes: opts.selectedCodes,
+        token: opts.token,
+        dropCustom: opts.dropCustom,
+        includeFreetext: opts.includeFreetext,
+      },
+      bytes,
+    );
+    pending.set(id, { kind: "censor", resolve, reject });
   });
 }
 

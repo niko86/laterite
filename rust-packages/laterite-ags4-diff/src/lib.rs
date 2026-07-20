@@ -202,7 +202,7 @@ fn diff_group(
             key_heading_names(g)
                 .iter()
                 .filter(|h| set_a.contains(**h) && set_b.contains(**h))
-                .map(|h| h.to_string())
+                .map(std::string::ToString::to_string)
                 .collect()
         })
         .unwrap_or_default();
@@ -231,37 +231,37 @@ fn diff_group(
 
     for row_a in &ga.rows {
         let k = row_key(row_a, &idx_a, &key_headings, keyed);
-        match b_by_key.get_mut(&k).and_then(|q| q.pop_front()) {
-            Some(bi) => {
-                matched_b[bi] = true;
-                let row_b = &gb.rows[bi];
-                let cells = changed_cells(
-                    code, &common, row_a, &idx_a, &ga.types, row_b, &idx_b, &gb.types, dict,
-                );
-                if !cells.is_empty() {
-                    changed += 1;
-                    if under_cap(&rows) {
-                        rows.push(RowDelta {
-                            kind: "changed",
-                            key: k,
-                            line_a: Some(row_a.line),
-                            line_b: Some(row_b.line),
-                            cells,
-                        });
-                    }
-                }
-            }
-            None => {
-                removed += 1;
+        if let Some(bi) = b_by_key
+            .get_mut(&k)
+            .and_then(std::collections::VecDeque::pop_front)
+        {
+            matched_b[bi] = true;
+            let row_b = &gb.rows[bi];
+            let cells = changed_cells(
+                code, &common, row_a, &idx_a, &ga.types, row_b, &idx_b, &gb.types, dict,
+            );
+            if !cells.is_empty() {
+                changed += 1;
                 if under_cap(&rows) {
                     rows.push(RowDelta {
-                        kind: "removed",
+                        kind: "changed",
                         key: k,
                         line_a: Some(row_a.line),
-                        line_b: None,
-                        cells: Vec::new(),
+                        line_b: Some(row_b.line),
+                        cells,
                     });
                 }
+            }
+        } else {
+            removed += 1;
+            if under_cap(&rows) {
+                rows.push(RowDelta {
+                    kind: "removed",
+                    key: k,
+                    line_a: Some(row_a.line),
+                    line_b: None,
+                    cells: Vec::new(),
+                });
             }
         }
     }
@@ -298,6 +298,7 @@ fn diff_group(
 /// parses both files; this neither parses nor serialises. `max_rows_per_group`
 /// caps how many per-row deltas each group carries (the `added`/`removed`/
 /// `changed` counts stay the true totals); `None` keeps everything.
+#[must_use]
 pub fn diff_parsed(
     a: &ParsedFile,
     b: &ParsedFile,
@@ -456,7 +457,7 @@ mod tests {
 
         let reg = registry();
         let mut mismatches: Vec<String> = Vec::new();
-        for &ed in DictVersion::ALL.iter() {
+        for &ed in DictVersion::ALL {
             let d = Dictionary::bundled(ed);
             let mut codes: Vec<&str> = d.group_codes().collect();
             codes.sort_unstable();
@@ -465,7 +466,7 @@ mod tests {
                     .get(code)
                     .map(|g| key_heading_names(g).into_iter().collect())
                     .unwrap_or_default();
-                for &h in d.group_headings(code) {
+                for &h in d.group_headings(code).iter() {
                     let old = d.heading(code, h).is_some_and(|e| e.status.contains("KEY"));
                     let new = union_keys.contains(h);
                     if old != new {

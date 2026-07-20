@@ -4,8 +4,10 @@ import laterite
 # the Report is on the .report property.
 ags = laterite.read("examples/sample_site.ags").validate()
 r = ags.report
-print(f"is_valid={r.is_valid} count={r.count} "
-      f"dict_version={r.dict_version!r} resolution={r.resolution!r}")
+print(
+    f"is_valid={r.is_valid} count={r.count} "
+    f"dict_version={r.dict_version!r} resolution={r.resolution!r}"
+)
 
 assert r.is_valid is True
 assert r.count == 0

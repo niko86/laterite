@@ -31,7 +31,7 @@ import mkdocs_gen_files
 # `catalogue_data` sits beside this script; runpy.run_path does not put the
 # script's dir on sys.path for a plain file, so add it explicitly.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import catalogue_data as cd  # noqa: E402
+import catalogue_data as cd
 
 # Dump the whole registry from a clean child interpreter (see module docstring).
 _DUMP = r"""
@@ -60,7 +60,9 @@ print(json.dumps(out))
 GROUPS: dict = json.loads(
     subprocess.run(
         [sys.executable, "-c", _DUMP],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout
 )
 
@@ -86,8 +88,7 @@ def _heading_rows(code: str, g: dict) -> str:
     for h in g["headings"]:
         jh = jh_by_name.get(h["name"])
         provs[h["name"]] = (
-            cd.heading_provenance(group_eds, jh, _ALL_EDS) if jh
-            else {"differs": False}
+            cd.heading_provenance(group_eds, jh, _ALL_EDS) if jh else {"differs": False}
         )
     show_eds = any(p.get("differs") for p in provs.values())
 
@@ -99,8 +100,12 @@ def _heading_rows(code: str, g: dict) -> str:
     rows = [head, sep]
     for h in g["headings"]:
         mark = " **(key)**" if h["is_key"] else ""
-        cells = [f"`{h['name']}`{mark}", h["status"], _type_cell(h["type"]),
-                 h["unit"] or ""]
+        cells = [
+            f"`{h['name']}`{mark}",
+            h["status"],
+            _type_cell(h["type"]),
+            h["unit"] or "",
+        ]
         if show_eds:
             p = provs[h["name"]]
             if p.get("added_in"):
@@ -123,8 +128,9 @@ for code in sorted(GROUPS):
     fam = cd.family(code)
     prov = cd.group_provenance(code)
     edlabel = cd.edition_label(prov)
-    index_rows.append((code, g["contents"], fam, g["parent"] or "—",
-                       len(g["headings"]), edlabel))
+    index_rows.append(
+        (code, g["contents"], fam, g["parent"] or "—", len(g["headings"]), edlabel)
+    )
 
     crumb = " → ".join(f"[{c}]({c}.md)" for c in reversed(g["ancestors"]))
     own = g["key_headings"]
@@ -137,22 +143,27 @@ for code in sorted(GROUPS):
     out.append("")
     if prov["added_in"]:
         out.append(f'!!! info "New in AGS {prov["added_in"]}"')
-        out.append(f"    This group was introduced in AGS edition "
-                   f"{prov['added_in']}.")
+        out.append(f"    This group was introduced in AGS edition {prov['added_in']}.")
         out.append("")
     elif prov["removed_in"]:
         out.append(f'!!! warning "Removed in AGS {prov["removed_in"]}"')
-        out.append(f"    This group was defined up to AGS {prov['span'][1]} and "
-                   f"removed in {prov['removed_in']}.")
+        out.append(
+            f"    This group was defined up to AGS {prov['span'][1]} and "
+            f"removed in {prov['removed_in']}."
+        )
         out.append("")
     out.append('!!! note "Key chain"')
     own_s = "`, `".join(own) if own else "(none)"
     if inh:
-        out.append(f"    Identified by `{own_s}`. Inherits "
-                   f"`{'`, `'.join(inh)}` from `{g['parent']}`.")
+        out.append(
+            f"    Identified by `{own_s}`. Inherits "
+            f"`{'`, `'.join(inh)}` from `{g['parent']}`."
+        )
     else:
-        out.append(f"    Identified by `{own_s}`. Root-level under the project "
-                   f"— inherits no parent key.")
+        out.append(
+            f"    Identified by `{own_s}`. Root-level under the project "
+            f"— inherits no parent key."
+        )
     out.append("")
     out.append(_heading_rows(code, g))
     out.append("")
@@ -163,8 +174,7 @@ for code in sorted(GROUPS):
         out.append("")
         out.append('<div class="grid cards" markdown>')
         out.append("")
-        for k in kids:
-            out.append(f"- [`{k['code']}`]({k['code']}.md) — {k['contents']}")
+        out.extend(f"- [`{k['code']}`]({k['code']}.md) — {k['contents']}" for k in kids)
         out.append("")
         out.append("</div>")
         out.append("")
@@ -177,27 +187,40 @@ for code in sorted(GROUPS):
 # (vanilla JS). Each card carries `data-family` so a click filters the table; the
 # href degrades to a jump to the table if JS is off. Families render in the
 # curated order from catalogue_data (not alphabetical).
-land = ["# Group catalogue", "",
-        f"All **{len(GROUPS)} AGS4 groups** — every group is one searchable, "
-        "deep-linkable page. Pick a family to filter, type in the box, or page "
-        "through the table (20 at a time). The **Editions** column shows the AGS "
-        "edition span each group covers — so a group added in 4.2, or removed in "
-        "4.2, stands out. The left sidebar lists them by family too.", "",
-        '<div class="grid cards" markdown>', ""]
+land = [
+    "# Group catalogue",
+    "",
+    f"All **{len(GROUPS)} AGS4 groups** — every group is one searchable, "
+    "deep-linkable page. Pick a family to filter, type in the box, or page "
+    "through the table (20 at a time). The **Editions** column shows the AGS "
+    "edition span each group covers — so a group added in 4.2, or removed in "
+    "4.2, stands out. The left sidebar lists them by family too.",
+    "",
+    '<div class="grid cards" markdown>',
+    "",
+]
 for fam, desc in cd.FAMILIES:
     n = sum(1 for r in index_rows if r[2] == fam)
     if not n:
         continue
     label = f"**{fam}** — {n} groups"
-    land.append(f'- [{label}](#group-table){{ data-family="{fam}" }}'
-                + (f'<br><small>{desc}</small>' if desc else ''))
-land += ["", "</div>", "",
-         '<div class="group-table" id="group-table" markdown>', "",
-         "| Code | Group | Family | Parent | Headings | Editions |",
-         "|---|---|---|:--|--:|:--|"]
+    land.append(
+        f'- [{label}](#group-table){{ data-family="{fam}" }}'
+        + (f"<br><small>{desc}</small>" if desc else "")
+    )
+land += [
+    "",
+    "</div>",
+    "",
+    '<div class="group-table" id="group-table" markdown>',
+    "",
+    "| Code | Group | Family | Parent | Headings | Editions |",
+    "|---|---|---|:--|--:|:--|",
+]
 for code, contents, fam, parent, n, edlabel in index_rows:
-    land.append(f"| [`{code}`]({code}.md) | {contents} | {fam} | "
-                f"{parent} | {n} | {edlabel} |")
+    land.append(
+        f"| [`{code}`]({code}.md) | {contents} | {fam} | {parent} | {n} | {edlabel} |"
+    )
 land += ["", "</div>"]
 with mkdocs_gen_files.open("reference/groups/index.md", "w") as fd:
     fd.write("\n".join(land))

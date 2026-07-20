@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
-use laterite_ags4_validator::{CheckOptions, DictVersion};
+use laterite_ags4_validator::{CheckOptions, DictVersion, overlay};
 
 use crate::cli::DictArgs;
 
@@ -29,37 +29,81 @@ pub fn apply_dict_args(mut opts: CheckOptions, d: &DictArgs) -> CheckOptions {
             // message below was already generated (`editions_joined`) while the arms
             // above it were not — so a new edition in ags_dictionary.json would have
             // produced a CLI that rejects `4.3` with a message advertising `4.3`.
-            other => match DictVersion::from_edition(other) {
-                Some(dv) => Some(dv),
-                None => {
+            other => {
+                if let Some(dv) = DictVersion::from_edition(other) {
+                    Some(dv)
+                } else {
                     eprintln!(
                         "error: --dict-version expects auto|{}, got {other:?}",
                         laterite_ags4_validator::editions_joined("|")
                     );
                     exit(5);
                 }
-            },
+            }
         };
     }
     if let Some(label) = d.encoding.as_deref() {
-        match resolve_encoding(label) {
-            Some(enc) => opts.encoding = enc,
-            None => {
-                // Name the labels AGS4 files actually turn up in, then say what the
-                // real rule is. The accepted set is every WHATWG label (via
-                // `Encoding::for_label`) plus the leaf's extra aliases, which is far
-                // too long to list and would rot the moment it was written down.
-                eprintln!(
-                    "error: --encoding {label:?} not recognised \
-                     (common: utf-8 / cp1252 / latin1 / iso-8859-1 / latin-9; \
-                     any WHATWG encoding label is accepted)"
-                );
-                exit(5);
-            }
+        if let Some(enc) = resolve_encoding(label) {
+            opts.encoding = enc;
+        } else {
+            // Name the labels AGS4 files actually turn up in, then say what the
+            // real rule is. The accepted set is every WHATWG label (via
+            // `Encoding::for_label`) plus the leaf's extra aliases, which is far
+            // too long to list and would rot the moment it was written down.
+            eprintln!(
+                "error: --encoding {label:?} not recognised \
+                 (common: utf-8 / cp1252 / latin1 / iso-8859-1 / latin-9; \
+                 any WHATWG encoding label is accepted)"
+            );
+            exit(5);
         }
     }
     if let Some(p) = d.dict.as_ref() {
-        opts.custom_dict = Some(p.clone());
+        // A forced base and "no base" cannot both hold.
+        if d.dict_replace && opts.dict_version.is_some() {
+            eprintln!(
+                "error: --dict-replace cannot be combined with --dict-version \
+                 (a forced base contradicts a full replacement)"
+            );
+            exit(5);
+        }
+        let bytes = match std::fs::read(p) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("error: cannot read --dict {}: {e}", p.display());
+                exit(5);
+            }
+        };
+        // With `--dict`, `--dict-version` (already folded into `opts.dict_version`
+        // above) selects the OVERLAY BASE rather than a bundled edition;
+        // `--dict-replace` drops the base entirely; otherwise the base is detected
+        // structurally from the dictionary itself (#568 §2).
+        let base = if d.dict_replace {
+            overlay::BaseSpec::Replace
+        } else if let Some(v) = opts.dict_version {
+            overlay::BaseSpec::Force(v)
+        } else {
+            overlay::BaseSpec::Auto
+        };
+        // Advisory label for the cert — the basename, never the path (#568 §4).
+        let name = p
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("custom-dict")
+            .to_string();
+        match overlay::parse_dict(
+            &bytes,
+            overlay::DictFormat::Auto,
+            opts.encoding,
+            base,
+            &name,
+        ) {
+            Ok(cd) => opts.custom_dict = Some(cd),
+            Err(e) => {
+                eprintln!("error: bad --dict {name}: {e}");
+                exit(5);
+            }
+        }
     }
     opts
 }
@@ -103,6 +147,7 @@ mod tests {
             let args = DictArgs {
                 dict_version: Some(dv.as_str().to_string()),
                 dict: None,
+                dict_replace: false,
                 encoding: None,
             };
             let opts = apply_dict_args(CheckOptions::default(), &args);
@@ -115,12 +160,13 @@ mod tests {
         }
     }
 
-    /// `auto` means "decide from TRAN_AGS", i.e. force nothing.
+    /// `auto` means "decide from `TRAN_AGS`", i.e. force nothing.
     #[test]
     fn auto_forces_no_edition() {
         let args = DictArgs {
             dict_version: Some("auto".to_string()),
             dict: None,
+            dict_replace: false,
             encoding: None,
         };
         assert_eq!(

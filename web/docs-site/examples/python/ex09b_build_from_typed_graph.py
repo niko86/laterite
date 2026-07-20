@@ -14,7 +14,9 @@ res = build_ags4(p)
 print("groups:", laterite.read(data=res.bytes).groups)
 print("findings:", len(res.findings))
 
-assert {"PROJ", "LOCA", "TRAN", "UNIT", "TYPE"}.issubset(laterite.read(data=res.bytes).groups)
+assert {"PROJ", "LOCA", "TRAN", "UNIT", "TYPE"}.issubset(
+    laterite.read(data=res.bytes).groups
+)
 assert not res.findings  # a valid file, no caveats
 
 # The managed child collection is append-only — reassigning it raises:

@@ -25,7 +25,11 @@ export const SampleLoader: Component<{
   };
 
   return (
-    <Disclosure summary="Or try a sample" count={SAMPLES.length} open={props.open}>
+    <Disclosure
+      summary="Or try a sample"
+      count={SAMPLES.length}
+      open={props.open}
+    >
       <div class="flex flex-col gap-2">
         <div class="flex flex-wrap gap-2">
           <For each={SAMPLES}>

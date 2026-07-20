@@ -15,7 +15,7 @@
 use laterite_ags4_parse::{ParsedFile, parse_bytes};
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, WorldScope, check_parsed_with_dict,
-    dict::Dictionary, dict::FALLBACK, findings, resolve_dict_version, tran_ags_of,
+    dict::Dictionary, dict::FALLBACK, findings, overlay, resolve_dict_version, tran_ags_of,
 };
 use laterite_types::sql_type;
 use serde::{Deserialize, Serialize};
@@ -95,6 +95,16 @@ struct ValidationReport {
     shown_count: usize,
     findings: Vec<RuleGroup>,
     error: Option<ValErr>,
+    /// Why a proffered `.ags.idx` certificate did NOT stand in for the rule engine,
+    /// as the stable snake_case token (`"dictionary_changed"`, `"content_changed"`,
+    /// …), else `null`. Present for cross-surface shape parity with `Report`
+    /// (laterite-py) and Node's `revalidateReason` (#568 Phase 6). **Structurally
+    /// always `null` here:** this surface has no cert-consume door — `validate`
+    /// re-runs the engine unconditionally (`certify` only *mints*), so no
+    /// certificate is ever offered to accept or reject. The field exists so a JS
+    /// consumer reads the same report shape on every surface, and is ready if a
+    /// wasm cert-consume path is ever added.
+    revalidate_reason: Option<String>,
 }
 
 impl ValidationReport {
@@ -110,6 +120,7 @@ impl ValidationReport {
                 kind: kind.to_string(),
                 message,
             }),
+            revalidate_reason: None,
         }
     }
 }
@@ -163,6 +174,45 @@ fn resolve_dict_override(s: Option<&str>) -> Result<Option<DictVersion>, String>
             )
         }),
     }
+}
+
+/// Build the runtime custom-dictionary overlay (#568) from browser-supplied bytes.
+///
+/// The wasm sandbox has no filesystem, so — unlike the CLI/Python/Node twins — this
+/// has no path arm: a custom dict always arrives as raw bytes (a `Uint8Array` the UI
+/// read from a file). `over` forces a base edition (from `dict_version`),
+/// `dict_replace` drops the base entirely, and the two cannot both hold (a forced
+/// base contradicts a full replacement). `enc` is the caller's already-resolved
+/// source encoding — the same one it hands `CheckOptions`.
+///
+/// Returns `Ok(None)` when no dict was supplied. The error is a short message the
+/// caller surfaces on the same channel a bad `dict_version` uses.
+fn build_custom_dict(
+    dict_bytes: Option<&[u8]>,
+    dict_replace: bool,
+    over: Option<DictVersion>,
+    enc: &'static encoding_rs::Encoding,
+) -> std::result::Result<Option<overlay::CustomDict>, String> {
+    let Some(bytes) = dict_bytes else {
+        return Ok(None);
+    };
+    if dict_replace && over.is_some() {
+        return Err("dict_replace cannot be combined with dict_version \
+             (a forced base contradicts a full replacement)"
+            .to_string());
+    }
+    let base = if dict_replace {
+        overlay::BaseSpec::Replace
+    } else if let Some(v) = over {
+        overlay::BaseSpec::Force(v)
+    } else {
+        overlay::BaseSpec::Auto
+    };
+    // The advisory name the cert records is a neutral label — never a filesystem path
+    // (the browser has none anyway), matching the in-memory-bytes arm on every surface.
+    overlay::parse_dict(bytes, overlay::DictFormat::Auto, enc, base, "custom-dict")
+        .map(Some)
+        .map_err(|e| format!("bad dict: {e}"))
 }
 
 // --- AGS4 production: `build_ags4` (the read path reversed) -----------------
@@ -510,9 +560,18 @@ mod build_ags4_tests {
 ///   wasm→JS boundary, not the full millions. The cap is purely on output:
 ///   every rule still runs over every line, and `finding_count` /
 ///   `RuleGroup.total` always report the true, uncapped counts.
+/// * `dict_bytes` — an optional custom AGS4 dictionary (`.ags` or JSON),
+///   supplied as raw bytes (#568). The browser has no filesystem, so — unlike
+///   `lat --dict <path>` — the dict always arrives in memory. `None` uses the
+///   bundled edition. A bespoke group declared here becomes first-class instead
+///   of being flagged as unknown.
+/// * `dict_replace` — with `dict_bytes`, drop the bundled base entirely (the dict
+///   fully replaces the standard) rather than overlaying on top of it. Contradicts
+///   a forced `dict_version`; supplying both is a `bad_dict` error.
 ///
 /// Returns a [`ValidationReport`] as a plain JS object (json-compatible:
 /// `None` → `null`, matching the CLI's `--json`).
+#[allow(clippy::too_many_arguments)] // the wasm surface mirrors lat's positional flags
 #[wasm_bindgen]
 pub fn validate(
     data: &[u8],
@@ -521,6 +580,8 @@ pub fn validate(
     include_fyi: bool,
     encoding_label: Option<String>,
     max_per_rule: Option<u32>,
+    dict_bytes: Option<Vec<u8>>,
+    dict_replace: bool,
 ) -> JsValue {
     console_error_panic_hook::set_once();
 
@@ -531,6 +592,8 @@ pub fn validate(
         include_fyi,
         encoding_label.as_deref(),
         max_per_rule.map(|c| c as usize),
+        dict_bytes.as_deref(),
+        dict_replace,
     );
     // json_compatible so the JS side sees plain objects + null (not Map
     // / undefined) — same shape the CLI emits.
@@ -559,21 +622,31 @@ pub fn validate(
 ///
 /// It also cannot record an on-disk `FILE/` check: the wasm sandbox has no filesystem, and
 /// the stamp no longer has a field in which to say otherwise.
+///
+/// `dict_bytes` / `dict_replace` mint the certificate against a custom dictionary
+/// (#568), the same overlay `validate` accepts: the stamp records the dict's
+/// `{name, hash}` so a later `validate --index` on any surface re-validates (never
+/// silently vouches) when the effective dictionary differs (O-48, record-not-contract).
 #[wasm_bindgen]
 pub fn certify(
     data: &[u8],
     dict_version: Option<String>,
     encoding_label: Option<String>,
     checked_at: String,
+    dict_bytes: Option<Vec<u8>>,
+    dict_replace: bool,
 ) -> Result<String, JsError> {
     console_error_panic_hook::set_once();
 
     let dict_over = resolve_dict_override(dict_version.as_deref()).map_err(|m| JsError::new(&m))?;
     let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
+    let custom_dict = build_custom_dict(dict_bytes.as_deref(), dict_replace, dict_over, encoding)
+        .map_err(|m| JsError::new(&m))?;
 
     let opts = CheckOptions {
         dict_version: dict_over,
         encoding,
+        custom_dict,
         ..CheckOptions::default()
     };
     let sidecar = laterite_ags4_trust::mint(data, &opts, checked_at, None)
@@ -592,6 +665,68 @@ pub fn list_rules() -> String {
     laterite_ags4_validator::rule_metadata_json().to_string()
 }
 
+/// The browser highlight's char-span, by precedence: a finding-CARRIED span
+/// (Rules 1/6 attach one directly) wins; otherwise, for a field-targeted finding
+/// that carries a `field_index`, derive the inner-value span from the raw source
+/// line via the parse leaf's [`laterite_ags4_parse::field_span`].
+///
+/// This derivation exists on NO other surface — `char_span` is serialized only
+/// by wasm, and it drives the browser's cell/heading highlight — yet before #555
+/// part 1 it had zero test coverage (and `field_span`, the leaf it calls, had
+/// none either). Extracted from `run`'s finding-mapping closure so the precedence
+/// AND the offset it produces are pinned by the `derive_char_span_*` tests.
+fn derive_char_span(
+    carried: Option<(u32, u32)>,
+    field_index: Option<u32>,
+    raw_line: Option<&str>,
+) -> Option<[u32; 2]> {
+    carried
+        .map(|(s, e)| [s, e])
+        .or_else(|| laterite_ags4_parse::field_span(raw_line?, field_index?).map(|(s, e)| [s, e]))
+}
+
+#[cfg(test)]
+mod char_span_tests {
+    use super::derive_char_span;
+
+    // A DATA row whose tag-stripped column 1 is the value "10.5".
+    const LINE: &str = r#""DATA","BH1","10.5""#;
+
+    #[test]
+    fn carried_span_wins_over_derivation() {
+        // Rules 1/6 attach an explicit span; it is used verbatim even when a
+        // field_index + line are also present — the derivation must not override.
+        assert_eq!(
+            derive_char_span(Some((3, 7)), Some(1), Some(LINE)),
+            Some([3, 7])
+        );
+    }
+
+    #[test]
+    fn derives_inner_value_span_from_field_index() {
+        // No carried span → derive from the raw line. field_index is the
+        // TAG-STRIPPED column, so on `"DATA","BH1","10.5"` index 1 is the value
+        // "10.5" at chars 14..18 and index 0 is "BH1" at 8..11 — the exact
+        // offsets the browser highlights, and the first coverage of both this
+        // derivation and the leaf `field_span` it calls.
+        assert_eq!(derive_char_span(None, Some(1), Some(LINE)), Some([14, 18]));
+        assert_eq!(derive_char_span(None, Some(0), Some(LINE)), Some([8, 11]));
+    }
+
+    #[test]
+    fn none_without_field_index() {
+        // A whole-line / whole-group finding (no field_index) gets no span.
+        assert_eq!(derive_char_span(None, None, Some(LINE)), None);
+    }
+
+    #[test]
+    fn none_without_raw_line() {
+        // field_index present but the source line unavailable → no span, no panic.
+        assert_eq!(derive_char_span(None, Some(1), None), None);
+    }
+}
+
+#[allow(clippy::too_many_arguments)] // mirrors the public `validate` arg list one-to-one
 fn run(
     data: &[u8],
     dict_version: Option<&str>,
@@ -599,6 +734,8 @@ fn run(
     include_fyi: bool,
     encoding_label: Option<&str>,
     max_per_rule: Option<usize>,
+    dict_bytes: Option<&[u8]>,
+    dict_replace: bool,
 ) -> ValidationReport {
     let dict_over = match resolve_dict_override(dict_version) {
         Ok(v) => v,
@@ -609,6 +746,13 @@ fn run(
         // Same channel a bad dict_version uses: the caller SEES the bad label,
         // instead of getting findings that are artefacts of a UTF-8 fallback.
         Err(message) => return ValidationReport::failure("bad_args", message),
+    };
+    // The custom-dict overlay is resolved (base detected, delta built, hash minted)
+    // once here, before parsing the delivery — a bad dictionary is the DICTIONARY's
+    // problem and is reported as such, on the same channel a bad dict_version uses.
+    let custom_dict = match build_custom_dict(dict_bytes, dict_replace, dict_over, encoding) {
+        Ok(c) => c,
+        Err(message) => return ValidationReport::failure("bad_dict", message),
     };
 
     let parsed = match parse_bytes(data, encoding) {
@@ -626,6 +770,7 @@ fn run(
         include_warnings,
         include_fyi,
         encoding,
+        custom_dict,
         ..CheckOptions::default()
     };
 
@@ -702,15 +847,15 @@ fn run(
                         // (TS treats it so) and lets the UI pick the row-band
                         // colour without inferring a default.
                         let severity = Some(f.severity.as_str().to_string());
-                        // Span precedence: a finding-carried span (Rules 1/6)
-                        // wins; otherwise, for a field-targeted finding,
-                        // compute the inner-value span from the raw line so
-                        // cell/heading findings get a precise highlight too.
-                        let char_span = f.location.char_span.map(|(s, e)| [s, e]).or_else(|| {
-                            let fi = f.location.field_index?;
-                            let line = raw_line(f.line)?;
-                            laterite_ags4_parse::field_span(line, fi).map(|(s, e)| [s, e])
-                        });
+                        // Span precedence (see `derive_char_span`): a
+                        // finding-carried span (Rules 1/6) wins; else derive the
+                        // inner-value span from the raw line for field-targeted
+                        // findings so cell/heading findings highlight precisely.
+                        let char_span = derive_char_span(
+                            f.location.char_span,
+                            f.location.field_index,
+                            raw_line(f.line),
+                        );
                         FindingDto {
                             line: f.line,
                             group: f.group,
@@ -736,6 +881,101 @@ fn run(
         shown_count,
         findings: findings_out,
         error: None,
+        // No cert-consume path on this surface (see the field's doc): the engine
+        // always ran, so there is no proffered certificate to have rejected.
+        revalidate_reason: None,
+    }
+}
+
+#[cfg(test)]
+mod dict_overlay_tests {
+    use super::run;
+
+    // The #568 Phase-3 end-to-end fixtures, shared with the validator's `custom_dict.rs`
+    // so the browser is proven against the same bytes: a bespoke `XTRA` group hung off
+    // the standard `SAMP`, and a delivery that uses it.
+    const DELIVERY: &[u8] = include_bytes!(
+        "../../laterite-ags4-validator/tests/fixtures/custom_dict/delivery_with_xtra.ags"
+    );
+    const DICT_JSON: &[u8] =
+        include_bytes!("../../laterite-ags4-validator/tests/fixtures/custom_dict/xtra.dict.json");
+
+    fn xtra_findings(report: &super::ValidationReport) -> usize {
+        report
+            .findings
+            .iter()
+            .flat_map(|g| &g.items)
+            .filter(|f| f.group == "XTRA")
+            .count()
+    }
+
+    #[test]
+    fn dict_bytes_make_a_bespoke_group_valid_in_the_browser() {
+        // Acceptance #3 (browser leg) + #5: the same bytes the CLI/py/node smokes use.
+        // Warnings + FYI on so the unknown-group findings are actually surfaced.
+        let err_msg = |r: &super::ValidationReport| {
+            r.error
+                .as_ref()
+                .map(|e| e.message.clone())
+                .unwrap_or_default()
+        };
+        let without = run(DELIVERY, None, true, true, None, None, None, false);
+        assert!(
+            without.error.is_none(),
+            "delivery parses: {}",
+            err_msg(&without)
+        );
+        assert!(
+            xtra_findings(&without) > 0,
+            "the bundled dictionary must flag the unknown XTRA group"
+        );
+
+        // With the custom dictionary supplied as bytes (the browser's only form),
+        // XTRA is a first-class group and draws no findings.
+        let with = run(
+            DELIVERY,
+            None,
+            true,
+            true,
+            None,
+            None,
+            Some(DICT_JSON),
+            false,
+        );
+        assert!(
+            with.error.is_none(),
+            "delivery parses with dict: {}",
+            err_msg(&with)
+        );
+        assert_eq!(
+            xtra_findings(&with),
+            0,
+            "the overlay makes XTRA recognised ({} residual XTRA findings)",
+            xtra_findings(&with)
+        );
+
+        // Acceptance #5: `revalidate_reason` is a present field on the report — always
+        // `None` here because this surface has no cert-consume door (see the field's doc).
+        assert!(with.revalidate_reason.is_none());
+    }
+
+    #[test]
+    fn dict_replace_with_a_forced_base_is_a_bad_dict_error() {
+        // The one contradiction: a full replacement cannot also force a base edition.
+        let report = run(
+            DELIVERY,
+            Some("4.2"),
+            true,
+            true,
+            None,
+            None,
+            Some(DICT_JSON),
+            true,
+        );
+        let err = report
+            .error
+            .expect("contradiction is surfaced, not silently ignored");
+        assert_eq!(err.kind, "bad_dict");
     }
 }
 
@@ -911,9 +1151,9 @@ pub fn xlsx_to_ags4(data: &[u8], format_numeric: bool) -> Result<ExcelResult, Js
 // typed table — no per-cell JS objects, no staging table, no TRY_CAST.
 //
 // Typing uses the SAME laterite_types::{canonical_type, parse_value,
-// parse_datetime} the native .ags5db conversion uses, off the file's own
+// parse_datetime} the native DuckDB conversion uses, off the file's own
 // TYPE row (convert.rs does the same), so the explorer casts a file
-// IDENTICALLY to a .ags5db — parity by construction.
+// IDENTICALLY to the native DuckDB conversion — parity by construction.
 // ---------------------------------------------------------------------
 
 /// A parsed AGS4 file held in wasm memory as the lightweight string
@@ -976,12 +1216,24 @@ impl ParsedDataset {
     /// already correctly typed. Built lazily here and dropped on return.
     ///
     /// `keys` (default `false`) prepends the two content-addressed key columns
-    /// `_id`/`_parent_id` — the SAME UUIDv8s the wheel / Node / `.ags5db`
+    /// `_id`/`_parent_id` — the SAME UUIDv8s the wheel / Node / DuckDB
     /// extension produce (via the one shared keychain). Pass `true` when feeding
     /// duckdb-wasm so cross-group joins (`s._parent_id = l._id`) resolve; leave
     /// it off (the default) for a plain typed frame. A custom/passthrough group
     /// carries no keys, so `keys` is a no-op for it. (#303)
-    pub fn arrow_ipc(&self, code: &str, keys: Option<bool>) -> Result<Vec<u8>, JsError> {
+    ///
+    /// `content_hash` (default `false`) appends a trailing `_content_hash`
+    /// value fingerprint (SHA-256 over the typed, blank-normalised heading
+    /// values) — the SAME hash Node/Python produce via the one shared
+    /// keychain. Unlike `keys` this needs no registry entry, so a
+    /// custom/passthrough group still gets a usable `_content_hash` even
+    /// without an `_id`. (#448)
+    pub fn arrow_ipc(
+        &self,
+        code: &str,
+        keys: Option<bool>,
+        content_hash: Option<bool>,
+    ) -> Result<Vec<u8>, JsError> {
         let group = self
             .parsed
             .groups
@@ -989,34 +1241,43 @@ impl ParsedDataset {
             .ok_or_else(|| JsError::new(&format!("group {code:?} not in dataset")))?;
 
         // Typed columns + IPC framing both come from laterite-types now
-        // (`ipc::build_group_ipc` = the shared `arrow_cols` cast + StreamWriter)
-        // — the SAME composition the napi host frames, so the browser, Node and
-        // Python type a file byte-identically by construction. Framed here only
-        // for duckdb-wasm.
+        // (`ipc::build_group_ipc_synth` = the shared `arrow_cols` cast + StreamWriter,
+        // `_id`/`_parent_id` col 0/1, `_content_hash` trailing) — the SAME
+        // composition the napi host frames, so the browser, Node and Python type
+        // a file byte-identically by construction. Framed here only for
+        // duckdb-wasm.
         let reg = laterite_ags4_core::registry::registry();
-        let buf = if keys.unwrap_or(false) && reg.get(code).is_some() {
-            let ids = laterite_ags4_core::keychain::group_row_ids(
+        let ids = (keys.unwrap_or(false) && reg.get(code).is_some()).then(|| {
+            laterite_ags4_core::keychain::group_row_ids(
                 reg,
                 code,
                 &group.headings,
                 group.rows.len(),
                 |col, row| group.cell(col, row),
-            );
-            laterite_types::ipc::build_group_ipc_with_ids(
-                &ids,
+            )
+        });
+        let hashes = if content_hash.unwrap_or(false) {
+            Some(laterite_ags4_core::keychain::group_content_hashes(
+                code,
                 &group.headings,
+                &group.units,
                 &group.types,
                 group.rows.len(),
                 |col, row| group.cell(col, row),
-            )
+            ))
         } else {
-            laterite_types::ipc::build_group_ipc(
-                &group.headings,
-                &group.types,
-                group.rows.len(),
-                |col, row| group.cell(col, row),
-            )
-        }
+            None
+        };
+        let buf = laterite_types::ipc::build_group_ipc_synth(
+            &laterite_types::arrow_cols::SynthColumns {
+                ids: ids.as_deref(),
+                hashes: hashes.as_deref(),
+            },
+            &group.headings,
+            &group.types,
+            group.rows.len(),
+            |col, row| group.cell(col, row),
+        )
         .map_err(|e| JsError::new(&format!("arrow ipc for {code}: {e}")))?;
         Ok(buf)
     }
@@ -1190,8 +1451,8 @@ pub fn merge(
 // dictionary() -> the bundled STANDARD dictionary for an edition.
 //
 // The Tools reference (Dictionary browser / Template generator) used to fetch
-// a static `ags5_dictionary.json` — the scaffolded AGS5 *merged* dict, where
-// ~91% of headings had EMPTY descriptions and it was a single fixed edition.
+// a static scaffolded dictionary — a single fixed edition where ~91% of
+// headings had EMPTY descriptions.
 // This exposes the validator's real per-edition standard dictionary instead:
 // canonical names + descriptions + units + types + status, selectable across
 // 4.0.3 … 4.2 (the same data the engine validates against).
@@ -1200,6 +1461,21 @@ pub fn merge(
 /// Serialise the bundled standard dictionary for `dict_version`
 /// (`None`/`"auto"` → the [`FALLBACK`] edition; else `4.0.3|4.0.4|4.1|4.1.1|
 /// 4.2`). Groups are sorted by code; each group's headings keep the canonical
+/// The crate version — the same answer Node's `version()` gives, from the same
+/// `CARGO_PKG_VERSION`.
+///
+/// It exists because `ags4-compliance`'s wasm runner HARD-CODED `version: "0.5.1"`
+/// (tools/compliance/emit_js.mjs) — a literal true when it was written, that the
+/// workspace moved past to 0.7.0 while nothing compared it back. The harness then
+/// printed "wasm v0.5.1" next to three 0.7.0 surfaces and called the comparison
+/// 4-laterite identity. The build was current; only the report lied. Node had this
+/// all along and asked the module; wasm had nothing to ask, which is why someone
+/// wrote a constant instead. (#556)
+#[wasm_bindgen]
+pub fn version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 /// dictionary order. Returns the web reference UI's `{ags_edition, groups:[…]}`
 /// shape — built by the shared `dict::dictionary_dto` (#294 F#6), the same
 /// source `laterite.registry.dictionary()` and Node's render.
@@ -1215,6 +1491,78 @@ pub fn dictionary(dict_version: Option<String>) -> Result<JsValue, JsError> {
         .map_err(|e| JsError::new(&e.to_string()))
 }
 
+// ---------------------------------------------------------------------
+// censor() -> anonymise a file with the shared scrub engine (#581).
+//
+// The browser Anonymiser drives the SAME `laterite-ags4-censor` engine the
+// corpus `censor` tool uses (Phase 2 of the #527 convergence), instead of a
+// hand-written TS reimplementation. It's a batch action (Download click), off
+// the render path, so it rides the engine wasm asynchronously in the validator
+// worker rather than a boot-critical main-thread instance.
+// ---------------------------------------------------------------------
+
+/// `{ text, tally }` — the anonymised file plus the per-action cell/structure
+/// counts the Anonymiser surfaces. `tally`'s fields match the leaf's snake_case.
+#[derive(Serialize)]
+struct CensorDto {
+    text: String,
+    tally: laterite_ags4_censor::Tally,
+}
+
+/// Anonymise `data` with the shared engine. `sensitive_json` is the
+/// classification SSOT (`sensitive_headings.json`); `selected_codes` (a JS
+/// array of heading codes, or `null` for every classified heading) restricts
+/// the policy to the user's ticked columns; `token` replaces token/brackets
+/// hits; `drop_custom` removes non-dictionary groups/columns + their orphaned
+/// DICT/ABBR rows; `include_freetext` tokenises descriptions instead of
+/// stripping their `[units]`. Returns `{ text, tally }`.
+///
+/// `PROJ_ID`'s filehash is the full 64-hex SHA-256 of `data` (a KEY field —
+/// full width so a collision is cryptographically nil); the leaf takes that id
+/// precomputed, so this wrapper hashes the bytes.
+#[wasm_bindgen]
+pub fn censor(
+    data: &[u8],
+    sensitive_json: &str,
+    selected_codes: JsValue,
+    token: &str,
+    drop_custom: bool,
+    include_freetext: bool,
+) -> Result<JsValue, JsError> {
+    console_error_panic_hook::set_once();
+
+    // Lossy decode (matches the Anonymiser's `TextDecoder({fatal:false})`): a
+    // browser anonymises what it can rather than skipping non-UTF-8 outright.
+    let text = String::from_utf8_lossy(data);
+    let file_id = hex::encode(<sha2::Sha256 as sha2::Digest>::digest(data));
+
+    let mut policy =
+        laterite_ags4_censor::Policy::from_sensitive_json(sensitive_json, include_freetext)
+            .map_err(|e| JsError::new(&e.to_string()))?;
+    // null → keep the full policy (every classified heading); an array
+    // restricts it to the browser's column selection.
+    let selected: Option<Vec<String>> =
+        serde_wasm_bindgen::from_value(selected_codes).map_err(|e| JsError::new(&e.to_string()))?;
+    if let Some(codes) = selected {
+        policy.retain_codes(&codes.into_iter().collect());
+    }
+
+    let opts = laterite_ags4_censor::CensorOptions {
+        token: token.to_string(),
+        keywords: Vec::new(),
+        drop_custom,
+    };
+    let (out_text, tally) = laterite_ags4_censor::censor(&text, &file_id, &policy, &opts);
+
+    let dto = CensorDto {
+        text: out_text,
+        tally,
+    };
+    let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+    dto.serialize(&serializer)
+        .map_err(|e| JsError::new(&e.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     //! Parity-by-construction guard for `read()`'s typed-Arrow path.
@@ -1222,9 +1570,9 @@ mod tests {
     //! `build_column` is the whole casting surface (the wasm-bindgen
     //! wrappers above only marshal it), and it casts through the SAME
     //! `laterite_types` fns — off the file's TYPE row — that the native
-    //! `.ags5db` convert uses (`laterite-ags5-db/src/convert.rs`). So asserting the
+    //! DuckDB conversion uses (`laterite-ags5-db/src/convert.rs`). So asserting the
     //! Arrow `DataType` + cell values here proves the explorer casts a
-    //! file identically to a `.ags5db`, with no DuckDB/Node/wasm runtime.
+    //! file identically to that native conversion, with no DuckDB/Node/wasm runtime.
     //! The datetime oracle is computed independently via `chrono`.
     use super::*;
     // `Array` provides `is_null`/`len`; ArrayRef/DataType/TimeUnit assert the
@@ -1304,6 +1652,8 @@ mod tests {
             None,
             None,
             "2020-01-01T00:00:00Z".to_string(),
+            None,
+            false,
         ) {
             Ok(s) => s,
             Err(_) => panic!("a clean minimal AGS4 file must certify"),
@@ -1324,6 +1674,8 @@ mod tests {
             None,
             None,
             "2020-01-01T00:00:00Z".to_string(),
+            None,
+            false,
         )
         .unwrap_or_else(|_| panic!("a clean minimal AGS4 file must certify"));
         let v: serde_json::Value = serde_json::from_str(&json).expect("the cert is JSON");
@@ -1345,6 +1697,8 @@ mod tests {
             None,
             None,
             "2020-01-01T00:00:00Z".to_string(),
+            None,
+            false,
         )
         .unwrap_or_else(|_| panic!("a clean minimal AGS4 file must certify"));
         assert!(
@@ -1618,8 +1972,14 @@ mod tests {
 
         // keys=true → the golden UUIDv8s; child._parent_id links to parent._id;
         // a root group's _parent_id is NULL.
-        let proj = ds.arrow_ipc("PROJ", Some(true)).ok().expect("PROJ keyed");
-        let loca = ds.arrow_ipc("LOCA", Some(true)).ok().expect("LOCA keyed");
+        let proj = ds
+            .arrow_ipc("PROJ", Some(true), None)
+            .ok()
+            .expect("PROJ keyed");
+        let loca = ds
+            .arrow_ipc("LOCA", Some(true), None)
+            .ok()
+            .expect("LOCA keyed");
         assert_eq!(
             first(&proj, "_id").as_deref(),
             Some("ac30a95d-e0ca-85f9-83c8-37a64af2762b"),
@@ -1635,7 +1995,7 @@ mod tests {
         assert_eq!(first(&proj, "_parent_id"), None);
 
         // The default (no keys) strips: a plain frame carries no `_id` column.
-        let plain = ds.arrow_ipc("PROJ", None).ok().expect("PROJ plain");
+        let plain = ds.arrow_ipc("PROJ", None, None).ok().expect("PROJ plain");
         assert!(
             first(&plain, "_id").is_none(),
             "default arrow_ipc must not carry _id",

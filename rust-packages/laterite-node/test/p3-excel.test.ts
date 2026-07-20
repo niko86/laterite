@@ -46,7 +46,9 @@ describe("Excel I/O (#358)", () => {
     const dir = mkdtempSync(join(tmpdir(), "lat-excel-"));
     const ags = join(dir, "in.ags");
     writeFileSync(ags, AGS);
-    const stats = toExcel(ags, join(dir, "o.xlsx"), { groups: ["LOCA", "PROJ"] });
+    const stats = toExcel(ags, join(dir, "o.xlsx"), {
+      groups: ["LOCA", "PROJ"],
+    });
     expect(stats.sheetsWritten).toBe(2);
     expect(stats.warnings).toEqual([]);
   });
@@ -94,6 +96,8 @@ describe("Excel bytes forms (#391)", () => {
     const viaPath = toExcel(ags); // path-in → bytes-out
     const viaBytes = toExcel(agsBytes); // bytes-in → bytes-out
     // both are valid workbooks that convert back to the same group set
-    expect(read(fromExcel(viaPath)).groups.sort()).toEqual(read(fromExcel(viaBytes)).groups.sort());
+    expect(read(fromExcel(viaPath)).groups.sort()).toEqual(
+      read(fromExcel(viaBytes)).groups.sort(),
+    );
   });
 });

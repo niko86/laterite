@@ -43,7 +43,9 @@ test("Explore: a half-open depth band puts a boundary depth in the lower stratum
       ` ON t."LOCA_ID" = g."LOCA_ID" AND t."SPEC_DPTH" >= g."GEOL_TOP" AND t."SPEC_DPTH" < g."GEOL_BASE"` +
       ` WHERE t."SPEC_REF" = 'SP2'`,
   );
-  await expect(page.getByText("SA", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("SA", { exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(page.getByText("CL", { exact: true })).toHaveCount(0);
 });
 
@@ -58,7 +60,9 @@ test("Explore: a sample below all strata still shows (LEFT join keeps it, stratu
       ` ON s."LOCA_ID" = g."LOCA_ID" AND s."SAMP_TOP" >= g."GEOL_TOP" AND s."SAMP_TOP" < g."GEOL_BASE"` +
       ` WHERE s."SAMP_TOP" = 12.0`,
   );
-  await expect(page.getByText("BH01-S4", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("BH01-S4", { exact: true })).toBeVisible({
+    timeout: 30_000,
+  });
 });
 
 test("Explore: the content-addressed keys join a child to its parent (SAMP._parent_id = LOCA._id)", async ({
@@ -74,7 +78,9 @@ test("Explore: the content-addressed keys join a child to its parent (SAMP._pare
     `SELECT l."LOCA_ID" AS loca FROM "SAMP" s JOIN "LOCA" l ON s."_parent_id" = l."_id"`,
   );
   await expect(page.getByText(/SQL error/)).toHaveCount(0);
-  await expect(page.getByText("BH01", { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("BH01", { exact: true }).first()).toBeVisible({
+    timeout: 30_000,
+  });
 });
 
 test("Explore: SqlBuilder auto depth-band joins SAMP→GEOL, and LIKE wildcards inject %", async ({

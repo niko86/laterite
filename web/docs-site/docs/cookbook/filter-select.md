@@ -4,7 +4,7 @@
 
 Narrow one group to the rows and columns you want. In Python it's a lazy query
 builder; on every other surface it's the same idea said in SQL — and because the
-dtype *is* the AGS type, a numeric filter compares numbers, not strings.
+dtype _is_ the AGS type, a numeric filter compares numbers, not strings.
 
 === "Python"
 

@@ -60,7 +60,7 @@ export const DownloadReport: Component<{
       <button
         type="button"
         disabled={busy()}
-        onClick={download}
+        onClick={() => void download()}
         class="rounded border border-line-strong px-3 py-1.5 text-fg transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy() ? "Preparing…" : "Download full report (.json.gz)"}

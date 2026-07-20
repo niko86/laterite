@@ -3,7 +3,7 @@
 When laterite lands a group in the relational (DuckDB) model, every row carries
 two synthetic columns: `_id` and `_parent_id`. Both are **UUIDv8 values derived
 from the row's spec key-chain** — its own AGS key fields, plus its parent's, walked
-up the group tree. The id is a hash of *what the row is*, not of when or where it
+up the group tree. The id is a hash of _what the row is_, not of when or where it
 was read.
 
 That single property does the work:
@@ -29,7 +29,7 @@ SELECT * FROM SAMP s JOIN LOCA l ON s._parent_id = l._id;
 ```
 
 Both return the same rows. The difference is that the second join holds for
-*every* parent/child edge in the dictionary with one column pair — you don't need
+_every_ parent/child edge in the dictionary with one column pair — you don't need
 to know that `SAMP` hangs off `LOCA` by `LOCA_ID`, or that `GEOL` hangs off `SAMP`
 by `(LOCA_ID, SAMP_TOP)`. The key-chain is baked into `_parent_id`.
 
@@ -73,10 +73,10 @@ AGS data, so a `keys=True` frame round-tripped back to AGS4 drops the synthetic
 columns — they live only in the read model.
 
 !!! note "Why it matters"
-    Content-addressing turns the AGS parent/child tree into a stable graph that
-    survives independent reads, partial files, and re-emission. Same content, same
-    key — so merging two deliveries, or spotting a row that appears twice, is a set
-    operation rather than a join you have to hand-author per group pair.
+Content-addressing turns the AGS parent/child tree into a stable graph that
+survives independent reads, partial files, and re-emission. Same content, same
+key — so merging two deliveries, or spotting a row that appears twice, is a set
+operation rather than a join you have to hand-author per group pair.
 
 See also: [SQL across groups](../cookbook/sql-across-groups.md) ·
 [Born-typed reads](./born-typed.md)

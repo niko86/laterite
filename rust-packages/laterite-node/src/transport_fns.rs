@@ -16,6 +16,11 @@ use napi_derive::napi;
 
 /// Result of `transportPack` / `transportLock`: output size, ratio vs source,
 /// elapsed seconds.
+// `--all-targets` clippy checks the `lib test` build variant, where these
+// napi-exported items have no Rust caller (they're only called from JS in the
+// real cdylib — see the note at the bottom of this file) — dead_code false
+// positives confined to that build variant.
+#[allow(dead_code)]
 #[napi(object)]
 pub struct PackStats {
     pub bytes: BigInt,
@@ -24,6 +29,7 @@ pub struct PackStats {
 }
 
 /// Result of `transportUnpack` / `transportUnlock`: output size, elapsed seconds.
+#[allow(dead_code)]
 #[napi(object)]
 pub struct UnpackStats {
     pub bytes: BigInt,
@@ -32,15 +38,20 @@ pub struct UnpackStats {
 
 /// The leaf renders every failure (missing file, wrong password, corrupt
 /// envelope) as a human message; surface it verbatim as a JS error.
-fn napi_err(e: TransportError) -> Error {
+// Internal helper (not a napi boundary) — `.to_string()` only ever needs `&self`,
+// so there is nothing to own; each call site borrows the propagated error.
+#[allow(dead_code)]
+fn napi_err(e: &TransportError) -> Error {
     Error::from_reason(e.to_string())
 }
 
 /// zstd-compress `src` → `dest`. `level` is 1–22 (default 9, the AGS sweet spot).
+#[allow(dead_code)]
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn transport_pack(src: String, dest: String, level: Option<i32>) -> Result<PackStats> {
     let s = laterite_transport::pack(Path::new(&src), Path::new(&dest), level.unwrap_or(9))
-        .map_err(napi_err)?;
+        .map_err(|e| napi_err(&e))?;
     Ok(PackStats {
         bytes: BigInt::from(s.bytes),
         ratio: s.ratio,
@@ -49,9 +60,12 @@ pub fn transport_pack(src: String, dest: String, level: Option<i32>) -> Result<P
 }
 
 /// zstd-decompress `src` → `dest`.
+#[allow(dead_code)]
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn transport_unpack(src: String, dest: String) -> Result<UnpackStats> {
-    let s = laterite_transport::unpack(Path::new(&src), Path::new(&dest)).map_err(napi_err)?;
+    let s =
+        laterite_transport::unpack(Path::new(&src), Path::new(&dest)).map_err(|e| napi_err(&e))?;
     Ok(UnpackStats {
         bytes: BigInt::from(s.bytes),
         elapsed_s: s.elapsed_s,
@@ -60,7 +74,9 @@ pub fn transport_unpack(src: String, dest: String) -> Result<UnpackStats> {
 
 /// zstd-compress, then age-encrypt with `password` → `dest`. Compress-then-
 /// encrypt is load-bearing: zstd needs low-entropy input; ciphertext is random.
+#[allow(dead_code)]
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn transport_lock(
     src: String,
     dest: String,
@@ -75,7 +91,7 @@ pub fn transport_lock(
         level.unwrap_or(9),
         log_n.unwrap_or(laterite_transport::SCRYPT_LOG_N),
     )
-    .map_err(napi_err)?;
+    .map_err(|e| napi_err(&e))?;
     Ok(PackStats {
         bytes: BigInt::from(s.bytes),
         ratio: s.ratio,
@@ -85,10 +101,12 @@ pub fn transport_lock(
 
 /// age-decrypt with `password`, then zstd-decompress → `dest`. Wrong passphrase
 /// / non-passphrase envelopes surface as an error.
+#[allow(dead_code)]
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn transport_unlock(src: String, dest: String, password: String) -> Result<UnpackStats> {
     let s = laterite_transport::unlock(Path::new(&src), Path::new(&dest), &password)
-        .map_err(napi_err)?;
+        .map_err(|e| napi_err(&e))?;
     Ok(UnpackStats {
         bytes: BigInt::from(s.bytes),
         elapsed_s: s.elapsed_s,
@@ -105,22 +123,29 @@ pub fn transport_unlock(src: String, dest: String, password: String) -> Result<U
 // napi bytes-in/bytes-out convention used across this crate).
 
 /// zstd-compress `data` in memory → bytes. `level` is 1–22 (default 9).
+#[allow(dead_code)]
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn transport_pack_bytes(data: Uint8Array, level: Option<i32>) -> Result<Buffer> {
-    let out = laterite_transport::pack_bytes(&data, level.unwrap_or(9)).map_err(napi_err)?;
+    let out =
+        laterite_transport::pack_bytes(&data, level.unwrap_or(9)).map_err(|e| napi_err(&e))?;
     Ok(Buffer::from(out))
 }
 
 /// zstd-decompress `data` in memory → bytes (the twin of `transportPackBytes`).
+#[allow(dead_code)]
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn transport_unpack_bytes(data: Uint8Array) -> Result<Buffer> {
-    let out = laterite_transport::unpack_bytes(&data).map_err(napi_err)?;
+    let out = laterite_transport::unpack_bytes(&data).map_err(|e| napi_err(&e))?;
     Ok(Buffer::from(out))
 }
 
 /// zstd-compress, then age-encrypt `data` with `password` in memory → bytes —
 /// no plaintext on disk. `level` is 1–22 (default 9).
+#[allow(dead_code)]
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn transport_lock_bytes(
     data: Uint8Array,
     password: String,
@@ -133,15 +158,17 @@ pub fn transport_lock_bytes(
         level.unwrap_or(9),
         log_n.unwrap_or(laterite_transport::SCRYPT_LOG_N),
     )
-    .map_err(napi_err)?;
+    .map_err(|e| napi_err(&e))?;
     Ok(Buffer::from(out))
 }
 
 /// age-decrypt with `password`, then zstd-decompress `data` in memory → bytes.
 /// Wrong passphrase / non-passphrase envelopes surface as an error.
+#[allow(dead_code)]
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn transport_unlock_bytes(data: Uint8Array, password: String) -> Result<Buffer> {
-    let out = laterite_transport::unlock_bytes(&data, &password).map_err(napi_err)?;
+    let out = laterite_transport::unlock_bytes(&data, &password).map_err(|e| napi_err(&e))?;
     Ok(Buffer::from(out))
 }
 

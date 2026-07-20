@@ -60,7 +60,8 @@ describe("coverageTruncationNote", () => {
 // assert BOTH the result shape AND the queries the builders emit.
 
 type Row = Record<string, unknown>;
-const tbl = (rows: Row[]): Table => ({ toArray: () => rows }) as unknown as Table;
+const tbl = (rows: Row[]): Table =>
+  ({ toArray: () => rows }) as unknown as Table;
 
 /** Build a `run` from an ordered list of [match, rows] handlers; the first
  *  whose `match` (substring or RegExp) hits the SQL wins. Records every query
@@ -68,12 +69,13 @@ const tbl = (rows: Row[]): Table => ({ toArray: () => rows }) as unknown as Tabl
  *  query that never fired. */
 function fakeRun(handlers: [string | RegExp, Row[]][]) {
   const calls: string[] = [];
-  const run = async (sql: string): Promise<Table> => {
+  const run = (sql: string): Promise<Table> => {
     calls.push(sql);
     for (const [m, rows] of handlers) {
-      if (typeof m === "string" ? sql.includes(m) : m.test(sql)) return tbl(rows);
+      if (typeof m === "string" ? sql.includes(m) : m.test(sql))
+        return Promise.resolve(tbl(rows));
     }
-    throw new Error(`unhandled SQL: ${sql}`);
+    return Promise.reject(new Error(`unhandled SQL: ${sql}`));
   };
   return Object.assign(run, { calls });
 }
@@ -122,7 +124,7 @@ describe("referentialIntegrity", () => {
     const { links, orphans } = await referentialIntegrity(metas, dict, run);
     expect(links).toBe(1); // only SAMP→LOCA (PROJ not loaded; LOCA's parent absent)
     expect(orphans).toHaveLength(1);
-    const o = orphans[0];
+    const o = orphans[0]!;
     expect(o.child).toBe("SAMP");
     expect(o.parent).toBe("LOCA");
     expect(o.keys).toEqual(["LOCA_ID"]); // only the SHARED key (SAMP_ID isn't LOCA's)
@@ -137,7 +139,10 @@ describe("referentialIntegrity", () => {
   });
 
   it("emits no sample query and pushes nothing when there are zero orphans", async () => {
-    const metas = [meta("LOCA", ["LOCA_ID"]), meta("SAMP", ["LOCA_ID", "SAMP_ID"])];
+    const metas = [
+      meta("LOCA", ["LOCA_ID"]),
+      meta("SAMP", ["LOCA_ID", "SAMP_ID"]),
+    ];
     const run = fakeRun([
       [/SELECT count\(\*\) AS n FROM "SAMP" c LEFT JOIN/, [{ n: 0 }]],
       [/SELECT count\(\*\) AS n FROM "SAMP"$/, [{ n: 5 }]],
@@ -193,16 +198,19 @@ describe("completeness", () => {
       }),
     ];
     // 4 rows: LOCA_ID full (4), LOCA_TYPE half (2), LOCA_NOTE empty (0).
-    const run = fakeRun([
-      [/FROM "LOCA"/, [{ n: 4, c0: 4, c1: 2, c2: 0 }]],
-    ]);
+    const run = fakeRun([[/FROM "LOCA"/, [{ n: 4, c0: 4, c1: 2, c2: 0 }]]]);
     const out = await completeness(metas, run);
     expect(out).toHaveLength(1);
-    const g = out[0];
+    const g = out[0]!;
     expect(g.code).toBe("LOCA");
     expect(g.total).toBe(4);
     expect(g.cols.map((c) => c.pct)).toEqual([1, 0.5, 0]);
-    expect(g.cols[0]).toMatchObject({ heading: "LOCA_ID", type: "ID", sqlType: "VARCHAR", filled: 4 });
+    expect(g.cols[0]).toMatchObject({
+      heading: "LOCA_ID",
+      type: "ID",
+      sqlType: "VARCHAR",
+      filled: 4,
+    });
     expect(g.emptyCols).toEqual(["LOCA_NOTE"]); // 100%-empty present column
     expect(g.overall).toBeCloseTo((1 + 0.5 + 0) / 3, 10);
 
@@ -223,10 +231,11 @@ describe("completeness", () => {
     const metas = [meta("LOCA", ["LOCA_ID", "LOCA_TYPE"])];
     const run = fakeRun([[/FROM "LOCA"/, [{ n: 0, c0: 0, c1: 0 }]]]);
     const out = await completeness(metas, run);
-    expect(out[0].total).toBe(0);
-    expect(out[0].cols.map((c) => c.pct)).toEqual([0, 0]);
-    expect(out[0].emptyCols).toEqual([]);
-    expect(out[0].overall).toBe(0);
+    const g = out[0]!;
+    expect(g.total).toBe(0);
+    expect(g.cols.map((c) => c.pct)).toEqual([0, 0]);
+    expect(g.emptyCols).toEqual([]);
+    expect(g.overall).toBe(0);
   });
 
   it("falls back to empty type/sqlType when the meta arrays are short", async () => {
@@ -236,8 +245,9 @@ describe("completeness", () => {
     ];
     const run = fakeRun([[/FROM "LOCA"/, [{ n: 1, c0: 1, c1: 1 }]]]);
     const out = await completeness(metas, run);
-    expect(out[0].cols[1].type).toBe("");
-    expect(out[0].cols[1].sqlType).toBe("");
+    const col = out[0]!.cols[1]!;
+    expect(col.type).toBe("");
+    expect(col.sqlType).toBe("");
   });
 });
 
@@ -250,7 +260,10 @@ describe("coverage", () => {
     expect(await coverage([meta("LOCA", ["LOCA_ID"])], run)).toBeNull();
     // A group without LOCA_ID doesn't count toward the threshold.
     expect(
-      await coverage([meta("LOCA", ["LOCA_ID"]), meta("PROJ", ["PROJ_ID"])], run),
+      await coverage(
+        [meta("LOCA", ["LOCA_ID"]), meta("PROJ", ["PROJ_ID"])],
+        run,
+      ),
     ).toBeNull();
     expect(run.calls).toEqual([]);
   });
@@ -269,8 +282,8 @@ describe("coverage", () => {
     expect(c).not.toBeNull();
     expect(c.groups).toEqual(["LOCA", "SAMP"]); // PROJ excluded
     expect(c.locas).toEqual(["BH01", "BH02", "BH03"]); // distinct + sorted, null dropped
-    expect([...c.present.LOCA].sort()).toEqual(["BH01", "BH02"]);
-    expect([...c.present.SAMP].sort()).toEqual(["BH01", "BH03"]);
+    expect([...c.present.LOCA!].sort()).toEqual(["BH01", "BH02"]);
+    expect([...c.present.SAMP!].sort()).toEqual(["BH01", "BH03"]);
     expect(c.totalGroups).toBe(2);
     expect(c.totalLocas).toBe(3);
     expect(c.truncated).toBe(false);
@@ -280,7 +293,10 @@ describe("coverage", () => {
 
   it("caps boreholes at MAX_LOCA (60) and flags truncation", async () => {
     // 70 distinct LOCAs across two groups → rows capped to 60, truncated=true.
-    const ids = Array.from({ length: 70 }, (_, i) => `BH${String(i).padStart(3, "0")}`);
+    const ids = Array.from(
+      { length: 70 },
+      (_, i) => `BH${String(i).padStart(3, "0")}`,
+    );
     const metas = [meta("LOCA", ["LOCA_ID"]), meta("SAMP", ["LOCA_ID"])];
     const run = fakeRun([
       [/FROM "LOCA"/, ids.map((id) => ({ id }))],

@@ -1,7 +1,7 @@
 """Content-addressed `_id` / `_parent_id` keys on the Python read surface (#303).
 
 The pitch — stateless cross-group joins / merge / dedup via two synthetic UUIDv8
-columns — was sold as core but shipped only in the `.ags5db` DuckDB extension
+columns — was sold as core but shipped only in the DuckDB extension
 (`laterite.read(...).sql("... s._parent_id = l._id")` used to raise *Binder
 Error: no column "_parent_id"*). Phase 3 makes it real in the wheel, via the one
 shared Rust keychain. The model these tests pin:
@@ -49,7 +49,9 @@ def test_default_read_frame_has_no_key_columns():
 def test_keys_true_adds_exactly_id_and_parent_id():
     plain = set(L.read(text=_SRC)["PROJ"].columns)
     keyed = set(L.read(text=_SRC, keys=True)["PROJ"].columns)
-    assert keyed - plain == {"_id", "_parent_id"}, "keys=True adds exactly the two key columns"
+    assert keyed - plain == {"_id", "_parent_id"}, (
+        "keys=True adds exactly the two key columns"
+    )
 
 
 def test_per_call_table_keys_override():

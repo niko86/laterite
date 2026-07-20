@@ -14,12 +14,12 @@ Prebuilt native binaries ship for linux-x64-gnu, darwin-arm64, and win32-x64-msv
 
 One clean-room Rust AGS4 engine, surfaced for every stack:
 
-| Surface | Package | Get it |
-|---|---|---|
-| **Python** | [`laterite`](https://pypi.org/project/laterite/) — PyPI | `pip install laterite` |
-| **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm | `npm install laterite` |
-| **Rust / CLI** | [`lat-db` + `lat`](https://github.com/niko86/laterite/releases) | GitHub Releases |
-| **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser |
+| Surface        | Package                                                                | Get it                 |
+| -------------- | ---------------------------------------------------------------------- | ---------------------- |
+| **Python**     | [`laterite`](https://pypi.org/project/laterite/) — PyPI                | `pip install laterite` |
+| **Node.js**    | [`laterite`](https://www.npmjs.com/package/laterite) — npm             | `npm install laterite` |
+| **Rust / CLI** | [`lat`](https://github.com/niko86/laterite/releases)                   | GitHub Releases        |
+| **Browser**    | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser      |
 
 ## Command line — `npx laterite`
 
@@ -45,15 +45,15 @@ the passphrase from `--password-file` or `$LAT_TRANSPORT_PASSWORD` (never a flag
 ```ts
 import { read, validate } from "laterite";
 
-const ags = read("delivery.ags");        // path, or read(bytes) / read(undefined, { text })
-ags.groups;                               // ["PROJ", "LOCA", "SAMP", …]
-const loca = ags.table("LOCA");           // a born-typed apache-arrow Table
-loca.getChild("LOCA_GL")?.get(0);         // → 12.3 (a number)
+const ags = read("delivery.ags"); // path, or read(bytes) / read(undefined, { text })
+ags.groups; // ["PROJ", "LOCA", "SAMP", …]
+const loca = ags.table("LOCA"); // a born-typed apache-arrow Table
+loca.getChild("LOCA_GL")?.get(0); // → 12.3 (a number)
 
 const report = validate("delivery.ags");
-report.isValid;                           // boolean
-report.findings;                          // [{ rule, line?, group, desc, severity? }]
-report.toJson();                          // byte-identical to `lat validate --json`
+report.isValid; // boolean
+report.findings; // [{ rule, line?, group, desc, severity? }]
+report.toJson(); // byte-identical to `lat validate --json`
 ```
 
 ## Produce AGS4
@@ -63,12 +63,15 @@ From per-group data (arrow-js Tables or plain row objects):
 ```ts
 import { buildAgs4 } from "laterite";
 
-const res = buildAgs4(new Map([
-  ["PROJ", [{ PROJ_ID: "P1", PROJ_NAME: "Demo" }]],
-  ["LOCA", [{ LOCA_ID: "BH01", LOCA_GL: 12.3 }]],
-]), { edition: "4.1.1", mode: "autofix" });
+const res = buildAgs4(
+  new Map([
+    ["PROJ", [{ PROJ_ID: "P1", PROJ_NAME: "Demo" }]],
+    ["LOCA", [{ LOCA_ID: "BH01", LOCA_GL: 12.3 }]],
+  ]),
+  { edition: "4.1.1", mode: "autofix" },
+);
 
-res.text;          // the AGS4 document
+res.text; // the AGS4 document
 res.save("out.ags");
 ```
 
@@ -82,7 +85,7 @@ const proj = new PROJ({
   PROJ_NAME: "Demo",
   locas: [new LOCA({ LOCA_ID: "BH01", LOCA_GL: 12.3 })],
 });
-buildAgs4(proj);    // walks the tree → valid AGS4
+buildAgs4(proj); // walks the tree → valid AGS4
 ```
 
 ## SQL across groups (optional)

@@ -44,7 +44,9 @@ const B = [
 
 describe("merge → MergeResult", () => {
   it("returns bytes that re-parse as AGS4, plus the audit arrays", () => {
-    const res = merge([Buffer.from(A), Buffer.from(B)], { onTypeClash: "widen" });
+    const res = merge([Buffer.from(A), Buffer.from(B)], {
+      onTypeClash: "widen",
+    });
     expect(res.bytes).toBeInstanceOf(Uint8Array);
     expect(res.text.startsWith('"GROUP"')).toBe(true);
     expect(Array.isArray(res.warnings)).toBe(true);
@@ -54,19 +56,25 @@ describe("merge → MergeResult", () => {
   });
 
   it("unions every borehole (BH2 A-only and BH3 B-only both survive)", () => {
-    const { text } = merge([Buffer.from(A), Buffer.from(B)], { onTypeClash: "widen" });
+    const { text } = merge([Buffer.from(A), Buffer.from(B)], {
+      onTypeClash: "widen",
+    });
     for (const bh of ["BH1", "BH2", "BH3"]) expect(text).toContain(`"${bh}"`);
   });
 
   it("resolves a KEY conflict by argument order (BH1 GL becomes B's 11.50)", () => {
-    const { text } = merge([Buffer.from(A), Buffer.from(B)], { onTypeClash: "widen" });
+    const { text } = merge([Buffer.from(A), Buffer.from(B)], {
+      onTypeClash: "widen",
+    });
     // B's BH1 GL (11.50) wins over A's (10.00).
     expect(text).toContain('"11.50"');
     expect(text).not.toContain('"10.00"');
   });
 
   it("reports the real GL revision only, not the type-widened equal NATE", () => {
-    const res = merge([Buffer.from(A), Buffer.from(B)], { onTypeClash: "widen" });
+    const res = merge([Buffer.from(A), Buffer.from(B)], {
+      onTypeClash: "widen",
+    });
     const locaRevs = res.revisions.filter((r) => r.group === "LOCA");
     expect(locaRevs.length).toBe(1);
     expect(locaRevs[0]?.key).toEqual(["BH1"]);
@@ -104,10 +112,15 @@ describe("merge → MergeResult", () => {
     writeFileSync(aPath, A);
     writeFileSync(bPath, B);
     const fromPaths = merge([aPath, bPath], { onTypeClash: "widen" });
-    const fromBytes = merge([Buffer.from(A), Buffer.from(B)], { onTypeClash: "widen" });
-    const fromHandles = merge([read(undefined, { text: A }), read(undefined, { text: B })], {
+    const fromBytes = merge([Buffer.from(A), Buffer.from(B)], {
       onTypeClash: "widen",
     });
+    const fromHandles = merge(
+      [read(undefined, { text: A }), read(undefined, { text: B })],
+      {
+        onTypeClash: "widen",
+      },
+    );
     for (const r of [fromPaths, fromBytes, fromHandles]) {
       expect(r.revisions.filter((x) => x.group === "LOCA").length).toBe(1);
     }
@@ -124,9 +137,17 @@ describe("merge → MergeResult", () => {
   // catch it.
   it("throws MergeConflictError on conflicting UNITs, in every mode", () => {
     const inM = [
-      '"GROUP","PROJ"', '"HEADING","PROJ_ID"', '"UNIT",""', '"TYPE","ID"', '"DATA","P1"',
-      '"GROUP","LOCA"', '"HEADING","LOCA_ID","LOCA_GL"', '"UNIT","","m"', '"TYPE","ID","2DP"',
-      '"DATA","BH01","10.00"', "",
+      '"GROUP","PROJ"',
+      '"HEADING","PROJ_ID"',
+      '"UNIT",""',
+      '"TYPE","ID"',
+      '"DATA","P1"',
+      '"GROUP","LOCA"',
+      '"HEADING","LOCA_ID","LOCA_GL"',
+      '"UNIT","","m"',
+      '"TYPE","ID","2DP"',
+      '"DATA","BH01","10.00"',
+      "",
     ].join("\r\n");
     const inMm = inM
       .replace('"UNIT","","m"', '"UNIT","","mm"')
@@ -171,8 +192,10 @@ describe("merge onTypeClash", () => {
     '"DATA","BH02","20.12345"',
   );
 
-  it('promote keeps the greatest nDP precision and zero-pads the coarser values', () => {
-    const res = merge([Buffer.from(DP2), Buffer.from(DP5)], { onTypeClash: "promote" });
+  it("promote keeps the greatest nDP precision and zero-pads the coarser values", () => {
+    const res = merge([Buffer.from(DP2), Buffer.from(DP5)], {
+      onTypeClash: "promote",
+    });
     expect(res.text).toContain('"TYPE","ID","5DP"');
     expect(res.text).toContain('"DATA","BH01","10.00000"'); // padded — no digit changed
     expect(res.text).toContain('"DATA","BH02","20.12345"'); // already 5DP — untouched
@@ -182,7 +205,9 @@ describe("merge onTypeClash", () => {
   });
 
   it("widen throws the TYPE away instead (the contrast that motivates promote)", () => {
-    const res = merge([Buffer.from(DP2), Buffer.from(DP5)], { onTypeClash: "widen" });
+    const res = merge([Buffer.from(DP2), Buffer.from(DP5)], {
+      onTypeClash: "widen",
+    });
     expect(res.text).toContain('"TYPE","ID","X"');
     expect(res.text).toContain('"DATA","BH01","10.00"'); // bytes untouched
   });
@@ -207,9 +232,13 @@ describe("merge onTypeClash", () => {
       '"DATA","BH01","10.00"',
       '"DATA","BH02","20.123"',
     );
-    const res = merge([Buffer.from(sf3), Buffer.from(sf5)], { onTypeClash: "promote" });
+    const res = merge([Buffer.from(sf3), Buffer.from(sf5)], {
+      onTypeClash: "promote",
+    });
     expect(res.text).toContain('"TYPE","ID","X"');
-    expect(res.warnings.filter((w) => w.kind === "type_promoted")).toHaveLength(0);
+    expect(res.warnings.filter((w) => w.kind === "type_promoted")).toHaveLength(
+      0,
+    );
   });
 
   it("rejects an unknown mode, listing the ones it accepts", () => {

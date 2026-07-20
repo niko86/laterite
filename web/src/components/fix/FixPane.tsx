@@ -32,7 +32,7 @@ import { FileDiff } from "./FileDiff";
 
 // Severity is a FINDING property, not a FIX one — by design the Rust `Fix`
 // model omits it so the parity oracle's byte-identical JSON can't regress (see
-// wiki ags5-design/validator-finding-ux). So to tell whether a fix touches an
+// wiki design/validator-finding-ux). So to tell whether a fix touches an
 // FYI-classified finding (the surprise: Validate hides FYI by default, yet a
 // fix for it — e.g. a Rule 1 BOM/extended-char — still showed up and got
 // applied here), we map each fix to the severity of the finding it resolves,
@@ -51,7 +51,7 @@ function buildSevIndex(report: ValidationReport | undefined): SevIndex {
   if (report)
     for (const g of report.findings)
       for (const it of g.items) {
-        const s = (it.severity ?? "warning") as Severity;
+        const s = it.severity ?? "warning";
         if (it.line != null) {
           const k = `${g.rule}|${it.line}`;
           const prev = byRuleLine.get(k);
@@ -77,7 +77,9 @@ export const FixPane: Component = () => {
       const b = fileStore.canonicalBytes();
       // Track dict/encoding so changing either (e.g. switch to Windows-1252
       // in Validate) recomputes the fixes here too.
-      return b && b.length > 0 ? { b, dict: dictVersion(), enc: encoding() } : null;
+      return b && b.length > 0
+        ? { b, dict: dictVersion(), enc: encoding() }
+        : null;
     },
     (src) => computeFixes(src.b, src.dict, src.enc),
   );
@@ -105,7 +107,9 @@ export const FixPane: Component = () => {
     if (!r) return false;
     const rulesWithFyi = new Set(
       r.findings
-        .filter((g) => g.items.some((it) => (it.severity ?? "warning") === "fyi"))
+        .filter((g) =>
+          g.items.some((it) => (it.severity ?? "warning") === "fyi"),
+        )
         .map((g) => g.rule),
     );
     // The BOM's FYI is filed under a sibling "FYI (Related to Rule 1)" rule, so
@@ -114,7 +118,8 @@ export const FixPane: Component = () => {
     return (fixes() ?? []).some(
       (f) =>
         f.risk !== "risky" &&
-        (rulesWithFyi.has(f.rule) || (hasRule1Fyi && f.rule.includes("Rule 1"))),
+        (rulesWithFyi.has(f.rule) ||
+          (hasRule1Fyi && f.rule.includes("Rule 1"))),
     );
   });
 
@@ -158,7 +163,10 @@ export const FixPane: Component = () => {
   const commit = (next: Uint8Array, prior?: Uint8Array) => {
     const before = prior ?? fileStore.bytes();
     if (before)
-      setUndoStack((s) => [...s, { bytes: before, edited: fileStore.edited() }]);
+      setUndoStack((s) => [
+        ...s,
+        { bytes: before, edited: fileStore.edited() },
+      ]);
     fileStore.setBytes(next);
     fileStore.setEdited(false); // engine output is canonical UTF-8 (CRLF)
     // apply_fixes re-encodes to UTF-8, so the fixed bytes are now UTF-8 — reset
@@ -262,7 +270,9 @@ export const FixPane: Component = () => {
           <button
             type="button"
             class="mt-4 rounded bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent/25"
-            onClick={() => goTo("validate")}
+            onClick={() => {
+              goTo("validate");
+            }}
           >
             Go to Validate to load a file →
           </button>
@@ -274,12 +284,16 @@ export const FixPane: Component = () => {
           <PillToggle
             label="Fixes"
             active={view() === "fixes"}
-            onClick={() => setView("fixes")}
+            onClick={() => {
+              setView("fixes");
+            }}
           />
           <PillToggle
             label="Diff"
             active={view() === "diff"}
-            onClick={() => setView("diff")}
+            onClick={() => {
+              setView("diff");
+            }}
           />
           {/* Persistent download — independent of view + whether any fixes
               remain (the old Export lived inside FixesPanel and vanished once
@@ -299,7 +313,7 @@ export const FixPane: Component = () => {
               type="button"
               class="rounded bg-emerald-600/80 px-3 py-1.5 font-medium text-emerald-50 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={busy() || fixCount() === 0}
-              onClick={fixAllSafe}
+              onClick={() => void fixAllSafe()}
             >
               Fix all safe ({fixCount()})
             </button>
@@ -307,7 +321,7 @@ export const FixPane: Component = () => {
               type="button"
               class="rounded border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip disabled:opacity-40"
               disabled={busy() || fixCount() === 0}
-              onClick={iterateToClean}
+              onClick={() => void iterateToClean()}
             >
               Fix until clean
             </button>
@@ -351,8 +365,8 @@ export const FixPane: Component = () => {
               clear a related <span class="text-accent">FYI</span> advisory tied
               to the same issue (e.g. stripping a Rule 1 BOM). The Validate
               severity filter only controls what's <em>listed</em> there — it
-              doesn't limit what gets fixed. Each fix is badged with the severity
-              it addresses.
+              doesn't limit what gets fixed. Each fix is badged with the
+              severity it addresses.
             </p>
           </Show>
 
@@ -367,7 +381,9 @@ export const FixPane: Component = () => {
               <button
                 type="button"
                 class="mt-2 rounded bg-amber-600/80 px-3 py-1 text-xs font-medium text-amber-50 hover:bg-amber-600"
-                onClick={() => setEncoding("windows-1252")}
+                onClick={() => {
+                  setEncoding("windows-1252");
+                }}
               >
                 Switch encoding to Windows-1252
               </button>
@@ -379,7 +395,7 @@ export const FixPane: Component = () => {
             text={text}
             selected={selected}
             onToggle={toggleFix}
-            onApply={applySelected}
+            onApply={(sel) => void applySelected(sel)}
             aligned={aligned}
             severityOf={severityOf}
           />
@@ -392,4 +408,3 @@ export const FixPane: Component = () => {
     </Show>
   );
 };
-

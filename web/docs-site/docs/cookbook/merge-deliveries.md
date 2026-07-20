@@ -2,7 +2,7 @@
 
 **Available in:** Python · Node · CLI · Browser
 
-**When:** two deliveries of *one* project need to become one file — a phased
+**When:** two deliveries of _one_ project need to become one file — a phased
 site investigation, or a resubmission that revises some boreholes and adds
 others — and you want the engine to reconcile them, not a manual copy-paste.
 
@@ -11,7 +11,7 @@ group's dictionary **KEY headings**, so a re-sorted borehole list still merges
 onto its prior self. Files merge in **argument order** — a later file wins a KEY
 conflict — and the result is a **union**: a row present in only one file is kept
 (silence is not deletion). Every surface reports the same audit: the per-row
-*revisions* a later file made, plus any warnings.
+_revisions_ a later file made, plus any warnings.
 
 === "CLI"
 
@@ -92,14 +92,14 @@ One delivery types `LOCA_GL` as `2DP`, the next types it `5DP`. Merge will not
 guess: by default it **errors** (exit `6` / `MergeConflictError`). You choose how
 to settle it.
 
-| mode | what the merged column becomes | your values |
-|---|---|---|
-| `error` *(default)* | — | merge refuses |
-| `widen` | `X` (free text) | kept byte-for-byte |
-| `promote` | the **greatest precision** — `2DP` + `5DP` → `5DP` | coarser values zero-padded: `10.00` → `10.00000` |
+| mode                | what the merged column becomes                     | your values                                      |
+| ------------------- | -------------------------------------------------- | ------------------------------------------------ |
+| `error` _(default)_ | —                                                  | merge refuses                                    |
+| `widen`             | `X` (free text)                                    | kept byte-for-byte                               |
+| `promote`           | the **greatest precision** — `2DP` + `5DP` → `5DP` | coarser values zero-padded: `10.00` → `10.00000` |
 
 `widen` is lossless on the bytes but **throws the type away**, and `X` is the
-least informative answer available. `promote` keeps the column *numeric*.
+least informative answer available. `promote` keeps the column _numeric_.
 
 === "CLI"
 
@@ -119,7 +119,7 @@ least informative answer available. `promote` keeps the column *numeric*.
     const res = merge(["phase1.ags", "phase2.ags"], { onTypeClash: "promote" });
     ```
 
-**`promote` never rounds and never demotes.** It only ever *appends zeros*, so no
+**`promote` never rounds and never demotes.** It only ever _appends zeros_, so no
 digit you wrote is ever changed, and taking the **maximum** precision is the only
 direction that cannot destroy data — which also makes the result independent of
 argument order (unlike a KEY conflict, where the later file deliberately wins). A
@@ -127,7 +127,7 @@ value it cannot pad losslessly is kept verbatim and warned about, never rounded.
 
 **It is deliberately limited to `nDP`.** Significant figures (`3SF`) and scientific
 notation (`2SCI`) fall back to `widen`, because decimal places are a formatting
-convention but significant figures are a claim about *measured* precision — padding
+convention but significant figures are a claim about _measured_ precision — padding
 `3SF` to `5SF` would assert two digits the instrument never resolved.
 
 !!! tip "Why promote matters downstream"
@@ -144,7 +144,7 @@ convention but significant figures are a claim about *measured* precision — pa
     different UNITs for one heading, merge refuses in **every** mode, `promote`
     included. Reconcile the `UNIT` row at source.
 
-**One caveat everywhere:** identity is KEY-based, so *correcting* a KEY value
+**One caveat everywhere:** identity is KEY-based, so _correcting_ a KEY value
 (a `LOCA_ID` typo `BH1` → `BH01`) reads as a different row, not an edit — both
 persist. Fix KEY typos in the source before merging.
 

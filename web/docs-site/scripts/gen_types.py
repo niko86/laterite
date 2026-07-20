@@ -14,7 +14,7 @@ from pathlib import Path
 import mkdocs_gen_files
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import catalogue_data as cd  # noqa: E402
+import catalogue_data as cd
 
 _READS_AS = {
     "string": "`str`",
@@ -56,8 +56,9 @@ for e in cd.TYPE_GLOSSARY:
     out.append(f"### {e['title']} {{ #{e['key']} }}")
     out.append("")
     out.append(f"- **Codes:** {codes}")
-    out.append(f"- **Reads as:** {_READS_AS[e['canonical']]} "
-               f"(canonical `{e['canonical']}`)")
+    out.append(
+        f"- **Reads as:** {_READS_AS[e['canonical']]} (canonical `{e['canonical']}`)"
+    )
     out.append(f"- **AGS standard:** {e['ags']}")
     out.append("")
     out.append(e["detail"])

@@ -24,11 +24,37 @@ SOFTWARE.
 
 Third-party data notice:
 
-The AGS4 standard data dictionaries bundled under
-`rust-packages/laterite-ags4-validator/data/` (`Standard_dictionary_v4_1.ags`,
-`Standard_dictionary_v4_2.ags`) are © The Association of Geotechnical and
-Geoenvironmental Specialists (AGS), all rights reserved. They are reference
-data for the published AGS4 transfer-format standard, redistributed here as
-a documented decision — see that directory's `PROVENANCE.md`. This MIT
-licence covers the source code of this repository; it does not purport to
-relicense the AGS dictionary data.
+This software incorporates the AGS4 Data Dictionary — the machine-readable
+schema of the AGS4 transfer format (group codes, heading names, data types,
+units, status and descriptions) — for all five published editions:
+
+    Standard_dictionary_v4_0_3.ags     AGS4 edition 4.0.3
+    Standard_dictionary_v4_0_4.ags     AGS4 edition 4.0.4
+    Standard_dictionary_v4_1.ags       AGS4 edition 4.1
+    Standard_dictionary_v4_1_1.ags     AGS4 edition 4.1.1
+    Standard_dictionary_v4_2.ags       AGS4 edition 4.2
+
+That data is © The Association of Geotechnical and Geoenvironmental
+Specialists (AGS), all rights reserved. It is reference data for the
+published AGS4 transfer-format standard, redistributed here as a documented
+decision by the repository owner — see
+`rust-packages/laterite-ags4-validator/data/PROVENANCE.md` for the source,
+the retrieval provenance and the reasoning.
+
+HOW THE DATA IS DISTRIBUTED — this differs by artefact, and the difference
+matters if you are looking for it:
+
+  * In a SOURCE distribution the five files above are present, verbatim, at
+    `rust-packages/laterite-ags4-validator/data/`.
+
+  * In a COMPILED distribution — the `laterite` Python wheel, the
+    `@laterite/native-*` npm packages, the wasm bundle, the `lat` CLI, the
+    `laterite_ags4` DuckDB extension — they are NOT present as files. The
+    five editions are projected into a single `ags_dictionary.json` and
+    embedded into the binary at compile time (as an `include_str!` constant
+    and as generated lookup tables). The AGS content, including every
+    heading description verbatim, is therefore inside the compiled artefact
+    even though no dictionary file appears alongside it.
+
+This MIT licence covers the source code of this repository. It does not
+purport to relicense the AGS dictionary data.

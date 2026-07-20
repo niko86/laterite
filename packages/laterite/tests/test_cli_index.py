@@ -41,7 +41,11 @@ _CLEAN = (
 def _certified(path, cert) -> bool:
     """Did the certificate stand in for the rule engine? — via the library, which is the
     same code path `_cli._with_cert` drives."""
-    return laterite.read(str(path), index=str(cert)).validate(warnings=False).report.certified
+    return (
+        laterite.read(str(path), index=str(cert))
+        .validate(warnings=False)
+        .report.certified
+    )
 
 
 def _mint(tmp_path):
@@ -86,7 +90,15 @@ def test_cli_index_auto_sentinel_does_not_disarm_the_skip(tmp_path, capsys):
 
     assert (
         _cli.main(
-            ["validate", str(src), "--index", str(cert), "--no-warnings", "--dict-version", "auto"]
+            [
+                "validate",
+                str(src),
+                "--index",
+                str(cert),
+                "--no-warnings",
+                "--dict-version",
+                "auto",
+            ]
         )
         == 0
     )
@@ -101,12 +113,22 @@ def test_cli_index_a_forced_edition_correctly_refuses_the_cert(tmp_path, capsys)
 
     assert (
         _cli.main(
-            ["validate", str(src), "--index", str(cert), "--no-warnings", "--dict-version", "4.2"]
+            [
+                "validate",
+                str(src),
+                "--index",
+                str(cert),
+                "--no-warnings",
+                "--dict-version",
+                "4.2",
+            ]
         )
         == 0
     )
     err = capsys.readouterr().err
-    assert "rule engine skipped" not in err, "a forced edition is more than the cert vouches for"
+    assert "rule engine skipped" not in err, (
+        "a forced edition is more than the cert vouches for"
+    )
 
 
 def test_cli_index_stale_cert_is_a_note_not_an_error(tmp_path, capsys):
@@ -121,7 +143,9 @@ def test_cli_index_stale_cert_is_a_note_not_an_error(tmp_path, capsys):
     out = capsys.readouterr()
 
     assert code == 1, "the full check must run and report the new findings"
-    assert "--index not used" in out.err, f"the stale cert must be explained: {out.err!r}"
+    assert "--index not used" in out.err, (
+        f"the stale cert must be explained: {out.err!r}"
+    )
     assert "finding(s)" in out.out
 
 
@@ -129,14 +153,18 @@ def test_cli_index_wrong_file_cert_is_caught(tmp_path, capsys):
     """A certificate for a DIFFERENT file must be rejected on its bytes. This is the
     case npx got wrong in the most complete way possible: it accepted `--index`, read
     nothing, and validated as if the flag were absent."""
-    src, cert = _mint(tmp_path)
+    _src, cert = _mint(tmp_path)
     other = tmp_path / "other.ags"
     # Still error-clean, but not the same bytes — so the cert's SHA-256 cannot match.
     other.write_bytes(_CLEAN + b"\r\n")
 
-    assert _cli.main(["validate", str(other), "--index", str(cert), "--no-warnings"]) == 0
+    assert (
+        _cli.main(["validate", str(other), "--index", str(cert), "--no-warnings"]) == 0
+    )
     err = capsys.readouterr().err
-    assert "--index not used" in err, "a cert minted for another file must not be trusted"
+    assert "--index not used" in err, (
+        "a cert minted for another file must not be trusted"
+    )
 
 
 def test_cli_index_json_output_is_unchanged_by_the_cert(tmp_path, capsys):
@@ -145,10 +173,17 @@ def test_cli_index_json_output_is_unchanged_by_the_cert(tmp_path, capsys):
     the same JSON shape a clean engine run does."""
     src, cert = _mint(tmp_path)
 
-    assert _cli.main(["validate", str(src), "--index", str(cert), "--no-warnings", "--json"]) == 0
+    assert (
+        _cli.main(
+            ["validate", str(src), "--index", str(cert), "--no-warnings", "--json"]
+        )
+        == 0
+    )
     certified = json.loads(capsys.readouterr().out)
 
     assert _cli.main(["validate", str(src), "--no-warnings", "--json"]) == 0
     engine = json.loads(capsys.readouterr().out)
 
-    assert certified == engine, "a certificate must not change what the verdict LOOKS like"
+    assert certified == engine, (
+        "a certificate must not change what the verdict LOOKS like"
+    )

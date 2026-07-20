@@ -44,9 +44,11 @@ export const RevisionDiff: Component = () => {
     ({ x, y }) => revisionDiff(x.bytes, y.bytes, "utf-8", MAX_ROWS_PER_GROUP),
   );
 
-  const pick = (set: (p: Picked) => void) => async (e: Event) => {
-    const f = (e.currentTarget as HTMLInputElement).files?.[0];
-    if (f) set(await readFile(f));
+  const pick = (set: (p: Picked) => void) => (e: Event) => {
+    void (async () => {
+      const f = (e.currentTarget as HTMLInputElement).files?.[0];
+      if (f) set(await readFile(f));
+    })();
   };
 
   return (
@@ -60,11 +62,7 @@ export const RevisionDiff: Component = () => {
       </p>
 
       <div class="grid gap-3 sm:grid-cols-2">
-        <FilePicker
-          label="Baseline (a)"
-          picked={a()}
-          onPick={pick(setA)}
-        />
+        <FilePicker label="Baseline (a)" picked={a()} onPick={pick(setA)} />
         <FilePicker label="Revision (b)" picked={b()} onPick={pick(setB)} />
       </div>
 
@@ -107,12 +105,14 @@ const FilePicker: Component<{
       type="file"
       accept=".ags,.txt,text/plain"
       class="text-xs text-fg-muted file:mr-2 file:rounded file:border-0 file:bg-chip file:px-2 file:py-1 file:text-fg-soft"
-      onChange={(e) => props.onPick(e)}
+      onChange={(e) => {
+        props.onPick(e);
+      }}
     />
     <Show when={props.picked}>
-      <span class="mono truncate text-xs text-accent">
-        {props.picked!.name}
-      </span>
+      {(picked) => (
+        <span class="mono truncate text-xs text-accent">{picked().name}</span>
+      )}
     </Show>
   </label>
 );
@@ -120,6 +120,9 @@ const FilePicker: Component<{
 const DeltaView: Component<{
   delta: import("../../lib/validator").RevisionDelta;
 }> = (props) => {
+  // DeltaView is remounted per delta — the <Show when={!delta.loading}> above
+  // unmounts it while re-comparing — so props.delta never changes in place.
+  // eslint-disable-next-line solid/reactivity
   const d = props.delta;
   const unchanged = () =>
     d.total_added === 0 &&
@@ -162,6 +165,8 @@ const DeltaView: Component<{
 };
 
 const GroupDeltaView: Component<{ g: GroupDelta }> = (props) => {
+  // Rendered under <For> (value-keyed), so props.g is stable for this instance.
+  // eslint-disable-next-line solid/reactivity
   const g = props.g;
   const shown = () => g.rows.length;
   const total = () => g.added + g.removed + g.changed;
@@ -191,7 +196,9 @@ const GroupDeltaView: Component<{ g: GroupDelta }> = (props) => {
       <Show when={g.headings_added.length > 0 || g.headings_removed.length > 0}>
         <p class="mt-1 text-xs text-fg-dim">
           <Show when={g.headings_added.length > 0}>
-            <span class="text-ok">+headings {g.headings_added.join(", ")}</span>{" "}
+            <span class="text-ok">
+              +headings {g.headings_added.join(", ")}
+            </span>{" "}
           </Show>
           <Show when={g.headings_removed.length > 0}>
             <span class="text-err">
@@ -215,6 +222,8 @@ const GroupDeltaView: Component<{ g: GroupDelta }> = (props) => {
 };
 
 const RowDeltaView: Component<{ r: RowDelta }> = (props) => {
+  // Rendered under <For> (value-keyed), so props.r is stable for this instance.
+  // eslint-disable-next-line solid/reactivity
   const r = props.r;
   const band =
     r.kind === "added"

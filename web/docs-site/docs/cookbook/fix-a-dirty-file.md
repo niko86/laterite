@@ -75,7 +75,7 @@ fresh handle.
     — the same safe-fix engine as every other surface, running entirely in
     your browser.
 
-These are *safe* repairs — width/whitespace/structural defects that have one
+These are _safe_ repairs — width/whitespace/structural defects that have one
 unambiguous correction. Anything judgemental (a wrong value, a missing KEY) is
 left for you; fix will not invent data.
 

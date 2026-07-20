@@ -17,21 +17,21 @@ import pytest
 
 # One crafted source per safe-fixable rule, each triggering that rule.
 CASES = {
-    "1": dict(  # leading UTF-8 BOM -> Rule 1 (StripBom, safe)
-        data=b"\xef\xbb\xbf"
+    "1": {  # leading UTF-8 BOM -> Rule 1 (StripBom, safe)
+        "data": b"\xef\xbb\xbf"
         b'"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n"DATA","P1"\r\n'
-    ),
-    "2a": dict(  # bare-LF line endings -> Rule 2a (NormalizeCrlf, safe)
-        text='"GROUP","PROJ"\n"HEADING","PROJ_ID"\n"UNIT",""\n"TYPE","ID"\n"DATA","P1"\n'
-    ),
-    "4": dict(  # DATA row shorter than HEADING -> Rule 4 (PadShortRow, safe)
-        text='"GROUP","PROJ"\r\n"HEADING","PROJ_ID","PROJ_NAME"\r\n"UNIT","",""\r\n'
+    },
+    "2a": {  # bare-LF line endings -> Rule 2a (NormalizeCrlf, safe)
+        "text": '"GROUP","PROJ"\n"HEADING","PROJ_ID"\n"UNIT",""\n"TYPE","ID"\n"DATA","P1"\n'
+    },
+    "4": {  # DATA row shorter than HEADING -> Rule 4 (PadShortRow, safe)
+        "text": '"GROUP","PROJ"\r\n"HEADING","PROJ_ID","PROJ_NAME"\r\n"UNIT","",""\r\n'
         '"TYPE","ID","X"\r\n"DATA","P1"\r\n'
-    ),
-    "8": dict(  # 2DP value at 1 dp -> Rule 8 (ReformatNumeric, safe)
-        text='"GROUP","LOCA"\r\n"HEADING","LOCA_ID","LOCA_GL"\r\n"UNIT","","m"\r\n'
+    },
+    "8": {  # 2DP value at 1 dp -> Rule 8 (ReformatNumeric, safe)
+        "text": '"GROUP","LOCA"\r\n"HEADING","LOCA_ID","LOCA_GL"\r\n"UNIT","","m"\r\n'
         '"TYPE","ID","2DP"\r\n"DATA","BH1","1.0"\r\n'
-    ),
+    },
 }
 
 
@@ -87,10 +87,10 @@ def test_exclude_leaves_the_targeted_rule_unfixed(short):
 def test_only_applies_just_the_named_rule():
     """A file with TWO fixable defects (Rule 2a bare-LF + Rule 8 precision):
     `only=['8']` fixes the precision and leaves the line endings."""
-    src = dict(
-        text='"GROUP","LOCA"\n"HEADING","LOCA_ID","LOCA_GL"\n"UNIT","","m"\n'
+    src = {
+        "text": '"GROUP","LOCA"\n"HEADING","LOCA_ID","LOCA_GL"\n"UNIT","","m"\n'
         '"TYPE","ID","2DP"\n"DATA","BH1","1.0"\n'
-    )
+    }
     both = _rules(L.read(**src).validate().report)
     assert {"AGS Format Rule 2a", "AGS Format Rule 8"} <= both
 

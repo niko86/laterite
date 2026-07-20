@@ -51,8 +51,11 @@ async function instantiate(): Promise<DuckHandle> {
   const duckdb = await import("@duckdb/duckdb-wasm");
   const bundle = await duckdb.selectBundle(bundles);
   // bundle.mainWorker is the ?url string Vite rewrote under the base; a
-  // classic Worker (duckdb's worker is not an ES module).
-  const worker = new Worker(bundle.mainWorker!);
+  // classic Worker (duckdb's worker is not an ES module). Typed `string | null`,
+  // though a selected bundle always carries one — guard for a clear failure.
+  if (!bundle.mainWorker)
+    throw new Error("DuckDB bundle is missing its worker URL");
+  const worker = new Worker(bundle.mainWorker);
   const db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
   const conn = await db.connect();
@@ -91,7 +94,10 @@ export function isEngineReady(): boolean {
 
 /** Ingest one group's typed Arrow IPC stream as a table named by its code.
  *  Idempotent per code within the active file (the ingested-set guards). */
-export async function ingestGroup(code: string, ipc: Uint8Array): Promise<void> {
+export async function ingestGroup(
+  code: string,
+  ipc: Uint8Array,
+): Promise<void> {
   if (ingested.has(code)) return;
   const { conn } = await getDuckDb();
   await conn.insertArrowFromIPCStream(ipc, { name: code, create: true });
@@ -113,8 +119,8 @@ export function isLoaded(bytes: Uint8Array): boolean {
  *  duck — it's ExplorePane's GroupInfo[]). Returning this on a re-mount avoids
  *  re-parsing the whole file in wasm + re-running count(*) per group, which
  *  was pure waste on every Explore tab switch. */
-export function getLoadedGroups<T>(): T | null {
-  return loadedGroups as T | null;
+export function getLoadedGroups(): unknown {
+  return loadedGroups;
 }
 
 /** Record `bytes` as the ingested file + cache its computed group info, so a
@@ -138,18 +144,16 @@ export async function run(sql: string): Promise<Table> {
   const { conn } = await getDuckDb();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () =>
-        reject(
-          new Error(
-            `Query exceeded ${QUERY_TIMEOUT_MS / 1000}s — it likely hit an ` +
-              `error the engine couldn't report (e.g. comparing a number or ` +
-              `date column to text). The engine was reset; adjust the query ` +
-              `and run again.`,
-          ),
+    timer = setTimeout(() => {
+      reject(
+        new Error(
+          `Query exceeded ${QUERY_TIMEOUT_MS / 1000}s — it likely hit an ` +
+            `error the engine couldn't report (e.g. comparing a number or ` +
+            `date column to text). The engine was reset; adjust the query ` +
+            `and run again.`,
         ),
-      QUERY_TIMEOUT_MS,
-    );
+      );
+    }, QUERY_TIMEOUT_MS);
   });
   try {
     return await Promise.race([conn.query(sql), timeout]);
@@ -175,7 +179,9 @@ async function reconnect(): Promise<void> {
     const conn = await Promise.race([
       db.connect(),
       new Promise<AsyncDuckDBConnection>((_, reject) =>
-        setTimeout(() => reject(new Error("reconnect timed out")), 3_000),
+        setTimeout(() => {
+          reject(new Error("reconnect timed out"));
+        }, 3_000),
       ),
     ]);
     if (instance === prev) instance = Promise.resolve({ db, conn });

@@ -33,37 +33,37 @@ export const ResultsGrid: Component<{
         class={`rounded-lg border border-line ${props.maxHeight ? "overflow-auto" : props.flowOnMobile ? "scroll-region-soft" : "scroll-region"}`}
         style={props.maxHeight ? { "max-height": props.maxHeight } : undefined}
       >
-      <table class="min-w-full text-xs">
-        <thead class="sticky top-0 z-10 bg-surface-raised text-fg-soft [&_th]:border-b [&_th]:border-line">
-          <tr>
-            <For each={props.result.columns}>
-              {(c) => (
-                <th class="whitespace-nowrap px-3 py-1.5 text-left font-medium">
-                  {c.name}
-                  <span class="ml-1 font-normal text-fg-dim">
-                    {c.sqlType.toLowerCase()}
-                  </span>
-                </th>
+        <table class="min-w-full text-xs">
+          <thead class="sticky top-0 z-10 bg-surface-raised text-fg-soft [&_th]:border-b [&_th]:border-line">
+            <tr>
+              <For each={props.result.columns}>
+                {(c) => (
+                  <th class="whitespace-nowrap px-3 py-1.5 text-left font-medium">
+                    {c.name}
+                    <span class="ml-1 font-normal text-fg-dim">
+                      {c.sqlType.toLowerCase()}
+                    </span>
+                  </th>
+                )}
+              </For>
+            </tr>
+          </thead>
+          <tbody class="mono">
+            <For each={props.result.rows}>
+              {(row) => (
+                <tr class="border-t border-line-subtle hover:bg-surface-raised">
+                  <For each={row}>
+                    {(cell) => (
+                      <td class="whitespace-nowrap px-3 py-1 text-fg-soft">
+                        {cell || "—"}
+                      </td>
+                    )}
+                  </For>
+                </tr>
               )}
             </For>
-          </tr>
-        </thead>
-        <tbody class="mono">
-          <For each={props.result.rows}>
-            {(row) => (
-              <tr class="border-t border-line-subtle hover:bg-surface-raised">
-                <For each={row}>
-                  {(cell) => (
-                    <td class="whitespace-nowrap px-3 py-1 text-fg-soft">
-                      {cell || "—"}
-                    </td>
-                  )}
-                </For>
-              </tr>
-            )}
-          </For>
-        </tbody>
-      </table>
+          </tbody>
+        </table>
       </div>
     </div>
   </Show>

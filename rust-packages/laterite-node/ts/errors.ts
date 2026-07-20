@@ -94,7 +94,11 @@ export class MergeConflictError extends Ags4Error {
 
 /** Build the exception for a `(kind, exitCode, message)` failure — the data-
  * driven map (mirrors `_errors.py::_KIND_TO_EXC`), never message-matching. */
-export function makeError(kind: string, exitCode: number, message: string): Ags4Error {
+export function makeError(
+  kind: string,
+  exitCode: number,
+  message: string,
+): Ags4Error {
   switch (kind) {
     case "not_found":
     case "io":
@@ -121,7 +125,11 @@ export function makeError(kind: string, exitCode: number, message: string): Ags4
  * `{ok:false}` failure report (the analog of Python's `raise_for`). */
 export function raiseFor(report: ValidationReport): ValidationReport {
   if (report.ok) return report;
-  throw makeError(report.errorKind ?? "", report.exitCode, report.error ?? "unknown error");
+  throw makeError(
+    report.errorKind ?? "",
+    report.exitCode,
+    report.error ?? "unknown error",
+  );
 }
 
 /** Recover the mapped exception from a thrown native error whose message is the

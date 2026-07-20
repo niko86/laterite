@@ -7,9 +7,9 @@
 use std::io;
 use std::path::Path;
 
-use laterite_ags4_validator::Findings;
+use laterite_ags4_validator::{Findings, findings};
 use laterite_cliutil::{colour_enabled, styled_table, write_json_pretty};
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 /// Findings flattened to one row per finding, in spec-rule order (the `Findings`
 /// map is a `BTreeMap`, so deterministic), rendered through the shared
@@ -26,7 +26,7 @@ pub fn findings_table(found: &Findings, use_color: bool) -> String {
                 .unwrap_or(rule)
                 .to_string();
             items.iter().map(move |f| {
-                let line = f.line.map(|l| l.to_string()).unwrap_or_else(|| "-".into());
+                let line = f.line.map_or_else(|| "-".into(), |l| l.to_string());
                 vec![short.clone(), line, f.group.clone(), f.desc.clone()]
             })
         })
@@ -42,46 +42,25 @@ pub fn report_table(path: &Path, found: &Findings, n: usize) {
 /// The nested report value `{file, findings:{rule:[{line,group,desc}]}}`. Shared
 /// by the stdout `--json` path and the `--out`/`--json-out` file writers so they
 /// never disagree.
+///
+/// A `&Path`-taking adapter over the engine's renderer — the rendering itself
+/// lives beside `Finding` in `laterite_ags4_validator::findings` so this
+/// binary, laterite-py and laterite-node cannot spell `--json` differently
+/// (#530).
 pub fn json_value(path: &Path, found: &Findings) -> Value {
-    let mut fmap = Map::new();
-    for (rule, items) in found {
-        let arr: Vec<Value> = items
-            .iter()
-            .map(|f| serde_json::to_value(f).unwrap_or(Value::Null))
-            .collect();
-        fmap.insert(rule.clone(), Value::Array(arr));
-    }
-    let mut root = Map::new();
-    root.insert("file".into(), Value::from(path.display().to_string()));
-    root.insert("findings".into(), Value::Object(fmap));
-    Value::Object(root)
+    findings::findings_json_value(&path.display().to_string(), found)
 }
 
 /// Plain pretty JSON (never coloured) — for files (`--out`/`--json-out`).
 pub fn json_string(path: &Path, found: &Findings) -> String {
-    serde_json::to_string_pretty(&json_value(path, found)).unwrap_or_default()
+    findings::findings_json(&path.display().to_string(), found)
 }
 
 /// One flat JSON object per finding per line (NDJSON). Stream/grep friendly;
 /// identical whether it goes to stdout or a file (no colour). Empty (no lines)
 /// when there are zero findings.
 pub fn ndjson_string(found: &Findings) -> String {
-    let mut s = String::new();
-    for (rule, items) in found {
-        for f in items {
-            // Build `rule`-first (the historical NDJSON key position), then
-            // splice in the serialized `Finding` body so line-only findings stay
-            // `{rule,line,group,desc}` byte-for-byte.
-            let mut o = Map::new();
-            o.insert("rule".into(), Value::from(rule.clone()));
-            if let Value::Object(body) = serde_json::to_value(f).unwrap_or(Value::Null) {
-                o.extend(body);
-            }
-            s.push_str(&serde_json::to_string(&Value::Object(o)).unwrap_or_default());
-            s.push('\n');
-        }
-    }
-    s
+    findings::findings_ndjson(found)
 }
 
 /// The plain report rendered to a `String` (no colour) — for `--out` when

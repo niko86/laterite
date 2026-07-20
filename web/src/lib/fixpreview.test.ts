@@ -68,7 +68,7 @@ describe("fixHighlight — astral chars don't desync offsets", () => {
   it("rebases correctly past a surrogate pair", () => {
     // "DATA","😀","x" — replace the x (a 1-char value) in field 2.
     const line = '"DATA","😀","x"';
-    const cps = [...line];
+    const cps = Array.from(line);
     const xPos = cps.lastIndexOf("x");
     const h = fixHighlight(line, edit(xPos, xPos + 1, "y"));
     expect(h.after).toBe('"DATA","😀","y"');

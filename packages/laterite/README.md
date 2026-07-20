@@ -100,8 +100,8 @@ tables + methodology in the
 
 ## Parity + clean-room
 
-122 / 131 of python-ags4 1.2.0's own test suite passes through
-`laterite.compat` (the 9 remaining are deliberate non-closures). The validator
+121 / 131 of python-ags4 1.2.0's own test suite passes through
+`laterite.compat` (the 10 remaining are deliberate non-closures). The validator
 is **clean-room** from the AGS4 spec — python-ags4 is LGPL-3.0, and the
 separation is what lets laterite ship under MIT. Details:
 [COMPAT.md](https://github.com/niko86/laterite/blob/main/COMPAT.md) ·

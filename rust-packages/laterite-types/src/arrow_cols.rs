@@ -59,16 +59,13 @@ where
         let mut id_b = StringBuilder::with_capacity(n_rows, n_rows * 36);
         let mut pid_b = StringBuilder::with_capacity(n_rows, n_rows * 36);
         for row in 0..n_rows {
-            match ids.get(row) {
-                Some((id, parent)) => {
-                    id_b.append_value(id);
-                    pid_b.append_option(parent.as_deref());
-                }
+            if let Some((id, parent)) = ids.get(row) {
+                id_b.append_value(id);
+                pid_b.append_option(parent.as_deref());
+            } else {
                 // Defensive: ids shorter than n_rows → null pair (never a panic).
-                None => {
-                    id_b.append_null();
-                    pid_b.append_null();
-                }
+                id_b.append_null();
+                pid_b.append_null();
             }
         }
         fields.push(Field::new("_id", DataType::Utf8, true));
@@ -84,7 +81,7 @@ where
         for row in 0..n_rows {
             // Callers pass hashes.len() == n_rows; the fallback keeps the column
             // non-null (never a panic) for a defensively-short slice.
-            h_b.append_value(hashes.get(row).map(String::as_str).unwrap_or(""));
+            h_b.append_value(hashes.get(row).map_or("", String::as_str));
         }
         fields.push(Field::new("_content_hash", DataType::Utf8, false));
         columns.push(Arc::new(h_b.finish()) as ArrayRef);
@@ -114,7 +111,7 @@ where
 /// Like [`build_record_batch`], but prepends the two content-addressed key
 /// columns — `_id` (col 0) and `_parent_id` (col 1, NULL for a root group) —
 /// from caller-computed ids, then the heading columns. The column order, the
-/// `Utf8` type, and the root-NULL exactly match the `.ags5db` DuckDB
+/// `Utf8` type, and the root-NULL exactly match the DuckDB
 /// extension's `read_ags` recipe, so a file's keys are byte-identical whether
 /// they come from the extension or any host wheel. `ids[row]` is the
 /// `(_id, _parent_id)` pair (see `laterite_ags4_core::keychain::group_row_ids`,
@@ -144,6 +141,61 @@ where
     )
 }
 
+/// Build the python-ags4-shaped ("compat") all-`Utf8` `RecordBatch` for one
+/// group. Unlike [`build_record_batch_synth`] (which *types* each column), this
+/// is the drop-in shape `laterite.compat.AGS4_to_dataframe` hands back: a leading
+/// `HEADING` tag column, then one raw-string column per heading, with rows laid
+/// out as the `UNIT` row, the `TYPE` row, then the DATA rows. Every cell is a
+/// string; a missing/ragged cell is `""` (matching python-ags4, which pads a
+/// short DATA row to heading width). No canonical-type casting — compat keeps the
+/// file's raw text, so the boxing/typing the typed path pays is skipped.
+///
+/// Field names are positional (`HEADING`, then `c0`, `c1`, …): python-ags4's
+/// duplicate-heading renaming lives Python-side (it also owns the `rename=False`
+/// raise), and positional names mean a duplicated heading can never collide in
+/// the Arrow schema. `cell(col, row)` returns the raw DATA cell for data row
+/// `row` and heading `col` (or `None` → `""`); the batch has `n_data_rows + 2`
+/// rows (UNIT + TYPE + DATA).
+pub fn build_record_batch_compat<'a, F>(
+    headings: &[String],
+    units: &[String],
+    types: &[String],
+    n_data_rows: usize,
+    cell: F,
+) -> Result<RecordBatch, ArrowError>
+where
+    F: Fn(usize, usize) -> Option<&'a str>,
+{
+    let n_rows = n_data_rows + 2;
+    let mut fields = Vec::with_capacity(headings.len() + 1);
+    let mut columns: Vec<ArrayRef> = Vec::with_capacity(headings.len() + 1);
+
+    // Column 0: the row-tag column python-ags4 names "HEADING".
+    let mut tag = StringBuilder::with_capacity(n_rows, n_rows * 4);
+    tag.append_value("UNIT");
+    tag.append_value("TYPE");
+    for _ in 0..n_data_rows {
+        tag.append_value("DATA");
+    }
+    fields.push(Field::new("HEADING", DataType::Utf8, false));
+    columns.push(Arc::new(tag.finish()) as ArrayRef);
+
+    // One raw-string column per heading: [unit, type, *data].
+    for col in 0..headings.len() {
+        let mut b = StringBuilder::with_capacity(n_rows, n_rows * 8);
+        b.append_value(units.get(col).map_or("", String::as_str));
+        b.append_value(types.get(col).map_or("", String::as_str));
+        for row in 0..n_data_rows {
+            b.append_value(cell(col, row).unwrap_or(""));
+        }
+        fields.push(Field::new(format!("c{col}"), DataType::Utf8, false));
+        columns.push(Arc::new(b.finish()) as ArrayRef);
+    }
+
+    let schema = Arc::new(Schema::new(fields));
+    RecordBatch::try_new(schema, columns)
+}
+
 /// Build one typed column per heading and push its field + array. Shared by the
 /// keyed and unkeyed batch builders so the casting is identical between them.
 fn append_heading_columns<'a, F>(
@@ -157,7 +209,7 @@ fn append_heading_columns<'a, F>(
     F: Fn(usize, usize) -> Option<&'a str>,
 {
     for (col, heading) in headings.iter().enumerate() {
-        let ags_type = ags_types.get(col).map(String::as_str).unwrap_or("X");
+        let ags_type = ags_types.get(col).map_or("X", String::as_str);
         let (array, dt) = build_column(n_rows, ags_type, |row| cell(col, row));
         fields.push(Field::new(heading, dt, true));
         columns.push(array);
@@ -204,7 +256,7 @@ where
         }
         Some(CanonicalType::Datetime) => {
             // tz-naive microseconds — matches DuckDB TIMESTAMP and the native
-            // .ags5db. parse_datetime (not parse_value, which re-formats back
+            // DuckDB extension. parse_datetime (not parse_value, which re-formats back
             // to a string) gives the typed instant; an empty / unparseable
             // cell → null, the same null-ness as parse_value's Datetime arm.
             let mut b = TimestampMicrosecondBuilder::with_capacity(n_rows);
@@ -340,5 +392,46 @@ mod tests {
             field_names(&batch),
             vec!["_id", "_parent_id", "LOCA_ID", "LOCA_GL", "_content_hash"]
         );
+    }
+
+    /// The compat builder lays out python-ags4's frame shape: a leading `HEADING`
+    /// tag column (`UNIT`/`TYPE`/`DATA`), one raw-string column per heading with
+    /// positional names, `unit`/`type`/`*data` rows, and `""` for a short/ragged
+    /// cell (never a null).
+    #[test]
+    fn compat_batch_shape_and_ragged() {
+        let headings = vec!["LOCA_ID".to_string(), "LOCA_GL".to_string()];
+        let units = vec![String::new(), "m".to_string()];
+        let types = vec!["ID".to_string(), "2DP".to_string()];
+        // row 0 full; row 1 ragged (only one value) → col 1 becomes "".
+        let data = [vec!["BH1", "1.23"], vec!["BH2"]];
+        let cell = |col: usize, row: usize| -> Option<&str> {
+            data.get(row).and_then(|r| r.get(col)).copied()
+        };
+        let batch = build_record_batch_compat(&headings, &units, &types, data.len(), cell).unwrap();
+
+        let names: Vec<String> = batch
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| f.name().clone())
+            .collect();
+        assert_eq!(names, vec!["HEADING", "c0", "c1"]);
+        assert_eq!(batch.num_rows(), 4); // UNIT + TYPE + 2 DATA
+
+        let col = |i: usize| -> Vec<String> {
+            batch
+                .column(i)
+                .as_any()
+                .downcast_ref::<arrow::array::StringArray>()
+                .unwrap()
+                .iter()
+                .map(|o| o.unwrap_or("").to_string())
+                .collect()
+        };
+        assert_eq!(col(0), vec!["UNIT", "TYPE", "DATA", "DATA"]);
+        assert_eq!(col(1), vec!["", "ID", "BH1", "BH2"]);
+        // ragged: row 1 had no second value → "".
+        assert_eq!(col(2), vec!["m", "2DP", "1.23", ""]);
     }
 }

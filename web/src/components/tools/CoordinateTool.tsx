@@ -50,7 +50,7 @@ function loadGrid(): Promise<ArrayBuffer> {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.arrayBuffer();
       })
-      .catch((e) => {
+      .catch((e: unknown) => {
         gridPromise = null; // allow a later retry
         throw e;
       });
@@ -67,8 +67,10 @@ interface Loca {
 const decode = (b: Uint8Array) =>
   new TextDecoder("utf-8", { fatal: false }).decode(b);
 
-const val = (cps: string[], f: { valueStart: number; valueEnd: number }) =>
-  cps.slice(f.valueStart, f.valueEnd).join("");
+const val = (
+  cps: string[],
+  f: { valueStart: number; valueEnd: number } | undefined,
+) => (f ? cps.slice(f.valueStart, f.valueEnd).join("") : "");
 
 /** Pull (LOCA_ID, LOCA_NATE, LOCA_NATN) from the LOCA group's DATA rows. */
 function parseLoca(text: string): Loca[] {
@@ -78,7 +80,7 @@ function parseLoca(text: string): Loca[] {
   for (const line of text.split(/\r?\n/)) {
     if (line.trim() === "") continue;
     const fields = splitAgsFields(line);
-    const cps = [...line];
+    const cps = Array.from(line);
     const tag = val(cps, fields[0]);
     if (tag === "GROUP") {
       inLoca = val(cps, fields[1] ?? fields[0]) === "LOCA";
@@ -147,7 +149,8 @@ export const CoordinateTool: Component = () => {
       /* private mode — keep the in-memory consent, skip persistence */
     }
   };
-  const requestMap = () => (consented() ? setShowMap(true) : setAskConsent(true));
+  const requestMap = () =>
+    consented() ? setShowMap(true) : setAskConsent(true);
   const confirmConsent = () => {
     persistConsent(true);
     setAskConsent(false);
@@ -334,7 +337,10 @@ export const CoordinateTool: Component = () => {
           {/* Accuracy + provenance line — always tells the consumer what they
               get, and carries the OS attribution when OSTN15 is active. */}
           <p class="text-xs text-fg-muted">
-            Accuracy: <span class="text-fg-soft">{transformLabel(crs(), effPrecise())}</span>
+            Accuracy:{" "}
+            <span class="text-fg-soft">
+              {transformLabel(crs(), effPrecise())}
+            </span>
             <Show when={!effPrecise() && preciseSupported()}>
               {" "}
               — tick <span class="text-fg-soft">Precise</span> for survey-grade
@@ -439,7 +445,9 @@ export const CoordinateTool: Component = () => {
                     <th class="px-3 py-1.5 text-right font-medium">Easting</th>
                     <th class="px-3 py-1.5 text-right font-medium">Northing</th>
                     <th class="px-3 py-1.5 text-right font-medium">Latitude</th>
-                    <th class="px-3 py-1.5 text-right font-medium">Longitude</th>
+                    <th class="px-3 py-1.5 text-right font-medium">
+                      Longitude
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="mono">
@@ -447,8 +455,12 @@ export const CoordinateTool: Component = () => {
                     {(r) => (
                       <tr class="border-t border-line-subtle hover:bg-surface-raised">
                         <td class="px-3 py-1 text-accent">{r.id || "—"}</td>
-                        <td class="px-3 py-1 text-right text-fg-soft">{r.e || "—"}</td>
-                        <td class="px-3 py-1 text-right text-fg-soft">{r.n || "—"}</td>
+                        <td class="px-3 py-1 text-right text-fg-soft">
+                          {r.e || "—"}
+                        </td>
+                        <td class="px-3 py-1 text-right text-fg-soft">
+                          {r.n || "—"}
+                        </td>
                         <td class="px-3 py-1 text-right text-fg-soft">
                           {r.lat?.toFixed(6) ?? "—"}
                         </td>

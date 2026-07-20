@@ -17,7 +17,7 @@ produce byte-faithful AGS4 back out. Work through them in order — each page en
    `BuildResult` you can `.save`.
 
 !!! tip
-    In a hurry? The [cheatsheet](../reference/cheatsheet.md) is the whole API on one page,
-    and the [cookbook](../cookbook/index.md) has task-shaped recipes.
+In a hurry? The [cheatsheet](../reference/cheatsheet.md) is the whole API on one page,
+and the [cookbook](../cookbook/index.md) has task-shaped recipes.
 
 [Next → Install](./install.md)

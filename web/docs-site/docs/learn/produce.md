@@ -36,9 +36,9 @@ is append-only, so reassigning `p.locas` raises `AttributeError` rather than
 silently dropping the rows you built up.
 
 !!! tip
-    Both doors return the same `BuildResult`. Inspect `res.text` / `res.bytes`
-    in memory, check `res.findings` for any caveats autofix couldn't resolve, or
-    `res.save("out.ags")` to persist a byte-faithful AGS4 file to disk.
+Both doors return the same `BuildResult`. Inspect `res.text` / `res.bytes`
+in memory, check `res.findings` for any caveats autofix couldn't resolve, or
+`res.save("out.ags")` to persist a byte-faithful AGS4 file to disk.
 
 → See the whole fluent API assembled in the
 [Chaining Showcase](../chaining/index.md).

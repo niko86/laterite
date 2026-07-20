@@ -140,6 +140,9 @@ fn slice_reparse_recovers_the_group() {
     // 6b/6f: slice [PROJ.start .. TRAN.start) reparses to exactly PROJ.
     let bytes = lf();
     let pf = parse_bytes(&bytes, encoding_rs::UTF_8).unwrap();
+    // `lf()` is a tiny literal test fixture (a handful of bytes), so these
+    // offsets trivially fit usize.
+    #[allow(clippy::cast_possible_truncation)]
     let (s, e) = (
         pf.groups["PROJ"].group_byte as usize,
         pf.groups["TRAN"].group_byte as usize,

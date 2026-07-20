@@ -48,7 +48,9 @@ def test_chained_validate_encoding_arg_overrides_the_handle(tmp_path):
     """An explicit `encoding=` on `.validate()` wins over the handle's read encoding."""
     p = _write(tmp_path)
     # read as cp1252 (faithful) but force a UTF-8 re-check → the replacement-char Rule 1 returns
-    assert _has_rule1(L.read(str(p), encoding="cp1252").validate(encoding="utf-8").report)
+    assert _has_rule1(
+        L.read(str(p), encoding="cp1252").validate(encoding="utf-8").report
+    )
 
 
 def test_chained_fix_inherits_read_encoding(tmp_path):

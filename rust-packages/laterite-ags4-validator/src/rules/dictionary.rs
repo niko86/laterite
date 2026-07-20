@@ -30,7 +30,7 @@
 //! its structure/completeness is Rules 15/16/17/18 (V6).
 //!
 //! python-ags4 splits Rule 7 into a per-line duplicate-heading check
-//! (7_1) and the order check (7_2). The duplicate check is *inferred*
+//! (`7_1`) and the order check (`7_2`). The duplicate check is *inferred*
 //! — the prose only mandates dictionary order — but a HEADING row with
 //! repeated names has no well-defined order or field identity, so we
 //! keep it (attributed to Rule 7, matching python's count). See
@@ -74,6 +74,10 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
         // Rule 9 — every heading must be defined somewhere. `ci` is the
         // tag-stripped heading index; the UI resolves the raw field as
         // `field_index + 1` (field 0 is the HEADING tag).
+        // `ci` is a column index within one AGS4 group's heading row —
+        // bounded by that group's heading count (dictionary-bounded, a few
+        // dozen at most), nowhere near u32::MAX.
+        #[allow(clippy::cast_possible_truncation)]
         for (ci, h) in g.headings.iter().enumerate() {
             if !known.contains(h.as_str()) {
                 add_at(
@@ -183,7 +187,7 @@ fn rule_7_2(
 /// Pull the file's own DICT group into `group -> [user heading, …]`
 /// (file order). Columns are resolved by name from the DICT HEADING
 /// row, so column reordering doesn't break it. Mirrors python-ags4's
-/// combine_DICT_tables (standard dict first, file DICT appended);
+/// `combine_DICT_tables` (standard dict first, file DICT appended);
 /// here we only read it — DICT *validation* is V6.
 pub(crate) fn collect_file_dict(parsed: &ParsedFile) -> HashMap<String, Vec<String>> {
     let mut out: HashMap<String, Vec<String>> = HashMap::new();
@@ -195,8 +199,8 @@ pub(crate) fn collect_file_dict(parsed: &ParsedFile) -> HashMap<String, Vec<Stri
         return out; // malformed DICT — Rule 18 (V6) reports that
     };
     for row in &dictg.rows {
-        let grp = row.values.get(gi).map(String::as_str).unwrap_or("");
-        let hdng = row.values.get(hi).map(String::as_str).unwrap_or("");
+        let grp = row.values.get(gi).map_or("", String::as_str);
+        let hdng = row.values.get(hi).map_or("", String::as_str);
         if grp.is_empty() || hdng.is_empty() {
             continue; // GROUP-type rows / blanks contribute no heading
         }

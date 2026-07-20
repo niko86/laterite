@@ -23,7 +23,7 @@ export declare class Reading {
    * SAME casting Python/wasm use — so a file types byte-identically across
    * hosts. Returns `null` if the code isn't in the file.
    */
-  tableIpc(code: string): Buffer | null
+  tableIpc(code: string, contentHash?: boolean | undefined | null): Buffer | null
   /**
    * Re-emit byte-faithful AGS4 text from the retained parse (the raw DATA
    * values, unchanged). = laterite-py's `Reading::emit`.
@@ -34,10 +34,15 @@ export declare class Reading {
 /**
  * The `.ags.idx` validity certificate — the Node mirror of laterite-py's
  * `Sidecar` pyclass, wrapping the ONE core `laterite_ags4_core::index::Sidecar`
- * so a Node-minted cert is byte-identical + checker-compatible with Python,
- * `lat certify`, and the DuckDB extension. `Ags4File.certify()` mints
- * one; `read(file, {index})` consumes it; a fresh + engine-matching cert lets a
- * later `.validate()` skip the rule engine.
+ * so a Node-minted cert is byte-identical + checker-compatible with Python and
+ * `lat certify`. `Ags4File.certify()` mints one; `read(file, {index})` consumes
+ * it; a fresh + engine-matching cert lets a later `.validate()` skip the rule
+ * engine.
+ *
+ * The DuckDB extension also reads these, but "checker-compatible" is the wrong
+ * word for it: it never runs the checker. It consumes only the byte-offset index
+ * for a sliced read, gating on size — so it shares the FORMAT with the doors
+ * above, not the trust decision.
  */
 export declare class Sidecar {
   /**
@@ -54,7 +59,7 @@ export declare class Sidecar {
    * runs the rules itself, with both tiers on, and records what they returned. It
    * refuses a file with ERRORS; warnings and FYI are recorded, not fatal.
    */
-  static mint(data: Uint8Array, checkedAt: string, dictVersion?: string | undefined | null, encoding?: string | undefined | null, compat?: string | undefined | null): Sidecar
+  static mint(data: Uint8Array, checkedAt: string, dictVersion?: string | undefined | null, encoding?: string | undefined | null, compat?: string | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null): Sidecar
   /**
    * Parse a certificate from its on-disk `.ags.idx` JSON bytes, rejecting an
    * unknown format version. Throws on malformed / unsupported JSON.
@@ -123,7 +128,7 @@ export declare function ags4ToExcel(agsPath: string, xlsxPath: string, orderedKe
 
 /**
  * One applied fix — the Node mirror of laterite-py's `applied[]` entries.
- * `kind`/`risk` are the serde snake_case strings (`strip_bom`, `safe`, …) so
+ * `kind`/`risk` are the serde `snake_case` strings (`strip_bom`, `safe`, …) so
  * the shape is identical across Python / CLI / Node.
  */
 export interface AppliedFix {
@@ -179,7 +184,7 @@ export declare function emitAgs4FromIpc(groups: Array<GroupIpc>, edition?: strin
 /**
  * The emit result. `bytes` is the AGS4 document; `findingsJson` is the
  * validator's `{rule:[…]}` map on the output; `applied` is the safe-fix ledger
- * AutoFix made (same shape as `fix()`'s `FixReport.applied`); `fixesApplied`
+ * `AutoFix` made (same shape as `fix()`'s `FixReport.applied`); `fixesApplied`
  * is its length.
  */
 export interface EmitResult {
@@ -242,7 +247,7 @@ export interface Finding {
  * a `FixResult` (`.bytes` / `.text` / `.save(path)`) and adds `inPlace` / `out`
  * write-back on top.
  */
-export declare function fixFile(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, includeRisky?: boolean | undefined | null, only?: Array<string> | undefined | null, exclude?: Array<string> | undefined | null): FixReport
+export declare function fixFile(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, includeRisky?: boolean | undefined | null, only?: Array<string> | undefined | null, exclude?: Array<string> | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null): FixReport
 
 /**
  * The repair report — the Node mirror of laterite-py's `fix_file` dict. `ok` is
@@ -356,6 +361,20 @@ export declare function parseValue(raw: string | undefined | null, agsType: stri
 export declare function readGroupsRaw(path: string): string
 
 /**
+ * Parent chain from `code` up to the registry root — `[code, parent, …, root]`
+ * (a root group returns `[code]`). Raises for an unknown code, so a root is
+ * distinguishable from a miss.
+ *
+ * The walk is `laterite_ags4_core::registry::ancestor_chain`, the ONE Rust
+ * definition of the group tree — the same leaf function the Python wheel binds
+ * (`registry_fns.rs::registry_ancestor_chain`). Node used to re-walk `.parent`
+ * pointers in TypeScript (`ts/registry.ts`), a hand-kept-in-sync copy of that
+ * logic; routing through the binding removes it so the tree can't drift from the
+ * leaf (#532, #527).
+ */
+export declare function registryAncestorChain(code: string): Array<string>
+
+/**
  * The bundled standard dictionary for `edition` as JSON — the
  * `{ags_edition, groups:[{code, contents, parent, headings:[…]}]}` shape the
  * browser and `laterite.registry.dictionary()` also render, from the ONE shared
@@ -364,6 +383,34 @@ export declare function readGroupsRaw(path: string): string
  * it. (The generated `GROUPS` stays the default union registry.)
  */
 export declare function registryDictionaryJson(edition?: string | undefined | null): string
+
+/**
+ * The KEY heading names a group inherits from its DIRECT parent — the
+ * intersection of its KEY headings with the parent's — sorted for determinism
+ * (the TS facade wraps this in a Set). Empty for a root; raises for an unknown
+ * code.
+ *
+ * The intersection is `laterite_ags4_core::registry::inherited_key_names`, the
+ * same leaf function the Python wheel binds; Node used to re-implement the
+ * KEY-intersection logic in TypeScript. Deleting that copy is the point of #532
+ * (part of the #527 leaf-convergence arc).
+ */
+export declare function registryInheritedKeyNames(code: string): Array<string>
+
+/**
+ * `lat read --csv` for one group: the rendered string, from core's ONE CSV
+ * writer (RFC-4180-ish quoting). Replaces `ts/cli.ts`'s hand-ported `csvRow`.
+ */
+export declare function renderReadCsv(headings: Array<string>, rows: Array<Array<string>>): string
+
+/**
+ * `lat read --json` for one group: the rendered string, from core's ONE JSON
+ * writer. `ts/cli.ts` used to build this with `JSON.stringify(x, null, 2)`
+ * while the binary used `serde_json` and Python used `json.dumps` — three
+ * different JSON libraries kept byte-identical by hand-discipline, with no gate
+ * on `read` output (#530).
+ */
+export declare function renderReadJson(headings: Array<string>, rows: Array<Array<string>>): string
 
 /**
  * What THIS SURFACE resolves an encoding label to — the canonical `encoding_rs`
@@ -388,7 +435,7 @@ export declare function resolveEncodingLabel(label?: string | undefined | null):
  * returned by default (`includeWarnings` defaults to `true`); pass `false` for
  * errors-only. `includeFyi` (default `false`) adds the low-signal FYI tier.
  */
-export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null, cert?: Sidecar | undefined | null): ValidationReport
+export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null, cert?: Sidecar | undefined | null): ValidationReport
 
 /**
  * zstd-compress, then age-encrypt with `password` → `dest`. Compress-then-
@@ -426,6 +473,18 @@ export declare function transportUnpack(src: string, dest: string): UnpackStats
 /** zstd-decompress `data` in memory → bytes (the twin of `transportPackBytes`). */
 export declare function transportUnpackBytes(data: Uint8Array): Buffer
 
+/**
+ * The `--on-type-clash` modes merge accepts, in declaration order —
+ * `["error", "widen", "promote"]`.
+ *
+ * GENERATED, same as [`editions`]: the set is owned by `TypeClashMode::ALL` in
+ * laterite-ags4-merge. Exposed so the JS launcher does not keep a hand-written
+ * copy — it had two (the census `values` for `merge --on-type-clash`, and the
+ * unknown-mode error message in `cli.ts`), and a fourth mode added to the enum
+ * would have reached neither (#555).
+ */
+export declare function typeClashModes(): Array<string>
+
 /** Result of `transportUnpack` / `transportUnlock`: output size, elapsed seconds. */
 export interface UnpackStats {
   bytes: bigint
@@ -461,6 +520,12 @@ export interface ValidationReport {
    * checked": a world check (Rule 20's on-disk half) runs even on a certified read.
    */
   certified: boolean
+  /**
+   * If a certificate was offered and NOT used, the stable token for why (the core
+   * `RevalidateReason::as_str`, e.g. `"dictionary_changed"`). `None` when no cert was
+   * offered, or it was vouched.
+   */
+  revalidateReason?: string
   findings: Array<Finding>
   json: string
   ndjson: string

@@ -21,7 +21,7 @@ currency — the set of `"AGS Format Rule N"` labels that fired — then asserts
    A mismatch is a binding or serialization bug, and it fails the check.
 2. **python-ags4 agrees, modulo the documented divergences.** The incumbent
    `python-ags4` is compared too; the handful of deliberate, catalogued
-   differences reconcile, and only an *unexplained* difference is flagged.
+   differences reconcile, and only an _unexplained_ difference is flagged.
 
 This runs two ways: a **per-PR gate** (the four in-repo surfaces, on every change
 that could move a finding) and a **monthly full-matrix report** (all six,

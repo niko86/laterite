@@ -23,6 +23,21 @@ export interface GroupMeta {
   sql_types: string[];
 }
 
+/** Coerce a non-null scalar cell value to a display string. AGS cells are
+ *  primitives; an unexpected object falls back to JSON so nothing reaches the
+ *  DOM as "[object Object]". `null`/`undefined` → empty string. */
+export function scalarText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  )
+    return String(value);
+  return JSON.stringify(value);
+}
+
 /** Coerce one cell value (as Arrow JS / DuckDB-wasm hands it back) to a
  *  display string, driven by the column's DuckDB sql_type. Two values must
  *  never reach the DOM raw:
@@ -56,9 +71,8 @@ export function formatCell(value: unknown, sqlType: string): string {
         .replace(/\.\d+Z$/, "")
         .replace("Z", "");
     }
-    return String(value);
+    return scalarText(value);
   }
 
-  if (typeof value === "bigint") return value.toString();
-  return String(value);
+  return scalarText(value);
 }

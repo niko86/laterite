@@ -44,12 +44,17 @@ describe("Ags4File.validate — chainable, report on .report", () => {
     expect(typeof rep.count).toBe("number");
     expect(rep.count).toBe(rep.findings.length);
     // Matches the free validate() over the same source.
-    expect(rep.count).toBe(read(undefined, { text: CLEAN }).validate().report?.count);
+    expect(rep.count).toBe(
+      read(undefined, { text: CLEAN }).validate().report?.count,
+    );
   });
 
   it("honours the warnings gate like the free fn", () => {
-    const withWarnings = read(undefined, { text: CLEAN }).validate().report?.count ?? 0;
-    const errorsOnly = read(undefined, { text: CLEAN }).validate({ warnings: false }).report?.count ?? 0;
+    const withWarnings =
+      read(undefined, { text: CLEAN }).validate().report?.count ?? 0;
+    const errorsOnly =
+      read(undefined, { text: CLEAN }).validate({ warnings: false }).report
+        ?.count ?? 0;
     expect(errorsOnly).toBeLessThanOrEqual(withWarnings);
   });
 });
@@ -61,7 +66,9 @@ describe("Ags4File.fix — → new repaired handle, report on .fixReport", () =>
     expect(repaired).toBeInstanceOf(Ags4File);
     expect(repaired).not.toBe(ags); // a new handle, non-destructive
     expect(repaired.fixReport?.fixesApplied).toBeGreaterThan(0);
-    expect(repaired.fixReport?.applied[0]).toMatchObject({ rule: "AGS Format Rule 8" });
+    expect(repaired.fixReport?.applied[0]).toMatchObject({
+      rule: "AGS Format Rule 8",
+    });
     // The repaired document carries the canonical 2DP value.
     expect(repaired.text).toContain('"DATA","BH01","1.00"');
     // …and the original handle is untouched.
@@ -77,13 +84,22 @@ describe("Ags4File.fix — → new repaired handle, report on .fixReport", () =>
 
 describe("Ags4File.diff — baseline = self", () => {
   it("agrees with the free diff and reports the changed cell", () => {
-    const revision = CLEAN.replace('"DATA","BH01","12.30"', '"DATA","BH01","13.30"');
+    const revision = CLEAN.replace(
+      '"DATA","BH01","12.30"',
+      '"DATA","BH01","13.30"',
+    );
     const delta = read(undefined, { text: CLEAN }).diff(Buffer.from(revision));
     expect(delta.total_changed).toBe(1);
     const loca = delta.groups.find((g) => g.code === "LOCA");
     const changed = loca?.rows.find((r) => r.kind === "changed");
-    expect(changed?.cells[0]).toMatchObject({ heading: "LOCA_GL", a: "12.30", b: "13.30" });
+    expect(changed?.cells[0]).toMatchObject({
+      heading: "LOCA_GL",
+      a: "12.30",
+      b: "13.30",
+    });
     // no diff against itself
-    expect(read(undefined, { text: CLEAN }).diff(Buffer.from(CLEAN)).total_changed).toBe(0);
+    expect(
+      read(undefined, { text: CLEAN }).diff(Buffer.from(CLEAN)).total_changed,
+    ).toBe(0);
   });
 });

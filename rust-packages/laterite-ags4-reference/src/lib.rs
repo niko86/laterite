@@ -14,6 +14,13 @@
 
 pub mod catalogue;
 pub mod dict;
+// Runtime-owned custom-dictionary overlay (#568): the sparse delta a `--dict`
+// override contributes over a bundled base. `dict::Dictionary::Layered` borrows it.
+pub mod overlay;
+// The runtime `.ags` DICT-group reader `overlay::parse_dict` dispatches to for the
+// `.ags` custom-dict format (the JSON format reuses `union`'s serde). Crate-private:
+// its one entry point is `pub(crate)`, reached only through `overlay`.
+mod dict_read;
 // Content-addressed row keys (`_id`/`_parent_id`) + the single `key_heading_names`
 // definition of row identity. Relocated from core (row-identity consolidation)
 // so `laterite-ags4-diff` — which depends on this leaf, not core — shares the

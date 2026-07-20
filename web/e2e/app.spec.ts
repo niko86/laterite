@@ -12,7 +12,9 @@ const fixture = (name: string) =>
 // the worker reports ready — see App's wasmReady gate).
 async function ready(page: Page) {
   await page.goto(APP);
-  await expect(page.getByRole("button", { name: /Clean \(minimal\)/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Clean \(minimal\)/ }),
+  ).toBeVisible();
 }
 
 const tab = (page: Page, name: string) =>
@@ -39,7 +41,10 @@ test("unknown-heading sample surfaces a Rule 9 finding", async ({ page }) => {
   // collapses once a file is loaded, so .first() alone would hit the hidden one.
   await expect(page.getByText("✗").first()).toBeVisible();
   await expect(
-    page.getByText(/Rule 9/).filter({ visible: true }).first(),
+    page
+      .getByText(/Rule 9/)
+      .filter({ visible: true })
+      .first(),
   ).toBeVisible();
 });
 
@@ -49,7 +54,9 @@ test("an FYI-only file shows an amber informational banner, not red", async ({
   await ready(page);
   // fyi_only.ags = the clean fixture with one extended-ASCII char (é) → a
   // single "FYI (Related to Rule 1)" finding, no errors/warnings.
-  await page.locator('input[type="file"]').setInputFiles(fixture("fyi_only.ags"));
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles(fixture("fyi_only.ags"));
   await expect(page.getByText(/informational \(FYI\) finding/)).toBeVisible();
   // The red error banner (✗) must NOT appear for an FYI-only file.
   await expect(page.getByText("✗")).toHaveCount(0);
@@ -76,7 +83,9 @@ test("a fixable file offers a safe fix and applying it clears the safe set", asy
   page,
 }) => {
   await ready(page);
-  await page.locator('input[type="file"]').setInputFiles(fixture("fixable.ags"));
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles(fixture("fixable.ags"));
   await tab(page, "Fix").click();
 
   // The 1-dp value "123.4" under LOCA_NATE's 2DP type is a safe Rule 8
@@ -114,7 +123,9 @@ test("Explore chart builder renders a chart, and the SQL builder composes a quer
 }) => {
   await ready(page);
   // fixable.ags has a LOCA group with a numeric LOCA_NATE column to plot.
-  await page.locator('input[type="file"]').setInputFiles(fixture("fixable.ags"));
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles(fixture("fixable.ags"));
   await enterExplore(page);
 
   // Chart builder: pick LOCA, and an ECharts canvas renders.
@@ -235,7 +246,10 @@ test("Tools → Transport round-trips a file through .zst.age, client-side", asy
   await page.getByRole("button", { name: /^Transport$/ }).click();
 
   // Encrypt the loaded file with a passphrase → a real age file (magic bytes).
-  await page.getByPlaceholder("Passphrase").first().fill("correct horse battery");
+  await page
+    .getByPlaceholder("Passphrase")
+    .first()
+    .fill("correct horse battery");
   const [ageDl] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: /Encrypt & download/ }).click(),
@@ -248,7 +262,10 @@ test("Tools → Transport round-trips a file through .zst.age, client-side", asy
 
   // Decrypt it back and assert byte-for-byte recovery of the original.
   await page.locator('input[accept*="age"]').setInputFiles(lockedPath);
-  await page.getByPlaceholder("Passphrase").nth(1).fill("correct horse battery");
+  await page
+    .getByPlaceholder("Passphrase")
+    .nth(1)
+    .fill("correct horse battery");
   const [outDl] = await Promise.all([
     page.waitForEvent("download"),
     page.getByRole("button", { name: /Decrypt & download/ }).click(),
@@ -281,9 +298,11 @@ test("Tools → Anonymiser pseudonymises IDs (cross-refs intact) + hashes PROJ_I
   expect(m).not.toBeNull();
   expect(out.split(m![0]).length - 1).toBeGreaterThan(1);
 
-  // PROJ_ID "P1" → a 16-hex content hash, not the original.
+  // PROJ_ID "P1" → the file's full 64-hex content hash (Phase 2, #581: the web
+  // now drives the shared Rust engine, which uses the full-width hash — a KEY
+  // field, so collision-safe — not the old 16-hex TS truncation).
   expect(out).not.toMatch(/"DATA","P1"/);
-  expect(out).toMatch(/[0-9a-f]{16}/);
+  expect(out).toMatch(/"[0-9a-f]{64}"/);
 });
 
 test("an empty pane's 'Go to Validate' button jumps to the Validate tab", async ({
@@ -293,7 +312,9 @@ test("an empty pane's 'Go to Validate' button jumps to the Validate tab", async 
   // No file loaded → Explore shows its empty state, now with an actionable
   // button (was a dead end: text saying 'load a file in Validate' + no way to).
   await tab(page, "Explore").click();
-  await page.getByRole("button", { name: /Go to Validate to load a file/ }).click();
+  await page
+    .getByRole("button", { name: /Go to Validate to load a file/ })
+    .click();
   await expect(tab(page, "Validate")).toHaveAttribute("aria-selected", "true");
 });
 
@@ -329,7 +350,9 @@ test("Tools → Coordinates: the OpenStreetMap basemap is consent-gated", async 
   await expect(page.locator(".leaflet-container")).toHaveCount(0);
 
   // Consent → Leaflet mounts (container + OSM attribution control render).
-  await page.getByRole("button", { name: /Load map \(OpenStreetMap\)/ }).click();
+  await page
+    .getByRole("button", { name: /Load map \(OpenStreetMap\)/ })
+    .click();
   await expect(page.locator(".leaflet-container")).toBeVisible();
   await expect(page.locator(".leaflet-control-attribution")).toContainText(
     /OpenStreetMap/,
@@ -409,6 +432,9 @@ test("PWA: the app loads and validates fully offline after first visit", async (
       const paths = reqs.map((r) => new URL(r.url).pathname);
       if (
         paths.some((p) => /\/ags4_wasm_bg-.*\.wasm$/.test(p)) &&
+        // The tiny tokenizer wasm (#533) is boot-critical: first render is
+        // gated on it, so a precache drop breaks the app offline entirely.
+        paths.some((p) => /\/ags4_tokenizer_bg-.*\.wasm$/.test(p)) &&
         paths.some((p) => /\/index\.html$/.test(p))
       )
         return true;
@@ -494,7 +520,9 @@ test("Fix tab offers a RISKY datetime canonicalisation for a non-ISO DT cell", a
   // miss the fixer rewrites to ISO. Both components are ≤ 12 and differ, so the
   // dd/mm reading is a genuine guess → RISKY, landing in the opt-in section, not
   // fix-all-safe. (An unambiguous date like 18/08/2020 would be safe-by-default.)
-  await page.locator('input[type="file"]').setInputFiles(fixture("datetime.ags"));
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles(fixture("datetime.ags"));
   await tab(page, "Fix").click();
   await expect(page.getByText(/Canonicalise datetime/)).toBeVisible();
   await expect(page.getByText(/2020-06-05/).first()).toBeVisible();
@@ -511,7 +539,9 @@ test("Explore on a low-end device asks before downloading the engine, then loads
     Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, get: () => 2 });
   } catch (e) {}`);
   await ready(page);
-  await page.locator('input[type="file"]').setInputFiles(fixture("fixable.ags"));
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles(fixture("fixable.ags"));
 
   // The dashboard must NOT appear yet — the cold-engine confirmation gates it.
   await tab(page, "Explore").click();

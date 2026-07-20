@@ -68,7 +68,7 @@ fn rule_2_orphan_rows(parsed: &ParsedFile, found: &mut Findings) {
             continue; // blank separators are not rows (the parse walk skips them)
         }
         let fields = split_ags_line(&rl.text);
-        match fields.first().map(String::as_str).unwrap_or("") {
+        match fields.first().map_or("", String::as_str) {
             "GROUP" => break, // first GROUP reached — every later row is in-group
             tag @ ("HEADING" | "UNIT" | "TYPE" | "DATA") => add(
                 found,

@@ -50,9 +50,10 @@ def test_buildmode_literal_matches_the_engine_modes():
     def accepts(mode: str) -> bool:
         try:
             L.build_ags4(frame, mode=mode)
-            return True
         except Exception as e:  # strict may raise a *violation* — still "accepted"
             return "unknown mode" not in str(e).lower()
+        else:
+            return True
 
     for mode in typing.get_args(L.BuildMode):
         assert accepts(mode), f"engine rejected documented BuildMode {mode!r}"

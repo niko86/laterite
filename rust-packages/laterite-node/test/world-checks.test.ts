@@ -79,21 +79,25 @@ const rulesOf = (report: Report) => Object.keys(report.byRule());
 describe("checkFiles without a source path", () => {
   it("refuses a bytes read instead of reporting Rule 20 clean", () => {
     // THE BUG. Before: a clean report, Rule 20 silently unasked.
-    expect(() => read(DATA).validate({ checkFiles: true })).toThrow(WorldCheckRequiresSourceError);
+    expect(() => read(DATA).validate({ checkFiles: true })).toThrow(
+      WorldCheckRequiresSourceError,
+    );
+    let caught: unknown;
     try {
       read(DATA).validate({ checkFiles: true });
     } catch (e) {
-      expect((e as { exitCode: number }).exitCode).toBe(5);
-      expect((e as Error).message).toContain("path");
+      caught = e;
     }
+    expect((caught as { exitCode: number }).exitCode).toBe(5);
+    expect((caught as Error).message).toContain("path");
   });
 
   it("refuses a text read too", () => {
     // The text modality is the bytes modality's twin, and had the same hole. In Node
     // a bare string is a PATH, so text arrives via `validate(undefined, {text})`.
-    expect(() => validate(undefined, { text: WITH_ATTACHMENT, checkFiles: true })).toThrow(
-      WorldCheckRequiresSourceError,
-    );
+    expect(() =>
+      validate(undefined, { text: WITH_ATTACHMENT, checkFiles: true }),
+    ).toThrow(WorldCheckRequiresSourceError);
   });
 });
 

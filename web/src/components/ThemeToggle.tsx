@@ -8,7 +8,9 @@ export const ThemeToggle: Component = () => {
     <button
       type="button"
       onClick={toggleTheme}
-      title={theme() === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+      title={
+        theme() === "dark" ? "Switch to light theme" : "Switch to dark theme"
+      }
       aria-label="Toggle colour theme"
       class="rounded border border-line-strong px-2 py-1 text-sm text-fg-soft transition-colors hover:border-accent hover:text-accent"
     >

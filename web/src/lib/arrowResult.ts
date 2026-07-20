@@ -29,7 +29,7 @@ export interface ResultSet {
 }
 
 function arrowSqlType(field: Field): string {
-  const t = field.type;
+  const t = field.type as DataType;
   if (DataType.isTimestamp(t)) return "TIMESTAMP";
   if (DataType.isDate(t)) return "DATE";
   if (DataType.isBool(t)) return "BOOLEAN";
@@ -41,7 +41,11 @@ function arrowSqlType(field: Field): string {
   return "VARCHAR";
 }
 
-export function arrowResult(table: Table, cap?: number, dropSynthKeys = false): ResultSet {
+export function arrowResult(
+  table: Table,
+  cap?: number,
+  dropSynthKeys = false,
+): ResultSet {
   // `dropSynthKeys` hides the content-addressed `_id`/`_parent_id` key columns —
   // the group-grid view passes it so those synthetic columns don't clutter a
   // data table, while the SQL console leaves them visible (a query that SELECTs

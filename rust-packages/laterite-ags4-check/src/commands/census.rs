@@ -29,7 +29,7 @@ use crate::cli::Cli;
 /// `tools/gen_census.py` pins a minimum and refuses anything older, so a launcher
 /// built before a table existed fails loudly instead of reporting that table empty.
 /// All three launchers declare this; they must agree.
-pub const CENSUS_VERSION: u32 = 4;
+pub const CENSUS_VERSION: u32 = 5;
 
 /// The encoding labels the census resolves on every surface.
 ///
@@ -75,7 +75,7 @@ pub const ENCODING_PROBES: &[&str] = &[
 fn encodings_json() -> Value {
     let mut m = serde_json::Map::new();
     for label in ENCODING_PROBES {
-        let resolved = super::common::resolve_encoding(label).map(|e| e.name());
+        let resolved = super::common::resolve_encoding(label).map(encoding_rs::Encoding::name);
         m.insert((*label).to_string(), json!(resolved));
     }
     Value::Object(m)

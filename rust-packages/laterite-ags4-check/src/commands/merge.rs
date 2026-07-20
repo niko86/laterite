@@ -14,7 +14,7 @@ use crate::cli::MergeArgs;
 use crate::commands::common::apply_dict_args;
 
 /// Merge `args.files` in order (last wins a KEY conflict) → `args.out`. Edition is
-/// picked from the newest file's TRAN_AGS (forced by `--dict-version`). `--json`
+/// picked from the newest file's `TRAN_AGS` (forced by `--dict-version`). `--json`
 /// emits a `{warnings, revisions}` summary; otherwise a human summary. The merged
 /// bytes always go to `--out`, so stdout stays clean.
 pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
@@ -52,8 +52,7 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
         opts.dict_version,
         parsed.last().and_then(tran_ags_of).as_deref(),
     )
-    .map(|(dv, _)| dv)
-    .unwrap_or(FALLBACK);
+    .map_or(FALLBACK, |(dv, _)| dv);
 
     // A merge-TRAN is synthesised only when both an issue and a date are given.
     let tran = match (&args.tran_issue, &args.tran_date) {

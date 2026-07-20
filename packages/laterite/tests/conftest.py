@@ -41,4 +41,4 @@ def _clear_dynamic_cache():
     from laterite import dynamic
 
     dynamic.clear_cache()
-    yield
+    return

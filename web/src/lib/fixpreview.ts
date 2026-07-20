@@ -25,7 +25,7 @@ export interface FixHighlight {
 }
 
 export function fixHighlight(line: string, edit: SpanEdit): FixHighlight {
-  const cps = [...line];
+  const cps = Array.from(line);
   const s = Math.max(0, Math.min(edit.start, cps.length));
   const e = Math.max(s, Math.min(edit.end, cps.length));
   const after =
@@ -42,19 +42,22 @@ export function fixHighlight(line: string, edit: SpanEdit): FixHighlight {
   // span (same start, replacement length).
   let delHl: [number, number] | null = null;
   if (changedCol >= 0) {
-    const f = fields[changedCol];
-    delHl = [
-      Math.max(0, edit.start - f.start),
-      Math.max(0, edit.end - f.start),
-    ];
+    const f = fields[changedCol]; // findIndex ≥ 0 → in-bounds.
+    if (f)
+      delHl = [
+        Math.max(0, edit.start - f.start),
+        Math.max(0, edit.end - f.start),
+      ];
   }
 
   const afterFields = splitAgsFields(after);
   let insHl: [number, number] | null = null;
   if (changedCol >= 0 && changedCol < afterFields.length) {
-    const f = afterFields[changedCol];
-    const cs = Math.max(0, edit.start - f.start);
-    insHl = [cs, cs + [...edit.replacement].length];
+    const f = afterFields[changedCol]; // bounds checked in the guard.
+    if (f) {
+      const cs = Math.max(0, edit.start - f.start);
+      insHl = [cs, cs + Array.from(edit.replacement).length];
+    }
   }
 
   // Row-padding appends past end-of-line (inside no original field). Flag the

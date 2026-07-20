@@ -10,8 +10,16 @@ const src = join(tmp, "site.ags");
 copyFileSync("examples/sample_site.ags", src);
 
 // lock = zstd pack + age passphrase encrypt (scrypt KDF + ChaCha20-Poly1305).
-transport.lock(src, join(tmp, "site.ags.zst.age"), "correct horse battery staple");
-transport.unlock(join(tmp, "site.ags.zst.age"), join(tmp, "restored.ags"), "correct horse battery staple");
+transport.lock(
+  src,
+  join(tmp, "site.ags.zst.age"),
+  "correct horse battery staple",
+);
+transport.unlock(
+  join(tmp, "site.ags.zst.age"),
+  join(tmp, "restored.ags"),
+  "correct horse battery staple",
+);
 
 const original = readFileSync(src);
 const restored = readFileSync(join(tmp, "restored.ags"));

@@ -74,6 +74,7 @@ export const PwaUpdater: Component = () => {
       done = true;
       window.location.reload();
     };
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- DOM types serviceWorker as always-present, but it's undefined on insecure/legacy contexts
     navigator.serviceWorker?.addEventListener("controllerchange", reload, {
       once: true,
     });

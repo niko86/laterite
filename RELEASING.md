@@ -1,9 +1,7 @@
 # Releasing laterite
 
 `laterite` is the single shipped wheel and follows **semantic versioning** with a
-pre-1.0 convention. (The experimental `.ags5db` companion `laterite-ags5` was
-decoupled to the dormant `ags5/` holding folder in #177 — it is no longer built
-or published; a future AGS5 strand will publish it separately.)
+pre-1.0 convention.
 
 ## Version policy — the axis is *compatibility*, not change size
 

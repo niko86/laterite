@@ -36,7 +36,12 @@ import * as registry from "./registry";
 import { Report } from "./report";
 import { AgsGroup } from "./typed-graph";
 
-export interface ReadOptions {
+/** File-reading knobs shared by every verb that opens a source (`read`,
+ *  `validate`, …): in-memory `text`, source `encoding`, and an `.ags.idx`
+ *  certificate `index`. Held apart from {@link ReadOptions} so table-shaping
+ *  knobs (`contentHash`) do NOT ride onto `validate`/`fix`/`diff`, which build
+ *  no tables and would silently ignore them. */
+export interface FileOptions {
   /** Validate/parse in-memory text instead of a file path. */
   text?: string;
   /** Source encoding label (`"utf-8"` default, `"windows-1252"`, …). */
@@ -46,6 +51,17 @@ export interface ReadOptions {
    * fresh cert is carried so a later errors-only `.validate()` skips the rule
    * engine; a size/SHA mismatch throws {@link StaleCertError}. (#294 Batch E / #14) */
   index?: string;
+}
+
+/** Options for {@link read}: the shared file-reading knobs, plus table-shaping
+ *  knobs that apply only to the typed relational tables `read` produces. */
+export interface ReadOptions extends FileOptions {
+  /** Add a `_content_hash` column to each group's relational table: a typed,
+   *  blank-insensitive fingerprint of the row's whole VALUE (unit-aware), so
+   *  `DISTINCT ON (_content_hash)` collapses genuinely-identical rows while
+   *  keeping revisions. Off by default — the plain table is byte-identical
+   *  without it. Mirrors Python `read(content_hash=…)`. */
+  contentHash?: boolean;
 }
 
 /**
@@ -73,19 +89,27 @@ export interface ReadOptions {
  * @throws {UnsupportedEditionError} A recognised but unsupported edition (e.g. AGS3).
  * @throws {Ags4Error} Any other native parse failure (the fallback mapping).
  */
-export function read(source?: string | Uint8Array, opts: ReadOptions = {}): Ags4File {
+export function read(
+  source?: string | Uint8Array,
+  opts: ReadOptions = {},
+): Ags4File {
   const path = typeof source === "string" ? source : undefined;
-  const data = typeof source === "string" || source == null ? undefined : source;
+  const data =
+    typeof source === "string" || source == null ? undefined : source;
   let handle: Ags4File;
   try {
     // Retain the source so the chained verbs (`ags.validate()`/`fix()`/`diff()`)
     // re-run against the TRUE bytes + read encoding, not the `.bytes` re-emit.
-    handle = new Ags4File(parseArrow(path, opts.text, data, opts.encoding), {
-      path,
-      text: opts.text,
-      data,
-      encoding: opts.encoding,
-    });
+    handle = new Ags4File(
+      parseArrow(path, opts.text, data, opts.encoding),
+      {
+        path,
+        text: opts.text,
+        data,
+        encoding: opts.encoding,
+      },
+      opts.contentHash ?? false,
+    );
   } catch (e) {
     throw fromNativeError(e);
   }
@@ -95,7 +119,10 @@ export function read(source?: string | Uint8Array, opts: ReadOptions = {}): Ags4
     // SHA-256 mismatch fails fast rather than silently re-validating. (#294 E/#14)
     const cert = Sidecar.fromJson(readFileSync(opts.index));
     const srcBytes =
-      data ?? (path !== undefined ? readFileSync(path) : Buffer.from(opts.text ?? "", "utf8"));
+      data ??
+      (path !== undefined
+        ? readFileSync(path)
+        : Buffer.from(opts.text ?? "", "utf8"));
     if (!cert.isFreshFor(srcBytes)) {
       throw new StaleCertError(
         `certificate ${opts.index} is stale for this file — its size / SHA-256 differ; ` +
@@ -107,8 +134,9 @@ export function read(source?: string | Uint8Array, opts: ReadOptions = {}): Ags4
   return handle;
 }
 
-export interface ValidateOptions extends ReadOptions {
-  /** Force an edition (`"4.0.3"`…`"4.2"`); default auto-detects from `TRAN_AGS`. */
+export interface ValidateOptions extends FileOptions {
+  /** Force an edition (`"4.0.3"`…`"4.2"`); default auto-detects from `TRAN_AGS`.
+   *  With `dictionary`, selects the overlay base. */
   dictVersion?: string;
   /** Include warning-severity findings. */
   warnings?: boolean;
@@ -116,6 +144,27 @@ export interface ValidateOptions extends ReadOptions {
   fyi?: boolean;
   /** Also run Rule 20's on-disk half (the sibling `FILE/` tree must exist). */
   checkFiles?: boolean;
+  /** A custom AGS4 dictionary to overlay (#568) — a file path or the raw `.ags`/JSON
+   *  bytes of one — so a bespoke group (or a re-parented/overridden standard heading)
+   *  validates as first-class instead of being flagged unknown. The base edition is
+   *  detected from the dictionary itself unless `dictVersion` forces it or `dictReplace`
+   *  drops it. Overrides of standard definitions are honoured with a warning. */
+  dictionary?: string | Uint8Array;
+  /** Treat `dictionary` as a FULL REPLACEMENT — drop the bundled base entirely rather
+   *  than overlaying it (default `false`). Cannot be combined with `dictVersion`. */
+  dictReplace?: boolean;
+}
+
+/** Split a `dictionary` custom-dict override (#568) into the `[dictPath, dictBytes]`
+ *  the native `runCheck`/`fixFile`/`Sidecar.mint` take. A string is a filesystem path;
+ *  raw bytes are the in-memory spelling. */
+function splitDict(
+  dictionary: string | Uint8Array | undefined,
+): [string | undefined, Uint8Array | undefined] {
+  if (dictionary === undefined) return [undefined, undefined];
+  return typeof dictionary === "string"
+    ? [dictionary, undefined]
+    : [undefined, dictionary];
 }
 
 /** Validate AGS4 — a file `source` path, raw `Uint8Array`/`Buffer` bytes, or
@@ -142,9 +191,14 @@ export interface ValidateOptions extends ReadOptions {
  * @throws {UnsupportedEditionError} a recognised-but-unsupported edition (AGS3).
  * @throws {BadDictError} an invalid `opts.dictVersion` / unimplemented dictionary.
  */
-export function validate(source?: string | Uint8Array, opts: ValidateOptions = {}): Report {
+export function validate(
+  source?: string | Uint8Array,
+  opts: ValidateOptions = {},
+): Report {
   const path = typeof source === "string" ? source : undefined;
-  const data = typeof source === "string" || source == null ? undefined : source;
+  const data =
+    typeof source === "string" || source == null ? undefined : source;
+  const [dictPath, dictBytes] = splitDict(opts.dictionary);
   const r = runCheck(
     path,
     opts.text,
@@ -154,6 +208,9 @@ export function validate(source?: string | Uint8Array, opts: ValidateOptions = {
     opts.fyi,
     opts.checkFiles,
     opts.encoding,
+    dictPath,
+    dictBytes,
+    opts.dictReplace,
   );
   return new Report(raiseFor(r));
 }
@@ -211,11 +268,16 @@ function walkTree(root: AgsGroup): Array<[string, GroupRows]> {
     const record = node as unknown as Record<string, unknown>;
     const row: Record<string, unknown> = {};
     for (const h of desc.headings) row[h.name] = record[h.name] ?? null;
-    if (!buckets.has(code)) buckets.set(code, []);
-    buckets.get(code)!.push(row);
+    let bucket = buckets.get(code);
+    if (!bucket) {
+      bucket = [];
+      buckets.set(code, bucket);
+    }
+    bucket.push(row);
     for (const child of registry.childGroups(code)) {
       const children = record[`${child.code.toLowerCase()}s`];
-      if (Array.isArray(children)) for (const c of children) visit(c as AgsGroup);
+      if (Array.isArray(children))
+        for (const c of children) visit(c as AgsGroup);
     }
   };
   visit(root);
@@ -223,11 +285,12 @@ function walkTree(root: AgsGroup): Array<[string, GroupRows]> {
   // flagged, not silently dropped). Otherwise a sparse node emits ~45 blank
   // columns whose unset edition-specific / PA headings trip Rule 9 / 16.
   for (const [code, rows] of buckets) {
-    const desc = registry.get(code)!;
+    const desc = registry.get(code);
+    if (!desc) continue;
     for (const h of desc.headings) {
       if (registry.isKeyStatus(h.status)) continue;
       if (rows.every((r) => r[h.name] == null)) {
-        for (const r of rows) delete r[h.name];
+        for (const r of rows) Reflect.deleteProperty(r, h.name);
       }
     }
   }
@@ -246,7 +309,9 @@ function checkMeta(
   for (const [code, hmap] of Object.entries(meta)) {
     const known = columns.get(code);
     if (known === undefined) {
-      throw new Ags4Error(`buildAgs4 ${name}: unknown group ${JSON.stringify(code)}`);
+      throw new Ags4Error(
+        `buildAgs4 ${name}: unknown group ${JSON.stringify(code)}`,
+      );
     }
     for (const heading of Object.keys(hmap)) {
       if (!known.has(heading)) {
@@ -301,7 +366,9 @@ export function buildAgs4(
   const columns = new Map<string, Set<string>>();
   for (const [code, data] of items) {
     // Never emit a read(...).table(code, { keys: true }) _id/_parent_id.
-    const table = stripSynthKeys(Array.isArray(data) ? rowsToTable(data) : data);
+    const table = stripSynthKeys(
+      Array.isArray(data) ? rowsToTable(data) : data,
+    );
     columns.set(code, new Set(table.schema.fields.map((f) => f.name)));
     ipcGroups.push({ code, ipc: Buffer.from(tableToIPC(table, "stream")) });
   }
@@ -309,8 +376,17 @@ export function buildAgs4(
   // heading not in that group is a typo to surface, not a silent no-op.
   checkMeta(opts.units, "units", columns);
   checkMeta(opts.types, "types", columns);
-  const res = emitAgs4FromIpc(ipcGroups, opts.dictVersion, opts.mode, opts.units, opts.types);
-  const byRule = JSON.parse(res.findingsJson) as Record<string, Array<Record<string, unknown>>>;
+  const res = emitAgs4FromIpc(
+    ipcGroups,
+    opts.dictVersion,
+    opts.mode,
+    opts.units,
+    opts.types,
+  );
+  const byRule = JSON.parse(res.findingsJson) as Record<
+    string,
+    Array<Record<string, unknown>>
+  >;
   const findings = Object.entries(byRule).flatMap(([rule, list]) =>
     list.map((f) => ({ rule, ...f })),
   );
@@ -409,7 +485,10 @@ export interface FixOptions {
  *   {@link NotAgs4Error}, {@link UnsupportedEditionError}, {@link BadDictError})
  *   for un-fixable input, carrying the matching `lat-check` exit code.
  */
-export function fix(source?: string | Uint8Array, opts: FixOptions = {}): FixResult {
+export function fix(
+  source?: string | Uint8Array,
+  opts: FixOptions = {},
+): FixResult {
   if (opts.inPlace && opts.out !== undefined) {
     throw new TypeError("fix(): `inPlace` and `out` are mutually exclusive");
   }
@@ -418,8 +497,15 @@ export function fix(source?: string | Uint8Array, opts: FixOptions = {}): FixRes
   // so without this a typo like only:["9"] would quietly repair nothing. The
   // fixable set comes from the engine (`listRules`), never a hand-list.
   if (opts.only !== undefined || opts.exclude !== undefined) {
-    const fixable = new Set(listRules().filter((r) => r.fixable).map((r) => r.rule));
-    for (const [kw, labels] of [["only", opts.only], ["exclude", opts.exclude]] as const) {
+    const fixable = new Set(
+      listRules()
+        .filter((r) => r.fixable)
+        .map((r) => r.rule),
+    );
+    for (const [kw, labels] of [
+      ["only", opts.only],
+      ["exclude", opts.exclude],
+    ] as const) {
       for (const label of labels ?? []) {
         if (!fixable.has(label)) {
           throw new TypeError(
@@ -430,10 +516,15 @@ export function fix(source?: string | Uint8Array, opts: FixOptions = {}): FixRes
     }
   }
   const path = typeof source === "string" ? source : undefined;
-  const data = typeof source === "string" || source == null ? undefined : source;
+  const data =
+    typeof source === "string" || source == null ? undefined : source;
   if (opts.inPlace && path === undefined) {
     // Nothing on disk to overwrite — mirror laterite-py's Ags4Error guard.
-    throw makeError("bad_args", 5, "fix(): `inPlace` needs a path source; use `out` or `.save(path)`");
+    throw makeError(
+      "bad_args",
+      5,
+      "fix(): `inPlace` needs a path source; use `out` or `.save(path)`",
+    );
   }
   const r = fixFile(
     path,
@@ -445,7 +536,8 @@ export function fix(source?: string | Uint8Array, opts: FixOptions = {}): FixRes
     opts.only,
     opts.exclude,
   );
-  if (!r.ok) throw makeError(r.errorKind ?? "", r.exitCode, r.error ?? "unknown error");
+  if (!r.ok)
+    throw makeError(r.errorKind ?? "", r.exitCode, r.error ?? "unknown error");
   const result = new FixResult(r.fixed, r.residual, r.applied, r.dictVersion);
   // Write-back (opt-in, non-destructive by default): `inPlace` overwrites the
   // source path, `out` writes elsewhere — the repaired bytes are always UTF-8
@@ -526,7 +618,11 @@ function diffBytes(x: DiffSource): Uint8Array {
   try {
     return readFileSync(x);
   } catch (e) {
-    if (e && typeof e === "object" && (e as { code?: string }).code === "ENOENT") {
+    if (
+      e &&
+      typeof e === "object" &&
+      (e as { code?: string }).code === "ENOENT"
+    ) {
       throw new FileNotFoundError(`No such file or directory: ${x}`, 3);
     }
     throw e;
@@ -554,11 +650,17 @@ function diffBytes(x: DiffSource): Uint8Array {
  * @throws {NotAgs4Error} either side is not decodable AGS4.
  * @throws {BadDictError} an invalid `opts.dictVersion`.
  */
-export function diff(a: DiffSource, b: DiffSource, opts: DiffOptions = {}): RevisionDelta {
+export function diff(
+  a: DiffSource,
+  b: DiffSource,
+  opts: DiffOptions = {},
+): RevisionDelta {
   const aBytes = diffBytes(a);
   const bBytes = diffBytes(b);
   try {
-    return JSON.parse(nativeDiff(aBytes, bBytes, opts.dictVersion, opts.encoding)) as RevisionDelta;
+    return JSON.parse(
+      nativeDiff(aBytes, bBytes, opts.dictVersion, opts.encoding),
+    ) as RevisionDelta;
   } catch (e) {
     throw fromNativeError(e);
   }
@@ -659,8 +761,12 @@ export type MergeSource = string | Uint8Array | Ags4File;
  * @throws {BadDictError} an invalid `opts.dictVersion`.
  * @throws {RangeError} fewer than two sources.
  */
-export function merge(sources: MergeSource[], opts: MergeOptions = {}): MergeResult {
-  if (sources.length < 2) throw new RangeError("merge needs at least two source documents");
+export function merge(
+  sources: MergeSource[],
+  opts: MergeOptions = {},
+): MergeResult {
+  if (sources.length < 2)
+    throw new RangeError("merge needs at least two source documents");
   const files = sources.map(diffBytes);
   try {
     const out = nativeMerge(
@@ -688,7 +794,11 @@ export function merge(sources: MergeSource[], opts: MergeOptions = {}): MergeRes
 
 /** Pick the three stat fields out of an in-memory conversion result. */
 function excelStatsOf(r: ExcelBytesResult): ExcelStats {
-  return { sheetsWritten: r.sheetsWritten, rowsWritten: r.rowsWritten, warnings: r.warnings };
+  return {
+    sheetsWritten: r.sheetsWritten,
+    rowsWritten: r.rowsWritten,
+    warnings: r.warnings,
+  };
 }
 
 /**

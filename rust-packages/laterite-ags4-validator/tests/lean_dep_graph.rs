@@ -1,11 +1,11 @@
 //! Lean dep-graph guard (the engine-purity invariant).
 //!
 //! `laterite-ags4-validator` is the clean-room engine that everything embeds —
-//! the shipped `lat-db` binary, `ags4-parity`, `ags4-corpus-qa`,
+//! the shipped `lat` binary, `ags4-parity`, `ags4-corpus-qa`,
 //! `ags4-forge`, and (via PyO3) `laterite-py`. Dependencies are
 //! transitive: if any of these heavy / FFI-coupling crates leaked into
 //! the engine's *normal* dep graph, every consumer would inherit it —
-//! most damagingly, `pyo3` would make the shipped `lat-db` binary link
+//! most damagingly, `pyo3` would make the shipped `lat` binary link
 //! libpython and require a Python runtime, the exact thing
 //! "validator stays pyo3-free" intent in
 //! `dec-python-imports-rust-library.md` was documented but unenforced;
@@ -16,7 +16,7 @@
 //! none of the forbidden crates appear. Since the CLI split (the
 //! `lat` crate now owns comfy-table/indicatif and the optional
 //! ratatui/crossterm TUI), the validator is a pure library leaf — its
-//! normal graph is just phf/thiserror/chrono/encoding_rs + their deps.
+//! normal graph is just `phf/thiserror/chrono/encoding_rs` + their deps.
 //! `cargo tree` only resolves; it does not build, so there is no
 //! target-dir lock contention inside `cargo test`.
 
@@ -25,7 +25,7 @@ use std::process::Command;
 /// Crates that must never appear in the validator library's normal
 /// dependency graph (matches the documented "no walkdir/rayon/ratatui"
 /// guarantee + the pyo3-free invariant):
-/// - `pyo3` — would make the shipped `lat-db` binary link libpython
+/// - `pyo3` — would make the shipped `lat` binary link libpython
 ///   and require a Python runtime (the thing dec-rust-drives-python
 ///   forbids). The single most important entry.
 /// - `polars` — Rust↔Python ABI coupling the engine must stay free of.

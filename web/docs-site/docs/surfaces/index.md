@@ -7,13 +7,13 @@ validator.
 
 ## Pick your door
 
-| Surface | Install | Best for |
-|---|---|---|
-| **[Python](python.md)** &nbsp;(`laterite`, PyPI) | `pip install laterite` | data pipelines, notebooks, the python-ags4 drop-in |
-| **[Node](../node/index.md)** &nbsp;(`laterite`, npm) | `npm install laterite` | JS/TS tooling, servers, born-typed Arrow |
-| **[DuckDB](../duckdb/index.md)** &nbsp;(`laterite_ags4`) | `INSTALL laterite_ags4 FROM community` | SQL-native analytics, querying files in place |
-| **[CLI](cli.md)** &nbsp;(`lat`) | the shipped binary | CI gates, shell one-liners, `fix` in place |
-| **[Browser](browser.md)** &nbsp;(the web app) | open the app | drag-and-drop validate / fix / explore — nothing uploaded |
+| Surface                                                  | Install                                | Best for                                                  |
+| -------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------- |
+| **[Python](python.md)** &nbsp;(`laterite`, PyPI)         | `pip install laterite`                 | data pipelines, notebooks, the python-ags4 drop-in        |
+| **[Node](../node/index.md)** &nbsp;(`laterite`, npm)     | `npm install laterite`                 | JS/TS tooling, servers, born-typed Arrow                  |
+| **[DuckDB](../duckdb/index.md)** &nbsp;(`laterite_ags4`) | `INSTALL laterite_ags4 FROM community` | SQL-native analytics, querying files in place             |
+| **[CLI](cli.md)** &nbsp;(`lat`)                          | the shipped binary                     | CI gates, shell one-liners, `fix` in place                |
+| **[Browser](browser.md)** &nbsp;(the web app)            | open the app                           | drag-and-drop validate / fix / explore — nothing uploaded |
 
 ## What each door can do
 
@@ -21,41 +21,41 @@ The surfaces aren't equal — they're **different shapes**. Python is the fulles
 library; Node mirrors it; DuckDB is a SQL idiom; the CLI is a CI tool; the
 browser is a product. This grid is the honest map:
 
-| Capability | Python | Node | DuckDB | CLI | Browser |
-|---|:--:|:--:|:--:|:--:|:--:|
-| **validate** | ✅ | ✅ | — | ✅ | ✅ |
-| **read** — a group's rows | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **query** across groups | ✅ | ✅ | ✅ | — | ✅ |
-| **build / emit** AGS4 | ✅ | ✅ | — | — | ✅ |
-| **fix** | ✅ | ✅ | — | ✅ | ✅ |
-| **diff** revisions | ✅ | ✅ | — | ✅ | ✅ |
-| **certify** (`.ags.idx`) | ✅ | ✅ | — | ✅ | ✅ |
-| **Excel** ↔ AGS4 | ✅ | ✅ | — | ✅ | ✅ |
-| **transport** (pack / lock) | ✅ | ✅ | — | ✅ | ✅ |
-| **python-ags4 compat** | ✅ | — | — | — | — |
+| Capability                  | Python | Node | DuckDB | CLI | Browser |
+| --------------------------- | :----: | :--: | :----: | :-: | :-----: |
+| **validate**                |   ✅   |  ✅  |   —    | ✅  |   ✅    |
+| **read** — a group's rows   |   ✅   |  ✅  |   ✅   | ✅  |   ✅    |
+| **query** across groups     |   ✅   |  ✅  |   ✅   |  —  |   ✅    |
+| **build / emit** AGS4       |   ✅   |  ✅  |   —    |  —  |   ✅    |
+| **fix**                     |   ✅   |  ✅  |   —    | ✅  |   ✅    |
+| **diff** revisions          |   ✅   |  ✅  |   —    | ✅  |   ✅    |
+| **certify** (`.ags.idx`)    |   ✅   |  ✅  |   —    | ✅  |   ✅    |
+| **Excel** ↔ AGS4            |   ✅   |  ✅  |   —    | ✅  |   ✅    |
+| **transport** (pack / lock) |   ✅   |  ✅  |   —    | ✅  |   ✅    |
+| **python-ags4 compat**      |   ✅   |  —   |   —    |  —  |    —    |
 
 **✅ supported&nbsp;&nbsp;·&nbsp;&nbsp;○ planned&nbsp;&nbsp;·&nbsp;&nbsp;— by design**
 
 Every capability is now either supported (`✅`) or a deliberate by-design blank
 (`—`). The browser reaches **everything except the `python-ags4` drop-in** — the
 former Excel, `certify` and `transport` gaps are all closed (transport encrypts
-in a Web Worker with the same `zstd + age` envelope the CLI reads). *By design
-(`—`):* the CLI is a validator + inspect/repair tool (no query/build); DuckDB is
+in a Web Worker with the same `zstd + age` envelope the CLI reads). _By design
+(`—`):_ the CLI is a validator + inspect/repair tool (no query/build); DuckDB is
 a **read-only** SQL reader — it queries and joins but doesn't validate, certify,
 or mutate (validation and certification live in the CLI + library; the extension
-only *consumes* an externally-minted `.ags.idx`); the `python-ags4` compat shim
+only _consumes_ an externally-minted `.ags.idx`); the `python-ags4` compat shim
 is a Python-only concern.
 
 ## The shared vocabulary
 
-Every surface that *can* do a task uses the same verb, so knowledge transfers:
+Every surface that _can_ do a task uses the same verb, so knowledge transfers:
 
-| Verb | What it does |
-|---|---|
-| `read` | load an AGS4 file → a handle whose groups are born-typed |
-| `validate` | run the numbered-rules engine → a report (edition self-selected from `TRAN_AGS`) |
-| `build_ags4` / `buildAgs4` | produce byte-faithful AGS4 from data frames or a typed graph |
-| `save` · `.text` · `.bytes` | write it out |
+| Verb                        | What it does                                                                     |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| `read`                      | load an AGS4 file → a handle whose groups are born-typed                         |
+| `validate`                  | run the numbered-rules engine → a report (edition self-selected from `TRAN_AGS`) |
+| `build_ags4` / `buildAgs4`  | produce byte-faithful AGS4 from data frames or a typed graph                     |
+| `save` · `.text` · `.bytes` | write it out                                                                     |
 
 See **[Validate a delivery](../cookbook/validate-a-delivery.md)** for the same
 operation side-by-side across Python, Node, DuckDB, the CLI, and the browser, with

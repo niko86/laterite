@@ -1,4 +1,5 @@
 import { createEffect, onCleanup, onMount, type Component } from "solid-js";
+import type * as Leaflet from "leaflet";
 import type { ConvertedPoint } from "../../lib/coords";
 
 // Leaflet + OpenStreetMap basemap host. Two reasons it's isolated here and
@@ -18,15 +19,14 @@ export const CoordinateMap: Component<{
   points: () => ConvertedPoint[];
 }> = (props) => {
   let el!: HTMLDivElement;
-  // 3rd-party canvas/DOM objects — typed loosely, like Chart.tsx's echarts.
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  let map: any = null;
-  let layer: any = null;
-  let L: any = null;
-  /* eslint-enable @typescript-eslint/no-explicit-any */
+  // Leaflet is dynamically imported in onMount (kept out of the entry chunk), so
+  // these hold its real types via a type-only import — no runtime leaflet here.
+  let map: Leaflet.Map | null = null;
+  let layer: Leaflet.LayerGroup | null = null;
+  let L: typeof Leaflet | null = null;
 
   const draw = () => {
-    if (!map || !L) return;
+    if (!map || !L || !layer) return;
     layer.clearLayers();
     const latlngs: [number, number][] = [];
     for (const p of props.points()) {
@@ -45,8 +45,10 @@ export const CoordinateMap: Component<{
         .bindPopup(popup)
         .addTo(layer);
     }
-    if (latlngs.length === 1) map.setView(latlngs[0], 15);
-    else if (latlngs.length > 1)
+    if (latlngs.length === 1) {
+      const only = latlngs[0];
+      if (only) map.setView(only, 15);
+    } else if (latlngs.length > 1)
       map.fitBounds(L.latLngBounds(latlngs), { padding: [30, 30] });
   };
 
@@ -55,8 +57,10 @@ export const CoordinateMap: Component<{
     void Promise.all([
       import("leaflet"),
       import("leaflet/dist/leaflet.css"),
+      // eslint-disable-next-line solid/reactivity -- one-shot init after the dynamic import; the reactive redraw is the createEffect below, not this .then callback
     ]).then(([leaflet]) => {
       if (disposed) return;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- leaflet's type says .default is always present, but the ESM/CJS interop shape varies by bundler
       L = leaflet.default ?? leaflet;
       map = L.map(el).setView([54.5, -2.5], 5); // GB-ish until fitBounds
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {

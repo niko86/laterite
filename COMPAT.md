@@ -10,8 +10,8 @@ upstream library it tracks). It exists so you can:
   direction), and which are spec ambiguities the AGS-DFWG could
   clarify.
 
-**Status**: `122/131` of python-ags4's own test suite passes
-through `laterite.compat` (93%). The 9 residual failures are all in
+**Status**: `121/131` of python-ags4's own test suite passes
+through `laterite.compat` (92%). The 10 residual failures are all in
 the deliberate-non-closure category — listed below with rationale.
 
 The authoritative behavioural catalogue is
@@ -556,7 +556,7 @@ A summary table by tag:
 | BUG | 2 | Likely python-ags4 defect |
 | NOTE | 17 | Behavioural observation (internal documentation) |
 
-### The 9 residual parity-test failures
+### The 10 residual parity-test failures
 
 | Test | Category | Why |
 |---|---|---|
@@ -567,11 +567,12 @@ A summary table by tag:
 | `test_rule_STNDandPREMCheck` | Identity | Same |
 | `test_rule_AGS3` | O-30 | We refuse AGS3 rather than mis-validate as AGS4 |
 | `test_rule_6_1` | O-2 / O-34 | We refuse non-CSV input as `NotAgs4Error` |
+| `test_rule_6_2` | O-47 | Quote-aware: we keep an embedded-newline field whole and report Rule 6; python-ags4 tears the row into Rule 4/5 |
 | `test_checking_without_dictionary_raises_error` | H-1 | We raise, python-ags4 wraps |
 | `test_duplicate_groups_raises_error` (check.py) | H-1 | Same |
 
 Each is defensible; closing them would unwind a deliberate design
-decision. The pass rate (122/131, 93%) is the honest signal of
+decision. The pass rate (121/131, 92%) is the honest signal of
 where the two validators actually agree.
 
 ---

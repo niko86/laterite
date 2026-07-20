@@ -1,0 +1,18 @@
+{
+  "groups": {
+    "XTRA": {
+      "parent": "SAMP",
+      "description": "Bespoke extra lab test",
+      "headings": [
+        {"name": "LOCA_ID",   "type": "ID",  "status": "KEY"},
+        {"name": "SAMP_TOP",  "type": "2DP", "status": "KEY", "unit": "m"},
+        {"name": "SAMP_REF",  "type": "X",   "status": "KEY"},
+        {"name": "SAMP_TYPE", "type": "PA",  "status": "KEY"},
+        {"name": "SAMP_ID",   "type": "ID",  "status": "KEY"},
+        {"name": "XTRA_NO",   "type": "ID",  "status": "KEY",      "description": "Test number"},
+        {"name": "XTRA_VAL",  "type": "2DP", "status": "REQUIRED", "unit": "mm", "description": "Measured value"},
+        {"name": "XTRA_REM",  "type": "X",   "status": "OTHER",    "description": "Remarks"}
+      ]
+    }
+  }
+}

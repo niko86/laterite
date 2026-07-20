@@ -1,135 +1,30 @@
-// Offset-preserving AGS4 line tokenizer.
+// GROUP-block reconstruction + column alignment for the validate/fix views.
 //
-// AGS4 lines are comma-separated, double-quoted fields; a literal quote
-// inside a field is escaped by doubling it (`""`). This splits a raw
-// line into field tokens whose `.text` slices, concatenated in order,
-// reproduce `raw` byte-for-byte (the lossless-reassembly invariant).
-//
-// Tokenization rule (consistent + lossless): each token spans its field
-// content INCLUDING its surrounding quotes, plus the trailing comma
-// delimiter that follows it (the last field has no trailing comma). Any
-// stray whitespace/characters between a comma and the next quote ride
-// along with the following token. Concatenating every `.text` therefore
-// always rebuilds `raw`.
-//
-// Examples:
-//   splitAgsFields('"HEADING","LOCA_ID"')
-//     -> [{text:'"HEADING",',start:0,end:10},{text:'"LOCA_ID"',start:10,end:19}]
-//   splitAgsFields('"a","b ""c"" d"')  // escaped quotes stay inside the field
-//     -> two tokens; field 1 text is '"b ""c"" d"'
-//   concat of every .text === raw   (always)
+// The offset-preserving tokenizer + field quoter this builds on
+// (`splitAgsFields` / `quoteAgsField` / `agsLine`) now live in `./tokenizer`,
+// backed by the shared Rust leaves through a tiny wasm (#533, part of the #527
+// arc) — the browser no longer carries its own copy. This module keeps the
+// browser-only DISPLAY logic (block reconstruction, DATA windowing, column
+// alignment, fix-preview pairing) that CONSUMES those tokens. The tokenizer
+// surface is re-exported here so existing importers of `./agsline` are unchanged.
 
-export interface AgsField {
-  /** The raw slice for this field, including quotes + trailing comma. */
-  text: string;
-  /** Char offset (code points) where this token starts in `raw`. */
-  start: number;
-  /** Char offset (code points) one past this token's end. */
-  end: number;
-  /**
-   * Char offset (code points) of the field's INNER value — the content
-   * between the surrounding quotes (an unquoted field: its trimmed
-   * content), excluding the quotes AND the trailing comma. This is the
-   * range a field-level highlight should paint, not the whole token.
-   * For an empty quoted field `valueStart === valueEnd`.
-   */
-  valueStart: number;
-  /** Char offset (code points) one past the inner value's end. */
-  valueEnd: number;
-}
+import { splitAgsFields } from "./tokenizer";
 
-export function splitAgsFields(raw: string): AgsField[] {
-  // Code-point aware: index over the spread array so astral chars don't
-  // split a surrogate pair mid-offset.
-  const chars = [...raw];
-  const fields: AgsField[] = [];
-  const n = chars.length;
+export {
+  splitAgsFields,
+  quoteAgsField,
+  agsLine,
+  tokenizerReady,
+} from "./tokenizer";
+export type { AgsField } from "./tokenizer";
 
-  let i = 0;
-  let tokenStart = 0;
-  let inQuotes = false;
-  // Inner-value bounds for the field currently being read. For a quoted
-  // field these are set just inside the opening/closing quotes; for an
-  // unquoted field they're derived from the token at push time.
-  let valueStart = -1;
-  let valueEnd = -1;
-
-  // Push the token spanning [tokenStart, end). `valueStart/valueEnd` are
-  // the inner-value bounds if a quote was seen; otherwise the trimmed
-  // unquoted content (excluding the trailing comma at `end-1`, if any).
-  const push = (end: number, hadComma: boolean) => {
-    let vs = valueStart;
-    let ve = valueEnd;
-    if (vs < 0) {
-      // Unquoted (or empty) field — inner value is the trimmed content
-      // up to the trailing comma.
-      const contentEnd = hadComma ? end - 1 : end;
-      vs = tokenStart;
-      ve = contentEnd;
-      while (vs < ve && chars[vs] === " ") vs += 1;
-      while (ve > vs && chars[ve - 1] === " ") ve -= 1;
-    }
-    fields.push({
-      text: chars.slice(tokenStart, end).join(""),
-      start: tokenStart,
-      end,
-      valueStart: vs,
-      valueEnd: ve,
-    });
-    valueStart = -1;
-    valueEnd = -1;
-  };
-
-  while (i < n) {
-    const c = chars[i];
-    if (inQuotes) {
-      if (c === '"') {
-        // A doubled quote ("") is an escaped literal quote, not a close.
-        if (chars[i + 1] === '"') {
-          i += 2;
-          continue;
-        }
-        inQuotes = false;
-        valueEnd = i; // content ends just before the closing quote.
-      }
-      i += 1;
-      continue;
-    }
-    // Outside quotes:
-    if (c === '"') {
-      inQuotes = true;
-      i += 1;
-      valueStart = i; // content begins just inside the opening quote.
-      valueEnd = i; // empty field defaults to a zero-width inner span.
-    } else if (c === ",") {
-      // The comma closes the current token (it rides along, per the rule).
-      i += 1;
-      push(i, true);
-      tokenStart = i;
-    } else {
-      i += 1;
-    }
-  }
-
-  // Trailing token (after the last comma, or the whole line if commaless).
-  if (tokenStart < n || fields.length === 0) {
-    push(n, false);
-  }
-
-  return fields;
-}
-
-/** Quote a raw value as an AGS4 field: wrap in double quotes, doubling any
- *  internal quote (the inverse of the inner-value unescaping above). */
-export function quoteAgsField(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`;
-}
-
-/** Build one AGS4 line from raw field values: each quoted, comma-joined.
- *  `agsLine(["GROUP", "LOCA"])` → `"GROUP","LOCA"`. */
-export function agsLine(values: string[]): string {
-  return values.map(quoteAgsField).join(",");
-}
+// Every `!` below is a non-null assertion on an array index that the loop bounds
+// or an above-checked length PROVE in range (each is justified inline). Under
+// noUncheckedIndexedAccess TypeScript still types those reads `T | undefined`;
+// the assertions faithfully express hand-verified invariants across this index-
+// dense alignment/windowing code, so no-non-null-assertion is disabled file-wide
+// here (#615) — same rationale as linediff.ts.
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 // --- GROUP-block reconstruction + column alignment ---
 //
@@ -144,8 +39,8 @@ export function agsLine(values: string[]): string {
 function lineTag(raw: string): string {
   const fields = splitAgsFields(raw);
   if (fields.length === 0) return "";
-  const f = fields[0];
-  return [...raw].slice(f.valueStart, f.valueEnd).join("");
+  const f = fields[0]!; // length !== 0 checked above → in-bounds.
+  return Array.from(raw).slice(f.valueStart, f.valueEnd).join("");
 }
 
 export interface GroupBlock {
@@ -235,12 +130,14 @@ function windowRows(all: GroupBlock["rows"]): GroupBlock["rows"] {
   }
 
   const out: GroupBlock["rows"] = [...headers];
+  // data.length > DATA_MAX here, and start/end are clamped into
+  // [0, data.length−1] → every data[...] access below is in-bounds.
   if (start > 0)
-    out.push({ n: data[0].n, raw: "", hit: false, ellipsis: start });
-  for (let i = start; i <= end; i++) out.push(data[i]);
+    out.push({ n: data[0]!.n, raw: "", hit: false, ellipsis: start });
+  for (let i = start; i <= end; i++) out.push(data[i]!);
   const trailing = data.length - 1 - end;
   if (trailing > 0)
-    out.push({ n: data[end + 1].n, raw: "", hit: false, ellipsis: trailing });
+    out.push({ n: data[end + 1]!.n, raw: "", hit: false, ellipsis: trailing });
   return out;
 }
 
@@ -282,13 +179,16 @@ export function alignBlock(block: GroupBlock): AlignedBlock {
   const split = block.rows.map((r) =>
     r.ellipsis === undefined ? splitAgsFields(r.raw) : null,
   );
-  const colCount = split.reduce((m, fs) => (fs ? Math.max(m, fs.length) : m), 0);
+  const colCount = split.reduce(
+    (m, fs) => (fs ? Math.max(m, fs.length) : m),
+    0,
+  );
   const widths: number[] = [];
   for (let c = 0; c < colCount; c++) {
     let w = 0;
     for (const fs of split) {
       if (!fs) continue;
-      const len = c < fs.length ? [...fs[c].text].length : 0;
+      const len = c < fs.length ? Array.from(fs[c]!.text).length : 0;
       if (len > w) w = len;
     }
     widths[c] = w;
@@ -301,7 +201,8 @@ export function alignBlock(block: GroupBlock): AlignedBlock {
     const fs = split[ri]!;
     const cells: AlignedCell[] = fs.map((f, c) => {
       const text = f.text;
-      const pad = Math.max(0, widths[c] - [...text].length);
+      // c < fs.length ≤ colCount = widths.length → widths[c] is in-bounds.
+      const pad = Math.max(0, widths[c]! - Array.from(text).length);
       // valueStart/valueEnd are token-relative; rebase onto the cell.
       return {
         padded: text + " ".repeat(pad),
@@ -345,7 +246,7 @@ export function fixBlock(
 
 // The lossless-reassembly invariant (concat of every `.text` rebuilds `raw`)
 // and the inner-value bounds are load-bearing — every fix preview and the
-// Anonymiser/Coordinate tools rebuild lines from these tokens. They're
-// enforced by the unit suite in `agsline.test.ts` (run in CI), which replaced
-// an import-time dev-only console check that also false-flagged empty quoted
-// fields (`""`, ubiquitous in AGS4) as "inner value includes a quote".
+// Anonymiser/Coordinate tools rebuild lines from these tokens. They are now
+// pinned authoritatively in Rust (`laterite-ags4-parse`'s `tokenize_spans`
+// proptest), the single source the wasm tokenizer wraps; the browser-side
+// display logic above (groupBlock/alignBlock/fixBlock) keeps its own tests.

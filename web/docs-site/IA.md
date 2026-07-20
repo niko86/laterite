@@ -21,7 +21,7 @@ duplicated.
 - **Learn** — one Python-led tutorial (Python = the best teaching surface); each step points to the Cookbook for "same in your surface".
 - **Cookbook** — task recipes, surface-tabbed for shared tasks; a per-recipe "Available in" badge; Python-only recipes (compat / Excel / AgsQuery) stay Python.
 - **Surfaces** — one focused page per door: `index` (hub + matrix), `python`, `node`, `duckdb`, `cli`, `browser`. Entry + unique parts, links into the Cookbook.
-- **Concepts** — surface-agnostic *why* (born-typed, fluent, certificate, keys, dictionary selection, severity, dependency shape, **cross-surface parity**).
+- **Concepts** — surface-agnostic _why_ (born-typed, fluent, certificate, keys, dictionary selection, severity, dependency shape, **cross-surface parity**).
 - **Reference** — per-surface API sized to each: CLI flags, Python API (autodoc), **Node API** (new), **DuckDB functions** (new), AGS types, group catalogue, **AGS4 rules + O-N catalogue** (new), cheatsheet.
 
 ## The capability matrix — three states
@@ -32,18 +32,18 @@ backlog**: every `○` is a real, tracked gap.
 Target state (owner decision: Node + Browser reach parity except python-ags4
 compat; DuckDB + CLI stay by-design; web transport is a by-design browser blank):
 
-| Capability | Python | Node | DuckDB | CLI | Browser |
-|---|:--:|:--:|:--:|:--:|:--:|
-| validate | ✅ | ✅ | ✅ | ✅ | ✅ |
-| read (typed) | ✅ | ✅ | ✅ | — | ✅ |
-| query | ✅ | ✅ | ✅ | — | ✅ |
-| build / emit | ✅ | ✅ | — | — | ✅ |
-| fix | ✅ | ✅ | — | ✅ | ✅ |
-| diff | ✅ | ✅ | — | — | ✅ |
-| certify | ✅ | ✅ | ✅ | ✅ | ○ |
-| Excel ↔ AGS4 | ✅ | ○ | — | — | ○ |
-| transport (pack/lock) | ✅ | ✅ | — | — | — |
-| python-ags4 compat | ✅ | — | — | — | — |
+| Capability            | Python | Node | DuckDB | CLI | Browser |
+| --------------------- | :----: | :--: | :----: | :-: | :-----: |
+| validate              |   ✅   |  ✅  |   ✅   | ✅  |   ✅    |
+| read (typed)          |   ✅   |  ✅  |   ✅   |  —  |   ✅    |
+| query                 |   ✅   |  ✅  |   ✅   |  —  |   ✅    |
+| build / emit          |   ✅   |  ✅  |   —    |  —  |   ✅    |
+| fix                   |   ✅   |  ✅  |   —    | ✅  |   ✅    |
+| diff                  |   ✅   |  ✅  |   —    |  —  |   ✅    |
+| certify               |   ✅   |  ✅  |   ✅   | ✅  |    ○    |
+| Excel ↔ AGS4          |   ✅   |  ○   |   —    |  —  |    ○    |
+| transport (pack/lock) |   ✅   |  ✅  |   —    |  —  |    —    |
+| python-ags4 compat    |   ✅   |  —   |   —    |  —  |    —    |
 
 ## Plug-list (the `○` cells — docs ship now, plugs on their own cadence)
 

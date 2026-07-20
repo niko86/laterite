@@ -12,6 +12,7 @@
 
 import { createSignal, type Accessor } from "solid-js";
 import type { DictVersionOpt, EncodingOpt } from "./validator";
+import { DICT_VERSIONS } from "./editions";
 import type { TabId } from "../components/Tabs";
 import type { Tool } from "../components/tools/ToolsPane";
 
@@ -25,7 +26,10 @@ const PREFIX = "ags4w:";
 // Parse the hash once at load (a shared link applies on first paint only).
 const hashParams: Record<string, string> = (() => {
   const out: Record<string, string> = {};
-  const h = (typeof location !== "undefined" ? location.hash : "").replace(/^#/, "");
+  const h = (typeof location !== "undefined" ? location.hash : "").replace(
+    /^#/,
+    "",
+  );
   if (!h) return out;
   for (const part of h.split("&")) {
     const eq = part.indexOf("=");
@@ -34,7 +38,11 @@ const hashParams: Record<string, string> = (() => {
   return out;
 })();
 
-function seed<T extends string>(key: string, def: T, valid: (s: string) => boolean): T {
+function seed<T extends string>(
+  key: string,
+  def: T,
+  valid: (s: string) => boolean,
+): T {
   const fromHash = hashParams[key];
   if (fromHash && valid(fromHash)) return fromHash as T;
   try {
@@ -65,12 +73,26 @@ function persisted<T extends string>(
   return [get, set];
 }
 
-function persistedBool(key: string, def: boolean): [Accessor<boolean>, (v: boolean) => void] {
-  const [get, set] = persisted(key, def ? "1" : "0", (s) => s === "0" || s === "1");
-  return [() => get() === "1", (v: boolean) => set(v ? "1" : "0")];
+function persistedBool(
+  key: string,
+  def: boolean,
+): [Accessor<boolean>, (v: boolean) => void] {
+  const [get, set] = persisted(
+    key,
+    def ? "1" : "0",
+    (s) => s === "0" || s === "1",
+  );
+  return [
+    () => get() === "1",
+    (v: boolean) => {
+      set(v ? "1" : "0");
+    },
+  ];
 }
 
-const DICTS = ["auto", "4.0.3", "4.0.4", "4.1", "4.1.1", "4.2"];
+// The selectable dictionary versions — the generated SSOT (#529). `readonly
+// string[]` so `.includes(persistedString)` typechecks against an arbitrary string.
+const DICTS: readonly string[] = DICT_VERSIONS;
 const ENCS = ["utf-8", "windows-1252"];
 const TABS = ["validate", "fix", "explore", "tools", "export"];
 const EXPLORE_VIEWS = ["browse", "sql", "charts", "analyse"];
@@ -111,10 +133,8 @@ export const [exploreView, setExploreView] = persisted<ExploreView>(
   "browse",
   (s) => EXPLORE_VIEWS.includes(s),
 );
-export const [fixView, setFixView] = persisted<FixView>(
-  "fv",
-  "fixes",
-  (s) => FIX_VIEWS.includes(s),
+export const [fixView, setFixView] = persisted<FixView>("fv", "fixes", (s) =>
+  FIX_VIEWS.includes(s),
 );
 export const [toolsTool, setToolsTool] = persisted<Tool>(
   "tool",

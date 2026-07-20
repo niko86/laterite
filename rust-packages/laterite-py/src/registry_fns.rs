@@ -4,13 +4,14 @@
 //! the static Rust registry to Python as JSON-shaped data so a thin
 //! Python facade (`laterite/registry.py`) can produce equivalent
 //! msgspec.Struct objects without re-parsing the on-disk JSON. D4a
-//! later routes `ags5_models.GROUPS` through this same path,
-//! collapsing the duplicate-parse.
+//! later routed the Python-side registry facade through this same
+//! path, collapsing the duplicate-parse.
 //!
 //! Mutation (`register` / passthrough auto-registration) stays Python-
 //! side as an overlay merged with this base — see D4a in the plan.
 
 use laterite_ags4_core::registry::{ancestor_chain, inherited_key_names, registry};
+use laterite_ags4_merge::TypeClashMode;
 use laterite_ags4_validator::dict::DictVersion;
 
 use pyo3::exceptions::PyValueError;
@@ -18,8 +19,8 @@ use pyo3::prelude::*;
 
 /// All groups serialised as a JSON array, in declaration order. The
 /// per-group field order matches the dictionary's declaration order
-/// thanks to `serde_json::preserve_order` (set workspace-wide in the
-/// `ags5db` Cargo.toml) + the `GroupDescriptor` struct field order.
+/// thanks to `serde_json::preserve_order` (the same feature flag every
+/// producing crate sets) + the `GroupDescriptor` struct field order.
 ///
 /// Returning a JSON string rather than a list-of-dicts avoids walking
 /// every nested heading through PyO3's per-call type conversion — one
@@ -39,8 +40,7 @@ fn registry_ancestor_chain(code: &str) -> PyResult<Vec<String>> {
     let reg = registry();
     if reg.get(code).is_none() {
         return Err(PyValueError::new_err(format!(
-            "unknown group code: {:?}",
-            code
+            "unknown group code: {code:?}"
         )));
     }
     Ok(ancestor_chain(reg, code)
@@ -57,7 +57,7 @@ fn registry_inherited_key_names(code: &str) -> PyResult<Vec<String>> {
     let reg = registry();
     let g = reg
         .get(code)
-        .ok_or_else(|| PyValueError::new_err(format!("unknown group code: {:?}", code)))?;
+        .ok_or_else(|| PyValueError::new_err(format!("unknown group code: {code:?}")))?;
     let mut names: Vec<String> = inherited_key_names(reg, g).into_iter().collect();
     names.sort();
     Ok(names)
@@ -72,6 +72,8 @@ fn registry_inherited_key_names(code: &str) -> PyResult<Vec<String>> {
 /// per-edition, standard-dictionary view.)
 #[pyfunction]
 #[pyo3(signature = (edition=None))]
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
 fn registry_dictionary_json(edition: Option<String>) -> PyResult<String> {
     let version = crate::parse_dv(edition.as_deref())
         .map_err(PyValueError::new_err)?
@@ -113,6 +115,23 @@ fn registry_fallback_edition() -> String {
     laterite_ags4_validator::dict::FALLBACK.as_str().into()
 }
 
+/// The `--on-type-clash` modes merge accepts, in declaration order —
+/// `["error", "widen", "promote"]`.
+///
+/// Same reason as [`registry_editions`]: the set is defined once, by
+/// [`TypeClashMode::ALL`] in `laterite-ags4-merge`, and Python kept a hand-typed
+/// copy (`_cli.py`'s `_CLASH_CHOICES`) sitting one line below `_DICT_CHOICES`,
+/// which already asks the registry. A fourth mode added to the Rust enum would
+/// have reached the copy through no path — the exact drift shape #549 is about.
+/// Ordered because `ALL` is (Error/default first), and `--help` prints it.
+#[pyfunction]
+fn registry_type_clash_modes() -> Vec<String> {
+    TypeClashMode::ALL
+        .iter()
+        .map(|m| m.as_str().into())
+        .collect()
+}
+
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_groups_json, m)?)?;
     m.add_function(wrap_pyfunction!(registry_ancestor_chain, m)?)?;
@@ -121,5 +140,6 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(registry_editions, m)?)?;
     m.add_function(wrap_pyfunction!(resolve_encoding_label, m)?)?;
     m.add_function(wrap_pyfunction!(registry_fallback_edition, m)?)?;
+    m.add_function(wrap_pyfunction!(registry_type_clash_modes, m)?)?;
     Ok(())
 }

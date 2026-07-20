@@ -17,7 +17,7 @@ fn p(text: &str) -> ParsedFile {
     parse_str(text).unwrap()
 }
 
-/// One LOCA row, with `unit` / `ty` declared for LOCA_GL.
+/// One LOCA row, with `unit` / `ty` declared for `LOCA_GL`.
 fn loca(unit: &str, ty: &str, id: &str, gl: &str) -> String {
     [
         r#""GROUP","PROJ""#.to_string(),

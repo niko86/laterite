@@ -41,10 +41,12 @@ members = [
     "laterite-ags4-emit",
     "laterite-ags4-diff",
     "laterite-ags4-merge",
+    "laterite-ags4-censor",
     "laterite-ags4-validator",
     "laterite-ags4-trust",
     "laterite-ags4-check",
     "laterite-ags4-wasm",
+    "laterite-ags4-tokenizer-wasm",
     "laterite-cliutil",
     "laterite-py",
     "laterite-node",
@@ -58,6 +60,31 @@ members = [
 # npm `laterite` versions on its own `node-v*` track.
 [workspace.package]
 version = "0.7.0"
+
+# Workspace-wide clippy pedantic (lever 6, chore/clippy-pedantic): every member
+# opts in via `[lints] workspace = true` (see each member's Cargo.toml), except
+# the two wasm crates CI already excludes from clippy.
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Last-resort allows only (each justified). Generated code is allowed at its
+# include site (see typed_graph/mod.rs, dict.rs), not here.
+similar_names = "allow"              # flags distinct, correct names that merely look alike
+unused_self = "allow"               # PyO3 #[pymethods]/trait methods must take &self by contract
+struct_excessive_bools = "allow"    # design nudge (bools->enum), not a mechanical fix
+fn_params_excessive_bools = "allow" # ditto
+
+# --- Deferred by owner decision (2026-07-19): the fix is a separate effort or a
+#     wash, not a code-quality win. Tracked in the PR body; revisit as focused
+#     follow-ups. Note cast_possible_truncation is deliberately NOT here — it is
+#     audited case-by-case, since a real truncation can hide a bug.
+missing_errors_doc = "allow"        # writing # Errors sections is a docs project of its own
+missing_panics_doc = "allow"        # ditto (# Panics)
+cast_precision_loss = "allow"       # inherent to i64/u64 -> f64; the casts are intentional
+cast_sign_loss = "allow"            # intentional signed<->unsigned conversions
+cast_possible_wrap = "allow"        # intentional u32 -> i32 etc. where the range is known
+too_many_lines = "allow"            # refactoring to a line threshold is risky churn, not correctness
+must_use_candidate = "allow"        # #[must_use] on every getter is noise (all real hits were codegen)
+return_self_not_must_use = "allow"  # same family as must_use_candidate
 
 # Release profile lives at the workspace root — cargo only honours
 # profile settings declared here and silently ignores them on member

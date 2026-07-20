@@ -28,6 +28,7 @@ const report = (findings: FindingDto[]): ValidationReport => ({
     ? [{ rule: "Rule 1", total: findings.length, items: findings }]
     : [],
   error: null,
+  revalidate_reason: null,
 });
 
 describe("reportIsOnlyFyi", () => {
@@ -63,8 +64,12 @@ describe("reportIsOnlyFyi", () => {
 describe("severityCounts / reportSeverity", () => {
   it("splits a mixed report by severity (the user's 36 + 14 case)", () => {
     const findings = [
-      ...Array(36).fill(0).map(() => find("error")),
-      ...Array(14).fill(0).map(() => find("fyi")),
+      ...Array(36)
+        .fill(0)
+        .map(() => find("error")),
+      ...Array(14)
+        .fill(0)
+        .map(() => find("fyi")),
     ];
     expect(severityCounts(report(findings))).toEqual({
       error: 36,
@@ -92,7 +97,7 @@ describe("severityCounts / reportSeverity", () => {
   it("reportSeverity is NOT exact once the per-rule cap clips items", () => {
     // 3 serialized items but a true total of 9000 ⇒ the split would undercount.
     const r = report([find("error"), find("error"), find("fyi")]);
-    r.findings[0].total = 9000;
+    r.findings[0]!.total = 9000;
     r.finding_count = 9000;
     expect(reportSeverity(r).exact).toBe(false);
   });

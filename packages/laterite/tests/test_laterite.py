@@ -16,6 +16,7 @@ import json
 import logging
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 
 import laterite
@@ -29,9 +30,7 @@ _FIX = (
     / "tests"
     / "fixtures"
 )
-_RUST_BIN = (
-    Path(__file__).parents[3] / "rust-packages" / "target" / "release" / "lat"
-)
+_RUST_BIN = Path(__file__).parents[3] / "rust-packages" / "target" / "release" / "lat"
 _FIXTURES = sorted(_FIX.glob("*.ags"))
 _CLEAN = _FIX / "clean_minimal.ags"
 
@@ -83,8 +82,8 @@ def test_compat_dataframe_shape_matches_python_ags4():
     pytest.importorskip("python_ags4")
     from python_ags4 import AGS4 as ref
 
-    t, h = AGS4.AGS4_to_dataframe(str(_CLEAN))  # default = pandas
-    rt, rh = _quiet(ref.AGS4_to_dataframe, str(_CLEAN))
+    t, _h = AGS4.AGS4_to_dataframe(str(_CLEAN))  # default = pandas
+    rt, _rh = _quiet(ref.AGS4_to_dataframe, str(_CLEAN))
     assert set(t) == set(rt)
     for g in t:
         assert list(t[g].columns) == list(rt[g].columns)
@@ -341,6 +340,122 @@ def test_pandas_missing_gives_actionable_error(monkeypatch):
         _frames.materialize(pl.DataFrame({"a": [1]}), "pandas")
 
 
+_SRC_PROJ = (
+    '"GROUP","PROJ"\r\n"HEADING","PROJ_ID","PROJ_NAME"\r\n'
+    '"UNIT","",""\r\n"TYPE","ID","X"\r\n'
+    '"DATA","P1","Site A"\r\n"DATA","P2","Site B"\r\n'
+)
+
+
+# Exercised in a subprocess with pyarrow blocked BEFORE laterite/duckdb import.
+# In-process simulation is impossible: DuckDB caches pyarrow availability
+# process-globally, so once any earlier test imports pyarrow, blocking it mid-run
+# breaks DuckDB's own `.df()` — which a genuine pyarrow-free install never does
+# (DuckDB simply takes its NumPy path). Only a fresh interpreter is faithful.
+_PYARROW_FREE_EXERCISE = textwrap.dedent(
+    """
+    import io, sys
+
+    class _BlockPyarrow:
+        def find_spec(self, name, path=None, target=None):
+            if name.split(".")[0] == "pyarrow":
+                raise ModuleNotFoundError("[sim] pyarrow not installed")
+            return None
+
+    sys.meta_path.insert(0, _BlockPyarrow())  # before laterite / duckdb import
+
+    from laterite import compat as AGS4
+
+    SRC = (
+        '"GROUP","PROJ"\\r\\n"HEADING","PROJ_ID","PROJ_NAME"\\r\\n'
+        '"UNIT","",""\\r\\n"TYPE","ID","X"\\r\\n'
+        '"DATA","P1","Site A"\\r\\n"DATA","P2","Site B"\\r\\n'
+    )
+
+    fails = []
+
+    # object-dtype pandas via the DuckDB `.df()` fallback (no pyarrow)
+    tables, _ = AGS4.AGS4_to_dataframe(io.StringIO(SRC), backend="pandas")
+    proj = tables["PROJ"]
+    if list(proj.columns) != ["HEADING", "PROJ_ID", "PROJ_NAME"]:
+        fails.append(f"columns={list(proj.columns)}")
+    if not all(str(d) == "object" for d in proj.dtypes):
+        fails.append(f"dtypes={list(proj.dtypes)}")
+    if proj["PROJ_ID"].tolist() != ["", "ID", "P1", "P2"]:
+        fails.append(f"values={proj['PROJ_ID'].tolist()}")
+
+    # string_dtype='string' needs pyarrow — must raise, never downgrade
+    try:
+        AGS4.AGS4_to_dataframe(io.StringIO(SRC), backend="pandas", string_dtype="string")
+        fails.append("string_dtype did not raise")
+    except ModuleNotFoundError as e:
+        if "pyarrow" not in str(e):
+            fails.append(f"string raise msg={e}")
+
+    # and pyarrow really was unreachable
+    try:
+        import pyarrow  # noqa: F401
+        fails.append("pyarrow importable — block failed")
+    except ModuleNotFoundError:
+        pass
+
+    if fails:
+        print("PYARROW-FREE FAILURES:", fails)
+        sys.exit(1)
+    sys.exit(0)
+    """
+)
+
+
+def test_compat_pyarrow_free_fallback_subprocess():
+    """The `[compat]` pyarrow-free contract (a real `pip install laterite[compat]`)
+    in a fresh interpreter that blocks pyarrow before any import: AGS4_to_dataframe
+    still yields object-dtype pandas via DuckDB's `.df()` with values intact, and
+    `string_dtype="string"` raises an actionable error rather than downgrading."""
+    proc = subprocess.run(
+        [sys.executable, "-c", _PYARROW_FREE_EXERCISE],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0, (
+        "pyarrow-free compat fallback broke:\n"
+        f"--- stdout ---\n{proc.stdout}\n--- stderr ---\n{proc.stderr}"
+    )
+
+
+def test_compat_dataframe_default_is_object_dtype():
+    """The drop-in contract: default `AGS4_to_dataframe` returns numpy object
+    columns — byte-identical to python-ags4 today (its downstream
+    `select_dtypes('object')` / `astype('object')` assume it)."""
+    t, _ = AGS4.AGS4_to_dataframe(io.StringIO(_SRC_PROJ), backend="pandas")
+    assert all(str(d) == "object" for d in t["PROJ"].dtypes)
+
+
+def test_compat_string_dtype_knob_pyarrow():
+    """`string_dtype="string"` (per-call and process-wide) yields pandas'
+    Arrow-backed `str` dtype — what python-ags4 returns on pandas 3 — while
+    staying `select_dtypes('object')`-visible (the na_value=NaN variant)."""
+    pytest.importorskip("pyarrow")
+    import pandas as pd
+
+    t, _ = AGS4.AGS4_to_dataframe(
+        io.StringIO(_SRC_PROJ), backend="pandas", string_dtype="string"
+    )
+    assert all(isinstance(d, pd.StringDtype) for d in t["PROJ"].dtypes)
+    assert "PROJ_ID" in t["PROJ"].select_dtypes(include="object").columns
+
+    AGS4.set_string_dtype("string")
+    try:
+        assert AGS4.get_string_dtype() == "string"
+        t2, _ = AGS4.AGS4_to_dataframe(io.StringIO(_SRC_PROJ), backend="pandas")
+        assert all(isinstance(d, pd.StringDtype) for d in t2["PROJ"].dtypes)
+    finally:
+        AGS4.set_string_dtype("object")
+    with pytest.raises(ValueError, match=r"unknown string_dtype"):
+        AGS4.set_string_dtype("nonsense")
+
+
 def test_compat_ags3_is_refused():
     with pytest.raises(laterite.UnsupportedEditionError):
         AGS4.AGS4_to_dataframe_AGS3("x")
@@ -482,7 +597,9 @@ def test_cli_fix_writes_sibling_and_exit_codes(tmp_path):
     """`lat fix` (Python CLI): sibling output by default, in-place /
     --fix-out variants, and exit 0 clean vs 1 residual."""
     lf = tmp_path / "delivery.ags"
-    lf.write_bytes(_CLEAN.read_bytes().replace(b"\r\n", b"\n"))  # LF-only → fixable clean
+    lf.write_bytes(
+        _CLEAN.read_bytes().replace(b"\r\n", b"\n")
+    )  # LF-only → fixable clean
 
     # Default: writes delivery.fixed.ags, source untouched, exit 0 (clean).
     out, code = _run_py_cli(["fix", str(lf)])
@@ -497,7 +614,9 @@ def test_cli_fix_writes_sibling_and_exit_codes(tmp_path):
     assert code == 0 and b"\r\n" in lf.read_bytes()
 
     # A file with non-fixable findings → exit 1, findings remain.
-    _, code = _run_py_cli(["fix", str(_RULE8_PRECISION), "--fix-out", str(tmp_path / "r8.ags")])
+    _, code = _run_py_cli(
+        ["fix", str(_RULE8_PRECISION), "--fix-out", str(tmp_path / "r8.ags")]
+    )
     assert code == 1
     assert (tmp_path / "r8.ags").exists()
 
@@ -520,7 +639,16 @@ def test_cli_fix_rust_binary_parity(tmp_path):
     assert (tmp_path / "d.fixed.ags").read_bytes().count(b"\r\n") >= 1
 
 
-_FIXABLE_RULES = {"1", "2a", "4", "6", "7", "8", "11a", "11b"}  # fixes.rs FIXABLE_RULE_LABELS
+_FIXABLE_RULES = {
+    "1",
+    "2a",
+    "4",
+    "6",
+    "7",
+    "8",
+    "11a",
+    "11b",
+}  # fixes.rs FIXABLE_RULE_LABELS
 
 
 def test_list_rules_returns_the_27_with_fields():
@@ -556,7 +684,9 @@ def test_cli_list_rules_table_and_json():
 def test_cli_list_rules_rust_binary_json_matches_python():
     """The standalone Rust binary's --list-rules --json is byte-identical to the
     Python CLI's — both stream the same compile-time-embedded rules_meta.json."""
-    r = subprocess.run([str(_RUST_BIN), "rules", "--json"], capture_output=True, text=True)
+    r = subprocess.run(
+        [str(_RUST_BIN), "rules", "--json"], capture_output=True, text=True
+    )
     assert r.returncode == 0
     py, _ = _run_py_cli(["rules", "--json"])
     assert r.stdout == py  # byte-identical, not merely structurally equal
@@ -613,7 +743,9 @@ def test_cli_transport_password_file_and_missing_input(tmp_path):
     pw.write_text("hunter2\n")
     age, out = tmp_path / "l.age", tmp_path / "u.ags"
     assert (
-        _cli.main(["lock", str(_CLEAN), str(age), "--log-n", "10", "--password-file", str(pw)])
+        _cli.main(
+            ["lock", str(_CLEAN), str(age), "--log-n", "10", "--password-file", str(pw)]
+        )
         == 0
     )
     assert _cli.main(["unlock", str(age), str(out), "--password-file", str(pw)]) == 0
@@ -633,7 +765,9 @@ def test_cli_excel_round_trip(tmp_path):
     assert _cli.main(["excel", str(xlsx), str(back)]) == 0
     assert set(read(str(back)).groups) == set(read(str(_CLEAN)).groups)
     assert _cli.main(["excel", str(_CLEAN), str(tmp_path / "x.dat")]) == 5  # ambiguous
-    assert _cli.main(["excel", str(tmp_path / "none.ags"), str(tmp_path / "y.xlsx")]) == 3
+    assert (
+        _cli.main(["excel", str(tmp_path / "none.ags"), str(tmp_path / "y.xlsx")]) == 3
+    )
 
 
 def test_cli_readme_and_help_flags():
@@ -654,10 +788,8 @@ def test_compat_AGS4Error_is_exception():
     from laterite.compat import AGS4Error
 
     assert issubclass(AGS4Error, Exception)
-    try:
+    with pytest.raises(AGS4Error, match=r"^test$"):
         raise AGS4Error("test")
-    except AGS4Error as exc:
-        assert str(exc) == "test"
 
 
 def test_compat_count_errors_categorises_by_key_prefix():
@@ -810,7 +942,7 @@ def test_compat_AGS4_to_excel_writes_HEADING_column_first(tmp_path):
 
     assert "PROJ" in sheets
     proj = sheets["PROJ"]
-    assert list(proj.columns)[0] == "HEADING"
+    assert next(iter(proj.columns)) == "HEADING"
     assert proj.loc[0, "HEADING"] == "UNIT"
     assert proj.loc[1, "HEADING"] == "TYPE"
     assert proj.loc[2, "HEADING"] == "DATA"
@@ -930,7 +1062,11 @@ def test_fix_risky_excluded_by_default_included_on_request():
     risky = laterite.fix(text=_DUP_HEADING_SRC, risky=True)
     assert all(a["kind"] != "rename_duplicate_heading" for a in safe.applied)
     assert any(a["kind"] == "rename_duplicate_heading" for a in risky.applied)
-    assert all(a["risk"] == "risky" for a in risky.applied if a["kind"] == "rename_duplicate_heading")
+    assert all(
+        a["risk"] == "risky"
+        for a in risky.applied
+        if a["kind"] == "rename_duplicate_heading"
+    )
 
 
 def test_fix_result_save_and_text(tmp_path):
@@ -1110,7 +1246,9 @@ def test_to_excel_rejects_non_ags_input(tmp_path):
 
 # --- Report.findings / by_rule carry severity + location (#196) -------------
 
-_RULE10A_DUP = _FIX / "rule10a_dup_key.ags"  # cell-target findings (field_index/data_row)
+_RULE10A_DUP = (
+    _FIX / "rule10a_dup_key.ags"
+)  # cell-target findings (field_index/data_row)
 _RULE11C_RL = _FIX / "rule11c_bad_rl.ags"  # a heading-target finding
 
 

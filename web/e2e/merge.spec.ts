@@ -13,7 +13,9 @@ test("Tools → Merge reconciles two deliveries: revision audit + downloadable u
   await ready(page);
 
   // Load the base delivery in Validate — it seeds the Merge tool's "Base (a)".
-  await page.locator('input[type="file"]').setInputFiles(fixture("merge_base.ags"));
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles(fixture("merge_base.ags"));
   await tab(page, "Tools").click();
   await page.getByRole("button", { name: /^Merge$/ }).click();
 

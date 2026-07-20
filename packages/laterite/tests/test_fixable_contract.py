@@ -29,44 +29,44 @@ import pytest
 # fixtures track what the engine actually repairs.
 CASES: dict[str, dict] = {
     # leading UTF-8 BOM -> Rule 1 (StripBom, safe)
-    "1": dict(
-        data=b"\xef\xbb\xbf"
+    "1": {
+        "data": b"\xef\xbb\xbf"
         b'"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n"DATA","P1"\r\n'
-    ),
+    },
     # bare-LF line endings -> Rule 2a (NormalizeCrlf, safe)
-    "2a": dict(
-        text='"GROUP","PROJ"\n"HEADING","PROJ_ID"\n"UNIT",""\n"TYPE","ID"\n"DATA","P1"\n'
-    ),
+    "2a": {
+        "text": '"GROUP","PROJ"\n"HEADING","PROJ_ID"\n"UNIT",""\n"TYPE","ID"\n"DATA","P1"\n'
+    },
     # DATA row shorter than HEADING -> Rule 4 (PadShortRow, safe)
-    "4": dict(
-        text='"GROUP","PROJ"\r\n"HEADING","PROJ_ID","PROJ_NAME"\r\n"UNIT","",""\r\n'
+    "4": {
+        "text": '"GROUP","PROJ"\r\n"HEADING","PROJ_ID","PROJ_NAME"\r\n"UNIT","",""\r\n'
         '"TYPE","ID","X"\r\n"DATA","P1"\r\n'
-    ),
+    },
     # embedded CR inside a DATA value -> Rule 6 (StripEmbeddedCr, safe)
-    "6": dict(
-        text='"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n'
+    "6": {
+        "text": '"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n'
         '"DATA","a\rb"\r\n'
-    ),
+    },
     # duplicated heading -> Rule 7 (RenameDuplicateHeading, RISKY — see the partial note)
-    "7": dict(
-        text='"GROUP","LOCA"\r\n"HEADING","LOCA_ID","LOCA_ID"\r\n"UNIT","",""\r\n'
+    "7": {
+        "text": '"GROUP","LOCA"\r\n"HEADING","LOCA_ID","LOCA_ID"\r\n"UNIT","",""\r\n'
         '"TYPE","ID","ID"\r\n"DATA","BH1","BH1"\r\n'
-    ),
+    },
     # 2DP value at 1 dp -> Rule 8 (ReformatNumeric, safe)
-    "8": dict(
-        text='"GROUP","LOCA"\r\n"HEADING","LOCA_ID","LOCA_GL"\r\n"UNIT","","m"\r\n'
+    "8": {
+        "text": '"GROUP","LOCA"\r\n"HEADING","LOCA_ID","LOCA_GL"\r\n"UNIT","","m"\r\n'
         '"TYPE","ID","2DP"\r\n"DATA","BH1","1.0"\r\n'
-    ),
+    },
     # TRAN with empty TRAN_DLIM -> Rule 11a (InsertTranDlim, safe)
-    "11a": dict(
-        text='"GROUP","TRAN"\r\n"HEADING","TRAN_DLIM","TRAN_RCON"\r\n"UNIT","",""\r\n'
+    "11a": {
+        "text": '"GROUP","TRAN"\r\n"HEADING","TRAN_DLIM","TRAN_RCON"\r\n"UNIT","",""\r\n'
         '"TYPE","X","X"\r\n"DATA","","+"\r\n'
-    ),
+    },
     # TRAN with empty TRAN_RCON -> Rule 11b (InsertTranRcon, safe)
-    "11b": dict(
-        text='"GROUP","TRAN"\r\n"HEADING","TRAN_DLIM","TRAN_RCON"\r\n"UNIT","",""\r\n'
+    "11b": {
+        "text": '"GROUP","TRAN"\r\n"HEADING","TRAN_DLIM","TRAN_RCON"\r\n"UNIT","",""\r\n'
         '"TYPE","X","X"\r\n"DATA","|",""\r\n'
-    ),
+    },
 }
 
 # Rule 7's rename resolves the duplicate but introduces a non-dictionary heading,

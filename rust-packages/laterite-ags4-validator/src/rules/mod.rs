@@ -11,7 +11,7 @@
 //! V5: typed-value rule (8) — value vs declared TYPE/UNIT.
 //! V6: mandatory/definition groups (12, 13, 14, 15, 16, 17, 18).
 //! V7: relational rules (10a, 10b, 10c, 11/11a/11b, 11c).
-//! V8: cross-reference rules (19b_2/19b_3 dict-aware, 20).
+//! V8: cross-reference rules (`19b_2/19b_3` dict-aware, 20).
 //! All eight phases now wired; `run_all` is feature-complete.
 
 pub mod dictionary;

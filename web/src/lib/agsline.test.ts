@@ -9,10 +9,13 @@ import {
   type GroupBlock,
 } from "./agsline";
 
-// The lossless-reassembly invariant is load-bearing: every fix preview and the
-// Anonymiser/Coordinate tools rebuild lines by concatenating `.text`. It used
-// to be guarded only by a dev-only console.error (silent in prod). These make
-// it a real, enforced contract.
+// Runs in the WASM lane (vitest.wasm.config.ts): splitAgsFields/quoteAgsField
+// are now backed by the tiny tokenizer wasm (#533), init'd from disk in the
+// lane's setup file. The tokenizer's invariants are pinned AUTHORITATIVELY in
+// Rust (laterite-ags4-parse's `tokenize_spans` proptest); the checks below
+// double as a cross-check that the wasm boundary hands JS the right shape
+// (camelCase valueStart/valueEnd, lossless `.text`), and exercise the
+// browser-only display helpers (groupBlock/alignBlock/fixBlock) against it.
 
 const CASES = [
   '"HEADING","LOCA_ID","LOCA_NATE"',
@@ -24,7 +27,7 @@ const CASES = [
   '"DATA",   "spaced"  ,"x"', // stray whitespace between comma and quote
   '"DATA","emoji 😀 here","z"', // astral char — must not split a surrogate pair
   '"a",,"c"', // empty unquoted middle field
-  ',,', // all-empty fields
+  ",,", // all-empty fields
   '"x""y"', // a field that is just an escaped quote
 ];
 
@@ -36,19 +39,22 @@ describe("splitAgsFields — lossless reassembly", () => {
 });
 
 describe("splitAgsFields — inner-value bounds", () => {
-  it.each(CASES)("inner value never spills past token / onto quote+comma for %j", (raw) => {
-    const cps = [...raw];
-    for (const f of splitAgsFields(raw)) {
-      expect(f.valueStart).toBeGreaterThanOrEqual(f.start);
-      expect(f.valueEnd).toBeLessThanOrEqual(f.end);
-      expect(f.valueStart).toBeLessThanOrEqual(f.valueEnd);
-      // The inner value must exclude the surrounding quote and trailing comma.
-      if (f.valueStart < f.valueEnd) {
-        expect(cps[f.valueStart]).not.toBe('"');
-        expect(cps[f.valueEnd - 1]).not.toBe(",");
+  it.each(CASES)(
+    "inner value never spills past token / onto quote+comma for %j",
+    (raw) => {
+      const cps = Array.from(raw);
+      for (const f of splitAgsFields(raw)) {
+        expect(f.valueStart).toBeGreaterThanOrEqual(f.start);
+        expect(f.valueEnd).toBeLessThanOrEqual(f.end);
+        expect(f.valueStart).toBeLessThanOrEqual(f.valueEnd);
+        // The inner value must exclude the surrounding quote and trailing comma
+        // (only constrained when the inner value is non-empty).
+        const nonEmpty = f.valueStart < f.valueEnd;
+        expect(nonEmpty && cps[f.valueStart] === '"').toBe(false);
+        expect(nonEmpty && cps[f.valueEnd - 1] === ",").toBe(false);
       }
-    }
-  });
+    },
+  );
 });
 
 describe("splitAgsFields — field count + values", () => {
@@ -59,10 +65,12 @@ describe("splitAgsFields — field count + values", () => {
 
   it("recovers the inner value, unescaping doubled quotes structurally", () => {
     const f = splitAgsFields('"DATA","b ""c"" d"');
-    const innerOf = (raw: string, x: { valueStart: number; valueEnd: number }) =>
-      [...raw].slice(x.valueStart, x.valueEnd).join("");
+    const innerOf = (
+      raw: string,
+      x: { valueStart: number; valueEnd: number },
+    ) => Array.from(raw).slice(x.valueStart, x.valueEnd).join("");
     // valueStart/valueEnd span the raw (still-escaped) inner content.
-    expect(innerOf('"DATA","b ""c"" d"', f[1])).toBe('b ""c"" d');
+    expect(innerOf('"DATA","b ""c"" d"', f[1]!)).toBe('b ""c"" d');
   });
 
   it("absorbs a trailing comma into the preceding token (the documented rule)", () => {
@@ -71,13 +79,13 @@ describe("splitAgsFields — field count + values", () => {
     // a new empty field. The lossless invariant (covered above) still holds.
     const f = splitAgsFields('"DATA","BH01",');
     expect(f).toHaveLength(2);
-    expect(f[1].text).toBe('"BH01",');
+    expect(f[1]!.text).toBe('"BH01",');
   });
 
   it("an empty line is a single empty field (never zero fields)", () => {
     const f = splitAgsFields("");
     expect(f).toHaveLength(1);
-    expect(f[0].text).toBe("");
+    expect(f[0]!.text).toBe("");
   });
 });
 
@@ -92,7 +100,9 @@ describe("quoteAgsField / agsLine", () => {
     for (const v of ["BH01", "a, b", 'has "quote"', ""]) {
       const line = agsLine(["DATA", v]);
       const f = splitAgsFields(line);
-      const inner = [...line].slice(f[1].valueStart, f[1].valueEnd).join("");
+      const inner = Array.from(line)
+        .slice(f[1]!.valueStart, f[1]!.valueEnd)
+        .join("");
       // The structural inner value is the escaped form; un-doubling recovers v.
       expect(inner.replace(/""/g, '"')).toBe(v);
     }
@@ -132,7 +142,7 @@ describe("groupBlock", () => {
 
   it("scans up from a DATA-row hit to the GROUP opener", () => {
     const blk = groupBlock(SMALL_BLOCK, 6)!; // hit on the 2nd DATA row
-    expect(blk.rows[0].raw).toBe('"GROUP","LOCA"');
+    expect(blk.rows[0]!.raw).toBe('"GROUP","LOCA"');
     expect(blk.rows.find((r) => r.hit)!.raw).toBe('"DATA","BH02","CP"');
   });
 
@@ -213,7 +223,7 @@ describe("groupBlock", () => {
       ]);
       const ell = blk.rows.filter((r) => r.ellipsis !== undefined);
       expect(ell).toHaveLength(1); // only trailing (start === 0 → no leading)
-      expect(ell[0].ellipsis).toBe(7); // 12 - 5
+      expect(ell[0]!.ellipsis).toBe(7); // 12 - 5
     });
 
     it("no leading ellipsis when the hit is within DATA_CONTEXT of the first data row", () => {
@@ -238,13 +248,13 @@ describe("alignBlock", () => {
     const aligned = alignBlock(block);
     expect(aligned.rows).toHaveLength(2);
     // Column 0: max("HEADING", "DATA",) widths → both cells equal width.
-    const w0 = aligned.rows.map((r) => r.cells[0].padded.length);
+    const w0 = aligned.rows.map((r) => r.cells[0]!.padded.length);
     expect(w0[0]).toBe(w0[1]);
     // Column 1: '"LOCA_ID",' (10) vs '"BH01",' (7) → data cell padded to 10.
-    expect(aligned.rows[1].cells[1].padded).toBe('"BH01",   '); // 7 + 3 spaces
-    expect(aligned.rows[1].hit).toBe(true);
+    expect(aligned.rows[1]!.cells[1]!.padded).toBe('"BH01",   '); // 7 + 3 spaces
+    expect(aligned.rows[1]!.hit).toBe(true);
     // valueStart/valueEnd are rebased to be cell-relative (just inside the quote).
-    const cell = aligned.rows[1].cells[1];
+    const cell = aligned.rows[1]!.cells[1]!;
     expect(cell.padded.slice(cell.valueStart, cell.valueEnd)).toBe("BH01");
   });
 
@@ -257,8 +267,8 @@ describe("alignBlock", () => {
     };
     const aligned = alignBlock(block);
     // Row 2 has no 3rd cell; row 1's 3rd column width comes from itself only.
-    expect(aligned.rows[1].cells).toHaveLength(2);
-    expect(aligned.rows[0].cells).toHaveLength(3);
+    expect(aligned.rows[1]!.cells).toHaveLength(2);
+    expect(aligned.rows[0]!.cells).toHaveLength(3);
   });
 
   it("carries ellipsis rows through with no cells", () => {
@@ -270,7 +280,12 @@ describe("alignBlock", () => {
       ],
     };
     const aligned = alignBlock(block);
-    expect(aligned.rows[1]).toMatchObject({ n: 2, hit: false, cells: [], ellipsis: 5 });
+    expect(aligned.rows[1]).toMatchObject({
+      n: 2,
+      hit: false,
+      cells: [],
+      ellipsis: 5,
+    });
   });
 
   it("preserves the variant flag through alignment (del/ins pairs)", () => {
@@ -293,10 +308,18 @@ describe("fixBlock", () => {
     expect(blk).not.toBeNull();
     const hitPair = blk.rows.filter((r) => r.variant);
     expect(hitPair).toHaveLength(2);
-    expect(hitPair[0]).toMatchObject({ raw: '"DATA","BH02","CP"', variant: "del" });
-    expect(hitPair[1]).toMatchObject({ raw: '"DATA","BH02","XX"', variant: "ins" });
+    expect(hitPair[0]).toMatchObject({
+      raw: '"DATA","BH02","CP"',
+      variant: "del",
+    });
+    expect(hitPair[1]).toMatchObject({
+      raw: '"DATA","BH02","XX"',
+      variant: "ins",
+    });
     // Non-hit rows are passed through unchanged (no variant).
-    expect(blk.rows.find((r) => r.raw === '"GROUP","LOCA"')!.variant).toBeUndefined();
+    expect(
+      blk.rows.find((r) => r.raw === '"GROUP","LOCA"')!.variant,
+    ).toBeUndefined();
   });
 
   it("returns null when there's no enclosing GROUP block to anchor the fix", () => {
@@ -305,13 +328,17 @@ describe("fixBlock", () => {
   });
 
   it("aligns the del/ins pair to the same column widths as the rest of the block", () => {
-    const blk = fixBlock(SMALL_BLOCK, 6, '"DATA","BH02","a much longer value"')!;
+    const blk = fixBlock(
+      SMALL_BLOCK,
+      6,
+      '"DATA","BH02","a much longer value"',
+    )!;
     const aligned = alignBlock(blk);
     const variantRows = aligned.rows.filter((r) => r.variant);
     // Both del + ins share the block widths: every row's col-1 cell is the same width.
     const widths = aligned.rows
       .filter((r) => r.cells.length > 1)
-      .map((r) => r.cells[1].padded.length);
+      .map((r) => r.cells[1]!.padded.length);
     expect(new Set(widths).size).toBe(1);
     expect(variantRows.map((r) => r.variant)).toEqual(["del", "ins"]);
   });

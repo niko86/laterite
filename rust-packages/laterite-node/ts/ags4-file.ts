@@ -1,7 +1,13 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { type Table, tableFromIPC } from "apache-arrow";
-import { DuckEngine, type QueryOptions, quoteId, type Row, stripSynthKeys } from "./duckdb";
+import {
+  DuckEngine,
+  type QueryOptions,
+  quoteId,
+  type Row,
+  stripSynthKeys,
+} from "./duckdb";
 import { Ags4Error, raiseFor } from "./errors";
 // The chained verbs (`fix`/`diff`/`toExcel`) reuse the free functions with this
 // handle's retained source, so the ONE engine call + error mapping lives in one
@@ -34,6 +40,19 @@ export interface Ags4Source {
   text?: string;
   data?: Uint8Array;
   encoding?: string;
+}
+
+/** Knobs for {@link Ags4File.certify} / {@link Ags4File.certifyBytes}: the edition pin
+ *  and the #568 custom-`--dict` overlay the certificate is minted against. Each defaults
+ *  to the last `.validate()` on this handle (see `#mint`). */
+export interface CertifyOptions {
+  /** Force the base edition; default is the last `.validate()`'s, else auto from TRAN_AGS. */
+  dictVersion?: string;
+  /** A custom AGS4 dictionary (path or raw `.ags`/JSON bytes) to certify against — its
+   *  `{name, hash}` is stamped into the cert (O-48). */
+  dictionary?: string | Uint8Array;
+  /** Treat `dictionary` as a full replacement (no base edition). */
+  dictReplace?: boolean;
 }
 
 /**
@@ -74,10 +93,25 @@ export class Ags4File {
   // against. NOT a trust claim — the mint re-validates; this only says with which
   // dictionary.
   #lastDictVersion: string | undefined;
+  // Same provenance for a `--dict` custom overlay (#568): the dictionary the last
+  // `.validate()` overlaid and whether it replaced the base, so a following `.certify()`
+  // mints against the same effective dictionary (and stamps its {name, hash}).
+  #lastDictionary: string | Uint8Array | undefined;
+  #lastDictReplace = false;
 
-  constructor(reading: Reading, src?: Ags4Source) {
+  // Whether this handle's relational tables CARRY a `_content_hash` column —
+  // the typed, blank-insensitive fingerprint of a row's whole VALUE (as
+  // against `_id`, which fingerprints its IDENTITY: two deliveries of the
+  // same borehole with a corrected level share an `_id` and differ here).
+  // HANDLE-level (set once at construction, not per `table()` call) so the
+  // `#tables` memoisation keyed by `code` alone stays correct — mirrors
+  // Python's `Ags4File(content_hash=…)`. (#448)
+  readonly #contentHash: boolean;
+
+  constructor(reading: Reading, src?: Ags4Source, contentHash = false) {
     this.#reading = reading;
     this.#src = src;
+    this.#contentHash = contentHash;
   }
 
   /** @internal — `read(..., { index })` attaches a freshness-checked certificate
@@ -100,7 +134,8 @@ export class Ags4File {
 
   #meta(code: string): GroupMeta {
     const m = this.#reading.meta(code);
-    if (m === null) throw new Error(`group ${JSON.stringify(code)} not in file`);
+    if (m === null)
+      throw new Error(`group ${JSON.stringify(code)} not in file`);
     return m;
   }
 
@@ -138,8 +173,9 @@ export class Ags4File {
   #rawTable(code: string): Table {
     const cached = this.#tables.get(code);
     if (cached !== undefined) return cached;
-    const ipc = this.#reading.tableIpc(code);
-    if (ipc === null) throw new Error(`group ${JSON.stringify(code)} not in file`);
+    const ipc = this.#reading.tableIpc(code, this.#contentHash);
+    if (ipc === null)
+      throw new Error(`group ${JSON.stringify(code)} not in file`);
     const table = tableFromIPC(ipc);
     this.#tables.set(code, table);
     return table;
@@ -194,7 +230,10 @@ export class Ags4File {
    * {@link toExcel}. `groups` fixes the worksheet order (default source order). */
   toExcel(xlsxPath: string, opts?: { groups?: string[] }): ExcelStats;
   toExcel(xlsxPath?: undefined, opts?: { groups?: string[] }): Buffer;
-  toExcel(xlsxPath?: string, opts: { groups?: string[] } = {}): ExcelStats | Buffer {
+  toExcel(
+    xlsxPath?: string,
+    opts: { groups?: string[] } = {},
+  ): ExcelStats | Buffer {
     // Delegate to the free verb with this handle's bytes — one write path.
     return xlsxPath === undefined
       ? toExcelFree(this.bytes, undefined, opts)
@@ -207,7 +246,10 @@ export class Ags4File {
    * read source (so line numbers match the original), or the re-emit for a
    * synthesised handle. `text` is not re-encoded; a path/bytes source carries its
    * read `encoding`. */
-  #freeSource(): [string | Uint8Array | undefined, { text?: string; encoding?: string }] {
+  #freeSource(): [
+    string | Uint8Array | undefined,
+    { text?: string; encoding?: string },
+  ] {
     const s = this.#src;
     if (s?.path !== undefined) return [s.path, { encoding: s.encoding }];
     if (s?.text !== undefined) return [undefined, { text: s.text }];
@@ -243,12 +285,21 @@ export class Ags4File {
     // can be deleted without changing a byte of the .ags, so no statement about the file's
     // bytes can speak for it. It runs live, every time.
     this.#lastDictVersion = opts.dictVersion;
+    this.#lastDictionary = opts.dictionary;
+    this.#lastDictReplace = opts.dictReplace ?? false;
     const [source, base] = this.#freeSource();
     const path = typeof source === "string" ? source : undefined;
-    const data = typeof source === "string" || source == null ? undefined : source;
+    const data =
+      typeof source === "string" || source == null ? undefined : source;
+    const dictPath =
+      typeof opts.dictionary === "string" ? opts.dictionary : undefined;
+    const dictBytes =
+      typeof opts.dictionary === "string" || opts.dictionary == null
+        ? undefined
+        : opts.dictionary;
     // Not the free `validate()`: the certificate is a HANDLE-scoped fact (it arrived with
     // `read(..., { index })`), not a knob a caller passes, so it is not in the public
-    // `ValidateOptions`. Same native door, one extra argument. Mirrors laterite-py.
+    // `ValidateOptions`. Same native door, extra arguments. Mirrors laterite-py.
     this.#report = new Report(
       raiseFor(
         runCheck(
@@ -260,6 +311,9 @@ export class Ags4File {
           opts.fyi,
           opts.checkFiles,
           opts.encoding ?? base.encoding,
+          dictPath,
+          dictBytes,
+          opts.dictReplace,
           this.#cert,
         ),
       ),
@@ -276,11 +330,18 @@ export class Ags4File {
    * `laterite.Ags4File.fix()`. */
   fix(opts: Omit<FixOptions, "text"> = {}): Ags4File {
     const [source, base] = this.#freeSource();
-    const result = fixFree(source, { ...base, ...opts, encoding: opts.encoding ?? base.encoding });
-    // The repaired handle's source IS the repaired UTF-8 bytes (BOM-stripped).
-    const repaired = new Ags4File(parseArrow(undefined, undefined, result.bytes, undefined), {
-      data: result.bytes,
+    const result = fixFree(source, {
+      ...base,
+      ...opts,
+      encoding: opts.encoding ?? base.encoding,
     });
+    // The repaired handle's source IS the repaired UTF-8 bytes (BOM-stripped).
+    const repaired = new Ags4File(
+      parseArrow(undefined, undefined, result.bytes, undefined),
+      {
+        data: result.bytes,
+      },
+    );
     repaired.#fixReport = result;
     return repaired;
   }
@@ -290,7 +351,10 @@ export class Ags4File {
    * `Ags4File`. `encoding` defaults to this handle's read encoding. Mirrors
    * `laterite.Ags4File.diff()`. */
   diff(other: DiffSource, opts: DiffOptions = {}): RevisionDelta {
-    return diffFree(this, other, { ...opts, encoding: opts.encoding ?? this.#src?.encoding });
+    return diffFree(this, other, {
+      ...opts,
+      encoding: opts.encoding ?? this.#src?.encoding,
+    });
   }
 
   // --- certificate (.ags.idx) ----------------------------------------------
@@ -321,7 +385,7 @@ export class Ags4File {
    * `path` is the certificate's OUTPUT location (default `<source>.idx`), not a file to
    * certify — it refuses to overwrite the source or any existing non-certificate file.
    * Mirrors `laterite.Ags4File.certify()`. */
-  certify(path?: string, opts: { dictVersion?: string } = {}): string {
+  certify(path?: string, opts: CertifyOptions = {}): string {
     const srcPath = this.#src?.path;
     const out = path ?? (srcPath !== undefined ? `${srcPath}.idx` : undefined);
     if (out === undefined) {
@@ -338,14 +402,20 @@ export class Ags4File {
       );
     }
     if (existsSync(out) && statSync(out).size > 0) {
-      const head = readFileSync(out).subarray(0, 64).toString("utf8").trimStart();
+      const head = readFileSync(out)
+        .subarray(0, 64)
+        .toString("utf8")
+        .trimStart();
       if (!head.startsWith("{")) {
         throw new Ags4Error(
           `refusing to overwrite ${out}: it is not a laterite certificate (certify writes or replaces an .ags.idx)`,
         );
       }
     }
-    writeFileSync(out, this.#mint(opts.dictVersion).toJson());
+    writeFileSync(
+      out,
+      this.#mint(opts.dictVersion, opts.dictionary, opts.dictReplace).toJson(),
+    );
     return out;
   }
 
@@ -354,24 +424,48 @@ export class Ags4File {
    * with errors, and records the counts it measured) and the same output, so the bytes
    * interop with `read({ index })`, the CLI `--index`, and the browser cert. Mirrors
    * `laterite.Ags4File.certify_bytes()`. */
-  certifyBytes(opts: { dictVersion?: string } = {}): Buffer {
-    return this.#mint(opts.dictVersion).toJson();
+  certifyBytes(opts: CertifyOptions = {}): Buffer {
+    return this.#mint(
+      opts.dictVersion,
+      opts.dictionary,
+      opts.dictReplace,
+    ).toJson();
   }
 
   /** Mint the `Sidecar` over the ORIGINAL source bytes.
    *
    * The mint validates; it is not told a verdict. There is no longer a parameter through
    * which a caller could assert one. The edition input is the caller's: an explicit
-   * `dictVersion` wins, else the one the last `.validate()` used, else auto-resolution. */
-  #mint(dictVersion?: string): Sidecar {
+   * `dictVersion` wins, else the one the last `.validate()` used, else auto-resolution.
+   * The custom `--dict` overlay follows the same rule — an explicit `dictionary` wins,
+   * else the last validate's (with its replace flag). */
+  #mint(
+    dictVersion?: string,
+    dictionary?: string | Uint8Array,
+    dictReplace?: boolean,
+  ): Sidecar {
+    // An explicit `dictionary` brings its own `dictReplace`; falling back to the last
+    // validate's overlay inherits that run's replace flag too. Mirrors laterite-py.
+    let dict = dictionary;
+    let replace = dictReplace ?? false;
+    if (dict === undefined) {
+      dict = this.#lastDictionary;
+      replace = replace || this.#lastDictReplace;
+    }
+    const dictPath = typeof dict === "string" ? dict : undefined;
+    const dictBytes =
+      typeof dict === "string" || dict == null ? undefined : dict;
     return Sidecar.mint(
       this.#sourceBytes(),
       new Date().toISOString(),
       dictVersion ?? this.#lastDictVersion,
       this.#src?.encoding,
+      undefined,
+      dictPath,
+      dictBytes,
+      replace,
     );
   }
-
 
   // --- optional DuckDB engine (sql / at / connection) ----------------------
 
@@ -449,7 +543,9 @@ export class Ags4File {
       if (values.length === 0) {
         clauses.push("FALSE"); // an empty selection matches nothing
       } else {
-        clauses.push(`${quoteId(key)} IN (${values.map(() => "?").join(", ")})`);
+        clauses.push(
+          `${quoteId(key)} IN (${values.map(() => "?").join(", ")})`,
+        );
         params.push(...values);
       }
     }
@@ -457,10 +553,14 @@ export class Ags4File {
     // Strip the synthetic key columns from this FRAME surface (the engine table
     // keeps them for joins; the `.at()` accessor returns AGS data). A passthrough
     // group has none, so a plain `*`. (#303)
-    const keyed = this.#rawTable(code).schema.fields.some((f) => f.name === "_id");
+    const keyed = this.#rawTable(code).schema.fields.some(
+      (f) => f.name === "_id",
+    );
     const select = keyed ? "* EXCLUDE (_id, _parent_id)" : "*";
     const sql = `SELECT ${select} FROM ${quoteId(code)} WHERE ${where}`;
-    return opts.arrow ? engine.queryArrow(sql, params) : engine.query(sql, params);
+    return opts.arrow
+      ? engine.queryArrow(sql, params)
+      : engine.query(sql, params);
   }
 
   // --- lifecycle -----------------------------------------------------------

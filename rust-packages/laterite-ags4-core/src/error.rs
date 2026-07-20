@@ -16,6 +16,7 @@ pub enum CliError {
 }
 
 impl CliError {
+    #[must_use]
     pub fn exit_code(&self) -> i32 {
         match self {
             Self::FileNotFound(_) => 3,

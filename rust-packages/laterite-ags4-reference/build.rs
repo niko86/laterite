@@ -166,7 +166,11 @@ fn emit_dict_version(out: &mut String, editions: &[String], default_ed: &str, fa
         "    /// The five compiled lookup tables for this edition."
     )
     .unwrap();
-    writeln!(out, "    fn tables(self) -> DictTables {{").unwrap();
+    // `pub(super)`: dict.rs (chore/clippy-pedantic) wraps this generated code
+    // in a private `dict_data` submodule so `#[allow(clippy::pedantic)]` scopes
+    // correctly; `BundledDict::bundled` (the sole caller, in the parent module)
+    // still needs to reach it.
+    writeln!(out, "    pub(super) fn tables(self) -> DictTables {{").unwrap();
     writeln!(out, "        match self {{").unwrap();
     for ed in editions {
         let id = ed.replace('.', "_");

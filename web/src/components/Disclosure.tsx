@@ -16,7 +16,10 @@ export const Disclosure: ParentComponent<{
   /** Extra classes on the body wrapper. */
   bodyClass?: string;
 }> = (props) => (
-  <details class="group rounded-lg border border-line bg-surface" open={props.open}>
+  <details
+    class="group rounded-lg border border-line bg-surface"
+    open={props.open}
+  >
     <summary class="flex cursor-pointer list-none select-none items-center gap-2 px-3 py-2 text-sm font-medium text-fg-soft [&::-webkit-details-marker]:hidden">
       <Chevron />
       <span class="min-w-0">{props.summary}</span>

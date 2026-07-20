@@ -20,7 +20,9 @@ import { census } from "../ts/cli";
 
 const pkgDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const repo = resolve(pkgDir, "..", "..");
-const SSOT = JSON.parse(readFileSync(join(repo, "surface-census.json"), "utf8")) as {
+const SSOT = JSON.parse(
+  readFileSync(join(repo, "surface-census.json"), "utf8"),
+) as {
   authority: string;
   surfaces: Record<
     string,
@@ -51,7 +53,9 @@ describe("surface census: npx", () => {
     // accepting: bundling `4.3` would have rejected `4.3` while advertising `4.3`.
     const c = census() as { editions: string[]; fallback_edition: string };
     expect(c.editions).toEqual(SSOT.surfaces[SSOT.authority]?.editions);
-    expect(c.fallback_edition).toBe(SSOT.surfaces[SSOT.authority]?.fallback_edition);
+    expect(c.fallback_edition).toBe(
+      SSOT.surfaces[SSOT.authority]?.fallback_edition,
+    );
   });
 
   it("every bundled edition is actually ACCEPTED, not merely listed", () => {
@@ -69,16 +73,21 @@ describe("surface census: npx", () => {
     for (const edition of (census() as { editions: string[] }).editions) {
       let code = 0;
       try {
-        execFileSync("node", [BIN, "validate", CLEAN, "--dict-version", edition], {
-          encoding: "utf8",
-          stdio: "pipe",
-        });
+        execFileSync(
+          "node",
+          [BIN, "validate", CLEAN, "--dict-version", edition],
+          {
+            encoding: "utf8",
+            stdio: "pipe",
+          },
+        );
       } catch (e) {
         code = (e as { status?: number }).status ?? 1;
       }
-      expect(code, `npx rejected --dict-version ${edition}, which the dictionary bundles`).not.toBe(
-        5,
-      );
+      expect(
+        code,
+        `npx rejected --dict-version ${edition}, which the dictionary bundles`,
+      ).not.toBe(5);
     }
   });
 
@@ -91,9 +100,10 @@ describe("surface census: npx", () => {
     expect(authority.length).toBeGreaterThan(0);
     const mine = new Set(verbsOf(census()));
     const missing = authority.filter((v) => !mine.has(v));
-    expect(missing, `npx is missing verb(s) the native binary ships: ${missing}`).toEqual(
-      [],
-    );
+    expect(
+      missing,
+      `npx is missing verb(s) the native binary ships: ${missing.join(", ")}`,
+    ).toEqual([]);
   });
 
   it("every advertised verb is a real door — and none of them CRASHES", () => {
@@ -124,12 +134,14 @@ describe("surface census: npx", () => {
       } catch (e) {
         stderr = (e as { stderr?: string }).stderr ?? "";
       }
-      expect(stderr, `census advertises '${verb}', but the CLI took it for a filename`).not.toContain(
-        `error: ${verb}: not found`,
-      );
-      expect(stderr, `'${verb}' CRASHED (uncaught throw):\n${stderr}`).not.toMatch(
-        /^\s*(TypeError|ReferenceError|RangeError|SyntaxError):/m,
-      );
+      expect(
+        stderr,
+        `census advertises '${verb}', but the CLI took it for a filename`,
+      ).not.toContain(`error: ${verb}: not found`);
+      expect(
+        stderr,
+        `'${verb}' CRASHED (uncaught throw):\n${stderr}`,
+      ).not.toMatch(/^\s*(TypeError|ReferenceError|RangeError|SyntaxError):/m);
     }
   });
 });
@@ -144,8 +156,12 @@ describe("surface census: npx", () => {
 describe("surface census: encodings", () => {
   it("resolves every probe label exactly as the authority does", () => {
     const recorded = SSOT.surfaces[SSOT.authority]?.encodings;
-    expect(recorded, "surface-census.json has no authority encodings row").toBeDefined();
-    const mine = (census() as { encodings: Record<string, string | null> }).encodings;
+    expect(
+      recorded,
+      "surface-census.json has no authority encodings row",
+    ).toBeDefined();
+    const mine = (census() as { encodings: Record<string, string | null> })
+      .encodings;
     expect(mine).toEqual(recorded);
   });
 
@@ -154,14 +170,16 @@ describe("surface census: encodings", () => {
     // `cp1252x` was handed text decoded by an encoding they never asked for, with no
     // error. `C3 A9` is `é` in UTF-8 and `Ã©` in cp1252 — both decode cleanly, so the
     // file then "validated" with the wrong text in it.
-    const mine = (census() as { encodings: Record<string, string | null> }).encodings;
+    const mine = (census() as { encodings: Record<string, string | null> })
+      .encodings;
     expect(mine["cp1252x"]).toBeNull();
   });
 
   it("`latin-9` resolves here, not only in the native binary", () => {
     // These two labels lived in a PRIVATE table inside the `lat` binary, so
     // `--encoding latin-9` worked there and was rejected by every other surface.
-    const mine = (census() as { encodings: Record<string, string | null> }).encodings;
+    const mine = (census() as { encodings: Record<string, string | null> })
+      .encodings;
     expect(mine["latin9"]).toBe("ISO-8859-15");
     expect(mine["latin-9"]).toBe("ISO-8859-15");
   });

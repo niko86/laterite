@@ -46,17 +46,19 @@
 //! compiling until they say which kind it is. That compile error is the point: an
 //! unclassified knob is a future false clean.
 
+use std::fmt::Write as _;
+
 use laterite_ags4_core::error::CliError;
 // Re-exported so a surface can name a decision, a reason or a tier without also taking
 // a direct dependency on core's index module — the trust vocabulary lives at ONE import.
 pub use laterite_ags4_core::index::{
-    Decision, ENGINE_IDENTITY, EditionInput, EngineId, Question, RevalidateReason, Sidecar, Tier,
-    TierCoverage, ValidationStamp,
+    CustomDictRef, Decision, ENGINE_IDENTITY, EditionInput, EngineId, Question, RevalidateReason,
+    Sidecar, Tier, TierCoverage, ValidationStamp,
 };
 use laterite_ags4_parse::parse_bytes;
 use laterite_ags4_validator::{
     CheckOptions, DictResolution, DictVersion, Findings, ValidatorError, WorldScope,
-    check_parsed_with_dict, findings, world,
+    check_parsed_with_dict, findings, overlay, world,
 };
 
 /// The engine asking the question: this build's rules, dictionary and compat profile.
@@ -64,6 +66,7 @@ use laterite_ags4_validator::{
 /// `compat` is `Some(v)` only for the python-ags4 drop-in shim, whose behaviour
 /// deliberately differs from the native engine — so a compat-minted certificate cannot
 /// answer for a native request, nor the reverse.
+#[must_use]
 pub fn engine_id(compat: Option<String>) -> EngineId {
     EngineId {
         validator: ENGINE_IDENTITY.to_string(),
@@ -127,20 +130,17 @@ pub fn split_options(
         include_warnings, // which severity tiers the engine runs
         include_fyi,      //   "
         encoding,         // how the bytes decode to text
+        // A custom `--dict` overlay (#568) is CONTENT: it was parsed once at the
+        // surface boundary into an owned `CustomDict`, and its identity (base + delta,
+        // hashed) is a pure function of that dictionary — nothing on disk is read per
+        // file. So the cert can and must speak for it: which dictionary produced the
+        // verdict is recorded on the Question below and compared in `Sidecar::decide`.
+        custom_dict,
         // --- WORLD: reads state the bytes do not contain. No certificate may speak
         //     for these; they run live, every call.
         check_files, // Rule 20's on-disk FILE/ tree
-        // --- UNSUPPORTED: an external dictionary is a file on disk (WORLD), and is
-        //     deferred (O-28). Refused here so no modality can quietly honour it.
-        custom_dict,
     } = opts;
 
-    if let Some(path) = custom_dict {
-        return Err(ValidatorError::BadDict {
-            path: path.clone(),
-            reason: "external --dict override is not implemented (O-28)".to_string(),
-        });
-    }
     // The request and the ability to honour it must agree. Asking for the on-disk check
     // with no disk to look at is not a question anyone can answer, and answering it
     // "clean" — which is what the engine used to do — is a lie.
@@ -162,9 +162,26 @@ pub fn split_options(
             // The decoder is part of the question, not just of the parse. The findings are
             // a function of bytes AND decoder, and the certificate seals only the bytes.
             encoding: encoding.name().to_string(),
+            // The custom overlay this request uses (#568) — compared against the cert's
+            // own record. `custom_dict` here is the destructured `&Option<CustomDict>`.
+            custom_dict: custom_dict.as_ref().map(custom_dict_record),
         },
         world,
     ))
+}
+
+/// The cert's portable record of a custom `--dict` overlay: its advisory name +
+/// the hex of its precomputed identity hash. Both the Question (what this request
+/// uses) and the `ValidationStamp` (what the verdict used) carry it, so
+/// [`Sidecar::decide`] can compare like for like.
+fn custom_dict_record(cd: &overlay::CustomDict) -> CustomDictRef {
+    CustomDictRef {
+        name: cd.name.clone(),
+        hash: cd.hash.iter().fold(String::new(), |mut acc, b| {
+            let _ = write!(acc, "{b:02x}");
+            acc
+        }),
+    }
 }
 
 /// **Validate.** The only way in.
@@ -295,6 +312,10 @@ pub fn mint(
         // What the bytes were READ as. `Sidecar::decide` refuses a request made through a
         // different decoder: same bytes, different text, different question.
         encoding: full.encoding.name().to_string(),
+        // The custom overlay this verdict was reached against (#568), so a later
+        // request supplying a different (or no) dict revalidates rather than trusting a
+        // cert minted under another dictionary.
+        custom_dict: opts.custom_dict.as_ref().map(custom_dict_record),
         // Measured, all three, because we just ran all three. This is the only place a
         // ValidationStamp is built from a real engine result.
         errors: TierCoverage::Measured { count: errors },
@@ -309,6 +330,9 @@ pub fn mint(
 }
 
 /// Findings of one severity.
+// Bounded by the number of validator findings in a file, which can't exceed
+// the file's cell count — far below u32::MAX for any real AGS4 file.
+#[allow(clippy::cast_possible_truncation)]
 fn count_of(found: &Findings, sev: findings::Severity) -> u32 {
     found
         .values()
@@ -379,6 +403,7 @@ impl MintError {
     /// The process exit code, on the `lat` contract: a refused-but-checkable file is 1
     /// (findings), an unusable one is whatever the validator says, and un-indexable
     /// bytes are 4 (input we cannot work with).
+    #[must_use]
     pub fn exit_code(&self) -> i32 {
         match self {
             MintError::Validate(e) => e.exit_code(),

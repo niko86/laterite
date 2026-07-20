@@ -10,7 +10,12 @@ import {
 import type { GroupMeta } from "../../lib/duckTypes";
 import { Chevron } from "../Chevron";
 import { controlClass, controlCompact } from "../../lib/controls";
-import { selectSql, type Cond, type JoinSpec, type Wildcard } from "../../lib/sqlgen";
+import {
+  selectSql,
+  type Cond,
+  type JoinSpec,
+  type Wildcard,
+} from "../../lib/sqlgen";
 import {
   relatedGroups,
   joinKeys,
@@ -25,8 +30,17 @@ import {
 // and columns/filters can come from either table. A scaffold, not a replacement
 // for the editor — anything it can't express, edit by hand after applying.
 
-const OPS = ["=", "!=", ">", "<", ">=", "<=", "LIKE", "IS NULL", "IS NOT NULL"] as const;
-type Op = (typeof OPS)[number];
+const OPS = [
+  "=",
+  "!=",
+  ">",
+  "<",
+  ">=",
+  "<=",
+  "LIKE",
+  "IS NULL",
+  "IS NOT NULL",
+] as const;
 const WILDCARDS: { v: Wildcard; label: string }[] = [
   { v: "contains", label: "contains" },
   { v: "starts", label: "starts with" },
@@ -54,7 +68,8 @@ export const SqlBuilder: Component<{
   const [joinCode, setJoinCode] = createSignal(""); // "" = single-table
   const [joinKind, setJoinKind] = createSignal<"LEFT" | "INNER">("LEFT");
   createEffect(() => {
-    if (!table() && codes().length) setTable(codes()[0]);
+    const first = codes()[0];
+    if (!table() && first !== undefined) setTable(first);
   });
 
   const baseMeta = () => props.groups.find((g) => g.code === table());
@@ -88,7 +103,13 @@ export const SqlBuilder: Component<{
     const dr = depthRangeOf(joinCode(), props.dict, j.headings);
     const dc = dr ? depthColumnFor(b.code, b.headings, props.dict) : null;
     return dr && dc
-      ? { baseAlias: BASE, baseCol: dc.col, top: dr.top, base: dr.base, level: dc.level }
+      ? {
+          baseAlias: BASE,
+          baseCol: dc.col,
+          top: dr.top,
+          base: dr.base,
+          level: dc.level,
+        }
       : null;
   });
 
@@ -96,11 +117,28 @@ export const SqlBuilder: Component<{
   const allCols = createMemo<ColRef[]>(() => {
     const b = baseMeta();
     if (!b) return [];
-    if (!joined()) return b.headings.map((col) => ({ alias: BASE, col, key: col, label: col }));
-    const j = joinMeta()!;
+    const j = joinMeta();
+    // `joined()` is `!!joinCode() && !!joinMeta()`, inlined here so `j` narrows.
+    if (!joinCode() || !j)
+      return b.headings.map((col) => ({
+        alias: BASE,
+        col,
+        key: col,
+        label: col,
+      }));
     return [
-      ...b.headings.map((col) => ({ alias: BASE, col, key: `${BASE}.${col}`, label: `${b.code}.${col}` })),
-      ...j.headings.map((col) => ({ alias: JOIN, col, key: `${JOIN}.${col}`, label: `${j.code}.${col}` })),
+      ...b.headings.map((col) => ({
+        alias: BASE,
+        col,
+        key: `${BASE}.${col}`,
+        label: `${b.code}.${col}`,
+      })),
+      ...j.headings.map((col) => ({
+        alias: JOIN,
+        col,
+        key: `${JOIN}.${col}`,
+        label: `${j.code}.${col}`,
+      })),
     ];
   });
   const orderCols = () => baseMeta()?.headings ?? [];
@@ -141,7 +179,8 @@ export const SqlBuilder: Component<{
   };
   const setCond = (i: number, patch: Partial<Cond>) =>
     setConds((prev) => prev.map((c, j) => (j === i ? { ...c, ...patch } : c)));
-  const delCond = (i: number) => setConds((prev) => prev.filter((_, j) => j !== i));
+  const delCond = (i: number) =>
+    setConds((prev) => prev.filter((_, j) => j !== i));
 
   const sql = createMemo(() => {
     const base = table();
@@ -171,7 +210,12 @@ export const SqlBuilder: Component<{
       leftAlias: BASE,
       on: joinPairs(),
       range: rp
-        ? { baseAlias: rp.baseAlias, baseCol: rp.baseCol, top: rp.top, base: rp.base }
+        ? {
+            baseAlias: rp.baseAlias,
+            baseCol: rp.baseCol,
+            top: rp.top,
+            base: rp.base,
+          }
         : undefined,
     };
     return selectSql({
@@ -197,7 +241,9 @@ export const SqlBuilder: Component<{
   if (typeof window !== "undefined") {
     const onResize = () => setVw(window.innerWidth);
     window.addEventListener("resize", onResize);
-    onCleanup(() => window.removeEventListener("resize", onResize));
+    onCleanup(() => {
+      window.removeEventListener("resize", onResize);
+    });
   }
   const nameCap = () => (vw() >= 1024 ? 44 : vw() >= 640 ? 26 : 16);
   const trunc = (s: string, n: number) =>
@@ -252,7 +298,9 @@ export const SqlBuilder: Component<{
                     aria-label="join type"
                     class={ctrl}
                     value={joinKind()}
-                    onChange={(e) => setJoinKind(e.currentTarget.value as "LEFT" | "INNER")}
+                    onChange={(e) =>
+                      setJoinKind(e.currentTarget.value as "LEFT" | "INNER")
+                    }
                   >
                     <option value="LEFT">LEFT</option>
                     <option value="INNER">INNER</option>
@@ -269,8 +317,15 @@ export const SqlBuilder: Component<{
                     // the join table (alias j) so no stale row lingers pointing at
                     // a column that's no longer in allCols().
                     if (!v) {
-                      setPicked((p) => new Set([...p].filter((k) => !k.startsWith(`${JOIN}.`))));
-                      setConds((cs) => cs.filter((c) => (c.alias ?? BASE) === BASE));
+                      setPicked(
+                        (p) =>
+                          new Set(
+                            [...p].filter((k) => !k.startsWith(`${JOIN}.`)),
+                          ),
+                      );
+                      setConds((cs) =>
+                        cs.filter((c) => (c.alias ?? BASE) === BASE),
+                      );
                     }
                   }}
                 >
@@ -292,8 +347,9 @@ export const SqlBuilder: Component<{
           {(rp) => (
             <p class="text-xs text-fg-faint">
               Depth-band join: <span class="mono">{rp().baseCol}</span> within{" "}
-              <span class="mono">{rp().top}</span>…<span class="mono">{rp().base}</span>{" "}
-              ({rp().level}-level) — each row gets the stratum it sits in.
+              <span class="mono">{rp().top}</span>…
+              <span class="mono">{rp().base}</span> ({rp().level}-level) — each
+              row gets the stratum it sits in.
             </p>
           )}
         </Show>
@@ -343,10 +399,18 @@ export const SqlBuilder: Component<{
                 <select
                   aria-label="filter column"
                   class={controlCompact}
-                  value={joined() ? `${cond.alias ?? BASE}.${cond.col}` : cond.col}
+                  value={
+                    joined() ? `${cond.alias ?? BASE}.${cond.col}` : cond.col
+                  }
                   onChange={(e) => {
-                    const ref = allCols().find((r) => r.key === e.currentTarget.value);
-                    if (ref) setCond(i(), { col: ref.col, alias: joined() ? ref.alias : undefined });
+                    const ref = allCols().find(
+                      (r) => r.key === e.currentTarget.value,
+                    );
+                    if (ref)
+                      setCond(i(), {
+                        col: ref.col,
+                        alias: joined() ? ref.alias : undefined,
+                      });
                   }}
                 >
                   <For each={allCols()}>
@@ -357,7 +421,7 @@ export const SqlBuilder: Component<{
                   aria-label="filter operator"
                   class={controlCompact}
                   value={cond.op}
-                  onChange={(e) => setCond(i(), { op: e.currentTarget.value as Op })}
+                  onChange={(e) => setCond(i(), { op: e.currentTarget.value })}
                 >
                   <For each={OPS}>{(o) => <option value={o}>{o}</option>}</For>
                 </select>
@@ -366,9 +430,15 @@ export const SqlBuilder: Component<{
                     aria-label="filter wildcard"
                     class={controlCompact}
                     value={cond.wildcard ?? "contains"}
-                    onChange={(e) => setCond(i(), { wildcard: e.currentTarget.value as Wildcard })}
+                    onChange={(e) =>
+                      setCond(i(), {
+                        wildcard: e.currentTarget.value as Wildcard,
+                      })
+                    }
                   >
-                    <For each={WILDCARDS}>{(w) => <option value={w.v}>{w.label}</option>}</For>
+                    <For each={WILDCARDS}>
+                      {(w) => <option value={w.v}>{w.label}</option>}
+                    </For>
                   </select>
                 </Show>
                 <Show when={cond.op !== "IS NULL" && cond.op !== "IS NOT NULL"}>
@@ -376,7 +446,9 @@ export const SqlBuilder: Component<{
                     class={`w-32 ${controlCompact}`}
                     placeholder="value"
                     value={cond.val}
-                    onInput={(e) => setCond(i(), { val: e.currentTarget.value })}
+                    onInput={(e) =>
+                      setCond(i(), { val: e.currentTarget.value })
+                    }
                   />
                 </Show>
                 <button
@@ -405,13 +477,17 @@ export const SqlBuilder: Component<{
                 onChange={(e) => setOrderBy(e.currentTarget.value)}
               >
                 <option value="">(none)</option>
-                <For each={orderCols()}>{(c) => <option value={c}>{c}</option>}</For>
+                <For each={orderCols()}>
+                  {(c) => <option value={c}>{c}</option>}
+                </For>
               </select>
               <select
                 aria-label="order direction"
                 class={ctrl}
                 value={orderDir()}
-                onChange={(e) => setOrderDir(e.currentTarget.value as "ASC" | "DESC")}
+                onChange={(e) =>
+                  setOrderDir(e.currentTarget.value as "ASC" | "DESC")
+                }
               >
                 <option value="ASC">ASC</option>
                 <option value="DESC">DESC</option>
@@ -441,7 +517,9 @@ export const SqlBuilder: Component<{
           <button
             type="button"
             class="shrink-0 self-start rounded bg-surface-raised px-3 py-1.5 text-xs font-medium text-fg hover:bg-chip"
-            onClick={() => props.onApply(sql())}
+            onClick={() => {
+              props.onApply(sql());
+            }}
           >
             Use this SQL ↓
           </button>

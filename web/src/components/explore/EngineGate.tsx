@@ -60,7 +60,11 @@ export const EngineGate: Component<{ onConfirm: () => void }> = (props) => {
         <Show
           when={wasmCached()}
           fallback={
-            <> The first use downloads it (~38&nbsp;MB) and compiles it, which can take several seconds on this device.</>
+            <>
+              {" "}
+              The first use downloads it (~38&nbsp;MB) and compiles it, which
+              can take several seconds on this device.
+            </>
           }
         >
           <> Starting it can take a few seconds on this device.</>
@@ -78,7 +82,9 @@ export const EngineGate: Component<{ onConfirm: () => void }> = (props) => {
         <button
           type="button"
           class="rounded border border-line-strong px-3 py-1.5 text-sm text-fg-soft hover:bg-chip"
-          onClick={() => goTo("validate")}
+          onClick={() => {
+            goTo("validate");
+          }}
         >
           Back to Validate
         </button>

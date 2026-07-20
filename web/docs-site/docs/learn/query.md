@@ -98,7 +98,7 @@ its code — so `SAMP s JOIN LOCA l USING (LOCA_ID)` just works. It returns a
 as polars, pandas, or Arrow.
 
 !!! tip
-    `.query()` is the guard-railed builder for single-group work; `.sql()` is
-    the escape hatch for anything DuckDB can express. Both share the same engine.
+`.query()` is the guard-railed builder for single-group work; `.sql()` is
+the escape hatch for anything DuckDB can express. Both share the same engine.
 
 Next → [Produce AGS4](./produce.md)

@@ -51,7 +51,9 @@ describe("fix() — mechanical repair (the Node mirror of laterite.fix)", () => 
     expect(r.fixesApplied).toBeGreaterThan(0);
     const severities = new Set(r.findings.map((f) => f.severity));
     expect(severities.has("warning")).toBe(true);
-    expect(r.findings.some((f) => f.rule === "Warning (Related to Rule 14)")).toBe(true);
+    expect(
+      r.findings.some((f) => f.rule === "Warning (Related to Rule 14)"),
+    ).toBe(true);
   });
 });
 
@@ -81,8 +83,12 @@ describe("fix() — per-rule selection (only/exclude)", () => {
     // deliberately bypass it to prove the RUNTIME guard also rejects a bad label
     // (e.g. a value that slipped in untyped from JSON / a JS caller).
     const bad = (labels: string[]) => labels as unknown as FixableRule[];
-    expect(() => fix(undefined, { text: TWO_DEFECTS, only: bad(["99"]) })).toThrow(/not fixable/);
-    expect(() => fix(undefined, { text: TWO_DEFECTS, exclude: bad(["nope"]) })).toThrow(/not fixable/);
+    expect(() =>
+      fix(undefined, { text: TWO_DEFECTS, only: bad(["99"]) }),
+    ).toThrow(/not fixable/);
+    expect(() =>
+      fix(undefined, { text: TWO_DEFECTS, exclude: bad(["nope"]) }),
+    ).toThrow(/not fixable/);
   });
 });
 
@@ -114,11 +120,15 @@ describe("fix() — inPlace / out write-back", () => {
   });
 
   it("inPlace and out are mutually exclusive", () => {
-    expect(() => fix("x.ags", { inPlace: true, out: "y.ags" })).toThrow(/mutually exclusive/);
+    expect(() => fix("x.ags", { inPlace: true, out: "y.ags" })).toThrow(
+      /mutually exclusive/,
+    );
   });
 
   it("inPlace needs a path source (bytes/text have nothing to overwrite)", () => {
-    expect(() => fix(undefined, { text: TWO_DEFECTS, inPlace: true })).toThrow(/path source/);
+    expect(() => fix(undefined, { text: TWO_DEFECTS, inPlace: true })).toThrow(
+      /path source/,
+    );
   });
 });
 

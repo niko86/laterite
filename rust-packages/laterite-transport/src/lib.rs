@@ -9,7 +9,7 @@
 //! `napi::Error`.
 //!
 //! The operations are **content-agnostic** — zstd/age over raw file bytes, so
-//! they work on any file (`.ags`, `.ags5db`, anything). The `age` envelope is
+//! they work on any file (`.ags`, anything). The `age` envelope is
 //! interoperable with the python-side `pyrage` library — same on-disk format,
 //! both link the same Rust `age` crate under the hood.
 

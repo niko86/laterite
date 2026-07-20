@@ -28,6 +28,7 @@
 
 use std::collections::BTreeMap;
 use std::env;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
 
@@ -94,9 +95,9 @@ fn main() {
 
     for &code in &codes {
         let headings: &[Heading] = &by_code[code].headings;
-        let children: &[String] = children_of.get(code).map(Vec::as_slice).unwrap_or(&[]);
+        let children: &[String] = children_of.get(code).map_or(&[], Vec::as_slice);
         emit_group(&mut out, code, headings, children);
-        registrations.push_str(&format!("    m.add_class::<{code}>()?;\n"));
+        let _ = writeln!(registrations, "    m.add_class::<{code}>()?;");
     }
 
     registrations.push_str("    Ok(())\n}\n");
@@ -115,7 +116,7 @@ fn emit_group(out: &mut String, code: &str, headings: &[Heading], children: &[St
         .map(|h| (py_name(&h.name), rust_type(&h.ags_type)))
         .collect();
 
-    // Child field names follow the ags5_models convention:
+    // Child field names follow the original Python model-graph convention:
     // `{child_code.lower()}s` (e.g. PROJ.locas, LOCA.samps).
     let child_fields: Vec<(String, &String)> = children
         .iter()
@@ -127,14 +128,13 @@ fn emit_group(out: &mut String, code: &str, headings: &[Heading], children: &[St
     // attach passthrough children via setattr. ~16 bytes per instance
     // overhead; required for the dynamic-class-on-read policy
     // (see dec-rust-typed-graph.md, *Custom groups & passthrough*).
-    out.push_str(&format!(
+    let _ = write!(
+        out,
         "#[pyclass(name = \"{code}\", module = \"laterite._laterite_native\", dict)]\n\
          pub struct {code} {{\n",
-    ));
+    );
     for (field, ty) in &scalars {
-        out.push_str(&format!(
-            "    #[pyo3(get, set)]\n    pub {field}: Option<{ty}>,\n"
-        ));
+        let _ = writeln!(out, "    #[pyo3(get, set)]\n    pub {field}: Option<{ty}>,");
     }
     for (field, _) in &child_fields {
         // `get` only — mutation is via `.append()` on the list itself,
@@ -143,22 +143,22 @@ fn emit_group(out: &mut String, code: &str, headings: &[Heading], children: &[St
         // contract that makes `proj.locas.append(loca)` work — `set`
         // would let users reassign the list reference but that breaks
         // identity if a caller holds an old reference.
-        out.push_str(&format!("    #[pyo3(get)]\n    pub {field}: Py<PyList>,\n"));
+        let _ = writeln!(out, "    #[pyo3(get)]\n    pub {field}: Py<PyList>,");
     }
     out.push_str("}\n\n");
 
     // ---- pymethods ----
-    out.push_str(&format!("#[pymethods]\nimpl {code} {{\n"));
+    let _ = writeln!(out, "#[pymethods]\nimpl {code} {{");
 
     // #[new] signature: every field keyword-only with None default.
     // Children take Option<Py<PyList>>; None → empty PyList created
     // here (so each instance gets its own list).
     out.push_str("    #[new]\n    #[pyo3(signature = (*");
     for (field, _) in &scalars {
-        out.push_str(&format!(", {field}=None"));
+        let _ = write!(out, ", {field}=None");
     }
     for (field, _) in &child_fields {
-        out.push_str(&format!(", {field}=None"));
+        let _ = write!(out, ", {field}=None");
     }
     out.push_str("))]\n");
     out.push_str("    #[allow(clippy::too_many_arguments, unused_variables)]\n");
@@ -169,10 +169,10 @@ fn emit_group(out: &mut String, code: &str, headings: &[Heading], children: &[St
     out.push_str("    fn new(\n");
     out.push_str("        py: Python<'_>,\n");
     for (field, ty) in &scalars {
-        out.push_str(&format!("        {field}: Option<{ty}>,\n"));
+        let _ = writeln!(out, "        {field}: Option<{ty}>,");
     }
     for (field, _) in &child_fields {
-        out.push_str(&format!("        {field}: Option<Py<PyList>>,\n"));
+        let _ = writeln!(out, "        {field}: Option<Py<PyList>>,");
     }
     out.push_str("    ) -> Self {\n");
     if !child_fields.is_empty() {
@@ -180,12 +180,13 @@ fn emit_group(out: &mut String, code: &str, headings: &[Heading], children: &[St
     }
     out.push_str("        Self {\n");
     for (field, _) in &scalars {
-        out.push_str(&format!("            {field},\n"));
+        let _ = writeln!(out, "            {field},");
     }
     for (field, _) in &child_fields {
-        out.push_str(&format!(
-            "            {field}: {field}.unwrap_or_else(|| PyList::empty(py).unbind()),\n",
-        ));
+        let _ = writeln!(
+            out,
+            "            {field}: {field}.unwrap_or_else(|| PyList::empty(py).unbind()),",
+        );
     }
     out.push_str("        }\n    }\n\n");
 
@@ -205,16 +206,16 @@ fn emit_group(out: &mut String, code: &str, headings: &[Heading], children: &[St
     out.push_str("    fn walk(&self, py: Python<'_>, code: &str) -> PyResult<Vec<Py<PyAny>>> {\n");
     out.push_str("        let mut out: Vec<Py<PyAny>> = Vec::new();\n");
     for (field, child_code) in &child_fields {
-        out.push_str(&format!(
-            "        // descend into self.{field} ({child_code})\n"
-        ));
+        let _ = writeln!(out, "        // descend into self.{field} ({child_code})");
         out.push_str("        {\n");
-        out.push_str(&format!(
-            "            let matches_self = code.eq_ignore_ascii_case(\"{child_code}\");\n"
-        ));
-        out.push_str(&format!(
-            "            for item in self.{field}.bind(py).try_iter()? {{\n"
-        ));
+        let _ = writeln!(
+            out,
+            "            let matches_self = code.eq_ignore_ascii_case(\"{child_code}\");"
+        );
+        let _ = writeln!(
+            out,
+            "            for item in self.{field}.bind(py).try_iter()? {{"
+        );
         out.push_str("                let item = item?.unbind();\n");
         out.push_str("                if matches_self {\n");
         out.push_str("                    out.push(item.clone_ref(py));\n");
@@ -228,7 +229,7 @@ fn emit_group(out: &mut String, code: &str, headings: &[Heading], children: &[St
 
     // __repr__: minimal — fuller form arrives when KEY-aware emission lands.
     out.push_str("    fn __repr__(&self) -> String {\n");
-    out.push_str(&format!("        \"{code}(...)\".to_string()"));
+    let _ = write!(out, "        \"{code}(...)\".to_string()");
     out.push_str("\n    }\n");
 
     out.push_str("}\n\n");
@@ -239,7 +240,7 @@ fn py_name(heading: &str) -> String {
     heading.to_ascii_lowercase()
 }
 
-/// Mirror `laterite_ags5_db::ags_types::canonical_type` minus the public API —
+/// Mirror `laterite_types::canonical_type` minus the public API —
 /// build.rs can't easily call the crate's function (would create a
 /// build-dep cycle), so we duplicate the small classification logic.
 /// The two MUST stay in lockstep; a parity probe in F2b-6 will catch

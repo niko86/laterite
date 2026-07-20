@@ -60,7 +60,9 @@ function fromJoins(table: string, alias: string, joins: JoinSpec[]): string {
   let s = `FROM ${q(table)} ${alias}`;
   for (const j of joins) {
     const preds = [
-      ...j.on.map((p) => `${j.leftAlias}.${q(p.left)} = ${j.alias}.${q(p.right)}`),
+      ...j.on.map(
+        (p) => `${j.leftAlias}.${q(p.left)} = ${j.alias}.${q(p.right)}`,
+      ),
       ...(j.range
         ? [
             `${j.range.baseAlias}.${q(j.range.baseCol)} >= ${j.alias}.${q(j.range.top)}`,
@@ -135,7 +137,11 @@ export interface ChartSqlOpts {
 
 /** Resolve a column to its SQL reference: `"col"` single-table; `alias."col"`
  *  when joins are present (string ⇒ the base alias, QualifiedCol ⇒ its alias). */
-function colRef(c: string | QualifiedCol, baseAlias: string, joined: boolean): string {
+function colRef(
+  c: string | QualifiedCol,
+  baseAlias: string,
+  joined: boolean,
+): string {
   if (typeof c !== "string") return `${c.alias}.${q(c.col)}`;
   return joined ? `${baseAlias}.${q(c)}` : q(c);
 }
@@ -149,7 +155,8 @@ export function chartSql(o: ChartSqlOpts): string {
   const { table, x, y, colour, chartType, agg, rowCap } = o;
   const counting = agg === "count";
   const aggregating = chartType === "bar" && agg !== "none";
-  const joined = (o.joins?.length ?? 0) > 0;
+  const joins = o.joins ?? [];
+  const joined = joins.length > 0;
   const a = o.alias ?? "t0";
   if (!table || !x) return "";
   if (!counting && !y) return "";
@@ -157,7 +164,7 @@ export function chartSql(o: ChartSqlOpts): string {
   const xr = colRef(x, a, joined);
   const yr = y ? colRef(y, a, joined) : "";
   const cr = colour ? colRef(colour, a, joined) : "";
-  const from = joined ? fromJoins(table, a, o.joins!) : `FROM ${q(table)}`;
+  const from = joined ? fromJoins(table, a, joins) : `FROM ${q(table)}`;
   const selC = cr ? `, ${cr} AS c` : "";
   if (aggregating) {
     const yExpr = counting ? "COUNT(*)" : `${agg.toUpperCase()}(${yr})`;

@@ -68,8 +68,8 @@ class GroupDescriptor:
 
     Frozen for the same reason as ``Heading`` — this describes the AGS
     dictionary, which is fixed at Rust crate load. The ``table``/``view``
-    getters give the conventional DuckDB names a ``.ags5db`` store uses
-    for the group.
+    getters give the conventional DuckDB table/view names for the
+    group.
     """
 
     code: str
@@ -79,14 +79,14 @@ class GroupDescriptor:
 
     @property
     def table(self) -> str:
-        """The group's physical table name in a ``.ags5db`` store —
-        ``g_<code>`` lower-cased."""
+        """The group's physical table name (``g_<code>`` lower-cased)
+        in a DuckDB store."""
         return f"g_{self.code.lower()}"
 
     @property
     def view(self) -> str:
-        """The group's view name in a ``.ags5db`` store — ``v_<code>``
-        lower-cased — the parent-joined view that complements the raw
+        """The group's view name (``v_<code>`` lower-cased) in a DuckDB
+        store — the parent-joined view that complements the raw
         ``table``."""
         return f"v_{self.code.lower()}"
 
@@ -232,8 +232,7 @@ def inherited_key_names(code: str) -> set[str]:
 
 def child_groups(parent_code: str) -> list[GroupDescriptor]:
     """Every direct child group of ``parent_code``, in alphabetical
-    order. Same shape ``ags5_models.child_groups`` returned (replaces
-    that helper as of F2c-4)."""
+    order."""
     return sorted(
         (g for g in GROUPS.values() if g.parent == parent_code),
         key=lambda g: g.code,
@@ -241,12 +240,12 @@ def child_groups(parent_code: str) -> list[GroupDescriptor]:
 
 
 __all__ = [
+    "GROUPS",
+    "GroupDescriptor",
     "Heading",
     "HeadingStatus",
-    "GroupDescriptor",
-    "GROUPS",
-    "get",
     "ancestor_chain",
-    "inherited_key_names",
     "child_groups",
+    "get",
+    "inherited_key_names",
 ]

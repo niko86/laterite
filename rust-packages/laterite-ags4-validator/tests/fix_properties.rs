@@ -57,6 +57,9 @@ fn edited_lines(applied: &[Fix]) -> HashSet<u32> {
 /// stripped first), so the whole-doc fixes (CRLF/BOM) don't perturb it. For every
 /// line the field count never shrinks (a shrink is the truncation signature); and
 /// a line no `SpanEdit` touched is byte-identical field-for-field.
+// `i` is a line number within a proptest-generated fixture (bounded by the
+// generator's own size config, far under u32::MAX).
+#[allow(clippy::cast_possible_truncation)]
 fn assert_cells_preserved(raw: &[u8], fixed: &[u8], applied: &[Fix]) -> Result<(), TestCaseError> {
     let orig = String::from_utf8_lossy(raw);
     let out = String::from_utf8_lossy(fixed);
@@ -271,7 +274,7 @@ fn render(d: &Doc) -> Vec<u8> {
     let mut lines: Vec<String> = vec![
         row(&["GROUP".into(), "PROJ".into()]),
         row(&["HEADING".into(), "PROJ_ID".into()]),
-        row(&["UNIT".into(), "".into()]),
+        row(&["UNIT".into(), String::new()]),
         row(&["TYPE".into(), "ID".into()]),
         row(&["DATA".into(), "P1".into()]),
     ];
@@ -283,15 +286,16 @@ fn render(d: &Doc) -> Vec<u8> {
         }
         // Rule 7 duplicate-heading dirt: make the 2nd heading equal the 1st.
         if d.dirt.dup_heading && gi == 0 && headings.len() >= 3 {
-            headings[2] = headings[1].clone();
+            let dup = headings[1].clone();
+            headings[2] = dup;
         }
-        let mut units: Vec<String> = vec!["UNIT".into(), "".into()];
+        let mut units: Vec<String> = vec!["UNIT".into(), String::new()];
         let mut types: Vec<String> = vec!["TYPE".into(), "ID".into()];
         for ty in &g.types {
             units.push(if ty == "DT" {
                 "yyyy-mm-dd".into()
             } else {
-                "".into()
+                String::new()
             });
             types.push(ty.clone());
         }

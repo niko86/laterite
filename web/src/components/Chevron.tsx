@@ -13,7 +13,9 @@ import type { Component } from "solid-js";
 //     `<summary>`. Rotation is CSS-driven via `group-open` (no `open` prop).
 //   • Manual toggle (a `<button>` flipping a signal, e.g. FindingsView /
 //     AnalyseView group rows): pass `open={isOpen}` and rotation tracks it.
-export const Chevron: Component<{ class?: string; open?: boolean }> = (props) => (
+export const Chevron: Component<{ class?: string; open?: boolean }> = (
+  props,
+) => (
   <svg
     viewBox="0 0 16 16"
     aria-hidden="true"

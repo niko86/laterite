@@ -75,7 +75,9 @@ export const DictionaryBrowser: Component = () => {
           <select
             class={controlClass}
             value={dictVersion()}
-            onChange={(e) => setDictVersion(e.currentTarget.value as DictVersionOpt)}
+            onChange={(e) => {
+              setDictVersion(e.currentTarget.value as DictVersionOpt);
+            }}
           >
             <For each={["auto", ...(editionMeta()?.editions ?? [])]}>
               {(ed) => (

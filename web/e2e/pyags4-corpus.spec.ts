@@ -40,7 +40,8 @@ function collect(): { name: string; path: string }[] {
     const dir = sub ? path.join(PYAGS4, sub) : PYAGS4;
     if (!existsSync(dir)) continue;
     for (const n of readdirSync(dir)) {
-      if (n.toLowerCase().endsWith(".ags")) out.push({ name: n, path: path.join(dir, n) });
+      if (n.toLowerCase().endsWith(".ags"))
+        out.push({ name: n, path: path.join(dir, n) });
     }
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -103,8 +104,16 @@ test("python-ags4 .ags corpus through the wasm validator (opt-in)", async ({
     }
 
     const exp = expectedNum(f.name);
-    const matched = exp == null ? null : new Set(surfaced.flatMap(numsIn)).has(exp);
-    rows.push({ file: f.name, outcome, total, expected: exp, matched, surfaced });
+    const matched =
+      exp == null ? null : new Set(surfaced.flatMap(numsIn)).has(exp);
+    rows.push({
+      file: f.name,
+      outcome,
+      total,
+      expected: exp,
+      matched,
+      surfaced,
+    });
     // Log ANOMALIES only, not a line per file. The filename-vs-rule `match` is a
     // heuristic (the filename lies: an `…OK` fixture is clean, a `rule18` file
     // legitimately trips Rule 7/9, a file python can't parse yields nothing) — it
@@ -116,7 +125,9 @@ test("python-ags4 .ags corpus through the wasm validator (opt-in)", async ({
     // `no-report`: neither findings nor a clean banner appeared (a refusal, hang
     // or crash worth an eyeball). Full per-file detail still lands in the JSON.
     if (outcome === "no-report") {
-      console.log(`  ⚠ no-report: ${f.name} — neither findings nor a clean banner`);
+      console.log(
+        `  ⚠ no-report: ${f.name} — neither findings nor a clean banner`,
+      );
     }
   }
 

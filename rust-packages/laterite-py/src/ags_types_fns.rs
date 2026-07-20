@@ -11,12 +11,21 @@
 //! the pure-Python implementation produced. The pyo3 `chrono` feature
 //! gives us `IntoPyObject` for `NaiveDateTime` / `NaiveDate` /
 //! `NaiveTime` — no manual `PyDateTime` boilerplate needed.
+//!
+//! The parsing itself is NOT re-implemented here: the format tables and the
+//! typed parsers (`parse_datetime` / `parse_date` / `parse_time` /
+//! `parse_bool`) live in the leaf (`laterite_ags4_core::ags_types`, i.e.
+//! `laterite-types`) and back the leaf's own `parse_value` too, so there is
+//! one parser and one set of format tables (#531). This wrapper only
+//! dispatches on `canonical_type` and maps each parsed value to its Python
+//! object — the same canonicalisation that feeds `_content_hash`, now with
+//! a single source instead of a drift-prone second copy (see #503).
 
 use laterite_ags4_core::ags_types::{
     CanonicalType, canonical_type as rs_canonical_type, display_hint as rs_display_hint,
+    parse_ags_decimal, parse_ags_integer, parse_bool, parse_date, parse_datetime, parse_time,
 };
 
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use pyo3::prelude::*;
 use pyo3::types::PyNone;
 
@@ -28,7 +37,7 @@ use pyo3::types::PyNone;
 /// nothing; unknown codes pass through to string in `parse_value`).
 #[pyfunction]
 fn canonical_type(ags_type: &str) -> Option<&'static str> {
-    rs_canonical_type(ags_type).map(|c| c.as_str())
+    rs_canonical_type(ags_type).map(laterite_types::CanonicalType::as_str)
 }
 
 /// Presentation hint for numeric AGS types: `"2DP"` → `Some("%.2f")`,
@@ -69,102 +78,40 @@ fn parse_value<'py>(
         return Ok(PyNone::get(py).to_owned().into_any());
     }
 
-    let ct = match rs_canonical_type(ags_type) {
-        Some(c) => c,
-        // Unknown AGS type — Python returns the trimmed string. Preserve.
-        None => return Ok(s.into_pyobject(py)?.into_any()),
+    // Unknown AGS type — Python returns the trimmed string. Preserve.
+    let Some(ct) = rs_canonical_type(ags_type) else {
+        return Ok(s.into_pyobject(py)?.into_any());
     };
 
     match ct {
         CanonicalType::String | CanonicalType::Enum => Ok(s.into_pyobject(py)?.into_any()),
-        CanonicalType::Integer => match s.parse::<f64>() {
-            // Python's `int(float(s))` tolerance for "5.0" notation.
-            Ok(f) if f.is_finite() => Ok((f as i64).into_pyobject(py)?.into_any()),
-            _ => Ok(PyNone::get(py).to_owned().into_any()),
-        },
-        CanonicalType::Decimal => match s.parse::<f64>() {
-            Ok(f) if f.is_finite() => Ok(f.into_pyobject(py)?.into_any()),
-            _ => Ok(PyNone::get(py).to_owned().into_any()),
-        },
+        // The same range-guarded parsers the leaf's `parse_value` uses, so the
+        // typed-read Python object can't drift from the `_content_hash`
+        // canonicalisation (#611 finishes the #531 dedup for Integer/Decimal).
+        CanonicalType::Integer => Ok(parse_ags_integer(s)
+            .map(|i| i.into_pyobject(py).map(pyo3::Bound::into_any))
+            .transpose()?
+            .unwrap_or_else(|| PyNone::get(py).to_owned().into_any())),
+        CanonicalType::Decimal => Ok(parse_ags_decimal(s)
+            .map(|f| f.into_pyobject(py).map(pyo3::Bound::into_any))
+            .transpose()?
+            .unwrap_or_else(|| PyNone::get(py).to_owned().into_any())),
         CanonicalType::Datetime => Ok(parse_datetime(s)
-            .map(|dt| dt.into_pyobject(py).map(|b| b.into_any()))
+            .map(|dt| dt.into_pyobject(py).map(pyo3::Bound::into_any))
             .transpose()?
             .unwrap_or_else(|| PyNone::get(py).to_owned().into_any())),
         CanonicalType::Date => Ok(parse_date(s)
-            .map(|d| d.into_pyobject(py).map(|b| b.into_any()))
+            .map(|d| d.into_pyobject(py).map(pyo3::Bound::into_any))
             .transpose()?
             .unwrap_or_else(|| PyNone::get(py).to_owned().into_any())),
         CanonicalType::Time => Ok(parse_time(s)
-            .map(|t| t.into_pyobject(py).map(|b| b.into_any()))
+            .map(|t| t.into_pyobject(py).map(pyo3::Bound::into_any))
             .transpose()?
             .unwrap_or_else(|| PyNone::get(py).to_owned().into_any())),
         CanonicalType::Bool => Ok(parse_bool(s)
             .map(|b| b.into_pyobject(py).map(|x| x.to_owned().into_any()))
             .transpose()?
             .unwrap_or_else(|| PyNone::get(py).to_owned().into_any())),
-    }
-}
-
-// --- format tables ---------------------------------------------------
-//
-// Mirror Python's `_DATETIME_FORMATS` / `_DATE_FORMATS` / `_TIME_FORMATS`
-// exactly so cross-side parity is byte-faithful. (`ags_types.rs`'s own
-// `DATETIME_FORMATS` is intended for JSON-Value output and shares the
-// same order; we duplicate here to keep this module's intent — produce
-// Python-typed values — separate from the JSON path.)
-
-const DATETIME_FORMATS: &[&str] = &[
-    "%Y-%m-%d %H:%M:%S",
-    "%Y-%m-%d %H:%M",
-    "%Y-%m-%dT%H:%M:%S",
-    "%Y-%m-%d",
-    "%Y/%m/%d",
-    "%d/%m/%Y",
-];
-const DATE_FORMATS: &[&str] = &["%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y"];
-const TIME_FORMATS: &[&str] = &["%H:%M:%S", "%H:%M"];
-
-fn parse_datetime(s: &str) -> Option<NaiveDateTime> {
-    for fmt in DATETIME_FORMATS {
-        if let Ok(dt) = NaiveDateTime::parse_from_str(s, fmt) {
-            return Some(dt);
-        }
-        // Date-only DT fallback (matches the Stage C item 1 fix in
-        // ags_types.rs): a date-only string under a `yyyy-mm-dd` format
-        // is legally a DT value — promote to midnight.
-        if let Ok(d) = NaiveDate::parse_from_str(s, fmt) {
-            if let Some(dt) = d.and_hms_opt(0, 0, 0) {
-                return Some(dt);
-            }
-        }
-    }
-    None
-}
-
-fn parse_date(s: &str) -> Option<NaiveDate> {
-    for fmt in DATE_FORMATS {
-        if let Ok(d) = NaiveDate::parse_from_str(s, fmt) {
-            return Some(d);
-        }
-    }
-    None
-}
-
-fn parse_time(s: &str) -> Option<NaiveTime> {
-    for fmt in TIME_FORMATS {
-        if let Ok(t) = NaiveTime::parse_from_str(s, fmt) {
-            return Some(t);
-        }
-    }
-    None
-}
-
-fn parse_bool(s: &str) -> Option<bool> {
-    let u = s.to_uppercase();
-    match u.as_str() {
-        "Y" | "YES" | "TRUE" | "1" => Some(true),
-        "N" | "NO" | "FALSE" | "0" => Some(false),
-        _ => None,
     }
 }
 

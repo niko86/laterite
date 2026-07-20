@@ -47,6 +47,44 @@ def resolve_backend(explicit: str | None) -> str:
     return name
 
 
+# Module-level compat output string dtype (pandas backend only — polars/pyarrow
+# have a single string type). Mirrors the backend knob exactly:
+# `compat.set_string_dtype(...)` mutates this, env LATERITE_COMPAT_STRING_DTYPE
+# overrides the built-in default at import, per-call `string_dtype=` beats both.
+#   "object" — numpy object (today's python-ags4 baseline; the true drop-in).
+#   "string" — pandas' Arrow-backed str dtype (na_value=NaN), which is what
+#              python-ags4 itself returns once it runs on pandas 3. The default
+#              flips to "string" in that era — a one-word change here.
+_DEFAULT_STRING_DTYPE = os.environ.get(
+    "LATERITE_COMPAT_STRING_DTYPE", "object"
+).lower()
+
+_VALID_STRING_DTYPES = ("object", "string")
+
+
+def get_default_string_dtype() -> str:
+    return _DEFAULT_STRING_DTYPE
+
+
+def set_default_string_dtype(name: str) -> None:
+    global _DEFAULT_STRING_DTYPE
+    name = name.lower()
+    if name not in _VALID_STRING_DTYPES:
+        raise ValueError(
+            f"unknown string_dtype {name!r} (expected one of {_VALID_STRING_DTYPES})"
+        )
+    _DEFAULT_STRING_DTYPE = name
+
+
+def resolve_string_dtype(explicit: str | None) -> str:
+    name = (explicit or _DEFAULT_STRING_DTYPE).lower()
+    if name not in _VALID_STRING_DTYPES:
+        raise ValueError(
+            f"unknown string_dtype {name!r} (expected one of {_VALID_STRING_DTYPES})"
+        )
+    return name
+
+
 def frame_from_arrow(table: Any) -> pl.DataFrame:
     """Ingest a Rust-built Arrow table (the pyo3-arrow ``PyTable`` ``read()``
     hands back per group) into a polars frame — pyarrow-free and zero-copy via
@@ -90,7 +128,7 @@ def materialize(frame: pl.DataFrame, backend: str) -> Any:
         return frame.to_arrow()
     if backend == "pandas":
         try:
-            import pandas  # noqa: F401
+            import pandas as pd  # noqa: F401
         except ModuleNotFoundError as e:
             raise ModuleNotFoundError(
                 "the laterite `compat` default backend is pandas but pandas "
@@ -106,4 +144,137 @@ def materialize(frame: pl.DataFrame, backend: str) -> Any:
         con = duckdb.connect()
         con.register("__f", ArrowStream(frame))
         return con.sql("SELECT * FROM __f").df()
+    raise ValueError(f"unknown backend {backend!r}")
+
+
+def _pandas_str_dtype() -> Any:
+    """python-ags4's pandas-3 baseline string dtype: pandas' Arrow-backed `str`
+    with a NaN missing sentinel — byte-for-byte what `future.infer_string=True`
+    produces, and (unlike the strict `pd.NA` variant) still matched by
+    `select_dtypes(include='object')`. Constructed explicitly so the pandas hop
+    can target it regardless of the caller's global `infer_string` option."""
+    import numpy as np
+    import pandas as pd
+
+    return pd.StringDtype(storage="pyarrow", na_value=np.nan)
+
+
+def _pandas_missing_error() -> ModuleNotFoundError:
+    return ModuleNotFoundError(
+        "the laterite `compat` default backend is pandas but pandas is not "
+        "installed. Install it with `pip install laterite[compat]` (or "
+        "`uv add laterite[compat]`), or switch the backend: "
+        "`laterite.compat.set_backend('polars')` / set "
+        "LATERITE_COMPAT_BACKEND=polars (then pandas is not needed)."
+    )
+
+
+def _pyarrow_missing_error(what: str) -> ModuleNotFoundError:
+    return ModuleNotFoundError(
+        f"{what} needs pyarrow, which the default `[compat]` install omits. "
+        "Install it with `pip install laterite[compat,pyarrow]` (or `[all]`). "
+        "The pyarrow-free `[compat]` still gives object-dtype pandas frames "
+        "(via DuckDB's NumPy `.df()`) and the full polars backend — pyarrow only "
+        "accelerates the pandas hop a touch and unlocks string_dtype='string' "
+        "(pandas' Arrow-backed str)."
+    )
+
+
+def _pyarrow_available() -> bool:
+    """Is pyarrow importable? The optional accelerator — its absence routes the
+    compat pandas hop through DuckDB's `.df()` instead of pyarrow's `to_pandas`."""
+    try:
+        import pyarrow as pa  # noqa: F401
+    except ModuleNotFoundError:
+        return False
+    return True
+
+
+def compat_materializer(backend: str, string_dtype: str):
+    """Resolve — ONCE, before the per-group loop — the cheapest hop from a native
+    compat Arrow table (a leading `HEADING` tag column then one `Utf8` column per
+    heading, positional field names) to `backend`, returning a
+    ``(table, cols) -> frame`` callable that relabels the columns to `cols`.
+
+    Resolving once is deliberate: the hop's shared state is captured in the closure
+    and paid ONCE, not per group. The pyarrow hop holds the pyarrow module; the
+    pyarrow-free pandas hop holds a single DuckDB connection (a fresh
+    ``duckdb.connect()`` per group was the original `AGS4_to_dataframe` regression).
+
+    pyarrow is an OPTIONAL accelerator, not a hard dep. Absent, the pandas backend
+    still materialises object-dtype frames via DuckDB's NumPy ``.df()`` (~the same
+    speed — the Rust builder already removed the per-cell boxing that was the real
+    cost). pyarrow's ``to_pandas`` is a touch faster AND the only route to pandas'
+    Arrow-backed `str` dtype, so ``string_dtype='string'`` requires it."""
+    if backend == "polars":
+
+        def _polars(table: Any, cols: list[str]) -> Any:
+            f = frame_from_arrow(table)
+            # Positional native names → the python-ags4 labels (HEADING + headings).
+            return f.rename(dict(zip(f.columns, cols, strict=True)))
+
+        return _polars
+
+    if backend == "pyarrow":
+        try:
+            import pyarrow as pa
+        except ModuleNotFoundError as e:
+            raise _pyarrow_missing_error("backend='pyarrow'") from e
+
+        def _pyarrow(table: Any, cols: list[str]) -> Any:
+            return pa.table(table).rename_columns(cols)
+
+        return _pyarrow
+
+    if backend == "pandas":
+        try:
+            import pandas as pd  # noqa: F401
+        except ModuleNotFoundError as e:
+            raise _pandas_missing_error() from e
+        if _pyarrow_available():
+            # Fast path: pyarrow's `to_pandas` is the cheapest object hop and the
+            # only way to reach pandas' Arrow-backed `str` dtype. pyarrow is
+            # imported inside the closure — cached, so ~free per call, and it keeps
+            # `pa` a plain module binding (no Optional to thread through).
+            if string_dtype == "string":
+                dt = _pandas_str_dtype()
+
+                def _pandas_arrow_str(table: Any, cols: list[str]) -> Any:
+                    import pyarrow as pa
+
+                    pat = pa.table(table).rename_columns(cols)
+                    return pat.to_pandas(
+                        types_mapper=lambda t: dt if pa.types.is_string(t) else None
+                    )
+
+                return _pandas_arrow_str
+
+            def _pandas_arrow_obj(table: Any, cols: list[str]) -> Any:
+                import pyarrow as pa
+
+                # numpy object dtype — byte-identical to python-ags4 today.
+                return pa.table(table).rename_columns(cols).to_pandas()
+
+            return _pandas_arrow_obj
+
+        # pyarrow-free fallback: object dtype via DuckDB's NumPy `.df()`, over ONE
+        # shared connection (register per group, `.df()`, unregister). The
+        # Arrow-backed `str` dtype is unreachable without pyarrow.
+        if string_dtype == "string":
+            raise _pyarrow_missing_error("string_dtype='string'")
+        import duckdb
+
+        con = duckdb.connect()
+
+        def _pandas_duckdb(table: Any, cols: list[str]) -> Any:
+            f = frame_from_arrow(table)
+            f = f.rename(dict(zip(f.columns, cols, strict=True)))
+            con.register("__f", ArrowStream(f))
+            try:
+                return con.sql("SELECT * FROM __f").df()
+            finally:
+                con.unregister("__f")
+
+        return _pandas_duckdb
+
     raise ValueError(f"unknown backend {backend!r}")

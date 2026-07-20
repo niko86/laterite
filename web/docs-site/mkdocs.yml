@@ -63,9 +63,6 @@ plugins:
       scripts:
         - scripts/gen_groups.py
         - scripts/gen_types.py
-        # Release notes — renders the repo-root CHANGELOG.md into the site and
-        # stamps the shipped version (both derived at build, so no drift).
-        - scripts/gen_changelog.py
         # `lat` command reference — rendered from the shipped README-cli.md
         # (`lat --readme`), so a new verb never leaves the docs stale.
         - scripts/gen_cli.py

@@ -1,4 +1,4 @@
-//! AGS4 type system — port of `ags5_models._types`.
+//! AGS4 type system — ported from the original Python typed-value parser.
 //!
 //! Three responsibilities live here:
 //!
@@ -17,7 +17,7 @@ use serde_json::{Number, Value};
 
 // Typed Arrow column/record-batch building. Behind the `arrow` feature so
 // laterite-types stays a tiny wasm-safe leaf for consumers that only need the
-// type system (laterite-ags4-core → ags5db). Enabled by the two hosts that emit
+// type system (e.g. laterite-ags4-core's downstream consumers). Enabled by the two hosts that emit
 // Arrow: laterite-ags4-wasm (→ IPC stream) and laterite-py (→ zero-copy capsule).
 #[cfg(feature = "arrow")]
 pub mod arrow_cols;
@@ -41,8 +41,9 @@ pub enum CanonicalType {
 }
 
 impl CanonicalType {
-    /// Lower-case label that matches Python's `CanonicalType` StrEnum
+    /// Lower-case label that matches Python's `CanonicalType` `StrEnum`
     /// values (`"string"`, `"integer"`, …). Used in `_spec_headings`.
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::String => "string",
@@ -59,6 +60,7 @@ impl CanonicalType {
     /// DuckDB SQL storage type for the canonical category. Mirrors
     /// `_ddl._sql_type` exactly: decimal -> DOUBLE (Phase 6.5.1), integer
     /// -> BIGINT, datetime -> TIMESTAMP, etc.
+    #[must_use]
     pub fn sql_type(self) -> &'static str {
         match self {
             Self::String | Self::Enum => "VARCHAR",
@@ -89,6 +91,7 @@ const BOOL_AGS_TYPES: &[&str] = &["YN"];
 /// codes (Python's version raises `ValueError`; in Rust the caller picks
 /// the fallback — `parse_value` treats unknown codes as String storage,
 /// the DDL builder maps them to VARCHAR).
+#[must_use]
 pub fn canonical_type(ags_type: &str) -> Option<CanonicalType> {
     let t = ags_type.trim().to_uppercase();
     if STRING_AGS_TYPES.contains(&t.as_str()) {
@@ -119,10 +122,9 @@ pub fn canonical_type(ags_type: &str) -> Option<CanonicalType> {
 /// AGS spec → DuckDB SQL type. Falls back to VARCHAR on unknown codes
 /// so passthrough rows from AGS4 ingest of an unfamiliar dictionary
 /// still land somewhere queryable.
+#[must_use]
 pub fn sql_type(ags_type: &str) -> &'static str {
-    canonical_type(ags_type)
-        .map(|c| c.sql_type())
-        .unwrap_or("VARCHAR")
+    canonical_type(ags_type).map_or("VARCHAR", CanonicalType::sql_type)
 }
 
 /// Format a typed value back to the AGS4 string form the codec would
@@ -136,6 +138,7 @@ pub fn sql_type(ags_type: &str) -> &'static str {
 ///   `ags4_str(Value::from(100.5), "2DP")` -> `"100.50"`
 ///   `ags4_str(Value::from(5_i64), "0DP")` -> `"5"`
 ///   `ags4_str(Value::Null,        _   )` -> `""`
+#[must_use]
 pub fn ags4_str(value: &Value, ags_type: &str) -> String {
     if value.is_null() {
         return String::new();
@@ -178,47 +181,35 @@ pub fn ags4_str(value: &Value, ags_type: &str) -> String {
         }
     }
     if t == "0DP" {
-        return value
-            .as_i64()
-            .map(|i| i.to_string())
-            .or_else(|| value.as_f64().map(|f| (f as i64).to_string()))
-            .unwrap_or_default();
+        if let Some(i) = value.as_i64() {
+            return i.to_string();
+        }
+        // A float value under a 0DP type is unusual — `parse_value` now nulls an
+        // out-of-range 0DP cell (#611), so this only sees a float from an odd
+        // re-typed import. Render it only if it fits i64 (see `f64_fits_i64`);
+        // otherwise blank, rather than fabricate a saturated integer.
+        if let Some(f) = value.as_f64().filter(|f| f64_fits_i64(*f)) {
+            #[allow(clippy::cast_possible_truncation)] // range-checked by the filter
+            return (f as i64).to_string();
+        }
+        return String::new();
     }
     if t.ends_with("DP") {
         let n = t[..t.len() - 2].parse::<usize>().unwrap_or(0);
         if let Some(f) = value.as_f64() {
-            return format!("{:.*}", n, f);
+            return format_ndp(f, n);
         }
     }
     if t.ends_with("SF") {
         let n = t[..t.len() - 2].parse::<usize>().unwrap_or(0);
         if let Some(f) = value.as_f64() {
-            // n significant figures in fixed-point — python-ags4's
-            // validator rejects scientific notation under nSF
-            // ("Value 1.0e2 not of data type 2SF. Expected: 100"). The
-            // canonical form: round to n sig figs, emit as a plain
-            // decimal — trailing zeros for small magnitudes show the
-            // precision (0.002 -> "0.00200" under 3SF); large
-            // magnitudes get integer-rounded (1234 -> "1230" under 3SF).
-            if f == 0.0 {
-                return format!("{:.*}", n.saturating_sub(1), 0.0);
-            }
-            let exp = f.abs().log10().floor() as i32;
-            let dp = (n as i32) - exp - 1;
-            if dp >= 0 {
-                return format!("{:.*}", dp as usize, f);
-            }
-            // dp < 0: round to nearest 10^|dp|, emit as integer
-            // (no decimal point — `{:.0}` does that).
-            let scale = 10f64.powi(-dp);
-            let rounded = (f / scale).round() * scale;
-            return format!("{:.0}", rounded);
+            return format_nsf(f, n);
         }
     }
     if t.ends_with("SCI") {
         let n = t[..t.len() - 3].parse::<usize>().unwrap_or(0);
         if let Some(f) = value.as_f64() {
-            return format!("{:.*e}", n, f);
+            return format_nsci(f, n);
         }
     }
     match value {
@@ -227,16 +218,135 @@ pub fn ags4_str(value: &Value, ags_type: &str) -> String {
     }
 }
 
+// --- AGS4 field quoting (the write-side line primitive) ---------------
+//
+// The inverse of the tokenizer's inner-value unescape. Kept here beside
+// `ags4_str` (its value→wire-form sibling) as the SINGLE authority for AGS4
+// field quoting: `laterite-ags4-emit`'s byte-faithful `write_row` streams
+// through it, and the browser tokenizer's tiny wasm reuses it via
+// `quote_field`, so the browser's old TS copy (`quoteAgsField` in agsline.ts)
+// is retired against one Rust source (#533, part of the #527 convergence arc).
+
+/// Write `value` as one AGS4-quoted field to `out`: wrap it in double quotes,
+/// doubling any embedded `"` (`""`) — AGS4's Rule-1 field escaping.
+///
+/// Streaming (generic over `W`) so the writer pays NO per-cell allocation on
+/// its hot path — the no-quote branch writes the value's bytes straight
+/// through. It carries NO Rule-6 CR/LF check: that stays a row-level guarantee
+/// in the emitter (a field primitive can't reject what it can't see), so a
+/// value containing a raw CR/LF is quoted verbatim here.
+pub fn write_quoted_field<W: std::io::Write>(out: &mut W, value: &str) -> std::io::Result<()> {
+    out.write_all(b"\"")?;
+    // Escape embedded `"` → `""` (allocating only when there's one to double).
+    if value.contains('"') {
+        out.write_all(value.replace('"', "\"\"").as_bytes())?;
+    } else {
+        out.write_all(value.as_bytes())?;
+    }
+    out.write_all(b"\"")
+}
+
+/// [`write_quoted_field`] into an owned `String` — the AGS4-quoted form of
+/// `value`. This IS the browser field-quoter (`quoteAgsField`), exposed through
+/// the tiny wasm; native writers should prefer the streaming form to avoid the
+/// per-cell allocation this necessarily makes.
+///
+/// Examples:
+///   `quote_field("LOCA")`  -> `"\"LOCA\""`
+///   `quote_field("a\"b")`  -> `"\"a\"\"b\""`
+#[must_use]
+pub fn quote_field(value: &str) -> String {
+    let mut buf: Vec<u8> = Vec::with_capacity(value.len() + 2);
+    // Writing to a `Vec<u8>` is infallible, and we only wrap valid UTF-8 in
+    // ASCII quotes, so the bytes are always valid UTF-8.
+    write_quoted_field(&mut buf, value).expect("Vec<u8> write is infallible");
+    String::from_utf8(buf).expect("quote_field: ASCII quotes around UTF-8 stays UTF-8")
+}
+
+// --- the numeric expected-forms ---------------------------------------
+//
+// The three AGS4 numeric renderings, as `(value, n)` functions so the two
+// callers that need them share ONE implementation: `ags4_str` above (which
+// resolves `n` out of the type code) and laterite-ags4-validator's Rule 8 /
+// fixes engine (which already has `n` parsed and re-exports these). The
+// validator used to carry a hand-port of all three, kept honest only by a
+// "ported from ags_types::ags4_str" comment — it agreed, but nothing checked
+// it, so a validator could have judged a value by a different formatter than
+// the one that WRITES it (#528). laterite-excel keeps its own, deliberately
+// divergent formatter (uppercase `E`, bare `"0"` for SF-of-zero) — that
+// divergence is by design and pinned in xcheck-allow.json.
+
+/// Numeric TYPE counts (the `n` in "3DP" / "3SF" / "3SCI") are read straight
+/// from a file's TYPE spec with no upper bound, and each `format_*` below feeds
+/// `n` into a format width. f64 carries only ~17 significant decimal digits, so
+/// a count past this generous ceiling is meaningless — clamping to it stops a
+/// crafted spec like "9999999999DP" from asking for a ~10-billion-char string
+/// (an OOM/DoS), or wrapping the i32 cast inside `format_nsf`. Real AGS4 numeric
+/// counts are single-digit, so no legitimate value is affected. Hardens the
+/// #610 Class B divergence (O-49); python-ags4 shares the same unbounded read.
+const MAX_NUMERIC_COUNT: usize = 30;
+
+/// nDP expected form — fixed-point with exactly `n` fractional digits.
+/// NB `ags4_str` routes `0DP` to a truncating integer path BEFORE reaching
+/// here, so `format_ndp(f, 0)` (which rounds) is the validator's grammar
+/// form, not `ags4_str`'s `0DP` rendering. Both are deliberate.
+#[must_use]
+pub fn format_ndp(f: f64, n: usize) -> String {
+    let n = n.min(MAX_NUMERIC_COUNT);
+    format!("{f:.n$}")
+}
+
+/// nSF expected form — `n` significant figures in FIXED-POINT. python-ags4's
+/// validator rejects scientific notation under nSF ("Value 1.0e2 not of data
+/// type 2SF. Expected: 100"), so the canonical form rounds to `n` sig figs and
+/// emits a plain decimal: trailing zeros for small magnitudes show the
+/// precision (`0.002` → `"0.00200"` @3SF); large magnitudes get
+/// integer-rounded (`1234` → `"1230"` @3SF).
+#[must_use]
+pub fn format_nsf(f: f64, n: usize) -> String {
+    // Clamp first (see MAX_NUMERIC_COUNT): the bounded count fits i32, so the
+    // dp arithmetic below can't wrap on a crafted "9999999999SF".
+    let n = i32::try_from(n.min(MAX_NUMERIC_COUNT)).unwrap_or(i32::MAX);
+    if f == 0.0 {
+        return format!("{:.*}", (n - 1).max(0) as usize, 0.0);
+    }
+    // log10 of any finite f64 is bounded to roughly ±308 (f64's exponent
+    // range), always fits i32 regardless of `f`'s magnitude.
+    #[allow(clippy::cast_possible_truncation)]
+    let exp = f.abs().log10().floor() as i32;
+    let dp = n - exp - 1;
+    if dp >= 0 {
+        return format!("{:.*}", dp as usize, f);
+    }
+    // dp < 0: round to nearest 10^|dp|, emit as integer (no decimal
+    // point — `{:.0}` does that).
+    let scale = 10f64.powi(-dp);
+    let rounded = (f / scale).round() * scale;
+    format!("{rounded:.0}")
+}
+
+/// nSCI expected form — scientific notation, one digit before the point and
+/// `n` after. Rust's `{:e}` already emits a single leading mantissa digit and
+/// a sign-less-or-minus exponent with no leading zero (`1.5e2`, `3.1e-5`) —
+/// exactly the AGS form, and LOWERCASE `e` (laterite-excel's uppercase `E` is
+/// the registered by-design divergence).
+#[must_use]
+pub fn format_nsci(f: f64, n: usize) -> String {
+    let n = n.min(MAX_NUMERIC_COUNT);
+    format!("{f:.n$e}")
+}
+
 /// Presentation hint for a numeric AGS type: `'2DP'` → `Some("%.2f")`,
 /// `'3SF'` → `Some("%.3g")`, `'1SCI'` → `Some("%.1e")`. Mirrors Python's
 /// `display_hint`. String/datetime/bool types return `None`.
+#[must_use]
 pub fn display_hint(ags_type: &str) -> Option<String> {
     let t = ags_type.trim().to_uppercase();
     for (suffix, fmt_letter) in [("DP", 'f'), ("SF", 'g'), ("SCI", 'e')] {
         if t.ends_with(suffix) {
             let prefix = &t[..t.len() - suffix.len()];
             if !prefix.is_empty() && prefix.chars().all(|c| c.is_ascii_digit()) {
-                return Some(format!("%.{}{}", prefix, fmt_letter));
+                return Some(format!("%.{prefix}{fmt_letter}"));
             }
         }
     }
@@ -252,6 +362,7 @@ pub fn display_hint(ags_type: &str) -> Option<String> {
 /// figures and scientific notation are explicit claims about **measurement
 /// precision**. A caller that may rewrite values (merge's `promote`) must key off
 /// the code family, never the canonical class — hence this.
+#[must_use]
 pub fn decimal_places(ags_type: &str) -> Option<usize> {
     let t = ags_type.trim().to_uppercase();
     let prefix = t.strip_suffix("DP")?;
@@ -280,6 +391,7 @@ pub fn decimal_places(ags_type: &str) -> Option<usize> {
 /// as `…568`), and a *widen* that alters a digit is a contradiction in terms.
 /// Contrast the validator's `format_ndp`, which *is* an f64 round-and-render —
 /// correct for a Rule 8 **fix** (where rounding is the intent), wrong here.
+#[must_use]
 pub fn pad_decimals(raw: &str, n: usize) -> Option<String> {
     let s = raw.trim();
     let body = s.strip_prefix('-').unwrap_or(s);
@@ -327,80 +439,33 @@ pub fn parse_value(raw: Option<&str>, ags_type: &str) -> Value {
     if s.is_empty() {
         return Value::Null;
     }
-    let ct = match canonical_type(ags_type) {
-        Some(c) => c,
-        None => return Value::String(s.to_string()),
+    let Some(ct) = canonical_type(ags_type) else {
+        return Value::String(s.to_string());
     };
     match ct {
         CanonicalType::String | CanonicalType::Enum => Value::String(s.to_string()),
-        CanonicalType::Integer => match s.parse::<f64>() {
-            // Tolerate "5.0" notation for integers (Python `int(float(s))`).
-            Ok(f) if f.is_finite() => Value::from(f as i64),
-            _ => Value::Null,
-        },
-        CanonicalType::Decimal => match s.parse::<f64>() {
-            Ok(f) if f.is_finite() => Number::from_f64(f)
-                .map(Value::Number)
-                .unwrap_or(Value::Null),
-            _ => Value::Null,
-        },
-        CanonicalType::Datetime => parse_with_formats(s, DATETIME_FORMATS, |fmt| {
-            // Full datetime first. Fall back to a date-only parse
-            // (promoted to midnight) — a `DT` cell legally carries just
-            // `2020-08-18` under a `yyyy-mm-dd` UNIT, and
-            // `NaiveDateTime::parse_from_str` can't build a datetime from
-            // a time-less string, so without this the value silently
-            // dropped to NULL (data loss; the date-only formats listed in
-            // DATETIME_FORMATS were dead). On export the value is rendered
-            // back to date-only form.
-            NaiveDateTime::parse_from_str(s, fmt)
-                .ok()
-                .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
-                .or_else(|| {
-                    NaiveDate::parse_from_str(s, fmt)
-                        .ok()
-                        .map(|d| d.format("%Y-%m-%d 00:00:00").to_string())
-                })
-        })
-        .map(Value::String)
-        .unwrap_or(Value::Null),
-        CanonicalType::Date => parse_with_formats(s, DATE_FORMATS, |fmt| {
-            NaiveDate::parse_from_str(s, fmt)
-                .ok()
-                .map(|d| d.format("%Y-%m-%d").to_string())
-        })
-        .map(Value::String)
-        .unwrap_or(Value::Null),
-        CanonicalType::Time => parse_with_formats(s, TIME_FORMATS, |fmt| {
-            NaiveTime::parse_from_str(s, fmt)
-                .ok()
-                .map(|t| t.format("%H:%M:%S").to_string())
-        })
-        .map(Value::String)
-        .unwrap_or(Value::Null),
-        CanonicalType::Bool => {
-            let u = s.to_uppercase();
-            if BOOL_TRUE.contains(&u.as_str()) {
-                Value::Bool(true)
-            } else if BOOL_FALSE.contains(&u.as_str()) {
-                Value::Bool(false)
-            } else {
-                Value::Null
-            }
-        }
+        // One integer parser (range-guarded, #611) for the leaf and laterite-py.
+        CanonicalType::Integer => parse_ags_integer(s).map_or(Value::Null, Value::from),
+        CanonicalType::Decimal => parse_ags_decimal(s)
+            .and_then(Number::from_f64)
+            .map_or(Value::Null, Value::Number),
+        // Datetime / Date / Time / Bool route through the shared typed
+        // parsers below, so there is ONE set of format tables and one parse
+        // per category (the PyO3 wrapper in laterite-py calls the same four).
+        // `parse_datetime` owns the date-only-promoted-to-midnight rule (a
+        // `DT` cell legally carries just `2020-08-18` under a `yyyy-mm-dd`
+        // UNIT); on export the midnight value renders back to date-only form.
+        CanonicalType::Datetime => parse_datetime(s).map_or(Value::Null, |dt| {
+            Value::String(dt.format("%Y-%m-%d %H:%M:%S").to_string())
+        }),
+        CanonicalType::Date => parse_date(s).map_or(Value::Null, |d| {
+            Value::String(d.format("%Y-%m-%d").to_string())
+        }),
+        CanonicalType::Time => parse_time(s).map_or(Value::Null, |t| {
+            Value::String(t.format("%H:%M:%S").to_string())
+        }),
+        CanonicalType::Bool => parse_bool(s).map_or(Value::Null, Value::Bool),
     }
-}
-
-fn parse_with_formats<F>(_s: &str, formats: &[&str], mut try_one: F) -> Option<String>
-where
-    F: FnMut(&str) -> Option<String>,
-{
-    for fmt in formats {
-        if let Some(out) = try_one(fmt) {
-            return Some(out);
-        }
-    }
-    None
 }
 
 /// Parse an AGS4 DATETIME cell into a `NaiveDateTime`, trying the same
@@ -414,6 +479,7 @@ where
 /// typed Arrow (epoch-µs timestamps) — use this instead, so they cast
 /// *identically* to how `parse_value` decides what is a valid datetime.
 /// Returns `None` when no format matches (the caller appends a null).
+#[must_use]
 pub fn parse_datetime(s: &str) -> Option<NaiveDateTime> {
     let s = s.trim();
     for fmt in DATETIME_FORMATS {
@@ -425,6 +491,106 @@ pub fn parse_datetime(s: &str) -> Option<NaiveDateTime> {
         }
     }
     None
+}
+
+/// Parse an AGS4 DATE cell into a `NaiveDate`, trying the same
+/// `DATE_FORMATS` `parse_value` uses. `None` when no format matches.
+/// The typed twin of `parse_value`'s Date arm — shared with laterite-py's
+/// PyO3 wrapper so there is one date parser, not two.
+#[must_use]
+pub fn parse_date(s: &str) -> Option<NaiveDate> {
+    let s = s.trim();
+    for fmt in DATE_FORMATS {
+        if let Ok(d) = NaiveDate::parse_from_str(s, fmt) {
+            return Some(d);
+        }
+    }
+    None
+}
+
+/// Parse an AGS4 TIME cell into a `NaiveTime`, trying the same
+/// `TIME_FORMATS` `parse_value` uses. `None` when no format matches.
+/// Shared with laterite-py's PyO3 wrapper.
+#[must_use]
+pub fn parse_time(s: &str) -> Option<NaiveTime> {
+    let s = s.trim();
+    for fmt in TIME_FORMATS {
+        if let Ok(t) = NaiveTime::parse_from_str(s, fmt) {
+            return Some(t);
+        }
+    }
+    None
+}
+
+/// Parse an AGS4 boolean (`YN`) cell: the `BOOL_TRUE` / `BOOL_FALSE`
+/// token sets, case-folded. `None` for anything else. Shared with
+/// laterite-py's PyO3 wrapper so both agree on the token set.
+#[must_use]
+pub fn parse_bool(s: &str) -> Option<bool> {
+    let u = s.trim().to_uppercase();
+    if BOOL_TRUE.contains(&u.as_str()) {
+        Some(true)
+    } else if BOOL_FALSE.contains(&u.as_str()) {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+/// The f64 magnitude that bounds the i64 range. `i64::MAX` (2^63 − 1) is not
+/// f64-representable, so the usable upper bound is the exclusive 2^63; `i64::MIN`
+/// (−2^63) is exact, so the lower bound is inclusive `-I64_F64_BOUND`.
+const I64_F64_BOUND: f64 = 9_223_372_036_854_775_808.0; // 2^63
+
+/// True when a finite `f` maps onto i64 with only its fraction truncated (i.e.
+/// `f as i64` is faithful, not saturating). Non-finite `f` (NaN/±∞) fails both
+/// comparisons and returns `false`.
+fn f64_fits_i64(f: f64) -> bool {
+    (-I64_F64_BOUND..I64_F64_BOUND).contains(&f)
+}
+
+/// Parse an AGS4 Integer (`0DP`) cell to an `i64`, or `None` when the text is
+/// not a finite number OR falls outside i64's range. The single source for the
+/// leaf's own `parse_value`/`ags4_str` and laterite-py's PyO3 wrapper (#611
+/// finishes the #531 dedup — that PR single-sourced the date/time/bool parsers
+/// but left this Integer arm copied three ways).
+///
+/// The range guard is the #611 hardening: an out-of-range value returns `None`
+/// (→ a Null typed value / `None` in Python) instead of the silently
+/// *fabricated* `i64::MAX` a saturating `as` cast produced. Real geotech
+/// integers never approach i64 (~9.2e18) — the largest integer column in
+/// practice is a cyclic-triaxial cycle count (~1e4) — so the guard only ever
+/// fires on a 19-digit value, which in a whole-number column is an Excel/export
+/// error we want surfaced (the validator already flags it via Rule 8), not
+/// coerced into a wrong number.
+///
+/// TO CHANGE THIS: if a data model ever needs integers past i64 and must
+/// PRESERVE them (matching python-ags4's arbitrary-precision `int(float(s))`
+/// → the deferred "full precision" option), you would store them at arbitrary
+/// precision — `serde_json`'s `arbitrary_precision` feature or a bigint variant
+/// in `Value` — thread that through `_content_hash` and the PyO3/typed-read
+/// surfaces, and relax this guard. This guard is the minimal, low-risk option;
+/// widening the store is the larger one.
+#[must_use]
+pub fn parse_ags_integer(s: &str) -> Option<i64> {
+    match s.parse::<f64>() {
+        // Tolerate "5.0" notation (Python `int(float(s))`); the cast truncates
+        // the fraction toward zero, and `f64_fits_i64` has range-checked it.
+        #[allow(clippy::cast_possible_truncation)]
+        Ok(f) if f64_fits_i64(f) => Some(f as i64),
+        _ => None,
+    }
+}
+
+/// Parse an AGS4 Decimal-typed cell to an `f64`, or `None` when not a finite
+/// number. The single source for the leaf's `parse_value` Decimal arm and
+/// laterite-py's wrapper (the #531/#611 dedup, Decimal half).
+#[must_use]
+pub fn parse_ags_decimal(s: &str) -> Option<f64> {
+    match s.parse::<f64>() {
+        Ok(f) if f.is_finite() => Some(f),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -571,6 +737,30 @@ mod tests {
         assert_eq!(ags4_str(&Value::from(100.0), "2SF"), "100");
         assert_eq!(ags4_str(&Value::from(1234.0), "3SF"), "1230");
         assert_eq!(ags4_str(&Value::from(10.0), "1SF"), "10");
+    }
+
+    #[test]
+    fn nsf_count_is_clamped_so_a_crafted_type_cannot_dos() {
+        // The SF count is read straight from a file's TYPE spec ("3SF") with no
+        // upper bound (#610 Class B, O-49). python-ags4's `_format_SF` reads it
+        // the same way at arbitrary precision, so a crafted "9999999999SF" makes
+        // it request a ~10-billion-place format width and OOM. We clamp to
+        // MAX_NUMERIC_COUNT first, so an absurd count collapses to a bounded
+        // string instead of wrapping the i32 cast or blowing up the width.
+        let ceiling = format_nsf(1.5, MAX_NUMERIC_COUNT);
+        assert_eq!(format_nsf(1.5, 9_999_999_999), ceiling);
+        assert_eq!(format_nsf(1.5, usize::MAX), ceiling); // saturating clamp path
+        assert!(ceiling.len() < 40, "clamped output stays bounded");
+        // The zero-value branch uses the count for its width too — also clamped.
+        assert!(format_nsf(0.0, usize::MAX).len() < 40);
+        // Legit SF counts (≤ the ceiling) render exactly as before.
+        assert_eq!(format_nsf(1.23, 3), "1.23");
+        assert_eq!(format_nsf(1234.0, 3), "1230");
+        // The nDP / nSCI siblings feed `n` straight into the width — clamp too.
+        assert!(format_ndp(1.5, usize::MAX).len() < 40);
+        assert!(format_nsci(1.5, usize::MAX).len() < 40);
+        assert_eq!(format_ndp(1.5, 3), "1.500"); // legit count untouched
+        assert_eq!(format_nsci(1500.0, 2), "1.50e3");
     }
 
     // --- CanonicalType label / SQL-type mapping ---------------------
@@ -750,6 +940,9 @@ mod tests {
     }
 
     #[test]
+    // 3.14159 is a deliberate test input chosen to round to "3.142" at
+    // 3dp — not an attempt to approximate PI.
+    #[allow(clippy::approx_constant)]
     fn ags4_str_ndp_formats_to_precision() {
         assert_eq!(ags4_str(&Value::from(100.5_f64), "2DP"), "100.50");
         assert_eq!(ags4_str(&Value::from(3.14159_f64), "3DP"), "3.142");
@@ -777,6 +970,40 @@ mod tests {
         // n-1 fractional digits.
         assert_eq!(ags4_str(&Value::from(0.0_f64), "3SF"), "0.00");
         assert_eq!(ags4_str(&Value::from(0.0_f64), "1SF"), "0");
+    }
+
+    // --- quote_field / write_quoted_field -------------------------
+
+    #[test]
+    fn quote_field_wraps_and_doubles_embedded_quotes() {
+        assert_eq!(quote_field("LOCA"), "\"LOCA\"");
+        assert_eq!(quote_field(""), "\"\"");
+        // Embedded `"` is doubled (AGS4 Rule-1 escaping).
+        assert_eq!(quote_field(r#"he said "hi""#), r#""he said ""hi""""#);
+        // A comma is data inside the quotes, not a delimiter.
+        assert_eq!(quote_field("a,b"), "\"a,b\"");
+    }
+
+    #[test]
+    fn quote_field_is_the_streaming_form_collected() {
+        // The owned wrapper must be byte-identical to streaming into a buffer —
+        // they are one authority, so a divergence here is a real bug.
+        for v in ["", "x", "a\"b", "a\"\"b", "with,comma", "  padded  ", "🦀"] {
+            let mut buf: Vec<u8> = Vec::new();
+            write_quoted_field(&mut buf, v).unwrap();
+            assert_eq!(
+                String::from_utf8(buf).unwrap(),
+                quote_field(v),
+                "value {v:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn write_quoted_field_carries_no_cr_lf_check() {
+        // The field primitive quotes a raw CR/LF verbatim — Rule 6 rejection is
+        // the emitter's ROW-level job, not this primitive's.
+        assert_eq!(quote_field("a\r\nb"), "\"a\r\nb\"");
     }
 
     // --- display_hint ---------------------------------------------
@@ -807,6 +1034,51 @@ mod tests {
         assert_eq!(parse_value(Some("abc"), "0DP"), Value::Null);
         // Infinity is not finite -> Null.
         assert_eq!(parse_value(Some("inf"), "0DP"), Value::Null);
+    }
+
+    #[test]
+    fn parse_ags_integer_guards_the_i64_range() {
+        // In-range: truncate toward zero (Python `int(float(s))`); "5.0" tolerated.
+        assert_eq!(parse_ags_integer("42"), Some(42));
+        assert_eq!(parse_ags_integer("-42"), Some(-42));
+        assert_eq!(parse_ags_integer("5.0"), Some(5));
+        assert_eq!(parse_ags_integer("5.7"), Some(5));
+        assert_eq!(parse_ags_integer("1E-30"), Some(0)); // tiny -> 0, as Python
+        // The largest f64-representable i64 still parses; 2^63 and up do not.
+        assert_eq!(
+            parse_ags_integer("9223372036854774784"),
+            Some(9_223_372_036_854_774_784)
+        );
+        // Out-of-range -> None, NOT a fabricated i64::MAX (the #611 hardening).
+        assert_eq!(parse_ags_integer("1E30"), None);
+        assert_eq!(parse_ags_integer("99999999999999999999"), None);
+        assert_eq!(parse_ags_integer("-1E30"), None);
+        assert_eq!(parse_ags_integer("9223372036854775808"), None); // 2^63
+        // Non-numeric / non-finite -> None.
+        assert_eq!(parse_ags_integer("abc"), None);
+        assert_eq!(parse_ags_integer("inf"), None);
+        assert_eq!(parse_ags_integer("NaN"), None);
+        assert_eq!(parse_ags_integer(""), None);
+    }
+
+    #[test]
+    fn parse_value_0dp_overflow_is_null_not_fabricated() {
+        // The observable #611 change: a giant 0DP value no longer canonicalises
+        // to a fabricated i64::MAX — it becomes Null. In-range is unchanged, so
+        // _content_hash for real data is untouched.
+        assert_eq!(parse_value(Some("42"), "0DP"), Value::from(42));
+        assert_eq!(parse_value(Some("5.0"), "0DP"), Value::from(5));
+        assert_eq!(parse_value(Some("1E30"), "0DP"), Value::Null);
+    }
+
+    #[test]
+    fn parse_ags_decimal_takes_finite_floats_only() {
+        assert_eq!(parse_ags_decimal("2.5"), Some(2.5));
+        // Decimals hold big magnitudes fine — the i64 guard is Integer-only.
+        assert_eq!(parse_ags_decimal("1E30"), Some(1e30));
+        assert_eq!(parse_ags_decimal("inf"), None);
+        assert_eq!(parse_ags_decimal("NaN"), None);
+        assert_eq!(parse_ags_decimal("x"), None);
     }
 
     #[test]

@@ -6,8 +6,7 @@ import { downloadBlob, baseName } from "../../lib/download";
 const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-const count = (n: number, noun: string) =>
-  `${n} ${noun}${n === 1 ? "" : "s"}`;
+const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
 // Tools → Excel: AGS4 ↔ `.xlsx` conversion, fully client-side (the wasm
 // laterite-excel cores; #359). Export turns the loaded AGS4 into a workbook
@@ -35,7 +34,9 @@ export const ExcelConverter: Component = () => {
       const r = await excelExport(b);
       downloadBlob(r.bytes, `${baseName(fileStore.name())}.xlsx`, XLSX_MIME);
       setWarnings(r.warnings);
-      setNote(`${count(r.sheets, "sheet")}, ${count(r.rows, "data row")} → .xlsx`);
+      setNote(
+        `${count(r.sheets, "sheet")}, ${count(r.rows, "data row")} → .xlsx`,
+      );
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -49,9 +50,15 @@ export const ExcelConverter: Component = () => {
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const r = await excelImport(bytes, formatNumeric());
-      downloadBlob(r.bytes, `${baseName(file.name)}.ags`, "text/plain;charset=utf-8");
+      downloadBlob(
+        r.bytes,
+        `${baseName(file.name)}.ags`,
+        "text/plain;charset=utf-8",
+      );
       setWarnings(r.warnings);
-      setNote(`${count(r.sheets, "sheet")}, ${count(r.rows, "data row")} → .ags`);
+      setNote(
+        `${count(r.sheets, "sheet")}, ${count(r.rows, "data row")} → .ags`,
+      );
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -83,9 +90,11 @@ export const ExcelConverter: Component = () => {
               type="button"
               disabled={busy() !== null}
               class="rounded bg-emerald-600/80 px-3 py-1.5 font-medium text-emerald-50 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={runExport}
+              onClick={() => void runExport()}
             >
-              {busy() === "export" ? "Converting…" : "Download as Excel (.xlsx)"}
+              {busy() === "export"
+                ? "Converting…"
+                : "Download as Excel (.xlsx)"}
             </button>
             <span class="text-xs text-fg-faint">
               from {fileStore.name() || "the loaded file"}

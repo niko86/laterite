@@ -6,6 +6,7 @@ import {
   type Component,
 } from "solid-js";
 import { ready as validatorReady } from "./lib/validatorClient";
+import { tokenizerReady } from "./lib/tokenizer";
 import { pendingTab, setPendingTab } from "./lib/nav";
 import { activeTab, setActiveTab, shareUrl } from "./lib/settings";
 import { warmLazyAssets } from "./lib/prefetch";
@@ -19,17 +20,22 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { PwaUpdater } from "./components/PwaUpdater";
 
 const App: Component = () => {
-  // Gate the panes on wasm instantiation (now inside the worker). A
-  // resource keeps the loading / error states declarative — no top-level
-  // await, no race where a pane calls validate() before the module is live.
+  // Gate the panes on wasm instantiation: the validator engine (in the worker)
+  // AND the tiny main-thread tokenizer wasm (#533) that the validate/fix views
+  // + tools call synchronously through `splitAgsFields`/`quoteAgsField`. A
+  // resource keeps the loading / error states declarative — no top-level await,
+  // no race where a pane calls validate() (or tokenizes a line) before its
+  // module is live.
   const [wasmReady] = createResource(async () => {
-    await validatorReady();
+    await Promise.all([validatorReady(), tokenizerReady()]);
     return true;
   });
   // The active tab is persisted + shareable (lib/settings) — a reload (or a
   // shared link) restores it.
   const tab = activeTab;
-  const setTab = (t: TabId) => setActiveTab(t);
+  const setTab = (t: TabId) => {
+    setActiveTab(t);
+  };
 
   // Cross-tab jumps (e.g. Explore analytics → Validate) flow through the nav
   // channel so a deep component can switch tabs without prop-drilling setTab.
@@ -166,7 +172,7 @@ const ShareButton: Component = () => {
   return (
     <button
       type="button"
-      onClick={copy}
+      onClick={() => void copy()}
       class="rounded border border-line-strong px-2 py-1 text-xs text-fg-soft transition-colors hover:bg-chip"
       title="Copy a link that restores the current dictionary / encoding / view settings"
     >

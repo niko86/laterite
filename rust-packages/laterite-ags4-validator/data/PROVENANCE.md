@@ -68,12 +68,63 @@ the repository owner**, who accepts the associated risk. The rationale:
    Only the dictionary *data* originates with AGS.
 
 This note exists so the provenance and the decision are explicit and
-auditable. If AGS objects, the fallback is the runtime `--dict <path>`
-mode (already supported): ship no bundled dictionary and require the
-user to supply their own freely-downloaded copy.
+auditable.
+
+<!-- dict-fallback-claim -->
+**The stated fallback now exists (#568).** If AGS objects to the bundled
+dictionary, the retreat is the runtime `--dict` custom-dictionary override:
+ship no bundled copy and require the user to supply their own
+freely-downloaded dictionary (or an entirely bespoke one) at validation time.
+`lat validate --dict <path>` accepts an AGS4 `.ags` **or** JSON dictionary and
+validates the delivery against it; the same capability reaches every surface
+(`dict_path` / `dict_bytes` on the Python and Node APIs, bytes-only in the
+browser). `--dict-replace` drops the bundled base entirely for a fully
+self-contained custom dictionary. So the bundling decision is no longer a
+one-way door — a consumer who cannot rely on the embedded ©AGS data has a
+documented, working way to substitute their own.
+
+This note used to read "the fallback is the runtime `--dict <path>` mode
+(already supported)" while the flag actually refused (`external --dict override
+is not implemented`, O-28) — a capability asserted in one document and
+contradicted in another, with nothing comparing them. That gap is now closed on
+both sides: the capability is real (O-28 records the implementation across all
+four surfaces), and `tests/test_provenance_dict_fallback.py` pins this paragraph
+to it — the test fails if this claim is removed OR if `lat validate --dict`
+stops working (a clean delivery validated against a custom dictionary must not
+exit 5), so the claim cannot silently un-become true again.
+<!-- /dict-fallback-claim -->
+
+## This claim is enforced
+
+Everything under **Source** above is checked, not asserted:
+`tests/test_vendored_authority_faithful.py` compares these five files
+**byte-for-byte** against the `python-ags4` copies installed in the dev
+environment (it is a declared dev dependency — the parity oracle), checks
+the file *set* still equals upstream's `STANDARD_DICT_FILES`, and checks
+that every place in the tree stating a python-ags4 version agrees with the
+one actually installed. It runs in the root suite, offline.
+
+It exists because the claim was previously unguarded in a way that is easy
+to misread. `tests/test_dictionary_faithful.py` re-runs `gen_dictionary.py`
+and asserts the committed union matches — but that proves the union is
+faithful to *whatever these files currently say*, not that these files are
+faithful to AGS. Measured: appending a fabricated group to
+`Standard_dictionary_v4_2.ags` and regenerating took the union from 174 to
+175 groups, and that test still reported **5 passed**. The invented group
+would have been compiled into the validator, the wasm build and the typed
+graph with every gate green.
+
+**What it does not prove:** that `python-ags4`'s dictionaries match the AGS
+specification. These files come from our own parity oracle, so the parity
+suite cannot detect a divergence the two of us share — both sides read the
+same bytes. The argument for the source is the one made above (it is the
+AGS-DFWG's own tooling); that argument is a *position*, and this test pins
+us to the source we chose rather than auditing it.
 
 ## Refresh
 
-`tools/sync-standard-dicts.ps1` documents the retrieval command. When a
-new AGS4 edition is published, re-copy from the AGS-DFWG source and bump
-the retrieval date above.
+`tools/sync-standard-dicts.sh` (Mac/Linux) or `tools/sync-standard-dicts.ps1`
+(Windows) copies them from the installed `python-ags4`. When a new AGS4
+edition is published, re-copy from the AGS-DFWG source, bump the retrieval
+date above, and regenerate the union with `tools/gen_dictionary.py`. The
+test named above will fail until the copy and this note agree again.

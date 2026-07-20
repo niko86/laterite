@@ -1,5 +1,5 @@
 // P3 — laterite.transport: zstd pack/unpack + age lock/unlock round-trips.
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -12,7 +12,7 @@ const PAYLOAD = '"GROUP","PROJ"\r\n'.repeat(500); // compressible AGS-ish text
 afterAll(() => {
   // best-effort temp cleanup
   try {
-    require("node:fs").rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
   } catch {
     /* ignore */
   }
@@ -47,7 +47,11 @@ describe("lock / unlock (zstd + age passphrase)", () => {
       const src = p("secret.ags");
       writeFileSync(src, PAYLOAD);
       transport.lock(src, p("secret.zst.age"), "correct horse");
-      transport.unlock(p("secret.zst.age"), p("secret.back.ags"), "correct horse");
+      transport.unlock(
+        p("secret.zst.age"),
+        p("secret.back.ags"),
+        "correct horse",
+      );
       expect(readFileSync(p("secret.back.ags"), "utf8")).toBe(PAYLOAD);
     },
     SCRYPT_TIMEOUT_MS,
@@ -59,7 +63,9 @@ describe("lock / unlock (zstd + age passphrase)", () => {
       const src = p("secret2.ags");
       writeFileSync(src, PAYLOAD);
       transport.lock(src, p("secret2.zst.age"), "right");
-      expect(() => transport.unlock(p("secret2.zst.age"), p("nope.ags"), "wrong")).toThrow();
+      expect(() =>
+        transport.unlock(p("secret2.zst.age"), p("nope.ags"), "wrong"),
+      ).toThrow();
     },
     SCRYPT_TIMEOUT_MS,
   );
@@ -94,7 +100,9 @@ describe("lockBytes / unlockBytes (zstd + age passphrase, in-memory)", () => {
     () => {
       const sealed = transport.lockBytes(BYTES, "correct horse");
       expect(sealed.length).toBeGreaterThan(0);
-      const opened = Buffer.from(transport.unlockBytes(sealed, "correct horse"));
+      const opened = Buffer.from(
+        transport.unlockBytes(sealed, "correct horse"),
+      );
       expect(opened.equals(BYTES)).toBe(true);
     },
     SCRYPT_TIMEOUT_MS,
@@ -105,7 +113,11 @@ describe("lockBytes / unlockBytes (zstd + age passphrase, in-memory)", () => {
     () => {
       const sealed = transport.lockBytes(BYTES, "correct horse");
       writeFileSync(p("frombytes.zst.age"), sealed);
-      transport.unlock(p("frombytes.zst.age"), p("frombytes.unlocked.ags"), "correct horse");
+      transport.unlock(
+        p("frombytes.zst.age"),
+        p("frombytes.unlocked.ags"),
+        "correct horse",
+      );
       expect(readFileSync(p("frombytes.unlocked.ags"), "utf8")).toBe(PAYLOAD);
     },
     SCRYPT_TIMEOUT_MS,
@@ -129,7 +141,9 @@ describe("lockBytes / unlockBytes (zstd + age passphrase, in-memory)", () => {
     const header = sealed.subarray(0, 200).toString("latin1");
     const stanza = header.split("\n").find((l) => l.startsWith("-> scrypt "));
     expect(stanza?.trim().split(" ").pop()).toBe("12");
-    expect(Buffer.from(transport.unlockBytes(sealed, "correct horse")).equals(BYTES)).toBe(true);
+    expect(
+      Buffer.from(transport.unlockBytes(sealed, "correct horse")).equals(BYTES),
+    ).toBe(true);
   });
 
   it("rejects an out-of-range logN", () => {

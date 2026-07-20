@@ -132,7 +132,9 @@ def test_latin9_is_accepted_by_the_library_not_just_the_binary(tmp_path: Path) -
         label: laterite.read(f, encoding=label).table("PROJ")["PROJ_NAME"][0]
         for label in ("latin9", "latin-9", "iso-8859-15", "l9")
     }
-    assert len(set(values.values())) == 1, f"aliases of one encoding disagreed: {values}"
+    assert len(set(values.values())) == 1, (
+        f"aliases of one encoding disagreed: {values}"
+    )
 
 
 # --- the uvx launcher --------------------------------------------------------
@@ -184,4 +186,6 @@ def test_census_probe_lists_agree() -> None:
         "the Rust and Python census probe lists have drifted — the launchers would be "
         "answering different questions and the census would call it agreement"
     )
-    assert "cp1252x" in labels, "the policy pin (an unknown label) must stay in the list"
+    assert "cp1252x" in labels, (
+        "the policy pin (an unknown label) must stay in the list"
+    )

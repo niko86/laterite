@@ -47,7 +47,9 @@ def test_certify_rejects_a_non_utf8_source(tmp_path: Path) -> None:
     src = tmp_path / "accented.ags"
     src.write_bytes(raw)
     f = L.read(src, encoding="cp1252").validate(warnings=False)
-    assert not f.report.by_rule(), "errors-only validation must be clean to reach the guard"
+    assert not f.report.by_rule(), (
+        "errors-only validation must be clean to reach the guard"
+    )
     with pytest.raises(L.Ags4Error, match="not valid UTF-8"):
         f.certify(path=tmp_path / "accented.ags.idx")
 
@@ -121,8 +123,10 @@ def test_to_json_and_to_ndjson_describe_the_same_findings() -> None:
     emits ONE line per occurrence. Different shapes, same underlying facts: the
     flattened `(rule, line, group, desc)` occurrences must agree as multisets, so
     neither view can silently drop or duplicate a finding the other keeps."""
-    fx = str(Path(__file__).resolve().parents[3]
-             / "rust-packages/ags4-forge/vendor/pyags4-tests/4.1-rule8-1.ags")
+    fx = str(
+        Path(__file__).resolve().parents[3]
+        / "rust-packages/ags4-forge/vendor/pyags4-tests/4.1-rule8-1.ags"
+    )
     rep = L.validate(fx, warnings=True, fyi=True)
 
     by_rule = json.loads(rep.to_json())["findings"]
@@ -134,7 +138,9 @@ def test_to_json_and_to_ndjson_describe_the_same_findings() -> None:
     )
     nd = sorted(
         (r["rule"], r["line"], r["group"], r["desc"])
-        for r in (json.loads(line) for line in rep.to_ndjson().splitlines() if line.strip())
+        for r in (
+            json.loads(line) for line in rep.to_ndjson().splitlines() if line.strip()
+        )
     )
     assert flat == nd
     # And the by-rule keys are exactly what by_rule() reports.

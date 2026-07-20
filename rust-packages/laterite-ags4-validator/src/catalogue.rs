@@ -1,5 +1,5 @@
 //! The rule catalogue — the single source for `lat rules` and
-//! (via the follow-up that repoints it) the web RuleExplainer.
+//! (via the follow-up that repoints it) the web `RuleExplainer`.
 //!
 //! Two facts combine here, reconciled by the gate tests so they cannot drift:
 //!   1. the engine's **inventory** — [`RULE_LABELS`], the exact set of rule
@@ -65,7 +65,10 @@ mod tests {
             .iter()
             .map(|r| r["rule"].as_str().expect("rule string").to_string())
             .collect();
-        let want: BTreeSet<String> = RULE_LABELS.iter().map(|s| s.to_string()).collect();
+        let want: BTreeSet<String> = RULE_LABELS
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
         assert_eq!(
             meta, want,
             "rules_meta.json must cover EXACTLY the engine inventory (no phantom / missing rules)"
@@ -79,7 +82,10 @@ mod tests {
             .filter(|r| r["fixable"].as_bool().unwrap_or(false))
             .map(|r| r["rule"].as_str().unwrap().to_string())
             .collect();
-        let engine: BTreeSet<String> = FIXABLE_RULE_LABELS.iter().map(|s| s.to_string()).collect();
+        let engine: BTreeSet<String> = FIXABLE_RULE_LABELS
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
         assert_eq!(
             meta_fixable, engine,
             "rules_meta.json `fixable` must match the rules the fix engine actually repairs"
@@ -115,7 +121,7 @@ mod tests {
         let want: BTreeSet<String> = FYI_BEARING_RULES
             .iter()
             .chain(WARN_BEARING_RULES.iter())
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
         assert_eq!(
             non_error, want,

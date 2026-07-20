@@ -1,7 +1,7 @@
 """Base read-path performance baselines via pytest-benchmark.
 
 Tracks the operations the 1.0 Arrow engine redesign changes (see
-``redacted-wiki/ags5-design/api-surface-1.0.md``): cold read, group-frame access,
+``redacted-wiki/design/api-surface-1.0.md``): cold read, group-frame access,
 numeric coercion, and validation (Rust-on-text — a control that stays
 unchanged). They don't assert wall-clock (machines vary); pytest-benchmark
 records timings and ``--benchmark-save`` / ``--benchmark-compare`` flag
@@ -14,9 +14,8 @@ path) — the Arrow boundary + the Rust write-back handle:
     read-cold      864us -> 660us   (~1.3x; parse+Arrow replaced the O(cells) dict)
     validate      1161us -> 1169us  (unchanged control)
 
-Named test_perf_read.py (distinct from the .ags5db write benchmark at
-packages/laterite-ags5/tests/test_perf.py) — pytest collects both in one session
-and duplicate basenames would clash. Run (use --benchmark-enable, since
+Named test_perf_read.py (distinct from other per-surface benchmarks) —
+pytest collects them in one session and duplicate basenames would clash. Run (use --benchmark-enable, since
 pyproject sets --benchmark-disable in addopts; --benchmark-only conflicts):
     uv run pytest packages/laterite/tests/test_perf_read.py --benchmark-enable
     uv run pytest .../test_perf_read.py --benchmark-enable --benchmark-save=phase-1

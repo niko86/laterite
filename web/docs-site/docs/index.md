@@ -1,7 +1,7 @@
 # laterite
 
 laterite reads, validates, queries and **produces** AGS4 geotechnical data. Files come back as
-**born-typed** polars frames — the polars dtype *is* the AGS type — wired into a fluent, chainable
+**born-typed** polars frames — the polars dtype _is_ the AGS type — wired into a fluent, chainable
 API. One engine drives Python, the `lat` CLI, Node and DuckDB, and it's a drop-in for
 python-ags4 that runs **7–17× faster**.
 
@@ -24,8 +24,8 @@ straight back so the chain keeps flowing, with the verdict on `.report`. The dic
 (`4.1.1`) is picked automatically from the file's `TRAN_AGS` row — no flags, no guessing.
 
 !!! tip
-    Every frame is born typed. A `2DP` column is a polars `Float64`, a date is a `Date`, an `ID` is a
-    `String` — so `.query(...)`, `.sql(...)` and plain polars all see real types, not text.
+Every frame is born typed. A `2DP` column is a polars `Float64`, a date is a `Date`, an `ID` is a
+`String` — so `.query(...)`, `.sql(...)` and plain polars all see real types, not text.
 
 ## Where to go next
 

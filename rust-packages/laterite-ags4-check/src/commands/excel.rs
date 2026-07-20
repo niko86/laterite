@@ -30,15 +30,12 @@ fn direction(args: &ExcelArgs) -> Option<bool> {
 }
 
 pub fn run(args: &ExcelArgs) -> ! {
-    let export = match direction(args) {
-        Some(e) => e,
-        None => {
-            eprintln!(
-                "error: can't infer direction from output {} — pass --export (→ .xlsx) or --import (→ .ags)",
-                args.output.display()
-            );
-            exit(5);
-        }
+    let Some(export) = direction(args) else {
+        eprintln!(
+            "error: can't infer direction from output {} — pass --export (→ .xlsx) or --import (→ .ags)",
+            args.output.display()
+        );
+        exit(5);
     };
 
     let result = if export {

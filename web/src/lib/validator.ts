@@ -43,6 +43,12 @@ export interface ValidationReport {
   shown_count: number;
   findings: RuleGroup[];
   error: ValErr | null;
+  /** Why a proffered `.ags.idx` cert did NOT stand in for the engine (the stable
+   *  snake_case token), else `null`. Mirrors `Report.revalidateReason` (Node) and
+   *  `laterite.Report.revalidate_reason` (Python) for cross-surface shape parity.
+   *  Always `null` on this surface: `validate` has no cert-consume door, so the
+   *  engine always ran and no certificate was ever offered to reject (#568). */
+  revalidate_reason: string | null;
 }
 
 /** True when a report has findings but EVERY one is FYI (informational) — the
@@ -133,13 +139,11 @@ export interface Fix {
 // `computeFixes` / `applyFixes` live in `validatorClient.ts` — they round-
 // trip through the worker (the only wasm owner) and so are async there.
 
-export type DictVersionOpt =
-  | "auto"
-  | "4.0.3"
-  | "4.0.4"
-  | "4.1"
-  | "4.1.1"
-  | "4.2";
+// The selectable dictionary version — single-sourced onto the generated editions
+// module (#529). It was a hand-typed union kept in lockstep by hand with three
+// other web copies + the dictionary; re-exported here so its many importers
+// (Controls, ExportPane, validatorClient, settings, …) are unchanged.
+export type { DictVersionOpt } from "./editions";
 export type EncodingOpt = "utf-8" | "windows-1252";
 
 // --- merge (Tools → Merge): how to settle a heading two deliveries typed
@@ -250,8 +254,16 @@ export const DEFAULT_MAX_PER_RULE = 10_000;
 /** Bundled sample files served from public/samples/ (copied from the
  *  validator's test fixtures). Loaded via fetch under the deploy base. */
 export const SAMPLES: { name: string; file: string; blurb: string }[] = [
-  { name: "Clean (minimal)", file: "clean_minimal.ags", blurb: "valid — 0 findings" },
-  { name: "Rule 8 — bad DATETIME", file: "rule8_dt_bad.ags", blurb: "typed-value error" },
+  {
+    name: "Clean (minimal)",
+    file: "clean_minimal.ags",
+    blurb: "valid — 0 findings",
+  },
+  {
+    name: "Rule 8 — bad DATETIME",
+    file: "rule8_dt_bad.ags",
+    blurb: "typed-value error",
+  },
   {
     name: "Rule 9 — unknown heading",
     file: "rule9_unknown_heading.ags",

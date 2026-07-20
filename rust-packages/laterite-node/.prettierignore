@@ -1,0 +1,9 @@
+# Generated / vendored / build output — never hand-formatted.
+node_modules/
+dist/
+coverage/
+index.js
+*.d.ts
+ts/registry.generated.ts
+ts/typed-graph.generated.ts
+package-lock.json

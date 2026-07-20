@@ -1,6 +1,6 @@
 //! Name-format rules: AGS4.1/4.2 Rules 19, 19a, 19b (the per-line,
-//! structural parts — 19b_1). The cross-group "borrowed heading must
-//! exist in the referenced GROUP" semantic (python-ags4's 19b_2/19b_3)
+//! structural parts — `19b_1`). The cross-group "borrowed heading must
+//! exist in the referenced GROUP" semantic (python-ags4's `19b_2/19b_3`)
 //! is dictionary-dependent and lands in V8.
 //!
 //! CLEAN-ROOM. Implemented from the AGS4 spec (`reports/AGS 4_1.pdf` &
@@ -15,10 +15,10 @@
 //!   characters long and shall consist of uppercase letters, numbers
 //!   or the underscore character only."
 //! * **Rule 19b** — "HEADING names shall start with the GROUP name
-//!   followed by an underscore character. e.g. 'NGRP_HED1'. Where a
+//!   followed by an underscore character. e.g. '`NGRP_HED1`'. Where a
 //!   HEADING refers to an existing HEADING within another GROUP, the
 //!   HEADING name added to the group shall bear the same name. e.g.
-//!   'CMPG_TESN' in the 'CMPT' GROUP."
+//!   '`CMPG_TESN`' in the 'CMPT' GROUP."
 //!
 //! **Enforcement policy: de-facto, not literal prose** (user decision,
 //! see OBSERVATIONS O-6/O-7). The spec *prose* is looser than the AGS
@@ -37,7 +37,7 @@
 //!
 //! Rule 19a follows the prose (≤9, `[A-Z0-9_]`) — there the prose and
 //! the dictionary agree. The prefix==GROUP / valid cross-group borrow
-//! check is dictionary-dependent → deferred to V8 (python's 19b_2/3).
+//! check is dictionary-dependent → deferred to V8 (python's `19b_2/3`).
 
 use crate::findings::{Findings, Location, Severity, Target, add, add_at};
 use crate::parse::ParsedFile;
@@ -96,6 +96,10 @@ fn rule_19(code: &str, line: u32, found: &mut Findings) {
 /// Rule 19a — HEADING name: ≤9 chars, `[A-Z0-9_]` only. Length and
 /// charset are reported as separate findings (a heading can fail both),
 /// matching python-ags4's granularity for count parity.
+// `ci` is a heading's column index within one AGS4 group — bounded by that
+// group's heading count (dictionary-bounded, a few dozen at most), nowhere
+// near u32::MAX.
+#[allow(clippy::cast_possible_truncation)]
 fn rule_19a(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {
     let loc = || Location {
         target: Target::Heading,
@@ -130,7 +134,7 @@ fn rule_19a(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {
     }
 }
 
-/// Rule 19b_1 — de-facto structural shape `AAAA_BBBB`:
+/// Rule `19b_1` — de-facto structural shape `AAAA_BBBB`:
 ///   * a **4 uppercase-letter** group-name prefix `[A-Z]{4}`,
 ///   * a single underscore,
 ///   * a **1–4 char** field part, `[A-Z0-9]` only (no further `_`).
@@ -139,7 +143,9 @@ fn rule_19a(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {
 /// (0 / 4199 deviate across both dictionaries — O-7), which is
 /// stricter than the spec prose. The prefix-equals-GROUP (or valid
 /// cross-group borrow, e.g. `FILE_FSET` inside LOCA) check needs the
-/// dictionary and is deferred to V8 (python's 19b_2/3).
+/// dictionary and is deferred to V8 (python's `19b_2/3`).
+// `ci` is bounded the same way as in `rule_19a` above.
+#[allow(clippy::cast_possible_truncation)]
 fn rule_19b(h: &str, ci: usize, line: u32, group: &str, found: &mut Findings) {
     let loc = || Location {
         target: Target::Heading,

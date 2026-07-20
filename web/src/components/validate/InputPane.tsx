@@ -1,7 +1,9 @@
 import { createSignal, type Component } from "solid-js";
 
 /** Read a dropped/selected file into bytes + its name. */
-async function readFile(file: File): Promise<{ bytes: Uint8Array; name: string }> {
+async function readFile(
+  file: File,
+): Promise<{ bytes: Uint8Array; name: string }> {
   const buf = await file.arrayBuffer();
   return { bytes: new Uint8Array(buf), name: file.name };
 }
@@ -47,7 +49,7 @@ export const InputPane: Component<{
           ref={fileInput}
           type="file"
           class="hidden"
-          onChange={(e) => handleFiles(e.currentTarget.files)}
+          onChange={(e) => void handleFiles(e.currentTarget.files)}
         />
       </div>
 
@@ -75,7 +77,9 @@ export const InputPane: Component<{
           }
           spellcheck={false}
           value={props.text()}
-          onInput={(e) => props.onText(e.currentTarget.value)}
+          onInput={(e) => {
+            props.onText(e.currentTarget.value);
+          }}
         />
       </div>
     </div>

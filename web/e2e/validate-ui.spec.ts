@@ -47,9 +47,7 @@ test("severity chips show/hide findings of that severity", async ({ page }) => {
     .poll(async () => (await shownNow(page)).shown)
     .toBeGreaterThan(start.shown);
   await fyiChip.click(); // turn FYI back off → restored
-  await expect
-    .poll(async () => (await shownNow(page)).shown)
-    .toBe(start.shown);
+  await expect.poll(async () => (await shownNow(page)).shown).toBe(start.shown);
 });
 
 test("the encoding toggle re-decodes the file and re-validates", async ({
@@ -60,20 +58,16 @@ test("the encoding toggle re-decodes the file and re-validates", async ({
   // UTF-8 (default): the 0xE9 byte decodes to U+FFFD → a Rule 1 ERROR, and the
   // app offers the "Switch encoding" hint.
   await expect(page.getByText("✗").first()).toBeVisible();
-  await expect(
-    page.getByText(/Switch encoding to Windows-1252/),
-  ).toBeVisible();
+  await expect(page.getByText(/Switch encoding to Windows-1252/)).toBeVisible();
 
   // Switch to Windows-1252: the byte is now é (a Rule 1 FYI) → FYI-only amber
   // banner, no error, hint gone. Same bytes, different validation.
   await page.getByLabel("Encoding").selectOption("windows-1252");
-  await expect(
-    page.getByText(/informational \(FYI\) finding/),
-  ).toBeVisible();
+  await expect(page.getByText(/informational \(FYI\) finding/)).toBeVisible();
   await expect(page.getByText("✗")).toHaveCount(0);
-  await expect(
-    page.getByText(/Switch encoding to Windows-1252/),
-  ).toHaveCount(0);
+  await expect(page.getByText(/Switch encoding to Windows-1252/)).toHaveCount(
+    0,
+  );
 });
 
 test("the dictionary-edition selector re-validates without breaking", async ({

@@ -79,8 +79,9 @@ export const RuleExplainer: Component = () => {
       <p class="text-xs text-fg-dim">
         The AGS Format Rules are stable across editions 4.0.3–4.2, so there's no
         edition to pick here — only the group/heading/type definitions change.
-        For those, use the <span class="font-medium text-fg-soft">Dictionary</span>{" "}
-        tool's edition selector.
+        For those, use the{" "}
+        <span class="font-medium text-fg-soft">Dictionary</span> tool's edition
+        selector.
       </p>
       <Show
         when={!cat.loading}
@@ -121,7 +122,8 @@ export const RuleExplainer: Component = () => {
                       <For each={r.observations}>
                         {(o) => (
                           <li class="text-xs text-fg-faint">
-                            <span class="mono text-fg-dim">{o.id}</span> {o.note}
+                            <span class="mono text-fg-dim">{o.id}</span>{" "}
+                            {o.note}
                           </li>
                         )}
                       </For>

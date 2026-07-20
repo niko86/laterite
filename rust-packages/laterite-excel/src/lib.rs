@@ -4,7 +4,7 @@
 //! ⚠️ ROUGH EXTRACTION (2026-06-18): lifted verbatim out of
 //! `laterite-ags4-core::excel` so `laterite-ags4-core` sheds `calamine` +
 //! `rust_xlsxwriter` — ~1.5 MB that every core consumer which never touches
-//! Excel was carrying (the DuckDB extension, `laterite-ags5-db`, `ags4-perf`).
+//! Excel was carrying (the DuckDB extension, `ags4-perf`).
 //! The logic is unchanged. **FLAGGED FOR REWRITE**: today this is
 //! AGS4-specific (one sheet per group, AGS4 UNIT/TYPE pseudo-rows); the
 //! intent is to rewrite it into a proper, general-purpose Excel library.
@@ -102,7 +102,7 @@ pub fn ags4_bytes_to_xlsx(
             .map_err(|e| CliError::Schema(format!("write HEADING: {e}")))?;
         for (i, heading) in group.headings.iter().enumerate() {
             sheet
-                .write_string(0, (i + 1) as u16, heading)
+                .write_string(0, excel_col(i + 1)?, heading)
                 .map_err(|e| CliError::Schema(format!("write heading: {e}")))?;
         }
 
@@ -110,15 +110,19 @@ pub fn ags4_bytes_to_xlsx(
         write_group_row(sheet, 1, "UNIT", &group.units, group.headings.len())?;
         write_group_row(sheet, 2, "TYPE", &group.types, group.headings.len())?;
         for (ri, row) in group.rows.iter().enumerate() {
+            // Row index, not column: bounded by rows actually held in memory
+            // (Excel's own cap is ~1M, u32::MAX is billions — unreachable
+            // without exhausting RAM first), so no fallible conversion here.
+            #[allow(clippy::cast_possible_truncation)]
             let r = (3 + ri) as u32;
             sheet
                 .write_string(r, 0, "DATA")
                 .map_err(|e| CliError::Schema(format!("write DATA tag: {e}")))?;
             for (ci, heading) in group.headings.iter().enumerate() {
-                let value = row.get(heading).map(String::as_str).unwrap_or("");
+                let value = row.get(heading).map_or("", String::as_str);
                 if !value.is_empty() {
                     sheet
-                        .write_string(r, (ci + 1) as u16, value)
+                        .write_string(r, excel_col(ci + 1)?, value)
                         .map_err(|e| CliError::Schema(format!("write cell: {e}")))?;
                 }
             }
@@ -135,7 +139,7 @@ pub fn ags4_bytes_to_xlsx(
             .map_err(|e| CliError::Schema(format!("col width: {e}")))?;
         for (i, heading) in group.headings.iter().enumerate() {
             sheet
-                .set_column_width((i + 1) as u16, column_width(heading, group))
+                .set_column_width(excel_col(i + 1)?, column_width(heading, group))
                 .map_err(|e| CliError::Schema(format!("col width: {e}")))?;
         }
 
@@ -167,14 +171,30 @@ fn write_group_row(
         .write_string(r, 0, tag)
         .map_err(|e| CliError::Schema(format!("write {tag}: {e}")))?;
     for i in 0..heading_count {
-        let value = cells.get(i).map(String::as_str).unwrap_or("");
+        let value = cells.get(i).map_or("", String::as_str);
         if !value.is_empty() {
             sheet
-                .write_string(r, (i + 1) as u16, value)
+                .write_string(r, excel_col(i + 1)?, value)
                 .map_err(|e| CliError::Schema(format!("write {tag} cell: {e}")))?;
         }
     }
     Ok(())
+}
+
+/// `usize` column index → the `u16` `rust_xlsxwriter` wants. A group with more
+/// than `u16::MAX` headings can't happen from a normal dictionary group (58 max
+/// — #475's `ags_dictionary.json`), but an oversized or malformed HEADING row
+/// (a passthrough/dynamic group, or a corrupt file) could plausibly carry tens
+/// of thousands of fields without needing a huge file — each field can be a
+/// few bytes. `as u16` would silently WRAP that into an existing column,
+/// overwriting real data instead of failing loudly, so this is checked.
+fn excel_col(index: usize) -> Result<u16, CliError> {
+    u16::try_from(index).map_err(|_| {
+        CliError::Schema(format!(
+            "too many columns ({index}) for an Excel worksheet (max {})",
+            u16::MAX
+        ))
+    })
 }
 
 /// Column width matching python-ags4's `min(max(13, max_len+1), 75)`.
@@ -241,7 +261,7 @@ pub fn xlsx_bytes_to_ags4(
     let mut workbook = open_workbook_auto_from_rs(Cursor::new(input))
         .map_err(|e| CliError::Schema(format!("open xlsx: {e}")))?;
 
-    let sheet_names: Vec<String> = workbook.sheet_names().to_vec();
+    let sheet_names: Vec<String> = workbook.sheet_names().clone();
     let mut emit_groups: Vec<AgsGroup> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
     let mut rows_written = 0usize;
@@ -252,12 +272,9 @@ pub fn xlsx_bytes_to_ags4(
             .map_err(|e| CliError::Schema(format!("read sheet {sheet_name}: {e}")))?;
 
         let mut rows_iter = range.rows();
-        let header_row = match rows_iter.next() {
-            Some(r) => r,
-            None => {
-                warnings.push(format!("{sheet_name}: empty sheet, skipped"));
-                continue;
-            }
+        let Some(header_row) = rows_iter.next() else {
+            warnings.push(format!("{sheet_name}: empty sheet, skipped"));
+            continue;
         };
 
         // First column must be HEADING for this to be a valid AGS4
@@ -416,7 +433,7 @@ fn emit_err(e: EmitError) -> CliError {
 ///
 /// Non-numeric specs pass through untouched. Cells that can't be
 /// parsed as floats (e.g. blank strings, sentinels like `?`) also
-/// pass through — matches python-ags4's silent ValueError fallback.
+/// pass through — matches python-ags4's silent `ValueError` fallback.
 fn apply_type_formatting(
     headings: &[String],
     types: &[String],
@@ -473,13 +490,19 @@ impl NumericFormat {
     }
 
     fn format(&self, v: f64) -> String {
+        // Clamp the count (see MAX_NUMERIC_COUNT) — it comes uncapped from the
+        // TYPE spec, and Dp/Sci feed it straight into the format width.
         match *self {
-            Self::Dp(n) => format!("{v:.*}", n),
+            Self::Dp(n) => {
+                let n = n.min(MAX_NUMERIC_COUNT);
+                format!("{v:.n$}")
+            }
             Self::Sci(n) => {
                 // python-ags4 uses `f"{x:.{N}E}"` — uppercase E with
                 // a single digit exponent (e.g. 1.23E+02). Rust's
                 // default scientific format matches.
-                format!("{v:.*E}", n)
+                let n = n.min(MAX_NUMERIC_COUNT);
+                format!("{v:.n$E}")
             }
             Self::Sf(n) => format_sf(v, n),
         }
@@ -494,12 +517,27 @@ fn numeric_prefix(upper: &str, suffix: &str) -> Option<usize> {
     prefix.parse::<usize>().ok()
 }
 
+/// A numeric TYPE count (the `n` in "3DP" / "3SF" / "3SCI", see `numeric_prefix`)
+/// comes straight from the file's TYPE spec with no upper bound, and every
+/// `NumericFormat` arm feeds `n` into a format width. f64 carries only ~17
+/// significant digits, so clamp to this generous ceiling first — a crafted
+/// "9999999999DP" then can't ask for a ~10-billion-char string (an OOM/DoS) or
+/// wrap the i32 cast in `format_sf`. Real AGS4 numeric counts are single-digit,
+/// so no legitimate value is affected. Hardens #610 Class B (O-49).
+const MAX_NUMERIC_COUNT: usize = 30;
+
 /// Significant-figure formatter — mirrors python-ags4's `_format_SF`.
 fn format_sf(value: f64, n: usize) -> String {
     if value == 0.0 {
         return format!("{value}");
     }
-    let i: i32 = (n as i32) - 1 - value.abs().log10().floor() as i32;
+    // log10 of any finite f64 is bounded to roughly ±308 (f64's exponent
+    // range), always fits i32 regardless of `value`'s magnitude.
+    #[allow(clippy::cast_possible_truncation)]
+    let exp = value.abs().log10().floor() as i32;
+    // Clamp first (see MAX_NUMERIC_COUNT): the bounded count fits i32.
+    let n = i32::try_from(n.min(MAX_NUMERIC_COUNT)).unwrap_or(i32::MAX);
+    let i: i32 = n - 1 - exp;
     if i < 0 {
         let rounded = (value / 10f64.powi(-i)).round() * 10f64.powi(-i);
         format!("{rounded:.0}")
@@ -511,13 +549,22 @@ fn format_sf(value: f64, n: usize) -> String {
 fn cell_str(cell: &Data) -> String {
     match cell {
         Data::Empty => String::new(),
-        Data::String(s) => s.clone(),
         Data::Float(f) => {
             // Floats from calamine may be 1.0 for ints. Strip the
             // trailing .0 to match the string representation
             // python-ags4 / openpyxl produces for integer-valued cells.
-            if f.fract() == 0.0 && f.is_finite() {
-                format!("{}", *f as i64)
+            // An Excel cell can hold any float a user pasted in, so also
+            // check the value actually fits i64 — outside that range `as
+            // i64` would silently saturate to a wrong value instead of
+            // erroring; falling through to `{f}`'s full decimal expansion
+            // is the correct (if unusual) AGS4 field text for such a cell.
+            let in_i64_range = (i64::MIN as f64..=i64::MAX as f64).contains(f);
+            if f.fract() == 0.0 && f.is_finite() && in_i64_range {
+                // Guarded by `in_i64_range` above (clippy can't see the
+                // preceding `if` proves this in range).
+                #[allow(clippy::cast_possible_truncation)]
+                let v = *f as i64;
+                format!("{v}")
             } else {
                 format!("{f}")
             }
@@ -525,8 +572,7 @@ fn cell_str(cell: &Data) -> String {
         Data::Int(i) => i.to_string(),
         Data::Bool(b) => b.to_string(),
         Data::DateTime(d) => d.to_string(),
-        Data::DateTimeIso(s) => s.clone(),
-        Data::DurationIso(s) => s.clone(),
+        Data::String(s) | Data::DateTimeIso(s) | Data::DurationIso(s) => s.clone(),
         Data::Error(e) => format!("{e:?}"),
     }
 }
@@ -636,6 +682,27 @@ mod tests {
         assert_eq!(format_sf(5.0, 1), "5");
     }
 
+    #[test]
+    fn format_sf_count_is_clamped_so_a_crafted_type_cannot_dos() {
+        // The SF count comes straight from the file's TYPE spec ("3SF") with no
+        // upper bound (#610 Class B, O-49). python-ags4's `_format_SF` reads it
+        // the same way at arbitrary precision, so a crafted "9999999999SF" makes
+        // it request a ~10-billion-place width and OOM. We clamp to
+        // MAX_NUMERIC_COUNT first, so an absurd count collapses to a bounded string.
+        let ceiling = format_sf(1.5, MAX_NUMERIC_COUNT);
+        assert_eq!(format_sf(1.5, 9_999_999_999), ceiling);
+        assert_eq!(format_sf(1.5, usize::MAX), ceiling); // saturating clamp path
+        assert!(ceiling.len() < 40, "clamped output stays bounded");
+        // Legit SF counts (≤ the ceiling) render exactly as before.
+        assert_eq!(format_sf(0.002, 3), "0.00200");
+        assert_eq!(format_sf(1234.0, 3), "1230");
+        // The Dp / Sci enum arms feed `n` straight into the width — clamp too.
+        assert!(NumericFormat::Dp(usize::MAX).format(1.5).len() < 40);
+        assert!(NumericFormat::Sci(usize::MAX).format(1.5).len() < 40);
+        assert_eq!(NumericFormat::Dp(3).format(1.5), "1.500"); // legit untouched
+        assert_eq!(NumericFormat::Sci(2).format(1500.0), "1.50E3");
+    }
+
     // --- cell_str over every calamine Data variant -----------------
 
     #[test]
@@ -667,7 +734,7 @@ mod tests {
                 ("TEST_TXT".to_string(), "keep".to_string()),
             ]),
             HashMap::from([
-                ("TEST_VAL".to_string(), "".to_string()), // empty -> skipped
+                ("TEST_VAL".to_string(), String::new()), // empty -> skipped
             ]),
             HashMap::from([
                 ("TEST_VAL".to_string(), "notnum".to_string()), // unparseable -> untouched
@@ -684,7 +751,7 @@ mod tests {
     fn apply_type_formatting_skips_blank_and_missing_specs() {
         let headings = vec!["TEST_A".to_string(), "TEST_B".to_string()];
         // TEST_A has a blank type; TEST_B has no type entry at all.
-        let types = vec!["".to_string()];
+        let types = vec![String::new()];
         let mut rows = vec![HashMap::from([
             ("TEST_A".to_string(), "1.5".to_string()),
             ("TEST_B".to_string(), "2.5".to_string()),

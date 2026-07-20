@@ -34,7 +34,9 @@ pub fn cell_value(array: &dyn Array, row: usize) -> Value {
     }
     macro_rules! num {
         ($ty:ty) => {
-            Value::from(array.as_any().downcast_ref::<$ty>().unwrap().value(row) as i64)
+            Value::from(i64::from(
+                array.as_any().downcast_ref::<$ty>().unwrap().value(row),
+            ))
         };
     }
     match array.data_type() {
@@ -75,13 +77,13 @@ pub fn cell_value(array: &dyn Array, row: usize) -> Value {
                 .unwrap()
                 .value(row),
         ),
-        DataType::Float32 => Value::from(
+        DataType::Float32 => Value::from(f64::from(
             array
                 .as_any()
                 .downcast_ref::<Float32Array>()
                 .unwrap()
-                .value(row) as f64,
-        ),
+                .value(row),
+        )),
         DataType::Float64 => Value::from(
             array
                 .as_any()
@@ -103,8 +105,13 @@ pub fn cell_value(array: &dyn Array, row: usize) -> Value {
 /// field names (the AGS headings); UNIT/TYPE are left to the dictionary; rows
 /// are the transposed cells. `schema` is passed explicitly so a 0-batch group
 /// still emits its (empty) section with the right headings.
+#[must_use]
 pub fn group_from_arrow(code: String, schema: &Schema, batches: &[RecordBatch]) -> GroupInput {
-    group_from_arrow_with_meta(code, schema, batches, None, None)
+    // No override maps, so the hasher never matters — pin the default one to
+    // give type inference something concrete for `S`.
+    group_from_arrow_with_meta::<std::collections::hash_map::RandomState>(
+        code, schema, batches, None, None,
+    )
 }
 
 /// Like [`group_from_arrow`] but with per-heading UNIT/TYPE **overrides**: a
@@ -114,12 +121,13 @@ pub fn group_from_arrow(code: String, schema: &Schema, batches: &[RecordBatch]) 
 /// entry ("fill from the dictionary"). `None` leaves the whole tier to the
 /// dictionary (identical to `group_from_arrow`). Order-independent: it keys off
 /// the heading name, not the column position.
-pub fn group_from_arrow_with_meta(
+#[must_use]
+pub fn group_from_arrow_with_meta<S: std::hash::BuildHasher>(
     code: String,
     schema: &Schema,
     batches: &[RecordBatch],
-    units: Option<&HashMap<String, String>>,
-    types: Option<&HashMap<String, String>>,
+    units: Option<&HashMap<String, String, S>>,
+    types: Option<&HashMap<String, String, S>>,
 ) -> GroupInput {
     let headings: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
     let mut rows: Vec<Vec<Value>> = Vec::new();
@@ -135,7 +143,7 @@ pub fn group_from_arrow_with_meta(
     }
     // Align a {heading → value} override map to the heading order; a heading not
     // in the map gets "" (the emit orchestrator reads that as "fill from dict").
-    let align = |m: Option<&HashMap<String, String>>| -> Option<Vec<String>> {
+    let align = |m: Option<&HashMap<String, String, S>>| -> Option<Vec<String>> {
         m.map(|map| {
             headings
                 .iter()

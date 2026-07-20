@@ -5,9 +5,9 @@
 //! the binary.
 //!
 //! These operations are **content-agnostic** — zstd/age over raw bytes,
-//! so they work on any file (`.ags`, `.ags5db`, anything). The fns were
-//! renamed off the legacy `ags5db_*` prefix (#111 Facet B): the prefix
-//! wrongly implied `.ags5db`-only, the same misnomer W2 fixed for the
+//! so they work on any file (`.ags`, anything). The fns were
+//! renamed off a legacy prefix (#111 Facet B) that wrongly implied a
+//! single file type, the same misnomer W2 fixed for the
 //! Excel fns. Internal `_native.*` names (not public), so no alias —
 //! `laterite.transport` calls these directly.
 
@@ -23,13 +23,16 @@ use crate::map_cli_err;
 /// zstd-compress any file to `dest`. Returns `{bytes, ratio, elapsed_s}`.
 #[pyfunction]
 #[pyo3(signature = (src, dest, level = 9))]
-fn transport_pack<'py>(
-    py: Python<'py>,
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn transport_pack(
+    py: Python<'_>,
     src: String,
     dest: String,
     level: i32,
-) -> PyResult<Bound<'py, PyDict>> {
-    let stats = transport::pack(Path::new(&src), Path::new(&dest), level).map_err(map_cli_err)?;
+) -> PyResult<Bound<'_, PyDict>> {
+    let stats =
+        transport::pack(Path::new(&src), Path::new(&dest), level).map_err(|e| map_cli_err(&e))?;
     let d = PyDict::new(py);
     d.set_item("bytes", stats.bytes)?;
     d.set_item("ratio", stats.ratio)?;
@@ -41,12 +44,11 @@ fn transport_pack<'py>(
 /// Returns `{bytes, elapsed_s}`.
 #[pyfunction]
 #[pyo3(signature = (src, dest))]
-fn transport_unpack<'py>(
-    py: Python<'py>,
-    src: String,
-    dest: String,
-) -> PyResult<Bound<'py, PyDict>> {
-    let stats = transport::unpack(Path::new(&src), Path::new(&dest)).map_err(map_cli_err)?;
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn transport_unpack(py: Python<'_>, src: String, dest: String) -> PyResult<Bound<'_, PyDict>> {
+    let stats =
+        transport::unpack(Path::new(&src), Path::new(&dest)).map_err(|e| map_cli_err(&e))?;
     let d = PyDict::new(py);
     d.set_item("bytes", stats.bytes)?;
     d.set_item("elapsed_s", stats.elapsed_s)?;
@@ -58,14 +60,16 @@ fn transport_unpack<'py>(
 /// with `pyrage`.
 #[pyfunction]
 #[pyo3(signature = (src, dest, password, level = 9, log_n = None))]
-fn transport_lock<'py>(
-    py: Python<'py>,
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn transport_lock(
+    py: Python<'_>,
     src: String,
     dest: String,
     password: String,
     level: i32,
     log_n: Option<u8>,
-) -> PyResult<Bound<'py, PyDict>> {
+) -> PyResult<Bound<'_, PyDict>> {
     let stats = transport::lock(
         Path::new(&src),
         Path::new(&dest),
@@ -73,7 +77,7 @@ fn transport_lock<'py>(
         level,
         log_n.unwrap_or(transport::SCRYPT_LOG_N),
     )
-    .map_err(map_cli_err)?;
+    .map_err(|e| map_cli_err(&e))?;
     let d = PyDict::new(py);
     d.set_item("bytes", stats.bytes)?;
     d.set_item("ratio", stats.ratio)?;
@@ -86,14 +90,16 @@ fn transport_lock<'py>(
 /// surface as `RuntimeError`.
 #[pyfunction]
 #[pyo3(signature = (src, dest, password))]
-fn transport_unlock<'py>(
-    py: Python<'py>,
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn transport_unlock(
+    py: Python<'_>,
     src: String,
     dest: String,
     password: String,
-) -> PyResult<Bound<'py, PyDict>> {
-    let stats =
-        transport::unlock(Path::new(&src), Path::new(&dest), &password).map_err(map_cli_err)?;
+) -> PyResult<Bound<'_, PyDict>> {
+    let stats = transport::unlock(Path::new(&src), Path::new(&dest), &password)
+        .map_err(|e| map_cli_err(&e))?;
     let d = PyDict::new(py);
     d.set_item("bytes", stats.bytes)?;
     d.set_item("elapsed_s", stats.elapsed_s)?;
@@ -113,7 +119,7 @@ fn transport_pack_bytes<'py>(
     data: &[u8],
     level: i32,
 ) -> PyResult<Bound<'py, PyBytes>> {
-    let out = transport::pack_bytes(data, level).map_err(map_cli_err)?;
+    let out = transport::pack_bytes(data, level).map_err(|e| map_cli_err(&e))?;
     Ok(PyBytes::new(py, &out))
 }
 
@@ -121,13 +127,15 @@ fn transport_pack_bytes<'py>(
 #[pyfunction]
 #[pyo3(signature = (data))]
 fn transport_unpack_bytes<'py>(py: Python<'py>, data: &[u8]) -> PyResult<Bound<'py, PyBytes>> {
-    let out = transport::unpack_bytes(data).map_err(map_cli_err)?;
+    let out = transport::unpack_bytes(data).map_err(|e| map_cli_err(&e))?;
     Ok(PyBytes::new(py, &out))
 }
 
 /// zstd-compress + age-passphrase-encrypt bytes → bytes.
 #[pyfunction]
 #[pyo3(signature = (data, password, level = 9, log_n = None))]
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
 fn transport_lock_bytes<'py>(
     py: Python<'py>,
     data: &[u8],
@@ -141,7 +149,7 @@ fn transport_lock_bytes<'py>(
         level,
         log_n.unwrap_or(transport::SCRYPT_LOG_N),
     )
-    .map_err(map_cli_err)?;
+    .map_err(|e| map_cli_err(&e))?;
     Ok(PyBytes::new(py, &out))
 }
 
@@ -149,12 +157,14 @@ fn transport_lock_bytes<'py>(
 /// non-passphrase envelopes surface as `RuntimeError`.
 #[pyfunction]
 #[pyo3(signature = (data, password))]
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
 fn transport_unlock_bytes<'py>(
     py: Python<'py>,
     data: &[u8],
     password: String,
 ) -> PyResult<Bound<'py, PyBytes>> {
-    let out = transport::unlock_bytes(data, &password).map_err(map_cli_err)?;
+    let out = transport::unlock_bytes(data, &password).map_err(|e| map_cli_err(&e))?;
     Ok(PyBytes::new(py, &out))
 }
 

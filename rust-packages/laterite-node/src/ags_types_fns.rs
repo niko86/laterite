@@ -9,6 +9,7 @@ use napi_derive::napi;
 /// `"decimal"`, `"datetime"`, `"date"`, `"time"`, `"bool"`, `"enum"`), or `null`
 /// for unknown codes (the TS wrapper re-raises as an error).
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn canonical_type(ags_type: String) -> Option<String> {
     laterite_types::canonical_type(&ags_type).map(|c| c.as_str().to_string())
 }
@@ -16,6 +17,7 @@ pub fn canonical_type(ags_type: String) -> Option<String> {
 /// Presentation hint for a numeric AGS type: `"2DP"` → `"%.2f"`, `"3SF"` →
 /// `"%.3g"`, `"1SCI"` → `"%.1e"`; `null` for non-numeric / unknown codes.
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn display_hint(ags_type: String) -> Option<String> {
     laterite_types::display_hint(&ags_type)
 }
@@ -26,6 +28,7 @@ pub fn display_hint(ags_type: String) -> Option<String> {
 /// **datetime/date/time → the canonical string** (`"YYYY-MM-DD HH:MM:SS"` /
 /// `"YYYY-MM-DD"` / `"HH:MM:SS"`), unknown code → the trimmed input.
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn parse_value(raw: Option<String>, ags_type: String) -> serde_json::Value {
     laterite_types::parse_value(raw.as_deref(), &ags_type)
 }
@@ -63,7 +66,7 @@ mod tests {
             Some(12.5)
         );
         // empty / None → null (permissive)
-        assert!(parse_value(Some("".to_string()), "2DP".to_string()).is_null());
+        assert!(parse_value(Some(String::new()), "2DP".to_string()).is_null());
         assert!(parse_value(None, "2DP".to_string()).is_null());
     }
 }

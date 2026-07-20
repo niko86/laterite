@@ -79,6 +79,12 @@ laterite-ags4-diff = { path = "../laterite-ags4-diff" }
 # recency, widen-to-X). Wasm-safe: it pulls only parse + emit + reference, all
 # already here — the same leaf PyO3 + Node + the CLI reuse.
 laterite-ags4-merge = { path = "../laterite-ags4-merge" }
+# `censor()` — the shared AGS4 scrub engine (#581) behind the browser
+# Anonymiser, the SAME engine the corpus `censor` tool drives. Wasm-safe: it
+# pulls only parse + reference + types, all already here. The leaf takes a
+# precomputed content hash (file_id), so this wrapper hashes the bytes itself
+# (sha2 + hex — both already in the wasm dep graph via the keychain).
+laterite-ags4-censor = { path = "../laterite-ags4-censor" }
 # AGS4 ↔ XLSX conversion (#359). Its FS-free `ags4_bytes_to_xlsx` /
 # `xlsx_bytes_to_ags4` cores back the browser Excel surface. calamine +
 # rust_xlsxwriter (+ zip / flate2 / zopfli) are wasm-clean; laterite-excel takes
@@ -89,7 +95,7 @@ laterite-ags4-merge = { path = "../laterite-ags4-merge" }
 # creation time.
 laterite-excel = { path = "../laterite-excel", features = ["wasm"] }
 # The AGS type system — SAME canonical_type / parse_value / parse_datetime
-# the native .ags5db conversion uses, so the explorer casts identically
+# the native DuckDB conversion uses, so the explorer casts identically
 # (parity by construction). The `arrow` feature pulls in arrow_cols, the
 # shared typed-Arrow column/record-batch builder both hosts emit through —
 # so the browser and the native PyCapsule path cast byte-identically.
@@ -118,6 +124,11 @@ console_error_panic_hook = "0.1"
 # Same encoding_rs as the validator so `&'static Encoding` types match
 # across the parse_bytes boundary; resolves the UI's encoding select.
 encoding_rs = "0.8"
+# The `censor()` file-hash: PROJ_ID becomes the full 64-hex SHA-256 of the
+# input bytes (a KEY field — full width, collision-safe). Same sha2 the
+# keychain content-hash already pulls; hex encodes the digest.
+sha2 = "0.10"
+hex = "0.4"
 
 [dev-dependencies]
 # Independent datetime oracle for the typed-Arrow parity test: the

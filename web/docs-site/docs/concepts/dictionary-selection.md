@@ -3,7 +3,7 @@
 laterite validates against the right AGS edition without you naming it. The
 edition is read from the file's `TRAN_AGS` row and resolved to a bundled
 dictionary (4.0.3 … 4.2). `dict_for(path)` reports the decision as a
-`(version, reason)` tuple so you can see *why* a file landed on a given edition.
+`(version, reason)` tuple so you can see _why_ a file landed on a given edition.
 
 ```python
 --8<-- "python/ex14_rules_dict.py"
@@ -36,10 +36,10 @@ laterite.read("delivery.ags").validate(dict_version="4.1.1")
 ```
 
 !!! note "One dictionary, many editions"
-    All editions are projected from a single union dictionary at build time, so
-    every bundled edition is available in-process — no download, no per-edition
-    install. See [Born-typed reads](born-typed.md) for how the same dictionary
-    drives column typing.
+All editions are projected from a single union dictionary at build time, so
+every bundled edition is available in-process — no download, no per-edition
+install. See [Born-typed reads](born-typed.md) for how the same dictionary
+drives column typing.
 
 See also: [List the validator's rules](../cookbook/list-rules.md) ·
 [Validate](../learn/validate.md)

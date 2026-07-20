@@ -43,15 +43,17 @@ fn main() {
         }
     };
 
-    let (json, ndjson, quiet) = (cli.json, cli.ndjson, cli.quiet);
+    // `--json`/`--ndjson` are per-verb now (#545): a verb that renders JSON declares
+    // them, one that can't never sees the flag. Only `--quiet` remains global.
+    let quiet = cli.quiet;
     match &cli.command {
-        Commands::Validate(a) => commands::validate::run(a, json, ndjson, quiet),
-        Commands::Read(a) => commands::read::run(a, json),
-        Commands::Fix(a) => commands::fix::run(a, quiet),
-        Commands::Diff(a) => commands::diff::run(a, json, quiet),
-        Commands::Merge(a) => commands::merge::run(a, json, quiet),
+        Commands::Validate(a) => commands::validate::run(a, a.json, a.ndjson, quiet),
+        Commands::Read(a) => commands::read::run(a, a.json),
+        Commands::Fix(a) => commands::fix::run(a, a.json, quiet),
+        Commands::Diff(a) => commands::diff::run(a, a.json, quiet),
+        Commands::Merge(a) => commands::merge::run(a, a.json, quiet),
         Commands::Certify(a) => commands::certify::run(a, quiet),
-        Commands::Rules => commands::rules::run(json),
+        Commands::Rules(a) => commands::rules::run(a.json),
         Commands::Census => commands::census::run(),
         #[cfg(feature = "transport")]
         Commands::Pack(a) => commands::transport::run_pack(a),
@@ -69,8 +71,17 @@ fn main() {
 /// Splice `validate` in when the first non-flag token isn't a known subcommand —
 /// so `lat foo.ags` (and `lat --json foo.ags`) route to `validate`, preserving
 /// the pre-rework "a bare file validates" ergonomics (and the Python byte-parity
-/// invocation `lat <file> --json`). All global flags are valueless bools, so a
-/// leading run of `-` tokens can be skipped without consuming a value.
+/// invocation `lat <file> --json`). Leading `-` tokens are all valueless bools
+/// (`--json`/`--ndjson`/`--quiet`), so a run of them can be skipped without
+/// consuming a value.
+///
+/// Since #545 moved `--json`/`--ndjson` off the global scope onto each verb, the
+/// splice inserts `validate` at the **front** (not before the file), so a leading
+/// `lat --json foo.ags` becomes `lat validate --json foo.ags` — the flag now lands
+/// *after* the subcommand that declares it, where clap can parse it. (Before, with
+/// the flags global, position didn't matter.) An explicit `lat --json read foo.ags`
+/// is no longer spliced and clap rejects the pre-verb flag: the canonical form is
+/// `lat read --json foo.ags`, the flag after its verb.
 fn with_default_subcommand(mut argv: Vec<String>) -> Vec<String> {
     let mut i = 1; // argv[0] is the binary name
     while i < argv.len() {
@@ -80,7 +91,7 @@ fn with_default_subcommand(mut argv: Vec<String>) -> Vec<String> {
             return argv;
         }
         if a.starts_with('-') {
-            i += 1; // a global bool flag — no value to skip
+            i += 1; // a valueless bool flag — no value to skip
             continue;
         }
         // First positional: an explicit subcommand stays; anything else is a
@@ -95,7 +106,9 @@ fn with_default_subcommand(mut argv: Vec<String>) -> Vec<String> {
             .get_subcommands()
             .any(|s| s.get_name() == a);
         if !is_verb {
-            argv.insert(i, "validate".to_string());
+            // Front, not `i`: any leading `--json`/`--ndjson` must end up after
+            // `validate` (the verb that owns them now), not before it.
+            argv.insert(1, "validate".to_string());
         }
         return argv;
     }

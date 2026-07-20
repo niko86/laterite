@@ -13,7 +13,8 @@ const RESOLUTION_BLURB: Record<string, string> = {
   fallback: "fallback (TRAN_AGS missing/unknown)",
 };
 
-const plural = (n: number, w: string) => `${n.toLocaleString()} ${w}${n === 1 ? "" : "s"}`;
+const plural = (n: number, w: string) =>
+  `${n.toLocaleString()} ${w}${n === 1 ? "" : "s"}`;
 
 /** "36 errors · 14 informational" — only the non-zero severities, so a pure
  *  error file just reads "36 errors". */
@@ -40,7 +41,7 @@ export const SummaryBanner: Component<{
     const { counts, exact } = reportSeverity(props.report);
     return exact
       ? breakdown(counts)
-      : `${plural(props.report.finding_count, "finding")}`;
+      : plural(props.report.finding_count, "finding");
   };
   return (
     <Show
@@ -48,12 +49,8 @@ export const SummaryBanner: Component<{
       fallback={
         <div class="rounded-lg border border-amber-600/50 bg-amber-500/10 p-4">
           <p class="font-medium text-warn">Could not validate</p>
-          <p class="mt-1 text-sm text-warn">
-            {props.report.error?.message}
-          </p>
-          <p class="mt-1 text-xs text-warn">
-            ({props.report.error?.kind})
-          </p>
+          <p class="mt-1 text-sm text-warn">{props.report.error?.message}</p>
+          <p class="mt-1 text-xs text-warn">({props.report.error?.kind})</p>
         </div>
       }
     >
@@ -90,7 +87,9 @@ export const SummaryBanner: Component<{
                 {RESOLUTION_BLURB[props.report.resolution] ??
                   props.report.resolution}
               </p>
-              <Show when={props.report.shown_count < props.report.finding_count}>
+              <Show
+                when={props.report.shown_count < props.report.finding_count}
+              >
                 <p class="mt-2 text-xs text-warn">
                   Showing the first {props.report.shown_count.toLocaleString()}{" "}
                   of {props.report.finding_count.toLocaleString()} findings

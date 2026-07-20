@@ -95,7 +95,9 @@ def test_a_path_makes_the_question_answerable_and_rule_20_fires(tmp_path):
     # "I cannot answer" no longer looks exactly like "nothing is wrong".
     src = _write(tmp_path)
     rep = lat.read(src).validate(check_files=True).report
-    assert RULE_20 in _rules(rep), f"missing FILE/ tree must flag Rule 20: {_rules(rep)}"
+    assert RULE_20 in _rules(rep), (
+        f"missing FILE/ tree must flag Rule 20: {_rules(rep)}"
+    )
     assert not rep.is_valid
 
 

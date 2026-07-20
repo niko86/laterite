@@ -30,9 +30,7 @@ pub fn load(cert_path: &Path) -> Result<Sidecar, String> {
 
 /// Write a minted certificate to `out`, else `<path>.ags.idx`.
 pub fn write(sidecar: &Sidecar, path: &Path, out: Option<&Path>) -> Result<PathBuf, String> {
-    let dest = out
-        .map(PathBuf::from)
-        .unwrap_or_else(|| default_index_path(path));
+    let dest = out.map_or_else(|| default_index_path(path), PathBuf::from);
     let json = sidecar.to_json().map_err(|e| e.to_string())?;
     write_atomic(&dest, &json).map_err(|e| format!("write {}: {e}", dest.display()))?;
     Ok(dest)
@@ -60,6 +58,11 @@ pub fn why(reason: RevalidateReason) -> &'static str {
         RevalidateReason::EditionDiffers => {
             "the certificate judged the file against a different dictionary than this \
              request asks for (--dict-version)"
+        }
+        RevalidateReason::DictionaryChanged => {
+            "the certificate was minted with a different custom dictionary than this \
+             request supplies (--dict) — the effective dictionary changed, so its \
+             verdict may no longer hold"
         }
         RevalidateReason::EncodingDiffers => {
             "the certificate read the file through a different decoder than this request \

@@ -4,11 +4,11 @@
 one-liners, with machine-readable output and meaningful exit codes. It is the same
 tool however you launch it, so everything below is written as `lat …`:
 
-| Launcher | Get it | Run |
-|---|---|---|
-| **Native binary** | [GitHub Releases](https://github.com/niko86/laterite/releases) | `lat …` |
-| **Python** (`uvx`) | `pip install laterite` | `uvx --from laterite lat …` (or `lat …`) |
-| **Node** (`npx`) | `npm install -g laterite` | `npx laterite …` (or `lat …`) |
+| Launcher           | Get it                                                         | Run                                      |
+| ------------------ | -------------------------------------------------------------- | ---------------------------------------- |
+| **Native binary**  | [GitHub Releases](https://github.com/niko86/laterite/releases) | `lat …`                                  |
+| **Python** (`uvx`) | `pip install laterite`                                         | `uvx --from laterite lat …` (or `lat …`) |
+| **Node** (`npx`)   | `npm install -g laterite`                                      | `npx laterite …` (or `lat …`)            |
 
 Same verbs, same flags, and **byte-identical** `--json` / `--ndjson` output across
 all three — so a CI gate, a Python shop, and a Node service can share the same
@@ -16,17 +16,17 @@ downstream tooling.
 
 ## The verbs
 
-| Verb | What it does |
-|---|---|
-| `validate <file>` | run the numbered AGS Format Rules (the **default** — a bare `lat <file>` runs it) |
-| `read <file> [group]` | dump a group's rows (table / `--csv` / `--json`), or list the group codes |
-| `fix <file>` | mechanically repair — safe fixes by default, `--risky` for the intent-guessing ones |
-| `diff <a> <b>` | the KEY-aware / type-aware revision delta |
-| `certify <file>` | mint the [`.ags.idx`](../concepts/certificate-lifecycle.md) validity certificate |
-| `rules` | print the AGS4 rule catalogue |
-| `pack` / `unpack` | zstd-compress a file for transport, and restore it |
-| `lock` / `unlock` | add an age passphrase envelope (passphrase from `--password-file` / `$LAT_TRANSPORT_PASSWORD`, never a flag) |
-| `excel <in> <out>` | convert AGS4 ↔ Excel (direction inferred from the output extension) |
+| Verb                  | What it does                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `validate <file>`     | run the numbered AGS Format Rules (the **default** — a bare `lat <file>` runs it)                            |
+| `read <file> [group]` | dump a group's rows (table / `--csv` / `--json`), or list the group codes                                    |
+| `fix <file>`          | mechanically repair — safe fixes by default, `--risky` for the intent-guessing ones                          |
+| `diff <a> <b>`        | the KEY-aware / type-aware revision delta                                                                    |
+| `certify <file>`      | mint the [`.ags.idx`](../concepts/certificate-lifecycle.md) validity certificate                             |
+| `rules`               | print the AGS4 rule catalogue                                                                                |
+| `pack` / `unpack`     | zstd-compress a file for transport, and restore it                                                           |
+| `lock` / `unlock`     | add an age passphrase envelope (passphrase from `--password-file` / `$LAT_TRANSPORT_PASSWORD`, never a flag) |
+| `excel <in> <out>`    | convert AGS4 ↔ Excel (direction inferred from the output extension)                                          |
 
 For querying across groups (SQL) or building AGS4 from data, reach for
 [Python](python.md) or [DuckDB](../duckdb/index.md) — the [capability
@@ -65,5 +65,5 @@ lat unlock delivery.ags.age out.ags --password-file pw.txt
 ```
 
 !!! tip "The full reference"
-    Every verb, flag, and exit code — the shipped `lat --readme` guide — is the
-    [CLI command reference](../reference/cli.md).
+Every verb, flag, and exit code — the shipped `lat --readme` guide — is the
+[CLI command reference](../reference/cli.md).

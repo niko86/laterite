@@ -60,9 +60,13 @@ function severityBand(severity: FindingDto["severity"]): string {
 
 /** Wrap a `[start, end)` code-point sub-range of `raw` in a strong
  *  highlight, leaving the surrounding text plain. Slicing is code-point
- *  correct (spread → array) so a multibyte line can't split a char. */
-export function highlightSpan(raw: string, start: number, end: number): JSX.Element {
-  const cps = [...raw];
+ *  correct (via Array.from) so a multibyte line can't split a char. */
+export function highlightSpan(
+  raw: string,
+  start: number,
+  end: number,
+): JSX.Element {
+  const cps = Array.from(raw);
   const s = Math.max(0, Math.min(start, cps.length));
   const e = Math.max(s, Math.min(end, cps.length));
   return (
@@ -100,7 +104,8 @@ function renderLine(raw: string, f: FindingDto): JSX.Element {
 
   // Highlight the field's inner value (no quotes, no comma) — fixes the
   // over-wide token highlight that lit `"ERES_LAB",` comma and all.
-  const field = fields[idx];
+  const field = fields[idx]; // idx bounds checked above → in-bounds.
+  if (!field) return raw;
   return highlightSpan(raw, field.valueStart, field.valueEnd);
 }
 
@@ -115,15 +120,18 @@ function renderAlignedRow(row: AlignedRow, f: FindingDto): JSX.Element {
   const idx =
     (f.target === "heading" || f.target === "cell" || f.target === "group") &&
     f.field_index != null
-      ? (f.field_index as number) + 1 // +1 skips the leading tag.
+      ? f.field_index + 1 // +1 skips the leading tag.
       : -1;
   return (
     <>
-      {row.cells.map((c, i) =>
-        i === idx
-          ? highlightSpan(c.padded, c.valueStart, c.valueEnd)
-          : c.padded,
-      )}
+      <For each={row.cells}>
+        {(c, i) =>
+          // eslint-disable-next-line solid/reactivity -- <For> over positional cells that never reorder + idx is constant, so i()'s once-read stays correct
+          i() === idx
+            ? highlightSpan(c.padded, c.valueStart, c.valueEnd)
+            : c.padded
+        }
+      </For>
     </>
   );
 }
@@ -168,7 +176,7 @@ const FindingRow: Component<{
               <Show
                 when={block()}
                 fallback={
-                  <For each={snippet(props.lines(), props.f.line!)}>
+                  <For each={snippet(props.lines(), props.f.line ?? 0)}>
                     {(row) => (
                       // min-w-max so the row-band background spans the full
                       // scrolled line width inside the overflow-x-auto <pre>,
@@ -328,10 +336,13 @@ export const FindingsView: Component<{
     model(); // track: any expand/collapse or filter change
     props.aligned(); // track: aligned toggle re-renders rows (no model change)
     virtualizer.measure();
-    requestAnimationFrame(() => virtualizer.measure());
+    requestAnimationFrame(() => {
+      virtualizer.measure();
+    });
   });
 
   onMount(() => {
+    // eslint-disable-next-line solid/reactivity -- imperative jump handler invoked on user action; reading model() at call-time is intended (event-handler-like)
     props.registerJump?.((rule) => {
       const idx = model().headerIndex.get(rule);
       if (idx != null) virtualizer.scrollToIndex(idx, { align: "start" });
@@ -345,14 +356,18 @@ export const FindingsView: Component<{
           <button
             type="button"
             class="underline-offset-2 hover:text-fg hover:underline"
-            onClick={() => props.onExpandAll()}
+            onClick={() => {
+              props.onExpandAll();
+            }}
           >
             Expand all
           </button>
           <button
             type="button"
             class="underline-offset-2 hover:text-fg hover:underline"
-            onClick={() => props.onCollapseAll()}
+            onClick={() => {
+              props.onCollapseAll();
+            }}
           >
             Collapse all
           </button>
@@ -383,9 +398,11 @@ export const FindingsView: Component<{
                     {(r) => (
                       <div
                         data-index={vi.index}
-                        ref={(el) =>
-                          queueMicrotask(() => virtualizer.measureElement(el))
-                        }
+                        ref={(el) => {
+                          queueMicrotask(() => {
+                            virtualizer.measureElement(el);
+                          });
+                        }}
                         style={{
                           position: "absolute",
                           top: 0,
@@ -395,7 +412,9 @@ export const FindingsView: Component<{
                         }}
                       >
                         <Show
-                          when={r().kind === "header" ? (r() as HeaderRow) : null}
+                          when={
+                            r().kind === "header" ? (r() as HeaderRow) : null
+                          }
                           fallback={
                             <FindingRow
                               f={(r() as FindingRowData).f}
@@ -408,7 +427,9 @@ export const FindingsView: Component<{
                             <button
                               type="button"
                               id={ruleAnchor(h().rule)}
-                              onClick={() => props.onToggle(h().rule)}
+                              onClick={() => {
+                                props.onToggle(h().rule);
+                              }}
                               class="flex w-full scroll-mt-4 items-baseline gap-2 border-b border-line bg-surface-raised px-3 py-2 text-left text-sm font-medium text-fg backdrop-blur"
                             >
                               <Chevron open={h().open} class="self-center" />

@@ -59,7 +59,9 @@ export const ToolsPane: Component = () => {
                   <PillToggle
                     label={t.label}
                     active={tool() === t.id}
-                    onClick={() => setTool(t.id)}
+                    onClick={() => {
+                      setTool(t.id);
+                    }}
                   />
                 )}
               </For>

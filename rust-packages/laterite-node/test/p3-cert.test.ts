@@ -21,7 +21,10 @@ import { Ags4Error, StaleCertError, read } from "../ts/index";
 // --emit-index test mints from, so the cert values line up cross-surface.
 const CLEAN = readFileSync(
   fileURLToPath(
-    new URL("../../laterite-ags4-validator/tests/fixtures/clean_minimal.ags", import.meta.url),
+    new URL(
+      "../../laterite-ags4-validator/tests/fixtures/clean_minimal.ags",
+      import.meta.url,
+    ),
   ),
 );
 
@@ -85,7 +88,9 @@ describe("certify → .ags.idx (#294 Batch E / #14)", () => {
     const idx = read(f).certify();
     // The fixture is warning-clean, and the mint MEASURED that — so the engine can be
     // skipped for a question it can fully answer, not merely for the one it was minted on.
-    expect(read(f, { index: idx }).validate({ warnings: true }).report?.certified).toBe(true);
+    expect(
+      read(f, { index: idx }).validate({ warnings: true }).report?.certified,
+    ).toBe(true);
   });
 
   it("a stale cert (file changed) fails fast at read time", () => {
@@ -147,7 +152,9 @@ describe("certify guards", () => {
   });
 
   it("throws Ags4Error for a text handle with no source path", () => {
-    expect(() => read(undefined, { text: CLEAN.toString("utf8") }).certify()).toThrow(Ags4Error);
+    expect(() =>
+      read(undefined, { text: CLEAN.toString("utf8") }).certify(),
+    ).toThrow(Ags4Error);
   });
 });
 
@@ -168,7 +175,10 @@ describe("the decoder is part of the verdict", () => {
   it("the two decoders really do disagree (the premise, asserted)", () => {
     const f = tmpFile("omega.ags", OMEGA);
     expect(read(f).validate({ warnings: false }).report?.count).toBe(1);
-    expect(read(f).validate({ warnings: false, encoding: "windows-1252" }).report?.count).toBe(0);
+    expect(
+      read(f).validate({ warnings: false, encoding: "windows-1252" }).report
+        ?.count,
+    ).toBe(0);
   });
 
   it("a certificate minted through another decoder does not answer", () => {
@@ -185,7 +195,9 @@ describe("the decoder is part of the verdict", () => {
     expect(rep?.isValid).toBe(false);
 
     // The decoder it WAS minted under still gets the fast path — a match, not a ban.
-    const same = read(f, { index: idx, encoding: "windows-1252" }).validate({ warnings: false });
+    const same = read(f, { index: idx, encoding: "windows-1252" }).validate({
+      warnings: false,
+    });
     expect(same.report?.certified).toBe(true);
   });
 });

@@ -22,6 +22,7 @@ import argparse
 import json
 import sys
 from importlib import resources
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
@@ -37,7 +38,11 @@ from . import _laterite_native as _native
 #: match arms were not, so a new edition would have made `lat` reject `4.3` with a
 #: message advertising `4.3`.
 _DICT_CHOICES = ("auto", *_native.registry_editions())
-_CLASH_CHOICES = ("error", "widen", "promote")
+#: The `--on-type-clash` modes, from `TypeClashMode::ALL` in laterite-ags4-merge —
+#: same single-sourcing as `_DICT_CHOICES` one line up, for the same reason. This
+#: was a hand-typed `("error", "widen", "promote")`, one of four copies of a set the
+#: Rust enum already owns (#555); a fourth mode would have reached none of them.
+_CLASH_CHOICES = tuple(_native.registry_type_clash_modes())
 
 #: Encoding labels the surface census resolves on every launcher. Mirrors
 #: `ENCODING_PROBES` in `commands/census.rs`; `test_census_probe_lists_agree` pins
@@ -81,8 +86,7 @@ def _plain(file: str, findings: list[dict], n: int) -> str:
     out = [f"{file}: {n} finding(s)"]
     out.append(" | ".join(h.ljust(w[i]) for i, h in enumerate(head)))
     out.append("-+-".join("-" * w[i] for i in range(4)))
-    for r in rows:
-        out.append(" | ".join(r[i].ljust(w[i]) for i in range(4)))
+    out.extend(" | ".join(r[i].ljust(w[i]) for i in range(4)) for r in rows)
     return "\n".join(out) + "\n"
 
 
@@ -95,6 +99,8 @@ def _engine(args) -> dict:
         include_fyi=args.show_fyi,
         check_files=args.check_files,
         encoding=args.encoding,
+        dict_path=args.dict,
+        dict_replace=args.dict_replace,
     )
 
 
@@ -149,6 +155,8 @@ def _with_cert(args) -> dict:
             warnings=not args.no_warnings,
             fyi=args.show_fyi,
             check_files=args.check_files,
+            dictionary=args.dict,
+            dict_replace=args.dict_replace,
         ).report
     except Ags4Error as e:
         return {"ok": False, "error": str(e), "exit_code": e.exit_code}
@@ -180,15 +188,19 @@ def _run_validate(args) -> int:
         active = _plain(r["file"], r["findings"], n)
 
     if args.json_out:
-        with open(args.json_out, "w", encoding="utf-8", newline="") as fh:
+        with Path(args.json_out).open("w", encoding="utf-8", newline="") as fh:
             fh.write(r["json"] + "\n")
-        sys.stdout.write(_plain(r["file"], r["findings"], n))  # tee: plain still to stdout
+        sys.stdout.write(
+            _plain(r["file"], r["findings"], n)
+        )  # tee: plain still to stdout
         return code
 
     if args.out:
-        with open(args.out, "w", encoding="utf-8", newline="") as fh:
+        with Path(args.out).open("w", encoding="utf-8", newline="") as fh:
             fh.write(active)
-        print(f"{r['file']}: {n} finding(s)" if n else f"{r['file']}: clean (0 findings)")
+        print(
+            f"{r['file']}: {n} finding(s)" if n else f"{r['file']}: clean (0 findings)"
+        )
         return code
 
     sys.stdout.write(active)
@@ -211,6 +223,8 @@ def _run_fix(args) -> int:
         dict_version=args.dict_version,
         include_risky=args.risky,
         encoding=args.encoding,
+        dict_path=args.dict,
+        dict_replace=args.dict_replace,
     )
     if not r.get("ok"):
         print(f"error: {r.get('error')}", file=sys.stderr)
@@ -231,6 +245,28 @@ def _run_fix(args) -> int:
         print(f"error: writing {dest}: {e}", file=sys.stderr)
         return 3
 
+    by_rule = json.loads(r["findings_json"])
+    n_residual = sum(len(v) for v in by_rule.values())
+
+    # --json: the machine-readable report replaces the human summary (#545). Same
+    # shape as the native `lat fix --json` — `applied` is the native `fix_file`'s
+    # `{kind, label, rule, line, risk}` ledger verbatim. Exit unchanged (0/1).
+    if args.json:
+        # `risky_available` is human-only: the Node FixReport has no risky-count to
+        # mirror, so the machine report omits it to stay identical across launchers.
+        report = {
+            "file": str(args.file),
+            "dest": str(dest),
+            "applied": r["applied"],
+            "residual": n_residual,
+        }
+        # ensure_ascii=False: a fix label carries the reformat arrow (`"10.5" → "10.50"`,
+        # Rule 8), and Python's json.dumps ASCII-escapes it to `→` while the native
+        # serde_json and npx JSON.stringify emit the raw UTF-8 char. Without this the
+        # three launchers' `fix --json` diverge on an ordinary DP-precision fix (#545).
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return 0 if n_residual == 0 else 1
+
     kinds = sorted({a["kind"] for a in r["applied"]})
     n_applied = r["fixes_applied"]
     if n_applied == 0:
@@ -238,8 +274,6 @@ def _run_fix(args) -> int:
     else:
         print(f"applied {n_applied} fix(es) [{', '.join(kinds)}] → {dest}")
 
-    by_rule = json.loads(r["findings_json"])
-    n_residual = sum(len(v) for v in by_rule.values())
     if n_residual == 0:
         print(f"{dest}: clean (0 findings)")
         return 0
@@ -273,8 +307,7 @@ def _list_rules(as_json: bool) -> int:
     head = ["Rule", "Title", "Severity", "Fix?"]
     out = [" | ".join(h.ljust(w[i]) for i, h in enumerate(head)).rstrip()]
     out.append("-+-".join("-" * w[i] for i in range(4)))
-    for r in rows:
-        out.append(" | ".join(r[i].ljust(w[i]) for i in range(4)).rstrip())
+    out.extend(" | ".join(r[i].ljust(w[i]) for i in range(4)).rstrip() for r in rows)
     print("\n".join(out))
     return 0
 
@@ -365,7 +398,7 @@ def _run_merge(args) -> int:
         # here by re-deriving a second error taxonomy from string matching.
         print(f"error: {e}", file=sys.stderr)
         return 6
-    except Exception as e:  # noqa: BLE001 — parse / emit failures surface here
+    except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 4
 
@@ -417,9 +450,14 @@ def _run_certify(args) -> int:
     from . import Ags4Error, read
 
     dv = None if args.dict_version == "auto" else args.dict_version
+    ckw = {"dictionary": args.dict, "dict_replace": args.dict_replace}
     try:
         handle = read(args.file, encoding=args.encoding)
-        dest = handle.certify(args.out, dict_version=dv) if args.out else handle.certify(dict_version=dv)
+        dest = (
+            handle.certify(args.out, dict_version=dv, **ckw)
+            if args.out
+            else handle.certify(dict_version=dv, **ckw)
+        )
     except FileNotFoundError:
         print(f"error: {args.file}: not found", file=sys.stderr)
         return 3
@@ -430,7 +468,7 @@ def _run_certify(args) -> int:
             return 1
         print(f"error: {e}", file=sys.stderr)
         return e.exit_code
-    except Exception as e:  # noqa: BLE001 — parse/dict errors surface here
+    except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 4
     print(f"certificate written to {dest}")
@@ -439,7 +477,7 @@ def _run_certify(args) -> int:
 
 def _emit(body: str, out: str | None) -> int:
     if out:
-        with open(out, "w", encoding="utf-8", newline="") as fh:
+        with Path(out).open("w", encoding="utf-8", newline="") as fh:
             fh.write(body)
         print(f"note: written to {out}", file=sys.stderr)
     else:
@@ -447,16 +485,12 @@ def _emit(body: str, out: str | None) -> int:
     return 0
 
 
-def _csv_row(cells) -> str:
-    """One RFC-4180-ish CSV line — byte-identical to the Rust `read` CSV: quote a
-    field iff it contains `,` / `"` / CR / LF, doubling internal quotes."""
-    out = []
-    for c in cells:
-        if any(ch in c for ch in ',"\r\n'):
-            out.append('"' + c.replace('"', '""') + '"')
-        else:
-            out.append(c)
-    return ",".join(out) + "\n"
+""" `read`'s CSV/JSON rendering is NOT done here: `_laterite_native`'s
+`render_read_csv` / `render_read_json` call core's single writers, the same ones
+the `lat` binary and Node use. This module used to hand-port RFC-4180 quoting
+and reach for Python's `json.dumps` while the binary used `serde_json` and Node
+used `JSON.stringify` — three libraries held byte-identical by discipline, with
+no gate on `read` output (#530). """
 
 
 def _read_table(headings, rows) -> str:
@@ -468,8 +502,10 @@ def _read_table(headings, rows) -> str:
             w[i] = max(w[i], len(c))
     lines = [" | ".join(h.ljust(w[i]) for i, h in enumerate(headings)).rstrip()]
     lines.append("-+-".join("-" * w[i] for i in range(len(headings))))
-    for row in rows:
-        lines.append(" | ".join(row[i].ljust(w[i]) for i in range(len(headings))).rstrip())
+    lines.extend(
+        " | ".join(row[i].ljust(w[i]) for i in range(len(headings))).rstrip()
+        for row in rows
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -486,7 +522,7 @@ def _run_read(args) -> int:
         return 3
     try:
         raw = _native.read_groups_raw(args.file)
-    except Exception as e:  # noqa: BLE001 — parse/dict errors surface here
+    except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 4
 
@@ -513,11 +549,11 @@ def _run_read(args) -> int:
     g = raw["groups"][args.group]
     headings, rows = g["headings"], g["rows"]
     if args.json:
-        objs = [dict(zip(headings, row, strict=True)) for row in rows]
-        body = _json.dumps(objs, indent=2, ensure_ascii=False) + "\n"
+        body = _native.render_read_json(headings, rows)
     elif args.csv:
-        body = "".join(_csv_row(r) for r in [headings, *rows])
+        body = _native.render_read_csv(headings, rows)
     else:
+        # The table stays local — it is a presentation choice, not a data format.
         body = _read_table(headings, rows)
     return _emit(body, args.out)
 
@@ -549,7 +585,7 @@ def _run_pack(args) -> int:
         return 3
     try:
         transport.pack(args.input, dest=args.output, level=args.level)
-    except Exception as e:  # noqa: BLE001 — zstd failure surfaces here
+    except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 6
     print(f"packed {args.input} → {args.output}", file=sys.stderr)
@@ -566,7 +602,7 @@ def _run_unpack(args) -> int:
         return 3
     try:
         transport.unpack(args.input, dest=args.output)
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 6
     print(f"unpacked {args.input} → {args.output}", file=sys.stderr)
@@ -583,8 +619,14 @@ def _run_lock(args) -> int:
         return 3
     pw = _resolve_password(args.password_file, "Passphrase to lock with: ")
     try:
-        transport.lock(args.input, password=pw, level=args.level, log_n=args.log_n, dest=args.output)
-    except Exception as e:  # noqa: BLE001 — zstd / age failure surfaces here
+        transport.lock(
+            args.input,
+            password=pw,
+            level=args.level,
+            log_n=args.log_n,
+            dest=args.output,
+        )
+    except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 6
     print(f"locked {args.input} → {args.output}", file=sys.stderr)
@@ -602,7 +644,7 @@ def _run_unlock(args) -> int:
     pw = _resolve_password(args.password_file, "Passphrase to unlock: ")
     try:
         transport.unlock(args.input, password=pw, dest=args.output)
-    except Exception as e:  # noqa: BLE001 — wrong password / corrupt file surfaces here
+    except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 6
     print(f"unlocked {args.input} → {args.output}", file=sys.stderr)
@@ -642,19 +684,26 @@ def _run_excel(args) -> int:
             laterite.to_excel(args.input, args.output)
         else:
             laterite.from_excel(
-                args.input, args.output, format_numeric_columns=not args.no_format_numeric
+                args.input,
+                args.output,
+                format_numeric_columns=not args.no_format_numeric,
             )
-    except Exception as e:  # noqa: BLE001 — parse / xlsx failure surfaces here
+    except Exception as e:
         print(f"error: {e}", file=sys.stderr)
         return 6
-    print(f"{'exported' if export else 'imported'} {args.input} → {args.output}", file=sys.stderr)
+    print(
+        f"{'exported' if export else 'imported'} {args.input} → {args.output}",
+        file=sys.stderr,
+    )
     return 0
 
 
 def _global_parent() -> argparse.ArgumentParser:
+    # `--quiet` is the one genuinely cross-cutting flag, so it stays global (mirrors
+    # the native `Cli`). `--json`/`--ndjson` moved onto each report-producing verb in
+    # #545 — a verb that can't render JSON now rejects the flag instead of ignoring
+    # it — so they are declared per-subparser below, not here.
     p = argparse.ArgumentParser(add_help=False)
-    p.add_argument("--json", action="store_true")
-    p.add_argument("--ndjson", action="store_true")
     p.add_argument("--quiet", action="store_true")
     return p
 
@@ -663,6 +712,10 @@ def _dict_parent() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(add_help=False)
     p.add_argument("--dict-version", choices=_DICT_CHOICES, default="auto")
     p.add_argument("--dict")
+    # (with --dict) treat the custom dictionary as a FULL REPLACEMENT — no base edition
+    # contributes. Mirrors the native `DictArgs::dict_replace`; contradicts --dict-version
+    # (the native/library reject the pair with exit 5). (#568)
+    p.add_argument("--dict-replace", dest="dict_replace", action="store_true")
     p.add_argument("--encoding")
     return p
 
@@ -675,21 +728,28 @@ def _subcommands(p: argparse.ArgumentParser) -> tuple[str, ...]:
     this launcher. The parser is what actually parses argv, so it is the only
     honest answer to "what verbs are there".
     """
-    subs = next((a for a in p._actions if isinstance(a, argparse._SubParsersAction)), None)
+    subs = next(
+        (a for a in p._actions if isinstance(a, argparse._SubParsersAction)), None
+    )
     return tuple(subs.choices) if subs else ()
 
 
 def _with_default_subcommand(argv: list[str], p: argparse.ArgumentParser) -> list[str]:
     """Splice `validate` in when the first non-flag token isn't a known subcommand
     — so `lat <file>` (and `lat <file> --json`) route to validate, mirroring the
-    Rust argv pre-scan. Global flags are valueless bools, so a leading run of `-`
-    tokens is skipped without consuming a value."""
+    Rust argv pre-scan. Leading `-` tokens are valueless bools, so a run of them is
+    skipped without consuming a value.
+
+    Inserts `validate` at the FRONT (not before the file): since #545 moved
+    `--json`/`--ndjson` onto the verbs, a leading `lat --json <file>` must become
+    `lat validate --json <file>` so the flag lands after the verb that declares it
+    (before, with the flags global, position was immaterial)."""
     verbs = _subcommands(p)
-    for i, a in enumerate(argv):
+    for a in argv:
         if a.startswith("-"):
             continue
         if a not in verbs:
-            return argv[:i] + ["validate"] + argv[i:]
+            return ["validate", *argv]
         return argv
     return argv
 
@@ -709,6 +769,10 @@ def _build_parser() -> argparse.ArgumentParser:
 
     pv = sub.add_parser("validate", add_help=False, parents=[gp, dp])
     pv.add_argument("file")
+    # `--json`/`--ndjson` are per-verb now (#545). validate is the only verb that
+    # streams NDJSON; the json↔ndjson mutual exclusion is enforced in `main`.
+    pv.add_argument("--json", action="store_true")
+    pv.add_argument("--ndjson", action="store_true")
     pv.add_argument("--no-warnings", action="store_true")
     pv.add_argument("--show-fyi", action="store_true")
     pv.add_argument("--check-files", action="store_true")
@@ -724,11 +788,13 @@ def _build_parser() -> argparse.ArgumentParser:
     prd = sub.add_parser("read", add_help=False, parents=[gp])
     prd.add_argument("file")
     prd.add_argument("group", nargs="?")
+    prd.add_argument("--json", action="store_true")
     prd.add_argument("--csv", action="store_true")
     prd.add_argument("--out")
 
     pf = sub.add_parser("fix", add_help=False, parents=[gp, dp])
     pf.add_argument("file")
+    pf.add_argument("--json", action="store_true")
     pf.add_argument("--risky", action="store_true")
     pf.add_argument("--in-place", action="store_true")
     pf.add_argument("--fix-out")
@@ -736,11 +802,15 @@ def _build_parser() -> argparse.ArgumentParser:
     pdf = sub.add_parser("diff", add_help=False, parents=[gp, dp])
     pdf.add_argument("file")
     pdf.add_argument("other")
+    pdf.add_argument("--json", action="store_true")
 
     pm = sub.add_parser("merge", add_help=False, parents=[gp, dp])
     pm.add_argument("files", nargs="+")
+    pm.add_argument("--json", action="store_true")
     pm.add_argument("--out", required=True)
-    pm.add_argument("--on-type-clash", dest="on_type_clash", choices=_CLASH_CHOICES, default="error")
+    pm.add_argument(
+        "--on-type-clash", dest="on_type_clash", choices=_CLASH_CHOICES, default="error"
+    )
     pm.add_argument("--tran-issue", dest="tran_issue")
     pm.add_argument("--tran-date", dest="tran_date")
     pm.add_argument("--tran-producer", dest="tran_producer")
@@ -756,7 +826,8 @@ def _build_parser() -> argparse.ArgumentParser:
     # them is not one. Use `lat validate --check-files`, which runs it live.
     pc.add_argument("--out")
 
-    sub.add_parser("rules", add_help=False, parents=[gp])
+    pr = sub.add_parser("rules", add_help=False, parents=[gp])
+    pr.add_argument("--json", action="store_true")
 
     pk = sub.add_parser("pack", add_help=False, parents=[gp])
     pk.add_argument("input")
@@ -785,7 +856,9 @@ def _build_parser() -> argparse.ArgumentParser:
     _exdir = pe.add_mutually_exclusive_group()
     _exdir.add_argument("--export", action="store_true")
     _exdir.add_argument("--import", dest="import_", action="store_true")
-    pe.add_argument("--no-format-numeric", dest="no_format_numeric", action="store_true")
+    pe.add_argument(
+        "--no-format-numeric", dest="no_format_numeric", action="store_true"
+    )
 
     return p
 
@@ -821,11 +894,15 @@ def census() -> dict:
     diffs this against the native binary (the authority).
     """
     p = _build_parser()
-    subs = next((a for a in p._actions if isinstance(a, argparse._SubParsersAction)), None)
+    subs = next(
+        (a for a in p._actions if isinstance(a, argparse._SubParsersAction)), None
+    )
     # argparse types `choices` as an untyped Iterable, but a _SubParsersAction's
     # choices values ARE the per-verb parsers — which is the whole point here: we
     # reflect each real parser rather than describing it from a list.
-    choices = cast("dict[str, argparse.ArgumentParser]", dict(subs.choices) if subs else {})
+    choices = cast(
+        "dict[str, argparse.ArgumentParser]", dict(subs.choices) if subs else {}
+    )
 
     # The two launchers declare the same globals in opposite directions: clap hangs
     # `--json/--ndjson/--quiet` off the ROOT command, while argparse can only reach a
@@ -839,7 +916,9 @@ def census() -> dict:
 
     verbs = []
     for verb, sp in choices.items():
-        args = [j for a in sp._actions if (j := _arg_json(a))["name"] not in global_names]
+        args = [
+            j for a in sp._actions if (j := _arg_json(a))["name"] not in global_names
+        ]
         args.sort(key=lambda d: d["name"])
         verbs.append({"verb": verb, "args": args})
     verbs.sort(key=lambda d: d["verb"])
@@ -847,7 +926,7 @@ def census() -> dict:
         # See CENSUS_VERSION in the Rust census — bumped when a TABLE is added, so a
         # launcher built before a table existed fails loudly rather than reporting it
         # empty (which would read as "no drift").
-        "census_version": 4,
+        "census_version": 5,
         "surface": "cli-uvx",
         "authority": False,
         "verbs": verbs,
@@ -893,19 +972,10 @@ def main(argv: list[str] | None = None) -> int:
         print("error: a subcommand or input file is required", file=sys.stderr)
         return 5
 
-    # External --dict is deliberately unimplemented (O-28) — the Rust binary
-    # returns BadDict (exit 5) for it too. The edition list is GENERATED: it used to
-    # be spelled out here, so bundling a new edition would have left this message
-    # telling the user to reach for a set that no longer matched the one the flag
-    # accepts. That is the exact trap #509 found in the binary, inverted.
-    if getattr(args, "dict", None):
-        editions = "/".join(e for e in _DICT_CHOICES if e != "auto")
-        print(
-            "error: external --dict override is not implemented; use "
-            f"--dict-version ({editions}) or omit it",
-            file=sys.stderr,
-        )
-        return 5
+    # `--dict` is now a real custom-dictionary overlay (#568): each verb threads it into
+    # the native engine (validate/fix) or the library (certify), so there is no refusal
+    # here any more. The dict's own errors (unreadable file, malformed dict,
+    # `--dict-replace` + `--dict-version`) surface as exit 5 from the engine, in its words.
     if getattr(args, "json", False) and getattr(args, "ndjson", False):
         print("error: --json and --ndjson are mutually exclusive", file=sys.stderr)
         return 5

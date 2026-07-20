@@ -21,9 +21,9 @@ whole file.
 
 ## Read
 
-| Function | Returns |
-|---|---|
-| `read_ags(path, group)` | one group, columns cast to their AGS4 types. |
+| Function                        | Returns                                          |
+| ------------------------------- | ------------------------------------------------ |
+| `read_ags(path, group)`         | one group, columns cast to their AGS4 types.     |
 | `read_ags_text(content, group)` | the same, from an AGS4 string instead of a path. |
 
 ```sql
@@ -40,20 +40,20 @@ JOIN read_ags('delivery.ags', 'GEOL') g USING (loca_id);
 
 ## Inspect the file
 
-| Function | Returns |
-|---|---|
-| `ags_groups(path)` | the groups present in the file, with per-group row and heading counts. |
+| Function             | Returns                                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------- |
+| `ags_groups(path)`   | the groups present in the file, with per-group row and heading counts.                                |
 | `ags_headings(path)` | every group's headings — unit, `ags_type`, `sql_type`, `is_key` — with a `group` column to filter on. |
 
 ## Inspect the dictionary
 
-The AGS4 dictionary ships *inside* the extension — no download.
+The AGS4 dictionary ships _inside_ the extension — no download.
 
-| Function | Returns |
-|---|---|
-| `ags_dictionary()` | every group/heading with its unit and data type. |
-| `ags_relationships()` | the group parent/child (KEY) graph. |
-| `ags_rules()` | the AGS4 numbered-rule catalogue (`rule`, `title`, `severity`, `fixable`) — the extension *lists* the rules; the CLI/library *run* them. |
+| Function              | Returns                                                                                                                                  |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `ags_dictionary()`    | every group/heading with its unit and data type.                                                                                         |
+| `ags_relationships()` | the group parent/child (KEY) graph.                                                                                                      |
+| `ags_rules()`         | the AGS4 numbered-rule catalogue (`rule`, `title`, `severity`, `fixable`) — the extension _lists_ the rules; the CLI/library _run_ them. |
 
 ```sql
 SELECT heading, unit, ags_type, sql_type FROM ags_dictionary() WHERE "group" = 'LOCA';
@@ -64,8 +64,8 @@ SELECT heading, unit, ags_type, sql_type FROM ags_dictionary() WHERE "group" = '
 `load_ags` emits the `CREATE TABLE` DDL to persist every group as an indexed,
 repeat-/remote-queryable store — turning a one-shot read into a durable database.
 
-| Function | Returns |
-|---|---|
+| Function         | Returns                                                            |
+| ---------------- | ------------------------------------------------------------------ |
 | `load_ags(path)` | `(seq, stmt)` — ordered `CREATE TABLE` DDL, one statement per row. |
 
 ```sql
@@ -73,6 +73,6 @@ SELECT stmt FROM load_ags('delivery.ags') ORDER BY seq;
 ```
 
 !!! note "Read-only query surface"
-    DuckDB is a **read** door — it reads and inspects, but doesn't validate,
-    certify, `fix`, `diff`, or emit AGS4 (those are the library and CLI
-    surfaces). See the [capability matrix](../surfaces/index.md#what-each-door-can-do).
+DuckDB is a **read** door — it reads and inspects, but doesn't validate,
+certify, `fix`, `diff`, or emit AGS4 (those are the library and CLI
+surfaces). See the [capability matrix](../surfaces/index.md#what-each-door-can-do).

@@ -2,10 +2,10 @@
 //! GROUP record starts — the third oracle that catches the "both parsers agree
 //! but are wrong" mode a snapshot-vs-self gate cannot.
 //!
-//! GROUND_TRUTH = the TRUE line-start byte offset of each `"GROUP"` record,
+//! `GROUND_TRUTH` = the TRUE line-start byte offset of each `"GROUP"` record,
 //! verified out-of-band with `grep -abo '"GROUP"'`. As of Phase 4 the `.ags.idx`
 //! byte index ([`index_ags4_bytes`]) sources these from the shared parse leaf's
-//! source-true byte walk, so it matches GROUND_TRUTH for EVERY fixture —
+//! source-true byte walk, so it matches `GROUND_TRUTH` for EVERY fixture —
 //! including the two the retired csv reader got wrong: CRLF (it recorded a
 //! non-first GROUP at the preceding `\n`, off by one) and leading blank lines (it
 //! recorded the first GROUP at 0, absorbing the blanks into section 1). The owner

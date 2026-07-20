@@ -17,6 +17,6 @@ fixed = dirty.fix()  # returns a NEW Ags4File; the original is untouched
 kinds = [a["kind"] for a in fixed.fix_report.applied]
 print(fixed.fix_report.applied[0]["kind"])
 
-assert fixed is not dirty                       # non-destructive: a fresh handle
+assert fixed is not dirty  # non-destructive: a fresh handle
 assert fixed.fix_report.applied[0]["kind"] == "pad_short_row"
-assert "pad_short_row" in kinds                 # the short row was padded to width
+assert "pad_short_row" in kinds  # the short row was padded to width

@@ -6,8 +6,8 @@
 //! learn *which* TYPE codes it validates and *how* it interprets each
 //! (facts about the AGS standard, not copyrightable). No code,
 //! structure, or wording was copied. The nSF expected-form algorithm
-//! is ported from this workspace's own MIT `ags5db` (`ags_types::
-//! ags4_str`), which was independently fitted to python-ags4's output.
+//! is ported from this workspace's own MIT `laterite-types`
+//! (`ags4_str`), which was independently fitted to python-ags4's output.
 //!
 //! Spec text (verbatim, AGS 4.2 §4.1.1, p.155 — AGS 4.1 identical):
 //!
@@ -85,6 +85,10 @@ fn classify(code: &str) -> Check {
     Check::Skip
 }
 
+// `ci`/`ri` are a column/row index within one AGS4 group — both bounded far
+// below u32::MAX for any real AGS4 file (dictionary-bounded heading count;
+// row count bounded by what's actually held in memory).
+#[allow(clippy::cast_possible_truncation)]
 pub fn check(parsed: &ParsedFile, found: &mut Findings) {
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
@@ -95,8 +99,8 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
         }
 
         for (ci, ty) in g.types.iter().enumerate() {
-            let unit = g.units.get(ci).map(String::as_str).unwrap_or("");
-            let heading = g.headings.get(ci).map(String::as_str).unwrap_or("");
+            let unit = g.units.get(ci).map_or("", String::as_str);
+            let heading = g.headings.get(ci).map_or("", String::as_str);
             let chk = classify(ty);
             if matches!(chk, Check::Skip) {
                 continue;
@@ -134,11 +138,11 @@ pub fn check(parsed: &ParsedFile, found: &mut Findings) {
                             Ok(0.0) => false,
                             Ok(f) => {
                                 let ref_form = format_nsf(f, *n);
-                                if ref_form != *v {
+                                if ref_form == *v {
+                                    false
+                                } else {
                                     sf_expected = Some(ref_form);
                                     true
-                                } else {
-                                    false
                                 }
                             }
                             Err(_) => true, // non-numeric under nSF
@@ -191,6 +195,8 @@ fn unit_hint(chk: &Check, unit: &str) -> String {
 /// Every row whose ID value repeats within the group is flagged
 /// (python uses `duplicated(keep=False)` — all occurrences, not just
 /// the second).
+// `ci`/`ri` are bounded the same way as in `check` above.
+#[allow(clippy::cast_possible_truncation)]
 fn flag_duplicate_ids(
     g: &crate::parse::ParsedGroup,
     ci: usize,
@@ -380,7 +386,7 @@ const PANDAS_MAX: &str = "2262-04-11T23:47:16";
 /// `pd.to_datetime` accepts before coercing to `NaT`)? A date-only
 /// value is lifted to midnight by the caller, so `1677-09-21`
 /// (00:00:00 < the 00:12:43 min) correctly fails — matching python's
-/// NaT for that input.
+/// `NaT` for that input.
 fn in_pandas_range(dt: chrono::NaiveDateTime) -> bool {
     use chrono::NaiveDateTime;
     let fmt = "%Y-%m-%dT%H:%M:%S";
@@ -392,7 +398,7 @@ fn in_pandas_range(dt: chrono::NaiveDateTime) -> bool {
 /// Fields extracted from a DT value by lexing it through its UNIT
 /// pattern. Any field the UNIT didn't ask for is `None`; the
 /// caller fills defaults (year missing → no date check; month →
-/// 1; day → 1; time → 00:00:00) before building a NaiveDateTime.
+/// 1; day → 1; time → 00:00:00) before building a `NaiveDateTime`.
 #[derive(Debug, Default, PartialEq, Eq)]
 struct DtFields {
     year: Option<i32>,
@@ -414,11 +420,6 @@ struct DtFields {
 /// mismatch). A successful lex doesn't yet validate ranges — the
 /// caller checks month 1-12, etc.
 fn lex_unit_value(unit: &str, value: &str) -> Option<DtFields> {
-    let mut u = unit.chars().peekable();
-    let mut v = value.chars().peekable();
-    let mut fields = DtFields::default();
-    let mut seen_hh = false;
-
     fn read_digits(v: &mut std::iter::Peekable<std::str::Chars>, n: usize) -> Option<u32> {
         let mut acc = 0u32;
         for _ in 0..n {
@@ -439,6 +440,11 @@ fn lex_unit_value(unit: &str, value: &str) -> Option<DtFields> {
         }
         n
     }
+
+    let mut u = unit.chars().peekable();
+    let mut v = value.chars().peekable();
+    let mut fields = DtFields::default();
+    let mut seen_hh = false;
 
     while let Some(uc) = u.next() {
         match uc {
@@ -577,42 +583,21 @@ fn dt_semantic_ok(value: &str, unit: &str) -> bool {
         .is_some_and(in_pandas_range)
 }
 
-/// nDP expected form — fixed-point with exactly `n` fractional digits.
-/// The fixes engine (`fixes.rs`) reuses this to reformat an nDP cell to
-/// its declared precision; mirrors `is_ndp`'s grammar (`-?\d+\.\d{n}`,
-/// or a bare integer for 0DP). `pub(crate)` so only the engine sees it.
-pub(crate) fn format_ndp(f: f64, n: usize) -> String {
-    format!("{f:.n$}")
-}
-
-/// nSCI expected form — scientific notation with exactly one digit
-/// before the point and `n` after, matching `is_nsci`'s grammar
-/// (`-?\d\.\d{n}[eE][+-]?\d+`). Rust's `{:e}` already emits a single
-/// leading mantissa digit and a sign-less-or-minus exponent without a
-/// leading zero (`1.5e2`, `3.1e-5`) — exactly the AGS form — so `{:.n$e}`
-/// fixes the fraction width too. `pub(crate)` for the fixes engine.
-pub(crate) fn format_nsci(f: f64, n: usize) -> String {
-    format!("{f:.n$e}")
-}
-
-/// nSF expected form, ported from this workspace's MIT `ags5db`
-/// `ags_types::ags4_str` (already fitted to python-ags4's validator
-/// output: `0.002` @3SF → `"0.00200"`, `1234` @3SF → `"1230"`, never
-/// scientific). Zeros are handled by the caller (skipped). `pub(crate)`
-/// so the fixes engine can reuse the same rounding as the detector.
-pub(crate) fn format_nsf(f: f64, n: usize) -> String {
-    if f == 0.0 {
-        return format!("{:.*}", n.saturating_sub(1), 0.0);
-    }
-    let exp = f.abs().log10().floor() as i32;
-    let dp = n as i32 - exp - 1;
-    if dp >= 0 {
-        format!("{:.*}", dp as usize, f)
-    } else {
-        let scale = 10f64.powi(-dp);
-        format!("{:.0}", (f / scale).round() * scale)
-    }
-}
+// The nDP / nSCI / nSF expected forms come from the AGS type-system leaf —
+// the SAME functions `laterite_types::ags4_str` uses to WRITE a typed value,
+// so the form Rule 8 EXPECTS and the form `build_ags4` EMITS cannot drift
+// (#528). All three were a hand-port here, kept honest only by a "ported from
+// ags_types::ags4_str" comment: it agreed with the authority, but nothing
+// gated it — a validator judging a value by a different formatter than the one
+// that writes it. Re-exported at the old path, so Rule 8 above and the fixes
+// engine (`fixes.rs`) are unchanged, and the grammar linkage still holds:
+// `format_ndp` mirrors `is_ndp` (`-?\d+\.\d{n}`, or a bare integer for 0DP),
+// `format_nsci` mirrors `is_nsci` (`-?\d\.\d{n}[eE][+-]?\d+`), and `format_nsf`
+// is the never-scientific fixed-point form python-ags4 expects (`0.002` @3SF →
+// "0.00200"). The format↔validate inverse proptests below now guard the LEAF's
+// formatters against this crate's grammar. (laterite-excel keeps a
+// deliberately divergent formatter — by-design, pinned in xcheck-allow.json.)
+pub(crate) use laterite_types::{format_ndp, format_nsci, format_nsf};
 
 #[cfg(test)]
 mod tests {

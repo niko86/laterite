@@ -148,6 +148,8 @@ fn rule_1(line: &str, n: u32, opts: &CheckOptions, found: &mut Findings) {
 /// Char offset (Unicode scalar count, not byte) of the first char whose
 /// code point exceeds `threshold`, or `None` if every char is at/below
 /// it. Used to point Rule 1's span at the exact offending character.
+// `i` is a char offset within ONE AGS4 line — bounded well under u32::MAX.
+#[allow(clippy::cast_possible_truncation)]
 fn first_codepoint_over(line: &str, threshold: u32) -> Option<u32> {
     line.chars()
         .position(|c| c as u32 > threshold)
@@ -157,7 +159,7 @@ fn first_codepoint_over(line: &str, threshold: u32) -> Option<u32> {
 /// Rule 3 — leading data descriptor.
 fn rule_3(line: &str, n: u32, found: &mut Findings) {
     let fields = split_ags_line(line);
-    let first = fields.first().map(String::as_str).unwrap_or("");
+    let first = fields.first().map_or("", String::as_str);
     if !DESCRIPTORS.contains(&first) {
         add(
             found,
@@ -173,7 +175,7 @@ fn rule_3(line: &str, n: u32, found: &mut Findings) {
 /// Rule 5 — every field double-quote enclosed; embedded quotes doubled.
 ///
 /// python-ags4 emits two distinct messages depending on which Rule 5
-/// sub-violation tripped — and its own test_rule_5_{1,2} asserts on
+/// sub-violation tripped — and its own `test_rule_5`_{1,2} asserts on
 /// the exact wording. We classify the deviation type and emit
 /// matching distinct descs so `compat.check_file` can parity-match
 /// without a translator branch.
@@ -214,6 +216,8 @@ fn rule_6(line: &str, n: u32, found: &mut Findings) {
     // the first one; its char offset is its char position (CR/LF is one scalar)
     // so [i, i+1) spans it.
     if let Some(i) = line.chars().position(|c| c == '\r' || c == '\n') {
+        // A char offset within ONE AGS4 line — bounded well under u32::MAX.
+        #[allow(clippy::cast_possible_truncation)]
         let i = i as u32;
         add_at(
             found,
@@ -265,7 +269,7 @@ fn check_quoting(line: &str) -> QuotingDeviation {
         // "not enclosed" case (test_rule_5_2).
         match chars.next() {
             None => return QuotingDeviation::Ok,
-            Some(',') => continue,
+            Some(',') => {}
             Some(_) => return QuotingDeviation::EmbeddedQuote,
         }
     }

@@ -16,7 +16,10 @@ import { SqlBuilder } from "./SqlBuilder";
 import { ChartBuilder } from "./ChartBuilder";
 import { AnalyseView } from "./AnalyseView";
 import { PillToggle } from "../PillToggle";
-import { exploreView as view, setExploreView as setView } from "../../lib/settings";
+import {
+  exploreView as view,
+  setExploreView as setView,
+} from "../../lib/settings";
 import { goTo } from "../../lib/nav";
 import { EngineGate, engineGateNeeded } from "./EngineGate";
 import { Spinner } from "../Spinner";
@@ -61,7 +64,8 @@ export const ExplorePane: Component = () => {
   // no heavy engine work starts while the dialog is up.
   const [proceed, setProceed] = createSignal(false);
   createEffect(() => {
-    if (fileStore.bytes() && !proceed() && !engineGateNeeded()) setProceed(true);
+    if (fileStore.bytes() && !proceed() && !engineGateNeeded())
+      setProceed(true);
   });
   // Staged bring-up text, so a slow load shows progress instead of a frozen tab.
   const [stage, setStage] = createSignal("Starting the data engine…");
@@ -69,7 +73,7 @@ export const ExplorePane: Component = () => {
   const [dataset] = createResource(
     () => (proceed() ? fileStore.bytes() : undefined),
     async (bytes) => {
-      if (!bytes || bytes.length === 0) return null;
+      if (bytes.length === 0) return null;
       const seq = ++loadSeq;
       const stale = () => seq !== loadSeq;
       const {
@@ -86,7 +90,7 @@ export const ExplorePane: Component = () => {
       // cached group info untouched: NO wasm re-parse, NO per-group count(*)
       // re-run. On a big file that re-derivation was multi-second pure waste.
       if (isLoaded(bytes)) {
-        const cachedGroups = getLoadedGroups<GroupInfo[]>();
+        const cachedGroups = getLoadedGroups() as GroupInfo[] | null;
         if (cachedGroups) return cachedGroups;
       }
       // A new file: reset, ingest each group, count, and cache the result.
@@ -101,17 +105,26 @@ export const ExplorePane: Component = () => {
       if (stale()) return null;
       const out: GroupInfo[] = [];
       for (const g of groups) {
-        setStage(`Loading tables… ${out.length + 1}/${groups.length} (${g.code})`);
+        setStage(
+          `Loading tables… ${out.length + 1}/${groups.length} (${g.code})`,
+        );
         // keys=true: ingest the content-addressed _id/_parent_id columns into
         // duckdb-wasm so the SQL console's cross-group joins resolve; the group
-        // grid (DataTable) strips them from display. (#303)
-        const ipc = await arrowIpc(g.code, true);
+        // grid (DataTable) strips them from display. (#303) contentHash=true:
+        // same deal for the trailing _content_hash value fingerprint, enabling
+        // `SELECT DISTINCT ON (_content_hash)` in the SQL console; arrowResult's
+        // `dropSynthKeys` strips every `_`-prefixed column (not just the two key
+        // columns), so it's hidden from the grid the same way. (#448)
+        const ipc = await arrowIpc(g.code, true, true);
         if (stale()) return null;
         await ingestGroup(g.code, ipc);
         if (stale()) return null;
         const t = await run(`SELECT count(*) AS n FROM "${g.code}"`);
         if (stale()) return null;
-        out.push({ meta: g, rows: Number(t.toArray()[0].n) });
+        // Single-row `SELECT count(*) AS n` result; DuckDB returns the count as
+        // a bigint, so the cast names the shape we asked for.
+        const countRow = t.toArray()[0] as { n: number | bigint };
+        out.push({ meta: g, rows: Number(countRow.n) });
       }
       if (stale()) return null;
       markLoaded(bytes, out);
@@ -122,9 +135,9 @@ export const ExplorePane: Component = () => {
   // Seed the SQL editor once the first dataset lands (the console is now
   // controlled by ExplorePane, so the default query is set here).
   createEffect(() => {
-    const ds = dataset();
-    if (ds && ds.length && !sqlText())
-      setSqlText(`SELECT * FROM "${ds[0].meta.code}" LIMIT 100`);
+    const first = dataset()?.[0];
+    if (first && !sqlText())
+      setSqlText(`SELECT * FROM "${first.meta.code}" LIMIT 100`);
   });
 
   const totalRows = () => dataset()?.reduce((n, g) => n + g.rows, 0) ?? 0;
@@ -168,7 +181,9 @@ export const ExplorePane: Component = () => {
           <button
             type="button"
             class="mt-4 rounded bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent/25"
-            onClick={() => goTo("validate")}
+            onClick={() => {
+              goTo("validate");
+            }}
           >
             Go to Validate to load a file →
           </button>
@@ -179,163 +194,173 @@ export const ExplorePane: Component = () => {
         when={proceed()}
         fallback={<EngineGate onConfirm={() => setProceed(true)} />}
       >
-      <Show
-        when={!dataset.loading}
-        fallback={
-          <div class="py-2">
-            <Spinner label={stage()} />
-          </div>
-        }
-      >
         <Show
-          when={!dataset.error}
+          when={!dataset.loading}
           fallback={
-            <p class="text-sm text-err">
-              {/* The DuckDB engine wasm is NOT precached (it's 36+ MB), so a
+            <div class="py-2">
+              <Spinner label={stage()} />
+            </div>
+          }
+        >
+          <Show
+            when={!dataset.error}
+            fallback={
+              <p class="text-sm text-err">
+                {/* The DuckDB engine wasm is NOT precached (it's 36+ MB), so a
                   FIRST Explore while offline can't fetch it — degrade to a
                   clear message rather than a raw "Failed to fetch". Validate /
                   Fix are unaffected (their wasm is precached). */}
-              {navigator.onLine === false
-                ? "The data engine isn't cached for offline use yet — open Explore once while online, and it'll work offline after. (Validate & Fix already work offline.)"
-                : `Explore error: ${String(dataset.error)}`}
-            </p>
-          }
-        >
-          <div class="flex min-w-0 flex-col gap-4">
-            {/* Browse | SQL view toggle */}
-            <div class="flex items-center gap-1 text-sm">
-              <PillToggle
-                label="Browse"
-                active={view() === "browse"}
-                onClick={() => setView("browse")}
-              />
-              <PillToggle
-                label="SQL"
-                active={view() === "sql"}
-                onClick={() => setView("sql")}
-              />
-              <PillToggle
-                label="Charts"
-                active={view() === "charts"}
-                onClick={() => setView("charts")}
-              />
-              <PillToggle
-                label="Analyse"
-                active={view() === "analyse"}
-                onClick={() => setView("analyse")}
-              />
-            </div>
-            <Show when={view() === "browse"}>
-              {/* items-start so the capped sidebar sizes to its own content
+                {!navigator.onLine
+                  ? "The data engine isn't cached for offline use yet — open Explore once while online, and it'll work offline after. (Validate & Fix already work offline.)"
+                  : `Explore error: ${String(dataset.error)}`}
+              </p>
+            }
+          >
+            <div class="flex min-w-0 flex-col gap-4">
+              {/* Browse | SQL view toggle */}
+              <div class="flex items-center gap-1 text-sm">
+                <PillToggle
+                  label="Browse"
+                  active={view() === "browse"}
+                  onClick={() => {
+                    setView("browse");
+                  }}
+                />
+                <PillToggle
+                  label="SQL"
+                  active={view() === "sql"}
+                  onClick={() => {
+                    setView("sql");
+                  }}
+                />
+                <PillToggle
+                  label="Charts"
+                  active={view() === "charts"}
+                  onClick={() => {
+                    setView("charts");
+                  }}
+                />
+                <PillToggle
+                  label="Analyse"
+                  active={view() === "analyse"}
+                  onClick={() => {
+                    setView("analyse");
+                  }}
+                />
+              </div>
+              <Show when={view() === "browse"}>
+                {/* items-start so the capped sidebar sizes to its own content
                   instead of stretching to the (often taller) data panel. The
                   sidebar appears from sm+ so small tablets / landscape phones
                   get it too; below sm the main panel uses a group dropdown. */}
-              <div class="grid items-start gap-4 sm:grid-cols-[13rem_minmax(0,1fr)]">
-                {/* Group sidebar — capped + scrollable + type-to-filter. Hidden
+                <div class="grid items-start gap-4 sm:grid-cols-[13rem_minmax(0,1fr)]">
+                  {/* Group sidebar — capped + scrollable + type-to-filter. Hidden
                     on a phone (the main panel gets a compact group dropdown
                     instead, so you don't scroll past 69 buttons to reach data). */}
-                <aside class="scroll-region hidden min-w-0 flex-col text-sm sm:flex">
-              {/* Opaque (canvas-coloured) sticky band so group buttons scroll
+                  <aside class="scroll-region hidden min-w-0 flex-col text-sm sm:flex">
+                    {/* Opaque (canvas-coloured) sticky band so group buttons scroll
                   cleanly UNDER the rounded filter input — a bare sticky input
                   let a sliver of each row show through its gap + rounded corners. */}
-              <div class="sticky top-0 z-10 bg-canvas pb-1">
-                <input
-                  type="search"
-                  aria-label="filter groups"
-                  placeholder="Filter groups…"
-                  value={groupFilter()}
-                  onInput={(e) => setGroupFilter(e.currentTarget.value)}
-                  class={`w-full ${controlCompact}`}
-                />
-              </div>
-              <div class="flex flex-col gap-1">
-                <SidebarButton
-                  label="Overview"
-                  active={selected() === null}
-                  onClick={() => setSelected(null)}
-                />
-                <For each={filteredGroups()}>
-                  {(g) => (
-                    <SidebarButton
-                      label={g.meta.code}
-                      count={g.rows}
-                      active={selected() === g.meta.code}
-                      onClick={() => setSelected(g.meta.code)}
-                    />
-                  )}
-                </For>
-              </div>
-            </aside>
+                    <div class="sticky top-0 z-10 bg-canvas pb-1">
+                      <input
+                        type="search"
+                        aria-label="filter groups"
+                        placeholder="Filter groups…"
+                        value={groupFilter()}
+                        onInput={(e) => setGroupFilter(e.currentTarget.value)}
+                        class={`w-full ${controlCompact}`}
+                      />
+                    </div>
+                    <div class="flex flex-col gap-1">
+                      <SidebarButton
+                        label="Overview"
+                        active={selected() === null}
+                        onClick={() => setSelected(null)}
+                      />
+                      <For each={filteredGroups()}>
+                        {(g) => (
+                          <SidebarButton
+                            label={g.meta.code}
+                            count={g.rows}
+                            active={selected() === g.meta.code}
+                            onClick={() => setSelected(g.meta.code)}
+                          />
+                        )}
+                      </For>
+                    </div>
+                  </aside>
 
-            {/* Main panel */}
-            <section class="min-w-0">
-              {/* Mobile group picker (the sidebar is hidden below md). */}
-              <label class="mb-3 flex flex-col gap-1 text-xs text-fg-muted sm:hidden">
-                Group
-                <select
-                  aria-label="group"
-                  class={controlClass}
-                  value={selected() ?? ""}
-                  onChange={(e) => setSelected(e.currentTarget.value || null)}
-                >
-                  <option value="">Overview</option>
-                  <For each={dataset()}>
-                    {(g) => (
-                      <option value={g.meta.code}>
-                        {g.meta.code} ({g.rows})
-                      </option>
-                    )}
-                  </For>
-                </select>
-              </label>
-              <Show
-                when={selectedInfo()}
-                fallback={
-                  <Dashboard
-                    groups={dataset() ?? []}
-                    totalRows={totalRows()}
-                    onPick={setSelected}
-                  />
-                }
-              >
-                {(info) => (
-                  <DataTable
-                    code={info().meta.code}
-                    rows={info().rows}
-                    meta={info().meta}
-                  />
-                )}
+                  {/* Main panel */}
+                  <section class="min-w-0">
+                    {/* Mobile group picker (the sidebar is hidden below md). */}
+                    <label class="mb-3 flex flex-col gap-1 text-xs text-fg-muted sm:hidden">
+                      Group
+                      <select
+                        aria-label="group"
+                        class={controlClass}
+                        value={selected() ?? ""}
+                        onChange={(e) =>
+                          setSelected(e.currentTarget.value || null)
+                        }
+                      >
+                        <option value="">Overview</option>
+                        <For each={dataset()}>
+                          {(g) => (
+                            <option value={g.meta.code}>
+                              {g.meta.code} ({g.rows})
+                            </option>
+                          )}
+                        </For>
+                      </select>
+                    </label>
+                    <Show
+                      when={selectedInfo()}
+                      fallback={
+                        <Dashboard
+                          groups={dataset() ?? []}
+                          totalRows={totalRows()}
+                          onPick={setSelected}
+                        />
+                      }
+                    >
+                      {(info) => (
+                        <DataTable
+                          code={info().meta.code}
+                          rows={info().rows}
+                          meta={info().meta}
+                        />
+                      )}
+                    </Show>
+                  </section>
+                </div>
               </Show>
-            </section>
-              </div>
-            </Show>
-            <Show when={view() === "sql"}>
-              <div class="flex min-w-0 flex-col gap-3">
-                <SqlBuilder
+              <Show when={view() === "sql"}>
+                <div class="flex min-w-0 flex-col gap-3">
+                  <SqlBuilder
+                    groups={(dataset() ?? []).map((g) => g.meta)}
+                    dict={dict()}
+                    onApply={setSqlText}
+                  />
+                  <SqlConsole
+                    groups={(dataset() ?? []).map((g) => g.meta.code)}
+                    sql={sqlText}
+                    setSql={setSqlText}
+                    related={relatedExamples()}
+                  />
+                </div>
+              </Show>
+              <Show when={view() === "charts"}>
+                <ChartBuilder
                   groups={(dataset() ?? []).map((g) => g.meta)}
                   dict={dict()}
-                  onApply={setSqlText}
                 />
-                <SqlConsole
-                  groups={(dataset() ?? []).map((g) => g.meta.code)}
-                  sql={sqlText}
-                  setSql={setSqlText}
-                  related={relatedExamples()}
-                />
-              </div>
-            </Show>
-            <Show when={view() === "charts"}>
-              <ChartBuilder
-                groups={(dataset() ?? []).map((g) => g.meta)}
-                dict={dict()}
-              />
-            </Show>
-            <Show when={view() === "analyse"}>
-              <AnalyseView groups={(dataset() ?? []).map((g) => g.meta)} />
-            </Show>
-          </div>
+              </Show>
+              <Show when={view() === "analyse"}>
+                <AnalyseView groups={(dataset() ?? []).map((g) => g.meta)} />
+              </Show>
+            </div>
+          </Show>
         </Show>
-      </Show>
       </Show>
     </Show>
   );
@@ -349,7 +374,9 @@ const SidebarButton: Component<{
 }> = (props) => (
   <button
     type="button"
-    onClick={() => props.onClick()}
+    onClick={() => {
+      props.onClick();
+    }}
     class="flex items-center justify-between rounded px-2.5 py-1 text-left transition-colors"
     classList={{
       "bg-chip text-accent font-medium": props.active,
@@ -397,7 +424,9 @@ const Dashboard: Component<{
             {(g) => (
               <tr
                 class="cursor-pointer border-t border-line-subtle hover:bg-surface-raised"
-                onClick={() => props.onPick(g.meta.code)}
+                onClick={() => {
+                  props.onPick(g.meta.code);
+                }}
               >
                 <td class="mono px-3 py-1 text-accent">{g.meta.code}</td>
                 <td class="px-3 py-1 text-right text-fg-soft">{g.rows}</td>

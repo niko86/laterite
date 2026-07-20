@@ -4,8 +4,9 @@
 # native (PyO3) and browser (wasm) hosts over one shared orchestrator.
 # Extracted as a leaf so `laterite-ags4-wasm` can produce AGS4 without depending
 # on all of `laterite-ags4-core` (which drags age/zstd/calamine/rust_xlsxwriter —
-# wasm-hostile). It also lifts the AGS4 *writer* out of the "ags5"-named
-# core, the first concrete step toward relieving that naming/scope smell.
+# wasm-hostile). It also lifts the AGS4 *writer* out of the original
+# DuckDB-branded core, the first concrete step toward relieving that
+# naming/scope smell.
 #
 # Reuses the shipped, well-tested pieces so the only new code is the
 # orchestrator:
@@ -28,7 +29,7 @@ publish = false
 
 [dependencies]
 # ags4_str (typed -> AGS4 string) + parse_value (string -> typed), the
-# exact casting both hosts already share via laterite-ags4-wasm / the .ags5db path.
+# exact casting both hosts already share via laterite-ags4-wasm / the native DuckDB path.
 laterite-types = { path = "../laterite-types" }
 # The per-edition standard Dictionary (UNIT/TYPE fill), parse_bytes,
 # rules::run_all (validate), and compute_fixes/apply_fixes (AutoFix).
@@ -54,3 +55,6 @@ proptest = "1"
 # Typed-Arrow input support (the `arrow_in` transpose). Off by default so
 # JSON-only consumers don't pull arrow.
 arrow = ["dep:arrow"]
+
+[lints]
+workspace = true

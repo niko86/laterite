@@ -1,9 +1,7 @@
 """Dynamic typed-graph classes for custom AGS groups.
 
 Stage F2b-4. Built on demand by ``laterite.ags4.read_typed`` when a file
-declares a group not in the compiled-in typed-graph registry. (The decoupled
-``.ags5db`` reader in ``ags5/`` uses the same factory from a file's
-``_spec_*`` tables.)
+declares a group not in the compiled-in typed-graph registry.
 
 The factory caches classes process-wide by
 ``(code, sorted-heading-tuple)`` so subsequent reads with the same
@@ -31,7 +29,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-__all__ = ["get_or_register", "registered_classes", "clear_cache"]
+__all__ = ["clear_cache", "get_or_register", "registered_classes"]
 
 
 # (code, sorted-heading-tuple) → class
@@ -47,9 +45,7 @@ def _shape_key(headings: list[dict[str, Any]]) -> tuple[tuple[str, str], ...]:
     Sorted by name; includes the AGS type so a rename or type change
     surfaces as a distinct shape (and therefore a distinct class).
     """
-    return tuple(sorted(
-        (h["name"], h.get("type", "X")) for h in headings
-    ))
+    return tuple(sorted((h["name"], h.get("type", "X")) for h in headings))
 
 
 def _make_init(field_names: tuple[str, ...]):
@@ -74,6 +70,7 @@ def _make_init(field_names: tuple[str, ...]):
 def _make_repr(name: str):
     def __repr__(self):
         return f"{name}(...)"
+
     return __repr__
 
 
@@ -119,9 +116,7 @@ def get_or_register(
     # F2b-5b write_db path can rebuild a GroupDescriptor for the
     # session-extended registry without re-reading the file. Order
     # matches the source headings list (NOT sorted by name).
-    heading_specs = tuple(
-        (h["name"].upper(), h.get("type", "X")) for h in headings
-    )
+    heading_specs = tuple((h["name"].upper(), h.get("type", "X")) for h in headings)
     namespace: dict[str, Any] = {
         "__init__": _make_init(field_names),
         "__repr__": _make_repr(cls_name),
@@ -177,10 +172,6 @@ def __getattr__(name: str) -> type:
 def __dir__() -> list[str]:
     """Make registered class names visible to ``dir()`` and to
     tooling that introspects the module."""
-    base = list(__all__) + ["__name__", "__doc__"]
-    base.extend(
-        cls.__name__
-        for variants in _BY_CODE.values()
-        for _, cls in variants
-    )
+    base = [*list(__all__), "__name__", "__doc__"]
+    base.extend(cls.__name__ for variants in _BY_CODE.values() for _, cls in variants)
     return sorted(set(base))

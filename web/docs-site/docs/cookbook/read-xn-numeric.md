@@ -3,7 +3,7 @@
 **Available in:** Python (the `xn=` knob is a frame-materialisation option; on
 other surfaces `XN` columns read as text and cast in SQL)
 
-AGS `XN` headings are *numeric-or-text* on disk — laterite reads them as
+AGS `XN` headings are _numeric-or-text_ on disk — laterite reads them as
 `String` by default. Pass `xn="numeric"` to coerce them to `Float64` at the door.
 
 ```python
@@ -17,7 +17,7 @@ SAMP inherits: {'LOCA_ID'}
 LLPL_PL dtype: Float64
 ```
 
-`XN` is the AGS type for a column that *usually* holds a number but is allowed to
+`XN` is the AGS type for a column that _usually_ holds a number but is allowed to
 carry a non-numeric token (e.g. a free-text remark or a `<` censored value), so
 the safe default is to keep it as text — nothing is lost or silently dropped. The
 `xn="numeric"` opt-in says "I want these as real numbers": here `LLPL_PL` (plastic

@@ -2,16 +2,26 @@
 
 <!-- One or two sentences. Lead with the "why". -->
 
+## Checks (run locally first — CI runs the same)
+
+<!-- The fast gates. Run them before pushing and save a round trip. -->
+
+- [ ] `uv run ruff check .`
+- [ ] `uv run ty check`
+- [ ] `cd rust-packages && cargo fmt --all -- --check`
+- [ ] `cargo clippy --workspace --all-targets --exclude laterite-ags4-wasm --exclude laterite-ags4-tokenizer-wasm -- -D warnings`
+- [ ] `uv run pytest tests/ packages/laterite/tests -q`
+- [ ] `cargo test --workspace`
+
 ## Test plan
 
 <!-- How you verified this. Tick all that apply. -->
 
-- [ ] `cargo test --workspace --release` passes
-- [ ] `uv run pytest tests/ packages/laterite/tests -q` passes
-- [ ] `./tools/run_python_ags4_tests.sh` parity count unchanged (or improved)
 - [ ] New behaviour covered by a test
-- [ ] Validator behaviour change → `OBSERVATIONS.md` updated
+- [ ] `./tools/run_python_ags4_tests.sh` parity count unchanged (or improved)
+- [ ] Validator behaviour change → `COMPAT.md` + `docs/parity-coverage-map.md` updated
 - [ ] User-visible API change → `CHANGELOG.md` updated
+- [ ] Validator behaviour change → `OBSERVATIONS.md` updated
 - [ ] Wiki updated — ags-wiki reflects any behaviour/architecture/build change (`lint.py --since` passes)
 
 ## Clean-room confirmation

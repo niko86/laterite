@@ -40,3 +40,6 @@ serde_json = "1"
 # must collapse via TYPED matching, not report spurious revisions). DEV-ONLY —
 # proptest's rand pull never reaches the crate's runtime dep-graph.
 proptest = "1"
+
+[lints]
+workspace = true

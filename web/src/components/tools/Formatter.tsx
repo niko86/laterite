@@ -51,7 +51,12 @@ export const Formatter: Component = () => {
 
   const save = () => {
     const c = computed();
-    if (c) downloadBlob(c.out, `${baseName(fileStore.name())}.ags`, "text/plain;charset=utf-8");
+    if (c)
+      downloadBlob(
+        c.out,
+        `${baseName(fileStore.name())}.ags`,
+        "text/plain;charset=utf-8",
+      );
   };
 
   const apply = () => {
@@ -127,7 +132,9 @@ export const Formatter: Component = () => {
             <li>
               <span class="text-fg-dim">Trailing whitespace:</span>{" "}
               {c().trailingFixed > 0 ? (
-                <span class="text-warn">{c().trailingFixed} lines stripped</span>
+                <span class="text-warn">
+                  {c().trailingFixed} lines stripped
+                </span>
               ) : (
                 <span class="text-ok">none</span>
               )}

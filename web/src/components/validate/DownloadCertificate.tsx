@@ -22,7 +22,9 @@ export const DownloadCertificate: Component<{
     setErr(null);
     try {
       const json = await certify(b, props.dict, props.encoding);
-      const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+      const url = URL.createObjectURL(
+        new Blob([json], { type: "application/json" }),
+      );
       const a = document.createElement("a");
       a.href = url;
       a.download = `${props.name || "delivery.ags"}.idx`;
@@ -42,14 +44,15 @@ export const DownloadCertificate: Component<{
       <button
         type="button"
         disabled={busy()}
-        onClick={download}
+        onClick={() => void download()}
         class="rounded border border-line-strong px-3 py-1.5 text-fg transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy() ? "Minting…" : "Download certificate (.ags.idx)"}
       </button>
       <span class="text-xs text-fg-faint">
-        A validity certificate for this clean file — the same <code class="mono">.ags.idx</code>{" "}
-        the CLI and libraries mint, so a later re-check can skip an unchanged file.
+        A validity certificate for this clean file — the same{" "}
+        <code class="mono">.ags.idx</code> the CLI and libraries mint, so a
+        later re-check can skip an unchanged file.
       </span>
       <Show when={err()}>
         <span class="basis-full text-xs text-err">Certify failed: {err()}</span>

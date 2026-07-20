@@ -39,6 +39,7 @@ pub struct Heading {
 }
 
 impl Heading {
+    #[must_use]
     pub fn is_key(&self) -> bool {
         // The official dict uses combined statuses (e.g. "KEY+REQUIRED"); a
         // heading is a KEY iff "KEY" is one of the `+`-separated parts.
@@ -58,11 +59,13 @@ pub struct GroupDescriptor {
 
 impl GroupDescriptor {
     /// `g_<code>` — the DuckDB table name.
+    #[must_use]
     pub fn table(&self) -> String {
         format!("g_{}", self.code.to_lowercase())
     }
 
     /// `v_<code>` — the DuckDB view name.
+    #[must_use]
     pub fn view(&self) -> String {
         format!("v_{}", self.code.to_lowercase())
     }
@@ -76,33 +79,67 @@ impl GroupDescriptor {
 /// fields ARE each heading's latest-edition definition; the `by_ed`/`eds`
 /// per-edition variation is intentionally not captured (serde drops the unknown
 /// fields) — the registry consumes the UNION at the latest-edition definition.
-#[derive(Debug, Deserialize)]
-struct DictHeading {
-    name: String,
-    status: String,
+// `pub(crate)` (not private): the custom-dictionary overlay (#568, `overlay.rs`
+// + `dict_read.rs`) deserialises a `--dict` JSON straight into these structs, so
+// the custom-JSON schema and the bundled `ags_dictionary.json` schema can never
+// drift — there is one serde definition, not two. `Clone` so a parsed
+// `DictionaryFile` can live on an owned `CustomDict`.
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct DictHeading {
+    pub(crate) name: String,
+    pub(crate) status: String,
     #[serde(rename = "type")]
-    ags_type: String,
+    pub(crate) ags_type: String,
     #[serde(default)]
-    unit: Option<String>,
+    pub(crate) unit: Option<String>,
     #[serde(default)]
-    description: String,
+    pub(crate) description: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct DictGroup {
-    parent: Option<String>,
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct DictGroup {
+    pub(crate) parent: Option<String>,
     #[serde(default)]
-    description: Option<String>,
-    headings: Vec<DictHeading>,
+    pub(crate) description: Option<String>,
+    pub(crate) headings: Vec<DictHeading>,
 }
 
-#[derive(Debug, Deserialize)]
-struct DictionaryFile {
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct DictionaryFile {
+    // `#[serde(default)]`: the bundled dictionary always carries these, but a
+    // hand-authored `--dict` JSON — the format we pitch *for* editability —
+    // needn't declare `format_version`/`editions` just to add one group.
     #[allow(dead_code)]
-    format_version: String,
+    #[serde(default)]
+    pub(crate) format_version: String,
     #[allow(dead_code)]
-    editions: Vec<String>,
-    groups: HashMap<String, DictGroup>,
+    #[serde(default)]
+    pub(crate) editions: Vec<String>,
+    pub(crate) groups: HashMap<String, DictGroup>,
+}
+
+impl DictGroup {
+    /// An empty group shell the runtime `.ags` reader fills incrementally as it
+    /// walks GROUP / HEADING rows (#568 `dict_read`).
+    pub(crate) fn empty() -> Self {
+        DictGroup {
+            parent: None,
+            description: None,
+            headings: Vec::new(),
+        }
+    }
+}
+
+impl DictionaryFile {
+    /// Wrap a runtime-built group map as a `DictionaryFile` (the `.ags` reader
+    /// has no `format_version`/`editions` to declare — a custom dict needn't).
+    pub(crate) fn from_groups(groups: HashMap<String, DictGroup>) -> Self {
+        DictionaryFile {
+            format_version: String::new(),
+            editions: Vec::new(),
+            groups,
+        }
+    }
 }
 
 /// Parent-depth of `code` (PROJ-rooted; root = 0). Orders groups
@@ -130,6 +167,7 @@ fn group_depth(groups: &HashMap<String, DictGroup>, code: &str) -> usize {
 /// deterministically by `(depth, code)`. Shared by `registry()` and the
 /// `build.rs` typed-class codegen so the typed graph, the DDL, and the registry
 /// single-source one reconstruction of the heading-local dictionary.
+#[must_use]
 pub fn union_groups() -> Vec<GroupDescriptor> {
     let file: DictionaryFile =
         serde_json::from_str(DICTIONARY_JSON).expect("bundled ags_dictionary.json must parse");
@@ -174,6 +212,7 @@ pub struct Registry {
 }
 
 impl Registry {
+    #[must_use]
     pub fn get(&self, code: &str) -> Option<&GroupDescriptor> {
         self.by_code.get(code).map(|i| &self.entries[*i].1)
     }
@@ -182,10 +221,12 @@ impl Registry {
         self.entries.iter().map(|(_, g)| g)
     }
 
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
@@ -197,6 +238,7 @@ impl Registry {
     /// `preserve_order` feature + the struct field ordering. Used by
     /// `laterite.registry` to ferry the registry across the PyO3
     /// boundary without rebuilding a parallel schema (Stage D2 of
+    #[must_use]
     pub fn to_groups_json(&self) -> String {
         let groups: Vec<&GroupDescriptor> = self.iter().collect();
         serde_json::to_string(&groups).expect("registry to_json must succeed")
@@ -222,11 +264,11 @@ pub fn registry() -> &'static Registry {
 /// parent, code]`). Mirrors `_ddl._ancestor_chain` reversed; the DDL
 /// uses the reversed form (g first, then parents) but `migrate` uses
 /// the root-down form when joining parent columns. Both are useful.
+#[must_use]
 pub fn ancestor_chain<'a>(reg: &'a Registry, code: &str) -> Vec<&'a GroupDescriptor> {
     let mut chain: Vec<&'a GroupDescriptor> = Vec::new();
-    let mut cursor = match reg.get(code) {
-        Some(g) => g,
-        None => return chain,
+    let Some(mut cursor) = reg.get(code) else {
+        return chain;
     };
     chain.push(cursor);
     while let Some(p) = cursor.parent.as_deref() {
@@ -244,18 +286,17 @@ pub fn ancestor_chain<'a>(reg: &'a Registry, code: &str) -> Vec<&'a GroupDescrip
 /// The KEY heading names a group inherits from its parent (Python's
 /// `_inherited_key_names`). These are dropped from the child's typed
 /// columns — the view JOIN-s them through from the parent.
+#[must_use]
 pub fn inherited_key_names(
     reg: &Registry,
     g: &GroupDescriptor,
 ) -> std::collections::HashSet<String> {
     let mut out = std::collections::HashSet::new();
-    let parent_code = match g.parent.as_deref() {
-        Some(p) => p,
-        None => return out,
+    let Some(parent_code) = g.parent.as_deref() else {
+        return out;
     };
-    let parent = match reg.get(parent_code) {
-        Some(p) => p,
-        None => return out,
+    let Some(parent) = reg.get(parent_code) else {
+        return out;
     };
     let parent_keys: std::collections::HashSet<&str> =
         parent.key_headings().map(|h| h.name.as_str()).collect();
@@ -304,8 +345,7 @@ mod tests {
         let inherited = inherited_key_names(reg, samp);
         assert!(
             inherited.contains("LOCA_ID"),
-            "SAMP should inherit LOCA_ID from LOCA, got {:?}",
-            inherited,
+            "SAMP should inherit LOCA_ID from LOCA, got {inherited:?}",
         );
     }
 

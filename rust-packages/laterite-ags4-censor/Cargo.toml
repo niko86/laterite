@@ -1,0 +1,39 @@
+# The shared AGS4 anonymisation engine (#581). ONE copy of the scrub logic —
+# the five actions (filehash / pseudonym / blank / token / brackets), the
+# two-pass per-heading pseudonym map, custom-group/column dropping and the
+# ABBR-of-sensitive tokenisation — extracted out of `ags4-corpus-qa`'s
+# `censor.rs` so the browser `Anonymiser` drives the SAME engine (via the
+# engine wasm) instead of hand-reimplementing it in TS. Part of the #527
+# cross-surface convergence arc, the sibling of the #533 tokenizer/quoter work.
+#
+# A wasm-clean leaf by construction: it tokenizes via the shared parse leaf
+# (`tokenize_spans`), re-quotes via `laterite-types` (`quote_field`), and reads
+# the standard-code set from the reference leaf — the same three leaves the
+# engine wasm already carries. No FS, no rayon, no CLI: the crawler/manifest/
+# report wrapper stays in `ags4-corpus-qa`, which now depends ON this leaf.
+[package]
+name = "laterite-ags4-censor"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "Shared AGS4 anonymisation/redaction engine (the scrub convergence leaf)"
+license = "MIT"
+publish = false
+
+[dependencies]
+# Tokenizing: the SAME offset-preserving `tokenize_spans` the browser display
+# path and the tokenizer wasm use (#533) — so the scrub reads fields through the
+# one AGS4 line authority, not a private fourth tokenizer.
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+# Standard group/heading codes for `drop_custom` — from the dictionary SSOT the
+# reference leaf owns (#475), not a re-embedded copy of ags_dictionary.json.
+laterite-ags4-reference = { path = "../laterite-ags4-reference" }
+# Canonical AGS4 field quoting for re-emitted (scrubbed / column-dropped) cells:
+# `quote_field` — the quoter authority (#528/#533 Decision C). Default features
+# (arrow off) keep this leaf light + wasm-clean.
+laterite-types = { path = "../laterite-types" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints]
+workspace = true

@@ -10,12 +10,19 @@ const loca = [
 ];
 
 // A Map (or Array of [code, rows]) — group order is preserved, so put PROJ first.
-const res = buildAgs4(new Map([["PROJ", proj], ["LOCA", loca]])); // default mode "autofix"
+const res = buildAgs4(
+  new Map([
+    ["PROJ", proj],
+    ["LOCA", loca],
+  ]),
+); // default mode "autofix"
 const groups = read(res.bytes).groups;
 console.log("groups:", groups);
 console.log("findings:", res.findings.length);
 
 // Autofix synthesizes the mandatory metadata catalogs (TRAN/UNIT/TYPE), so a
 // data-only build is valid in one call.
-assert.ok(["PROJ", "LOCA", "TRAN", "UNIT", "TYPE"].every((c) => groups.includes(c)));
+assert.ok(
+  ["PROJ", "LOCA", "TRAN", "UNIT", "TYPE"].every((c) => groups.includes(c)),
+);
 assert.equal(res.findings.length, 0);

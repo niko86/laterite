@@ -8,10 +8,11 @@
 //! tables `parse_arrow` hands over (pyo3-arrow capsule, zero-copy).
 //!
 //! Two error-JSON shapes are deliberately preserved (see the package
-//! README): the Rust-CLI shape `{file, findings:{rule:[...]}}` is
-//! built *here* with the same `serde_json` (`preserve_order`) calls
-//! the `lat` binary uses, so `--json`/`--ndjson` are
-//! byte-faithful; the python-ags4 `check_file` dict (with
+//! README): the Rust-CLI shape `{file, findings:{rule:[...]}}` comes from
+//! the ENGINE's own renderer (`laterite_ags4_validator::findings`) — the
+//! same function the `lat` binary calls, so `--json`/`--ndjson` are
+//! byte-faithful by construction rather than by a hand-copy kept in step
+//! with a comment (#530); the python-ags4 `check_file` dict (with
 //! `Metadata`/`Summary`) is assembled in `laterite/compat.py`.
 
 use std::path::Path;
@@ -22,17 +23,16 @@ use laterite_ags4_validator::findings::{Severity, Target};
 use laterite_ags4_validator::fixes::FixRisk;
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, Dictionary, Findings, Fix, ValidatorError, WorldScope,
-    fix_document_selective,
+    fix_document_selective, overlay,
 };
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList};
 use pyo3_arrow::PyTable;
-use serde_json::{Map, Value};
 
-// S3b (release/v0.1.0-prep): `ags5db_fns` moved to the separate
-// `laterite-py-ags5` cdylib. Base wheel ships without DuckDB; the
-// AGS5 surface is gated behind the `laterite[ags5]` extra.
+// S3b (release/v0.1.0-prep): the DuckDB-bound function module moved to
+// a separate cdylib. Base wheel ships without DuckDB; the modules
+// below are the ones that stay in it.
 mod ags_types_fns;
 mod emit_typed;
 mod excel_fns;
@@ -40,21 +40,21 @@ mod registry_fns;
 mod transport_fns;
 mod typed_graph;
 
-/// Map an `laterite-ags4-core` `CliError` to a PyRuntimeError, preserving the
+/// Map an `laterite-ags4-core` `CliError` to a `PyRuntimeError`, preserving the
 /// exit-code label python callers may surface in error messages.
-/// Previously lived in `ags5db_fns.rs`; that module moved to the
-/// AGS5 cdylib in S3b, so the base-wheel transport + excel functions
-/// share this local copy instead.
-pub(crate) fn map_cli_err(e: CliError) -> PyErr {
+/// Previously lived in a DuckDB-bound function module; that module
+/// moved to a separate cdylib in S3b, so the base-wheel transport +
+/// excel functions share this local copy instead.
+pub(crate) fn map_cli_err(e: &CliError) -> PyErr {
     let code = e.exit_code();
     PyRuntimeError::new_err(format!("laterite error (exit {code}): {e}"))
 }
 
 /// Map a `--dict-version` string to the optional override. `None` /
-/// `"auto"` ⇒ no override (TRAN_AGS auto-pick). Unknown ⇒ `Err`.
+/// `"auto"` ⇒ no override (`TRAN_AGS` auto-pick). Unknown ⇒ `Err`.
 pub(crate) fn parse_dv(s: Option<&str>) -> Result<Option<DictVersion>, String> {
     match s {
-        None | Some("auto") | Some("") => Ok(None),
+        None | Some("auto" | "") => Ok(None),
         Some(other) => DictVersion::from_edition(other).map(Some).ok_or_else(|| {
             format!(
                 "unknown --dict-version {other:?} (expected auto|{})",
@@ -64,10 +64,62 @@ pub(crate) fn parse_dv(s: Option<&str>) -> Result<Option<DictVersion>, String> {
     }
 }
 
-/// (exit_code, error_kind, message) for a validator error — exit codes
+/// Parse the `--dict` custom-dictionary override for a Python call, mirroring the CLI's
+/// `apply_dict_args` (#568). The dict arrives as a filesystem path OR raw bytes (wasm has
+/// no FS, so bytes is the portable spelling every surface shares); the base edition is a
+/// property of the dict, detected structurally, unless the caller forces one via
+/// `--dict-version` (`over`) or drops it entirely via `dict_replace`. `enc` is the caller's
+/// already-resolved source encoding (the same one it hands `CheckOptions`), so the label is
+/// resolved once per call.
+///
+/// Returns `Ok(None)` when no dict was named. Errors use the same `(5, "bad_dict", msg)`
+/// shape as the rest of this file so the Python layer raises the mapped exception.
+fn build_custom_dict(
+    dict_path: Option<&str>,
+    dict_bytes: Option<&[u8]>,
+    dict_replace: bool,
+    over: Option<DictVersion>,
+    enc: &'static encoding_rs::Encoding,
+) -> Result<Option<overlay::CustomDict>, (i32, String, String)> {
+    let bad = |m: String| (5, "bad_dict".to_string(), m);
+    // Where the bytes come from, and the advisory name the cert records (basename for a
+    // path, a neutral label for in-memory bytes — never a filesystem path, #568 §4).
+    let (bytes, name): (Vec<u8>, String) = if let Some(p) = dict_path {
+        let b =
+            std::fs::read(Path::new(p)).map_err(|e| bad(format!("cannot read --dict {p}: {e}")))?;
+        let name = Path::new(p)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("custom-dict")
+            .to_string();
+        (b, name)
+    } else if let Some(b) = dict_bytes {
+        (b.to_vec(), "custom-dict".to_string())
+    } else {
+        return Ok(None);
+    };
+    // A forced base and "no base" cannot both hold — same contradiction the CLI exits 5 on.
+    if dict_replace && over.is_some() {
+        return Err(bad("dict_replace cannot be combined with dict_version \
+             (a forced base contradicts a full replacement)"
+            .to_string()));
+    }
+    let base = if dict_replace {
+        overlay::BaseSpec::Replace
+    } else if let Some(v) = over {
+        overlay::BaseSpec::Force(v)
+    } else {
+        overlay::BaseSpec::Auto
+    };
+    overlay::parse_dict(&bytes, overlay::DictFormat::Auto, enc, base, &name)
+        .map(Some)
+        .map_err(|e| bad(format!("bad --dict {name}: {e}")))
+}
+
+/// (`exit_code`, `error_kind`, message) for a validator error — exit codes
 /// mirror the `lat` binary exactly (3 not-found/io, 4
 /// not-utf8/not-ags4/unsupported-edition, 5 bad-dict).
-fn map_err(e: ValidatorError) -> (i32, String, String) {
+fn map_err(e: &ValidatorError) -> (i32, String, String) {
     // Delegate to the single producers so codes/kinds can't drift.
     (e.exit_code(), e.kind().to_string(), e.to_string())
 }
@@ -88,6 +140,9 @@ struct Checked {
     findings: Findings,
     /// A cert answered the CONTENT half. The world half (Rule 20 on-disk) ran regardless.
     certified: bool,
+    /// If a certificate was offered and NOT used, the stable token for why (the core
+    /// `RevalidateReason::as_str`). `None` when no cert was offered, or it was vouched.
+    revalidate_reason: Option<String>,
 }
 
 /// Run the validator from a path, in-memory text, or raw bytes — through the ONE door.
@@ -108,6 +163,9 @@ fn validate(
     fyi: bool,
     check_files: bool,
     encoding: Option<&str>,
+    dict_path: Option<&str>,
+    dict_bytes: Option<&[u8]>,
+    dict_replace: bool,
     cert: Option<&CoreSidecar>,
 ) -> Result<Checked, (i32, String, String)> {
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
@@ -118,9 +176,10 @@ fn validate(
             format!("unknown encoding {:?}", encoding.unwrap_or("")),
         )
     })?;
+    let custom_dict = build_custom_dict(dict_path, dict_bytes, dict_replace, over, enc)?;
     let opts = CheckOptions {
         dict_version: over,
-        custom_dict: None,
+        custom_dict,
         include_warnings: warnings,
         include_fyi: fyi,
         check_files,
@@ -165,7 +224,7 @@ fn validate(
         world,
         compat: None,
     })
-    .map_err(map_err)?;
+    .map_err(|e| map_err(&e))?;
 
     Ok(Checked {
         file: label,
@@ -173,10 +232,11 @@ fn validate(
         resolution: out.resolution.as_str().to_string(),
         findings: out.findings,
         certified: out.certified,
+        revalidate_reason: out.revalidate_reason.map(|r| r.as_str().to_string()),
     })
 }
 
-/// Lowercase serde-name of a [`Target`] for the structured PyDict
+/// Lowercase serde-name of a [`Target`] for the structured `PyDict`
 /// (matches the JSON `target` value).
 fn target_str(t: Target) -> &'static str {
     match t {
@@ -187,54 +247,19 @@ fn target_str(t: Target) -> &'static str {
     }
 }
 
-/// Lowercase serde-name of a [`Severity`] for the structured PyDict — delegates
+/// Lowercase serde-name of a [`Severity`] for the structured `PyDict` — delegates
 /// to the single producer so it can't drift from the serde token.
 fn severity_str(s: Severity) -> &'static str {
     s.as_str()
 }
 
-/// `{file, findings:{ "AGS Format Rule N":[{line,group,desc}] }}` —
-/// the exact `serde_json` value + insertion order the `lat`
-/// binary's `json_value`/`json_string` produce. `preserve_order` (set
-/// in Cargo.toml, matching the validator) keeps the key order stable.
-fn findings_json(file: &str, found: &Findings) -> String {
-    let mut fmap = Map::new();
-    for (rule, items) in found {
-        // Serialize the engine `Finding` directly — byte-faithful to the
-        // CLI's `json_value`. Unset location/severity fields skip, so
-        // line-only findings stay `{line,group,desc}`; migrated findings
-        // additively gain the rich keys.
-        let arr: Vec<Value> = items
-            .iter()
-            .map(|f| serde_json::to_value(f).unwrap_or(Value::Null))
-            .collect();
-        fmap.insert(rule.clone(), Value::Array(arr));
-    }
-    let mut root = Map::new();
-    root.insert("file".into(), Value::from(file.to_string()));
-    root.insert("findings".into(), Value::Object(fmap));
-    serde_json::to_string_pretty(&Value::Object(root)).unwrap_or_default()
-}
-
-/// One flat JSON object per finding per line (NDJSON) — byte-identical
-/// to the binary's `ndjson_string`.
-fn findings_ndjson(found: &Findings) -> String {
-    let mut s = String::new();
-    for (rule, items) in found {
-        for f in items {
-            // `rule`-first then the serialized `Finding` body — byte-faithful
-            // to the CLI's `ndjson_string`.
-            let mut o = Map::new();
-            o.insert("rule".into(), Value::from(rule.clone()));
-            if let Value::Object(body) = serde_json::to_value(f).unwrap_or(Value::Null) {
-                o.extend(body);
-            }
-            s.push_str(&serde_json::to_string(&Value::Object(o)).unwrap_or_default());
-            s.push('\n');
-        }
-    }
-    s
-}
+// `findings_json` / `findings_ndjson` are the ENGINE's renderers
+// (`laterite_ags4_validator::findings`), re-exported here at the old private
+// path so the call sites below are unchanged. This module used to carry its own
+// copy, marked "byte-identical to the binary's `ndjson_string`" — a comment is
+// not a guarantee, and there were three such copies (#530). Now `lat validate
+// --json`, `laterite`'s report JSON and Node's all come out of one function.
+use laterite_ags4_validator::findings::{findings_json, findings_ndjson};
 
 fn err_dict<'py>(
     py: Python<'py>,
@@ -256,8 +281,10 @@ fn err_dict<'py>(
 /// error, exit_code}` (the Python layer raises the mapped exception;
 /// the CLI uses `exit_code` directly).
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, check_files=false, encoding=None, cert=None))]
+#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, check_files=false, encoding=None, dict_path=None, dict_bytes=None, dict_replace=false, cert=None))]
 #[allow(clippy::too_many_arguments)]
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
 fn run_check<'py>(
     py: Python<'py>,
     path: Option<String>,
@@ -268,6 +295,11 @@ fn run_check<'py>(
     include_fyi: bool,
     check_files: bool,
     encoding: Option<String>,
+    // The custom `--dict` overlay (#568): a path OR raw bytes, plus `dict_replace` to drop
+    // the base. wasm has no FS, so bytes is the spelling every surface can share.
+    dict_path: Option<String>,
+    dict_bytes: Option<Vec<u8>>,
+    dict_replace: bool,
     // The certificate, if the caller named one. The decision to trust it is NOT made in
     // Python — it is made once, in `laterite_ags4_trust`, alongside every other surface.
     // The Python layer used to make it itself, with its own conjunction of predicates.
@@ -282,6 +314,9 @@ fn run_check<'py>(
         include_fyi,
         check_files,
         encoding.as_deref(),
+        dict_path.as_deref(),
+        dict_bytes.as_deref(),
+        dict_replace,
         cert.as_ref().map(|c| &c.inner),
     ) {
         Err((code, kind, msg)) => err_dict(py, code, &kind, &msg),
@@ -292,6 +327,7 @@ fn run_check<'py>(
                 resolution: res,
                 findings: found,
                 certified,
+                revalidate_reason,
             } = checked;
             let d = PyDict::new(py);
             d.set_item("ok", true)?;
@@ -301,6 +337,9 @@ fn run_check<'py>(
             // Whether the rule ENGINE was skipped. Never "whether the file was checked":
             // a world check (Rule 20 on-disk) runs even on a certified read.
             d.set_item("certified", certified)?;
+            // Why a proffered cert didn't help (stable token), or `None`. A reader that
+            // passed no cert always sees `None`; a certified read also sees `None`.
+            d.set_item("revalidate_reason", revalidate_reason)?;
 
             let mut count = 0usize;
             let items = PyList::empty(py);
@@ -339,7 +378,7 @@ fn run_check<'py>(
                 }
             }
             d.set_item("count", count)?;
-            d.set_item("exit_code", if count == 0 { 0 } else { 1 })?;
+            d.set_item("exit_code", i32::from(count != 0))?;
             d.set_item("findings", items)?;
             d.set_item("json", findings_json(&file, &found))?;
             d.set_item("ndjson", findings_ndjson(&found))?;
@@ -382,7 +421,7 @@ pub(crate) fn fixes_to_pylist<'py>(py: Python<'py>, fixes: &[Fix]) -> PyResult<B
 /// the intent-guessing *risky* set when `include_risky`), and re-validates the
 /// result. Returns `(fixed_bytes, residual_findings, applied_fixes, dict_version,
 /// resolution)` or the `(exit_code, kind, msg)` error triple. Mirrors the
-/// AutoFix path in `laterite-ags4-emit::emit`, but on a file's own bytes rather
+/// `AutoFix` path in `laterite-ags4-emit::emit`, but on a file's own bytes rather
 /// than freshly-built data.
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn fix_core(
@@ -394,6 +433,9 @@ fn fix_core(
     include_risky: bool,
     only: Option<&[String]>,
     exclude: &[String],
+    dict_path: Option<&str>,
+    dict_bytes: Option<&[u8]>,
+    dict_replace: bool,
 ) -> Result<(Vec<u8>, Findings, Vec<Fix>, String, String, usize), (i32, String, String)> {
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
     let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
@@ -403,6 +445,7 @@ fn fix_core(
             format!("unknown encoding {:?}", encoding.unwrap_or("")),
         )
     })?;
+    let custom_dict = build_custom_dict(dict_path, dict_bytes, dict_replace, over, enc)?;
     // The source bytes — fix needs the raw document to apply byte/char edits to,
     // so unlike `validate` we always materialise bytes (a path is read here).
     let raw: Vec<u8> = if let Some(p) = path {
@@ -434,13 +477,14 @@ fn fix_core(
     // vs the other surfaces (#294 Batch C).
     let opts = CheckOptions {
         dict_version: over,
-        custom_dict: None,
+        custom_dict,
         include_warnings: true,
         include_fyi: false,
         check_files: false,
         encoding: enc,
     };
-    let out = fix_document_selective(&raw, &opts, include_risky, only, exclude).map_err(map_err)?;
+    let out = fix_document_selective(&raw, &opts, include_risky, only, exclude)
+        .map_err(|e| map_err(&e))?;
     Ok((
         out.fixed,
         out.residual,
@@ -457,10 +501,12 @@ fn fix_core(
 /// un-fixable input returns the same `{ok:false, …}` shape as `run_check`, so
 /// the Python layer raises the mapped exception.
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, encoding=None, include_risky=false, only=None, exclude=None))]
+#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, encoding=None, include_risky=false, only=None, exclude=None, dict_path=None, dict_bytes=None, dict_replace=false))]
 #[allow(clippy::too_many_arguments)]
-fn fix_file<'py>(
-    py: Python<'py>,
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn fix_file(
+    py: Python<'_>,
     path: Option<String>,
     text: Option<String>,
     data: Option<Vec<u8>>,
@@ -469,7 +515,10 @@ fn fix_file<'py>(
     include_risky: bool,
     only: Option<Vec<String>>,
     exclude: Option<Vec<String>>,
-) -> PyResult<Bound<'py, PyDict>> {
+    dict_path: Option<String>,
+    dict_bytes: Option<Vec<u8>>,
+    dict_replace: bool,
+) -> PyResult<Bound<'_, PyDict>> {
     let exclude = exclude.unwrap_or_default();
     match fix_core(
         path.as_deref(),
@@ -480,6 +529,9 @@ fn fix_file<'py>(
         include_risky,
         only.as_deref(),
         &exclude,
+        dict_path.as_deref(),
+        dict_bytes.as_deref(),
+        dict_replace,
     ) {
         Err((code, kind, msg)) => err_dict(py, code, &kind, &msg),
         Ok((bytes, residual, applied, dv, res, risky_available)) => {
@@ -532,16 +584,15 @@ fn diff_core(
     })?;
     let pa = laterite_ags4_parse::parse_bytes(a, enc)
         .map_err(ValidatorError::from)
-        .map_err(map_err)?;
+        .map_err(|e| map_err(&e))?;
     let pb = laterite_ags4_parse::parse_bytes(b, enc)
         .map_err(ValidatorError::from)
-        .map_err(map_err)?;
+        .map_err(|e| map_err(&e))?;
     // KEY headings come from the dictionary; pick the edition from the revision
     // (b)'s TRAN_AGS (forced by dict_version), falling back to the standard.
     let tran = laterite_ags4_validator::tran_ags_of(&pb);
     let dv = laterite_ags4_validator::resolve_dict_version(over, tran.as_deref())
-        .map(|(dv, _)| dv)
-        .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
+        .map_or(laterite_ags4_validator::dict::FALLBACK, |(dv, _)| dv);
     let dict = Dictionary::bundled(dv);
     let delta = laterite_ags4_diff::diff_parsed(&pa, &pb, &dict, None);
     Ok(serde_json::to_string(&delta).unwrap_or_else(|_| "{}".to_string()))
@@ -552,13 +603,15 @@ fn diff_core(
 /// or the `{ok:false, error_kind, exit_code, error}` failure dict.
 #[pyfunction]
 #[pyo3(signature = (a, b, dict_version=None, encoding=None))]
-fn diff_files<'py>(
-    py: Python<'py>,
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn diff_files(
+    py: Python<'_>,
     a: Vec<u8>,
     b: Vec<u8>,
     dict_version: Option<String>,
     encoding: Option<String>,
-) -> PyResult<Bound<'py, PyDict>> {
+) -> PyResult<Bound<'_, PyDict>> {
     match diff_core(&a, &b, dict_version.as_deref(), encoding.as_deref()) {
         Err((code, kind, msg)) => err_dict(py, code, &kind, &msg),
         Ok(delta_json) => {
@@ -621,7 +674,7 @@ fn merge_core(
         .map(|b| {
             laterite_ags4_parse::parse_bytes(b, enc)
                 .map_err(ValidatorError::from)
-                .map_err(map_err)
+                .map_err(|e| map_err(&e))
         })
         .collect::<Result<_, _>>()?;
 
@@ -634,8 +687,7 @@ fn merge_core(
             .and_then(laterite_ags4_validator::tran_ags_of)
             .as_deref(),
     )
-    .map(|(dv, _)| dv)
-    .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
+    .map_or(laterite_ags4_validator::dict::FALLBACK, |(dv, _)| dv);
 
     // A merge-TRAN is synthesised only when both an issue and a date are given.
     let (isno, date, prod, recv, stat) = tran;
@@ -712,6 +764,8 @@ fn merge_core(
 #[pyfunction]
 #[pyo3(signature = (files, on_type_clash="error", dict_version=None, encoding=None, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None))]
 #[allow(clippy::too_many_arguments)]
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
 fn merge_files<'py>(
     py: Python<'py>,
     files: Vec<Vec<u8>>,
@@ -757,19 +811,18 @@ fn merge_files<'py>(
 /// needs the python-ags4-shaped frame.
 #[pyfunction]
 #[pyo3(signature = (path=None, text=None, data=None, encoding=None))]
-fn parse_primitives<'py>(
-    py: Python<'py>,
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn parse_primitives(
+    py: Python<'_>,
     path: Option<String>,
     text: Option<String>,
     data: Option<Vec<u8>>,
     encoding: Option<String>,
-) -> PyResult<Bound<'py, PyDict>> {
-    let enc = match laterite_ags4_parse::resolve_encoding(encoding.as_deref()) {
-        Some(e) => e,
-        None => {
-            let label = encoding.as_deref().unwrap_or("");
-            return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}"));
-        }
+) -> PyResult<Bound<'_, PyDict>> {
+    let Some(enc) = laterite_ags4_parse::resolve_encoding(encoding.as_deref()) else {
+        let label = encoding.as_deref().unwrap_or("");
+        return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}"));
     };
     let parsed = match (path.as_deref(), text.as_deref(), data.as_deref()) {
         (Some(p), _, _) => {
@@ -784,7 +837,7 @@ fn parse_primitives<'py>(
     let pf = match parsed {
         Ok(pf) => pf,
         Err(e) => {
-            let (c, k, m) = map_err(e);
+            let (c, k, m) = map_err(&e);
             return err_dict(py, c, &k, &m);
         }
     };
@@ -821,11 +874,111 @@ fn parse_primitives<'py>(
     Ok(d)
 }
 
+/// Parse to the python-ags4-shaped ("compat") all-`Utf8` Arrow — one table per
+/// group, built Rust-side with NO per-cell `PyObject` boxing (unlike
+/// `parse_primitives`, which crosses the whole file as Python strings). Each
+/// group's `table` carries a leading `HEADING` tag column then one raw-string
+/// column per heading (positional names `c0`, `c1`, … — the Python side owns
+/// python-ags4's duplicate-heading renaming and the `rename=False` raise). Also
+/// returns `group_records` (every GROUP occurrence — for the duplicate-GROUP
+/// raise) and, per group, `ragged` (DATA rows whose field count differs from the
+/// heading count — for the ragged-row raise), so the compat reader needs no
+/// second file scan. This is the fast path behind `compat.AGS4_to_dataframe`.
+#[pyfunction]
+#[pyo3(signature = (path=None, text=None, data=None, encoding=None))]
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn parse_compat_arrow(
+    py: Python<'_>,
+    path: Option<String>,
+    text: Option<String>,
+    data: Option<Vec<u8>>,
+    encoding: Option<String>,
+) -> PyResult<Bound<'_, PyDict>> {
+    let Some(enc) = laterite_ags4_parse::resolve_encoding(encoding.as_deref()) else {
+        let label = encoding.as_deref().unwrap_or("");
+        return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}"));
+    };
+    let parsed = match (path.as_deref(), text.as_deref(), data.as_deref()) {
+        (Some(p), _, _) => {
+            laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc)
+        }
+        (_, Some(t), _) => laterite_ags4_parse::parse_str(t).map_err(ValidatorError::from),
+        (_, _, Some(d)) => laterite_ags4_parse::parse_bytes(d, enc).map_err(ValidatorError::from),
+        _ => {
+            return err_dict(py, 5, "bad_args", "one of path, text, or data is required");
+        }
+    };
+    let pf = match parsed {
+        Ok(pf) => pf,
+        Err(e) => {
+            let (c, k, m) = map_err(&e);
+            return err_dict(py, c, &k, &m);
+        }
+    };
+
+    let d = PyDict::new(py);
+    d.set_item("ok", true)?;
+    d.set_item("group_order", pf.group_order.clone())?;
+    d.set_item("tran_ags", laterite_ags4_validator::tran_ags_of(&pf))?;
+    // Every GROUP occurrence (the parse dedups/merges groups but keeps this list)
+    // so the reader can raise on a duplicate GROUP with both line numbers.
+    d.set_item(
+        "group_records",
+        pf.group_records
+            .iter()
+            .map(|gr| (gr.code.clone(), gr.line))
+            .collect::<Vec<_>>(),
+    )?;
+
+    let groups = PyDict::new(py);
+    for code in &pf.group_order {
+        let Some(g) = pf.groups.get(code) else {
+            continue;
+        };
+        let gd = PyDict::new(py);
+        gd.set_item("headings", g.headings.clone())?;
+        gd.set_item("group_line", g.group_line)?;
+        gd.set_item("heading_line", g.heading_line)?;
+        gd.set_item("unit_line", g.unit_line)?;
+        gd.set_item("type_line", g.type_line)?;
+        gd.set_item(
+            "line_numbers",
+            g.rows.iter().map(|r| r.line).collect::<Vec<_>>(),
+        )?;
+        // Ragged DATA rows (raw field count != heading count) — python-ags4
+        // raises on the first. Usually empty; only the offenders cross.
+        let n_head = g.headings.len();
+        let ragged: Vec<(u32, usize)> = g
+            .rows
+            .iter()
+            .filter(|r| r.values.len() != n_head)
+            .map(|r| (r.line, r.values.len()))
+            .collect();
+        gd.set_item("ragged", ragged)?;
+
+        let batch = laterite_types::arrow_cols::build_record_batch_compat(
+            &g.headings,
+            &g.units,
+            &g.types,
+            g.rows.len(),
+            |col, row| g.cell(col, row),
+        )
+        .map_err(|e| PyRuntimeError::new_err(format!("compat arrow for {code}: {e}")))?;
+        let schema = batch.schema();
+        gd.set_item("table", PyTable::try_new(vec![batch], schema)?)?;
+
+        groups.set_item(code, gd)?;
+    }
+    d.set_item("groups", groups)?;
+    Ok(d)
+}
+
 /// A parsed AGS4 file held Rust-side. `parse_arrow` crosses only cheap
 /// per-group metadata; the raw `ParsedFile` stays HERE and serves two roles
 /// on demand: `table_for` builds a group's typed Arrow table on first touch
 /// (per-group lazy reads), and `emit` re-emits byte-faithful AGS4 for
-/// `write()`. No O(cells) PyObject dict crosses the boundary, and there is no
+/// `write()`. No O(cells) `PyObject` dict crosses the boundary, and there is no
 /// second AGS formatter — emit reproduces the source DATA values exactly. The
 /// Python `Ags4File` holds one of these as its `_handle`.
 #[pyclass]
@@ -885,7 +1038,7 @@ impl Reading {
     /// Build ONE group's typed Arrow table on demand. The read path is
     /// per-group lazy: `read()` / `scan()` only pay for the groups actually
     /// touched, so a 69-group file you query two groups of builds two
-    /// RecordBatches, not 69. Returns `None` if `code` isn't in the file.
+    /// `RecordBatches`, not 69. Returns `None` if `code` isn't in the file.
     /// Same shared emitter (`laterite_types::arrow_cols`) as the old eager build —
     /// byte-identical columns, and still the SAME cast the browser's IPC path
     /// uses. The Python `Ags4File` memoises the result per code.
@@ -907,7 +1060,7 @@ impl Reading {
         // cross-group join in `.sql()` works with no opt-in — the Python frame
         // accessor strips them by default. The ids come from the one shared
         // keychain (`group_row_ids` → `keychain::row_ids`), so they are byte-
-        // identical to the `.ags5db` extension's. A custom/passthrough group is
+        // identical across every surface that shares this crate. A custom/passthrough group is
         // absent from the registry → it has no spec keys → unkeyed (`ids: None`,
         // #303).
         //
@@ -987,13 +1140,17 @@ impl PySidecar {
     /// legitimately carry them). Raises `ValueError` on an uncertifiable or unparseable
     /// file.
     #[staticmethod]
-    #[pyo3(signature = (data, checked_at, dict_version=None, encoding=None, compat=None))]
+    #[pyo3(signature = (data, checked_at, dict_version=None, encoding=None, compat=None, dict_path=None, dict_bytes=None, dict_replace=false))]
+    #[allow(clippy::too_many_arguments)]
     fn mint(
         data: &[u8],
         checked_at: String,
         dict_version: Option<&str>,
         encoding: Option<&str>,
         compat: Option<String>,
+        dict_path: Option<&str>,
+        dict_bytes: Option<&[u8]>,
+        dict_replace: bool,
     ) -> PyResult<Self> {
         let over = parse_dv(dict_version).map_err(pyo3::exceptions::PyValueError::new_err)?;
         let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
@@ -1002,8 +1159,14 @@ impl PySidecar {
                 encoding.unwrap_or("")
             ))
         })?;
+        // The cert records WHICH custom dictionary judged the file (#568, O-48): a mint
+        // against a `--dict` overlay stamps its {name, hash}, and a later read that names a
+        // different dict revalidates rather than inheriting a stale verdict.
+        let custom_dict = build_custom_dict(dict_path, dict_bytes, dict_replace, over, enc)
+            .map_err(|(_, _, m)| pyo3::exceptions::PyValueError::new_err(m))?;
         let opts = CheckOptions {
             dict_version: over,
+            custom_dict,
             encoding: enc,
             ..CheckOptions::default()
         };
@@ -1157,27 +1320,26 @@ impl PySidecar {
 }
 
 /// Parse `path` or `text` for `read()` / `scan()`: per-group metadata only
-/// (headings/units/types/line_numbers). The typed Arrow table for a group is
+/// (`headings/units/types/line_numbers`). The typed Arrow table for a group is
 /// NOT built here — it is built lazily, per group, on first touch via the
 /// `_handle`'s `Reading::table_for` (cast by the one shared emitter
 /// `laterite_types::arrow_cols`, byte-identical to the browser's IPC path). The
 /// raw parse stays Rust-side in that `Reading` handle, also feeding
-/// byte-faithful `write()`; no per-cell PyObject rows cross the boundary.
+/// byte-faithful `write()`; no per-cell `PyObject` rows cross the boundary.
 #[pyfunction]
 #[pyo3(signature = (path=None, text=None, data=None, encoding=None))]
-fn parse_arrow<'py>(
-    py: Python<'py>,
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn parse_arrow(
+    py: Python<'_>,
     path: Option<String>,
     text: Option<String>,
     data: Option<Vec<u8>>,
     encoding: Option<String>,
-) -> PyResult<Bound<'py, PyDict>> {
-    let enc = match laterite_ags4_parse::resolve_encoding(encoding.as_deref()) {
-        Some(e) => e,
-        None => {
-            let label = encoding.as_deref().unwrap_or("");
-            return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}"));
-        }
+) -> PyResult<Bound<'_, PyDict>> {
+    let Some(enc) = laterite_ags4_parse::resolve_encoding(encoding.as_deref()) else {
+        let label = encoding.as_deref().unwrap_or("");
+        return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}"));
     };
     let parsed = match (path.as_deref(), text.as_deref(), data.as_deref()) {
         (Some(p), _, _) => {
@@ -1190,7 +1352,7 @@ fn parse_arrow<'py>(
     let pf = match parsed {
         Ok(pf) => pf,
         Err(e) => {
-            let (c, k, m) = map_err(e);
+            let (c, k, m) = map_err(&e);
             return err_dict(py, c, &k, &m);
         }
     };
@@ -1234,6 +1396,8 @@ fn parse_arrow<'py>(
 /// `ValueError` on a bad override or an unsupported (AGS3) edition.
 #[pyfunction]
 #[pyo3(signature = (tran_ags=None, override_version=None))]
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
 fn resolve_dict(
     tran_ags: Option<String>,
     override_version: Option<String>,
@@ -1274,7 +1438,7 @@ fn dict_group_unit_type<'py>(
         })?;
     let dict = laterite_ags4_validator::dict::Dictionary::bundled(dv);
     let out = pyo3::types::PyDict::new(py);
-    for h in dict.group_headings(group) {
+    for h in dict.group_headings(group).iter() {
         if let Some(entry) = dict.heading(group, h) {
             out.set_item(*h, (entry.unit, entry.ags_type))?;
         }
@@ -1287,7 +1451,9 @@ fn dict_group_unit_type<'py>(
 /// core's read codec (no typing). So the Rust binary and the Python `lat read`
 /// agree byte-for-byte on `read --json` / `--csv` (#430 PR 2).
 #[pyfunction]
-fn read_groups_raw<'py>(py: Python<'py>, path: String) -> PyResult<Bound<'py, PyDict>> {
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn read_groups_raw(py: Python<'_>, path: String) -> PyResult<Bound<'_, PyDict>> {
     let parsed = laterite_ags4_core::ags4_codec::read_ags4(std::path::Path::new(&path))
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
     let d = PyDict::new(py);
@@ -1302,7 +1468,7 @@ fn read_groups_raw<'py>(py: Python<'py>, path: String) -> PyResult<Bound<'py, Py
                 let cells: Vec<&str> = g
                     .headings
                     .iter()
-                    .map(|h| row.get(h).map(String::as_str).unwrap_or(""))
+                    .map(|h| row.get(h).map_or("", String::as_str))
                     .collect();
                 rows.append(PyList::new(py, &cells)?)?;
             }
@@ -1314,6 +1480,27 @@ fn read_groups_raw<'py>(py: Python<'py>, path: String) -> PyResult<Bound<'py, Py
     Ok(d)
 }
 
+/// `lat read --json` for one group: the rendered string, from core's ONE JSON
+/// writer. `_cli.py` used to build this with Python's `json.dumps(indent=2,
+/// ensure_ascii=False)` while the binary used `serde_json` and Node used
+/// `JSON.stringify` — three different JSON libraries kept byte-identical by
+/// hand-discipline, with no gate on `read` output (#530).
+#[pyfunction]
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn render_read_json(headings: Vec<String>, rows: Vec<Vec<String>>) -> String {
+    laterite_ags4_core::read_render::render_rows_json(&headings, &rows)
+}
+
+/// `lat read --csv` for one group: the rendered string, from core's ONE CSV
+/// writer (RFC-4180-ish quoting). Replaces `_cli.py`'s hand-ported `_csv_row`.
+#[pyfunction]
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+fn render_read_csv(headings: Vec<String>, rows: Vec<Vec<String>>) -> String {
+    laterite_ags4_core::read_render::render_rows_csv(&headings, &rows)
+}
+
 #[pymodule]
 fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(run_check, m)?)?;
@@ -1323,7 +1510,10 @@ fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(merge_files, m)?)?;
     m.add_function(wrap_pyfunction!(parse_primitives, m)?)?;
     m.add_function(wrap_pyfunction!(parse_arrow, m)?)?;
+    m.add_function(wrap_pyfunction!(parse_compat_arrow, m)?)?;
     m.add_function(wrap_pyfunction!(read_groups_raw, m)?)?;
+    m.add_function(wrap_pyfunction!(render_read_json, m)?)?;
+    m.add_function(wrap_pyfunction!(render_read_csv, m)?)?;
     m.add_function(wrap_pyfunction!(resolve_dict, m)?)?;
     m.add_function(wrap_pyfunction!(dict_group_unit_type, m)?)?;
     m.add_function(wrap_pyfunction!(emit_typed::emit_ags4_from_arrow, m)?)?;

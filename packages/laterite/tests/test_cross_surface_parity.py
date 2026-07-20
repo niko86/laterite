@@ -69,7 +69,9 @@ def _py_knobs(fn, drop: set[str]) -> set[str]:
     }
 
 
-def _ts_interface_fields(src: str, name: str, _seen: set[str] | None = None) -> set[str]:
+def _ts_interface_fields(
+    src: str, name: str, _seen: set[str] | None = None
+) -> set[str]:
     """The field names of a TS `interface`, following one `extends` chain (so
     `ValidateOptions extends ReadOptions` inherits `encoding`/`text`/…). Fields are
     the identifiers before `?:` / `:` at the top of the interface body."""
@@ -77,7 +79,9 @@ def _ts_interface_fields(src: str, name: str, _seen: set[str] | None = None) -> 
     if name in _seen:
         return set()
     _seen.add(name)
-    m = re.search(rf"export interface {name}(?: extends (\w+))?\s*\{{(.*?)\n\}}", src, re.DOTALL)
+    m = re.search(
+        rf"export interface {name}(?: extends (\w+))?\s*\{{(.*?)\n\}}", src, re.DOTALL
+    )
     if m is None:
         raise AssertionError(f"interface {name} not found in index.ts")
     parent, body = m.group(1), m.group(2)
@@ -128,7 +132,9 @@ def test_allowlist_is_live():
         py = _py_knobs(free_fn, py_drop)
         node = _ts_interface_fields(src, iface)
         for knob in node_missing:
-            assert knob in py, f"{op}: stale allowlist entry {knob!r} (not a Python knob)"
+            assert knob in py, (
+                f"{op}: stale allowlist entry {knob!r} (not a Python knob)"
+            )
             assert _snake_to_camel(knob) not in node, (
                 f"{op}: {knob!r} is now on Node — remove it from the allowlist"
             )

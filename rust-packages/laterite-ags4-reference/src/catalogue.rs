@@ -29,6 +29,7 @@ pub const RULE_LABELS: &[&str] = &[
 /// The editorial rule metadata as the raw `rules_meta.json`, embedded at compile
 /// time (no runtime parse for the `--json` passthrough). Gated by the
 /// validator's `catalogue::tests`.
+#[must_use]
 pub fn rule_metadata_json() -> &'static str {
     include_str!("../data/rules_meta.json")
 }

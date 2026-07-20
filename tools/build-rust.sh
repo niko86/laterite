@@ -1,22 +1,20 @@
 #!/usr/bin/env bash
-# Build the Rust read-side `lat-db` CLI in release mode.
+# Build the Rust `lat` AGS4 CLI in release mode.
 #
-# Mac/Linux sibling of build-rust.ps1. The Rust binary is the small-
-# and-fast counterpart to the Python CLI (`ags5db-py`, installed via
-# `uv tool install ./packages/ags5-db`). It ships at ~25-36 MB and
-# starts in <100 ms, replacing the PyInstaller bundle (117.8 MB / 7.6 s
-# cold) for the read-side commands.
+# Mac/Linux sibling of build-rust.ps1. `lat` is the shipped standalone binary —
+# the small, fast AGS4 validator/reader (validate, read, fix, diff, merge,
+# certify, pack/lock, …). The Python `laterite` wheel is the primary library
+# surface; this script is for the CLI on its own.
 #
 # Run from repo root (or anywhere — the script resolves its own path):
 #     tools/build-rust.sh
 #
 # Output:
-#     dist/lat-db                          the canonical read-side binary
+#     dist/lat                             the AGS4 CLI binary
 #     rust-packages/target/release/        cargo build cache (gitignored)
 #
-# Requires: cargo (Rust toolchain). Installed via `rustup`. The first
-# build compiles bundled libduckdb from source and takes ~5-10 min;
-# incremental builds are ~10 s.
+# Requires: cargo (Rust toolchain, install via `rustup`). The CLI is DuckDB-free,
+# so a cold build is a couple of minutes; incremental builds are ~10 s.
 
 set -euo pipefail
 
@@ -25,13 +23,12 @@ repo=$(cd "$script_dir/.." && pwd)
 
 (
   cd "$repo/rust-packages"
-  # `--bin lat-db` builds only the binary crate. The sibling crates
-  # in the workspace aren't needed for shipping the read-side CLI.
-  cargo build --release --bin lat-db
+  # `-p laterite-ags4-check` builds the crate that carries the `lat` binary.
+  cargo build --release -p laterite-ags4-check
 )
 
-src="$repo/rust-packages/target/release/lat-db"
-dst="$repo/dist/lat-db"
+src="$repo/rust-packages/target/release/lat"
+dst="$repo/dist/lat"
 if [[ ! -f $src ]]; then
   echo "Build reported success but $src is missing." >&2
   exit 1

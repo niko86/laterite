@@ -49,7 +49,10 @@ const MISLABELLED_4_0_3 = [
 function answer(rep: Report) {
   const findings = Object.entries(rep.byRule())
     .flatMap(([rule, items]) =>
-      items.map((f) => `${rule}|${f.line ?? ""}|${f.group}|${f.desc}|${f.severity ?? ""}`),
+      items.map(
+        (f) =>
+          `${rule}|${f.line ?? ""}|${f.group}|${f.desc}|${f.severity ?? ""}`,
+      ),
     )
     .sort();
   return {
@@ -93,15 +96,25 @@ describe("the O-42 4.0.3 guard", () => {
     const runs: Array<[string, Report]> = [
       ["path", validate(src, { fyi: true })],
       ["text", validate(undefined, { text: MISLABELLED_4_0_3, fyi: true })],
-      ["bytes", validate(Buffer.from(MISLABELLED_4_0_3, "utf8"), { fyi: true })],
+      [
+        "bytes",
+        validate(Buffer.from(MISLABELLED_4_0_3, "utf8"), { fyi: true }),
+      ],
     ];
     for (const [label, rep] of runs) {
-      expect(rep.dictVersion, `${label}: must be judged against 4.0.4`).toBe("4.0.4");
-      expect(rep.resolution, `${label}`).toBe("guessed");
+      expect(rep.dictVersion, `${label}: must be judged against 4.0.4`).toBe(
+        "4.0.4",
+      );
+      expect(rep.resolution, `${label}: resolution must be "guessed"`).toBe(
+        "guessed",
+      );
       const hasFyi = Object.values(rep.byRule())
         .flat()
-        .some((f) => f.severity === "fyi" && (f.desc ?? "").includes("4.0.4"));
-      expect(hasFyi, `${label}: the transparency FYI (#222 / O-42) is missing`).toBe(true);
+        .some((f) => f.severity === "fyi" && f.desc.includes("4.0.4"));
+      expect(
+        hasFyi,
+        `${label}: the transparency FYI (#222 / O-42) is missing`,
+      ).toBe(true);
     }
   });
 });
@@ -110,8 +123,11 @@ describe("the chained handle agrees with the free function", () => {
   it("read(bytes).validate() lands on the same edition as read(path).validate()", () => {
     const src = writeAgs(MISLABELLED_4_0_3);
     const viaPath = read(src).validate({ fyi: true }).report;
-    const viaBytes = read(Buffer.from(MISLABELLED_4_0_3, "utf8")).validate({ fyi: true }).report;
-    if (!viaPath || !viaBytes) throw new Error("validate() did not produce a report");
+    const viaBytes = read(Buffer.from(MISLABELLED_4_0_3, "utf8")).validate({
+      fyi: true,
+    }).report;
+    if (!viaPath || !viaBytes)
+      throw new Error("validate() did not produce a report");
     expect(answer(viaBytes)).toEqual(answer(viaPath));
   });
 });

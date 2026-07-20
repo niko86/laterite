@@ -9,8 +9,8 @@ and the parity-decisions catalogue in
 
 ## Headline
 
-**122 / 131 of python-ags4 1.2.0's own test suite passes through
-`laterite.compat` (93%).** The remaining 9 are deliberate
+**121 / 131 of python-ags4 1.2.0's own test suite passes through
+`laterite.compat` (92%).** The remaining 10 are deliberate
 non-closures, enumerated below.
 
 **Reproduce it yourself:** `./tools/parity-coverage.sh` clones python-ags4 1.2.0,
@@ -19,7 +19,7 @@ runs its own test suite through `laterite.compat`, and reports the parity count
 coverage — the uncovered remainder is the Rust-backed Excel I/O). It exits
 non-zero if parity drops below 122.
 
-The 122/131 count is anchored against python-ags4 **1.2.0**
+The 121/131 count is anchored against python-ags4 **1.2.0**
 specifically — the parity-pin (`PYTHON_AGS4_COMPAT`) is exact, not a
 floor. A silent upstream behavioural drift would otherwise invalidate
 multiple reconcile arms in the O-N catalogue without a test failure
@@ -42,11 +42,13 @@ aliases `python_ags4 → laterite.compat`, so pytest collects against
 the upstream tests but every behavioural assertion runs through the
 Rust engine.
 
-Expected result: **122 passed, 9 failed**. Any other count is a
-parity regression (closer to 131) or new fault (further from 122) —
-both worth investigating.
+Expected result: **121 passed, 10 failed**, and the ten failures are
+exactly the set named in `parity-known-failures.json` — which is what
+`tools/check_parity.py` enforces, by IDENTITY rather than by count (#556).
+A count alone cannot see a SWAP: one test regressing while another starts
+passing holds the total and reads as green.
 
-## The 9 deliberate non-closures
+## The 10 deliberate non-closures
 
 These are not bugs we plan to fix. They reflect design decisions
 where laterite and python-ags4 give different signals for the same
@@ -89,8 +91,8 @@ agreement.
 ## In-repo synthetic tests beyond python-ags4
 
 These exercise behaviour python-ags4 does not test — either because
-it's a laterite-specific surface (`.ags5db`, typed PROJ graph,
-transport), or because it pins a regression we've fixed (FYI
+it's a laterite-specific surface (typed PROJ graph, transport), or
+because it pins a regression we've fixed (FYI
 surfacing, dictionary parity, recipe execution …).
 
 | Module | Tests | Coverage |
@@ -100,15 +102,10 @@ surfacing, dictionary parity, recipe execution …).
 | `packages/laterite/tests/test_transport.py` | 7 | `transport.{pack,unpack,lock,unlock}` — zstd + age envelope; wrong-passphrase failure mode |
 | `packages/laterite/tests/test_ags4.py` | 1 | 23 MB / 69-group real-world round-trip (skips if fixture absent) |
 | `packages/laterite/tests/test_ags4_typed.py` | 3 | `laterite.ags4.read_typed` → typed PROJ tree |
-| `packages/laterite/tests/test_review_regressions.py` | 2 | Pinned-fix regressions (e.g. older-`.ags5db` view tolerance — kept as a smoke test) |
-| `packages/laterite-ags5/tests/test_ags5db.py` | 31 | The full `.ags5db` Python surface: convert / export / count / sum / sql / peek / query / info / groups / headings / inspect / validate / diff / Predicate |
-| `packages/laterite-ags5/tests/test_typed_graph.py` | 27 | Round-trip the 92 typed `#[pyclass]` groups + dynamic passthrough groups + heading dedup |
-| `packages/laterite-ags5/tests/test_db.py` | 14 | DDL invariants (UUID7 PKs, parent-id JOINs, KEY-overlap dedup, content-hash dedup) |
-| `packages/laterite-ags5/tests/test_blobs.py` | 8 | Photo / file attachment round-trip, SHA-256 persistence, `list_blobs` filters |
-| `packages/laterite-ags5/tests/test_merge.py` | 5 | Append-merge idempotency, KEY-only overlap dedup, real-file scale |
+| `packages/laterite/tests/test_review_regressions.py` | 2 | Pinned-fix regressions (kept as smoke tests) |
 
-Total ~210 in-repo tests (counts the `tests/` collected for `uv run
-pytest`); plus the 131 upstream tests when the parity oracle is run.
+These are the AGS4-surface tests beyond python-ags4; plus the 131
+upstream tests when the parity oracle is run.
 
 ## See also
 

@@ -1,6 +1,6 @@
 import { createSignal, For, Show, type Component } from "solid-js";
 
-const MIME: Record<string, string> = {
+const MIME: Record<"csv" | "json" | "parquet", string> = {
   csv: "text/csv",
   json: "application/json",
   parquet: "application/octet-stream",
@@ -53,7 +53,7 @@ export const ExportBar: Component<{
             type="button"
             class="rounded border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-40"
             disabled={busy() !== null}
-            onClick={() => doExport(fmt)}
+            onClick={() => void doExport(fmt)}
           >
             {busy() === fmt ? "…" : fmt.toUpperCase()}
           </button>

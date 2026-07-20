@@ -101,9 +101,21 @@ jobs:
               - 'tools/gen_reference_groups.py'                        # test_reference_groups_faithful — the group tier generator (its SSOT, ags_dictionary.json, is already covered by rust-packages/**)
               - 'tools/gen_crate_graph.py'                             # test_crate_graph_faithful — the crate-graph generator (its SSOT, the Cargo manifests, is already covered by rust-packages/**)
               - 'tools/xcheck/**'                                      # the OUTPUT-VALUE gate's surface legs — an xcheck-only PR must run its own gate (the cases live under rust-packages/ags4-compliance, already covered by rust-packages/**)
+              - 'tools/wheel_smoke.py'                                 # the wheel-smoke job's post-install smoke — an edit to it must re-run that job (#554)
               - 'xcheck-allow.json'                                    # the value allowlist — a pin edit must re-run the gate that enforces it
               - 'surface-census.json'                                  # test_census_faithful — the census SSOT
               - 'tools/gen_census.py'                                  # the census generator — a render/related change must re-run it
+              # The PUBLISHED parity claim (#556). tests/test_parity_claim_faithful.py
+              # asserts these match parity-known-failures.json — but that gate lives in
+              # the python job, so without these paths a README-only edit would skip the
+              # very gate that guards it. That is how the claim rotted to 122/131: O-47
+              # moved the number, parity.yml was updated, and nothing ran when the docs
+              # weren't.
+              - 'parity-known-failures.json'                          # the parity SSOT
+              - 'README.md'                                           # the headline claim
+              - 'packages/laterite/README.md'                         # ships in the wheel, to PyPI
+              - 'COMPAT.md'                                           # the non-closure table
+              - 'docs/parity-coverage-map.md'                         # the verification recipe
             node:
               # The napi addon links sibling crates — laterite-ags4-validator,
               # laterite-types, laterite-ags4-emit (see laterite-node/Cargo.toml) —
@@ -144,7 +156,17 @@ jobs:
   # advisory exceptions live in rust-packages/deny.toml. Fast — no compilation.
   deny:
     needs: changes
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
+    # `!cancelled()` is load-bearing, NOT decoration: GitHub applies an implicit
+    # success() to any `if:` without a status-check function, so a job whose
+    # `needs` FAILED is skipped before the condition is ever read. Referencing
+    # needs.changes.result is NOT such a function — without !cancelled() this
+    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
+    # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
+    # the filter failing to answer must never read as "nothing changed".
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -152,7 +174,7 @@ jobs:
       - name: rust toolchain (cargo-deny shells out to `cargo metadata`)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: install cargo-deny
-        uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
         with:
           tool: cargo-deny
       - name: cargo deny check
@@ -161,7 +183,17 @@ jobs:
 
   rust:
     needs: changes
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
+    # `!cancelled()` is load-bearing, NOT decoration: GitHub applies an implicit
+    # success() to any `if:` without a status-check function, so a job whose
+    # `needs` FAILED is skipped before the condition is ever read. Referencing
+    # needs.changes.result is NOT such a function — without !cancelled() this
+    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
+    # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
+    # the filter failing to answer must never read as "nothing changed".
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     # 35 min ceiling (generous): the AGS5 crates (the bundled-DuckDB long pole)
     # were decoupled to ags5/, so the kept workspace links no bundled DuckDB and
@@ -212,17 +244,27 @@ jobs:
       # links ("DuckDB API not initialized" at runtime).
       - name: cargo clippy
         working-directory: rust-packages
-        run: cargo clippy --workspace --exclude laterite-ags4-wasm -- -D warnings
+        # --all-targets lints tests/benches/examples too, not just lib/bin code.
+        run: cargo clippy --workspace --all-targets --exclude laterite-ags4-wasm --exclude laterite-ags4-tokenizer-wasm -- -D warnings
 
       # The shared parse leaf (#168) becomes a wasm dependency of the browser
       # validator from Phase 3 on. Build it for wasm32 NOW so a
       # wasm-incompatible change (name-allowlist ≠ wasm-compilability — memchr's
       # std::arch paths, encoding_rs) fails here, not at adoption.
-      - name: cargo build (parse leaf, wasm32)
+      - name: cargo build (parse leaf + tokenizer wasm, wasm32)
         working-directory: rust-packages
         run: |
           rustup target add wasm32-unknown-unknown
           cargo build -p laterite-ags4-parse --target wasm32-unknown-unknown
+          # The tiny browser tokenizer wasm (#533) is built from parse + types;
+          # compile it for wasm32 here so a wasm-incompatible change to either
+          # leaf (or the wrapper) fails in this fast job, not only in e2e/deploy.
+          cargo build -p laterite-ags4-tokenizer-wasm --target wasm32-unknown-unknown
+          # The shared scrub engine (#581) becomes a wasm dependency of the
+          # engine wasm (browser Anonymiser) in Phase 2. Build it for wasm32 NOW
+          # so a wasm-hostile change (it pulls parse + reference + types) fails
+          # in this fast job, not at adoption.
+          cargo build -p laterite-ags4-censor --target wasm32-unknown-unknown
 
       # No `cargo test --workspace` here: the dedicated `coverage` job below is
       # the SOLE Rust test authority. It runs the same instrumented workspace
@@ -255,7 +297,17 @@ jobs:
   # self-hosted Linux runner + sccache (the napi build reuses the warm cache).
   node:
     needs: changes
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.node == 'true' }}
+    # `!cancelled()` is load-bearing, NOT decoration: GitHub applies an implicit
+    # success() to any `if:` without a status-check function, so a job whose
+    # `needs` FAILED is skipped before the condition is ever read. Referencing
+    # needs.changes.result is NOT such a function — without !cancelled() this
+    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
+    # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
+    # the filter failing to answer must never read as "nothing changed".
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.node == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -273,7 +325,7 @@ jobs:
       # half shares the same content-addressed cache as the `rust` job.
       - uses: ./.github/actions/build-accel
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 22
 
@@ -346,7 +398,17 @@ jobs:
   # kept crates (validator/types/core at 95-97%) lift the workspace number clear.
   coverage:
     needs: changes
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
+    # `!cancelled()` is load-bearing, NOT decoration: GitHub applies an implicit
+    # success() to any `if:` without a status-check function, so a job whose
+    # `needs` FAILED is skipped before the condition is ever read. Referencing
+    # needs.changes.result is NOT such a function — without !cancelled() this
+    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
+    # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
+    # the filter failing to answer must never read as "nothing changed".
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -367,7 +429,7 @@ jobs:
       - name: Install cargo-llvm-cov
         # Prebuilt binary (no compile, no runner-image rebuild). SHA-pinned
         # per the supply-chain policy; Dependabot bumps it.
-        uses: taiki-e/install-action@2ca9b94c269419b7b0c711c09d0b21c4e1d51145 # v2.83.1
+        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
         with:
           tool: cargo-llvm-cov
 
@@ -379,6 +441,7 @@ jobs:
         run: |
           cargo llvm-cov --no-report --workspace \
             --exclude laterite-ags4-wasm \
+            --exclude laterite-ags4-tokenizer-wasm \
             --exclude laterite-py \
             --exclude laterite-node
 
@@ -409,7 +472,17 @@ jobs:
 
   python:
     needs: [changes, rust]
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
+    # `!cancelled()` is load-bearing, NOT decoration: GitHub applies an implicit
+    # success() to any `if:` without a status-check function, so a job whose
+    # `needs` FAILED is skipped before the condition is ever read. Referencing
+    # needs.changes.result is NOT such a function — without !cancelled() this
+    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
+    # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
+    # the filter failing to answer must never read as "nothing changed".
+    if: ${{ !cancelled() && needs.rust.result == 'success' && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     env:
       # uv's download cache (persistent runner home) and the workspace venv
@@ -568,6 +641,122 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
+  # Published-wheel smoke (#554): the per-PR proof that the ARTEFACT users receive
+  # actually installs-and-imports. Every OTHER Python gate reaches `laterite`
+  # through `maturin develop` (an editable install with the cdylib compiled into
+  # the source tree) and reaches the CLI's `main()` through the `__main__` guard —
+  # so the real wheel, and the `[project.scripts] lat` console script, are never
+  # exercised. An ordinary rename can rot the console script or break the wheel
+  # install while every existing gate stays green. This builds the real `--release`
+  # abi3 wheel ONCE, then installs it into a FRESH isolated venv (by path, not
+  # editable — exactly `pip install laterite`) on real 3.12, 3.13 AND 3.14
+  # interpreters — the abi3-py312 floor the wheel claims and that NO other job runs
+  # (every Python job today uses only 3.14). `lat --help` proves the console script
+  # resolves; a real import+validate proves the wheel works. Plus a `[compat]` leg
+  # that is the only pandas-present / pyarrow-absent environment there is.
+  wheel-smoke:
+    needs: [changes, rust]
+    # Same guard shape as `python` (see its note): !cancelled() so a failed need
+    # doesn't silently skip us, and code-gated so a docs-only PR doesn't pay for a
+    # release wheel build.
+    if: ${{ !cancelled() && needs.rust.result == 'success' && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.code == 'true') }}
+    runs-on: ubuntu-latest
+    env:
+      UV_LINK_MODE: copy
+    # A --release maturin build (PyO3 + bundled DuckDB) plus three isolated
+    # installs; well under the `python` job's 50 on a warm sccache.
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+
+      # sccache + mold so the maturin compile hits the cache the rust job populated.
+      - uses: ./.github/actions/build-accel
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: false
+
+      # The three interpreters the abi3-py312 wheel promises to run on, fetched
+      # from python-build-standalone (self-hosted runners can't use
+      # actions/setup-python — see release.yml). 3.12/3.13 are the shipped-wheel
+      # floor that no other job exercises; 3.14 is the dev floor.
+      - name: Install Python 3.12 / 3.13 / 3.14 via uv
+        run: uv python install 3.12 3.13 3.14
+
+      # Put the build backend (`maturin` + linux `patchelf`, both in the `dev`
+      # dependency-group) on PATH. Plain `uv sync` — NOT --all-extras: the wheel
+      # build needs only the backend, and `uv sync` installs the workspace editable
+      # WITHOUT compiling the cdylib (see the `python` job), so the single compile
+      # is the `maturin build` below, not doubled. The runtime test extras get
+      # installed into the ISOLATED smoke venvs from the built wheel instead.
+      - name: uv sync (build backend into the venv)
+        run: uv sync
+
+      # The artefact users receive: the RELEASE abi3 wheel (one cp312-abi3 wheel
+      # per platform), built ONCE into dist/ and reused across all three venvs.
+      - name: Build the release wheel
+        run: (cd packages/laterite && uv run --no-sync maturin build --release --out "$GITHUB_WORKSPACE/dist")
+
+      # Isolated install + console-script + import on each interpreter. The wheel
+      # is installed BY PATH into a fresh venv per version — no workspace, no
+      # editable .pth, no develop cdylib — so this is exactly `pip install laterite`.
+      # `lat --help` (exit 0) is the [project.scripts] resolution proof: the
+      # console script is argparse with add_help=False and has no --version (an
+      # unknown flag exits 5), so --help, not --version, is the honest probe.
+      - name: Install-and-import the wheel on 3.12 / 3.13 / 3.14
+        run: |
+          set -euxo pipefail
+          wheel=$(echo "$GITHUB_WORKSPACE"/dist/laterite-*.whl)
+          for v in 3.12 3.13 3.14; do
+            venv="$GITHUB_WORKSPACE/.smoke-$v"
+            uv venv --python "$v" --clear "$venv"
+            uv pip install --python "$venv/bin/python" "$wheel"
+            "$venv/bin/lat" --help >/dev/null
+            "$venv/bin/python" --version
+            "$venv/bin/python" tools/wheel_smoke.py
+          done
+
+      # Rider: the drop-in is pyarrow-FREE. `[compat]` pulls only pandas —
+      # AGS4_to_dataframe reads a Rust-built all-Utf8 Arrow table and hands pandas
+      # an object-dtype frame via DuckDB's NumPy `.df()` (~2x faster than
+      # python-ags4, no per-cell boxing). Since `uv sync --all-extras` puts pyarrow
+      # in every workspace env, this isolated `install laterite[compat]` is the ONLY
+      # place the pyarrow-free fallback runs: assert pyarrow is ABSENT and the
+      # drop-in still yields the object-dtype frame callers expect.
+      - name: '[compat] is pyarrow-free + object-dtype drop-in'
+        run: |
+          set -euxo pipefail
+          wheel=$(echo "$GITHUB_WORKSPACE"/dist/laterite-*.whl)
+          venv="$GITHUB_WORKSPACE/.smoke-compat"
+          uv venv --python 3.12 --clear "$venv"
+          uv pip install --python "$venv/bin/python" "${wheel}[compat]"
+          "$venv/bin/python" tools/compat_smoke.py
+
+      # The opt-in accelerator: `[compat,pyarrow]` adds pyarrow, which swaps the
+      # pandas hop for `to_pandas` and unlocks string_dtype='string' (pandas'
+      # Arrow-backed str). Isolated install proves the extra resolves + both hops.
+      - name: '[compat,pyarrow] accelerator: fast hop + string dtype'
+        run: |
+          set -euxo pipefail
+          wheel=$(echo "$GITHUB_WORKSPACE"/dist/laterite-*.whl)
+          venv="$GITHUB_WORKSPACE/.smoke-compat-pyarrow"
+          uv venv --python 3.12 --clear "$venv"
+          uv pip install --python "$venv/bin/python" "${wheel}[compat,pyarrow]"
+          "$venv/bin/python" tools/compat_pyarrow_smoke.py
+
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
   # Docs-site gate (#201). The MkDocs site under web/docs-site/ is example-led
   # (every page `--8<--`-includes a file from examples/) AND carries the
   # mkdocstrings Python API reference, which introspects the *installed*
@@ -586,7 +775,17 @@ jobs:
   # example or fixture edit re-runs it there).
   docs:
     needs: changes
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.docs == 'true' }}
+    # `!cancelled()` is load-bearing, NOT decoration: GitHub applies an implicit
+    # success() to any `if:` without a status-check function, so a job whose
+    # `needs` FAILED is skipped before the condition is ever read. Referencing
+    # needs.changes.result is NOT such a function — without !cancelled() this
+    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
+    # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
+    # the filter failing to answer must never read as "nothing changed".
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.docs == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -631,7 +830,17 @@ jobs:
   # — that is how this gate avoids ags4-perf's fate (built, never wired).
   output-values:
     needs: changes
-    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.code == 'true' }}
+    # `!cancelled()` is load-bearing, NOT decoration: GitHub applies an implicit
+    # success() to any `if:` without a status-check function, so a job whose
+    # `needs` FAILED is skipped before the condition is ever read. Referencing
+    # needs.changes.result is NOT such a function — without !cancelled() this
+    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
+    # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
+    # the filter failing to answer must never read as "nothing changed".
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.code == 'true') }}
     runs-on: ubuntu-latest
     # Cold build of the wheel (PyO3 + bundled DuckDB) + napi addon + wasm +
     # release lat; warm (sccache) runs finish far under this. Matches the
@@ -655,7 +864,7 @@ jobs:
         with:
           enable-cache: false
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 22
 

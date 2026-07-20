@@ -380,11 +380,11 @@ fn non_ags4_input_is_a_hard_error() {
 
 // ---- O-32: invalid-encoding input is decoded lossily, not refused --
 
-/// A temp `.ags` copy of clean_minimal.ags with `inject` spliced into
-/// the PROJ_NAME value (after the literal "Clean"). Temp, never
+/// A temp `.ags` copy of `clean_minimal.ags` with `inject` spliced into
+/// the `PROJ_NAME` value (after the literal "Clean"). Temp, never
 /// `tests/fixtures/`: a non-UTF-8 file there would trip corpus-qa's
 /// e2e `hard_error==0` assertion *and* defeat the behaviour under
-/// test. PROJ_NAME is a non-KEY OTHER field, so splicing there can't
+/// test. `PROJ_NAME` is a non-KEY OTHER field, so splicing there can't
 /// perturb any relational rule — only Rule 1 reacts.
 fn clean_minimal_with_injected_bytes(inject: &[u8]) -> tempfile::NamedTempFile {
     use std::io::Write;

@@ -3,7 +3,9 @@ import { Show, type Component } from "solid-js";
 // A small, asset-free "working, not hung" indicator — the antidote to the
 // slow-hardware symptom where a multi-second wasm compile / query looks like a
 // frozen tab. Inline SVG + Tailwind's `animate-spin`; announces politely to AT.
-export const Spinner: Component<{ label?: string; class?: string }> = (props) => (
+export const Spinner: Component<{ label?: string; class?: string }> = (
+  props,
+) => (
   <span
     role="status"
     aria-live="polite"

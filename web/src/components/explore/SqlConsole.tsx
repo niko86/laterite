@@ -1,4 +1,10 @@
-import { createResource, createSignal, For, Show, type Component } from "solid-js";
+import {
+  createResource,
+  createSignal,
+  For,
+  Show,
+  type Component,
+} from "solid-js";
 import { ResultsGrid } from "./ResultsGrid";
 import { ExportBar } from "./ExportBar";
 import { Spinner } from "../Spinner";
@@ -25,8 +31,8 @@ interface Snippet {
 
 function loadSnippets(): Snippet[] {
   try {
-    const arr = JSON.parse(localStorage.getItem(SNIPPET_KEY) ?? "[]");
-    return Array.isArray(arr) ? arr : [];
+    const arr: unknown = JSON.parse(localStorage.getItem(SNIPPET_KEY) ?? "[]");
+    return Array.isArray(arr) ? (arr as Snippet[]) : [];
   } catch {
     return [];
   }
@@ -42,11 +48,17 @@ export const SqlConsole: Component<{
    *  templates) for the loaded groups — shown as one-click example chips. */
   related?: { name: string; sql: string }[];
 }> = (props) => {
+  // props.sql / props.setSql are stable accessor/setter fn refs — aliasing the
+  // reference keeps reactivity (sql()/setSql() still track); not the value-prop
+  // destructure footgun the rule targets.
+  /* eslint-disable solid/reactivity */
   const sql = props.sql;
   const setSql = props.setSql;
-  const [submitted, setSubmitted] = createSignal<{ sql: string; n: number } | null>(
-    null,
-  );
+  /* eslint-enable solid/reactivity */
+  const [submitted, setSubmitted] = createSignal<{
+    sql: string;
+    n: number;
+  } | null>(null);
   const [snippets, setSnippets] = createSignal<Snippet[]>(loadSnippets());
   const [snipName, setSnipName] = createSignal("");
   let runN = 0;
@@ -83,17 +95,24 @@ export const SqlConsole: Component<{
   const save = () => {
     const name = snipName().trim();
     if (!name) return;
-    persist([...snippets().filter((s) => s.name !== name), { name, sql: sql() }]);
+    persist([
+      ...snippets().filter((s) => s.name !== name),
+      { name, sql: sql() },
+    ]);
     setSnipName("");
   };
-  const del = (name: string) =>
+  const del = (name: string) => {
     persist(snippets().filter((s) => s.name !== name));
+  };
 
   const examples = (): Snippet[] => {
     const g = props.groups;
     const ex: Snippet[] = [];
     if (g[0])
-      ex.push({ name: `${g[0]} rows`, sql: `SELECT * FROM "${g[0]}" LIMIT 100` });
+      ex.push({
+        name: `${g[0]} rows`,
+        sql: `SELECT * FROM "${g[0]}" LIMIT 100`,
+      });
     // Relationship examples derived from the dictionary (CHILD ⋈ PARENT joins
     // + templates) — replaces the old hard-coded SAMP⋈LOCA with whatever the
     // loaded file actually relates.
@@ -115,7 +134,9 @@ export const SqlConsole: Component<{
             <button
               type="button"
               class="rounded border border-line-strong px-2 py-0.5 text-fg-soft hover:bg-chip"
-              onClick={() => setSql(s.sql)}
+              onClick={() => {
+                setSql(s.sql);
+              }}
             >
               {s.name}
             </button>
@@ -135,7 +156,9 @@ export const SqlConsole: Component<{
                 <button
                   type="button"
                   class="text-accent hover:underline"
-                  onClick={() => setSql(s.sql)}
+                  onClick={() => {
+                    setSql(s.sql);
+                  }}
                 >
                   {s.name}
                 </button>
@@ -143,7 +166,9 @@ export const SqlConsole: Component<{
                   type="button"
                   class="text-fg-dim hover:text-err"
                   title="Delete snippet"
-                  onClick={() => del(s.name)}
+                  onClick={() => {
+                    del(s.name);
+                  }}
                 >
                   ×
                 </button>
@@ -157,7 +182,9 @@ export const SqlConsole: Component<{
         class="mono h-32 w-full resize-y rounded-lg border border-line-strong bg-surface-raised p-3 text-xs text-fg outline-none"
         spellcheck={false}
         value={sql()}
-        onInput={(e) => setSql(e.currentTarget.value)}
+        onInput={(e) => {
+          setSql(e.currentTarget.value);
+        }}
         onKeyDown={onKeyDown}
       />
 
@@ -184,14 +211,14 @@ export const SqlConsole: Component<{
           Save
         </button>
         <Show when={submitted()}>
-          <ExportBar sql={() => submitted()!.sql} filename="query" />
+          {(sub) => <ExportBar sql={() => sub().sql} filename="query" />}
         </Show>
       </div>
 
       <Show when={result.loading}>
         <Spinner label="Running…" />
       </Show>
-      <Show when={result.error}>
+      <Show when={Boolean(result.error)}>
         <p class="text-sm text-err">SQL error: {String(result.error)}</p>
       </Show>
       {/* Guard the resource read: accessing `result()` while the resource is in

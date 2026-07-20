@@ -8,7 +8,7 @@ import { buildAgs4, read } from "../ts/index";
 //
 // SAME fixture + golden UUIDv8s as the Python `test_content_keys.py` — the ids
 // come from the one shared Rust keychain, so matching goldens here IS a
-// cross-surface parity proof (Node == Python == the .ags5db extension).
+// cross-surface parity proof (Node == Python == the DuckDB extension).
 const AGS =
   '"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n"DATA","P1"\r\n' +
   '"GROUP","LOCA"\r\n"HEADING","LOCA_ID","PROJ_ID"\r\n' +
@@ -28,7 +28,9 @@ describe("content-addressed _id/_parent_id (#303, Node)", () => {
   it("table(code, { keys: true }) adds exactly the two key columns", () => {
     const ags = read(undefined, { text: AGS });
     const plain = new Set(names(ags.table("PROJ")));
-    const added = names(ags.table("PROJ", { keys: true })).filter((n) => !plain.has(n));
+    const added = names(ags.table("PROJ", { keys: true })).filter(
+      (n) => !plain.has(n),
+    );
     expect(added.sort()).toEqual(["_id", "_parent_id"]);
   });
 
@@ -44,7 +46,10 @@ describe("content-addressed _id/_parent_id (#303, Node)", () => {
 
   it("ids are deterministic across reads", () => {
     const id = (): unknown =>
-      read(undefined, { text: AGS }).table("LOCA", { keys: true }).getChild("_id")!.get(0);
+      read(undefined, { text: AGS })
+        .table("LOCA", { keys: true })
+        .getChild("_id")!
+        .get(0);
     expect(id()).toBe(id());
     expect(id()).toBe(LOCA_ID);
   });

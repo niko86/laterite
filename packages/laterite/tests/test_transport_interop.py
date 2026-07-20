@@ -29,12 +29,15 @@ leg tolerates the cap rejection while still proving we PARSED the envelope.
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pyrage
 import pyrage.passphrase as age
 import pytest
 from laterite import transport
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _PW = "correct horse battery staple"
 # Cheap scrypt factor for the our-side locks — well under any machine's decrypt
@@ -82,7 +85,10 @@ def test_pyrage_sealed_envelope_is_recognised_by_our_unlock() -> None:
     try:
         assert transport.unlock_bytes(sealed, password=_PW) == data
     except RuntimeError as exc:
-        assert "work parameter" in str(exc), (
+        # Not a pytest.raises() case: the round-trip succeeding is ALSO a pass
+        # (the comment above spells out why) — this branch only guards the one
+        # acceptable failure mode.
+        assert "work parameter" in str(exc), (  # noqa: PT017
             f"pyrage envelope must parse as our scrypt file; only the work-factor "
             f"cap may reject it, got: {exc}"
         )

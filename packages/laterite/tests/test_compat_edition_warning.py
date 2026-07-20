@@ -1,5 +1,6 @@
 """compat warns (never silently) when it auto-resolves an ambiguous TRAN_AGS
 to a different edition than python-ags4 would (#190 / O-30 / O-42)."""
+
 import warnings
 
 import pytest
@@ -42,11 +43,15 @@ def _edition_warnings(fn):
 def test_no_warning_when_editions_agree(tmp_path):
     # "4.1" / "4.2" / "4.1.1" resolve the same on both sides -> no edition warning.
     for ed in ("4.1", "4.2", "4.1.1"):
-        assert not _edition_warnings(lambda e=ed: compat.check_file(_write(tmp_path, e)))
+        assert not _edition_warnings(
+            lambda e=ed: compat.check_file(_write(tmp_path, e))
+        )
 
 
 def test_no_warning_when_dictionary_is_explicit(tmp_path):
     # An explicit edition is the caller's choice — don't second-guess it.
     assert not _edition_warnings(
-        lambda: compat.check_file(_write(tmp_path, "4.0"), standard_AGS4_dictionary="4.0.4")
+        lambda: compat.check_file(
+            _write(tmp_path, "4.0"), standard_AGS4_dictionary="4.0.4"
+        )
     )

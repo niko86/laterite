@@ -10,7 +10,7 @@
 //!   file omits is dropped. (There is deliberately no delete/supersede primitive;
 //!   a KEY-value correction therefore reads as a new row, not a revision — an
 //!   inherent limit of KEY-based identity, documented, not silently handled.)
-//! - **Argument order is authority; TRAN_DATE only cross-checks.** When two files
+//! - **Argument order is authority; `TRAN_DATE` only cross-checks.** When two files
 //!   carry the same KEY with different content, the later-argument file wins. If
 //!   its file-level `TRAN_DATE` predates an earlier file's, that contradiction is
 //!   *warned* (advisory), never blocking — because `TRAN_ISNO`/`TRAN_STAT` are
@@ -85,6 +85,7 @@ pub enum TypeClashMode {
 
 impl TypeClashMode {
     /// The wire name — the exact token every surface accepts and reports.
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             TypeClashMode::Error => "error",
@@ -362,8 +363,7 @@ fn heading_index(headings: &[String]) -> HashMap<&str, usize> {
 /// A cell of a parsed group's row by heading name; `None` if the group doesn't
 /// carry that heading, `Some("")` for a short/ragged row (carried-but-empty).
 fn cell<'a>(idx: &HashMap<&str, usize>, row: &'a [String], h: &str) -> Option<&'a str> {
-    idx.get(h)
-        .map(|&i| row.get(i).map(String::as_str).unwrap_or(""))
+    idx.get(h).map(|&i| row.get(i).map_or("", String::as_str))
 }
 
 /// Warn when a file later in argument order carries an earlier `TRAN_DATE` than
@@ -396,7 +396,7 @@ fn recency_warnings(files: &[ParsedFile], warnings: &mut Vec<MergeWarning>) {
             }
             _ => {}
         }
-        if running_max.as_ref().map(|(_, d)| day > *d).unwrap_or(true) {
+        if running_max.as_ref().is_none_or(|(_, d)| day > *d) {
             running_max = Some((i, day));
         }
     }
@@ -445,7 +445,10 @@ fn merged_unit(code: &str, heading: &str, declared: &[String]) -> Result<String,
         _ => Err(MergeError::UnitConflict {
             group: code.to_string(),
             heading: heading.to_string(),
-            units: distinct.iter().map(|s| s.to_string()).collect(),
+            units: distinct
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect(),
         }),
     }
 }
@@ -504,7 +507,10 @@ fn merged_type(
                 return Err(MergeError::TypeConflict {
                     group: code.to_string(),
                     heading: heading.to_string(),
-                    types: distinct.iter().map(|s| s.to_string()).collect(),
+                    types: distinct
+                        .iter()
+                        .map(std::string::ToString::to_string)
+                        .collect(),
                 });
             }
 
@@ -724,15 +730,14 @@ fn reconcile_rows(
                     });
                     dup_warned = true;
                 }
-                match pos.get(&key) {
-                    Some(&p) => (p, created_by[p] != *fi),
-                    None => {
-                        order.push(vec![None; union_h.len()]);
-                        created_by.push(*fi);
-                        let p = order.len() - 1;
-                        pos.insert(key, p);
-                        (p, false)
-                    }
+                if let Some(&p) = pos.get(&key) {
+                    (p, created_by[p] != *fi)
+                } else {
+                    order.push(vec![None; union_h.len()]);
+                    created_by.push(*fi);
+                    let p = order.len() - 1;
+                    pos.insert(key, p);
+                    (p, false)
                 }
             };
 
@@ -793,13 +798,14 @@ fn reconcile_rows(
                     let Some(m) = c else { return Value::Null };
                     match pad[ui] {
                         // Blank means "no opinion", not zero — never pad it into one.
-                        Some(n) if !m.value.trim().is_empty() => match pad_decimals(&m.value, n) {
-                            Some(padded) => Value::String(padded),
-                            None => {
+                        Some(n) if !m.value.trim().is_empty() => {
+                            if let Some(padded) = pad_decimals(&m.value, n) {
+                                Value::String(padded)
+                            } else {
                                 unpaddable[ui] += 1;
                                 Value::String(m.value)
                             }
-                        },
+                        }
                         _ => Value::String(m.value),
                     }
                 })
@@ -833,7 +839,7 @@ fn reconcile_rows(
 }
 
 /// Build the merged file's own single-row TRAN from the caller's stamp, recording
-/// the input files' ISNO/DATE in TRAN_REM so the merge is self-documenting.
+/// the input files' ISNO/DATE in `TRAN_REM` so the merge is self-documenting.
 fn synthesise_tran(files: &[ParsedFile], stamp: &TranStamp) -> GroupInput {
     let provenance = {
         let parts: Vec<String> = files

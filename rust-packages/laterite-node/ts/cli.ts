@@ -9,15 +9,28 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 
-import type { Report, ValidateOptions } from "./index";
-import { diff, fix, fromExcel, merge, read, toExcel, transport, validate } from "./index";
+import type { MergeOptions, Report, ValidateOptions } from "./index";
+import {
+  diff,
+  fromExcel,
+  merge,
+  read,
+  toExcel,
+  transport,
+  validate,
+} from "./index";
 import { StaleCertError } from "./errors";
+import { FixResult } from "./fix-result";
 import {
   editions as nativeEditions,
   fallbackEdition,
+  fixFile,
   listRules as rulesMetaJson,
   readGroupsRaw,
+  renderReadCsv,
+  renderReadJson,
   resolveEncodingLabel,
+  typeClashModes,
 } from "./native";
 
 // The verb table IS the dispatch table. It used to be a hand-written Set sitting
@@ -43,8 +56,9 @@ import {
 //     cp1252 file was decoded as UTF-8 and the findings blamed the file.
 //   * `--dict <custom.ags>` was accepted and IGNORED, so a user's project dictionary
 //     was quietly dropped, the file was checked against the bundled one, and the tool
-//     said "clean". The binary and the uvx launcher both refuse `--dict` outright
-//     (exit 5 — the external-dictionary override is deliberately unimplemented).
+//     said "clean". `--dict` is now a real custom-dictionary overlay (#568), honoured
+//     on every surface — an `.ags`/JSON dictionary layered over a base edition, with
+//     `--dict-replace` for a full replacement.
 interface Spec {
   run: (p: Parsed, json: boolean, ndjson: boolean) => number;
   /** Verb-specific long flags, without the `--`. Globals are added separately. */
@@ -58,34 +72,67 @@ interface Spec {
   positionals?: readonly string[];
 }
 
-/** Accepted on every verb (all booleans). Mirrors clap's global args. */
-const GLOBAL_FLAGS = ["json", "ndjson", "quiet"] as const;
+/** A flag's closed value set, where it has one. Keyed by flag long-name (without
+ *  `--`), and sourced from the engine — never hand-listed. The census emits these
+ *  as each arg's `values` so tools/gen_census.py can diff the modes a launcher
+ *  accepts against the other two: the table that catches a surface offering a
+ *  *different* set of modes, not just a different flag.
+ *
+ *  Computed lazily (a function, not a const) so the native addon is not called at
+ *  module load — same reason `census()` calls `nativeEditions()` inline rather
+ *  than baking it into a top-level table. `--dict-version` is deliberately absent:
+ *  its set is the editions table, compared there, and represented differently by
+ *  each parser framework (a per-arg copy would be double-reported false drift). */
+function flagValueSets(): Record<string, readonly string[]> {
+  return { "on-type-clash": typeClashModes() };
+}
 
-/** Shared by the verbs that resolve a dictionary edition + decode bytes. */
-const DICT_FLAGS = ["dict", "dict-version", "encoding"] as const;
+/** Accepted on every verb (a boolean). Mirrors clap's one remaining global arg —
+ *  `--json`/`--ndjson` moved onto the report-producing verbs in #545, so a verb that
+ *  can't render JSON rejects the flag (via `rejectUnknownFlags`) instead of ignoring it. */
+const GLOBAL_FLAGS = ["quiet"] as const;
+
+/** Shared by the verbs that resolve a dictionary edition + decode bytes. `dict-replace`
+ *  is a boolean (no value), so it rides in `flags` but never in the `valued` lists. */
+const DICT_FLAGS = [
+  "dict",
+  "dict-replace",
+  "dict-version",
+  "encoding",
+] as const;
 
 const SPECS: Record<string, Spec> = {
   validate: {
     run: (p, json, ndjson) => runValidate(p, json, ndjson),
-    flags: [...DICT_FLAGS, "check-files", "index", "json-out", "no-warnings", "out", "show-fyi"],
+    flags: [
+      ...DICT_FLAGS,
+      "check-files",
+      "index",
+      "json",
+      "json-out",
+      "ndjson",
+      "no-warnings",
+      "out",
+      "show-fyi",
+    ],
     valued: ["dict", "dict-version", "encoding", "index", "json-out", "out"],
     positionals: ["<file>"],
   },
   read: {
     run: (p, json) => runRead(p, json),
-    flags: ["csv", "out"],
+    flags: ["csv", "json", "out"],
     valued: ["out"],
     positionals: ["<file>", "<group>"],
   },
   fix: {
-    run: (p) => runFix(p),
-    flags: [...DICT_FLAGS, "fix-out", "in-place", "risky"],
+    run: (p, json) => runFix(p, json),
+    flags: [...DICT_FLAGS, "fix-out", "in-place", "json", "risky"],
     valued: ["dict", "dict-version", "encoding", "fix-out"],
     positionals: ["<file>"],
   },
   diff: {
     run: (p, json) => runDiff(p, json),
-    flags: [...DICT_FLAGS],
+    flags: [...DICT_FLAGS, "json"],
     valued: ["dict", "dict-version", "encoding"],
     positionals: ["<file>", "<other>"],
   },
@@ -93,6 +140,7 @@ const SPECS: Record<string, Spec> = {
     run: (p, json) => runMerge(p, json),
     flags: [
       ...DICT_FLAGS,
+      "json",
       "on-type-clash",
       "out",
       "tran-date",
@@ -126,7 +174,7 @@ const SPECS: Record<string, Spec> = {
     valued: ["dict", "dict-version", "encoding", "out"],
     positionals: ["<file>"],
   },
-  rules: { run: (_p, json) => runRules(json) },
+  rules: { run: (_p, json) => runRules(json), flags: ["json"] },
   pack: {
     run: (p) => runTransport("pack", p),
     flags: ["level"],
@@ -164,7 +212,9 @@ const SUBCOMMANDS = new Set(Object.keys(SPECS));
  * otherwise leave `4.2` looking like a positional (and be mistaken for the verb).
  * The real parse then uses the verb's OWN set, and anything it does not declare is
  * rejected — so this union never widens what a verb accepts. */
-const ANY_VALUED = new Set<string>(Object.values(SPECS).flatMap((s) => s.valued ?? []));
+const ANY_VALUED = new Set<string>(
+  Object.values(SPECS).flatMap((s) => s.valued ?? []),
+);
 
 /** Encoding labels the surface census resolves on every launcher. Mirrors
  *  `ENCODING_PROBES` in `commands/census.rs`; a test pins the lists equal, so the
@@ -193,26 +243,43 @@ export function census(): unknown {
     // See CENSUS_VERSION in the Rust census — bumped when a TABLE is added, so a
     // launcher built before a table existed fails loudly rather than reporting it
     // empty (which would read as "no drift").
-    census_version: 4,
+    census_version: 5,
     surface: "cli-npx",
     authority: false,
     // Reflected from SPECS — the same declaration that parses argv and rejects an
     // unknown flag. Before, this reported `args: []` for every verb, because there
     // WAS no per-verb flag table: the census could only say "this launcher has no
     // opinion", which is exactly how a swallowed flag stays invisible.
-    verbs: [...SUBCOMMANDS].sort().map((verb) => ({
-      verb,
-      args: [
-        ...[...(SPECS[verb]?.flags ?? [])].sort().map((f) => ({
-          name: `--${f}`,
-          takes_value: (SPECS[verb]?.valued ?? []).includes(f),
-        })),
-        // Positionals report as `<name>`, as clap does — so the census compares the
-        // ARITY of each verb, not just its flags.
-        ...(SPECS[verb]?.positionals ?? []).map((n) => ({ name: n, takes_value: true })),
-      ].sort((a, b) => a.name.localeCompare(b.name)),
+    verbs: [...SUBCOMMANDS].sort().map((verb) => {
+      const valueSets = flagValueSets();
+      return {
+        verb,
+        args: [
+          ...[...(SPECS[verb]?.flags ?? [])].sort().map((f) => ({
+            name: `--${f}`,
+            takes_value: (SPECS[verb]?.valued ?? []).includes(f),
+            // The closed value set this flag accepts, where it has one. Empty
+            // otherwise — matching the other launchers, which report `[]` for a
+            // free-form or boolean flag. This is what #555 part 3b added: before,
+            // the census had no per-arg value column, so a launcher accepting a
+            // DIFFERENT set of `--on-type-clash` modes was invisible to the diff.
+            values: [...(valueSets[f] ?? [])].sort(),
+          })),
+          // Positionals report as `<name>`, as clap does — so the census compares the
+          // ARITY of each verb, not just its flags.
+          ...(SPECS[verb]?.positionals ?? []).map((n) => ({
+            name: n,
+            takes_value: true,
+            values: [] as string[],
+          })),
+        ].sort((a, b) => a.name.localeCompare(b.name)),
+      };
+    }),
+    global_args: [...GLOBAL_FLAGS].sort().map((f) => ({
+      name: `--${f}`,
+      takes_value: false,
+      values: [] as string[],
     })),
-    global_args: [...GLOBAL_FLAGS].sort().map((f) => ({ name: `--${f}`, takes_value: false })),
     documented_verbs: [...SUBCOMMANDS].sort(),
     // This launcher keeps NO edition table: `--dict-version` goes straight to the
     // engine, which validates it against the generated `DictVersion::ALL`. That is
@@ -279,7 +346,12 @@ function pickVerb(argv: string[]): string {
       const key = a.slice(2);
       const next = argv[i + 1];
       // `--flag=value` carries its value; `--flag value` eats the next token.
-      if (!key.includes("=") && ANY_VALUED.has(key) && next !== undefined && !next.startsWith("--")) {
+      if (
+        !key.includes("=") &&
+        ANY_VALUED.has(key) &&
+        next !== undefined &&
+        !next.startsWith("--")
+      ) {
         i++;
       }
       continue;
@@ -287,26 +359,6 @@ function pickVerb(argv: string[]): string {
     return SUBCOMMANDS.has(a) || a === "census" ? a : "validate";
   }
   return "validate";
-}
-
-/** The external-dictionary override is deliberately unimplemented (O-28), and the
- *  binary and uvx both refuse it with exit 5. This launcher used to ACCEPT
- *  `--dict custom.ags` and quietly drop it: the file was then checked against the
- *  BUNDLED dictionary and reported **clean**, so a user's project dictionary silently
- *  did nothing at all. Refusing is the only honest answer. */
-function rejectExternalDict(p: Parsed): void {
-  if (p.flags["dict"] !== undefined) {
-    // The edition list is GENERATED, never spelled out — a hand-written one here would
-    // go stale the moment a new edition is bundled, leaving this message recommending
-    // a set that no longer matches what the flag accepts. That is the trap #509 found
-    // in the binary (its rejection message was generated while its match arms were
-    // not), and it is just as easy to walk into from the other direction.
-    fail(
-      `external --dict override is not implemented; use --dict-version ` +
-        `(${nativeEditions().join("/")}) or omit it`,
-      5,
-    );
-  }
 }
 
 /** Refuse a flag the verb does not declare — what clap does, and what this launcher
@@ -346,7 +398,11 @@ const pin = (p: Parsed): string | undefined => {
 // Map a thrown engine error to the shared exit code (3 io, 4 not-ags4/bad-input,
 // 5 bad-dict, 6 schema) — the Rust binary's scheme.
 function exitCodeFor(e: unknown): number {
-  const err = e as { kind?: string; name?: string; message?: string };
+  // A thrown value really can be null/undefined, so keep the type nullable —
+  // that's what justifies the `?.` guards below (a bare cast would assert
+  // non-null and make them look redundant).
+  const err = e as
+    { kind?: string; name?: string; message?: string } | null | undefined;
   if (err?.kind === "not_found" || /ENOENT/.test(err?.message ?? "")) return 3;
   if (
     err?.name === "BadDictError" ||
@@ -380,9 +436,11 @@ function emit(body: string, out: string | undefined): void {
 }
 
 // ---- read: byte-parity with the Rust `read` (raw file cells) ----------
-function csvRow(cells: string[]): string {
-  return `${cells.map((c) => (/[",\r\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(",")}\n`;
-}
+// The CSV/JSON bodies are rendered by the ENGINE (`renderReadCsv`/`renderReadJson`
+// → core's single writers), not here. This file used to hand-port RFC-4180
+// quoting and build the JSON with `JSON.stringify(x, null, 2)` while the binary
+// used serde_json and Python used json.dumps — three libraries held
+// byte-identical by discipline, with no gate on `read` output (#530).
 
 function runRead(p: Parsed, json: boolean): number {
   const file = p.positionals[0];
@@ -392,9 +450,12 @@ function runRead(p: Parsed, json: boolean): number {
   // surface, and clap rejects the flag on the native `read` for the same reason), so
   // `rejectUnknownFlags` now refuses it before we ever get here. It used to be
   // silently swallowed, leaving the user believing their file was read as cp1252.
-  let raw: { order: string[]; groups: Record<string, { headings: string[]; rows: string[][] }> };
+  let raw: {
+    order: string[];
+    groups: Record<string, { headings: string[]; rows: string[][] }>;
+  };
   try {
-    raw = JSON.parse(readGroupsRaw(file));
+    raw = JSON.parse(readGroupsRaw(file)) as typeof raw;
   } catch (e) {
     fail((e as Error).message, exitCodeFor(e));
   }
@@ -405,7 +466,12 @@ function runRead(p: Parsed, json: boolean): number {
       note("no groups in the file");
       return 0;
     }
-    emit(json ? `${JSON.stringify(raw.order, null, 2)}\n` : `${raw.order.join("\n")}\n`, out);
+    emit(
+      json
+        ? `${JSON.stringify(raw.order, null, 2)}\n`
+        : `${raw.order.join("\n")}\n`,
+      out,
+    );
     return 0;
   }
   const g = raw.groups[group];
@@ -415,11 +481,11 @@ function runRead(p: Parsed, json: boolean): number {
   }
   let body: string;
   if (json) {
-    const objs = g.rows.map((row) => Object.fromEntries(g.headings.map((h, i) => [h, row[i] ?? ""])));
-    body = `${JSON.stringify(objs, null, 2)}\n`;
+    body = renderReadJson(g.headings, g.rows);
   } else if (p.flags["csv"]) {
-    body = csvRow(g.headings) + g.rows.map(csvRow).join("");
+    body = renderReadCsv(g.headings, g.rows);
   } else {
+    // The table stays local — a presentation choice, not a data format.
     body = readTable(g.headings, g.rows);
   }
   emit(body, out);
@@ -427,8 +493,14 @@ function runRead(p: Parsed, json: boolean): number {
 }
 
 function readTable(headings: string[], rows: string[][]): string {
-  const w = headings.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
-  const line = (cells: string[]) => cells.map((c, i) => c.padEnd(w[i] ?? 0)).join(" | ").replace(/\s+$/, "");
+  const w = headings.map((h, i) =>
+    Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)),
+  );
+  const line = (cells: string[]) =>
+    cells
+      .map((c, i) => c.padEnd(w[i] ?? 0))
+      .join(" | ")
+      .replace(/\s+$/, "");
   const out = [line(headings), w.map((n) => "-".repeat(n)).join("-+-")];
   for (const r of rows) out.push(line(r));
   return `${out.join("\n")}\n`;
@@ -448,10 +520,18 @@ function readTable(headings: string[], rows: string[][]): string {
  * posture: a cert that cannot be trusted is a NOTE, not an error. Re-validating is
  * always safe; refusing to run because the cert went stale would not be.
  */
-function validateWithCert(file: string, index: string, opts: Omit<ValidateOptions, "text">): Report {
+function validateWithCert(
+  file: string,
+  index: string,
+  opts: Omit<ValidateOptions, "text">,
+): Report {
   try {
     // `.report` is optional only on a handle nobody validated yet; we just did.
-    return read(file, { index, encoding: opts.encoding }).validate(opts).report!;
+    const report = read(file, { index, encoding: opts.encoding }).validate(
+      opts,
+    ).report;
+    if (!report) throw new Error("validate() produced no report");
+    return report;
   } catch (e) {
     if (!(e instanceof StaleCertError)) throw e;
     note(`note: --index not used (${e.message}); running the full check`);
@@ -463,17 +543,22 @@ function runValidate(p: Parsed, json: boolean, ndjson: boolean): number {
   const file = p.positionals[0];
   if (!file) fail("validate needs a file", 5);
   if (!existsSync(file)) fail(`${file}: not found`, 3);
-  const opts = {
+  const opts: ValidateOptions = {
     warnings: !p.flags["no-warnings"],
     fyi: !!p.flags["show-fyi"],
     dictVersion: pin(p),
     encoding: str(p.flags["encoding"]),
     checkFiles: !!p.flags["check-files"],
+    dictionary: str(p.flags["dict"]),
+    dictReplace: !!p.flags["dict-replace"],
   };
   const index = str(p.flags["index"]);
   let report;
   try {
-    report = index === undefined ? validate(file, opts) : validateWithCert(file, index, opts);
+    report =
+      index === undefined
+        ? validate(file, opts)
+        : validateWithCert(file, index, opts);
   } catch (e) {
     fail((e as Error).message, exitCodeFor(e));
   }
@@ -482,7 +567,9 @@ function runValidate(p: Parsed, json: boolean, ndjson: boolean): number {
     // was on, its on-disk half still ran (a certificate can never vouch for a directory),
     // so the wording must not imply otherwise. The same note, on the same stream, as the
     // binary and uvx: this is one tool behind three launchers.
-    note("note: certified clean by the .ags.idx certificate — rule engine skipped");
+    note(
+      "note: certified clean by the .ags.idx certificate — rule engine skipped",
+    );
   }
   const out = str(p.flags["out"]);
   const jsonOut = str(p.flags["json-out"]);
@@ -495,10 +582,20 @@ function runValidate(p: Parsed, json: boolean, ndjson: boolean): number {
     emit(report.toNdjson(), out);
   } else {
     const head = `${file} — ${report.dictVersion} (${report.resolution})`;
-    const lines = [head, report.isValid ? "  clean — no findings" : `  ${report.count} finding(s)`];
+    const lines = [
+      head,
+      report.isValid ? "  clean — no findings" : `  ${report.count} finding(s)`,
+    ];
     if (!report.isValid) {
       for (const line of report.toNdjson().trimEnd().split("\n")) {
-        const f = JSON.parse(line);
+        // NDJSON is our own `lat-check --ndjson` output (one flat finding per
+        // line), so the shape is known — assert it rather than reading `any`.
+        const f = JSON.parse(line) as {
+          rule: string;
+          line: number;
+          group: string;
+          desc: string;
+        };
         lines.push(`    ${f.rule} (line ${f.line}, ${f.group}): ${f.desc}`);
       }
     }
@@ -521,26 +618,56 @@ function siblingFixedPath(file: string): string {
 }
 
 // ---- fix -------------------------------------------------------------
-function runFix(p: Parsed): number {
+function runFix(p: Parsed, json: boolean): number {
   const file = p.positionals[0];
   if (!file) fail("fix needs a file", 5);
   if (!existsSync(file)) fail(`${file}: not found`, 3);
-  let result;
-  try {
-    result = fix(file, {
-      risky: !!p.flags["risky"],
-      dictVersion: str(p.flags["dict-version"]),
-      encoding: str(p.flags["encoding"]),
-    });
-  } catch (e) {
-    fail((e as Error).message, exitCodeFor(e));
-  }
+  // Native `fixFile` directly (not the library `fix()`): the `--dict` custom overlay
+  // (#568) is a CLI flag, not a public `FixOptions` knob — mirrors the uvx launcher,
+  // which likewise reaches `_native.fix_file(dict_path=…)` past the library `fix()`.
+  const r = fixFile(
+    file,
+    undefined,
+    undefined,
+    str(p.flags["dict-version"]),
+    str(p.flags["encoding"]),
+    !!p.flags["risky"],
+    undefined,
+    undefined,
+    str(p.flags["dict"]),
+    undefined,
+    !!p.flags["dict-replace"],
+  );
+  if (!r.ok) fail(r.error ?? "unknown error", r.exitCode);
+  // Reuse `FixResult` so the one-line note is byte-identical to the library path.
+  const result = new FixResult(r.fixed, r.residual, r.applied, r.dictVersion);
   const dest = p.flags["in-place"]
     ? file
     : (str(p.flags["fix-out"]) ?? siblingFixedPath(file));
   result.save(dest);
+  const residual = result.findings.length;
+  // --json: the machine-readable report replaces the human note (#545). Same shape
+  // and key order as the native `lat fix --json` / uvx — `applied` is the native
+  // `fixFile` `{kind, label, rule, line, risk}` ledger; `residual` is the count.
+  // (`risky_available` is human-only: `FixReport` has no risky-count to mirror.)
+  if (json) {
+    // Rebuild each entry explicitly: a whole-file fix has no `line`, and napi maps
+    // that `Option<u32>::None` to `undefined`, which `JSON.stringify` DROPS — so the
+    // key would vanish here while the Rust/Python `null` stays. `?? null` pins the
+    // field present, keeping the three launchers' bytes identical.
+    const applied = result.applied.map((f) => ({
+      kind: f.kind,
+      label: f.label,
+      rule: f.rule,
+      line: f.line ?? null,
+      risk: f.risk,
+    }));
+    const report = { file, dest, applied, residual };
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    return residual === 0 ? 0 : 1;
+  }
   note(`${result.toString()} → ${dest}`);
-  return result.findings.length === 0 ? 0 : 1;
+  return residual === 0 ? 0 : 1;
 }
 
 // ---- diff ------------------------------------------------------------
@@ -566,7 +693,9 @@ function runDiff(p: Parsed, json: boolean): number {
     process.stdout.write("no differences\n");
   } else {
     for (const g of changed) {
-      process.stdout.write(`${g.code}: +${g.added} -${g.removed} ~${g.changed}\n`);
+      process.stdout.write(
+        `${g.code}: +${g.added} -${g.removed} ~${g.changed}\n`,
+      );
     }
   }
   return 0;
@@ -587,15 +716,25 @@ function runMerge(p: Parsed, json: boolean): number {
   const clash = str(p.flags["on-type-clash"]) ?? "error";
   // Reject an unknown mode instead of letting it fall through as `undefined` (which
   // would silently mean "error" — a typo'd `--on-type-clash promot` would then refuse
-  // the merge and look like a real type clash).
-  if (clash !== "error" && clash !== "widen" && clash !== "promote") {
-    fail(`--on-type-clash: unknown mode '${clash}' (error, widen, promote)`, 5);
+  // the merge and look like a real type clash). The accepted set and the message are
+  // BOTH the engine's `TypeClashMode::ALL` (#555) — this was two hand-typed copies of
+  // the modes, which a fourth mode would have reached through neither.
+  const modes = typeClashModes();
+  if (!modes.includes(clash)) {
+    fail(`--on-type-clash: unknown mode '${clash}' (${modes.join(", ")})`, 5);
   }
+  // `modes` is `string[]` (from the native binding), so `.includes()` cannot
+  // narrow `clash` to the option's literal union the way the old literal `!==`
+  // chain did. The `fail` above returns `never` for anything outside the set, so
+  // by here `clash` IS one of the modes. Cast via the EXISTING option type rather
+  // than re-typing the literal triple here — that would just re-add the hand-copy
+  // this change removes.
+  const onTypeClash = clash as NonNullable<MergeOptions["onTypeClash"]>;
 
   let res;
   try {
     res = merge(files, {
-      onTypeClash: clash,
+      onTypeClash,
       dictVersion: str(p.flags["dict-version"]),
       encoding: str(p.flags["encoding"]),
       tranIssue: str(p.flags["tran-issue"]),
@@ -631,8 +770,11 @@ function runMerge(p: Parsed, json: boolean): number {
     );
     return 0;
   }
-  process.stdout.write(`merged ${files.length} files → ${out} (${res.bytes.length} bytes)\n`);
-  for (const w of res.warnings) process.stdout.write(`  warning [${w.kind}]: ${w.message}\n`);
+  process.stdout.write(
+    `merged ${files.length} files → ${out} (${res.bytes.length} bytes)\n`,
+  );
+  for (const w of res.warnings)
+    process.stdout.write(`  warning [${w.kind}]: ${w.message}\n`);
   if (res.revisions.length > 0) {
     process.stdout.write(`  ${res.revisions.length} row revision(s):\n`);
     for (const r of res.revisions) {
@@ -660,7 +802,11 @@ function runCertify(p: Parsed): number {
     // caller rather than a measurement by the engine.
     const dest = read(file, { encoding: str(p.flags["encoding"]) }).certify(
       str(p.flags["out"]),
-      { dictVersion: str(p.flags["dict-version"]) },
+      {
+        dictVersion: str(p.flags["dict-version"]),
+        dictionary: str(p.flags["dict"]),
+        dictReplace: !!p.flags["dict-replace"],
+      },
     );
     // STDOUT, like the binary and uvx. This line is the verb's RESULT, not a progress
     // note — `CERT=$(lat certify f.ags)` is the obvious way to use it, and this
@@ -689,10 +835,18 @@ function runRules(json: boolean): number {
   // unchecked assertion) and which threw `rules is not iterable` at runtime: the
   // human `lat rules` crashed on this launcher alone, while `--json` — the only path
   // the tests covered — was fine.
-  const { rules }: { rules: Array<{ rule: string; title: string; severity: string; fixable: boolean }> } =
-    JSON.parse(rulesMetaJson());
+  const { rules } = JSON.parse(rulesMetaJson()) as {
+    rules: Array<{
+      rule: string;
+      title: string;
+      severity: string;
+      fixable: boolean;
+    }>;
+  };
   for (const r of rules) {
-    process.stdout.write(`Rule ${r.rule}\t${r.severity}${r.fixable ? "\tfixable" : ""}\t${r.title}\n`);
+    process.stdout.write(
+      `Rule ${r.rule}\t${r.severity}${r.fixable ? "\tfixable" : ""}\t${r.title}\n`,
+    );
   }
   return 0;
 }
@@ -705,7 +859,10 @@ function resolvePassword(p: Parsed, prompt: string): string {
   if (env) return env;
   // No TTY prompt library in the Node package; require a file/env so we never
   // read a passphrase from argv.
-  fail(`${prompt} — set $LAT_TRANSPORT_PASSWORD or pass --password-file <path>`, 5);
+  fail(
+    `${prompt} — set $LAT_TRANSPORT_PASSWORD or pass --password-file <path>`,
+    5,
+  );
 }
 
 function runTransport(verb: string, p: Parsed): number {
@@ -720,14 +877,26 @@ function runTransport(verb: string, p: Parsed): number {
       transport.unpack(input, output);
     } else if (verb === "lock") {
       const logN = p.flags["log-n"] ? Number(p.flags["log-n"]) : undefined;
-      transport.lock(input, output, resolvePassword(p, "passphrase to lock with"), level, logN);
+      transport.lock(
+        input,
+        output,
+        resolvePassword(p, "passphrase to lock with"),
+        level,
+        logN,
+      );
     } else {
-      transport.unlock(input, output, resolvePassword(p, "passphrase to unlock"));
+      transport.unlock(
+        input,
+        output,
+        resolvePassword(p, "passphrase to unlock"),
+      );
     }
   } catch (e) {
     fail((e as Error).message, 6);
   }
-  note(`${verb === "unpack" || verb === "unlock" ? "restored" : verb + "ed"} ${input} → ${output}`);
+  note(
+    `${verb === "unpack" || verb === "unlock" ? "restored" : verb + "ed"} ${input} → ${output}`,
+  );
   return 0;
 }
 
@@ -741,10 +910,17 @@ function runExcel(p: Parsed): number {
   else if (p.flags["import"]) exp = false;
   else if (output.toLowerCase().endsWith(".xlsx")) exp = true;
   else if (output.toLowerCase().endsWith(".ags")) exp = false;
-  else fail(`can't infer direction from output ${output} — pass --export (→ .xlsx) or --import (→ .ags)`, 5);
+  else
+    fail(
+      `can't infer direction from output ${output} — pass --export (→ .xlsx) or --import (→ .ags)`,
+      5,
+    );
   try {
     if (exp) toExcel(input, output);
-    else fromExcel(input, output, { formatNumericColumns: !p.flags["no-format-numeric"] });
+    else
+      fromExcel(input, output, {
+        formatNumericColumns: !p.flags["no-format-numeric"],
+      });
   } catch (e) {
     fail((e as Error).message, 6);
   }
@@ -778,11 +954,9 @@ export function main(argv: string[] = process.argv.slice(2)): number {
   const ndjson = !!p.flags["ndjson"];
   if (json && ndjson) fail("--json and --ndjson are mutually exclusive", 5);
   rejectUnknownFlags(p, verb, spec);
-  rejectExternalDict(p);
 
   if (p.positionals.length === 0 && verb === "validate" && argv.length === 0) {
     fail("a subcommand or input file is required", 5);
   }
   return spec.run(p, json, ndjson);
 }
-

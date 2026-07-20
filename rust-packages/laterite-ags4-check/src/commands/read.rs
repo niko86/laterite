@@ -5,8 +5,8 @@
 use std::process::exit;
 
 use laterite_ags4_core::ags4_codec::{AgsGroup, read_ags4};
+use laterite_ags4_core::read_render;
 use laterite_cliutil::{colour_enabled, styled_table, write_atomic};
-use serde_json::{Map, Value};
 
 use crate::cli::ReadArgs;
 
@@ -28,9 +28,10 @@ pub fn run(args: &ReadArgs, json: bool) -> ! {
 
     let body = match args.group.as_deref() {
         None => list_groups(&parsed.order, json),
-        Some(code) => match parsed.get(code) {
-            Some(group) => render_group(group, json, args.csv),
-            None => {
+        Some(code) => {
+            if let Some(group) = parsed.get(code) {
+                render_group(group, json, args.csv)
+            } else {
                 let present = if parsed.order.is_empty() {
                     "none".to_string()
                 } else {
@@ -42,7 +43,7 @@ pub fn run(args: &ReadArgs, json: bool) -> ! {
                 );
                 exit(4);
             }
-        },
+        }
     };
 
     if let Some(p) = args.out.as_deref() {
@@ -79,68 +80,37 @@ fn list_groups(order: &[String], json: bool) -> String {
 /// One group's rows. Rows are `HashMap`s, so project through `group.headings`
 /// for deterministic column order — never iterate the map directly.
 fn render_group(group: &AgsGroup, json: bool, csv: bool) -> String {
-    if json {
-        let arr: Vec<Value> = group
-            .rows
-            .iter()
-            .map(|row| {
-                let mut o = Map::new();
-                for h in &group.headings {
-                    o.insert(
-                        h.clone(),
-                        Value::from(row.get(h).cloned().unwrap_or_default()),
-                    );
-                }
-                Value::Object(o)
-            })
-            .collect();
-        serde_json::to_string_pretty(&Value::Array(arr)).unwrap_or_default() + "\n"
-    } else if csv {
-        let mut s = csv_row(group.headings.iter().map(String::as_str));
-        for row in &group.rows {
-            s.push_str(&csv_row(
-                group
-                    .headings
-                    .iter()
-                    .map(|h| row.get(h).map(String::as_str).unwrap_or("")),
-            ));
-        }
-        s
-    } else {
-        let headers: Vec<&str> = group.headings.iter().map(String::as_str).collect();
-        let rows: Vec<Vec<String>> = group
-            .rows
-            .iter()
-            .map(|row| {
-                group
-                    .headings
-                    .iter()
-                    .map(|h| row.get(h).cloned().unwrap_or_default())
-                    .collect()
-            })
-            .collect();
-        styled_table(&headers, rows, colour_enabled(false)).to_string() + "\n"
-    }
-}
-
-/// One RFC-4180-ish CSV line: quote a field iff it contains `,` / `"` / CR / LF,
-/// doubling internal quotes. Trailing `\n`.
-fn csv_row<'a>(cells: impl Iterator<Item = &'a str>) -> String {
-    let fields: Vec<String> = cells
-        .map(|c| {
-            if c.contains([',', '"', '\r', '\n']) {
-                format!("\"{}\"", c.replace('"', "\"\""))
-            } else {
-                c.to_string()
-            }
+    // Project the HashMap rows through `headings` once — the shared renderers
+    // take positional rows (the shape the bindings already hand every surface).
+    let rows: Vec<Vec<String>> = group
+        .rows
+        .iter()
+        .map(|row| {
+            group
+                .headings
+                .iter()
+                .map(|h| row.get(h).cloned().unwrap_or_default())
+                .collect()
         })
         .collect();
-    fields.join(",") + "\n"
+    if json {
+        // JSON + CSV come from core's `read_render` — the same writers Node and
+        // Python now call, so `read --json`/`--csv` is one format, not three
+        // hand-synced ones (#530). The table stays local: it renders through
+        // `laterite-cliutil`'s styled grid, a CLI-only concern.
+        read_render::render_rows_json(&group.headings, &rows)
+    } else if csv {
+        read_render::render_rows_csv(&group.headings, &rows)
+    } else {
+        let headers: Vec<&str> = group.headings.iter().map(String::as_str).collect();
+        styled_table(&headers, rows, colour_enabled(false)).to_string() + "\n"
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
     use std::collections::HashMap;
 
     fn group() -> AgsGroup {

@@ -19,7 +19,7 @@ export type { PackStats, UnpackStats };
 
 /**
  * zstd-compress `src` → `dest` for transport — content-agnostic, so it works on
- * any file (an `.ags` transfer, an `.ags5db`, anything), not just AGS data.
+ * any file (an `.ags` transfer, anything), not just AGS data.
  *
  * @param src - Path to the file to compress.
  * @param dest - Path the compressed output is written to.
@@ -46,7 +46,7 @@ export function unpack(src: string, dest: string): UnpackStats {
  * zstd-compress, then age-passphrase-encrypt `src` → `dest`. Compress-then-
  * encrypt is load-bearing: zstd needs low-entropy input, and ciphertext is
  * random — so the order can't flip. The age envelope is interoperable with the
- * Python side (pyrage) and `lat-db lock`, all linking the same Rust `age` crate.
+ * Python side (pyrage) and `lat lock`, all linking the same Rust `age` crate.
  *
  * @param src - Path to the file to compress and encrypt.
  * @param dest - Path the encrypted output is written to.
@@ -76,7 +76,11 @@ export function lock(
  * @returns The output size and elapsed seconds.
  * @throws If the passphrase is wrong or the input is not a passphrase envelope.
  */
-export function unlock(src: string, dest: string, password: string): UnpackStats {
+export function unlock(
+  src: string,
+  dest: string,
+  password: string,
+): UnpackStats {
   return transportUnlock(src, dest, password);
 }
 

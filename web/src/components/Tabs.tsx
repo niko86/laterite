@@ -26,7 +26,9 @@ export const Tabs: Component<{
             type="button"
             role="tab"
             aria-selected={props.active === t.id}
-            onClick={() => props.onChange(t.id)}
+            onClick={() => {
+              props.onChange(t.id);
+            }}
             class="relative -mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors"
             classList={{
               "border-accent text-accent": props.active === t.id,

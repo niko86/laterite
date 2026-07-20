@@ -91,7 +91,7 @@ _LAT_CANDIDATES = [_TARGET / "release" / "lat", _TARGET / "debug" / "lat"]
 #: from "no drift", i.e. a gate that quietly disarms itself. That is not hypothetical:
 #: the release `lat` from one commit earlier answered `census` perfectly well and
 #: reported no editions at all.
-CENSUS_VERSION = 4
+CENSUS_VERSION = 5
 
 
 class StaleLauncher(Exception):
@@ -159,6 +159,29 @@ def shape(census: dict) -> dict:
         "global_args": {
             a["name"]: bool(a["takes_value"]) for a in census.get("global_args", [])
         },
+        # verb flag -> the CLOSED VALUE SET the flag accepts (sorted). This is the
+        # table #555 added: the args table above compares a flag's arity, not the
+        # modes it accepts, so a launcher offering a DIFFERENT `--on-type-clash` set
+        # was invisible — the same shape as the swallowed `--encoding`, one level in.
+        #
+        # Normalised, because the three parser frameworks report per-arg values
+        # inconsistently and a raw compare would be pure false drift:
+        #   * only `takes_value` flags — clap reports `['true','false']` for a bool
+        #     switch (its possible-values), argparse reports nothing; a switch has no
+        #     user-facing value enum, so both collapse to "no entry" here.
+        #   * `--dict-version` excluded — its set is the `editions` table, compared
+        #     there and ORDERED; clap doesn't enforce it as a closed arg-value set at
+        #     all (it validates in the engine), so a per-arg copy is double-reported.
+        # What survives today is `merge --on-type-clash`; a future value-flag joins
+        # automatically. Sorted: a value SET has no meaningful order (unlike editions).
+        "arg_values": {
+            f"{v['verb']} {a['name']}": sorted(a["values"])
+            for v in census.get("verbs", [])
+            for a in v.get("args", [])
+            if a.get("takes_value")
+            and a.get("values")
+            and a["name"] != "--dict-version"
+        },
         # The dictionary editions this launcher accepts for --dict-version. ORDERED:
         # it is a sequence (oldest → newest), and the order is meaningful.
         "editions": list(census.get("editions", [])),
@@ -208,24 +231,24 @@ def divergences(surfaces: dict[str, dict]) -> list[dict]:
         # --- CLI verbs: a set. A missing door is the headline bug this caught.
         a_verbs = set(auth["verbs"]) - {"census"}
         s_verbs = set(s["verbs"]) - {"census"}
-        for key in sorted(a_verbs - s_verbs):
-            found.append(
-                {
-                    "table": "cli-verbs",
-                    "surface": name,
-                    "key": key,
-                    "detail": f"`lat {key}` exists in {AUTHORITY} and is absent from {name}",
-                }
-            )
-        for key in sorted(s_verbs - a_verbs):
-            found.append(
-                {
-                    "table": "cli-verbs",
-                    "surface": name,
-                    "key": key,
-                    "detail": f"`lat {key}` exists in {name} and is absent from {AUTHORITY}",
-                }
-            )
+        found.extend(
+            {
+                "table": "cli-verbs",
+                "surface": name,
+                "key": key,
+                "detail": f"`lat {key}` exists in {AUTHORITY} and is absent from {name}",
+            }
+            for key in sorted(a_verbs - s_verbs)
+        )
+        found.extend(
+            {
+                "table": "cli-verbs",
+                "surface": name,
+                "key": key,
+                "detail": f"`lat {key}` exists in {name} and is absent from {AUTHORITY}",
+            }
+            for key in sorted(s_verbs - a_verbs)
+        )
 
         # --- Per-verb flags. Only for verbs BOTH launchers have: a missing verb is
         # already reported above, and re-reporting each of its flags would bury the
@@ -249,7 +272,12 @@ def divergences(surfaces: dict[str, dict]) -> list[dict]:
                 else:
                     continue
                 found.append(
-                    {"table": "args", "surface": name, "key": f"{verb} {flag}", "detail": detail}
+                    {
+                        "table": "args",
+                        "surface": name,
+                        "key": f"{verb} {flag}",
+                        "detail": detail,
+                    }
                 )
 
         # --- The globals, compared once rather than per verb.
@@ -261,7 +289,12 @@ def divergences(surfaces: dict[str, dict]) -> list[dict]:
             else:
                 continue
             found.append(
-                {"table": "args", "surface": name, "key": f"(global) {flag}", "detail": detail}
+                {
+                    "table": "args",
+                    "surface": name,
+                    "key": f"(global) {flag}",
+                    "detail": detail,
+                }
             )
 
         # --- Editions: an ordered sequence, compared whole. A launcher that accepts
@@ -291,6 +324,28 @@ def divergences(surfaces: dict[str, dict]) -> list[dict]:
                     ),
                 }
             )
+
+        # --- Per-flag value sets (#555). Compared as SETS: a launcher that accepts a
+        # different set of `--on-type-clash` modes is broken the same way one that
+        # swallows `--encoding` is — it answers a question the user did not ask. A
+        # flag present on only one side is skipped here: that's already an `args`
+        # finding (the flag itself diverged), and re-reporting its values would bury
+        # the root under a follow-on.
+        a_vals = auth.get("arg_values", {})
+        s_vals = s.get("arg_values", {})
+        found.extend(
+            {
+                "table": "arg-values",
+                "surface": name,
+                "key": key,
+                "detail": (
+                    f"`lat {key}` accepts {s_vals[key]} on {name}, "
+                    f"{a_vals[key]} on {AUTHORITY}"
+                ),
+            }
+            for key in sorted(set(a_vals) & set(s_vals))
+            if a_vals[key] != s_vals[key]
+        )
 
         # --- Encoding labels: per-label resolution. A launcher that answers UTF-8
         # where the authority answers None has re-added a silent fallback — the bug
@@ -416,7 +471,9 @@ def render(ssot: dict) -> str:
         for n in names:
             a = surfaces[AUTHORITY]["args"].get(v, {})
             s = surfaces[n]["args"].get(v, {})
-            cells.append("—" if v not in surfaces[n]["verbs"] else ("✅" if s == a else "❌"))
+            cells.append(
+                "—" if v not in surfaces[n]["verbs"] else ("✅" if s == a else "❌")
+            )
         lines.append(f"| `{v}` | {' | '.join(cells)} |")
 
     glob = ", ".join(f"`{f}`" for f in sorted(surfaces[AUTHORITY]["global_args"]))
@@ -601,7 +658,9 @@ def main() -> int:
     # Each job has only the launchers it builds. Pin the ones present against the
     # committed SSOT; the SSOT's other rows are pinned by the job that owns them.
     if not SSOT.exists():
-        print(f"error: {SSOT.name} is missing — run tools/gen_census.py", file=sys.stderr)
+        print(
+            f"error: {SSOT.name} is missing — run tools/gen_census.py", file=sys.stderr
+        )
         return 1
     ssot = json.loads(SSOT.read_text())
     recorded: dict[str, dict] = ssot["surfaces"]
@@ -618,7 +677,9 @@ def main() -> int:
     for name, tables in live.items():
         if name not in recorded:
             ok = False
-            print(f"UNRECORDED surface {name} — regenerate the census.", file=sys.stderr)
+            print(
+                f"UNRECORDED surface {name} — regenerate the census.", file=sys.stderr
+            )
             continue
         if recorded[name] == tables:
             continue
@@ -626,9 +687,15 @@ def main() -> int:
         print(f"STALE census for {name}:", file=sys.stderr)
         was, now = set(recorded[name].get("verbs", [])), set(tables["verbs"])
         for v in sorted(now - was):
-            print(f"  verbs: + {v} (the launcher has it; the census does not know)", file=sys.stderr)
+            print(
+                f"  verbs: + {v} (the launcher has it; the census does not know)",
+                file=sys.stderr,
+            )
         for v in sorted(was - now):
-            print(f"  verbs: - {v} (the census claims it; the launcher lacks it)", file=sys.stderr)
+            print(
+                f"  verbs: - {v} (the census claims it; the launcher lacks it)",
+                file=sys.stderr,
+            )
         for key in ("editions", "fallback_edition", "encodings"):
             if recorded[name].get(key) != tables[key]:
                 print(
@@ -638,11 +705,15 @@ def main() -> int:
                 )
         print("  → run `uv run --no-sync python tools/gen_census.py`", file=sys.stderr)
 
-    declared = {(d["table"], d["surface"], d["key"]) for d in ssot.get("divergences", [])}
+    declared = {
+        (d["table"], d["surface"], d["key"]) for d in ssot.get("divergences", [])
+    }
     found = divergences(recorded)
     keys = {(f["table"], f["surface"], f["key"]) for f in found}
 
-    undeclared = [f for f in found if (f["table"], f["surface"], f["key"]) not in declared]
+    undeclared = [
+        f for f in found if (f["table"], f["surface"], f["key"]) not in declared
+    ]
     if undeclared:
         ok = False
         print("CENSUS DRIFT — undeclared divergence(s):", file=sys.stderr)
@@ -659,7 +730,10 @@ def main() -> int:
         ok = False
         print("STALE divergence(s) — declared but no longer real:", file=sys.stderr)
         for t, s, k in stale:
-            print(f"  [{t}] {s}: {k} — remove it from surface-census.json", file=sys.stderr)
+            print(
+                f"  [{t}] {s}: {k} — remove it from surface-census.json",
+                file=sys.stderr,
+            )
 
     if RENDER.read_text() != render(ssot):
         ok = False

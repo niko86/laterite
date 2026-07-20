@@ -14,8 +14,9 @@
 // the entry chunk): the helpers take a proj4 instance the caller dynamically
 // imports. coords.test.ts imports proj4 directly under Node.
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Proj4Like = any;
+// proj4 is lazy-loaded by the caller (kept out of the entry chunk), so this is
+// its real type via a type-only import — no runtime proj4 pulled in here.
+type Proj4Like = typeof import("proj4");
 
 export const WGS84 = "EPSG:4326";
 
@@ -85,7 +86,10 @@ export function registerOstn15(proj4: Proj4Like, grid: ArrayBuffer): void {
  *  variant (requires {@link registerOstn15} to have run first). */
 export function applyDefs(proj4: Proj4Like, precise: boolean): void {
   const osgb = CRS.osgb;
-  proj4.defs(osgb.epsg, precise && osgb.nadgrids ? osgb.nadgrids : osgb.helmert);
+  proj4.defs(
+    osgb.epsg,
+    precise && osgb.nadgrids ? osgb.nadgrids : osgb.helmert,
+  );
   proj4.defs(CRS.irish.epsg, CRS.irish.helmert);
 }
 
@@ -139,12 +143,15 @@ export function toGeoJson(
       ...(usedOstn15 ? { attribution: OS_ATTRIBUTION } : {}),
     },
     features: points
-      .filter((p) => p.lon != null && p.lat != null)
+      .filter(
+        (p): p is ConvertedPoint & { lon: number; lat: number } =>
+          p.lon != null && p.lat != null,
+      )
       .map((p) => ({
         type: "Feature",
         geometry: {
           type: "Point",
-          coordinates: [round8(p.lon!), round8(p.lat!)],
+          coordinates: [round8(p.lon), round8(p.lat)],
         },
         properties: {
           LOCA_ID: p.id,

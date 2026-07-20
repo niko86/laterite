@@ -9,13 +9,10 @@ dependencies = [
     "duckdb>=1.5.4",
     "polars>=1.42.1",
     "pyarrow>=25.0.0",
-    "lxml>=6.1.1",
 ]
 
 [tool.uv.workspace]
-# Only `packages/laterite` remains here; the experimental AGS5 packages
-# (laterite-ags5 / laterite-ags5x) were moved to the dormant `ags5/` holding
-# folder (#177 decouple) and are no longer workspace members.
+# `packages/laterite` is the sole workspace member — the one shipped wheel.
 members = ["packages/*"]
 
 [tool.uv.sources]
@@ -27,8 +24,7 @@ laterite = { workspace = true }
 # were removed here. `marimo` is back for the laterite tour notebook —
 # author it with `uv run --group dev marimo edit --sandbox examples/laterite_tour.py`
 # (the notebook's PEP 723 header brings polars/duckdb/altair/pyarrow/laterite,
-# so the shipped wheel never gains marimo). pandas<3 stays — python-ags4 needs
-# it and ags5_ags4/codec.py imports it directly.
+# so the shipped wheel never gains marimo). pandas<3 stays — python-ags4 needs it.
 dev = [
     "marimo>=0.23.14",
     "pandas<3",
@@ -38,28 +34,36 @@ dev = [
     # Ags4File text round-trip with generated input the example-based
     # tests don't reach (the laterite-base tests in
     # packages/laterite/tests/test_ags_types.py + test_ags4file.py).
-    "hypothesis>=6.156.6",
-    # Parallel test execution. The laterite + ags5 suites are
-    # file/DuckDB-heavy (per-test tmp_path isolation), so they fan out
-    # cleanly across workers. CI runs `-n 4` to roughly halve the suite
-    # while leaving headroom on the shared self-hosted runner host.
+    "hypothesis>=6.157.0",
+    # Parallel test execution. The laterite suite is file/DuckDB-heavy
+    # (per-test tmp_path isolation), so tests fan out cleanly across
+    # workers. CI runs `-n 4` to roughly halve the suite while leaving
+    # headroom on the shared self-hosted runner host.
     "pytest-xdist>=3.6",
-    # Line-coverage gate for the laterite + laterite_ags5 Python surface.
+    # Line-coverage gate for the laterite Python surface.
     # CI's pytest passes --cov + --cov-fail-under (see ci.yml); the
-    # [tool.coverage] config below scopes it to the two packages. Plays
+    # [tool.coverage] config below scopes it to the package. Plays
     # with xdist (combines per-worker data automatically).
     "pytest-cov>=5",
-    "ruff>=0.15.21",
+    "ruff>=0.15.22",
     # Astral's type checker (preview) — the type-faithfulness gate (#303 Phase 1):
     # proves the shipped `laterite` package's type hints don't lie. Same toolchain
     # as ruff/uv (Rust-fast). Run in the project venv (`uv run ty check`, NOT
     # `uvx`) so it resolves polars/duckdb + the generated `_laterite_native.pyi`;
     # config + scope in [tool.ty] below. CI step sits beside `ruff check`.
-    "ty>=0.0.58",
+    "ty>=0.0.61",
+    # Dead-code finder for the Python surface (Rust's `dead_code` lint is
+    # built-in; Python has no equivalent). NOT a gate — it's a reliquary
+    # *scout*: `uv run vulture` surfaces candidate unused funcs/classes for a
+    # deletion. Noisy by design on public API / enums / dunders (it can't see
+    # cross-package or C-extension callers), so [tool.vulture] below scopes it
+    # and whitelists those false-positive shapes. See the reliquary's
+    # "Finding relics — tooling" section.
+    "vulture>=2.14",
     # Build backend for the `laterite` package (PyO3 extension compiled
     # from rust-packages/laterite-py). In the dev group so a workspace
-    # `uv sync` builds the native module; not a runtime dep of any
-    # ags5-* package.
+    # `uv sync` builds the native module; not a runtime dep of the
+    # shipped wheel.
     "maturin>=1.14.1,<2",
     # Lets maturin set the cdylib rpath during `maturin develop` (the
     # editable build) on Linux; without it maturin warns "Failed to set
@@ -90,6 +94,11 @@ dev = [
     # envelope is standard-age, not self-consistent — a skipped oracle proves
     # nothing. Wheels ship for macOS + manylinux (confirmed `uv sync`).
     "pyrage>=1.2",
+    # Used only by tools/make-white-bg.py (one-off brand-asset flattening,
+    # not imported by anything shipped). Declared here (rather than pulled
+    # ephemerally via `--with`) so the widened ty scope (lever 7 of #585,
+    # tools/ + tests/) can resolve the import instead of flagging it.
+    "pillow>=11",
 ]
 
 # Docs site (#201, Phase 1): MkDocs + Material. A separate group so the core
@@ -101,7 +110,7 @@ dev = [
 # build time (runtime handler), so the docs build needs the workspace wheel
 # present — `uv sync` builds it (the local working-tree build the docs track).
 docs = [
-    "mkdocs-material>=9.5",
+    "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=1.0.6",
     # Capped BELOW the releases that added a hard `properdocs` dependency
     # (gen-files 0.6.1, literate-nav 0.6.3). properdocs is the maintainer's own
@@ -115,8 +124,8 @@ docs = [
     # caps `mkdocs<2` and uv.lock pins 1.6.1. The successor we'd actually follow
     # is Material's own Zensical, not properdocs — so freezing these two plugins
     # costs us nothing. Lift a cap only if a release drops the properdocs dep.)
-    "mkdocs-gen-files>=0.5,<0.6.1",
-    "mkdocs-literate-nav>=0.6,<0.6.3",
+    "mkdocs-gen-files>=0.6.1,<0.6.2",
+    "mkdocs-literate-nav>=0.6.3,<0.6.4",
 ]
 
 [tool.pytest.ini_options]
@@ -131,7 +140,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-# Scope the coverage gate to the two Python packages CI exercises. Import
+# Scope the coverage gate to the shipped laterite package CI exercises. Import
 # names (not paths) so the editable installs map to their src dirs; this also
 # keeps the test files out of the denominator without an explicit omit. The
 # --cov-fail-under floor lives in ci.yml's pytest step (visible alongside the
@@ -140,18 +149,42 @@ markers = [
 source = ["laterite"]
 parallel = true
 
+[tool.vulture]
+# Reliquary scout, not a gate (see the dev-dep comment + reliquary.md). Two
+# scopes with very different signal-to-noise:
+#   * tools/          — internal scripts; a dead function here is almost always
+#     really dead (this is where the 3 recorded orphans live). HIGH signal.
+#   * packages/…/laterite — the SHIPPED package; most "unused" hits are public
+#     API called from OUTSIDE Python (other packages, or the PyO3/wasm/JS
+#     surfaces vulture can't see), so treat every hit as a QUESTION to answer
+#     against `__all__` + the crate-map, never a delete-on-sight. LOW signal.
+# `uv run vulture` prints candidates; a human confirms, then records the
+# default so unused *functions/classes* surface (they score 60; raising it to
+# 80 would only leave unused imports/vars and hide exactly the relics we want).
+paths = ["packages/laterite/python/laterite", "tools"]
+exclude = [
+    # Generated stub — not hand-written source; drift is guarded by its own test.
+    "*/_laterite_native.pyi",
+    # Release helpers run only in CI-mirror context; not part of the local surface.
+]
+ignore_names = [
+    # ast.NodeVisitor / dispatch methods reached via getattr, never a direct call.
+    "visit_*",
+    # pytest collects by name; not "called" from Python's point of view.
+    "test_*",
+]
+ignore_decorators = ["@pytest.fixture"]
+
 [tool.ruff]
 line-length = 88
-# py314, NOT py312: ruff lints the WHOLE workspace, which includes the unshipped
-# laterite-ags5x — it uses `compression.zstd` (PEP 784), a 3.14-only stdlib module.
-# Lowering to py312 makes ruff reclassify `compression` as non-stdlib and flag
-# those files' import blocks as mis-sorted (I001). The shipped wheels DO target
-# 3.12 (abi3-py312 / requires-python >=3.12), but that floor is enforced by the
-# wheel metadata + the CI 3.12 wheel-test, not by this lint target.
-target-version = "py314"
+# Match the shipped wheel's floor (abi3-py312 / requires-python >=3.12): linting
+# at py312 catches a 3.13+-only stdlib API leaking into shipped code — the same
+# floor the `wheel-smoke` job enforces at runtime (it installs and imports the
+# built wheel on real 3.12/3.13/3.14). The dormant holding folder (the only
+# 3.14-requiring code) is excluded below, so nothing here needs a 3.14 target.
+target-version = "py312"
 extend-exclude = [
-    # The dormant experimental-AGS5 holding folder (#177): preserved as-is for
-    # a future AGS5 strand to re-link, not active code — excluded from lint.
+    # Dormant holding folder (#177), kept for a future revive — not active code.
     "ags5",
     "examples/output",
     "output",
@@ -159,34 +192,63 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "PIE"]
+select = [
+    "E", "F", "I", "B", "UP", "PIE",
+    "SIM", "C4", "RET", "RSE", "PTH", "RUF", "PT", "TCH", "PERF", "FLY",
+    "LOG", "ICN", "G", "TRY",
+]
 ignore = [
     "E501",  # line length — let the formatter handle it
     "B008",  # function call in argument defaults (FastAPI/pytest idiom)
+    "TRY003",  # external-message-in-raise — flags nearly every `raise X("msg")`, noisy, low value
+    "PT018",  # composite-assertion splitting — pure style churn, low value
+    # RUF001/002/003 (ambiguous-unicode-character): this codebase deliberately
+    # writes en-dash ranges ("A–Z", "1–4"), × for "by"/"times", and — for
+    # parenthetical asides throughout prose (comments/docstrings/strings) — the
+    # house style, not an accident. Blindly swapping them for ASCII is actively
+    # wrong in at least two spots: `_compat_desc.py`'s `[–-]` regex class
+    # intentionally matches BOTH dash variants seen in the wild, and its
+    # `A–Z` literal must byte-match the Rust engine's real Rule-19 finding text
+    # (`rust-packages/laterite-ags4-validator/src/rules/naming.rs`), which also
+    # uses an en-dash. No autofix exists for these three rules.
+    "RUF001",
+    "RUF002",
+    "RUF003",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["B011"]
-"**/tests/**" = ["B011"]
+# FLY002: fixture AGS4 text is authored as one quoted line per row (readable,
+# diffable, matches the format's own line-per-record shape) then joined with
+# "\r\n" — the autofix collapses that into one unreadable mega-line, which is
+# a strictly worse trade for a one-off fixture literal.
+"tests/**" = ["B011", "FLY002"]
+"**/tests/**" = ["B011", "FLY002"]
 # Example scripts intentionally mutate sys.path/env before imports.
 # E402: marimo notebooks import inside @app.cell functions.
 # B018: a marimo cell's bare last expression IS its rendered output.
 "examples/**" = ["E402", "B018"]
 
 # --- Type-faithfulness gate (#303 Phase 1) --------------------------------
-# Astral `ty` (preview). Scoped to the SHIPPED `laterite` package only — the
-# gate is about the surface users import, not the dev/tools/dormant-ags5 code
-# (ruff's wider workspace net already covers those). Resolves polars/duckdb +
-# the generated `_laterite_native.pyi` from the project venv, so it must run as
+# Astral `ty` (preview). Originally scoped to the SHIPPED `laterite` package
+# only; widened (lever 7 of #585) to also cover the repo's own `tools/` +
+# `tests/` — a generator/tool bug (undeclared dep, lying annotation) is worth
+# catching too, and ruff's checks (unused imports/vars) don't type-check
+# return values the way `ty` does. Resolves polars/duckdb + the generated
+# `_laterite_native.pyi` from the project venv, so it must run as
 # `uv run ty check` (NOT `uvx`, which has no project deps). CI runs it beside
 # `ruff check`; pairs with tests/test_free_chained_parity.py + the package's
 # test_type_faithfulness.py which assert behaviour, not just declared types.
 [tool.ty.src]
-include = ["packages/laterite/python"]
+include = ["packages/laterite/python", "tools", "tests"]
 
 [tool.ty.environment]
 # Check against the wheel's real floor (abi3-py312 / requires-python >=3.12),
-# NOT the dev env's 3.14 — so a 3.13+-only API leaking into shipped code is caught.
+# NOT the dev env's 3.14 — so a 3.13+-only API leaking into shipped code is
+# caught. This also applies to `tools/` + `tests/` even though those are
+# dev-only and always run on the pinned 3.14 interpreter (.python-version) —
+# a 3.13+-only stdlib API there is a false positive, not a real bug; prefer
+# rewriting to a version-portable equivalent (e.g. `Path.open(newline=...)`
+# over `Path.read_text(newline=...)`) rather than suppressing.
 python-version = "3.12"
 
 # --- Release version management -------------------------------------------
@@ -256,8 +318,7 @@ replace = "compare/v{new_version}...HEAD\n[{new_version}]: https://github.com/ni
 # member inherits it with version.workspace = true). Stamped here so a
 # `bump-my-version bump` moves the engine crates + the `lat` binary in
 # lockstep with the Python wheels — preventing the kind of Python/Rust version
-# drift this single-sourcing fixed. (The `lat-db` binary is dormant under
-# `ags5/`, #177 — not built or shipped.) The only `version = "X"` literal in
+# drift this single-sourcing fixed. The only `version = "X"` literal in
 # that file is the [workspace.package] line.
 [[tool.bumpversion.files]]
 filename = "rust-packages/Cargo.toml"

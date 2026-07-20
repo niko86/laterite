@@ -2,9 +2,8 @@
 
 The four operations are **content-agnostic**: they read a file's bytes,
 (de)compress and optionally (de)encrypt them, and write the result. They work on
-**any file** — an AGS4 ``.ags`` transfer file, an ``.ags5db``, anything — not only
-``.ags5db`` (the historical framing; the Rust core just runs zstd/age over raw
-bytes).
+**any file** — an AGS4 ``.ags`` transfer file, anything — the Rust core just runs
+zstd/age over raw bytes.
 
 Two pairs of operations:
 
@@ -12,14 +11,14 @@ Two pairs of operations:
   spot on AGS data (~10% ratio in a few seconds; higher levels buy minutes not
   bytes).
 * ``lock`` / ``unlock`` — zstd + age passphrase encryption. The age envelope is
-  interoperable with ``pyrage`` and the ``lat-db lock`` binary subcommand — both
+  interoperable with ``pyrage`` and the ``lat lock`` binary subcommand — both
   link the same Rust ``age`` crate.
 
     >>> from laterite import transport
     >>> transport.pack("delivery.ags")
     PosixPath('delivery.ags.zst')
-    >>> transport.lock("delivery.ags5db", password="hunter2")
-    PosixPath('delivery.ags5db.zst.age')
+    >>> transport.lock("delivery.ags", password="hunter2")
+    PosixPath('delivery.ags.zst.age')
 """
 
 from __future__ import annotations
@@ -89,7 +88,7 @@ def pack(
 ) -> Path:
     """Compress any file to ``<src>.zst`` for transport (zstd only).
 
-    Works on **any file** — ``.ags``, ``.ags5db``, anything. ``level`` is the zstd
+    Works on **any file** — ``.ags``, anything. ``level`` is the zstd
     level (1=fastest, 22=highest ratio); default 9 is the sweet spot on AGS data.
     ``dest`` overrides the default ``<src>.zst`` output path.
 
@@ -152,7 +151,7 @@ def lock(
     """Compress + age-passphrase-encrypt any file to ``<src>.zst.age``.
 
     Zstd first (low-entropy data compresses well), then age (scrypt +
-    ChaCha20-Poly1305). The envelope is interoperable with ``lat-db lock`` and
+    ChaCha20-Poly1305). The envelope is interoperable with ``lat lock`` and
     ``pyrage`` — both use the same Rust ``age`` crate. ``password`` is required (no
     agent-default path). ``level`` is the zstd level (default 9); ``dest`` overrides
     the default ``<src>.zst.age`` output path.
@@ -257,7 +256,9 @@ def unpack_bytes(data: bytes) -> bytes:
     return _native.transport_unpack_bytes(data)
 
 
-def lock_bytes(data: bytes, *, password: str, level: int = 9, log_n: int | None = None) -> bytes:
+def lock_bytes(
+    data: bytes, *, password: str, level: int = 9, log_n: int | None = None
+) -> bytes:
     """Compress + age-passphrase-encrypt bytes → bytes in memory — no plaintext on disk.
 
     The in-memory form of :func:`lock` (zstd, then age scrypt +

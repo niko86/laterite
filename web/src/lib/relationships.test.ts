@@ -14,7 +14,11 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { RawUnion } from "./dict";
 
-const H = (name: string, status: string, type: string) => ({ name, status, type });
+const H = (name: string, status: string, type: string) => ({
+  name,
+  status,
+  type,
+});
 
 // The canonical single source of truth — read at runtime (not a static import,
 // which would make tsc infer the ~800 KB literal). This is the exact file every
@@ -115,7 +119,11 @@ describe("joinKeys", () => {
   const d = dict();
   it("SAMP ⋈ LOCA on LOCA_ID", () => {
     expect(
-      joinKeys({ code: "SAMP", cols: cols(d, "SAMP") }, { code: "LOCA", cols: cols(d, "LOCA") }, d),
+      joinKeys(
+        { code: "SAMP", cols: cols(d, "SAMP") },
+        { code: "LOCA", cols: cols(d, "LOCA") },
+        d,
+      ),
     ).toEqual([{ left: "LOCA_ID", right: "LOCA_ID" }]);
   });
   it("TREG ⋈ SAMP on the full 5-part sample key", () => {
@@ -155,7 +163,9 @@ describe("joinKeys", () => {
       code: "SAMP",
       cols: cols(d, "SAMP").filter((c) => c !== "LOCA_ID"),
     };
-    expect(joinKeys(sampNoLoca, { code: "LOCA", cols: cols(d, "LOCA") }, d)).toEqual([]);
+    expect(
+      joinKeys(sampNoLoca, { code: "LOCA", cols: cols(d, "LOCA") }, d),
+    ).toEqual([]);
   });
 });
 
@@ -182,7 +192,9 @@ describe("depth helpers", () => {
   it("depthRangeOf is cols-aware: no band when the *_BASE column is absent", () => {
     // GEOL declares GEOL_TOP/GEOL_BASE, but a band is only built when both are
     // physically present in the ingested table (else a DuckDB column-not-found).
-    expect(depthRangeOf("GEOL", d, ["LOCA_ID", "GEOL_TOP", "GEOL_BASE"])).toEqual({
+    expect(
+      depthRangeOf("GEOL", d, ["LOCA_ID", "GEOL_TOP", "GEOL_BASE"]),
+    ).toEqual({
       loca: "LOCA_ID",
       top: "GEOL_TOP",
       base: "GEOL_BASE",
@@ -200,7 +212,10 @@ describe("depth helpers", () => {
 describe("geologyTemplate", () => {
   const d = dict();
   it("builds a TREG × GEOL half-open depth band with specimen + geology desc", () => {
-    const metas = ["GEOL", "TREG"].map((code) => ({ code, headings: cols(d, code) }));
+    const metas = ["GEOL", "TREG"].map((code) => ({
+      code,
+      headings: cols(d, code),
+    }));
     const t = geologyTemplate(metas, d)!;
     expect(t).not.toBeNull();
     expect(t.name).toBe("TREG × GEOL stratum");
@@ -241,7 +256,7 @@ describe("asKeyMap", () => {
     // analytics module consumes — no copy, no second fetch.
     const d = dict();
     const km = asKeyMap(d);
-    expect(km).toBe(d as unknown);
+    expect(km).toBe(d);
     expect(km.get("SAMP")?.parent).toBe("LOCA");
     expect(km.get("SAMP")?.keys).toContain("LOCA_ID");
   });
@@ -329,8 +344,12 @@ describe("geologyTemplate — non-GEOL depth-range group", () => {
       H("SAMP_TOP", "KEY", "2DP"),
       H("SAMP_ID", "KEY", "ID"),
     ]);
-    const cz = (code: string) => (m.get(code)?.headings ?? []).map((h) => h.name);
-    const metas = ["STRT", "SAMP"].map((code) => ({ code, headings: cz(code) }));
+    const cz = (code: string) =>
+      (m.get(code)?.headings ?? []).map((h) => h.name);
+    const metas = ["STRT", "SAMP"].map((code) => ({
+      code,
+      headings: cz(code),
+    }));
     const t = geologyTemplate(metas, m)!;
     expect(t).not.toBeNull();
     expect(t.name).toBe("SAMP × STRT stratum");

@@ -46,7 +46,10 @@ function initGroupTable() {
     prev.type = "button";
     prev.textContent = "‹ Prev";
     prev.disabled = page === 0;
-    prev.addEventListener("click", () => { page -= 1; render(); });
+    prev.addEventListener("click", () => {
+      page -= 1;
+      render();
+    });
 
     const info = document.createElement("span");
     info.className = "group-pager-info";
@@ -58,7 +61,10 @@ function initGroupTable() {
     next.type = "button";
     next.textContent = "Next ›";
     next.disabled = page >= pages - 1;
-    next.addEventListener("click", () => { page += 1; render(); });
+    next.addEventListener("click", () => {
+      page += 1;
+      render();
+    });
 
     pager.append(prev, info, next);
 
@@ -69,7 +75,10 @@ function initGroupTable() {
       clear.type = "button";
       clear.className = "group-clear";
       clear.textContent = `✕ Show all ${rows.length}`;
-      clear.addEventListener("click", () => { search.value = ""; setFiltered(rows); });
+      clear.addEventListener("click", () => {
+        search.value = "";
+        setFiltered(rows);
+      });
       pager.append(clear);
     }
   }
@@ -82,7 +91,9 @@ function initGroupTable() {
 
   function filter(query) {
     const q = query.trim().toLowerCase();
-    setFiltered(q ? rows.filter((r) => r.textContent.toLowerCase().includes(q)) : rows);
+    setFiltered(
+      q ? rows.filter((r) => r.textContent.toLowerCase().includes(q)) : rows,
+    );
   }
 
   search.addEventListener("input", () => filter(search.value));

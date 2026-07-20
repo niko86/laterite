@@ -26,12 +26,12 @@ export function fixKey(f: Fix): string {
 
 /** Splice `replacement` into the [start, end) char range of `raw`,
  *  returning the AFTER line with the replacement region highlighted.
- *  Code-point correct (spread → array), matching the engine's slicing. */
+ *  Code-point correct (via Array.from), matching the engine's slicing. */
 function afterLine(raw: string, edit: SpanEdit): JSX.Element {
-  const cps = [...raw];
+  const cps = Array.from(raw);
   const s = Math.max(0, Math.min(edit.start, cps.length));
   const e = Math.max(s, Math.min(edit.end, cps.length));
-  const repl = [...edit.replacement];
+  const repl = Array.from(edit.replacement);
   const before = cps.slice(0, s).join("");
   const after = cps.slice(e).join("");
   return (
@@ -66,8 +66,7 @@ const EditDiff: Component<{ edit: SpanEdit; lines: () => string[] }> = (
   );
 };
 
-const GUTTER =
-  "mr-2 inline-block w-10 select-none text-right text-fg-dim";
+const GUTTER = "mr-2 inline-block w-10 select-none text-right text-fg-dim";
 
 /** Render one aligned fix-preview row: a before (`del`) / after (`ins`) pair
  *  inside the enclosing GROUP block. The changed cell highlights the EXACT
@@ -98,23 +97,31 @@ function fixRow(
         ? "bg-emerald-500/10"
         : "";
   const mark = row.variant === "del" ? "−" : row.variant === "ins" ? "+" : " ";
-  const hl = row.variant === "del" ? delHl : row.variant === "ins" ? insHl : null;
+  const hl =
+    row.variant === "del" ? delHl : row.variant === "ins" ? insHl : null;
   return (
     <div class={`min-w-max ${band}`}>
       <span class={GUTTER}>{row.n}</span>
       <span class="mr-2 select-none text-fg-faint">{mark}</span>
-      {row.cells.map((c, i) => {
-        if (hl && i === changedCol) return highlightSpan(c.padded, hl[0], hl[1]);
-        // Row-padding appends whole new cells (no original to sub-span) —
-        // highlight them wholesale on the ins side so the additions are visible.
-        if (row.variant === "ins" && appendFrom !== null && i >= appendFrom)
-          return (
-            <span class="rounded-sm bg-emerald-500/40 text-emerald-50">
-              {c.padded}
-            </span>
-          );
-        return c.padded;
-      })}
+      <For each={row.cells}>
+        {(c, i) => {
+          // <For> over positional cells (stable index); hl/changedCol/appendFrom
+          // are constant for this render, so these i() once-reads stay correct.
+          /* eslint-disable solid/reactivity */
+          if (hl && i() === changedCol)
+            return highlightSpan(c.padded, hl[0], hl[1]);
+          // Row-padding appends whole new cells (no original to sub-span) —
+          // highlight them wholesale on the ins side so the additions are visible.
+          if (row.variant === "ins" && appendFrom !== null && i() >= appendFrom)
+            return (
+              <span class="rounded-sm bg-emerald-500/40 text-emerald-50">
+                {c.padded}
+              </span>
+            );
+          /* eslint-enable solid/reactivity */
+          return c.padded;
+        }}
+      </For>
     </div>
   );
 }
@@ -209,7 +216,9 @@ export const FixesPanel: Component<{
             type="checkbox"
             class="mt-1"
             checked={props.selected().has(key)}
-            onChange={() => props.onToggle(key)}
+            onChange={() => {
+              props.onToggle(key);
+            }}
           />
           <span class="min-w-0 flex-1">
             <span class="text-fg">{f.label}</span>
@@ -220,11 +229,13 @@ export const FixesPanel: Component<{
               {shortRule(f.rule)}
             </a>
             <Show when={props.severityOf}>
-              <span
-                class={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${SEV_BADGE[props.severityOf!(f)]}`}
-              >
-                {props.severityOf!(f)}
-              </span>
+              {(severityOf) => (
+                <span
+                  class={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${SEV_BADGE[severityOf()(f)]}`}
+                >
+                  {severityOf()(f)}
+                </span>
+              )}
             </Show>
           </span>
         </label>
@@ -267,7 +278,9 @@ export const FixesPanel: Component<{
             type="button"
             class="rounded bg-emerald-600/80 px-3 py-1.5 text-sm font-medium text-emerald-50 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
             disabled={selectedFixes().length === 0}
-            onClick={() => props.onApply(selectedFixes())}
+            onClick={() => {
+              props.onApply(selectedFixes());
+            }}
           >
             Apply selected ({selectedFixes().length})
           </button>

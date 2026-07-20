@@ -48,7 +48,19 @@ export class Report {
    * field answer two questions — *which dictionary judged the file* and *did we skip the
    * engine* — and answer neither properly. */
   get certified(): boolean {
-    return this.#r.certified ?? false;
+    return this.#r.certified;
+  }
+
+  /** Why a proffered `index` certificate did NOT stand in for the engine, as a stable
+   * token (`"content_changed"`, `"dictionary_changed"`, `"edition_differs"`,
+   * `"encoding_differs"`, `"tier_not_measured_warnings"`, …), or `undefined`.
+   *
+   * `undefined` in the two ordinary cases: no certificate was offered, or one was offered
+   * and vouched (then `certified` is `true`). A defined value means a cert *was* offered
+   * but couldn't answer — the token says which guard fired. Mirrors
+   * `laterite.Report.revalidate_reason`; the terse twin of `lat`'s human sentence. */
+  get revalidateReason(): string | undefined {
+    return this.#r.revalidateReason ?? undefined;
   }
 
   get file(): string {

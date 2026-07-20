@@ -1,0 +1,19 @@
+# Keep the free-form "blank issue" escape hatch, and point a few common
+# non-bug questions at the right place before they become issues here.
+blank_issues_enabled: true
+contact_links:
+  - name: AGS4 data format (the standard itself)
+    url: https://www.ags.org.uk/data-format/
+    about: >-
+      Questions about what the AGS4 format requires (not laterite's behaviour)
+      belong with the AGS Data Format Working Group.
+  - name: python-ags4 (the upstream reference library)
+    url: https://gitlab.com/ags-data-format-wg/ags-python-library
+    about: >-
+      Bugs in python-ags4 itself go to its own tracker. If laterite and
+      python-ags4 disagree on a file, see the parity map below first.
+  - name: laterite ↔ python-ags4 parity map
+    url: https://github.com/niko86/laterite/blob/main/docs/parity-coverage-map.md
+    about: >-
+      The 10 deliberate divergences are documented here. Check whether a
+      disagreement is already a known, intentional non-closure before filing.

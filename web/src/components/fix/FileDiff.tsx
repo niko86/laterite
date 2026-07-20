@@ -86,8 +86,14 @@ export const FileDiff: Component<{
 const GUTTER = "mr-2 inline-block w-10 select-none text-right text-fg-dim";
 
 const DiffRowView: Component<{ row: DiffRow }> = (props) => {
+  // Rendered under <For> (value-keyed), so props.row is stable for this
+  // instance's lifetime: the snapshot never goes stale and the type-based early
+  // return can't strand a later branch (re-renders come from For, not a prop
+  // update in place).
+  // eslint-disable-next-line solid/reactivity
   const row = props.row;
   if (row.type === "gap") {
+    // eslint-disable-next-line solid/components-return-once
     return (
       <div class="min-w-max text-fg-faint italic">
         <span class={GUTTER}>⋯</span>

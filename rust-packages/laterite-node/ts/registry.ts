@@ -7,7 +7,11 @@
  * @module
  */
 import { Ags4Error } from "./errors";
-import { registryDictionaryJson } from "./native";
+import {
+  registryAncestorChain,
+  registryDictionaryJson,
+  registryInheritedKeyNames,
+} from "./native";
 import {
   GROUPS_DATA,
   type GeneratedGroup,
@@ -122,43 +126,37 @@ export function childGroups(parentCode: string): GroupDescriptor[] {
 }
 
 /** Parent chain from `code` to root: `[code, parent, …, root]`. Throws for an
- * unknown code (so root groups — `[code]` — are distinguishable). */
+ * unknown code (so root groups — `[code]` — are distinguishable).
+ *
+ * Delegates to the native `laterite_ags4_core::registry::ancestor_chain` — the
+ * ONE Rust definition of the group tree, the same walk the Python wheel binds —
+ * rather than re-walking `.parent` pointers in TS (#532). The native error for an
+ * unknown code is re-typed to {@link Ags4Error} to keep this facade's contract. */
 export function ancestorChain(code: string): string[] {
-  if (GROUPS[code] === undefined) {
-    throw new Ags4Error(`unknown group code: ${JSON.stringify(code)}`);
+  try {
+    return registryAncestorChain(code);
+  } catch (e) {
+    throw new Ags4Error(e instanceof Error ? e.message : String(e));
   }
-  const chain: string[] = [];
-  let current: string | null = code;
-  while (current !== null) {
-    chain.push(current);
-    current = GROUPS[current]?.parent ?? null;
-  }
-  return chain;
 }
 
 /** KEY heading names a group inherits from its **direct parent** — the
- * intersection of this group's KEY headings with its immediate parent's. This
- * matches the Rust/Python `inherited_key_names` (NOT the whole ancestor chain):
- * because AGS re-declares inherited keys at every level, the direct-parent
- * intersection already captures every key a group carries from above, so an
- * ancestor-chain union would only add ancestor keys the group doesn't have
- * (e.g. `PROJ_ID` on `SAMP`).
+ * intersection of this group's KEY headings with its immediate parent's (NOT the
+ * whole ancestor chain: AGS re-declares inherited keys at every level, so the
+ * direct-parent intersection already captures every key carried from above).
+ *
+ * Delegates to the native `laterite_ags4_core::registry::inherited_key_names`
+ * (the same leaf the Python wheel binds) rather than re-implementing the
+ * KEY-intersection in TS (#532); native returns the names sorted, wrapped here in
+ * a Set. The native error for an unknown code is re-typed to {@link Ags4Error}.
  *
  * @param code The group whose inherited KEY names to gather.
  * @returns The set of KEY heading names shared with the direct parent (empty for a root).
  * @throws {Ags4Error} If `code` isn't in the registry. */
 export function inheritedKeyNames(code: string): Set<string> {
-  const g = GROUPS[code];
-  if (g === undefined) {
-    throw new Ags4Error(`unknown group code: ${JSON.stringify(code)}`);
+  try {
+    return new Set(registryInheritedKeyNames(code));
+  } catch (e) {
+    throw new Ags4Error(e instanceof Error ? e.message : String(e));
   }
-  const names = new Set<string>();
-  if (g.parent === null) return names;
-  const parent = GROUPS[g.parent];
-  if (parent === undefined) return names;
-  const parentKeys = new Set(parent.keyHeadings.map((h) => h.name));
-  for (const h of g.keyHeadings) {
-    if (parentKeys.has(h.name)) names.add(h.name);
-  }
-  return names;
 }

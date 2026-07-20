@@ -31,7 +31,10 @@ describe("registry.dictionary(edition) — the per-edition STANDARD dictionary (
     expect(d.groups.length).toBeGreaterThan(150);
     const proj = d.groups.find((g) => g.code === "PROJ")!;
     expect(proj.contents).toBeTruthy();
-    expect(proj.headings[0]).toMatchObject({ name: "PROJ_ID", status: expect.any(String) });
+    expect(proj.headings[0]).toMatchObject({
+      name: "PROJ_ID",
+      status: expect.any(String),
+    });
     // `type`, not `ags_type` — the shared shape across surfaces.
     expect(proj.headings[0]).toHaveProperty("type");
   });
@@ -40,7 +43,9 @@ describe("registry.dictionary(edition) — the per-edition STANDARD dictionary (
     expect(registry.dictionary("4.0.3").groups.length).toBeLessThan(
       registry.dictionary("4.2").groups.length,
     );
-    expect(registry.dictionary().ags_edition).toBe(registry.dictionary("auto").ags_edition);
+    expect(registry.dictionary().ags_edition).toBe(
+      registry.dictionary("auto").ags_edition,
+    );
   });
 
   it("throws on an unknown edition", () => {
@@ -55,16 +60,26 @@ describe("registry traversal", () => {
     expect([...children]).toEqual([...children].sort()); // alphabetical
   });
 
-  it("ancestorChain walks code → root", () => {
+  // These two walks are now the native binding (laterite_ags4_core::registry),
+  // the SAME leaf the Python wheel binds — not a TS re-implementation of the parent
+  // walk / KEY-intersection (#532). The values below are the leaf's; the unknown-code
+  // case also pins that the native error surfaces as an Ags4Error with the message intact.
+  it("ancestorChain walks code → root (native binding, #532)", () => {
     expect(registry.ancestorChain("PROJ")).toEqual(["PROJ"]); // root
     expect(registry.ancestorChain("SAMP")).toEqual(["SAMP", "LOCA", "PROJ"]);
     expect(() => registry.ancestorChain("NOPE")).toThrow(Ags4Error);
+    expect(() => registry.ancestorChain("NOPE")).toThrow(
+      'unknown group code: "NOPE"',
+    );
   });
 
-  it("inheritedKeyNames is the direct-parent intersection (parity with Rust/Python)", () => {
+  it("inheritedKeyNames is the direct-parent intersection (native binding, #532)", () => {
     const inherited = registry.inheritedKeyNames("SAMP");
     expect(inherited.has("LOCA_ID")).toBe(true); // shared with the direct parent LOCA
     expect(inherited.has("PROJ_ID")).toBe(false); // NOT inherited — SAMP carries no PROJ_ID key
     expect(() => registry.inheritedKeyNames("NOPE")).toThrow(Ags4Error);
+    expect(() => registry.inheritedKeyNames("NOPE")).toThrow(
+      'unknown group code: "NOPE"',
+    );
   });
 });

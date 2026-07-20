@@ -20,13 +20,9 @@ test("Fix tab badges severity + explains FYI side-effects for a BOM file", async
   ).toBeVisible();
 
   // It carries a severity badge (the BOM is a Rule 1 error).
-  await expect(
-    page.getByText("error", { exact: true }).first(),
-  ).toBeVisible();
+  await expect(page.getByText("error", { exact: true }).first()).toBeVisible();
 
   // The explainer is shown (a fix can clear a related FYI; the filter doesn't
   // gate fixing).
-  await expect(
-    page.getByText(/doesn't limit what gets fixed/i),
-  ).toBeVisible();
+  await expect(page.getByText(/doesn't limit what gets fixed/i)).toBeVisible();
 });

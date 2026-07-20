@@ -62,7 +62,7 @@ const CLEAN_WITH_A_WARNING: &str = concat!(
     "\"DATA\",\"DT\",\"Date and time\"\r\n",
 );
 
-/// The same shape of file, error-clean, but with the Greek capital omega in PROJ_NAME.
+/// The same shape of file, error-clean, but with the Greek capital omega in `PROJ_NAME`.
 ///
 /// Its UTF-8 bytes are `CE A9`. Read as UTF-8 that is ONE code point, 937 — above the
 /// extended-ASCII range Rule 1 tolerates, so it is a Rule 1 **ERROR**. Read as
@@ -288,6 +288,7 @@ fn an_unmeasured_tier_is_not_a_clean_one() {
             resolution: laterite_ags4_validator::DictResolution::ExactTranAgs,
         },
         encoding: "UTF-8".to_string(),
+        custom_dict: None,
         errors: TierCoverage::Measured { count: 0 },
         warnings: TierCoverage::NotMeasured,
         fyi: TierCoverage::NotMeasured,
@@ -597,21 +598,36 @@ fn a_world_we_were_handed_but_not_asked_to_look_at_is_not_looked_at() {
 }
 
 #[test]
-fn an_external_dict_is_refused_at_the_door() {
+fn an_external_dict_is_honoured_not_refused() {
+    // #568 reversed the O-28 deferral: a valid `--dict` overlay now RUNS (layered
+    // over its detected base) rather than erroring BadDict at the door. The overlay
+    // adds a group the file doesn't use, so the verdict is unchanged from a bundled
+    // run — the point is that it is honoured, not refused.
     let bytes = CLEAN_WITH_ATTACHMENT.as_bytes();
+    let dict_json = br#"{"groups":{"XTRA":{"parent":"SAMP","headings":[
+        {"name":"SAMP_ID","type":"ID","status":"KEY"},
+        {"name":"XTRA_VAL","type":"2DP","status":"REQUIRED"}
+    ]}}}"#;
+    let custom = laterite_ags4_validator::overlay::parse_dict(
+        dict_json,
+        laterite_ags4_validator::overlay::DictFormat::Json,
+        CheckOptions::default().encoding,
+        laterite_ags4_validator::overlay::BaseSpec::Auto,
+        "mine.json",
+    )
+    .expect("custom dict parses");
     let opts = CheckOptions {
-        custom_dict: Some(std::path::PathBuf::from("mine.ags")),
+        custom_dict: Some(custom),
         ..CheckOptions::default()
     };
-    let err = check(Request {
+    check(Request {
         bytes,
         opts: &opts,
         cert: None,
         world: WorldScope::None,
         compat: None,
     })
-    .expect_err("O-28: deferred, and refused rather than ignored");
-    assert!(matches!(err, ValidatorError::BadDict { .. }));
+    .expect("a valid custom dict is honoured, not refused");
 }
 
 // --- the decoder is part of the question ------------------------------------

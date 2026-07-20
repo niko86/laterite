@@ -1,7 +1,13 @@
 // what this shows: zstd transport round-trip — pack a file to .zst, unpack it, prove byte-identical + smaller.
 import { transport } from "laterite";
 import assert from "node:assert/strict";
-import { copyFileSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 

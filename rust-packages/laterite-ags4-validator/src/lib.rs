@@ -74,10 +74,16 @@ pub use fixes::{
 // `laterite_ags4_validator::dict::…` path throughout this crate + its
 // consumers (laterite-py, laterite-node, wasm) keeps resolving unchanged.
 pub use laterite_ags4_reference::dict;
+// The runtime custom-dictionary overlay (#568): `CustomDict` (parsed once at the
+// surface boundary, carried on `CheckOptions::custom_dict`), `parse_dict`, and
+// its `DictError`. Re-exported so surfaces build a `CustomDict` through
+// `laterite_ags4_validator::overlay::…` without reaching past the validator.
+pub use laterite_ags4_reference::overlay;
 
 /// The bundled AGS4 editions joined with `sep` — the single source for every
 /// surface's "expected auto|4.0.3|…" / "pass one of 4.0.3/…" message, so no
 /// hand-written list can drift from `DictVersion::ALL`.
+#[must_use]
 pub fn editions_joined(sep: &str) -> String {
     DictVersion::ALL
         .iter()
@@ -94,16 +100,16 @@ pub struct CheckOptions {
     /// `TRAN_AGS` (the default — see [`resolve_dict_version`]).
     /// `Some(v)` ⇒ force edition `v`, ignoring `TRAN_AGS`.
     pub dict_version: Option<DictVersion>,
-    /// Override the bundled dictionary with an external `.ags` standard
-    /// dictionary. **Deliberately deferred** (O-28): supporting a
-    /// runtime-parsed dictionary means abstracting the `'static`
-    /// phf-backed [`Dictionary`] over an owned variant, which ripples a
-    /// non-`'static` lifetime through every rule module. Setting this
-    /// returns [`ValidatorError::BadDict`] (a clear error, never
-    /// silent).
-    pub custom_dict: Option<PathBuf>,
+    /// Override the bundled dictionary with a runtime custom dictionary
+    /// (#568, O-28). Parsed ONCE at the surface boundary into a
+    /// [`overlay::CustomDict`] — a base-resolved sparse overlay (or full
+    /// replacement) — so a batch run pays the parse cost once, reused across
+    /// every file. `None` ⇒ the bundled path (`dict_version` / `TRAN_AGS`
+    /// auto-detect). A malformed dict fails at that boundary
+    /// ([`ValidatorError::BadDict`]) before any file is read.
+    pub custom_dict: Option<overlay::CustomDict>,
     /// Include WARNING-severity findings (malformed DICT, nonstandard
-    /// abbreviations, unrecognised TRAN_AGS edition, …). On by default at
+    /// abbreviations, unrecognised `TRAN_AGS` edition, …). On by default at
     /// the binding layer; `--no-warnings` drops to errors-only.
     pub include_warnings: bool,
     /// Include FYI-severity findings.
@@ -144,6 +150,7 @@ impl Default for CheckOptions {
 /// The file's declared `TRAN_AGS` value (TRAN group, first DATA row,
 /// `TRAN_AGS` column), trimmed; `None` if absent/blank. Same
 /// resolve-column-by-name + first-DATA-row pattern Rule 11 uses.
+#[must_use]
 pub fn tran_ags_of(parsed: &parse::ParsedFile) -> Option<String> {
     let tran = parsed.groups.get("TRAN")?;
     let ci = tran.headings.iter().position(|h| h == "TRAN_AGS")?;
@@ -170,7 +177,7 @@ pub fn resolve_dict_version(
     tran_ags: Option<&str>,
 ) -> Result<(DictVersion, DictResolution), ValidatorError> {
     use DictResolution as K;
-    use DictVersion::*;
+    use DictVersion::{V4_0_3, V4_0_4, V4_1, V4_1_1, V4_2};
     if let Some(v) = over {
         return Ok((v, K::Forced));
     }
@@ -207,11 +214,10 @@ pub fn resolve_dict_version(
     match parts.next() {
         None => Ok((V4_0_4, K::GuessedPatch)), // bare "4"
         Some(m) => match m.parse::<u32>().ok() {
-            Some(0) => Ok((V4_0_4, K::GuessedPatch)),     // 4.0 / 4.0.x
-            Some(1) => Ok((V4_1_1, K::GuessedPatch)),     // 4.1.x (exact above)
-            Some(2) => Ok((V4_2, K::GuessedPatch)),       // 4.2.x
-            Some(_) => Ok((dict::FALLBACK, K::Fallback)), // 4.3 / 4.9 …
-            None => Ok((V4_0_4, K::GuessedPatch)),        // "4." / "4.x" junk
+            Some(0) | None => Ok((V4_0_4, K::GuessedPatch)), // 4.0/4.0.x, or "4."/"4.x" junk
+            Some(1) => Ok((V4_1_1, K::GuessedPatch)),        // 4.1.x (exact above)
+            Some(2) => Ok((V4_2, K::GuessedPatch)),          // 4.2.x
+            Some(_) => Ok((dict::FALLBACK, K::Fallback)),    // 4.3 / 4.9 …
         },
     }
 }
@@ -328,7 +334,6 @@ pub fn check_file_with_dict(
     path: &Path,
     opts: &CheckOptions,
 ) -> Result<(Findings, DictVersion, DictResolution), ValidatorError> {
-    reject_custom_dict(opts)?;
     let parsed = parse::parse_file_with_encoding(path, opts.encoding)?;
     // We have a path, so `--check-files` is answerable: Rule 20's on-disk half
     // can locate the sibling `FILE/` tree.
@@ -355,7 +360,25 @@ pub fn check_parsed_with_dict(
     opts: &CheckOptions,
     world: &WorldScope,
 ) -> Result<(Findings, DictVersion, DictResolution), ValidatorError> {
-    reject_custom_dict(opts)?;
+    // The custom-dictionary path (#568): the base + delta are already fixed on
+    // the `CustomDict` (parsed once at the surface boundary), so there is no
+    // `TRAN_AGS` resolution and no 4.0.3→4.0.4 content guard — the caller chose
+    // the base deliberately. `build_delta` re-derives the stack-local overlay the
+    // layered `Dictionary` borrows for this one validation.
+    if let Some(custom) = &opts.custom_dict {
+        let delta = custom.build_delta().map_err(|e| ValidatorError::BadDict {
+            path: PathBuf::from(&custom.name),
+            reason: e.to_string(),
+        })?;
+        let dict = Dictionary::layered(&delta);
+        let mut found = check_parsed(parsed, &dict, opts, world)?;
+        // Honour + warn (#568 §3): the overlay takes effect, but every override
+        // of a STANDARD group/heading is surfaced loudly (KEY demotion loudest),
+        // so a bespoke dictionary can never silently reshape the standard schema.
+        emit_override_warnings(custom, &delta, &mut found);
+        return Ok((found, custom.base_version, custom.resolution));
+    }
+
     let (dv, kind) = resolve_dict_version(opts.dict_version, tran_ags_of(parsed).as_deref())?;
     let (dv, kind, upgraded_from_4_0_3) = guard_4_0_4(dv, kind, parsed);
     let dict = Dictionary::bundled(dv);
@@ -383,23 +406,90 @@ pub fn check_parsed_with_dict(
     Ok((found, dv, kind))
 }
 
-/// The external `--dict <path>` override (O-28) is not implemented. Refused here
-/// rather than in each entry point, so no modality can quietly honour it.
-fn reject_custom_dict(opts: &CheckOptions) -> Result<(), ValidatorError> {
-    match &opts.custom_dict {
-        Some(custom) => Err(ValidatorError::BadDict {
-            path: custom.clone(),
-            reason: "external --dict override is not implemented; use a bundled \
-                     --dict-version (4.0.3/4.0.4/4.1/4.1.1/4.2) or omit it for \
-                     TRAN_AGS auto-detection"
-                .to_string(),
-        }),
-        None => Ok(()),
+/// Surface each override a custom overlay makes to a STANDARD group/heading as a
+/// WARNING (#568 §3, honour + warn). Only overlays (not full replacements — a
+/// replacement is declared, not an override) and only groups/headings the base
+/// actually defines. A KEY→non-KEY status change is called out as the loudest.
+fn emit_override_warnings(
+    custom: &overlay::CustomDict,
+    delta: &overlay::OwnedDelta,
+    found: &mut Findings,
+) {
+    if !custom.fall_through {
+        return; // a full replacement redefines the schema wholesale, by design
+    }
+    let base = Dictionary::bundled(custom.base_version);
+
+    // Re-parented standard groups.
+    let mut groups: Vec<&String> = delta.groups.keys().collect();
+    groups.sort();
+    for code in groups {
+        if let Some(bg) = base.group(code) {
+            let meta = &delta.groups[code];
+            if meta.parent != bg.parent {
+                findings::add_at(
+                    found,
+                    "DICT",
+                    None,
+                    code,
+                    format!(
+                        "custom dictionary re-parents standard group {code} from \
+                         {:?} to {:?} — honoured, but it reshapes the standard tree.",
+                        bg.parent, meta.parent
+                    ),
+                    findings::Location::default(),
+                    findings::Severity::Warning,
+                );
+            }
+        }
+    }
+
+    // Overridden standard headings (type/status), KEY demotion loudest.
+    let mut keys: Vec<&String> = delta.headings.keys().collect();
+    keys.sort();
+    for key in keys {
+        let Some((group, heading)) = key.split_once('\u{1f}') else {
+            continue;
+        };
+        let Some(bh) = base.heading(group, heading) else {
+            continue; // a brand-new heading is an addition, not an override
+        };
+        let over = &delta.headings[key];
+        let key_demotion = bh.status.contains("KEY") && !over.status.contains("KEY");
+        if key_demotion {
+            findings::add_at(
+                found,
+                "DICT",
+                None,
+                group,
+                format!(
+                    "custom dictionary demotes standard KEY heading {group}/{heading} \
+                     to status {:?} — honoured, but it changes row identity.",
+                    over.status
+                ),
+                findings::Location::default(),
+                findings::Severity::Warning,
+            );
+        } else if bh.ags_type != over.ags_type || bh.status != over.status {
+            findings::add_at(
+                found,
+                "DICT",
+                None,
+                group,
+                format!(
+                    "custom dictionary overrides standard heading {group}/{heading} \
+                     ({}/{} → {}/{}) — honoured.",
+                    bh.ags_type, bh.status, over.ags_type, over.status
+                ),
+                findings::Location::default(),
+                findings::Severity::Warning,
+            );
+        }
     }
 }
 
 /// `true` iff `check_file` produced zero findings. What the CLI exit
-/// code and `ags5db db-to-ags4 --validate` key off.
+/// code and other validate-on-convert callers key off.
 pub fn is_valid(path: &Path, opts: &CheckOptions) -> Result<bool, ValidatorError> {
     Ok(findings::count(&check_file(path, opts)?) == 0)
 }
@@ -410,13 +500,34 @@ mod tests {
     use DictVersion::*;
 
     #[test]
-    fn custom_dict_is_rejected() {
+    fn custom_dict_is_honoured_not_rejected() {
+        // The #568 reversal of the old refusal: a valid `--dict` overlay resolves
+        // to its detected base and runs the rules against the layered dictionary,
+        // rather than short-circuiting to BadDict.
+        let dict_json = br#"{"groups":{"TEST":{"parent":"SAMP","headings":[
+            {"name":"SAMP_ID","type":"ID","status":"KEY"},
+            {"name":"TEST_VAL","type":"2DP","status":"REQUIRED"}
+        ]}}}"#;
+        let custom = overlay::parse_dict(
+            dict_json,
+            overlay::DictFormat::Json,
+            encoding_rs::UTF_8,
+            overlay::BaseSpec::Auto,
+            "test.json",
+        )
+        .expect("custom dict parses");
         let opts = CheckOptions {
-            custom_dict: Some(PathBuf::from("whatever.ags")),
+            custom_dict: Some(custom),
             ..Default::default()
         };
-        let err = check_file(Path::new("unused"), &opts).unwrap_err();
-        assert!(matches!(err, ValidatorError::BadDict { .. }));
+        let pf = parse::parse_str(
+            "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n",
+        )
+        .expect("parses");
+        let (_found, dv, res) =
+            check_parsed_with_dict(&pf, &opts, &WorldScope::None).expect("custom dict runs");
+        assert_eq!(dv, V4_2, "additive dict detects the latest base");
+        assert_eq!(res, DictResolution::StructuralBase);
     }
 
     fn r(t: &str) -> DictVersion {

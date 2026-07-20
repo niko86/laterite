@@ -8,9 +8,12 @@ same tree shape from an AGS4 source as the explicit
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _TINY_AGS = (
     '"GROUP","PROJ"\n'
@@ -18,7 +21,7 @@ _TINY_AGS = (
     '"UNIT","",""\n'
     '"TYPE","ID","X"\n'
     '"DATA","P1","tiny project"\n'
-    '\n'
+    "\n"
     '"GROUP","LOCA"\n'
     '"HEADING","LOCA_ID","LOCA_TYPE","LOCA_GL"\n'
     '"UNIT","","","m"\n'
@@ -62,13 +65,13 @@ def test_read_typed_passthrough_attaches_dynamic_class(tmp_path: Path) -> None:
         '"UNIT",""\n'
         '"TYPE","ID"\n'
         '"DATA","P1"\n'
-        '\n'
+        "\n"
         '"GROUP","LOCA"\n'
         '"HEADING","LOCA_ID","LOCA_TYPE"\n'
         '"UNIT","",""\n'
         '"TYPE","ID","PA"\n'
         '"DATA","BH01","CP"\n'
-        '\n'
+        "\n"
         '"GROUP","ZZTS"\n'
         '"HEADING","LOCA_ID","ZZTS_REF","ZZTS_VAL"\n'
         '"UNIT","","","kPa"\n'
@@ -85,7 +88,8 @@ def test_read_typed_passthrough_attaches_dynamic_class(tmp_path: Path) -> None:
     assert len(zztss) == 1
     assert zztss[0].zzts_ref == "R1"
     assert zztss[0].zzts_val == 123.4
-    from laterite.dynamic import ZZTS  # noqa: PLC0415
+    from laterite.dynamic import ZZTS
+
     assert isinstance(zztss[0], ZZTS)
 
 

@@ -1,4 +1,4 @@
-"""Generate `_laterite_native.pyi` from the AGS5 dictionary.
+"""Generate `_laterite_native.pyi` from the AGS4 dictionary.
 
 Reads `rust-packages/laterite-ags4-reference/data/ags_dictionary.json` and emits the
 type-stub file that sits next to the compiled `_laterite_native.so`,
@@ -20,18 +20,21 @@ mirrors this type mapping; the two MUST stay in sync.
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DICT_JSON = REPO_ROOT / "rust-packages" / "laterite-ags4-reference" / "data" / "ags_dictionary.json"
-OUT_PYI = (
+DICT_JSON = (
     REPO_ROOT
-    / "packages"
-    / "laterite"
-    / "python"
-    / "laterite"
-    / "_laterite_native.pyi"
+    / "rust-packages"
+    / "laterite-ags4-reference"
+    / "data"
+    / "ags_dictionary.json"
+)
+OUT_PYI = (
+    REPO_ROOT / "packages" / "laterite" / "python" / "laterite" / "_laterite_native.pyi"
 )
 
 
@@ -182,6 +185,25 @@ def _emit_native_members(skip: set[str]) -> str:
     return "\n".join(blocks)
 
 
+def _ruff_format(content: str) -> str:
+    """Run the generated stub through the project's `ruff format` so the
+    committed `.pyi` is real formatted code, not a file the formatter is told
+    to skip. Config is discovered from `REPO_ROOT` (via ``cwd``); the `.pyi`
+    stdin-filename makes ruff apply its stub-file rules. This couples the stub
+    to ruff's version — a ruff bump that changes wrapping means regenerating —
+    which `test_pyi_stubs_match_generator` catches loudly."""
+    ruff = shutil.which("ruff") or str(Path(sys.executable).parent / "ruff")
+    result = subprocess.run(
+        [ruff, "format", "--stdin-filename", str(OUT_PYI), "-"],
+        input=content,
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        check=True,
+    )
+    return result.stdout
+
+
 def generate() -> str:
     """Build the full `.pyi` content from the dictionary."""
     data = json.loads(DICT_JSON.read_text(encoding="utf-8"))
@@ -234,9 +256,7 @@ def generate() -> str:
     all_block = (
         "\n# Re-exported by `laterite.groups` (its TYPE_CHECKING star import) for\n"
         "# `from laterite.groups import PROJ, ...`. DO NOT EDIT BY HAND.\n"
-        "__all__ = [\n"
-        + "".join(f"    {name!r},\n" for name in all_names)
-        + "]\n"
+        "__all__ = [\n" + "".join(f"    {name!r},\n" for name in all_names) + "]\n"
     )
 
     # The native module's internal functions + the Sidecar certificate class,
@@ -253,7 +273,7 @@ def generate() -> str:
     )
     native_block = _emit_native_members(set(all_names))
 
-    return (
+    return _ruff_format(
         header
         + "\n".join(body_blocks)
         + native_header

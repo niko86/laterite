@@ -9,7 +9,7 @@
 //! `serde_json::Value` rows by `laterite_ags4_emit::group_from_arrow` (the shared
 //! Arrow→Value conversion the wasm host uses too) and fed to the orchestrator,
 //! which formats (via `ags4_str` + dictionary UNIT/TYPE fill) and applies the
-//! chosen validity mode (AutoFix / Report / Strict).
+//! chosen validity mode (`AutoFix` / Report / Strict).
 
 use arrow::array::{
     Array, BooleanArray, Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array,
@@ -32,7 +32,7 @@ fn parse_edition(s: Option<&str>) -> PyResult<DictVersion> {
     // `auto` resolves to FALLBACK (also generated: the union's `fallback_edition`),
     // which is V4_1_1 — the value this used to hard-code.
     match s.map(str::trim) {
-        None | Some("") | Some("auto") => Ok(laterite_ags4_validator::dict::FALLBACK),
+        None | Some("" | "auto") => Ok(laterite_ags4_validator::dict::FALLBACK),
         Some(other) => DictVersion::from_edition(other).ok_or_else(|| {
             PyRuntimeError::new_err(format!(
                 "unknown edition {other:?}; expected {}",
@@ -44,7 +44,7 @@ fn parse_edition(s: Option<&str>) -> PyResult<DictVersion> {
 
 fn parse_mode(s: Option<&str>) -> PyResult<EmitMode> {
     match s.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
-        None | Some("") | Some("autofix") => Ok(EmitMode::AutoFix),
+        None | Some("" | "autofix") => Ok(EmitMode::AutoFix),
         Some("report") => Ok(EmitMode::Report),
         Some("strict") => Ok(EmitMode::Strict),
         Some(other) => Err(PyRuntimeError::new_err(format!(
@@ -61,11 +61,13 @@ fn parse_mode(s: Option<&str>) -> PyResult<EmitMode> {
 /// headings. Returns `(bytes, findings_json, applied, fixes_applied)` where
 /// `findings_json` is the validator's `{rule: [finding, …]}` map and `applied`
 /// is the safe-fix ledger (the same `{kind,label,rule,line,risk}` shape `fix()`
-/// returns) AutoFix made — `fixes_applied` is its length (#294 F#7).
+/// returns) `AutoFix` made — `fixes_applied` is its length (#294 F#7).
 #[pyfunction]
 #[pyo3(signature = (tables, edition=None, mode=None, units=None, types=None))]
-pub fn emit_ags4_from_arrow<'py>(
-    py: Python<'py>,
+// PyO3 boundary: owns the deserialized input
+#[allow(clippy::needless_pass_by_value)]
+pub fn emit_ags4_from_arrow(
+    py: Python<'_>,
     tables: Vec<(String, PyTable)>,
     edition: Option<String>,
     mode: Option<String>,
@@ -73,7 +75,7 @@ pub fn emit_ags4_from_arrow<'py>(
     // F#9). A group/heading absent from the map keeps the dictionary default.
     units: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
     types: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
-) -> PyResult<(Py<PyBytes>, String, Bound<'py, pyo3::types::PyList>, usize)> {
+) -> PyResult<(Py<PyBytes>, String, Bound<'_, pyo3::types::PyList>, usize)> {
     let opts = EmitOpts {
         mode: parse_mode(mode.as_deref())?,
         edition: parse_edition(edition.as_deref())?,
@@ -154,13 +156,13 @@ fn compat_cell_string(array: &dyn Array, row: usize) -> String {
         DataType::UInt16 => istr!(UInt16Array),
         DataType::UInt32 => istr!(UInt32Array),
         DataType::UInt64 => istr!(UInt64Array),
-        DataType::Float32 => py_float_str(
+        DataType::Float32 => py_float_str(f64::from(
             array
                 .as_any()
                 .downcast_ref::<Float32Array>()
                 .unwrap()
-                .value(row) as f64,
-        ),
+                .value(row),
+        )),
         DataType::Float64 => py_float_str(
             array
                 .as_any()
@@ -179,7 +181,13 @@ fn compat_cell_string(array: &dyn Array, row: usize) -> String {
 /// "13.0"`), which Rust's `{}` drops; non-integral uses the shortest
 /// round-trip, matching Python for the common cases.
 fn py_float_str(f: f64) -> String {
-    if f.is_finite() && f == f.trunc() && f.abs() < 1e16 {
+    // Exact equality is the point here, not a false positive: this tests
+    // whether `f` IS a whole number (Python's `str(13.0) == "13.0"`), so
+    // comparing to its own `trunc()` needs bit-exact equality — an epsilon
+    // check would misclassify genuinely non-integral floats near a boundary.
+    #[allow(clippy::float_cmp)]
+    let is_integral = f.is_finite() && f == f.trunc() && f.abs() < 1e16;
+    if is_integral {
         format!("{f:.1}")
     } else {
         format!("{f}")
@@ -198,11 +206,7 @@ pub fn emit_ags4_compat(tables: Vec<(String, PyTable)>) -> PyResult<String> {
     let mut blocks: Vec<(String, Vec<Vec<String>>)> = Vec::with_capacity(tables.len());
     for (code, table) in tables {
         let (batches, schema) = table.into_inner();
-        let header: Vec<String> = schema
-            .fields()
-            .iter()
-            .map(|f| f.name().to_string())
-            .collect();
+        let header: Vec<String> = schema.fields().iter().map(|f| f.name().clone()).collect();
         let mut matrix: Vec<Vec<String>> = Vec::new();
         matrix.push(header);
         for batch in &batches {

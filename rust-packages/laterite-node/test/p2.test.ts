@@ -54,7 +54,12 @@ describe("read → Arrow-direct, born-typed", () => {
 
   it("exposes metadata without an Arrow decode", () => {
     const ags = read(undefined, { text: AGS });
-    expect(ags.headings("LOCA")).toEqual(["LOCA_ID", "LOCA_GL", "LOCA_CKED", "LOCA_STAR"]);
+    expect(ags.headings("LOCA")).toEqual([
+      "LOCA_ID",
+      "LOCA_GL",
+      "LOCA_CKED",
+      "LOCA_STAR",
+    ]);
     expect(ags.units("LOCA")).toEqual(["", "m", "", ""]);
     expect(ags.types("LOCA")).toEqual(["ID", "2DP", "YN", "DT"]);
     expect(ags.lineNumbers("LOCA")).toEqual([10, 11]); // the two DATA rows
@@ -118,7 +123,9 @@ describe("read/validate from raw bytes (the V8 string-cap door)", () => {
   });
 
   it("validate(Uint8Array) matches validate(text), byte-faithfully", () => {
-    expect(validate(bytes).toNdjson()).toBe(validate(undefined, { text: AGS }).toNdjson());
+    expect(validate(bytes).toNdjson()).toBe(
+      validate(undefined, { text: AGS }).toNdjson(),
+    );
   });
 
   it("encoding applies to the bytes path (windows-1252)", () => {
@@ -147,33 +154,40 @@ describe("read/validate from raw bytes (the V8 string-cap door)", () => {
 
 describe("native failure → mapped exception", () => {
   it("read() of a missing path throws FileNotFoundError (exit 3)", () => {
+    let caught: unknown;
     try {
       read("/no/such/file.ags");
-      throw new Error("expected a throw");
     } catch (e) {
-      expect(e).toBeInstanceOf(FileNotFoundError);
-      expect((e as FileNotFoundError).exitCode).toBe(3);
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(FileNotFoundError);
+    expect((caught as FileNotFoundError).exitCode).toBe(3);
   });
 
   it("read() of non-AGS4 text throws NotAgs4Error (exit 4)", () => {
+    let caught: unknown;
     try {
       read(undefined, { text: "this is not an ags4 file\r\n" });
-      throw new Error("expected a throw");
     } catch (e) {
-      expect(e).toBeInstanceOf(NotAgs4Error);
-      expect((e as NotAgs4Error).exitCode).toBe(4);
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(NotAgs4Error);
+    expect((caught as NotAgs4Error).exitCode).toBe(4);
   });
 
   it("validate() of non-AGS4 text also throws NotAgs4Error", () => {
-    expect(() => validate(undefined, { text: "nope\r\n" })).toThrow(NotAgs4Error);
+    expect(() => validate(undefined, { text: "nope\r\n" })).toThrow(
+      NotAgs4Error,
+    );
   });
 });
 
 describe("buildAgs4 → data → AGS4", () => {
   it("builds valid AGS4 from arrow-js Tables and round-trips", () => {
-    const proj = tableFromArrays({ PROJ_ID: ["P1"], PROJ_NAME: ["Demo project"] });
+    const proj = tableFromArrays({
+      PROJ_ID: ["P1"],
+      PROJ_NAME: ["Demo project"],
+    });
     const loca = tableFromArrays({
       LOCA_ID: ["BH01", "BH02"],
       LOCA_GL: Float64Array.from([12.3, 13.0]),
@@ -216,7 +230,10 @@ describe("buildAgs4 → data → AGS4", () => {
     const res = buildAgs4(groups, { dictVersion: "4.1.1", mode: "autofix" });
     expect(res.fixesApplied).toBe(res.applied.length);
     expect(res.applied.length).toBeGreaterThan(0);
-    expect(res.applied[0]).toMatchObject({ rule: "AGS Format Rule 8", risk: "safe" });
+    expect(res.applied[0]).toMatchObject({
+      rule: "AGS Format Rule 8",
+      risk: "safe",
+    });
     expect(typeof res.applied[0]?.kind).toBe("string");
     // report mode touches nothing -> empty ledger.
     const rep = buildAgs4(groups, { mode: "report" });
@@ -258,9 +275,11 @@ describe("buildAgs4 → data → AGS4", () => {
 
   it("units/types reject an unknown group or heading (#294 F#9)", () => {
     const groups: Array<[string, GroupData]> = [["LOCA", [{ LOCA_ID: "BH1" }]]];
-    expect(() => buildAgs4(groups, { units: { NOPE: { X: "m" } } })).toThrow(/unknown group/);
-    expect(() => buildAgs4(groups, { types: { LOCA: { NOSUCH: "3DP" } } })).toThrow(
-      /no heading/,
+    expect(() => buildAgs4(groups, { units: { NOPE: { X: "m" } } })).toThrow(
+      /unknown group/,
     );
+    expect(() =>
+      buildAgs4(groups, { types: { LOCA: { NOSUCH: "3DP" } } }),
+    ).toThrow(/no heading/);
   });
 });

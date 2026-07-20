@@ -12,7 +12,9 @@ export const PillToggle: Component<{
 }> = (props) => (
   <button
     type="button"
-    onClick={() => props.onClick()}
+    onClick={() => {
+      props.onClick();
+    }}
     class="rounded px-3 py-1 font-medium transition-colors"
     classList={{
       "bg-chip text-accent": props.active,

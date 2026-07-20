@@ -25,7 +25,12 @@ const delta = diff(baseline, revision);
 const proj = delta.groups.find((g) => g.code === "PROJ");
 const changed = proj.rows.filter((r) => r.kind === "changed");
 
-console.log("totals:", delta.total_added, delta.total_removed, delta.total_changed);
+console.log(
+  "totals:",
+  delta.total_added,
+  delta.total_removed,
+  delta.total_changed,
+);
 console.log("PROJ key headings:", proj.key_headings);
 console.log("changed row key:", changed[0].key);
 console.log("changed cell:", changed[0].cells[0]);

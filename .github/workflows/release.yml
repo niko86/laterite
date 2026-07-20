@@ -401,7 +401,7 @@ jobs:
           merge-multiple: true
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           generate_release_notes: true
           # rc/dev tags (PEP 440 canonical, no hyphen) → flagged pre-release so
@@ -411,6 +411,52 @@ jobs:
             artefacts/*.whl
             artefacts/*.tar.gz
             artefacts/*.zip
+
+  # Pre-publish gate (#554): install-and-import the EXACT built wheel BEFORE it can
+  # reach PyPI, so a wheel that compiles but doesn't import (a broken cdylib, a
+  # renamed console script, a bad [project.scripts]) can never be published. The
+  # per-PR ci.yml `wheel-smoke` job proves the mechanism on every change; this
+  # proves the artefact actually being shipped, and `pypi-publish` gates on it.
+  # abi3-py312 forward-compat is checked across the 3.12/3.13/3.14 floor using the
+  # Linux wheel — the representative artefact (mac/win wheels ride the same abi3
+  # mechanism and are proven to BUILD by the matrix; a per-platform install test
+  # would need the self-hosted mac/win runners and is not what the floor claim
+  # rests on). uv fetches the interpreters; the wheel installs by path.
+  verify-wheel:
+    name: verify wheel (install + import)
+    runs-on: ubuntu-latest
+    needs: build-wheels
+    steps:
+      # The committed post-install smoke (tools/wheel_smoke.py) at the tagged ref.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: wheels-x86_64-unknown-linux-gnu # the Linux wheel + sdist
+          path: dist/
+
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: false
+
+      - name: Install Python 3.12 / 3.13 / 3.14 via uv
+        run: uv python install 3.12 3.13 3.14
+
+      # Fresh isolated venv per interpreter; install the built wheel BY PATH and
+      # prove the console script resolves (`lat --help`, exit 0 — the script has no
+      # --version) and the library imports + validates (tools/wheel_smoke.py).
+      - name: Install-and-import the built wheel on 3.12 / 3.13 / 3.14
+        run: |
+          set -euxo pipefail
+          wheel=$(echo dist/laterite-*.whl)
+          for v in 3.12 3.13 3.14; do
+            venv=".verify-$v"
+            uv venv --python "$v" --clear "$venv"
+            uv pip install --python "$venv/bin/python" "$wheel"
+            "$venv/bin/lat" --help >/dev/null
+            "$venv/bin/python" --version
+            "$venv/bin/python" tools/wheel_smoke.py
+          done
 
   pypi-publish:
     # Trusted-publishing flow (no API token). The PyPI trusted publisher
@@ -445,7 +491,9 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'dev')
     name: pypi (laterite)
     runs-on: ubuntu-latest
-    needs: build-wheels
+    # verify-wheel gates the publish: the exact built wheel must install-and-import
+    # on the 3.12/3.13/3.14 floor before it can reach PyPI (#554).
+    needs: [build-wheels, verify-wheel]
     environment: pypi
     permissions:
       id-token: write
@@ -604,7 +652,7 @@ jobs:
           rustup default stable-x86_64-pc-windows-msvc
           rustup target add ${{ matrix.target }}
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 22
 
@@ -654,7 +702,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
@@ -685,6 +733,42 @@ jobs:
           npx napi create-npm-dirs
           npx napi artifacts -d artifacts
           npm run build:ts
+
+      # The ©AGS third-party notice must ride with every package that carries the
+      # data. It does: each `.node` embeds the AGS4 dictionary (build.rs + an
+      # include_str! put it in the binary), and `napi create-npm-dirs` generates
+      # per-platform packages with only package.json + README + the .node. The
+      # published 0.7.0 packages therefore shipped verbatim ©AGS text under a bare
+      # `"license": "MIT"` with no notice at all — the wheel carried one, npm never
+      # did. npm auto-includes a LICENSE file regardless of the `files` array, so
+      # placing it is enough. Copied from the root rather than committed per-package
+      # so there is exactly one notice to keep true.
+      - name: Ship the third-party notice with every npm package
+        run: |
+          set -euo pipefail
+          cp "$GITHUB_WORKSPACE/LICENSE" ./LICENSE
+          for d in npm/*/; do cp "$GITHUB_WORKSPACE/LICENSE" "$d/LICENSE"; done
+          ls -1 npm/ | sed 's/^/  staged notice for @laterite\/native-/'
+
+      # Verify the OUTPUT, not the copy: ask npm what it would actually publish.
+      # A copy step that silently no-ops (a renamed npm/ layout, a changed cwd)
+      # would leave the packages exactly as broken as they were, and the step above
+      # would still be green. This asserts the file is in the pack list.
+      - name: Verify every package to be published carries the notice
+        run: |
+          set -euo pipefail
+          fail=0
+          for pkg in . npm/*/; do
+            name=$(node -p "require('./$pkg/package.json').name")
+            if npm pack --dry-run --json --prefix "$pkg" 2>/dev/null \
+                 | node -e 'const d=JSON.parse(require("fs").readFileSync(0));process.exit(d[0].files.some(f=>f.path==="LICENSE")?0:1)'; then
+              echo "  ok   $name carries LICENSE"
+            else
+              echo "  FAIL $name would publish WITHOUT the ©AGS notice"
+              fail=1
+            fi
+          done
+          exit $fail
 
       # Publish the platform packages (napi pre-publish: also syncs the main
       # package's optionalDependencies to this version), then the main package.

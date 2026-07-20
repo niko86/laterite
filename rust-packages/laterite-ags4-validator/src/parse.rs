@@ -145,7 +145,7 @@ mod tests {
 
     /// Helper: write `bytes` to a temp `.ags` file and `parse_file` it. Temp
     /// (not tests/fixtures/) because corpus-qa's e2e crawls the fixture dir
-    /// and asserts hard_error==0 — a non-UTF-8 fixture would defeat the test.
+    /// and asserts `hard_error==0` — a non-UTF-8 fixture would defeat the test.
     fn parse_bytes_via_file(bytes: &[u8]) -> Result<ParsedFile, ValidatorError> {
         use std::io::Write;
         let mut f = tempfile::Builder::new().suffix(".ags").tempfile().unwrap();

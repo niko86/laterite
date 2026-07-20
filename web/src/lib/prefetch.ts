@@ -27,7 +27,10 @@ let warmed = false;
 function onIdle(fn: () => void): void {
   const ric = (
     window as unknown as {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void;
+      requestIdleCallback?: (
+        cb: () => void,
+        opts?: { timeout: number },
+      ) => void;
     }
   ).requestIdleCallback;
   if (ric) ric(fn, { timeout: 4000 });
@@ -61,6 +64,8 @@ export function warmLazyAssets(): void {
   // Explore click downloads nothing yet a validate-only session never pays the
   // wasm-compile / worker / engine-heap cost.
   if (!isLowEndDevice()) {
-    onIdle(() => void import("./duck").then((m) => m.warmFetch()).catch(() => {}));
+    onIdle(
+      () => void import("./duck").then((m) => m.warmFetch()).catch(() => {}),
+    );
   }
 }

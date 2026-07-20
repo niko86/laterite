@@ -38,8 +38,8 @@ def _make_string_frame(fdep_cells):
     return pl.DataFrame(
         {
             "HEADING": ["UNIT", "TYPE"] + ["DATA"] * n,
-            "LOCA_ID": ["", "ID"] + ids,
-            "LOCA_FDEP": ["m", "2DP"] + list(fdep_cells),
+            "LOCA_ID": ["", "ID", *ids],
+            "LOCA_FDEP": ["m", "2DP", *list(fdep_cells)],
         }
     )
 

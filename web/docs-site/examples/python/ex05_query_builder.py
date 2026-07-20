@@ -13,10 +13,10 @@ q = (
 )
 
 # Four terminals materialise the same lazy plan:
-frame = q.frame()          # handle's default backend (polars)
-pl_df = q.to_polars()      # always polars
-pd_df = q.to_pandas()      # always pandas
-rel = q.relation()         # the lazy DuckDBPyRelation (not yet materialised)
+frame = q.frame()  # handle's default backend (polars)
+pl_df = q.to_polars()  # always polars
+pd_df = q.to_pandas()  # always pandas
+rel = q.relation()  # the lazy DuckDBPyRelation (not yet materialised)
 
 print(pl_df)
 

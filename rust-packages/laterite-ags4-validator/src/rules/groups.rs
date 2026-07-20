@@ -30,7 +30,7 @@
 //!   for all abbreviations entered in a FIELD where the data TYPE is
 //!   defined as \"PA\" …"
 //! * **Rule 16a** — multi-abbreviation FIELDs are split on the
-//!   TRAN_RCON concatenator (default `+`); each part must be defined
+//!   `TRAN_RCON` concatenator (default `+`); each part must be defined
 //!   separately in ABBR.
 //! * **Rule 17** — "Each data file shall contain the TYPE GROUP to
 //!   define the field TYPEs used within the data file. Every data type
@@ -127,9 +127,9 @@ fn rule_16_fyi(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
         return; // malformed ABBR — main Rule 16 / Rule 9 report it
     };
     for row in &abbr.rows {
-        let hdng = row.values.get(hi).map(String::as_str).unwrap_or("");
-        let code = row.values.get(ci).map(String::as_str).unwrap_or("");
-        let file_desc = row.values.get(di).map(String::as_str).unwrap_or("");
+        let hdng = row.values.get(hi).map_or("", String::as_str);
+        let code = row.values.get(ci).map_or("", String::as_str);
+        let file_desc = row.values.get(di).map_or("", String::as_str);
         if hdng.is_empty() || code.is_empty() {
             continue;
         }
@@ -184,8 +184,8 @@ fn rule_16_fyi_nonstandard_abbr(parsed: &ParsedFile, dict: &Dictionary, found: &
         return; // malformed ABBR — main Rule 16 / Rule 9 report it
     };
     for row in &abbr.rows {
-        let hdng = row.values.get(hi).map(String::as_str).unwrap_or("");
-        let code = row.values.get(ci).map(String::as_str).unwrap_or("");
+        let hdng = row.values.get(hi).map_or("", String::as_str);
+        let code = row.values.get(ci).map_or("", String::as_str);
         if hdng.is_empty() || code.is_empty() {
             continue;
         }
@@ -215,9 +215,9 @@ fn rule_16_fyi_nonstandard_abbr(parsed: &ParsedFile, dict: &Dictionary, found: &
     }
 }
 
-/// TRAN_AGS value present but not a recognised AGS4 edition — laterite then falls
+/// `TRAN_AGS` value present but not a recognised AGS4 edition — laterite then falls
 /// back to a default dictionary and may validate against the wrong schema. Not a
-/// Rule 14 error (TRAN_AGS being *present* is what Rule 14 requires; *recognised*
+/// Rule 14 error (`TRAN_AGS` being *present* is what Rule 14 requires; *recognised*
 /// isn't a rule). Emitted at the caller's chosen tier: a WARNING for the native
 /// (warnings-on) view, or python-ags4's FYI tier for `compat` — see `check`.
 fn tran_ags_unrecognised(
@@ -320,7 +320,7 @@ fn rule_15(parsed: &ParsedFile, found: &mut Findings) {
         }
         for (ci, ty) in g.types.iter().enumerate() {
             if ty.trim() == "PU" {
-                let hd = g.headings.get(ci).map(String::as_str).unwrap_or("?");
+                let hd = g.headings.get(ci).map_or("?", String::as_str);
                 for v in column_values(g, ci) {
                     note(v, format!("column {hd} of {code}"), &mut used);
                 }
@@ -347,7 +347,7 @@ fn rule_15(parsed: &ParsedFile, found: &mut Findings) {
 }
 
 /// Rule 16/16a — every abbreviation in a `PA`-typed FIELD (split on the
-/// TRAN_RCON concatenator) must be defined in ABBR for that heading.
+/// `TRAN_RCON` concatenator) must be defined in ABBR for that heading.
 fn rule_16(parsed: &ParsedFile, found: &mut Findings) {
     // Does the file use any PA column at all?
     let has_pa = parsed
@@ -388,7 +388,7 @@ fn rule_16(parsed: &ParsedFile, found: &mut Findings) {
             if ty.trim() != "PA" {
                 continue;
             }
-            let hd = g.headings.get(ci).map(String::as_str).unwrap_or("");
+            let hd = g.headings.get(ci).map_or("", String::as_str);
             for v in column_values(g, ci) {
                 let parts: Vec<&str> = match concat {
                     Some(sep) => v.split(sep).collect(),
@@ -455,7 +455,7 @@ fn rule_17(parsed: &ParsedFile, found: &mut Findings) {
 /// Follow-on to Rule 9 (V4): `dictionary::check` runs first in
 /// `run_all`, so the presence of a Rule 9 finding *is* "the file uses
 /// a non-standard heading" (python-ags4 wires this the same way, by
-/// inspecting rule_9's output).
+/// inspecting `rule_9`'s output).
 fn rule_18(parsed: &ParsedFile, found: &mut Findings) {
     let non_standard = found.contains_key("AGS Format Rule 9");
     if non_standard && !parsed.groups.contains_key("DICT") {
@@ -519,7 +519,7 @@ fn rule_18_structure(parsed: &ParsedFile, found: &mut Findings) {
 
     // (2) Per-row defects.
     for row in &dictg.rows {
-        let grp = row.values.get(gi).map(String::as_str).unwrap_or("");
+        let grp = row.values.get(gi).map_or("", String::as_str);
         if grp.is_empty() {
             add_at(
                 found,
@@ -538,12 +538,10 @@ fn rule_18_structure(parsed: &ParsedFile, found: &mut Findings) {
         // legitimately has a blank DICT_HDNG, so branch on DICT_TYPE first).
         let dtype = ti
             .and_then(|ti| row.values.get(ti))
-            .map(String::as_str)
-            .unwrap_or("");
+            .map_or("", String::as_str);
         let hdng = hi
             .and_then(|hi| row.values.get(hi))
-            .map(String::as_str)
-            .unwrap_or("");
+            .map_or("", String::as_str);
         if dtype.eq_ignore_ascii_case("HEADING") && hdng.is_empty() {
             add_at(
                 found,
@@ -696,7 +694,7 @@ mod tests {
              \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
              \"DATA\",\"HEADING\",\"LOCA\",\"\"\r\n",
         );
-        assert!(run(&src).get(RULE_18_WARN).is_none());
+        assert!(!run(&src).contains_key(RULE_18_WARN));
     }
 
     #[test]
@@ -708,7 +706,7 @@ mod tests {
              \"DATA\",\"GROUP\",\"LOCX\",\"\",\"PROJ\"\r\n\
              \"DATA\",\"HEADING\",\"LOCX\",\"LOCX_ID\",\"\"\r\n",
         );
-        assert!(run_warn(&src).get(RULE_18_WARN).is_none());
+        assert!(!run_warn(&src).contains_key(RULE_18_WARN));
     }
 
     #[test]
@@ -800,11 +798,7 @@ mod tests {
             "{fyi:?}"
         );
         // It is an FYI, never an error Rule 16 (the code IS in the file's ABBR).
-        assert!(
-            run_fyi(&abbr_fixture("SAMP_TYPE", "ZZ"))
-                .get(RULE_16)
-                .is_none()
-        );
+        assert!(!run_fyi(&abbr_fixture("SAMP_TYPE", "ZZ")).contains_key(RULE_16));
     }
 
     #[test]
@@ -822,7 +816,7 @@ mod tests {
     fn rule_16_fyi_nonstandard_off_without_include_fyi() {
         // Default opts (include_fyi = false) → the FYI never fires.
         let f = run(&abbr_fixture("SAMP_TYPE", "ZZ"));
-        assert!(f.get(RULE_16_FYI).is_none());
+        assert!(!f.contains_key(RULE_16_FYI));
     }
 
     #[test]

@@ -15,7 +15,7 @@ import laterite as L
 import pytest
 from laterite import _errors
 
-_ROOT = Path(__file__).resolve().parents[3]  # …/laterite
+_ROOT = Path(__file__).resolve().parents[3]  # repo root
 
 
 def _src(*parts: str) -> str:
@@ -88,7 +88,9 @@ def test_wasm_io_collapse_is_an_allowlisted_live_divergence():
     assert 'ValidatorError::NotFound(_) | ValidatorError::Io { .. } => "io"' in wasm
     assert 'ValidatorError::NotFound(_) => "not_found"' in err
     val_err = wasm.split("struct ValErr")[1].split("}")[0]
-    assert "exit_code" not in val_err, "wasm ValErr carries no exit code (browser has none)"
+    assert "exit_code" not in val_err, (
+        "wasm ValErr carries no exit code (browser has none)"
+    )
 
 
 def test_severity_is_single_sourced_not_debug_derived():
@@ -96,7 +98,9 @@ def test_severity_is_single_sourced_not_debug_derived():
     emitted tokens are the three canonical ones."""
     for surface in ("laterite-node", "laterite-ags4-wasm"):
         s = _src("rust-packages", surface, "src", "lib.rs")
-        assert 'format!("{s:?}").to_lowercase()' not in s, f"{surface} still Debug-derives severity"
+        assert 'format!("{s:?}").to_lowercase()' not in s, (
+            f"{surface} still Debug-derives severity"
+        )
         assert ".as_str()" in s
     dirty = (
         '"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n"DATA","P1"\r\n'
@@ -104,6 +108,8 @@ def test_severity_is_single_sourced_not_debug_derived():
         '"TYPE","ID","X"\r\n"DATA","BH1","x"\r\n'
     )
     rep = L.validate(text=dirty, fyi=True)
-    sevs = {f.get("severity", "error") for items in rep.by_rule().values() for f in items}
+    sevs = {
+        f.get("severity", "error") for items in rep.by_rule().values() for f in items
+    }
     assert sevs, "expected some findings"
     assert sevs <= {"error", "warning", "fyi"}

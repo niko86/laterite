@@ -1,30 +1,35 @@
 """laterite.transport — zstd + age round-trip tests (content-agnostic, base-only).
 
-transport works on ANY file (#111-B), so these run on a plain AGS4 ``.ags`` file and
-need no ``.ags5db`` / ``[ags5]`` surface. They also cover the ``src``/``db``
-deprecation shim and the early non-path ``TypeError``.
+transport works on ANY file (#111-B), so these run on a plain AGS4 ``.ags`` file.
+They also cover the ``src``/``db`` deprecation shim and the early non-path
+``TypeError``.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from laterite import transport
 
-_AGS = "\r\n".join([
-    '"GROUP","PROJ"',
-    '"HEADING","PROJ_ID","PROJ_NAME"',
-    '"UNIT","",""',
-    '"TYPE","ID","X"',
-    '"DATA","P1","transport test"',
-    "",
-]).encode("utf-8")
+if TYPE_CHECKING:
+    from pathlib import Path
+
+_AGS = "\r\n".join(
+    [
+        '"GROUP","PROJ"',
+        '"HEADING","PROJ_ID","PROJ_NAME"',
+        '"UNIT","",""',
+        '"TYPE","ID","X"',
+        '"DATA","P1","transport test"',
+        "",
+    ]
+).encode("utf-8")
 
 
 @pytest.fixture
 def ags_file(tmp_path: Path) -> Path:
-    # transport is content-agnostic — a plain AGS4 file, no .ags5db conversion.
+    # transport is content-agnostic — a plain AGS4 file, no format conversion.
     f = tmp_path / "delivery.ags"
     f.write_bytes(_AGS)
     return f
@@ -32,7 +37,7 @@ def ags_file(tmp_path: Path) -> Path:
 
 def test_pack_default_dest_on_ags4(ags_file: Path) -> None:
     out = transport.pack(ags_file)
-    assert out == ags_file.with_suffix(".ags.zst")   # any-file: <src>.zst
+    assert out == ags_file.with_suffix(".ags.zst")  # any-file: <src>.zst
     assert out.exists() and out.stat().st_size > 0
     # zstd magic number: 0x28 B5 2F FD (little-endian).
     assert out.read_bytes()[:4] == bytes.fromhex("28B52FFD")
@@ -110,16 +115,17 @@ def test_lock_rejects_out_of_range_log_n(bad: int) -> None:
 
 # --- in-memory (bytes) forms ------------------------------------------------
 
+
 def test_pack_bytes_round_trip() -> None:
     packed = transport.pack_bytes(_AGS * 20)
-    assert packed[:4] == bytes.fromhex("28B52FFD")       # zstd magic
-    assert len(packed) < len(_AGS * 20)                  # repetitive → shrinks
+    assert packed[:4] == bytes.fromhex("28B52FFD")  # zstd magic
+    assert len(packed) < len(_AGS * 20)  # repetitive → shrinks
     assert transport.unpack_bytes(packed) == _AGS * 20
 
 
 def test_lock_bytes_round_trip_and_wrong_password() -> None:
     sealed = transport.lock_bytes(_AGS, password="hunter2")
-    assert sealed != _AGS                                # encrypted
+    assert sealed != _AGS  # encrypted
     assert transport.unlock_bytes(sealed, password="hunter2") == _AGS
     with pytest.raises(RuntimeError):
         transport.unlock_bytes(sealed, password="wrong")
@@ -138,6 +144,7 @@ def test_bytes_and_file_forms_interoperate(ags_file: Path, tmp_path: Path) -> No
 
 
 # --- non-path guard ---------------------------------------------------------
+
 
 def test_non_path_arg_raises_actionable_typeerror() -> None:
     # Passing e.g. an Ags4File (or any non-path) fails early, naming the fix.

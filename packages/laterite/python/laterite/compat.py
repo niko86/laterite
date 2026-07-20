@@ -19,9 +19,9 @@ upstream docs: https://gitlab.com/ags-data-format-wg/ags-python-library
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import hashlib
-import os
 import warnings
 from pathlib import Path
 from typing import Any
@@ -30,10 +30,14 @@ from . import _compat_desc
 from . import _laterite_native as _native
 from ._errors import Ags4Error, BadDictError, raise_for
 from ._frames import (
+    compat_materializer,
     get_default_backend,
+    get_default_string_dtype,
     materialize,
     resolve_backend,
+    resolve_string_dtype,
     set_default_backend,
+    set_default_string_dtype,
 )
 
 # Honest identity strings. python-ags4 callers reach `__version__` via
@@ -64,9 +68,7 @@ PYTHON_AGS4_COMPAT = "1.2.0"
 __version__ = f"0.7.0+compat.python-ags4.{PYTHON_AGS4_COMPAT}"
 
 # Human-readable Metadata.Checker — same intent, prose form.
-_CHECKER_STRING = (
-    "laterite 0.7.0 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine"
-)
+_CHECKER_STRING = "laterite 0.7.0 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine"
 
 # python-ags4 maps these version strings → bundled standard dict files;
 # we map them to the engine's --dict-version. A *path* argument is
@@ -101,6 +103,18 @@ def get_backend() -> str:
     return get_default_backend()
 
 
+def set_string_dtype(name: str) -> None:
+    """Set the process-wide compat pandas string dtype (``object`` | ``string``).
+    ``object`` is today's python-ags4 baseline (the true drop-in); ``string`` is
+    pandas' Arrow-backed ``str`` (what python-ags4 returns on pandas 3). Pandas
+    backend only — polars/pyarrow have a single string type."""
+    set_default_string_dtype(name)
+
+
+def get_string_dtype() -> str:
+    return get_default_string_dtype()
+
+
 # --- readers --------------------------------------------------------
 
 
@@ -131,12 +145,10 @@ def _strict_pre_check(filepath_or_buffer: Any, encoding: str) -> None:
             text = text.decode(encoding, errors="replace")
         # Rewind file-like buffers so the subsequent parse can re-read.
         if hasattr(filepath_or_buffer, "seek"):
-            try:
+            with contextlib.suppress(OSError, ValueError):
                 filepath_or_buffer.seek(0)
-            except (OSError, ValueError):
-                pass
     else:
-        with open(filepath_or_buffer, encoding=encoding, errors="replace") as fh:
+        with Path(filepath_or_buffer).open(encoding=encoding, errors="replace") as fh:
             text = fh.read()
 
     import csv
@@ -173,6 +185,52 @@ def _strict_pre_check(filepath_or_buffer: Any, encoding: str) -> None:
                     f"Line {lineno} of group {current_group!r} does not "
                     "have the same number of entries as the HEADING row."
                 )
+
+
+def _strict_check_native(p: dict) -> None:
+    """python-ags4's hard raises (duplicate GROUP / ragged DATA row) sourced from
+    the native parse data instead of a second full-file ``csv`` scan — the fast
+    ``AGS4_to_dataframe`` path's replacement for :func:`_strict_pre_check`. Raises
+    the earliest-line offence (matching a top-to-bottom scan's precedence);
+    messages/behaviour mirror the scan. ``AGS4_to_dict`` still uses the scan (it
+    has no native compat data), so its pinned raises are unchanged."""
+    offences: list[tuple[int, str]] = []
+
+    # First duplicate GROUP declaration, in file order (parse merges duplicates
+    # but keeps every occurrence in `group_records`).
+    seen: dict[str, int] = {}
+    for code, line in p["group_records"]:
+        if code in seen:
+            offences.append(
+                (
+                    line,
+                    f'"{code}" group duplicated in Line {line} '
+                    f"(first seen on Line {seen[code]}); "
+                    "therefore please combine all duplicate groups.",
+                )
+            )
+            break
+        seen[code] = line
+
+    # First ragged DATA row per group (only where a HEADING row exists — the scan
+    # only checks arity once it has a heading count).
+    groups = p["groups"]
+    for code in p["group_order"]:
+        g = groups.get(code)
+        if g is None or g["heading_line"] is None or not g["ragged"]:
+            continue
+        line = g["ragged"][0][0]
+        offences.append(
+            (
+                line,
+                f"Line {line} of group {code!r} does not "
+                "have the same number of entries as the HEADING row.",
+            )
+        )
+
+    if offences:
+        offences.sort(key=lambda o: o[0])
+        raise Ags4Error(offences[0][1])
 
 
 def _rename_dups(headings: list[str], rename: bool, group: str) -> list[str]:
@@ -243,6 +301,21 @@ def AGS4_to_dict(
     return data, headings
 
 
+def _compat_arrow(filepath_or_buffer: Any, encoding: str) -> dict:
+    """Native compat parse → per-group all-``Utf8`` Arrow, built Rust-side with
+    no per-cell ``PyObject`` boxing (the fast path behind ``AGS4_to_dataframe``).
+    Returns ``group_order`` + per-group ``{headings, table, ragged, …}`` +
+    ``group_records`` (the dup/ragged data the strict raises consume)."""
+    if hasattr(filepath_or_buffer, "read"):
+        text = filepath_or_buffer.read()
+        if isinstance(text, bytes):
+            text = text.decode(encoding, errors="replace")
+        return raise_for(_native.parse_compat_arrow(text=text))
+    return raise_for(
+        _native.parse_compat_arrow(path=str(filepath_or_buffer), encoding=encoding)
+    )
+
+
 def AGS4_to_dataframe(
     filepath_or_buffer: Any,
     encoding: str = "utf-8",
@@ -250,23 +323,73 @@ def AGS4_to_dataframe(
     rename_duplicate_headers: bool = True,
     only_groups: list[str] | None = None,
     backend: str | None = None,
+    string_dtype: str | None = None,
 ):
     """Load an AGS4 file to ``(tables, headings[, line_numbers])``.
 
     ``tables[GROUP]`` is a dataframe in the configured backend (default
     pandas) with a leading ``HEADING`` column and ``UNIT``/``TYPE``
     pseudo-rows then ``DATA`` — byte-identical *shape* to python-ags4's
-    ``AGS4_to_dataframe`` (the contract ``ags5_ags4/codec.py`` relies
-    on: ``df.iloc[2:]`` + dropping ``HEADING``)."""
-    be = resolve_backend(backend)
-    out = AGS4_to_dict(
-        filepath_or_buffer, encoding, get_line_numbers, rename_duplicate_headers
-    )
-    if get_line_numbers:
-        data, headings, line_numbers = out
-    else:
-        data, headings = out
+    ``AGS4_to_dataframe`` (the contract downstream consumers rely
+    on: ``df.iloc[2:]`` + dropping ``HEADING``).
 
+    ``string_dtype`` (pandas backend only) selects the string column dtype:
+    ``"object"`` (default, today's python-ags4 baseline) or ``"string"``
+    (pandas' Arrow-backed ``str`` — what python-ags4 returns on pandas 3).
+    Process-wide via ``set_string_dtype`` / ``LATERITE_COMPAT_STRING_DTYPE``. The
+    default ``[compat]`` install is pyarrow-free (object frames via DuckDB's NumPy
+    ``.df()``); ``string_dtype="string"`` needs the pyarrow accelerator
+    (``pip install laterite[compat,pyarrow]``)."""
+    be = resolve_backend(backend)
+    # get_line_numbers (no shipped caller, no test coverage) keeps the proven
+    # primitives→reshape route; the common path is native-Arrow → per-backend.
+    if get_line_numbers:
+        return _ags4_to_dataframe_via_dict(
+            filepath_or_buffer, encoding, rename_duplicate_headers, only_groups, be
+        )
+
+    sd = resolve_string_dtype(string_dtype)
+    p = _compat_arrow(filepath_or_buffer, encoding)
+    # python-ags4's hard raises from the native parse — no second file scan.
+    _strict_check_native(p)
+    groups = p["groups"]
+
+    # Rename duplicate headings per group (python-ags4's scheme; raises when
+    # rename_duplicate_headers=False and a group has dups) — for ALL groups, so
+    # the raise fires regardless of only_groups, matching the prior behaviour.
+    headings: dict[str, list[str]] = {}
+    for code in p["group_order"]:
+        g = groups.get(code)
+        if g is None:
+            continue
+        headings[code] = [
+            "HEADING",
+            *_rename_dups(list(g["headings"]), rename_duplicate_headers, code),
+        ]
+
+    keys = only_groups if only_groups else list(headings)
+    # Resolve the per-backend hop once (pyarrow presence, one shared DuckDB
+    # connection for the pyarrow-free pandas fallback) — not per group.
+    mat = compat_materializer(be, sd)
+    tables: dict[str, Any] = {
+        code: mat(groups[code]["table"], headings[code]) for code in keys
+    }
+    return tables, headings
+
+
+def _ags4_to_dataframe_via_dict(
+    filepath_or_buffer: Any,
+    encoding: str,
+    rename_duplicate_headers: bool,
+    only_groups: list[str] | None,
+    be: str,
+):
+    """``get_line_numbers=True`` fallback: build frames from the primitives dict
+    (the native-Arrow path carries no per-row line column). Kept on the proven
+    reshape + ``materialize`` route since this flag has no shipped caller."""
+    data, headings, line_numbers = AGS4_to_dict(
+        filepath_or_buffer, encoding, True, rename_duplicate_headers
+    )
     keys = only_groups if only_groups else list(data)
     tables: dict[str, Any] = {}
     for k in keys:
@@ -284,10 +407,7 @@ def AGS4_to_dataframe(
             else {c: [] for c in cols}
         )
         tables[k] = materialize(df, be)
-
-    if get_line_numbers:
-        return tables, headings, line_numbers
-    return tables, headings
+    return tables, headings, line_numbers
 
 
 def AGS4_to_dataframe_AGS3(*_a, **_k):
@@ -337,11 +457,13 @@ def dataframe_to_AGS4(
     blocks: list[tuple[str, Any]] = []
     for code, df in tables.items():
         nf = _to_polars(df)
-        cols = [c for c in (headings.get(code) or []) if c in nf.columns] or list(nf.columns)
+        cols = [c for c in (headings.get(code) or []) if c in nf.columns] or list(
+            nf.columns
+        )
         blocks.append((code, nf.select(cols)))
     text = _native.emit_ags4_compat(blocks)
     m = "ab" if mode == "a" else "wb"
-    with open(filepath, m) as f:
+    with Path(filepath).open(m) as f:
         f.write(text.encode(encoding))
 
 
@@ -389,7 +511,7 @@ def _try_dict_version(dictionary: Any) -> str | None:
     s = str(dictionary)
     if s in _VERSION_STRINGS:
         return s
-    base = os.path.basename(s)
+    base = Path(s).name
     return _DICT_FILE_TO_EDITION.get(base)
 
 
@@ -529,7 +651,7 @@ def convert_to_text(dataframe: Any, dictionary: str | None = None) -> Any:
             if edition == "4.0":
                 edition = "4.0.4"
             dict_unit_type = _resolve_dict_unit_type(dataframe, edition)
-        elif os.path.isfile(str(dictionary)):
+        elif Path(str(dictionary)).is_file():
             dict_unit_type = _unit_type_from_external_dict_file(str(dictionary))
         else:
             # No recognised version, no readable file — still O-28 (but
@@ -610,7 +732,7 @@ def _dict_version_arg(standard_AGS4_dictionary: Any) -> str | None:
     s = str(standard_AGS4_dictionary)
     if s in _VERSION_STRINGS:
         return "4.0.4" if s == "4.0" else s
-    base = os.path.basename(s)
+    base = Path(s).name
     if base in _DICT_FILE_TO_EDITION:
         return _DICT_FILE_TO_EDITION[base]
     raise BadDictError(
@@ -791,8 +913,8 @@ def check_file(
 
     sha = hashlib.sha256()
     if is_path:
-        with open(
-            filepath_or_buffer, newline="", encoding=encoding, errors="replace"
+        with Path(filepath_or_buffer).open(
+            newline="", encoding=encoding, errors="replace"
         ) as fh:
             for line in fh:
                 sha.update(line.encode(encoding))
@@ -1339,7 +1461,7 @@ def _format_sf(value: float, TYPE: str) -> str:
     if value == 0:
         return f"{value}"
 
-    i = int(TYPE.strip("SF")) - 1 - int(floor(log10(abs(value))))
+    i = int(TYPE.strip("SF")) - 1 - floor(log10(abs(value)))
     if i < 0:
         return f"{round(value, i):.0f}"
     return f"{value:.{i}f}"
@@ -1397,7 +1519,7 @@ def write_error_report(
     error_count, warnings_count, fyi_count = count_errors(ags_errors)
 
     try:
-        with open(output_file, "w", newline="", encoding="utf-8") as f:
+        with Path(output_file).open("w", newline="", encoding="utf-8") as f:
             if "Metadata" in ags_errors:
                 for entry in ags_errors["Metadata"]:
                     f.write(f"""{entry["line"] + ":":<12} {entry["desc"]}\r\n""")
@@ -1634,18 +1756,18 @@ def _extract_project_group_parents(dict_table: Any) -> list[tuple[str, str | Non
 
 
 __all__ = [
-    "__version__",
     "PYTHON_AGS4_COMPAT",
     "AGS4Error",
-    "AGS4_to_dict",
     "AGS4_to_dataframe",
     "AGS4_to_dataframe_AGS3",
+    "AGS4_to_dict",
     "AGS4_to_excel",
-    "dataframe_to_AGS4",
+    "__version__",
+    "check_file",
     "convert_to_numeric",
     "convert_to_text",
-    "check_file",
     "count_errors",
+    "dataframe_to_AGS4",
     "excel_to_AGS4",
     "format_numeric_column",
     "get_ABBR_table_from_json_file",
@@ -1653,8 +1775,8 @@ __all__ = [
     "get_TRAN_AGS",
     "get_TYPE_table_from_json_file",
     "get_UNIT_table_from_json_file",
-    "set_backend",
     "get_backend",
+    "set_backend",
     "sort_groups",
     "write_error_report",
 ]

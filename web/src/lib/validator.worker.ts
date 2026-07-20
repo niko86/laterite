@@ -18,6 +18,7 @@ import init, {
   read,
   diff,
   merge,
+  censor,
   dictionary,
   build_ags4,
   ags4_to_xlsx,
@@ -48,6 +49,11 @@ export interface ValidateReq {
   /** When set, gzip the JSON in-worker and return bytes, not the object —
    *  keeps the multi-hundred-MB string off the main thread (Phase: download). */
   gzip?: boolean;
+  /** An optional custom AGS4 dictionary as raw bytes (`.ags` or JSON), #568 — the
+   *  browser's only form (no filesystem). `dictReplace` drops the bundled base so
+   *  the dict fully replaces the standard. Omitted ⇒ the bundled edition. */
+  dictBytes?: Uint8Array;
+  dictReplace?: boolean;
 }
 /** Compute the safe fixes for a file (the FYI-on engine path). */
 export interface ComputeFixesReq {
@@ -67,6 +73,10 @@ export interface CertifyReq {
   dict: string | null;
   encoding: string;
   checkedAt: string;
+  /** Mint against a custom dictionary (#568); the cert records its `{name, hash}`
+   *  so a later `validate --index` re-validates when the effective dict differs. */
+  dictBytes?: Uint8Array;
+  dictReplace?: boolean;
 }
 /** Apply a selected subset of fixes; the worker returns the new file as
  *  UTF-8 bytes (transferred back, so the buffer never copies twice). */
@@ -94,6 +104,8 @@ export interface ArrowReq {
   code: string;
   /** Include the content-addressed `_id`/`_parent_id` key columns (#303). */
   keys?: boolean;
+  /** Include the trailing `_content_hash` value fingerprint (#448). */
+  contentHash?: boolean;
 }
 /** Compare two AGS4 files (Tools → Revision diff). Carries both buffers,
  *  transferred; returns the KEY-aware, type-aware structured delta. */
@@ -120,6 +132,34 @@ export interface MergeReq {
   tranIssue: string | null;
   tranDate: string | null;
   tranProducer: string | null;
+}
+/** Per-action cell/structure counts from the shared scrub engine — the leaf's
+ *  `Tally`, snake_case as serialised across the wasm boundary. */
+export interface CensorTally {
+  pseudonym: number;
+  blank: number;
+  token: number;
+  brackets: number;
+  keyword: number;
+  dropped_cols: number;
+  dropped_groups: number;
+  dropped_defs: number;
+}
+/** Anonymise a file with the shared scrub engine (Tools → Anonymiser, #581).
+ *  Carries the file bytes, transferred; `sensitiveJson` is the classification
+ *  SSOT; `selectedCodes` (null = every classified heading) restricts the policy
+ *  to the user's ticked columns; `token` replaces token/brackets hits;
+ *  `dropCustom` removes non-dictionary groups/columns; `includeFreetext`
+ *  tokenises descriptions instead of stripping their `[units]`. */
+export interface CensorReq {
+  id: number;
+  kind: "censor";
+  bytes: ArrayBuffer;
+  sensitiveJson: string;
+  selectedCodes: string[] | null;
+  token: string;
+  dropCustom: boolean;
+  includeFreetext: boolean;
 }
 /** Load the bundled STANDARD dictionary for an edition (Tools reference).
  *  Carries no file bytes — it reads the engine's own per-edition dict. */
@@ -163,6 +203,7 @@ export type WorkerReq =
   | ArrowReq
   | RevisionDiffReq
   | MergeReq
+  | CensorReq
   | DictionaryReq
   | ToAgs4Req
   | ExcelExportReq
@@ -173,7 +214,13 @@ export type WorkerRes =
   | { type: "initError"; error: string }
   | { id: number; ok: true; kind: "report"; report: ValidationReport }
   | { id: number; ok: true; kind: "cert"; json: string }
-  | { id: number; ok: true; kind: "gzip"; bytes: ArrayBuffer; report: ReportMeta }
+  | {
+      id: number;
+      ok: true;
+      kind: "gzip";
+      bytes: ArrayBuffer;
+      report: ReportMeta;
+    }
   | { id: number; ok: true; kind: "fixes"; fixes: Fix[] }
   | { id: number; ok: true; kind: "applied"; bytes: ArrayBuffer }
   | { id: number; ok: true; kind: "parsed"; groups: GroupMeta[] }
@@ -189,6 +236,7 @@ export type WorkerRes =
       revisionsJson: string;
     }
   | { id: number; ok: true; kind: "dictionary"; dict: StandardDict }
+  | { id: number; ok: true; kind: "censor"; text: string; tally: CensorTally }
   | { id: number; ok: true; kind: "toAgs4"; result: ExportResult }
   | {
       id: number;
@@ -214,8 +262,10 @@ export interface ReportMeta {
 // the `Worker` type carries exactly that signature, so route every reply
 // through it (also gives a single typed choke point for `WorkerRes`).
 const ctx = self as unknown as Worker;
-const reply = (msg: WorkerRes, transfer?: Transferable[]) =>
-  transfer ? ctx.postMessage(msg, transfer) : ctx.postMessage(msg);
+const reply = (msg: WorkerRes, transfer?: Transferable[]) => {
+  if (transfer) ctx.postMessage(msg, transfer);
+  else ctx.postMessage(msg);
+};
 
 // Instantiate once. Passing the bundled-asset URL explicitly avoids the
 // import.meta.url fetch fallback (which breaks under a non-root `base`).
@@ -226,8 +276,12 @@ const ready: Promise<void> = init({ module_or_path: wasmUrl }).then(
 );
 
 ready.then(
-  () => reply({ type: "ready" }),
-  (e) => reply({ type: "initError", error: String(e) }),
+  () => {
+    reply({ type: "ready" });
+  },
+  (e: unknown) => {
+    reply({ type: "initError", error: String(e) });
+  },
 );
 
 // The most-recently parsed dataset (the Explore/Tools typed-data path).
@@ -267,7 +321,7 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
         new Uint8Array(req.bytes),
         req.encoding,
         req.fixes,
-      ) as Uint8Array;
+      );
       // Transfer the result bytes back in a standalone buffer (slice()
       // gives one sized exactly to the output, safe to transfer).
       const buf = out.slice().buffer;
@@ -277,9 +331,10 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
 
     if (req.kind === "parse") {
       dataset?.free();
-      dataset = read(new Uint8Array(req.bytes), req.encoding);
-      const groups: GroupMeta[] = dataset.group_codes().map((code) => {
-        const m = dataset!.meta(code) as Omit<GroupMeta, "code"> | null;
+      const ds = read(new Uint8Array(req.bytes), req.encoding);
+      dataset = ds;
+      const groups: GroupMeta[] = ds.group_codes().map((code) => {
+        const m = ds.meta(code) as Omit<GroupMeta, "code"> | null;
         return m
           ? { code, ...m }
           : { code, headings: [], units: [], types: [], sql_types: [] };
@@ -293,11 +348,18 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
       // keys (default false): include the content-addressed _id/_parent_id
       // columns. The Explore ingest passes true so duckdb-wasm carries them and
       // cross-group joins resolve; the group grid strips them for display. (#303)
-      const out = dataset.arrow_ipc(req.code, req.keys ?? false) as Uint8Array;
+      // contentHash (default false): include the trailing _content_hash value
+      // fingerprint, same opt-in shape. (#448)
+      const out = dataset.arrow_ipc(
+        req.code,
+        req.keys ?? false,
+        req.contentHash ?? false,
+      );
       const buf = out.slice().buffer;
-      reply({ id: req.id, ok: true, kind: "arrow", code: req.code, bytes: buf }, [
-        buf,
-      ]);
+      reply(
+        { id: req.id, ok: true, kind: "arrow", code: req.code, bytes: buf },
+        [buf],
+      );
       return;
     }
 
@@ -339,6 +401,29 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
       return;
     }
 
+    if (req.kind === "censor") {
+      // The shared scrub engine (#581). Hashes the bytes for PROJ_ID's filehash,
+      // decodes lossily, applies the (optionally column-restricted) policy, and
+      // returns the anonymised text + per-action tally. Never throws for normal
+      // input; a bad sensitiveJson → JsError → outer catch → ok:false.
+      const res = censor(
+        new Uint8Array(req.bytes),
+        req.sensitiveJson,
+        req.selectedCodes,
+        req.token,
+        req.dropCustom,
+        req.includeFreetext,
+      ) as { text: string; tally: CensorTally };
+      reply({
+        id: req.id,
+        ok: true,
+        kind: "censor",
+        text: res.text,
+        tally: res.tally,
+      });
+      return;
+    }
+
     if (req.kind === "dictionary") {
       const dict = dictionary(req.edition ?? undefined) as StandardDict;
       reply({ id: req.id, ok: true, kind: "dictionary", dict });
@@ -359,7 +444,14 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
     if (req.kind === "certify") {
       // `certify` throws (a JsError) on a dirty/unparseable file; the outer
       // catch turns that into an `ok: false` reply the client rejects.
-      const json = certify(new Uint8Array(req.bytes), req.dict, req.encoding, req.checkedAt);
+      const json = certify(
+        new Uint8Array(req.bytes),
+        req.dict,
+        req.encoding,
+        req.checkedAt,
+        req.dictBytes,
+        req.dictReplace ?? false,
+      );
       reply({ id: req.id, ok: true, kind: "cert", json });
       return;
     }
@@ -379,7 +471,15 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
       res.free();
       const buf = outBytes.slice().buffer;
       reply(
-        { id: req.id, ok: true, kind: "excel", bytes: buf, warnings, sheets, rows },
+        {
+          id: req.id,
+          ok: true,
+          kind: "excel",
+          bytes: buf,
+          warnings,
+          sheets,
+          rows,
+        },
         [buf],
       );
       return;
@@ -394,6 +494,8 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
       req.includeFyi,
       req.encoding,
       req.maxPerRule,
+      req.dictBytes,
+      req.dictReplace ?? false,
     ) as ValidationReport;
 
     if (req.gzip) {

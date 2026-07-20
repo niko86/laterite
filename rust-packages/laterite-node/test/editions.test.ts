@@ -11,7 +11,10 @@ import { BadDictError, validate } from "../ts/index";
 // Read the bundled editions from the SAME JSON the dictionary is generated from.
 const DICT = JSON.parse(
   readFileSync(
-    new URL("../../laterite-ags4-reference/data/ags_dictionary.json", import.meta.url),
+    new URL(
+      "../../laterite-ags4-reference/data/ags_dictionary.json",
+      import.meta.url,
+    ),
     "utf8",
   ),
 );
@@ -24,22 +27,27 @@ describe("edition value domain", () => {
   it("accepts every bundled edition, plus auto / undefined", () => {
     expect(EDITIONS.length).toBeGreaterThanOrEqual(5);
     for (const ed of EDITIONS) {
-      expect(() => validate(undefined, { text: AGS, dictVersion: ed })).not.toThrow();
+      expect(() =>
+        validate(undefined, { text: AGS, dictVersion: ed }),
+      ).not.toThrow();
     }
-    expect(() => validate(undefined, { text: AGS, dictVersion: "auto" })).not.toThrow();
+    expect(() =>
+      validate(undefined, { text: AGS, dictVersion: "auto" }),
+    ).not.toThrow();
     expect(() => validate(undefined, { text: AGS })).not.toThrow();
   });
 
   it("rejects an unknown edition with a message listing every bundled edition", () => {
+    let caught: unknown;
     try {
       validate(undefined, { text: AGS, dictVersion: "9.9" });
-      throw new Error("expected a throw");
     } catch (e) {
-      expect(e).toBeInstanceOf(BadDictError);
-      const msg = (e as Error).message;
-      for (const ed of EDITIONS) {
-        expect(msg, `message must name ${ed}`).toContain(ed);
-      }
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(BadDictError);
+    const msg = (caught as Error).message;
+    for (const ed of EDITIONS) {
+      expect(msg, `message must name ${ed}`).toContain(ed);
     }
   });
 });

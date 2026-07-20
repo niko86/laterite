@@ -45,7 +45,9 @@ async function loadKeyMap(): Promise<DictKeyMap> {
     const grp: DictGroup = g;
     m.set(code, {
       parent: grp.parent,
-      keys: grp.headings.filter((h) => isKeyStatus(h.status)).map((h) => h.name),
+      keys: grp.headings
+        .filter((h) => isKeyStatus(h.status))
+        .map((h) => h.name),
     });
   }
   return m;
@@ -77,16 +79,15 @@ export const AnalyseView: Component<{ groups: GroupMeta[] }> = (props) => {
       <Show
         when={!analysis.error}
         fallback={
-          <p class="text-sm text-err">Analyse error: {String(analysis.error)}</p>
+          <p class="text-sm text-err">
+            Analyse error: {String(analysis.error)}
+          </p>
         }
       >
         <Show when={analysis()}>
           {(a) => (
             <div class="flex min-w-0 flex-col gap-4">
-              <RICard
-                links={a().ri.links}
-                orphans={a().ri.orphans}
-              />
+              <RICard links={a().ri.links} orphans={a().ri.orphans} />
               <CompletenessCard groups={a().comp} />
               <Show when={a().cov}>{(c) => <CoverageCard cov={c()} />}</Show>
             </div>
@@ -99,7 +100,9 @@ export const AnalyseView: Component<{ groups: GroupMeta[] }> = (props) => {
 
 // --- referential integrity ---
 
-const RICard: Component<{ links: number; orphans: OrphanResult[] }> = (props) => (
+const RICard: Component<{ links: number; orphans: OrphanResult[] }> = (
+  props,
+) => (
   <section class="rounded-lg border border-line bg-surface p-3">
     <h3 class="text-sm font-semibold text-fg">Referential integrity</h3>
     <p class="mt-0.5 text-xs text-fg-dim">
@@ -111,8 +114,7 @@ const RICard: Component<{ links: number; orphans: OrphanResult[] }> = (props) =>
       when={props.orphans.length > 0}
       fallback={
         <p class="mt-2 text-sm text-ok">
-          ✓ All referential links intact — every child row resolves to a
-          parent.
+          ✓ All referential links intact — every child row resolves to a parent.
         </p>
       }
     >
@@ -127,9 +129,7 @@ const RICard: Component<{ links: number; orphans: OrphanResult[] }> = (props) =>
                 <span class="text-err">
                   {o.orphans} of {o.total} rows orphaned
                 </span>
-                <span class="text-xs text-fg-dim">
-                  on {o.keys.join(" + ")}
-                </span>
+                <span class="text-xs text-fg-dim">on {o.keys.join(" + ")}</span>
               </div>
               <Show when={o.samples.length > 0}>
                 <div class="mono mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-fg-muted">
@@ -144,7 +144,9 @@ const RICard: Component<{ links: number; orphans: OrphanResult[] }> = (props) =>
         <button
           type="button"
           class="self-start text-xs text-accent underline-offset-2 hover:underline"
-          onClick={() => goTo("validate")}
+          onClick={() => {
+            goTo("validate");
+          }}
         >
           Open Validate (Rules 10c/14 flag these too) →
         </button>
@@ -162,7 +164,9 @@ function fillClass(pct: number): string {
   return "bg-emerald-500/15 text-ok";
 }
 
-const CompletenessCard: Component<{ groups: GroupCompleteness[] }> = (props) => {
+const CompletenessCard: Component<{ groups: GroupCompleteness[] }> = (
+  props,
+) => {
   const [open, setOpen] = createSignal<Set<string>>(new Set());
   const toggle = (code: string) =>
     setOpen((prev) => {
@@ -208,8 +212,12 @@ const CompletenessCard: Component<{ groups: GroupCompleteness[] }> = (props) => 
                     <thead class="bg-surface-raised text-fg-soft">
                       <tr>
                         <th class="px-3 py-1 text-left font-medium">Heading</th>
-                        <th class="px-3 py-1 text-left font-medium">AGS type</th>
-                        <th class="px-3 py-1 text-left font-medium">Stored as</th>
+                        <th class="px-3 py-1 text-left font-medium">
+                          AGS type
+                        </th>
+                        <th class="px-3 py-1 text-left font-medium">
+                          Stored as
+                        </th>
                         <th class="px-3 py-1 text-right font-medium">Filled</th>
                       </tr>
                     </thead>
@@ -254,8 +262,7 @@ const CoverageCard: Component<{ cov: Coverage }> = (props) => {
     // count of (loca, group) cells that are absent — the gaps.
     let n = 0;
     for (const id of props.cov.locas)
-      for (const g of props.cov.groups)
-        if (!props.cov.present[g]?.has(id)) n++;
+      for (const g of props.cov.groups) if (!props.cov.present[g]?.has(id)) n++;
     return n;
   });
   return (

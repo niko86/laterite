@@ -7,11 +7,14 @@ import { createSignal, onCleanup } from "solid-js";
 // after the window was narrowed (or an iPad rotated across 1024px). Must be
 // called in a reactive scope (component body) so onCleanup can detach.
 export function createMediaQuery(query: string): () => boolean {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- DOM types matchMedia as always-present, but it's absent in SSR/legacy/test environments
   if (typeof window === "undefined" || !window.matchMedia) return () => false;
   const mql = window.matchMedia(query);
   const [matches, setMatches] = createSignal(mql.matches);
   const on = (e: MediaQueryListEvent) => setMatches(e.matches);
   mql.addEventListener("change", on);
-  onCleanup(() => mql.removeEventListener("change", on));
+  onCleanup(() => {
+    mql.removeEventListener("change", on);
+  });
   return matches;
 }

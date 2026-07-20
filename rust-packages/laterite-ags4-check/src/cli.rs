@@ -1,16 +1,20 @@
 //! Command-line surface (clap derive) for `lat` — the reworked AGS4 tool.
 //!
-//! Follows the workspace CLI lineage (`ags4-forge` / `ags4-corpus-qa`): a few
-//! **global** flags valid before/after the subcommand, results to **stdout**,
-//! progress to **stderr**, typed exit codes in `after_help`. Each verb owns its
-//! flags, so the six imperative mutual-exclusion checks the old flat parser
-//! carried mostly vanish structurally (a flag can't reach a verb it doesn't
-//! belong to); the two that remain are declared here (`--json`↔`--ndjson`,
-//! `fix --in-place`↔`--fix-out`).
+//! Follows the workspace CLI lineage (`ags4-forge` / `ags4-corpus-qa`): `--quiet`
+//! is the one **global** flag, results to **stdout**, progress to **stderr**, typed
+//! exit codes in `after_help`. Each verb owns its flags, so a flag can't reach a
+//! verb it doesn't belong to — which is the whole point of #545: `--json`/`--ndjson`
+//! are declared **per-verb, only on the verbs that produce a report**, so a verb
+//! that can't render JSON (`certify`, the transport verbs, …) rejects the flag
+//! structurally instead of accepting it and silently rendering a table. They used to
+//! be global bools honoured by 1 of 13 verbs; clap and these declarations are now the
+//! gate that keeps that from recurring.
 //!
-//! `--json`/`--ndjson` are deliberately kept as **global bools** (not the
-//! `OutputMode` enum the siblings use) so the validate report is byte-identical
-//! to the pre-rework CLI — the byte-parity gate (`test_cli_*`) depends on it.
+//! `validate` keeps both `--json` and `--ndjson` with identical semantics, so the
+//! byte-parity gate (`test_cli_*`) is unaffected. `--json` is `bool` per verb (not
+//! the `OutputMode` enum the siblings use) so the report bytes match the pre-rework
+//! CLI. `ndjson`↔`json` and `fix --in-place`↔`--fix-out` are the remaining
+//! declared mutual exclusions.
 
 use std::path::PathBuf;
 
@@ -28,13 +32,8 @@ pub const SUBCOMMANDS: &[&str] = &[
 #[derive(Parser)]
 #[command(name = "lat", about = "AGS4 validate / read / fix / diff / certify", version, after_help = HELP_EPILOG)]
 pub struct Cli {
-    /// Machine-readable findings (pretty JSON).
-    #[arg(long, global = true)]
-    pub json: bool,
-    /// One flat JSON object per finding per line.
-    #[arg(long, global = true, conflicts_with = "json")]
-    pub ndjson: bool,
-    /// Suppress the progress spinner.
+    /// Suppress the progress spinner. Genuinely cross-cutting (every verb has a
+    /// spinner to quiet), so unlike `--json`/`--ndjson` it stays global.
     #[arg(long, global = true)]
     pub quiet: bool,
 
@@ -61,7 +60,7 @@ pub enum Commands {
     /// Mint the `.ags.idx` validity certificate for an error-clean file.
     Certify(CertifyArgs),
     /// Print the AGS4 rule catalogue (no input file needed).
-    Rules,
+    Rules(RulesArgs),
     /// Dump this binary's own parser as JSON — the AUTHORITY the surface census
     /// diffs the uvx / npx launchers against (`tools/gen_census.py`). Hidden: a
     /// machine door, not a user command.
@@ -99,7 +98,7 @@ pub struct PasswordArgs {
 #[cfg(feature = "transport")]
 #[derive(Args)]
 pub struct PackArgs {
-    /// The file to package (any type — `.ags`, `.ags5db`, anything).
+    /// The file to package (any type — `.ags`, anything).
     pub input: PathBuf,
     /// The `.zst` output path.
     pub output: PathBuf,
@@ -168,13 +167,19 @@ pub struct ExcelArgs {
 /// Dictionary + encoding flags shared by every file-consuming verb.
 #[derive(Args)]
 pub struct DictArgs {
-    /// Force a bundled edition: `auto` (default — from the file's TRAN_AGS) |
-    /// 4.0.3 | 4.0.4 | 4.1 | 4.1.1 | 4.2.
+    /// Force a bundled edition: `auto` (default — from the file's `TRAN_AGS`) |
+    /// 4.0.3 | 4.0.4 | 4.1 | 4.1.1 | 4.2. With `--dict`, selects the overlay BASE.
     #[arg(long, value_name = "V")]
     pub dict_version: Option<String>,
-    /// External dictionary override (not supported).
+    /// Custom dictionary override (#568): an `.ags` or JSON dictionary layered over
+    /// a base edition detected from the dictionary itself. Overrides of standard
+    /// definitions are honoured with a warning.
     #[arg(long, value_name = "PATH")]
     pub dict: Option<PathBuf>,
+    /// (with `--dict`) treat the custom dictionary as a FULL REPLACEMENT — no base
+    /// edition contributes. Cannot be combined with `--dict-version`.
+    #[arg(long)]
+    pub dict_replace: bool,
     /// Source file encoding (default utf-8): utf-8 | cp1252 | latin1 |
     /// iso-8859-1 | iso-8859-15.
     #[arg(long, value_name = "NAME")]
@@ -187,6 +192,12 @@ pub struct ValidateArgs {
     pub file: PathBuf,
     #[command(flatten)]
     pub dict: DictArgs,
+    /// Machine-readable findings (pretty JSON).
+    #[arg(long)]
+    pub json: bool,
+    /// One flat JSON object per finding per line.
+    #[arg(long, conflicts_with = "json")]
+    pub ndjson: bool,
     /// Errors only — suppress the WARNING tier (shown by default).
     #[arg(long)]
     pub no_warnings: bool,
@@ -218,6 +229,9 @@ pub struct ReadArgs {
     pub file: PathBuf,
     /// The group code to dump (e.g. `LOCA`). Omit to list the file's group codes.
     pub group: Option<String>,
+    /// Machine-readable output (JSON).
+    #[arg(long)]
+    pub json: bool,
     /// Output CSV (quote-doubling) instead of the aligned table.
     #[arg(long, conflicts_with = "json")]
     pub csv: bool,
@@ -233,6 +247,9 @@ pub struct FixArgs {
     pub file: PathBuf,
     #[command(flatten)]
     pub dict: DictArgs,
+    /// Machine-readable report of what was repaired (JSON).
+    #[arg(long)]
+    pub json: bool,
     /// Also apply the intent-guessing fixes (duplicate-heading rename, ambiguous
     /// dd/mm date canonicalisation, smart-quote→ASCII).
     #[arg(long)]
@@ -253,6 +270,9 @@ pub struct DiffArgs {
     pub other: PathBuf,
     #[command(flatten)]
     pub dict: DictArgs,
+    /// Machine-readable delta (JSON).
+    #[arg(long)]
+    pub json: bool,
 }
 
 #[derive(Args)]
@@ -283,13 +303,13 @@ pub struct MergeArgs {
             .map(|s| s.parse::<TypeClashMode>().expect("clap restricted the value")),
     )]
     pub on_type_clash: TypeClashMode,
-    /// Issue reference (TRAN_ISNO) for the merged file's own synthesised TRAN.
+    /// Issue reference (`TRAN_ISNO`) for the merged file's own synthesised TRAN.
     /// With --tran-date, a fresh merge-transmission TRAN is written (recording
-    /// the inputs' ISNOs/dates in TRAN_REM); without it, TRAN is reconciled and
+    /// the inputs' ISNOs/dates in `TRAN_REM`); without it, TRAN is reconciled and
     /// a warning notes no stamp was supplied.
     #[arg(long, value_name = "ISNO")]
     pub tran_issue: Option<String>,
-    /// Production date (TRAN_DATE, yyyy-mm-dd) for the merged file's TRAN.
+    /// Production date (`TRAN_DATE`, yyyy-mm-dd) for the merged file's TRAN.
     #[arg(long, value_name = "DATE")]
     pub tran_date: Option<String>,
     /// Producer / recipient / status for the merged TRAN (optional).
@@ -301,6 +321,16 @@ pub struct MergeArgs {
     pub tran_status: Option<String>,
     #[command(flatten)]
     pub dict: DictArgs,
+    /// Machine-readable merge report (JSON).
+    #[arg(long)]
+    pub json: bool,
+}
+
+#[derive(Args)]
+pub struct RulesArgs {
+    /// Machine-readable catalogue (JSON).
+    #[arg(long)]
+    pub json: bool,
 }
 
 #[derive(Args)]

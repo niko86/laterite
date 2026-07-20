@@ -5,17 +5,15 @@ typed-graph form directly.
 
 **Why this is hand-rolled here** (W2, 2026-06-16). ``read_typed`` is a
 *base* AGS4 API — it must work on a plain ``pip install laterite``. It used
-to route ``convert(ags4 → temp .ags5db)`` then ``read_db(tmp)``, dragging a
+to route through a temporary DuckDB store, dragging a
 DuckDB-bundled companion wheel into what is a pure-AGS4 read. This builds the
 PROJ tree from the base parser (``parse_primitives``), the registry, and
-``parse_value`` — no DuckDB. (Since #177 the experimental ``.ags5db`` engine
-is fully decoupled to the dormant ``ags5/`` holding folder, so the base
-genuinely cannot reach it.)
+``parse_value`` — no DuckDB. (That DuckDB-backed path is not part of the
+base wheel, so the base genuinely cannot reach it.)
 
 **Parity with the converter.** The linkage below is a faithful port of the
-``.ags5db`` converter's parent resolution (``insert_group_rows`` /
-``resolve_parent_uuid`` in the decoupled ``ags5/`` ``convert.rs``):
-topological group order, content-key row dedup, and the *shared-keys
+DuckDB converter's parent resolution: topological group order,
+content-key row dedup, and the *shared-keys
 intersection* — for each child group, the parent's KEY headings whose names
 the child also KEYs on (in parent-KEY order), joined into a tuple and matched
 between parent and child rows. (Pseudo-key drift like MOND_REF↔PIPE_REF needs
@@ -23,8 +21,8 @@ no special case: drifted names simply fall out of the name-intersection, so
 linkage rides the keys both layers share. The implicit PROJ↔LOCA edge works
 the same way — PROJ_ID isn't a LOCA heading, so the intersection is empty and
 every LOCA attaches to the one PROJ.) The byte-equality parity test against
-the DuckDB path moved with the AGS5 engine to ``ags5/`` (dormant); the
-algorithm here remains the reference for the base typed read.
+the DuckDB path lives elsewhere; the algorithm here remains the
+reference for the base typed read.
 
 Custom / passthrough groups (present in the file but not in the standard
 dictionary) flow through the same ``laterite.dynamic`` factory the converter
@@ -34,13 +32,15 @@ declared AGS type — matching ``convert.rs::build_passthrough_descriptors``.
 
 from __future__ import annotations
 
-from os import PathLike
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from laterite import _laterite_native as _native
 from laterite import _resolve_source, dynamic, raise_for
 from laterite.ags_types import parse_value
 from laterite.registry import GROUPS, GroupDescriptor, Heading
+
+if TYPE_CHECKING:
+    from os import PathLike
 
 __all__ = ["read_typed"]
 

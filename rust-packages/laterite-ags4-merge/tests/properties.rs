@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 
 use laterite_ags4_merge::{MergeOpts, TypeClashMode, merge_parsed};
 use laterite_ags4_parse::{ParsedFile, parse_str};
@@ -22,10 +23,7 @@ fn build_loca(rows: &BTreeMap<u8, i32>, decimals: usize) -> ParsedFile {
         "\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\"\n\"UNIT\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\"\n",
     );
     for (id, gl) in rows {
-        s.push_str(&format!(
-            "\"DATA\",\"BH{id}\",\"{:.*}\"\n",
-            decimals, *gl as f64
-        ));
+        let _ = writeln!(s, "\"DATA\",\"BH{id}\",\"{:.*}\"", decimals, f64::from(*gl));
     }
     parse_str(&s).unwrap()
 }

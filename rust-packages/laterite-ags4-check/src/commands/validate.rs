@@ -118,7 +118,7 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
                 );
             }
 
-            let code = if n == 0 { 0 } else { 1 };
+            let code = i32::from(n != 0);
 
             // `--json-out`: always tee a JSON artifact, independent of stdout.
             if let Some(p) = args.json_out.as_deref() {

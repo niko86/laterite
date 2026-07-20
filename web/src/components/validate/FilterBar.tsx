@@ -48,14 +48,13 @@ export const FilterBar: Component<{
     const counts = new Map<Severity, number>();
     for (const g of props.report.findings) {
       for (const f of g.items) {
-        const s = (f.severity ?? "warning") as Severity;
+        const s = f.severity ?? "warning";
         counts.set(s, (counts.get(s) ?? 0) + 1);
       }
     }
-    return SEV_ORDER.filter((s) => counts.has(s)).map((s) => ({
-      sev: s,
-      count: counts.get(s)!,
-    }));
+    return SEV_ORDER.map((s) => ({ sev: s, count: counts.get(s) })).filter(
+      (e): e is { sev: Severity; count: number } => e.count !== undefined,
+    );
   });
 
   // Distinct groups present (sorted), with total counts.
@@ -103,13 +102,14 @@ export const FilterBar: Component<{
       props.onSearch("");
       return;
     }
-    searchTimer = setTimeout(() => props.onSearch(v), 180);
+    searchTimer = setTimeout(() => {
+      props.onSearch(v);
+    }, 180);
   };
 
   const chipBase =
     "rounded-full border px-2.5 py-1 text-xs transition-colors cursor-pointer select-none";
-  const chipOff =
-    "border-line bg-chip text-fg-faint hover:border-line-strong";
+  const chipOff = "border-line bg-chip text-fg-faint hover:border-line-strong";
   const countBadge =
     "ml-1.5 rounded-full bg-chip px-1.5 text-[10px] text-fg-soft";
 
@@ -154,9 +154,11 @@ export const FilterBar: Component<{
                 <button
                   type="button"
                   class="cursor-pointer"
-                  onClick={() =>
-                    props.onSelectedRules(toggle(props.selectedRules(), r.rule))
-                  }
+                  onClick={() => {
+                    props.onSelectedRules(
+                      toggle(props.selectedRules(), r.rule),
+                    );
+                  }}
                 >
                   {shortRule(r.rule)}
                 </button>
@@ -165,7 +167,9 @@ export const FilterBar: Component<{
                   type="button"
                   class="ml-1 cursor-pointer text-fg-muted hover:text-accent"
                   title="Jump to this rule"
-                  onClick={() => props.onJump(r.rule)}
+                  onClick={() => {
+                    props.onJump(r.rule);
+                  }}
                 >
                   ↳
                 </button>
@@ -177,16 +181,18 @@ export const FilterBar: Component<{
         <button
           type="button"
           class="ml-1 text-xs text-fg-muted underline-offset-2 hover:text-fg hover:underline"
-          onClick={() =>
-            props.onSelectedRules(new Set(rules().map((r) => r.rule)))
-          }
+          onClick={() => {
+            props.onSelectedRules(new Set(rules().map((r) => r.rule)));
+          }}
         >
           All
         </button>
         <button
           type="button"
           class="text-xs text-fg-muted underline-offset-2 hover:text-fg hover:underline"
-          onClick={() => props.onSelectedRules(new Set())}
+          onClick={() => {
+            props.onSelectedRules(new Set());
+          }}
         >
           None
         </button>
@@ -208,11 +214,11 @@ export const FilterBar: Component<{
                       [sevActiveClass(s.sev)]: active(),
                       [chipOff]: !active(),
                     }}
-                    onClick={() =>
+                    onClick={() => {
                       props.onSelectedSeverities(
                         toggle(props.selectedSeverities(), s.sev),
-                      )
-                    }
+                      );
+                    }}
                   >
                     {s.sev}
                     <span class={countBadge}>{s.count}</span>
@@ -237,11 +243,11 @@ export const FilterBar: Component<{
                       "border-accent bg-accent/15 text-accent": active(),
                       [chipOff]: !active(),
                     }}
-                    onClick={() =>
+                    onClick={() => {
                       props.onSelectedGroups(
                         toggle(props.selectedGroups(), g.group),
-                      )
-                    }
+                      );
+                    }}
                   >
                     {g.group}
                     <span class={countBadge}>{g.count}</span>
@@ -259,7 +265,9 @@ export const FilterBar: Component<{
           type="search"
           placeholder="Search line text, descriptions, headings, groups…"
           value={props.search()}
-          onInput={(e) => onSearchInput(e.currentTarget.value)}
+          onInput={(e) => {
+            onSearchInput(e.currentTarget.value);
+          }}
           class="min-w-0 flex-1 rounded border border-line-strong bg-surface-raised px-2.5 py-1.5 text-sm text-fg outline-none focus:border-accent"
         />
         <span class="text-xs whitespace-nowrap text-fg-muted">

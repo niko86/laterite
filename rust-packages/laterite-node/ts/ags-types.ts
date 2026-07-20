@@ -2,7 +2,11 @@
 // `ags_types`. The parsing LOGIC is native (one shared engine across hosts);
 // this is just the typed TS face over it.
 import { Ags4Error } from "./errors";
-import { canonicalType as nativeCanonicalType, displayHint, parseValue as nativeParseValue } from "./native";
+import {
+  canonicalType as nativeCanonicalType,
+  displayHint,
+  parseValue as nativeParseValue,
+} from "./native";
 
 /** Cross-system target categories — the lowercase labels the engine returns. */
 export type CanonicalType =
@@ -30,11 +34,26 @@ export type AgsValue = string | number | boolean | null;
  */
 export function canonicalType(agsType: string): CanonicalType {
   const label = nativeCanonicalType(agsType);
-  if (label === null) throw new Ags4Error(`unknown AGS type code: ${JSON.stringify(agsType)}`);
+  if (label === null)
+    throw new Ags4Error(`unknown AGS type code: ${JSON.stringify(agsType)}`);
   return label as CanonicalType;
 }
 
 export { displayHint };
+
+/** Coerce a non-null scalar to a string without the `[object Object]` footgun
+ *  (an unexpected object → JSON; AGS cells are primitives, so that branch is
+ *  defensive only). */
+function scalarString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  )
+    return String(value);
+  return JSON.stringify(value);
+}
 
 /**
  * Parse an AGS4-shaped raw value into its canonical JS value (empty /
@@ -42,11 +61,11 @@ export { displayHint };
  * (engine shape; `new Date(s)` if you want a Date). Non-string input is
  * stringified first (matches the Python wrapper).
  *
- * @param raw - The raw cell value; non-string input is coerced via `String(...)`, and `null`/`undefined` short-circuit to `null`.
+ * @param raw - The raw cell value; non-string input is stringified, and `null`/`undefined` short-circuit to `null`.
  * @param agsType - The AGS4 spec type code governing how `raw` is interpreted.
  * @returns The canonical value: a number (integer/decimal), boolean (YN), string (text/enum and the datetime/date/time strings), or `null`.
  */
 export function parseValue(raw: unknown, agsType: string): AgsValue {
-  const s = raw === null || raw === undefined ? null : String(raw);
+  const s = raw === null || raw === undefined ? null : scalarString(raw);
   return nativeParseValue(s, agsType) as AgsValue;
 }

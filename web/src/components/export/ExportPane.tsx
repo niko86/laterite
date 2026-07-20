@@ -7,11 +7,8 @@ import { createSignal, For, Show, type Component } from "solid-js";
 import { Card } from "../Card";
 import { toAgs4 } from "../../lib/validatorClient";
 import { downloadBlob } from "../../lib/download";
-import type { DictVersionOpt, EmitMode, ExportResult } from "../../lib/validator";
-
-type Edition = Exclude<DictVersionOpt, "auto">;
-
-const EDITIONS: Edition[] = ["4.0.3", "4.0.4", "4.1", "4.1.1", "4.2"];
+import type { EmitMode, ExportResult } from "../../lib/validator";
+import { EDITIONS, type Edition } from "../../lib/editions"; // generated SSOT (#529)
 const MODES: { id: EmitMode; label: string }[] = [
   { id: "autofix", label: "AutoFix — apply safe fixes" },
   { id: "report", label: "Report — emit as-is + findings" },
@@ -22,7 +19,11 @@ const MODES: { id: EmitMode; label: string }[] = [
 // are AGS headings; a typed float (12.3) canonicalises to 2DP on emit.
 const EXAMPLE = JSON.stringify(
   [
-    { code: "PROJ", headings: ["PROJ_ID", "PROJ_NAME"], rows: [["P1", "Demo project"]] },
+    {
+      code: "PROJ",
+      headings: ["PROJ_ID", "PROJ_NAME"],
+      rows: [["P1", "Demo project"]],
+    },
     { code: "TRAN", headings: ["TRAN_DLIM", "TRAN_RCON"], rows: [["|", ";"]] },
     {
       code: "LOCA",
@@ -68,7 +69,9 @@ export const ExportPane: Component = () => {
   return (
     <div class="flex flex-col gap-4">
       <Card>
-        <h2 class="mb-1 text-lg font-semibold text-fg">Build &amp; export AGS4</h2>
+        <h2 class="mb-1 text-lg font-semibold text-fg">
+          Build &amp; export AGS4
+        </h2>
         <p class="mb-3 text-sm text-fg-muted">
           Produce a valid AGS4 file from your own per-group data — entirely in
           your browser, nothing uploaded. Each group's column headings are the
@@ -83,7 +86,9 @@ export const ExportPane: Component = () => {
               value={edition()}
               onInput={(e) => setEdition(e.currentTarget.value as Edition)}
             >
-              <For each={EDITIONS}>{(ed) => <option value={ed}>{ed}</option>}</For>
+              <For each={EDITIONS}>
+                {(ed) => <option value={ed}>{ed}</option>}
+              </For>
             </select>
           </label>
           <label class="flex flex-col gap-1 text-xs text-fg-muted">
@@ -93,13 +98,16 @@ export const ExportPane: Component = () => {
               value={mode()}
               onInput={(e) => setMode(e.currentTarget.value as EmitMode)}
             >
-              <For each={MODES}>{(m) => <option value={m.id}>{m.label}</option>}</For>
+              <For each={MODES}>
+                {(m) => <option value={m.id}>{m.label}</option>}
+              </For>
             </select>
           </label>
         </div>
 
         <label class="mt-3 flex flex-col gap-1 text-xs text-fg-muted">
-          Group data (JSON) — an array of <code>{"{ code, headings, rows }"}</code>
+          Group data (JSON) — an array of{" "}
+          <code>{"{ code, headings, rows }"}</code>
           <textarea
             class="h-64 w-full rounded border border-line bg-surface px-2 py-1 font-mono text-xs text-fg"
             spellcheck={false}
@@ -113,7 +121,7 @@ export const ExportPane: Component = () => {
             type="button"
             class="rounded border border-accent px-3 py-1.5 font-medium text-accent hover:bg-chip disabled:opacity-50"
             disabled={busy()}
-            onClick={() => build(true)}
+            onClick={() => void build(true)}
           >
             Build &amp; download .ags
           </button>
@@ -121,7 +129,7 @@ export const ExportPane: Component = () => {
             type="button"
             class="rounded border border-line-strong px-3 py-1.5 font-medium text-fg-soft hover:bg-chip disabled:opacity-50"
             disabled={busy()}
-            onClick={() => build(false)}
+            onClick={() => void build(false)}
           >
             Preview only
           </button>
@@ -155,15 +163,20 @@ export const ExportPane: Component = () => {
           <Card>
             <div class="mb-2 flex flex-wrap items-center gap-3 text-sm">
               <span class="font-medium text-fg">Result</span>
-              <span class="text-fg-muted">{r().fixes_applied} safe fix(es) applied</span>
-              <span class="text-fg-muted">{r().findings.length} finding(s)</span>
+              <span class="text-fg-muted">
+                {r().fixes_applied} safe fix(es) applied
+              </span>
+              <span class="text-fg-muted">
+                {r().findings.length} finding(s)
+              </span>
             </div>
             <Show when={r().findings.length > 0}>
               <ul class="mb-3 flex max-h-40 flex-col gap-1 overflow-auto text-xs text-fg-muted">
                 <For each={r().findings.slice(0, 50)}>
                   {(f) => (
                     <li>
-                      <span class="text-fg-soft">{f.rule}</span> — {f.group}: {f.desc}
+                      <span class="text-fg-soft">{f.rule}</span> — {f.group}:{" "}
+                      {f.desc}
                     </li>
                   )}
                 </For>

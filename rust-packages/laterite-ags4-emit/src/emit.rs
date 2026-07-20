@@ -11,7 +11,7 @@
 //!      *mode* below is the single owner of any canonicalisation);
 //!   3. `write_ags4` the sections;
 //!   4. apply the chosen [`EmitMode`] — Strict rejects bad output, Report
-//!      returns it with findings, AutoFix applies the *safe* mechanical
+//!      returns it with findings, `AutoFix` applies the *safe* mechanical
 //!      fixes (the same machinery the web "fix-all-safe" button uses) and
 //!      returns the compliant-where-fixable bytes plus residual findings.
 //!
@@ -77,8 +77,8 @@ impl Default for EmitOpts {
 }
 
 /// The emit result. `findings` are on the *returned* bytes (so, post-fix
-/// for AutoFix) — empty means clean. `applied` is the list of safe fixes
-/// AutoFix made (empty for Strict/Report); `fixes_applied` is its length,
+/// for `AutoFix`) — empty means clean. `applied` is the list of safe fixes
+/// `AutoFix` made (empty for Strict/Report); `fixes_applied` is its length,
 /// kept as a convenience so a caller can report a count without the detail.
 pub struct EmitResult {
     pub bytes: Vec<u8>,
@@ -255,7 +255,7 @@ fn dict_type(dict: &Dictionary, code: &str, heading: &str) -> String {
 /// Format one cell to its AGS4 string. Typed values go through the
 /// canonical `ags4_str`; string values emit verbatim so the validity
 /// *mode* is the single owner of canonicalisation (Report = unchanged,
-/// AutoFix's text fixer pads/normalises, Strict rejects).
+/// `AutoFix`'s text fixer pads/normalises, Strict rejects).
 fn format_cell(value: &Value, ags_type: &str) -> String {
     match value {
         Value::String(s) => s.clone(),
@@ -280,7 +280,7 @@ fn validate(bytes: &[u8], edition: DictVersion) -> Result<Findings, EmitError> {
         .map_err(|e| EmitError::Reparse(e.to_string()))
 }
 
-/// Under AutoFix, synthesize whichever mandatory metadata catalog group is
+/// Under `AutoFix`, synthesize whichever mandatory metadata catalog group is
 /// absent so a data-only build still yields a valid file. UNIT and TYPE are
 /// pure derivations of the data; TRAN is a placeholder stub the caller
 /// overwrites; ABBR is minted when (and only when) the data uses PA picklist
@@ -445,7 +445,7 @@ fn collect_abbreviations(
     for g in groups {
         for (ci, ty) in g.types.iter().enumerate() {
             if ty.trim() == "PA" {
-                let heading = g.headings.get(ci).map(String::as_str).unwrap_or("");
+                let heading = g.headings.get(ci).map_or("", String::as_str);
                 for row in &g.rows {
                     if let Some(cell) = row.get(ci) {
                         for code in cell.split(concat) {
@@ -463,8 +463,7 @@ fn collect_abbreviations(
         .map(|(h, c)| {
             let desc = dict
                 .abbr_desc(&h, &c)
-                .map(str::to_string)
-                .unwrap_or_else(|| c.clone());
+                .map_or_else(|| c.clone(), str::to_string);
             [h, c, desc]
         })
         .collect()

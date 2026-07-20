@@ -83,7 +83,7 @@ single borehole's whole story, not one group at a time.
 When to use it: building a per-location report, exporting one hole's data, or
 feeding a downstream model that wants the whole record set at once. Gotcha:
 `.at(...)`/`frames()` is a **fan-out, not a join** — each group stays a separate
-frame keyed on its own KEY heading. If you want the groups *joined* into one wide
+frame keyed on its own KEY heading. If you want the groups _joined_ into one wide
 result, run SQL across them instead (the DuckDB tab shows the join form).
 
 See also: [SQL across groups](./sql-across-groups.md) ·

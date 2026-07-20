@@ -10,7 +10,15 @@
     "directory": "rust-packages/laterite-node"
   },
   "homepage": "https://github.com/niko86/laterite#readme",
-  "keywords": ["ags4", "ags", "geotechnical", "validator", "arrow", "napi", "rust"],
+  "keywords": [
+    "ags4",
+    "ags",
+    "geotechnical",
+    "validator",
+    "arrow",
+    "napi",
+    "rust"
+  ],
   "type": "commonjs",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -32,7 +40,13 @@
       "default": "./index.js"
     }
   },
-  "files": ["dist", "bin.mjs", "index.js", "index.d.ts", "README.md"],
+  "files": [
+    "dist",
+    "bin.mjs",
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -57,7 +71,11 @@
     "smoke:pack": "node tools/pack-smoke.mjs",
     "prepublish:napi": "napi pre-publish -t npm",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "knip": "knip"
   },
   "dependencies": {
     "apache-arrow": "^21.1.0"
@@ -77,10 +95,17 @@
   },
   "devDependencies": {
     "@duckdb/node-api": "^1.5.3-r.3",
+    "@eslint/js": "^9.39.5",
     "@napi-rs/cli": "^3.7.2",
     "@types/node": "^26.0.1",
+    "@vitest/eslint-plugin": "^1.6.23",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "knip": "^6.27.0",
+    "prettier": "^3.9.5",
     "tsup": "^8.5.0",
     "typescript": "^6.0.3",
+    "typescript-eslint": "^8.64.0",
     "vitest": "^4.1.8"
   }
 }

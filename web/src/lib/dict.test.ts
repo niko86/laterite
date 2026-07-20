@@ -63,10 +63,12 @@ describe("projectEdition — a faithful per-edition view from the union", () => 
 
   it("applies by_ed overrides (PROJ_CLNT description differs by edition)", () => {
     expect(
-      heading(projectEdition(REAL_UNION, "4.2"), "PROJ", "PROJ_CLNT")?.description,
+      heading(projectEdition(REAL_UNION, "4.2"), "PROJ", "PROJ_CLNT")
+        ?.description,
     ).toBe("Client organisation name");
     expect(
-      heading(projectEdition(REAL_UNION, "4.0.3"), "PROJ", "PROJ_CLNT")?.description,
+      heading(projectEdition(REAL_UNION, "4.0.3"), "PROJ", "PROJ_CLNT")
+        ?.description,
     ).toBe("Client name");
   });
 
@@ -80,7 +82,7 @@ describe("projectEdition — a faithful per-edition view from the union", () => 
   it("every projected group is a member of the requested edition", () => {
     const ed = "4.0.3";
     for (const g of projectEdition(REAL_UNION, ed).groups) {
-      const eds = REAL_UNION.groups[g.code].eds;
+      const eds = REAL_UNION.groups[g.code]!.eds; // g.code is a projected key.
       expect(!eds || eds.includes(ed)).toBe(true);
     }
   });
@@ -90,10 +92,13 @@ describe("loadStandardDict — fetch + project, memoised", () => {
   it("fetches the union once and projects the requested edition", async () => {
     const orig = globalThis.fetch;
     let calls = 0;
-    globalThis.fetch = (async () => {
+    globalThis.fetch = () => {
       calls++;
-      return { ok: true, json: async () => REAL_UNION } as Response;
-    }) as typeof fetch;
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(REAL_UNION),
+      } as Response);
+    };
     try {
       const d = await loadStandardDict("4.2");
       expect(d.ags_edition).toBe("4.2");

@@ -22,10 +22,13 @@
         "validate": {
           "--check-files": false,
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
           "--index": true,
+          "--json": false,
           "--json-out": true,
+          "--ndjson": false,
           "--no-warnings": false,
           "--out": true,
           "--show-fyi": false,
@@ -33,30 +36,37 @@
         },
         "read": {
           "--csv": false,
+          "--json": false,
           "--out": true,
           "<file>": true,
           "<group>": true
         },
         "fix": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
           "--fix-out": true,
           "--in-place": false,
+          "--json": false,
           "--risky": false,
           "<file>": true
         },
         "diff": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
+          "--json": false,
           "<file>": true,
           "<other>": true
         },
         "merge": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
+          "--json": false,
           "--on-type-clash": true,
           "--out": true,
           "--tran-date": true,
@@ -68,12 +78,15 @@
         },
         "certify": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
           "--out": true,
           "<file>": true
         },
-        "rules": {},
+        "rules": {
+          "--json": false
+        },
         "census": {},
         "pack": {
           "--level": true,
@@ -105,9 +118,14 @@
         }
       },
       "global_args": {
-        "--json": false,
-        "--ndjson": false,
         "--quiet": false
+      },
+      "arg_values": {
+        "merge --on-type-clash": [
+          "error",
+          "promote",
+          "widen"
+        ]
       },
       "editions": [
         "4.0.3",
@@ -151,6 +169,7 @@
       "args": {
         "certify": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
           "--out": true,
@@ -158,8 +177,10 @@
         },
         "diff": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
+          "--json": false,
           "<file>": true,
           "<other>": true
         },
@@ -172,10 +193,12 @@
         },
         "fix": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
           "--fix-out": true,
           "--in-place": false,
+          "--json": false,
           "--risky": false,
           "<file>": true
         },
@@ -188,8 +211,10 @@
         },
         "merge": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
+          "--json": false,
           "--on-type-clash": true,
           "--out": true,
           "--tran-date": true,
@@ -206,11 +231,14 @@
         },
         "read": {
           "--csv": false,
+          "--json": false,
           "--out": true,
           "<file>": true,
           "<group>": true
         },
-        "rules": {},
+        "rules": {
+          "--json": false
+        },
         "unlock": {
           "--password-file": true,
           "<input>": true,
@@ -223,10 +251,13 @@
         "validate": {
           "--check-files": false,
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
           "--index": true,
+          "--json": false,
           "--json-out": true,
+          "--ndjson": false,
           "--no-warnings": false,
           "--out": true,
           "--show-fyi": false,
@@ -234,9 +265,14 @@
         }
       },
       "global_args": {
-        "--json": false,
-        "--ndjson": false,
         "--quiet": false
+      },
+      "arg_values": {
+        "merge --on-type-clash": [
+          "error",
+          "promote",
+          "widen"
+        ]
       },
       "editions": [
         "4.0.3",
@@ -280,6 +316,7 @@
       "args": {
         "certify": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
           "--out": true,
@@ -287,8 +324,10 @@
         },
         "diff": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
+          "--json": false,
           "<file>": true,
           "<other>": true
         },
@@ -301,10 +340,12 @@
         },
         "fix": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
           "--fix-out": true,
           "--in-place": false,
+          "--json": false,
           "--risky": false,
           "<file>": true
         },
@@ -317,8 +358,10 @@
         },
         "merge": {
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
+          "--json": false,
           "--on-type-clash": true,
           "--out": true,
           "--tran-date": true,
@@ -335,11 +378,14 @@
         },
         "read": {
           "--csv": false,
+          "--json": false,
           "--out": true,
           "<file>": true,
           "<group>": true
         },
-        "rules": {},
+        "rules": {
+          "--json": false
+        },
         "unlock": {
           "--password-file": true,
           "<input>": true,
@@ -352,10 +398,13 @@
         "validate": {
           "--check-files": false,
           "--dict": true,
+          "--dict-replace": false,
           "--dict-version": true,
           "--encoding": true,
           "--index": true,
+          "--json": false,
           "--json-out": true,
+          "--ndjson": false,
           "--no-warnings": false,
           "--out": true,
           "--show-fyi": false,
@@ -363,9 +412,14 @@
         }
       },
       "global_args": {
-        "--json": false,
-        "--ndjson": false,
         "--quiet": false
+      },
+      "arg_values": {
+        "merge --on-type-clash": [
+          "error",
+          "promote",
+          "widen"
+        ]
       },
       "editions": [
         "4.0.3",

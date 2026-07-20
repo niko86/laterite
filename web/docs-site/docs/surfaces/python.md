@@ -27,13 +27,13 @@ laterite.read("delivery.ags").validate().save("checked.ags")
 
 ## Only in Python
 
-| Feature | What it is |
-|---|---|
+| Feature                | What it is                                                                                                     |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- |
 | **python-ags4 compat** | `from laterite import compat as AGS4` — a drop-in for the `python_ags4` API, so existing scripts run unchanged |
-| **Excel I/O** | `to_excel()` / `from_excel()` — round-trip AGS4 ↔ XLSX |
-| **`AgsQuery`** | a lazy, chainable query view (`.query()` / `.filter()` / `.sql()`) over the groups |
-| **`registry`** | the typed group graph — `GROUPS`, `child_groups`, the KEY chain — as importable Python |
-| **transport** | `pack` / `lock` — zstd + age-passphrase file envelopes (also on Node) |
+| **Excel I/O**          | `to_excel()` / `from_excel()` — round-trip AGS4 ↔ XLSX                                                         |
+| **`AgsQuery`**         | a lazy, chainable query view (`.query()` / `.filter()` / `.sql()`) over the groups                             |
+| **`registry`**         | the typed group graph — `GROUPS`, `child_groups`, the KEY chain — as importable Python                         |
+| **transport**          | `pack` / `lock` — zstd + age-passphrase file envelopes (also on Node)                                          |
 
 Everything else — read, validate, build_ags4, fix, diff, certify — is the
 [shared vocabulary](index.md#the-shared-vocabulary), documented once and mirrored

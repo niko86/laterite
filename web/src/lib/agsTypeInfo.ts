@@ -14,12 +14,15 @@
 export function typeDescription(agsType: string): string {
   const t = (agsType || "").trim().toUpperCase();
   if (t === "0DP") return "whole number";
-  let m = t.match(/^(\d+)DP$/);
-  if (m) return `decimal, ${m[1]} place${m[1] === "1" ? "" : "s"}`;
-  m = t.match(/^(\d+)SF$/);
-  if (m) return `decimal, ${m[1]} significant figures`;
-  m = t.match(/^(\d+)SCI$/);
-  if (m) return `scientific notation, ${m[1]} d.p.`;
+  // The capture group is guaranteed present when the regex matches, but
+  // noUncheckedIndexedAccess still types it `string | undefined`; the
+  // `!== undefined` guard narrows it to a real string for the template.
+  const dp = /^(\d+)DP$/.exec(t)?.[1];
+  if (dp !== undefined) return `decimal, ${dp} place${dp === "1" ? "" : "s"}`;
+  const sf = /^(\d+)SF$/.exec(t)?.[1];
+  if (sf !== undefined) return `decimal, ${sf} significant figures`;
+  const sci = /^(\d+)SCI$/.exec(t)?.[1];
+  if (sci !== undefined) return `scientific notation, ${sci} d.p.`;
   switch (t) {
     case "DT":
       return "date / time";

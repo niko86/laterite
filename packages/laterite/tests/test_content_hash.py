@@ -121,7 +121,7 @@ def test_formatting_only_reemit_is_not_a_value_change():
 def test_any_real_value_change_changes_the_hash(cell, changed):
     """Perturb each non-key cell of BH01 in turn; every one must move the hash.
     (A hash that misses a changed cell would silently drop a correction — the
-    exact harm the AGS5 merge-semantics note warns about.)"""
+    exact harm the merge-semantics note warns about.)"""
     base = _hash_of(_loca(_D1), "BH01")
     mutated = _D1.replace(cell, changed, 1)
     assert mutated != _D1, "the fixture must actually contain the cell"

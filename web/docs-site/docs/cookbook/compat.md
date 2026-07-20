@@ -20,11 +20,20 @@ headings)` 2-tuple, same pandas frames.
 code already uses, so `AGS4.AGS4_to_dataframe(path)` returns the faithful
 2-tuple: `result[0]` maps each group code to a pandas `DataFrame` (including the
 metadata groups `TRAN`/`UNIT`/`TYPE`/`ABBR`), and `result[1]` carries the
-heading metadata. The import-swap *is* the migration — no call-site edits.
+heading metadata. The import-swap _is_ the migration — no call-site edits.
 
 The shim is faithful by design: it mirrors python-ags4's verdicts and is gated
 against that library's own test suite. The pandas backend is the default, so
 downstream `df.shape`, indexing, and `.to_numeric` code keeps working.
+
+**It's also faster.** `AGS4_to_dataframe` reads a Rust-built Arrow table (no
+per-cell Python boxing) and materialises pandas through DuckDB — **~2× faster
+than python-ags4** on the pyarrow-free `[compat]` install, more with the pyarrow
+accelerator. The frames are **object dtype** by default, byte-identical to
+python-ags4 today. Want pandas' Arrow-backed `str` dtype (what python-ags4
+returns on pandas 3)? Install `[compat,pyarrow]` and pass `string_dtype="string"`
+(or `set_string_dtype("string")` / `LATERITE_COMPAT_STRING_DTYPE=string`). See
+[Dependency shape](../concepts/dependency-shape.md).
 
 **Gotcha** — the pandas frames need the `[compat]` extra: `pip install
 laterite[compat]`. Importing `laterite.compat` without it is safe, but a

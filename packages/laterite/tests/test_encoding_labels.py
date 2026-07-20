@@ -29,7 +29,16 @@ def _write(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "label", ["latin-1", "latin1", "iso-8859-1", "windows-1252", "cp1252", "Latin-1", " latin-1 "]
+    "label",
+    [
+        "latin-1",
+        "latin1",
+        "iso-8859-1",
+        "windows-1252",
+        "cp1252",
+        "Latin-1",
+        " latin-1 ",
+    ],
 )
 def test_windows1252_spellings_all_accepted_and_equivalent(tmp_path, label):
     """Every legacy spelling — including the hyphenated `latin-1` (and mixed
@@ -42,6 +51,5 @@ def test_unknown_encoding_still_raises(tmp_path):
     """A genuinely unknown label is still an error on the library surface, not a
     silent UTF-8 fallback — the fix widened the accepted set, it didn't mute
     mistakes."""
-    with pytest.raises(Exception) as exc:  # BadDictError
+    with pytest.raises(L.BadDictError, match=r"(?i)unknown encoding"):
         L.read(_write(tmp_path), encoding="totally-bogus-encoding").validate()
-    assert "unknown encoding" in str(exc.value).lower()

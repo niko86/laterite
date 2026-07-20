@@ -4,6 +4,7 @@ import {
   createResource,
   createSignal,
   For,
+  on,
   Show,
   type Component,
 } from "solid-js";
@@ -25,10 +26,12 @@ export const DataTable: Component<{
 }> = (props) => {
   const [page, setPage] = createSignal(0);
   // Reset to the first page whenever the selected group changes.
-  createEffect(() => {
-    props.code;
-    setPage(0);
-  });
+  createEffect(
+    on(
+      () => props.code,
+      () => setPage(0),
+    ),
+  );
 
   const [result] = createResource(
     () => ({ code: props.code, page: page() }),
@@ -97,9 +100,7 @@ export const DataTable: Component<{
             <p class="text-sm text-err">Query error: {String(result.error)}</p>
           }
         >
-          <Show when={result()}>
-            {(r) => <ResultsGrid result={r()} />}
-          </Show>
+          <Show when={result()}>{(r) => <ResultsGrid result={r()} />}</Show>
         </Show>
       </Show>
 

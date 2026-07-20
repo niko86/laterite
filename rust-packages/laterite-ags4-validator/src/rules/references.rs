@@ -1,5 +1,5 @@
 //! Cross-reference rules: AGS4.1/4.2 Rule 19b (dict-aware borrowed-
-//! heading parts 19b_2/19b_3) and Rule 20 (FILE / FILE_FSET).
+//! heading parts `19b_2/19b_3`) and Rule 20 (FILE / `FILE_FSET`).
 //!
 //! CLEAN-ROOM. Implemented from the AGS4 spec (`reports/AGS 4_1.pdf` &
 //! `reports/AGS 4_2.pdf` §4.1.1). python-ags4 (LGPL-3.0) was read only
@@ -10,31 +10,31 @@
 //! Spec text (verbatim, AGS 4.2 §4.1.1, p.157 — AGS 4.1 identical):
 //!
 //! * **Rule 19b** — "HEADING names shall start with the GROUP name
-//!   followed by an underscore character. e.g. 'NGRP_HED1'. Where a
+//!   followed by an underscore character. e.g. '`NGRP_HED1`'. Where a
 //!   HEADING refers to an existing HEADING within another GROUP, the
 //!   HEADING name added to the group shall bear the same name. e.g.
-//!   'CMPG_TESN' in the 'CMPT' GROUP." (V3 covered the structural
-//!   part 19b_1; here 19b_2/19b_3 add the cross-group borrow check
+//!   '`CMPG_TESN`' in the 'CMPT' GROUP." (V3 covered the structural
+//!   part `19b_1`; here `19b_2/19b_3` add the cross-group borrow check
 //!   that needs the effective dictionary.)
 //! * **Rule 20** — "Additional computer files (e.g. digital images)
 //!   can be included within a data submission. Each such file shall be
 //!   defined in a FILE GROUP. The additional files shall be
 //!   transferred in a sub-folder named FILE. This FILE sub-folder
-//!   shall contain additional sub-folders each named by the FILE_FSET
-//!   reference. Each FILE_FSET named folder will contain the files
+//!   shall contain additional sub-folders each named by the `FILE_FSET`
+//!   reference. Each `FILE_FSET` named folder will contain the files
 //!   listed in the FILE GROUP."
 //!
 //! Scope:
-//! * 19b_2/19b_3 act only on a heading whose prefix names *another*
+//! * `19b_2/19b_3` act only on a heading whose prefix names *another*
 //!   group (the borrowed-heading case). A missing-underscore or
 //!   structurally-bad heading is already a V3 Rule 19b finding and a
 //!   V4 Rule 9 finding — we do not re-report it under Rule 19b here,
-//!   unlike python-ags4 which adds it again from 19b_2 *and* 19b_3
+//!   unlike python-ags4 which adds it again from `19b_2` *and* `19b_3`
 //!   (O-26). The `SPEC`/`TEST` prefixes are dictionary-sanctioned
 //!   exceptions, skipped exactly as python-ags4 does.
 //! * Rule 20 implements the **data-level** check (every used
-//!   FILE_FSET defined in the FILE group; FILE group present when
-//!   FILE_FSET is used). The on-disk `FILE/<fset>/<name>` existence
+//!   `FILE_FSET` defined in the FILE group; FILE group present when
+//!   `FILE_FSET` is used). The on-disk `FILE/<fset>/<name>` existence
 //!   checks python-ags4 performs are deliberately **not** done — a
 //!   library validator must be deterministic and path-independent,
 //!   and `db-to-ags4 --validate` checks an emitted file with no
@@ -85,6 +85,10 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
         let g = &parsed.groups[code];
         let Some(hl) = g.heading_line else { continue };
 
+        // `ci` is a heading's column index within one AGS4 group — bounded
+        // by that group's heading count (dictionary-bounded), nowhere near
+        // u32::MAX.
+        #[allow(clippy::cast_possible_truncation)]
         for (ci, h) in g.headings.iter().enumerate() {
             // The borrowed-heading rule only has something to say when
             // the prefix names a *different* group. No underscore / bad
@@ -185,8 +189,8 @@ pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
     rule_20(parsed, found);
 }
 
-/// Rule 20 (data level) — every FILE_FSET used must be defined in the
-/// FILE group; the FILE group must exist when FILE_FSET is used.
+/// Rule 20 (data level) — every `FILE_FSET` used must be defined in the
+/// FILE group; the FILE group must exist when `FILE_FSET` is used.
 fn rule_20(parsed: &ParsedFile, found: &mut Findings) {
     // (group, fset value, line, field_index, data_row) for every
     // alphanumeric FILE_FSET used. `ci` is the tag-stripped column index
@@ -198,6 +202,11 @@ fn rule_20(parsed: &ParsedFile, found: &mut Findings) {
         let Some(ci) = g.headings.iter().position(|h| h == "FILE_FSET") else {
             continue;
         };
+        // `ci`/`ri` are a column/row index within one AGS4 group — bounded
+        // by that group's heading count and its actual row count, both far
+        // below u32::MAX for any real AGS4 file (see `laterite-ags4-core`'s
+        // byte-offset casts for the same reasoning on file-scale bounds).
+        #[allow(clippy::cast_possible_truncation)]
         for (ri, row) in g.rows.iter().enumerate() {
             if let Some(v) = row.values.get(ci) {
                 if v.chars().any(|c| c.is_ascii_alphanumeric()) {

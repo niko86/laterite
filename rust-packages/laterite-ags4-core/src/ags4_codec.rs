@@ -6,7 +6,7 @@
 //! disambiguates its purpose:
 //!
 //!   "GROUP","LOCA"
-//!   "HEADING","LOCA_ID","LOCA_TYPE",...
+//!   "`HEADING","LOCA_ID","LOCA_TYPE`",...
 //!   "UNIT","","","",...
 //!   "TYPE","ID","PA","2DP",...
 //!   "DATA","BH01","CP","100.50",...
@@ -34,7 +34,7 @@ use crate::error::CliError;
 #[derive(Debug, Clone)]
 pub struct AgsGroup {
     pub code: String,
-    /// Heading names in declaration order (e.g. ["LOCA_ID","LOCA_TYPE",...]).
+    /// Heading names in declaration order (e.g. `["LOCA_ID", "LOCA_TYPE", ...]`).
     pub headings: Vec<String>,
     /// Units row aligned with `headings`. Padded with empty strings if the
     /// UNIT row was shorter than the heading list (some AGS4 emitters).
@@ -54,6 +54,7 @@ pub struct ParsedAgs4 {
 }
 
 impl ParsedAgs4 {
+    #[must_use]
     pub fn get(&self, code: &str) -> Option<&AgsGroup> {
         self.groups.get(code)
     }
@@ -84,7 +85,7 @@ pub fn read_ags4_bytes(bytes: &[u8]) -> Result<ParsedAgs4, CliError> {
         ..ParseOptions::lean()
     };
     match parse_bytes_opts(bytes, opts) {
-        Ok(parsed) => Ok(from_shared(parsed)),
+        Ok(parsed) => Ok(from_shared(&parsed)),
         Err(ParseError::NotAgs4(_)) => Ok(ParsedAgs4 {
             groups: HashMap::new(),
             order: Vec::new(),
@@ -99,7 +100,7 @@ pub fn read_ags4_bytes(bytes: &[u8]) -> Result<ParsedAgs4, CliError> {
 /// every heading/unit/type/value, pads UNIT to the heading count (empty) and
 /// TYPE (with `"X"`), and keys each DATA row by heading name. First-seen wins on
 /// a duplicate (trimmed) code, matching the csv reader this replaced.
-fn from_shared(pf: ParsedFile) -> ParsedAgs4 {
+fn from_shared(pf: &ParsedFile) -> ParsedAgs4 {
     let mut groups: HashMap<String, AgsGroup> = HashMap::with_capacity(pf.group_order.len());
     let mut order: Vec<String> = Vec::with_capacity(pf.group_order.len());
     for raw_code in &pf.group_order {
@@ -127,7 +128,7 @@ fn from_shared(pf: ParsedFile) -> ParsedAgs4 {
             .map(|r| {
                 let mut row = HashMap::with_capacity(headings.len());
                 for (i, h) in headings.iter().enumerate() {
-                    let v = r.values.get(i).map(|s| s.trim()).unwrap_or("");
+                    let v = r.values.get(i).map_or("", |s| s.trim());
                     row.insert(h.clone(), v.to_string());
                 }
                 row

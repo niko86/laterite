@@ -14,7 +14,7 @@ use crate::commands::common::apply_dict_args;
 
 /// `a` (baseline) vs `b` (revision). `json` emits the full `RevisionDelta`;
 /// otherwise a per-group summary. KEY headings come from the dictionary, edition
-/// picked from the revision's TRAN_AGS (forced by `--dict-version`).
+/// picked from the revision's `TRAN_AGS` (forced by `--dict-version`).
 pub fn run(args: &DiffArgs, json: bool, quiet: bool) -> ! {
     let opts = apply_dict_args(
         CheckOptions {
@@ -46,8 +46,7 @@ pub fn run(args: &DiffArgs, json: bool, quiet: bool) -> ! {
     drop(spinner);
 
     let dv = resolve_dict_version(opts.dict_version, tran_ags_of(&pb).as_deref())
-        .map(|(dv, _)| dv)
-        .unwrap_or(FALLBACK);
+        .map_or(FALLBACK, |(dv, _)| dv);
     let dict = Dictionary::bundled(dv);
     let delta = laterite_ags4_diff::diff_parsed(&pa, &pb, &dict, None);
 

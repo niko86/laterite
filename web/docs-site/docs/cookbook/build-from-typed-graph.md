@@ -59,10 +59,10 @@ graph to the emitter — use this when your data is already a graph in memory
     download — nothing uploaded.
 
 !!! tip
-    `build_ags4` / `buildAgs4` returns a `BuildResult` whichever door you use.
-    Inspect `res.text` / `res.bytes` in memory, check `res.findings` for any
-    caveats autofix couldn't resolve, or `res.save("out.ags")` to persist a
-    byte-faithful AGS4 file.
+`build_ags4` / `buildAgs4` returns a `BuildResult` whichever door you use.
+Inspect `res.text` / `res.bytes` in memory, check `res.findings` for any
+caveats autofix couldn't resolve, or `res.save("out.ags")` to persist a
+byte-faithful AGS4 file.
 
 See also: [Build from frames](./build-from-frames.md) ·
 [Produce AGS4](../learn/produce.md).

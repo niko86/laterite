@@ -63,6 +63,7 @@ impl ValidatorError {
     /// Node `errors.ts`, the CLI). The single PRODUCER of the error-kind value
     /// domain — every surface delegates here instead of re-mapping the variants
     /// by hand, so the tables can't drift. A new variant forces this match.
+    #[must_use]
     pub fn kind(&self) -> &'static str {
         match self {
             ValidatorError::NotFound(_) => "not_found",
@@ -77,6 +78,7 @@ impl ValidatorError {
     /// The process exit code each maps to — byte-faithful to `lat`'s
     /// contract (3 = unreadable / io, 4 = not-AGS4 / unsupported-edition, 5 =
     /// bad-dict / bad-args). The single producer of the exit-code value domain.
+    #[must_use]
     pub fn exit_code(&self) -> i32 {
         match self {
             ValidatorError::NotFound(_) | ValidatorError::Io { .. } => 3,
@@ -99,10 +101,9 @@ impl From<laterite_ags4_parse::ParseError> for ValidatorError {
     fn from(e: laterite_ags4_parse::ParseError) -> Self {
         use laterite_ags4_parse::ParseError as P;
         match e {
-            P::NotAgs4(msg) => ValidatorError::NotAgs4(msg),
             P::UnsupportedEdition { found } => ValidatorError::UnsupportedEdition { found },
             P::NotUtf8 => ValidatorError::NotAgs4("file is not valid UTF-8".to_string()),
-            P::Structure(msg) => ValidatorError::NotAgs4(msg),
+            P::NotAgs4(msg) | P::Structure(msg) => ValidatorError::NotAgs4(msg),
         }
     }
 }

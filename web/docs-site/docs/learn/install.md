@@ -5,13 +5,18 @@ pip install laterite
 ```
 
 That one line gives you the library **and** the `lat` CLI. The base
-install is **polars + duckdb** — pyarrow-free, no pandas. Two optional extras
+install is **polars + duckdb** — pyarrow-free, no pandas. Optional extras
 add drop-in surfaces only if you want them:
 
 ```bash
-pip install laterite[compat]    # the python-ags4 drop-in shim (adds pandas)
-pip install laterite[pyarrow]   # the Arrow backend (adds pyarrow)
+pip install laterite[compat]          # the python-ags4 drop-in shim (adds pandas) — pyarrow-free
+pip install laterite[compat,pyarrow]  # + pyarrow accelerator (faster pandas hop + string dtype)
+pip install laterite[pyarrow]         # the Arrow backend (adds pyarrow)
 ```
+
+`[compat]` alone is already **~2× faster than python-ags4** (object-dtype pandas
+via DuckDB). pyarrow is an optional accelerator — see
+[Dependency shape](../concepts/dependency-shape.md).
 
 ## First validate, from the command line
 
@@ -58,9 +63,9 @@ lat validate examples/sample_site.ags --json
 ```
 
 !!! note "The exit-code contract"
-    `lat` exits **`0`** when the file is clean and **`1`** when there are
-    findings — nothing else. That makes it a drop-in gate for CI or a pre-commit
-    hook: `lat validate delivery.ags` fails the step the moment a rule fires, no
-    output parsing required.
+`lat` exits **`0`** when the file is clean and **`1`** when there are
+findings — nothing else. That makes it a drop-in gate for CI or a pre-commit
+hook: `lat validate delivery.ags` fails the step the moment a rule fires, no
+output parsing required.
 
 Next → [Read & explore a file](./read.md)

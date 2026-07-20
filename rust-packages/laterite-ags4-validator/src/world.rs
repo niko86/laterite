@@ -96,8 +96,7 @@ fn rule_20_on_disk(parsed: &ParsedFile, source: &Path, found: &mut Findings) {
         }
         let name = nci
             .and_then(|c| row.values.get(c))
-            .map(String::as_str)
-            .unwrap_or("");
+            .map_or("", String::as_str);
         if name.is_empty() {
             continue;
         }

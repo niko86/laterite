@@ -11,7 +11,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const src = path.resolve(here, "../../rust-packages/laterite-ags4-reference/data/ags_dictionary.json");
+const src = path.resolve(
+  here,
+  "../../rust-packages/laterite-ags4-reference/data/ags_dictionary.json",
+);
 const dst = path.resolve(here, "../public/ags_dictionary.json");
 
 // Fail loudly rather than ship a stale dictionary: if the source can't be read
@@ -19,4 +22,6 @@ const dst = path.resolve(here, "../public/ags_dictionary.json");
 const raw = readFileSync(src, "utf8");
 JSON.parse(raw); // throws on malformed source
 copyFileSync(src, dst);
-console.log(`[sync-dict] ${path.relative(process.cwd(), src)} → ${path.relative(process.cwd(), dst)}`);
+console.log(
+  `[sync-dict] ${path.relative(process.cwd(), src)} → ${path.relative(process.cwd(), dst)}`,
+);

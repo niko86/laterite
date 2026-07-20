@@ -17,7 +17,7 @@ use laterite_ags4_validator::fixes::Fix;
 use laterite_ags4_parse::{ParsedFile, parse_bytes, parse_str};
 use laterite_ags4_validator::parse::parse_file_with_encoding;
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, ValidatorError, WorldScope, fix_document_selective,
+    CheckOptions, DictVersion, ValidatorError, WorldScope, fix_document_selective, overlay,
     rule_metadata_json, tran_ags_of,
 };
 use laterite_types::sql_type;
@@ -52,13 +52,16 @@ fn classify(e: &ValidatorError) -> (i32, &'static str) {
 
 /// A `ValidatorError` as a thrown napi error (for the handle-returning
 /// `parseArrow`): `kind␟code␟message`, recovered by the TS `fromNativeError`.
-fn thrown(e: ValidatorError) -> Error {
-    let (code, kind) = classify(&e);
+// Internal helper (not a napi boundary) — `classify`/`Display` only ever need
+// `&e`, so each call site borrows the propagated error instead of moving it.
+fn thrown(e: &ValidatorError) -> Error {
+    let (code, kind) = classify(e);
     Error::from_reason(format!("{kind}{SEP}{code}{SEP}{e}"))
 }
 
 /// The crate version.
 #[napi]
+#[must_use]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
@@ -92,12 +95,14 @@ pub struct Reading {
 impl Reading {
     /// Group codes in file order (the order to load tables in).
     #[napi]
+    #[must_use]
     pub fn group_codes(&self) -> Vec<String> {
         self.parsed.group_order.clone()
     }
 
     /// The file's `TRAN_AGS` edition string, if present.
     #[napi(getter)]
+    #[must_use]
     pub fn tran_ags(&self) -> Option<String> {
         tran_ags_of(&self.parsed)
     }
@@ -105,6 +110,8 @@ impl Reading {
     /// `{headings, units, types, sqlTypes}` for one group, or `null` if the
     /// code isn't present. No Arrow built — cheap metadata only.
     #[napi]
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
     pub fn meta(&self, code: String) -> Option<GroupMeta> {
         let group = self.parsed.groups.get(&code)?;
         let n = group.headings.len();
@@ -134,7 +141,8 @@ impl Reading {
     /// SAME casting Python/wasm use — so a file types byte-identically across
     /// hosts. Returns `null` if the code isn't in the file.
     #[napi]
-    pub fn table_ipc(&self, code: String) -> Result<Option<Buffer>> {
+    #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
+    pub fn table_ipc(&self, code: String, content_hash: Option<bool>) -> Result<Option<Buffer>> {
         let Some(group) = self.parsed.groups.get(&code) else {
             return Ok(None);
         };
@@ -142,32 +150,48 @@ impl Reading {
         // content-addressed key columns (`_id` col 0, `_parent_id` col 1) so a
         // cross-group join in `sql()`/`at()` works with no opt-in — the TS
         // `table()` accessor strips them by default. Ids come from the one shared
-        // keychain (byte-identical to the .ags5db extension). A custom/passthrough
+        // keychain (byte-identical to the DuckDB extension). A custom/passthrough
         // group is absent from the registry → unkeyed IPC (#303).
+        //
+        // The hash needs NO registry — it hashes every heading rather than the
+        // spec key-chain, so a custom/passthrough group (which gets no `_id` at
+        // all) still gets a usable value fingerprint. Keying and hashing are
+        // independent knobs, both folded in by the ONE shared
+        // `build_group_ipc_synth` (`_id`/`_parent_id` col 0/1, `_content_hash`
+        // trailing) so every host gets identical column order by construction —
+        // mirrors laterite-py's `Reading::table_for`.
         let reg = laterite_ags4_core::registry::registry();
-        let buf = if reg.get(&code).is_some() {
-            let ids = laterite_ags4_core::keychain::group_row_ids(
+        let ids = reg.get(&code).map(|_| {
+            laterite_ags4_core::keychain::group_row_ids(
                 reg,
                 &code,
                 &group.headings,
                 group.rows.len(),
                 |col, row| group.cell(col, row),
-            );
-            laterite_types::ipc::build_group_ipc_with_ids(
-                &ids,
+            )
+        });
+        let hashes = if content_hash.unwrap_or(false) {
+            Some(laterite_ags4_core::keychain::group_content_hashes(
+                &code,
                 &group.headings,
+                &group.units,
                 &group.types,
                 group.rows.len(),
                 |col, row| group.cell(col, row),
-            )
+            ))
         } else {
-            laterite_types::ipc::build_group_ipc(
-                &group.headings,
-                &group.types,
-                group.rows.len(),
-                |col, row| group.cell(col, row),
-            )
-        }
+            None
+        };
+        let buf = laterite_types::ipc::build_group_ipc_synth(
+            &laterite_types::arrow_cols::SynthColumns {
+                ids: ids.as_deref(),
+                hashes: hashes.as_deref(),
+            },
+            &group.headings,
+            &group.types,
+            group.rows.len(),
+            |col, row| group.cell(col, row),
+        )
         .map_err(|e| Error::from_reason(format!("arrow ipc for {code}: {e}")))?;
         Ok(Some(buf.into()))
     }
@@ -231,6 +255,7 @@ impl Reading {
 /// — applies to `path` / `data` (text is already decoded). Throws the classified
 /// `kind␟code␟message` (see the error-protocol note) on bad input.
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn parse_arrow(
     path: Option<String>,
     text: Option<String>,
@@ -244,15 +269,15 @@ pub fn parse_arrow(
     let parsed = if let Some(t) = text {
         parse_str(&t)
             .map_err(ValidatorError::from)
-            .map_err(thrown)?
+            .map_err(|e| thrown(&e))?
     } else if let Some(d) = data {
-        let enc = resolve_encoding(encoding.as_deref()).map_err(bad_encoding)?;
+        let enc = resolve_encoding(encoding.as_deref()).map_err(|e| bad_encoding(&e))?;
         parse_bytes(d.as_ref(), enc)
             .map_err(ValidatorError::from)
-            .map_err(thrown)?
+            .map_err(|e| thrown(&e))?
     } else if let Some(p) = path {
-        let enc = resolve_encoding(encoding.as_deref()).map_err(bad_encoding)?;
-        parse_file_with_encoding(Path::new(&p), enc).map_err(thrown)?
+        let enc = resolve_encoding(encoding.as_deref()).map_err(|e| bad_encoding(&e))?;
+        parse_file_with_encoding(Path::new(&p), enc).map_err(|e| thrown(&e))?
     } else {
         return Err(Error::from_reason(format!(
             "bad_args{SEP}5{SEP}provide `path`, `text`, or `data`"
@@ -295,6 +320,10 @@ pub struct ValidationReport {
     /// Did an `index` certificate stand in for the rule engine? Never "the file was not
     /// checked": a world check (Rule 20's on-disk half) runs even on a certified read.
     pub certified: bool,
+    /// If a certificate was offered and NOT used, the stable token for why (the core
+    /// `RevalidateReason::as_str`, e.g. `"dictionary_changed"`). `None` when no cert was
+    /// offered, or it was vouched.
+    pub revalidate_reason: Option<String>,
     pub findings: Vec<Finding>,
     pub json: String,
     pub ndjson: String,
@@ -314,6 +343,7 @@ impl ValidationReport {
             resolution: String::new(),
             count: 0,
             certified: false,
+            revalidate_reason: None,
             findings: Vec::new(),
             json: String::new(),
             ndjson: String::new(),
@@ -321,40 +351,65 @@ impl ValidationReport {
     }
 }
 
-/// `{file, findings:{ "AGS Format Rule N":[{line,group,desc}] }}` pretty-JSON —
-/// byte-identical to `lat validate --json` (ported verbatim from laterite-py's
-/// `findings_json`; `preserve_order` keeps the key order stable).
-fn findings_json(file: &str, found: &Findings) -> String {
-    let mut fmap = Map::new();
-    for (rule, items) in found {
-        let arr: Vec<Value> = items
-            .iter()
-            .map(|f| serde_json::to_value(f).unwrap_or(Value::Null))
-            .collect();
-        fmap.insert(rule.clone(), Value::Array(arr));
-    }
-    let mut root = Map::new();
-    root.insert("file".into(), Value::from(file.to_string()));
-    root.insert("findings".into(), Value::Object(fmap));
-    serde_json::to_string_pretty(&Value::Object(root)).unwrap_or_default()
-}
+// `findings_json` / `findings_ndjson` are the ENGINE's renderers
+// (`laterite_ags4_validator::findings`), re-exported here at the old private
+// path so the call sites below are unchanged. This module used to carry a copy
+// "ported verbatim from laterite-py's findings_ndjson" — the third of three
+// hand-copies of one format (#530). `lat validate --json`, laterite-py's report
+// JSON and this binding now all come out of the same function.
+use laterite_ags4_validator::findings::{findings_json, findings_ndjson};
 
-/// One flat `{rule, …}` JSON object per finding per line — byte-identical to
-/// `lat validate --ndjson` (ported verbatim from laterite-py's `findings_ndjson`).
-fn findings_ndjson(found: &Findings) -> String {
-    let mut s = String::new();
-    for (rule, items) in found {
-        for f in items {
-            let mut o = Map::new();
-            o.insert("rule".into(), Value::from(rule.clone()));
-            if let Value::Object(body) = serde_json::to_value(f).unwrap_or(Value::Null) {
-                o.extend(body);
-            }
-            s.push_str(&serde_json::to_string(&Value::Object(o)).unwrap_or_default());
-            s.push('\n');
-        }
+/// Parse the `--dict` custom-dictionary override for a node call, mirroring the CLI's
+/// `apply_dict_args` and laterite-py's helper (#568). The dict arrives as a filesystem
+/// path OR raw bytes; the base edition is detected structurally from the dict itself
+/// unless `over` forces it (`dictVersion`) or `dict_replace` drops it. `enc` is the
+/// caller's already-resolved source encoding — the same one it hands `CheckOptions`.
+///
+/// Returns `Ok(None)` when no dict was named; errors use the `(exit_code, kind, message)`
+/// shape the surface's failure reports take.
+fn build_custom_dict(
+    dict_path: Option<&str>,
+    dict_bytes: Option<&[u8]>,
+    dict_replace: bool,
+    over: Option<DictVersion>,
+    enc: &'static encoding_rs::Encoding,
+) -> std::result::Result<Option<overlay::CustomDict>, (i32, &'static str, String)> {
+    // Where the bytes come from, and the advisory name the cert records (basename for a
+    // path, a neutral label for in-memory bytes — never a filesystem path, #568 §4).
+    let (bytes, name): (Vec<u8>, String) = if let Some(p) = dict_path {
+        let b = std::fs::read(Path::new(p))
+            .map_err(|e| (5, "bad_dict", format!("cannot read dict {p}: {e}")))?;
+        let name = Path::new(p)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("custom-dict")
+            .to_string();
+        (b, name)
+    } else if let Some(b) = dict_bytes {
+        (b.to_vec(), "custom-dict".to_string())
+    } else {
+        return Ok(None);
+    };
+    // A forced base and "no base" cannot both hold — same contradiction the CLI exits 5 on.
+    if dict_replace && over.is_some() {
+        return Err((
+            5,
+            "bad_dict",
+            "dictReplace cannot be combined with dictVersion \
+             (a forced base contradicts a full replacement)"
+                .to_string(),
+        ));
     }
-    s
+    let base = if dict_replace {
+        overlay::BaseSpec::Replace
+    } else if let Some(v) = over {
+        overlay::BaseSpec::Force(v)
+    } else {
+        overlay::BaseSpec::Auto
+    };
+    overlay::parse_dict(&bytes, overlay::DictFormat::Auto, enc, base, &name)
+        .map(Some)
+        .map_err(|e| (5, "bad_dict", format!("bad dict {name}: {e}")))
 }
 
 /// Run the validator from a `path`, in-memory `text`, or raw `data` — mirrors
@@ -369,9 +424,12 @@ fn validate_inner(
     path: Option<&str>,
     text: Option<&str>,
     data: Option<&[u8]>,
-    opts: CheckOptions,
+    opts: &CheckOptions,
     cert: Option<&laterite_ags4_core::index::Sidecar>,
-) -> std::result::Result<(String, String, String, Findings, bool), (i32, &'static str, String)> {
+) -> std::result::Result<
+    (String, String, String, Findings, bool, Option<String>),
+    (i32, &'static str, String),
+> {
     let map = |e: ValidatorError| {
         let (code, kind) = classify(&e);
         (code, kind, e.to_string())
@@ -408,7 +466,7 @@ fn validate_inner(
 
     let out = laterite_ags4_trust::check(laterite_ags4_trust::Request {
         bytes: &bytes,
-        opts: &opts,
+        opts,
         cert,
         world,
         compat: None,
@@ -421,6 +479,7 @@ fn validate_inner(
         out.resolution.as_str().to_string(),
         out.findings,
         out.certified,
+        out.revalidate_reason.map(|r| r.as_str().to_string()),
     ))
 }
 
@@ -433,6 +492,7 @@ fn validate_inner(
 /// errors-only. `includeFyi` (default `false`) adds the low-signal FYI tier.
 #[napi]
 #[allow(clippy::too_many_arguments)] // the napi surface mirrors lat's flags
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn run_check(
     path: Option<String>,
     text: Option<String>,
@@ -442,6 +502,11 @@ pub fn run_check(
     include_fyi: Option<bool>,
     check_files: Option<bool>,
     encoding: Option<String>,
+    // The custom `--dict` overlay (#568): a path OR raw bytes, plus `dictReplace` to drop
+    // the base. Same currency every surface shares.
+    dict_path: Option<String>,
+    dict_bytes: Option<Uint8Array>,
+    dict_replace: Option<bool>,
     // The certificate, if the caller named one. Whether to TRUST it is not decided here,
     // nor in TypeScript — it is decided once, in `laterite_ags4_trust`, for every surface.
     cert: Option<&Sidecar>,
@@ -457,19 +522,29 @@ pub fn run_check(
         Ok(e) => e,
         Err(msg) => return Ok(ValidationReport::failure("bad_args", 5, msg)),
     };
+    let custom_dict = match build_custom_dict(
+        dict_path.as_deref(),
+        dict_bytes.as_deref(),
+        dict_replace.unwrap_or(false),
+        forced,
+        enc,
+    ) {
+        Ok(cd) => cd,
+        Err((code, kind, msg)) => return Ok(ValidationReport::failure(kind, code, msg)),
+    };
     let opts = CheckOptions {
         dict_version: forced,
         include_warnings: include_warnings.unwrap_or(true),
         include_fyi: include_fyi.unwrap_or(false),
         check_files: check_files.unwrap_or(false),
         encoding: enc,
-        ..CheckOptions::default()
+        custom_dict,
     };
-    let (file, dv, res, found, certified) = match validate_inner(
+    let (file, dv, res, found, certified, revalidate_reason) = match validate_inner(
         path.as_deref(),
         text.as_deref(),
         data.as_deref(),
-        opts,
+        &opts,
         cert.map(|c| &c.inner),
     ) {
         Ok(t) => t,
@@ -490,13 +565,17 @@ pub fn run_check(
             })
         })
         .collect();
+    // Bounded by the number of validator findings in a file, which can't
+    // exceed the file's cell count — far below u32::MAX for any real file.
+    #[allow(clippy::cast_possible_truncation)]
     let count = findings.len() as u32;
     Ok(ValidationReport {
         ok: true,
         certified,
+        revalidate_reason,
         error_kind: None,
         error: None,
-        exit_code: if count == 0 { 0 } else { 1 },
+        exit_code: i32::from(count != 0),
         json: findings_json(&file, &found),
         ndjson: findings_ndjson(&found),
         file,
@@ -513,6 +592,7 @@ pub fn run_check(
 /// laterite-py's `list_rules()` and `lat rules --json`. The TS
 /// layer parses it into typed `RuleMeta[]`. No input file.
 #[napi]
+#[must_use]
 pub fn list_rules() -> String {
     rule_metadata_json().to_string()
 }
@@ -524,6 +604,7 @@ pub fn list_rules() -> String {
 /// edition; else 4.0.3|4.0.4|4.1|4.1.1|4.2. The TS `registry.dictionary()` parses
 /// it. (The generated `GROUPS` stays the default union registry.)
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn registry_dictionary_json(edition: Option<String>) -> Result<String> {
     let version = resolve_edition(edition.as_deref())
         .map_err(Error::from_reason)?
@@ -541,6 +622,7 @@ pub fn registry_dictionary_json(edition: Option<String>) -> Result<String> {
 /// total_added, total_removed, total_changed}` shape — that the TS `diff()`
 /// parses. Parse failure throws the mapped error (`NotAgs4Error`, …).
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn diff(
     a: Uint8Array,
     b: Uint8Array,
@@ -551,19 +633,18 @@ pub fn diff(
     // maps to BadDictError (parse errors below reuse `thrown` for the same reason).
     let forced = resolve_edition(dict_version.as_deref())
         .map_err(|m| Error::from_reason(format!("bad_dict{SEP}5{SEP}{m}")))?;
-    let enc = resolve_encoding(encoding.as_deref()).map_err(bad_encoding)?;
+    let enc = resolve_encoding(encoding.as_deref()).map_err(|e| bad_encoding(&e))?;
     let pa = parse_bytes(a.as_ref(), enc)
         .map_err(ValidatorError::from)
-        .map_err(thrown)?;
+        .map_err(|e| thrown(&e))?;
     let pb = parse_bytes(b.as_ref(), enc)
         .map_err(ValidatorError::from)
-        .map_err(thrown)?;
+        .map_err(|e| thrown(&e))?;
     // KEY headings come from the dictionary; pick the edition from the revision
     // (b)'s TRAN_AGS (unless dict_version forces it), falling back to the standard.
     let tran = laterite_ags4_validator::tran_ags_of(&pb);
     let dv = laterite_ags4_validator::resolve_dict_version(forced, tran.as_deref())
-        .map(|(dv, _)| dv)
-        .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
+        .map_or(laterite_ags4_validator::dict::FALLBACK, |(dv, _)| dv);
     let dict = Dictionary::bundled(dv);
     let delta = laterite_ags4_diff::diff_parsed(&pa, &pb, &dict, None);
     serde_json::to_string(&delta).map_err(|e| Error::from_reason(e.to_string()))
@@ -592,6 +673,7 @@ pub struct MergeOutput {
 /// `dictVersion` forces it. Parse failure throws the mapped error.
 #[napi]
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn merge(
     files: Vec<Uint8Array>,
     on_type_clash: Option<String>,
@@ -612,13 +694,13 @@ pub fn merge(
     }
     let forced = resolve_edition(dict_version.as_deref())
         .map_err(|m| Error::from_reason(format!("bad_dict{SEP}5{SEP}{m}")))?;
-    let enc = resolve_encoding(encoding.as_deref()).map_err(bad_encoding)?;
+    let enc = resolve_encoding(encoding.as_deref()).map_err(|e| bad_encoding(&e))?;
     let parsed: Vec<_> = files
         .iter()
         .map(|b| {
             parse_bytes(b.as_ref(), enc)
                 .map_err(ValidatorError::from)
-                .map_err(thrown)
+                .map_err(|e| thrown(&e))
         })
         .collect::<Result<_>>()?;
 
@@ -630,8 +712,7 @@ pub fn merge(
             .and_then(laterite_ags4_validator::tran_ags_of)
             .as_deref(),
     )
-    .map(|(dv, _)| dv)
-    .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
+    .map_or(laterite_ags4_validator::dict::FALLBACK, |(dv, _)| dv);
 
     // A merge-TRAN is synthesised only when both an issue and a date are given.
     let tran = match (tran_issue, tran_date) {
@@ -712,6 +793,7 @@ pub fn merge(
 /// straight from core's read codec (no typing), so `lat read --json` / `--csv`
 /// match the Rust binary and Python byte-for-byte (#430).
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn read_groups_raw(path: String) -> Result<String> {
     let parsed = laterite_ags4_core::ags4_codec::read_ags4(Path::new(&path))
         .map_err(|e| Error::from_reason(e.to_string()))?;
@@ -740,6 +822,27 @@ pub fn read_groups_raw(path: String) -> Result<String> {
     serde_json::to_string(&out).map_err(|e| Error::from_reason(e.to_string()))
 }
 
+/// `lat read --json` for one group: the rendered string, from core's ONE JSON
+/// writer. `ts/cli.ts` used to build this with `JSON.stringify(x, null, 2)`
+/// while the binary used `serde_json` and Python used `json.dumps` — three
+/// different JSON libraries kept byte-identical by hand-discipline, with no gate
+/// on `read` output (#530).
+#[napi]
+#[must_use]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
+pub fn render_read_json(headings: Vec<String>, rows: Vec<Vec<String>>) -> String {
+    laterite_ags4_core::read_render::render_rows_json(&headings, &rows)
+}
+
+/// `lat read --csv` for one group: the rendered string, from core's ONE CSV
+/// writer (RFC-4180-ish quoting). Replaces `ts/cli.ts`'s hand-ported `csvRow`.
+#[napi]
+#[must_use]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
+pub fn render_read_csv(headings: Vec<String>, rows: Vec<Vec<String>>) -> String {
+    laterite_ags4_core::read_render::render_rows_csv(&headings, &rows)
+}
+
 // --- the .ags.idx certificate (#294 Batch E / #14) ----------------------
 
 /// A `TierCoverage` as JS sees it: the count, or `null` if the tier was never run.
@@ -752,10 +855,15 @@ fn tier_count(c: laterite_ags4_core::index::TierCoverage) -> Option<u32> {
 
 /// The `.ags.idx` validity certificate — the Node mirror of laterite-py's
 /// `Sidecar` pyclass, wrapping the ONE core `laterite_ags4_core::index::Sidecar`
-/// so a Node-minted cert is byte-identical + checker-compatible with Python,
-/// `lat certify`, and the DuckDB extension. `Ags4File.certify()` mints
-/// one; `read(file, {index})` consumes it; a fresh + engine-matching cert lets a
-/// later `.validate()` skip the rule engine.
+/// so a Node-minted cert is byte-identical + checker-compatible with Python and
+/// `lat certify`. `Ags4File.certify()` mints one; `read(file, {index})` consumes
+/// it; a fresh + engine-matching cert lets a later `.validate()` skip the rule
+/// engine.
+///
+/// The DuckDB extension also reads these, but "checker-compatible" is the wrong
+/// word for it: it never runs the checker. It consumes only the byte-offset index
+/// for a sliced read, gating on size — so it shares the FORMAT with the doors
+/// above, not the trust decision.
 #[napi]
 pub struct Sidecar {
     inner: laterite_ags4_core::index::Sidecar,
@@ -776,12 +884,17 @@ impl Sidecar {
     /// runs the rules itself, with both tiers on, and records what they returned. It
     /// refuses a file with ERRORS; warnings and FYI are recorded, not fatal.
     #[napi(factory)]
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
     pub fn mint(
         data: Uint8Array,
         checked_at: String,
         dict_version: Option<String>,
         encoding: Option<String>,
         compat: Option<String>,
+        dict_path: Option<String>,
+        dict_bytes: Option<Uint8Array>,
+        dict_replace: Option<bool>,
     ) -> Result<Sidecar> {
         let forced = resolve_edition(dict_version.as_deref()).map_err(Error::from_reason)?;
         let enc = laterite_ags4_parse::resolve_encoding(encoding.as_deref()).ok_or_else(|| {
@@ -790,9 +903,21 @@ impl Sidecar {
                 encoding.unwrap_or_default()
             ))
         })?;
+        // The cert records WHICH custom dictionary judged the file (#568, O-48): a mint
+        // against a `--dict` overlay stamps its {name, hash}, and a later read naming a
+        // different dict revalidates rather than inheriting a stale verdict.
+        let custom_dict = build_custom_dict(
+            dict_path.as_deref(),
+            dict_bytes.as_deref(),
+            dict_replace.unwrap_or(false),
+            forced,
+            enc,
+        )
+        .map_err(|(_, _, msg)| Error::from_reason(msg))?;
         let opts = CheckOptions {
             dict_version: forced,
             encoding: enc,
+            custom_dict,
             ..CheckOptions::default()
         };
         let inner = laterite_ags4_trust::mint(data.as_ref(), &opts, checked_at, compat)
@@ -803,6 +928,7 @@ impl Sidecar {
     /// Parse a certificate from its on-disk `.ags.idx` JSON bytes, rejecting an
     /// unknown format version. Throws on malformed / unsupported JSON.
     #[napi(factory)]
+    #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
     pub fn from_json(data: Uint8Array) -> Result<Sidecar> {
         let inner = laterite_ags4_core::index::Sidecar::from_json(data.as_ref())
             .map_err(|e| Error::from_reason(e.to_string()))?;
@@ -821,26 +947,32 @@ impl Sidecar {
     /// Is this certificate still current for `data`? Strong check: format version +
     /// byte length + SHA-256. A mismatch means the source changed under the cert.
     #[napi]
+    #[must_use]
+    #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
     pub fn is_fresh_for(&self, data: Uint8Array) -> bool {
         self.inner.is_fresh_for(data.as_ref())
     }
 
     #[napi(getter)]
+    #[must_use]
     pub fn version(&self) -> u32 {
         self.inner.version
     }
     /// The certified source's byte length (a JS number; AGS files are well within
     /// the 2^53 safe-integer range).
     #[napi(getter)]
+    #[must_use]
     pub fn size(&self) -> f64 {
         self.inner.file.size as f64
     }
     #[napi(getter)]
+    #[must_use]
     pub fn sha256(&self) -> String {
         self.inner.file.sha256.clone()
     }
     /// The AGS edition the rules were run against.
     #[napi(getter)]
+    #[must_use]
     pub fn edition(&self) -> String {
         self.inner.validation.edition.edition().to_string()
     }
@@ -848,10 +980,12 @@ impl Sidecar {
     /// fact with the edition string, not two — a forced run and an auto run can name the
     /// same edition having applied different dictionaries.
     #[napi(getter)]
+    #[must_use]
     pub fn edition_forced(&self) -> bool {
         self.inner.validation.edition.is_forced()
     }
     #[napi(getter)]
+    #[must_use]
     pub fn validator(&self) -> String {
         self.inner.validation.validator.clone()
     }
@@ -859,14 +993,17 @@ impl Sidecar {
     /// sources and the bundled dictionary, NOT the addon's version. A rule can change
     /// without a version bump; this cannot.
     #[napi(getter)]
+    #[must_use]
     pub fn engine(&self) -> String {
         self.inner.validation.engine.clone()
     }
     #[napi(getter)]
+    #[must_use]
     pub fn compat(&self) -> Option<String> {
         self.inner.validation.compat.clone()
     }
     #[napi(getter)]
+    #[must_use]
     pub fn checked_at(&self) -> String {
         self.inner.validation.checked_at.clone()
     }
@@ -875,6 +1012,7 @@ impl Sidecar {
     /// verdicts on one unchanged file — so a cert minted under one does not answer a
     /// request made under another.
     #[napi(getter)]
+    #[must_use]
     pub fn encoding(&self) -> String {
         self.inner.validation.encoding.clone()
     }
@@ -883,21 +1021,24 @@ impl Sidecar {
     /// that tier's rules. `null` is the point: the old format stored a plain number that
     /// defaulted to 0, so "found none" and "never looked" were the same value.
     #[napi(getter)]
+    #[must_use]
     pub fn errors(&self) -> Option<u32> {
         tier_count(self.inner.validation.errors)
     }
     #[napi(getter)]
+    #[must_use]
     pub fn warnings(&self) -> Option<u32> {
         tier_count(self.inner.validation.warnings)
     }
     #[napi(getter)]
+    #[must_use]
     pub fn fyi(&self) -> Option<u32> {
         tier_count(self.inner.validation.fyi)
     }
 }
 
 /// One applied fix — the Node mirror of laterite-py's `applied[]` entries.
-/// `kind`/`risk` are the serde snake_case strings (`strip_bom`, `safe`, …) so
+/// `kind`/`risk` are the serde `snake_case` strings (`strip_bom`, `safe`, …) so
 /// the shape is identical across Python / CLI / Node.
 #[napi(object)]
 pub struct AppliedFix {
@@ -970,6 +1111,7 @@ impl FixReport {
 /// write-back on top.
 #[napi]
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn fix_file(
     path: Option<String>,
     text: Option<String>,
@@ -984,6 +1126,9 @@ pub fn fix_file(
     // fix is risky still needs `include_risky` even when named in `only`.
     only: Option<Vec<String>>,
     exclude: Option<Vec<String>>,
+    dict_path: Option<String>,
+    dict_bytes: Option<Uint8Array>,
+    dict_replace: Option<bool>,
 ) -> Result<FixReport> {
     let raw: Vec<u8> = if let Some(t) = text {
         t.into_bytes()
@@ -1009,9 +1154,20 @@ pub fn fix_file(
         Ok(e) => e,
         Err(msg) => return Ok(FixReport::failure("bad_args", 5, msg)),
     };
+    let custom_dict = match build_custom_dict(
+        dict_path.as_deref(),
+        dict_bytes.as_deref(),
+        dict_replace.unwrap_or(false),
+        forced,
+        enc,
+    ) {
+        Ok(cd) => cd,
+        Err((code, kind, msg)) => return Ok(FixReport::failure(kind, code, msg)),
+    };
     let opts = CheckOptions {
         dict_version: forced,
         encoding: enc,
+        custom_dict,
         // The residual re-validation tier matches this surface's `validate()`
         // default (errors + warnings) — not `CheckOptions::default()`'s
         // errors-only, which under-reported what the fix left behind (#294 C).
@@ -1050,12 +1206,15 @@ pub fn fix_file(
             })
         })
         .collect();
+    // Bounded by the number of fixes applied, which can't exceed the
+    // file's finding count — far below u32::MAX for any real file.
+    #[allow(clippy::cast_possible_truncation)]
     let fixes_applied = applied.len() as u32;
     Ok(FixReport {
         ok: true,
         error_kind: None,
         error: None,
-        exit_code: if residual.is_empty() { 0 } else { 1 },
+        exit_code: i32::from(!residual.is_empty()),
         fixed: Buffer::from(outcome.fixed),
         dict_version: outcome.dict_version.as_str().to_string(),
         resolution: outcome.resolution.as_str().to_string(),
@@ -1077,7 +1236,7 @@ pub struct GroupIpc {
 
 /// The emit result. `bytes` is the AGS4 document; `findingsJson` is the
 /// validator's `{rule:[…]}` map on the output; `applied` is the safe-fix ledger
-/// AutoFix made (same shape as `fix()`'s `FixReport.applied`); `fixesApplied`
+/// `AutoFix` made (same shape as `fix()`'s `FixReport.applied`); `fixesApplied`
 /// is its length.
 #[napi(object)]
 pub struct EmitResult {
@@ -1089,7 +1248,13 @@ pub struct EmitResult {
 
 /// Build valid AGS4 from per-group **Arrow IPC** streams (the columnar
 /// producer; the read boundary reversed). = `laterite-ags4-wasm`'s `to_ags4_ipc`.
+// napi boundary: owns the deserialized input (needless_pass_by_value); and napi
+// always deserializes a JS object into HashMap<_, _, RandomState> — no caller
+// can supply a different hasher, so genericizing over `S: BuildHasher` here
+// would be unreachable generality (implicit_hasher).
 #[napi]
+#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::implicit_hasher)]
 pub fn emit_ags4_from_ipc(
     groups: Vec<GroupIpc>,
     edition: Option<String>,
@@ -1114,11 +1279,14 @@ pub fn emit_ags4_from_ipc(
     let res = laterite_ags4_emit::emit_ags4(&inputs, &opts)
         .map_err(|e| Error::from_reason(e.to_string()))?;
     let findings_json = serde_json::to_string(&res.findings).unwrap_or_else(|_| "{}".into());
+    // Bounded the same way as `fixes_applied` in `fix_ags4` above.
+    #[allow(clippy::cast_possible_truncation)]
+    let fixes_applied = res.fixes_applied as u32;
     Ok(EmitResult {
         bytes: res.bytes.into(),
         findings_json,
         applied: to_applied_fixes(&res.applied),
-        fixes_applied: res.fixes_applied as u32,
+        fixes_applied,
     })
 }
 
@@ -1162,7 +1330,9 @@ fn resolve_encoding(
 }
 
 /// The `kind␟code␟message` shape TS's `fromNativeError` maps to a typed error.
-fn bad_encoding(msg: String) -> Error {
+// Internal helper (not a napi boundary) — the message is only ever formatted,
+// never owned, so each call site borrows the `String` `resolve_encoding` returns.
+fn bad_encoding(msg: &str) -> Error {
     Error::from_reason(format!("bad_args{SEP}5{SEP}{msg}"))
 }
 
@@ -1170,7 +1340,7 @@ fn bad_encoding(msg: String) -> Error {
 /// a `{ok:false}` failure report while `emit_ags4_from_ipc` throws it.
 fn resolve_edition(s: Option<&str>) -> std::result::Result<Option<DictVersion>, String> {
     match s.map(str::trim) {
-        None | Some("") | Some("auto") => Ok(None),
+        None | Some("" | "auto") => Ok(None),
         Some(o) => DictVersion::from_edition(o).map(Some).ok_or_else(|| {
             format!(
                 "unknown dict_version {o:?}; expected auto|{}",
@@ -1182,7 +1352,7 @@ fn resolve_edition(s: Option<&str>) -> std::result::Result<Option<DictVersion>, 
 
 fn resolve_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode> {
     match s.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
-        None | Some("") | Some("autofix") => Ok(laterite_ags4_emit::EmitMode::AutoFix),
+        None | Some("" | "autofix") => Ok(laterite_ags4_emit::EmitMode::AutoFix),
         Some("report") => Ok(laterite_ags4_emit::EmitMode::Report),
         Some("strict") => Ok(laterite_ags4_emit::EmitMode::Strict),
         Some(o) => Err(Error::from_reason(format!(
@@ -1208,6 +1378,11 @@ pub struct ExcelStats {
 }
 
 impl From<laterite_excel::ExcelStats> for ExcelStats {
+    // `sheets_written` is bounded by the AGS4 dictionary's group count (174
+    // max); `rows_written` needs billions of in-memory rows to overflow —
+    // physically unreachable (RAM exhausts long before this cast could
+    // truncate).
+    #[allow(clippy::cast_possible_truncation)]
     fn from(s: laterite_excel::ExcelStats) -> Self {
         ExcelStats {
             sheets_written: s.sheets_written as u32,
@@ -1220,6 +1395,7 @@ impl From<laterite_excel::ExcelStats> for ExcelStats {
 /// Write an AGS4 file's groups to an `.xlsx` — one worksheet per group.
 /// `orderedKeys` forces the worksheet order; otherwise AGS4 source order.
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn ags4_to_excel(
     ags_path: String,
     xlsx_path: String,
@@ -1233,6 +1409,7 @@ pub fn ags4_to_excel(
 /// Read an `.xlsx` back into an AGS4 file. `formatNumericColumns` (default
 /// true) re-applies AGS4 numeric formatting to numeric-looking columns.
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn excel_to_ags4(
     xlsx_path: String,
     ags_path: String,
@@ -1263,16 +1440,21 @@ pub struct ExcelBytesResult {
 /// forces the worksheet order; otherwise AGS4 source order. The bytes twin of
 /// `ags4ToExcel`.
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn ags4_bytes_to_xlsx(
     data: Uint8Array,
     ordered_keys: Option<Vec<String>>,
 ) -> Result<ExcelBytesResult> {
     let (xlsx, stats) = laterite_excel::ags4_bytes_to_xlsx(&data, ordered_keys)
         .map_err(|e| Error::from_reason(e.to_string()))?;
+    // Bounded the same way as `ExcelStats::from` above (group count /
+    // physical RAM limits).
+    #[allow(clippy::cast_possible_truncation)]
+    let (sheets_written, rows_written) = (stats.sheets_written as u32, stats.rows_written as u32);
     Ok(ExcelBytesResult {
         bytes: Buffer::from(xlsx),
-        sheets_written: stats.sheets_written as u32,
-        rows_written: stats.rows_written as u32,
+        sheets_written,
+        rows_written,
         warnings: stats.warnings,
     })
 }
@@ -1281,6 +1463,7 @@ pub fn ags4_bytes_to_xlsx(
 /// re-applies AGS4 numeric formatting to numeric-looking columns. The bytes twin
 /// of `excelToAgs4`.
 #[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn xlsx_bytes_to_ags4(
     data: Uint8Array,
     format_numeric_columns: Option<bool>,
@@ -1288,10 +1471,14 @@ pub fn xlsx_bytes_to_ags4(
     let (ags, stats) =
         laterite_excel::xlsx_bytes_to_ags4(&data, format_numeric_columns.unwrap_or(true))
             .map_err(|e| Error::from_reason(e.to_string()))?;
+    // Bounded the same way as `ExcelStats::from` above (group count /
+    // physical RAM limits).
+    #[allow(clippy::cast_possible_truncation)]
+    let (sheets_written, rows_written) = (stats.sheets_written as u32, stats.rows_written as u32);
     Ok(ExcelBytesResult {
         bytes: Buffer::from(ags),
-        sheets_written: stats.sheets_written as u32,
-        rows_written: stats.rows_written as u32,
+        sheets_written,
+        rows_written,
         warnings: stats.warnings,
     })
 }
@@ -1307,6 +1494,8 @@ pub fn xlsx_bytes_to_ags4(
 /// reports what a Node caller actually gets, so a reintroduced fallback shows up as
 /// `"cp1252x" -> "UTF-8"` and the surface census fails.
 #[napi]
+#[must_use]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn resolve_encoding_label(label: Option<String>) -> Option<String> {
     resolve_encoding(label.as_deref())
         .ok()
@@ -1321,6 +1510,7 @@ pub fn resolve_encoding_label(label: Option<String>) -> Option<String> {
 /// const the Rust binary and the Python wheel answer with, so the three launchers
 /// cannot disagree about which editions exist.
 #[napi]
+#[must_use]
 pub fn editions() -> Vec<String> {
     laterite_ags4_validator::dict::DictVersion::ALL
         .iter()
@@ -1328,9 +1518,73 @@ pub fn editions() -> Vec<String> {
         .collect()
 }
 
+/// The `--on-type-clash` modes merge accepts, in declaration order —
+/// `["error", "widen", "promote"]`.
+///
+/// GENERATED, same as [`editions`]: the set is owned by `TypeClashMode::ALL` in
+/// laterite-ags4-merge. Exposed so the JS launcher does not keep a hand-written
+/// copy — it had two (the census `values` for `merge --on-type-clash`, and the
+/// unknown-mode error message in `cli.ts`), and a fourth mode added to the enum
+/// would have reached neither (#555).
+#[napi]
+#[must_use]
+pub fn type_clash_modes() -> Vec<String> {
+    laterite_ags4_merge::TypeClashMode::ALL
+        .iter()
+        .map(|m| m.as_str().to_string())
+        .collect()
+}
+
 /// The edition `auto` falls back to when a file's `TRAN_AGS` is missing or
 /// unrecognised (the union's `fallback_edition`, generated).
 #[napi]
+#[must_use]
 pub fn fallback_edition() -> String {
     laterite_ags4_validator::dict::FALLBACK.as_str().to_string()
+}
+
+/// Parent chain from `code` up to the registry root — `[code, parent, …, root]`
+/// (a root group returns `[code]`). Raises for an unknown code, so a root is
+/// distinguishable from a miss.
+///
+/// The walk is `laterite_ags4_core::registry::ancestor_chain`, the ONE Rust
+/// definition of the group tree — the same leaf function the Python wheel binds
+/// (`registry_fns.rs::registry_ancestor_chain`). Node used to re-walk `.parent`
+/// pointers in TypeScript (`ts/registry.ts`), a hand-kept-in-sync copy of that
+/// logic; routing through the binding removes it so the tree can't drift from the
+/// leaf (#532, #527).
+#[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
+pub fn registry_ancestor_chain(code: String) -> Result<Vec<String>> {
+    let reg = laterite_ags4_core::registry::registry();
+    if reg.get(&code).is_none() {
+        return Err(Error::from_reason(format!("unknown group code: {code:?}")));
+    }
+    Ok(laterite_ags4_core::registry::ancestor_chain(reg, &code)
+        .into_iter()
+        .map(|g| g.code.clone())
+        .collect())
+}
+
+/// The KEY heading names a group inherits from its DIRECT parent — the
+/// intersection of its KEY headings with the parent's — sorted for determinism
+/// (the TS facade wraps this in a Set). Empty for a root; raises for an unknown
+/// code.
+///
+/// The intersection is `laterite_ags4_core::registry::inherited_key_names`, the
+/// same leaf function the Python wheel binds; Node used to re-implement the
+/// KEY-intersection logic in TypeScript. Deleting that copy is the point of #532
+/// (part of the #527 leaf-convergence arc).
+#[napi]
+#[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
+pub fn registry_inherited_key_names(code: String) -> Result<Vec<String>> {
+    let reg = laterite_ags4_core::registry::registry();
+    let g = reg
+        .get(&code)
+        .ok_or_else(|| Error::from_reason(format!("unknown group code: {code:?}")))?;
+    let mut names: Vec<String> = laterite_ags4_core::registry::inherited_key_names(reg, g)
+        .into_iter()
+        .collect();
+    names.sort();
+    Ok(names)
 }

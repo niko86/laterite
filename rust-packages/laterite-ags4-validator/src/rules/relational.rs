@@ -29,10 +29,10 @@
 //!   defining the cross-referenced data row, in the order presented in
 //!   the AGS4 DATA DICTIONARY."
 //! * **Rule 11a** — "Each GROUP/KEY FIELD shall be separated by a
-//!   delimiter character … defined in TRAN_DLIM. The default being
+//!   delimiter character … defined in `TRAN_DLIM`. The default being
 //!   '|' (ASCII 124)."
 //! * **Rule 11b** — "… more than one combination … separated by a
-//!   defined concatenation character … defined in TRAN_RCON. The
+//!   defined concatenation character … defined in `TRAN_RCON`. The
 //!   default being '+' (ASCII 43)."
 //! * **Rule 11c** — "Any heading of data TYPE 'Record Link' included
 //!   in a data file shall cross-reference to the KEY FIELDs of data
@@ -70,16 +70,16 @@ const PARENTLESS: &[&str] = &[
 /// Standard dictionary + the file's own DICT group, answering the
 /// status / parent questions Rules 10a–10c need. Owned `String`s keep
 /// the call sites lifetime-free.
-struct EffectiveDict {
-    std: Dictionary,
-    /// group → [(heading, DICT_STAT)] declared in the file's DICT.
+struct EffectiveDict<'a> {
+    std: Dictionary<'a>,
+    /// group → [(heading, `DICT_STAT`)] declared in the file's DICT.
     file_hdng: HashMap<String, Vec<(String, String)>>,
-    /// group → raw DICT_PGRP from a file DICT `GROUP`-type row.
+    /// group → raw `DICT_PGRP` from a file DICT `GROUP`-type row.
     file_parent: HashMap<String, String>,
 }
 
-impl EffectiveDict {
-    fn build(parsed: &ParsedFile, std: Dictionary) -> Self {
+impl<'a> EffectiveDict<'a> {
+    fn build(parsed: &ParsedFile, std: Dictionary<'a>) -> Self {
         let mut file_hdng: HashMap<String, Vec<(String, String)>> = HashMap::new();
         let mut file_parent: HashMap<String, String> = HashMap::new();
         if let Some(d) = parsed.groups.get("DICT") {
@@ -94,12 +94,10 @@ impl EffectiveDict {
             if let (Some(ti), Some(gi)) = (ti, gi) {
                 for r in &d.rows {
                     let get = |i: Option<usize>| {
-                        i.and_then(|i| r.values.get(i))
-                            .map(String::as_str)
-                            .unwrap_or("")
+                        i.and_then(|i| r.values.get(i)).map_or("", String::as_str)
                     };
-                    let dtype = r.values.get(ti).map(String::as_str).unwrap_or("");
-                    let grp = r.values.get(gi).map(String::as_str).unwrap_or("");
+                    let dtype = r.values.get(ti).map_or("", String::as_str);
+                    let grp = r.values.get(gi).map_or("", String::as_str);
                     if grp.is_empty() {
                         continue;
                     }
@@ -133,7 +131,7 @@ impl EffectiveDict {
     /// file-DICT extras, de-duplicated.
     fn fields_with_status(&self, group: &str, want: &str) -> Vec<String> {
         let mut out: Vec<String> = Vec::new();
-        for h in self.std.group_headings(group) {
+        for h in self.std.group_headings(group).iter() {
             if let Some(e) = self.std.heading(group, h) {
                 if e.status.to_ascii_uppercase().contains(want) {
                     out.push((*h).to_string());
@@ -169,7 +167,7 @@ impl EffectiveDict {
     }
 }
 
-pub fn check(parsed: &ParsedFile, dict: &Dictionary, found: &mut Findings) {
+pub fn check(parsed: &ParsedFile, dict: &Dictionary<'_>, found: &mut Findings) {
     let eff = EffectiveDict::build(parsed, *dict);
 
     for code in &parsed.group_order {
@@ -202,7 +200,10 @@ fn tuple(g: &ParsedGroup, names: &[String], row: &crate::parse::DataRow) -> Vec<
 }
 
 /// Rule 10a — KEY fields present; no duplicate KEY combinations.
-fn rule_10a(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findings) {
+// `ri` is a DATA row's index within one AGS4 group — bounded by that
+// group's actual row count, far below u32::MAX for any real AGS4 file.
+#[allow(clippy::cast_possible_truncation)]
+fn rule_10a(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut Findings) {
     let keys = eff.key_fields(code);
     if keys.is_empty() {
         return;
@@ -258,7 +259,9 @@ fn rule_10a(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findin
 }
 
 /// Rule 10b — REQUIRED fields present and non-empty in every DATA row.
-fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findings) {
+// `ri` is bounded the same way as in `rule_10a` above.
+#[allow(clippy::cast_possible_truncation)]
+fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut Findings) {
     let req = eff.required_fields(code);
     if req.is_empty() {
         return;
@@ -266,25 +269,22 @@ fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findin
 
     let mut present: Vec<&String> = Vec::new();
     for r in &req {
-        match g.headings.iter().any(|h| h == r) {
-            true => present.push(r),
-            false => {
-                if let Some(hl) = g.heading_line {
-                    add_at(
-                        found,
-                        RULE_10B,
-                        Some(hl),
-                        code,
-                        format!("REQUIRED field {r} is not present."),
-                        Location {
-                            target: Target::Heading,
-                            heading: Some(r.clone()),
-                            ..Default::default()
-                        },
-                        Severity::Error,
-                    );
-                }
-            }
+        if g.headings.iter().any(|h| h == r) {
+            present.push(r);
+        } else if let Some(hl) = g.heading_line {
+            add_at(
+                found,
+                RULE_10B,
+                Some(hl),
+                code,
+                format!("REQUIRED field {r} is not present."),
+                Location {
+                    target: Target::Heading,
+                    heading: Some(r.clone()),
+                    ..Default::default()
+                },
+                Severity::Error,
+            );
         }
     }
 
@@ -296,12 +296,9 @@ fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findin
         .collect();
 
     for (ri, row) in g.rows.iter().enumerate() {
-        let any_empty = req_cols.iter().any(|(i, _)| {
-            row.values
-                .get(*i)
-                .map(|v| v.trim().is_empty())
-                .unwrap_or(true)
-        });
+        let any_empty = req_cols
+            .iter()
+            .any(|(i, _)| row.values.get(*i).is_none_or(|v| v.trim().is_empty()));
         if !any_empty {
             continue;
         }
@@ -312,17 +309,12 @@ fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findin
         let empty_at: std::collections::HashMap<usize, &str> = req_cols
             .iter()
             .copied()
-            .filter(|(i, _)| {
-                row.values
-                    .get(*i)
-                    .map(|v| v.trim().is_empty())
-                    .unwrap_or(true)
-            })
+            .filter(|(i, _)| row.values.get(*i).is_none_or(|v| v.trim().is_empty()))
             .collect();
         let mut parts: Vec<String> = Vec::with_capacity(g.headings.len() + 1);
         parts.push("DATA".to_string());
         for (i, _) in g.headings.iter().enumerate() {
-            let v = row.values.get(i).map(String::as_str).unwrap_or("");
+            let v = row.values.get(i).map_or("", String::as_str);
             if let Some(name) = empty_at.get(&i) {
                 parts.push(format!("??{name}??"));
             } else {
@@ -347,11 +339,13 @@ fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict, found: &mut Findin
 
 /// Rule 10c — every child row must have a matching parent row, keyed
 /// by the parent's KEY fields.
+// `ri` is bounded the same way as in `rule_10a` above.
+#[allow(clippy::cast_possible_truncation)]
 fn rule_10c(
     parsed: &ParsedFile,
     g: &ParsedGroup,
     code: &str,
-    eff: &EffectiveDict,
+    eff: &EffectiveDict<'_>,
     found: &mut Findings,
 ) {
     if PARENTLESS.contains(&code) {
@@ -471,7 +465,7 @@ fn rule_10c(
     }
 }
 
-/// Rule 11 — read TRAN_DLIM / TRAN_RCON, dispatch 11a/11b/11c.
+/// Rule 11 — read `TRAN_DLIM` / `TRAN_RCON`, dispatch 11a/11b/11c.
 fn rule_11(parsed: &ParsedFile, found: &mut Findings) {
     let Some(tran) = parsed.groups.get("TRAN") else {
         return; // TRAN missing → Rule 14 reports it
@@ -484,8 +478,8 @@ fn rule_11(parsed: &ParsedFile, found: &mut Findings) {
     let (Some(di), Some(ci)) = (col(tran, "TRAN_DLIM"), col(tran, "TRAN_RCON")) else {
         return;
     };
-    let delim = data.values.get(di).map(String::as_str).unwrap_or("");
-    let concat = data.values.get(ci).map(String::as_str).unwrap_or("");
+    let delim = data.values.get(di).map_or("", String::as_str);
+    let concat = data.values.get(ci).map_or("", String::as_str);
 
     let mut blocked = false;
     if delim.is_empty() {
@@ -517,6 +511,9 @@ fn rule_11(parsed: &ParsedFile, found: &mut Findings) {
 /// Rule 11c — every Record-Link value must resolve to exactly one row
 /// in the referenced GROUP (positional match against its leading
 /// columns, the AGS4 "GROUP|key1|key2…" form).
+// `ci`/`ri` are a column/row index within one AGS4 group — both bounded
+// far below u32::MAX for any real AGS4 file (see `rule_10a` above).
+#[allow(clippy::cast_possible_truncation)]
 fn rule_11c(parsed: &ParsedFile, delim: &str, concat: &str, found: &mut Findings) {
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
@@ -599,7 +596,7 @@ fn fetch_count(parsed: &ParsedFile, parts: &[&str]) -> usize {
         .filter(|r| {
             keys.iter()
                 .enumerate()
-                .all(|(i, k)| r.values.get(i).map(String::as_str).unwrap_or("") == *k)
+                .all(|(i, k)| r.values.get(i).map_or("", String::as_str) == *k)
         })
         .count()
 }
@@ -646,14 +643,11 @@ mod tests {
     fn rule_10c_pmtl_parent_is_edition_dependent() {
         // #222 / O-42: the parent PMTL is checked against differs by edition.
         let pmtl_orphans = |v| {
-            run_v(PMTL_EDITION_FIXTURE, v)
-                .get(RULE_10C)
-                .map(|f| {
-                    f.iter()
-                        .filter(|x| x.group == "PMTL" && x.desc.contains("No parent entry"))
-                        .count()
-                })
-                .unwrap_or(0)
+            run_v(PMTL_EDITION_FIXTURE, v).get(RULE_10C).map_or(0, |f| {
+                f.iter()
+                    .filter(|x| x.group == "PMTL" && x.desc.contains("No parent entry"))
+                    .count()
+            })
         };
         // 4.0.3: PMTL→PMTD on a key incl. the (blank) PMTD_SEQ → orphan.
         assert_eq!(
@@ -755,7 +749,7 @@ mod tests {
         let r = run(src);
         // Standalone row (LOCA_ID="") → no Rule 10c.
         assert!(
-            r.get(RULE_10C).is_none_or(|v| v.is_empty()),
+            r.get(RULE_10C).is_none_or(std::vec::Vec::is_empty),
             "standalone row must not flag: {:?}",
             r.get(RULE_10C)
         );

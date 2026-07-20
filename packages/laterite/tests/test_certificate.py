@@ -248,7 +248,7 @@ def test_malformed_cert_raises_value_error(tmp_path):
     src = _write(tmp_path)
     bad = tmp_path / "bad.idx"
     bad.write_bytes(b"{not json")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="sidecar parse"):
         lat.read(src, index=bad)
 
 
@@ -492,7 +492,10 @@ def test_a_certificate_minted_through_another_decoder_does_not_answer(tmp_path):
 
     # Error-clean under windows-1252, so it mints — and the stamp says so.
     cert = lat.read(src, encoding="windows-1252").certify()
-    assert lat.read(src, index=cert, encoding="windows-1252")._cert.encoding == "windows-1252"
+    assert (
+        lat.read(src, index=cert, encoding="windows-1252")._cert.encoding
+        == "windows-1252"
+    )
 
     # The same bytes, read with the default decoder, offering that certificate.
     report = lat.read(src, index=cert).validate().report
@@ -501,5 +504,9 @@ def test_a_certificate_minted_through_another_decoder_does_not_answer(tmp_path):
     assert not report.is_valid
 
     # And the decoder it WAS minted under still gets the fast path: a match, not a ban.
-    same = lat.read(src, index=cert, encoding="windows-1252").validate(warnings=False).report
+    same = (
+        lat.read(src, index=cert, encoding="windows-1252")
+        .validate(warnings=False)
+        .report
+    )
     assert same.certified

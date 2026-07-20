@@ -112,7 +112,7 @@ def test_merge_synthesises_a_merge_tran(tmp_path):
 
 
 def test_merge_needs_two_sources():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="at least two"):
         laterite.merge(_A)
 
 
@@ -191,9 +191,8 @@ def test_a_blank_unit_is_not_a_conflict():
 
 #: Same borehole list, but LOCA_GL is typed 2DP in one delivery and 5DP in the other.
 _DP2 = _UNIT_M  # BH01, LOCA_GL "10.00", TYPE 2DP, UNIT m
-_DP5 = (
-    _UNIT_M.replace('"TYPE","ID","2DP"', '"TYPE","ID","5DP"')
-    .replace('"DATA","BH01","10.00"', '"DATA","BH02","20.12345"')
+_DP5 = _UNIT_M.replace('"TYPE","ID","2DP"', '"TYPE","ID","5DP"').replace(
+    '"DATA","BH01","10.00"', '"DATA","BH02","20.12345"'
 )
 
 
@@ -231,9 +230,8 @@ def test_significant_figures_never_promote():
     """Zero-padding nDP is a formatting change; zero-padding nSF would assert
     measurement precision the instrument never resolved. So nSF falls back to X."""
     sf3 = _UNIT_M.replace('"TYPE","ID","2DP"', '"TYPE","ID","3SF"')
-    sf5 = (
-        _UNIT_M.replace('"TYPE","ID","2DP"', '"TYPE","ID","5SF"')
-        .replace('"DATA","BH01","10.00"', '"DATA","BH02","20.123"')
+    sf5 = _UNIT_M.replace('"TYPE","ID","2DP"', '"TYPE","ID","5SF"').replace(
+        '"DATA","BH01","10.00"', '"DATA","BH02","20.123"'
     )
     res = laterite.merge(sf3, sf5, on_type_clash="promote")
     assert '"TYPE","ID","X"' in res.text, "nSF has no lossless join — widen"
@@ -260,6 +258,7 @@ def test_promote_lets_a_merged_row_still_content_hash_against_its_typed_source()
     the declared TYPE, so `10.00` hashes as a NUMBER under 2DP but as a STRING under
     X. A widened merge therefore stops value-matching its own inputs; a promoted one
     does not."""
+
     def bh01_hash(doc) -> str:
         loca = laterite.read(doc, content_hash=True, keys=True)["LOCA"]
         return next(
@@ -309,7 +308,12 @@ def test_cli_merge_writes_the_same_bytes_as_the_library(tmp_path, capsys):
     b.write_text(_B)
     out = tmp_path / "merged.ags"
 
-    assert _cli.main(["merge", str(a), str(b), "--out", str(out), "--on-type-clash", "promote"]) == 0
+    assert (
+        _cli.main(
+            ["merge", str(a), str(b), "--out", str(out), "--on-type-clash", "promote"]
+        )
+        == 0
+    )
     capsys.readouterr()
 
     expected = laterite.merge(str(a), str(b), on_type_clash="promote").bytes
@@ -329,13 +333,24 @@ def test_cli_merge_json_uses_the_wire_spelling(tmp_path, capsys):
     out = tmp_path / "merged.ags"
 
     code = _cli.main(
-        ["merge", str(a), str(b), "--out", str(out), "--on-type-clash", "promote", "--json"]
+        [
+            "merge",
+            str(a),
+            str(b),
+            "--out",
+            str(out),
+            "--on-type-clash",
+            "promote",
+            "--json",
+        ]
     )
     assert code == 0
     summary = json.loads(capsys.readouterr().out)
 
     assert summary["bytes"] == len(out.read_bytes())
-    assert summary["revisions"], "BH1's GL was revised 10.00 -> 11.50 — that is a revision"
+    assert summary["revisions"], (
+        "BH1's GL was revised 10.00 -> 11.50 — that is a revision"
+    )
     for r in summary["revisions"]:
         assert "winner_file" in r and "winnerFile" not in r
         assert isinstance(r["winner_file"], int)
@@ -365,7 +380,9 @@ def test_cli_merge_requires_out_and_two_files(tmp_path, capsys):
     b.write_text(_B)
 
     assert _cli.main(["merge", str(a), str(b)]) == 5  # no --out
-    assert _cli.main(["merge", str(a), "--out", str(tmp_path / "m.ags")]) == 5  # one file
+    assert (
+        _cli.main(["merge", str(a), "--out", str(tmp_path / "m.ags")]) == 5
+    )  # one file
     capsys.readouterr()
 
 
@@ -379,7 +396,15 @@ def test_cli_merge_rejects_a_typod_mode(tmp_path, capsys):
     b.write_text(_B)
 
     code = _cli.main(
-        ["merge", str(a), str(b), "--out", str(tmp_path / "m.ags"), "--on-type-clash", "promot"]
+        [
+            "merge",
+            str(a),
+            str(b),
+            "--out",
+            str(tmp_path / "m.ags"),
+            "--on-type-clash",
+            "promot",
+        ]
     )
     assert code == 5
     capsys.readouterr()

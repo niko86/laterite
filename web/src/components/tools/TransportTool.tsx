@@ -55,7 +55,7 @@ export const TransportTool: Component = () => {
       return {
         size: b.length,
         name: fileStore.name() || "delivery.ags",
-        bytes: async () => b,
+        bytes: () => Promise.resolve(b),
       };
     return null;
   };
@@ -73,8 +73,14 @@ export const TransportTool: Component = () => {
     reset();
     try {
       const out = await lock(await src.bytes(), lockPass());
-      downloadBlob(out.slice().buffer, `${src.name}.zst.age`, "application/octet-stream");
-      setNote(`Encrypted ${src.name} → ${src.name}.zst.age (${fmtSize(out.length)})`);
+      downloadBlob(
+        out.slice().buffer,
+        `${src.name}.zst.age`,
+        "application/octet-stream",
+      );
+      setNote(
+        `Encrypted ${src.name} → ${src.name}.zst.age (${fmtSize(out.length)})`,
+      );
     } catch (e) {
       setErr(friendlyErr(e));
     } finally {
@@ -90,7 +96,9 @@ export const TransportTool: Component = () => {
     try {
       const bytes = new Uint8Array(await f.arrayBuffer());
       const out = await unlock(bytes, unlockPass());
-      const name = f.name.replace(/\.zst\.age$/i, "").replace(/\.age$/i, "") || "decrypted";
+      const name =
+        f.name.replace(/\.zst\.age$/i, "").replace(/\.age$/i, "") ||
+        "decrypted";
       downloadBlob(out.slice().buffer, name, "application/octet-stream");
       setNote(`Decrypted ${f.name} → ${name} (${fmtSize(out.length)})`);
     } catch (e) {
@@ -103,10 +111,11 @@ export const TransportTool: Component = () => {
   return (
     <div class="flex min-w-0 flex-col gap-4">
       <p class="text-sm text-fg-soft">
-        Compress + passphrase-encrypt a file to a <code class="mono">.zst.age</code>{" "}
-        you can share, and decrypt one back. Byte-compatible with{" "}
-        <code class="mono">lat unlock</code> / the <code class="mono">laterite</code>{" "}
-        library / <code class="mono">pyrage</code>. Runs entirely in your browser.
+        Compress + passphrase-encrypt a file to a{" "}
+        <code class="mono">.zst.age</code> you can share, and decrypt one back.
+        Byte-compatible with <code class="mono">lat unlock</code> / the{" "}
+        <code class="mono">laterite</code> library /{" "}
+        <code class="mono">pyrage</code>. Runs entirely in your browser.
       </p>
 
       {/* Lock: encrypt the loaded file (or an uploaded one). */}
@@ -122,10 +131,12 @@ export const TransportTool: Component = () => {
         >
           {(src) => (
             <p class="text-xs text-fg-faint">
-              File: <span class="mono text-fg-soft">{src().name}</span> ({fmtSize(src().size)})
+              File: <span class="mono text-fg-soft">{src().name}</span> (
+              {fmtSize(src().size)})
               <Show when={overCap(src().size)}>
                 <span class="ml-2 text-warn">
-                  · over {CAP_MB} MB — encryption may be slow / memory-heavy on this device
+                  · over {CAP_MB} MB — encryption may be slow / memory-heavy on
+                  this device
                 </span>
               </Show>
             </p>
@@ -144,7 +155,7 @@ export const TransportTool: Component = () => {
             type="button"
             disabled={busy() !== null || !lockSource() || !lockPass()}
             class="rounded bg-emerald-600/80 px-3 py-1.5 font-medium text-emerald-50 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-            onClick={doLock}
+            onClick={() => void doLock()}
           >
             {busy() === "lock" ? "Encrypting…" : "Encrypt & download"}
           </button>
@@ -176,7 +187,9 @@ export const TransportTool: Component = () => {
         <p class="text-sm font-medium text-fg-soft">Decrypt ← .zst.age</p>
         <div class="flex flex-wrap items-center gap-3 text-sm">
           <label class="cursor-pointer rounded border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip">
-            {unlockFile() ? unlockFile()!.name : "Choose a .zst.age file…"}
+            <Show when={unlockFile()} fallback="Choose a .zst.age file…">
+              {(f) => f().name}
+            </Show>
             <input
               type="file"
               accept=".age,.zst,application/octet-stream"
@@ -199,7 +212,7 @@ export const TransportTool: Component = () => {
             type="button"
             disabled={busy() !== null || !unlockFile() || !unlockPass()}
             class="rounded border border-line-strong px-3 py-1.5 text-fg hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
-            onClick={doUnlock}
+            onClick={() => void doUnlock()}
           >
             {busy() === "unlock" ? "Decrypting…" : "Decrypt & download"}
           </button>
@@ -207,7 +220,11 @@ export const TransportTool: Component = () => {
       </div>
 
       <Show when={busy()}>
-        <Spinner label={busy() === "lock" ? "Encrypting (deriving key)…" : "Decrypting…"} />
+        <Spinner
+          label={
+            busy() === "lock" ? "Encrypting (deriving key)…" : "Decrypting…"
+          }
+        />
       </Show>
       <Show when={note()}>
         <p class="text-xs text-ok">✓ {note()}</p>

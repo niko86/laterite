@@ -23,7 +23,9 @@ from laterite import _cli
 from laterite import _laterite_native as _native
 
 REPO = Path(__file__).resolve().parents[3]
-_DICT = REPO / "rust-packages" / "laterite-ags4-reference" / "data" / "ags_dictionary.json"
+_DICT = (
+    REPO / "rust-packages" / "laterite-ags4-reference" / "data" / "ags_dictionary.json"
+)
 
 _CLEAN = "\r\n".join(
     [
@@ -39,11 +41,16 @@ _CLEAN = "\r\n".join(
 
 def test_the_native_edition_list_is_the_dictionarys_own() -> None:
     """The bridge itself: what Rust hands Python IS ags_dictionary.json's `editions`."""
-    assert list(_native.registry_editions()) == json.loads(_DICT.read_text())["editions"]
+    assert (
+        list(_native.registry_editions()) == json.loads(_DICT.read_text())["editions"]
+    )
 
 
 def test_the_fallback_is_the_dictionarys_own() -> None:
-    assert _native.registry_fallback_edition() == json.loads(_DICT.read_text())["fallback_edition"]
+    assert (
+        _native.registry_fallback_edition()
+        == json.loads(_DICT.read_text())["fallback_edition"]
+    )
 
 
 def test_the_cli_offers_exactly_the_bundled_editions() -> None:
@@ -53,7 +60,7 @@ def test_the_cli_offers_exactly_the_bundled_editions() -> None:
     this cannot drift — and if someone pastes the literal back, a newly bundled
     edition breaks it.
     """
-    assert _cli._DICT_CHOICES == ("auto", *_native.registry_editions())
+    assert ("auto", *_native.registry_editions()) == _cli._DICT_CHOICES
 
 
 @pytest.mark.parametrize("edition", _native.registry_editions())
@@ -77,7 +84,9 @@ def test_every_bundled_edition_is_accepted_by_the_uvx_cli(
     f.write_text(_CLEAN)
     code = _cli.main(["validate", str(f), "--dict-version", edition])
     capsys.readouterr()
-    assert code != 5, f"the uvx launcher rejected --dict-version {edition}, which the dictionary bundles"
+    assert code != 5, (
+        f"the uvx launcher rejected --dict-version {edition}, which the dictionary bundles"
+    )
 
 
 def test_an_unbundled_edition_is_still_rejected(

@@ -3,7 +3,7 @@
 // worker owns the lazy-loaded libs. Same request/response-by-id shape as
 // validatorClient.ts.
 
-import type { TransportReq, TransportRes } from "./transport.worker";
+import type { TransportRes } from "./transport.worker";
 
 type Pending = {
   resolve: (bytes: Uint8Array) => void;
@@ -25,6 +25,7 @@ const readyPromise = new Promise<void>((resolve, reject) => {
     if ("type" in msg && msg.type === "ready") {
       worker.removeEventListener("message", onInit);
       resolve();
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker messages are a runtime boundary; keep the explicit check though the type narrows to it
     } else if ("type" in msg && msg.type === "initError") {
       worker.removeEventListener("message", onInit);
       reject(new Error(msg.error));
@@ -53,24 +54,34 @@ export function ready(): Promise<void> {
   return readyPromise;
 }
 
-function post(kind: "lock" | "unlock", bytes: Uint8Array, passphrase: string): Promise<Uint8Array> {
+function post(
+  kind: "lock" | "unlock",
+  bytes: Uint8Array,
+  passphrase: string,
+): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const id = nextId++;
     // Transfer a copy so the caller's Uint8Array stays intact.
     const buf = bytes.slice().buffer;
     pending.set(id, { resolve, reject });
-    worker.postMessage({ id, kind, bytes: buf, passphrase } as TransportReq, [buf]);
+    worker.postMessage({ id, kind, bytes: buf, passphrase }, [buf]);
   });
 }
 
 /** Compress + passphrase-encrypt bytes to a `.zst.age` (byte-compatible with
  *  laterite `lock` — zstd 9 + age scrypt log_N 18). */
-export function lock(bytes: Uint8Array, passphrase: string): Promise<Uint8Array> {
+export function lock(
+  bytes: Uint8Array,
+  passphrase: string,
+): Promise<Uint8Array> {
   return post("lock", bytes, passphrase);
 }
 
 /** Decrypt + decompress a `.zst.age`'s bytes. Rejects on a wrong passphrase or
  *  a non-age / non-zstd payload. */
-export function unlock(bytes: Uint8Array, passphrase: string): Promise<Uint8Array> {
+export function unlock(
+  bytes: Uint8Array,
+  passphrase: string,
+): Promise<Uint8Array> {
   return post("unlock", bytes, passphrase);
 }

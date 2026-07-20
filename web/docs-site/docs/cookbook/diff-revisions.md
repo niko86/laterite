@@ -2,7 +2,7 @@
 
 **Available in:** Python · Node · CLI · Browser
 
-**When:** a resubmission lands and you need to know *what actually changed* between
+**When:** a resubmission lands and you need to know _what actually changed_ between
 Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
 
 === "Python"

@@ -152,13 +152,17 @@ def _answer(report) -> dict:
 
 @pytest.mark.parametrize(("name", "text"), FIXTURES, ids=[n for n, _ in FIXTURES])
 @pytest.mark.parametrize(("warnings", "fyi"), TIERS)
-def test_path_text_and_bytes_return_the_same_verdict(tmp_path, name, text, warnings, fyi):
+def test_path_text_and_bytes_return_the_same_verdict(
+    tmp_path, name, text, warnings, fyi
+):
     src = tmp_path / f"{name}.ags"
     src.write_bytes(text.encode("utf-8"))  # write_bytes: keep CRLF (no translation)
 
     from_path = _answer(lat.read(src).validate(warnings=warnings, fyi=fyi).report)
     from_text = _answer(lat.read(text).validate(warnings=warnings, fyi=fyi).report)
-    from_bytes = _answer(lat.read(text.encode("utf-8")).validate(warnings=warnings, fyi=fyi).report)
+    from_bytes = _answer(
+        lat.read(text.encode("utf-8")).validate(warnings=warnings, fyi=fyi).report
+    )
 
     assert from_text == from_path, f"text disagrees with path on {name}"
     assert from_bytes == from_path, f"bytes disagrees with path on {name}"

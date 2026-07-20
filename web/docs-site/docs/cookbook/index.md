@@ -1,8 +1,8 @@
 # Cookbook
 
 Task-indexed recipes. Each one is a runnable block you can lift straight into your code — the snippet
-on the page is the *exact* file the CI gate executes, so the output is real. New here? the
-[Learn path](../learn/index.md) walks the same ground in order; this page is for *"how do I…?"*.
+on the page is the _exact_ file the CI gate executes, so the output is real. New here? the
+[Learn path](../learn/index.md) walks the same ground in order; this page is for _"how do I…?"_.
 
 ## Reading & typing
 
@@ -39,6 +39,6 @@ on the page is the *exact* file the CI gate executes, so the output is real. New
 - [**Drop-in for python-ags4**](compat.md) — `from laterite import compat as AGS4`.
 
 !!! tip
-    Want to see the whole fluent API assembled from these parts? The [Chaining showcase](../chaining/index.md)
-    climbs a power ladder from a one-line `read().validate()` to raw SQL, your own functions, and the
-    certify fast-path.
+Want to see the whole fluent API assembled from these parts? The [Chaining showcase](../chaining/index.md)
+climbs a power ladder from a one-line `read().validate()` to raw SQL, your own functions, and the
+certify fast-path.

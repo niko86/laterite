@@ -7,7 +7,7 @@ The original report: a base ``pip install laterite`` user called
 ``ModuleNotFoundError: laterite.ags5db requires the 'ags5' extra`` — a base
 namespace silently depending on the heavy AGS5 (DuckDB) wheel. The
 emit path had the same disease (it round-tripped frames through DuckDB,
-whose polars ingest pulls ``pyarrow`` — a ``[compat]`` dep).
+whose polars ingest pulls ``pyarrow`` — an opt-in extra, never a base dep).
 
 Since #177 the experimental ``.ags5db`` surface is fully decoupled — its code
 moved to the dormant ``ags5/`` holding folder, there is no ``[ags5]`` extra,
@@ -17,7 +17,8 @@ never re-acquires that dependency, alongside the live ``[compat]`` extras.
 We can't uninstall the extras in the dev workspace (everything's installed),
 so we run a **subprocess** with a ``sys.meta_path`` finder that makes the
 decoupled/optional top-levels (``laterite_ags5`` = the AGS5 package;
-``pandas`` / ``pyarrow`` = ``[compat]``) un-importable — a faithful base-only
+``pandas`` = ``[compat]``; ``pyarrow`` = the ``[pyarrow]`` / ``[compat,pyarrow]``
+opt-in accelerator) un-importable — a faithful base-only
 simulation. Base ``duckdb`` / ``polars`` stay (they ARE base deps). The
 subprocess exercises the whole documented base surface and asserts:
 
@@ -38,10 +39,10 @@ import textwrap
 # Runs inside a fresh interpreter with the extras blocked BEFORE laterite is
 # imported. Exits non-zero (with a diagnostic dump) on any base-surface break.
 _EXERCISE = textwrap.dedent(
-    '''
+    """
     import sys
 
-    BLOCKED = {"laterite_ags5", "pandas", "pyarrow"}  # decoupled AGS5 pkg + [compat]
+    BLOCKED = {"laterite_ags5", "pandas", "pyarrow"}  # AGS5 pkg + [compat] + [pyarrow]
 
     class _BlockExtras:
         def find_spec(self, name, path=None, target=None):
@@ -144,7 +145,7 @@ _EXERCISE = textwrap.dedent(
         print("ags5 absent from base:", gate_ok)
         sys.exit(1)
     sys.exit(0)
-    '''
+    """
 )
 
 

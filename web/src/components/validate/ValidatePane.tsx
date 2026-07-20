@@ -39,8 +39,15 @@ export const ValidatePane: Component = () => {
   // are shared too, so the Fix tab derives the same CRLF-correct bytes. The
   // Apply-Fixes experience is now its own tab (FixPane) — this pane is purely
   // about validating + browsing findings.
-  const { bytes, name, setBytes, setName, setEdited, canonicalBytes, loadFile } =
-    fileStore;
+  const {
+    bytes,
+    name,
+    setBytes,
+    setName,
+    setEdited,
+    canonicalBytes,
+    loadFile,
+  } = fileStore;
   // dictVersion / encoding / aligned are persisted + shareable (lib/settings):
   // your last choice survives a reload, and a shared link restores them. The
   // aligned toggle renders a finding's enclosing GROUP block as space-aligned
@@ -86,8 +93,7 @@ export const ValidatePane: Component = () => {
     // string shouldn't allocate a match array the size of the hit count.
     const t = text();
     let n = 0;
-    for (let i = t.indexOf("�"); i !== -1; i = t.indexOf("�", i + 1))
-      n++;
+    for (let i = t.indexOf("�"); i !== -1; i = t.indexOf("�", i + 1)) n++;
     return n;
   });
 
@@ -155,11 +161,12 @@ export const ValidatePane: Component = () => {
         rule: g.rule,
         total: g.total,
         items: g.items.filter((f) => {
-          if (!sevs.has((f.severity ?? "warning") as Severity)) return false;
+          if (!sevs.has(f.severity ?? "warning")) return false;
           if (!groups.has(f.group || "—")) return false;
           if (q) {
             const src = f.line != null ? (lines[f.line - 1] ?? "") : "";
-            const hay = `${f.desc} ${f.heading ?? ""} ${f.group ?? ""} ${g.rule} ${src}`.toLowerCase();
+            const hay =
+              `${f.desc} ${f.heading ?? ""} ${f.group} ${g.rule} ${src}`.toLowerCase();
             if (!hay.includes(q)) return false;
           }
           return true;
@@ -234,7 +241,9 @@ export const ValidatePane: Component = () => {
             <button
               type="button"
               class="mt-1.5 rounded border border-line-strong px-2 py-1 text-xs font-medium text-fg-soft hover:bg-chip"
-              onClick={() => setEncoding("windows-1252")}
+              onClick={() => {
+                setEncoding("windows-1252");
+              }}
             >
               Switch encoding to Windows-1252
             </button>
@@ -259,7 +268,7 @@ export const ValidatePane: Component = () => {
                 when={report.loading}
                 fallback={
                   <Show
-                    when={report.error}
+                    when={Boolean(report.error)}
                     fallback="Load a file, paste AGS4 text, or pick a sample to validate."
                   >
                     <span class="text-err">

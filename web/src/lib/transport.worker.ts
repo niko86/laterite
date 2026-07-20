@@ -17,8 +17,16 @@ import { Decrypter, Encrypter } from "age-encryption";
 
 /** zstd level — laterite `lock`'s default. */
 const ZSTD_LEVEL = 9;
-/** scrypt work factor — MUST match laterite-transport::SCRYPT_LOG_N (18) so a
- *  browser-locked file opens in the CLI/library and vice-versa. */
+/** scrypt work factor — matches `laterite-transport::SCRYPT_LOG_N` (18).
+ *
+ *  NOT "must match, or the file won't open": age writes the factor into the
+ *  header's `-> scrypt <salt> <log_N>` stanza and decryption accepts whatever the
+ *  file declares, so a file locked at 17 opens in the CLI regardless. What would
+ *  actually break interop is exceeding **20** — this decoder (`age-encryption`)
+ *  refuses above it, which is why Rust pins a constant rather than letting age
+ *  machine-calibrate (it reaches 20+ on fast hardware; `lock_pins_scrypt_work_factor`
+ *  guards that end). Matching buys one thing: the same KDF cost whichever door
+ *  locked the file. */
 const SCRYPT_LOG_N = 18;
 
 export interface LockReq {
@@ -44,16 +52,22 @@ export type TransportRes =
   | { id: number; ok: false; error: string };
 
 const ctx = self as unknown as Worker;
-const reply = (msg: TransportRes, transfer?: Transferable[]) =>
-  transfer ? ctx.postMessage(msg, transfer) : ctx.postMessage(msg);
+const reply = (msg: TransportRes, transfer?: Transferable[]) => {
+  if (transfer) ctx.postMessage(msg, transfer);
+  else ctx.postMessage(msg);
+};
 
 // zstd needs its wasm instantiated once before compress/decompress. age is pure
 // JS (no init). Every handler awaits this, so a request that lands before the
 // wasm is ready queues behind it rather than racing a live-before-ready call.
 const ready: Promise<void> = zstdInit().then(() => undefined);
 ready.then(
-  () => reply({ type: "ready" }),
-  (e) => reply({ type: "initError", error: String(e) }),
+  () => {
+    reply({ type: "ready" });
+  },
+  (e: unknown) => {
+    reply({ type: "initError", error: String(e) });
+  },
 );
 
 self.onmessage = async (e: MessageEvent<TransportReq>) => {
@@ -76,7 +90,10 @@ self.onmessage = async (e: MessageEvent<TransportReq>) => {
     // the outer catch turns it into an `ok: false` the client rejects.
     const dec = new Decrypter();
     dec.addPassphrase(req.passphrase);
-    const compressed = await dec.decrypt(new Uint8Array(req.bytes), "uint8array");
+    const compressed = await dec.decrypt(
+      new Uint8Array(req.bytes),
+      "uint8array",
+    );
     const plain = decompress(compressed);
     const buf = plain.slice().buffer;
     reply({ id: req.id, ok: true, kind: "unlocked", bytes: buf }, [buf]);

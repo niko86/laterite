@@ -47,11 +47,13 @@ it("example library is non-empty", () => {
 it.each(examples)(
   "%s runs",
   (name) => {
-    // Throws (failing the test, with captured output) on any non-zero exit.
-    execFileSync(process.execPath, [join(exampleDir, name)], {
+    // Throws (failing the test, with captured output) on any non-zero exit;
+    // a successful run returns the captured stdout.
+    const stdout = execFileSync(process.execPath, [join(exampleDir, name)], {
       cwd: repoRoot,
       encoding: "utf8",
     });
+    expect(typeof stdout).toBe("string");
   },
   // Most examples finish in well under a second, but ex17_lock does two scrypt
   // log_N-18 derivations (lock + unlock) — sub-second locally, but the 256 MiB

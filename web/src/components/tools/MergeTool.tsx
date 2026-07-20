@@ -1,4 +1,10 @@
-import { createResource, createSignal, For, Show, type Component } from "solid-js";
+import {
+  createResource,
+  createSignal,
+  For,
+  Show,
+  type Component,
+} from "solid-js";
 import { mergeFiles, type MergeConversion } from "../../lib/validatorClient";
 import { fileStore } from "../../lib/fileStore";
 import { downloadBlob, baseName } from "../../lib/download";
@@ -85,9 +91,11 @@ export const MergeTool: Component = () => {
       }),
   );
 
-  const pick = (set: (p: Picked) => void) => async (e: Event) => {
-    const f = (e.currentTarget as HTMLInputElement).files?.[0];
-    if (f) set(await readFile(f));
+  const pick = (set: (p: Picked) => void) => (e: Event) => {
+    void (async () => {
+      const f = (e.currentTarget as HTMLInputElement).files?.[0];
+      if (f) set(await readFile(f));
+    })();
   };
 
   const download = () => {
@@ -108,16 +116,24 @@ export const MergeTool: Component = () => {
 
       <div class="grid gap-3 sm:grid-cols-2">
         <FilePicker label="Base (a)" picked={a()} onPick={pick(setA)} />
-        <FilePicker label="Incoming (b) — wins conflicts" picked={b()} onPick={pick(setB)} />
+        <FilePicker
+          label="Incoming (b) — wins conflicts"
+          picked={b()}
+          onPick={pick(setB)}
+        />
       </div>
 
       <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-fg-muted">
         <label class="flex items-center gap-1.5">
-          <span class="text-fg-dim">If the files type a column differently:</span>
+          <span class="text-fg-dim">
+            If the files type a column differently:
+          </span>
           <select
             class={controlCompact}
             value={onTypeClash()}
-            onChange={(e) => setOnTypeClash(e.currentTarget.value as TypeClashMode)}
+            onChange={(e) =>
+              setOnTypeClash(e.currentTarget.value as TypeClashMode)
+            }
           >
             <For each={CLASH_MODES}>
               {(m) => <option value={m.value}>{m.label}</option>}
@@ -125,7 +141,9 @@ export const MergeTool: Component = () => {
           </select>
         </label>
         <span class="flex items-center gap-1.5">
-          <span class="text-fg-dim">Stamp a merge transmission (optional):</span>
+          <span class="text-fg-dim">
+            Stamp a merge transmission (optional):
+          </span>
           <input
             class={`${controlCompact} w-16`}
             placeholder="issue"
@@ -165,7 +183,7 @@ export const MergeTool: Component = () => {
             when={!result.error}
             fallback={
               <MergeError
-                error={result.error}
+                error={result.error as unknown}
                 mode={onTypeClash()}
                 onChoose={setOnTypeClash}
               />
@@ -192,10 +210,14 @@ const FilePicker: Component<{
       type="file"
       accept=".ags,.txt,text/plain"
       class="text-xs text-fg-muted file:mr-2 file:rounded file:border-0 file:bg-chip file:px-2 file:py-1 file:text-fg-soft"
-      onChange={(e) => props.onPick(e)}
+      onChange={(e) => {
+        props.onPick(e);
+      }}
     />
     <Show when={props.picked}>
-      <span class="mono truncate text-xs text-accent">{props.picked!.name}</span>
+      {(picked) => (
+        <span class="mono truncate text-xs text-accent">{picked().name}</span>
+      )}
     </Show>
   </label>
 );
@@ -228,7 +250,9 @@ const MergeError: Component<{
                 <button
                   type="button"
                   class="text-accent underline hover:no-underline"
-                  onClick={() => props.onChoose(m.value)}
+                  onClick={() => {
+                    props.onChoose(m.value);
+                  }}
                 >
                   {m.label}
                 </button>{" "}
@@ -245,7 +269,13 @@ const MergeError: Component<{
   );
 };
 
-const MergeView: Component<{ result: MergeConversion; onDownload: () => void }> = (props) => {
+const MergeView: Component<{
+  result: MergeConversion;
+  onDownload: () => void;
+}> = (props) => {
+  // MergeView is remounted per result — the <Show when={!result.loading}> above
+  // unmounts it during a re-merge — so props.result never changes in place.
+  // eslint-disable-next-line solid/reactivity
   const r = props.result;
   return (
     <div class="flex min-w-0 flex-col gap-3">
@@ -253,13 +283,15 @@ const MergeView: Component<{ result: MergeConversion; onDownload: () => void }> 
         <button
           type="button"
           class="rounded bg-emerald-600/80 px-3 py-1.5 text-sm font-medium text-emerald-50 hover:bg-emerald-600"
-          onClick={() => props.onDownload()}
+          onClick={() => {
+            props.onDownload();
+          }}
         >
           Download merged (.ags)
         </button>
         <span class="text-xs text-fg-dim">
-          {r.revisions.length} row revision{r.revisions.length === 1 ? "" : "s"} ·{" "}
-          {r.warnings.length} warning{r.warnings.length === 1 ? "" : "s"}
+          {r.revisions.length} row revision{r.revisions.length === 1 ? "" : "s"}{" "}
+          · {r.warnings.length} warning{r.warnings.length === 1 ? "" : "s"}
         </span>
       </div>
 
@@ -274,8 +306,12 @@ const MergeView: Component<{ result: MergeConversion; onDownload: () => void }> 
                 <div class="min-w-max">
                   <span class="text-warn">~</span>{" "}
                   <span class="text-fg">{rev.group}</span>{" "}
-                  <span class="text-fg-soft">{rev.key.join(" | ") || "(row)"}</span>
-                  <span class="ml-2 text-fg-dim">changed {rev.changed.join(", ")}</span>
+                  <span class="text-fg-soft">
+                    {rev.key.join(" | ") || "(row)"}
+                  </span>
+                  <span class="ml-2 text-fg-dim">
+                    changed {rev.changed.join(", ")}
+                  </span>
                 </div>
               )}
             </For>
@@ -285,7 +321,9 @@ const MergeView: Component<{ result: MergeConversion; onDownload: () => void }> 
 
       <Show when={r.warnings.length > 0}>
         <div class="rounded-lg border border-line bg-surface px-3 py-2">
-          <p class="mb-1 text-xs font-medium uppercase tracking-wide text-fg-dim">Warnings</p>
+          <p class="mb-1 text-xs font-medium uppercase tracking-wide text-fg-dim">
+            Warnings
+          </p>
           <ul class="flex flex-col gap-1 text-xs text-fg-muted">
             <For each={r.warnings}>
               {(w) => (

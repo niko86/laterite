@@ -2,8 +2,16 @@
 # from ags_dictionary.json. PR1 carries the UNION registry projection (moved out
 # of laterite-ags4-core so consumers that only want the dictionary — the DuckDB
 # extension, laterite-ags4-diff — needn't pull the rest of core/validator). The
-# per-edition phf projection + the rules catalogue join it in PR2. A true leaf:
-# no workspace-crate deps.
+# per-edition phf projection + the rules catalogue join it in PR2.
+#
+# A near-leaf: its TWO workspace deps are `laterite-types` (wasm consumes `keychain`
+# for `_id`/`_parent_id`) and `laterite-ags4-parse` (the #568 runtime `.ags` custom-
+# dict reader reuses the shared tokenizer — both are wasm-clean sibling leaves, so no
+# added wasm weight). It said "a true leaf: no workspace-crate deps" until #557; that
+# stopped being true when the types dep landed, and nothing noticed because a manifest
+# comment is read by no one and gated by nothing (now `tests/dep_graph.rs` gates it).
+# It matters beyond tidiness: #550's engine-fingerprint walk has to RECURSE through
+# this crate to reach those leaves, precisely because this is not a leaf.
 [package]
 name = "laterite-ags4-reference"
 version.workspace = true
@@ -27,7 +35,7 @@ phf = "0.14"
 # consolidation): SHA-256 over the injective key-chain encoding, then UUIDv8
 # from the first 128 bits. RNG-free (uuid v8 from bytes, no `rng` feature), and
 # core already ships both crates to wasm, so the leaf stays wasm-clean.
-sha2 = "0.11"
+sha2 = "0.10"
 uuid = { version = "1", features = ["v8"] }
 # `keychain::content_hash` canonicalises each cell through `parse_value` before
 # hashing, so a formatting-only re-emit (`1.0` → `1.00`) is not a value change.
@@ -38,6 +46,14 @@ uuid = { version = "1", features = ["v8"] }
 # reference leaf wasm-clean (wasm consumes keychain for `_id`/`_parent_id`).
 # Default features only — the `arrow` feature stays off here.
 laterite-types = { path = "../laterite-types" }
+# The shared tolerant AGS4 tokenizer (#168 leaf) — reused by `dict_read.rs` to read
+# a runtime `--dict` custom dictionary from a plain `.ags` file (#568). A wasm-clean
+# sibling leaf (`encoding_rs` + `memchr` only), so it adds zero wasm-hostile weight;
+# `tests/dep_graph.rs` pins that.
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+# The custom-dict API takes a `&'static Encoding` (a `--dict` file may not be UTF-8);
+# `encoding_rs` is already in-tree via the parse leaf and is wasm-clean.
+encoding_rs = "0.8"
 
 [build-dependencies]
 # build.rs projects each edition out of the consolidated union dictionary
@@ -45,3 +61,6 @@ laterite-types = { path = "../laterite-types" }
 # OUT_DIR/dict_data.rs. Moved from the validator (PR2 #475).
 phf_codegen = "0.14"
 serde_json = "1"
+
+[lints]
+workspace = true

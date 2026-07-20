@@ -5,7 +5,7 @@
 # Runs python-ags4 1.2.0's OWN test suite through `laterite.compat` (the
 # Rust-backed drop-in) and reports BOTH:
 #   * PARITY  — how many of python-ags4's tests pass against laterite
-#               (the README's "122 / 131" claim), and
+#               (the README's "121 / 131" claim), and
 #   * COVERAGE — how much of `laterite.compat` (and laterite overall) that
 #                external suite actually exercises.
 # Together: the drop-in is faithful (tests pass) AND genuinely covered (the
@@ -22,7 +22,12 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SIBLING="$REPO_ROOT/../ags-python-library"
 PY_AGS4_VERSION="${PYTHON_AGS4_VERSION:-1.2.0}"
-PARITY_MIN="${PARITY_MIN_PASSING:-122}"
+# The floor is 121, not 122: O-47 made test_rule_6_2 a CORRECT divergence and
+# lowered it. parity.yml was updated at the time; this default was not, and
+# nor was any published claim (#556). The SET is now the contract —
+# parity-known-failures.json + tools/check_parity.py; this stays a count only
+# because this script is a local coverage helper, not the gate.
+PARITY_MIN="${PARITY_MIN_PASSING:-121}"
 OUT="$REPO_ROOT/output"            # gitignored working space
 LOG="$OUT/parity-coverage.log"
 XML="$OUT/parity-coverage.xml"

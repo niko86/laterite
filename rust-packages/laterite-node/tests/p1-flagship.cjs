@@ -30,7 +30,12 @@ assert.strictEqual(reading.tableIpc("NOPE"), null);
 
 // --- validate (runCheck: path, text, data, dictVersion, warnings, fyi, files, enc) ---
 const rep = native.runCheck(null, ags, null, null, false, false, false, null);
-console.log("runCheck:", { ok: rep.ok, dictVersion: rep.dictVersion, resolution: rep.resolution, count: rep.count });
+console.log("runCheck:", {
+  ok: rep.ok,
+  dictVersion: rep.dictVersion,
+  resolution: rep.resolution,
+  count: rep.count,
+});
 assert.strictEqual(rep.ok, true); // parsed fine — `ok` means validatable, not valid
 assert.strictEqual(typeof rep.dictVersion, "string");
 assert.ok(Array.isArray(rep.findings));
@@ -43,19 +48,33 @@ const reEmitted = reading.emit();
 assert.match(reEmitted, /"GROUP","LOCA"/);
 assert.match(reEmitted, /"DATA","BH01","12\.30","Y"/);
 assert.match(reEmitted, /\r\n/);
-assert.deepStrictEqual(native.parseArrow(null, reEmitted, null, null).groupCodes(), ["LOCA"]);
+assert.deepStrictEqual(
+  native.parseArrow(null, reEmitted, null, null).groupCodes(),
+  ["LOCA"],
+);
 
 // --- data → AGS4 via Arrow IPC (build arrow-js tables → emit) ---
 const toIpc = (tbl) => Buffer.from(tableToIPC(tbl, "stream"));
 const proj = tableFromArrays({ PROJ_ID: ["P1"], PROJ_NAME: ["Demo project"] });
-const loca = tableFromArrays({ LOCA_ID: ["BH01", "BH02"], LOCA_GL: Float64Array.from([12.3, 13.0]) });
+const loca = tableFromArrays({
+  LOCA_ID: ["BH01", "BH02"],
+  LOCA_GL: Float64Array.from([12.3, 13.0]),
+});
 const out = native.emitAgs4FromIpc(
-  [{ code: "PROJ", ipc: toIpc(proj) }, { code: "LOCA", ipc: toIpc(loca) }],
+  [
+    { code: "PROJ", ipc: toIpc(proj) },
+    { code: "LOCA", ipc: toIpc(loca) },
+  ],
   "4.1.1",
   "autofix",
 );
 const text = out.bytes.toString("utf8");
-console.log("emit fixesApplied:", out.fixesApplied, "| findings keys:", Object.keys(JSON.parse(out.findingsJson)).length);
+console.log(
+  "emit fixesApplied:",
+  out.fixesApplied,
+  "| findings keys:",
+  Object.keys(JSON.parse(out.findingsJson)).length,
+);
 assert.match(text, /"GROUP","PROJ"/);
 assert.match(text, /"TYPE","ID","2DP"/); // dict-filled
 assert.match(text, /"DATA","BH01","12\.30"/); // Float64 12.3 → canonical 2DP

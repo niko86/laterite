@@ -108,7 +108,7 @@ aggregates — that a single-group query can't express. Drop to SQL.
 ### Join without knowing the keys
 
 Every group also carries two synthetic **content-addressed** columns in the
-engine — `_id` and `_parent_id` — so a parent/child join is the *same* column
+engine — `_id` and `_parent_id` — so a parent/child join is the _same_ column
 pair for every edge, with no `USING (…)` to look up per group:
 
 ```python

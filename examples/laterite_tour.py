@@ -83,11 +83,9 @@ def _():
     # The rich default is fetched from the repo at runtime so it stays editable
     # as a plain file (swap in your own dataset there). Two tiny fixtures are
     # embedded for an offline fallback + the "watch the validator" demo.
-    EXAMPLE_URL = (
-        "https://raw.githubusercontent.com/niko86/laterite/main/examples/sample_site.ags"
-    )
+    EXAMPLE_URL = "https://raw.githubusercontent.com/niko86/laterite/main/examples/sample_site.ags"
 
-    EXCEL_AGS = '''"GROUP","PROJ"
+    EXCEL_AGS = """"GROUP","PROJ"
 "HEADING","PROJ_ID","PROJ_NAME"
 "UNIT","",""
 "TYPE","ID","X"
@@ -112,9 +110,9 @@ def _():
 "TYPE","ID","2DP","X","PA","ID","2SF","XN","2SF"
 "DATA","Location_1","1.00","1a","Bag","S1","55.1","20.3","34.8"
 "DATA","Location_1","2.00","2a","Bag","S2","155.1","20.3","134.8"
-'''
+"""
 
-    CLEAN_AGS = '''"GROUP","PROJ"
+    CLEAN_AGS = """"GROUP","PROJ"
 "HEADING","PROJ_ID","PROJ_NAME"
 "UNIT","",""
 "TYPE","ID","X"
@@ -139,7 +137,7 @@ def _():
 "DATA","ID","Unique identifier"
 "DATA","X","Text"
 "DATA","DT","Date and time"
-'''
+"""
     return CLEAN_AGS, EXAMPLE_URL, EXCEL_AGS
 
 
@@ -231,9 +229,7 @@ def _(mo):
 
 @app.cell
 def _(ags_path, fyi_sw, laterite, mo, warnings_sw):
-    report = laterite.validate(
-        ags_path, warnings=warnings_sw.value, fyi=fyi_sw.value
-    )
+    report = laterite.validate(ags_path, warnings=warnings_sw.value, fyi=fyi_sw.value)
     _counts = {"error": 0, "warning": 0, "fyi": 0}
     if report.count:
         for _row in report.findings.group_by("severity").len().iter_rows():
@@ -242,7 +238,9 @@ def _(ags_path, fyi_sw, laterite, mo, warnings_sw):
         [
             mo.stat(
                 # errors + warnings are the gate; FYI is advisory and never fails it
-                "PASS" if (_counts["error"] == 0 and _counts["warning"] == 0) else "FAIL",
+                "PASS"
+                if (_counts["error"] == 0 and _counts["warning"] == 0)
+                else "FAIL",
                 label="Validity",
                 caption=f"dict {report.dict_version}",
                 bordered=True,
@@ -331,13 +329,23 @@ def _(alt, ags, mo, pl):
     )
     if _have_pl:
         _ll = ags["LLPL"]
-        _tt = [c for c in ("LOCA_ID", "SAMP_TOP", "LLPL_LL", "LLPL_PI") if c in _ll.columns]
+        _tt = [
+            c for c in ("LOCA_ID", "SAMP_TOP", "LLPL_LL", "LLPL_PI") if c in _ll.columns
+        ]
         _pts = (
             alt.Chart(_ll)
             .mark_circle(size=90, opacity=0.7, color="#b2342a")
             .encode(
-                x=alt.X("LLPL_LL:Q", title="Liquid limit, LL (%)", scale=alt.Scale(domain=[0, 100])),
-                y=alt.Y("LLPL_PI:Q", title="Plasticity index, PI (%)", scale=alt.Scale(domain=[0, 70])),
+                x=alt.X(
+                    "LLPL_LL:Q",
+                    title="Liquid limit, LL (%)",
+                    scale=alt.Scale(domain=[0, 100]),
+                ),
+                y=alt.Y(
+                    "LLPL_PI:Q",
+                    title="Plasticity index, PI (%)",
+                    scale=alt.Scale(domain=[0, 70]),
+                ),
                 tooltip=_tt,
             )
         )
@@ -357,7 +365,9 @@ def _(alt, ags, mo, pl):
             ]
         )
     else:
-        _out = mo.md("*(no `LLPL` plasticity data in this file — try the example site)*")
+        _out = mo.md(
+            "*(no `LLPL` plasticity data in this file — try the example site)*"
+        )
     _out
     return
 
@@ -415,7 +425,7 @@ def _(ags, mo):
                         f"`ags.at('LOCA', {_ids})` pulls `{_ids[0]}` **and every "
                         f"related group** (the registry knows the key chain):"
                     ),
-                    mo.ui.tabs({g: f for g, f in _q.frames().items()}),
+                    mo.ui.tabs(dict(_q.frames().items())),
                 ]
             )
     _out
@@ -451,8 +461,17 @@ def _(ags_path, laterite, mo):
                     mo.md("### 🔖 Certificate + index (`.ags.idx`)"),
                     mo.hstack(
                         [
-                            mo.stat(_c.report.resolution, label="Re-validate", caption="engine skipped", bordered=True),
-                            mo.stat("PASS" if _c.report.is_valid else "FAIL", label="Verdict", bordered=True),
+                            mo.stat(
+                                _c.report.resolution,
+                                label="Re-validate",
+                                caption="engine skipped",
+                                bordered=True,
+                            ),
+                            mo.stat(
+                                "PASS" if _c.report.is_valid else "FAIL",
+                                label="Verdict",
+                                bordered=True,
+                            ),
                         ],
                         justify="start",
                     ),
@@ -491,9 +510,21 @@ def _(ags_path, mo, pathlib):
             mo.md("### 📦 Transport — pack (zstd) & lock (age)"),
             mo.hstack(
                 [
-                    mo.stat(f"{_src.stat().st_size:,} B", label="Original", bordered=True),
-                    mo.stat(f"{_z.stat().st_size:,} B", label="pack() .zst", caption=f"{_ratio:.0%} of source", bordered=True),
-                    mo.stat(f"{_a.stat().st_size:,} B", label="lock() .zst.age", caption="encrypted", bordered=True),
+                    mo.stat(
+                        f"{_src.stat().st_size:,} B", label="Original", bordered=True
+                    ),
+                    mo.stat(
+                        f"{_z.stat().st_size:,} B",
+                        label="pack() .zst",
+                        caption=f"{_ratio:.0%} of source",
+                        bordered=True,
+                    ),
+                    mo.stat(
+                        f"{_a.stat().st_size:,} B",
+                        label="lock() .zst.age",
+                        caption="encrypted",
+                        bordered=True,
+                    ),
                 ],
                 justify="start",
             ),
@@ -575,14 +606,12 @@ def _(ags_path, duckdb, mo):
         _err = _e
     if _ext_ok:
         _groups = _con.execute(
-            "SELECT \"group\", n_rows, n_headings FROM ags_groups(?)", [ags_path]
+            'SELECT "group", n_rows, n_headings FROM ags_groups(?)', [ags_path]
         ).pl()
         _loca = _con.execute(
             "SELECT * FROM read_ags(?, 'LOCA') LIMIT 10", [ags_path]
         ).pl()
-        _body = mo.ui.tabs(
-            {"ags_groups()": _groups, "read_ags(…, 'LOCA')": _loca}
-        )
+        _body = mo.ui.tabs({"ags_groups()": _groups, "read_ags(…, 'LOCA')": _loca})
     else:
         _body = mo.vstack(
             [
@@ -613,7 +642,9 @@ def _(laterite, mo, pl):
     # Produce valid AGS4 from data.
     _res = laterite.build_ags4(
         {
-            "PROJ": pl.DataFrame({"PROJ_ID": ["P1"], "PROJ_NAME": ["Built by laterite"]}),
+            "PROJ": pl.DataFrame(
+                {"PROJ_ID": ["P1"], "PROJ_NAME": ["Built by laterite"]}
+            ),
             "LOCA": pl.DataFrame(
                 {"LOCA_ID": ["BH01", "BH02"], "LOCA_GL": [12.50, 13.75]}
             ),
@@ -630,7 +661,9 @@ def _(laterite, mo, pl):
             ),
             mo.ui.code_editor(_res.text, language="csv", disabled=True),
             mo.download(
-                data=_res.bytes, filename="built_by_laterite.ags", label="⬇ download .ags"
+                data=_res.bytes,
+                filename="built_by_laterite.ags",
+                label="⬇ download .ags",
             ),
         ]
     )

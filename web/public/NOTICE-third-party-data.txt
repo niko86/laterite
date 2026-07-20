@@ -1,0 +1,23 @@
+Third-party data notice — ags_dictionary.json
+=============================================
+
+The file `ags_dictionary.json` served from this directory is the AGS4 Data
+Dictionary: the machine-readable schema of the AGS4 transfer format (group
+codes, heading names, data types, units, status and descriptions), projected
+into a single JSON union across all five published editions (4.0.3, 4.0.4,
+4.1, 4.1.1, 4.2).
+
+That data is (c) The Association of Geotechnical and Geoenvironmental
+Specialists (AGS), all rights reserved.
+
+It is reference data for the published AGS4 transfer-format standard,
+redistributed here as a documented decision by the repository owner. The
+source, retrieval provenance and reasoning are recorded in the repository at
+`rust-packages/laterite-ags4-validator/data/PROVENANCE.md`.
+
+The projection is a re-encoding, not an abstraction: the AGS-authored
+descriptions are carried verbatim. The container changed from CSV to JSON;
+the content did not.
+
+This application's own source code is MIT licensed. That licence does not
+purport to relicense the AGS dictionary data.

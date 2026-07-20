@@ -12,6 +12,14 @@
 //     middle is emitted as a single replace block (every old line removed,
 //     every new line added) and `capped` is set so the UI can say so —
 //     no silent truncation.
+//
+// Every `!` below is a non-null assertion on an array / typed-array index that
+// the surrounding loop bounds PROVE in range (each is justified inline). Under
+// noUncheckedIndexedAccess TypeScript still types those reads `T | undefined`;
+// the assertion is the honest expression of a hand-verified invariant, and
+// narrowing each read would add branches to correct, test-pinned hot loops for
+// zero runtime benefit — so no-non-null-assertion is disabled file-wide (#615).
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 export type DiffType = "eq" | "del" | "ins";
 
@@ -50,7 +58,8 @@ export function diffLines(a: string[], b: string[]): DiffResult {
   const minLen = Math.min(a.length, b.length);
   while (lo < minLen && a[lo] === b[lo]) lo++;
   for (let i = 0; i < lo; i++) {
-    ops.push({ type: "eq", aLine: i + 1, bLine: i + 1, text: a[i] });
+    // i < lo ≤ min(a.length, b.length) → a[i] is in-bounds.
+    ops.push({ type: "eq", aLine: i + 1, bLine: i + 1, text: a[i]! });
   }
 
   // --- trim common suffix (not into the already-matched prefix) ---
@@ -75,9 +84,16 @@ export function diffLines(a: string[], b: string[]): DiffResult {
   // --- suffix (the common tail trimmed above) ---
   for (let i = aHi; i < a.length; i++) {
     const offset = i - aHi;
-    ops.push({ type: "eq", aLine: i + 1, bLine: bHi + offset + 1, text: a[i] });
+    // i < a.length → a[i] is in-bounds.
+    ops.push({
+      type: "eq",
+      aLine: i + 1,
+      bLine: bHi + offset + 1,
+      text: a[i]!,
+    });
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Vite types import.meta.env as always-injected, but it's absent outside a Vite bundle (bare ts-node/vitest paths)
   if (import.meta.env?.DEV && !middle.capped) checkInvariant(ops, a, b);
 
   return { ops, added, removed, capped: middle.capped };
@@ -92,7 +108,6 @@ function checkInvariant(ops: DiffOp[], a: string[], b: string[]): void {
   const eq = (x: string[], y: string[]) =>
     x.length === y.length && x.every((v, i) => v === y[i]);
   if (!eq(fromA, a) || !eq(fromB, b)) {
-    // eslint-disable-next-line no-console
     console.error("diffLines reconstruction invariant broken", {
       aOk: eq(fromA, a),
       bOk: eq(fromB, b),
@@ -126,8 +141,16 @@ function diffMiddle(a: string[], b: string[], base: number): MiddleResult {
   if (!trace) {
     // Over MAX_D — emit the whole middle as a replace block.
     const ops: DiffOp[] = [
-      ...a.map<DiffOp>((text, i) => ({ type: "del", aLine: base + i + 1, text })),
-      ...b.map<DiffOp>((text, i) => ({ type: "ins", bLine: base + i + 1, text })),
+      ...a.map<DiffOp>((text, i) => ({
+        type: "del",
+        aLine: base + i + 1,
+        text,
+      })),
+      ...b.map<DiffOp>((text, i) => ({
+        type: "ins",
+        bLine: base + i + 1,
+        text,
+      })),
     ];
     return { ops, capped: true };
   }
@@ -153,10 +176,12 @@ function myersTrace(a: string[], b: string[]): Int32Array[] | null {
       // Choose to extend the furthest-reaching path: move down (insertion)
       // when at the lower edge or the down-neighbour reached further.
       let x: number;
-      if (k === -d || (k !== d && v[off + k - 1] < v[off + k + 1])) {
-        x = v[off + k + 1];
+      // v-band indices off+k±1 ∈ [0, 2*max] by construction (k ∈ [−d, d],
+      // d ≤ max, off = max) → every band read is in-bounds.
+      if (k === -d || (k !== d && v[off + k - 1]! < v[off + k + 1]!)) {
+        x = v[off + k + 1]!;
       } else {
-        x = v[off + k - 1] + 1;
+        x = v[off + k - 1]! + 1;
       }
       let y = x - k;
       while (x < n && y < m && a[x] === b[y]) {
@@ -185,26 +210,35 @@ function backtrack(
   let y = m;
 
   for (let d = trace.length - 1; d > 0; d--) {
-    const v = trace[d];
+    // d ∈ [1, trace.length−1] → trace[d] is in-bounds; the v-band and snake
+    // indices below are all provably in range by the Myers path invariant.
+    const v = trace[d]!;
     const k = x - y;
     // Which neighbour the furthest path came from (mirror of the forward step).
     const prevK =
-      k === -d || (k !== d && v[off + k - 1] < v[off + k + 1]) ? k + 1 : k - 1;
-    const prevX = v[off + prevK];
+      k === -d || (k !== d && v[off + k - 1]! < v[off + k + 1]!)
+        ? k + 1
+        : k - 1;
+    const prevX = v[off + prevK]!;
     const prevY = prevX - prevK;
 
     // Diagonal (equal) moves between the snake end and the previous point.
     while (x > prevX && y > prevY) {
       x--;
       y--;
-      ops.push({ type: "eq", aLine: base + x + 1, bLine: base + y + 1, text: a[x] });
+      ops.push({
+        type: "eq",
+        aLine: base + x + 1,
+        bLine: base + y + 1,
+        text: a[x]!,
+      });
     }
     if (x === prevX) {
       // moved down → insertion of b[prevY]
-      ops.push({ type: "ins", bLine: base + prevY + 1, text: b[prevY] });
+      ops.push({ type: "ins", bLine: base + prevY + 1, text: b[prevY]! });
     } else {
       // moved right → deletion of a[prevX]
-      ops.push({ type: "del", aLine: base + prevX + 1, text: a[prevX] });
+      ops.push({ type: "del", aLine: base + prevX + 1, text: a[prevX]! });
     }
     x = prevX;
     y = prevY;
@@ -213,7 +247,12 @@ function backtrack(
   while (x > 0 && y > 0) {
     x--;
     y--;
-    ops.push({ type: "eq", aLine: base + x + 1, bLine: base + y + 1, text: a[x] });
+    ops.push({
+      type: "eq",
+      aLine: base + x + 1,
+      bLine: base + y + 1,
+      text: a[x]!,
+    });
   }
 
   ops.reverse();
@@ -224,8 +263,7 @@ function backtrack(
 
 /** A display row: a diff op, or a `gap` collapsing `count` unchanged lines. */
 export type DiffRow =
-  | (DiffOp & { type: DiffType })
-  | { type: "gap"; count: number };
+  (DiffOp & { type: DiffType }) | { type: "gap"; count: number };
 
 /**
  * Collapse long runs of unchanged lines, keeping `context` equal lines on
@@ -237,8 +275,13 @@ export function toHunks(ops: DiffOp[], context = 3): DiffRow[] {
   // Mark each eq op for keeping if it's within `context` of a change.
   const keep = new Array<boolean>(n).fill(false);
   for (let i = 0; i < n; i++) {
-    if (ops[i].type === "eq") continue;
-    for (let j = Math.max(0, i - context); j <= Math.min(n - 1, i + context); j++) {
+    // i, j < n = ops.length → in-bounds throughout this loop.
+    if (ops[i]!.type === "eq") continue;
+    for (
+      let j = Math.max(0, i - context);
+      j <= Math.min(n - 1, i + context);
+      j++
+    ) {
       keep[j] = true;
     }
   }
@@ -246,7 +289,7 @@ export function toHunks(ops: DiffOp[], context = 3): DiffRow[] {
   const rows: DiffRow[] = [];
   let gap = 0;
   for (let i = 0; i < n; i++) {
-    const op = ops[i];
+    const op = ops[i]!; // i < n = ops.length → in-bounds.
     if (op.type === "eq" && !keep[i]) {
       gap++;
       continue;

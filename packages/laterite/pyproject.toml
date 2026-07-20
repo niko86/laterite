@@ -1,7 +1,7 @@
 [project]
 name = "laterite"
 version = "0.7.0"
-description = "Rust-backed AGS4 reader/writer/validator — a fast, drop-in replacement for python-ags4 with born-typed polars/pandas reads (pyarrow-free)"
+description = "Rust-backed AGS4 reader/writer/validator — a fast, drop-in replacement for python-ags4 with born-typed polars/pandas reads and a lean polars+duckdb base install"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -40,11 +40,13 @@ requires-python = ">=3.12"
 #              (LTS line, in-memory COMPRESS).
 # narwhals is GONE — the core returns polars / pandas directly and `compat`
 # branches on the native frame; nothing imports narwhals at runtime.
-# pyarrow is NOT a laterite dependency anywhere — not base, not the [compat] extra.
-# The polars path uses the Arrow C-stream capsule; the pandas path (core AND compat)
-# uses DuckDB's NumPy `.df()`; both are pyarrow-free. An Arrow table is only reachable
-# via `ags.connection` (or the explicit `pyarrow` backend/extra) with the user's own
-# pyarrow. pandas is an optional extra; a python-ags4 install pulls pandas in
+# pyarrow is NOT in the base install NOR the default [compat] extra: the polars
+# path uses the Arrow C-stream capsule and the pandas path (core AND compat) goes
+# via DuckDB's NumPy `.df()` — both pyarrow-free, object-dtype. pyarrow is an
+# OPTIONAL accelerator: `[compat,pyarrow]` (or `[all]` / `[pyarrow]`) adds it,
+# which speeds compat's pandas hop a touch and unlocks its Arrow-backed `str`
+# dtype (string_dtype='string'), and gives the explicit `pyarrow` backend its
+# table. pandas is an optional extra; a python-ags4 install pulls pandas in
 # unconditionally, laterite does not.
 dependencies = [
     "polars>=1.42.1",
@@ -62,16 +64,15 @@ Changelog = "https://github.com/niko86/laterite/blob/main/CHANGELOG.md"
 # want when porting from python_ags4. `set_backend("polars")` (or
 # LATERITE_COMPAT_BACKEND=polars) removes the pandas requirement entirely.
 [project.optional-dependencies]
-# compat (the python-ags4 drop-in, pandas by default) is now pyarrow-free: its pandas
-# output goes polars -> pandas via DuckDB's NumPy `.df()` (the same trick the core
-# uses), so the extra is just pandas. `pyarrow` stays for callers who explicitly want
-# the Arrow backend (the only thing that pulls pyarrow).
+# compat (the python-ags4 drop-in, pandas by default) is pyarrow-FREE: its
+# AGS4_to_dataframe reads a Rust-built all-Utf8 Arrow table (no per-cell boxing)
+# and hands pandas an object-dtype frame via DuckDB's NumPy `.df()` — already
+# ~2x faster than python-ags4. Adding pyarrow (`[compat,pyarrow]` or `[all]`)
+# swaps that hop for pyarrow's `to_pandas` (a touch faster) and unlocks pandas'
+# Arrow-backed `str` dtype (`string_dtype="string"`, the pandas-3 baseline), so
+# pyarrow is an opt-in accelerator, never required for the drop-in.
 compat = ["pandas<3"]
 pyarrow = ["pyarrow>=25.0.0"]
-# The experimental DuckDB-backed `.ags5db` surface was decoupled from the
-# shipped AGS4 product (#177) — it now lives in the dormant `ags5/` holding
-# folder and is no longer installable as an extra. The future AGS5 strand
-# will publish it as a separate library.
 all = ["pandas<3", "pyarrow>=25.0.0"]
 
 [project.scripts]
