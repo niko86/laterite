@@ -1,19 +1,23 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/niko86/laterite/main/assets/laterite-social-preview-white.png" alt="laterite — a Rust-backed AGS4 reader, writer and validator" width="600" />
+  <img src="https://raw.githubusercontent.com/niko86/laterite/main/assets/laterite-social-preview-white.png" alt="laterite — a modern AGS4 toolkit" width="600" />
 </p>
 
 # laterite
 
-A Rust-backed **AGS4 toolchain** for the
-[AGS4](https://www.ags.org.uk/data-format/) geotechnical data format —
-**validate, read as typed data, query, build, fix, diff, certify, and convert
-↔ Excel** — surfaced natively for **Python, Node.js, the CLI, DuckDB and the
-browser**, all on one clean-room Rust engine.
+A modern **AGS4 toolkit** for the [AGS4](https://www.ags.org.uk/data-format/)
+geotechnical data format: validate, read as born-typed data, query, build, fix,
+diff, certify, and convert ↔ Excel. One fast Rust engine drives it, surfaced
+natively for **Python, Node.js, the CLI, DuckDB and the browser**.
 
-Coming from [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library)?
-`laterite` is a faster, faithful drop-in for its `AGS4` module — swap
-`from python_ags4 import AGS4` for `from laterite import compat as AGS4`, keep
-your code — and a full toolchain beyond it ([what that means](#more-than-a-faster-python-ags4)).
+Files come back born-typed — a `2DP` heading is a float, a `DT` a datetime, an
+`ID` a string — so polars, SQL and the typed graph see real types, not text.
+
+The closest open-source tool is
+[`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library), and
+it's what inspired laterite. laterite takes that idea, rebuilds it on a Rust
+core for speed, and uses that core to bring AGS4 to more languages. Already on
+python-ags4? There's a drop-in — swap `from python_ags4 import AGS4` for
+`from laterite import compat as AGS4` and keep your code.
 
 [![ci](https://github.com/niko86/laterite/actions/workflows/ci.yml/badge.svg)](https://github.com/niko86/laterite/actions/workflows/ci.yml)
 [![rust cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=rust&label=rust%20cov)](https://codecov.io/gh/niko86/laterite)
@@ -22,6 +26,8 @@ your code — and a full toolchain beyond it ([what that means](#more-than-a-fas
 [![PyPI](https://img.shields.io/pypi/v/laterite.svg)](https://pypi.org/project/laterite/)
 [![Python versions](https://img.shields.io/pypi/pyversions/laterite.svg)](https://pypi.org/project/laterite/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+📖 **[Full documentation](https://niko86.github.io/laterite/docs/)** · 🌐 **[Browser validator + data explorer](https://niko86.github.io/laterite/)**
 
 ## Part of the laterite suite
 
@@ -38,15 +44,20 @@ One Rust AGS4 engine, surfaced for every stack:
 ## Install
 
 ```bash
-pip install laterite                  # base AGS4 (polars + duckdb)
-pip install "laterite[compat]"        # + pandas (python-ags4 drop-in)
+pip install laterite                     # base AGS4 (polars + duckdb)
+pip install "laterite[compat]"           # + pandas (python-ags4 drop-in) — pyarrow-free
+pip install "laterite[compat,pyarrow]"   # + optional pyarrow accelerator (or [all])
 ```
 
-Requires Python ≥ 3.12.
+Requires Python ≥ 3.12. The `[compat]` drop-in is pyarrow-free and fast on its
+own; adding `pyarrow` swaps the pandas step for pyarrow's `to_pandas` and
+unlocks the Arrow-backed `string` dtype — an optional accelerator, never
+required.
 
 ## Use
 
-The same engine drives every surface — pick your stack.
+The same engine drives every surface — pick your stack. Full guides and the API
+reference live in the [documentation](https://niko86.github.io/laterite/docs/).
 
 ### Python
 
@@ -115,19 +126,17 @@ lat rules                              # the AGS4 rule catalogue (no input neede
 Exit codes: `0` clean · `1` findings · `3` unreadable · `4` not AGS4 · `5` bad args · `6` schema.
 Run `lat --readme` for the full guide.
 
-## More than a faster `python-ags4`
+## A full AGS4 toolkit
 
-[`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library) is the
-reference **Python** library for AGS4 — validation plus pandas read/write.
-`laterite` is a faithful, faster drop-in for that
-([parity](#parity-with-python-ags4) · [speed](#performance)) **and** a
-cross-surface toolchain on top:
+laterite covers the whole AGS4 workflow, not just read and write. The closest
+open-source tool, `python-ags4`, focuses on Python validation and pandas I/O;
+laterite matches that and adds a cross-surface toolchain on top:
 
 | | `laterite` | `python-ags4` |
 |---|:---:|:---:|
 | Runs on | Python · Node · CLI · DuckDB · browser | Python |
 | Validate — numbered AGS4 rules | ✅ | ✅ |
-| Read → typed data | ✅ born-typed (polars) | pandas (all strings) |
+| Read → typed data | ✅ born-typed (polars) | strings; opt-in `convert_to_numeric` |
 | Build / write AGS4 | ✅ | ✅ |
 | Excel ↔ AGS4 | ✅ | ✅ |
 | Repair engine (`fix`) — CRLF / BOM / short-row pad / embedded-CR… | ✅ | — |
@@ -136,47 +145,56 @@ cross-surface toolchain on top:
 | Validity certificates (`.ags.idx`) | ✅ | — |
 | Transport — compress + encrypt | ✅ | — |
 | Typed PROJ → LOCA → SAMP graph | ✅ | — |
-| Shipped as a standalone binary CLI | ✅ (`lat`) | — |
+| Command-line interface | ✅ standalone binary (`lat`) | ✅ Python (`ags4_cli`) |
 
 laterite reports the same findings as `python-ags4`, with 10 documented
 exceptions (see [Parity](#parity-with-python-ags4)).
 
 ## Performance
 
-Validation throughput vs `python-ags4` 1.2.0, on synthetic AGS4 files of
-increasing size (wall-clock after warmup, macOS arm64). The files are
-LOCA-heavy — a 40-column real-schema LOCA group with `ID`/`PA`/`2DP`/`DT`
-columns — carrying floating-point noise in the numeric cells that fails
-AGS4 Rule 8, so **every cell triggers a finding**. This is the worst case:
-it exercises the validator's per-finding accumulation and output-rendering
-paths in full. laterite reports the same findings as `python-ags4` here.
+Timings on synthetic, spec-valid AGS4 files generated by `ags4-forge` — the
+`wide` scaffold: **123 groups**, a realistic type mix, clean (zero findings).
+Every rung is reproducible (`ags4-forge scale --size 100MB --scaffold wide
+--seed 0`); each cell is the mean of 10 warm runs (8 at 265 MB, 5 at 524 MB —
+a single run there is already tens of seconds), files read hot, on macOS arm64,
+against `python-ags4` 1.2.0.
 
-| Size | python-ags4 | `laterite.validate` | `lat` (CLI) | Findings | speedup |
-|---:|---:|---:|---:|---:|---:|
-|   512 KB |    90 ms |   **7 ms** |   13 ms |     1 129 | **13×** |
-|     5 MB |   547 ms |  **67 ms** |   92 ms |    11 485 |  **8×** |
-|    50 MB |   6.09 s |  **0.79 s** | 0.96 s |   116 415 |  **8×** |
-|   500 MB |  62.45 s |   **8.1 s** | 10.1 s | 1 170 223 |  **8×** |
-|     1 GB | 132.67 s |  **18.3 s** | 22.9 s | 2 396 471 |  **7×** |
+**Validation** (`AGS4.check_file` vs `laterite.validate`, all rules):
 
-Notes on the CLI:
+| File (123 groups) | `python-ags4` | `laterite.validate` | speedup |
+|---:|---:|---:|:---:|
+| 4.9 MB · 459 BH | 1.5 s | 0.11 s | **14.0×** |
+| 24.9 MB · 2,219 BH | 3.7 s | 0.51 s | **7.2×** |
+| 102 MB · 8,872 BH | 12.2 s | 2.1 s | **5.8×** |
+| 265 MB · 21,952 BH | 30.5 s | 5.3 s | **5.8×** |
+| 524 MB · 43,042 BH | 63.9 s | 11.4 s | **5.6×** |
 
-- `lat validate --json` writes findings to stdout as JSON
-  (~80 bytes/finding). On the worst-case 1 GB file (2.4 M findings)
-  that's ~190 MB of JSON. The native PyO3 path skips this
-  serialisation step — for "validate then process findings in
-  Python", use `laterite.validate`; for "validate then pipe to
-  downstream tools", use `lat`. On clean files the gap is
-  single-digit %.
-- Native PyO3 returns findings as native Python objects (no Arrow
-  boundary — findings are few); `rep.findings` assembles them into a
-  polars frame and `rep.by_rule()` into a dict, both ~0% over the bare
-  validation pass (PyO3's `IntoPyObject` is well-tuned for our `Finding`
-  struct). The zero-copy Arrow capsule is the separate *data* read path
-  (`read()` / `ags[code]`), not this validation path.
+**Read, strings** — like-for-like, both sides return the same all-string pandas
+frames: `compat.AGS4_to_dataframe` vs `python-ags4`'s `AGS4_to_dataframe`:
 
-Both validators scale linearly: ~17 ns/byte for laterite, ~110
-ns/byte for python-ags4.
+| File | `python-ags4` `AGS4_to_dataframe` | `compat` | speedup |
+|---:|---:|---:|:---:|
+| 4.9 MB | 144 ms | 61 ms | **2.4×** |
+| 24.9 MB | 669 ms | 249 ms | **2.7×** |
+| 102 MB | 2.7 s | 1.0 s | **2.7×** |
+| 265 MB | 7.4 s | 2.5 s | **2.9×** |
+| 524 MB | 14.9 s | 5.2 s | **2.8×** |
+
+**Read, typed** — real typed columns (floats, dates). python-ags4 gets there with
+`AGS4_to_dataframe` + `convert_to_numeric` on every group; `laterite.read` is
+born-typed, so the typing is inline — and it types dates too, which
+`convert_to_numeric` skips:
+
+| File | `python-ags4` + `convert_to_numeric` | `laterite.read` (born-typed) | speedup |
+|---:|---:|---:|:---:|
+| 4.9 MB · 459 BH | 187 ms | 52 ms | **3.6×** |
+| 24.9 MB · 2,219 BH | 771 ms | 250 ms | **3.1×** |
+| 102 MB · 8,872 BH | 3.0 s | 1.0 s | **3.0×** |
+| 265 MB · 21,952 BH | 7.8 s | 2.6 s | **3.1×** |
+
+`laterite.read` hands back born-typed polars frames (a `2DP` heading is a
+`Float64`, a `DT` a `Datetime`) ready for `.sql()` — the same data python-ags4
+gives you only after a separate conversion pass.
 
 ## Parity with python-ags4
 
@@ -188,17 +206,11 @@ documented rule by rule:
 - [docs/parity-coverage-map.md](docs/parity-coverage-map.md) — the
   test-level map of laterite ↔ python-ags4
 
-The validator is **clean-room** — every rule written from the AGS4 spec,
-not copied from python-ags4 (LGPL-3.0) source — which is what lets laterite
-ship under MIT.
+Every validator rule is written from the published AGS4 specification, not
+adapted from another library's source — which is what lets laterite ship under
+a permissive MIT licence.
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: PRs welcome, CI
 gates `cargo test` + `pytest` + the python-ags4 parity oracle.
-
-## License
-
-[MIT](LICENSE). The bundled AGS4 standard dictionaries remain ©
-[AGS](https://www.ags.org.uk/data-format/) and are redistributed
-under their published terms.

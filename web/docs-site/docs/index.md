@@ -3,7 +3,7 @@
 laterite reads, validates, queries and **produces** AGS4 geotechnical data. Files come back as
 **born-typed** polars frames — the polars dtype _is_ the AGS type — wired into a fluent, chainable
 API. One engine drives Python, the `lat` CLI, Node and DuckDB, and it's a drop-in for
-python-ags4 that runs **7–17× faster**.
+python-ags4, rebuilt on a Rust core for speed.
 
 ```bash
 pip install laterite
