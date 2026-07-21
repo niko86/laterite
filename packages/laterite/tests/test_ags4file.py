@@ -212,18 +212,22 @@ def test_read_rejects_unknown_backend():
         laterite.read(text=_NUMERIC_SRC, backend="arrow")
 
 
-def test_groups_load_into_engine_on_first_touch():
-    # The engine is lazy: read() alone spins up nothing; touching a group loads
-    # only that group as a native DuckDB table. A fresh handle (not the shared
-    # module-scoped `clean`, whose engine other tests populate).
+def test_frame_reads_bypass_engine_keyed_path_spins_it_up():
+    # The engine is lazy AND the default frame path is engine-free: read() spins
+    # up nothing, and a plain keys-stripped frame read goes Arrow -> frame
+    # directly (the fast path), never touching DuckDB — the content-addressed
+    # keys it would strip anyway are simply not built. Only the keyed/relational
+    # path (keys=True, .sql(), .connection, .at()) loads groups as native DuckDB
+    # tables. A fresh handle (not the shared module-scoped `clean`, whose engine
+    # other tests populate).
     f = laterite.read(str(_CLEAN))
     assert f._con is None  # read() did not create the engine
-    _ = f["PROJ"]
-    assert f._con is not None and f._registered == {"PROJ"}
-    _ = f["PROJ"]  # second touch reuses the table, registers nothing new
-    assert f._registered == {"PROJ"}
-    _ = f["TRAN"]
-    assert f._registered == {"PROJ", "TRAN"}
+    _ = f["PROJ"]  # fast frame path...
+    assert f._con is None  # ...touches no engine
+    _ = f.table("PROJ", keys=True)  # a keyed frame needs the relational engine
+    assert f._con is not None and "PROJ" in f._registered
+    _ = f.sql('SELECT * FROM "TRAN"')  # .sql() registers the rest
+    assert "TRAN" in f._registered
 
 
 def test_sql_returns_a_duckdb_relation_with_pushdown():
@@ -249,9 +253,23 @@ def test_connection_exposes_raw_duckdb_seeded_with_groups():
 
 def test_context_manager_closes_engine():
     with laterite.read(text=_NUMERIC_SRC) as f:
-        _ = f["LOCA"]
+        _ = f.connection  # spin up the relational engine (a plain frame read no longer does)
         assert f._con is not None
     assert f._con is None  # __exit__ closed it
+
+
+def test_frame_read_does_not_leak_unkeyed_table_into_sql():
+    # GUARDRAIL for the fast frame path: reading a group as a frame (which skips
+    # the content-addressed keys the frame strips anyway) must NOT register an
+    # un-keyed table into the shared SQL connection — else a later cross-group
+    # JOIN on _parent_id/_id would silently return wrong/empty rows. The fast path
+    # goes Arrow -> frame OFF the engine, so the engine only ever holds keyed
+    # tables. Read the frames FIRST, then assert the join still resolves.
+    f = laterite.read(text=_RELATED_SRC)
+    _ = f["LOCA"]  # fast frame reads first...
+    _ = f["SAMP"]
+    rel = f.sql("SELECT s.SAMP_REF FROM SAMP s JOIN LOCA l ON s._parent_id = l._id")
+    assert rel.df().shape[0] > 0  # the join still resolves via correct keys
 
 
 # --- at(): location-subset view -------------------------------------------

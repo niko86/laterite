@@ -1050,8 +1050,13 @@ impl Reading {
     /// nothing and the default batch stays byte-identical (a `SELECT *` through
     /// `.sql()` is unchanged — which projection-time stripping could not have
     /// promised). Appended LAST so `_id`/`_parent_id` keep columns 0/1.
-    #[pyo3(signature = (code, content_hash=false))]
-    fn table_for(&self, code: &str, content_hash: bool) -> PyResult<Option<PyTable>> {
+    #[pyo3(signature = (code, content_hash=false, with_keys=true))]
+    fn table_for(
+        &self,
+        code: &str,
+        content_hash: bool,
+        with_keys: bool,
+    ) -> PyResult<Option<PyTable>> {
         let Some(g) = self.parsed.groups.get(code) else {
             return Ok(None);
         };
@@ -1072,16 +1077,27 @@ impl Reading {
         // independent knobs, both folded in by the ONE shared
         // `build_record_batch_synth` (`_id`/`_parent_id` col 0/1, `_content_hash`
         // trailing) so every host gets identical column order by construction.
-        let reg = laterite_ags4_core::registry::registry();
-        let ids = reg.get(code).map(|_| {
-            laterite_ags4_core::keychain::group_row_ids(
-                reg,
-                code,
-                &g.headings,
-                g.rows.len(),
-                |col, row| g.cell(col, row),
-            )
-        });
+        // `with_keys=false` (the frame fast-path: keys=False + xn="string") SKIPS
+        // the content-addressed `group_row_ids` — its per-row HashMap-of-every-
+        // heading + SHA-256 is the dominant read cost, and a plain frame read
+        // strips `_id`/`_parent_id` right back off, so computing them was pure
+        // overhead. The id MATH is untouched: every keyed caller (`.sql()` /
+        // `.at()` / `keys=True`, all default `with_keys=true`) still gets the
+        // byte-identical ids the certificate + cross-surface gates pin.
+        let ids = if with_keys {
+            let reg = laterite_ags4_core::registry::registry();
+            reg.get(code).map(|_| {
+                laterite_ags4_core::keychain::group_row_ids(
+                    reg,
+                    code,
+                    &g.headings,
+                    g.rows.len(),
+                    |col, row| g.cell(col, row),
+                )
+            })
+        } else {
+            None
+        };
         let hashes = if content_hash {
             Some(laterite_ags4_core::keychain::group_content_hashes(
                 code,

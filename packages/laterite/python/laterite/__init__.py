@@ -37,7 +37,7 @@ from ._errors import (
     WorldCheckRequiresSourceError,
     raise_for,
 )
-from ._frames import ArrowStream, frame_from_arrow
+from ._frames import ArrowStream, frame_from_arrow, materialize
 from .registry import GROUPS as _GROUPS
 from .registry import child_groups as _child_groups
 
@@ -646,6 +646,19 @@ class Ags4File:
         ``keys=True`` (or ``read(..., keys=True)`` for the handle default) to keep
         them. The relational ``.sql()`` layer carries them regardless."""
         want = self._keys if keys is None else keys
+        # Fast frame path: a keys-stripped frame in the default xn="string" mode
+        # needs neither the content-addressed keys nor the SQL engine. Build the
+        # un-keyed typed Arrow (`with_keys=False` skips the dominant `group_row_ids`
+        # keying) and go straight Arrow → frame, skipping BOTH that keying and the
+        # per-group DuckDB CTAS. The shared SQL `_con` is deliberately NOT touched
+        # here, so a later `.sql()` still registers correctly-keyed tables — no
+        # un-keyed table can leak into a JOIN. xn="numeric" (rare, non-default)
+        # needs the engine's TRY_CAST, so it falls through to the keyed path below.
+        if not want and self._xn == "string":
+            table = self._p["_handle"].table_for(code, self._content_hash, False)
+            if table is None:
+                raise KeyError(f"group {code!r} not in file")
+            return materialize(frame_from_arrow(table), self._backend)
         self._register(code)
         select = "*" if want else self._frame_select(code)
         return self._materialize(self._engine().sql(f'SELECT {select} FROM "{code}"'))
