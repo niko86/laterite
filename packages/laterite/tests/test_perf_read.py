@@ -1,7 +1,7 @@
 """Base read-path performance baselines via pytest-benchmark.
 
 Tracks the operations the 1.0 Arrow engine redesign changes (see
-``redacted-wiki/design/api-surface-1.0.md``): cold read, group-frame access,
+``ags-wiki/design/api-surface-1.0.md``): cold read, group-frame access,
 numeric coercion, and validation (Rust-on-text — a control that stays
 unchanged). They don't assert wall-clock (machines vary); pytest-benchmark
 records timings and ``--benchmark-save`` / ``--benchmark-compare`` flag
@@ -24,10 +24,13 @@ pyproject sets --benchmark-disable in addopts; --benchmark-only conflicts):
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import laterite
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # A self-contained synthetic AGS4 file — meaningful size, no gitignored fixture, so
 # CI runs it. ~2000 LOCA rows with two numeric (2DP) columns for the numeric path.
@@ -86,13 +89,3 @@ def test_group_access_baseline(benchmark, parsed: laterite.Ags4File):
 def test_validate_baseline(benchmark, ags_path: Path):
     """Validation is Rust-on-text and stays unchanged at 1.0 — a control number."""
     benchmark(lambda: laterite.validate(str(ags_path)))
-
-
-_LARGE = Path(__file__).resolve().parents[3] / "examples" / "output" / "large.ags"
-
-
-@pytest.mark.benchmark
-@pytest.mark.skipif(not _LARGE.exists(), reason="examples/output/large.ags absent")
-def test_read_large_ags_baseline(benchmark):
-    """Optional richer baseline on the real 23 MB / 69-group file (local only)."""
-    benchmark(lambda: laterite.read(str(_LARGE)))
