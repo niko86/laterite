@@ -1,0 +1,14 @@
+# doc_markdown false positives for AGS/AGS4 domain vocabulary + our own
+# tech stack. NOTE (verified against the installed clippy 0.1.95, 2026-07-19):
+# this key REPLACES clippy's built-in doc-valid-idents list unless it
+# contains the ".." sentinel, which splices the defaults back in — so we
+# list only our additions plus ".." rather than hand-copying clippy's
+# default list (which would drift out of sync with future clippy releases).
+doc-valid-idents = [
+    "AGS", "AGS4", "AGSX", "LOCA", "PROJ", "SAMP",
+    "PyO3", "DuckDB", "WASM", "napi", "napi-rs",
+    "UUID", "UUIDv8", "UUID7", "JSON", "phf",
+    "zstd", "scrypt", "SHA", "NumPy", "polars", "pandas", "pyarrow",
+    "stdin", "stdout", "SQL", "CTAS", "DDL",
+    "..",
+]

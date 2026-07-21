@@ -2,6 +2,11 @@
 # reproducible. Without a pin, a fresh runner installs whatever `stable` is
 # newest, and each clippy release expands lints like `doc_markdown` — so the
 # same code passes on one machine and fails on another. Bump deliberately.
+# `targets` must list every non-host target the workspace builds (wasm32 for
+# the browser validator); rustup installs them for the pinned channel, so a
+# `dtolnay/rust-toolchain` step that adds a target to `stable` doesn't leave
+# the pinned toolchain without it.
 [toolchain]
 channel = "1.95.0"
 components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]
