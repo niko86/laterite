@@ -1,0 +1,1664 @@
+{
+  "format_version": "1.0.0",
+  "title": "Cross-surface I/O-form (modality) register",
+  "preamble": "Every laterite capability is one engine behind several doors. A 'modality' is the I/O *form* a capability is offered in — an input door (path / text / bytes / file-like / handle / stdin / cert) or an output door (file / bytes / text / handle / value / table / stdout). The behavioural-knob parity gates (test_free_chained_parity, test_cross_surface_parity) compare pairs that exist on BOTH sides and STRIP the modality-bearing params before comparing, so nothing there detects a capability offered in fewer forms on one surface — an *absence*, not a *drift*. This register is that missing axis: one cell per (capability, surface, spelling), each form tri-stated present|absent|divergent, each absence verdicted gap|by-design with a reason. It is the find-only deliverable AND the by-design allowlist the standing gate (test_modality_parity) checks reflected reality against. The sibling baseline (which surface offers the richest form-set for a capability) is COMPUTED by the generator, never stored — a stored baseline is the multi-source-of-truth class #181 exists to kill.\n\nThis register is the **I/O-form** axis of cross-surface parity — does a capability exist in this SHAPE on this surface. [[surface-census]] is the **verb/table** axis of the same problem — does it exist AT ALL on this surface. Both share the reflect-don't-hand-list discipline (a form or verb list authored by hand is just a fourth thing to drift), and both exist because a *value*-comparison gate structurally cannot see an absence: feed identical input through every surface and diff the outputs, and a door that was never built produces no output to diff.",
+  "forms": {
+    "input": [
+      "path",
+      "text",
+      "bytes",
+      "file-like",
+      "handle",
+      "stdin",
+      "cert",
+      "value"
+    ],
+    "output": [
+      "file",
+      "bytes",
+      "text",
+      "handle",
+      "value",
+      "table",
+      "stdout"
+    ]
+  },
+  "glossary": {
+    "path": "a filesystem path (str / PathLike / string arg).",
+    "text": "in-memory AGS4 text (a str/String door, e.g. text= / read_ags_text).",
+    "bytes": "raw in-memory bytes (Python bytes / Node Uint8Array / Rust &[u8]).",
+    "file-like": "an object with a documented .read() (io.BytesIO / open file) — Python-specific.",
+    "handle": "a param typed as an already-parsed file object (Ags4File) — distinct from file-like.",
+    "stdin": "process standard input (a shell surface's bytes door).",
+    "cert": "consumes an .ags.idx certificate to skip revalidation (input side of certify).",
+    "file": "writes the result to a filesystem path.",
+    "value": "in-memory structured data — as OUTPUT a Report / FixResult / BuildResult / dict; as INPUT the caller's own data for build (row objects / Arrow Table / typed-graph objects). Not raw bytes/text.",
+    "tri-state": "each form is present (offered), absent (not offered — verdicted gap|by-design), or divergent (offered but its shape differs from siblings, warranting reconciliation).",
+    "table": "returns a relational / columnar result set (DuckDB rows, Arrow table/IPC).",
+    "stdout": "writes the result to process standard output (a shell surface)."
+  },
+  "surfaces": [
+    {
+      "id": "python",
+      "label": "Python (laterite wheel)",
+      "source": "packages/laterite/python/laterite/{__init__.py,transport.py,ags4.py}",
+      "reflection": "probe+inspect"
+    },
+    {
+      "id": "node",
+      "label": "Node (laterite npm)",
+      "source": "rust-packages/laterite-node/ts/{index,transport,ags4-file}.ts",
+      "reflection": "ts-parse"
+    },
+    {
+      "id": "cli",
+      "label": "lat CLI",
+      "source": "rust-packages/laterite-ags4-check/src/main.rs",
+      "reflection": "documentation"
+    },
+    {
+      "id": "browser",
+      "label": "Browser (wasm crate + web/src/lib)",
+      "source": "rust-packages/laterite-ags4-wasm/src/lib.rs + web/src/lib/*.ts",
+      "reflection": "orphan-guard"
+    },
+    {
+      "id": "duckdb",
+      "label": "DuckDB extension",
+      "source": "output/laterite-duckdb-ext/src/*.rs (separate gitignored repo — absent from CI)",
+      "reflection": "documentation"
+    }
+  ],
+  "excluded_axes": [
+    {
+      "axis": "async-vs-sync",
+      "reason": "Node sql()/at() are Promise-based only because @duckdb/node-api is async; the returned form is identical. A calling convention, not a modality."
+    },
+    {
+      "axis": "streaming-input",
+      "reason": "raw .ags has no index/footer, so a full read is format-inherent, not a per-surface choice. Streaming-OUTPUT (DuckDB scan vector-chunks, wasm lazy arrow_ipc) is already captured by the table/bytes output forms."
+    },
+    {
+      "axis": "frame-shaping-knobs",
+      "reason": "keys / backend=polars|pandas / {arrow:true} are sub-form refinements of a present form — kept as knob-parity in test_cross_surface_parity. (xn='numeric', a Python-only output view with no sibling and no knob-gate, IS carried below as a documented divergence.)"
+    },
+    {
+      "axis": "output-value-agreement",
+      "reason": "This register's grid asks whether a capability is OFFERED in a form; it is silent on whether two present forms agree on the ANSWER for identical bytes. That gap is exactly where an edition-resolution bug lived — the O-42 `guard_4_0_4` content guard ran on a path read (`check_file_with_dict`) but was skipped by laterite-py/laterite-node/wasm's hand-assembled bytes/text branches, so the same file resolved to a different dictionary edition by modality — until closed 2026-07-14 by a same-bytes-same-verdict gate: `repo:packages/laterite/tests/test_modality_output_parity.py` / `repo:rust-packages/laterite-node/test/modality-output-parity.test.ts`. See [[cert-trust-v2]] for the fix and the general 'surfaces reach past the door' pattern it closes a second instance of."
+    }
+  ],
+  "capabilities": [
+    {
+      "capability": "read",
+      "summary": "Parse AGS4 into a read handle.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "read",
+              "in_forms": [
+                "path",
+                "text",
+                "bytes",
+                "file-like",
+                "cert"
+              ],
+              "out_forms": [
+                "handle"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "bytes": "present",
+            "file-like": "present",
+            "cert": "present"
+          },
+          "output": {
+            "handle": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "read",
+              "in_forms": [
+                "path",
+                "text",
+                "bytes",
+                "cert"
+              ],
+              "out_forms": [
+                "handle"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "bytes": "present",
+            "file-like": "absent",
+            "cert": "present"
+          },
+          "output": {
+            "handle": "present"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "file-like",
+              "verdict": "by-design",
+              "reason": "Node has no io.BytesIO-style universal file-like; a caller reads the stream to a Buffer and passes bytes.",
+              "priority": "by-design"
+            }
+          ]
+        },
+        {
+          "surface": "cli",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "lat validate <path>",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "stdout"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "stdin": "absent"
+          },
+          "output": {
+            "stdout": "present",
+            "value": "present"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "stdin",
+              "verdict": "gap",
+              "reason": "no '-'/stdin door — a piped .ags must be spooled to a temp file first. The shell surface's bytes form IS stdin.",
+              "priority": "P2",
+              "related": "cli-stdin"
+            }
+          ]
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "read",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "handle"
+              ]
+            }
+          ],
+          "input": {
+            "bytes": "present",
+            "path": "absent",
+            "cert": "absent"
+          },
+          "output": {
+            "handle": "present"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "path",
+              "verdict": "by-design",
+              "reason": "no filesystem in the browser — a File/upload is read to a Uint8Array, so bytes is the only sensible input door.",
+              "priority": "by-design"
+            }
+          ]
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "read_ags",
+              "in_forms": [
+                "path",
+                "cert"
+              ],
+              "out_forms": [
+                "table"
+              ]
+            },
+            {
+              "name": "read_ags_text",
+              "in_forms": [
+                "text"
+              ],
+              "out_forms": [
+                "table"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "cert": "present"
+          },
+          "output": {
+            "table": "present"
+          },
+          "gaps": []
+        }
+      ]
+    },
+    {
+      "capability": "validate",
+      "summary": "Run the numbered AGS4 rules and return a verdict.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "validate",
+              "in_forms": [
+                "path",
+                "text",
+                "bytes",
+                "file-like"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "bytes": "present",
+            "file-like": "present"
+          },
+          "output": {
+            "value": "present"
+          },
+          "gaps": [],
+          "note": "validate exposes only the positional source sniff + text= keyword — no explicit path=/data= keyword doors like read/fix. All input FORMS are still reachable via the sniff (_resolve_source accepts path/bytes/file-like), so this is a keyword-ergonomics inconsistency, NOT a lost modality — recorded here, deliberately not a gap."
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "validate",
+              "in_forms": [
+                "path",
+                "text",
+                "bytes",
+                "cert"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "bytes": "present",
+            "file-like": "absent"
+          },
+          "output": {
+            "value": "present"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "file-like",
+              "verdict": "by-design",
+              "reason": "same as read — no universal Node file-like; pass bytes.",
+              "priority": "by-design"
+            }
+          ]
+        },
+        {
+          "surface": "cli",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "lat validate <path>",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "stdout"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "stdin": "absent"
+          },
+          "output": {
+            "stdout": "present"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "stdin",
+              "verdict": "gap",
+              "reason": "no '-'/stdin door; a piped file must be spooled to disk first.",
+              "priority": "P2",
+              "related": "cli-stdin"
+            }
+          ]
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "validate",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            }
+          ],
+          "input": {
+            "bytes": "present",
+            "path": "absent"
+          },
+          "output": {
+            "value": "present"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "path",
+              "verdict": "by-design",
+              "reason": "no filesystem in the browser.",
+              "priority": "by-design"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "capability": "fix",
+      "summary": "Mechanically repair AGS4.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "fix",
+              "in_forms": [
+                "path",
+                "text",
+                "bytes",
+                "file-like"
+              ],
+              "out_forms": [
+                "value",
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "bytes": "present",
+            "file-like": "present"
+          },
+          "output": {
+            "value": "present",
+            "file": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "fix",
+              "in_forms": [
+                "path",
+                "text",
+                "bytes"
+              ],
+              "out_forms": [
+                "value",
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "value": "present",
+            "file": "present"
+          },
+          "gaps": [],
+          "note": "#394 added inPlace/out write-back (the out.file form) + only/exclude rule selection — the latter shrank the test_cross_surface_parity _MATRIX allowlist to empty. Rule labels are typed as FixableRule, drift-gated to Python/the engine (test_typed_choices)."
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "compute_fixes",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            },
+            {
+              "name": "apply_fixes",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "bytes": "present"
+          },
+          "output": {
+            "value": "present",
+            "bytes": "present"
+          },
+          "gaps": [],
+          "note": "the browser deliberately SPLITS fix into compute_fixes (returns the Fix[] proposal for the UI to preview — a value form) and apply_fixes (returns the repaired bytes). The library surfaces one-shot fix() and offer no dry-run Fix[] preview form; whether to add one is P3 verb-decomposition (fix-dry-run-split), tracked in the backlog, not a browser defect."
+        }
+      ]
+    },
+    {
+      "capability": "build",
+      "summary": "Construct valid AGS4 from caller-supplied data (build_ags4).",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "build_ags4",
+              "in_forms": [
+                "handle",
+                "value"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present",
+            "value": "present"
+          },
+          "output": {
+            "value": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "buildAgs4",
+              "in_forms": [
+                "handle",
+                "value"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present",
+            "value": "present"
+          },
+          "output": {
+            "value": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "build_ags4",
+              "in_forms": [
+                "text"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            },
+            {
+              "name": "build_ags4_ipc",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "text": "divergent",
+            "bytes": "present"
+          },
+          "output": {
+            "bytes": "present"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "text",
+              "verdict": "gap",
+              "reason": "build_ags4 takes a JSON-TEXT groups payload — the lone text-in build door across all surfaces (Python/Node take a typed-graph root or (code, frame) rows). Bytes-in already exists as build_ags4_ipc, so the reconciliation is the JSON-text outlier, NOT adding a bytes door.",
+              "priority": "P2",
+              "related": "wasm-build-text-outlier",
+              "shape_note": "present-but-anomalous: JSON text where every sibling takes native value objects or Arrow-IPC bytes."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "capability": "diff",
+      "summary": "Compare two AGS4 revisions.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "diff",
+              "in_forms": [
+                "path",
+                "text",
+                "bytes",
+                "file-like",
+                "handle"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "bytes": "present",
+            "file-like": "present",
+            "handle": "present"
+          },
+          "output": {
+            "value": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "diff",
+              "in_forms": [
+                "path",
+                "bytes",
+                "handle"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present",
+            "handle": "present",
+            "file-like": "absent"
+          },
+          "output": {
+            "value": "present"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "file-like",
+              "verdict": "by-design",
+              "reason": "no universal Node file-like; DiffSource is string|Uint8Array|Ags4File.",
+              "priority": "by-design"
+            }
+          ]
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "diff",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            }
+          ],
+          "input": {
+            "bytes": "present"
+          },
+          "output": {
+            "value": "present"
+          },
+          "gaps": []
+        }
+      ]
+    },
+    {
+      "capability": "merge",
+      "summary": "Reconcile N AGS4 deliveries of one project into one file.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "merge",
+              "in_forms": [
+                "path",
+                "text",
+                "bytes",
+                "file-like",
+                "handle"
+              ],
+              "out_forms": [
+                "value",
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "bytes": "present",
+            "file-like": "present",
+            "handle": "present"
+          },
+          "output": {
+            "value": "present",
+            "file": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "merge",
+              "in_forms": [
+                "path",
+                "bytes",
+                "handle"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present",
+            "handle": "present",
+            "file-like": "absent"
+          },
+          "output": {
+            "value": "present",
+            "file": "absent"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "file-like",
+              "verdict": "by-design",
+              "reason": "no universal Node file-like; MergeSource is string|Uint8Array|Ags4File.",
+              "priority": "by-design"
+            },
+            {
+              "direction": "out",
+              "form": "file",
+              "verdict": "by-design",
+              "reason": "Node merge returns a MergeResult carrying the merged bytes; the caller writes with fs (return-only, matching diff).",
+              "priority": "by-design"
+            }
+          ]
+        },
+        {
+          "surface": "cli",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "merge",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "file",
+                "stdout"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present"
+          },
+          "output": {
+            "file": "present",
+            "stdout": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "merge",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "value",
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "bytes": "present"
+          },
+          "output": {
+            "value": "present",
+            "file": "present"
+          },
+          "gaps": []
+        }
+      ]
+    },
+    {
+      "capability": "censor",
+      "summary": "Anonymise an AGS4 file — scrub the classified sensitive cells (pseudonymise IDs, hash PROJ_ID, blank coordinates, tokenise names, strip free-text [units]) before sharing. Browser-only among shipped surfaces: the SAME laterite-ags4-censor engine backs the private ags4-corpus-qa `censor` dev tool, which is not a shipped py/node/cli API, so its cross-surface EXISTENCE is a surface-census matter, not a modality one.",
+      "cells": [
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "censor",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "value",
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "bytes": "present"
+          },
+          "output": {
+            "value": "present",
+            "file": "present"
+          },
+          "gaps": []
+        }
+      ]
+    },
+    {
+      "capability": "certify",
+      "summary": "Mint an .ags.idx validity certificate (cert as OUTPUT).",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "Ags4File.certify",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            },
+            {
+              "name": "Ags4File.certify_bytes",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "gaps": [],
+          "note": "certify_bytes() (#390) returns the .ags.idx bytes in memory — the certify analog of transport.lock_bytes; same cert as certify() (bar the mint timestamp), so it interops with read(index=)/--index/the browser."
+        },
+        {
+          "surface": "node",
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "Ags4File.certify",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            },
+            {
+              "name": "Ags4File.certifyBytes",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "gaps": [],
+          "note": "certifyBytes() (#390) mirrors laterite-py's certify_bytes — same in-memory cert form."
+        },
+        {
+          "surface": "cli",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "lat certify [--out]",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present"
+          },
+          "output": {
+            "file": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "certify",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "text"
+              ]
+            }
+          ],
+          "input": {
+            "bytes": "present"
+          },
+          "output": {
+            "text": "present",
+            "file": "absent"
+          },
+          "gaps": [
+            {
+              "direction": "out",
+              "form": "file",
+              "verdict": "by-design",
+              "reason": "certify returns the cert as a String because the browser has no filesystem — a PRESENT capability, not a shape gap. It proved the in-memory shape that Python/Node now match via certify_bytes/certifyBytes (#390).",
+              "priority": "by-design",
+              "related": "certify-bytes-output"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "capability": "cert-input",
+      "summary": "Consume an .ags.idx certificate to skip revalidation (cert as INPUT).",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "read(index=)",
+              "in_forms": [
+                "cert"
+              ],
+              "out_forms": [
+                "handle"
+              ]
+            }
+          ],
+          "input": {
+            "cert": "present"
+          },
+          "output": {
+            "handle": "present"
+          },
+          "gaps": [],
+          "note": "explicit opt-in — autodiscovery is deliberately refused so naming index= asserts the cert is for THIS file."
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "read({index})",
+              "in_forms": [
+                "cert"
+              ],
+              "out_forms": [
+                "handle"
+              ]
+            }
+          ],
+          "input": {
+            "cert": "present"
+          },
+          "output": {
+            "handle": "present"
+          },
+          "gaps": [],
+          "note": "explicit opt-in, mirrors Python."
+        },
+        {
+          "surface": "duckdb",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "read_ags (<path>.idx autodiscovery)",
+              "in_forms": [
+                "cert"
+              ],
+              "out_forms": [
+                "table"
+              ]
+            }
+          ],
+          "input": {
+            "cert": "present"
+          },
+          "output": {
+            "table": "present"
+          },
+          "gaps": [],
+          "note": "implicit — a sibling <path>.idx is auto-consumed (the divergent FORM of the same cert-input capability: autodiscovery vs explicit)."
+        },
+        {
+          "surface": "cli",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "lat validate <path> --index <cert>",
+              "in_forms": [
+                "cert"
+              ],
+              "out_forms": [
+                "stdout"
+              ]
+            }
+          ],
+          "input": {
+            "cert": "present"
+          },
+          "output": {
+            "stdout": "present"
+          },
+          "gaps": [],
+          "note": "--index (#393) consumes a fresh, same-engine, profile-covering .ags.idx to SKIP the rule engine (mirrors the library read(index=) short-circuit); a stale/foreign/insufficient cert is re-validated. Explicit opt-in like Python/Node, not autodiscovery like DuckDB."
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [],
+          "input": {
+            "cert": "absent"
+          },
+          "output": {},
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "cert",
+              "verdict": "by-design",
+              "reason": "the browser read handle is transient (one in-memory ParsedDataset per upload); there is no persisted-cert reuse flow to consume.",
+              "priority": "by-design"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "capability": "emit",
+      "summary": "Get spec-correct AGS4 back OUT of a read handle.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "Ags4File.text/bytes/save",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "text",
+                "bytes",
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "text": "present",
+            "bytes": "present",
+            "file": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "node",
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "Ags4File.text/bytes/save",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "text",
+                "bytes",
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "text": "present",
+            "bytes": "present",
+            "file": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "browser",
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "ParsedDataset.group_codes/meta/arrow_ipc",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "table"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "table": "present",
+            "text": "absent",
+            "bytes": "absent"
+          },
+          "gaps": [
+            {
+              "direction": "out",
+              "form": "bytes",
+              "verdict": "gap",
+              "reason": "the wasm read handle (ParsedDataset) exposes only group_codes/meta/arrow_ipc (typed table-out) — no .text/.bytes AGS4 re-emit, so there is no round-trip AGS4 out of a browser read (Python/Node Ags4File have .text/.bytes/.save). Compute the fix instead via the separate build/apply verbs.",
+              "priority": "P2",
+              "related": "wasm-read-emit"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "capability": "to_excel",
+      "summary": "Convert AGS4 to an .xlsx workbook.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "to_excel",
+              "in_forms": [
+                "path",
+                "text",
+                "bytes",
+                "file-like"
+              ],
+              "out_forms": [
+                "file",
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "bytes": "present",
+            "file-like": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "gaps": [],
+          "note": "to_excel(output=None) (#391) returns the .xlsx bytes in memory — the FS-free door the browser's ags4_to_xlsx already offered."
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "toExcel",
+              "in_forms": [
+                "path",
+                "bytes"
+              ],
+              "out_forms": [
+                "file",
+                "bytes"
+              ]
+            },
+            {
+              "name": "Ags4File.toExcel",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "file",
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "gaps": [],
+          "note": "#391 added bytes-in/bytes-out (omit xlsxPath → Buffer) + the Ags4File.toExcel() handle method — mirrors Python's to_excel."
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "ags4_to_xlsx",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "bytes": "present"
+          },
+          "output": {
+            "bytes": "present"
+          },
+          "gaps": []
+        }
+      ]
+    },
+    {
+      "capability": "from_excel",
+      "summary": "Convert an AGS4-shaped .xlsx back to AGS4.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "from_excel",
+              "in_forms": [
+                "path",
+                "bytes"
+              ],
+              "out_forms": [
+                "file",
+                "handle"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "file": "present",
+            "handle": "present"
+          },
+          "gaps": [],
+          "note": "from_excel(source) (#391) accepts raw .xlsx bytes — an uploaded workbook needn't hit disk first."
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "fromExcel",
+              "in_forms": [
+                "path",
+                "bytes"
+              ],
+              "out_forms": [
+                "file",
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present",
+            "handle": "absent"
+          },
+          "gaps": [
+            {
+              "direction": "out",
+              "form": "handle",
+              "verdict": "by-design",
+              "reason": "Node fromExcel(bytes) returns the AGS4 Buffer, not an Ags4File; the handle is one read() away (read(fromExcel(bytes))) — the Node idiom, where read IS the handle constructor. Python returns the handle directly as a convenience.",
+              "priority": "by-design"
+            }
+          ]
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "xlsx_to_ags4",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "bytes": "present"
+          },
+          "output": {
+            "bytes": "present"
+          },
+          "gaps": []
+        }
+      ]
+    },
+    {
+      "capability": "transport-pack",
+      "summary": "zstd-only compress/decompress (pack/unpack).",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "pack/unpack",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            },
+            {
+              "name": "pack_bytes/unpack_bytes",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "pack/unpack",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            },
+            {
+              "name": "packBytes/unpackBytes",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "gaps": [],
+          "note": "the *Bytes forms (#389) mirror laterite-py's pack_bytes/unpack_bytes — same shared-leaf envelope, so a Node-sealed blob interops with the file API and pyrage/the browser."
+        }
+      ]
+    },
+    {
+      "capability": "transport-lock",
+      "summary": "zstd + age passphrase encrypt/decrypt (lock/unlock) — the motivating capability.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "lock/unlock",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            },
+            {
+              "name": "lock_bytes/unlock_bytes",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "gaps": [],
+          "note": "the *_bytes forms were added in 0.6.2-dev to close the exact path-only-vs-browser-bytes-only gap this whole audit is named after."
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "lock/unlock",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            },
+            {
+              "name": "lockBytes/unlockBytes",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "gaps": [],
+          "note": "the *Bytes forms (#389) close the remaining leg of the motivating gap — lockBytes never writes plaintext to disk; same shared-leaf envelope as the Python/browser forms."
+        },
+        {
+          "surface": "browser",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "lock/unlock",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "bytes": "present",
+            "path": "absent"
+          },
+          "output": {
+            "bytes": "present",
+            "file": "absent"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "path",
+              "verdict": "by-design",
+              "reason": "no filesystem in the browser — bytes-in/bytes-out is the only form. This surface (web/src/lib/transportClient.ts, JS zstd/age) is where the motivating bug lived; the wasm CRATE has zero transport code.",
+              "priority": "by-design"
+            }
+          ]
+        },
+        {
+          "surface": "cli",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "lat lock/unlock",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "absent"
+          },
+          "output": {
+            "file": "present"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "bytes",
+              "verdict": "by-design",
+              "reason": "the CLI is a file tool: lat lock/unlock take an input path and write an output file (transport::lock(input, output)); there is no in-memory bytes door on the CLI, matching lat's other file-in/file-out verbs.",
+              "priority": "by-design"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "capability": "read_typed",
+      "summary": "Read AGS4 into the typed-graph object model.",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "ags4.read_typed",
+              "in_forms": [
+                "path",
+                "text",
+                "bytes",
+                "file-like"
+              ],
+              "out_forms": [
+                "handle"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "bytes": "present",
+            "file-like": "present"
+          },
+          "output": {
+            "handle": "present"
+          },
+          "gaps": []
+        },
+        {
+          "surface": "node",
+          "spelling": "free",
+          "verbs": [],
+          "input": {},
+          "output": {
+            "handle": "absent"
+          },
+          "gaps": [
+            {
+              "direction": "out",
+              "form": "handle",
+              "verdict": "gap",
+              "reason": "Node has the 174 typed-graph classes (for buildAgs4) but no read_typed to populate them FROM a file — the biggest port lift, a real typed-graph reader. Last in the backlog.",
+              "priority": "P3",
+              "related": "node-read-typed"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "capability": "read-output-view",
+      "summary": "Output-shaping of a read (xn numeric coercion).",
+      "cells": [
+        {
+          "surface": "python",
+          "spelling": "free",
+          "verbs": [
+            {
+              "name": "read(xn='numeric')",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "table"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present"
+          },
+          "output": {
+            "table": "divergent"
+          },
+          "gaps": [
+            {
+              "direction": "out",
+              "form": "table",
+              "verdict": "gap",
+              "reason": "read(xn=) casts XN columns to Float64 — a Python-only output-shaping view with no sibling and (unlike keys/backend) no knob-parity gate. An open port-or-document decision, so it is a P3 gap/divergence, not a settled by-design.",
+              "priority": "P3",
+              "related": "xn-numeric-view",
+              "shape_note": "present-but-Python-only: no other surface offers an xn numeric coercion of the table output."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

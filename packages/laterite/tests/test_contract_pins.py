@@ -123,10 +123,7 @@ def test_to_json_and_to_ndjson_describe_the_same_findings() -> None:
     emits ONE line per occurrence. Different shapes, same underlying facts: the
     flattened `(rule, line, group, desc)` occurrences must agree as multisets, so
     neither view can silently drop or duplicate a finding the other keeps."""
-    fx = str(
-        Path(__file__).resolve().parents[3]
-        / "rust-packages/ags4-forge/vendor/pyags4-tests/4.1-rule8-1.ags"
-    )
+    fx = str(Path(__file__).resolve().parent / "fixtures" / "multi_finding.ags")
     rep = L.validate(fx, warnings=True, fyi=True)
 
     by_rule = json.loads(rep.to_json())["findings"]

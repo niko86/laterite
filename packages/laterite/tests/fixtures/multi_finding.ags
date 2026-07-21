@@ -1,0 +1,11 @@
+"GROUP","PROJ"
+"HEADING","PROJ_ID","PROJ_NAME","PROJ_NAME"
+"UNIT","","",""
+"TYPE","ID","X","X"
+"DATA","P1","Multi-finding fixture (hand-authored, MIT, ours)","dup"
+
+"GROUP","LOCA"
+"HEADING","LOCA_ID","LOCA_TYPE","LOCA_NATE"
+"UNIT","","","m"
+"TYPE","ID","PA","2DP"
+"DATA","BH1","Boring","not_a_number"

@@ -100,9 +100,7 @@ jobs:
               - 'web/docs-site/docs/reference/duckdb-functions.md'     # the guarded doc — a hand-edit must re-run the gate
               - 'tools/gen_reference_groups.py'                        # test_reference_groups_faithful — the group tier generator (its SSOT, ags_dictionary.json, is already covered by rust-packages/**)
               - 'tools/gen_crate_graph.py'                             # test_crate_graph_faithful — the crate-graph generator (its SSOT, the Cargo manifests, is already covered by rust-packages/**)
-              - 'tools/xcheck/**'                                      # the OUTPUT-VALUE gate's surface legs — an xcheck-only PR must run its own gate (the cases live under rust-packages/ags4-compliance, already covered by rust-packages/**)
               - 'tools/wheel_smoke.py'                                 # the wheel-smoke job's post-install smoke — an edit to it must re-run that job (#554)
-              - 'xcheck-allow.json'                                    # the value allowlist — a pin edit must re-run the gate that enforces it
               - 'surface-census.json'                                  # test_census_faithful — the census SSOT
               - 'tools/gen_census.py'                                  # the census generator — a render/related change must re-run it
               # The PUBLISHED parity claim (#556). tests/test_parity_claim_faithful.py
