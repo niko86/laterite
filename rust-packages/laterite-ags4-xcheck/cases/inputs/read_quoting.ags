@@ -1,0 +1,10 @@
+"GROUP","LOCA"
+"HEADING","LOCA_ID","LOCA_TYPE","LOCA_REM","LOCA_NATE"
+"UNIT","","","","m"
+"TYPE","ID","PA","X","2DP"
+"DATA","BH01","CP","has, a comma","0.00"
+"DATA","BH02","CP","has a ""quote""","1.00"
+"DATA","BH03","CP","café – Ø ± 5°","2.00"
+"DATA","BH04","CP","a back\slash and a /slash","3.00"
+"DATA","BH05","CP"
+

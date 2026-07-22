@@ -1,0 +1,49 @@
+# Cross-surface OUTPUT-VALUE gate (X1). Pushes a committed list of (op × input)
+# cases through every surface leg and compares the observed output VALUES N-way,
+# with the in-process Rust leaf (`emit-cases`) as the AUTHORITY column. Every
+# OTHER gate compares knob NAMES; this one compares the values themselves.
+#
+# `emit-cases` is the authority leg — it drives the shared emit/format leaves
+# DIRECTLY (not through a binding), so its column is the reference the Python /
+# Node / wasm / CLI legs are held to. `xcheck` reparses each leg's emitted bytes
+# with the same parse leaf every surface wraps and runs N-way equality (ZERO
+# normalisation, JSON value equality), exiting non-zero on any unexplained split.
+#
+# Split out of the dev `ags4-compliance` crate (#553 reversal, the public-is-dev-
+# home flip): that crate's findings/duckdb harness needs the private `ags4-parity`
+# oracle, but this output-value gate needs only the public emit/parse/validator/
+# core leaves — so it ships here on its own, without dragging the oracle public.
+[package]
+name = "laterite-ags4-xcheck"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "Cross-surface output-value agreement gate for the laterite AGS4 surfaces"
+license = "MIT"
+publish = false
+
+[dependencies]
+# The authority + reparse leaves — all public, DuckDB-free. `emit-cases` drives
+# emit/format directly; `xcheck` reparses emitted bytes with the shared parse leaf.
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+laterite-ags4-core = { path = "../laterite-ags4-core" }
+laterite-ags4-emit = { path = "../laterite-ags4-emit" }
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# The AUTHORITY leg — emits one observation file (`rust-leaf.json`) by driving the
+# shared emit/format leaves directly (not through a binding).
+[[bin]]
+name = "emit-cases"
+path = "src/bin/emit_cases.rs"
+
+# The COMPARATOR — loads the case manifest + every leg's observation file, runs
+# N-way equality with leaf authority + the spec invariants; exits non-zero on any
+# unexplained split. ZERO normalisation (JSON equality).
+[[bin]]
+name = "xcheck"
+path = "src/bin/xcheck.rs"
+
+[lints]
+workspace = true

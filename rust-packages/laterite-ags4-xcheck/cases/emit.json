@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "emit.reemit.clean_minimal",
+      "op": "reemit_canonical",
+      "input": { "fixture": "rust-packages/laterite-ags4-validator/tests/fixtures/clean_minimal.ags" },
+      "legs": ["rust-leaf", "python", "node"],
+      "invariants": ["emit_reparses"],
+      "spec_ref": "AGS4 Rule 3 — a blank line SEPARATES groups; the file carries no trailing sentinel. The re-emit of a 4-group file must be byte-identical across surfaces (drift #1a: python .text once appended a trailing blank line node emit() did not; unified in #518)."
+    }
+  ]
+}

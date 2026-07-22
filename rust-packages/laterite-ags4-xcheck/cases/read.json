@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "read.json.quoting",
+      "op": "read_json",
+      "input": {
+        "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/read_quoting.ags",
+        "group": "LOCA"
+      },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "`lat read <file> LOCA --json` renders cells through core's `read_render::render_rows_json` on all three launchers (#530 family B). Before that convergence this JSON came from THREE DIFFERENT JSON LIBRARIES — serde_json, `JSON.stringify(x, null, 2)`, `json.dumps(indent=2, ensure_ascii=False)` — agreeing only by hand-discipline, and `lat read` had no gate at all. The fixture carries the cells where those libraries diverge if anyone reintroduces a private renderer: an embedded quote (`\\\"`), a backslash (`\\\\`), a forward slash (JSON.stringify leaves it bare), non-ASCII (drop `ensure_ascii=False` and Python alone emits `\\uXXXX`), a numeric-looking cell that must stay a STRING, and a short row that must PAD to heading width rather than shift cells."
+    },
+    {
+      "id": "read.csv.quoting",
+      "op": "read_csv",
+      "input": {
+        "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/read_quoting.ags",
+        "group": "LOCA"
+      },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "`lat read <file> LOCA --csv` — the same rows through `read_render::render_rows_csv`. Was three hand-ports of RFC-4180 quoting; the fixture pins the quote-iff-needed boundary (a comma cell and an embedded-quote cell are quoted + doubled; a backslash/non-ASCII cell is NOT), which is exactly where three independent ports drift."
+    },
+    {
+      "id": "read.json.grouplist",
+      "op": "read_json",
+      "input": { "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/read_quoting.ags" },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "`lat read <file> --json` with NO group lists the file's group codes — the one read path #530 deliberately left un-converged, on the argument that AGS group codes are four ASCII uppercase letters so three JSON libraries cannot diverge on `[\"LOCA\"]`. That argument is sound but unproven; this case proves it, and turns the day someone widens the list's shape (a code plus a row count, say) into a failure instead of a silent split."
+    }
+  ]
+}

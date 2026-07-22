@@ -50,6 +50,7 @@ members = [
     "laterite-cliutil",
     "laterite-py",
     "laterite-node",
+    "laterite-ags4-xcheck",
 ]
 
 # Single-sourced crate version: every member inherits this via

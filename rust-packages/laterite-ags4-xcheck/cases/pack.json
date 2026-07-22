@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "pack.out.zstd_bytes",
+      "op": "pack_out",
+      "input": {
+        "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/diff_base.ags"
+      },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "`lat pack <input> out.zst` — the zstd transport envelope (laterite-transport leaf, on by default via the `transport` feature). zstd is deterministic for a fixed input + level (the AGS4 sweet-spot default, 9), so the packed bytes are identical across launchers; this pins their SHA-256 + size equal on all three. A launcher packing at a different level or wrapping the payload differently would split the hash (#555 part 2)."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "numeric.canonical.grat_3sf_zero",
+      "op": "reemit_canonical",
+      "input": { "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/grat_3sf_zero.ags" },
+      "legs": ["rust-leaf", "python", "node"],
+      "invariants": ["emit_reparses"],
+      "spec_ref": "The canonical AGS4 form of a 3SF-of-zero cell (GRAT_SIZE) is `\"0.00\"` — n significant figures, rendered by `ags4_str`. Every surface re-emits it identically; this is the reference the Excel round-trip is measured against."
+    },
+    {
+      "id": "numeric.excel_roundtrip.grat_3sf_zero",
+      "op": "excel_roundtrip",
+      "input": { "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/grat_3sf_zero.ags" },
+      "legs": ["python"],
+      "equivalent_to": "numeric.canonical.grat_3sf_zero",
+      "spec_ref": "to_excel → from_excel SHOULD preserve the bytes, but Excel's numeric formatter (`NumericFormat::format`) renders 3SF-of-zero `\"0\"`, not `\"0.00\"` — a documented, accepted lossiness (owner ruling: leave Excel; it is the python-ags4 import canonicaliser, gated at the formatter level by #517). The single-cell divergence is pinned `by-design` in xcheck-allow.json."
+    }
+  ]
+}
