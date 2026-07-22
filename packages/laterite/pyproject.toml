@@ -50,7 +50,7 @@ requires-python = ">=3.12"
 # unconditionally, laterite does not.
 dependencies = [
     "polars>=1.42.1",
-    "duckdb>=1.4.0",
+    "duckdb>=1.5.5",
 ]
 
 [project.urls]
