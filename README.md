@@ -23,7 +23,9 @@ python-ags4? There's a drop-in — swap `from python_ags4 import AGS4` for
 [![rust cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=rust&label=rust%20cov)](https://codecov.io/gh/niko86/laterite)
 [![python cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=python&label=python%20cov)](https://codecov.io/gh/niko86/laterite)
 [![web cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=web&label=web%20cov)](https://codecov.io/gh/niko86/laterite)
+[![node cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=node&label=node%20cov)](https://codecov.io/gh/niko86/laterite)
 [![PyPI](https://img.shields.io/pypi/v/laterite.svg)](https://pypi.org/project/laterite/)
+[![npm](https://img.shields.io/npm/v/laterite.svg)](https://www.npmjs.com/package/laterite)
 [![Python versions](https://img.shields.io/pypi/pyversions/laterite.svg)](https://pypi.org/project/laterite/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 

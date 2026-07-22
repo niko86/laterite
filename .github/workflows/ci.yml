@@ -358,8 +358,23 @@ jobs:
       # vitest: read/validate/emit, the typed-graph generator drift guard, and
       # the DuckDB sql/at suite (the optional @duckdb/node-api peer is a devDep;
       # the { arrow: true } path fetches DuckDB's `arrow` community extension).
-      - name: vitest
-        run: npm test
+      # --coverage (v8) instruments the ts/ wrapper the tests import directly and
+      # writes coverage/lcov.info for the Codecov `node` flag below.
+      - name: vitest (+ coverage)
+        run: npm run test:coverage
+
+      # Codecov `node` flag — public repo only (where the badge lives + the token
+      # is set). Measures the TS wrapper; the Rust engine's number is the nightly
+      # cargo-llvm-cov `rust` flag. codecov-action is a `uses:` step so it runs at
+      # the repo root — hence the full path to the node package's lcov.
+      - name: Upload Node coverage to Codecov
+        if: github.repository == 'niko86/laterite'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: rust-packages/laterite-node/coverage/lcov.info
+          flags: node
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
       # Packaging smoke: `npm pack` the package and run read/table/validate/emit
       # against the PACKED dist + native binary — the thing `npm install laterite`
