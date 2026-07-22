@@ -144,14 +144,18 @@ jobs:
           # README + docs carry many github.com links + shields/codecov badges).
           GITHUB_TOKEN: ${{ github.token }}
         with:
-          # README + all docs markdown. --accept adds 429 to the 2xx default (a
-          # rate-limited host is ALIVE, not broken); retries smooth transient 5xx.
-          # --exclude npmjs.com: the npm PACKAGE PAGE Cloudflare-403s all bots
-          # (even a browser UA), so it's a guaranteed false alarm — the package's
-          # existence is already proven by the shields npm badge (registry API)
-          # and the npm-install smoke path.
+          # EXTERNAL links + badges only (--scheme http/https). The docs carry
+          # ~200 RELATIVE .md cross-links — those are mkdocs's domain, and
+          # `mkdocs build --strict` (ci.yml docs job) already gates them. lychee
+          # resolves mkdocs link rewriting unreliably, so it must NOT double-check
+          # internal links (that's what turned the first run red). --accept adds
+          # 429 to the 2xx default (rate-limited = ALIVE); retries smooth transient
+          # 5xx. --exclude npmjs.com: the npm PACKAGE PAGE Cloudflare-403s all bots
+          # (even a browser UA), a guaranteed false alarm — existence is proven by
+          # the shields npm badge (registry API) + the npm-install smoke.
           args: >-
             --no-progress --max-retries 3 --retry-wait-time 5
+            --scheme https --scheme http
             --accept 200..=299,429
             --exclude 'www\.npmjs\.com'
             README.md 'web/docs-site/docs/**/*.md'
