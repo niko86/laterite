@@ -96,7 +96,7 @@
   },
   "devDependencies": {
     "@duckdb/node-api": "^1.5.3-r.3",
-    "@eslint/js": "^9.39.5",
+    "@eslint/js": "^10.0.1",
     "@napi-rs/cli": "^3.7.2",
     "@types/node": "^26.0.1",
     "@vitest/coverage-v8": "^4.1.10",
