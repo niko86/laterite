@@ -1,11 +1,16 @@
 # PR-tier CI: build + test on every PR (the single validation gate).
 #
-# Two jobs: `rust` then `python`. The Python job needs the compiled
-# PyO3 cdylibs, so it depends on `rust` to fail fast — if the Rust
-# build is red, no point spending matrix minutes on Python.
+# Runner routing (the public-repo rule). A PR from a FORK runs on
+# GitHub-hosted `ubuntu-latest` — untrusted code must never execute on the
+# self-hosted pool (LAN + shared-sccache reach). Our own same-repo PRs,
+# pushes, schedules and dispatches run on the warm `laterite-linux` pool
+# (sccache-on-NFS, switched on by ./.github/actions/build-accel), so the
+# redundant per-job compiles are cache hits rather than cold rebuilds. Every
+# `runs-on` below is that same fork-routing ternary.
 #
-# Sticks to Linux only on the free tier — the per-OS wheel build is
-# the release workflow's job (matrix on tag), not every PR.
+# The Python job needs the compiled PyO3 cdylib, so it `needs: rust` to fail
+# fast — no point spending build minutes on Python if the Rust build is red.
+# Per-OS wheels are the release workflow's job (matrix on tag), not every PR.
 
 name: ci
 
@@ -52,7 +57,7 @@ jobs:
   # own paths filter in e2e.yml. On NON-PR events (push to release/**, manual
   # dispatch) the heavy jobs always run — the gate only filters pull_requests.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
     permissions:
       contents: read
       pull-requests: read   # dorny/paths-filter reads the PR's changed files
@@ -165,7 +170,7 @@ jobs:
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.code == 'true') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -192,7 +197,7 @@ jobs:
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.code == 'true') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
     # 35 min ceiling (generous): the AGS5 crates (the bundled-DuckDB long pole)
     # were decoupled to ags5/, so the kept workspace links no bundled DuckDB and
     # a cold build is much faster; warmed runs (sccache hits) finish in minutes.
@@ -213,8 +218,8 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
 
-      # Turn on sccache + mold IF the runner has them (the ags5-runner pool image
-      # does; a GitHub-hosted fallback doesn't → no-op). Must run before the
+      # Turn on sccache + mold IF the runner has them (the laterite-runner pool
+      # image does; a GitHub-hosted fallback doesn't → no-op). Must run before the
       # build steps so the env it exports is in scope.
       - uses: ./.github/actions/build-accel
 
@@ -306,7 +311,7 @@ jobs:
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.node == 'true') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
     timeout-minutes: 25
     defaults:
       run:
@@ -407,7 +412,7 @@ jobs:
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.code == 'true') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -481,7 +486,7 @@ jobs:
     if: ${{ !cancelled() && needs.rust.result == 'success' && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.code == 'true') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
     env:
       # uv's download cache (persistent runner home) and the workspace venv
       # land on different filesystems on the Docker runner, so uv can't
@@ -660,7 +665,7 @@ jobs:
     if: ${{ !cancelled() && needs.rust.result == 'success' && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.code == 'true') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
     env:
       UV_LINK_MODE: copy
     # A --release maturin build (PyO3 + bundled DuckDB) plus three isolated
@@ -784,7 +789,7 @@ jobs:
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.docs == 'true') }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

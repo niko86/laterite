@@ -2,7 +2,7 @@ name: build-accel
 description: >
   Conditionally enable the Rust build accelerators (sccache + mold) for this job,
   but ONLY when they're actually present on the runner. The pool's baked
-  `ags5-runner` image ships both; a GitHub-hosted fallback (or any other runner)
+  `laterite-runner` image ships both; a GitHub-hosted fallback (or any other runner)
   ships neither, where this step simply no-ops and the build runs unaccelerated.
   That's the whole point: the workflows can carry these flags unconditionally
   without breaking a runner that lacks the tools.
@@ -30,12 +30,12 @@ runs:
         # sccache: wrap rustc AND the C/C++ compiler (so DuckDB's bundled C++
         # amalgamation is cached too, not just Rust). Incremental compilation is
         # incompatible with sccache, so turn it off. SCCACHE_DIR/backend is
-        # provided by the runner's own env (the pool stack points it at the NFS
-        # mount); we only flip the wrappers on.
+        # provided by the runner's own env (the pool stack points it at a mount
+        # shared across runners); we only flip the wrappers on.
         if command -v sccache >/dev/null 2>&1; then
           # SCCACHE_BASEDIR rewrites absolute paths under the workspace to relative
           # in the cache key — without it the EPHEMERAL runner's random name in the
-          # build path (/_work/ags5-pool-<rnd>/…) busts the C/C++ (bundled-DuckDB)
+          # build path (/_work/laterite-pool-<rnd>/…) busts the C/C++ (bundled-DuckDB)
           # cache every run (the long pole). BUT the sccache SERVER reads basedir
           # only at STARTUP, and letting cargo spawn it implicitly left it unset
           # ("Base directories (none)" → still cold). So start the server HERE with
