@@ -275,6 +275,64 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
+  # build-ext: compile the PyO3 cdylib ONCE ("build once"). The python and
+  # docs jobs both used to run their own `maturin develop`, compiling the same
+  # debug _laterite_native .so twice per PR (wheel-smoke builds a third, but that
+  # is a RELEASE wheel install-smoke and legitimately its own artefact — left
+  # alone). Here the debug cdylib is built a single time and uploaded; python and
+  # docs download it into the package source tree instead of recompiling. sccache
+  # already made the repeat compiles cache-hits, so the win is the redundant LINK
+  # plus a freed slot on the 2-runner pool, not raw wall-clock.
+  build-ext:
+    needs: changes
+    # Runs whenever EITHER consumer runs: `code` (python) OR `docs` (docs). Same
+    # !cancelled() + filter-failed-means-run discipline as the other jobs.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.code == 'true'
+        || needs.changes.outputs.docs == 'true') }}
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
+    env:
+      UV_LINK_MODE: copy
+    # This job now carries the one cold cdylib build (PyO3 + the workspace as a
+    # lib), so it gets the generous ceiling the python job used to need.
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable # explicit channel — see the rust job's note above
+      # sccache + mold for the maturin (PyO3) build, if the runner has them.
+      - uses: ./.github/actions/build-accel
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+      - name: Install Python 3.14 via uv
+        run: uv python install 3.14
+      - name: uv sync (deps + maturin into the venv)
+        run: uv sync --all-extras
+      # Build the debug abi3 cdylib into packages/laterite/python/laterite/ —
+      # byte-identical to the `maturin develop` the python/docs jobs used to run
+      # (same maturin from the venv, same 3.14 interpreter), so the artefact they
+      # download is exactly what they would have compiled themselves.
+      - name: Build native extension (maturin develop)
+        run: (cd packages/laterite && uv run --no-sync maturin develop --uv)
+      - name: Upload prebuilt cdylib
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: laterite-cdylib
+          # Glob so the abi3 (`_laterite_native.abi3.so`) or interpreter-tagged
+          # name both match; error rather than silently upload nothing.
+          path: packages/laterite/python/laterite/_laterite_native*.so
+          if-no-files-found: error
+          retention-days: 1
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
   # laterite-node: the napi addon + TS package. The `rust` job above already
   # compiles the crate (workspace clippy/test); this gate is the TS half —
   # build the native addon, typecheck, and run the vitest suite (read/validate/
@@ -424,7 +482,7 @@ jobs:
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
   python:
-    needs: [changes, rust]
+    needs: [changes, build-ext]
     # `!cancelled()` is load-bearing, NOT decoration: GitHub applies an implicit
     # success() to any `if:` without a status-check function, so a job whose
     # `needs` FAILED is skipped before the condition is ever read. Referencing
@@ -433,7 +491,14 @@ jobs:
     # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
     # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
     # the filter failing to answer must never read as "nothing changed".
-    if: ${{ !cancelled() && needs.rust.result == 'success' && (github.event_name != 'pull_request'
+    #
+    # NB there is deliberately NO `needs.build-ext.result == 'success'` guard:
+    # build-ext (the prebuilt-cdylib producer) is NOT a required check, so if it
+    # fails python must FAIL — its download-artifact step 404s — not SKIP. A
+    # skipped required check counts as success (the #561 trap), which would let a
+    # broken build merge. `!cancelled()` runs python despite a build-ext failure
+    # so the missing artefact surfaces as red here (python IS required).
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.code == 'true') }}
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
@@ -445,20 +510,17 @@ jobs:
       # packages); this just acknowledges it so the log isn't noisy. NOT a
       # perf fix — that would need the cache to share the venv's filesystem.
       UV_LINK_MODE: copy
-    # 50 min ceiling: the python job builds the laterite-py PyO3 cdylib fresh
-    # via maturin (the rust job excludes it). Since the AGS5 crates (the
-    # bundled-DuckDB long pole) were decoupled to ags5/, this is now far
-    # lighter; the headroom over the rust job's 35 still covers a cold bootstrap
-    # run COMPLETING + populating the cache rather than timing out mid-compile
-    # (which would save nothing and loop). Warm runs finish well under 10 min.
-    timeout-minutes: 50
+    # 30 min ceiling: the cdylib is now built ONCE in build-ext and downloaded
+    # here (see the download step below), so this job's only compile is the lean
+    # lat CLI (no bundled DuckDB) plus uv sync + pytest — comfortably under 30 on
+    # a warm sccache. (Was 50 when this job compiled the PyO3 cdylib itself.)
+    timeout-minutes: 30
     steps:
-      # needs: rust is fail-fast only — don't spend python minutes if the
-      # Rust build is red — NOT a way to share target/: on the ephemeral
-      # pool this job may land on a different runner with its own fresh
-      # _work. The cross-job warm cache is sccache, so maturin's PyO3 +
-      # bundled-DuckDB compile still hits the shared cache the rust job
-      # populated.
+      # needs: build-ext gives this job the prebuilt _laterite_native cdylib
+      # (downloaded below) instead of recompiling it. The Rust toolchain +
+      # build-accel below are STILL needed — not for the cdylib, but for the lean
+      # lat CLI build further down (the byte-parity tests exercise the shipped
+      # binary at target/release/lat).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Rust toolchain
@@ -491,26 +553,18 @@ jobs:
       - name: uv sync (deps + maturin into the venv)
         run: uv sync --all-extras
 
-      - name: Build native extensions (maturin develop)
-        # uv sync installs the workspace packages *editable* but does NOT
-        # compile the PyO3 cdylib — the _laterite_native .so only exists
-        # after maturin builds it into the package's python/ source tree,
-        # so without this step `import laterite` fails with a
-        # missing-_laterite_native ImportError. DEBUG build (no --release):
-        # nothing in the CI suite
-        # asserts wall-clock timing (test_perf only *records* via
-        # pytest-benchmark, never gates), so the heavy release profile
-        # (opt-level=3 + thin-LTO + codegen-units=1 × bundled DuckDB)
-        # would just risk the timeout for no test benefit.
-        #
-        # No `cargo clean -p` / `rm -rf target/maturin` guard: that worked
-        # around a truncated cdylib left in a *persisted* target/ by an
-        # interrupted build on the old single runner. Ephemeral runners start
-        # every job with a fresh _work (no persisted target/), so there's
-        # nothing stale to inherit — the guard would only force a needless
-        # relink of the PyO3 cdylib each run.
-        run: |
-          (cd packages/laterite && uv run --no-sync maturin develop --uv)
+      - name: Download prebuilt cdylib
+        # The _laterite_native .so that build-ext compiled once. uv sync
+        # above installed laterite EDITABLE (import resolves to the package's
+        # python/ source tree) but did not build the extension; dropping the
+        # prebuilt .so into that same tree makes `import laterite` work with
+        # exactly the layout `maturin develop` used to produce — one extension,
+        # nothing recompiled, so no editable-vs-wheel shadowing. A missing
+        # artefact (build-ext failed) 404s here → this required job goes red.
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: laterite-cdylib
+          path: packages/laterite/python/laterite/
 
       - name: Build lat CLI (for the byte-parity tests)
         # The byte-parity tests (test_cli_json_ndjson_exit_byte_parity et al.)
@@ -700,7 +754,11 @@ jobs:
   # tests/test_docs_examples.py in the `python` job (also `code`-filtered, so an
   # example or fixture edit re-runs it there).
   docs:
-    needs: changes
+    # needs build-ext for the prebuilt cdylib (downloaded below). No
+    # build-ext-success guard, same reason as the python job: build-ext isn't
+    # required, so a build-ext failure must fail THIS (required) job via the
+    # 404ing download, not skip-pass it.
+    needs: [changes, build-ext]
     # `!cancelled()` is load-bearing, NOT decoration: GitHub applies an implicit
     # success() to any `if:` without a status-check function, so a job whose
     # `needs` FAILED is skipped before the condition is ever read. Referencing
@@ -716,26 +774,28 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
-        with:
-          toolchain: stable
-      - uses: ./.github/actions/build-accel
+      # No Rust toolchain / build-accel here any more: the cdylib is built once
+      # in build-ext and downloaded below, so this job no longer compiles
+      # anything — it is a pure Python (uv + mkdocs) job.
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - name: Install Python 3.14 via uv
+        # Pin the interpreter to the one build-ext built the cdylib against (the
+        # python job pins 3.14 too). The shipped wheel is abi3, so a single .so
+        # would load on 3.12+ regardless, but pinning removes the assumption.
+        run: uv python install 3.14
       - name: Build the working-tree wheel + docs deps
         run: uv sync --group docs
       # `uv sync` installs laterite EDITABLE but does NOT build the PyO3 cdylib
       # (same gotcha the python job documents) — so mkdocstrings' runtime import
-      # AND the group-catalogue generator need an explicit maturin develop to
-      # build + co-locate `_laterite_native` into the package source tree.
-      # Without this the docs build only works on a warm uv cache (it did in #286
-      # by luck; a cold runner fails to import laterite).
-      - name: Build native extension (maturin develop)
-        run: (cd packages/laterite && uv run --no-sync maturin develop --uv)
+      # AND the group-catalogue generator need `_laterite_native` co-located in
+      # the package source tree. Download the prebuilt .so (from build-ext) into
+      # that tree instead of recompiling it with `maturin develop`. A missing
+      # artefact (build-ext failed) 404s here → this required job goes red.
+      - name: Download prebuilt cdylib
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: laterite-cdylib
+          path: packages/laterite/python/laterite/
       - name: mkdocs build --strict
         working-directory: web/docs-site
         run: uv run --no-sync mkdocs build --strict
-      - name: sccache stats
-        if: always()
-        shell: bash
-        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
