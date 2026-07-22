@@ -232,13 +232,48 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
+  # Ruleset-drift gate (I2 of the CI/CD audit). The branch-protection ruleset —
+  # the required-check SET, enforcement, admin-bypass actors, the strict flag —
+  # lives ONLY in repo settings; nothing in the tree pins it, so a silent edit (a
+  # required check removed, enforcement dropped to `evaluate`, bypass widened, the
+  # protected branch swapped) goes unnoticed until something slips through. Snapshot
+  # the canonical ruleset in .github/rulesets/main-protection.expected.json and fail
+  # if the live one drifts. Read-only. Needs a fine-grained PAT with
+  # `administration: read` in GH_RULESET_TOKEN — the default GITHUB_TOKEN cannot read
+  # a ruleset's bypass_actors. GitHub-hosted: pure API + jq, no build, no pool lane.
+  ruleset-drift:
+    if: github.repository == 'niko86/laterite'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Compare the live main-protection ruleset to the committed snapshot
+        env:
+          GH_TOKEN: ${{ secrets.GH_RULESET_TOKEN }}
+        run: |
+          set -euo pipefail
+          norm=.github/rulesets/normalize.jq
+          snapshot=.github/rulesets/main-protection.expected.json
+          # Normalise BOTH sides through the SAME filter so formatting / key order
+          # can never cause a false diff — only governance content can.
+          gh api "repos/${GITHUB_REPOSITORY}/rulesets/19425032" \
+            | jq -S -f "$norm" > live.normalized.json
+          jq -S -f "$norm" "$snapshot" > expected.normalized.json
+          if ! diff -u expected.normalized.json live.normalized.json; then
+            echo "::error::The 'main protection' ruleset (19425032) drifted from ${snapshot}. If the change was intentional, regenerate it: gh api repos/${GITHUB_REPOSITORY}/rulesets/19425032 | jq -S -f ${norm} > ${snapshot}"
+            exit 1
+          fi
+          echo "main-protection ruleset matches the committed snapshot."
+
   # Open or update ONE tracking issue when the nightly fails, so a bad night is
   # actionable without watching the Actions tab. GitHub also emails the owner on a
   # scheduled-workflow failure, so this is the durable, dedup'd record — and it
   # no-ops gracefully if the runner has no `gh` (the email still fires).
   notify:
-    needs: [coverage, deny, links, wheel-smoke]
-    if: ${{ always() && (needs.coverage.result == 'failure' || needs.deny.result == 'failure' || needs.links.result == 'failure' || needs.wheel-smoke.result == 'failure') }}
+    needs: [coverage, deny, links, wheel-smoke, ruleset-drift]
+    if: ${{ always() && (needs.coverage.result == 'failure' || needs.deny.result == 'failure' || needs.links.result == 'failure' || needs.wheel-smoke.result == 'failure' || needs.ruleset-drift.result == 'failure') }}
     # GitHub-hosted so `gh` is guaranteed present (the pool image may lack it) —
     # the whole point of this job is to reliably open the tracking issue.
     runs-on: ubuntu-latest
@@ -254,6 +289,7 @@ jobs:
           DENY: ${{ needs.deny.result }}
           LINKS: ${{ needs.links.result }}
           WHEEL: ${{ needs.wheel-smoke.result }}
+          RULESET: ${{ needs.ruleset-drift.result }}
         run: |
           set -euo pipefail
           command -v gh >/dev/null 2>&1 || {
@@ -264,7 +300,7 @@ jobs:
           num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
             --search "in:title \"$title\"" --json number,title \
             --jq "[.[] | select(.title==\"$title\")][0].number // empty")
-          body="The nightly run failed: $RUN_URL (coverage=$COV, deny=$DENY, links=$LINKS, wheel=$WHEEL)."
+          body="The nightly run failed: $RUN_URL (coverage=$COV, deny=$DENY, links=$LINKS, wheel=$WHEEL, ruleset=$RULESET)."
           if [ -n "$num" ]; then
             gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
