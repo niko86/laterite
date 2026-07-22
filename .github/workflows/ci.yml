@@ -92,33 +92,17 @@ jobs:
               - 'web/docs-site/examples/**'  # docs example sources — test_docs_examples.py executes these
               - 'examples/sample_site.ags'   # the fixture that gate reads (subprocess cwd = repo root)
               - 'web/docs-site/scripts/**'   # catalogue_data/gen_* — its drift gate (test_groups_catalogue_faithful) runs in the python job
-              # SSOT→generator faithfulness gates whose canon lives at repo root /
-              # ags-wiki (NOT under packages|rust-packages|tests) — so an SSOT-only PR
-              # would otherwise skip the python job and never run the gate that guards
-              # it (the reliability audit's own "enforcement that doesn't run" hole).
-              - 'modality.json'                             # test_modality_faithful + test_modality_parity
-              - 'tools/gen_modality.py'                     # the generator — a render change must re-run it
-              - 'observations.json'                         # test_observations_faithful
-              - 'OBSERVATIONS.md'                           # its committed render
-              - 'tools/gen_observations.py'                 # the generator
-              - 'tools/vendor/laterite-duckdb-functions.json'          # test_duckdb_surface_faithful (the pinned duckdb fn manifest)
-              - 'web/docs-site/docs/reference/duckdb-functions.md'     # the guarded doc — a hand-edit must re-run the gate
-              - 'tools/gen_reference_groups.py'                        # test_reference_groups_faithful — the group tier generator (its SSOT, ags_dictionary.json, is already covered by rust-packages/**)
-              - 'tools/gen_crate_graph.py'                             # test_crate_graph_faithful — the crate-graph generator (its SSOT, the Cargo manifests, is already covered by rust-packages/**)
-              - 'tools/wheel_smoke.py'                                 # the wheel-smoke job's post-install smoke — an edit to it must re-run that job (#554)
-              - 'surface-census.json'                                  # test_census_faithful — the census SSOT
-              - 'tools/gen_census.py'                                  # the census generator — a render/related change must re-run it
-              # The PUBLISHED parity claim (#556). tests/test_parity_claim_faithful.py
-              # asserts these match parity-known-failures.json — but that gate lives in
-              # the python job, so without these paths a README-only edit would skip the
-              # very gate that guards it. That is how the claim rotted to 122/131: O-47
-              # moved the number, parity.yml was updated, and nothing ran when the docs
-              # weren't.
-              - 'parity-known-failures.json'                          # the parity SSOT
-              - 'README.md'                                           # the headline claim
-              - 'packages/laterite/README.md'                         # ships in the wheel, to PyPI
-              - 'COMPAT.md'                                           # the non-closure table
-              - 'docs/parity-coverage-map.md'                         # the verification recipe
+              # SSOT paths whose faithfulness gate lives in the root `tests/`
+              # suite — which is private-only (blocklisted from this public
+              # mirror). On this repo those gates aren't present, so an SSOT / doc
+              # edit here would fire the ~12-min `python` job for a gate that can't
+              # run (a README badge bump rebuilding the whole wheel is the visible
+              # symptom). Keep ONLY the paths a test or job IN THIS REPO actually
+              # reads; the rest return alongside the private faithfulness suite.
+              - 'modality.json'          # read by test_modality_parity (packages/laterite/tests)
+              - 'COMPAT.md'              # referenced by test_laterite (packages/laterite/tests)
+              - 'tools/gen_census.py'    # referenced by test_merge (packages/laterite/tests)
+              - 'tools/wheel_smoke.py'   # the wheel-smoke job's post-install smoke (#554)
             node:
               # The napi addon links sibling crates — laterite-ags4-validator,
               # laterite-types, laterite-ags4-emit (see laterite-node/Cargo.toml) —
