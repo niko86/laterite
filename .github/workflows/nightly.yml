@@ -162,13 +162,80 @@ jobs:
           fail: true
           jobSummary: true
 
+  # The full wheel install matrix (W1). The per-PR ci.yml `wheel-smoke` keeps a
+  # cheap 3.12-only build+import gate on the required path; the wider 3.13/3.14
+  # legs + the [compat] and [compat,pyarrow] isolated smokes are a once-a-day
+  # check here, off the PR path. Same --release build (warm on the pool).
+  wheel-smoke:
+    runs-on: ["self-hosted", "linux", "x64", "laterite-linux"]
+    timeout-minutes: 45
+    env:
+      UV_LINK_MODE: copy
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+      # sccache + mold so the maturin compile hits the warm cache.
+      - uses: ./.github/actions/build-accel
+      - name: Install uv
+        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        with:
+          enable-cache: false
+      - name: Install Python 3.12 / 3.13 / 3.14 via uv
+        run: uv python install 3.12 3.13 3.14
+      - name: uv sync (build backend into the venv)
+        run: uv sync
+      - name: Build the release wheel
+        run: (cd packages/laterite && uv run --no-sync maturin build --release --out "$GITHUB_WORKSPACE/dist")
+      # Isolated install + console-script + import on all three interpreters the
+      # abi3-py312 wheel promises to run on (exactly `pip install laterite`).
+      - name: Install-and-import the wheel on 3.12 / 3.13 / 3.14
+        run: |
+          set -euxo pipefail
+          wheel=$(echo "$GITHUB_WORKSPACE"/dist/laterite-*.whl)
+          for v in 3.12 3.13 3.14; do
+            venv="$GITHUB_WORKSPACE/.smoke-$v"
+            uv venv --python "$v" --clear "$venv"
+            uv pip install --python "$venv/bin/python" "$wheel"
+            "$venv/bin/lat" --help >/dev/null
+            "$venv/bin/python" --version
+            "$venv/bin/python" tools/wheel_smoke.py
+          done
+      # The drop-in is pyarrow-FREE: [compat] pulls only pandas. This isolated
+      # install is the ONLY place the pyarrow-free fallback runs — assert pyarrow
+      # is ABSENT and the object-dtype drop-in still works.
+      - name: '[compat] is pyarrow-free + object-dtype drop-in'
+        run: |
+          set -euxo pipefail
+          wheel=$(echo "$GITHUB_WORKSPACE"/dist/laterite-*.whl)
+          venv="$GITHUB_WORKSPACE/.smoke-compat"
+          uv venv --python 3.12 --clear "$venv"
+          uv pip install --python "$venv/bin/python" "${wheel}[compat]"
+          "$venv/bin/python" tools/compat_smoke.py
+      # The opt-in accelerator: [compat,pyarrow] adds pyarrow (swaps the pandas hop
+      # for to_pandas + unlocks string_dtype='string').
+      - name: '[compat,pyarrow] accelerator: fast hop + string dtype'
+        run: |
+          set -euxo pipefail
+          wheel=$(echo "$GITHUB_WORKSPACE"/dist/laterite-*.whl)
+          venv="$GITHUB_WORKSPACE/.smoke-compat-pyarrow"
+          uv venv --python 3.12 --clear "$venv"
+          uv pip install --python "$venv/bin/python" "${wheel}[compat,pyarrow]"
+          "$venv/bin/python" tools/compat_pyarrow_smoke.py
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
   # Open or update ONE tracking issue when the nightly fails, so a bad night is
   # actionable without watching the Actions tab. GitHub also emails the owner on a
   # scheduled-workflow failure, so this is the durable, dedup'd record — and it
   # no-ops gracefully if the runner has no `gh` (the email still fires).
   notify:
-    needs: [coverage, deny, links]
-    if: ${{ always() && (needs.coverage.result == 'failure' || needs.deny.result == 'failure' || needs.links.result == 'failure') }}
+    needs: [coverage, deny, links, wheel-smoke]
+    if: ${{ always() && (needs.coverage.result == 'failure' || needs.deny.result == 'failure' || needs.links.result == 'failure' || needs.wheel-smoke.result == 'failure') }}
     # GitHub-hosted so `gh` is guaranteed present (the pool image may lack it) —
     # the whole point of this job is to reliably open the tracking issue.
     runs-on: ubuntu-latest
@@ -183,6 +250,7 @@ jobs:
           COV: ${{ needs.coverage.result }}
           DENY: ${{ needs.deny.result }}
           LINKS: ${{ needs.links.result }}
+          WHEEL: ${{ needs.wheel-smoke.result }}
         run: |
           set -euo pipefail
           command -v gh >/dev/null 2>&1 || {
@@ -193,7 +261,7 @@ jobs:
           num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
             --search "in:title \"$title\"" --json number,title \
             --jq "[.[] | select(.title==\"$title\")][0].number // empty")
-          body="The nightly run failed: $RUN_URL (coverage=$COV, deny=$DENY, links=$LINKS)."
+          body="The nightly run failed: $RUN_URL (coverage=$COV, deny=$DENY, links=$LINKS, wheel=$WHEEL)."
           if [ -n "$num" ]; then
             gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
