@@ -50,7 +50,7 @@ permissions:
 
 jobs:
   # Gate the heavy jobs on actual CODE changes. A docs / tools / assets PR (no
-  # Rust or Python source change) skips rust/coverage/python — they'd only
+  # Rust or Python source change) skips rust/test/python — they'd only
   # re-measure what master already passed, and the redundant bundled-DuckDB
   # compiles pile up and starve the ephemeral pool under PR contention (the
   # "empty step conclusion + missing log" runner deaths). Web tests have their
@@ -269,20 +269,18 @@ jobs:
           # in this fast job, not at adoption.
           cargo build -p laterite-ags4-censor --target wasm32-unknown-unknown
 
-      # No `cargo test --workspace` here: the dedicated `coverage` job below is
-      # the SOLE Rust test authority. It runs the same instrumented workspace
-      # tests (minus the two PyO3 glue crates, which the Python job exercises)
-      # AND gates a line-coverage floor — so a plain `cargo test` here would just
-      # re-run the identical suite, a duplicate full Rust test pass (incl. the
-      # long bundled-DuckDB compile) on every push for no extra signal. The one
-      # test the coverage job excludes is laterite-ags4-wasm's, run on its own
-      # below.
+      # No `cargo test --workspace` here: the parallel `test` job below is the
+      # PR-tier Rust test authority (plain, sccache-warm), and the nightly
+      # (nightly.yml) runs the heavier INSTRUMENTED coverage measurement. Keeping
+      # the workspace test out of THIS job is deliberate — folding it in would
+      # lengthen the `rust` -> `python` critical path (python `needs: rust`) and
+      # make every PR slower, for no gain over running it in parallel.
 
-      # laterite-ags4-wasm is excluded from the coverage workspace run too (a
-      # wasm32 cdylib, built elsewhere), so it's the single test the sole-
-      # authority coverage job doesn't cover. Its host-compilable unit tests
-      # (the typed-Arrow parse() parity guard) run fine on the host without the
-      # wasm target, so run them on their own here.
+      # laterite-ags4-wasm is a wasm32 cdylib built elsewhere, so it's excluded
+      # from the `test` / nightly-coverage workspace runs. Its host-compilable
+      # unit tests (the typed-Arrow parse() parity guard) run fine on the host
+      # without the wasm target, so run them on their own here — in this fast
+      # job, beside the wasm32 build check above.
       - name: cargo test (laterite-ags4-wasm parity)
         working-directory: rust-packages
         run: cargo test -p laterite-ags4-wasm
@@ -376,97 +374,50 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
-  # The SOLE Rust test authority + the coverage floor gate, in one job. The
-  # `rust` job above runs fmt/clippy (+ the wasm-only parity test) but NO
-  # `cargo test --workspace` — this job's instrumented run IS that test pass,
-  # so there's exactly one full Rust test execution per push instead of two.
-  # PARALLEL — no `needs`, so it never slows the fast `rust`/`python` feedback
-  # above. Separate because `-C instrument-coverage` changes RUSTFLAGS: sccache
-  # can't share its cache with the plain build (the bundled-DuckDB C++ still
-  # hits sccache via CC/CXX; only the instrumented Rust recompiles), so folding
-  # coverage into the `rust` job would just slow every run. The floor is a
-  # FLOOR, ratchet up over time.
+  # PR-tier Rust test authority. The heavier INSTRUMENTED coverage MEASUREMENT
+  # moved to the nightly (nightly.yml) — `-C instrument-coverage` changes
+  # RUSTFLAGS so every Rust crate is an sccache MISS (only the bundled-DuckDB
+  # C++ stays cached via CC/CXX), which made it the single longest job on the PR
+  # board. This plain `cargo test` uses the SAME non-instrumented profile the
+  # rest of CI builds, so it is cache-warm run over run, not a cold recompile.
+  # PARALLEL — no `needs` beyond `changes` — so it never slows the fast
+  # `rust` -> `python` critical path (folding it into `rust` would).
   #
-  # Scope: the workspace minus laterite-ags4-wasm (a wasm32 cdylib, built elsewhere)
-  # and the host-runtime binding cdylibs laterite-py (PyO3) + laterite-node
-  # (napi-rs) — exercised by the Python / Node suites in the `python` / `node`
-  # jobs, never by `cargo test`, so including them would measure ~0% binding glue
-  # and let unrelated PyO3/napi growth trip the gate. (laterite-node further
-  # *can't* link a standalone lib-test under napi 3: napi's `Error::drop`
-  # references N-API symbols — `napi_delete_reference` etc. — that only exist
-  # once the Node host loads the addon; the same reason its tests live in vitest,
-  # not `cargo test`.) The 62 floor has
-  # ample headroom: since the AGS5 crates (laterite-ags5-db's Python-tested
-  # CLI/query, which held the number down to ~68%) were decoupled to ags5/, the
-  # kept crates (validator/types/core at 95-97%) lift the workspace number clear.
-  coverage:
+  # Scope: the workspace minus laterite-ags4-wasm (a wasm32 cdylib, built +
+  # host-tested in the `rust` job) and the binding cdylibs laterite-py (PyO3) +
+  # laterite-node (napi) — exercised by the Python / Node suites, never by
+  # `cargo test` (laterite-node further can't even link a standalone lib-test
+  # under napi 3: its N-API symbols only resolve once the Node host loads the
+  # addon). The nightly coverage run uses the identical exclude set.
+  test:
     needs: changes
-    # `!cancelled()` is load-bearing, NOT decoration: GitHub applies an implicit
-    # success() to any `if:` without a status-check function, so a job whose
-    # `needs` FAILED is skipped before the condition is ever read. Referencing
-    # needs.changes.result is NOT such a function — without !cancelled() this
-    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
-    # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
-    # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
-    # the filter failing to answer must never read as "nothing changed".
+    # `!cancelled()` is load-bearing (see the rust job's note): a failed `needs`
+    # must not silently skip us, and `!= 'success'` means any non-answer runs.
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.code == 'true') }}
     runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
-    timeout-minutes: 45
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Install Rust toolchain (+ llvm-tools)
+      - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
-          toolchain: stable # explicit channel — see the rust job's note above
-          # cargo-llvm-cov needs llvm-tools-preview (llvm-profdata/llvm-cov).
-          components: llvm-tools-preview
+          toolchain: stable
 
-      # sccache + mold: the bundled-DuckDB C++ compile (the long pole) is
-      # cached across this and the `rust` job; only the instrumented Rust
-      # crates recompile here.
+      # sccache + mold (no-op off the pool) — the plain profile shares the cache
+      # the `rust` job populated.
       - uses: ./.github/actions/build-accel
 
-      - name: Install cargo-llvm-cov
-        # Prebuilt binary (no compile, no runner-image rebuild). SHA-pinned
-        # per the supply-chain policy; Dependabot bumps it.
-        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
-        with:
-          tool: cargo-llvm-cov
-
-      # Split into collect + report so the same profdata feeds BOTH the floor
-      # gate (always) and the lcov upload (public repo only). --no-report runs
-      # the instrumented tests; the two `report` calls reuse the merged profdata.
-      - name: cargo llvm-cov (collect)
+      - name: cargo test (workspace)
         working-directory: rust-packages
         run: |
-          cargo llvm-cov --no-report --workspace \
+          cargo test --workspace \
             --exclude laterite-ags4-wasm \
             --exclude laterite-ags4-tokenizer-wasm \
             --exclude laterite-py \
             --exclude laterite-node
-
-      - name: cargo llvm-cov (line-coverage floor)
-        working-directory: rust-packages
-        run: cargo llvm-cov report --summary-only --fail-under-lines 62
-
-      # Codecov `rust` flag — public repo only (niko86/laterite), where the badge
-      # lives + CODECOV_TOKEN is set. NB: this is the cargo-only number (the PyO3
-      # glue is Python-tested, excluded above), so the rust flag reads ~68%.
-      - name: lcov report for Codecov
-        if: github.repository == 'niko86/laterite'
-        working-directory: rust-packages
-        run: cargo llvm-cov report --lcov --output-path rust.lcov
-      - name: Upload Rust coverage to Codecov
-        if: github.repository == 'niko86/laterite'
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
-        with:
-          files: rust-packages/rust.lcov
-          flags: rust
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
 
       - name: sccache stats
         if: always()

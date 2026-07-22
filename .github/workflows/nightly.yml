@@ -1,0 +1,160 @@
+# Nightly heartbeat (Stage 2 of the CI two-tier restructure). The heavy
+# MEASUREMENT work that doesn't need to gate every PR runs here on a schedule,
+# on the warm self-hosted pool:
+#
+#   - instrumented coverage — its `-C instrument-coverage` build changes RUSTFLAGS
+#     so every Rust crate is an sccache MISS (only the bundled-DuckDB C++ stays
+#     cached via CC/CXX). That made it the single longest job when it lived on the
+#     PR path; the per-PR Rust tests now run plain + cache-warm in ci.yml's `test`
+#     job, and the coverage NUMBER is measured here once a day.
+#   - a re-run of the supply-chain advisory check (`cargo deny`) so a RustSec
+#     advisory published against an UNCHANGED dependency is caught within ~24h,
+#     with zero code change — exactly the drift the per-PR `deny` job can't see.
+#
+# Validate-only: nothing is uploaded or retained (coverage results go to Codecov,
+# an external service). A failed run opens or updates ONE tracking issue.
+#
+# Why run on a schedule even when nothing changed: the point is to catch breakage
+# that has nothing to do with our commits — a new advisory, a yanked dep,
+# toolchain or platform drift. Gating on "our code changed" would miss exactly
+# that class, and on our own pool the cost is ~zero. (GitHub auto-disables a
+# scheduled workflow after 60 days of repo inactivity — irrelevant while active.)
+#
+# Runner: schedule + workflow_dispatch are TRUSTED events with no fork surface
+# (dispatch needs write access; schedule runs as the repo), so these jobs go
+# straight to the warm `laterite-linux` pool — no fork-routing ternary needed.
+
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # 04:00 UTC daily
+  workflow_dispatch: # the manual "run heavy" button
+
+# Don't cancel a slow night if the next trigger lands — let it finish (a
+# half-measured coverage run is worse than a late one).
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Instrumented line-coverage + the floor gate + the Codecov `rust` flag. Lifted
+  # off the PR path (was ci.yml's `coverage` job) — same scope, same floor.
+  coverage:
+    runs-on: ["self-hosted", "linux", "x64", "laterite-linux"]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Install Rust toolchain (+ llvm-tools)
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+          # cargo-llvm-cov needs llvm-tools-preview (llvm-profdata/llvm-cov).
+          components: llvm-tools-preview
+
+      # sccache + mold: the bundled-DuckDB C++ compile stays cached (CC/CXX);
+      # only the instrumented Rust crates recompile here.
+      - uses: ./.github/actions/build-accel
+
+      - name: Install cargo-llvm-cov
+        # Prebuilt binary (no compile). SHA-pinned; Dependabot bumps it.
+        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
+        with:
+          tool: cargo-llvm-cov
+
+      # Split collect + report so the same profdata feeds BOTH the floor gate and
+      # the lcov upload. --no-report runs the instrumented tests; the two `report`
+      # calls reuse the merged profdata.
+      - name: cargo llvm-cov (collect)
+        working-directory: rust-packages
+        run: |
+          cargo llvm-cov --no-report --workspace \
+            --exclude laterite-ags4-wasm \
+            --exclude laterite-ags4-tokenizer-wasm \
+            --exclude laterite-py \
+            --exclude laterite-node
+
+      - name: cargo llvm-cov (line-coverage floor)
+        working-directory: rust-packages
+        run: cargo llvm-cov report --summary-only --fail-under-lines 62
+
+      # Codecov `rust` flag — public repo only (where the badge lives + the token
+      # is set). NB: the cargo-only number (PyO3 glue is Python-tested, excluded).
+      - name: lcov report for Codecov
+        if: github.repository == 'niko86/laterite'
+        working-directory: rust-packages
+        run: cargo llvm-cov report --lcov --output-path rust.lcov
+      - name: Upload Rust coverage to Codecov
+        if: github.repository == 'niko86/laterite'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: rust-packages/rust.lcov
+          flags: rust
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
+  # Re-check the supply-chain advisory + license policy against the CURRENT deps.
+  # The per-PR `deny` job only runs when a PR lands; this catches an advisory
+  # published against a dependency we already ship, between PRs.
+  deny:
+    runs-on: ["self-hosted", "linux", "x64", "laterite-linux"]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: rust toolchain (cargo-deny shells out to `cargo metadata`)
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      - name: install cargo-deny
+        uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
+        with:
+          tool: cargo-deny
+      - name: cargo deny check
+        working-directory: rust-packages
+        run: cargo deny check
+
+  # Open or update ONE tracking issue when the nightly fails, so a bad night is
+  # actionable without watching the Actions tab. GitHub also emails the owner on a
+  # scheduled-workflow failure, so this is the durable, dedup'd record — and it
+  # no-ops gracefully if the runner has no `gh` (the email still fires).
+  notify:
+    needs: [coverage, deny]
+    if: ${{ always() && (needs.coverage.result == 'failure' || needs.deny.result == 'failure') }}
+    runs-on: ["self-hosted", "linux", "x64", "laterite-linux"]
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: open or update the nightly-failure tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COV: ${{ needs.coverage.result }}
+          DENY: ${{ needs.deny.result }}
+        run: |
+          set -euo pipefail
+          command -v gh >/dev/null 2>&1 || {
+            echo "gh CLI not on runner — relying on the default scheduled-failure email"
+            exit 0
+          }
+          title="Nightly CI failing"
+          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "in:title \"$title\"" --json number,title \
+            --jq "[.[] | select(.title==\"$title\")][0].number // empty")
+          body="The nightly run failed: $RUN_URL (coverage=$COV, deny=$DENY)."
+          if [ -n "$num" ]; then
+            gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
