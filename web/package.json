@@ -50,7 +50,7 @@
     "@types/node": "^26.1.1",
     "@vitest/coverage-v8": "^4.1.8",
     "@vitest/eslint-plugin": "^1.6.23",
-    "eslint": "^9.39.5",
+    "eslint": "^10.7.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-solid": "^0.14.5",
     "knip": "^6.29.0",
