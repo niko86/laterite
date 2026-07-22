@@ -84,7 +84,10 @@ jobs:
 
       - name: cargo llvm-cov (line-coverage floor)
         working-directory: rust-packages
-        run: cargo llvm-cov report --summary-only --fail-under-lines 62
+        # Floor sits just under the real number (90% as of 2026-07, so 88 leaves
+        # a small buffer for normal fluctuation) and is RATCHETED UP as coverage
+        # climbs. The old 62 was 28 points below actual — it caught nothing.
+        run: cargo llvm-cov report --summary-only --fail-under-lines 88
 
       # Codecov `rust` flag — public repo only (where the badge lives + the token
       # is set). NB: the cargo-only number (PyO3 glue is Python-tested, excluded).
