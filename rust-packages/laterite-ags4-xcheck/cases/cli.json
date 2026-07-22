@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "cli.fix.dest.txt",
+      "op": "fix_dest",
+      "input": { "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/data.txt", "as": "data.txt" },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "`lat fix data.txt` with no --fix-out writes the sibling `data.fixed.txt` — `.fixed` inserted before the extension (native `sibling_fixed_path`, uvx `stem.fixed.suffix`). npx once wrote `data.txt.fixed.ags` (drift #3); fixed in this cut."
+    },
+    {
+      "id": "cli.fix.dest.ags",
+      "op": "fix_dest",
+      "input": { "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/data.txt", "as": "data.ags" },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "`data.ags` → `data.fixed.ags`. The one variant all three launchers already agreed on — the old npx regex matched the trailing `.ags`."
+    },
+    {
+      "id": "cli.fix.dest.AGS",
+      "op": "fix_dest",
+      "input": { "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/data.txt", "as": "data.AGS" },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "`data.AGS` → `data.fixed.AGS` — the extension's CASE is preserved. The old npx regex was case-insensitive and lower-cased it to `data.fixed.ags`."
+    },
+    {
+      "id": "cli.fix.dest.noext",
+      "op": "fix_dest",
+      "input": { "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/data.txt", "as": "data" },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "An extension-less `data` → `data.fixed`. The old npx regex matched zero-width at end-of-string and appended `.fixed.ags`."
+    },
+    {
+      "id": "cli.fix.json.report",
+      "op": "fix_json",
+      "input": { "fixture": "rust-packages/laterite-ags4-validator/tests/fixtures/rule8_dp_wrong_precision.ags", "as": "data.ags" },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "`lat fix data.ags --json` emits `{file, dest, applied, residual}` — the machine report #545 gave `fix` (the one verb that rewrites the user's data), which ACCEPTED but silently IGNORED `--json` before. The fixture applies a real DP-precision fix, so `applied` is NON-EMPTY — this pins the per-entry `{kind,label,rule,line,risk}` serialization, hand-synced across native serde_json / uvx json.dumps / npx JSON.stringify (npx must coerce napi's `undefined`→`null` for an absent `line`, the exact drift an empty `applied` would hide). Run with a relative name so `file`/`dest` are launcher-independent; raw stdout + exit (0 clean · 1 residual) is the pinned value."
+    }
+  ]
+}

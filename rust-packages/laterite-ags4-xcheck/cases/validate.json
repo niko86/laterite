@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "validate.json.findings",
+      "op": "validate_json",
+      "input": { "fixture": "rust-packages/laterite-ags4-validator/tests/fixtures/rule8_dp_wrong_precision.ags" },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "`lat validate --json` renders findings through a HAND-SYNCED renderer triplicated across the three launchers (laterite-py lib.rs, laterite-node lib.rs 'ported verbatim', render.rs 'byte-identical'). Three hand-synced copies held by discipline is the exact shape that produced drifts #1 and #2 — so the whole render (findings map + exit code) must be byte-identical."
+    },
+    {
+      "id": "validate.json.clean",
+      "op": "validate_json",
+      "input": { "fixture": "rust-packages/laterite-ags4-validator/tests/fixtures/clean_minimal.ags" },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "The empty-findings render path — a clean file exits 0 with an empty findings map, identically across launchers."
+    },
+    {
+      "id": "validate.ndjson.findings",
+      "op": "validate_ndjson",
+      "input": { "fixture": "rust-packages/laterite-ags4-validator/tests/fixtures/rule8_dp_wrong_precision.ags" },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "`lat validate --ndjson` over the same findings fixture as the `--json` case — one flat JSON object per finding per line. `--ndjson` is the ONLY output flag validate honours that no other verb does (a global flag every verb accepts but only validate reads; a silent no-op on diff/read/merge/rules), and it is a SEPARATE renderer (`findings_ndjson`) hand-synced across the three surfaces — so it is pinned in its own right, not assumed covered by `--json`."
+    }
+  ]
+}

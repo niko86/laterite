@@ -2207,6 +2207,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "laterite-ags4-xcheck"
+version = "0.7.0"
+dependencies = [
+ "laterite-ags4-core",
+ "laterite-ags4-emit",
+ "laterite-ags4-parse",
+ "laterite-ags4-validator",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "laterite-cliutil"
 version = "0.7.0"
 dependencies = [

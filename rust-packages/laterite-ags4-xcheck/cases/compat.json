@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "emit.compat.embedded_newline",
+      "op": "emit_typed_verbatim",
+      "input": {
+        "groups": [
+          {
+            "code": "PROJ",
+            "rows": [
+              ["HEADING", "PROJ_ID", "PROJ_NAME"],
+              ["UNIT", "", ""],
+              ["TYPE", "ID", "X"],
+              ["DATA", "P1", "line one\nline two"]
+            ]
+          }
+        ]
+      },
+      "legs": ["rust-leaf", "python-compat"],
+      "spec_ref": "AGS4 Rule 6 forbids a CR/LF WITHIN a field and offers no in-field escape. compat.dataframe_to_AGS4 once wrote the newline RAW, tearing the DATA row across two physical lines — an illegal file (#423). Post-#518 the shared writer REFUSES it; the leg and the leaf must both refuse (`EmbeddedNewline`)."
+    },
+    {
+      "id": "emit.compat.valid",
+      "op": "emit_typed_verbatim",
+      "input": {
+        "groups": [
+          {
+            "code": "PROJ",
+            "rows": [
+              ["HEADING", "PROJ_ID", "PROJ_NAME"],
+              ["UNIT", "", ""],
+              ["TYPE", "ID", "X"],
+              ["DATA", "P1", "a clean value"]
+            ]
+          }
+        ]
+      },
+      "legs": ["rust-leaf", "python-compat"],
+      "spec_ref": "The happy path: with no embedded newline, compat.dataframe_to_AGS4 and the rust-leaf write the SAME bytes — both route the same cell matrix through write_ags4_matrix in the compat shape (trailing blank line)."
+    }
+  ]
+}

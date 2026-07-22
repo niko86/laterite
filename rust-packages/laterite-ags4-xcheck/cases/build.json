@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "emit.build.proj",
+      "op": "build_typed",
+      "input": {
+        "build": [
+          {
+            "code": "PROJ",
+            "headings": ["PROJ_ID", "PROJ_NAME"],
+            "rows": [["P1", "Test Project"]]
+          }
+        ]
+      },
+      "legs": ["rust-leaf", "python", "node", "wasm-engine"],
+      "spec_ref": "The data→AGS4 door (`build_ags4`) across all four surfaces. Each has its OWN input idiom — a polars frame (python), row-objects (node `buildAgs4`), a JSON string (wasm `build_ags4`), a `GroupInput` (rust-leaf) — but all route through the ONE shared emit orchestrator, so the built bytes (with the dictionary-filled UNIT/TYPE and the AutoFix-added TRAN/UNIT/TYPE groups) must be byte-identical. A surface re-implementing build would diverge from the leaf."
+    }
+  ]
+}
