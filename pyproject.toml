@@ -6,8 +6,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "laterite",
-    "duckdb>=1.5.4",
-    "polars>=1.42.1",
+    "duckdb>=1.5.5",
+    "polars>=1.43.0",
     "pyarrow>=25.0.0",
 ]
 
@@ -34,7 +34,7 @@ dev = [
     # Ags4File text round-trip with generated input the example-based
     # tests don't reach (the laterite-base tests in
     # packages/laterite/tests/test_ags_types.py + test_ags4file.py).
-    "hypothesis>=6.157.0",
+    "hypothesis>=6.160.0",
     # Parallel test execution. The laterite suite is file/DuckDB-heavy
     # (per-test tmp_path isolation), so tests fan out cleanly across
     # workers. CI runs `-n 4` to roughly halve the suite while leaving
@@ -51,7 +51,7 @@ dev = [
     # as ruff/uv (Rust-fast). Run in the project venv (`uv run ty check`, NOT
     # `uvx`) so it resolves polars/duckdb + the generated `_laterite_native.pyi`;
     # config + scope in [tool.ty] below. CI step sits beside `ruff check`.
-    "ty>=0.0.61",
+    "ty>=0.0.62",
     # Dead-code finder for the Python surface (Rust's `dead_code` lint is
     # built-in; Python has no equivalent). NOT a gate — it's a reliquary
     # *scout*: `uv run vulture` surfaces candidate unused funcs/classes for a
