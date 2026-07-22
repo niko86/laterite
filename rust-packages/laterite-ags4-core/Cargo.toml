@@ -54,7 +54,7 @@ laterite-transport = { path = "../laterite-transport", optional = true }
 # The deterministic keychain (keychain.rs) hashes the spec key-chain with
 # SHA-256 → UUIDv8. (calamine + rust_xlsxwriter + hex left with excel.rs when
 # the Excel I/O moved out to the laterite-excel crate, 2026-06-18.)
-sha2 = "0.10"
+sha2 = "0.11"
 # Deterministic content-addressed row keys (keychain.rs): SHA-256 over the
 # spec key-chain → UUIDv8. `v8` is RFC 9562's custom/application version —
 # the correct choice for app-defined deterministic UUIDs (contrast the

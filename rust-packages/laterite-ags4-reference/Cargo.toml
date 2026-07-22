@@ -35,7 +35,7 @@ phf = "0.14"
 # consolidation): SHA-256 over the injective key-chain encoding, then UUIDv8
 # from the first 128 bits. RNG-free (uuid v8 from bytes, no `rng` feature), and
 # core already ships both crates to wasm, so the leaf stays wasm-clean.
-sha2 = "0.10"
+sha2 = "0.11"
 uuid = { version = "1", features = ["v8"] }
 # `keychain::content_hash` canonicalises each cell through `parse_value` before
 # hashing, so a formatting-only re-emit (`1.0` → `1.00`) is not a value change.

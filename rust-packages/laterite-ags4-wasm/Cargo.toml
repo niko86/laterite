@@ -127,7 +127,7 @@ encoding_rs = "0.8"
 # The `censor()` file-hash: PROJ_ID becomes the full 64-hex SHA-256 of the
 # input bytes (a KEY field — full width, collision-safe). Same sha2 the
 # keychain content-hash already pulls; hex encodes the digest.
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 
 [dev-dependencies]
