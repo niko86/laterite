@@ -58,7 +58,7 @@ def _filter_paths() -> list[tuple[str, str]]:
     return out
 
 
-@pytest.mark.parametrize("filter_name,path", _filter_paths())
+@pytest.mark.parametrize(("filter_name", "path"), _filter_paths())
 def test_ci_filter_path_resolves(filter_name: str, path: str) -> None:
     if path.startswith("!") or path in KNOWN_ABSENT:
         return  # an exclusion, or documented-absent — nothing to resolve
