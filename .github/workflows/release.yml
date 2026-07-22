@@ -127,7 +127,7 @@ jobs:
           - os: windows-2022
             target: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Tag <-> version guard: the wheel version comes from the STATIC pyproject
       # [project] version, not from the tag — so a `vX` tag against a stale
@@ -155,7 +155,7 @@ jobs:
       # Docker, macOS Tart, Windows VM) and resolves Python 3.14 from
       # the official python-build-standalone distribution.
       - name: Install uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
 
@@ -308,7 +308,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             ext: .exe
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # dtolnay/rust-toolchain is a bash-shell action; it works on
       # Linux (Docker container has bash) and macOS (Tart VM has bash)
@@ -393,7 +393,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -428,14 +428,14 @@ jobs:
     needs: build-wheels
     steps:
       # The committed post-install smoke (tools/wheel_smoke.py) at the tagged ref.
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: wheels-x86_64-unknown-linux-gnu # the Linux wheel + sdist
           path: dist/
 
-      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: false
 
@@ -531,7 +531,7 @@ jobs:
           echo "After re-tag:"
           ls -la
 
-      - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
+      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
         with:
           packages-dir: pypi/
 
@@ -597,7 +597,7 @@ jobs:
           echo "After re-tag:"
           ls -la
 
-      - uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
+      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
         with:
           packages-dir: pypi/
 
@@ -636,7 +636,7 @@ jobs:
           - os: windows-2022
             target: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Same per-OS toolchain split as build-binaries: dtolnay's bash action on
       # Linux/macOS; rustup directly on Windows (no Git Bash on PATH there).
@@ -700,7 +700,7 @@ jobs:
       run:
         working-directory: rust-packages/laterite-node
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
