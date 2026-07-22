@@ -124,14 +124,50 @@ jobs:
         working-directory: rust-packages
         run: cargo deny check
 
+  # Link + badge health check. ci.yml's `docs` job runs `mkdocs build --strict`,
+  # which only validates INTERNAL links — this catches dead EXTERNAL links + dead
+  # badge targets in the README and docs, rot that's otherwise invisible. Runs
+  # GitHub-hosted (pure network, no build) so it doesn't tie up a pool lane.
+  # Nightly, not per-PR: external checks are inherently flaky (rate limits,
+  # transient 5xx), so a slow-changing rot check belongs here, not on a merge gate.
+  links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: lychee link + badge check
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        env:
+          # Authenticated github.com checks dodge the anonymous rate limit (the
+          # README + docs carry many github.com links + shields/codecov badges).
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          # README + all docs markdown. --accept adds 429 to the 2xx default (a
+          # rate-limited host is ALIVE, not broken); retries smooth transient 5xx.
+          # --exclude npmjs.com: the npm PACKAGE PAGE Cloudflare-403s all bots
+          # (even a browser UA), so it's a guaranteed false alarm — the package's
+          # existence is already proven by the shields npm badge (registry API)
+          # and the npm-install smoke path.
+          args: >-
+            --no-progress --max-retries 3 --retry-wait-time 5
+            --accept 200..=299,429
+            --exclude 'www\.npmjs\.com'
+            README.md 'web/docs-site/docs/**/*.md'
+          fail: true
+          jobSummary: true
+
   # Open or update ONE tracking issue when the nightly fails, so a bad night is
   # actionable without watching the Actions tab. GitHub also emails the owner on a
   # scheduled-workflow failure, so this is the durable, dedup'd record — and it
   # no-ops gracefully if the runner has no `gh` (the email still fires).
   notify:
-    needs: [coverage, deny]
-    if: ${{ always() && (needs.coverage.result == 'failure' || needs.deny.result == 'failure') }}
-    runs-on: ["self-hosted", "linux", "x64", "laterite-linux"]
+    needs: [coverage, deny, links]
+    if: ${{ always() && (needs.coverage.result == 'failure' || needs.deny.result == 'failure' || needs.links.result == 'failure') }}
+    # GitHub-hosted so `gh` is guaranteed present (the pool image may lack it) —
+    # the whole point of this job is to reliably open the tracking issue.
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       issues: write
@@ -142,6 +178,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COV: ${{ needs.coverage.result }}
           DENY: ${{ needs.deny.result }}
+          LINKS: ${{ needs.links.result }}
         run: |
           set -euo pipefail
           command -v gh >/dev/null 2>&1 || {
@@ -152,7 +189,7 @@ jobs:
           num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
             --search "in:title \"$title\"" --json number,title \
             --jq "[.[] | select(.title==\"$title\")][0].number // empty")
-          body="The nightly run failed: $RUN_URL (coverage=$COV, deny=$DENY)."
+          body="The nightly run failed: $RUN_URL (coverage=$COV, deny=$DENY, links=$LINKS)."
           if [ -n "$num" ]; then
             gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
           else
