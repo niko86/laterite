@@ -148,7 +148,7 @@ laterite matches that and adds a cross-surface toolchain on top:
 | Validity certificates (`.ags.idx`) | ✅ | — |
 | Transport — compress + encrypt | ✅ | — |
 | Typed PROJ → LOCA → SAMP graph | ✅ | — |
-| Command-line interface | ✅ standalone binary (`lat`) | ✅ Python (`ags4_cli`) |
+| Command-line interface | ✅ standalone binary **+ `pip install`** (`lat`) | ✅ Python (`ags4_cli`) |
 
 laterite reports the same findings as `python-ags4`, with 10 documented
 exceptions (see [Parity](#parity-with-python-ags4)).
