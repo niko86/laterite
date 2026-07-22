@@ -21,12 +21,6 @@ on:
   pull_request:
     paths: ["web/**", "!web/docs-site/**", "rust-packages/laterite-ags4-wasm/**", "rust-packages/laterite-ags4-tokenizer-wasm/**", "rust-packages/laterite-ags4-parse/**", "rust-packages/laterite-ags4-censor/**", "rust-packages/laterite-types/**", ".github/workflows/e2e.yml"]
   workflow_dispatch:
-    inputs:
-      runner:
-        description: "Runner: self-hosted or github"
-        type: choice
-        options: [github]
-        default: github
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -42,7 +36,7 @@ jobs:
     # Fast pure-TS lane: no Rust/wasm toolchain, no Chromium download. The
     # vitest suite imports only wasm-free modules, so it needs no build. (tsc
     # is in the e2e job — it requires the generated wasm bindings.)
-    runs-on: ${{ (inputs.runner == 'github') && 'ubuntu-latest' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -65,8 +59,8 @@ jobs:
         run: npm test -- --coverage
 
       # Codecov `web` flag — only from the public repo (niko86/laterite), where
-      # the badge lives and CODECOV_TOKEN is set. The private repo skips this
-      # (its CI runs on self-hosted runners; no token, no upload).
+      # the badge lives and CODECOV_TOKEN is set. The private mirror skips it
+      # (no token set there).
       - name: Upload web coverage to Codecov
         if: github.repository == 'niko86/laterite'
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
@@ -77,8 +71,9 @@ jobs:
           fail_ci_if_error: false
 
   e2e:
-    # Same runner choice as the deploy job; default self-hosted, github fallback.
-    runs-on: ${{ (inputs.runner == 'github') && 'ubuntu-latest' || 'ubuntu-latest' }}
+    # GitHub-hosted: public runs are free minutes, and the warm pool is kept for
+    # ci.yml's per-PR builds. Cold wasm build here; e2e runs only on web changes.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -92,8 +87,8 @@ jobs:
       - uses: ./.github/actions/build-accel
 
       - name: Install wasm-pack
-        # Skip if the runner image already bakes wasm-pack (the ags5-runner pool
-        # does — see .github/runner); otherwise install it (GitHub-hosted fallback).
+        # Install wasm-pack when the runner doesn't already have it (GitHub-hosted
+        # doesn't); it then fetches a matching wasm-bindgen + binaryen on first build.
         run: command -v wasm-pack >/dev/null 2>&1 || cargo install wasm-pack --locked
 
       - name: Build wasm (release)
