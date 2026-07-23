@@ -9,6 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
+# Local, private Claude Code guidance (points at the private laterite-dev
+# satellite; never committed — the public CLAUDE.md is the shared one).
+CLAUDE.local.md
+
 # Generated example output
 output/
 
