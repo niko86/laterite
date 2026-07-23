@@ -69,7 +69,7 @@ The exception is bounded by three invariants:
    `laterite_ags4_validator`; the validator never depends on pyo3. The lean
    `phf+thiserror+chrono` dep-graph guarantee is verified intact
    (`cargo tree -p laterite-ags4-validator` shows no pyo3/polars) — same
-   wrapper pattern as `ags4-parity` / `laterite-cliutil`.
+   wrapper pattern as `laterite-ags4-parity` / `laterite-cliutil`.
 
 A further bounded deviation from the original design sketch: the
 Rust↔Python boundary carries **plain primitives**, not `pyo3-polars`

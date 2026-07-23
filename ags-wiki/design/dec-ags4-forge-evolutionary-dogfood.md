@@ -1,15 +1,15 @@
 ---
 type: decision
-title: "Evolutionary dual-validation dogfood tool (ags4-forge)"
+title: "Evolutionary dual-validation dogfood tool (laterite-ags4-forge)"
 status: accepted
 tags: [design, decision]
 decided: 2026-05-17
 supersedes: []
 from_gap: [parity-triage-sampling-bias, parity-cascade-unreconcilable]
-related: [parity-triage-sampling-bias, parity-cascade-unreconcilable, ags4-forge, ags4-parity-crate, agent-first-cli-contract, evolutionary-dogfooding, parity-confidence-model]
+related: [parity-triage-sampling-bias, parity-cascade-unreconcilable, laterite-ags4-forge, laterite-ags4-parity, agent-first-cli-contract, evolutionary-dogfooding, parity-confidence-model]
 sources: []
 ---
-# Evolutionary dual-validation dogfood tool (ags4-forge)
+# Evolutionary dual-validation dogfood tool (laterite-ags4-forge)
 
 ## Context
 The clean-room "Rust ≡ python except enumerated O-Ns" claim
@@ -22,9 +22,9 @@ why a crawl cannot reach them. We need *manufactured, proven*
 divergences, with the strategy chosen by the agent+wiki, not brute force.
 
 ## Options considered
-1. Extend [[ags4-corpus-qa]] with a generator — conflates a found-corpus
+1. Extend [[laterite-ags4-corpus-qa]] with a generator — conflates a found-corpus
    crawler with a synthesizer; bloats one binary.
-2. **New `ags4-forge` crate + extract a shared `ags4-parity` crate**
+2. **New `laterite-ags4-forge` crate + extract a shared `laterite-ags4-parity` crate**
    (classify/reconcile/PyOracle/Rng) consumed by both; fold
    `Ctx/Report/emit/Plan` into [[laterite-cliutil]].
 3. LLM-in-the-binary vs a **declarative strategy file** the agent authors.
@@ -48,9 +48,9 @@ where it informs while a floor + fingerprint-reset keep the trust
 honest.
 
 ## Consequences
-Commits to: a 5th + 6th workspace crate (`ags4-parity`, `ags4-forge`)
+Commits to: a 5th + 6th workspace crate (`laterite-ags4-parity`, `laterite-ags4-forge`)
 and a `report` module in [[laterite-cliutil]]; a behaviour-neutral
-[[ags4-corpus-qa]] refactor (its parity unit tests move and must stay
+[[laterite-ags4-corpus-qa]] refactor (its parity unit tests move and must stay
 green); the validator library's lean dep-graph stays intact (parity
 depends on the validator, never the reverse); confirmed findings flow
 through the §12.5 insight→`OBSERVATIONS.md` O-N path; generated
@@ -58,4 +58,4 @@ reproducers live in `ags-wiki/.bootstrap/probes/`, **never**
 `laterite-ags4-validator/tests/fixtures/`.
 
 ## Related
-[[parity-triage-sampling-bias]] · [[parity-cascade-unreconcilable]] · req-reproducible-conformance-corpus · [[ags4-forge]] · [[ags4-parity-crate]] · [[agent-first-cli-contract]] · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[design/_README\|AGS5 register]]
+[[parity-triage-sampling-bias]] · [[parity-cascade-unreconcilable]] · req-reproducible-conformance-corpus · [[laterite-ags4-forge]] · [[laterite-ags4-parity]] · [[agent-first-cli-contract]] · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[design/_README\|AGS5 register]]

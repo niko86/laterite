@@ -29,7 +29,7 @@ sources: []
 ## Relationship to other components
 ```mermaid
 flowchart LR
-  crawl[ags4-corpus-qa] --> ags4check[lat]
+  crawl[laterite-ags4-corpus-qa] --> ags4check[lat]
   crawl --> py[py-ags4-check-json]
   ags4check --> cliutil[laterite-cliutil]
   ags5db[ags5db] --> cliutil

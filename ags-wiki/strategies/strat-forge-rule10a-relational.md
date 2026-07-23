@@ -8,9 +8,9 @@ divergence_hypothesis: "Rule 10a has zero differential parity evidence because c
 probe_files: [ags-wiki/.bootstrap/probes/probe-forge-rule10a-relational.ags]
 expected_rust: "Rule 10a (duplicate KEY tuple within SAMP under one LOCA)"
 expected_python: "Rule 10a (rule_10a duplicate key) — expected AGREE; to be confirmed by probe"
-evidence: "ags4-forge gen(loca-samp,inject rule10a) → ddmin → probe-forge-rule10a-relational.ags; reproduced via lat (exit 1, Rule 10a) AND uv run tools/py_ags4_check_json.py (Rule 10a fired), cwd repo root → forge classify = AGREE"
+evidence: "laterite-ags4-forge gen(loca-samp,inject rule10a) → ddmin → probe-forge-rule10a-relational.ags; reproduced via lat (exit 1, Rule 10a) AND uv run tools/py_ags4_check_json.py (Rule 10a fired), cwd repo root → forge classify = AGREE"
 feeds_ags5_req: []
-related: [rule-10a-key-uniqueness, parity-model, evolutionary-dogfooding, ags4-forge, strat-parity-matrix, O-35, O-03]
+related: [rule-10a-key-uniqueness, parity-model, evolutionary-dogfooding, laterite-ags4-forge, strat-parity-matrix, O-35, O-03]
 sources: []
 ---
 # Probe: forge-synthesized LOCA→SAMP duplicate KEY tuple (Rule 10a blind spot)
@@ -19,7 +19,7 @@ sources: []
 > [!divergence] Rule 10a is one of the **13 zero-evidence blind
 > spots** in [[strat-parity-matrix]]: the minimal fixtures have no
 > parent→child relational base, so single-rule-isolable 10a evidence
-> never exists. [[ags4-forge]] Mode-B synthesizes a spec-valid
+> never exists. [[laterite-ags4-forge]] Mode-B synthesizes a spec-valid
 > `LOCA→SAMP` scaffold (real KEY tuples), dual-validates the
 > *un-injected* baseline clean in both validators, then injects
 > exactly one duplicated SAMP KEY tuple. Outcome is either a confirmed
@@ -35,8 +35,8 @@ sources: []
   `laterite-ags4-validator/tests/fixtures/`).
 - Run: `lat validate <probe>` and
   `uv run python tools/py_ags4_check_json.py <probe>` (cwd = repo
-  root), i.e. the same dual path [[ags4-forge]] automates via
-  [[ags4-parity-crate]].
+  root), i.e. the same dual path [[laterite-ags4-forge]] automates via
+  [[laterite-ags4-parity]].
 
 ## Expected vs observed
 
@@ -47,7 +47,7 @@ sources: []
 
 ## Verdict
 > [!note] **CONFIRMED — AGREE. The Rule-10a differential blind spot is
-> RETIRED.** [[ags4-forge]] Mode-B synthesized the `LOCA→SAMP`+`ABBR`
+> RETIRED.** [[laterite-ags4-forge]] Mode-B synthesized the `LOCA→SAMP`+`ABBR`
 > relational base the [[strat-parity-matrix]] PROJ/TRAN/UNIT/TYPE base
 > structurally *could not* provide; the un-injected base validates
 > clean in both validators (P2), and the duplicated SAMP KEY tuple
@@ -67,4 +67,4 @@ sources: []
 > forge's value here is the *independent reproduction* of O-35.
 
 ## Related
-[[rule-10a-key-uniqueness]] · [[parity-model]] · [[evolutionary-dogfooding]] · [[ags4-forge]] · [[strat-parity-matrix]] · [[O-35]] · [[O-03]]
+[[rule-10a-key-uniqueness]] · [[parity-model]] · [[evolutionary-dogfooding]] · [[laterite-ags4-forge]] · [[strat-parity-matrix]] · [[O-35]] · [[O-03]]

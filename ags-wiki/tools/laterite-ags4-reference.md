@@ -127,7 +127,7 @@ follow-up, since it lives in its own repo (`niko86/laterite-duckdb`).
 **Edition-set convergence (2026-07-14)**: `DictVersion::ALL`/`from_edition`
 being generated here did not stop three consumers hand-copying the same five
 strings anyway — `lat`'s `--dict-version` flag, `laterite-py`'s `emit_typed.rs`,
-and `ags4-corpus-qa`'s `validate.rs` each carried their own `match` table
+and `laterite-ags4-corpus-qa`'s `validate.rs` each carried their own `match` table
 instead of calling `from_edition`. All three now ask this leaf directly; see
 [[edition-resolution]] and [[data-single-source-audit]] (row 2) for the full
 finding.

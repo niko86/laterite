@@ -100,7 +100,7 @@ One shared implementation in `repo:rust-packages/laterite-ags4-emit/src/emit.rs:
 (a new step before `write_ags4`, gated to AutoFix), so **all four surfaces** (PyO3,
 Node, both wasm paths) inherit it with zero per-binding work; `"report"`/`"strict"`
 are unchanged (they show/reject the gaps). Mirrors the existing forge synthesizer
-(`repo:rust-packages/ags4-forge/src/synth/model.rs` `collect_unit`/`collect_type`/`tran`)
+(`repo:rust-packages/laterite-ags4-forge/src/synth/model.rs` `collect_unit`/`collect_type`/`tran`)
 — a parallel flagged for convergence in [[reliquary]].
 
 ## Update (2026-06-25): the typed-graph door emits only the headings you set

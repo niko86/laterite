@@ -8,7 +8,7 @@ repo_refs:
   workspace: "repo:rust-packages/Cargo.toml"
   readme: "repo:rust-packages/README.md"
   packages: "repo:packages/"
-related: [start-here, repo-layout, crate-dependency-graph, tech-stack-wasm, pyo3-boundary, laterite-ags4-validator, laterite-ags4-reference, laterite-py, laterite-types, laterite-ags4-core, laterite, dec-laterite-types-leaf, dec-ags4-censor-leaf, dec-rust-drives-python, dec-monorepo-structure, dec-duckdb-extension, dec-duckdb-perf-architecture, dec-duckdb-per-host-engine, dec-dictionary-single-source, dec-ags4-merge-semantics, dec-custom-dict-overlay, ags4-output, modality-register, surface-census, edition-resolution, data-single-source-audit, cert-trust-v2, ags4-corpus-qa]
+related: [start-here, repo-layout, crate-dependency-graph, tech-stack-wasm, pyo3-boundary, laterite-ags4-validator, laterite-ags4-reference, laterite-py, laterite-types, laterite-ags4-core, laterite, dec-laterite-types-leaf, dec-ags4-censor-leaf, dec-rust-drives-python, dec-monorepo-structure, dec-duckdb-extension, dec-duckdb-perf-architecture, dec-duckdb-per-host-engine, dec-dictionary-single-source, dec-ags4-merge-semantics, dec-custom-dict-overlay, ags4-output, modality-register, surface-census, edition-resolution, data-single-source-audit, cert-trust-v2, laterite-ags4-corpus-qa]
 sources: []
 ---
 # crate map
@@ -155,7 +155,7 @@ as stable):
   convergence (2026-07-14):** the leaf's `dict.rs` also generates the closed edition enum
   (`DictVersion::{ALL, as_str, from_edition}` + `FALLBACK`), but that didn't stop three
   consumers hand-copying the same five strings anyway — `lat`'s `--dict-version` flag,
-  `laterite-py`'s `emit_typed.rs`, and `ags4-corpus-qa`'s `validate.rs` each carried their
+  `laterite-py`'s `emit_typed.rs`, and `laterite-ags4-corpus-qa`'s `validate.rs` each carried their
   own `match` table. All three now call `from_edition`; new PyO3/napi projections
   (`registry_editions()`/`registry_fallback_edition()`, `editions()`/`fallbackEdition()`)
   close the host-language half of the same gap. See [[edition-resolution]] ·
@@ -206,7 +206,7 @@ as stable):
   wasm consumer takes `default-features = false` (the leaf's `age`→getrandom won't build on wasm32).
 - `laterite-excel` — AGS4 ↔ XLSX (`calamine` reader + `rust_xlsxwriter` writer), extracted out of
   `laterite-ags4-core` (2026-06-18) so those Excel deps stop riding into every core consumer that never
-  touches XLSX (the duckdb extension, `laterite-ags5-db`, `ags4-perf`). Path fns (`ags4_to_excel` /
+  touches XLSX (the duckdb extension, `laterite-ags5-db`, `laterite-ags4-perf`). Path fns (`ags4_to_excel` /
   `excel_to_ags4`) + **FS-free byte cores** (`ags4_bytes_to_xlsx` / `xlsx_bytes_to_ags4`, #359) the
   path fns wrap. Three consumers now: `laterite-py` (`laterite.compat.AGS4_to_excel` / `excel_to_AGS4`),
   `laterite-node` (`toExcel` / `fromExcel`, #358), and `laterite-ags4-wasm` (`ags4_to_xlsx` /
@@ -265,7 +265,7 @@ as stable):
   convergence arc): the five AGS4 anonymisation actions (filehash/pseudonym/blank/token/brackets), the
   two-pass per-heading pseudonym map, custom group/column/orphan-def dropping, and ABBR-of-sensitive
   tokenisation — `censor(text, file_id, &Policy, &CensorOptions) -> (String, Tally)` +
-  `Policy::from_sensitive_json`/`Policy::retain_codes`. Extracted out of `ags4-corpus-qa`'s private
+  `Policy::from_sensitive_json`/`Policy::retain_codes`. Extracted out of `laterite-ags4-corpus-qa`'s private
   `censor.rs`, which now depends ON this leaf and keeps only its crawler/manifest/rayon/report wrapper.
   Deps: `laterite-ags4-parse` (tokenizes via the shared `tokenize_spans`, retiring `censor.rs`'s own
   private `parse_fields`/`emit_fields` — the fourth AGS4 tokenizer this convergence arc has now folded
@@ -319,7 +319,7 @@ as stable):
   Excluded from the host workspace `cargo clippy/test --workspace` (CI's `--exclude`), same as the engine
   wasm; CI also compile-guards it for `wasm32-unknown-unknown`. **Sibling, not folded in:** #581 tracked
   a *different* axis of the same #527 arc — the browser Anonymiser's redaction engine
-  (`web/src/components/tools/Anonymiser.tsx`) re-implemented `ags4-corpus-qa`'s `censor.rs` scrub logic
+  (`web/src/components/tools/Anonymiser.tsx`) re-implemented `laterite-ags4-corpus-qa`'s `censor.rs` scrub logic
   independently of this tokenizer work. Phase 1 (2026-07-18) extracted that scrub logic into its own
   leaf, `laterite-ags4-censor` (above); Phase 2 (also 2026-07-18) added a `censor` export to the engine
   wasm (not this crate — censor has no per-keystroke latency constraint, so it rides the 6.9 MB engine
@@ -359,7 +359,7 @@ as stable):
   [[dec-duckdb-extension]].
 
 **Dev / QA — never shipped:**
-- `laterite-cliutil` (shared CLI presentation), [[ags4-parity-crate|ags4-parity]] (verdict model + PyOracle), [[ags4-corpus-qa]] (dogfood crawler + crawler/manifest wrapper around the `laterite-ags4-censor` leaf's `censor` subcommand, above), [[ags4-forge]] (evolutionary fuzzer), `ags4-perf` (the rust leg of the cross-surface perf matrix — times validate + parse-to-typed over the forge size ladder via the shipped validator-parse path, emitting the matrix's uniform JSON; `tools/perf-matrix.py` aggregates all surfaces), ags4-compliance (the cross-surface findings-agreement harness — runs the numbered-rule verdict across every surface over the vendored corpus and fails on a regression; also hosts the unrelated ags4-output-value-gate harness — `xcheck`/`emit-cases`, the reason this crate now also deps on `laterite-ags4-emit`/`laterite-ags4-parse`).
+- `laterite-cliutil` (shared CLI presentation), [[laterite-ags4-parity]] (verdict model + PyOracle), [[laterite-ags4-corpus-qa]] (dogfood crawler + crawler/manifest wrapper around the `laterite-ags4-censor` leaf's `censor` subcommand, above), [[laterite-ags4-forge]] (evolutionary fuzzer), [[laterite-ags4-perf]] (the rust leg of the cross-surface perf matrix — times validate + parse-to-typed over the forge size ladder via the shipped validator-parse path, emitting the matrix's uniform JSON; `tools/perf-matrix.py` aggregates all surfaces), laterite-ags4-compliance (the cross-surface findings-agreement harness — runs the numbered-rule verdict across every surface over the vendored corpus and fails on a regression; also hosts the unrelated ags4-output-value-gate harness — `xcheck`/`emit-cases`, the reason this crate now also deps on `laterite-ags4-emit`/`laterite-ags4-parse`).
 
 **Decoupled AGS5 — dormant in `ags5/`** (preserved, out of the workspace; not
 built or shipped; a future AGS5 strand re-links them — dec-ags5-decouple):
@@ -418,7 +418,7 @@ flowchart LR
   types --> censor
   censor --> corpusqa
   censor --> wasm
-  validator --> parity[ags4-parity]
+  validator --> parity[laterite-ags4-parity]
   core --> latpy[laterite-py]
   emit --> latpy
   validator --> latpy
@@ -430,13 +430,13 @@ flowchart LR
   types --> duckdb["laterite_ags4<br/>loadable DuckDB ext<br/>own repo: niko86/laterite-duckdb"]
   core --> duckdb
   validator --> duckdb
-  parity --> corpusqa[ags4-corpus-qa]
-  parity --> forge[ags4-forge]
-  parity --> compliance[ags4-compliance]
+  parity --> corpusqa[laterite-ags4-corpus-qa]
+  parity --> forge[laterite-ags4-forge]
+  parity --> compliance[laterite-ags4-compliance]
   validator --> compliance
   parse --> compliance
   emit --> compliance
-  validator --> perf[ags4-perf]
+  validator --> perf[laterite-ags4-perf]
   cliutil[laterite-cliutil] --> check
   cliutil --> corpusqa
   cliutil --> forge
@@ -457,4 +457,4 @@ generation is dec-registry-driven-generation.
 
 ## Related
 
-[[start-here]] · [[tech-stack-wasm]] · [[pyo3-boundary]] · [[laterite-ags4-validator]] · [[laterite-ags4-reference]] · [[laterite-py]] · laterite-ags5-db · laterite-py-ags5 · [[laterite]] · laterite-ags5 · [[laterite-node]] · [[dec-laterite-types-leaf]] · [[dec-ags4-censor-leaf]] · [[dec-rust-drives-python]] · [[dec-monorepo-structure]] · dec-ags5-decouple · [[dec-duckdb-extension]] · [[dec-duckdb-per-host-engine]] · [[dec-dictionary-single-source]] · [[dec-ags4-merge-semantics]] · [[dec-custom-dict-overlay]] · [[modality-register]] · [[surface-census]] · [[edition-resolution]] · [[data-single-source-audit]] · [[cert-trust-v2]] · [[ags4-corpus-qa]]
+[[start-here]] · [[tech-stack-wasm]] · [[pyo3-boundary]] · [[laterite-ags4-validator]] · [[laterite-ags4-reference]] · [[laterite-py]] · laterite-ags5-db · laterite-py-ags5 · [[laterite]] · laterite-ags5 · [[laterite-node]] · [[dec-laterite-types-leaf]] · [[dec-ags4-censor-leaf]] · [[dec-rust-drives-python]] · [[dec-monorepo-structure]] · dec-ags5-decouple · [[dec-duckdb-extension]] · [[dec-duckdb-per-host-engine]] · [[dec-dictionary-single-source]] · [[dec-ags4-merge-semantics]] · [[dec-custom-dict-overlay]] · [[modality-register]] · [[surface-census]] · [[edition-resolution]] · [[data-single-source-audit]] · [[cert-trust-v2]] · [[laterite-ags4-corpus-qa]]

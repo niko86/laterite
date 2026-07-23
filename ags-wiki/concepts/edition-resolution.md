@@ -41,7 +41,7 @@ needed the closed set of valid `--dict-version` strings.
 > (`laterite-ags4-check/src/commands/common.rs`), `laterite-py`'s
 > `emit_typed.rs` (a *second*, hand-written edition parser sitting in the
 > same crate as `lib.rs::parse_dv`, which already asked the authority),
-> and `ags4-corpus-qa`'s `validate.rs`. The sharpest trap was the CLI's:
+> and `laterite-ags4-corpus-qa`'s `validate.rs`. The sharpest trap was the CLI's:
 > its rejection **message** was generated (`editions_joined("|")`) while
 > its match **arms** were not — so bundling a new edition would have
 > shipped a `lat` that rejects that edition with an error message

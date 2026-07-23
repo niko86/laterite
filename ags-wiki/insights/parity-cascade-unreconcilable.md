@@ -22,7 +22,7 @@ sources: []
 > record split → Rule 2a+3+5 ([[strat-rule6-embedded-cr]]); a valid
 > extended char → Rust FYI-only / python silent ([[O-01]]); an
 > unquoted field → python Rule **3** (or 4 by position) vs Rust Rule 5
-> ([[O-03]]). `repo:rust-packages/ags4-corpus-qa/src/parity.rs`
+> ([[O-03]]). `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs`
 > `reconcile()` whittles only **single documented rule-swaps**
 > (O-2/O-3/O-26/O-27) and only when the *entire* symmetric diff is
 > consumed — so a cascade leaves residue and a *known* root cause

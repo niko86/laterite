@@ -94,7 +94,7 @@ UX **preview-diff then apply**. (All three the B1-recommended path.)
 **B3 architecture (locked 2026-05-31):**
 - **Separate wasm exports `compute_fixes` / `apply_fixes`** — NOT a `fix`
   field on `Finding`. This keeps `Finding`/`ValidationReport` JSON
-  byte-identical, so the parity oracle (`ags4-parity`,
+  byte-identical, so the parity oracle (`laterite-ags4-parity`,
   `line_only_finding_serializes_minimally`) cannot regress. Fixes are
   computed on demand (only when the user opens the Fixes panel), not on the
   hot `validate` path.
@@ -226,7 +226,7 @@ From the A1 (data-model) + A2 (rule matrix) doc pair → user decisions:
   (BMP) content `char` == UTF-16 unit so they match — the only divergence
   is astral-plane chars, which Rule 1 flags as invalid anyway.
 
-**Guarantees:** parity can't drift (the oracle `repo:rust-packages/ags4-parity/src/verdict.rs`
+**Guarantees:** parity can't drift (the oracle `repo:rust-packages/laterite-ags4-parity/src/verdict.rs`
 compares rule-label *presence* only); JSON stays byte-identical when
 fields unset (`skip_serializing_if` + `line,group,desc`-first order,
 golden-tested); serde is derive-only, no `serde_json` in the engine,

@@ -194,7 +194,7 @@ _Findings:_
 - ⚪ by-design · **node** in.file-like — no universal Node file-like; MergeSource is string|Uint8Array|Ags4File.
 - ⚪ by-design · **node** out.file — Node merge returns a MergeResult carrying the merged bytes; the caller writes with fs (return-only, matching diff).
 
-### censor — Anonymise an AGS4 file — scrub the classified sensitive cells (pseudonymise IDs, hash PROJ_ID, blank coordinates, tokenise names, strip free-text [units]) before sharing. Browser-only among shipped surfaces: the SAME laterite-ags4-censor engine backs the private ags4-corpus-qa `censor` dev tool, which is not a shipped py/node/cli API, so its cross-surface EXISTENCE is a surface-census matter, not a modality one.
+### censor — Anonymise an AGS4 file — scrub the classified sensitive cells (pseudonymise IDs, hash PROJ_ID, blank coordinates, tokenise names, strip free-text [units]) before sharing. Browser-only among shipped surfaces: the SAME laterite-ags4-censor engine backs the private laterite-ags4-corpus-qa `censor` dev tool, which is not a shipped py/node/cli API, so its cross-surface EXISTENCE is a surface-census matter, not a modality one.
 
 *Offered anywhere — in: bytes · out: file, value*
 

@@ -19,7 +19,7 @@ sources: []
 ## Claim
 > [!divergence] The entire Rust↔python divergence catalogue
 > ([[observations-coverage-map|O-1..O-34]]) and all
-> `repo:rust-packages/ags4-corpus-qa/src/parity.rs` `reconcile`/
+> `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs` `reconcile`/
 > `classify` arms (O-2/O-3/O-26/O-27/O-30/O-34) are encoded against
 > python-ags4 **1.2.0 source behaviour** (rule_6 no-op, rule_20
 > on-disk, default `rename_duplicate_headers` shielding O-8, …). It was
@@ -33,7 +33,7 @@ sources: []
 - Was `repo:pyproject.toml` `"python-ags4>=1.2.0"`; `--selfcheck`
   emitted only `{"ok":true}` (`repo:tools/py_ags4_check_json.py`).
 - `reconcile()` arms are literal python-source assumptions:
-  `repo:rust-packages/ags4-corpus-qa/src/parity.rs` (O-2 Rule 6 no-op,
+  `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs` (O-2 Rule 6 no-op,
   O-3 Rule 5↔4, O-26 triple-19b, O-27 on-disk).
 
 ## What was done (this campaign)

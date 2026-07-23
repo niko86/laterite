@@ -12,7 +12,7 @@ volatile_asof: 2026-05-30
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-wasm"
   lib: "repo:rust-packages/laterite-ags4-wasm/src/lib.rs"
-related: [crate-map, laterite-ags4-validator, laterite-types, tech-stack-wasm, validator-site, dec-ags4-merge-semantics, O-42, cert-trust-v2, dec-ags4-censor-leaf, ags4-corpus-qa]
+related: [crate-map, laterite-ags4-validator, laterite-types, tech-stack-wasm, validator-site, dec-ags4-merge-semantics, O-42, cert-trust-v2, dec-ags4-censor-leaf, laterite-ags4-corpus-qa]
 sources: []
 ---
 # laterite-ags4-wasm
@@ -35,7 +35,7 @@ sources: []
 > `censor(data, sensitiveJson, selectedCodes, token, dropCustom,
 > includeFreetext) -> { text, tally }` wraps the shared `laterite-ags4-censor`
 > scrub engine, so the browser Anonymiser's Download action drives the SAME
-> anonymisation logic `ags4-corpus-qa` uses instead of a hand-written TS
+> anonymisation logic `laterite-ags4-corpus-qa` uses instead of a hand-written TS
 > scrub. It SHA-256-hashes the input bytes for `PROJ_ID`'s filehash (the full
 > 64-hex), lossily decodes them, resolves `sensitive_headings.json` into a
 > `Policy` (optionally restricted to the user's selected heading codes via
@@ -116,7 +116,7 @@ Seven exports (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`):
   `laterite_ags4_censor::Policy::from_sensitive_json`, restricts it to
   `selected_codes` when given (`Policy::retain_codes` — `null` keeps every
   classified heading), and runs the shared `laterite-ags4-censor` engine.
-  This is the SAME engine `ags4-corpus-qa`'s `censor` subcommand drives; the
+  This is the SAME engine `laterite-ags4-corpus-qa`'s `censor` subcommand drives; the
   browser's former hand-written TS scrub
   (`web/src/components/tools/Anonymiser.tsx`) is deleted. See
   [[dec-ags4-censor-leaf]].
@@ -167,4 +167,4 @@ flowchart LR
 
 ## Related
 
-[[crate-map]] · [[laterite-ags4-validator]] · [[laterite-types]] · [[tech-stack-wasm]] · [[validator-site]] · [[dec-ags4-merge-semantics]] · [[O-42]] · [[cert-trust-v2]] · [[dec-ags4-censor-leaf]] · [[ags4-corpus-qa]]
+[[crate-map]] · [[laterite-ags4-validator]] · [[laterite-types]] · [[tech-stack-wasm]] · [[validator-site]] · [[dec-ags4-merge-semantics]] · [[O-42]] · [[cert-trust-v2]] · [[dec-ags4-censor-leaf]] · [[laterite-ags4-corpus-qa]]

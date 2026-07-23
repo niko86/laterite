@@ -6,10 +6,10 @@ tags: [concept]
 ags_editions: []
 repo_refs:
   cliutil: "rust-packages/laterite-cliutil/src/lib.rs"
-  cli: "rust-packages/ags4-corpus-qa/src/cli.rs"
-  main: "rust-packages/ags4-corpus-qa/src/main.rs"
-  output: "rust-packages/ags4-corpus-qa/src/output.rs"
-related: [laterite-cliutil, ags4-corpus-qa, laterite-ags4-check, ags4-forge, ags4-parity-crate, surface-census]
+  cli: "rust-packages/laterite-ags4-corpus-qa/src/cli.rs"
+  main: "rust-packages/laterite-ags4-corpus-qa/src/main.rs"
+  output: "rust-packages/laterite-ags4-corpus-qa/src/output.rs"
+related: [laterite-cliutil, laterite-ags4-corpus-qa, laterite-ags4-check, laterite-ags4-forge, laterite-ags4-parity, surface-census]
 sources: []
 ---
 # agent-first CLI contract
@@ -25,7 +25,7 @@ sources: []
 > + `--readme`; `--dry-run` mutates nothing; **typed exit codes in an
 > `after_help` epilog**; seedable RNG for reproducible runs. Embodied
 > by `repo:rust-packages/laterite-cliutil/src/lib.rs` (the shared UX
-> primitives) and the `repo:rust-packages/ags4-corpus-qa/src/cli.rs` /
+> primitives) and the `repo:rust-packages/laterite-ags4-corpus-qa/src/cli.rs` /
 > `src/main.rs` / `src/output.rs` (`Ctx` + `Report` trait + `emit`)
 > pattern.
 
@@ -36,9 +36,9 @@ output to another tool). It is also why `laterite-cliutil` exists at all:
 duplication across CLIs is resolved by **extracting a shared crate**,
 never a documented copy. The validator *library*'s lean dep-graph
 (no walkdir/rayon/ratatui) is a hard guarantee — shared UI stays
-bin-side. New CLIs ([[ags4-forge]]) inherit this verbatim; the
+bin-side. New CLIs ([[laterite-ags4-forge]]) inherit this verbatim; the
 `Ctx/Report/emit/Plan` layer is being lifted into [[laterite-cliutil]] so
-forge and [[ags4-corpus-qa]] share one report scaffold.
+forge and [[laterite-ags4-corpus-qa]] share one report scaffold.
 
 "Look and feel like one tool" extends past a single binary's own UX
 contract: `lat` itself ships behind three launchers (the native binary,
@@ -63,9 +63,9 @@ flowchart LR
 ```
 
 ## Where it shows up
-[[laterite-ags4-check]], [[ags4-corpus-qa]], laterite-ags5-db today; [[ags4-forge]]
+[[laterite-ags4-check]], [[laterite-ags4-corpus-qa]], laterite-ags5-db today; [[laterite-ags4-forge]]
 next. The shared primitives live in [[laterite-cliutil]]; the report-doc
-half of the contract is the [[ags4-corpus-qa]] `output.rs` pattern.
+half of the contract is the [[laterite-ags4-corpus-qa]] `output.rs` pattern.
 
 ## Related
-[[laterite-cliutil]] · [[ags4-corpus-qa]] · [[laterite-ags4-check]] · laterite-ags5-db · [[ags4-forge]] · [[ags4-parity-crate]] · [[surface-census]]
+[[laterite-cliutil]] · [[laterite-ags4-corpus-qa]] · [[laterite-ags4-check]] · laterite-ags5-db · [[laterite-ags4-forge]] · [[laterite-ags4-parity]] · [[surface-census]]

@@ -10,7 +10,7 @@ expected_rust: ""
 expected_python: ""
 evidence: "forge mine report.json per run (combo · seed · signature · divergence_prone · verdict · python_rules)"
 feeds_ags5_req: []
-related: [ags4-forge, evolutionary-dogfooding, strat-parity-matrix, strat-forge-rule10a-relational, parity-model]
+related: [laterite-ags4-forge, evolutionary-dogfooding, strat-parity-matrix, strat-forge-rule10a-relational, parity-model]
 sources: []
 ---
 # Combinatorial divergence-mining campaign
@@ -24,7 +24,7 @@ sources: []
 > (`repo:packages/laterite/tests/test_parity_divergences.py`, #190).
 
 ## Sequencing
-**Runs AFTER the forge injector improvements** (#169 ags4-compliance crate;
+**Runs AFTER the forge injector improvements** (#169 laterite-ags4-compliance crate;
 #172 synthetic DEPTH). The campaign is partly runnable today over the 9
 single-injectable faults, but its *coverage* is bounded by the injector
 menu — so the higher-value, wider campaign waits on those improvements to
@@ -79,7 +79,7 @@ this campaign:
   FILE (20) — domain setup, later.
 
 ## Where it lives / how to run
-- `repo:rust-packages/ags4-forge` — `ags4-forge mine --min-k K --max-k K
+- `repo:rust-packages/laterite-ags4-forge` — `laterite-ags4-forge mine --min-k K --max-k K
   --scaffold loca-samp|wide --seeds N --max-oracle M` (`--no-oracle` for
   the cheap Rust-only profile first).
 - Output: `report.json` per run (`combo · seed · signature ·
@@ -88,4 +88,4 @@ this campaign:
   divergence in `ags-wiki/.bootstrap/probes/`.
 
 ## Related
-[[ags4-forge]] · [[evolutionary-dogfooding]] · [[strat-parity-matrix]] · [[strat-forge-rule10a-relational]] · [[parity-model]]
+[[laterite-ags4-forge]] · [[evolutionary-dogfooding]] · [[strat-parity-matrix]] · [[strat-forge-rule10a-relational]] · [[parity-model]]

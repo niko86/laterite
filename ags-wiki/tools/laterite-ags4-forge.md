@@ -1,21 +1,21 @@
 ---
 type: tool
-title: ags4-forge
+title: laterite-ags4-forge
 status: drafted
 tags: [tool]
 tool_kind: cli
 language: rust
-artifact: ags4-forge
+artifact: laterite-ags4-forge
 ags_editions: []
 repo_refs:
-  root: "repo:rust-packages/ags4-forge"
-related: [parity-model, ags4-corpus-qa, ags4-parity-crate, agent-first-cli-contract, evolutionary-dogfooding, parity-confidence-model, strat-forge-rule10a-relational, bs5930-soil-descriptions]
+  root: "repo:rust-packages/laterite-ags4-forge"
+related: [parity-model, laterite-ags4-corpus-qa, laterite-ags4-parity, agent-first-cli-contract, evolutionary-dogfooding, parity-confidence-model, strat-forge-rule10a-relational, bs5930-soil-descriptions]
 sources: []
 ---
-# ags4-forge
+# laterite-ags4-forge
 
 ## What it is
-> [!quote] **Implemented** (`repo:rust-packages/ags4-forge`, P0–P5
+> [!quote] **Implemented** (`repo:rust-packages/laterite-ags4-forge`, P0–P5
 > complete + tested; rationale + phasing in
 > [[dec-ags4-forge-evolutionary-dogfood]]). First result:
 > [[strat-forge-rule10a-relational]] retired the Rule-10a parity
@@ -73,26 +73,26 @@ sources: []
 > parity-confidence ledger. `mine` writes its `mine_<combo>_s<seed>.ags`
 > candidates + a `report.json` (corpus gaps, divergence-prone count,
 > per-candidate signatures) into the same run-versioned dir; its
-> divergence-prone rule set is derived from the [[ags4-parity-crate]]
+> divergence-prone rule set is derived from the [[laterite-ags4-parity]]
 > `classify` arms (Rules 4/5/6/19b) + OBSERVATIONS behavioural entries
 > (Rules 7/8). `--compact` token-lean output drives the `/loop` agent
 > cycle.
 
 ## Where it lives
-Planned `repo:rust-packages/ags4-forge` (sibling of
-`repo:rust-packages/ags4-corpus-qa`). Reuses the validator library
+Planned `repo:rust-packages/laterite-ags4-forge` (sibling of
+`repo:rust-packages/laterite-ags4-corpus-qa`). Reuses the validator library
 `repo:rust-packages/laterite-ags4-validator/src/lib.rs`, the shared
-[[ags4-parity-crate]] (extracted from
-`repo:rust-packages/ags4-corpus-qa/src/parity.rs`), the python bridge
+[[laterite-ags4-parity]] (extracted from
+`repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs`), the python bridge
 `repo:tools/py_ags4_check_json.py`, and [[laterite-cliutil]] per the
 [[agent-first-cli-contract]].
 
 ## Relationship to other components
 ```mermaid
 flowchart LR
-  agent[the agent + wiki] -->|authors strategy.toml| forge[ags4-forge]
+  agent[the agent + wiki] -->|authors strategy.toml| forge[laterite-ags4-forge]
   forge --> val[laterite-ags4-validator lib]
-  forge --> parity[ags4-parity-crate]
+  forge --> parity[laterite-ags4-parity]
   parity --> py[py-ags4-check-json]
   forge --> cliutil[laterite-cliutil]
   forge -->|frontier / --compact| agent
@@ -103,4 +103,4 @@ See [[evolutionary-dogfooding]] for the loop and
 [[parity-confidence-model]] for the adaptive oracle gating.
 
 ## Related
-[[parity-model]] · [[ags4-corpus-qa]] · [[ags4-parity-crate]] · ags4-compliance · [[agent-first-cli-contract]] · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[dec-ags4-forge-evolutionary-dogfood]] · [[strat-forge-rule10a-relational]] · [[bs5930-soil-descriptions]] · [[crate-map]]
+[[parity-model]] · [[laterite-ags4-corpus-qa]] · [[laterite-ags4-parity]] · laterite-ags4-compliance · [[agent-first-cli-contract]] · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[dec-ags4-forge-evolutionary-dogfood]] · [[strat-forge-rule10a-relational]] · [[bs5930-soil-descriptions]] · [[crate-map]]
