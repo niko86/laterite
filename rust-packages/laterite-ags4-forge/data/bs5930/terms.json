@@ -1,0 +1,613 @@
+{
+  "strengthConsistency": [
+    {
+      "term": "Very soft",
+      "consistencyTest": "Finger easily pushed in up to 25 mm; exudes between fingers",
+      "ref": "BS 5930:2015+A1:2020 Table 8 (clause 33.3.2)"
+    },
+    {
+      "term": "Soft",
+      "consistencyTest": "Finger pushed in up to 10 mm; moulded by light finger pressure",
+      "ref": "BS 5930:2015+A1:2020 Table 8 (clause 33.3.2)"
+    },
+    {
+      "term": "Firm",
+      "consistencyTest": "Thumb makes impression easily; cannot be moulded by fingers, rolls in the hand to a 3 mm thick thread without breaking or crumbling",
+      "ref": "BS 5930:2015+A1:2020 Table 8 (clause 33.3.2)"
+    },
+    {
+      "term": "Stiff",
+      "consistencyTest": "Can be indented slightly by thumb; crumbles in rolling a 3 mm thick thread, but can then be remoulded into a lump",
+      "ref": "BS 5930:2015+A1:2020 Table 8 (clause 33.3.2)"
+    },
+    {
+      "term": "Very stiff",
+      "consistencyTest": "Can be indented by thumb nail; cannot be moulded but crumbles under pressure",
+      "ref": "BS 5930:2015+A1:2020 Table 8 (clause 33.3.2)"
+    },
+    {
+      "term": "Extremely low strength",
+      "cuKpa": "<10",
+      "ref": "BS 5930:2015+A1:2020 Table 9 (clause 33.3.2)"
+    },
+    {
+      "term": "Very low strength",
+      "cuKpa": "10 - 20",
+      "ref": "BS 5930:2015+A1:2020 Table 9 (clause 33.3.2)"
+    },
+    {
+      "term": "Low strength",
+      "cuKpa": "20 - 40",
+      "ref": "BS 5930:2015+A1:2020 Table 9 (clause 33.3.2)"
+    },
+    {
+      "term": "Medium strength",
+      "cuKpa": "40 - 75",
+      "ref": "BS 5930:2015+A1:2020 Table 9 (clause 33.3.2)"
+    },
+    {
+      "term": "High strength",
+      "cuKpa": "75 - 150",
+      "ref": "BS 5930:2015+A1:2020 Table 9 (clause 33.3.2)"
+    },
+    {
+      "term": "Very high strength",
+      "cuKpa": "150 - 300",
+      "ref": "BS 5930:2015+A1:2020 Table 9 (clause 33.3.2)"
+    }
+  ],
+  "relativeDensity": [
+    {
+      "term": "Very loose",
+      "sptN": "0 - 4",
+      "fieldDensity": "Very easy to excavate with a spade; geological pick penetration 100 mm (full depth); pushed pick 75 mm - 100 mm (full length)",
+      "ref": "BS 5930:2015+A1:2020 Tables 10 and 11 (clause 33.3.2)"
+    },
+    {
+      "term": "Loose",
+      "sptN": "4 - 10",
+      "fieldDensity": "Fairly easy to excavate with a spade or to penetrate with a crowbar; geological pick penetration 50 mm - 100 mm; pushed pick 25 mm - 75 mm",
+      "ref": "BS 5930:2015+A1:2020 Tables 10 and 11 (clause 33.3.2)"
+    },
+    {
+      "term": "Medium dense",
+      "sptN": "10 - 30",
+      "fieldDensity": "Difficult to excavate with a spade or to penetrate with a crowbar; geological pick penetration 25 mm - 50 mm; pushed pick 10 mm - 25 mm",
+      "ref": "BS 5930:2015+A1:2020 Tables 10 and 11 (clause 33.3.2)"
+    },
+    {
+      "term": "Dense",
+      "sptN": "30 - 50",
+      "fieldDensity": "Very difficult to penetrate with a crowbar, requires a pick for excavation; geological pick penetration 5 mm - 25 mm; pushed pick 2 mm - 10 mm",
+      "ref": "BS 5930:2015+A1:2020 Tables 10 and 11 (clause 33.3.2)"
+    },
+    {
+      "term": "Very dense",
+      "sptN": ">50",
+      "fieldDensity": "Difficult to excavate with a pick; geological pick penetration <5 mm; pushed pick <2 mm",
+      "ref": "BS 5930:2015+A1:2020 Tables 10 and 11 (clause 33.3.2)"
+    }
+  ],
+  "colour": [
+    {
+      "term": "light",
+      "group": "lightness",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "dark",
+      "group": "lightness",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "pinkish",
+      "group": "chroma",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "reddish",
+      "group": "chroma",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "orangeish",
+      "group": "chroma",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "yellowish",
+      "group": "chroma",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "brownish",
+      "group": "chroma",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "greenish",
+      "group": "chroma",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "bluish",
+      "group": "chroma",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "greyish",
+      "group": "chroma",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "red",
+      "group": "hue",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "pink",
+      "group": "hue",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "orange",
+      "group": "hue",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "yellow",
+      "group": "hue",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "cream",
+      "group": "hue",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "brown",
+      "group": "hue",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "green",
+      "group": "hue",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "blue",
+      "group": "hue",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "white",
+      "group": "hue",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "grey",
+      "group": "hue",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "black",
+      "group": "hue",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "mottled",
+      "group": "flag",
+      "criteria": "Strata with more than one distinct colour",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    },
+    {
+      "term": "multicoloured",
+      "group": "flag",
+      "criteria": "Strata with more than three distinct colours",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.2)"
+    }
+  ],
+  "colourWordOrder": "lightness chroma hue (HUE may be preceded by LIGHTNESS and/or CHROMA), e.g. light reddish brown. No chroma form exists for white, grey, black or cream; the mid lightness value has no term. Colour is the overall impression of the DAMP soil.",
+  "discontinuities": [
+    {
+      "term": "very widely",
+      "group": "spacing",
+      "spacingMm": ">2 000",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.3)"
+    },
+    {
+      "term": "widely",
+      "group": "spacing",
+      "spacingMm": "2 000-600",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.3)"
+    },
+    {
+      "term": "medium",
+      "group": "spacing",
+      "spacingMm": "600-200",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.3)"
+    },
+    {
+      "term": "closely",
+      "group": "spacing",
+      "spacingMm": "200-60",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.3)"
+    },
+    {
+      "term": "very closely",
+      "group": "spacing",
+      "spacingMm": "60-20",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.3)"
+    },
+    {
+      "term": "extremely closely",
+      "group": "spacing",
+      "spacingMm": "<20",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.3)"
+    },
+    {
+      "term": "fissured",
+      "group": "type",
+      "criteria": "Breaks into blocks along unpolished discontinuities",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.3)"
+    },
+    {
+      "term": "sheared",
+      "group": "type",
+      "criteria": "Breaks into blocks along polished discontinuities",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.3)"
+    }
+  ],
+  "bedding": [
+    {
+      "term": "very thickly bedded",
+      "thicknessMm": ">2 000",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.4)"
+    },
+    {
+      "term": "thickly bedded",
+      "thicknessMm": "2 000-600",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.4)"
+    },
+    {
+      "term": "medium bedded",
+      "thicknessMm": "600-200",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.4)"
+    },
+    {
+      "term": "thinly bedded",
+      "thicknessMm": "200-60",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.4)"
+    },
+    {
+      "term": "very thinly bedded",
+      "thicknessMm": "60-20",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.4)"
+    },
+    {
+      "term": "thickly laminated",
+      "thicknessMm": "20-6",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.4)"
+    },
+    {
+      "term": "thinly laminated",
+      "thicknessMm": "<6",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.3.4)"
+    }
+  ],
+  "angularity": [
+    {
+      "term": "very angular",
+      "ref": "BS 5930:2015+A1:2020 Figure 7 / BS EN ISO 14688-1:2018 Table 3 (clause 33.4.3)"
+    },
+    {
+      "term": "angular",
+      "ref": "BS 5930:2015+A1:2020 Figure 7 / BS EN ISO 14688-1:2018 Table 3 (clause 33.4.3)"
+    },
+    {
+      "term": "subangular",
+      "ref": "BS 5930:2015+A1:2020 Figure 7 / BS EN ISO 14688-1:2018 Table 3 (clause 33.4.3)"
+    },
+    {
+      "term": "subrounded",
+      "ref": "BS 5930:2015+A1:2020 Figure 7 / BS EN ISO 14688-1:2018 Table 3 (clause 33.4.3)"
+    },
+    {
+      "term": "rounded",
+      "ref": "BS 5930:2015+A1:2020 Figure 7 / BS EN ISO 14688-1:2018 Table 3 (clause 33.4.3)"
+    },
+    {
+      "term": "well rounded",
+      "ref": "BS 5930:2015+A1:2020 Figure 7 / BS EN ISO 14688-1:2018 Table 3 (clause 33.4.3)"
+    }
+  ],
+  "shape": [
+    {
+      "term": "cubic",
+      "group": "form",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.3 / BS EN ISO 14688-1:2018 Table 3"
+    },
+    {
+      "term": "flat (or tabular)",
+      "group": "form",
+      "criteria": "'Flat' is preferred to 'flaky' (BS EN 933-3)",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.3 / BS EN ISO 14688-1:2018 Table 3"
+    },
+    {
+      "term": "elongate",
+      "group": "form",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.3 / BS EN ISO 14688-1:2018 Table 3"
+    },
+    {
+      "term": "rough",
+      "group": "surfaceTexture",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.3"
+    },
+    {
+      "term": "smooth",
+      "group": "surfaceTexture",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.3"
+    },
+    {
+      "term": "high sphericity",
+      "group": "sphericity",
+      "ref": "BS 5930:2015+A1:2020 Figure 7 (clause 33.4.3)"
+    },
+    {
+      "term": "low sphericity",
+      "group": "sphericity",
+      "ref": "BS 5930:2015+A1:2020 Figure 7 (clause 33.4.3)"
+    }
+  ],
+  "grading": [
+    {
+      "term": "fine/medium/coarse fractions",
+      "definition": "Distribution of particle sizes within sands and gravels is described by stating the predominant size fractions present, using the fine/medium/coarse descriptors of Table 7.",
+      "ref": "BS 5930:2015+A1:2020 Table 7 (clause 33.4.3)"
+    },
+    {
+      "term": "conjunction 'and'",
+      "definition": "Used between two predominant size fractions, e.g. 'fine and medium GRAVEL'; differentiates the predominant fractions present.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.3 NOTE 2"
+    },
+    {
+      "term": "conjunction 'to'",
+      "definition": "Used to indicate a range of sizes, e.g. 'fine to coarse SAND'.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.3 NOTE 2"
+    },
+    {
+      "term": "no size adjective",
+      "definition": "Absence of a fine/medium/coarse adjective means the fine, medium and coarse fractions are all present in roughly equal proportions.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.3 NOTE 2"
+    },
+    {
+      "term": "well-graded (descriptive)",
+      "definition": "A well-graded soil with sufficient fine grains to fill the spaces between coarse grains is described as a fine soil; with insufficient fine grains it is a coarse soil. Formal grading-curve terms (well graded / poorly graded / uniformly graded / gap-graded) are BS EN ISO 14688-2 classification terms, not Section 6 field-description vocabulary.",
+      "ref": "BS 5930:2015+A1:2020 clause 33 (page 99 NOTE 2)"
+    }
+  ],
+  "mineralConstituents": [
+    {
+      "term": "slightly micaceous",
+      "definition": "Small amount of mica present; placed before the principal soil type.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    },
+    {
+      "term": "micaceous",
+      "definition": "Mica present in noticeable quantity; intermediate term of the slightly micaceous / micaceous / very micaceous series.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    },
+    {
+      "term": "very micaceous",
+      "definition": "High content of mica; upper term of the micaceous series.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    },
+    {
+      "term": "shelly",
+      "definition": "Shell material present; placed before the principal soil type.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    },
+    {
+      "term": "very shelly",
+      "definition": "Abundant shell material; example term in the clause.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    },
+    {
+      "term": "glauconitic",
+      "definition": "Presence of glauconite; example term in the clause.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    },
+    {
+      "term": "gypsiferous",
+      "definition": "Presence of gypsum (e.g. gypsum crystals in clay).",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6 / clause 33.4.3 NOTE 5"
+    },
+    {
+      "term": "organic",
+      "definition": "Organic content reported before the principal soil type (described per BS EN ISO 14688-1).",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    }
+  ],
+  "carbonate": [
+    {
+      "term": "carbonate free",
+      "criteria": "No effervescence; used to confirm a negative test result. Acid used is dilute hydrochloric acid, 10% (0.36 M).",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6 / BS EN ISO 14688-1:2018 Table 7"
+    },
+    {
+      "term": "slightly calcareous",
+      "criteria": "Effervescence on adding dilute HCl is weak or sporadic.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6 / BS EN ISO 14688-1:2018 Table 7"
+    },
+    {
+      "term": "calcareous",
+      "criteria": "Addition of dilute HCl produces a clear but unsustained effervescence.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6 / BS EN ISO 14688-1:2018 Table 7"
+    },
+    {
+      "term": "highly calcareous",
+      "criteria": "Effervescence on adding dilute HCl is strong and sustained.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6 / BS EN ISO 14688-1:2018 Table 7"
+    }
+  ],
+  "carbonateNote": "Description should state whether the clasts, the matrix, or both are calcareous. Carried out in accordance with BS EN ISO 14688-1:2018, Table 7.",
+  "tertiaryAmounts": [
+    {
+      "term": "with rare",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    },
+    {
+      "term": "with occasional",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    },
+    {
+      "term": "with frequent",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    },
+    {
+      "term": "with numerous",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    },
+    {
+      "term": "with abundant",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.4.6"
+    }
+  ],
+  "tertiaryNote": "Added at the END of the description (after the principal soil name and other constituents) using qualitative 'with ...' terms, e.g. 'SAND with rare gravel size brick fragments'. The size of the tertiary fractions may also be given in mm. The tertiary fraction does not need to be quantified and no percentage definition is given for the qualitative terms; they relate to identifying the geological unit (e.g. less than about 10% by mass in a fine soil, or about 2% in a coarse soil). Terms must be applied consistently on any given job.",
+  "plasticity": [
+    {
+      "term": "Non-plastic",
+      "criteria": "A 3 mm thread cannot be rolled at any water content.",
+      "ref": "BS 5930:2015+A1:2020 Table 23 (clause 34.3.4)"
+    },
+    {
+      "term": "Low",
+      "criteria": "The thread can barely be rolled and the lump cannot be formed when drier than the plastic limit.",
+      "ref": "BS 5930:2015+A1:2020 Table 23 (clause 34.3.4)"
+    },
+    {
+      "term": "Medium",
+      "criteria": "The thread is easy to roll and not much time is required to reach the plastic limit. The thread cannot be rerolled after reaching the plastic limit. The lump crumbles when drier than the plastic limit.",
+      "ref": "BS 5930:2015+A1:2020 Table 23 (clause 34.3.4)"
+    },
+    {
+      "term": "High",
+      "criteria": "It takes considerable time rolling and kneading to reach the plastic limit. The thread can be rerolled several times after reaching the plastic limit. The lump can be formed without crumbling when drier than the plastic limit.",
+      "ref": "BS 5930:2015+A1:2020 Table 23 (clause 34.3.4)"
+    }
+  ],
+  "odours": [
+    {
+      "term": "Camphor",
+      "category": "Camphor",
+      "descriptiveTerms": ["Bitter", "Mothballs", "Acrid"],
+      "ref": "BS 5930:2015+A1:2020 Section 6 (odour descriptors)"
+    },
+    {
+      "term": "Musk",
+      "category": "Musk",
+      "descriptiveTerms": ["Penetrating", "Pungent"],
+      "ref": "BS 5930:2015+A1:2020 Section 6 (odour descriptors)"
+    },
+    {
+      "term": "Floral",
+      "category": "Floral",
+      "descriptiveTerms": ["Wide range of terms, not likely to be used often in made ground"],
+      "ref": "BS 5930:2015+A1:2020 Section 6 (odour descriptors)"
+    },
+    {
+      "term": "Peppermint",
+      "category": "Peppermint",
+      "descriptiveTerms": ["Sweet", "Minty"],
+      "ref": "BS 5930:2015+A1:2020 Section 6 (odour descriptors)"
+    },
+    {
+      "term": "Ether",
+      "category": "Ether",
+      "descriptiveTerms": ["Solvent", "Acetone", "Medicinal"],
+      "ref": "BS 5930:2015+A1:2020 Section 6 (odour descriptors)"
+    },
+    {
+      "term": "Vinegar",
+      "category": "Vinegar",
+      "descriptiveTerms": ["Sharp", "Acetic", "Pungent"],
+      "ref": "BS 5930:2015+A1:2020 Section 6 (odour descriptors)"
+    },
+    {
+      "term": "Putrid",
+      "category": "Putrid",
+      "descriptiveTerms": ["Rancid", "Rotten egg", "Rotten cabbage", "Fishy", "Disagreeable, sweet", "Sulfurous"],
+      "ref": "BS 5930:2015+A1:2020 Section 6 (odour descriptors)"
+    },
+    {
+      "term": "Hydrocarbon",
+      "category": "Hydrocarbon",
+      "descriptiveTerms": ["Organic", "Petrol", "Diesel", "Oil", "Asphalt", "Tar"],
+      "ref": "BS 5930:2015+A1:2020 Section 6 (odour descriptors)"
+    }
+  ],
+  "peatTypes": [
+    {
+      "term": "PEAT",
+      "definition": "Accumulates in-situ in a mire. Predominantly plant remains, usually dark brown or black, distinctive smell, low bulk density. Can include disseminated or discrete inorganic particles.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.6"
+    },
+    {
+      "term": "Fibrous PEAT",
+      "definition": "Plant remains clearly recognizable and retain some tensile strength. Water and no solids on squeezing.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.6"
+    },
+    {
+      "term": "Pseudo-fibrous PEAT",
+      "definition": "Mixture of fibres and amorphous paste. Turbid water and <50% solids on squeezing.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.6"
+    },
+    {
+      "term": "Amorphous PEAT",
+      "definition": "No recognizable plant remains, mushy consistency. Paste and >50% solids on squeezing.",
+      "ref": "BS 5930:2015+A1:2020 clause 33.4.6"
+    }
+  ],
+  "peatCondition": [
+    {
+      "term": "Firm",
+      "definition": "Fibres compressed together.",
+      "ref": "BS 5930:2015+A1:2020 Table 21 (clause 33.4.6)"
+    },
+    {
+      "term": "Spongy",
+      "definition": "Very compressible; open structure.",
+      "ref": "BS 5930:2015+A1:2020 Table 21 (clause 33.4.6)"
+    },
+    {
+      "term": "Plastic",
+      "definition": "Can be moulded in hand; smears fingers.",
+      "ref": "BS 5930:2015+A1:2020 Table 21 (clause 33.4.6)"
+    }
+  ],
+  "vonPost": [],
+  "vonPostNote": "The full von Post degree-of-decomposition / humification scale (H1-H10) is not printed in BS 5930:2015+A1:2020 Section 6. It is referenced only as an external fuller-description scheme (von Post or Troels Smith) to be used for peat horizons of major engineering significance (clause 33.4.6, citing Hobbs 1986/1987 and Norbury 2015).",
+  "secondaryOrganic": [
+    {
+      "term": "Slightly organic",
+      "typicalColour": "Grey",
+      "organicContent": "Low organic content",
+      "percent": "2 - 6",
+      "ref": "BS 5930:2015+A1:2020 Table 20 (clause 33.4.6)"
+    },
+    {
+      "term": "Organic",
+      "typicalColour": "Dark grey",
+      "organicContent": "Medium organic content",
+      "percent": "6 - 20",
+      "ref": "BS 5930:2015+A1:2020 Table 20 (clause 33.4.6)"
+    },
+    {
+      "term": "Very organic",
+      "typicalColour": "Black",
+      "organicContent": "High organic content",
+      "percent": ">20",
+      "ref": "BS 5930:2015+A1:2020 Table 20 (clause 33.4.6)"
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "source": "BS 5930:2015+A1:2020 Section 6 — factual data extracted for the app's own description builder, not a reproduction of the standard.",
+  "description": "Particle size fractions with mm boundaries and coarse/medium/fine subdivisions (Table 7, clause 33.4.3), plus the rule for stating size fractions in a description. Boundary strings preserve the printed range notation; minMm/maxMm give numeric bounds for programmatic use. Each interval is closed at its lower bound and open at its upper bound except for the open-ended ends (BOULDERS has no upper limit; CLAY has no lower limit).",
+  "clause": "33.4.3",
+  "tableRef": "Table 7",
+  "fractions": [
+    {
+      "name": "BOULDERS",
+      "group": "Very coarse soils",
+      "minMm": 200,
+      "maxMm": null,
+      "boundary": ">200",
+      "subdivisions": [
+        { "name": "Large boulder", "minMm": 630, "maxMm": null, "boundary": ">630" },
+        { "name": "Boulder", "minMm": 200, "maxMm": 630, "boundary": "630-200" }
+      ]
+    },
+    {
+      "name": "COBBLES",
+      "group": "Very coarse soils",
+      "minMm": 63,
+      "maxMm": 200,
+      "boundary": "200-63",
+      "subdivisions": [
+        { "name": "Cobble", "minMm": 63, "maxMm": 200, "boundary": "200-63" }
+      ]
+    },
+    {
+      "name": "GRAVEL",
+      "group": "Coarse soils",
+      "minMm": 2,
+      "maxMm": 63,
+      "boundary": "63-2.0",
+      "subdivisions": [
+        { "name": "coarse", "minMm": 20, "maxMm": 63, "boundary": "63-20" },
+        { "name": "medium", "minMm": 6.3, "maxMm": 20, "boundary": "20-6.3" },
+        { "name": "fine", "minMm": 2.0, "maxMm": 6.3, "boundary": "6.3-2.0" }
+      ]
+    },
+    {
+      "name": "SAND",
+      "group": "Coarse soils",
+      "minMm": 0.063,
+      "maxMm": 2,
+      "boundary": "2.0-0.063",
+      "subdivisions": [
+        { "name": "coarse", "minMm": 0.63, "maxMm": 2.0, "boundary": "2.0-0.63" },
+        { "name": "medium", "minMm": 0.2, "maxMm": 0.63, "boundary": "0.63-0.2" },
+        { "name": "fine", "minMm": 0.063, "maxMm": 0.2, "boundary": "0.2-0.063" }
+      ]
+    },
+    {
+      "name": "SILT",
+      "group": "Fine soils",
+      "minMm": 0.002,
+      "maxMm": 0.063,
+      "boundary": "0.063-0.002",
+      "subdivisions": [
+        { "name": "coarse", "minMm": 0.02, "maxMm": 0.063, "boundary": "0.063-0.02" },
+        { "name": "medium", "minMm": 0.0063, "maxMm": 0.02, "boundary": "0.02-0.0063" },
+        { "name": "fine", "minMm": 0.002, "maxMm": 0.0063, "boundary": "0.0063-0.002" }
+      ]
+    },
+    {
+      "name": "CLAY",
+      "group": "Fine soils",
+      "minMm": null,
+      "maxMm": 0.002,
+      "boundary": "<0.002",
+      "subdivisions": []
+    }
+  ],
+  "sizeStatementRule": "For sands and gravels, state the predominant size fractions present using the coarse/medium/fine terms (e.g. 'fine and medium GRAVEL' or 'fine to coarse SAND'). Absence of these adjectives means fine, medium and coarse fractions are all present in roughly equal proportions. The conjunction 'and' indicates the predominant fractions present; 'to' indicates a continuous range of sizes spanning the named end fractions.",
+  "sourcePages": [100, 106],
+  "uncertainties": []
+}

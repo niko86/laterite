@@ -51,6 +51,10 @@ members = [
     "laterite-py",
     "laterite-node",
     "laterite-ags4-xcheck",
+    "laterite-ags4-parity",
+    "laterite-ags4-forge",
+    "laterite-ags4-corpus-qa",
+    "laterite-ags4-perf",
 ]
 
 # Single-sourced crate version: every member inherits this via

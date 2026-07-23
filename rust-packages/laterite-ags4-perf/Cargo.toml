@@ -1,0 +1,42 @@
+# laterite-ags4-perf — the rust leg of the cross-surface performance matrix
+# (Workstream C-perf). A dev/QA bin, never shipped.
+#
+# It lives in its own crate rather than the validator's benches/ for two
+# reasons: (1) a *bin* pulls regular [dependencies] (the data parser +
+# the Arrow typing leaf), which the validator's deliberately lean runtime
+# dep-graph must not gain — a Criterion bench's dev-deps wouldn't, but a
+# bin would; (2) it grows to host the duckdb criterion bench too. The
+# validator's own validate_large_fixture Criterion bench stays put as the
+# rust *regression* guard — a different job from this *comparison* matrix.
+
+[package]
+name = "laterite-ags4-perf"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "Cross-surface perf-matrix harness (rust leg) — times validate + parse-to-typed over the forge size ladder"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "laterite-ags4-perf"
+path = "src/main.rs"
+
+[dependencies]
+# validate: the clean-room validator's public check_file.
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# parse: the shared parse leaf (#168 Phase 3) — the ladder file parses through
+# the leaf directly, the same source-true tokenizer the bindings now use.
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+# parse-to-typed: the SAME path the shipped bindings (py/node/wasm) take —
+# the validator's parser + the shared Arrow typing leaf (build_record_batch
+# fed the positional ParsedGroup::cell accessor) — so this surface
+# materialises types identically to the hosts it is compared against. (NOT
+# laterite-ags4-core's DuckDB-ingest codec, which keys rows by name.)
+laterite-types = { path = "../laterite-types", features = ["arrow"] }
+# Manifest in (forge ladder) / results out (uniform matrix schema).
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints]
+workspace = true

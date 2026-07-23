@@ -1,0 +1,74 @@
+# Dev/QA dogfooding harness — NOT a shipped product.
+#
+# Crawl a (network) share for .ags files, copy a subset locally,
+# batch-run the clean-room Rust validator over them, bucket the
+# odd/failed ones, and parity-check those against python-ags4.
+#
+# Depends on `laterite-ags4-validator` by PATH, PUBLIC API ONLY (like every
+# other host crate) — the validator library's dep graph is provably unaffected. Every
+# dependency below is already in rust-packages/Cargo.lock: zero new
+# external surface. TUI is **on by default** here: this is a
+# non-shipped dev/QA harness (not the LLM-facing binary), so the
+# validator's opt-in `tui` guardrail rationale doesn't apply and a
+# plain `cargo build --workspace --release` should yield a working
+# `crawl --pick`. It's still a feature, so `--no-default-features`
+# gives a ratatui-free build; `--no-input`/non-TTY degrade cleanly.
+
+[package]
+name = "laterite-ags4-corpus-qa"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "Crawl a share, dogfood the AGS4 validator, parity-check vs python-ags4"
+license = "MIT"
+publish = false
+autobins = false
+
+[[bin]]
+name = "laterite-ags4-corpus-qa"
+path = "src/main.rs"
+
+[features]
+default = ["tui"]
+tui = ["dep:ratatui", "dep:crossterm"]
+
+[dependencies]
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# Stage 7b: CheckOptions now carries an `encoding: &'static
+# encoding_rs::Encoding` field. corpus-qa uses UTF-8 by harvesting
+# convention; the dep is already transitive via laterite-ags4-validator so
+# this just gives us a direct path to the type.
+encoding_rs = "0.8"
+# Shared parity model (classify/reconcile + the O-N reconcile arms),
+# the PyOracle python bridge, and seedable Rng/reservoir — extracted
+# out of this crate's old src/parity.rs + src/crawl.rs so laterite-ags4-forge
+# reuses the identical verdict semantics (extract-over-duplicate).
+laterite-ags4-parity = { path = "../laterite-ags4-parity" }
+# Shared CLI presentation (spinner, progress bar, styled table, colour
+# gate, coloured-JSON, OutputMode). The `clap` feature turns on the
+# `OutputMode` ValueEnum derive for the global `--output` flag. Pulls
+# comfy-table/indicatif transitively (so they're no longer named here).
+laterite-cliutil = { path = "../laterite-cliutil", features = ["clap"] }
+# The shared AGS4 scrub engine (#581): `censor` + Policy/CensorOptions/Tally.
+# The anonymisation logic itself moved here out of this crate's src/censor.rs so
+# the browser Anonymiser drives the SAME engine — this crate is now just the
+# crawler/manifest wrapper around it.
+laterite-ags4-censor = { path = "../laterite-ags4-censor" }
+walkdir = "2.5"
+rayon = "1.10"
+clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde", "clock"] }
+thiserror = "2"
+anyhow = "1"
+ratatui = { version = "0.30", optional = true }
+crossterm = { version = "0.29", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true
