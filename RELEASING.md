@@ -31,32 +31,30 @@ derived at build and republishes on merge. **Never hand-edit a version string**
 — `test_version_faithful.py`, the compat guard, and the `release.yml` tag-check
 all catch drift.
 
-> [!IMPORTANT] **Releases PUBLISH FROM THE PUBLIC MIRROR `niko86/laterite`, NOT this
-> repo.** `laterite`'s `release.yml` builds + tests the matrix, but only the
-> *mirror's* `release.yml` publishes — the PyPI/npm trusted publishers are configured
-> for `niko86/laterite`. **Do NOT `git push --tags` to `laterite`**: it builds, then
-> the publish step fails with `invalid-publisher` (by design). The release tags go on
-> the **mirror** (see step 3).
+> [!IMPORTANT] **Releases publish from this repo.** The PyPI/npm trusted
+> publishers are configured for `niko86/laterite`, so its `release.yml` builds,
+> tests, *and* publishes. Cut the `v*` / `node-v*` tags here, on `main`, once the
+> release PR has merged (step 3) — there is no separate publish origin.
 
 Before bumping, finish the `CHANGELOG.md` `[Unreleased]` section (the bump rolls
 it into the dated release). Then:
 
 ```bash
-# 1. On a release branch (the script refuses to run on master or a dirty tree),
+# 1. On a release branch (the script refuses to run on main or a dirty tree),
 #    bump every surface + regenerate uv.lock / Cargo.lock / package-lock.json,
 #    verify the drift-gate, and make one "release: X" commit (no tag, no push):
 git switch -c release/0.6.0
 tools/release/bump-version.sh minor          # or: patch  ·  --new-version 0.6.0rc1
 #    (DRY_RUN=1 tools/release/bump-version.sh minor  stamps + regenerates without committing)
 
-# 2. master is PROTECTED → land the bump via a release PR (merge-commit, NOT squash):
+# 2. main is PROTECTED → land the bump via a release PR (merge-commit, NOT squash):
 git push -u origin release/0.6.0
-gh pr create -B master -t "release: 0.6.0" -b "version bump"   # merge once CI is green
+gh pr create -B main -t "release: 0.6.0" -b "version bump"   # merge once CI is green
 
-# 3. Sync the bumped tree to the mirror, then cut BOTH tags THERE:
-tools/release/push-public-tree.sh --push     # carries the bump → niko86/laterite
-gh release create v0.6.0      --repo niko86/laterite   # wheels + sdist → PyPI, CLI → GH release
-gh release create node-v0.6.0 --repo niko86/laterite   # npm addon + @laterite/native-*
+# 3. On the merged main, cut BOTH tags — release.yml builds + publishes from them:
+git switch main && git pull
+gh release create v0.6.0      --title v0.6.0      --generate-notes   # wheels + sdist → PyPI, CLI → GH release
+gh release create node-v0.6.0 --title node-v0.6.0 --generate-notes   # npm addon + @laterite/native-*
 # 4. Approve the `pypi` / `npm` environments in the resulting Actions runs (the OIDC gates).
 
 # 5. Cut the DuckDB extension at the SAME version (its own repo — see below):
@@ -102,7 +100,7 @@ tools/release/bump-version.sh --new-version 0.6.0         # promote to final
 ## The DuckDB extension (`laterite_ags4`)
 
 The extension is a **separate repo, `niko86/laterite-duckdb`**, published through
-DuckDB **community-extensions** — not from this repo and not from the mirror. As
+DuckDB **community-extensions** — not from this repo. As
 of #372 it **tracks the laterite version**: cut it at the same number, as step 5
 above. Its own `.github/workflows/release.yml` fires on a `v*` tag to build +
 test the release artifact and pin the community descriptor to the tag's commit;
@@ -117,11 +115,11 @@ at whatever laterite version is then current.
 
 ## The docs site
 
-The docs (`web/docs-site/`) deploy to `/laterite/docs/` on **every master push**
+The docs (`web/docs-site/`) deploy to `/laterite/docs/` on **every main push**
 (`deploy-validator.yml`) — deliberately *not* gated on the release tag, so a doc
 fix ships immediately. The **Changelog page** (`reference/changelog.md`, generated
 by `scripts/gen_changelog.py`) renders the root `CHANGELOG.md` and stamps the
-shipped version, both **derived at build**. So merging the release PR to master
+shipped version, both **derived at build**. So merging the release PR to main
 republishes the docs with the new version + notes automatically — step 6 is just
 a confirmation, nothing to run.
 
