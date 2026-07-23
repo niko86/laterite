@@ -16,7 +16,7 @@ sources: []
 ## Definition
 
 The Rust side of the **shipped AGS4 toolkit** is **one Cargo workspace of
-twenty-three crates** (`repo:rust-packages/Cargo.toml` members) feeding **one
+twenty-four crates** (`repo:rust-packages/Cargo.toml` members) feeding **one
 published Python wheel** — the base [[laterite]] — plus a **loadable DuckDB
 extension** that ships outside the wheel entirely (the
 [[dec-duckdb-extension|laterite-duckdb]], via DuckDB Community Extensions).
@@ -49,7 +49,7 @@ CLI, a PyO3 cdylib, and a wasm bundle alike — see
 ## Why it matters
 
 Five questions a cold session re-derives from source unless this map
-exists: **why twenty-three crates** (the engine/CLI/QA/bindings/leaf split);
+exists: **why twenty-four crates** (the engine/CLI/QA/bindings/leaf split);
 **why AGS5 is decoupled** (the shipped product is AGS4-only; `.ags5db`/`.agsx`
 sit dormant in `ags5/` — dec-ags5-decouple); **the wasm path**
 ([[tech-stack-wasm]]); **the PyO3 boundary** ([[pyo3-boundary]]); and **why the
@@ -359,7 +359,7 @@ as stable):
   [[dec-duckdb-extension]].
 
 **Dev / QA — never shipped:**
-- `laterite-cliutil` (shared CLI presentation), [[laterite-ags4-parity]] (verdict model + PyOracle), [[laterite-ags4-corpus-qa]] (dogfood crawler + crawler/manifest wrapper around the `laterite-ags4-censor` leaf's `censor` subcommand, above), [[laterite-ags4-forge]] (evolutionary fuzzer), [[laterite-ags4-perf]] (the rust leg of the cross-surface perf matrix — times validate + parse-to-typed over the forge size ladder via the shipped validator-parse path, emitting the matrix's uniform JSON; `tools/perf-matrix.py` aggregates all surfaces), laterite-ags4-compliance (the cross-surface findings-agreement harness — runs the numbered-rule verdict across every surface over the vendored corpus and fails on a regression; also hosts the unrelated ags4-output-value-gate harness — `xcheck`/`emit-cases`, the reason this crate now also deps on `laterite-ags4-emit`/`laterite-ags4-parse`).
+- `laterite-cliutil` (shared CLI presentation), [[laterite-ags4-parity]] (verdict model + PyOracle), [[laterite-ags4-corpus-qa]] (dogfood crawler + crawler/manifest wrapper around the `laterite-ags4-censor` leaf's `censor` subcommand, above), [[laterite-ags4-forge]] (evolutionary fuzzer), [[laterite-ags4-perf]] (the rust leg of the cross-surface perf matrix — times validate + parse-to-typed over the forge size ladder via the shipped validator-parse path, emitting the matrix's uniform JSON; `tools/perf-matrix.py` aggregates all surfaces), [[laterite-ags4-compliance]] (the cross-surface findings-agreement harness — runs the numbered-rule verdict across every surface and fails on a regression; deps `laterite-ags4-{parity,validator,core}` only), and [[laterite-ags4-xcheck]] (the separate lean **output-value** gate — `xcheck`/`emit-cases` + the case manifest, kept its own crate so the gate builds without the harness's deps).
 
 **Decoupled AGS5 — dormant in `ags5/`** (preserved, out of the workspace; not
 built or shipped; a future AGS5 strand re-links them — dec-ags5-decouple):
@@ -434,8 +434,7 @@ flowchart LR
   parity --> forge[laterite-ags4-forge]
   parity --> compliance[laterite-ags4-compliance]
   validator --> compliance
-  parse --> compliance
-  emit --> compliance
+  core --> compliance
   validator --> perf[laterite-ags4-perf]
   cliutil[laterite-cliutil] --> check
   cliutil --> corpusqa

@@ -41,6 +41,7 @@ flowchart TD
     laterite_py[laterite-py]
   end
   subgraph L3["L3 · trust model + tools"]
+    laterite_ags4_compliance[laterite-ags4-compliance]
     laterite_ags4_corpus_qa[laterite-ags4-corpus-qa]
     laterite_ags4_forge[laterite-ags4-forge]
     laterite_ags4_parity[laterite-ags4-parity]
@@ -77,6 +78,9 @@ flowchart TD
   laterite_ags4_check --> laterite_ags4_validator
   laterite_ags4_check --> laterite_cliutil
   laterite_ags4_check --> laterite_excel
+  laterite_ags4_compliance --> laterite_ags4_core
+  laterite_ags4_compliance --> laterite_ags4_parity
+  laterite_ags4_compliance --> laterite_ags4_validator
   laterite_ags4_core --> laterite_ags4_parse
   laterite_ags4_core --> laterite_ags4_reference
   laterite_ags4_core --> laterite_transport
@@ -160,15 +164,16 @@ flowchart TD
 | `laterite-ags4-reference` | L0 | 2 | 6 | 2 |
 | `laterite-cliutil` | L0 | 0 | 3 | 0 |
 | `laterite-transport` | L0 | 0 | 2 | 0 |
-| `laterite-ags4-core` | L1 | 4 | 7 | 4 |
-| `laterite-ags4-validator` | L2 | 3 | 11 | 3 |
+| `laterite-ags4-core` | L1 | 4 | 8 | 4 |
+| `laterite-ags4-validator` | L2 | 3 | 12 | 3 |
 | `laterite-ags4-emit` | L2 | 2 | 6 | 4 |
 | `laterite-ags4-diff` | L2 | 3 | 4 | 3 |
 | `laterite-ags4-merge` | L2 | 4 | 4 | 5 |
 | `laterite-excel` | L2 | 2 | 4 | 7 |
 | `laterite-ags4-censor` | L2 | 3 | 2 | 3 |
 | `laterite-ags4-trust` | L3 | 3 | 4 | 6 |
-| `laterite-ags4-parity` | L3 | 1 | 2 | 4 |
+| `laterite-ags4-parity` | L3 | 1 | 3 | 4 |
+| `laterite-ags4-compliance` | L3 | 3 | 0 | 7 |
 | `laterite-ags4-corpus-qa` | L3 | 4 | 0 | 7 |
 | `laterite-ags4-forge` | L3 | 3 | 0 | 6 |
 | `laterite-ags4-perf` | L3 | 3 | 0 | 4 |
@@ -185,9 +190,9 @@ flowchart TD
 - **Dev-only cycles (latent — would cycle if promoted to a ship dep):** none.
 - **Hubs (in-degree ≥ 6):**
   - `laterite-ags4-parse` (in-degree 14)
+  - `laterite-ags4-validator` (in-degree 12)
   - `laterite-types` (in-degree 12)
-  - `laterite-ags4-validator` (in-degree 11)
-  - `laterite-ags4-core` (in-degree 7)
+  - `laterite-ags4-core` (in-degree 8)
   - `laterite-ags4-emit` (in-degree 6)
   - `laterite-ags4-reference` (in-degree 6)
 
