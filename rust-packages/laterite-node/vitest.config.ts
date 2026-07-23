@@ -20,12 +20,14 @@ export default defineConfig({
       all: false,
       include: ["ts/**"],
       exclude: ["ts/**/*.generated.ts"],
-      // Regression floor: node is the lowest-covered surface (~59% lines at
-      // 2026-07) and is being raised (see the tracking issue). The floor sits a
-      // couple points under current so a genuine drop reds the `node` job
-      // without a normal-fluctuation false-red — RATCHET UP as coverage climbs,
-      // like the rust (88) and python (80) floors.
-      thresholds: { lines: 57 },
+      // Regression floor: node was the lowest-covered surface (~59% lines at
+      // 2026-07); the in-process CLI suite (test/cli-inprocess.test.ts) drives
+      // `cli.ts` through the coverage instrument the subprocess test can't reach,
+      // taking lines to ~96% / branches to ~86%. The floors sit a couple points
+      // under current so a genuine drop reds the `node` job without a
+      // normal-fluctuation false-red — RATCHET UP as coverage climbs, like the
+      // rust (88) and python (80) floors.
+      thresholds: { lines: 93, branches: 84 },
     },
   },
 });
