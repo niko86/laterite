@@ -55,6 +55,7 @@ members = [
     "laterite-ags4-forge",
     "laterite-ags4-corpus-qa",
     "laterite-ags4-perf",
+    "laterite-ags4-compliance",
 ]
 
 # Single-sourced crate version: every member inherits this via

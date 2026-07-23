@@ -2065,6 +2065,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "laterite-ags4-compliance"
+version = "0.7.0"
+dependencies = [
+ "laterite-ags4-core",
+ "laterite-ags4-parity",
+ "laterite-ags4-validator",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "laterite-ags4-core"
 version = "0.7.0"
 dependencies = [
