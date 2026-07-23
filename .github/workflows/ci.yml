@@ -453,10 +453,12 @@ jobs:
 
   # TS lint + format gate (#585 / #615): the two shipped TS surfaces — web/ (the
   # Solid browser validator) and rust-packages/laterite-node (the npm bindings) —
-  # run `eslint .` (0 errors) + `prettier --check`. The #615/#621 burn-down fixed
-  # every rule at source and flipped them to `error`; this is the CI-enforcement
-  # half, so a regression can't merge (until now the gate was runnable locally via
-  # `npm run lint` / `format:check` but nothing enforced it per-PR).
+  # run `eslint . --max-warnings 0` (0 errors AND 0 warnings) + `prettier --check`.
+  # The #615/#621 burn-down fixed every rule at source and flipped them to `error`;
+  # `--max-warnings 0` (#65) makes a future regression to `warn` fatal too, so the
+  # "flip to error" can't silently erode. This is the CI-enforcement half, so a
+  # regression can't merge (until now the gate was runnable locally via `npm run
+  # lint` / `format:check` but nothing enforced it per-PR).
   #
   # web/ MUST build its wasm bindings first: eslint's type-aware rules
   # (`no-unsafe-*`) resolve the `../wasm/ags4_wasm.js` import through its GENERATED
