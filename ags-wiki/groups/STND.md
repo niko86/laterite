@@ -1,0 +1,58 @@
+---
+type: group
+title: STND — Standards / Specifications
+status: drafted
+tags: [group]
+group_code: STND
+parent: ""
+is_high_volume: false
+varies_between_editions: false
+key_headings: [STND_REF]
+required_headings: []
+ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
+repo_refs:
+  dictionary: "repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json groups[code=STND]"
+related: [parent-child-graph, key-tuple-pseudo-keys, heading-status-vocabulary, rule-10c-parent-child]
+sources: []
+---
+# STND — Standards / Specifications
+
+## Purpose
+> [!quote] The **STND** group — Standards / Specifications. It is a **root / non-hierarchy** group (file submission & description — Rules 13–18 territory). See [[parent-child-graph]].
+
+## Position in the model
+
+```mermaid
+erDiagram
+  STND {
+    KEY STND_REF
+  }
+```
+
+- Parent: _(root — no parent)_
+- Children: _none_
+- See [[parent-child-graph]] · [[key-tuple-pseudo-keys]] · [[heading-status-vocabulary]]
+
+## Headings
+> [!quote] Rendered from `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json groups[code=STND]` (the repo's model authority — AGS edition 4.2). Suggested UNITs + worked examples are in the cited spec PDF, not duplicated here.
+
+5 heading(s) — `**KEY**` = pseudo-key tuple, `*REQ*` = REQUIRED (non-null, Rule 10b), `DEP` = deprecated, OTHER = scope-dependent.
+
+| Heading | Status | Type | Description |
+|---|---|---|---|
+| `STND_REF` | **KEY** | `X` | Reference of standard |
+| `STND_TTLE` | OTHER | `X` | Document Title |
+| `STND_SCPE` | OTHER | `X` | Scope of data collected to this standard |
+| `STND_REM` | OTHER | `X` | Comments |
+| `FILE_FSET` | OTHER | `X` | Associated file reference (e.g. contract specific specifications) |
+
+Full cross-edition heading deltas: AGS Change Log (see [[ags4-rules-frozen-dictionary-evolves]]).
+
+## Relational notes
+KEY tuple: `STND_REF`. Children (0): _none_. Parent linkage is implicit/absent — Rule 10c is skipped for root groups (see [[non-hierarchy-ten-vs-parentless-list]]). See [[key-tuple-pseudo-keys]] · [[denormalised-child-rows]].
+
+## Variations
+No group-level change at 4.2 (present across the in-scope editions). Granular per-heading edition deltas live in the AGS online **Change Log** — the spec's own cited delta source (`spec:AGS4-4.2-2025.pdf` Foreword → ags.org.uk/.../change-log). Heading-level archaeology is deferred to a targeted Ingest if a rule/O-N interaction needs it (per [[ags4-rules-frozen-dictionary-evolves]]).
+
+## Related
+[[parent-child-graph]] · [[key-tuple-pseudo-keys]] · [[heading-status-vocabulary]] · [[rule-10c-parent-child]]
