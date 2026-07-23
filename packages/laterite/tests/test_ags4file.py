@@ -253,7 +253,9 @@ def test_connection_exposes_raw_duckdb_seeded_with_groups():
 
 def test_context_manager_closes_engine():
     with laterite.read(text=_NUMERIC_SRC) as f:
-        _ = f.connection  # spin up the relational engine (a plain frame read no longer does)
+        _ = (
+            f.connection
+        )  # spin up the relational engine (a plain frame read no longer does)
         assert f._con is not None
     assert f._con is None  # __exit__ closed it
 
