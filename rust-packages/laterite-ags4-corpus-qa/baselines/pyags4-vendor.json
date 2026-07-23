@@ -1,0 +1,4158 @@
+{
+  "schema": 1,
+  "dict_version": "auto",
+  "file_count": 83,
+  "finding_count": 654,
+  "summary": {
+    "clean": 3,
+    "findings": 77,
+    "hard_error": 3,
+    "panic": 0
+  },
+  "files": {
+    "0965c11193d2629aeffa17824b055cc1814e52e6afae846f3d25d6ec8664f635": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 1,
+          "group": ""
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 1,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 71,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "0d994a046dca58497d8580d5b2a834ad309c3d8814f73abed9e8b9ba29b603a8": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 76,
+          "group": "LOCA",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 77,
+          "group": "LOCA",
+          "field_index": 1
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 13,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 14,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "0e74cc10d91d8dd6cb8cfd7b441b61864d7b142573ca83822de7ab3a514ed0aa": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 154,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 156,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 157,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 158,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 159,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 160,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 161,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 162,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 163,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 164,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 165,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 166,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 168,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 171,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 172,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 173,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 174,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 175,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 176,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 177,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 178,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 179,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 180,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 181,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 182,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 184,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 185,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 187,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 188,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 189,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 190,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 191,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 192,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 193,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 194,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 195,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 196,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 197,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 198,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 199,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 200,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 201,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 202,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 203,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 204,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 205,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 206,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 207,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 208,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 209,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 210,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 211,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 212,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 213,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 214,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 215,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 216,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 217,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 218,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 219,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 220,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 221,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 222,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 223,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 224,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 225,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 226,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 227,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 228,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 229,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 230,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 231,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 232,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 233,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 234,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 235,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 236,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 237,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 238,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 239,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 240,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 241,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 242,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 243,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 244,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 245,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 246,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 247,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 248,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 249,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 250,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 251,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 252,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 253,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 254,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 255,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 256,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 257,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 258,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 259,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 260,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 261,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 262,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 263,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 264,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 265,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 266,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 267,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 268,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 269,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 270,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 271,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 272,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 273,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 274,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 275,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 276,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 277,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 278,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 279,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 280,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 281,
+          "group": ""
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "20199d58e703f77e3dabd27103d2198d27e3b084313e61804117499fb9f7732d": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 39,
+          "group": "TST"
+        },
+        {
+          "rule": "AGS Format Rule 19",
+          "line": 38,
+          "group": "TST"
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 39,
+          "group": "TST",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 39,
+          "group": "TST",
+          "field_index": 2
+        },
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 39,
+          "group": "TST"
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 39,
+          "group": "TST",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 39,
+          "group": "TST",
+          "field_index": 2
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 17,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "225445fa37c7ad70b136141768ca3028f80b403d966c43d3fac515b2eb9b716d": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "2ae9fb43591f867ddf6000abf6d66e674ea351a13623ab16898f0711c13ebbeb": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10b",
+          "line": 15,
+          "group": "ABBR"
+        },
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 15,
+          "group": "ABBR"
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 15,
+          "group": "ABBR",
+          "field_index": 2
+        }
+      ]
+    },
+    "2af01a4550276b465d4221b7d0542d7d1861e4dbd12d08a6c433fb3f6a1b8244": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 81,
+          "group": ""
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 17,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "2d2e34fbe2c2fe426d7315e63177a5be17e1f26cdde4fbac2336da4000d942dc": {
+      "outcome": "findings",
+      "dict_used": "4.0.4",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 5",
+          "line": 5,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 6",
+          "line": 5,
+          "group": ""
+        }
+      ]
+    },
+    "2e2dd47d67dffb06b14ccf1f003e81773bd3e50c898c9322233b106d4ac4caea": {
+      "outcome": "findings",
+      "dict_used": "4.1.1",
+      "dict_resolution": "fallback",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 14",
+          "group": "TRAN"
+        },
+        {
+          "rule": "AGS Format Rule 15",
+          "group": "UNIT"
+        },
+        {
+          "rule": "AGS Format Rule 17",
+          "group": "TYPE"
+        },
+        {
+          "rule": "AGS Format Rule 4",
+          "line": 5,
+          "group": "PROJ"
+        }
+      ]
+    },
+    "2e84eafc6ac0566432b5ee554cbbc5dbf6a4406f796652a5719bc192f2295eaa": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 19a",
+          "line": 39,
+          "group": "TEST",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 39,
+          "group": "TEST",
+          "field_index": 1
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 17,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "2f93a4a64a70622331c004080c9ee47d2955d3f0ce06b2ff2e5288032af3d131": {
+      "outcome": "clean",
+      "dict_used": "4.1",
+      "dict_resolution": "exact"
+    },
+    "334c51541e63c197f2a8cdeb886bf86ef7205f83b8a5e877df613bfbce6e3df2": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 39,
+          "group": "DEMO",
+          "field_index": 2
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 92,
+          "group": "LLPL",
+          "field_index": 10
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 92,
+          "group": "LLPL",
+          "field_index": 10
+        },
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 92,
+          "group": "LLPL"
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 92,
+          "group": "LLPL",
+          "field_index": 10
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 17,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "36f915962adf4b52b73975aa747379347ddc296f51497474f471352edf1feeff": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 5",
+          "line": 5,
+          "group": ""
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "3802870bc2bf9284f4f59bb8b7af38d2c7460187ff0ae474e575c39cf711d3c6": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 13",
+          "line": 6,
+          "group": "PROJ"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 13,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "4c3f699420849c5ec49a55a225dab91b28bd180bbabc14b55fe655166d79db30": {
+      "outcome": "hard_error",
+      "dict_used": "-",
+      "dict_resolution": "-",
+      "error_variant": "UnsupportedEdition"
+    },
+    "5461c0453013605fa6ccf994de57778c2a5a7d3d78ec9bb6452f934a4cb68321": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 11c",
+          "line": 70,
+          "group": "SAMP",
+          "field_index": 6
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "56d55d83b339817fb6a160df83583275fe15091e8d28d8c4d0de42bf5787e3aa": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10c",
+          "line": 70,
+          "group": "LLPL"
+        },
+        {
+          "rule": "AGS Format Rule 10c",
+          "line": 71,
+          "group": "LLPL"
+        },
+        {
+          "rule": "AGS Format Rule 10c",
+          "line": 72,
+          "group": "LLPL"
+        },
+        {
+          "rule": "AGS Format Rule 10c",
+          "line": 73,
+          "group": "LLPL"
+        },
+        {
+          "rule": "AGS Format Rule 10c",
+          "line": 74,
+          "group": "LLPL"
+        },
+        {
+          "rule": "AGS Format Rule 10c",
+          "line": 75,
+          "group": "LLPL"
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 70,
+          "group": "LLPL",
+          "field_index": 7
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 71,
+          "group": "LLPL",
+          "field_index": 7
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 73,
+          "group": "LLPL",
+          "field_index": 9
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 13,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 14,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "574a73ce8bcc09011544a3c948f3b149813b93a08568d175e7313d7e28c9142b": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 2",
+          "line": 60,
+          "group": "SAMP"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "5756e5974eeba174b8294292af0ac8c2f6f40810b680e0a1b4d86f417ab32d9b": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 13,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 14,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "5dfd5c7db196e6f65e53c1de2f906b77271ac08efee96c87926ac25184332585": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 17",
+          "group": "TYPE"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "5ebdf23920d3f1e3ae4c7b40176a61bfb1c1227214a832a2d4638e21f7d58a43": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 39,
+          "group": "test"
+        },
+        {
+          "rule": "AGS Format Rule 19",
+          "line": 38,
+          "group": "test"
+        },
+        {
+          "rule": "AGS Format Rule 19a",
+          "line": 39,
+          "group": "test",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 19a",
+          "line": 39,
+          "group": "test",
+          "field_index": 2
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 39,
+          "group": "test",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 39,
+          "group": "test",
+          "field_index": 2
+        },
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 39,
+          "group": "test"
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 39,
+          "group": "test",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 39,
+          "group": "test",
+          "field_index": 2
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 17,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "60cf2c943e99a5199ad22af05b3e2023ad603bef32d19fcb9a03b4ef2254f1e6": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "6160a017eb33474a84eab0b5c21ef8f83c034763cc61fe10a8ed30c8df8d7031": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 2b",
+          "line": 7,
+          "group": "ABBR"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 10,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "6743b04c659415e03b2dc873eb92e81f1e637de2ad4186ed5dbcbe2198865157": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 87,
+          "group": "ELRG"
+        },
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 87,
+          "group": "ELRG"
+        },
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 87,
+          "group": "ELRG"
+        },
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 87,
+          "group": "ELRG"
+        },
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 87,
+          "group": "ELRG"
+        },
+        {
+          "rule": "AGS Format Rule 15",
+          "group": "UNIT"
+        },
+        {
+          "rule": "AGS Format Rule 16",
+          "group": "ELRG"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "6769b2292b3b2755db50093b3028e8f5792d88765ff1dab58bba8437687cc7a7": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "71eeb8120dade9d9da948558e621373991115d543999ed7b5e6d21f5785f8ea6": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10c",
+          "line": 73,
+          "group": "LLPL"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "73804e45c3a5468800cebbe81ab95eda171fa16ee492483c413678b7dee6fc41": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 2b",
+          "line": 9,
+          "group": "ABBR"
+        },
+        {
+          "rule": "AGS Format Rule 2b",
+          "line": 10,
+          "group": "ABBR"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "73da1eb388e7723f3348cefbc2a48ceb8f8397ec29aaab3b798de597ea6a0630": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 2b",
+          "line": 7,
+          "group": "ABBR"
+        },
+        {
+          "rule": "AGS Format Rule 2b",
+          "line": 7,
+          "group": "ABBR"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 9,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 10,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "7580294ae37bda11049263f7f913d0641167b9e2cbfdaa2463c10f938416968a": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "78052e35737e7ab1d8e6e8258d8133f4872819c4c31838ec125d919b054abe96": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 15",
+          "group": "UNIT"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "789af5e76dc1aae17e59af082f1a60c3042d08829c2501fffefac7ebe3c51ec0": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10c",
+          "line": 69,
+          "group": "LLPL"
+        },
+        {
+          "rule": "AGS Format Rule 17",
+          "group": "TYPE"
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 82,
+          "group": "SAMP",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 82,
+          "group": "SAMP",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 83,
+          "group": "SAMP",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 83,
+          "group": "SAMP",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 84,
+          "group": "SAMP",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 84,
+          "group": "SAMP",
+          "field_index": 4
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 13,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 14,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "78acdf027952101249516587e18a1c501f7d86bf41828c6df6a9822d2d2582f7": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10c",
+          "line": 74,
+          "group": "LLPL"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "7916013536ab99c63be70b0554813d75ddd0448f84706cfa00fe009e4b5c393a": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 94,
+          "group": "ISPT"
+        },
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 95,
+          "group": "ISPT"
+        },
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 96,
+          "group": "ISPT"
+        },
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 97,
+          "group": "ISPT"
+        },
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 98,
+          "group": "ISPT"
+        },
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 99,
+          "group": "ISPT"
+        },
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 100,
+          "group": "ISPT"
+        },
+        {
+          "rule": "AGS Format Rule 17",
+          "group": "TYPE"
+        },
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 81,
+          "group": "SAMP"
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 76,
+          "group": "LOCA",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 77,
+          "group": "LOCA",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 78,
+          "group": "LOCA",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 85,
+          "group": "SAMP",
+          "field_index": 6
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 95,
+          "group": "ISPT",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 96,
+          "group": "ISPT",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 97,
+          "group": "ISPT",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 98,
+          "group": "ISPT",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 99,
+          "group": "ISPT",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 100,
+          "group": "ISPT",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 81,
+          "group": "SAMP",
+          "field_index": 7
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 13,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 14,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "7a31a24ca58953d657e76645ec083e59c3db8d7c777d76d3b57be0417b70c6cc": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 15,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "7a67729010d2e3d96787a9e741bdf8c7e04a9317c3fede07487b4ff2a33be943": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "7af417d2e0fd55428f74101445c56b9a02b5ccb49c224e367fd1f18a6c753b43": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10b",
+          "line": 24,
+          "group": "TRAN"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "7cbc82a2a9939c4fe029bf6c0825667fc6a5a5925317bdffaabff86b584506c6": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 69,
+          "group": "LOCA"
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 69,
+          "group": "LOCA",
+          "field_index": 39
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "808ca00827b60583f67567f9757bb8142d32aca5aa09eb0cd9b1ebf491d82857": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 13,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 14,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "8249dfac2f221787439fa38ea85ae1525f78185c0179b0aeb8d682dc7d506578": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 11b",
+          "line": 12,
+          "group": "TRAN"
+        },
+        {
+          "rule": "AGS Format Rule 16",
+          "group": "LOCA"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "83c19a1b9361b8e3ad6935650ae62e468873df30eda7f9b87a7b9e3fb209bc98": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 155,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 156,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 157,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 158,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 159,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 160,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 161,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 162,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 163,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 164,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 165,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 166,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 167,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 168,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 169,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 170,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 171,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 172,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 173,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 174,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 175,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 176,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 177,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 178,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 179,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 180,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 181,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 182,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 183,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 184,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 185,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 186,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 187,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 188,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 189,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 190,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 191,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 192,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 193,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 194,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 195,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 196,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 197,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 198,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 199,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 200,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 201,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 202,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 203,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 204,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 205,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 206,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 207,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 208,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 209,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 210,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 211,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 212,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 213,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 214,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 215,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 216,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 217,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 218,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 219,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 220,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 221,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 222,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 223,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 224,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 225,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 226,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 227,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 228,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 229,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 230,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 231,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 232,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 233,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 234,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 235,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 236,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 237,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 238,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 239,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 240,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 241,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 242,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 243,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 244,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 245,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 246,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 247,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 248,
+          "group": ""
+        },
+        {
+          "rule": "AGS Format Rule 1",
+          "line": 249,
+          "group": ""
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "857511a3ebba407e0834c74b1e8a7e8b4dff8339e925b0eb680b22a51a78b834": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 2",
+          "line": 54,
+          "group": "LOCA"
+        },
+        {
+          "rule": "AGS Format Rule 3",
+          "line": 58,
+          "group": ""
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "8a9fc989d271384604a0c8d55bd22e3850c28247023e4f5ca3abbe447cf797e2": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 17",
+          "group": "TYPE"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "8aebdcf83df5f2b0a81ed77ea6e8d0627b29ee55aa0bae6931c9addbafa92ee2": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10c",
+          "group": "SAMP"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "8d8b6e2b10237bc762666bf18cf73f46e51fbdc776d22270452eb3f88916cd97": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 2,
+          "group": "PROJ"
+        },
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 8,
+          "group": "ABBR"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "8fa04d17675fb69f9ad5ff82e4c674941633614e36a74c21e047901f58d7a1ad": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 17",
+          "group": "TYPE"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "8fd63ebabe29f6bdc3f6ed517054dabb21575545a060f2a6b783729498aed61f": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 11b",
+          "line": 12,
+          "group": "TRAN"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "91fe0e19fbdc5b56d11acddda94663f17fada8fba1db048804483fce70e3d521": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 2b",
+          "line": 7,
+          "group": "ABBR"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 10,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "929c1ff438e8f868bdf975ba12243b962596b088fdfd092799b6aed101324e5f": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 83,
+          "group": "SAMP",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 84,
+          "group": "SAMP",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 85,
+          "group": "SAMP",
+          "field_index": 4
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 13,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 14,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "930bf98fd87e33d9e9e593d1ec87c5db1d0164eb1d0dd85d06aaea6d3ed67637": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 70,
+          "group": "LLPL"
+        },
+        {
+          "rule": "AGS Format Rule 10c",
+          "line": 70,
+          "group": "LLPL"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "9d0aa59ef6bc2a1ab10c1f9fda8a498c5b287294c3aa930207005c9ba27901f1": {
+      "outcome": "clean",
+      "dict_used": "4.0.4",
+      "dict_resolution": "exact"
+    },
+    "9d926206102415a8e620949f925c6964b695bdef84c8afad1d53e16b02e96963": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 17",
+          "group": "TYPE"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "9f4b3475f5b7ff878df466c592990f6c200eb5a89464677b57cdcdb16942da5b": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10c",
+          "group": "TES1"
+        },
+        {
+          "rule": "AGS Format Rule 10c",
+          "group": "TEST"
+        },
+        {
+          "rule": "AGS Format Rule 19",
+          "line": 49,
+          "group": "TES1"
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 50,
+          "group": "TES1",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 50,
+          "group": "TES1",
+          "field_index": 2
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "a03b7a5aeee6f1055ea6cf3650ccb246181c749252db7405a813145708d6efb0": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 15",
+          "group": "UNIT"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "a318fce3a85b030ca19615c7a517c7ce9588b4b176dc74f75cace574a7b651fa": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 13",
+          "group": "PROJ"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 6,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 7,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "a444a2c9f6823acbef6fa9b7ca70293d6d97d81c9d17b3289303cc6b2b015e80": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 19a",
+          "line": 39,
+          "group": "TEST",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 39,
+          "group": "TEST",
+          "field_index": 1
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 17,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "a688878f41899861aa9c310834fcb003bae21b7d4dd0e749bc58463f5998b24b": {
+      "outcome": "hard_error",
+      "dict_used": "-",
+      "dict_resolution": "-",
+      "error_variant": "NotAgs4"
+    },
+    "aa8948554da3fd33b0b967cdb02434655ed9b5b9494233258df86eb0c7668386": {
+      "outcome": "findings",
+      "dict_used": "4.1.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 18,
+          "group": "LOCA",
+          "field_index": 9
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 18,
+          "group": "LOCA",
+          "field_index": 10
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 19,
+          "group": "LOCA",
+          "field_index": 9
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 20,
+          "group": "LOCA",
+          "field_index": 9
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 27,
+          "group": "SAMP",
+          "field_index": 6
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 28,
+          "group": "SAMP",
+          "field_index": 6
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 34,
+          "group": "HDPH",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 34,
+          "group": "HDPH",
+          "field_index": 5
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 35,
+          "group": "HDPH",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 43,
+          "group": "CHIS",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 43,
+          "group": "CHIS",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 44,
+          "group": "CHIS",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 44,
+          "group": "CHIS",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 45,
+          "group": "CHIS",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 46,
+          "group": "CHIS",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 47,
+          "group": "CHIS",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 47,
+          "group": "CHIS",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 48,
+          "group": "CHIS",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 48,
+          "group": "CHIS",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 49,
+          "group": "CHIS",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 50,
+          "group": "CHIS",
+          "field_index": 4
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 92,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 93,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 94,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 97,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 98,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 101,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 106,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 107,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 108,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 109,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "adedabe36abc56085c7f5d817a8415724131cc0ae2062b38291766a6b4155477": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 16",
+          "group": "LLPL"
+        },
+        {
+          "rule": "AGS Format Rule 16",
+          "group": "SAMP"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "b001c3a8b0c2ca03600193afff321282af1f3287c7831cd17ccf3b1f47066839": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 16",
+          "group": "LOCA"
+        },
+        {
+          "rule": "AGS Format Rule 16",
+          "group": "LOCA"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "b2828b63411b37438687897857ea7680c42416828059226b6a0258ea97f817da": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 70,
+          "group": "LOCA"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "b2bcd85ab9903614484feb4c97e822ebf582204044244a0f6d6c75f966bc8d87": {
+      "outcome": "findings",
+      "dict_used": "4.1.1",
+      "dict_resolution": "fallback",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "Warning (Related to Rule 14)",
+          "group": "TRAN",
+          "severity": "warning"
+        }
+      ]
+    },
+    "b3e8fe83d1acd331c04ef3fc0b58ed2ef75fbcdfbb6a109159713d643d28c7ad": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 78,
+          "group": "SAMP"
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 78,
+          "group": "SAMP",
+          "field_index": 7
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 13,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 14,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "b4ba2c79a81c24645f68b73cc86b25617f15c69c70f6b8b54923f8a0bf2fa7f3": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 14",
+          "line": 25,
+          "group": "TRAN"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "b809e7d945d05b03d2f38950c0f7b4f5df9ddfa9b9469fc9c44bd673a92454bc": {
+      "outcome": "clean",
+      "dict_used": "4.1",
+      "dict_resolution": "exact"
+    },
+    "bc33ac2a1d6a267cb5aa8f4c849d21704b3e4877436b1f71d2485f8408927fa4": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 39,
+          "group": "DEMO",
+          "field_index": 2
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 17,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "c12d08e4ad72d10947adb988e35fdba678d645ebc71ca2f5a6e48ca66bf3784a": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 20",
+          "line": 79,
+          "group": "LOCA",
+          "field_index": 37
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "c27e3e5ce9f61ec591a9aeb5f667f90f667ffa083bb65df68253efa8a507e259": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 11c",
+          "line": 70,
+          "group": "SAMP",
+          "field_index": 6
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "c8d51ec18f8b1ba44ab2d15d5ee23a3e54887ca3342de64e9f3e65878b061845": {
+      "outcome": "findings",
+      "dict_used": "4.0.4",
+      "dict_resolution": "guessed",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 16",
+          "group": "ABBR"
+        }
+      ]
+    },
+    "cf1f2f5ed8b4ff5bdc96c753498596256451d55294799620f1e6edf6c8c2afdc": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 16",
+          "group": "ABBR"
+        }
+      ]
+    },
+    "d148135a7a89ac17c2b69ff3c9421a331ecce8df87206a4b848a19963a30e27a": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10b",
+          "line": 23,
+          "group": "ABBR"
+        },
+        {
+          "rule": "AGS Format Rule 10b",
+          "line": 26,
+          "group": "ABBR"
+        },
+        {
+          "rule": "AGS Format Rule 10b",
+          "line": 40,
+          "group": "TYPE"
+        },
+        {
+          "rule": "AGS Format Rule 16",
+          "group": "LOCA"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "d33f09c826aa2903477de44e9d0c403cfc4ef2209a0cadc87c7a84b17a2348e5": {
+      "outcome": "findings",
+      "dict_used": "4.0.4",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "d81dc25a2a74d98074152ec5d2ea2dd0e02b3778106b2ca19981c9874e0e16ff": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 155,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 156,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 157,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 158,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 159,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 160,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 161,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 162,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 163,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 164,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 165,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 166,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 167,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 168,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 169,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 170,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 171,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 172,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 173,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 174,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 175,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 176,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 177,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 178,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 179,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 180,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 181,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 182,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 183,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 184,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 185,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 186,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 187,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 188,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 189,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 190,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 191,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 192,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 193,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 194,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 195,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 196,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 197,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 198,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 199,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 200,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 201,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 202,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 203,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 204,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 205,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 206,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 207,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 208,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 209,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 210,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 211,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 212,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 213,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 214,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 215,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 216,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 217,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 218,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 219,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 220,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 221,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 222,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 223,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 224,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 225,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 226,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 227,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 228,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 229,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 230,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 231,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 232,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 233,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 234,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 235,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 236,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 237,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 238,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 239,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 240,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 241,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 242,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 243,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 244,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 245,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 246,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 247,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 248,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 1)",
+          "line": 249,
+          "group": "",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "df44e16f77bf4fa434e4d71a5fdd5b2de5c364c3b33129850626949f9e501d9f": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 73,
+          "group": "LLPL"
+        },
+        {
+          "rule": "AGS Format Rule 10a",
+          "line": 74,
+          "group": "LLPL"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855": {
+      "outcome": "hard_error",
+      "dict_used": "-",
+      "dict_resolution": "-",
+      "error_variant": "NotAgs4"
+    },
+    "e6cba67dfe9bbddb3498bad1c6b49e651336b635305e9feb857eaadccb352bb5": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 6",
+          "line": 26,
+          "group": ""
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 26,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "e864b332448317fe30a68b740df2608cc4aac709d7921697e48b948ad2422e90": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10c",
+          "group": "TES1"
+        },
+        {
+          "rule": "AGS Format Rule 10c",
+          "group": "TEST"
+        },
+        {
+          "rule": "AGS Format Rule 19",
+          "line": 49,
+          "group": "TES1"
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 50,
+          "group": "TES1",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 19b",
+          "line": 50,
+          "group": "TES1",
+          "field_index": 2
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "efd64fa24cb8e10e1f6a13b60b504e7d68bca82f926aa32df3782be53b9ddeb5": {
+      "outcome": "findings",
+      "dict_used": "4.0.4",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 15",
+          "group": "UNIT"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "f0abd6d44f55bdfb45e5bad1edc4531605ed5e7b4fa7a3e26189fe4826e438ad": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 16",
+          "group": "LOCA"
+        },
+        {
+          "rule": "AGS Format Rule 16",
+          "group": "LOCA"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 19,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 25,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "f2994df2a00678d9b7bf648f7103835e968a6841ff61e993f2010e166f7d563a": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 10c",
+          "group": "PQRS"
+        },
+        {
+          "rule": "AGS Format Rule 10c",
+          "group": "WXYZ"
+        },
+        {
+          "rule": "AGS Format Rule 20",
+          "line": 5,
+          "group": "LOCA",
+          "field_index": 37
+        },
+        {
+          "rule": "AGS Format Rule 7",
+          "line": 35,
+          "group": "PQRS"
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 35,
+          "group": "PQRS",
+          "field_index": 0
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 35,
+          "group": "PQRS",
+          "field_index": 1
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 35,
+          "group": "PQRS",
+          "field_index": 2
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 35,
+          "group": "PQRS",
+          "field_index": 3
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 35,
+          "group": "PQRS",
+          "field_index": 4
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 35,
+          "group": "PQRS",
+          "field_index": 5
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 35,
+          "group": "PQRS",
+          "field_index": 6
+        },
+        {
+          "rule": "AGS Format Rule 9",
+          "line": 35,
+          "group": "PQRS",
+          "field_index": 7
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "fa3a98c7621a532f66bb1bacb0c501e34d7008744b87fc08f78fb26f1e1395a6": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 8",
+          "line": 73,
+          "group": "LOCA",
+          "field_index": 4
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 13,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 14,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "faf7c1229f795d3474b816e87c6a2b8eb7f115db6218da83dd0f0ac5326f6c84": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 19",
+          "line": 38,
+          "group": "TESTS"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 17,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 18,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "faf7ecf2f6a12451d34c0920511e337857dacab02b21e7259cfd5a20457dfff8": {
+      "outcome": "findings",
+      "dict_used": "4.1",
+      "dict_resolution": "exact",
+      "findings": [
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    },
+    "fd0c571ea2918635c24648e824a1298a77a33a92b56daf0456e865b9c73b426f": {
+      "outcome": "findings",
+      "dict_used": "4.1.1",
+      "dict_resolution": "fallback",
+      "findings": [
+        {
+          "rule": "AGS Format Rule 14",
+          "group": "TRAN"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 11,
+          "group": "ABBR",
+          "severity": "fyi"
+        },
+        {
+          "rule": "FYI (Related to Rule 16)",
+          "line": 12,
+          "group": "ABBR",
+          "severity": "fyi"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,47 @@
+# laterite-ags4-forge — evolutionary AGS4 dual-validation dogfood CLI.
+#
+# GENERATES AGS4 files (Mode A: mutate a seed · Mode B: synthesize a
+# spec-valid file from the bundled standard dictionary then inject one
+# targeted violation), runs each through the in-process Rust validator
+# and (confidence-gated) python-ags4, and evolves toward novel
+# divergences. Claude authors a declarative strategy; this binary is
+# the deterministic mutate/evolve/report muscle and embeds NO LLM.
+#
+# Reuses laterite-ags4-validator (lib API), the shared laterite-ags4-parity crate
+# (classify/reconcile/PyOracle/Rng — identical verdict semantics to
+# laterite-ags4-corpus-qa), and laterite-cliutil (the agent-first CLI contract +
+# report scaffold). Sibling of laterite-ags4-corpus-qa; NOT a shipped product.
+
+[package]
+name = "laterite-ags4-forge"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "Evolutionary AGS4 dual-validation dogfood generator/fuzzer"
+license = "MIT"
+publish = false
+autobins = false
+
+[[bin]]
+name = "laterite-ags4-forge"
+path = "src/main.rs"
+
+[dependencies]
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+laterite-ags4-parity = { path = "../laterite-ags4-parity" }
+laterite-cliutil = { path = "../laterite-cliutil", features = ["clap"] }
+clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+# The declarative strategy file (`forge strategy`, P4). `toml` is a
+# small pure-Rust parser; this is a non-shipped dev tool so it does
+# not touch the validator library's lean dep-graph guarantee.
+toml = "1.1"
+anyhow = "1"
+chrono = { version = "0.4", features = ["clock"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

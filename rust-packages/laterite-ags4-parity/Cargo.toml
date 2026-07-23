@@ -1,0 +1,31 @@
+# Shared Rust↔python-ags4 parity model + python oracle bridge.
+#
+# Extracted verbatim out of laterite-ags4-corpus-qa/src/parity.rs so the SAME
+# `classify`/`reconcile` verdict semantics (the OBSERVATIONS
+# O-2/O-3/O-26/O-30/O-34 reconcile arms) and the `PyOracle` python
+# bridge are consumed by BOTH laterite-ags4-corpus-qa and laterite-ags4-forge — the
+# extract-over-duplicate stance that created laterite-cliutil. Also hosts
+# the seedable `Rng`/`reservoir` (was crawl.rs) for deterministic
+# sampling shared by both tools.
+#
+# Depends ON laterite-ags4-validator and NEVER the reverse, so the validator
+# library's documented lean dep-graph guarantee is unaffected. Every
+# dependency is already in rust-packages/Cargo.lock — zero new external
+# surface; no walkdir/rayon/clap/ratatui.
+
+[package]
+name = "laterite-ags4-parity"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "Shared Rust↔python-ags4 parity verdict model + python oracle bridge"
+license = "MIT"
+publish = false
+
+[dependencies]
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints]
+workspace = true

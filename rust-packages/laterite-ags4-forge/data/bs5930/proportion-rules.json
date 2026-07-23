@@ -1,0 +1,218 @@
+{
+  "source": "BS 5930:2015+A1:2020 Section 6 — factual data extracted for the app's own description builder, not a reproduction of the standard.",
+  "description": "Machine-usable rule set for constraining secondary-constituent selection when building a BS 5930 soil description. principalClass identifies the named primary soil; for each (secondaryKind) the qualifier bands map an estimated percentage to the permitted descriptor. Percentages are subjective field visual estimates and, unless otherwise stated, are assessed by mass excluding cobbles and boulders.",
+  "clauses": ["33.4.4.1", "33.4.4.2", "33.4.4.3", "33.4.4.4", "33.4.4.5", "33.4.4.6"],
+  "principalClasses": {
+    "veryCoarse": {
+      "label": "Very coarse soils (BOULDERS, COBBLES)",
+      "principalSoils": ["BOULDERS", "COBBLES"],
+      "appliesWhen": "Over 50% of the material is very coarse (>63 mm).",
+      "secondaries": {
+        "veryCoarse": {
+          "label": "Other very coarse fraction (boulders within cobbles, or cobbles within boulders)",
+          "secondarySoils": ["BOULDERS", "COBBLES"],
+          "assessment": "Percentage by mass of the secondary very coarse fraction within the very coarse material.",
+          "bands": [
+            { "qualifier": "with occasional", "minPct": 0, "maxPct": 5, "minInclusive": true, "maxInclusive": true, "sourceTable": "Table 13", "footnotes": [] },
+            { "qualifier": "with some", "minPct": 5, "maxPct": 20, "minInclusive": false, "maxInclusive": true, "sourceTable": "Table 13", "footnotes": [] },
+            { "qualifier": "with many", "minPct": 20, "maxPct": 50, "minInclusive": false, "maxInclusive": true, "sourceTable": "Table 13", "footnotes": [] }
+          ]
+        },
+        "finer": {
+          "label": "Finer (coarse and/or fine) material within a very coarse principal",
+          "secondarySoils": ["finer material"],
+          "assessment": "Percentage by mass of finer material relative to the whole, apportioned separately from the very coarse fraction.",
+          "bands": [
+            { "qualifier": "with a little finer material", "minPct": 0, "maxPct": 5, "minInclusive": true, "maxInclusive": true, "sourceTable": "Table 14", "footnotes": [] },
+            { "qualifier": "with some finer material", "minPct": 5, "maxPct": 20, "minInclusive": false, "maxInclusive": true, "sourceTable": "Table 14", "footnotes": [] },
+            { "qualifier": "with much finer material", "minPct": 20, "maxPct": 50, "minInclusive": false, "maxInclusive": true, "sourceTable": "Table 14", "footnotes": [] }
+          ],
+          "note": "The finer material is itself described per 33.4.2–33.4.6 ignoring the very coarse fraction; its primary fraction name may be given in capitals, e.g. COBBLES with some sandy CLAY."
+        }
+      }
+    },
+    "fine_principal_with_very_coarse": {
+      "label": "Finer material as principal with a subordinate very coarse content",
+      "principalSoils": ["FINER MATERIAL"],
+      "appliesWhen": "Finer material is the principal but boulders/cobbles are present and apportioned separately.",
+      "secondaries": {
+        "veryCoarse": {
+          "label": "Boulder or cobble content within a finer-material principal",
+          "secondarySoils": ["boulders", "cobbles"],
+          "assessment": "Percentage by mass of very coarse particles relative to the whole, apportioned separately.",
+          "bands": [
+            { "qualifier": "with low boulder or cobble content", "minPct": 0, "maxPct": 5, "minInclusive": true, "maxInclusive": true, "sourceTable": "Table 15", "footnotes": [] },
+            { "qualifier": "with medium boulder or cobble content", "minPct": 5, "maxPct": 20, "minInclusive": false, "maxInclusive": true, "sourceTable": "Table 15", "footnotes": [] },
+            { "qualifier": "with high boulder or cobble content", "minPct": 20, "maxPct": null, "minInclusive": false, "maxInclusive": false, "sourceTable": "Table 15", "footnotes": [] }
+          ]
+        }
+      }
+    },
+    "coarse": {
+      "label": "Coarse soils (GRAVEL, SAND)",
+      "principalSoils": ["GRAVEL", "SAND"],
+      "appliesWhen": "Coarse fraction predominates and the principal is GRAVEL or SAND.",
+      "secondaries": {
+        "coarse": {
+          "label": "Coarse secondary (sandy in gravel, or gravelly in sand)",
+          "secondarySoils": ["sand", "gravel"],
+          "assessment": "Percentage by mass excluding cobbles and boulders. sandy and gravelly are assessed separately.",
+          "qualifierForm": "prefix",
+          "bands": [
+            { "qualifier": "slightly", "minPct": 0, "maxPct": 5, "minInclusive": true, "maxInclusive": false, "sourceTable": "Table 16", "footnotes": [] },
+            { "qualifier": "", "minPct": 5, "maxPct": 20, "minInclusive": true, "maxInclusive": true, "sourceTable": "Table 16", "footnotes": [] },
+            { "qualifier": "very", "minPct": 20, "maxPct": null, "minInclusive": false, "maxInclusive": false, "sourceTable": "Table 16", "footnotes": [] }
+          ],
+          "equalProportionsRule": "When sand and gravel are in about equal proportions, name the soil SAND and GRAVEL rather than applying a qualifier (Table 16)."
+        },
+        "fine": {
+          "label": "Fine secondary (silty or clayey) within a coarse principal",
+          "secondarySoils": ["silt", "clay"],
+          "assessment": "Percentage by mass of fine fraction excluding cobbles and boulders. Use Table 17 'Coarse and/or fine soil' column. silty and clayey are mutually exclusive.",
+          "qualifierForm": "prefix",
+          "bands": [
+            { "qualifier": "slightly", "minPct": 0, "maxPct": 5, "minInclusive": true, "maxInclusive": false, "sourceTable": "Table 17", "footnotes": [] },
+            { "qualifier": "", "minPct": 5, "maxPct": 20, "minInclusive": true, "maxInclusive": true, "sourceTable": "Table 17", "footnotes": ["A"] },
+            { "qualifier": "very", "minPct": 20, "maxPct": null, "minInclusive": false, "maxInclusive": false, "sourceTable": "Table 17", "footnotes": ["A"] }
+          ]
+        }
+      }
+    },
+    "fine": {
+      "label": "Fine soils (SILT, CLAY)",
+      "principalSoils": ["SILT", "CLAY"],
+      "appliesWhen": "Fine fraction predominates and the principal is SILT or CLAY.",
+      "secondaries": {
+        "coarse": {
+          "label": "Coarse secondary (sandy or gravelly) within a fine principal",
+          "secondarySoils": ["sand", "gravel"],
+          "assessment": "Percentage by mass of coarse fraction excluding cobbles and boulders. Use Table 17 'Coarse soil' column. sandy and gravelly are assessed separately.",
+          "qualifierForm": "prefix",
+          "bands": [
+            { "qualifier": "slightly", "minPct": 0, "maxPct": 35, "minInclusive": true, "maxInclusive": false, "sourceTable": "Table 17", "footnotes": ["C"] },
+            { "qualifier": "", "minPct": 35, "maxPct": 65, "minInclusive": true, "maxInclusive": true, "sourceTable": "Table 17", "footnotes": ["C"] },
+            { "qualifier": "very", "minPct": 65, "maxPct": null, "minInclusive": false, "maxInclusive": false, "sourceTable": "Table 17", "footnotes": ["B", "C"] }
+          ]
+        },
+        "fine": {
+          "label": "Fine secondary within a fine principal (silty CLAY / clayey SILT)",
+          "secondarySoils": ["silt", "clay"],
+          "assessment": "Qualitative only. The subordinate fine fraction is named as silty CLAY or clayey SILT with no slightly/very qualifier and no percentage band.",
+          "qualifierForm": "name",
+          "bands": [],
+          "allowedForms": ["silty CLAY", "clayey SILT"],
+          "note": "Choice between silty CLAY and clayey SILT is governed by the plastic properties of the fine fraction (33.4.4.4), not by a percentage."
+        }
+      }
+    }
+  },
+  "mutualExclusions": [
+    {
+      "id": "fine-secondary-silt-clay-exclusive",
+      "appliesTo": ["coarse.fine", "fine.fine"],
+      "rule": "When the secondary fraction is fine, 'silty' and 'clayey' (or silty CLAY / clayey SILT) are mutually exclusive. Use one only, chosen on the plastic properties of the fine fraction.",
+      "clause": "33.4.4.4",
+      "example": "gravelly clayey fine SAND (clayey chosen; silty would not also appear)."
+    },
+    {
+      "id": "no-slightly-very-for-fine-in-fine",
+      "appliesTo": ["fine.fine"],
+      "rule": "For a fine principal (SILT/CLAY) the fine secondary is qualitative only: use silty CLAY or clayey SILT but never apply slightly or very to it.",
+      "clause": "33.4.4.4"
+    },
+    {
+      "id": "coarse-secondaries-assessed-separately",
+      "appliesTo": ["coarse.coarse", "fine.coarse"],
+      "rule": "The coarse secondary terms 'sandy' and 'gravelly' may both be used together; their percentages are assessed separately, each against its own band, and are not summed against a single band.",
+      "clause": "33.4.4.5",
+      "example": "slightly gravelly slightly sandy CLAY = up to 35% sand AND up to 35% gravel."
+    }
+  ],
+  "cumulativeRule": {
+    "rule": "The cumulative proportions of the fractions, excluding cobbles and boulders, must not exceed 100%. A description whose summed fractions (less cobbles and boulders) exceed 100% is incorrect.",
+    "clause": "33.4.4.5 NOTE 2",
+    "exclusions": ["COBBLES", "BOULDERS"],
+    "separateApportionmentExceptions": [
+      "Soils composed of very coarse particles and finer material: the finer material and the very coarse fraction are apportioned separately, so the apparent total can exceed 100% (Tables 14 and 15, clause 33.4.4.1).",
+      "Coarse secondaries sandy and gravelly are each assessed against their own band, not summed (33.4.4.5)."
+    ],
+    "constraintCheck": "sum(percentages of all secondary + principal fractions excluding cobbles and boulders) <= 100, except where separateApportionmentExceptions apply."
+  },
+  "wordOrder": {
+    "rule": "Order secondary fractions before the primary soil term as: increasing proportion when there are two coarse secondaries; coarse-then-fine when there is one of each. Mineral constituents (e.g. slightly micaceous) precede the principal soil type. Very coarse content statements (e.g. with low cobble content) and tertiary fractions (with rare/occasional/frequent, no percentage) are added at the end. Qualifying adjectives for secondary-constituent sizes/grading are given in separate sentences after the main description.",
+    "clauses": ["33.4.4.5", "33.4.4.6"]
+  },
+  "footnotes": {
+    "A": "Or described as fine soil depending on engineering behaviour.",
+    "B": "Or described as coarse soil depending on assessed engineering behaviour.",
+    "C": "Can be silty CLAY or clayey SILT.",
+    "general": "Percentages are approximate visual field estimates and should be taken only as a subjective guide. Percentage of coarse or fine soil type is assessed excluding cobbles and boulders."
+  },
+  "workedExamples": [
+    {
+      "description": "Medium dense brown very gravelly coarse SAND. Gravel is subangular fine and medium of sandstone and mudstone.",
+      "principalClass": "coarse",
+      "principal": "SAND",
+      "secondaries": [{ "kind": "coarse", "soil": "gravel", "qualifier": "very", "estPct": 25 }],
+      "sourceTable": "Table 16",
+      "clause": "33.4.4.3",
+      "note": "Gravelly content >20% gives the 'very' qualifier; grading of the gravel is stated in a separate sentence."
+    },
+    {
+      "description": "COBBLES with some sandy CLAY.",
+      "principalClass": "veryCoarse",
+      "principal": "COBBLES",
+      "secondaries": [{ "kind": "finer", "soil": "finer material", "qualifier": "with some finer material", "estPct": 12 }],
+      "sourceTable": "Table 14",
+      "clause": "33.4.4.2",
+      "note": "5–20% finer material gives 'with some'; the finer material's own name (sandy CLAY) is given in capitals."
+    },
+    {
+      "description": "gravelly clayey fine SAND.",
+      "principalClass": "coarse",
+      "principal": "SAND",
+      "secondaries": [
+        { "kind": "coarse", "soil": "gravel", "qualifier": "", "estPct": 12 },
+        { "kind": "fine", "soil": "clay", "qualifier": "", "estPct": 12 }
+      ],
+      "sourceTable": "Table 17",
+      "clause": "33.4.4.5",
+      "note": "Fine secondary uses clayey (mutually exclusive with silty); coarse-then-fine word order."
+    },
+    {
+      "description": "slightly gravelly slightly sandy CLAY.",
+      "principalClass": "fine",
+      "principal": "CLAY",
+      "secondaries": [
+        { "kind": "coarse", "soil": "sand", "qualifier": "slightly", "estPct": 20 },
+        { "kind": "coarse", "soil": "gravel", "qualifier": "slightly", "estPct": 20 }
+      ],
+      "sourceTable": "Table 17",
+      "clause": "33.4.4.5",
+      "note": "Means up to 35% sand AND up to 35% gravel; sandy and gravelly assessed separately, not summed."
+    },
+    {
+      "description": "Gravelly very clayey fine to medium SAND with low cobble content. Gravel and cobbles are rounded fine and medium of quartzite.",
+      "principalClass": "coarse",
+      "principal": "SAND",
+      "secondaries": [
+        { "kind": "coarse", "soil": "gravel", "qualifier": "", "estPct": 12 },
+        { "kind": "fine", "soil": "clay", "qualifier": "very", "estPct": 25 }
+      ],
+      "veryCoarseContent": { "qualifier": "with low cobble content", "estPct": 3 },
+      "sourceTable": "Tables 16, 17, 15",
+      "clause": "33.4.4.5",
+      "note": "Word order coarse-then-fine; cobble content appended at end; grading in separate sentence."
+    },
+    {
+      "description": "SAND with rare gravel size brick fragments.",
+      "principalClass": "coarse",
+      "principal": "SAND",
+      "tertiary": { "qualifier": "with rare", "constituent": "gravel size brick fragments" },
+      "clause": "33.4.4.6",
+      "note": "Tertiary fraction is qualitative with no percentage."
+    }
+  ],
+  "sourcePages": [108, 109, 110, 111],
+  "uncertainties": []
+}
