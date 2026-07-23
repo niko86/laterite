@@ -326,6 +326,8 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 18, concept
 | [[laterite-ags4-forge]] | drafted | cli |
 | [[laterite-ags4-parity]] | drafted | crate |
 | [[laterite-ags4-perf]] | drafted | crate |
+| [[laterite-ags4-compliance]] | drafted | crate |
+| [[laterite-ags4-xcheck]] | drafted | crate |
 | [[build-rust]] | drafted | script |
 | [[laterite-ags4-check]] | reviewed | cli |
 | [[laterite-ags4-core]] | drafted | crate |
