@@ -59,6 +59,10 @@
             "context": "node"
           },
           {
+            "context": "parity",
+            "integration_id": 15368
+          },
+          {
             "context": "python"
           },
           {
@@ -66,6 +70,10 @@
           },
           {
             "context": "test",
+            "integration_id": 15368
+          },
+          {
+            "context": "ts-lint",
             "integration_id": 15368
           },
           {
