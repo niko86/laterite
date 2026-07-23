@@ -161,7 +161,7 @@ flowchart LR
   validator --> wasm[laterite-ags4-wasm]
   validator --> latpy[laterite-py]
   validator --> latpy5[laterite-py-ags5]
-  validator --> parity[ags4-parity]
+  validator --> parity[laterite-ags4-parity]
 ```
 
 ## Related

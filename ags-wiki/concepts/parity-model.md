@@ -4,14 +4,14 @@ title: parity model
 status: reviewed
 tags: [concept]
 ags_editions: []
-repo_refs: {parity: "rust-packages/ags4-corpus-qa/src/parity.rs"}
-related: [start-here, parity-cascade-unreconcilable, parity-triage-sampling-bias, oracle-drift-pin, evolutionary-dogfooding, parity-confidence-model, ags4-forge, ags4-parity-crate, surface-census]
+repo_refs: {parity: "rust-packages/laterite-ags4-corpus-qa/src/parity.rs"}
+related: [start-here, parity-cascade-unreconcilable, parity-triage-sampling-bias, oracle-drift-pin, evolutionary-dogfooding, parity-confidence-model, laterite-ags4-forge, laterite-ags4-parity, surface-census]
 sources: []
 ---
 # parity model
 
 ## Definition
-> [!quote] `repo:rust-packages/ags4-corpus-qa/src/parity.rs` reduces
+> [!quote] `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs` reduces
 > the Rust & python outcomes to **rule-key presence only** (never
 > line/group/desc/count — O-3/O-11/O-16/O-22/O-26 attribution
 > divergences are invisible by design). `classify` →
@@ -76,7 +76,7 @@ stateDiagram-v2
 Followed end-to-end by the [[traceability-chain]]; surfaced as the
 dogfood ACTION list; the spine of [[rust-vs-python-ags4-parity]] and
 [[observations-coverage-map]]. `classify`/`reconcile` are extracted
-into [[ags4-parity-crate]] so [[ags4-forge]] manufactures divergences
+into [[laterite-ags4-parity]] so [[laterite-ags4-forge]] manufactures divergences
 against the *identical* verdict semantics ([[evolutionary-dogfooding]]),
 with [[parity-confidence-model]] tightening the triage-bias limitation
 below. The parity arc's deliberate non-closures (residual `compat`
@@ -84,4 +84,4 @@ gaps we have a position on but haven't actioned) are parked in
 [[compat-decisions-held]].
 
 ## Related
-[[start-here]] · [[parity-cascade-unreconcilable]] · [[parity-triage-sampling-bias]] · [[oracle-drift-pin]] · [[strat-parity-matrix]] · [[strat-o27-rule20-ondisk]] · [[rust-vs-python-ags4-parity]] · [[observations-coverage-map]] · [[ags4-parity-crate]] · [[ags4-forge]] · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[laterite]] · [[surface-census]]
+[[start-here]] · [[parity-cascade-unreconcilable]] · [[parity-triage-sampling-bias]] · [[oracle-drift-pin]] · [[strat-parity-matrix]] · [[strat-o27-rule20-ondisk]] · [[rust-vs-python-ags4-parity]] · [[observations-coverage-map]] · [[laterite-ags4-parity]] · [[laterite-ags4-forge]] · [[evolutionary-dogfooding]] · [[parity-confidence-model]] · [[laterite]] · [[surface-census]]

@@ -322,9 +322,10 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 18, concept
 
 | page | status | tool_kind |
 |---|---|---|
-| [[ags4-corpus-qa]] | drafted | cli |
-| [[ags4-forge]] | drafted | cli |
-| [[ags4-parity-crate]] | drafted | crate |
+| [[laterite-ags4-corpus-qa]] | drafted | cli |
+| [[laterite-ags4-forge]] | drafted | cli |
+| [[laterite-ags4-parity]] | drafted | crate |
+| [[laterite-ags4-perf]] | drafted | crate |
 | [[build-rust]] | drafted | script |
 | [[laterite-ags4-check]] | reviewed | cli |
 | [[laterite-ags4-core]] | drafted | crate |

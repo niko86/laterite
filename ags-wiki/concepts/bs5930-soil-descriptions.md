@@ -5,9 +5,9 @@ status: drafted
 tags: [concept, geotech, synthesis]
 ags_editions: []
 repo_refs:
-  generator: "repo:rust-packages/ags4-forge/src/synth/bs5930.rs"
-  data: "repo:rust-packages/ags4-forge/data/bs5930/"
-related: [ags4-forge]
+  generator: "repo:rust-packages/laterite-ags4-forge/src/synth/bs5930.rs"
+  data: "repo:rust-packages/laterite-ags4-forge/data/bs5930/"
+related: [laterite-ags4-forge]
 sources: []
 ---
 # BS 5930 soil descriptions
@@ -18,15 +18,15 @@ The forge's `GEOL_DESC` engine: a **constraint-valid** generator of
 **BS 5930:2015+A1:2020 Section 6** field soil descriptions, so the
 synthetic AGS4 files the forge produces are realistic at the *geotechnical*
 layer (proper strata descriptions), not merely structurally valid. Lives at
-`repo:rust-packages/ags4-forge/src/synth/bs5930.rs`; previewed with
-`ags4-forge describe --count N --seed S`.
+`repo:rust-packages/laterite-ags4-forge/src/synth/bs5930.rs`; previewed with
+`laterite-ags4-forge describe --count N --seed S`.
 
 ## How it works
 
 - **Vendored vocabularies.** The open term lists (strength/consistency,
   relative density, colour lightness·chroma·hue, particle angularity, size
   sub-bands) are parsed at runtime (`include_str!` + serde) from the
-  vendored skill data at `repo:rust-packages/ags4-forge/data/bs5930/`
+  vendored skill data at `repo:rust-packages/laterite-ags4-forge/data/bs5930/`
   (`terms.json`, `particle-sizes.json`) — copied verbatim from the owner's
   `solmek-field-app` `bs5930-soil-description` skill (see that dir's
   `PROVENANCE.md` for the source ref + commit). They stay synced to that
@@ -73,4 +73,4 @@ dense…) for SAND/GRAVEL.
 
 ## Related
 
-[[ags4-forge]]
+[[laterite-ags4-forge]]

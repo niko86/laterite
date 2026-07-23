@@ -33,7 +33,7 @@ sources: []
 - `ext:ags-python-library:python_ags4/check.py` `rule_7_2`
   (`temp[i]`); `check_file(..., rename_duplicate_headers=True)` default
   (verified via `inspect.signature`).
-- Decision in `repo:rust-packages/ags4-corpus-qa/src/parity.rs`
+- Decision in `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs`
   `classify()` comment: no speculative O-8 crash arm (would
   over-claim); generic `PythonError` short-circuit is adequate.
 

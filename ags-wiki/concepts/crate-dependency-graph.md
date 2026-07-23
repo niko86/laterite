@@ -41,12 +41,12 @@ flowchart TD
     laterite_py[laterite-py]
   end
   subgraph L3["L3 · trust model + tools"]
-    ags4_compliance[ags4-compliance]
-    ags4_corpus_qa[ags4-corpus-qa]
-    ags4_forge[ags4-forge]
-    ags4_parity[ags4-parity]
-    ags4_perf[ags4-perf]
+    laterite_ags4_corpus_qa[laterite-ags4-corpus-qa]
+    laterite_ags4_forge[laterite-ags4-forge]
+    laterite_ags4_parity[laterite-ags4-parity]
+    laterite_ags4_perf[laterite-ags4-perf]
     laterite_ags4_trust[laterite-ags4-trust]
+    laterite_ags4_xcheck[laterite-ags4-xcheck]
   end
   subgraph L2["L2 · writer / validator / excel / diff"]
     laterite_ags4_censor[laterite-ags4-censor]
@@ -66,22 +66,6 @@ flowchart TD
     laterite_transport[laterite-transport]
     laterite_types[laterite-types]
   end
-  ags4_compliance --> ags4_parity
-  ags4_compliance --> laterite_ags4_core
-  ags4_compliance --> laterite_ags4_emit
-  ags4_compliance --> laterite_ags4_parse
-  ags4_compliance --> laterite_ags4_validator
-  ags4_corpus_qa --> ags4_parity
-  ags4_corpus_qa --> laterite_ags4_censor
-  ags4_corpus_qa --> laterite_ags4_validator
-  ags4_corpus_qa --> laterite_cliutil
-  ags4_forge --> ags4_parity
-  ags4_forge --> laterite_ags4_validator
-  ags4_forge --> laterite_cliutil
-  ags4_parity --> laterite_ags4_validator
-  ags4_perf --> laterite_ags4_parse
-  ags4_perf --> laterite_ags4_validator
-  ags4_perf --> laterite_types
   laterite_ags4_censor --> laterite_ags4_parse
   laterite_ags4_censor --> laterite_ags4_reference
   laterite_ags4_censor --> laterite_types
@@ -97,15 +81,26 @@ flowchart TD
   laterite_ags4_core --> laterite_ags4_reference
   laterite_ags4_core --> laterite_transport
   laterite_ags4_core --> laterite_types
+  laterite_ags4_corpus_qa --> laterite_ags4_censor
+  laterite_ags4_corpus_qa --> laterite_ags4_parity
+  laterite_ags4_corpus_qa --> laterite_ags4_validator
+  laterite_ags4_corpus_qa --> laterite_cliutil
   laterite_ags4_diff --> laterite_ags4_parse
   laterite_ags4_diff --> laterite_ags4_reference
   laterite_ags4_diff --> laterite_types
   laterite_ags4_emit --> laterite_ags4_validator
   laterite_ags4_emit --> laterite_types
+  laterite_ags4_forge --> laterite_ags4_parity
+  laterite_ags4_forge --> laterite_ags4_validator
+  laterite_ags4_forge --> laterite_cliutil
   laterite_ags4_merge --> laterite_ags4_emit
   laterite_ags4_merge --> laterite_ags4_parse
   laterite_ags4_merge --> laterite_ags4_reference
   laterite_ags4_merge --> laterite_types
+  laterite_ags4_parity --> laterite_ags4_validator
+  laterite_ags4_perf --> laterite_ags4_parse
+  laterite_ags4_perf --> laterite_ags4_validator
+  laterite_ags4_perf --> laterite_types
   laterite_ags4_reference --> laterite_ags4_parse
   laterite_ags4_reference --> laterite_types
   laterite_ags4_tokenizer_wasm --> laterite_ags4_parse
@@ -126,6 +121,10 @@ flowchart TD
   laterite_ags4_wasm --> laterite_ags4_validator
   laterite_ags4_wasm --> laterite_excel
   laterite_ags4_wasm --> laterite_types
+  laterite_ags4_xcheck --> laterite_ags4_core
+  laterite_ags4_xcheck --> laterite_ags4_emit
+  laterite_ags4_xcheck --> laterite_ags4_parse
+  laterite_ags4_xcheck --> laterite_ags4_validator
   laterite_excel --> laterite_ags4_core
   laterite_excel --> laterite_ags4_emit
   laterite_node --> laterite_ags4_core
@@ -169,11 +168,11 @@ flowchart TD
 | `laterite-excel` | L2 | 2 | 4 | 7 |
 | `laterite-ags4-censor` | L2 | 3 | 2 | 3 |
 | `laterite-ags4-trust` | L3 | 3 | 4 | 6 |
-| `ags4-parity` | L3 | 1 | 3 | 4 |
-| `ags4-compliance` | L3 | 5 | 0 | 8 |
-| `ags4-corpus-qa` | L3 | 4 | 0 | 7 |
-| `ags4-forge` | L3 | 3 | 0 | 6 |
-| `ags4-perf` | L3 | 3 | 0 | 4 |
+| `laterite-ags4-parity` | L3 | 1 | 2 | 4 |
+| `laterite-ags4-corpus-qa` | L3 | 4 | 0 | 7 |
+| `laterite-ags4-forge` | L3 | 3 | 0 | 6 |
+| `laterite-ags4-perf` | L3 | 3 | 0 | 4 |
+| `laterite-ags4-xcheck` | L3 | 4 | 0 | 7 |
 | `laterite-ags4-check` | L4 | 8 | 0 | 12 |
 | `laterite-ags4-tokenizer-wasm` | L4 | 2 | 0 | 2 |
 | `laterite-ags4-wasm` | L4 | 10 | 0 | 12 |
@@ -196,11 +195,10 @@ flowchart TD
 
 From the multi-lens architectural sweep. Computed from the manifests: the graph respects its layering (no ship edge points at a higher layer). A shipped cycle is impossible by construction (cargo rejects circular normal deps). The wasm boundary is reviewed, not computed here — leaf purity is pinned per-crate by `dep_graph.rs` (parse) and `lean_dep_graph.rs` (validator). These are the interpretation:
 
-1. **`parity` links the whole rule engine for a 2-symbol slice** — *moderate · hub-cohesion*.  `ags4-parity` uses only `Findings`/`count_by_rule`/a few `ValidatorError` variants, yet compile-links the entire ~8.8k-line validator — its ONLY dependency. Extracting `findings`/`error` into a small leaf would let it depend on a fraction of what it pulls today. `laterite-ags4-diff` was the other half of this note until #475 landed the dictionary leaf: it now depends on `parse` + `reference` + `types` and does not link the validator at all, which is the shape this note is asking for.
-2. **`core`'s `laterite-types` re-export is dead weight** — *minor · cheap*.  `core/src/lib.rs`'s `pub use laterite_types as ags_types;` is used internally nowhere — only by `laterite-py`, which already depends on `laterite-types` directly. Cuttable with a one-line import change.
-3. **#441 (`core → emit`) — CUT 2026-07-11** — *resolved*.  The edge is gone: `core` depended on `emit` solely for `impl From<EmitError> for CliError`, whose one consumer (`laterite-excel`) now owns the mapping. Cutting that shim fully severed the edge (an earlier worry that it was 'heavier than the shim framing' was misplaced — the shim was core's only use of `emit`) and, as a bonus, broke the former `validator ⇄ core → emit → validator` dev-dep cycle. See [[core-emit-layering-inversion]].
-4. **`emit → validator` is a legitimate same-layer edge** — *informational*.  Within L2, `validator` (dictionary + rules) is architecturally the lowest member; `emit`/`diff`/`excel` sit above it with no ship-direction cycle. Named explicitly so the L2 list order is never misread as an inversion.
-5. **wasm `getrandom` is a proc-macro build artifact, not a leak** — *known-benign*.  The only path to `getrandom` under `wasm32-unknown-unknown` is via `const-random-macro` (a host-compiled proc-macro) through `ahash ← arrow`, so it never reaches the wasm target at runtime. See ci-and-runners's known-benign register.
+1. **`core`'s `laterite-types` re-export is dead weight** — *minor · cheap*.  `core/src/lib.rs`'s `pub use laterite_types as ags_types;` is used internally nowhere — only by `laterite-py`, which already depends on `laterite-types` directly. Cuttable with a one-line import change.
+2. **#441 (`core → emit`) — CUT 2026-07-11** — *resolved*.  The edge is gone: `core` depended on `emit` solely for `impl From<EmitError> for CliError`, whose one consumer (`laterite-excel`) now owns the mapping. Cutting that shim fully severed the edge (an earlier worry that it was 'heavier than the shim framing' was misplaced — the shim was core's only use of `emit`) and, as a bonus, broke the former `validator ⇄ core → emit → validator` dev-dep cycle. See [[core-emit-layering-inversion]].
+3. **`emit → validator` is a legitimate same-layer edge** — *informational*.  Within L2, `validator` (dictionary + rules) is architecturally the lowest member; `emit`/`diff`/`excel` sit above it with no ship-direction cycle. Named explicitly so the L2 list order is never misread as an inversion.
+4. **wasm `getrandom` is a proc-macro build artifact, not a leak** — *known-benign*.  The only path to `getrandom` under `wasm32-unknown-unknown` is via `const-random-macro` (a host-compiled proc-macro) through `ahash ← arrow`, so it never reaches the wasm target at runtime.
 
 ## Related
 

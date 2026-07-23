@@ -114,7 +114,7 @@ gate the same way wasm's own `char_span` already is, since neither has a peer
 on the other three surfaces. **Sibling, not folded in:** #581 is a
 *different* axis of the same #527 arc — the browser Anonymiser's redaction
 *engine*, not a tokenizer/quoter concern, and was deliberately out of #533's
-scope. Its Phase 1 (2026-07-18) extracted `ags4-corpus-qa`'s `censor.rs` scrub
+scope. Its Phase 1 (2026-07-18) extracted `laterite-ags4-corpus-qa`'s `censor.rs` scrub
 logic into its own leaf, `laterite-ags4-censor` (see [[crate-map]]); Phase 2
 (also 2026-07-18) routed the browser Anonymiser through a `censor` export on
 the engine wasm, retiring its hand-written TS scrub. See

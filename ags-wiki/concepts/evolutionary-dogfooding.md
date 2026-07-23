@@ -6,14 +6,14 @@ tags: [concept]
 ags_editions: []
 repo_refs:
   matrix: "ags-wiki/.bootstrap/probes/parity-matrix.md"
-  parity: "rust-packages/ags4-corpus-qa/src/parity.rs"
-related: [parity-model, parity-confidence-model, ags4-forge, parity-triage-sampling-bias, parity-cascade-unreconcilable, strat-parity-matrix]
+  parity: "rust-packages/laterite-ags4-corpus-qa/src/parity.rs"
+related: [parity-model, parity-confidence-model, laterite-ags4-forge, parity-triage-sampling-bias, parity-cascade-unreconcilable, strat-parity-matrix]
 sources: []
 ---
 # evolutionary dogfooding
 
 ## Definition
-> [!quote] The method [[ags4-forge]] implements: instead of *waiting*
+> [!quote] The method [[laterite-ags4-forge]] implements: instead of *waiting*
 > for a crawl to surface a Rust↔python divergence, **manufacture and
 > prove** it. A candidate's *signature* is
 > `(parity_tag, rust_rules, python_rules, target_rule)`; **fitness =
@@ -45,7 +45,7 @@ in-binary LLM.
 flowchart LR
   strat[the agent authors strategy.toml] --> gen[generate: mutate / synth+inject]
   gen --> dv[dual-validate: Rust + confidence-gated python]
-  dv --> cl[ags4-parity::classify + reconcile]
+  dv --> cl[laterite-ags4-parity::classify + reconcile]
   cl --> fit{novel signature?}
   fit -->|TOP| breed[freeze + breed]
   fit -->|no| stale[staleness++]
@@ -56,11 +56,11 @@ flowchart LR
 ```
 
 ## Where it shows up
-[[ags4-forge]] (`evolve.rs`); pairs with [[parity-confidence-model]]
+[[laterite-ags4-forge]] (`evolve.rs`); pairs with [[parity-confidence-model]]
 for *who* reaches the oracle; confirmed findings flow into the
 [[strategies/_README|strategies]] register and the §12.5
 insight→`OBSERVATIONS.md` O-N path; serves
 req-reproducible-conformance-corpus.
 
 ## Related
-[[parity-model]] · [[parity-confidence-model]] · [[ags4-forge]] · [[parity-triage-sampling-bias]] · [[parity-cascade-unreconcilable]] · [[strat-parity-matrix]] · req-reproducible-conformance-corpus
+[[parity-model]] · [[parity-confidence-model]] · [[laterite-ags4-forge]] · [[parity-triage-sampling-bias]] · [[parity-cascade-unreconcilable]] · [[strat-parity-matrix]] · req-reproducible-conformance-corpus

@@ -211,7 +211,7 @@ Greppable: `^## \[(\d{4}-\d{2}-\d{2})\] (ingest|query|lint) \| (.+)$`.
 > running an Ingest session; resume from `index.md` status + `log.md`.
 
 1. **Classify the source**: spec erratum/new edition · new
-   `OBSERVATIONS` O-N · dogfood/parity finding (`ags4-corpus-qa`) ·
+   `OBSERVATIONS` O-N · dogfood/parity finding (`laterite-ags4-corpus-qa`) ·
    `ags5_dictionary.json` change · external doc (→ drop immutably in
    `sources/external/`, register a `sources/` stub).
 2. Read the source **in full** (never skim a region you will cite).

@@ -77,7 +77,7 @@ sources: []
 > isn't verified here) had no
 > on-disk stat — so under that harness python's always-on Rule 20
 > fires where Rust stays silent, and O-27 re-emerges. A **signature-
-> narrow O-27 arm was re-added** to `ags4-parity::reconcile`
+> narrow O-27 arm was re-added** to `laterite-ags4-parity::reconcile`
 > (`po.remove("AGS Format Rule 20") → O-27`): it is **inert under
 > corpus-qa** (with `check_files` on there is no py-only Rule 20 to
 > match) and only reconciles the compliance harness's expected

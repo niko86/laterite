@@ -17,10 +17,10 @@ sources: []
 # The parity differential is structurally biased to triage files
 
 ## Claim
-> [!divergence] `repo:rust-packages/ags4-corpus-qa/src/parity.rs`
+> [!divergence] `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs`
 > builds the parity set as **triage ∪ a reservoir sample of size
 > `--parity-sample`**, and `--parity-sample` **defaults to 0**
-> (`repo:rust-packages/ags4-corpus-qa/src/cli.rs`). So by default the
+> (`repo:rust-packages/laterite-ags4-corpus-qa/src/cli.rs`). So by default the
 > only files cross-checked against python-ags4 are those the Rust side
 > *already* flagged odd (HardError / Panic / `surprising`). A file the
 > Rust validator handles **confidently but wrongly** — plausible
