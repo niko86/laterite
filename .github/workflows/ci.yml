@@ -74,6 +74,7 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
       node: ${{ steps.filter.outputs.node }}
       docs: ${{ steps.filter.outputs.docs }}
+      web: ${{ steps.filter.outputs.web }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
@@ -146,6 +147,16 @@ jobs:
               - 'pyproject.toml'
               - 'uv.lock'
               - '.github/workflows/ci.yml'
+            web:
+              # ts-lint's web surface (the Solid browser validator's TS): eslint +
+              # prettier over web/**. The laterite-node TS half is covered by the
+              # `node` output (rust-packages/**), which ts-lint is ALSO gated on, so
+              # a wasm-crate change still re-lints web (its generated .d.ts feeds
+              # web's type-aware rules). A web/docs-site-only change over-triggers
+              # here (harmless — the job only lints), so no negation is used.
+              - 'web/**'
+              - '.github/workflows/ci.yml'
+              - '.github/actions/build-accel/**'
 
   # Supply-chain gate: RustSec advisories + the permissive-license policy +
   # crates.io-only sources + duplicate-version warnings. Config + the documented
@@ -440,6 +451,78 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
+  # TS lint + format gate (#585 / #615): the two shipped TS surfaces — web/ (the
+  # Solid browser validator) and rust-packages/laterite-node (the npm bindings) —
+  # run `eslint .` (0 errors) + `prettier --check`. The #615/#621 burn-down fixed
+  # every rule at source and flipped them to `error`; this is the CI-enforcement
+  # half, so a regression can't merge (until now the gate was runnable locally via
+  # `npm run lint` / `format:check` but nothing enforced it per-PR).
+  #
+  # web/ MUST build its wasm bindings first: eslint's type-aware rules
+  # (`no-unsafe-*`) resolve the `../wasm/ags4_wasm.js` import through its GENERATED
+  # .d.ts. With no wasm built the import is `any` and every call through it trips a
+  # FALSE no-unsafe error (75 of them) — so the wasm build is a lint prerequisite,
+  # not a test artefact. node/ needs no wasm (it links its own napi addon).
+  ts-lint:
+    needs: changes
+    # Runs when either TS surface (or its inputs) changed. Same !cancelled() +
+    # filter-failed-means-run discipline as the other jobs. `node` covers the
+    # laterite-node TS + the rust-packages/** wasm crates web's types derive from;
+    # `web` covers web/**.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.node == 'true'
+        || needs.changes.outputs.web == 'true') }}
+    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) || github.event_name == 'schedule') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Rust toolchain (+ wasm32 for web's wasm bindings)
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      # sccache + mold (no-op off the pool) — the wasm crate compile shares the
+      # cache the `rust` job populated (it builds the same crates for wasm32).
+      - uses: ./.github/actions/build-accel
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 22
+
+      - name: Install wasm-pack
+        run: command -v wasm-pack >/dev/null 2>&1 || cargo install wasm-pack --locked
+
+      # --- laterite-node (npm bindings): lint + format, no wasm needed ---
+      - name: node — install
+        working-directory: rust-packages/laterite-node
+        run: npm ci
+      - name: node — eslint + prettier
+        working-directory: rust-packages/laterite-node
+        run: |
+          npm run lint
+          npm run format:check
+
+      # --- web (browser validator): build wasm bindings, then lint + format ---
+      - name: web — install
+        working-directory: web
+        run: npm ci
+      - name: web — build wasm bindings (generates the .d.ts the type-aware rules need)
+        working-directory: web
+        run: npm run build:wasm:all
+      - name: web — eslint + prettier
+        working-directory: web
+        run: |
+          npm run lint
+          npm run format:check
+
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
   # PR-tier Rust test authority. The heavier INSTRUMENTED coverage MEASUREMENT
   # moved to the nightly (nightly.yml) — `-C instrument-coverage` changes
   # RUSTFLAGS so every Rust crate is an sccache MISS (only the bundled-DuckDB
@@ -590,6 +673,13 @@ jobs:
 
       - name: ruff check
         run: uv run ruff check .
+
+      - name: ruff format --check
+        # Enforce the formatter (#547): pyproject ignores E501 ("let the formatter
+        # handle it"), but until now nothing RAN a formatter, so line length was
+        # enforced by nobody. Beside `ruff check` — both Astral, both fast, no
+        # build needed. `ruff format .` is the fix if this goes red.
+        run: uv run ruff format --check .
 
       - name: ty check (type-faithfulness gate)
         # Astral `ty` over the SHIPPED `laterite` package (scope + the abi3-py312

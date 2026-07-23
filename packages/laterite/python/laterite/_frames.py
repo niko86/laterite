@@ -55,9 +55,7 @@ def resolve_backend(explicit: str | None) -> str:
 #   "string" — pandas' Arrow-backed str dtype (na_value=NaN), which is what
 #              python-ags4 itself returns once it runs on pandas 3. The default
 #              flips to "string" in that era — a one-word change here.
-_DEFAULT_STRING_DTYPE = os.environ.get(
-    "LATERITE_COMPAT_STRING_DTYPE", "object"
-).lower()
+_DEFAULT_STRING_DTYPE = os.environ.get("LATERITE_COMPAT_STRING_DTYPE", "object").lower()
 
 _VALID_STRING_DTYPES = ("object", "string")
 
