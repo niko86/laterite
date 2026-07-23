@@ -1,0 +1,66 @@
+{
+  "_comment": [
+    "The python-ags4 parity contract, BY IDENTITY (#556, owner decision 2).",
+    "",
+    "This replaces PARITY_MIN_PASSING=121 — a COUNT, and a count is blind to a swap:",
+    "one test regressing while another starts passing holds at 121 and reports green.",
+    "The number also said nothing about WHICH divergences we accept, so the",
+    "deliberate non-closures once lived only in prose that no job read.",
+    "",
+    "Every entry below is a test we EXPECT to fail, with the reason we accept it.",
+    "A failure not listed here is a regression. A listed test that starts PASSING is",
+    "also a failure of this gate — deliberately: it means a divergence closed and the",
+    "record must be updated, or this file rots into the thing it replaced.",
+    "",
+    "Re-vendor with: python tools/check_parity.py parity.log --write",
+    "Authority for the reasons: the `reason` on each entry below IS the record; the",
+    "`observation` field cross-links OBSERVATIONS.md (the O-N divergence canon)."
+  ],
+  "python_ags4_version": "1.2.0",
+  "total_tests": 131,
+  "known_failures": {
+    "tests/test_ags4.py::test_version": {
+      "category": "checker-identity",
+      "reason": "The shim reports laterite's version, not python-ags4's. We won't lie about being python-ags4."
+    },
+    "tests/test_check.py::test_rule_2": {
+      "category": "checker-identity",
+      "reason": "Metadata.Checker says 'laterite', not 'python-ags4'. Deliberate."
+    },
+    "tests/test_check.py::test_rule_2b_1": {
+      "category": "checker-identity",
+      "reason": "Metadata.Checker identity, as test_rule_2."
+    },
+    "tests/test_check.py::test_rule_LBSGCheck": {
+      "category": "checker-identity",
+      "reason": "Metadata.Checker identity, as test_rule_2."
+    },
+    "tests/test_check.py::test_rule_STNDandPREMCheck": {
+      "category": "checker-identity",
+      "reason": "Metadata.Checker identity, as test_rule_2."
+    },
+    "tests/test_check.py::test_checking_without_dictionary_raises_error": {
+      "category": "h1-catch-and-wrap",
+      "reason": "Python-idiom choice: laterite RAISES on error rather than returning error-as-dict."
+    },
+    "tests/test_check.py::test_duplicate_groups_raises_error": {
+      "category": "h1-catch-and-wrap",
+      "reason": "Python-idiom choice: raise, not return-error-as-dict. As above."
+    },
+    "tests/test_check.py::test_rule_AGS3": {
+      "category": "documented-divergence",
+      "observation": "O-30",
+      "reason": "laterite refuses AGS3 (UnsupportedEditionError) where python-ags4 mis-validates it."
+    },
+    "tests/test_check.py::test_rule_6_1": {
+      "category": "documented-divergence",
+      "observation": "O-34/O-2",
+      "reason": "laterite refuses a non-CSV file (NotAgs4Error) where python-ags4 mis-validates it."
+    },
+    "tests/test_check.py::test_rule_6_2": {
+      "category": "documented-divergence",
+      "observation": "O-47",
+      "reason": "The quote-aware splitter keeps an embedded-newline field whole and reports Rule 6; python-ags4's quote-blind reader tears the row into Rule 4/5. Flipped pass->fail at Stage 10 as a CORRECT new divergence — which is exactly the event a count-based gate reads as a regression and an identity gate reads properly."
+    }
+  }
+}

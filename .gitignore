@@ -56,6 +56,10 @@ htmlcov/
 lcov.info
 web/coverage/
 rust-packages/**/*.profraw
+
+# python-ags4 parity oracle run log (parity.yml `tee`s it, check_parity.py reads
+# it); regenerated per run, never committed.
+parity.log
 .DS_Store
 
 # marimo session/cache snapshots
