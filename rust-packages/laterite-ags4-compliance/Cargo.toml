@@ -1,0 +1,61 @@
+# Cross-surface findings-agreement harness (#169, Workstream C 5a).
+#
+# Reads one finding-set JSON per validation surface (emitted by the
+# per-surface runners that PULL the PUBLISHED artifacts) and checks the
+# findings-emitting AGS4 surfaces agree over python-ags4's fixtures:
+#   1. the 4 laterite surfaces (rust/python-laterite/node/wasm) wrap ONE
+#      engine → must be byte-identical on the rule floor;
+#   2. python-ags4 is the O-N-aware reference, compared via laterite-ags4-parity's
+#      `classify` VERBATIM (no parity logic re-derived → no clean-room drift).
+# (duckdb became a read-only reader in #446 → it does read/parse-agreement
+#  via the `duckdb-parse-check` bin, not findings; #458.)
+#
+# The OUTPUT-VALUE gate (`xcheck`/`emit-cases` + the case manifest) is a
+# SEPARATE concern and lives in its own lean crate `laterite-ags4-xcheck`, so
+# the gate builds without this harness's deps. This crate depends ON
+# laterite-ags4-parity (and transitively the validator) — never the reverse.
+# No new external surface beyond serde/json (already in the lock).
+[package]
+name = "laterite-ags4-compliance"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+description = "Cross-surface findings-agreement harness over python-ags4's fixtures (#169)"
+license = "MIT"
+publish = false
+# The comparator is the primary bin; `emit-rust` is the rust-surface runner.
+default-run = "laterite-ags4-compliance"
+
+[dependencies]
+laterite-ags4-parity = { path = "../laterite-ags4-parity" }
+# The RUST surface runner (`emit-rust`) drives the in-workspace validator
+# engine directly — the reference every laterite surface wraps. The validator
+# is the LEAN engine (phf + thiserror + chrono + encoding_rs), so this adds no
+# heavy dep beyond what laterite-ags4-parity already pulls transitively.
+laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+# The duckdb read/parse-agreement leg (`duckdb-parse-check`, #458) computes its
+# reference with the core reader (`read_ags4_bytes`) + the content-addressed
+# keychain — the exact read path the extension mirrors — so a match proves
+# duckdb's `read_ags` agrees with the shipped read path.
+laterite-ags4-core = { path = "../laterite-ags4-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[bin]]
+name = "laterite-ags4-compliance"
+path = "src/main.rs"
+
+# The rust leg of the findings harness — emits `rust.json` in the schema the
+# comparator reads (sibling to tools/compliance/_worker.py's Python surfaces).
+[[bin]]
+name = "emit-rust"
+path = "src/bin/emit_rust.rs"
+
+# The duckdb read/parse-agreement leg (#458) — checks the read-only extension's
+# `read_ags` produces the same content-addressed key set as the core reference.
+[[bin]]
+name = "duckdb-parse-check"
+path = "src/bin/duckdb_parse_check.rs"
+
+[lints]
+workspace = true
