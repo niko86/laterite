@@ -1,0 +1,69 @@
+# A10 (wiki-reliability-hardening plan) — best-effort weekly check that the
+# `ext:` allowlisted external-repo citations (ags-wiki/.bootstrap/lint.py's
+# A9) still resolve. A9 itself is local-only (no network — it just checks a
+# repo-id against EXT_ALLOWLIST), so it can't catch a *path* going stale
+# inside an already-allowlisted repo (e.g. the cited repo renaming or
+# deleting a file `ags-wiki/` still points at). This is that other half, on
+# its own schedule, never touching the PR-blocking path.
+#
+# Report-only: check_ext_drift.py always exits 0, and this workflow never
+# fails on drift or on a flaky GitHub API call — it opens/updates a
+# tracking issue instead. "Confirmed missing" (a real 404) is the only
+# thing that counts as drift; a timeout/rate-limit/auth hiccup is reported
+# as `unknown` and does NOT open an issue (network flakiness must not be
+# mistaken for a citation actually going stale).
+name: wiki-ext-drift
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Monday 04:00 UTC — low-traffic slot, clear of the parity job's
+    # monthly 1st-of-month 03:00 run.
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  ext-drift:
+    name: "ext: citation drift check"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+
+      - name: Run drift check
+        id: drift
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run --no-project python ags-wiki/.bootstrap/check_ext_drift.py | tee drift.log
+          count=$(grep -Eo '^DRIFT_COUNT=[0-9]+' drift.log | cut -d= -f2)
+          echo "count=${count:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Open/update tracking issue on confirmed drift
+        # continue-on-error, not just `|| true` on the run line — an issue
+        # API hiccup here must never turn a *report-only* check red.
+        # Looked up by TITLE, not a label — doesn't assume any repo-side
+        # label setup exists (this workflow is meant to be self-contained).
+        if: steps.drift.outputs.count != '0'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          title="wiki: ext: citation drift detected"
+          existing=$(gh issue list --search "in:title \"$title\"" --state open \
+            --json number --jq '.[0].number' 2>/dev/null)
+          body="Weekly \`ext:\` drift check found ${{ steps.drift.outputs.count }} confirmed-missing citation(s) — see the run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          if [ -n "$existing" ] && [ "$existing" != "null" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

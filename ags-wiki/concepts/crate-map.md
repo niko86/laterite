@@ -435,6 +435,10 @@ flowchart LR
   parity --> compliance[laterite-ags4-compliance]
   validator --> compliance
   core --> compliance
+  emit --> xcheck[laterite-ags4-xcheck]
+  validator --> xcheck
+  core --> xcheck
+  parse --> xcheck
   validator --> perf[laterite-ags4-perf]
   cliutil[laterite-cliutil] --> check
   cliutil --> corpusqa
