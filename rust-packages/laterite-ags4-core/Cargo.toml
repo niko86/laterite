@@ -76,6 +76,12 @@ transport = ["dep:laterite-transport"]
 # the file path + parse cycle. The runtime modules don't take a Path
 # dependency; this is test-only.
 tempfile = "3"
+# Read-codec + index benches (benches/read_index.rs).
+criterion = "0.8"
+
+[[bench]]
+name = "read_index"
+harness = false
 
 [lints]
 workspace = true

@@ -50,6 +50,12 @@ arrow = { version = "59", default-features = false, optional = true }
 # Property tests for the writer's quote-escaping round-trip. Already vendored +
 # cargo-deny-cleared (dev-dep of the validator / parse / types crates too).
 proptest = "1"
+# Write-path benches (benches/emit.rs). Same criterion the validator uses.
+criterion = "0.8"
+
+[[bench]]
+name = "emit"
+harness = false
 
 [features]
 # Typed-Arrow input support (the `arrow_in` transpose). Off by default so
