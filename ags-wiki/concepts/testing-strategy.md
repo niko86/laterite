@@ -154,4 +154,5 @@ flowchart LR
 - [[vendored-authority-faithful]] — the content gate that closes the "Faithfulness gates" table's row-2 gap: `test_dictionary_faithful.py` proved render-drift, not that the vendored `.ags` files match their claimed source
 - [[pyo3-boundary]] · [[crate-map]] — the surfaces the properties run across
 - [[playwright-e2e]] — the browser end of the test pyramid
+- [[core-perf-baseline]] — the criterion benches: what the core data path costs, and the rule-family attribution. A perf regression is a correctness-adjacent failure the test suite cannot see
 - [[start-here]]

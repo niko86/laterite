@@ -91,4 +91,7 @@ matrix (3 platforms × N Pythons instead of 3 total); abi3-py314 would drop
 
 ## Related
 
-[[pyo3-boundary]] · [[crate-map]] · [[laterite-py]]
+[[core-perf-baseline]] — the other half of the picture: this page prices the
+*binding*, that one prices the *engine* (parse / rules / type / emit).
+
+[[pyo3-boundary]] · [[crate-map]] · [[laterite-py]] · [[core-perf-baseline]]

@@ -1,7 +1,7 @@
 ---
 type: index
 generated: 2026-07-24
-counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 22, concepts: 25, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 21}
+counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 22, concepts: 26, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 21}
 ---
 # AGS Wiki — Content Catalog
 
@@ -16,17 +16,17 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 22, concept
 | Types | 17 |
 | Observations | 48 |
 | Tools | 22 |
-| Concepts | 25 |
+| Concepts | 26 |
 | Editions | 5 |
 | Comparisons | 1 |
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
 | Design | 21 |
-| **Total (live)** | **386** |
+| **Total (live)** | **387** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 20 · `confirmed` 18 · `drafted` 318 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 5 · `stub` 13
+**Status distribution:** `accepted` 20 · `confirmed` 18 · `drafted` 319 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 5 · `stub` 13
 
 ## Rules
 
@@ -352,6 +352,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 22, concept
 | [[abi3-perf]] | drafted |
 | [[agent-first-cli-contract]] | drafted |
 | [[bs5930-soil-descriptions]] | drafted |
+| [[core-perf-baseline]] | drafted |
 | [[crate-dependency-graph]] | reviewed |
 | [[crate-map]] | drafted |
 | [[denormalised-child-rows]] | drafted |
