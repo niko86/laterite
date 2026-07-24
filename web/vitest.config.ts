@@ -9,7 +9,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 // geometry) now call the wasm-backed tokenizer (#533), so they run in the
 // separate wasm lane (vitest.wasm.config.ts, in the e2e job) and are excluded
 // here to keep this lane pure + fast. The tokenizer's own invariants are pinned
-// in Rust (laterite-ags4-parse's `tokenize_spans` proptest).
+// in Rust (laterite-ags4-parse's `display_spans.rs` proptest).
 export default defineConfig({
   test: {
     environment: "node",

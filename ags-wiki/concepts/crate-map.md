@@ -100,15 +100,18 @@ as stable):
   the now-tautological `parse_parity.rs` gate was retired down to `from_shared_trim.rs` (keeps only
   the real trim-asymmetry guard, fork 1), and the lean non-UTF-8 wording was pinned in
   `error_mapping.rs` and **ratified as `O-46`** (the lean read path rejects non-UTF-8; the validator
-  decodes it lossily and flags Rule 1, per `O-32`). See the reliquary (#6). **Gained `tokenize_spans`/
-  `AgsSpan` (#533, part of the #527 convergence arc):** an offset-preserving line tokenizer — the
-  browser's hand-written `splitAgsFields` state machine ported verbatim to Rust (code-point offsets,
-  lossless-reassembly, unquoted-trim, empty-quoted zero-width span), pinned by a proptest
-  (`repo:rust-packages/laterite-ags4-parse/tests/tokenize_spans.rs`). It is a THIRD tokenizer
-  alongside `split_ags_line`/`field_span` above — deliberately so: those two serve the validator's
-  line-by-line rule walk, `tokenize_spans` serves an interactive line editor that needs per-character
-  span bounds for highlighting, a shape neither existing tokenizer returns. Reached by the browser
-  through the new `laterite-ags4-tokenizer-wasm` leaf below, not the 6.9 MB engine wasm.
+  decodes it lossily and flags Rule 1, per `O-32`). See the reliquary (#6). **Gained the shared `scan` core
+  (2026-07-24), which retired `tokenize_spans`/`AgsSpan`:** the grammar had grown THREE hand-written
+  implementations (`split_ags_line`, `field_span`, `tokenize_spans`) which had drifted apart on five
+  behaviours. `scan::scan_line` is the one state machine; what legitimately differs between callers —
+  how a token's inner VALUE resolves — is a `ValuePolicy` parameter (`RAW` for anything judging the
+  bytes, `DISPLAY` for the browser), and that parameter measures free. `RawField` is a strict superset
+  of the old `AgsSpan`, so the display tokenizer is now `scan_line(line, DISPLAY)`; the contract is
+  pinned in `repo:rust-packages/laterite-ags4-parse/tests/display_spans.rs`.
+  Bounds are **bytes**, not code points — the browser's code-point offsets are a conversion applied by
+  the `laterite-ags4-tokenizer-wasm` adapter that actually needs them, so the validator's per-line walk
+  stops paying for a requirement it never had. `split_ags_line` and `field_span` still carry their own
+  implementations (2 remaining, deliberately: folding `field_span` would cost its short-circuit).
 - [[laterite-ags4-reference]] — the AGS4 **reference-data leaf** (#475): the multi-edition dictionary,
   its per-edition `phf` projection, and the rules-catalogue data accessors — everything mechanically
   derived from `ags_dictionary.json`/`rules_meta.json`, single-sourced in one place. Extracted out of
@@ -267,7 +270,7 @@ as stable):
   tokenisation — `censor(text, file_id, &Policy, &CensorOptions) -> (String, Tally)` +
   `Policy::from_sensitive_json`/`Policy::retain_codes`. Extracted out of `laterite-ags4-corpus-qa`'s private
   `censor.rs`, which now depends ON this leaf and keeps only its crawler/manifest/rayon/report wrapper.
-  Deps: `laterite-ags4-parse` (tokenizes via the shared `tokenize_spans`, retiring `censor.rs`'s own
+  Deps: `laterite-ags4-parse` (tokenizes via the shared `scan_line`, retiring `censor.rs`'s own
   private `parse_fields`/`emit_fields` — the fourth AGS4 tokenizer this convergence arc has now folded
   away), `laterite-types` (`quote_field` re-quoting scrubbed cells), `laterite-ags4-reference` (standard
   group/heading codes for `drop_custom`, off the dictionary SSOT rather than a re-embedded copy). Proven
@@ -301,7 +304,7 @@ as stable):
 - `laterite-ags4-wasm` — the browser cdylib ([[tech-stack-wasm]]).
 - `laterite-ags4-tokenizer-wasm` — a SEPARATE, deliberately tiny browser cdylib (#533, part of the
   #527 convergence arc; new crate, 2026-07-17): two `#[wasm_bindgen]` wrappers,
-  `tokenize_spans`/`quote_field`, over `laterite-ags4-parse::tokenize_spans` and
+  `tokenize_spans`/`quote_field`, over `laterite-ags4-parse::scan::scan_line` and
   `laterite-types::quote_field` — nothing else. Deps: `laterite-ags4-parse` + `laterite-types` only
   (both already wasm-clean, `arrow` OFF), so the compiled artifact is ~30 KB / ~13 KB gzipped versus
   the 6.9 MB engine wasm (`laterite-ags4-wasm`) it deliberately does NOT reuse — a size gate

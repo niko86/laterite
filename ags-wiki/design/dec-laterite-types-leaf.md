@@ -94,7 +94,7 @@ copy (byte-identical — proven by the existing writer round-trip proptest +
 `embedded_quotes_are_doubled`; the Rule-6 CR/LF reject deliberately stays
 row-level in emit, since a field primitive can't reject what it can't see).
 
-The browser reaches both new primitives — `laterite-ags4-parse::tokenize_spans`
+The browser reaches both new primitives — `laterite-ags4-parse::scan::scan_line`
 (the offset-preserving line tokenizer the browser's editor/preview needs,
 ported verbatim from the hand-written TS state machine that used to live in
 `web/src/lib/agsline.ts`) and `quote_field` — through a **new, deliberately
@@ -107,7 +107,7 @@ old TS copy behind a value-gate case and not calling the 6.9 MB engine wasm
 now keeps only the browser-only GROUP-block/alignment DISPLAY logic; the
 tokenizer/quoter seam lives in `web/src/lib/tokenizer.ts`, warmed once at boot
 behind the app's existing readiness gate. See [[crate-map]] for the crate's
-full dependency listing. The browser's char-offset span model (`AgsSpan`'s
+full dependency listing. The browser's char-offset span model (the wasm adapter's
 `start`/`end`/`valueStart`/`valueEnd`) stays surface-specific *by design* — it
 is excluded from the #555 cross-surface output-value
 gate the same way wasm's own `char_span` already is, since neither has a peer

@@ -47,7 +47,7 @@ doubling an embedded `"`; the streaming form is the field primitive
 `laterite-ags4-emit`'s byte-faithful writer streams every cell through).
 `quote_field` is also this crate's browser face: the new tiny
 `laterite-ags4-tokenizer-wasm` crate wraps it (alongside
-`laterite-ags4-parse::tokenize_spans`) for the browser's inline line
+`laterite-ags4-parse::scan::scan_line`) for the browser's inline line
 editor/preview, retiring the hand-written TS copy that used to live in
 `web/src/lib/agsline.ts`. See [[dec-laterite-types-leaf]] for the
 home-of-the-quoter decision (Option C: beside `ags4_str`, zero new

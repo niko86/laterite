@@ -63,7 +63,7 @@ Tally)`, `Policy::from_sensitive_json(json, include_freetext)`,
 scrub actions (filehash / pseudonym / blank / token / brackets), the two-pass
 per-heading pseudonym map, custom group/column/orphan-def dropping, and the
 ABBR-of-sensitive tokenisation. Deps — all already wasm-clean:
-`laterite-ags4-parse` (tokenizes via the shared `tokenize_spans`, retiring the
+`laterite-ags4-parse` (tokenizes via the shared `scan_line`, retiring the
 corpus tool's own private tokenizer), `laterite-types` (`quote_field`
 re-quoting scrubbed cells), `laterite-ags4-reference` (standard group/heading
 codes for `drop_custom`, off the dictionary SSOT rather than a re-embedded
@@ -169,7 +169,7 @@ behaviours that had never been directly compared before:
   `parse_fields`/`emit_fields`) — every Rust surface that tokenizes an AGS4
   line now goes through `laterite-ags4-parse`, in one of its two established
   shapes (`split_ags_line`/`field_span` for the line-by-line rule walk,
-  `tokenize_spans` for span-preserving editing/scrubbing).
+  `scan_line` for span-preserving editing/scrubbing).
 - Corpus output is byte-identical to the pre-extraction tool on well-formed
   input, and strictly more faithful (cell-surgical) on pathological rows — a
   behaviour-neutral-or-better migration, not a re-tuning.

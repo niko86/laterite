@@ -7,7 +7,7 @@
 //!
 //!   * whole-file (`parse_bytes`) — where the read path's time actually goes,
 //!     with throughput so the number is comparable across fixture sizes;
-//!   * per-line (`split_ags_line` / `tokenize_spans` / `field_span`) — the
+//!   * per-line (`split_ags_line` / `scan_line` / `field_span`) — the
 //!     tokenizers the whole-file walk calls once per line. A regression here
 //!     is invisible at the file level until it is already large.
 //!
@@ -21,7 +21,7 @@ use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use laterite_ags4_parse::scan::{DISPLAY, RAW, first_field, scan_line};
-use laterite_ags4_parse::{field_span, parse_bytes, split_ags_line, tokenize_spans};
+use laterite_ags4_parse::{field_span, parse_bytes, split_ags_line};
 
 /// `output/bench-fixtures/<label>.ags`, or None if it hasn't been generated.
 fn fixture(label: &str) -> Option<PathBuf> {
@@ -71,10 +71,6 @@ fn bench_line_tokenizers(c: &mut Criterion) {
     g.bench_function("split_ags_line", |b| {
         b.iter(|| split_ags_line(std::hint::black_box(LINE)));
     });
-    // The browser editor's offset-preserving tokenizer (also a Vec, plus spans).
-    g.bench_function("tokenize_spans", |b| {
-        b.iter(|| tokenize_spans(std::hint::black_box(LINE)));
-    });
     // The allocation-free single-field probe — the shape the other two would
     // ideally converge toward for callers that want one field.
     g.bench_function("field_span", |b| {
@@ -86,11 +82,10 @@ fn bench_line_tokenizers(c: &mut Criterion) {
     g.bench_function("first_field", |b| {
         b.iter(|| first_field(std::hint::black_box(LINE)));
     });
-    // The shared core under both policies. Benched beside the three incumbents
-    // it exists to replace, so the claim "the core is cheaper than every machine
-    // it subsumes" stays reproducible rather than resting on a one-off probe.
-    // RAW is the validator's view, DISPLAY the browser's — same scan, and the
-    // gap between them prices the value policy itself.
+    // The shared core under both policies. `tokenize_spans` is gone — it IS
+    // `scan_line/display` now, so its old entry would have benched the same
+    // code twice. RAW is the validator's view, DISPLAY the browser's; the gap
+    // between them prices the value policy itself.
     g.bench_function("scan_line/raw", |b| {
         b.iter(|| scan_line(std::hint::black_box(LINE), RAW));
     });

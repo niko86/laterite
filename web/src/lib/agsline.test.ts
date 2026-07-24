@@ -12,10 +12,16 @@ import {
 // Runs in the WASM lane (vitest.wasm.config.ts): splitAgsFields/quoteAgsField
 // are now backed by the tiny tokenizer wasm (#533), init'd from disk in the
 // lane's setup file. The tokenizer's invariants are pinned AUTHORITATIVELY in
-// Rust (laterite-ags4-parse's `tokenize_spans` proptest); the checks below
+// Rust (laterite-ags4-parse's `display_spans.rs` proptest); the checks below
 // double as a cross-check that the wasm boundary hands JS the right shape
-// (camelCase valueStart/valueEnd, lossless `.text`), and exercise the
-// browser-only display helpers (groupBlock/alignBlock/fixBlock) against it.
+// (camelCase valueStart/valueEnd) and that the byte→code-point conversion the
+// wasm adapter now performs is correct, and exercise the browser-only display
+// helpers (groupBlock/alignBlock/fixBlock) against it.
+//
+// Tokens carry offsets only. The Rust side proves its bounds tile the line in
+// BYTES; this lane is the only place the CODE-POINT offsets JS actually
+// receives get checked, which is why the tiling test below lives here and not
+// only in Rust.
 
 const CASES = [
   '"HEADING","LOCA_ID","LOCA_NATE"',
@@ -31,10 +37,27 @@ const CASES = [
   '"x""y"', // a field that is just an escaped quote
 ];
 
-describe("splitAgsFields — lossless reassembly", () => {
-  it.each(CASES)("concat(.text) rebuilds %j byte-for-byte", (raw) => {
+describe("splitAgsFields — token ranges tile the line", () => {
+  // The same proposition the retired `.text` reassembly asserted — that the
+  // tokens cover the line with no gap and no overlap — stated directly against
+  // the offsets instead of via a materialised copy of each token.
+  it.each(CASES)("[start,end) ranges rebuild %j exactly", (raw) => {
+    const cps = Array.from(raw);
     const fields = splitAgsFields(raw);
-    expect(fields.map((f) => f.text).join("")).toBe(raw);
+    expect(fields.map((f) => cps.slice(f.start, f.end).join("")).join("")).toBe(
+      raw,
+    );
+  });
+
+  // Reassembly alone would still pass if every range were shifted by a
+  // compensating amount, so pin the seam explicitly.
+  it.each(CASES)("ranges are contiguous and start at 0 for %j", (raw) => {
+    const fields = splitAgsFields(raw);
+    expect(fields[0]!.start).toBe(0);
+    for (let i = 1; i < fields.length; i++) {
+      expect(fields[i]!.start).toBe(fields[i - 1]!.end);
+    }
+    expect(fields[fields.length - 1]!.end).toBe(Array.from(raw).length);
   });
 });
 
@@ -79,13 +102,17 @@ describe("splitAgsFields — field count + values", () => {
     // a new empty field. The lossless invariant (covered above) still holds.
     const f = splitAgsFields('"DATA","BH01",');
     expect(f).toHaveLength(2);
-    expect(f[1]!.text).toBe('"BH01",');
+    const raw = '"DATA","BH01",';
+    expect(Array.from(raw).slice(f[1]!.start, f[1]!.end).join("")).toBe(
+      '"BH01",',
+    );
   });
 
   it("an empty line is a single empty field (never zero fields)", () => {
     const f = splitAgsFields("");
     expect(f).toHaveLength(1);
-    expect(f[0]!.text).toBe("");
+    expect(f[0]!.start).toBe(0);
+    expect(f[0]!.end).toBe(0);
   });
 });
 
