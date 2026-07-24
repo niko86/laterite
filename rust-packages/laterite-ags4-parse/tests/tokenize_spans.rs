@@ -9,6 +9,7 @@
 //!     inner value excludes the surrounding quotes AND the trailing comma;
 //!   - the empty line yields exactly one empty field (never zero).
 
+use laterite_ags4_parse::scan::{DISPLAY, scan_line};
 use laterite_ags4_parse::{AgsSpan, tokenize_spans};
 use proptest::prelude::*;
 
@@ -145,5 +146,54 @@ proptest! {
         prop_assert!(bounds_hold(&spans));
         // Never zero fields — even the empty line has one empty field.
         prop_assert!(!spans.is_empty());
+    }
+}
+
+proptest! {
+    /// The consolidation claim, checked on arbitrary input rather than a fixed
+    /// corpus: the shared scanner under DISPLAY agrees with `tokenize_spans`
+    /// field-for-field.
+    ///
+    /// The unit-test corpus in `scan.rs` extends itself from a bench fixture in
+    /// gitignored working space, so in CI it shrinks to a handful of
+    /// hand-written lines. This does not depend on any fixture — it is the
+    /// version of the claim that actually runs on every PR.
+    ///
+    /// Compared as resolved STRINGS, deliberately: the two disagree on offset
+    /// UNITS (the scanner is bytes, `tokenize_spans` is code points, which is
+    /// the point of the byte scan) while agreeing on the values those offsets
+    /// denote. Comparing the numbers would assert the thing we changed.
+    #[test]
+    fn scan_line_display_agrees_with_tokenize_spans(
+        line in prop::collection::vec(line_char(), 0..40).prop_map(|cs| cs.into_iter().collect::<String>()),
+    ) {
+        let mine = scan_line(&line, DISPLAY);
+        let theirs = tokenize_spans(&line);
+        let chars: Vec<char> = line.chars().collect();
+        prop_assert_eq!(mine.len(), theirs.len(), "field count on {:?}", line);
+
+        for (m, t) in mine.iter().zip(theirs.iter()) {
+            let their_value = inner(&chars, t);
+            prop_assert_eq!(
+                &line[m.value_start..m.value_end],
+                their_value.as_str(),
+                "inner value on {:?}",
+                line
+            );
+            prop_assert_eq!(
+                &line[m.token_start..m.token_end],
+                t.text.as_str(),
+                "token slice on {:?}",
+                line
+            );
+        }
+
+        // Lossless reassembly, inherited: the scanner's token ranges tile the
+        // line exactly, with no gap and no overlap.
+        let rebuilt: String = mine
+            .iter()
+            .map(|f| &line[f.token_start..f.token_end])
+            .collect();
+        prop_assert_eq!(rebuilt, line);
     }
 }
