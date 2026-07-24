@@ -101,8 +101,16 @@ pub fn index_ags4_bytes(bytes: &[u8]) -> Result<GroupIndex, CliError> {
     // Lean profile: no raw-line retention, and reject invalid UTF-8 loudly —
     // mirroring the csv reader this replaced (which also failed on non-UTF-8).
     // `lean()` never substitutes bytes, so the offsets index the original buffer.
-    let parsed =
-        parse_bytes_opts(bytes, ParseOptions::lean()).map_err(crate::ags4_codec::map_parse_err)?;
+    // Locate-only: this function reads `group_records`, `group_order` and
+    // `total_bytes`, and nothing else. Under the plain lean profile the walk
+    // still tokenised every line into owned Strings and materialised every DATA
+    // row, all of which was dropped on return — a full parse to keep ~123
+    // records. Same walk, same guards, minus the model no one here reads.
+    let opts = ParseOptions {
+        locate_only: true,
+        ..ParseOptions::lean()
+    };
+    let parsed = parse_bytes_opts(bytes, opts).map_err(crate::ags4_codec::map_parse_err)?;
     // Defence in depth: a cert whose offsets don't index the original bytes is a
     // lie. `lean()` rejects rather than substitutes, so this never fires today —
     // but it must stay true if the profile ever changes.
