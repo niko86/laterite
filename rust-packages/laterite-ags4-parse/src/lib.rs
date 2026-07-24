@@ -536,6 +536,20 @@ pub fn line_spans(bytes: &[u8]) -> LineSpans<'_> {
 /// The unified parser. Drives [`split_ags_line`] over the raw bytes,
 /// decoding each line, so every record carries its absolute source-byte
 /// offset while line/char positions are against the decoded text.
+/// Take everything after the leading tag, MOVING the values out of `fields`.
+///
+/// This used to be `fields[1..].to_vec()`, which clones every `String` the
+/// tokenizer just allocated — so each cell was heap-allocated twice, once by
+/// `split_ags_line` and once here, on every descriptor and DATA row. Nothing
+/// reads `fields` after its arm, so the tail can simply be handed over.
+fn rest(fields: &mut Vec<String>) -> Vec<String> {
+    if fields.len() > 1 {
+        fields.split_off(1)
+    } else {
+        Vec::new()
+    }
+}
+
 pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, ParseError> {
     let has_bom = bytes.starts_with(BOM); // sniff BEFORE any strip (Rule 1)
     let total_bytes = bytes.len() as u64;
@@ -595,7 +609,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "HEADING" | "UNIT" | "TYPE" | "DATA" => !opts.locate_only,
                     _ => false,
                 };
-                let fields = if needs_fields {
+                let mut fields = if needs_fields {
                     split_ags_line(&text)
                 } else {
                     Vec::new()
@@ -656,7 +670,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "HEADING" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
                             g.heading_line = Some(number);
-                            g.headings = fields[1..].to_vec();
+                            g.headings = rest(&mut fields);
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure(
                                 "HEADING row before any GROUP".into(),
@@ -666,7 +680,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "UNIT" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
                             g.unit_line = Some(number);
-                            g.units = fields[1..].to_vec();
+                            g.units = rest(&mut fields);
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure("UNIT row before any GROUP".into()));
                         }
@@ -674,7 +688,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                     "TYPE" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
                             g.type_line = Some(number);
-                            g.types = fields[1..].to_vec();
+                            g.types = rest(&mut fields);
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure("TYPE row before any GROUP".into()));
                         }
@@ -684,7 +698,7 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                             g.rows.push(DataRow {
                                 line: number,
                                 byte_offset,
-                                values: fields[1..].to_vec(),
+                                values: rest(&mut fields),
                             });
                         } else if opts.strict_structure {
                             return Err(ParseError::Structure("DATA row before any GROUP".into()));
