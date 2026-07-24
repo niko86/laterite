@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import pathlib
 import statistics
 import subprocess
 import sys
@@ -154,6 +155,28 @@ def _time(fn) -> float:
     return time.perf_counter() - t0
 
 
+def warn_if_debug_build(laterite_mod) -> None:
+    """Refuse to publish numbers measured against a debug wheel.
+
+    A debug build of the native module is roughly 5x slower across every path,
+    which looks exactly like a catastrophic regression and is not one. The tell
+    is size: the release abi3 module is a few MB, a debug one is tens.
+    """
+    native = list(pathlib.Path(laterite_mod.__file__).parent.glob("*.so"))
+    if not native:
+        return
+    mb = max(f.stat().st_size for f in native) / 1e6
+    if mb > 25:
+        die(
+            f"the installed laterite native module is {mb:.0f} MB — that is a "
+            f"DEBUG build.\n"
+            f"       Every laterite timing would be ~5x slow and would read as a "
+            f"regression that is not real.\n"
+            f"       Rebuild first:  (cd packages/laterite && uv run --no-sync "
+            f"maturin develop --release --uv)"
+        )
+
+
 def dist_version(name: str) -> str:
     try:
         return version(name)
@@ -196,6 +219,8 @@ def main() -> int:
             "       (cd packages/laterite && uv run --no-sync maturin develop "
             "--release --uv)"
         )
+
+    warn_if_debug_build(laterite)
 
     sizes = [s.strip() for s in args.rungs.split(",") if s.strip()]
     paths = {s: fixture(s) for s in sizes}
