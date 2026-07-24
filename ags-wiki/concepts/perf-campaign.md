@@ -231,7 +231,7 @@ as such, because they are counts, not timings.
 | # | candidate | band | frequency | prize (ceiling) | cost | bench | coverage gap to close with it |
 |---|---|---|---|---|---|---|---|
 | ~~1~~ | ~~parent KEY-tuple set rebuilt per child~~ | validator | per-row | **LANDED T1 — relational −13.9%** | contained | yes | cache-reuse test added |
-| 2 | `build_column`'s string arm allocates a courier `String` per cell (`lib.rs:446` → `arrow_cols.rs:281`); `parse_value` re-resolves `canonical_type` per cell (`lib.rs:442` → `:96`, `trim().to_uppercase()`) | laterite-types | per-cell | **large** — string-family AGS types are 2114/3503 = **60.3%** of spec headings; two heap allocations per live cell. **Enclosing stage is not on the baseline table** | contained | partial | no test asserts `build_column`'s decoded array *contents* for any typed arm |
+| 2 → **T3** | `build_column`'s string arm allocates a courier `String` per cell (`lib.rs:446` → `arrow_cols.rs:281`); `parse_value` re-resolves `canonical_type` per cell (`lib.rs:442` → `:96`, `trim().to_uppercase()`) | laterite-types | per-cell | **large** — string-family AGS types 60.3% of headings; typing is ~95% of the typed build, now measured at **75.9 ms** (T2). Rankable. | contained | **yes** (T2) | decoded-array-contents tests added (T2) |
 | ~~3~~ | ~~`line_format`'s three per-line `chars()` walks~~ | validator | per-line | **LANDED T1 — line_format −48.5%** | contained | yes | `char_span` test added |
 | 4 | `raw_lines` pushes one owned `String` + full copy per line on the **default** validating profile (`parse/lib.rs:721`, `text.into_owned()`) | parse leaf | per-line | **medium** — inside `parse_bytes`, 142.8 ms, the largest stage of `check_file` (328 ms) | contained | yes | `RawLine.text` is `pub` at ~4 production + ~5 test sites; the lossy-replacement branch must keep its *decoded* text |
 | 5 | `Sidecar::assemble` runs a second full walk inside `mint`, over bytes `mint` has already parsed, plus a third full-buffer hash pass | core + trust | per-file | **medium** — `index_ags4_bytes` is 56.9 ms; `mint`'s total is **unmeasured** (no `benches/` in `laterite-ags4-trust`) | contained | partial | no test mints a file whose declared encoding is not UTF-8 |
@@ -327,7 +327,18 @@ identity. Coverage: the cache-reuse and `char_span` tests below both landed.
 a two-children-of-one-parent test proving the memoised set is applied to the
 right child. Both landed.
 
-### T2 — Put the typed read on the baseline axis (bench only)
+### T2 — Put the typed read on the baseline axis (bench only) — ✅ DONE (2026-07-24)
+
+**Landed:** `types/typed_read_file/large` = **75.9 ms** (312 MiB/s) — the typed
+build over the whole fixture's real cells, now on the baseline table. The
+mixed-group bench prices the typing directly: typed **19.4 ms** vs raw-string
+compat **0.88 ms** (~22×), so ~95% of the typed build is casting and the String
+arm (60.3% of headings) is its bulk. All five `build_column` arms are now benched
+(`0DP`/`YN` added), plus a `null-half` rung and the three sibling builders
+(`compat`, `with-ids`, `ipc`). Coverage: two value-correctness tests now assert
+`build_column`'s decoded array *contents* per arm and its typed-null handling.
+The typed-read stage is measured, so **candidate #2 is now rankable** and moves
+to T3 with a real ceiling (a fraction of 75.9 ms) rather than a heading census.
 
 The largest hole in the campaign: the baseline table prices `parse_bytes` →
 `read_ags4_bytes` → `check_parsed` → `emit`, all in pure Rust strings. The
