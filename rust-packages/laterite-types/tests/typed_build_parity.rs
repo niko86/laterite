@@ -132,7 +132,10 @@ fn assert_column_parity(label: &str, ags_type: &str, raws: &[Option<&str>]) {
     let rw = render(&want);
     let show = |o: &Option<String>| o.clone().unwrap_or_else(|| "<null>".to_string());
     let mism: Vec<_> = (0..n).filter(|&r| rg[r] != rw[r]).collect();
-    eprintln!("\n=== {label} ({ags_type}) — {} divergent cell(s) ===", mism.len());
+    eprintln!(
+        "\n=== {label} ({ags_type}) — {} divergent cell(s) ===",
+        mism.len()
+    );
     eprintln!("{:<28} {:>18} {:>18}", "raw", "parse_value", "build_column");
     for r in &mism {
         eprintln!(
@@ -142,7 +145,10 @@ fn assert_column_parity(label: &str, ags_type: &str, raws: &[Option<&str>]) {
             show(&rg[*r])
         );
     }
-    panic!("{label}: build_column diverges from parse_value ({} cell(s))", mism.len());
+    panic!(
+        "{label}: build_column diverges from parse_value ({} cell(s))",
+        mism.len()
+    );
 }
 
 #[test]
@@ -150,19 +156,19 @@ fn integer_0dp_matches_parse_value() {
     let raws = [
         Some("5"),
         Some("5.0"),
-        Some("5.7"),                    // truncate toward zero → 5
-        Some("-5.7"),                   // → -5
-        Some("12.999"),                 // → 12
+        Some("5.7"),    // truncate toward zero → 5
+        Some("-5.7"),   // → -5
+        Some("12.999"), // → 12
         Some("0"),
         Some("-0.0"),
-        Some("1E-30"),                  // → 0
-        Some(" 42 "),                   // trimmed
-        Some("1e30"),                   // > 2^63 → null
-        Some("99999999999999999999"),   // 1e20, > 2^63 → null
-        Some("1e400"),                  // inf → null
-        Some("-1e400"),                 // -inf → null
-        Some("9007199254740993"),       // 2^53+1: f64-lossy in BOTH (parse_ags_integer uses f64)
-        Some("9223372036854775807"),    // i64::MAX: f64 rounds to 2^63 → range guard nulls
+        Some("1E-30"),                // → 0
+        Some(" 42 "),                 // trimmed
+        Some("1e30"),                 // > 2^63 → null
+        Some("99999999999999999999"), // 1e20, > 2^63 → null
+        Some("1e400"),                // inf → null
+        Some("-1e400"),               // -inf → null
+        Some("9007199254740993"),     // 2^53+1: f64-lossy in BOTH (parse_ags_integer uses f64)
+        Some("9223372036854775807"),  // i64::MAX: f64 rounds to 2^63 → range guard nulls
         Some("abc"),
         Some(""),
         Some("   "),
@@ -182,12 +188,12 @@ fn decimal_matches_parse_value() {
         Some("1E-30"),
         Some("1e30"),
         Some(" 3.14 "),
-        Some("inf"),        // non-finite → null (Arrow admits it; the finite pass nulls it)
+        Some("inf"), // non-finite → null (Arrow admits it; the finite pass nulls it)
         Some("-inf"),
         Some("Infinity"),
         Some("nan"),
         Some("NaN"),
-        Some("1e400"),      // overflow → inf → null
+        Some("1e400"), // overflow → inf → null
         Some("abc"),
         Some(""),
         Some("   "),
@@ -209,7 +215,14 @@ fn string_bool_datetime_match_parse_value() {
     assert_column_parity(
         "bool",
         "YN",
-        &[Some("Y"), Some("n"), Some("YES"), Some("maybe"), Some(""), None],
+        &[
+            Some("Y"),
+            Some("n"),
+            Some("YES"),
+            Some("maybe"),
+            Some(""),
+            None,
+        ],
     );
     assert_column_parity(
         "datetime",
@@ -225,8 +238,7 @@ fn string_bool_datetime_match_parse_value() {
 }
 
 fn fixture() -> Option<PathBuf> {
-    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../output/bench-fixtures/large.ags");
+    let p = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../output/bench-fixtures/large.ags");
     p.exists().then_some(p)
 }
 
@@ -244,7 +256,9 @@ fn fixture_every_column_matches_parse_value() {
     let mut diverging: Vec<(String, String, usize)> = Vec::new();
 
     for code in &pf.group_order {
-        let Some(grp) = pf.groups.get(code) else { continue };
+        let Some(grp) = pf.groups.get(code) else {
+            continue;
+        };
         let n = grp.rows.len();
         for (col, heading) in grp.headings.iter().enumerate() {
             let ags_type = grp.types.get(col).map_or("X", String::as_str);
@@ -256,7 +270,11 @@ fn fixture_every_column_matches_parse_value() {
             if dt_got != dt_want || !arrays_equal(&got, &want) {
                 let rg = render(&got);
                 let rw = render(&want);
-                diverging.push((code.clone(), heading.clone(), (0..n).filter(|&i| rg[i] != rw[i]).count()));
+                diverging.push((
+                    code.clone(),
+                    heading.clone(),
+                    (0..n).filter(|&i| rg[i] != rw[i]).count(),
+                ));
             }
         }
     }
@@ -273,5 +291,9 @@ fn fixture_every_column_matches_parse_value() {
             eprintln!("    {g}.{h}: {m} cell(s)");
         }
     }
-    assert!(diverging.is_empty(), "{} columns diverge from parse_value", diverging.len());
+    assert!(
+        diverging.is_empty(),
+        "{} columns diverge from parse_value",
+        diverging.len()
+    );
 }

@@ -15,8 +15,7 @@
 use std::sync::Arc;
 
 use arrow::array::{
-    ArrayRef, BooleanBuilder, Float64Array, StringArray, StringBuilder,
-    TimestampMicrosecondBuilder,
+    ArrayRef, BooleanBuilder, Float64Array, StringArray, StringBuilder, TimestampMicrosecondBuilder,
 };
 use arrow::compute::cast;
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
@@ -308,7 +307,10 @@ where
         // arise from real AGS4 codes (only DT → Datetime), so they fall here
         // → Utf8, defensively. `parse_value`'s String arm was just trim +
         // empty→null, which `build_utf8` does directly (no dispatch).
-        _ => (Arc::new(build_utf8(n_rows, cell)) as ArrayRef, DataType::Utf8),
+        _ => (
+            Arc::new(build_utf8(n_rows, cell)) as ArrayRef,
+            DataType::Utf8,
+        ),
     }
 }
 
