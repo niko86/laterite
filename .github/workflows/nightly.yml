@@ -346,13 +346,46 @@ jobs:
           fi
           echo "main-protection ruleset matches the committed snapshot."
 
+  # Whole-vault wiki lint — the ENFORCING half of the wiki controls. wiki-lint.yml
+  # runs the same checks per-PR, but diff-scoped (`--since`) and deliberately not
+  # required: the wiki is the maintainer's to keep aligned, and a contributor
+  # shouldn't have a PR blocked because a page they never touched cites a file that
+  # moved. So the per-PR run is fast feedback, and THIS run — no `--since`, the full
+  # vault, every hard check — is what actually has to stay green. A failure here
+  # opens the nightly tracking issue like any other.
+  #
+  # Stdlib-only (`uv run --no-project`): no wheel, no Rust, ~10s. GitHub-hosted so
+  # it doesn't take a pool lane.
+  wiki-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+      - name: wiki-lint (whole vault, no ratchet)
+        run: uv run --no-project python ags-wiki/.bootstrap/lint.py
+      # The faithfulness gates. Without these a generator can silently stop
+      # generating while its page freezes at whatever it last said — there is no
+      # root `tests/` in this repo to catch it.
+      - name: reindex --check (index.md == render(the vault))
+        run: uv run --no-project python ags-wiki/.bootstrap/reindex.py --check
+      - name: gen_wiki_cli --check (verb table == README-cli.md)
+        run: uv run --no-project python tools/gen_wiki_cli.py --check
+      - name: gen_reference_groups --check (group tier == ags_dictionary.json)
+        run: uv run --no-project python tools/gen_reference_groups.py --check
+      - name: gen_crate_graph --check (graph == Cargo manifests)
+        run: uv run --no-project python tools/gen_crate_graph.py --check
+
   # Open or update ONE tracking issue when the nightly fails, so a bad night is
   # actionable without watching the Actions tab. GitHub also emails the owner on a
   # scheduled-workflow failure, so this is the durable, dedup'd record — and it
   # no-ops gracefully if the runner has no `gh` (the email still fires).
   notify:
-    needs: [coverage, deny, links, wheel-smoke, ruleset-drift, output-values]
-    if: ${{ always() && (needs.coverage.result == 'failure' || needs.deny.result == 'failure' || needs.links.result == 'failure' || needs.wheel-smoke.result == 'failure' || needs.ruleset-drift.result == 'failure' || needs.output-values.result == 'failure') }}
+    needs: [coverage, deny, links, wheel-smoke, ruleset-drift, output-values, wiki-lint]
+    if: ${{ always() && (needs.coverage.result == 'failure' || needs.deny.result == 'failure' || needs.links.result == 'failure' || needs.wheel-smoke.result == 'failure' || needs.ruleset-drift.result == 'failure' || needs.output-values.result == 'failure' || needs.wiki-lint.result == 'failure') }}
     # GitHub-hosted so `gh` is guaranteed present (the pool image may lack it) —
     # the whole point of this job is to reliably open the tracking issue.
     runs-on: ubuntu-latest
@@ -370,6 +403,7 @@ jobs:
           WHEEL: ${{ needs.wheel-smoke.result }}
           RULESET: ${{ needs.ruleset-drift.result }}
           XCHECK: ${{ needs.output-values.result }}
+          WIKI: ${{ needs.wiki-lint.result }}
         run: |
           set -euo pipefail
           command -v gh >/dev/null 2>&1 || {
@@ -380,7 +414,7 @@ jobs:
           num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
             --search "in:title \"$title\"" --json number,title \
             --jq "[.[] | select(.title==\"$title\")][0].number // empty")
-          body="The nightly run failed: $RUN_URL (coverage=$COV, deny=$DENY, links=$LINKS, wheel=$WHEEL, ruleset=$RULESET, xcheck=$XCHECK)."
+          body="The nightly run failed: $RUN_URL (coverage=$COV, deny=$DENY, links=$LINKS, wheel=$WHEEL, ruleset=$RULESET, xcheck=$XCHECK, wiki=$WIKI)."
           if [ -n "$num" ]; then
             gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
           else

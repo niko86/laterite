@@ -4,15 +4,16 @@
 # added or modified (see the script's own module docstring for the diff-scoped
 # mechanics).
 #
-# NOT yet a required check here. This workflow (and the `.bootstrap/` lint it
-# runs) predates the wiki going public: the content came across, the control
-# layer didn't, so `ags-wiki/` sat ungated on this repo. It is restored as an
-# ordinary check first; promoting it to required is a separate, deliberate step
-# — add the context to ruleset 19425032 and regenerate the snapshot at
-# `.github/rulesets/main-protection.expected.json`.
+# ADVISORY on PRs, by design — this is NOT a required check and is not intended
+# to become one. Enforcement lives in the nightly (`nightly.yml`'s `wiki-lint`
+# job: same checks, whole vault, no ratchet, failure opens the tracking issue).
+# The split is deliberate: keeping the wiki aligned is the maintainer's job, and
+# a contributor should not have a PR blocked because a page they never touched
+# cites a file that moved. So this run is fast feedback on rot a PR itself
+# introduces; the nightly is what actually has to stay green.
 #
-# There is deliberately NO trigger-level `paths:` filter, and that stays true
-# whether or not it is required:
+# There is deliberately NO trigger-level `paths:` filter. It would be actively
+# dangerous if this ever were made required, and it buys nothing either way:
 #
 #   A required check behind a workflow-level `paths:` filter is unsatisfiable.
 #   When a PR touches nothing the filter matches, the workflow never fires, so
@@ -55,14 +56,13 @@ permissions:
 
 jobs:
   wiki-lint:
-    # ⚠️ TREAT AS A FROZEN STRING. A job `name:` is the status-check *context*
-    # a ruleset matches by exact text — nothing links the two. This job is not
-    # in ruleset 19425032 yet, so a rename is currently harmless; the moment it
-    # is added, renaming leaves the rule waiting on a context that no longer
-    # exists, the check never reports, the PR is unmergeable, and the only exit
-    # is the admin bypass — the same failure the `on:` block above documents,
-    # reached from the other side. Change it only alongside the ruleset (and
-    # the snapshot at `.github/rulesets/main-protection.expected.json`).
+    # Free to rename WHILE this stays advisory. A job `name:` is the
+    # status-check *context* a ruleset matches by exact text, with nothing
+    # linking the two — so if this job is ever added to ruleset 19425032, a
+    # later rename leaves the rule waiting on a context that no longer exists:
+    # the check never reports, the PR is unmergeable, and the only exit is the
+    # admin bypass. Enforcement is deliberately in the nightly instead, so that
+    # trap is avoided rather than managed.
     name: wiki-lint --since (ratchet)
     runs-on: ubuntu-latest
     timeout-minutes: 5
