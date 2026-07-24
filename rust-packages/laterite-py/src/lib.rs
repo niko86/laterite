@@ -1484,7 +1484,7 @@ fn read_groups_raw(py: Python<'_>, path: String) -> PyResult<Bound<'_, PyDict>> 
                 let cells: Vec<&str> = g
                     .headings
                     .iter()
-                    .map(|h| row.get(h).map_or("", String::as_str))
+                    .map(|h| row.get(h.as_str()).map_or("", String::as_str))
                     .collect();
                 rows.append(PyList::new(py, &cells)?)?;
             }
