@@ -103,6 +103,38 @@ are unchanged (they show/reject the gaps). Mirrors the existing forge synthesize
 (`repo:rust-packages/laterite-ags4-forge/src/synth/model.rs` `collect_unit`/`collect_type`/`tran`)
 — a parallel flagged for convergence in [[reliquary]].
 
+## Update (2026-07-24): metadata synthesis becomes OPT-IN — owner decision, PENDING
+
+**Reverses the "on by default" half of the 2026-06-25 update above.** The synthesis
+*behaviour* is unchanged and stays available; what changes is that the caller must
+ask for it.
+
+**Reason — no unexpected magic.** A caller who hands `emit_ags4` their data should
+get *their* data back as AGS4, not silently acquire TRAN/UNIT/TYPE/ABBR groups they
+never supplied. Minting a placeholder `TRAN` with `"TBC"` fields is a meaningful act
+performed on someone's behalf; the owner's position is that the user decides and
+opts in. That argument stands on agency, not cost.
+
+**Not a performance change.** The staged emit bench prices synthesis at ~0.13 ms of
+45.5 ms — **0.3%** (see [[core-perf-baseline]]). The 48% `AutoFix` premium is
+validate-and-fix, i.e. the original 2026-06-12 default. Perf neither motivates nor
+argues against this; it only means the change is free either way.
+
+**Consequence, accepted:** a data-only build (notably a typed PROJ graph) no longer
+yields a valid file in one call by default — Rule 14/15/17 findings return unless
+the caller opts in. The one-call-valid path remains, one argument away.
+
+**Shape:** `EmitOpts::synthesize_metadata` (added 2026-07-24 to make the stage
+measurable; default still `true` at time of writing). The flip to `false` also
+requires the four surfaces to EXPOSE the option — PyO3 `emit_ags4_from_arrow`, the
+Node and wasm emit entry points, and the `build_ags4` wrappers — because a surface
+that silently opts in on the user's behalf is the same magic one layer down. It
+will also change emitted bytes on all four legs and so trips the `xcheck`
+output-value gate by design.
+
+**Status: decided, not yet implemented.** Landing before 0.8.0 so the default does
+not move after a release.
+
 ## Update (2026-06-25): the typed-graph door emits only the headings you set
 
 The typed-graph walk used to emit *every declared heading* of each class (null →

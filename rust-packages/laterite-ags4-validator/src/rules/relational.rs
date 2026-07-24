@@ -185,17 +185,26 @@ fn col(g: &ParsedGroup, name: &str) -> Option<usize> {
     g.headings.iter().position(|h| h == name)
 }
 
-/// The values of `g`'s row at the named columns, in `names` order
-/// (missing column → empty string, so tuples stay positional).
-fn tuple(g: &ParsedGroup, names: &[String], row: &crate::parse::DataRow) -> Vec<String> {
-    names
-        .iter()
-        .map(|n| {
-            col(g, n)
-                .and_then(|i| row.values.get(i))
-                .cloned()
-                .unwrap_or_default()
-        })
+/// Column indices of `names`, resolved ONCE for a group.
+///
+/// The indices do not vary by row, but the per-row form of this
+/// (`col()` inside `tuple()`) re-derived them for every row — and `col` is a
+/// linear scan of the heading list, so a group of R rows with K keys and H
+/// headings paid R*K*H string comparisons to answer the same K questions.
+/// Hoisting it makes that R*K pointer reads. See [[core-perf-baseline]].
+fn cols(g: &ParsedGroup, names: &[String]) -> Vec<Option<usize>> {
+    names.iter().map(|n| col(g, n)).collect()
+}
+
+/// The row's values at `idx`, in `idx` order, BORROWED from the row.
+///
+/// Same contract as the earlier owned version — a missing column or a ragged
+/// row yields `""` so tuples stay positional — but it no longer clones every
+/// cell. These tuples exist only to be hashed and compared; the rows already
+/// own the text, so the clone bought nothing.
+fn tuple_at<'a>(idx: &[Option<usize>], row: &'a crate::parse::DataRow) -> Vec<&'a str> {
+    idx.iter()
+        .map(|i| i.and_then(|i| row.values.get(i)).map_or("", String::as_str))
         .collect()
 }
 
@@ -234,12 +243,13 @@ fn rule_10a(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut Fi
         return; // can't trust the combination check without all keys
     }
 
-    let mut counts: HashMap<Vec<String>, usize> = HashMap::new();
+    let idx = cols(g, &keys);
+    let mut counts: HashMap<Vec<&str>, usize> = HashMap::new();
     for row in &g.rows {
-        *counts.entry(tuple(g, &keys, row)).or_default() += 1;
+        *counts.entry(tuple_at(&idx, row)).or_default() += 1;
     }
     for (ri, row) in g.rows.iter().enumerate() {
-        let t = tuple(g, &keys, row);
+        let t = tuple_at(&idx, row);
         if counts.get(&t).copied().unwrap_or(0) > 1 {
             add_at(
                 found,
@@ -429,10 +439,12 @@ fn rule_10c(
         return;
     }
 
-    let parent_tuples: HashSet<Vec<String>> =
-        pg.rows.iter().map(|r| tuple(pg, &pkeys, r)).collect();
+    // Both index sets resolved once, outside their loops (see `cols`).
+    let pidx = cols(pg, &pkeys);
+    let cidx = cols(g, &pkeys);
+    let parent_tuples: HashSet<Vec<&str>> = pg.rows.iter().map(|r| tuple_at(&pidx, r)).collect();
     for (ri, row) in g.rows.iter().enumerate() {
-        let t = tuple(g, &pkeys, row);
+        let t = tuple_at(&cidx, row);
         // O-39: skip child rows whose parent KEY cells are ALL empty
         // — those are "standalone" rows by the file's own design
         // (e.g. lab-control SAMP with no LOCA borehole, off-site
