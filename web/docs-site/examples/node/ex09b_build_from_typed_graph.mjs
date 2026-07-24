@@ -13,14 +13,24 @@ new PROJ({
   locas: [new LOCA({ LOCA_ID: "BH02", LOCA_GL: 13.75 })],
 }); // … or the ctor field
 
-// buildAgs4 walks the graph depth-first (#214), emits only the headings you set,
-// and autofix synthesizes the metadata catalogs — a sparse graph builds valid in one call.
+// buildAgs4 walks the graph depth-first (#214) and emits only the headings you
+// set — so a sparse graph stays sparse.
 const res = buildAgs4(p);
 const groups = read(res.bytes).groups;
 console.log("groups:", groups);
 console.log("findings:", res.findings.length);
 
+// The root-metadata groups (TRAN/UNIT/TYPE/ABBR/DICT) have no parent, so they
+// are not part of a PROJ-rooted graph. They are reported, not invented:
+assert.deepEqual(groups, ["PROJ", "LOCA"]);
+assert.ok(res.findings.length > 0);
+
+// `synthesiseMetadata` derives the ones that CAN be derived. PROJ and DICT are
+// never invented: a project identity and a schema extension are yours to state,
+// and a guessed DICT parent would quietly mislead the relational checks.
+const full = buildAgs4(p, { synthesiseMetadata: true });
+const fullGroups = read(full.bytes).groups;
 assert.ok(
-  ["PROJ", "LOCA", "TRAN", "UNIT", "TYPE"].every((c) => groups.includes(c)),
+  ["PROJ", "LOCA", "TRAN", "UNIT", "TYPE"].every((c) => fullGroups.includes(c)),
 );
-assert.equal(res.findings.length, 0); // a valid file, no caveats
+assert.equal(full.findings.length, 0); // valid in one call, because you asked

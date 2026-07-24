@@ -205,14 +205,11 @@ describe("buildAgs4 → data → AGS4", () => {
     expect(res.text).toMatch(/"DATA","BH01","12\.30"/); // Float64 12.3 → canonical 2DP
     expect(Array.isArray(res.findings)).toBe(true);
 
-    // The emitted bytes re-parse to the data groups + the autofix-synthesized
-    // metadata catalogs (UNIT/TYPE/TRAN).
+    // Exactly the data groups come back — metadata synthesis is opt-in, so
+    // nothing appears that the caller did not supply.
     expect(read(undefined, { text: res.text }).groups).toEqual([
       "PROJ",
       "LOCA",
-      "TRAN",
-      "UNIT",
-      "TYPE",
     ]);
   });
 

@@ -179,7 +179,7 @@ export declare function editions(): Array<string>
  * Build valid AGS4 from per-group **Arrow IPC** streams (the columnar
  * producer; the read boundary reversed). = `laterite-ags4-wasm`'s `to_ags4_ipc`.
  */
-export declare function emitAgs4FromIpc(groups: Array<GroupIpc>, edition?: string | undefined | null, mode?: string | undefined | null, units?: Record<string, Record<string, string>> | undefined | null, types?: Record<string, Record<string, string>> | undefined | null): EmitResult
+export declare function emitAgs4FromIpc(groups: Array<GroupIpc>, edition?: string | undefined | null, mode?: string | undefined | null, units?: Record<string, Record<string, string>> | undefined | null, types?: Record<string, Record<string, string>> | undefined | null, synthesiseMetadata?: boolean | undefined | null): EmitResult
 
 /**
  * The emit result. `bytes` is the AGS4 document; `findingsJson` is the
