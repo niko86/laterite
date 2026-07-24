@@ -153,6 +153,7 @@ flowchart TD
   laterite_py --> laterite_types
   laterite_ags4_validator -.dev.-> laterite_ags4_core
   laterite_excel -.dev.-> laterite_types
+  laterite_types -.dev.-> laterite_ags4_parse
 ```
 
 ## Crates by layer
