@@ -51,7 +51,7 @@ on any machine and in CI, carrying no real delivery data.
 | `parse_bytes` | 165 ms | 144 MiB/s |
 | `index_ags4_bytes` | 165 ms | 144 MiB/s |
 | `read_ags4_bytes` | 276 ms | 86 MiB/s |
-| `typed_read_file` (build_record_batch, T2) | **75.9 ms** | 312 MiB/s |
+| `typed_read_file` (build_record_batch, T3) | **19.9 ms** | 1.16 GiB/s |
 | `check_parsed` (rules only) | 343 ms | 69 MiB/s |
 | `check_file` (I/O + parse + rules) | 516 ms | 46 MiB/s |
 
@@ -64,7 +64,14 @@ on any machine and in CI, carrying no real delivery data.
 > here. The mixed-group micro-bench prices the typing itself — typed **19.4 ms**
 > vs the raw-string compat shape **0.88 ms**, so ~95% of the typed build is the
 > casting, and the String arm (60% of headings) is the bulk of it. That is what
-> makes candidate #2 rankable (see [[perf-campaign]]).
+> made candidate #2 rankable (see [[perf-campaign]]).
+>
+> **T3 landed the cast** (2026-07-25): `build_column` now builds each column as
+> `Utf8` and casts the numeric columns in bulk through Arrow's kernels instead of
+> per-cell `parse_value` — **75.9 ms → 19.9 ms (−73.7%)**, 312 MiB/s → 1.16 GiB/s.
+> Bool (`YN`) / Datetime (`DT`) keep their custom arms. Byte-parity with the
+> per-cell build is pinned cell-for-cell over the fixture in
+> `laterite-types/tests/typed_build_parity.rs`.
 
 `check_file` ≈ `parse_bytes` + `check_parsed` (508 ms), so I/O plus dictionary
 resolution is only ~8 ms and the split is self-consistent. That arithmetic is the
