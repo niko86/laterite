@@ -73,6 +73,26 @@ jobs:
       # Split collect + report so the same profdata feeds BOTH the floor gate and
       # the lcov upload. --no-report runs the instrumented tests; the two `report`
       # calls reuse the merged profdata.
+      #
+      # What this measures is the SHIPPED ENGINE, and the exclude set is what makes
+      # that true. Two categories come out, for two different reasons:
+      #
+      #   1. Binding cdylibs (wasm, tokenizer-wasm, laterite-py, laterite-node) —
+      #      exercised by the Python / Node / browser suites, never by `cargo test`.
+      #      Measuring them here would report ~0% for code that IS tested.
+      #   2. Dev-only QA tooling (xcheck, parity, forge, corpus-qa, perf,
+      #      compliance) — harnesses and CLIs that are never shipped to a user.
+      #
+      # Category 2 is not cosmetic. When parity/forge/corpus-qa/perf/compliance
+      # landed on public (#57, #60) they added ~7.3k lines at 43-73% covered, and
+      # the workspace total fell 89.6% -> 79.2% overnight with no change to the
+      # engine's own coverage — the 2026-07-24 nightly failure (#73). A floor is
+      # only meaningful over a fixed denominator; letting dev tooling into it turns
+      # "did the engine regress?" into "how much untested tooling did we add?".
+      #
+      # These crates are still TESTED — ci.yml's `test` job runs the workspace
+      # without these excludes on every PR. They are excluded from the MEASUREMENT,
+      # not from the test authority.
       - name: cargo llvm-cov (collect)
         working-directory: rust-packages
         run: |
@@ -81,13 +101,20 @@ jobs:
             --exclude laterite-ags4-tokenizer-wasm \
             --exclude laterite-py \
             --exclude laterite-node \
-            --exclude laterite-ags4-xcheck
+            --exclude laterite-ags4-xcheck \
+            --exclude laterite-ags4-parity \
+            --exclude laterite-ags4-forge \
+            --exclude laterite-ags4-corpus-qa \
+            --exclude laterite-ags4-perf \
+            --exclude laterite-ags4-compliance
 
       - name: cargo llvm-cov (line-coverage floor)
         working-directory: rust-packages
-        # Floor sits just under the real number (90% as of 2026-07, so 88 leaves
-        # a small buffer for normal fluctuation) and is RATCHETED UP as coverage
-        # climbs. The old 62 was 28 points below actual — it caught nothing.
+        # Floor sits just under the real number (89.6% measured 2026-07-24 over the
+        # exclude set above, so 88 leaves a small buffer for normal fluctuation) and
+        # is RATCHETED UP as coverage climbs. The old 62 was 28 points below actual
+        # — it caught nothing. Ratchet the floor and the exclude set TOGETHER: a
+        # number this tight is only comparable run-to-run while the denominator is.
         run: cargo llvm-cov report --summary-only --fail-under-lines 88
 
       # Codecov `rust` flag — public repo only (where the badge lives + the token
