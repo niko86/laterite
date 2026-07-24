@@ -18,9 +18,11 @@ sources: []
 
 ## Definition
 
-> [!note] This page records the **findings**. The work-list that produced them —
-> what is measured, priced, declined or still a guess — is [[perf-campaign]].
-> Start there when picking up the next candidate.
+> [!note] This page records the **findings**. The strategy that produced them —
+> how a candidate is ranked, the ranked queue and tranches, and the **stopping
+> rule** that says when a band is finished — is [[perf-campaign]]. Start there
+> when picking up the next candidate; the thresholds there are anchored to the
+> numbers on this page.
 
 The measured cost of the **core** AGS4 data path — parse, validate, type, emit —
 attributed stage by stage, and the two hotspots that attribution exposed. This is
