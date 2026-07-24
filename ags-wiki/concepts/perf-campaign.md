@@ -231,7 +231,7 @@ as such, because they are counts, not timings.
 | # | candidate | band | frequency | prize (ceiling) | cost | bench | coverage gap to close with it |
 |---|---|---|---|---|---|---|---|
 | ~~1~~ | ~~parent KEY-tuple set rebuilt per child~~ | validator | per-row | **LANDED T1 — relational −13.9%** | contained | yes | cache-reuse test added |
-| ~~2~~ | ~~`build_column` casts per cell via `parse_value` (courier `String`, `canonical_type` re-resolved per cell)~~ | laterite-types | per-cell | **LANDED T3 — typed_read_file −73.7% (75.9→19.9 ms)** via bulk Arrow cast | contained | yes | `typed_build_parity.rs` pins `build_column` ≡ `parse_value` |
+| ~~2~~ | ~~`build_column` casts per cell via `parse_value` (courier `String`, `canonical_type` re-resolved per cell)~~ | laterite-types | per-cell | **LANDED T3 — typed_read_file −78% (75.9→16.7 ms)** via direct per-cell parse (no arrow-cast) | contained | yes | `typed_build_parity.rs` pins `build_column` ≡ `parse_value` |
 | ~~3~~ | ~~`line_format`'s three per-line `chars()` walks~~ | validator | per-line | **LANDED T1 — line_format −48.5%** | contained | yes | `char_span` test added |
 | 4 | `raw_lines` pushes one owned `String` + full copy per line on the **default** validating profile (`parse/lib.rs:721`, `text.into_owned()`) | parse leaf | per-line | **medium** — inside `parse_bytes`, 142.8 ms, the largest stage of `check_file` (328 ms) | contained | yes | `RawLine.text` is `pub` at ~4 production + ~5 test sites; the lossy-replacement branch must keep its *decoded* text |
 | 5 | `Sidecar::assemble` runs a second full walk inside `mint`, over bytes `mint` has already parsed, plus a third full-buffer hash pass | core + trust | per-file | **medium** — `index_ags4_bytes` is 56.9 ms; `mint`'s total is **unmeasured** (no `benches/` in `laterite-ags4-trust`) | contained | partial | no test mints a file whose declared encoding is not UTF-8 |
@@ -363,29 +363,36 @@ cannot be reasoned about while the layer above it is unmeasured.
 **Exit:** a typed-read row exists on the baseline table, and #2 is rankable
 against a measured stage rather than a heading census.
 
-### T3 — The typed read's per-cell casting — ✅ DONE (2026-07-25)
+### T3 — The typed read's per-cell overhead — ✅ DONE (2026-07-25)
 
-**Landed:** `types/typed_read_file/large` **75.9 ms → 19.9 ms (−73.7%)**, 312 MiB/s
-→ 1.16 GiB/s — a **~3.8×** speedup on the exact `build_record_batch` every typed
+**Landed:** `types/typed_read_file/large` **75.9 ms → 16.7 ms (−78%)**, 312 MiB/s
+→ 1.39 GiB/s — a **~4.5×** speedup on the exact `build_record_batch` every typed
 surface pays. Well past the 5% candidate floor and the 10% tranche floor.
 
-**What changed (the owner's redesign, not the incremental plan).** The original
-candidate #2 was "bypass `parse_value` in `build_column`'s string arm". The owner
-proposed going further: **build every column as `Utf8`, then cast the numeric
-columns in bulk through Arrow's `compute::cast` kernels** instead of casting
-per cell. A measured spike (branch `spike/t3-arrow-cast`) proved it out, so it
-**replaced** the incremental edit.
+**What changed.** `build_column` matched `canonical_type` once per column, then
+called `parse_value` per cell — which re-resolved `canonical_type`
+(`trim().to_uppercase()` + table lookups) *again* for every cell and boxed the
+result through a `serde_json::Value`. The fix parses each borrowed cell straight
+into its typed Arrow builder, dropping both the redundant resolution and the
+boxing:
 
-- **String / Enum / unknown (~60% of headings):** built `Utf8` directly (trim +
-  empty→null), skipping the per-cell `canonical_type` dispatch entirely.
-- **Integer (`0DP`):** `Utf8 → Float64 → Int64`. The double cast reproduces
-  `parse_ags_integer`'s `int(float(s))` exactly — truncation toward zero and the
-  #611 i64 range guard fall out for free.
-- **Decimal (`nDP`/`nSF`/`nSCI`):** `Utf8 → Float64` + a bulk finite-null pass
-  (Arrow's string→float admits inf/NaN; `parse_ags_decimal` nulls non-finite).
-- **Bool (`YN`) / Datetime (`DT`):** unchanged custom arms — Arrow's generic cast
-  can't reproduce the Y/N/YES token set or the six AGS date formats. On the
-  fixture these are ~0.1% of cells, so leaving them per-cell costs nothing.
+- **String / Enum / unknown (~60% of headings):** build `Utf8` directly (trim +
+  empty→null) — no dispatch, no `Value`. This is the bulk of the win.
+- **Integer (`0DP`):** `parse_ags_integer` (== `int(float(s))`, range-guarded)
+  straight into an `Int64Builder`.
+- **Decimal (`nDP`/`nSF`/`nSCI`):** `parse_ags_decimal` (finite `f64` only)
+  straight into a `Float64Builder`.
+- **Bool (`YN`) / Datetime (`DT`):** unchanged custom arms.
+
+**Not via Arrow's cast kernel.** The owner first proposed building `Utf8` then
+bulk-casting the numerics through `arrow::compute::cast`. A spike (branch
+`spike/t3-arrow-cast`) proved that works and is parity-clean, but a **paired
+bench showed the direct parse is ~16% faster still** (the cast builds an
+intermediate `Utf8` column + a second pass, and needs a finite-null reconcile
+because Arrow's string→float admits inf/NaN) **and** referencing `cast` links the
+arrow-cast kernels into the wasm bundle, a **+3.5 MB (~50%)** bloat that broke the
+PWA precache limit (`e2e`). The direct parse needs neither — same speedup axis,
+zero wasm cost — so it replaced the cast approach.
 
 **Parity is the gate, and it holds.** `build_column` is byte-parity with the
 per-cell `parse_value` build — Arrow-representation identical (`ArrayData` logical
@@ -397,13 +404,9 @@ confirmed it end-to-end: every group's polars DataFrame (schema + dtypes + value
 
 **Surfaces inherit it free:** all typed surfaces funnel through `build_column`
 (py→polars via `build_record_batch_synth`, node→arrow-js and wasm→duckdb via IPC),
-so no API/feature change; `arrow-cast` is already non-optional under the `arrow`
-feature. The compat/pandas builder (`build_record_batch_compat`) is a separate
-all-`Utf8` path and is untouched, so python-ags4 parity is unaffected.
-
-**Follow-up left on the table:** the Decimal finite-null pass is an `iter/collect`
-scan; an Arrow `is_finite`-mask kernel could shave it further, but the win already
-clears every floor, so it is not pursued now.
+so no API/feature change. The compat/pandas builder (`build_record_batch_compat`)
+is a separate all-`Utf8` path and is untouched, so python-ags4 parity is
+unaffected.
 
 ### T4 — The parse leaf and the redundant certify walk
 

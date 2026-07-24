@@ -1,13 +1,12 @@
 //! Permanent guard that `build_column` stays byte-faithful to `parse_value`.
 //!
-//! `build_column` types Integer/Decimal/String by casting a whole `Utf8` column
-//! in bulk through Arrow's kernels (T3), which is ~4× faster than the per-cell
-//! `parse_value` it replaced. This test pins the two to the same output: side A
-//! is the production `build_column`; side B (`reference_column`) is the exact
-//! per-cell parse the arms used *before* T3. They must be Arrow-representation
-//! identical — same `DataType`, null bitmap, and non-null values (`ArrayData`
-//! logical equality, which is what the C-data interface and IPC carry to polars
-//! / duckdb / arrow-js).
+//! `build_column` (T3) parses each cell straight into its typed Arrow builder,
+//! bypassing the per-cell `parse_value` it replaced — ~4.5× faster. This test
+//! pins the two to the same output: side A is the production `build_column`;
+//! side B (`reference_column`) is the exact per-cell parse the arms used *before*
+//! T3. They must be Arrow-representation identical — same `DataType`, null
+//! bitmap, and non-null values (`ArrayData` logical equality, which is what the
+//! C-data interface and IPC carry to polars / duckdb / arrow-js).
 //!
 //! Coverage: crafted edge cases at the exact seams where a generic cast could
 //! diverge (truncation direction, the i64 range guard, inf/NaN, f64-precision

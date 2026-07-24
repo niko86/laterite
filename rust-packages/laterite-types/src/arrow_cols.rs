@@ -15,15 +15,18 @@
 use std::sync::Arc;
 
 use arrow::array::{
-    ArrayRef, BooleanBuilder, Float64Array, StringArray, StringBuilder, TimestampMicrosecondBuilder,
+    ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, StringArray, StringBuilder,
+    TimestampMicrosecondBuilder,
 };
-use arrow::compute::cast;
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use serde_json::Value;
 
-use crate::{CanonicalType, canonical_type, parse_datetime, parse_value};
+use crate::{
+    CanonicalType, canonical_type, parse_ags_decimal, parse_ags_integer, parse_datetime,
+    parse_value,
+};
 
 /// Caller-computed synthetic columns folded into a batch in ONE place, rather
 /// than bolted on per host afterward. `ids` prepends `_id` (col 0) / `_parent_id`
@@ -217,9 +220,8 @@ fn append_heading_columns<'a, F>(
 }
 
 /// One `Utf8` column with `parse_value`'s String preprocessing — trim, then
-/// empty → typed null — and nothing else. This is both the whole String-arm
-/// build (skipping the per-cell canonical-type dispatch) and the untyped
-/// substrate the numeric bulk casts run over.
+/// empty → typed null — and nothing else, skipping the per-cell canonical-type
+/// dispatch and the `serde_json::Value` boxing the old String arm paid.
 fn build_utf8<'a, F>(n_rows: usize, cell: F) -> StringArray
 where
     F: Fn(usize) -> Option<&'a str>,
@@ -238,42 +240,50 @@ where
 /// `cell(row)`. Public so a host wanting per-column control (e.g. the
 /// native sparse-override pass) reuses the exact same casting.
 ///
-/// Integer/Decimal/String build the raw text as one `Utf8` column and cast the
-/// whole column in bulk through Arrow's string→number kernels — ~4× faster than
-/// the per-cell `parse_value` this replaced, and byte-parity with it (proven
-/// cell-for-cell in `tests/typed_build_parity.rs`). Bool/Datetime keep the
-/// custom per-cell arms: Arrow's generic cast can't reproduce `parse_bool`'s
-/// Y/N/YES token set or `parse_datetime`'s six AGS date/datetime formats.
+/// Each arm parses the borrowed cell straight into its typed Arrow builder,
+/// bypassing `parse_value` — which re-resolved `canonical_type` per cell
+/// (`trim().to_uppercase()` + table lookups) and boxed every value through a
+/// `serde_json::Value`. Dropping that per-cell overhead is ~5× faster than the
+/// old path and byte-parity with it (proven cell-for-cell in
+/// `tests/typed_build_parity.rs`). Deliberately NOT via `arrow::compute::cast`:
+/// the cast is a touch slower here (it builds an intermediate `Utf8` column,
+/// then a second pass to the numeric type) AND it links the arrow-cast kernels,
+/// which bloats the wasm bundle ~3.5 MB — the direct parse needs neither.
 pub fn build_column<'a, F>(n_rows: usize, ags_type: &str, cell: F) -> (ArrayRef, DataType)
 where
     F: Fn(usize) -> Option<&'a str>,
 {
     match canonical_type(ags_type) {
         Some(CanonicalType::Integer) => {
-            // `Utf8 → Float64 → Int64` reproduces `parse_ags_integer`'s
-            // `int(float(s))`: the Float64 hop tolerates `"5.0"`/`"5.7"`
-            // (truncating toward zero) and the Int64 hop nulls anything outside
-            // i64 — the exact #611 range guard, for free. Safe casts never error
-            // (invalid → null); they only `Err` on unsupported type pairs, which
-            // these are not.
-            let utf8 = build_utf8(n_rows, cell);
-            let f = cast(&utf8, &DataType::Float64).expect("utf8→f64 is an infallible safe cast");
-            let i = cast(&f, &DataType::Int64).expect("f64→i64 is an infallible safe cast");
-            (i, DataType::Int64)
+            // `parse_ags_integer` is `int(float(s))` (tolerates `"5.0"`/`"5.7"`,
+            // truncates toward zero) with the #611 i64 range guard nulling
+            // out-of-range values. A None/empty cell → null. Same result the old
+            // `parse_value` Integer arm produced, without the `Value` round-trip.
+            let mut b = Int64Builder::with_capacity(n_rows);
+            for row in 0..n_rows {
+                b.append_option(
+                    cell(row)
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .and_then(parse_ags_integer),
+                );
+            }
+            (Arc::new(b.finish()) as ArrayRef, DataType::Int64)
         }
         Some(CanonicalType::Decimal) => {
-            // `Utf8 → Float64` is `parse_ags_decimal`'s `s.parse::<f64>()`,
-            // vectorised. Arrow's kernel ADMITS inf/NaN (`"inf"`, `"1e400"`,
-            // `"nan"`); `parse_ags_decimal` keeps only finite values, so a bulk
-            // finite-null pass reconciles the two — a float scan, no re-parse.
-            let utf8 = build_utf8(n_rows, cell);
-            let f = cast(&utf8, &DataType::Float64).expect("utf8→f64 is an infallible safe cast");
-            let fa = f
-                .as_any()
-                .downcast_ref::<Float64Array>()
-                .expect("Float64 cast yields Float64Array");
-            let finite: Float64Array = fa.iter().map(|o| o.filter(|v| v.is_finite())).collect();
-            (Arc::new(finite) as ArrayRef, DataType::Float64)
+            // `parse_ags_decimal` is `s.parse::<f64>()` keeping only finite values
+            // (inf/NaN → null), so — unlike Arrow's string→float kernel — no
+            // separate finite reconciliation is needed. None/empty → null.
+            let mut b = Float64Builder::with_capacity(n_rows);
+            for row in 0..n_rows {
+                b.append_option(
+                    cell(row)
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .and_then(parse_ags_decimal),
+                );
+            }
+            (Arc::new(b.finish()) as ArrayRef, DataType::Float64)
         }
         Some(CanonicalType::Bool) => {
             let mut b = BooleanBuilder::with_capacity(n_rows);
