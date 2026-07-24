@@ -70,8 +70,8 @@ first cut. On the 25 MB rung:
 
 | family | time | share | rules |
 |---|---|---|---|
-| **relational** | 228.9 ms → **103.0 ms** (fixed, below) | 67% → 49% | 10a–10c, 11a–11c |
-| **line_format** | 96.8 ms | **28%** (now the largest) | 1, 3, 5, 6 |
+| **relational** | 228.9 ms → **103.0 ms** (fixed) | 67% → 70% | 10a–10c, 11a–11c |
+| **line_format** | 96.8 ms → **32.5 ms** (fixed) | 28% → 22% | 1, 3, 5, 6 |
 | groups | 8.5 ms | 2.5% | 13–18 |
 | typed_values | 5.1 ms | 1.5% | 8 |
 | references | 0.46 ms | — | 19b_2/3, 20 |
@@ -88,7 +88,7 @@ is two thirds of validate" was not.
 Neither is inefficient code. Both are *avoidable work*, which is why a bench found
 them and a profiler was not needed.
 
-### Rule 3 tokenises a whole line to read one field — OPEN
+### Rule 3 tokenised a whole line to read one field — FIXED 2026-07-24
 
 `rule_3` (`repo:rust-packages/laterite-ags4-validator/src/rules/line_format.rs`)
 calls `split_ags_line`, which allocates a `Vec<String>` — one heap allocation plus
@@ -99,12 +99,14 @@ reads **only field 0** to check the descriptor. Once per line, every line.
 > "the field at `field_index + 1` — the `+1` skips the leading tag", so
 > `field_span(line, 0)` returns the field AFTER the descriptor. It also returns
 > **char** offsets, not bytes, so slicing by them misindexes any non-ASCII line —
-> precisely the lines Rule 1 exists to flag. Closing this needs a small
-> non-allocating first-field accessor on the parse leaf, which is an API addition
-> to a shared wasm-clean crate and so an owner decision.
+> precisely the lines Rule 1 exists to flag. Anyone optimising here will reach for
+> it; don't.
 
-The size of the prize is real though: on one representative line `split_ags_line`
-is 390 ns against `field_span`'s 45 ns — **8.6×** — and that gap is allocation.
+Resolved instead by the shared scanner (below): `scan::first_field` borrows field
+0. Measured over all 418,638 lines of the 25 MB fixture, `split_ags_line` costs
+**66.2 ms** against `first_field`'s **1.75 ms** — **38×** — and `line_format` fell
+96.8 → **32.5 ms**. (Per-line on a fat 10-field row the ratio reads 85×; the 38×
+is over the real fixture's line mix, so that is the one to quote.)
 
 ### Rules 10a/10c re-derived loop-invariant columns and cloned cells to hash them — FIXED 2026-07-24
 
@@ -136,6 +138,69 @@ Measured effect:
 
 One change, a quarter off the end-to-end validate cost — and it was allocation and
 a repeated linear scan, not an algorithm.
+
+## One scanner, two value policies
+
+The grammar was implemented **three times** in `laterite-ags4-parse`:
+`split_ags_line` (owned unescaped values), `field_span` (one field's char span)
+and `tokenize_spans` (all spans, lossless reassembly). Three hand-written machines
+over one grammar — which is how they came to disagree on **five** behaviours:
+
+| | `split_ags_line` | `field_span` | `tokenize_spans` |
+|---|---|---|---|
+| empty line | 0 fields | `None` | 1 empty field |
+| unquoted field | verbatim | verbatim | **trimmed** |
+| field indexing | 0-based | **`i+1`** (skips tag) | 0-based |
+| `""` escape | **unescaped** | raw | raw |
+| unterminated quote | to end-of-line | to end-of-line | **empty value** |
+
+`scan::scan_line` is the shared core. Two decisions make it work:
+
+- **Bytes, not code points.** `"` and `,` are ASCII and UTF-8 never puts an ASCII
+  byte inside a multi-byte sequence, so a byte scan is exactly equivalent — and
+  the validator's 418k-line walk stops paying for the code-point offsets only the
+  browser needs.
+- **The value policy is a parameter.** What was duplicated, and where every
+  divergence came from, is the *state machine*. What legitimately differs is how a
+  token's inner value is resolved — and those differences are needs, not accidents:
+  a browser editor wants display-trimmed bounds; a validator must judge the raw
+  bytes, because on an unquoted field the whitespace **is** the Rule 5 violation.
+  Collapsing them would let a UI concern define what the validator calls a value.
+  So `RAW` and `DISPLAY` policies share one scan.
+
+The core is cheaper than every machine it subsumes. Per line (one 10-field DATA
+row, benched in `parse/per-line` so the claim stays reproducible):
+
+| | time | vs core |
+|---|---:|---:|
+| `tokenize_spans` | 511.5 ns | 3.5× |
+| `split_ags_line` | 347.6 ns | 2.4× |
+| **`scan_line/raw`** | **147.8 ns** | — |
+| **`scan_line/display`** | **147.3 ns** | — |
+| `field_span` (one field) | 48.7 ns | |
+| `first_field` (field 0) | 4.07 ns | |
+
+**The value policy is free** — RAW and DISPLAY differ by less than noise, because
+the divergence is a handful of comparisons at token close, not a second walk. The
+separation argued for above on design grounds costs nothing to keep.
+
+`tokenize_spans`' 3.5× is its `Vec<char>` per line plus one `String` per field —
+the prize still on the table.
+
+One divergence is irreducible: a borrowed slice **cannot unescape**, since `""`→`"`
+yields a value shorter than its source. `RawField::has_escape` flags it. Sound for
+Rule 3 — no descriptor contains a quote.
+
+## Cumulative
+
+| | baseline | now | |
+|---|---|---|---|
+| `check_parsed` | 343.2 ms | **147.6 ms** | **−57%** |
+| `check_file` | 516 ms | **328 ms** | **−36%**, 46 → 72 MiB/s |
+
+Neither change was an algorithm. Both were work that did not need doing:
+re-deriving loop-invariant columns, cloning cells only to hash them, and
+tokenising a whole line to read one field of it.
 
 ## The emit ladder
 
