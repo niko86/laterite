@@ -20,6 +20,18 @@ different data is worse than not comparing.
 Use `--update-manifest` deliberately, when the generator was *meant* to change,
 and re-measure the whole table in the same run.
 
+Disk
+----
+The rungs total ~900 MB plain, most of it the two largest. Between runs they are
+kept zstd-packed via `laterite.transport` — the shipped pack/unpack — and
+unpacked on demand. AGS4 is extremely compressible, so the resting footprint is
+a fraction of the plain size.
+
+This dogfoods the transport layer usefully rather than decoratively: the SHA-256
+check runs against the UNPACKED bytes, so every benchmark run is also a
+byte-exact round-trip test of `pack`/`unpack`. A lossy round trip would fail as
+fixture drift.
+
 Usage
 -----
     uv run python tools/bench-vs-python-ags4.py                 # default rungs
@@ -82,9 +94,15 @@ def ensure_forge() -> None:
 
 
 def fixture(size: str) -> Path:
-    """Generate (or reuse) one rung. Deterministic for a given size + seed."""
+    """Generate, unpack or reuse one rung. Deterministic for a given size + seed."""
+    from laterite.transport import unpack
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     path = OUT_DIR / f"readme-{size}.ags"
+    packed = path.with_suffix(".ags.zst")
+    if not path.exists() and packed.exists():
+        print(f"  unpacking {packed.name} ...")
+        unpack(packed)
     if not path.exists():
         ensure_forge()
         print(f"  generating {path.name} ...")
@@ -140,6 +158,29 @@ def check_manifest(paths: dict[str, Path], update: bool) -> None:
         print(
             f"note: no pinned hash yet for {', '.join(missing)} "
             f"(run --update-manifest to pin)"
+        )
+
+
+def repack(paths: dict[str, Path]) -> None:
+    """Leave the fixtures packed: same bytes, a fraction of the disk.
+
+    Deliberately after timing, never before — the plain file is what gets timed,
+    and unpacking mid-run would put decompression inside a measurement.
+    """
+    from laterite.transport import pack
+
+    saved = 0
+    for path in paths.values():
+        if not path.exists():
+            continue
+        plain = path.stat().st_size
+        out = pack(path)
+        saved += plain - out.stat().st_size
+        path.unlink()
+    if saved:
+        print(
+            f"\nfixtures repacked — {saved / 1e6:.0f} MB reclaimed "
+            f"(unpacked automatically on the next run)"
         )
 
 
@@ -200,6 +241,11 @@ def main() -> int:
         "--update-manifest",
         action="store_true",
         help="re-pin fixture hashes (use when forge changed ON PURPOSE)",
+    )
+    ap.add_argument(
+        "--keep-plain",
+        action="store_true",
+        help="skip the post-run repack (faster repeat runs, ~900 MB on disk)",
     )
     args = ap.parse_args()
 
@@ -290,6 +336,8 @@ def main() -> int:
     table(
         "Read, typed", "python-ags4 + convert_to_numeric", "laterite.read", "read_typed"
     )
+    if not args.keep_plain:
+        repack(paths)
     print()
     return 0
 

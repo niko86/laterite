@@ -1,7 +1,7 @@
 ---
 type: index
 generated: 2026-07-24
-counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 22, concepts: 26, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 21}
+counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 24, concepts: 27, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 21}
 ---
 # AGS Wiki — Content Catalog
 
@@ -15,18 +15,18 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 22, concept
 | Groups | 177 |
 | Types | 17 |
 | Observations | 48 |
-| Tools | 22 |
-| Concepts | 26 |
+| Tools | 24 |
+| Concepts | 27 |
 | Editions | 5 |
 | Comparisons | 1 |
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
 | Design | 21 |
-| **Total (live)** | **387** |
+| **Total (live)** | **390** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 20 · `confirmed` 18 · `drafted` 319 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 5 · `stub` 13
+**Status distribution:** `accepted` 20 · `confirmed` 18 · `drafted` 322 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 5 · `stub` 13
 
 ## Rules
 
@@ -330,12 +330,14 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 22, concept
 | [[laterite-ags4-emit]] | drafted | crate |
 | [[laterite-ags4-forge]] | drafted | cli |
 | [[laterite-ags4-parity]] | drafted | crate |
+| [[laterite-ags4-parse]] | drafted | crate |
 | [[laterite-ags4-perf]] | drafted | crate |
 | [[laterite-ags4-reference]] | drafted | crate |
 | [[laterite-ags4-validator]] | drafted | crate |
 | [[laterite-ags4-wasm]] | drafted | crate |
 | [[laterite-ags4-xcheck]] | drafted | crate |
 | [[laterite-cliutil]] | drafted | crate |
+| [[laterite-excel]] | drafted | crate |
 | [[laterite-node]] | drafted | crate |
 | [[laterite-py]] | drafted | crate |
 | [[laterite-types]] | drafted | crate |
@@ -366,6 +368,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 22, concept
 | [[parent-child-graph]] | drafted |
 | [[parity-confidence-model]] | drafted |
 | [[parity-model]] | reviewed |
+| [[perf-campaign]] | drafted |
 | [[playwright-e2e]] | drafted |
 | [[pyo3-boundary]] | drafted |
 | [[repo-layout]] | drafted |
