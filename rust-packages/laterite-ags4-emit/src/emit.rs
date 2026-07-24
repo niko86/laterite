@@ -21,7 +21,7 @@
 use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};
 use laterite_ags4_validator::fixes::{Fix, FixRisk, apply_fixes, compute_fixes};
-use laterite_ags4_validator::parse::parse_bytes;
+use laterite_ags4_validator::parse::{ParsedFile, parse_bytes};
 use laterite_ags4_validator::{CheckOptions, DictVersion, WorldScope, check_parsed};
 use laterite_types::ags4_str;
 use serde_json::Value;
@@ -176,7 +176,9 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
     write_ags4(&mut bytes, &views)?;
 
     // --- step 4: apply the validity mode ------------------------------
-    let found = validate(&bytes, opts.edition)?;
+    // Keep the ParsedFile: `AutoFix` needs it for `compute_fixes`, and it used
+    // to re-parse the SAME bytes to get a second copy of it.
+    let (parsed, found) = validate(&bytes, opts.edition)?;
     match opts.mode {
         EmitMode::Report => Ok(EmitResult {
             bytes,
@@ -202,11 +204,12 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
             }
         }
         EmitMode::AutoFix => {
-            // Re-parse for compute_fixes (it needs the ParsedFile + the
-            // findings computed against it).
-            let text = String::from_utf8_lossy(&bytes).into_owned();
-            let parsed = parse_bytes(&bytes, encoding_rs::UTF_8)
-                .map_err(|e| EmitError::Reparse(e.to_string()))?;
+            // `parsed` comes from step 4's validate — these are the very bytes
+            // it just parsed, so re-parsing them produced an identical
+            // ParsedFile at full cost. Borrowed, not owned: `apply_fixes` wants
+            // `&str`, so an all-ASCII emit (the normal case) does not copy the
+            // whole output either.
+            let text = String::from_utf8_lossy(&bytes);
             let safe: Vec<_> = compute_fixes(&parsed, &found)
                 .into_iter()
                 .filter(|f| f.risk == FixRisk::Safe)
@@ -222,8 +225,9 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
             // The emitter never writes a BOM, so has_bom = false.
             let fixed = apply_fixes(&text, false, &safe);
             let fixed_bytes = fixed.into_bytes();
-            // Residual findings on the *fixed* output.
-            let residual = validate(&fixed_bytes, opts.edition)?;
+            // Residual findings on the *fixed* output — a genuinely different
+            // document, so this parse is real work, not a repeat.
+            let (_, residual) = validate(&fixed_bytes, opts.edition)?;
             Ok(EmitResult {
                 bytes: fixed_bytes,
                 findings: residual,
@@ -281,12 +285,15 @@ fn format_cell(value: &Value, ags_type: &str) -> String {
     }
 }
 
-/// Parse bytes + run all rules at the given edition, returning findings.
+/// Parse bytes + run all rules at the given edition, returning the parse AND
+/// the findings. Handing back the `ParsedFile` is the point: it is the exact
+/// input the rules ran against, so a caller that needs it (`AutoFix`, for
+/// `compute_fixes`) reuses it instead of re-deriving it from the same bytes.
 ///
 /// Content-only by construction: the emitter re-validates bytes it just produced
 /// in memory, which have no directory to sit beside, so there is no world to look
 /// at ([`WorldScope::None`]) and `check_files` stays default-off.
-fn validate(bytes: &[u8], edition: DictVersion) -> Result<Findings, EmitError> {
+fn validate(bytes: &[u8], edition: DictVersion) -> Result<(ParsedFile, Findings), EmitError> {
     let parsed =
         parse_bytes(bytes, encoding_rs::UTF_8).map_err(|e| EmitError::Reparse(e.to_string()))?;
     let dict = Dictionary::bundled(edition);
@@ -294,8 +301,9 @@ fn validate(bytes: &[u8], edition: DictVersion) -> Result<Findings, EmitError> {
         dict_version: Some(edition),
         ..CheckOptions::default()
     };
-    check_parsed(&parsed, &dict, &opts, &WorldScope::None)
-        .map_err(|e| EmitError::Reparse(e.to_string()))
+    let found = check_parsed(&parsed, &dict, &opts, &WorldScope::None)
+        .map_err(|e| EmitError::Reparse(e.to_string()))?;
+    Ok((parsed, found))
 }
 
 /// Under `AutoFix`, synthesize whichever mandatory metadata catalog group is
