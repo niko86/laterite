@@ -206,6 +206,14 @@ with the condition for revisiting).
 | `AutoFix` duplicate parse | `validate()` parsed, dropped the parse, then re-parsed the same bytes | autofix −49% | existing emit tests |
 | `tokenize_spans` retirement | third implementation of the line grammar; `AgsSpan.text` shipped derivable data across the wasm boundary | 511.5 → 147.3 ns/line | TS tiling + contiguity tests added — **caught a real conversion bug** |
 | `from_shared` row projection | per-row `HashMap` + heading name cloned per cell + values cloned from a parse about to be dropped | `read_ags4_bytes` −27%, projection −74% | existing `from_shared_trim.rs` pins semantics |
+| **T1** relational parent-tuple memoise | parent KEY-tuple `HashSet` rebuilt per child; memoised by parent code | `rule-family/relational` **−13.9%** | two-children-of-one-parent cache-reuse test added |
+| **T1** line_format byte scans | three per-line `chars()` walks (rule_1 max_cp, rule_6 CR/LF, check_quoting) → byte scans | `rule-family/line_format` **−48.5%**, `check_parsed` **−11.4%** combined | multi-byte-before-CR `char_span` test added |
+
+> [!note] **The validator band is closed** (T1, 2026-07-24). The structural stop
+> fired: `check_parsed` / `parse_bytes` = 120.1 / 142.8 = **0.84×**, so the rules
+> engine now costs *less* than the parse that feeds it. Further rules work
+> optimises the smaller half; the queue's remaining validator rows below are
+> retired unmeasured, recorded here so they are not rediscovered.
 
 ### Priced, declined
 
@@ -222,9 +230,9 @@ as such, because they are counts, not timings.
 
 | # | candidate | band | frequency | prize (ceiling) | cost | bench | coverage gap to close with it |
 |---|---|---|---|---|---|---|---|
-| 1 | parent KEY-tuple set rebuilt for **every child group of the same parent**; `tuple_at` run twice per row (`relational.rs:443`) | validator | per-row | **large** — bounded by `rule-family/relational`, 103.0 ms = 70% of `check_parsed`. Static count: 401,386 parent tuples built vs 59,017 if memoised by parent code, ~85% repeat work | contained | yes | the finding-emission path is never executed by any bench (T5) |
+| ~~1~~ | ~~parent KEY-tuple set rebuilt per child~~ | validator | per-row | **LANDED T1 — relational −13.9%** | contained | yes | cache-reuse test added |
 | 2 | `build_column`'s string arm allocates a courier `String` per cell (`lib.rs:446` → `arrow_cols.rs:281`); `parse_value` re-resolves `canonical_type` per cell (`lib.rs:442` → `:96`, `trim().to_uppercase()`) | laterite-types | per-cell | **large** — string-family AGS types are 2114/3503 = **60.3%** of spec headings; two heap allocations per live cell. **Enclosing stage is not on the baseline table** | contained | partial | no test asserts `build_column`'s decoded array *contents* for any typed arm |
-| 3 | `line_format` walks every line as `chars()` three times: `rule_1`'s `max_cp` loop with no early exit (`:97-103`), `rule_6`'s `chars().position` (`:226`), `check_quoting`'s state machine | validator | per-line | **medium** — bounded by `rule-family/line_format`, 32.5 ms = 22% of `check_parsed`. The fixture is 100% ASCII, so `rule_1` always pays the full scan and emits nothing | contained | yes | **no test pins `char_span`**; a byte scan must convert at the hit |
+| ~~3~~ | ~~`line_format`'s three per-line `chars()` walks~~ | validator | per-line | **LANDED T1 — line_format −48.5%** | contained | yes | `char_span` test added |
 | 4 | `raw_lines` pushes one owned `String` + full copy per line on the **default** validating profile (`parse/lib.rs:721`, `text.into_owned()`) | parse leaf | per-line | **medium** — inside `parse_bytes`, 142.8 ms, the largest stage of `check_file` (328 ms) | contained | yes | `RawLine.text` is `pub` at ~4 production + ~5 test sites; the lossy-replacement branch must keep its *decoded* text |
 | 5 | `Sidecar::assemble` runs a second full walk inside `mint`, over bytes `mint` has already parsed, plus a third full-buffer hash pass | core + trust | per-file | **medium** — `index_ags4_bytes` is 56.9 ms; `mint`'s total is **unmeasured** (no `benches/` in `laterite-ags4-trust`) | contained | partial | no test mints a file whose declared encoding is not UTF-8 |
 | 6 | node's `table_ipc` has no `with_keys=false` escape, so the keychain pass runs on the default `table(code)` call and the keys are then stripped | surfaces (node) | per-row | **large** — Python's twin documents this pass as "the dominant read cost"; **unmeasured on node** | contained | **no** — node has no bench of any kind | no test asserts `.sql()`/`.at()` after a prior plain `table()` on the same group |
@@ -240,6 +248,12 @@ Below the floor, measured out — recorded so they are not rediscovered:
 | *free rider inside #1:* `fields_with_status` allocates two `String`s per heading visit | a fixed per-group cost beside per-row work |
 | *free rider:* `in_pandas_range` re-parses two constant date strings per DT cell | `typed_values` is 5.1 ms (3.5%); the fixture is 0.09% DT cells, so the bench is blind to it |
 | *free rider:* `references::check` builds a fresh `HashSet<String>` per borrowed heading | the whole `references` family is 0.46 ms |
+
+> [!note] These free riders were **not** taken in T1 — the two ranked candidates
+> alone cleared the tranche floor and closed the band, and a sweep of trivial
+> untimed edits is exactly what the "free riders, not sweeps" rule forbids once
+> there is no longer a ranked candidate opening the file. They retire with the
+> band; reopen only if a future change is in these functions for another reason.
 
 ### Correctness and measurement — outside the ranking, not subject to the floor
 
@@ -292,10 +306,15 @@ Each is one session and one PR. Each candidate inside a tranche lands as its own
 commit with its own paired criterion run. Bench-writing tranches come **before**
 the optimisations that need them.
 
-### T1 — Close the validator band
+### T1 — Close the validator band — ✅ DONE (2026-07-24)
 
-**Candidates:** #1, #3, plus the three free riders in the same crate.
+**Candidates:** #1, #3 (the free riders were left untaken — see the note above).
 **Bench first:** already committed (`validate/rule-family`, `validate/check_parsed`).
+
+**Landed:** relational **−13.9%**, line_format **−48.5%**, `check_parsed`
+**−11.4%** combined — clearing the 10% tranche floor. The structural stop fired
+at **0.84×** (`check_parsed` / `parse_bytes`). Band closed. Parity held by
+identity. Coverage: the cache-reuse and `char_span` tests below both landed.
 
 > [!warning] #1 is **not** the landed 10a/10c fix. What landed was the
 > *column-index hoist* (`cols()`, whose doc comment names exactly what it
@@ -304,10 +323,9 @@ the optimisations that need them.
 > the same function. Read `relational.rs:438-450` before touching it.
 
 **Coverage closed:** a multi-byte-character-before-the-CR test pinning
-`char_span`. Today `rule_1`/`rule_6` emit char offsets and the unit tests assert
-only `.line`, so the byte-scan rewrite in #3 has nothing holding it honest.
-**Exit:** `check_parsed` moves ≥10%, or the band is closed — the structural stop
-has already effectively fired at 1.03×, so this is its last tranche either way.
+`char_span` (the CR's char offset, which a byte offset would have got wrong), and
+a two-children-of-one-parent test proving the memoised set is applied to the
+right child. Both landed.
 
 ### T2 — Put the typed read on the baseline axis (bench only)
 
