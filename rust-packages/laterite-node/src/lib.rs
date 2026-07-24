@@ -1269,8 +1269,9 @@ pub fn emit_ags4_from_ipc(
         edition: resolve_edition(edition.as_deref())
             .map_err(Error::from_reason)?
             .unwrap_or(DictVersion::V4_1_1),
-        // Metadata synthesis stays ON here: this surface's callers get the
-        // 2026-06-25 one-call-valid behaviour. See EmitOpts::default.
+        // Metadata synthesis inherits the default, which is now OFF (2026-07-24):
+        // no surface mints GROUPs the caller never wrote without being asked.
+        // `synthesiseMetadata` on the JS side opts in. See EmitOpts::default.
         ..laterite_ags4_emit::EmitOpts::default()
     };
     let mut inputs = Vec::with_capacity(groups.len());
