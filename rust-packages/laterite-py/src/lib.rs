@@ -1467,11 +1467,24 @@ fn dict_group_unit_type<'py>(
 /// core's read codec (no typing). So the Rust binary and the Python `lat read`
 /// agree byte-for-byte on `read --json` / `--csv` (#430 PR 2).
 #[pyfunction]
+#[pyo3(signature = (path, recover_duplicate_headings = false))]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
-fn read_groups_raw(py: Python<'_>, path: String) -> PyResult<Bound<'_, PyDict>> {
-    let parsed = laterite_ags4_core::ags4_codec::read_ags4(std::path::Path::new(&path))
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+fn read_groups_raw(
+    py: Python<'_>,
+    path: String,
+    recover_duplicate_headings: bool,
+) -> PyResult<Bound<'_, PyDict>> {
+    let read_opts = laterite_ags4_core::ags4_codec::ReadOptions {
+        duplicate_headings: if recover_duplicate_headings {
+            laterite_ags4_core::ags4_codec::DuplicateHeadings::Recover
+        } else {
+            laterite_ags4_core::ags4_codec::DuplicateHeadings::Error
+        },
+    };
+    let parsed =
+        laterite_ags4_core::ags4_codec::read_ags4_with(std::path::Path::new(&path), read_opts)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
     let d = PyDict::new(py);
     d.set_item("order", PyList::new(py, &parsed.order)?)?;
     let groups = PyDict::new(py);

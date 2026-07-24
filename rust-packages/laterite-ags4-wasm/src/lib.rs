@@ -1117,10 +1117,23 @@ impl ExcelResult {
 /// AGS4 bytes → an `.xlsx` workbook (one sheet per group, python-ags4's
 /// layout). `JsError` if the input carries no valid AGS4 groups.
 #[wasm_bindgen]
-pub fn ags4_to_xlsx(data: &[u8]) -> Result<ExcelResult, JsError> {
+pub fn ags4_to_xlsx(
+    data: &[u8],
+    recover_duplicate_headings: Option<bool>,
+) -> Result<ExcelResult, JsError> {
     console_error_panic_hook::set_once();
-    let (bytes, stats) =
-        laterite_excel::ags4_bytes_to_xlsx(data, None).map_err(|e| JsError::new(&e.to_string()))?;
+    use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ReadOptions};
+    // Duplicate headings are fatal by default here as on every read surface; the
+    // browser caller opts into the suffixed recovery read.
+    let opts = ReadOptions {
+        duplicate_headings: if recover_duplicate_headings.unwrap_or(false) {
+            DuplicateHeadings::Recover
+        } else {
+            DuplicateHeadings::Error
+        },
+    };
+    let (bytes, stats) = laterite_excel::ags4_bytes_to_xlsx_with(data, None, opts)
+        .map_err(|e| JsError::new(&e.to_string()))?;
     Ok(ExcelResult {
         bytes,
         warnings: stats.warnings,

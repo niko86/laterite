@@ -238,6 +238,12 @@ pub struct ReadArgs {
     /// Write the output to <path> instead of stdout.
     #[arg(long, value_name = "PATH")]
     pub out: Option<PathBuf>,
+    /// Read a file with duplicate headings (AGS4 Rule 7) instead of refusing it,
+    /// suffixing the repeats `__2`, `__3`, … so no column is lost. The output is
+    /// deliberately NOT valid AGS4 — this recovers data, it does not repair the
+    /// file. To repair it, use `lat fix --risky`.
+    #[arg(long)]
+    pub recover_duplicate_headings: bool,
 }
 
 #[derive(Args)]
