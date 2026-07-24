@@ -1,0 +1,121 @@
+# Diff-scoped wiki-lint ratchet. Runs `ags-wiki/.bootstrap/lint.py --since
+# origin/<base>`, which grandfathers every pre-existing dead `repo:` ref /
+# retired-term mention and fails ONLY on rot introduced by lines this PR itself
+# added or modified (see the script's own module docstring for the diff-scoped
+# mechanics).
+#
+# ADVISORY on PRs, by design — this is NOT a required check and is not intended
+# to become one. Enforcement lives in the nightly (`nightly.yml`'s `wiki-lint`
+# job: same checks, whole vault, no ratchet, failure opens the tracking issue).
+# The split is deliberate: keeping the wiki aligned is the maintainer's job, and
+# a contributor should not have a PR blocked because a page they never touched
+# cites a file that moved. So this run is fast feedback on rot a PR itself
+# introduces; the nightly is what actually has to stay green.
+#
+# There is deliberately NO trigger-level `paths:` filter. It would be actively
+# dangerous if this ever were made required, and it buys nothing either way:
+#
+#   A required check behind a workflow-level `paths:` filter is unsatisfiable.
+#   When a PR touches nothing the filter matches, the workflow never fires, so
+#   it never creates a check run, so the requirement sits PENDING forever and
+#   the PR cannot merge — the only way through is the admin bypass button
+#   ("Merge without waiting for requirements to be met"). This workflow was
+#   filtered once and did exactly that: every PR outside
+#   ags-wiki/rust-packages/packages merged by bypassing branch protection,
+#   which is precisely the enforcement-that-doesn't-run failure a lint gate
+#   exists to prevent. ci.yml and parity.yml state the same rule at their own
+#   `on:` blocks and route ALL path-filtering through a `changes` job, so their
+#   jobs skip-as-SUCCESS and always report. Those can't just run everything —
+#   their jobs are heavy. This one can: `lint.py` is stdlib-only, no wheel, no
+#   Rust, ~10s. So it simply runs on every PR.
+#
+# Running unfiltered also closes a live hole: `tools/gen_wiki_cli.py` (the
+# verb-table generator this job `--check`s below) sat in no path filter at all,
+# so editing it ran neither this workflow nor ci.yml's mirror test — the gate
+# guarding the CLI table was itself unguarded.
+#
+# Minimal Python-only job: `lint.py` is stdlib-only (re/subprocess/sys/
+# pathlib/difflib/collections — no third-party deps), so this deliberately
+# does NOT `uv sync` the workspace (that would build the laterite PyO3
+# wheel — a Rust build this job exists specifically to avoid). `uv run
+# --no-project` gets a pinned Python (`.python-version` → 3.14) without
+# touching the workspace lockfile or building anything.
+name: wiki-lint
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: wiki-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  wiki-lint:
+    # Free to rename WHILE this stays advisory. A job `name:` is the
+    # status-check *context* a ruleset matches by exact text, with nothing
+    # linking the two — so if this job is ever added to ruleset 19425032, a
+    # later rename leaves the rule waiting on a context that no longer exists:
+    # the check never reports, the PR is unmergeable, and the only exit is the
+    # admin bypass. Enforcement is deliberately in the nightly instead, so that
+    # trap is avoided rather than managed.
+    name: wiki-lint --since (ratchet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: the ratchet needs `git diff --unified=0
+          # <base>...HEAD` to find the merge-base with the PR's base
+          # branch — a shallow (default) checkout wouldn't have it.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+
+      - name: wiki-lint --since origin/<base>
+        run: |
+          uv run --no-project python ags-wiki/.bootstrap/lint.py \
+            --since "origin/${{ github.base_ref }}"
+
+      # The index-faithfulness gate, run HERE (stdlib-only, no wheel) so a
+      # wiki-only PR — which skips ci.yml's wheel-building python job — still
+      # can't land a page added/removed/reclassified without regenerating
+      # index.md. The `generated:` date stamp is normalised out, so it can't
+      # redden merely for running on a later calendar day.
+      #
+      # These four `--check` steps ARE the faithfulness enforcement on this
+      # repo. There is no root `tests/` here (the wheel's suite lives under
+      # packages/laterite/tests), so nothing else compares a generated page to
+      # its SSOT: if a step is dropped, that generator silently stops being
+      # generated and the page freezes at whatever it last said.
+      - name: reindex --check (index.md == render(the vault))
+        run: uv run --no-project python ags-wiki/.bootstrap/reindex.py --check
+
+      # The CLI verb-table faithfulness gate, run HERE too (stdlib-only, no wheel)
+      # so a wiki-only edit of tools/laterite-ags4-check.md — which skips ci.yml's
+      # python job — still can't drift the table from the shipped `lat --readme`
+      # guide. Fires on both ags-wiki/** and rust-packages/** (README-cli.md), so
+      # either side of the SSOT→page relationship reruns it.
+      - name: gen_wiki_cli --check (verb table == README-cli.md)
+        run: uv run --no-project python tools/gen_wiki_cli.py --check
+
+      # The group reference-tier gate, run HERE too (stdlib-only, no wheel) so a
+      # wiki-only edit of a groups/*.md page — which skips ci.yml's python job —
+      # still can't drift a generated page from ags_dictionary.json. Fires on
+      # both ags-wiki/** and rust-packages/** (the dictionary), covering either
+      # side.
+      - name: gen_reference_groups --check (group tier == ags_dictionary.json)
+        run: uv run --no-project python tools/gen_reference_groups.py --check
+
+      # The crate dependency-graph gate (stdlib-only, no wheel), run HERE too so
+      # a wiki-only edit — or a Cargo.toml dep change that skips a wiki edit —
+      # can't drift the generated graph.
+      - name: gen_crate_graph --check (graph == Cargo manifests)
+        run: uv run --no-project python tools/gen_crate_graph.py --check

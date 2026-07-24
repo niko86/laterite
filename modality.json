@@ -812,7 +812,7 @@
     },
     {
       "capability": "censor",
-      "summary": "Anonymise an AGS4 file — scrub the classified sensitive cells (pseudonymise IDs, hash PROJ_ID, blank coordinates, tokenise names, strip free-text [units]) before sharing. Browser-only among shipped surfaces: the SAME laterite-ags4-censor engine backs the private ags4-corpus-qa `censor` dev tool, which is not a shipped py/node/cli API, so its cross-surface EXISTENCE is a surface-census matter, not a modality one.",
+      "summary": "Anonymise an AGS4 file — scrub the classified sensitive cells (pseudonymise IDs, hash PROJ_ID, blank coordinates, tokenise names, strip free-text [units]) before sharing. Browser-only among shipped surfaces: the SAME laterite-ags4-censor engine backs the private laterite-ags4-corpus-qa `censor` dev tool, which is not a shipped py/node/cli API, so its cross-surface EXISTENCE is a surface-census matter, not a modality one.",
       "cells": [
         {
           "surface": "browser",

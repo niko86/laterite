@@ -1,0 +1,24 @@
+{
+  "_note": "Single source of the vault's page classes (wiki-reliability plan, D5). reindex.py builds its index sections + order from this; lint.py derives CONTENT (the stub-lifecycle scaffold-check scope) from the `content` flag. Previously both hand-duplicated the list — the enforcement machinery had the same multi-source-of-truth rot it exists to catch. Keep in sync with AGS-WIKI.md §8 (index sections) and §12 (lint scope).",
+  "fields": {
+    "dir": "the class folder under ags-wiki/",
+    "label": "the index.md section heading",
+    "extra": "an extra frontmatter field surfaced as a column, or null",
+    "content": "true for the content-lifecycle classes lint.py's scaffold-stub check scopes to (CONTENT); false for sources + the campaign classes",
+    "campaign": "true for campaign-authored classes that render a placeholder row when empty (CAMPAIGN)"
+  },
+  "classes": [
+    {"dir": "rules", "label": "Rules", "extra": "rule_family", "content": true, "campaign": false},
+    {"dir": "groups", "label": "Groups", "extra": "parent", "content": true, "campaign": false},
+    {"dir": "types", "label": "Types", "extra": "canonical_type", "content": true, "campaign": false},
+    {"dir": "observations", "label": "Observations", "extra": "obs_tag", "content": true, "campaign": false},
+    {"dir": "tools", "label": "Tools", "extra": "tool_kind", "content": true, "campaign": false},
+    {"dir": "concepts", "label": "Concepts", "extra": null, "content": true, "campaign": false},
+    {"dir": "editions", "label": "Editions", "extra": "ags_status", "content": true, "campaign": false},
+    {"dir": "comparisons", "label": "Comparisons", "extra": null, "content": true, "campaign": false},
+    {"dir": "sources", "label": "Sources", "extra": "source_kind", "content": false, "campaign": false},
+    {"dir": "insights", "label": "Insights & Gaps", "extra": "gap_kind", "content": false, "campaign": true},
+    {"dir": "strategies", "label": "Test Strategies", "extra": "targets", "content": false, "campaign": true},
+    {"dir": "design", "label": "Design", "extra": "priority", "content": false, "campaign": true}
+  ]
+}
