@@ -1,0 +1,218 @@
+{
+  "_comment": "Deliberate non-mirrors of python-ags4's public API, by identity. Enforced by tools/check_dropin_surface.py. A new gap fails; so does an entry that is no longer a gap.",
+  "excluded_modules": {
+    "ags4_cli": "python-ags4's Click CLI. laterite ships `lat` instead \u2014 a standalone binary with its own JSON/NDJSON output shapes, not a command-level mirror. Not a gap to close; a deliberate divergence."
+  },
+  "known_gaps": [
+    {
+      "module": "check",
+      "name": "add_error_msg",
+      "reason": "Internal helper of python-ags4's checker. COMPAT.md maps only check.get_TRAN_AGS from this module as user-facing; the rest is machinery behind check_file, which laterite implements in Rust."
+    },
+    {
+      "module": "check",
+      "name": "add_meta_data",
+      "reason": "Internal helper of python-ags4's checker. COMPAT.md maps only check.get_TRAN_AGS from this module as user-facing; the rest is machinery behind check_file, which laterite implements in Rust."
+    },
+    {
+      "module": "check",
+      "name": "combine_DICT_tables",
+      "reason": "Internal helper of python-ags4's checker. COMPAT.md maps only check.get_TRAN_AGS from this module as user-facing; the rest is machinery behind check_file, which laterite implements in Rust."
+    },
+    {
+      "module": "check",
+      "name": "fetch_record",
+      "reason": "Internal helper of python-ags4's checker. COMPAT.md maps only check.get_TRAN_AGS from this module as user-facing; the rest is machinery behind check_file, which laterite implements in Rust."
+    },
+    {
+      "module": "check",
+      "name": "fyi_16_1",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "get_data_summary",
+      "reason": "Internal helper of python-ags4's checker. COMPAT.md maps only check.get_TRAN_AGS from this module as user-facing; the rest is machinery behind check_file, which laterite implements in Rust."
+    },
+    {
+      "module": "check",
+      "name": "is_TRAN_AGS_valid",
+      "reason": "Internal helper of python-ags4's checker. COMPAT.md maps only check.get_TRAN_AGS from this module as user-facing; the rest is machinery behind check_file, which laterite implements in Rust."
+    },
+    {
+      "module": "check",
+      "name": "is_ags3",
+      "reason": "Internal helper of python-ags4's checker. COMPAT.md maps only check.get_TRAN_AGS from this module as user-facing; the rest is machinery behind check_file, which laterite implements in Rust."
+    },
+    {
+      "module": "check",
+      "name": "is_ags3_like",
+      "reason": "Internal helper of python-ags4's checker. COMPAT.md maps only check.get_TRAN_AGS from this module as user-facing; the rest is machinery behind check_file, which laterite implements in Rust."
+    },
+    {
+      "module": "check",
+      "name": "is_ags_ascii",
+      "reason": "Internal helper of python-ags4's checker. COMPAT.md maps only check.get_TRAN_AGS from this module as user-facing; the rest is machinery behind check_file, which laterite implements in Rust."
+    },
+    {
+      "module": "check",
+      "name": "pick_standard_dictionary",
+      "reason": "Internal helper of python-ags4's checker. COMPAT.md maps only check.get_TRAN_AGS from this module as user-facing; the rest is machinery behind check_file, which laterite implements in Rust."
+    },
+    {
+      "module": "check",
+      "name": "rule_1",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_10a",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_10b",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_10c",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_11",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_11c",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_12",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_13",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_14",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_15",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_16",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_17",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_18",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_19",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_19a",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_19b_1",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_19b_2",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_19b_3",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_2",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_20",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_2a",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_2b",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_3",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_4_1",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_4_2",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_5",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_6",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_7_1",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_7_2",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_8",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    },
+    {
+      "module": "check",
+      "name": "rule_9",
+      "reason": "python-ags4's implementation of one numbered AGS4 rule. laterite implements the rules in Rust (laterite-ags4-validator) and exposes the verdict through AGS4.check_file, which IS mirrored \u2014 a drop-in user never calls these directly. Listed by identity rather than excluded wholesale so that a NEW rule_* appearing upstream shows up here: that means a rule we may need to implement."
+    }
+  ]
+}

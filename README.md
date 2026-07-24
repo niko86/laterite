@@ -209,6 +209,18 @@ documented rule by rule:
 - [docs/parity-coverage-map.md](docs/parity-coverage-map.md) — the
   test-level map of laterite ↔ python-ags4
 
+The drop-in covers python-ags4's **library** API: `AGS4.*` and `utils.*` are
+mirrored name for name, so the one import line changes and the rest of your
+code doesn't. A weekly job compares the two public surfaces, so a function
+added upstream can't quietly go missing here.
+
+**The CLI is deliberately not mirrored.** There is no `compat` equivalent of
+python-ags4's `ags4_cli` commands — laterite ships [`lat`](#cli-lat) instead: a
+standalone binary (also installed by `pip install laterite`) with its own
+JSON / NDJSON output shapes. That's a different CLI on purpose, not a missing
+feature, so a *script* that shells out to `ags4_cli` needs porting rather than
+an import swap. Your Python code is unaffected.
+
 Every validator rule is written from the published AGS4 specification, not
 adapted from another library's source — which is what lets laterite ship under
 a permissive MIT licence.

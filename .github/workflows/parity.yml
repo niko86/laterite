@@ -1,8 +1,8 @@
 # Parity oracle: runs python-ags4's own test suite shimmed against
 # laterite.compat. The failing SET is the parity contract.
 #
-# Manual `workflow_dispatch` + scheduled monthly so an upstream
-# silent behavioural drift surfaces before it bites a user.
+# Manual `workflow_dispatch` + scheduled weekly so an upstream
+# silent drift surfaces before it bites a user.
 #
 # That sentence was false for as long as it existed (#558): PYTHON_AGS4_VERSION
 # below pins the oracle, so the cron re-ran one frozen version forever and could
@@ -25,8 +25,11 @@ name: parity
 on:
   workflow_dispatch:
   schedule:
-    # First of every month, 03:00 UTC.
-    - cron: "0 3 1 * *"
+    # Sundays, 03:00 UTC. Weekly rather than monthly since the `dropin-surface`
+    # job joined: a month is a long time to be unaware that upstream grew a
+    # public function our drop-in doesn't have. Both scheduled jobs are cheap
+    # (no wheel build, no Rust), so the extra cadence costs close to nothing.
+    - cron: "0 3 * * 0"
   # Per-PR regression gate (#190). NO trigger-level `paths:` — that is what made
   # this un-requireable (#556): a required check behind a trigger filter never
   # fires on an out-of-scope PR, so no check run is created and the requirement
@@ -111,6 +114,43 @@ jobs:
 
       - name: Has upstream moved past our pin?
         run: uv run --no-sync python tools/check_upstream_pin.py
+
+  # The SURFACE half of "did upstream move under us?". `upstream-pin` above sees
+  # that a version changed; `parity` (below) sees behaviour, but only on paths
+  # python-ags4's own tests exercise. Neither notices upstream ADDING a public
+  # function: no old test calls it, so parity stays green while a user porting
+  # `from python_ags4 import AGS4` hits AttributeError on a name we never knew
+  # existed. This job compares the public callables name-by-name and enforces
+  # `compat-surface-gaps.json` — the deliberate non-mirrors, by identity, same
+  # contract shape as parity-known-failures.json.
+  #
+  # Also PR-exempt, for the same reason as upstream-pin: upstream releasing while
+  # a PR is open is not that PR's fault. On the weekly cron, a red run IS the
+  # notice. Separate job so "they added something" and "we regressed" can't
+  # collapse into one ambiguous red X.
+  #
+  # No wheel, no Rust, no maturin: the check is AST-based on both sides, so the
+  # same cheap `--no-install-workspace` sync upstream-pin uses is enough.
+  dropin-surface:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install Python 3.14
+        run: uv python install 3.14
+
+      - name: Sync the dev group (python-ags4 is a declared dev dep)
+        run: uv sync --group dev --no-install-workspace
+
+      - name: Does laterite.compat still cover python-ags4's public API?
+        run: uv run --no-sync python tools/check_dropin_surface.py
 
   parity:
     needs: changes
