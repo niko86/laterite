@@ -38,6 +38,7 @@
           "--csv": false,
           "--json": false,
           "--out": true,
+          "--recover-duplicate-headings": false,
           "<file>": true,
           "<group>": true
         },
@@ -233,6 +234,7 @@
           "--csv": false,
           "--json": false,
           "--out": true,
+          "--recover-duplicate-headings": false,
           "<file>": true,
           "<group>": true
         },
@@ -380,6 +382,7 @@
           "--csv": false,
           "--json": false,
           "--out": true,
+          "--recover-duplicate-headings": false,
           "<file>": true,
           "<group>": true
         },

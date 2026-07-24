@@ -120,7 +120,7 @@ const SPECS: Record<string, Spec> = {
   },
   read: {
     run: (p, json) => runRead(p, json),
-    flags: ["csv", "json", "out"],
+    flags: ["csv", "json", "out", "recover-duplicate-headings"],
     valued: ["out"],
     positionals: ["<file>", "<group>"],
   },
@@ -455,7 +455,9 @@ function runRead(p: Parsed, json: boolean): number {
     groups: Record<string, { headings: string[]; rows: string[][] }>;
   };
   try {
-    raw = JSON.parse(readGroupsRaw(file)) as typeof raw;
+    raw = JSON.parse(
+      readGroupsRaw(file, Boolean(p.flags["recover-duplicate-headings"])),
+    ) as typeof raw;
   } catch (e) {
     fail((e as Error).message, exitCodeFor(e));
   }
