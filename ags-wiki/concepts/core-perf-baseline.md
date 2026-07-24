@@ -55,12 +55,20 @@ which half had moved.
 
 Two results worth keeping in view:
 
-- **`index_ags4_bytes` costs as much as a full parse.** The index records GROUP
-  byte offsets rather than materialising rows, so it ought to be markedly cheaper.
-  It isn't — unexplained, and a candidate.
+- **`index_ags4_bytes` cost as much as a full parse — because it WAS one.**
+  FIXED 2026-07-24. The line above originally read "the index records GROUP byte
+  offsets rather than materialising rows, so it ought to be markedly cheaper — it
+  isn't, unexplained". That described the intent, not the code: `ParseOptions::lean()`
+  only turns off raw-line retention, so every line was still tokenised into owned
+  `String`s and every DATA row materialised, after which the function kept ~123
+  GROUP records and dropped the rest. **A page can describe what a function is
+  for and be wrong about what it does; the fix was reading it.** See
+  [[laterite-ags4-core]] and the locate-only profile below.
 - **`read_ags4_bytes` adds ~67% on top of `parse_bytes`** for the re-trim and
   UNIT/TYPE pad that keep the codec byte-identical to the historical reader (the
-  #168 convergence). That is the price of byte-fidelity, paid on every typed read.
+  #168 convergence). Filed as the price of byte-fidelity, paid on every typed
+  read — but that is an assumption nobody has tested, and it is now the largest
+  unexamined gap on the read path. Treat it as open, not as settled.
 
 ## Rule-family attribution
 
@@ -197,10 +205,29 @@ Rule 3 — no descriptor contains a quote.
 |---|---|---|---|
 | `check_parsed` | 343.2 ms | **147.6 ms** | **−57%** |
 | `check_file` | 516 ms | **328 ms** | **−36%**, 46 → 72 MiB/s |
+| `index_ags4_bytes` | 165 ms | **56.9 ms** | **−66%**, 144 → 418 MiB/s |
+| `parse_bytes` | 171.3 ms | **142.8 ms** | **−16.7%** |
+| `emit_ags4/autofix` | 45.4 ms | **23.1 ms** | **−49%** |
+| `emit_ags4/report` | 30.6 ms | **22.4 ms** | **−27%** |
 
-Neither change was an algorithm. Both were work that did not need doing:
-re-deriving loop-invariant columns, cloning cells only to hash them, and
-tokenising a whole line to read one field of it.
+**Not one of these was an algorithm change.** Every one was work that did not
+need doing:
+
+- re-deriving loop-invariant column indices, once per row;
+- cloning cells purely to hash them;
+- tokenising a whole line to read one field of it;
+- running a full parse to keep 123 GROUP records;
+- allocating every cell twice — once in the tokenizer, once in the copy out of it;
+- parsing the same bytes twice in the same function.
+
+That is the durable lesson of this page, and it is why the benches exist. None of
+it was visible by reading the code for slowness, because none of it *is* slow
+code. It only became visible once the layers were timed separately.
+
+> [!note] Absolute figures drift ~20% run-to-run on a 25 MB fixture (page cache),
+> so the paired criterion comparison is the durable number and the millisecond
+> values are not. A second run of identical `index_ags4_bytes` code moved 56.9 →
+> 47.0 ms.
 
 ## The emit ladder
 
@@ -211,13 +238,25 @@ synthesis added 2026-06-25). 20k rows:
 | stage | time | adds |
 |---|---|---|
 | `write_ags4` | 2.9 ms | the bytes |
-| `report` | 30.6 ms | + dictionary fill + `ags4_str` + validate |
-| `autofix-no-synth` | 45.4 ms | + `compute_fixes` / `apply_fixes` |
-| `autofix-with-synth` | 45.5 ms | + metadata synthesis |
+| `report` | 30.6 → **22.4 ms** | + dictionary fill + `ags4_str` + validate |
+| `autofix-no-synth` | 45.4 → **23.1 ms** | + `compute_fixes` / `apply_fixes` |
+| `autofix-with-synth` | 45.5 → **23.8 ms** | + metadata synthesis |
 
-So the writer is ~6% of export cost — **the bytes are not the problem** — and
-metadata synthesis is ~0.13 ms, **0.3%**. The 48% `AutoFix` premium is entirely
-validate-and-fix, i.e. the original 2026-06-12 decision, not the later addition.
+The writer is a few percent of export cost — **the bytes are not the problem** —
+and metadata synthesis is ~0.13 ms, **0.3%**.
+
+> [!warning] This page previously read: "the 48% `AutoFix` premium is entirely
+> validate-and-fix, i.e. the original 2026-06-12 decision, not the later
+> addition." **That attribution was wrong.** The premium was mostly a *duplicate
+> parse*: `validate()` parsed the emitted bytes, ran the rules, dropped the
+> `ParsedFile` — and `AutoFix` then re-parsed the same bytes to rebuild it for
+> `compute_fixes`. Returning the parse from `validate()` (2026-07-24) collapsed
+> the premium from **48% to 3%** (23.1 vs 22.4 ms). Fixing *is* nearly free; the
+> measurement had been attributing a plumbing defect to a design decision.
+
+The lesson generalises past this page: a number can be reproducible, correctly
+measured, and still support the wrong conclusion, because attribution is a claim
+about mechanism and a stopwatch does not make one.
 
 > [!note] Perf is not the argument for making synthesis opt-in. The owner's
 > reasoning is that there should be no unexpected magic — the caller decides and
