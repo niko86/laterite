@@ -10,9 +10,9 @@
 //!     `EmitMode`.
 //!
 //! The gap between them IS the orchestrator's overhead, and `EmitMode` is
-//! benched across Report and AutoFix because AutoFix re-parses and re-validates
-//! the bytes it just produced — a cost worth seeing in isolation, since it is
-//! the DEFAULT mode.
+//! benched as a ladder because `AutoFix` re-parses and re-validates the bytes
+//! it just produced, and then optionally mints missing metadata on top — costs
+//! worth seeing separately, since that mode is the DEFAULT.
 //!
 //! Input is synthesised here rather than read from a fixture: the write path
 //! takes cell data, not a file, so a fixture would only add a parse step to
@@ -21,14 +21,18 @@
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use laterite_ags4_emit::{
-    EmitGroup, EmitMode, EmitOpts, GroupInput, emit_ags4, write_ags4,
-};
+use laterite_ags4_emit::{EmitGroup, EmitMode, EmitOpts, GroupInput, emit_ags4, write_ags4};
 use serde_json::Value;
 
 const HEADINGS: [&str; 8] = [
-    "LOCA_ID", "SAMP_TOP", "SAMP_REF", "SAMP_TYPE", "SAMP_DESC", "SAMP_DATE",
-    "SAMP_BASE", "SAMP_REM",
+    "LOCA_ID",
+    "SAMP_TOP",
+    "SAMP_REF",
+    "SAMP_TYPE",
+    "SAMP_DESC",
+    "SAMP_DATE",
+    "SAMP_BASE",
+    "SAMP_REM",
 ];
 const TYPES: [&str; 8] = ["ID", "2DP", "ID", "PA", "X", "DT", "2DP", "X"];
 
@@ -84,7 +88,7 @@ fn bench_orchestrator(c: &mut Criterion) {
     let n = 20_000usize;
     let input = vec![GroupInput {
         code: "SAMP".to_string(),
-        headings: HEADINGS.iter().map(|s| s.to_string()).collect(),
+        headings: HEADINGS.iter().map(ToString::to_string).collect(),
         units: None, // dictionary fill — the hybrid path a real caller hits
         types: None,
         rows: rows(n)
@@ -93,12 +97,33 @@ fn bench_orchestrator(c: &mut Criterion) {
             .collect(),
     }];
 
-    // Report emits and reports; AutoFix additionally re-parses + re-validates +
-    // applies safe fixes. AutoFix is the DEFAULT, so the delta is what a caller
-    // pays without asking for it.
-    for (label, mode) in [("report", EmitMode::Report), ("autofix", EmitMode::AutoFix)] {
-        let opts = EmitOpts { mode, ..EmitOpts::default() };
-        g.sample_size(20);
+    // A STAGE LADDER, not two points. Each rung adds exactly one stage, so a
+    // subtraction prices that stage instead of leaving one lump labelled
+    // "AutoFix overhead":
+    //
+    //   report              = dictionary fill + per-cell ags4_str + write + validate
+    //   autofix-no-synth    = the above + compute_fixes/apply_fixes
+    //   autofix-with-synth  = the above + step 2.5 metadata synthesis
+    //
+    // and `write_ags4` from the group above is the floor (bytes only), so
+    // `report - write` is the fill+format+validate cost.
+    //
+    // Splitting synthesis out matters because it is the DEFAULT and it grew
+    // after the mode did: the default was accepted 2026-06-12 meaning
+    // validate+safe-fix, and 2026-06-25 added metadata minting to it. Without
+    // this rung there is no way to tell which of those a caller is paying for.
+    let ladder = [
+        ("report", EmitMode::Report, false),
+        ("autofix-no-synth", EmitMode::AutoFix, false),
+        ("autofix-with-synth", EmitMode::AutoFix, true),
+    ];
+    g.sample_size(20);
+    for (label, mode, synth) in ladder {
+        let opts = EmitOpts {
+            mode,
+            synthesize_metadata: synth,
+            ..EmitOpts::default()
+        };
         g.bench_function(label, |b| {
             b.iter(|| emit_ags4(black_box(&input), &opts).expect("emits"));
         });

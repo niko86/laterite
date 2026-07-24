@@ -21,14 +21,14 @@ use laterite_types::arrow_cols::build_record_batch;
 
 const N_ROWS: usize = 50_000;
 
-/// (ags_type, a value that type actually parses) — one column per family so
+/// (`ags_type`, a value that type actually parses) — one column per family so
 /// each bench measures that family's caster in isolation.
 const FAMILIES: [(&str, &str); 5] = [
-    ("ID", "BH0001"),                 // string passthrough
-    ("X", "Firm grey sandy CLAY"),    // string passthrough, longer
-    ("2DP", "12.34"),                 // decimal-places float
-    ("3SF", "1.23"),                  // significant-figures float
-    ("DT", "2024-01-15T09:30:00"),    // datetime parse — the costliest caster
+    ("ID", "BH0001"),              // string passthrough
+    ("X", "Firm grey sandy CLAY"), // string passthrough, longer
+    ("2DP", "12.34"),              // decimal-places float
+    ("3SF", "1.23"),               // significant-figures float
+    ("DT", "2024-01-15T09:30:00"), // datetime parse — the costliest caster
 ];
 
 fn bench_families(c: &mut Criterion) {

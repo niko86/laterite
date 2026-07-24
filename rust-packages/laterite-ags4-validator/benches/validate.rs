@@ -3,8 +3,8 @@
 //! The old bench here measured `check_file` on a real 23 MB delivery kept in
 //! gitignored working space. Two problems: the fixture existed on exactly one
 //! machine (everywhere else the bench self-skipped and `cargo bench` reported
-//! success while measuring nothing), and `check_file` bundles file I/O + parse
-//! + rules into one number, so a rules regression could hide behind parse and
+//! success while measuring nothing), and `check_file` bundles file I/O, parse
+//! and rules into one number, so a rules regression could hide behind parse and
 //! vice versa. Fixtures now come from `tools/gen-bench-fixtures.sh`
 //! (forge-synthesised, deterministic, no real delivery data), and the work is
 //! benched at two levels:
@@ -26,7 +26,8 @@ use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, Dictionary, WorldScope, check_file, check_parsed, parse,
+    CheckOptions, DictVersion, Dictionary, Findings, WorldScope, check_file, check_parsed, parse,
+    rules,
 };
 
 fn fixture(label: &str) -> Option<PathBuf> {
@@ -81,5 +82,76 @@ fn bench_rules_only(c: &mut Criterion) {
     g.finish();
 }
 
-criterion_group!(benches, bench_check_file, bench_rules_only);
+/// Per-rule-FAMILY staging.
+///
+/// `check_parsed` says the rules engine is the bulk of validate; it cannot say
+/// WHICH rules, and "optimise the rules engine" is not an actionable finding.
+/// `rules::run_all` is `pub(crate)`, but every family's `check` is `pub`, so
+/// each one can be timed directly over the same parsed file — no API change and
+/// no profiler needed to get the first cut.
+///
+/// Same argument order as `run_all` so this reads against that dispatch list.
+/// Note the families take different inputs (some need the dictionary, some the
+/// options), which is why this is a hand-written ladder rather than a loop.
+fn bench_rule_families(c: &mut Criterion) {
+    let Some(path) = fixture("large") else {
+        eprintln!("validate: no large fixture — run tools/gen-bench-fixtures.sh");
+        return;
+    };
+    let bytes = std::fs::read(&path).expect("fixture readable");
+    let parsed = parse::parse_bytes(&bytes, encoding_rs::UTF_8).expect("fixture parses");
+    let dict = Dictionary::bundled(DictVersion::V4_1_1);
+    let opts = CheckOptions::default();
+
+    let mut g = c.benchmark_group("validate/rule-family");
+    g.sample_size(10).measurement_time(Duration::from_secs(20));
+    g.throughput(Throughput::Bytes(bytes.len() as u64));
+
+    macro_rules! fam {
+        ($name:literal, $call:expr) => {
+            g.bench_function($name, |b| {
+                b.iter(|| {
+                    let mut found = Findings::new();
+                    #[allow(clippy::redundant_closure_call)]
+                    ($call)(&mut found);
+                    found
+                });
+            });
+        };
+    }
+
+    fam!("line_format", |f: &mut Findings| rules::line_format::check(
+        &parsed, &opts, f
+    ));
+    fam!("structure", |f: &mut Findings| rules::structure::check(
+        &parsed, f
+    ));
+    fam!("naming", |f: &mut Findings| rules::naming::check(
+        &parsed, f
+    ));
+    fam!("dictionary", |f: &mut Findings| rules::dictionary::check(
+        &parsed, &dict, f
+    ));
+    fam!("typed_values", |f: &mut Findings| {
+        rules::typed_values::check(&parsed, f);
+    });
+    fam!("relational", |f: &mut Findings| rules::relational::check(
+        &parsed, &dict, f
+    ));
+    fam!("references", |f: &mut Findings| rules::references::check(
+        &parsed, &dict, f
+    ));
+    fam!("groups", |f: &mut Findings| rules::groups::check(
+        &parsed, &dict, &opts, f
+    ));
+
+    g.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_check_file,
+    bench_rules_only,
+    bench_rule_families
+);
 criterion_main!(benches);

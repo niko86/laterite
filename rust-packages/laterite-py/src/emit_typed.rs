@@ -79,6 +79,9 @@ pub fn emit_ags4_from_arrow(
     let opts = EmitOpts {
         mode: parse_mode(mode.as_deref())?,
         edition: parse_edition(edition.as_deref())?,
+        // Metadata synthesis stays ON here: callers get the 2026-06-25
+        // one-call-valid behaviour. See EmitOpts::default.
+        ..EmitOpts::default()
     };
 
     let mut groups: Vec<GroupInput> = Vec::with_capacity(tables.len());

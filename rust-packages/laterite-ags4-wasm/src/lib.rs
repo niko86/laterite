@@ -307,6 +307,9 @@ fn emit_report(
     let opts = laterite_ags4_emit::EmitOpts {
         mode: emit_mode(mode)?,
         edition: emit_edition(edition)?,
+        // Metadata synthesis stays ON here: this surface's callers get the
+        // 2026-06-25 one-call-valid behaviour. See EmitOpts::default.
+        ..laterite_ags4_emit::EmitOpts::default()
     };
     let res = laterite_ags4_emit::emit_ags4(&groups, &opts).map_err(|e| e.to_string())?;
     let findings = res
