@@ -272,9 +272,7 @@ def test_synthesise_metadata_mints_the_missing_catalogs_when_asked():
     # Opted in, build_ags4 mints the mandatory UNIT/TYPE catalogs (from the data)
     # and a placeholder TRAN, so a data-only build is valid in one call.
     loca = pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
-    res = laterite.build_ags4(
-        {"PROJ": _proj(), "LOCA": loca}, synthesise_metadata=True
-    )
+    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, synthesise_metadata=True)
     assert {"TRAN", "UNIT", "TYPE"}.issubset(laterite.read(data=res.bytes).groups)
     assert not res.findings  # fully valid, no Rule 14/15/17
 
@@ -302,9 +300,7 @@ def test_synthesise_metadata_mints_abbr_for_pa_codes():
     # When the data uses a PA picklist code (LOCA_TYPE is a PA heading), opted-in
     # synthesis also mints ABBR (Rule 16) defining that code.
     loca = pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_TYPE": ["TP"]})
-    res = laterite.build_ags4(
-        {"PROJ": _proj(), "LOCA": loca}, synthesise_metadata=True
-    )
+    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, synthesise_metadata=True)
     assert "ABBR" in laterite.read(data=res.bytes).groups
     assert '"DATA","LOCA_TYPE","TP"' in res.text
     assert not res.findings  # fully valid, incl. Rule 16
