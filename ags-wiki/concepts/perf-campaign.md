@@ -243,12 +243,48 @@ Below the floor, measured out — recorded so they are not rediscovered:
 
 ### Correctness and measurement — outside the ranking, not subject to the floor
 
-| id | item | why it is not a perf row |
-|---|---|---|
-| **C1** | `from_shared` silently collapses duplicate headings (`ags4_codec.rs:150-157`) and silently drops a trim-colliding duplicate GROUP (`:123`) | silent data loss on `lat read`, node read, `read_groups_raw` and `laterite-excel` — none of which runs the rule engine |
-| **C2** | `arrow_in.rs`'s catch-all cell formatter (`:97-101`), which every `DT` column and any user Decimal/Date column reaches, has zero tests and is compiled by no CI test job | a silent `Value::Null` on a shipped public entry point (`build_ags4`) |
-| **M1** | `laterite-types/arrow` (651 lines) is compiled out of the nightly coverage build by resolver-v2 feature unification once its only four enablers are excluded | the 88% gate silently excludes the Arrow boundary that ships inside the wheel and the node binding |
-| **M2** | the bench fixture is **clean by construction**, so `findings::add`, rule 10b's per-bad-row `format!`/`join`, rule 11c's O(child × target) scan and the entire FYI tier are never executed by any bench | unknown by construction — validating a file *with errors* is an unmeasured workload |
+| id | item | status | why it is not a perf row |
+|---|---|---|---|
+| **C1** | `from_shared` collapsed duplicate headings (`ags4_codec.rs`) | **LANDED** (#88) | wrong data, not merely lost data — see below |
+| **C2** | `arrow_in.rs` had zero tests and compiled under no CI test job | **LANDED** (#87) | untested code shipping inside the wheel and the node binding |
+| **M1** | `laterite-types/arrow` + `laterite-ags4-emit/arrow` (651 lines) were compiled out of the coverage build by resolver-2 feature unification once their only four enablers are excluded | **LANDED** (#87) | the 88% gate was not measuring the Arrow boundary at all |
+| **M2** | the bench fixture is **clean by construction**, so `findings::add`, rule 10b's per-bad-row `format!`/`join`, rule 11c's O(child × target) scan and the entire FYI tier are never executed by any bench | open — T5 | unknown by construction: validating a file *with errors* is an unmeasured workload |
+
+**C1, as measured rather than as queued.** The row above originally read
+"silently collapses duplicate headings". That understated it. Rows are keyed by
+heading name, and every consumer walks `headings` *positionally* then indexes the
+row *by name* (`laterite-excel:144`, node `lib.rs:117`, wasm `lib.rs:1198`,
+`read_groups_raw`) — so the survivor was returned for **both** positions. Built
+against the pre-fix commit, a `LOCA` with headings `LOCA_ID, LOCA_GL, LOCA_ID`
+and values `FIRST, 1.00, SECOND` read back as:
+
+```
+['SECOND', '1.00', 'SECOND']
+```
+
+`FIRST` gone **and** `SECOND` duplicated into its column, with no error. A column
+that looks fully populated and is wrong is a worse failure than a missing one,
+because nothing downstream can detect it. Now fatal by default, with an opt-in
+`__2` suffix recovery on every read surface.
+
+> [!warning] **C2 was overstated when queued, and this is the correction.** The
+> row read "a silent `Value::Null` on a shipped public entry point". Probing
+> arrow 59 across union, run-end, dictionary, struct, map, interval, duration,
+> binary, fixed-size-binary and time64, `ArrayFormatter::try_new` does not fail
+> for **any** of them — the `Err` arm is defensive, not live. The real defect was
+> only ever that none of the file compiled in CI. A test now pins the fallback so
+> it cannot start swallowing real cells without going red first.
+>
+> That is the **fourth** time this campaign has recorded a mechanism that was
+> wrong while its framing was right. The framing earned the fix; the mechanism
+> did not survive being read. Both halves belong in the ledger.
+
+> [!note] **M1 cost less than budgeted.** The decision accepted that the headline
+> coverage number would drop when 651 lines entered the denominator. Measured
+> over the identical exclude set it came in at **89.24%** against the previously
+> documented 89.6% — 0.36 points — because `arrow_cols.rs` (88%) and `ipc.rs`
+> (100%) were already well covered by their own tests and merely invisible to the
+> measurement. The floor stayed at 88; no re-baseline was needed.
 
 ## Tranches
 
@@ -289,7 +325,11 @@ cannot be reasoned about while the layer above it is unmeasured.
   for every row, so the `append_null` branch a sparse delivery takes constantly
   is never timed.
 - Bench `build_record_batch_compat`, `build_record_batch_with_ids` and `ipc.rs`.
-- Fix **M1** in the same PR and re-baseline `--fail-under-lines`.
+
+> [!note] **M1 no longer belongs to this tranche** — it landed early in #87,
+> alongside C2, because turning the feature edge back on without C2's tests would
+> have moved the gate before anything held it. The coverage denominator is
+> already honest; T2 is now purely a measurement tranche.
 
 **Exit:** a typed-read row exists on the baseline table, and #2 is rankable
 against a measured stage rather than a heading census.
