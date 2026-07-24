@@ -8,7 +8,7 @@
 // alignment, fix-preview pairing) that CONSUMES those tokens. The tokenizer
 // surface is re-exported here so existing importers of `./agsline` are unchanged.
 
-import { splitAgsFields } from "./tokenizer";
+import { fieldSlice, splitAgsFields } from "./tokenizer";
 
 export {
   splitAgsFields,
@@ -40,7 +40,7 @@ function lineTag(raw: string): string {
   const fields = splitAgsFields(raw);
   if (fields.length === 0) return "";
   const f = fields[0]!; // length !== 0 checked above → in-bounds.
-  return Array.from(raw).slice(f.valueStart, f.valueEnd).join("");
+  return fieldSlice(Array.from(raw), f.valueStart, f.valueEnd);
 }
 
 export interface GroupBlock {
@@ -188,7 +188,8 @@ export function alignBlock(block: GroupBlock): AlignedBlock {
     let w = 0;
     for (const fs of split) {
       if (!fs) continue;
-      const len = c < fs.length ? Array.from(fs[c]!.text).length : 0;
+      // A token's display width IS its offset span — no string needed.
+      const len = c < fs.length ? fs[c]!.end - fs[c]!.start : 0;
       if (len > w) w = len;
     }
     widths[c] = w;
@@ -199,10 +200,13 @@ export function alignBlock(block: GroupBlock): AlignedBlock {
       return { n: r.n, hit: false, cells: [], ellipsis: r.ellipsis };
     }
     const fs = split[ri]!;
+    // Split ONCE per row, not once per field — slicing each field from its own
+    // Array.from(raw) would be quadratic in the row's width.
+    const chars = Array.from(r.raw);
     const cells: AlignedCell[] = fs.map((f, c) => {
-      const text = f.text;
+      const text = fieldSlice(chars, f.start, f.end);
       // c < fs.length ≤ colCount = widths.length → widths[c] is in-bounds.
-      const pad = Math.max(0, widths[c]! - Array.from(text).length);
+      const pad = Math.max(0, widths[c]! - (f.end - f.start));
       // valueStart/valueEnd are token-relative; rebase onto the cell.
       return {
         padded: text + " ".repeat(pad),
@@ -244,9 +248,11 @@ export function fixBlock(
   return { rows };
 }
 
-// The lossless-reassembly invariant (concat of every `.text` rebuilds `raw`)
+// The tiling invariant (every token's [start,end) range, concatenated, rebuilds `raw`)
 // and the inner-value bounds are load-bearing — every fix preview and the
 // Anonymiser/Coordinate tools rebuild lines from these tokens. They are now
-// pinned authoritatively in Rust (`laterite-ags4-parse`'s `tokenize_spans`
-// proptest), the single source the wasm tokenizer wraps; the browser-side
-// display logic above (groupBlock/alignBlock/fixBlock) keeps its own tests.
+// pinned authoritatively in Rust (`laterite-ags4-parse`'s `display_spans.rs`
+// proptest), the single source the wasm tokenizer wraps — though only in BYTES:
+// the code-point offsets JS receives come from a conversion in the wasm adapter,
+// so the wasm test lane is where that unit is checked. The browser-side display
+// logic above (groupBlock/alignBlock/fixBlock) keeps its own tests.

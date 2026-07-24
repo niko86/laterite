@@ -876,151 +876,17 @@ pub fn field_span(line: &str, field_index: u32) -> Option<(u32, u32)> {
         }
     }
 }
-
 // --- offset-preserving field tokenizer (#533) -----------------------
-
-/// One field token of an AGS4 line: its raw slice plus the char offsets a
-/// browser highlight needs. This is the single source of the browser's
-/// `splitAgsFields` shape — the wasm tokenizer wraps it, retiring the TS copy
-/// in `web/src/lib/agsline.ts` (#533, part of the #527 convergence arc).
-///
-/// Offsets are **code points** (Unicode scalars), matching JS `[...raw]`
-/// indexing, so an astral char (e.g. an emoji) never splits an offset. The
-/// lossless-reassembly invariant holds: concatenating every span's [`text`](Self::text)
-/// in order reproduces the input line exactly (pinned by the tokenizer proptest).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AgsSpan {
-    /// Raw slice for this field: its content INCLUDING surrounding quotes and
-    /// the trailing comma delimiter (the last field has no trailing comma).
-    pub text: String,
-    /// Code-point offset where this token starts in the line.
-    pub start: u32,
-    /// Code-point offset one past this token's end.
-    pub end: u32,
-    /// Code-point offset of the field's INNER value — between the quotes for a
-    /// quoted field, or the trimmed content for an unquoted one; excludes the
-    /// quotes AND the trailing comma. An empty quoted field has
-    /// `value_start == value_end` (a zero-width inner span).
-    pub value_start: u32,
-    /// Code-point offset one past the inner value's end.
-    pub value_end: u32,
-}
-
-/// Tokenize an AGS4 line into offset-preserving field spans — the browser's
-/// `splitAgsFields` (agsline.ts) ported verbatim so the two can never drift.
-///
-/// Each token spans its field content plus the trailing comma that follows it;
-/// stray whitespace between a comma and the next quote rides along with the
-/// following token, so concatenating every [`AgsSpan::text`] rebuilds `line`
-/// exactly. An empty line yields exactly one empty field (never zero).
-#[must_use]
-pub fn tokenize_spans(line: &str) -> Vec<AgsSpan> {
-    // Code-point aware (like JS `[...raw]`): index a scalar vec so astral
-    // chars don't split an offset mid-surrogate.
-    let chars: Vec<char> = line.chars().collect();
-    let n = chars.len();
-    let mut fields: Vec<AgsSpan> = Vec::new();
-
-    let mut i = 0usize;
-    let mut token_start = 0usize;
-    let mut in_quotes = false;
-    // Inner-value bounds of the field being read. `Some` once an opening quote
-    // is seen; `None` means unquoted, and the bounds are derived (trimmed) at
-    // push time from the token itself.
-    let mut value_start: Option<usize> = None;
-    let mut value_end = 0usize;
-
-    while i < n {
-        let c = chars[i];
-        if in_quotes {
-            if c == '"' {
-                // A doubled quote ("") is an escaped literal, not a close.
-                if chars.get(i + 1) == Some(&'"') {
-                    i += 2;
-                    continue;
-                }
-                in_quotes = false;
-                value_end = i; // content ends just before the closing quote.
-            }
-            i += 1;
-            continue;
-        }
-        // Outside quotes:
-        if c == '"' {
-            in_quotes = true;
-            i += 1;
-            value_start = Some(i); // content begins just inside the opening quote.
-            value_end = i; // empty field defaults to a zero-width inner span.
-        } else if c == ',' {
-            // The comma closes the current token (it rides along, per the rule).
-            i += 1;
-            fields.push(make_span(
-                &chars,
-                token_start,
-                i,
-                true,
-                value_start,
-                value_end,
-            ));
-            value_start = None;
-            value_end = 0;
-            token_start = i;
-        } else {
-            i += 1;
-        }
-    }
-
-    // Trailing token (after the last comma, or the whole line if commaless).
-    if token_start < n || fields.is_empty() {
-        fields.push(make_span(
-            &chars,
-            token_start,
-            n,
-            false,
-            value_start,
-            value_end,
-        ));
-    }
-
-    fields
-}
-
-/// Build one [`AgsSpan`] for `[token_start, end)`. With no quote seen
-/// (`value_start` is `None`), the inner value is the space-trimmed content up
-/// to the trailing comma; otherwise the recorded quoted bounds are used.
-// These are code-point offsets within ONE line of AGS4 text — a
-// >4-billion-character single line isn't a realistic input (AGS4 files are
-// line-oriented tabular data, not one giant record).
-#[allow(clippy::cast_possible_truncation)]
-fn make_span(
-    chars: &[char],
-    token_start: usize,
-    end: usize,
-    had_comma: bool,
-    value_start: Option<usize>,
-    value_end: usize,
-) -> AgsSpan {
-    let (vs, ve) = if let Some(vs) = value_start {
-        (vs, value_end)
-    } else {
-        // Unquoted (or empty) — trim spaces within the content (the
-        // trailing comma at `end-1`, if any, is excluded first).
-        let content_end = if had_comma { end - 1 } else { end };
-        let mut vs = token_start;
-        let mut ve = content_end;
-        while vs < ve && chars[vs] == ' ' {
-            vs += 1;
-        }
-        while ve > vs && chars[ve - 1] == ' ' {
-            ve -= 1;
-        }
-        (vs, ve)
-    };
-    AgsSpan {
-        text: chars[token_start..end].iter().collect(),
-        start: token_start as u32,
-        end: end as u32,
-        value_start: vs as u32,
-        value_end: ve as u32,
-    }
-}
+//
+// RETIRED 2026-07-24. `AgsSpan` + `tokenize_spans` were a third hand-written
+// implementation of the AGS4 line grammar; `scan::RawField` is a strict
+// superset of what they returned (the same four bounds, plus `quoted`,
+// `has_escape` and `had_comma`), so callers use `scan::scan_line(line, DISPLAY)`
+// directly. See `scan.rs` for why the value policy is a parameter.
+//
+// The one deliberate change: bounds are BYTES, not code points. Rust callers
+// index `&str` by byte and previously could not use the offsets at all — which
+// is exactly why `AgsSpan` carried an owned `text` copy of every field. The
+// browser still needs code points, so that conversion now happens in the wasm
+// adapter that actually has the requirement, instead of every consumer paying
+// for a materialised string it mostly did not want.

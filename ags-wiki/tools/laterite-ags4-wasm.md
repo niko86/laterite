@@ -26,7 +26,7 @@ sources: []
 > Since #533 (part of the #527 convergence arc) the browser also loads a
 > SEPARATE, deliberately tiny sibling cdylib, `laterite-ags4-tokenizer-wasm`
 > (~30 KB vs this crate's ~6.9 MB) — two `#[wasm_bindgen]` wrappers over
-> `laterite-ags4-parse::tokenize_spans` and `laterite-types::quote_field` for
+> `laterite-ags4-parse::scan::scan_line` and `laterite-types::quote_field` for
 > the inline line editor/preview, instantiated on the main thread rather than
 > in this crate's Web Worker. It shares no dependency edge with this crate.
 > See [[crate-map]] for its full listing.

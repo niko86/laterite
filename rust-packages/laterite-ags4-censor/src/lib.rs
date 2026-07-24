@@ -4,7 +4,7 @@
 //! `censor.rs` so the browser `Anonymiser` drives the same engine (through the
 //! engine wasm) instead of a hand-written TS reimplementation. Part of the #527
 //! cross-surface convergence arc — the sibling of the #533 tokenizer/quoter
-//! work: the scrub now reads fields through the shared [`tokenize_spans`] parse
+//! work: the scrub now reads fields through the shared [`scan_line`] parse
 //! leaf and re-quotes through `laterite-types`, so no fourth AGS4 tokenizer.
 //!
 //! **Cell-surgical, defect-preserving.** Only DATA cells that actually change
@@ -31,7 +31,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 
-use laterite_ags4_parse::{AgsSpan, tokenize_spans};
+use laterite_ags4_parse::scan::{DISPLAY, RawField, scan_line};
 use laterite_types::quote_field;
 use serde::Deserialize;
 
@@ -215,18 +215,22 @@ fn lines_with_terminators(text: &str) -> Vec<(&str, &str)> {
 /// caller passes that line through verbatim and we never corrupt what we can't
 /// cleanly read (a malformed row, a quoted-newline continuation).
 ///
-/// Tokenizing is the shared parse leaf's [`tokenize_spans`]; this is only the
+/// Tokenizing is the shared parse leaf's [`scan_line`]; this is only the
 /// strict all-quoted *gate* the byte-faithful scrub needs on top of it (the
 /// tolerant tokenizer never rejects).
-fn clean_quoted_fields(spans: &[AgsSpan]) -> Option<Vec<String>> {
+fn clean_quoted_fields(content: &str, spans: &[RawField]) -> Option<Vec<String>> {
     // A well-formed line's final field carries no trailing delimiter; a trailing
-    // comma means a phantom (unquoted, empty) field → malformed.
-    if spans.last().is_none_or(|s| s.text.ends_with(',')) {
+    // comma means a phantom (unquoted, empty) field → malformed. The scanner
+    // records this directly, so it is no longer inferred from a string suffix.
+    if spans.last().is_none_or(|s| s.had_comma) {
         return None;
     }
     let mut out = Vec::with_capacity(spans.len());
     for s in spans {
-        let raw = s.text.strip_suffix(',').unwrap_or(&s.text);
+        // Byte bounds into the line we were given — no per-field copy. This is
+        // what `AgsSpan.text` was standing in for when the offsets were code
+        // points and therefore unusable from Rust.
+        let raw = &content[s.token_start..token_content_end(s)];
         // Every field must be `"…"`. The outer quotes are ASCII (1 byte each),
         // so the slice is on char boundaries; un-double the escaped inner quotes.
         if raw.len() < 2 || !raw.starts_with('"') || !raw.ends_with('"') {
@@ -240,10 +244,20 @@ fn clean_quoted_fields(spans: &[AgsSpan]) -> Option<Vec<String>> {
 /// Tokenize one line's content (terminator already split off) and decode it if
 /// it's clean all-quoted AGS4. Returns the field spans (for cell-surgical
 /// re-emit) alongside the decoded values.
-fn read_line(content: &str) -> Option<(Vec<AgsSpan>, Vec<String>)> {
-    let spans = tokenize_spans(content.trim_end_matches('\r'));
-    let values = clean_quoted_fields(&spans)?;
+fn read_line(content: &str) -> Option<(Vec<RawField>, Vec<String>)> {
+    let body = content.trim_end_matches('\r');
+    let spans = scan_line(body, DISPLAY);
+    let values = clean_quoted_fields(body, &spans)?;
     Some((spans, values))
+}
+
+/// One past a token's content, excluding the trailing comma when one closed it.
+fn token_content_end(s: &RawField) -> usize {
+    if s.had_comma {
+        s.token_end - 1
+    } else {
+        s.token_end
+    }
 }
 
 /// Canonical AGS4 emission of a field list — every field quoted (inner quotes
@@ -583,11 +597,14 @@ pub fn censor(text: &str, file_id: &str, policy: &Policy, opts: &CensorOptions) 
                     &mut tally,
                 );
                 if new == *val {
-                    line.push_str(&span.text);
+                    // `read_line` scanned `content` minus any trailing CR — a
+                    // SUFFIX trim, so start-relative byte offsets index either
+                    // string identically.
+                    line.push_str(&content[span.token_start..span.token_end]);
                 } else {
                     changed = true;
                     line.push_str(&quote_field(&new));
-                    if span.text.ends_with(',') {
+                    if span.had_comma {
                         line.push(',');
                     }
                 }
@@ -653,7 +670,7 @@ mod tests {
 
     #[test]
     fn clean_quoted_fields_handles_quoting_and_rejects_malformed() {
-        let read = |line: &str| clean_quoted_fields(&tokenize_spans(line));
+        let read = |line: &str| clean_quoted_fields(line, &scan_line(line, DISPLAY));
         assert_eq!(
             read(r#""DATA","a","b,c","he ""hi""""#).unwrap(),
             vec!["DATA", "a", "b,c", "he \"hi\""]

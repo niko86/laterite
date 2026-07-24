@@ -1,12 +1,16 @@
-//! PROTOTYPE — one AGS4 line scanner, in bytes.
+//! One AGS4 line scanner, in bytes.
 //!
-//! The grammar (quote-wrapped fields, `""` escapes, comma separators) is
-//! currently implemented THREE times in `lib.rs`: `split_ags_line` (owned
-//! unescaped values), `field_span` (char span of one field) and
-//! `tokenize_spans` (all spans, lossless reassembly). Three hand-written
-//! machines over one grammar, which is how they came to disagree on four
-//! behaviours — empty-line field count, unquoted trimming, field indexing and
-//! whether `""` stays escaped.
+//! The grammar (quote-wrapped fields, `""` escapes, comma separators) was
+//! implemented three times in `lib.rs`: `split_ags_line` (owned unescaped
+//! values), `field_span` (char span of one field) and `tokenize_spans` (all
+//! spans, lossless reassembly). Three hand-written machines over one grammar,
+//! which is how they came to disagree on five behaviours — empty-line field
+//! count, unquoted trimming, field indexing, whether `""` stays escaped, and
+//! what an unterminated quote yields.
+//!
+//! `tokenize_spans` has since been RETIRED onto this core (its `RawField` is a
+//! strict superset of the old `AgsSpan`); `split_ags_line` and `field_span`
+//! still carry their own implementations.
 //!
 //! This is the shared core they can all sit on. Two design choices make that
 //! possible without taxing the hot path:
@@ -290,11 +294,13 @@ fn finish(
 #[cfg(test)]
 mod differential {
     use super::*;
-    use crate::{split_ags_line, tokenize_spans};
+    use crate::split_ags_line;
 
-    /// Every line of the real fixture, plus edge cases, through both the new
-    /// core and each incumbent. This is the evidence that consolidation is
-    /// behaviour-preserving — or the list of places it isn't.
+    /// Edge cases plus every line of the real fixture when it is present.
+    /// `tokenize_spans` is gone — the core IS the display tokenizer now, so the
+    /// only differential left is against `split_ags_line`. The display
+    /// contract itself is pinned in `tests/display_spans.rs`, and the
+    /// code-point offsets the browser actually receives in the web wasm lane.
     fn corpus() -> Vec<String> {
         let mut v: Vec<String> = vec![
             String::new(),
@@ -317,56 +323,6 @@ mod differential {
         v
     }
 
-    #[test]
-    fn field_count_matches_tokenize_spans() {
-        let mut mismatches = 0usize;
-        for l in corpus() {
-            if scan_line(&l, DISPLAY).len() != tokenize_spans(&l).len() {
-                mismatches += 1;
-                if mismatches <= 5 {
-                    eprintln!("COUNT differs on {l:?}");
-                }
-            }
-        }
-        assert_eq!(mismatches, 0, "{mismatches} field-count mismatches");
-    }
-
-    #[test]
-    fn value_bounds_match_tokenize_spans() {
-        let mut mismatches = 0usize;
-        for l in corpus() {
-            let mine = scan_line(&l, DISPLAY);
-            let theirs = tokenize_spans(&l);
-            if mine.len() != theirs.len() {
-                continue;
-            }
-            for (m, t) in mine.iter().zip(theirs.iter()) {
-                let my_val = &l[m.value_start..m.value_end];
-                let their_val: String = l
-                    .chars()
-                    .skip(t.value_start as usize)
-                    .take((t.value_end - t.value_start) as usize)
-                    .collect();
-                if my_val != their_val {
-                    mismatches += 1;
-                    if mismatches <= 5 {
-                        eprintln!("VALUE differs on {l:?}: mine={my_val:?} theirs={their_val:?}");
-                    }
-                }
-            }
-        }
-        assert_eq!(mismatches, 0, "{mismatches} value mismatches");
-    }
-
-    /// `first_field` returns a BORROWED slice, so it cannot unescape: a `""`
-    /// becomes a single `"` only by allocating, and a span of the source cannot
-    /// express a value shorter than itself. So the contract is "raw inner
-    /// slice", and `RawField::has_escape` tells a caller when that differs from
-    /// the logical value.
-    ///
-    /// This is sound for its caller: Rule 3 compares against GROUP / HEADING /
-    /// UNIT / TYPE / DATA, none of which contain a quote — a field with an
-    /// escape is not a descriptor under either reading.
     #[test]
     fn first_field_matches_split_ags_line_where_unescaped() {
         let mut mismatches = 0usize;

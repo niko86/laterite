@@ -184,8 +184,12 @@ row, benched in `parse/per-line` so the claim stays reproducible):
 the divergence is a handful of comparisons at token close, not a second walk. The
 separation argued for above on design grounds costs nothing to keep.
 
-`tokenize_spans`' 3.5× is its `Vec<char>` per line plus one `String` per field —
-the prize still on the table.
+`tokenize_spans`' 3.5× was its `Vec<char>` per line plus one `String` per field.
+**Claimed 2026-07-24:** it was retired onto the core, and its `AgsSpan` — whose
+owned `text` existed only because code-point offsets are unusable from Rust —
+became `RawField`. Two implementations remain (`split_ags_line`, `field_span`);
+`field_span` is kept deliberately, because folding it would cost the
+short-circuit that makes it 48.7 ns.
 
 One divergence is irreducible: a borrowed slice **cannot unescape**, since `""`→`"`
 yields a value shorter than its source. `RawField::has_escape` flags it. Sound for

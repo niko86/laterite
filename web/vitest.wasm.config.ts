@@ -9,7 +9,7 @@ import { defineConfig } from "vitest/config";
 // `npm run test:wasm`.
 //
 // No coverage gate here: the tokenizer's own invariants are pinned
-// authoritatively in Rust (laterite-ags4-parse's `tokenize_spans` proptest),
+// authoritatively in Rust (laterite-ags4-parse's `display_spans.rs` proptest),
 // and the fast `unit` lane keeps the lines floor for the pure modules.
 export default defineConfig({
   test: {

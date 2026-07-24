@@ -2,7 +2,7 @@
 // Rust leaves through a tiny dedicated wasm (#533, part of the #527 arc).
 //
 // This retires the hand-written TS state machine that used to live in
-// agsline.ts: `splitAgsFields` now wraps `laterite_ags4_parse::tokenize_spans`
+// agsline.ts: `splitAgsFields` now wraps `laterite_ags4_parse::scan::scan_line`
 // and `quoteAgsField` wraps `laterite_types::quote_field`, so the browser
 // tokenizes/quotes through the SAME authority as every other surface (the
 // engine wasm, the wheel, the node binding, the CLI) instead of a second copy.
@@ -12,7 +12,8 @@
 // synchronous `splitAgsFields`/`quoteAgsField` below never run before the wasm
 // is live. The offset model these return is browser-only by design (excluded
 // from the #555 cross-surface value gate); its lossless-reassembly + code-point
-// offset invariants are pinned in Rust (`tokenize_spans` proptest).
+// offset invariants are pinned in Rust (`display_spans.rs` proptest), and the
+// byte->code-point conversion the adapter performs is pinned in this lane.
 
 import init, {
   tokenize_spans as wasmTokenize,
@@ -20,8 +21,6 @@ import init, {
 } from "../wasm-tokenizer/ags4_tokenizer.js";
 
 export interface AgsField {
-  /** The raw slice for this field, including quotes + trailing comma. */
-  text: string;
   /** Char offset (code points) where this token starts in `raw`. */
   start: number;
   /** Char offset (code points) one past this token's end. */
@@ -39,13 +38,30 @@ export interface AgsField {
 }
 
 /**
- * Split a raw AGS4 line into offset-preserving field tokens whose `.text`
- * slices, concatenated in order, reproduce `raw` exactly. Backed by the shared
- * Rust `tokenize_spans` via wasm — requires {@link tokenizerReady} to have
- * resolved (the app gates first render on it, so render-path callers are safe).
+ * Split a raw AGS4 line into offset-preserving field tokens whose `[start,end)`
+ * ranges tile `raw` exactly — no gap, no overlap. Backed by the shared Rust
+ * scanner via wasm; requires {@link tokenizerReady} to have resolved (the app
+ * gates first render on it, so render-path callers are safe).
+ *
+ * Tokens carry OFFSETS, not text. The caller already holds `raw`, so shipping a
+ * per-field copy back across the wasm boundary was sending JS its own data — a
+ * UTF-8→UTF-16 decode and an allocation per field. Use {@link fieldSlice} when
+ * you need the characters; several callers only need `end - start`, which is a
+ * length, not a string.
  */
 export function splitAgsFields(raw: string): AgsField[] {
   return wasmTokenize(raw) as AgsField[];
+}
+
+/** Characters of `raw` in `[start, end)`, by CODE POINT (the offset unit the
+ *  tokenizer returns). Pass a pre-split `Array.from(raw)` when slicing several
+ *  fields of the same line — splitting it per field is the quadratic trap. */
+export function fieldSlice(
+  chars: readonly string[],
+  start: number,
+  end: number,
+): string {
+  return chars.slice(start, end).join("");
 }
 
 /** Quote a raw value as an AGS4 field: wrap in double quotes, doubling any
