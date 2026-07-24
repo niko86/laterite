@@ -94,16 +94,15 @@ pub fn check(parsed: &ParsedFile, opts: &CheckOptions, found: &mut Findings) {
 
 /// Rule 1 — character set.
 fn rule_1(line: &str, n: u32, opts: &CheckOptions, found: &mut Findings) {
-    let mut max_cp = 0u32;
-    for c in line.chars() {
-        let cp = c as u32;
-        if cp > max_cp {
-            max_cp = cp;
-        }
-    }
-    if max_cp <= 127 {
+    // The overwhelmingly common case is a pure-ASCII line, which is compliant.
+    // `str::is_ascii` is a word-at-a-time byte scan, where the old per-char
+    // `max_cp` loop decoded every scalar — so this replaces the hot path's only
+    // full-line walk with a vectorised one, and the scalar decode below now runs
+    // only on the rare line that actually carries a non-ASCII character.
+    if line.is_ascii() {
         return; // pure ASCII — compliant
     }
+    let max_cp = line.chars().map(|c| c as u32).max().unwrap_or(0);
     if max_cp > 255 {
         let desc = if n == 1 {
             "Line contains non-ASCII character(s) (code point > 255), or a \
@@ -223,10 +222,15 @@ fn rule_6(line: &str, n: u32, found: &mut Findings) {
     // left here is illegal *within* a row (§4.1.1 Rule 6 bans both). Anchor on
     // the first one; its char offset is its char position (CR/LF is one scalar)
     // so [i, i+1) spans it.
-    if let Some(i) = line.chars().position(|c| c == '\r' || c == '\n') {
+    // CR and LF are ASCII, so a byte scan finds the first one without decoding
+    // every scalar — the common case has none and pays only the byte walk. Only
+    // at a hit do we convert the byte offset to the char offset the span wants
+    // (chars before the CR/LF may be multi-byte), by counting scalars in the
+    // prefix — a walk bounded to the rare offending line.
+    if let Some(b) = line.bytes().position(|b| b == b'\r' || b == b'\n') {
         // A char offset within ONE AGS4 line — bounded well under u32::MAX.
         #[allow(clippy::cast_possible_truncation)]
-        let i = i as u32;
+        let i = line[..b].chars().count() as u32;
         add_at(
             found,
             RULE_6,
@@ -249,35 +253,43 @@ fn rule_6(line: &str, n: u32, found: &mut Findings) {
 /// right desc — see [`QuotingDeviation`]. Strict counterpart to the
 /// tolerant `split_ags_line` (same grammar, opposite intent).
 fn check_quoting(line: &str) -> QuotingDeviation {
-    let mut chars = line.chars().peekable();
+    // Byte-level, not char-level: this grammar branches only on `"` (0x22) and
+    // `,` (0x2C), and no byte of a multi-byte UTF-8 scalar can equal an ASCII
+    // byte, so a byte walk is exactly equivalent to the old `chars()` one — every
+    // continuation/lead byte falls into the "other content" arm, as its scalar
+    // did — while skipping UTF-8 decoding.
+    let bytes = line.as_bytes();
+    let mut i = 0;
     loop {
         // Each field must open with a quote.
-        if chars.next() != Some('"') {
+        if bytes.get(i) != Some(&b'"') {
             return QuotingDeviation::NotEnclosed;
         }
+        i += 1;
         // Consume field body until the closing quote.
         loop {
-            match chars.next() {
+            match bytes.get(i) {
                 None => return QuotingDeviation::NotEnclosed, // unterminated
-                Some('"') => {
-                    if chars.peek() == Some(&'"') {
-                        chars.next(); // doubled quote — stays in field
+                Some(&b'"') => {
+                    if bytes.get(i + 1) == Some(&b'"') {
+                        i += 2; // doubled quote — stays in field
                     } else {
+                        i += 1;
                         break; // closing quote
                     }
                 }
-                Some(_) => {}
+                Some(_) => i += 1,
             }
         }
         // After a closing quote: either end-of-line or a comma + more.
-        // A non-comma non-EOL char here indicates the previous quote
+        // A non-comma non-EOL byte here indicates the previous quote
         // wasn't actually a field-closer — the author probably embedded
         // a lone `"` mid-field and meant to double it. python-ags4 emits
         // a distinct message for this case (test_rule_5_1) vs the
         // "not enclosed" case (test_rule_5_2).
-        match chars.next() {
+        match bytes.get(i) {
             None => return QuotingDeviation::Ok,
-            Some(',') => {}
+            Some(&b',') => i += 1,
             Some(_) => return QuotingDeviation::EmbeddedQuote,
         }
     }
@@ -410,6 +422,25 @@ mod tests {
         let f = run(&src, false);
         assert!(f.contains_key(RULE_6), "embedded LF not caught: {f:?}");
         assert_eq!(f[RULE_6][0].line, Some(6));
+    }
+
+    #[test]
+    fn rule_6_span_is_a_char_offset_not_a_byte_offset() {
+        // A 2-byte scalar (é, U+00E9) sits before the embedded CR. Rule 6 now
+        // finds the CR by a BYTE scan and must convert to the CHAR offset the
+        // span carries: the CR is the 10th char (index 9) but the 11th byte
+        // (index 10). A byte offset leaking through would read (10, 11).
+        //   " D A T A " ,  "  é  \r
+        //   0 1 2 3 4 5 6  7  8   9   ← char indices
+        let src = format!("{HEAD}\"DATA\",\"\u{00e9}\rb\"\r\n");
+        let f = run(&src, false);
+        let r6 = f.get(RULE_6).expect("embedded CR after a multi-byte char");
+        assert_eq!(
+            r6[0].location.char_span,
+            Some((9, 10)),
+            "span must be the CR's CHAR offset, not its byte offset: {:?}",
+            r6[0].location.char_span
+        );
     }
 
     #[test]
