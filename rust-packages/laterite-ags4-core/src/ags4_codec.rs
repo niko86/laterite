@@ -66,12 +66,51 @@ impl ParsedAgs4 {
     }
 }
 
+/// What the reader does when a group declares the same heading name twice.
+///
+/// AGS4 forbids it (Rule 7), and the validator raises it at error severity —
+/// but the *read* surfaces (`lat read`, `laterite-excel`, node,
+/// `read_groups_raw`) never run the rule engine. Left unhandled the collision is
+/// not merely lossy, it is **wrong**: rows are keyed by heading name, so the
+/// second occurrence overwrites the first, and consumers that walk `headings`
+/// positionally then read the survivor's value at *both* positions. The first
+/// column's data is gone and the second's is duplicated into its place, leaving
+/// a column that looks fully populated and is not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DuplicateHeadings {
+    /// Refuse the file, naming the offending heading. The default: a reader that
+    /// cannot represent the file faithfully should say so rather than hand back
+    /// a plausible-looking wrong answer.
+    #[default]
+    Error,
+    /// Disambiguate instead of colliding — the 2nd..nth occurrence of a name
+    /// become `NAME__2`, `NAME__3`, … in **both** `headings` and the row keys,
+    /// so positional reads line up again and no cell is lost.
+    ///
+    /// The result is deliberately **not valid AGS4** — a suffixed heading is not
+    /// a spec heading. This exists to recover data from a broken file, not to
+    /// round-trip one.
+    Recover,
+}
+
+/// Per-read behaviour switches. Defaults are the strict, faithful choices; a
+/// caller opts *into* leniency, never out of it by accident.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ReadOptions {
+    pub duplicate_headings: DuplicateHeadings,
+}
+
 /// Read an AGS4 file from a path — slurps the bytes and delegates to
 /// [`read_ags4_bytes`] (the shared leaf walks the whole buffer at once).
 pub fn read_ags4(path: &Path) -> Result<ParsedAgs4, CliError> {
+    read_ags4_with(path, ReadOptions::default())
+}
+
+/// [`read_ags4`] with explicit [`ReadOptions`].
+pub fn read_ags4_with(path: &Path, opts: ReadOptions) -> Result<ParsedAgs4, CliError> {
     let bytes =
         std::fs::read(path).map_err(|e| CliError::Schema(format!("open AGS4 file: {e}")))?;
-    read_ags4_bytes(&bytes)
+    read_ags4_bytes_with(&bytes, opts)
 }
 
 /// Read AGS4 from an in-memory byte buffer through the shared parse leaf, then
@@ -86,12 +125,17 @@ pub fn read_ags4(path: &Path) -> Result<ParsedAgs4, CliError> {
 /// So the leaf's `NotAgs4` is mapped back to an empty `ParsedAgs4`; structural
 /// violations (pre-GROUP rows, a code-less GROUP) still propagate as errors.
 pub fn read_ags4_bytes(bytes: &[u8]) -> Result<ParsedAgs4, CliError> {
+    read_ags4_bytes_with(bytes, ReadOptions::default())
+}
+
+/// [`read_ags4_bytes`] with explicit [`ReadOptions`].
+pub fn read_ags4_bytes_with(bytes: &[u8], read_opts: ReadOptions) -> Result<ParsedAgs4, CliError> {
     let opts = ParseOptions {
         strict_structure: true,
         ..ParseOptions::lean()
     };
     match parse_bytes_opts(bytes, opts) {
-        Ok(parsed) => Ok(from_shared(parsed)),
+        Ok(parsed) => from_shared(parsed, read_opts),
         Err(ParseError::NotAgs4(_)) => Ok(ParsedAgs4 {
             groups: HashMap::new(),
             order: Vec::new(),
@@ -100,13 +144,65 @@ pub fn read_ags4_bytes(bytes: &[u8]) -> Result<ParsedAgs4, CliError> {
     }
 }
 
+/// Resolve a group's heading list against [`DuplicateHeadings`].
+///
+/// Returns the names to key rows by. Under `Error` a repeat is a hard stop;
+/// under `Recover` the nth occurrence (n ≥ 2) becomes `NAME__n`. The suffix is
+/// applied to the *trimmed* name and counted per distinct name, so a third
+/// `LOCA_ID` is `LOCA_ID__3`, not `LOCA_ID__2__2`.
+///
+/// A generated name could in principle collide with a real heading that already
+/// ends `__2`, so the result is re-checked; that is a malformed file either way,
+/// and silently merging two columns is the one outcome this function exists to
+/// prevent.
+fn resolve_headings(
+    code: &str,
+    headings: Vec<String>,
+    policy: DuplicateHeadings,
+) -> Result<Vec<String>, CliError> {
+    let mut seen: HashMap<String, usize> = HashMap::with_capacity(headings.len());
+    let mut out: Vec<String> = Vec::with_capacity(headings.len());
+    for h in headings {
+        let n = seen.entry(h.clone()).or_insert(0);
+        *n += 1;
+        if *n == 1 {
+            out.push(h);
+            continue;
+        }
+        match policy {
+            DuplicateHeadings::Error => {
+                return Err(CliError::DuplicateHeading {
+                    group: code.to_string(),
+                    heading: h,
+                });
+            }
+            DuplicateHeadings::Recover => out.push(format!("{h}__{n}")),
+        }
+    }
+    if policy == DuplicateHeadings::Recover {
+        let mut check: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        for h in &out {
+            if !check.insert(h.as_str()) {
+                return Err(CliError::DuplicateHeading {
+                    group: code.to_string(),
+                    heading: h.clone(),
+                });
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// Project the shared leaf's positional, RAW [`ParsedFile`] into core's
 /// name-keyed, TRIMMED [`ParsedAgs4`] (#168 Phase 5). Re-applies the trims core
 /// has always done — the leaf leaves values raw (validator semantics) — on
 /// every heading/unit/type/value, pads UNIT to the heading count (empty) and
 /// TYPE (with `"X"`), and keys each DATA row by heading name. First-seen wins on
 /// a duplicate (trimmed) code, matching the csv reader this replaced.
-fn from_shared(pf: ParsedFile) -> ParsedAgs4 {
+///
+/// Duplicate heading NAMES within a group are a different matter and are
+/// governed by [`ReadOptions::duplicate_headings`] — see [`resolve_headings`].
+fn from_shared(pf: ParsedFile, read_opts: ReadOptions) -> Result<ParsedAgs4, CliError> {
     // Taken BY VALUE: the sole caller drops the parse immediately after, so
     // every heading/unit/type/value can be moved rather than cloned. Reading it
     // through a reference meant re-allocating the entire file's text a second
@@ -127,6 +223,9 @@ fn from_shared(pf: ParsedFile) -> ParsedAgs4 {
             continue; // group_order and groups are built together; defensive.
         };
         let headings: Vec<String> = pg.headings.into_iter().map(trim_owned).collect();
+        // Resolve BEFORE the UNIT/TYPE pad below, so those still align with the
+        // heading count — `Recover` renames headings, it never adds or drops one.
+        let headings = resolve_headings(&code, headings, read_opts.duplicate_headings)?;
         // Pad/truncate to the heading count — but ONLY when the row was actually
         // present (the csv reader resized inside its UNIT/TYPE arm; a group with
         // no UNIT row kept an empty vec, never padded). `unit_line`/`type_line`
@@ -170,7 +269,7 @@ fn from_shared(pf: ParsedFile) -> ParsedAgs4 {
             },
         );
     }
-    ParsedAgs4 { groups, order }
+    Ok(ParsedAgs4 { groups, order })
 }
 
 /// Trim a value WITHOUT reallocating it. `s.trim().to_string()` allocates even
@@ -305,5 +404,85 @@ mod tests {
             let parsed = read_ags4_bytes(empty).unwrap();
             assert!(parsed.order.is_empty() && parsed.groups.is_empty());
         }
+    }
+
+    /// A group whose HEADING row repeats a name. `LOCA_ID` appears at columns 0
+    /// and 2 with DIFFERENT values, which is what makes the old behaviour
+    /// detectable rather than merely lossy.
+    const DUP_HEADING: &[u8] = b"\"GROUP\",\"LOCA\"\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_GL\",\"LOCA_ID\"\n\
+\"UNIT\",\"\",\"m\",\"\"\n\
+\"TYPE\",\"ID\",\"2DP\",\"ID\"\n\
+\"DATA\",\"FIRST\",\"1.00\",\"SECOND\"\n";
+
+    #[test]
+    fn duplicate_heading_is_fatal_by_default() {
+        let err = read_ags4_bytes(DUP_HEADING).unwrap_err();
+        let CliError::DuplicateHeading { group, heading } = err else {
+            panic!("expected DuplicateHeading, got {err:?}");
+        };
+        assert_eq!((group.as_str(), heading.as_str()), ("LOCA", "LOCA_ID"));
+    }
+
+    /// The regression this exists to prevent. Rows are keyed by heading name, so
+    /// before the guard the second `LOCA_ID` overwrote the first and a
+    /// positional read — `headings[i]` → `row[&headings[i]]`, the shape
+    /// `laterite-excel`, node and `read_groups_raw` all use — returned
+    /// `["SECOND", "1.00", "SECOND"]`. `FIRST` was gone AND `SECOND` was
+    /// duplicated into its column, so the column looked populated and was wrong.
+    /// Recovery must keep both, in their own positions.
+    #[test]
+    fn recovery_keeps_every_cell_and_fixes_the_positional_read() {
+        let opts = ReadOptions {
+            duplicate_headings: DuplicateHeadings::Recover,
+        };
+        let parsed = read_ags4_bytes_with(DUP_HEADING, opts).expect("recovers");
+        let g = parsed.get("LOCA").expect("LOCA");
+        assert_eq!(g.headings, ["LOCA_ID", "LOCA_GL", "LOCA_ID__2"]);
+
+        let positional: Vec<&str> = g
+            .headings
+            .iter()
+            .map(|h| g.rows[0].get(h.as_str()).map_or("", String::as_str))
+            .collect();
+        assert_eq!(positional, ["FIRST", "1.00", "SECOND"]);
+
+        // UNIT/TYPE still align: renaming must not change the column count.
+        assert_eq!(g.units, ["", "m", ""]);
+        assert_eq!(g.types, ["ID", "2DP", "ID"]);
+    }
+
+    #[test]
+    fn recovery_numbers_each_repeat_from_two() {
+        let src = b"\"GROUP\",\"LOCA\"\n\
+\"HEADING\",\"A\",\"A\",\"A\",\"B\"\n\
+\"DATA\",\"1\",\"2\",\"3\",\"4\"\n";
+        let opts = ReadOptions {
+            duplicate_headings: DuplicateHeadings::Recover,
+        };
+        let parsed = read_ags4_bytes_with(src, opts).expect("recovers");
+        let g = parsed.get("LOCA").expect("LOCA");
+        // Counted per distinct name, so the third A is A__3 — not A__2__2.
+        assert_eq!(g.headings, ["A", "A__2", "A__3", "B"]);
+    }
+
+    /// A file that is already fine must be byte-identical under both policies —
+    /// the guard costs nothing and changes nothing for the 99.99% case.
+    #[test]
+    fn a_clean_file_reads_identically_under_either_policy() {
+        let src = b"\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\"\n\"DATA\",\"BH01\"\n";
+        let strict = read_ags4_bytes(src).expect("clean");
+        let recover = read_ags4_bytes_with(
+            src,
+            ReadOptions {
+                duplicate_headings: DuplicateHeadings::Recover,
+            },
+        )
+        .expect("clean");
+        assert_eq!(strict.order, recover.order);
+        assert_eq!(
+            strict.get("LOCA").unwrap().headings,
+            recover.get("LOCA").unwrap().headings
+        );
     }
 }

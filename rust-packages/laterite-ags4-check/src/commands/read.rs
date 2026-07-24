@@ -4,7 +4,7 @@
 
 use std::process::exit;
 
-use laterite_ags4_core::ags4_codec::{AgsGroup, read_ags4};
+use laterite_ags4_core::ags4_codec::{AgsGroup, DuplicateHeadings, ReadOptions, read_ags4_with};
 use laterite_ags4_core::read_render;
 use laterite_cliutil::{colour_enabled, styled_table, write_atomic};
 
@@ -18,7 +18,14 @@ pub fn run(args: &ReadArgs, json: bool) -> ! {
         eprintln!("error: {}: not found", path.display());
         exit(3);
     }
-    let parsed = match read_ags4(path) {
+    let read_opts = ReadOptions {
+        duplicate_headings: if args.recover_duplicate_headings {
+            DuplicateHeadings::Recover
+        } else {
+            DuplicateHeadings::Error
+        },
+    };
+    let parsed = match read_ags4_with(path, read_opts) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("error: {e}");

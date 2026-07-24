@@ -67,14 +67,19 @@ fn excel_to_ags4<'py>(
 /// `(xlsx_bytes, stats)` so a caller who wants the workbook without a temp file
 /// (e.g. streaming it to an upload) gets both.
 #[pyfunction]
-#[pyo3(signature = (data, ordered_keys=None))]
+#[pyo3(signature = (data, ordered_keys=None, recover_duplicate_headings=false))]
 fn ags4_bytes_to_xlsx<'py>(
     py: Python<'py>,
     data: &[u8],
     ordered_keys: Option<Vec<String>>,
+    recover_duplicate_headings: bool,
 ) -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyDict>)> {
-    let (xlsx, stats) =
-        laterite_excel::ags4_bytes_to_xlsx(data, ordered_keys).map_err(|e| map_cli_err(&e))?;
+    let (xlsx, stats) = laterite_excel::ags4_bytes_to_xlsx_with(
+        data,
+        ordered_keys,
+        read_opts(recover_duplicate_headings),
+    )
+    .map_err(|e| map_cli_err(&e))?;
     Ok((PyBytes::new(py, &xlsx), stats_to_pydict(py, stats)?))
 }
 
@@ -98,4 +103,17 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(ags4_bytes_to_xlsx, m)?)?;
     m.add_function(wrap_pyfunction!(xlsx_bytes_to_ags4, m)?)?;
     Ok(())
+}
+
+/// Map the surface-level boolean onto core's read policy. Duplicate headings are
+/// fatal by default on every read surface; a caller opts into recovery.
+fn read_opts(recover_duplicate_headings: bool) -> laterite_ags4_core::ags4_codec::ReadOptions {
+    use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ReadOptions};
+    ReadOptions {
+        duplicate_headings: if recover_duplicate_headings {
+            DuplicateHeadings::Recover
+        } else {
+            DuplicateHeadings::Error
+        },
+    }
 }

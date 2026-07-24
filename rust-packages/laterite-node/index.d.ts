@@ -118,7 +118,7 @@ export declare class Sidecar {
  * forces the worksheet order; otherwise AGS4 source order. The bytes twin of
  * `ags4ToExcel`.
  */
-export declare function ags4BytesToXlsx(data: Uint8Array, orderedKeys?: Array<string> | undefined | null): ExcelBytesResult
+export declare function ags4BytesToXlsx(data: Uint8Array, orderedKeys?: Array<string> | undefined | null, recoverDuplicateHeadings?: boolean | undefined | null): ExcelBytesResult
 
 /**
  * Write an AGS4 file's groups to an `.xlsx` — one worksheet per group.
@@ -358,7 +358,7 @@ export declare function parseValue(raw: string | undefined | null, agsType: stri
  * straight from core's read codec (no typing), so `lat read --json` / `--csv`
  * match the Rust binary and Python byte-for-byte (#430).
  */
-export declare function readGroupsRaw(path: string): string
+export declare function readGroupsRaw(path: string, recoverDuplicateHeadings?: boolean | undefined | null): string
 
 /**
  * Parent chain from `code` up to the registry root — `[code, parent, …, root]`

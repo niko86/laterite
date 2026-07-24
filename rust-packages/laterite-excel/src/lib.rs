@@ -26,7 +26,7 @@ use std::sync::Arc;
 use calamine::{Data, Reader, open_workbook_auto_from_rs};
 use rust_xlsxwriter::Workbook;
 
-use laterite_ags4_core::ags4_codec::{AgsGroup, read_ags4_bytes};
+use laterite_ags4_core::ags4_codec::{AgsGroup, ReadOptions, read_ags4_bytes_with};
 use laterite_ags4_core::error::CliError;
 use laterite_ags4_emit::{EmitError, EmitGroup, write_ags4};
 
@@ -51,9 +51,21 @@ pub fn ags4_to_excel(
     output: &Path,
     ordered_keys: Option<Vec<String>>,
 ) -> Result<ExcelStats, CliError> {
+    ags4_to_excel_with(input, output, ordered_keys, ReadOptions::default())
+}
+
+/// [`ags4_to_excel`] with explicit [`ReadOptions`] — the duplicate-heading
+/// recovery mode matters most here, since an XLSX export is the usual way
+/// someone tries to get data out of a file that will not validate.
+pub fn ags4_to_excel_with(
+    input: &Path,
+    output: &Path,
+    ordered_keys: Option<Vec<String>>,
+    read_opts: ReadOptions,
+) -> Result<ExcelStats, CliError> {
     let bytes = std::fs::read(input)
         .map_err(|e| CliError::Schema(format!("read {}: {e}", input.display())))?;
-    let (xlsx, stats) = ags4_bytes_to_xlsx(&bytes, ordered_keys)?;
+    let (xlsx, stats) = ags4_bytes_to_xlsx_with(&bytes, ordered_keys, read_opts)?;
     std::fs::write(output, xlsx)
         .map_err(|e| CliError::Schema(format!("save xlsx {}: {e}", output.display())))?;
     Ok(stats)
@@ -70,7 +82,16 @@ pub fn ags4_bytes_to_xlsx(
     input: &[u8],
     ordered_keys: Option<Vec<String>>,
 ) -> Result<(Vec<u8>, ExcelStats), CliError> {
-    let parsed = read_ags4_bytes(input)?;
+    ags4_bytes_to_xlsx_with(input, ordered_keys, ReadOptions::default())
+}
+
+/// [`ags4_bytes_to_xlsx`] with explicit [`ReadOptions`].
+pub fn ags4_bytes_to_xlsx_with(
+    input: &[u8],
+    ordered_keys: Option<Vec<String>>,
+    read_opts: ReadOptions,
+) -> Result<(Vec<u8>, ExcelStats), CliError> {
+    let parsed = read_ags4_bytes_with(input, read_opts)?;
     let order: Vec<String> = ordered_keys.unwrap_or_else(|| parsed.order.clone());
 
     if order.is_empty() {
@@ -614,8 +635,9 @@ fn matches_rule_19_heading(name: &str) -> bool {
 mod tests {
     use super::*;
     // The path round-trip tests re-parse the emitted file to assert its data;
-    // the non-test code path now reads bytes, so this is test-only.
-    use laterite_ags4_core::ags4_codec::read_ags4;
+    // the non-test code path now reads bytes with explicit options, so the
+    // default-policy entry points are test-only here.
+    use laterite_ags4_core::ags4_codec::{read_ags4, read_ags4_bytes};
     use tempfile::tempdir;
 
     // --- Rule 19 heading guard ------------------------------------

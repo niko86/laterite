@@ -154,6 +154,42 @@ describe("cli (in-process): read", () => {
     expect(stdout).toContain("PROJ");
   });
 
+  it("read refuses a duplicate heading, and --recover-duplicate-headings keeps both", () => {
+    // Rows are keyed by heading name, so before the guard the second LOCA_ID
+    // overwrote the first and this file read back as ["SECOND","1.00","SECOND"]
+    // -- FIRST gone, SECOND duplicated into its column, silently. `read` runs no
+    // rule engine, so Rule 7 never fired here.
+    const dup = join(tmp(), "dup.ags");
+    writeFileSync(
+      dup,
+      [
+        '"GROUP","LOCA"',
+        '"HEADING","LOCA_ID","LOCA_GL","LOCA_ID"',
+        '"UNIT","","m",""',
+        '"TYPE","ID","2DP","ID"',
+        '"DATA","FIRST","1.00","SECOND"',
+      ].join("\r\n") + "\r\n",
+    );
+
+    const refused = runCli(["read", dup, "LOCA", "--json"]);
+    expect(refused.code).not.toBe(0);
+    expect(refused.stderr).toContain("duplicate heading");
+
+    const { code, stdout } = runCli([
+      "read",
+      dup,
+      "LOCA",
+      "--json",
+      "--recover-duplicate-headings",
+    ]);
+    expect(code).toBe(0);
+    const body = JSON.stringify(JSON.parse(stdout));
+    expect(body).toContain("LOCA_ID__2");
+    // Both cells survive, in their own columns.
+    expect(body).toContain("FIRST");
+    expect(body).toContain("SECOND");
+  });
+
   it("read --json lists the group order as a JSON array", () => {
     const { code, stdout } = runCli(["read", CLEAN, "--json"]);
     expect(code).toBe(0);
