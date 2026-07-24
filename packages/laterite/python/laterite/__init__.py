@@ -1793,10 +1793,11 @@ def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
     recursion via the ``<child>s`` accessors, so only the PROJ-rooted subtree is
     walked. Root-metadata groups (TRAN/UNIT/TYPE/ABBR/DICT, parent ``None``) and
     orphaned subtrees (a child whose intermediate parent is absent) aren't part
-    of the tree, so the walk yields only PROJ's subtree; under the default
-    ``"autofix"`` mode the emitter then synthesizes the missing UNIT/TYPE/TRAN
-    metadata groups (and ABBR when the data uses PA codes; see
-    [`build_ags4`][laterite.build_ags4]). Coverage for
+    of the tree, so the walk yields only PROJ's subtree. Those metadata groups
+    are therefore absent from the output unless you pass
+    ``synthesise_metadata=True`` (see [`build_ags4`][laterite.build_ags4]);
+    without it they surface as Rule 14/15/17 findings rather than being filled
+    in silently. Coverage for
     standard groups is identical to Node's walk by construction (same dictionary
     parent→child map); additionally — a Python-only superset, since Node has no
     passthrough surface — a custom group that ``read_typed`` hangs off a parent
@@ -1901,8 +1902,9 @@ def build_ags4(
     mode: BuildMode = "autofix",
     units: Mapping[str, Mapping[str, str]] | None = None,
     types: Mapping[str, Mapping[str, str]] | None = None,
+    synthesise_metadata: bool = False,
 ) -> BuildResult:
-    """Build valid AGS4 from your own per-group data — the data→AGS4 door.
+    """Build AGS4 from your own per-group data — the data→AGS4 door.
 
     Where [`read`][laterite.read] loads an *existing* file, ``build_ags4`` *constructs* a new
     one (and autofixes + validates it); persist the result with
@@ -1916,11 +1918,12 @@ def build_ags4(
       registry's parent→child links. A typed graph emits only its PROJ-rooted
       subtree: the root-metadata groups (TRAN/UNIT/TYPE/ABBR/DICT) aren't children
       of ``PROJ``, so reach for the ``(code, frame)`` form if you need to carry
-      those. Under the default ``"autofix"`` mode the missing UNIT/TYPE catalogs
-      (derived from your data), a placeholder TRAN, and — when the data uses PA
-      picklist codes — ABBR are synthesized for you, so a typed-graph build is valid
-      out of the box; ``"report"``/``"strict"`` leave them absent (Rule 14/15/16/17
-      findings). PROJ (real project identity) is never synthesized.
+      those — or pass ``synthesise_metadata=True`` to have the derivable ones
+      (UNIT/TYPE from your data, a placeholder TRAN, and ABBR when PA picklist
+      codes are used) minted for you. That is **opt-in**: by default a typed-graph
+      build reports Rule 14/15/16/17 rather than quietly filling the gaps, so you
+      can see what is missing. PROJ (real project identity) and DICT (your schema
+      extension) are never synthesised at all.
     * a **mapping or list of ``(code, frame)`` pairs**, where each frame (pandas
       **or** polars) has **column names that are the AGS headings** (e.g.
       ``LOCA_ID``, ``LOCA_GL``).
@@ -1944,13 +1947,11 @@ def build_ags4(
         dict_version: The dictionary edition to fill UNIT/TYPE and validate against —
             one of ``"4.0.3"`` | ``"4.0.4"`` | ``"4.1"`` | ``"4.1.1"`` | ``"4.2"``.
             Defaults to ``"4.1.1"`` when ``None``.
-        mode: How findings are handled. ``"autofix"`` (default) builds, then
-            synthesizes any missing UNIT/TYPE/TRAN/ABBR metadata group (so a data-only
-            build is valid) and applies the *safe* mechanical fixes (pad decimals,
-            normalise, …); anything left unfixable (e.g. a missing PROJ) stays in
-            ``BuildResult.findings``. ``"report"`` builds unchanged and returns the
-            findings for you to act on. ``"strict"`` raises if the output violates
-            any error-severity rule.
+        mode: How findings are handled. ``"autofix"`` (default) builds, then applies
+            the *safe* mechanical fixes to what you wrote (pad decimals, normalise,
+            …); anything left unfixable stays in ``BuildResult.findings``.
+            ``"report"`` builds unchanged and returns the findings for you to act
+            on. ``"strict"`` raises if the output violates any error-severity rule.
         units: Per-heading UNIT overrides, keyed ``{code: {heading: unit}}`` — e.g.
             ``{"LOCA": {"LOCA_XTRA": "kPa"}}``. Name only the headings you want to set;
             every other heading fills from the dictionary as usual. Handy for giving a
@@ -1958,6 +1959,23 @@ def build_ags4(
             Raises ``ValueError`` if a code or heading isn't in the data.
         types: Per-heading AGS data-TYPE overrides, same ``{code: {heading: type}}``
             shape (e.g. ``{"LOCA": {"LOCA_XTRA": "3DP"}}``).
+        synthesise_metadata: Mint the mandatory metadata catalogs your data doesn't
+            carry — UNIT and TYPE (derived from the data), a placeholder TRAN, and
+            ABBR when PA picklist codes are used. ``"autofix"`` mode only.
+
+            **Off by default, deliberately.** Synthesis adds whole *groups* you
+            never wrote, and that should be something you ask for rather than
+            discover. Left off, a data-only build reports Rule 14/15/17 instead —
+            which tells you exactly what is missing. Turn it on when you want the
+            derived catalogs filled in for you::
+
+                res = build_ags4(frames, synthesise_metadata=True)
+
+            Only *derivable* metadata is ever minted. ``PROJ`` (your project
+            identity) and ``DICT`` (your schema extension) are never synthesised —
+            those are facts only you know, and a guessed ``DICT`` parent would turn
+            a visible Rule 18 error into a silent false statement about your data
+            model that the relational checks then trust.
 
     Returns:
         A [`BuildResult`][laterite.BuildResult] carrying the AGS4 ``bytes``, the validator
@@ -2037,6 +2055,7 @@ def build_ags4(
         mode,
         {k: dict(v) for k, v in units.items()} if units else None,
         {k: dict(v) for k, v in types.items()} if types else None,
+        synthesise_metadata,
     )
     by_rule: dict[str, list[dict]] = json.loads(findings_json)
     findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]

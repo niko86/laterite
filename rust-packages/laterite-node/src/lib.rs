@@ -1263,16 +1263,16 @@ pub fn emit_ags4_from_ipc(
     // F#9). A group/heading absent from the map keeps the dictionary default.
     units: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
     types: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+    // Off unless asked: no surface mints GROUPs the caller never wrote without
+    // being told to (2026-07-24). See EmitOpts::synthesise_metadata.
+    synthesise_metadata: Option<bool>,
 ) -> Result<EmitResult> {
     let opts = laterite_ags4_emit::EmitOpts {
         mode: resolve_mode(mode.as_deref())?,
         edition: resolve_edition(edition.as_deref())
             .map_err(Error::from_reason)?
             .unwrap_or(DictVersion::V4_1_1),
-        // Metadata synthesis inherits the default, which is now OFF (2026-07-24):
-        // no surface mints GROUPs the caller never wrote without being asked.
-        // `synthesiseMetadata` on the JS side opts in. See EmitOpts::default.
-        ..laterite_ags4_emit::EmitOpts::default()
+        synthesise_metadata: synthesise_metadata.unwrap_or(false),
     };
     let mut inputs = Vec::with_capacity(groups.len());
     for g in groups {

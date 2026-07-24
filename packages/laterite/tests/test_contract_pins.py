@@ -27,7 +27,10 @@ def _valid_accented_ags() -> str:
     non-ASCII, cp1252-encodable character — so the same content exists as valid
     UTF-8 and as non-UTF-8 cp1252 bytes."""
     proj = pl.DataFrame({"PROJ_ID": ["P1"], "PROJ_NAME": ["Café résumé"]})
-    return L.build_ags4({"PROJ": proj}).text
+    # `synthesise_metadata=True` because a VALID file is this helper's
+    # precondition, not its subject — without the catalogs the file trips
+    # Rule 14/15/17 and the certify guard under test is never reached.
+    return L.build_ags4({"PROJ": proj}, synthesise_metadata=True).text
 
 
 def test_certify_rejects_a_non_utf8_source(tmp_path: Path) -> None:
@@ -75,17 +78,36 @@ def test_strict_build_raises_and_never_returns_findings() -> None:
         L.build_ags4(invalid, mode="strict")
 
 
-# --- autofix synthesizes metadata catalogs, but never a PROJ ----------------
+# --- synthesis mints the derivable catalogs, but never a PROJ ---------------
 
 
-def test_autofix_never_synthesizes_proj() -> None:
-    """Autofix mints the mandatory metadata catalogs (TRAN/UNIT/TYPE) so a
-    data-only build is valid, but it must NEVER invent a PROJ — PROJ_ID is project
-    identity a machine cannot fabricate without corrupting provenance."""
-    res = L.build_ags4({"LOCA": pl.DataFrame({"LOCA_ID": ["BH1"]})}, mode="autofix")
+def test_synthesis_never_invents_proj() -> None:
+    """Opted-in synthesis mints the mandatory metadata catalogs (TRAN/UNIT/TYPE),
+    but must NEVER invent a PROJ — PROJ_ID is project identity a machine cannot
+    fabricate without corrupting provenance. The boundary is derivable-vs-authorial,
+    which is also why DICT is never minted."""
+    res = L.build_ags4(
+        {"LOCA": pl.DataFrame({"LOCA_ID": ["BH1"]})},
+        mode="autofix",
+        synthesise_metadata=True,
+    )
     groups = L.read(data=res.bytes).groups
     assert "PROJ" not in groups
-    assert {"TRAN", "UNIT", "TYPE"}.issubset(groups)  # the ones it DOES synthesize
+    assert "DICT" not in groups
+    assert {"TRAN", "UNIT", "TYPE"}.issubset(groups)  # the ones it DOES synthesise
+
+
+def test_autofix_does_not_synthesise_by_default() -> None:
+    """The default is opt-OUT of magic: autofix repairs what you wrote and does
+    not mint groups you didn't. The gaps come back as findings so you can see
+    exactly what you declined."""
+    res = L.build_ags4({"LOCA": pl.DataFrame({"LOCA_ID": ["BH1"]})}, mode="autofix")
+    groups = L.read(data=res.bytes).groups
+    assert not {"TRAN", "UNIT", "TYPE"} & set(groups)
+    rules = {f["rule"] for f in res.findings}
+    assert any("Rule 14" in r for r in rules)
+    assert any("Rule 15" in r for r in rules)
+    assert any("Rule 17" in r for r in rules)
 
 
 # --- Ags4File.close() is idempotent -----------------------------------------

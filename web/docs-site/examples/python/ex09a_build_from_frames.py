@@ -10,7 +10,21 @@ groups = laterite.read(data=res.bytes).groups
 print("groups:", groups)
 print("findings:", len(res.findings))
 
-# Autofix synthesizes the mandatory metadata catalogs (TRAN/UNIT/TYPE), so a
-# data-only build is valid in one call.
-assert {"PROJ", "LOCA", "TRAN", "UNIT", "TYPE"}.issubset(groups)
-assert not res.findings
+# You get back exactly the groups you supplied. AGS4 also mandates the metadata
+# catalogs (TRAN/UNIT/TYPE), which your frames don't carry — so those are
+# REPORTED rather than invented:
+assert set(groups) == {"PROJ", "LOCA"}
+assert {f["rule"] for f in res.findings} >= {
+    "AGS Format Rule 14",  # TRAN
+    "AGS Format Rule 15",  # UNIT
+    "AGS Format Rule 17",  # TYPE
+}
+
+# Ask for them and they're derived from your data — UNIT and TYPE from the
+# columns, TRAN as a placeholder you overwrite. Opt-in, so nothing appears in
+# your file that you didn't ask for.
+full = laterite.build_ags4({"PROJ": proj, "LOCA": loca}, synthesise_metadata=True)
+assert {"PROJ", "LOCA", "TRAN", "UNIT", "TYPE"}.issubset(
+    laterite.read(data=full.bytes).groups
+)
+assert not full.findings

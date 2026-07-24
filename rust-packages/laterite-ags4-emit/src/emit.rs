@@ -699,7 +699,7 @@ mod tests {
         );
     }
 
-    /// The NEW default: AutoFix still fixes what the caller wrote, but does not
+    /// The NEW default: `AutoFix` still fixes what the caller wrote, but does not
     /// invent groups they didn't. This is the behaviour change, so it is pinned
     /// directly rather than inferred from the opt-in test's absence.
     #[test]

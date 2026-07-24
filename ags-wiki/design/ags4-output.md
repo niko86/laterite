@@ -103,7 +103,7 @@ are unchanged (they show/reject the gaps). Mirrors the existing forge synthesize
 (`repo:rust-packages/laterite-ags4-forge/src/synth/model.rs` `collect_unit`/`collect_type`/`tran`)
 — a parallel flagged for convergence in [[reliquary]].
 
-## Update (2026-07-24): metadata synthesis becomes OPT-IN — owner decision, PENDING
+## Update (2026-07-24): metadata synthesis is OPT-IN — LANDED
 
 **Reverses the "on by default" half of the 2026-06-25 update above.** The synthesis
 *behaviour* is unchanged and stays available; what changes is that the caller must
@@ -115,25 +115,53 @@ never supplied. Minting a placeholder `TRAN` with `"TBC"` fields is a meaningful
 performed on someone's behalf; the owner's position is that the user decides and
 opts in. That argument stands on agency, not cost.
 
-**Not a performance change.** The staged emit bench prices synthesis at ~0.13 ms of
-45.5 ms — **0.3%** (see [[core-perf-baseline]]). The 48% `AutoFix` premium is
-validate-and-fix, i.e. the original 2026-06-12 default. Perf neither motivates nor
+**Not a performance change.** The staged emit bench prices synthesis at ~0.13 ms —
+**0.3%** of an export (see [[core-perf-baseline]]). Perf neither motivates nor
 argues against this; it only means the change is free either way.
+
+> [!note] This section originally added "the 48% `AutoFix` premium is
+> validate-and-fix, i.e. the original 2026-06-12 default". **That was wrong.** The
+> premium was mostly a *duplicate parse* of the emitted bytes, removed 2026-07-24;
+> `AutoFix` now costs ~3% more than `Report`. So there is no performance argument
+> on either side of this decision, which is the cleanest possible footing for one
+> made on agency grounds.
 
 **Consequence, accepted:** a data-only build (notably a typed PROJ graph) no longer
 yields a valid file in one call by default — Rule 14/15/17 findings return unless
 the caller opts in. The one-call-valid path remains, one argument away.
 
-**Shape:** `EmitOpts::synthesize_metadata` (added 2026-07-24 to make the stage
-measurable; default still `true` at time of writing). The flip to `false` also
-requires the four surfaces to EXPOSE the option — PyO3 `emit_ags4_from_arrow`, the
-Node and wasm emit entry points, and the `build_ags4` wrappers — because a surface
-that silently opts in on the user's behalf is the same magic one layer down. It
-will also change emitted bytes on all four legs and so trips the `xcheck`
-output-value gate by design.
+**Shape:** `EmitOpts::synthesise_metadata`, default `false`. British spelling for
+the new public surface (owner decision); only the flag and its private helper were
+renamed — the surrounding `-ize` prose was left alone rather than swept.
 
-**Status: decided, not yet implemented.** Landing before 0.8.0 so the default does
-not move after a release.
+Exposed on the surfaces that construct emit options, because a surface that
+silently opts in on the user's behalf is the same magic one layer down:
+
+| surface | name |
+|---|---|
+| Rust | `EmitOpts::synthesise_metadata` |
+| Python | `build_ags4(..., synthesise_metadata=True)` |
+| Node | `buildAgs4(..., { synthesiseMetadata: true })` |
+| wasm / merge | inherit the default — neither mints unasked |
+
+**What "off" actually means.** `AutoFix` still repairs what the caller wrote; it
+just stops adding groups they didn't. The gaps come back as Rule 14/15/17 findings,
+which is the point — the caller can see what they declined. Pinned at both layers
+(`autofix_does_not_synthesise_by_default` in Rust,
+`test_synthesis_is_off_by_default` in Python), because the *absence* of a
+behaviour needs a test as much as its presence does.
+
+The derivable/authorial boundary is unchanged and worth restating: UNIT and TYPE
+are pure functions of the data, ABBR comes from the standard table and only when PA
+codes are used, TRAN is a placeholder stub. **PROJ and DICT are never synthesised**
+— a project identity and a schema extension are authorial facts, and a guessed
+`DICT_PGRP` would turn a loud Rule 18 error into a silent false statement about the
+data model that Rule 10's relational checks then trust.
+
+**Status: landed 2026-07-24**, ahead of 0.8.0 so the default does not move after a
+release. The docs examples (`ex09a`/`ex09b`) were rewritten to demonstrate both
+paths rather than narrate the old one — showing the findings first and the opt-in
+second teaches the boundary better than the previous one-call version did.
 
 ## Update (2026-06-25): the typed-graph door emits only the headings you set
 
