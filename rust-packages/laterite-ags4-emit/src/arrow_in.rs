@@ -161,3 +161,176 @@ pub fn group_from_arrow_with_meta<S: std::hash::BuildHasher>(
         rows,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow::array::{
+        ArrayRef, Date32Array, Decimal128Array, TimestampMillisecondArray, UnionArray,
+    };
+    use arrow::datatypes::{Field, UnionFields};
+    use std::sync::Arc;
+
+    fn one(a: &dyn Array) -> Value {
+        cell_value(a, 0)
+    }
+
+    /// Every arm the `match` names, pinned to the `Value` variant the emit
+    /// orchestrator expects. `ags4_str` renders numbers and bools differently
+    /// from strings, so an arm returning the wrong *variant* changes the output
+    /// bytes even when the text looks right.
+    #[test]
+    fn typed_arms_map_to_their_json_variant() {
+        assert_eq!(one(&StringArray::from(vec!["BH01"])), Value::from("BH01"));
+        assert_eq!(
+            one(&LargeStringArray::from(vec!["BH01"])),
+            Value::from("BH01")
+        );
+        assert_eq!(one(&BooleanArray::from(vec![true])), Value::Bool(true));
+        assert_eq!(one(&Int8Array::from(vec![-8i8])), Value::from(-8));
+        assert_eq!(one(&Int16Array::from(vec![-16i16])), Value::from(-16));
+        assert_eq!(one(&Int32Array::from(vec![-32i32])), Value::from(-32));
+        assert_eq!(one(&Int64Array::from(vec![-64i64])), Value::from(-64));
+        assert_eq!(one(&UInt8Array::from(vec![8u8])), Value::from(8));
+        assert_eq!(one(&UInt16Array::from(vec![16u16])), Value::from(16));
+        assert_eq!(one(&UInt32Array::from(vec![32u32])), Value::from(32));
+        assert_eq!(one(&UInt64Array::from(vec![64u64])), Value::from(64));
+        assert_eq!(one(&Float64Array::from(vec![1.5f64])), Value::from(1.5));
+        // f32 widens to f64 — pinned because a naive `Value::from(f32)` would
+        // serialise 1.5f32 as 1.5000000596046448.
+        assert_eq!(one(&Float32Array::from(vec![1.5f32])), Value::from(1.5));
+    }
+
+    /// A null cell is `Value::Null` for EVERY type, checked before the match —
+    /// so the `unwrap()`s on the downcasts are only ever reached for a valid row.
+    #[test]
+    fn nulls_short_circuit_before_the_downcast() {
+        assert_eq!(one(&StringArray::from(vec![None::<&str>])), Value::Null);
+        assert_eq!(one(&Int64Array::from(vec![None::<i64>])), Value::Null);
+        assert_eq!(one(&BooleanArray::from(vec![None::<bool>])), Value::Null);
+        assert_eq!(one(&Date32Array::from(vec![None::<i32>])), Value::Null);
+    }
+
+    /// The fallback arm. **Every `DT` column on the emit path lands here**, so
+    /// these exact strings are load-bearing: they are what `ags4_str` receives
+    /// and what ends up in the file.
+    #[test]
+    fn temporal_and_decimal_fall_back_to_arrows_canonical_string() {
+        assert_eq!(
+            one(&Date32Array::from(vec![19738])),
+            Value::from("2024-01-16")
+        );
+        assert_eq!(
+            one(&TimestampMillisecondArray::from(vec![1_677_064_000_000i64])),
+            Value::from("2023-02-22T11:06:40")
+        );
+        let dec = Decimal128Array::from(vec![123_456i128])
+            .with_precision_and_scale(10, 2)
+            .expect("valid precision/scale");
+        assert_eq!(one(&dec), Value::from("1234.56"));
+    }
+
+    /// The `Err(_) => Value::Null` arm is **defensive, not live**. Probed across
+    /// arrow 59's exotic types — union, run-end, dictionary, struct, map,
+    /// interval, duration, binary, fixed-size-binary, time64 — `try_new` does
+    /// not fail for any of them. This test pins the one most likely to regress
+    /// if arrow narrows its formatter, so the arm cannot start silently nulling
+    /// real cells without a test going red first.
+    #[test]
+    fn the_formatter_fallback_is_not_silently_swallowing_a_live_type() {
+        let fields: UnionFields = [(0i8, Arc::new(Field::new("a", DataType::Int32, false)))]
+            .into_iter()
+            .collect();
+        let u = UnionArray::try_new(
+            fields,
+            vec![0i8].into(),
+            None,
+            vec![Arc::new(Int32Array::from(vec![7])) as ArrayRef],
+        )
+        .expect("valid union");
+        assert_ne!(
+            cell_value(&u, 0),
+            Value::Null,
+            "a formattable type reached the Err arm — the fallback is now eating real data"
+        );
+    }
+
+    fn schema2() -> Schema {
+        Schema::new(vec![
+            Field::new("LOCA_ID", DataType::Utf8, true),
+            Field::new("LOCA_GL", DataType::Float64, true),
+        ])
+    }
+
+    fn batch(ids: Vec<&str>, gls: Vec<f64>) -> RecordBatch {
+        RecordBatch::try_new(
+            Arc::new(schema2()),
+            vec![
+                Arc::new(StringArray::from(ids)) as ArrayRef,
+                Arc::new(Float64Array::from(gls)) as ArrayRef,
+            ],
+        )
+        .expect("batch")
+    }
+
+    #[test]
+    fn headings_come_from_the_schema_and_rows_are_transposed() {
+        let g = group_from_arrow(
+            "LOCA".into(),
+            &schema2(),
+            &[batch(vec!["A", "B"], vec![1.0, 2.0])],
+        );
+        assert_eq!(g.code, "LOCA");
+        assert_eq!(g.headings, ["LOCA_ID", "LOCA_GL"]);
+        // Column-major in, row-major out.
+        assert_eq!(
+            g.rows,
+            vec![
+                vec![Value::from("A"), Value::from(1.0)],
+                vec![Value::from("B"), Value::from(2.0)],
+            ]
+        );
+        assert!(
+            g.units.is_none() && g.types.is_none(),
+            "left to the dictionary"
+        );
+    }
+
+    /// Batches concatenate in order — a multi-batch stream is one group, not one
+    /// group per batch.
+    #[test]
+    fn multiple_batches_concatenate() {
+        let g = group_from_arrow(
+            "LOCA".into(),
+            &schema2(),
+            &[batch(vec!["A"], vec![1.0]), batch(vec!["B"], vec![2.0])],
+        );
+        assert_eq!(g.rows.len(), 2);
+        assert_eq!(g.rows[1][0], Value::from("B"));
+    }
+
+    /// The reason `schema` is a separate argument: a group whose stream carried
+    /// no batches still has to emit its section with the right headings.
+    #[test]
+    fn zero_batches_still_yields_the_headings() {
+        let g = group_from_arrow("LOCA".into(), &schema2(), &[]);
+        assert_eq!(g.headings, ["LOCA_ID", "LOCA_GL"]);
+        assert!(g.rows.is_empty());
+    }
+
+    /// Overrides align by heading NAME, not column position, and a heading the
+    /// map does not mention gets "" — which the orchestrator reads as "fill from
+    /// the dictionary", not as an empty UNIT.
+    #[test]
+    fn meta_overrides_align_by_name_and_leave_unnamed_headings_blank() {
+        let units: HashMap<String, String> = [("LOCA_GL".to_string(), "m".to_string())]
+            .into_iter()
+            .collect();
+        let g = group_from_arrow_with_meta("LOCA".into(), &schema2(), &[], Some(&units), None);
+        assert_eq!(g.units.expect("units"), ["", "m"]);
+        assert!(
+            g.types.is_none(),
+            "None leaves the whole tier to the dictionary"
+        );
+    }
+}
