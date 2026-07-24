@@ -539,7 +539,13 @@ jobs:
   # laterite-node (napi) — exercised by the Python / Node suites, never by
   # `cargo test` (laterite-node further can't even link a standalone lib-test
   # under napi 3: its N-API symbols only resolve once the Node host loads the
-  # addon). The nightly coverage run uses the identical exclude set.
+  # addon).
+  #
+  # The nightly coverage run excludes MORE than this, and deliberately so: it also
+  # drops the dev-only QA crates (xcheck, parity, forge, corpus-qa, perf,
+  # compliance) so its floor measures the shipped engine over a stable denominator.
+  # They are excluded from that MEASUREMENT, not from testing — this job is the
+  # test authority for them, and it must keep running them.
   test:
     needs: changes
     # `!cancelled()` is load-bearing (see the rust job's note): a failed `needs`
