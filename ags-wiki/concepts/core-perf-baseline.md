@@ -88,18 +88,22 @@ first cut. On the 25 MB rung:
 
 | family | time | share | rules |
 |---|---|---|---|
-| **relational** | 228.9 ms → **103.0 ms** (fixed) | 67% → 70% | 10a–10c, 11a–11c |
-| **line_format** | 96.8 ms → **32.5 ms** (fixed) | 28% → 22% | 1, 3, 5, 6 |
-| groups | 8.5 ms | 2.5% | 13–18 |
-| typed_values | 5.1 ms | 1.5% | 8 |
+| **relational** | 228.9 → 103.0 → **88.1 ms** (T1) | 67% → 73% | 10a–10c, 11a–11c |
+| **line_format** | 96.8 → 32.5 → **16.3 ms** (T1) | 28% → 14% | 1, 3, 5, 6 |
+| groups | 8.5 ms | 7% | 13–18 |
+| typed_values | 5.1 ms | 4% | 8 |
 | references | 0.46 ms | — | 19b_2/3, 20 |
 | structure | 0.43 ms | — | 2, 2a, 2b, 4 |
 | dictionary | 0.11 ms | — | 7, 9 |
 | naming | 0.01 ms | — | 19, 19a, 19b |
 
-Sums to 340 ms against `check_parsed`'s 343 ms, so nothing is unaccounted for.
-**Two families are 95% of the rules engine** — actionable, where "the rules engine
-is two thirds of validate" was not.
+The times shown for `relational` and `line_format` are post-T1 (re-measured
+2026-07-24); the other six are the earlier snapshot over unchanged code. They sum
+to ~119 ms against `check_parsed`'s post-T1 120.1 ms, so nothing is unaccounted
+for. **The two families that were 95% of the rules engine are still 87% of it**
+after T1 — the engine got smaller, not differently shaped, which is why the
+validator band is now closed rather than merely dented (see the structural stop
+in [[perf-campaign]]).
 
 ## The two hotspots — mechanism, not slow code
 
@@ -217,12 +221,27 @@ Rule 3 — no descriptor contains a quote.
 
 | | baseline | now | |
 |---|---|---|---|
-| `check_parsed` | 343.2 ms | **147.6 ms** | **−57%** |
-| `check_file` | 516 ms | **328 ms** | **−36%**, 46 → 72 MiB/s |
+| `check_parsed` | 343.2 ms | **120.1 ms** | **−65%** |
+| `check_file` | 516 ms | ~300 ms | ~−42% |
 | `index_ags4_bytes` | 165 ms | **56.9 ms** | **−66%**, 144 → 418 MiB/s |
 | `parse_bytes` | 171.3 ms | **142.8 ms** | **−16.7%** |
 | `emit_ags4/autofix` | 45.4 ms | **23.1 ms** | **−49%** |
 | `emit_ags4/report` | 30.6 ms | **22.4 ms** | **−27%** |
+
+The `check_parsed` line moved again in **T1** (2026-07-24), which closed the
+validator band. Paired at the 25 MB rung:
+
+| | before T1 | after T1 | |
+|---|---|---|---|
+| `rule-family/relational` | 102.4 ms | **88.1 ms** | **−13.9%** — parent KEY-tuple set memoised by parent code (was rebuilt per child) |
+| `rule-family/line_format` | 31.4 ms | **16.3 ms** | **−48.5%** — three per-line `chars()` walks became byte scans |
+| `check_parsed` | 148.6 ms | **120.1 ms** | **−11.4%** (combined) |
+
+The `check_file` figure is interpolated (`check_file` was not re-run in T1) and
+carries the ~20% drift warning until a paired run confirms it. The structural
+stop has fired: `check_parsed` / `parse_bytes` = 120.1 / 142.8 = **0.84×**, so
+the rules engine now costs *less* than the parse that feeds it, and further rules
+work optimises the smaller half. The band is closed.
 
 **Not one of these was an algorithm change.** Every one was work that did not
 need doing:

@@ -170,11 +170,19 @@ impl<'a> EffectiveDict<'a> {
 pub fn check(parsed: &ParsedFile, dict: &Dictionary<'_>, found: &mut Findings) {
     let eff = EffectiveDict::build(parsed, *dict);
 
+    // A parent's KEY-tuple set depends only on the parent group, never on which
+    // child is asking, so it is memoised by parent code across the whole file.
+    // Rule 10c runs once per group and many groups share a parent — SAMP alone
+    // parents the entire lab-test family — so rebuilding the set per child was
+    // the bulk of this rule's cost (see [[perf-campaign]] T1). The tuples borrow
+    // from `parsed`, which outlives the loop.
+    let mut parent_tuples: HashMap<String, HashSet<Vec<&str>>> = HashMap::new();
+
     for code in &parsed.group_order {
         let g = &parsed.groups[code];
         rule_10a(g, code, &eff, found);
         rule_10b(g, code, &eff, found);
-        rule_10c(parsed, g, code, &eff, found);
+        rule_10c(parsed, g, code, &eff, found, &mut parent_tuples);
     }
 
     rule_11(parsed, found);
@@ -351,12 +359,13 @@ fn rule_10b(g: &ParsedGroup, code: &str, eff: &EffectiveDict<'_>, found: &mut Fi
 /// by the parent's KEY fields.
 // `ri` is bounded the same way as in `rule_10a` above.
 #[allow(clippy::cast_possible_truncation)]
-fn rule_10c(
-    parsed: &ParsedFile,
-    g: &ParsedGroup,
+fn rule_10c<'p>(
+    parsed: &'p ParsedFile,
+    g: &'p ParsedGroup,
     code: &str,
     eff: &EffectiveDict<'_>,
     found: &mut Findings,
+    parent_tuples: &mut HashMap<String, HashSet<Vec<&'p str>>>,
 ) {
     if PARENTLESS.contains(&code) {
         return;
@@ -439,10 +448,14 @@ fn rule_10c(
         return;
     }
 
-    // Both index sets resolved once, outside their loops (see `cols`).
-    let pidx = cols(pg, &pkeys);
+    // Child indices are per-child, so resolved here; the parent tuple SET is
+    // per-parent, so built once and cached (see `check`). `entry` clones the
+    // parent code once per child — cheap beside the row scan it replaces.
     let cidx = cols(g, &pkeys);
-    let parent_tuples: HashSet<Vec<&str>> = pg.rows.iter().map(|r| tuple_at(&pidx, r)).collect();
+    let ptuples = parent_tuples.entry(parent.clone()).or_insert_with(|| {
+        let pidx = cols(pg, &pkeys);
+        pg.rows.iter().map(|r| tuple_at(&pidx, r)).collect()
+    });
     for (ri, row) in g.rows.iter().enumerate() {
         let t = tuple_at(&cidx, row);
         // O-39: skip child rows whose parent KEY cells are ALL empty
@@ -456,7 +469,7 @@ fn rule_10c(
         if t.iter().all(|s| s.trim().is_empty()) {
             continue;
         }
-        if !parent_tuples.contains(&t) {
+        if !ptuples.contains(&t) {
             add_at(
                 found,
                 RULE_10C,
@@ -740,6 +753,54 @@ mod tests {
         assert!(
             !r10c.iter().any(|x| x.desc.contains("BH1")),
             "BH1 has a parent: {r10c:?}"
+        );
+    }
+
+    #[test]
+    fn rule_10c_reuses_the_parent_tuple_set_across_two_children_correctly() {
+        // Two children of the SAME parent LOCA. The first (SAMP) builds and
+        // caches LOCA's KEY-tuple set; the second (a file-DICT child QKID, also
+        // parent LOCA) must reuse that cached set — flagging its own orphan while
+        // accepting its own valid reference. If the memoisation keyed or reused
+        // the set wrongly, QKID would either miss BH9 or wrongly flag BH1.
+        let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\
+                   \"DATA\",\"BH1\"\r\n\"DATA\",\"BH2\"\r\n\r\n\
+                   \"GROUP\",\"DICT\"\r\n\
+                   \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_PGRP\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"GROUP\",\"QKID\",\"\",\"\",\"LOCA\"\r\n\
+                   \"DATA\",\"HEADING\",\"QKID\",\"LOCA_ID\",\"KEY\",\"\"\r\n\
+                   \"DATA\",\"HEADING\",\"QKID\",\"QKID_ID\",\"KEY\",\"\"\r\n\r\n\
+                   \"GROUP\",\"SAMP\"\r\n\
+                   \"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\r\n\
+                   \"UNIT\",\"\",\"m\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\r\n\
+                   \"DATA\",\"BH1\",\"1.00\",\"S1\",\"B\",\"BH1S1\"\r\n\r\n\
+                   \"GROUP\",\"QKID\"\r\n\"HEADING\",\"LOCA_ID\",\"QKID_ID\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"ID\"\r\n\
+                   \"DATA\",\"BH1\",\"K1\"\r\n\"DATA\",\"BH9\",\"K2\"\r\n";
+        let r = run(src);
+        let r10c = r.get(RULE_10C).expect("Rule 10c");
+        // QKID's orphan BH9 flagged from the cached LOCA set...
+        assert!(
+            r10c.iter()
+                .any(|x| x.group == "QKID" && x.desc.contains("BH9")),
+            "QKID orphan BH9 should be flagged from the cached parent set: {r10c:?}"
+        );
+        // ...and QKID's genuinely-valid BH1 not flagged (the cache is LOCA's, not
+        // empty or SAMP's).
+        assert!(
+            !r10c
+                .iter()
+                .any(|x| x.group == "QKID" && x.desc.contains("BH1")),
+            "QKID's BH1 has a real LOCA parent: {r10c:?}"
+        );
+        // SAMP (which populated the cache) is itself clean.
+        assert!(
+            !r10c.iter().any(|x| x.group == "SAMP"),
+            "SAMP's only row references BH1 which exists: {r10c:?}"
         );
     }
 
