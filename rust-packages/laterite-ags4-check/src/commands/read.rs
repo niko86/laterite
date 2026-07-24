@@ -89,7 +89,7 @@ fn render_group(group: &AgsGroup, json: bool, csv: bool) -> String {
             group
                 .headings
                 .iter()
-                .map(|h| row.get(h).cloned().unwrap_or_default())
+                .map(|h| row.get(h.as_str()).cloned().unwrap_or_default())
                 .collect()
         })
         .collect();
@@ -112,11 +112,12 @@ mod tests {
     use super::*;
     use serde_json::Value;
     use std::collections::HashMap;
+    use std::sync::Arc;
 
     fn group() -> AgsGroup {
         let mut r1 = HashMap::new();
-        r1.insert("LOCA_ID".to_string(), "BH01".to_string());
-        r1.insert("LOCA_REM".to_string(), "has, a \"comma\"".to_string());
+        r1.insert(Arc::from("LOCA_ID"), "BH01".to_string());
+        r1.insert(Arc::from("LOCA_REM"), "has, a \"comma\"".to_string());
         AgsGroup {
             code: "LOCA".to_string(),
             headings: vec!["LOCA_ID".to_string(), "LOCA_REM".to_string()],
@@ -149,7 +150,7 @@ mod tests {
             headings: vec!["A".into(), "B".into()],
             units: vec![],
             types: vec![],
-            rows: vec![HashMap::from([("A".to_string(), "1".to_string())])],
+            rows: vec![HashMap::from([(Arc::from("A"), "1".to_string())])],
         };
         assert_eq!(render_group(&g, false, true), "A,B\n1,\n");
     }

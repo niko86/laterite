@@ -87,7 +87,7 @@ fn reference(reg: &Registry, bytes: &[u8]) -> Result<Reference, String> {
             // padded short rows).
             g.rows
                 .get(row)
-                .and_then(|r| r.get(&g.headings[col]))
+                .and_then(|r| r.get(g.headings[col].as_str()))
                 .map(String::as_str)
         });
         ids.sort();

@@ -21,6 +21,7 @@
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::Path;
+use std::sync::Arc;
 
 use calamine::{Data, Reader, open_workbook_auto_from_rs};
 use rust_xlsxwriter::Workbook;
@@ -119,7 +120,7 @@ pub fn ags4_bytes_to_xlsx(
                 .write_string(r, 0, "DATA")
                 .map_err(|e| CliError::Schema(format!("write DATA tag: {e}")))?;
             for (ci, heading) in group.headings.iter().enumerate() {
-                let value = row.get(heading).map_or("", String::as_str);
+                let value = row.get(heading.as_str()).map_or("", String::as_str);
                 if !value.is_empty() {
                     sheet
                         .write_string(r, excel_col(ci + 1)?, value)
@@ -319,7 +320,10 @@ pub fn xlsx_bytes_to_ags4(
 
         let mut units: Vec<String> = vec![String::new(); headings.len()];
         let mut types: Vec<String> = vec![String::new(); headings.len()];
-        let mut data_rows: Vec<HashMap<String, String>> = Vec::new();
+        // Heading names shared across rows by refcount, matching `AgsGroup`'s
+        // shape — the same names were previously cloned into every row's map.
+        let keys: Vec<Arc<str>> = headings.iter().map(|h| Arc::from(h.as_str())).collect();
+        let mut data_rows: Vec<HashMap<Arc<str>, String>> = Vec::new();
 
         for row in rows_iter {
             let tag = cell_str(row.get(hcol).unwrap_or(&Data::Empty));
@@ -334,10 +338,10 @@ pub fn xlsx_bytes_to_ags4(
                 "TYPE" => types = payload(),
                 "DATA" => {
                     let values = payload();
-                    let row_map: HashMap<String, String> = headings
+                    let row_map: HashMap<Arc<str>, String> = keys
                         .iter()
                         .zip(values)
-                        .map(|(h, v)| (h.clone(), v))
+                        .map(|(k, v)| (Arc::clone(k), v))
                         .collect();
                     data_rows.push(row_map);
                     rows_written += 1;
@@ -384,7 +388,7 @@ pub fn xlsx_bytes_to_ags4(
                 .map(|row| {
                     g.headings
                         .iter()
-                        .map(|h| row.get(h).cloned().unwrap_or_default())
+                        .map(|h| row.get(h.as_str()).cloned().unwrap_or_default())
                         .collect()
                 })
                 .collect(),
@@ -437,7 +441,7 @@ fn emit_err(e: EmitError) -> CliError {
 fn apply_type_formatting(
     headings: &[String],
     types: &[String],
-    rows: &mut [HashMap<String, String>],
+    rows: &mut [HashMap<Arc<str>, String>],
 ) {
     for (i, heading) in headings.iter().enumerate() {
         let Some(type_spec) = types.get(i) else {
@@ -451,14 +455,16 @@ fn apply_type_formatting(
             continue;
         };
         for row in rows.iter_mut() {
-            if let Some(value) = row.get(heading) {
+            // Rewrite in place: re-inserting would re-hash the entry and mint a
+            // fresh key, discarding the shared heading Arc for no reason.
+            if let Some(value) = row.get_mut(heading.as_str()) {
                 if value.is_empty() {
                     continue;
                 }
                 let Ok(parsed) = value.parse::<f64>() else {
                     continue;
                 };
-                row.insert(heading.clone(), formatter.format(parsed));
+                *value = formatter.format(parsed);
             }
         }
     }
@@ -730,14 +736,14 @@ mod tests {
         let types = vec!["3DP".to_string(), "X".to_string()];
         let mut rows = vec![
             HashMap::from([
-                ("TEST_VAL".to_string(), "5.1".to_string()),
-                ("TEST_TXT".to_string(), "keep".to_string()),
+                (Arc::from("TEST_VAL"), "5.1".to_string()),
+                (Arc::from("TEST_TXT"), "keep".to_string()),
             ]),
             HashMap::from([
-                ("TEST_VAL".to_string(), String::new()), // empty -> skipped
+                (Arc::from("TEST_VAL"), String::new()), // empty -> skipped
             ]),
             HashMap::from([
-                ("TEST_VAL".to_string(), "notnum".to_string()), // unparseable -> untouched
+                (Arc::from("TEST_VAL"), "notnum".to_string()), // unparseable -> untouched
             ]),
         ];
         apply_type_formatting(&headings, &types, &mut rows);
@@ -753,8 +759,8 @@ mod tests {
         // TEST_A has a blank type; TEST_B has no type entry at all.
         let types = vec![String::new()];
         let mut rows = vec![HashMap::from([
-            ("TEST_A".to_string(), "1.5".to_string()),
-            ("TEST_B".to_string(), "2.5".to_string()),
+            (Arc::from("TEST_A"), "1.5".to_string()),
+            (Arc::from("TEST_B"), "2.5".to_string()),
         ])];
         apply_type_formatting(&headings, &types, &mut rows);
         assert_eq!(rows[0]["TEST_A"], "1.5"); // blank spec -> untouched

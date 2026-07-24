@@ -807,7 +807,7 @@ pub fn read_groups_raw(path: String) -> Result<String> {
                     Value::Array(
                         g.headings
                             .iter()
-                            .map(|h| Value::from(row.get(h).cloned().unwrap_or_default()))
+                            .map(|h| Value::from(row.get(h.as_str()).cloned().unwrap_or_default()))
                             .collect(),
                     )
                 })

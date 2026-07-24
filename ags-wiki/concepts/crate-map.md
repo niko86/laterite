@@ -82,7 +82,7 @@ as stable):
   it; the browser reaches it via the new tiny `laterite-ags4-tokenizer-wasm` (below), retiring
   the hand-written copy that used to live in `web/src/lib/agsline.ts`. See
   [[dec-laterite-types-leaf]] for the home-of-the-quoter decision.
-- `laterite-ags4-parse` — the shared AGS4 **parse leaf** (#168): one tolerant tokenizer
+- [[laterite-ags4-parse]] — the shared AGS4 **parse leaf** (#168): one tolerant tokenizer
   (`split_ags_line`/`field_span`) + one source-true byte/line/char walk (`parse_bytes`/`parse_str`/
   `parse_bytes_opts`). A SIBLING leaf to `laterite-types` (no edge between them); deps `encoding_rs` +
   `memchr` only — wasm-clean, FS-free, returns raw strings (typing stays in `laterite-types`). The
@@ -207,7 +207,7 @@ as stable):
   `transport` module is now a thin `CliError`-returning face over the shared `laterite-transport`
   leaf (#327) — the zstd+age logic moved out — still behind a default-on `transport` feature so the
   wasm consumer takes `default-features = false` (the leaf's `age`→getrandom won't build on wasm32).
-- `laterite-excel` — AGS4 ↔ XLSX (`calamine` reader + `rust_xlsxwriter` writer), extracted out of
+- [[laterite-excel]] — AGS4 ↔ XLSX (`calamine` reader + `rust_xlsxwriter` writer), extracted out of
   `laterite-ags4-core` (2026-06-18) so those Excel deps stop riding into every core consumer that never
   touches XLSX (the duckdb extension, `laterite-ags5-db`, `laterite-ags4-perf`). Path fns (`ags4_to_excel` /
   `excel_to_ags4`) + **FS-free byte cores** (`ags4_bytes_to_xlsx` / `xlsx_bytes_to_ags4`, #359) the

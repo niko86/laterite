@@ -25,6 +25,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use laterite_ags4_parse::{ParseError, ParseOptions, ParsedFile, parse_bytes_opts};
 
@@ -42,7 +43,12 @@ pub struct AgsGroup {
     /// TYPE row aligned with `headings` — AGS4 type codes (X / ID / 2DP / …).
     pub types: Vec<String>,
     /// Each DATA row as a `{heading_name: raw_string_value}` map.
-    pub rows: Vec<HashMap<String, String>>,
+    ///
+    /// Keys are `Arc<str>` so a group's heading names are allocated ONCE and
+    /// shared by every row, not re-allocated per cell. `Arc<str>: Borrow<str>`,
+    /// so lookups are unchanged: `row["LOCA_ID"]` and `row.get("LOCA_ID")` work
+    /// exactly as before.
+    pub rows: Vec<HashMap<Arc<str>, String>>,
 }
 
 /// Whole-file parse result. `order` preserves the group-section order from
@@ -85,7 +91,7 @@ pub fn read_ags4_bytes(bytes: &[u8]) -> Result<ParsedAgs4, CliError> {
         ..ParseOptions::lean()
     };
     match parse_bytes_opts(bytes, opts) {
-        Ok(parsed) => Ok(from_shared(&parsed)),
+        Ok(parsed) => Ok(from_shared(parsed)),
         Err(ParseError::NotAgs4(_)) => Ok(ParsedAgs4 {
             groups: HashMap::new(),
             order: Vec::new(),
@@ -100,36 +106,54 @@ pub fn read_ags4_bytes(bytes: &[u8]) -> Result<ParsedAgs4, CliError> {
 /// every heading/unit/type/value, pads UNIT to the heading count (empty) and
 /// TYPE (with `"X"`), and keys each DATA row by heading name. First-seen wins on
 /// a duplicate (trimmed) code, matching the csv reader this replaced.
-fn from_shared(pf: &ParsedFile) -> ParsedAgs4 {
-    let mut groups: HashMap<String, AgsGroup> = HashMap::with_capacity(pf.group_order.len());
-    let mut order: Vec<String> = Vec::with_capacity(pf.group_order.len());
-    for raw_code in &pf.group_order {
+fn from_shared(pf: ParsedFile) -> ParsedAgs4 {
+    // Taken BY VALUE: the sole caller drops the parse immediately after, so
+    // every heading/unit/type/value can be moved rather than cloned. Reading it
+    // through a reference meant re-allocating the entire file's text a second
+    // time — ~8.4M Strings on a 25 MB delivery.
+    let ParsedFile {
+        groups: mut pgroups,
+        group_order,
+        ..
+    } = pf;
+    let mut groups: HashMap<String, AgsGroup> = HashMap::with_capacity(group_order.len());
+    let mut order: Vec<String> = Vec::with_capacity(group_order.len());
+    for raw_code in &group_order {
         let code = raw_code.trim().to_string();
         if groups.contains_key(&code) {
             continue; // first-seen wins on the trimmed code (csv-reader parity)
         }
-        let pg = &pf.groups[raw_code];
-        let headings: Vec<String> = pg.headings.iter().map(|h| h.trim().to_string()).collect();
+        let Some(pg) = pgroups.remove(raw_code) else {
+            continue; // group_order and groups are built together; defensive.
+        };
+        let headings: Vec<String> = pg.headings.into_iter().map(trim_owned).collect();
         // Pad/truncate to the heading count — but ONLY when the row was actually
         // present (the csv reader resized inside its UNIT/TYPE arm; a group with
         // no UNIT row kept an empty vec, never padded). `unit_line`/`type_line`
         // are `Some` iff the leaf saw that descriptor row.
-        let mut units: Vec<String> = pg.units.iter().map(|u| u.trim().to_string()).collect();
+        let mut units: Vec<String> = pg.units.into_iter().map(trim_owned).collect();
         if pg.unit_line.is_some() {
             units.resize(headings.len(), String::new());
         }
-        let mut types: Vec<String> = pg.types.iter().map(|t| t.trim().to_string()).collect();
+        let mut types: Vec<String> = pg.types.into_iter().map(trim_owned).collect();
         if pg.type_line.is_some() {
             types.resize(headings.len(), "X".to_string());
         }
-        let rows: Vec<HashMap<String, String>> = pg
+        // Heading names allocated ONCE per group; each row's map shares them by
+        // refcount. Previously every cell cloned its heading String, so the same
+        // ~20 names were re-allocated for every row in the file.
+        let keys: Vec<Arc<str>> = headings.iter().map(|h| Arc::from(h.as_str())).collect();
+        let rows: Vec<HashMap<Arc<str>, String>> = pg
             .rows
-            .iter()
+            .into_iter()
             .map(|r| {
-                let mut row = HashMap::with_capacity(headings.len());
-                for (i, h) in headings.iter().enumerate() {
-                    let v = r.values.get(i).map_or("", |s| s.trim());
-                    row.insert(h.clone(), v.to_string());
+                let mut row = HashMap::with_capacity(keys.len());
+                let mut values = r.values.into_iter();
+                for key in &keys {
+                    // A short/ragged row yields "" for the missing tail, as
+                    // before — the positional contract is unchanged.
+                    let v = values.next().map_or_else(String::new, trim_owned);
+                    row.insert(Arc::clone(key), v);
                 }
                 row
             })
@@ -147,6 +171,20 @@ fn from_shared(pf: &ParsedFile) -> ParsedAgs4 {
         );
     }
     ParsedAgs4 { groups, order }
+}
+
+/// Trim a value WITHOUT reallocating it. `s.trim().to_string()` allocates even
+/// when there is nothing to trim, which is the overwhelmingly common case for
+/// quoted AGS4 fields; this shrinks in place and copies nothing.
+fn trim_owned(mut s: String) -> String {
+    let lead = s.len() - s.trim_start().len();
+    let end = s.trim_end().len();
+    if lead == 0 && end == s.len() {
+        return s;
+    }
+    s.drain(..lead);
+    s.truncate(end - lead);
+    s
 }
 
 /// Map the shared leaf's `ParseError` into core's `CliError`. The structure

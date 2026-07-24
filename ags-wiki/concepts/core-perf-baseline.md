@@ -11,12 +11,16 @@ repo_refs:
   fixtures: "repo:tools/gen-bench-fixtures.sh"
   relational: "repo:rust-packages/laterite-ags4-validator/src/rules/relational.rs"
   line_format: "repo:rust-packages/laterite-ags4-validator/src/rules/line_format.rs"
-related: [crate-map, testing-strategy, abi3-perf, laterite-ags4-validator, laterite-ags4-emit, laterite-types, laterite-ags4-core]
+related: [crate-map, testing-strategy, abi3-perf, laterite-ags4-validator, laterite-ags4-emit, laterite-types, laterite-ags4-core, laterite-ags4-parse, laterite-excel, perf-campaign]
 sources: []
 ---
 # core perf baseline: where the time actually goes
 
 ## Definition
+
+> [!note] This page records the **findings**. The work-list that produced them —
+> what is measured, priced, declined or still a guess — is [[perf-campaign]].
+> Start there when picking up the next candidate.
 
 The measured cost of the **core** AGS4 data path — parse, validate, type, emit —
 attributed stage by stage, and the two hotspots that attribution exposed. This is
@@ -64,11 +68,15 @@ Two results worth keeping in view:
   GROUP records and dropped the rest. **A page can describe what a function is
   for and be wrong about what it does; the fix was reading it.** See
   [[laterite-ags4-core]] and the locate-only profile below.
-- **`read_ags4_bytes` adds ~67% on top of `parse_bytes`** for the re-trim and
-  UNIT/TYPE pad that keep the codec byte-identical to the historical reader (the
-  #168 convergence). Filed as the price of byte-fidelity, paid on every typed
-  read — but that is an assumption nobody has tested, and it is now the largest
-  unexamined gap on the read path. Treat it as open, not as settled.
+- **`read_ags4_bytes` added ~67% on top of `parse_bytes`** — and NOT, as this
+  page long claimed, for "the re-trim and UNIT/TYPE pad that keep the codec
+  byte-identical to the historical reader". That was a third plausible mechanism
+  written down without being checked. The cost was `from_shared` building one
+  `HashMap` per DATA row and **cloning the group's heading name into it as a key
+  for every cell** — the same ~20 strings re-allocated for every row — while
+  taking the parse by reference and so cloning every value too, despite its only
+  caller dropping that parse immediately. ~8.4M redundant key allocations plus
+  ~8.4M value allocations on a 25 MB delivery. FIXED 2026-07-24 (see below).
 
 ## Rule-family attribution
 
@@ -233,6 +241,28 @@ code. It only became visible once the layers were timed separately.
 > values are not. A second run of identical `index_ags4_bytes` code moved 56.9 →
 > 47.0 ms.
 
+## Deferred: the positional row model
+
+`from_shared`'s projection fell from ~97 ms to ~25 ms by sharing heading keys
+(`Arc<str>`, allocated once per group), moving values out of the parse rather
+than cloning them, and trimming in place. **74% of the cost, at no API cost** —
+`Arc<str>: Borrow<str>`, so `row["LOCA_ID"]` still resolves.
+
+What remains is the **per-row `HashMap` allocation** itself: ~418k of them on the
+25 MB rung, ~25 ms, **13% of the read**. Only a positional row model removes it —
+`Vec<Vec<String>>` plus the group's heading index, which is the shape
+[[laterite-ags4-parse]] already hands over and which `from_shared` currently
+converts *away from* into a more expensive one.
+
+**Priced and deliberately not taken (2026-07-24.)** It would change `r["LOCA_ID"]`
+to an index lookup at every call site — `lat read`, [[laterite-excel]], the node
+binding, `read_groups_raw` — and 13% did not justify that churn. The bigger
+number that motivated it (97 ms) had already been claimed by the cheap fix.
+
+Worth revisiting if either changes: a caller appears that reads these rows in a
+hot loop, or `AgsGroup` is being reshaped for another reason anyway and the
+migration cost is already being paid. Do not reopen it on the 13% alone.
+
 ## The emit ladder
 
 Measured separately because `AutoFix` is the default and its cost grew after the
@@ -278,4 +308,4 @@ nothing, which is exactly how the previous one sat silently dead.
 
 ## Related
 
-[[crate-map]] · [[testing-strategy]] · [[abi3-perf]] · [[laterite-ags4-validator]] · [[laterite-ags4-emit]] · [[laterite-types]] · [[laterite-ags4-core]] · [[ags4-output]]
+[[perf-campaign]] · [[crate-map]] · [[testing-strategy]] · [[abi3-perf]] · [[laterite-ags4-validator]] · [[laterite-ags4-emit]] · [[laterite-types]] · [[laterite-ags4-core]] · [[laterite-ags4-parse]] · [[laterite-excel]] · [[ags4-output]]
