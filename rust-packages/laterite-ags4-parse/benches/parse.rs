@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use laterite_ags4_parse::scan::first_field;
 use laterite_ags4_parse::{field_span, parse_bytes, split_ags_line, tokenize_spans};
 
 /// `output/bench-fixtures/<label>.ags`, or None if it hasn't been generated.
@@ -78,6 +79,12 @@ fn bench_line_tokenizers(c: &mut Criterion) {
     // ideally converge toward for callers that want one field.
     g.bench_function("field_span", |b| {
         b.iter(|| field_span(std::hint::black_box(LINE), 5));
+    });
+    // The shared scanner's field-0 accessor — what Rule 3 actually needs. Kept
+    // beside `split_ags_line` because the two answer the SAME question for that
+    // caller, and the gap between them is the reason this exists.
+    g.bench_function("first_field", |b| {
+        b.iter(|| first_field(std::hint::black_box(LINE)));
     });
     g.finish();
 }

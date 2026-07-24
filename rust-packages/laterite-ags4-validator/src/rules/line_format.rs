@@ -34,7 +34,8 @@
 
 use crate::CheckOptions;
 use crate::findings::{Findings, Location, Severity, add, add_at};
-use crate::parse::{ParsedFile, split_ags_line};
+use crate::parse::ParsedFile;
+use laterite_ags4_parse::scan::first_field;
 
 const RULE_1: &str = "AGS Format Rule 1";
 const RULE_1_FYI: &str = "FYI (Related to Rule 1)";
@@ -158,8 +159,15 @@ fn first_codepoint_over(line: &str, threshold: u32) -> Option<u32> {
 
 /// Rule 3 — leading data descriptor.
 fn rule_3(line: &str, n: u32, found: &mut Findings) {
-    let fields = split_ags_line(line);
-    let first = fields.first().map_or("", String::as_str);
+    // Only field 0 is needed. This used to call `split_ags_line`, which
+    // allocates a Vec<String> of EVERY field (~21 allocations on a 20-column
+    // DATA row) and then read one of them — on every line of every file, making
+    // it ~68% of this rule family's cost. `first_field` borrows instead.
+    //
+    // Same RAW value policy `split_ags_line` uses, so an unquoted or
+    // unterminated field reads identically. It cannot unescape a `""`, which is
+    // sound here: no descriptor contains a quote.
+    let first = first_field(line).unwrap_or("");
     if !DESCRIPTORS.contains(&first) {
         add(
             found,

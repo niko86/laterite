@@ -673,6 +673,8 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
     })
 }
 
+pub mod scan;
+
 // --- tokenizer + char-span tracker (lifted verbatim from the validator) ---
 
 /// Split one AGS4 line into fields. AGS4 wraps every field in double quotes
