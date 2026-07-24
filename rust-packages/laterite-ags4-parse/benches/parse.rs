@@ -20,7 +20,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use laterite_ags4_parse::scan::first_field;
+use laterite_ags4_parse::scan::{DISPLAY, RAW, first_field, scan_line};
 use laterite_ags4_parse::{field_span, parse_bytes, split_ags_line, tokenize_spans};
 
 /// `output/bench-fixtures/<label>.ags`, or None if it hasn't been generated.
@@ -85,6 +85,17 @@ fn bench_line_tokenizers(c: &mut Criterion) {
     // caller, and the gap between them is the reason this exists.
     g.bench_function("first_field", |b| {
         b.iter(|| first_field(std::hint::black_box(LINE)));
+    });
+    // The shared core under both policies. Benched beside the three incumbents
+    // it exists to replace, so the claim "the core is cheaper than every machine
+    // it subsumes" stays reproducible rather than resting on a one-off probe.
+    // RAW is the validator's view, DISPLAY the browser's — same scan, and the
+    // gap between them prices the value policy itself.
+    g.bench_function("scan_line/raw", |b| {
+        b.iter(|| scan_line(std::hint::black_box(LINE), RAW));
+    });
+    g.bench_function("scan_line/display", |b| {
+        b.iter(|| scan_line(std::hint::black_box(LINE), DISPLAY));
     });
     g.finish();
 }
