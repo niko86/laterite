@@ -106,15 +106,25 @@ jobs:
             --exclude laterite-ags4-forge \
             --exclude laterite-ags4-corpus-qa \
             --exclude laterite-ags4-perf \
-            --exclude laterite-ags4-compliance
+            --exclude laterite-ags4-compliance \
+            --features laterite-ags4-emit/arrow,laterite-types/arrow
 
       - name: cargo llvm-cov (line-coverage floor)
         working-directory: rust-packages
-        # Floor sits just under the real number (89.6% measured 2026-07-24 over the
-        # exclude set above, so 88 leaves a small buffer for normal fluctuation) and
-        # is RATCHETED UP as coverage climbs. The old 62 was 28 points below actual
-        # — it caught nothing. Ratchet the floor and the exclude set TOGETHER: a
-        # number this tight is only comparable run-to-run while the denominator is.
+        # Floor sits just under the real number (89.24% measured 2026-07-24 over
+        # the exclude set above WITH the arrow feature edge restored, so 88 leaves
+        # a small buffer for normal fluctuation) and is RATCHETED UP as coverage
+        # climbs. The old 62 was 28 points below actual — it caught nothing.
+        # Ratchet the floor and the exclude set TOGETHER: a number this tight is
+        # only comparable run-to-run while the denominator is.
+        #
+        # The denominator grew on 2026-07-24: `--features` above brought
+        # `laterite-types::{arrow_cols, ipc}` and `laterite-ags4-emit::arrow_in`
+        # back into BOTH numerator and denominator. They had been silently absent
+        # — not by any decision, but because resolver-2 unifies features across
+        # selected packages only, and the four crates that request `arrow` are all
+        # excluded here. The honest number came in 0.36 points below the old one
+        # (89.6% → 89.24%), so the floor did not have to move.
         run: cargo llvm-cov report --summary-only --fail-under-lines 88
 
       # Codecov `rust` flag — public repo only (where the badge lives + the token

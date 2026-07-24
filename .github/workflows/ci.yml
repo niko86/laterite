@@ -569,12 +569,19 @@ jobs:
 
       - name: cargo test (workspace)
         working-directory: rust-packages
+        # `--features` is load-bearing, not decoration. The `arrow` feature is
+        # enabled ONLY by the four crates excluded here, and resolver-2 unifies
+        # features across the SELECTED packages only — so without this flag
+        # `laterite-types::{arrow_cols, ipc}` and `laterite-ags4-emit::arrow_in`
+        # are `#[cfg]`-ed out and their tests never compile, let alone run. That
+        # is the Arrow boundary that ships inside the wheel and the node binding.
         run: |
           cargo test --workspace \
             --exclude laterite-ags4-wasm \
             --exclude laterite-ags4-tokenizer-wasm \
             --exclude laterite-py \
-            --exclude laterite-node
+            --exclude laterite-node \
+            --features laterite-ags4-emit/arrow,laterite-types/arrow
 
       - name: sccache stats
         if: always()
