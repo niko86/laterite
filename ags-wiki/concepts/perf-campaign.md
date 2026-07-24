@@ -394,6 +394,65 @@ out to dominate there.
   at `field_index + 1`", so `field_span(line, 0)` returns the field *after* the
   descriptor, and it returns **char** offsets. `scan::first_field` is the answer.
 
+## Decisions taken
+
+Recorded here so the next session does not re-open them. Each was a genuine fork
+with consequences both ways; none is a default that fell out of the code.
+
+**Sequencing — correctness and measurement debt first, then T1.** C2 and M1 land
+before the validator tranche. The reasoning is the exemption above: untested code
+that returns a silent wrong answer is not competing with a perf candidate for the
+same slot, and both are small. The accepted consequence is that the headline
+coverage number **drops** when the Arrow boundary enters the denominator — an
+honest lower number beats a flattering wrong one, and unlike the QA-crate
+exclusions this one was never a decision in the first place.
+
+**Item 4b — UNIT-first, then fall back.** `parse_datetime` consults the format
+the `UNIT` row names; if the cell does not match, it falls back to the existing
+table. Decided on **correctness, not speed** — `typed_values` is 5.1 ms (3.5% of
+`check_parsed`), below the candidate floor, and the fixture is 0.09% `DT` cells,
+so the perf case is being argued from a number nobody has. The correctness prize
+is real and does not need strictness to collect it: consulting `UNIT` first
+resolves the ambiguous slash-separated date by what the file says about itself
+rather than by table order (`%Y/%m/%d` is currently tried before `%d/%m/%Y`).
+Strict UNIT was rejected because it would null cells that parse today wherever a
+real delivery's `UNIT` is wrong, absent or free text — a read-path behaviour
+change with parity consequences against python-ags4.
+
+**C1 — duplicate headings fail the read by default, with an opt-in recovery
+flag.** The defect is worse than a lost column: consumers iterate `headings`
+positionally and index the row map by name, so the surviving duplicate is
+returned *for both positions*. The first column's data is gone **and** the
+second's is duplicated into its place — the column still looks populated, with
+wrong values. That is why "keep first and warn" was rejected: it leaves the
+positional defect live by default on four surfaces that never run the rule
+engine.
+
+- **Default: fail the read**, naming the flag in the error. Files that succeed
+  today will start failing; they were producing wrong data, not right data.
+- **Opt in** to disambiguate rather than collide: the second and subsequent
+  occurrences are suffixed `__2`, `__3`, … in **both** `headings` and the row
+  key, which restores correct positional reads and loses nothing.
+- **On every read surface** — `lat read`, `laterite-excel`, node,
+  `read_groups_raw` and the Python read. Not because each needs it equally, but
+  because a read option present on some surfaces and absent on others is exactly
+  the drift `laterite-ags4-xcheck` and the drop-in surface gate exist to catch;
+  partial wiring fails CI rather than quietly diverging.
+
+> [!note] The output is deliberately **not valid AGS4** — a suffixed heading is
+> not a spec heading. That is the accepted trade: the flag exists to recover data
+> from a broken file, not to round-trip it. The exposure is narrow because
+> `AgsGroup` is a read-side projection and the emit path builds from frames and
+> `ParsedFile`, so a suffixed read cannot corrupt validate-and-fix. The one real
+> case is a suffixed XLSX converted back to AGS4, which carries the suffixes —
+> and only for someone who opted in.
+
+**Node gets a bench harness.** Building it is a session and some CI cost, but the
+alternative positions are both worse: node carries the clearest per-row waste in
+the workspace (#6) with no way to price or defend a fix, and declaring the
+surface out of scope would leave a shipped binding permanently unmeasured. This
+is the T6 prerequisite, so #6 stays queued until the harness exists.
+
 ## Coverage discipline
 
 Perf work moves branches into and out of hot paths, which is precisely when an
