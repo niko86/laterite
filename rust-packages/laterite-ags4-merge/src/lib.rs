@@ -342,6 +342,9 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
     let emit_opts = EmitOpts {
         mode: opts.emit_mode,
         edition: opts.edition,
+        // Metadata synthesis stays ON here: callers get the 2026-06-25
+        // one-call-valid behaviour. See EmitOpts::default.
+        ..EmitOpts::default()
     };
     let out = emit_ags4(&inputs, &emit_opts).map_err(|e| MergeError::Emit(e.to_string()))?;
     Ok(MergeResult {

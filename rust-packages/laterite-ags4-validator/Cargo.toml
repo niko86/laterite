@@ -126,7 +126,7 @@ proptest = "1"
 laterite-ags4-core = { path = "../laterite-ags4-core" }
 
 [[bench]]
-name = "validate_large_fixture"
+name = "validate"
 harness = false
 
 [lints]

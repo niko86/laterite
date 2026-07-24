@@ -2079,6 +2079,7 @@ dependencies = [
 name = "laterite-ags4-core"
 version = "0.7.0"
 dependencies = [
+ "criterion",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
  "laterite-transport",
@@ -2130,6 +2131,7 @@ name = "laterite-ags4-emit"
 version = "0.7.0"
 dependencies = [
  "arrow",
+ "criterion",
  "encoding_rs",
  "laterite-ags4-validator",
  "laterite-types",
@@ -2178,6 +2180,7 @@ dependencies = [
 name = "laterite-ags4-parse"
 version = "0.7.0"
 dependencies = [
+ "criterion",
  "encoding_rs",
  "memchr",
  "proptest",
@@ -2374,6 +2377,7 @@ version = "0.7.0"
 dependencies = [
  "arrow",
  "chrono",
+ "criterion",
  "proptest",
  "serde_json",
 ]

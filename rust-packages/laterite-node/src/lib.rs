@@ -1269,6 +1269,9 @@ pub fn emit_ags4_from_ipc(
         edition: resolve_edition(edition.as_deref())
             .map_err(Error::from_reason)?
             .unwrap_or(DictVersion::V4_1_1),
+        // Metadata synthesis stays ON here: this surface's callers get the
+        // 2026-06-25 one-call-valid behaviour. See EmitOpts::default.
+        ..laterite_ags4_emit::EmitOpts::default()
     };
     let mut inputs = Vec::with_capacity(groups.len());
     for g in groups {

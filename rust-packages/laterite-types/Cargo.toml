@@ -49,6 +49,17 @@ arrow = ["dep:arrow", "arrow/ipc"]
 # runtime dep-graph. The moved unit tests still use only chrono +
 # serde_json + std.
 proptest = "1"
+# Typed-column build benches (benches/arrow_cols.rs) — dev-only, same
+# criterion version the validator already vendors.
+criterion = "0.8"
+
+# `arrow_cols` lives behind the `arrow` feature, so the bench does too —
+# `required-features` means `cargo bench` on a default build skips this target
+# instead of failing to compile it.
+[[bench]]
+name = "arrow_cols"
+harness = false
+required-features = ["arrow"]
 
 [lints]
 workspace = true

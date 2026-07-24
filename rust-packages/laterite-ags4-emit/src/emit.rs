@@ -63,15 +63,33 @@ pub enum EmitMode {
 pub struct EmitOpts {
     pub mode: EmitMode,
     pub edition: DictVersion,
+    /// Mint the mandatory metadata catalogs (UNIT / TYPE / TRAN / ABBR) that
+    /// the input doesn't carry. `AutoFix` only — `Strict`/`Report` always
+    /// show or reject the gaps rather than filling them.
+    ///
+    /// Separated from `mode` so it can be MEASURED: it is a distinct stage
+    /// (step 2.5) with a distinct cost, and folding it into `AutoFix` meant
+    /// the only observable number was the whole mode. `benches/emit.rs` walks
+    /// write → Report → AutoFix-without → AutoFix-with to price each stage.
+    pub synthesize_metadata: bool,
 }
 
 impl Default for EmitOpts {
     fn default() -> Self {
         // AutoFix + 4.1.1 are the resolved project defaults (see the
-        // ags4-output design page).
+        // ags4-output design page, decided 2026-06-12).
+        //
+        // `synthesize_metadata: true` preserves the 2026-06-25 behaviour: a
+        // data-only build (notably a typed PROJ graph, which cannot reach the
+        // parentless root-metadata groups) yields a valid file in ONE call
+        // rather than Rule 14/15/17 findings. That is the design's headline
+        // promise, so the default stays on until the staged benches say what
+        // the stage actually costs — flipping it is a user-visible behaviour
+        // change, not a tuning knob.
         EmitOpts {
             mode: EmitMode::AutoFix,
             edition: DictVersion::V4_1_1,
+            synthesize_metadata: true,
         }
     }
 }
@@ -138,7 +156,7 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
     // file — mint UNIT/TYPE (derived from the data), a placeholder TRAN, and
     // ABBR (when PA codes are used) for whichever are absent. PROJ is never
     // synthesized (real project identity), so a missing PROJ stays a Rule 13 finding.
-    if opts.mode == EmitMode::AutoFix {
+    if opts.mode == EmitMode::AutoFix && opts.synthesize_metadata {
         let synth = synthesize_metadata(&owned, &dict);
         owned.extend(synth);
     }
