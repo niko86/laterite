@@ -51,8 +51,20 @@ on any machine and in CI, carrying no real delivery data.
 | `parse_bytes` | 165 ms | 144 MiB/s |
 | `index_ags4_bytes` | 165 ms | 144 MiB/s |
 | `read_ags4_bytes` | 276 ms | 86 MiB/s |
+| `typed_read_file` (build_record_batch, T2) | **75.9 ms** | 312 MiB/s |
 | `check_parsed` (rules only) | 343 ms | 69 MiB/s |
 | `check_file` (I/O + parse + rules) | 516 ms | 46 MiB/s |
+
+> [!note] **The typed read landed on the axis in T2** (2026-07-24,
+> `types/typed_read_file/large`). This is `build_record_batch` — AGS4 strings →
+> typed Arrow columns — over the whole fixture's REAL cells, the parse excluded
+> (setup, not measured). It is the build the *typed* read path pays ON TOP of
+> `parse_bytes`, distinct from `read_ags4_bytes` (the pure-string codec). It had
+> been invisible: the old bench synthesised 50k rows and could not be placed
+> here. The mixed-group micro-bench prices the typing itself — typed **19.4 ms**
+> vs the raw-string compat shape **0.88 ms**, so ~95% of the typed build is the
+> casting, and the String arm (60% of headings) is the bulk of it. That is what
+> makes candidate #2 rankable (see [[perf-campaign]]).
 
 `check_file` ≈ `parse_bytes` + `check_parsed` (508 ms), so I/O plus dictionary
 resolution is only ~8 ms and the split is self-consistent. That arithmetic is the

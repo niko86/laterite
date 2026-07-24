@@ -295,6 +295,128 @@ where
 mod tests {
     use super::*;
 
+    /// Value-correctness for every arm of `build_column`. The existing tests
+    /// check the SCHEMA (field names, column set); none checked the decoded
+    /// CONTENTS, so a caster returning the right Arrow *type* with the wrong
+    /// *value* would pass silently. Pins one cell per family arm — Integer,
+    /// Decimal, Bool, Datetime, String — to its decoded value.
+    #[test]
+    fn build_column_decodes_each_family_to_the_right_value() {
+        use arrow::array::{
+            Array, BooleanArray, Float64Array, Int64Array, StringArray, TimestampMicrosecondArray,
+        };
+        let headings: Vec<String> = ["N", "F", "B", "D", "S"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
+        let types: Vec<String> = ["0DP", "2DP", "YN", "DT", "ID"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
+        // Column-major cell values for a single row.
+        let vals = ["42", "12.34", "Y", "2024-01-15T09:30:00", "BH1"];
+        let batch =
+            build_record_batch(&headings, &types, 1, |col, _row| vals.get(col).copied()).unwrap();
+
+        let col = |i: usize| batch.column(i).as_ref();
+        assert_eq!(
+            col(0)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap()
+                .value(0),
+            42
+        );
+        let f = col(1)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap()
+            .value(0);
+        assert!((f - 12.34).abs() < 1e-9, "2DP decoded to {f}");
+        assert!(
+            col(2)
+                .as_any()
+                .downcast_ref::<BooleanArray>()
+                .unwrap()
+                .value(0)
+        );
+        // DT parses to a non-null timestamp; the exact micros are parse_value's
+        // contract (tested there) — here we pin that the Datetime arm produced a
+        // valid, non-null value rather than silently nulling.
+        assert!(
+            col(3)
+                .as_any()
+                .downcast_ref::<TimestampMicrosecondArray>()
+                .unwrap()
+                .is_valid(0)
+        );
+        assert_eq!(
+            col(4)
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap()
+                .value(0),
+            "BH1"
+        );
+    }
+
+    /// A `None` (missing/ragged) cell must decode to a typed NULL in every arm,
+    /// not a default value — the branch a real sparse delivery takes constantly,
+    /// and the one the `null-half` bench rung exercises for cost.
+    #[test]
+    fn build_column_maps_a_missing_cell_to_a_typed_null() {
+        use arrow::array::{
+            Array, BooleanArray, Float64Array, Int64Array, StringArray, TimestampMicrosecondArray,
+        };
+        let headings: Vec<String> = ["N", "F", "B", "D", "S"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
+        let types: Vec<String> = ["0DP", "2DP", "YN", "DT", "ID"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
+        // Every cell missing.
+        let batch = build_record_batch(&headings, &types, 1, |_c, _r| None).unwrap();
+        let col = |i: usize| batch.column(i).as_ref();
+        assert!(
+            col(0)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap()
+                .is_null(0)
+        );
+        assert!(
+            col(1)
+                .as_any()
+                .downcast_ref::<Float64Array>()
+                .unwrap()
+                .is_null(0)
+        );
+        assert!(
+            col(2)
+                .as_any()
+                .downcast_ref::<BooleanArray>()
+                .unwrap()
+                .is_null(0)
+        );
+        assert!(
+            col(3)
+                .as_any()
+                .downcast_ref::<TimestampMicrosecondArray>()
+                .unwrap()
+                .is_null(0)
+        );
+        // The String arm maps an absent cell to null (not "").
+        assert!(
+            col(4)
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap()
+                .is_null(0)
+        );
+    }
+
     /// The 2×2 the single-purpose builders would have silently dropped:
     /// keyed×hashed are independent knobs, so all four combinations must
     /// produce the expected column set — in particular `ids: None, hashes:

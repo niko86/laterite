@@ -52,6 +52,13 @@ proptest = "1"
 # Typed-column build benches (benches/arrow_cols.rs) — dev-only, same
 # criterion version the validator already vendors.
 criterion = "0.8"
+# The typed-build bench's file rung parses a fixture ONCE in setup, then times
+# `build_record_batch` over that file's real cells — so the typed build lands on
+# the same MB/s axis as `parse_bytes` (see the perf-campaign T2 tranche). Both
+# are dev-only leaves; `laterite-ags4-parse` (encoding_rs + memchr) does NOT
+# depend on `laterite-types`, so there is no cycle.
+laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+encoding_rs = "0.8"
 
 # `arrow_cols` lives behind the `arrow` feature, so the bench does too —
 # `required-features` means `cargo bench` on a default build skips this target

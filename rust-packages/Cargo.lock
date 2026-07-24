@@ -2378,6 +2378,8 @@ dependencies = [
  "arrow",
  "chrono",
  "criterion",
+ "encoding_rs",
+ "laterite-ags4-parse",
  "proptest",
  "serde_json",
 ]
