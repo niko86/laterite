@@ -20,9 +20,31 @@ const groups = read(res.bytes).groups;
 console.log("groups:", groups);
 console.log("findings:", res.findings.length);
 
-// Autofix synthesizes the mandatory metadata catalogs (TRAN/UNIT/TYPE), so a
-// data-only build is valid in one call.
-assert.ok(
-  ["PROJ", "LOCA", "TRAN", "UNIT", "TYPE"].every((c) => groups.includes(c)),
+// You get back exactly the groups you supplied. AGS4 also mandates the metadata
+// catalogs (TRAN/UNIT/TYPE), which your rows don't carry — so those are REPORTED
+// rather than invented:
+assert.deepEqual(groups, ["PROJ", "LOCA"]);
+const rules = new Set(res.findings.map((f) => f.rule));
+for (const r of [
+  "AGS Format Rule 14",
+  "AGS Format Rule 15",
+  "AGS Format Rule 17",
+]) {
+  assert.ok(rules.has(r), `expected ${r}`);
+}
+
+// Ask for them and they're derived from your data — UNIT and TYPE from the
+// columns, TRAN as a placeholder you overwrite. Opt-in, so nothing appears in
+// your file that you didn't ask for.
+const full = buildAgs4(
+  new Map([
+    ["PROJ", proj],
+    ["LOCA", loca],
+  ]),
+  { synthesiseMetadata: true },
 );
-assert.equal(res.findings.length, 0);
+const fullGroups = read(full.bytes).groups;
+assert.ok(
+  ["PROJ", "LOCA", "TRAN", "UNIT", "TYPE"].every((c) => fullGroups.includes(c)),
+);
+assert.equal(full.findings.length, 0);

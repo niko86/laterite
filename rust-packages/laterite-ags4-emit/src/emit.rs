@@ -63,15 +63,28 @@ pub enum EmitMode {
 pub struct EmitOpts {
     pub mode: EmitMode,
     pub edition: DictVersion,
-    /// Mint the mandatory metadata catalogs (UNIT / TYPE / TRAN / ABBR) that
-    /// the input doesn't carry. `AutoFix` only — `Strict`/`Report` always
-    /// show or reject the gaps rather than filling them.
+    /// Mint the mandatory metadata catalogs (UNIT / TYPE / TRAN / ABBR) the
+    /// input doesn't carry. `AutoFix` only — `Strict`/`Report` always show or
+    /// reject the gaps rather than filling them.
+    ///
+    /// **Off by default, and opt-in by design.** Synthesis adds whole GROUPS
+    /// the caller never wrote; that is the sort of unexpected magic a caller
+    /// should ask for rather than discover. Turning it on is a statement that
+    /// derived catalogs are wanted.
+    ///
+    /// Only *derivable* metadata is ever minted: UNIT and TYPE are pure
+    /// functions of the data, ABBR comes from the standard table and only when
+    /// PA codes are used, TRAN is a placeholder stub. PROJ and DICT are never
+    /// synthesised — a project identity and a schema extension are authorial
+    /// facts, and inventing a DICT parent would turn a loud Rule 18 error into
+    /// a silent false statement that Rule 10's relational checks then trust.
     ///
     /// Separated from `mode` so it can be MEASURED: it is a distinct stage
-    /// (step 2.5) with a distinct cost, and folding it into `AutoFix` meant
-    /// the only observable number was the whole mode. `benches/emit.rs` walks
-    /// write → Report → AutoFix-without → AutoFix-with to price each stage.
-    pub synthesize_metadata: bool,
+    /// (step 2.5), and folding it into `AutoFix` meant the only observable
+    /// number was the whole mode. `benches/emit.rs` walks write → Report →
+    /// AutoFix-without → AutoFix-with to price each stage; the stage costs
+    /// ~0.3% of an export, so this flag is not a performance knob.
+    pub synthesise_metadata: bool,
 }
 
 impl Default for EmitOpts {
@@ -79,17 +92,20 @@ impl Default for EmitOpts {
         // AutoFix + 4.1.1 are the resolved project defaults (see the
         // ags4-output design page, decided 2026-06-12).
         //
-        // `synthesize_metadata: true` preserves the 2026-06-25 behaviour: a
-        // data-only build (notably a typed PROJ graph, which cannot reach the
-        // parentless root-metadata groups) yields a valid file in ONE call
-        // rather than Rule 14/15/17 findings. That is the design's headline
-        // promise, so the default stays on until the staged benches say what
-        // the stage actually costs — flipping it is a user-visible behaviour
-        // change, not a tuning knob.
+        // `synthesise_metadata: false` (2026-07-24). Minting whole GROUPS the
+        // caller never asked for is the kind of unexpected magic the caller
+        // should opt INTO — the decision is about agency, not cost. The staged
+        // benches priced it at ~0.13 ms (0.3% of an export), so there is no
+        // performance argument on either side of that choice; it is free to
+        // leave off and free to turn on.
+        //
+        // The consequence is deliberate and must stay documented: a data-only
+        // build now reports Rule 14/15/17 rather than silently filling them.
+        // See the ags4-output design page.
         EmitOpts {
             mode: EmitMode::AutoFix,
             edition: DictVersion::V4_1_1,
-            synthesize_metadata: true,
+            synthesise_metadata: false,
         }
     }
 }
@@ -156,8 +172,8 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
     // file — mint UNIT/TYPE (derived from the data), a placeholder TRAN, and
     // ABBR (when PA codes are used) for whichever are absent. PROJ is never
     // synthesized (real project identity), so a missing PROJ stays a Rule 13 finding.
-    if opts.mode == EmitMode::AutoFix && opts.synthesize_metadata {
-        let synth = synthesize_metadata(&owned, &dict);
+    if opts.mode == EmitMode::AutoFix && opts.synthesise_metadata {
+        let synth = synthesise_metadata(&owned, &dict);
         owned.extend(synth);
     }
 
@@ -313,7 +329,7 @@ fn validate(bytes: &[u8], edition: DictVersion) -> Result<(ParsedFile, Findings)
 /// codes (Rule 16). PROJ is deliberately never synthesized — it carries real
 /// project identity, not derivable metadata, so a missing PROJ stays a Rule 13
 /// finding.
-fn synthesize_metadata(owned: &[OwnedGroup], dict: &Dictionary) -> Vec<OwnedGroup> {
+fn synthesise_metadata(owned: &[OwnedGroup], dict: &Dictionary) -> Vec<OwnedGroup> {
     let present: BTreeSet<&str> = owned.iter().map(|g| g.code.as_str()).collect();
     let mut synth: Vec<OwnedGroup> = Vec::new();
 
@@ -643,11 +659,13 @@ mod tests {
         );
     }
 
+    /// Opting IN yields a valid file in one call — the capability is unchanged,
+    /// only its default. The `..Default::default()` spread is deliberate: this
+    /// must keep passing if other defaults move.
     #[test]
-    fn autofix_synthesizes_missing_metadata_groups() {
-        // The flagship enhancement: a data-only build (PROJ + LOCA, no
-        // TRAN/UNIT/TYPE) under the default AutoFix mode synthesizes the
-        // missing root-metadata groups and comes back fully valid.
+    fn autofix_synthesises_missing_metadata_groups_when_asked() {
+        // A data-only build (PROJ + LOCA, no TRAN/UNIT/TYPE) under AutoFix WITH
+        // synthesis mints the missing root-metadata groups and comes back valid.
         let loca = GroupInput {
             code: "LOCA".into(),
             headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
@@ -655,12 +673,16 @@ mod tests {
             types: None,
             rows: vec![vec![json!("BH01"), json!(12.3)]],
         };
-        let r = emit_ags4(&[proj(), loca], &EmitOpts::default()).unwrap();
+        let opts = EmitOpts {
+            synthesise_metadata: true,
+            ..EmitOpts::default()
+        };
+        let r = emit_ags4(&[proj(), loca], &opts).unwrap();
         let text = String::from_utf8(r.bytes.clone()).unwrap();
         for g in ["TRAN", "UNIT", "TYPE"] {
             assert!(
                 text.contains(&format!("\"GROUP\",\"{g}\"")),
-                "AutoFix should synthesize the {g} group, got:\n{text}"
+                "opted-in AutoFix should synthesise the {g} group, got:\n{text}"
             );
         }
         // The synthesized file is valid — no error-severity findings.
@@ -672,13 +694,44 @@ mod tests {
             .count();
         assert_eq!(
             errors, 0,
-            "synthesized build should be error-free, findings:\n{:?}",
+            "synthesised build should be error-free, findings:\n{:?}",
             r.findings
         );
     }
 
+    /// The NEW default: `AutoFix` still fixes what the caller wrote, but does not
+    /// invent groups they didn't. This is the behaviour change, so it is pinned
+    /// directly rather than inferred from the opt-in test's absence.
     #[test]
-    fn autofix_synthesizes_abbr_for_pa_codes() {
+    fn autofix_does_not_synthesise_by_default() {
+        let loca = GroupInput {
+            code: "LOCA".into(),
+            headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
+            units: None,
+            types: None,
+            rows: vec![vec![json!("BH01"), json!(12.3)]],
+        };
+        let r = emit_ags4(&[proj(), loca], &EmitOpts::default()).unwrap();
+        let text = String::from_utf8(r.bytes.clone()).unwrap();
+        for g in ["TRAN", "UNIT", "TYPE"] {
+            assert!(
+                !text.contains(&format!("\"GROUP\",\"{g}\"")),
+                "default AutoFix must not mint {g}, got:\n{text}"
+            );
+        }
+        // And the gaps are REPORTED rather than silently filled — the whole
+        // point of opting in is that the caller can see what they declined.
+        let labels: Vec<&str> = r.findings.keys().map(String::as_str).collect();
+        assert!(
+            labels.iter().any(|l| l.contains("Rule 14"))
+                && labels.iter().any(|l| l.contains("Rule 15"))
+                && labels.iter().any(|l| l.contains("Rule 17")),
+            "missing catalogs should surface as findings, got: {labels:?}"
+        );
+    }
+
+    #[test]
+    fn autofix_synthesises_abbr_for_pa_codes_when_asked() {
         // A PA-coded value (LOCA_TYPE is a PA heading) needs an ABBR definition
         // (Rule 16); AutoFix mints ABBR covering exactly the codes used, and the
         // file is valid.
@@ -689,11 +742,15 @@ mod tests {
             types: None,
             rows: vec![vec![json!("BH01"), json!("TP")]],
         };
-        let r = emit_ags4(&[proj(), loca], &EmitOpts::default()).unwrap();
+        let opts = EmitOpts {
+            synthesise_metadata: true,
+            ..EmitOpts::default()
+        };
+        let r = emit_ags4(&[proj(), loca], &opts).unwrap();
         let text = String::from_utf8(r.bytes.clone()).unwrap();
         assert!(
             text.contains("\"GROUP\",\"ABBR\""),
-            "AutoFix should synthesize ABBR, got:\n{text}"
+            "opted-in AutoFix should synthesise ABBR, got:\n{text}"
         );
         assert!(
             text.contains("\"DATA\",\"LOCA_TYPE\",\"TP\""),

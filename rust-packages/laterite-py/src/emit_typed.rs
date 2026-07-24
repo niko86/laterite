@@ -63,7 +63,7 @@ fn parse_mode(s: Option<&str>) -> PyResult<EmitMode> {
 /// is the safe-fix ledger (the same `{kind,label,rule,line,risk}` shape `fix()`
 /// returns) `AutoFix` made — `fixes_applied` is its length (#294 F#7).
 #[pyfunction]
-#[pyo3(signature = (tables, edition=None, mode=None, units=None, types=None))]
+#[pyo3(signature = (tables, edition=None, mode=None, units=None, types=None, synthesise_metadata=false))]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
 pub fn emit_ags4_from_arrow(
@@ -75,13 +75,14 @@ pub fn emit_ags4_from_arrow(
     // F#9). A group/heading absent from the map keeps the dictionary default.
     units: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
     types: Option<std::collections::HashMap<String, std::collections::HashMap<String, String>>>,
+    // Off unless asked: minting UNIT/TYPE/TRAN/ABBR the caller never wrote is
+    // opt-in across every surface (2026-07-24). See EmitOpts::synthesise_metadata.
+    synthesise_metadata: bool,
 ) -> PyResult<(Py<PyBytes>, String, Bound<'_, pyo3::types::PyList>, usize)> {
     let opts = EmitOpts {
         mode: parse_mode(mode.as_deref())?,
         edition: parse_edition(edition.as_deref())?,
-        // Metadata synthesis stays ON here: callers get the 2026-06-25
-        // one-call-valid behaviour. See EmitOpts::default.
-        ..EmitOpts::default()
+        synthesise_metadata,
     };
 
     let mut groups: Vec<GroupInput> = Vec::with_capacity(tables.len());

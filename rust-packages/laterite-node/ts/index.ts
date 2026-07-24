@@ -231,6 +231,15 @@ export interface EmitOptions {
   units?: Record<string, Record<string, string>>;
   /** Per-heading AGS data-TYPE overrides, same `{ code: { heading: type } }` shape. */
   types?: Record<string, Record<string, string>>;
+  /** Mint the mandatory metadata catalogs your data doesn't carry — UNIT and
+   *  TYPE (derived from the data), a placeholder TRAN, and ABBR when PA picklist
+   *  codes are used. `"autofix"` mode only. Default **false**.
+   *
+   *  Off by default on purpose: synthesis adds whole *groups* you never wrote,
+   *  which should be asked for rather than discovered. Left off, a data-only
+   *  build reports Rule 14/15/17 so you can see what is missing. `PROJ` and
+   *  `DICT` are never synthesised at all — those are authorial facts. */
+  synthesiseMetadata?: boolean;
 }
 
 /** Transpose row objects → an arrow-js Table (column types inferred from the
@@ -328,18 +337,19 @@ function checkMeta(
  * an *existing* file, `buildAgs4` *constructs* a new one: it lays the groups out
  * in order, fills UNIT/TYPE from the chosen `dictVersion`, then runs the output
  * through the validator (the `mode` knob on `opts` decides what happens to the
- * findings — `"autofix"` applies the safe fixes *and* synthesizes any missing
- * UNIT/TYPE/TRAN/ABBR metadata group so a data-only build is valid; `"report"` merely
- * records them). The returned `BuildResult` carries the bytes, the residual `findings`,
+ * findings — `"autofix"` applies the safe fixes to what you wrote; `"report"`
+ * merely records them). Minting the missing UNIT/TYPE/TRAN/ABBR catalogs is a
+ * separate opt-in, `synthesiseMetadata`. The returned `BuildResult` carries the bytes, the residual `findings`,
  * and a `fixesApplied` count; persist it with `BuildResult.save`. Needs no DuckDB.
  *
  * `groups` accepts two shapes. A **typed-graph root** (`new PROJ({…, locas:[new
  * LOCA({…})]})`) is walked depth-first via the registry's parent→child links,
  * only the headings you set becoming columns (entirely-unset ones are dropped,
  * except KEY). The walk covers only
- * PROJ's subtree (the root-metadata groups have no parent), but under `"autofix"`
- * the missing UNIT/TYPE/TRAN (and ABBR for PA codes) are synthesized, so a
- * typed-graph build is valid out of the box. Or pass a **Map / array of `[code,
+ * PROJ's subtree (the root-metadata groups have no parent), so those groups are
+ * absent unless you pass `synthesiseMetadata: true` — without it they surface as
+ * Rule 14/15/17 findings rather than being filled in silently. Or pass a
+ * **Map / array of `[code,
  * data]`** entries where `data` is
  * an arrow-js `Table` or row objects whose **keys are the AGS headings**
  * (`LOCA_ID`, …). Either way group order is preserved, so put `PROJ` first.
@@ -382,6 +392,7 @@ export function buildAgs4(
     opts.mode,
     opts.units,
     opts.types,
+    opts.synthesiseMetadata,
   );
   const byRule = JSON.parse(res.findingsJson) as Record<
     string,

@@ -307,8 +307,9 @@ fn emit_report(
     let opts = laterite_ags4_emit::EmitOpts {
         mode: emit_mode(mode)?,
         edition: emit_edition(edition)?,
-        // Metadata synthesis stays ON here: this surface's callers get the
-        // 2026-06-25 one-call-valid behaviour. See EmitOpts::default.
+        // Metadata synthesis inherits the default, which is now OFF
+        // (2026-07-24): no surface mints GROUPs the caller never wrote without
+        // being asked. See EmitOpts::synthesise_metadata.
         ..laterite_ags4_emit::EmitOpts::default()
     };
     let res = laterite_ags4_emit::emit_ags4(&groups, &opts).map_err(|e| e.to_string())?;
@@ -382,9 +383,10 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
 ///   (each row an array of cell values). The headings are the AGS headings;
 ///   UNIT/TYPE fill from the chosen edition's dictionary where omitted.
 /// * `dict_version` — `None`/`"auto"` → `4.1.1`, or `4.0.3|4.0.4|4.1|4.1.1|4.2`.
-/// * `mode` — `None`/`"autofix"` (default) | `"report"` | `"strict"`. Under
-///   `"autofix"` the missing UNIT/TYPE/TRAN/ABBR metadata groups are synthesized
-///   (from the data) so a data-only build is valid; `"report"`/`"strict"` don't.
+/// * `mode` — `None`/`"autofix"` (default) | `"report"` | `"strict"`. `"autofix"`
+///   repairs what the input contains. It does NOT mint the mandatory
+///   UNIT/TYPE/TRAN/ABBR catalogs — that became opt-in on 2026-07-24, so a
+///   data-only build reports Rule 14/15/17 rather than silently filling them.
 ///
 /// Returns `{ text, findings, fixes_applied }`; `text` is the AGS4 document
 /// (UTF-8, CRLF) for the browser to wrap in a `Blob`.

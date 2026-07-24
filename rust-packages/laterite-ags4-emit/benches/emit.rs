@@ -121,7 +121,7 @@ fn bench_orchestrator(c: &mut Criterion) {
     for (label, mode, synth) in ladder {
         let opts = EmitOpts {
             mode,
-            synthesize_metadata: synth,
+            synthesise_metadata: synth,
             ..EmitOpts::default()
         };
         g.bench_function(label, |b| {

@@ -26,14 +26,41 @@ describe("typed-graph builder → buildAgs4", () => {
     expect(res.text).toMatch(/"HEADING","LOCA_ID","LOCA_GL"/);
     expect(res.text).toMatch(/"DATA","BH01","12\.30"/); // 2DP canonicalised from 12.3
     expect(res.text).toMatch(/"DATA","P1","Demo project"/);
-    expect(res.findings).toHaveLength(0); // sparse graph builds valid (prune + synth)
+    // The root-metadata groups have no parent, so a PROJ-rooted graph cannot
+    // reach them; without `synthesiseMetadata` they are reported, not invented.
+    expect(res.findings.map((f) => f.rule)).toEqual(
+      expect.arrayContaining([
+        "AGS Format Rule 14",
+        "AGS Format Rule 15",
+        "AGS Format Rule 17",
+      ]),
+    );
 
-    // The emitted bytes re-parse to the built groups + the autofix-synthesized
-    // metadata catalogs (UNIT/TYPE/TRAN).
+    // Exactly the walked groups come back — the prune is what is under test.
     const back = read(undefined, { text: res.text });
-    expect(back.groups).toEqual(["PROJ", "LOCA", "TRAN", "UNIT", "TYPE"]);
+    expect(back.groups).toEqual(["PROJ", "LOCA"]);
     expect(back.table("LOCA").numRows).toBe(2);
     expect(back.table("LOCA").getChild("LOCA_GL")!.get(0)).toBe(12.3);
+  });
+
+  it("synthesiseMetadata mints the derivable catalogs, but never PROJ or DICT", () => {
+    // Opting in derives UNIT/TYPE from the data and stubs TRAN, so the same
+    // sparse graph builds valid in one call. PROJ here comes from the graph
+    // itself, not from synthesis — the boundary is derivable vs authorial.
+    const proj = new PROJ({ PROJ_ID: "P1", PROJ_NAME: "Demo project" });
+    proj.locas.push(new LOCA({ LOCA_ID: "BH01", LOCA_GL: 12.3 }));
+
+    const res = buildAgs4(proj, {
+      dictVersion: "4.1.1",
+      mode: "autofix",
+      synthesiseMetadata: true,
+    });
+    const back = read(undefined, { text: res.text });
+    expect(back.groups).toEqual(
+      expect.arrayContaining(["PROJ", "LOCA", "TRAN", "UNIT", "TYPE"]),
+    );
+    expect(back.groups).not.toContain("DICT");
+    expect(res.findings).toHaveLength(0);
   });
 
   it("a class carries its static code and constructs from a partial", () => {

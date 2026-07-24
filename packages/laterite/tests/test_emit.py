@@ -151,10 +151,15 @@ def test_round_trips_through_read():
     loca = pl.DataFrame({"LOCA_ID": ["BH01", "BH02"], "LOCA_GL": [12.3, 13.0]})
     res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca})
     back = laterite.read(text=res.text)
-    # autofix synthesizes the mandatory metadata groups, so the round-tripped
-    # file is valid and carries TRAN/UNIT/TYPE alongside the data groups.
-    assert sorted(back.groups) == ["LOCA", "PROJ", "TRAN", "TYPE", "UNIT"]
-    assert not res.findings
+    # Exactly what was built comes back — synthesis is opt-in, so the round trip
+    # is no longer entangled with minted groups. Metadata catalogs are absent,
+    # which is what the Rule 14/15/17 findings below say.
+    assert sorted(back.groups) == ["LOCA", "PROJ"]
+    assert {f["rule"] for f in res.findings} >= {
+        "AGS Format Rule 14",
+        "AGS Format Rule 15",
+        "AGS Format Rule 17",
+    }
     df = back["LOCA"]
     assert df["LOCA_ID"].to_list() == ["BH01", "BH02"]
     assert df["LOCA_GL"].to_list() == [12.3, 13.0]
@@ -211,7 +216,7 @@ def test_typed_graph_round_trips_through_read():
     proj.locas.append(laterite.groups.LOCA(loca_id="BH01", loca_gl=12.34))
     proj.locas.append(laterite.groups.LOCA(loca_id="BH02", loca_gl=8.0))
     back = laterite.read(data=laterite.build_ags4(proj).bytes)
-    assert sorted(back.groups) == ["LOCA", "PROJ", "TRAN", "TYPE", "UNIT"]
+    assert sorted(back.groups) == ["LOCA", "PROJ"]
     loca = back["LOCA"]
     assert loca["LOCA_ID"].to_list() == ["BH01", "BH02"]
     assert loca["LOCA_GL"].to_list() == [12.34, 8.0]
@@ -230,16 +235,8 @@ def test_typed_graph_recurses_deeply():
     proj.locas.append(loca)
 
     back = laterite.read(data=laterite.build_ags4(proj).bytes)
-    # the four walked groups + the autofix-synthesized metadata catalogs
-    assert sorted(back.groups) == [
-        "LLPL",
-        "LOCA",
-        "PROJ",
-        "SAMP",
-        "TRAN",
-        "TYPE",
-        "UNIT",
-    ]
+    # exactly the four walked groups — the depth-first walk is what is under test
+    assert sorted(back.groups) == ["LLPL", "LOCA", "PROJ", "SAMP"]
 
 
 def test_typed_graph_round_trips_via_read_typed(tmp_path):
@@ -260,36 +257,50 @@ def test_typed_graph_round_trips_via_read_typed(tmp_path):
     )
     proj = read_typed(src)
     back = laterite.read(data=laterite.build_ags4(proj).bytes)
-    assert sorted(back.groups) == ["LOCA", "PROJ", "TRAN", "TYPE", "UNIT"]
+    assert sorted(back.groups) == ["LOCA", "PROJ"]
     assert back["LOCA"]["LOCA_ID"].to_list() == ["BH01", "BH02"]
 
 
 def test_typed_graph_childless_root_builds():
     res = laterite.build_ags4(laterite.groups.PROJ(proj_id="P1", proj_name="Solo"))
     back = laterite.read(data=res.bytes)
-    assert sorted(back.groups) == ["PROJ", "TRAN", "TYPE", "UNIT"]
+    assert sorted(back.groups) == ["PROJ"]
     assert back["PROJ"]["PROJ_ID"].to_list() == ["P1"]
 
 
-def test_autofix_synthesizes_missing_metadata_groups():
-    # Under the default autofix mode, build_ags4 mints the mandatory UNIT/TYPE
-    # catalogs (from the data) and a placeholder TRAN, so a data-only build is
-    # valid out of the box; report mode leaves them absent.
+def test_synthesise_metadata_mints_the_missing_catalogs_when_asked():
+    # Opted in, build_ags4 mints the mandatory UNIT/TYPE catalogs (from the data)
+    # and a placeholder TRAN, so a data-only build is valid in one call.
     loca = pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
-    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca})
+    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, synthesise_metadata=True)
     assert {"TRAN", "UNIT", "TYPE"}.issubset(laterite.read(data=res.bytes).groups)
     assert not res.findings  # fully valid, no Rule 14/15/17
 
-    rep = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, mode="report")
+    # Report mode never synthesises, opted in or not — it reports, it doesn't fix.
+    rep = laterite.build_ags4(
+        {"PROJ": _proj(), "LOCA": loca}, mode="report", synthesise_metadata=True
+    )
     assert "TRAN" not in laterite.read(data=rep.bytes).groups
-    assert rep.findings  # report mode reports the missing metadata instead
+    assert rep.findings
 
 
-def test_autofix_synthesizes_abbr_for_pa_codes():
-    # When the data uses a PA picklist code (LOCA_TYPE is a PA heading), autofix
-    # also synthesizes ABBR (Rule 16) defining that code, so the build is valid.
-    loca = pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_TYPE": ["TP"]})
+def test_synthesis_is_off_by_default():
+    # The behaviour change: the same build without the flag mints nothing and
+    # surfaces the gaps instead, so the caller sees what they declined.
+    loca = pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
     res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca})
+    assert not {"TRAN", "UNIT", "TYPE"} & set(laterite.read(data=res.bytes).groups)
+    rules = {f["rule"] for f in res.findings}
+    assert any("Rule 14" in r for r in rules)
+    assert any("Rule 15" in r for r in rules)
+    assert any("Rule 17" in r for r in rules)
+
+
+def test_synthesise_metadata_mints_abbr_for_pa_codes():
+    # When the data uses a PA picklist code (LOCA_TYPE is a PA heading), opted-in
+    # synthesis also mints ABBR (Rule 16) defining that code.
+    loca = pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_TYPE": ["TP"]})
+    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, synthesise_metadata=True)
     assert "ABBR" in laterite.read(data=res.bytes).groups
     assert '"DATA","LOCA_TYPE","TP"' in res.text
     assert not res.findings  # fully valid, incl. Rule 16
@@ -302,7 +313,10 @@ def test_typed_graph_emits_only_set_columns():
     # edition-specific / PA headings would trip Rule 9 / 16).
     proj = laterite.groups.PROJ(proj_id="LAT-DEMO", proj_name="Demo")
     proj.locas.append(laterite.groups.LOCA(loca_id="BH01", loca_gl=12.50))
-    res = laterite.build_ags4(proj)
+    # Synthesis on: a clean baseline is this test's precondition — the claim is
+    # that PRUNING doesn't trip Rule 9/16, which needs the metadata gaps closed
+    # so they don't drown the signal.
+    res = laterite.build_ags4(proj, synthesise_metadata=True)
     hdr = next(
         ln for ln in res.text.splitlines() if ln.startswith('"HEADING","LOCA_ID"')
     )
@@ -316,7 +330,9 @@ def test_typed_graph_emits_only_set_columns():
         laterite.groups.LOCA(loca_id="BH01", loca_gl=12.5, loca_vssl="MV Demo")
     )
     assert "LOCA_VSSL" in laterite.build_ags4(p2).text
-    assert not laterite.build_ags4(p2, dict_version="4.2").findings
+    assert not laterite.build_ags4(
+        p2, dict_version="4.2", synthesise_metadata=True
+    ).findings
 
 
 def test_typed_graph_non_group_child_raises():
