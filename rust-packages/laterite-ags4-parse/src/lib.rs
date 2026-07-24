@@ -162,6 +162,17 @@ pub struct ParseOptions {
     /// stops at the first error). Core's *read* path opts IN — a data reader
     /// fails fast on structurally-broken input (#168 Phase 5, fork 3).
     pub strict_structure: bool,
+    /// Locate GROUP records only — skip HEADING/UNIT/TYPE/DATA materialisation.
+    ///
+    /// The cert/index path needs `group_records` + `group_order` and nothing
+    /// else, but it used to pay for the whole row model and discard it: on a
+    /// 25 MB file that is ~418k lines tokenised into owned `String`s to keep
+    /// ~123 GROUP records. Under this flag the walk is IDENTICAL — same line
+    /// spans, same decode, same UTF-8 rejection, same AGS3 sniff, same
+    /// first-seen-wins `group_order` — it just stops building what the caller
+    /// then drops. `groups` comes back with empty headings/units/types/rows,
+    /// so it is NOT a read profile; `index_ags4_bytes` is the only caller.
+    pub locate_only: bool,
 }
 
 impl ParseOptions {
@@ -174,6 +185,7 @@ impl ParseOptions {
             encoding: encoding_rs::UTF_8,
             on_invalid_utf8: InvalidUtf8::Reject,
             strict_structure: false,
+            locate_only: false,
         }
     }
     /// Validating: keep raw lines, UTF-8, lossy-replace, lenient structure (the
@@ -185,6 +197,7 @@ impl ParseOptions {
             encoding: encoding_rs::UTF_8,
             on_invalid_utf8: InvalidUtf8::LossyReplace,
             strict_structure: false,
+            locate_only: false,
         }
     }
 }
@@ -279,17 +292,21 @@ const BOM: &[u8] = &[0xEF, 0xBB, 0xBF];
 /// the single-byte encodings the validator accepts (UTF-8/cp1252/latin1)
 /// per-line decode equals whole-buffer decode (a record start is a `\n`
 /// byte — decode-invariant). Returns `(text, had_replacement, borrowed)`.
-fn decode_line(
-    body: &[u8],
+fn decode_line<'a>(
+    body: &'a [u8],
     encoding: &'static encoding_rs::Encoding,
     on_invalid: InvalidUtf8,
-) -> Result<(String, bool, bool), ParseError> {
+) -> Result<(Cow<'a, str>, bool, bool), ParseError> {
     let (cow, had_repl) = encoding.decode_without_bom_handling(body);
     if on_invalid == InvalidUtf8::Reject && had_repl {
         return Err(ParseError::NotUtf8);
     }
     let borrowed = matches!(cow, Cow::Borrowed(_));
-    Ok((cow.into_owned(), had_repl, borrowed))
+    // Deliberately NOT `into_owned()`. Every line used to allocate a String
+    // here even when the caller only needed a `&str` to tokenize and then
+    // dropped it — 418k allocations on a 25 MB file. The one caller that
+    // genuinely needs ownership (`retain_raw_lines`) takes it at the push.
+    Ok((cow, had_repl, borrowed))
 }
 
 // --- the shared quote-aware line splitter (#422) --------------------
@@ -557,9 +574,32 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
 
         let trimmed_empty = text.trim().is_empty();
         if !trimmed_empty {
-            let fields = split_ags_line(&text);
-            if !fields.is_empty() {
-                let tag = fields[0].as_str();
+            // Read the tag by BORROWING field 0, then split only when the tag
+            // says the rest of the line is wanted. The old order — split every
+            // line into owned Strings, then look at [0] — paid for the whole
+            // row on lines whose tag alone decides the outcome.
+            //
+            // `first_field` cannot unescape (a borrowed slice can't shrink), so
+            // it differs from `split_ags_line[0]` only on a tag containing `""`.
+            // No AGS4 descriptor and no AGS3 marker (`**`, `<UNITS>`, `<CONT>`)
+            // contains a quote, so every arm below reads the same either way.
+            //
+            // Non-empty after trim ⇒ non-empty field 0, so this never skips a
+            // line the old `!fields.is_empty()` guard would have processed.
+            if let Some(tag) = scan::first_field(&text) {
+                // A locator needs GROUP and nothing else; the full walk needs
+                // every descriptor row. An unrecognised tag needs neither — it
+                // is only sniffed for AGS3 markers, which live in the tag.
+                let needs_fields = match tag {
+                    "GROUP" => true,
+                    "HEADING" | "UNIT" | "TYPE" | "DATA" => !opts.locate_only,
+                    _ => false,
+                };
+                let fields = if needs_fields {
+                    split_ags_line(&text)
+                } else {
+                    Vec::new()
+                };
                 match tag {
                     "GROUP" => {
                         let code = fields.get(1).cloned().unwrap_or_default();
@@ -594,6 +634,24 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
                         // rows attach somewhere; the dup is reported from
                         // group_order vs groups by the validator.
                         current = Some(code);
+                    }
+                    // Locate-only stops here: the descriptor rows are exactly
+                    // the model this profile exists not to build. Matched
+                    // BEFORE the real arms (and not folded into `_`) so an
+                    // AGS3 sniff can never see a descriptor tag.
+                    "HEADING" | "UNIT" | "TYPE" | "DATA" if opts.locate_only => {
+                        // Skipping the model must not skip the GUARD. The
+                        // orphan-row check reads only `current`, which this
+                        // profile still maintains, so it costs nothing here —
+                        // and the message stays byte-identical to the full
+                        // walk's (core's `error_mapping` pins these strings).
+                        if opts.strict_structure
+                            && current.as_ref().and_then(|c| groups.get(c)).is_none()
+                        {
+                            return Err(ParseError::Structure(format!(
+                                "{tag} row before any GROUP"
+                            )));
+                        }
                     }
                     "HEADING" => {
                         if let Some(g) = current.as_ref().and_then(|c| groups.get_mut(c)) {
@@ -644,7 +702,9 @@ pub fn parse_bytes_opts(bytes: &[u8], opts: ParseOptions) -> Result<ParsedFile, 
         if opts.retain_raw_lines {
             raw_lines.push(RawLine {
                 number,
-                text,
+                // The one site that genuinely needs ownership — so it is the
+                // one site that pays for it.
+                text: text.into_owned(),
                 had_crlf,
                 byte_offset,
             });
