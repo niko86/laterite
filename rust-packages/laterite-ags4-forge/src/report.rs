@@ -241,25 +241,40 @@ pub struct ScaleReport {
     pub n_loca: usize,
     pub groups: usize,
     pub path: String,
+    /// The fault injector spread across the file (`None` = a clean scale, the
+    /// default — byte-identical to the pre-density behaviour).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inject: Option<String>,
+    /// Fraction of applicable sites corrupted (`None` = clean).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub density: Option<f64>,
+    /// How many sites the injector actually mutated (`0` = clean).
+    pub dirty_sites: usize,
 }
 
 impl Report for ScaleReport {
     fn render_table(&self, w: &mut dyn Write, ctx: &Ctx) -> io::Result<()> {
+        let mut rows = vec![
+            vec!["scaffold".into(), self.scaffold.clone()],
+            vec!["target".into(), self.target_bytes.to_string()],
+            vec!["actual".into(), self.actual_bytes.to_string()],
+            vec!["n_loca".into(), self.n_loca.to_string()],
+            vec!["groups".into(), self.groups.to_string()],
+        ];
+        if let Some(inject) = &self.inject {
+            rows.push(vec!["inject".into(), inject.clone()]);
+            rows.push(vec![
+                "density".into(),
+                self.density
+                    .map_or_else(|| "1.0".to_string(), |d| d.to_string()),
+            ]);
+            rows.push(vec!["dirty_sites".into(), self.dirty_sites.to_string()]);
+        }
+        rows.push(vec!["path".into(), self.path.clone()]);
         writeln!(
             w,
             "{}",
-            styled_table(
-                &["Field", "Value"],
-                vec![
-                    vec!["scaffold".into(), self.scaffold.clone()],
-                    vec!["target".into(), self.target_bytes.to_string()],
-                    vec!["actual".into(), self.actual_bytes.to_string()],
-                    vec!["n_loca".into(), self.n_loca.to_string()],
-                    vec!["groups".into(), self.groups.to_string()],
-                    vec!["path".into(), self.path.clone()],
-                ],
-                ctx.colour(),
-            )
+            styled_table(&["Field", "Value"], rows, ctx.colour())
         )
     }
 }

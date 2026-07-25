@@ -151,46 +151,139 @@ fn bench_rule_families(c: &mut Criterion) {
 /// T5 — the error-reporting half of the engine, which the other three benches
 /// never execute: they run `CheckOptions::default()` (both tier gates OFF) over a
 /// file the forge asserts is CLEAN, so `findings::add`, rule 10b's per-bad-row
-/// `format!`/`join`, rule 11c, and the FYI abbreviation scan sit at zero coverage.
-/// This measures them two ways. It LANDS NOTHING — it only makes the error path
-/// rankable; whatever it shows re-enters the queue at the same 5% floor.
+/// `format!`/`join`, and the FYI abbreviation scan sit at zero coverage. This
+/// measures them three ways, now that `forge scale --inject --density` can build
+/// SIZE-SCALED densely-dirty twins of `large`. It LANDS NOTHING — it only makes
+/// the error path rankable; whatever it shows re-enters the queue at the 5% floor.
+///
+/// The three levels:
+///   * `error-path/{large,dirty-r16}/gated` — whole-engine `check_file`, clean
+///     vs a ~340k-finding rule-16 file at the SAME 25 MB size. The delta is the
+///     emission MACHINERY (`findings::add` + per-finding message build) at scale.
+///   * `relational-emit/{clean,dirty-r10c}` — `relational::check` alone, clean
+///     vs a rule-10c file: the relational family (rule 10b's own module).
+///   * `rule10b-emit/<n>` — rule 10b's `format!`/`join` in ISOLATION. Rule 10b
+///     can't be filled at volume in a real file (its REQUIRED-non-KEY fields are
+///     structural, so a dense empty-REQUIRED file cascades), so this prices its
+///     per-finding cost on a synthetic single-group file of `n` empty-REQUIRED
+///     rows — unique keys → no 10a, a root group → no 10c: only 10b fires.
 fn bench_error_path(c: &mut Criterion) {
-    let mut g = c.benchmark_group("validate/error-path");
-    g.sample_size(10).measurement_time(Duration::from_secs(20));
-    // Both tier gates ON: WARNING + FYI findings now flow through `findings::add`,
-    // and rule 16's per-ABBR-row scan of the 3,471-entry abbreviation table runs.
     let gated = CheckOptions {
         include_warnings: true,
         include_fyi: true,
         ..CheckOptions::default()
     };
-    // (a) The 25 MB CLEAN fixture with the gates on — the SIZE-SCALED cost of the
-    // tier traversal itself (rule 16's abbr scan scales with the file's ABBR
-    // rows). Clean, so nothing is emitted: this isolates the tier walk from
-    // finding-building, and it is the only size-scaled error-path number we can
-    // get today.
-    if let Some(path) = fixture("large") {
+    let dict = Dictionary::bundled(DictVersion::V4_1_1);
+
+    // (1) Whole-engine, size-scaled: clean `large` vs the rule-16 dirty twin.
+    let mut g = c.benchmark_group("validate/error-path");
+    g.sample_size(10).measurement_time(Duration::from_secs(20));
+    for (label, fx) in [("large", "large"), ("dirty-r16", "dirty-r16")] {
+        let Some(path) = fixture(fx) else {
+            eprintln!("validate: no {fx} fixture — run tools/gen-bench-fixtures.sh");
+            continue;
+        };
         let len = std::fs::metadata(&path).expect("stat").len();
         g.throughput(Throughput::Bytes(len));
-        g.bench_with_input(BenchmarkId::new("large", "gated"), &path, |b, path| {
+        g.bench_with_input(BenchmarkId::new(label, "gated"), &path, |b, path| {
             b.iter(|| check_file(black_box(path), &gated).expect("validates"));
         });
-    }
-    // (b) A DIRTY fixture (`forge gen --combine …`, ~100 groups, ~10 rules firing)
-    // with the gates on — now `findings::add` and the rule 10b/11c dirty paths
-    // actually run. UNSCALED (a handful of findings): a size-scaled densely-dirty
-    // rung needs a `forge scale` fault-density mode that does not exist yet, so
-    // this prices the error path's SHAPE, not its ceiling.
-    if let Some(path) = fixture("dirty") {
-        let len = std::fs::metadata(&path).expect("stat").len();
-        g.throughput(Throughput::Bytes(len));
-        g.bench_with_input(BenchmarkId::new("dirty", "gated"), &path, |b, path| {
-            b.iter(|| check_file(black_box(path), &gated).expect("validates"));
-        });
-    } else {
-        eprintln!("validate: no dirty fixture — run tools/gen-bench-fixtures.sh");
     }
     g.finish();
+
+    // (2) Relational family alone (rule 10b's module): clean vs the rule-10c twin.
+    let mut gr = c.benchmark_group("validate/relational-emit");
+    gr.sample_size(10).measurement_time(Duration::from_secs(20));
+    for (label, fx) in [("clean", "large"), ("dirty-r10c", "dirty-r10c")] {
+        let Some(path) = fixture(fx) else { continue };
+        let bytes = std::fs::read(&path).expect("fixture readable");
+        let parsed = parse::parse_bytes(&bytes, encoding_rs::UTF_8).expect("parses");
+        gr.throughput(Throughput::Bytes(bytes.len() as u64));
+        gr.bench_with_input(BenchmarkId::from_parameter(label), &parsed, |b, parsed| {
+            b.iter(|| {
+                let mut found = Findings::new();
+                rules::relational::check(black_box(parsed), &dict, &mut found);
+                found
+            });
+        });
+    }
+    gr.finish();
+
+    // (3) Rule 10b's format!/join in isolation, scaling with the bad-row count.
+    let mut gm = c.benchmark_group("validate/rule10b-emit");
+    gm.sample_size(10).measurement_time(Duration::from_secs(15));
+    for n in [10_000usize, 200_000] {
+        let bytes = empty_required_ags(&dict, "ABBR", n);
+        let parsed = parse::parse_bytes(&bytes, encoding_rs::UTF_8).expect("parses");
+        gm.throughput(Throughput::Elements(n as u64));
+        gm.bench_with_input(BenchmarkId::from_parameter(n), &parsed, |b, parsed| {
+            b.iter(|| {
+                let mut found = Findings::new();
+                rules::relational::check(black_box(parsed), &dict, &mut found);
+                found
+            });
+        });
+    }
+    gm.finish();
+}
+
+/// An AGS4 buffer: `n` DATA rows of `group`, every KEY cell a unique non-empty
+/// value and every non-KEY cell EMPTY — so each row's pure-REQUIRED field is
+/// empty (→ Rule 10b) while unique keys avoid Rule 10a and a root group avoids
+/// Rule 10c. Dictionary-driven, so it tracks the real schema. Only
+/// `relational::check` runs over it, so the empty typed cells never trip a type
+/// rule. This isolates rule 10b's per-bad-row `format!`/`join`.
+fn empty_required_ags(dict: &Dictionary, group: &str, n: usize) -> Vec<u8> {
+    let headings = dict.group_headings(group);
+    assert!(!headings.is_empty(), "unknown bench group {group}");
+    let is_key = |h: &str| {
+        dict.heading(group, h).is_some_and(|hr| {
+            hr.status
+                .split('+')
+                .any(|p| p.trim().eq_ignore_ascii_case("KEY"))
+        })
+    };
+    let key_cols: Vec<usize> = (0..headings.len())
+        .filter(|&i| is_key(headings[i]))
+        .collect();
+    assert!(
+        !key_cols.is_empty(),
+        "bench group {group} needs a KEY column"
+    );
+
+    let quote_join = |cells: &[String]| {
+        cells
+            .iter()
+            .map(|c| format!("\"{c}\""))
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+
+    let names: Vec<String> = headings.iter().map(|h| (*h).to_string()).collect();
+    let mut lines = vec![
+        format!("\"GROUP\",\"{group}\""),
+        format!("\"HEADING\",{}", quote_join(&names)),
+        format!(
+            "\"UNIT\",{}",
+            quote_join(&vec![String::new(); headings.len()])
+        ),
+        format!(
+            "\"TYPE\",{}",
+            quote_join(&vec!["X".to_string(); headings.len()])
+        ),
+    ];
+    for i in 0..n {
+        // Only KEY cells filled (uniquely); the pure-REQUIRED and OTHER cells
+        // stay empty — the REQUIRED emptiness is exactly what trips Rule 10b.
+        let mut cells = vec![String::new(); headings.len()];
+        for &c in &key_cols {
+            cells[c] = format!("k{c}_{i}");
+        }
+        lines.push(format!("\"DATA\",{}", quote_join(&cells)));
+    }
+    let mut out = lines.join("\r\n");
+    out.push_str("\r\n");
+    out.into_bytes()
 }
 
 criterion_group!(

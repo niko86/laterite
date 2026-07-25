@@ -262,7 +262,7 @@ Below the floor, measured out — recorded so they are not rediscovered:
 | **C1** | `from_shared` collapsed duplicate headings (`ags4_codec.rs`) | **LANDED** (#88) | wrong data, not merely lost data — see below |
 | **C2** | `arrow_in.rs` had zero tests and compiled under no CI test job | **LANDED** (#87) | untested code shipping inside the wheel and the node binding |
 | **M1** | `laterite-types/arrow` + `laterite-ags4-emit/arrow` (651 lines) were compiled out of the coverage build by resolver-2 feature unification once their only four enablers are excluded | **LANDED** (#87) | the 88% gate was not measuring the Arrow boundary at all |
-| **M2** | the bench fixture is **clean by construction**, so `findings::add`, rule 10b's per-bad-row `format!`/`join`, rule 11c's O(child × target) scan and the entire FYI tier are never executed by any bench | **LANDED T5** — `validate/error-path` now benches both gates on (clean-large + a `forge gen` dirty rung); the tier walk is <5% at scale, the emission path is ~3.2× slower/byte but unscaled | closed with numbers; the size-scaled dense fixture (a `forge scale` fault-density mode) is the remaining unmeasured axis |
+| **M2** | the bench fixture is **clean by construction**, so `findings::add`, rule 10b's per-bad-row `format!`/`join`, rule 11c's O(child × target) scan and the entire FYI tier are never executed by any bench | **LANDED T5 + T5-followup** — `validate/error-path` benches both gates on over SIZE-SCALED dirty twins (`forge scale --inject --density`); emitting 314k findings is **−6% vs clean**, 10b's line ~310 ns/finding but structurally capped | **closed, ceiling measured: DECLINED** — below the 5% floor at any realistic fault density; 11c stays unreachable (the `wide` scaffold has zero RL columns) |
 
 **C1, as measured rather than as queued.** The row above originally read
 "silently collapses duplicate headings". That understated it. Rows are keyed by
@@ -475,6 +475,33 @@ fault-density mode** (a size-scaled densely-dirty rung): only then can rule 11c'
 O(child × target) asymptotic and the 10b per-bad-row `format!`/`join` be priced at
 25 MB. Until it exists, this tranche is closed with the numbers above.
 **Exit met:** the rungs are committed and produce numbers; nothing landed.
+
+**T5-followup — the fault-density mode, and the verdict (2026-07-25).** The
+missing piece landed: `forge scale --inject <token> --density <p>` (the new
+`rule10b`/`empty-required` injector + a deterministic `apply_dense`) builds
+size-scaled densely-dirty twins of `large`. `gen-bench-fixtures.sh` now emits two
+clean-*isolated* 25 MB dirty rungs (`dirty-r16` = 314,689 Rule-16 findings only;
+`dirty-r10c` = 4,369 Rule-10c findings only), and `validate.rs` prices the
+emission path three ways:
+
+| bench | clean | dirty | delta | reads as |
+|---|---|---|---|---|
+| `error-path/*/gated` (whole `check_file`) | 269.8 ms | `dirty-r16` (314k findings) **253.4 ms** | **−6%** | emitting 314k findings is *faster* than validating the clean twin — the finding-build is fully absorbed (undefined abbrevs fail the FYI table scan fast, where valid codes pay the full lookup) |
+| `relational-emit/*` (`relational::check`) | 89.1 ms | `dirty-r10c` (4,369 findings) **108.1 ms** | +19 ms (+21%) | ~4.3 µs/finding for the relational family — but only at all-SAMP-orphaned density, ~7% of whole validate |
+| `rule10b-emit/<n>` (10b's `format!`/`join`, isolated) | — | 10k → 3.00 ms, 200k → 64.4 ms | **~310 ns/finding, linear** | the named line, cascade-free (synthetic all-empty-REQUIRED ABBR rows; unique keys → no 10a, root group → no 10c) |
+
+**Verdict: the error-emission path is NOT a candidate — DECLINED.** At the
+whole-engine level, emitting findings is not even a visible cost (dirty ≤ clean).
+Rule 10b's specific line is ~310 ns each but its REQUIRED-non-KEY fields are
+*structural* (`TRAN_AGS`, the `ABBR/UNIT/TYPE` `*_DESC` definitions), so a real
+file caps it at a few hundred findings → tens of µs, far below the 5% floor of a
+270 ms validate. The relational family shows a genuine ~4 µs/finding cost, but
+only at pathological density and still ~7% of validate. Nothing clears the bar at
+any realistic fault density — **the tranche is now closed with the ceiling
+measured, not argued.** (Rule 11c's O(child × target) stays unpriced: the `wide`
+scaffold carries zero Record-Link columns, and 11c cannot fire on a file with no
+RL data, so no corruption of this fixture reaches it — pricing it needs an
+RL-bearing scaffold, a separate forge capability.)
 
 ### T6 — The surfaces (only once the core stopping rule has fired)
 

@@ -63,25 +63,35 @@ for rung in "${RUNGS[@]}"; do
         | head -n 1
 done
 
-# The DIRTY rung (T5): a `wide` base with a combined multi-fault injection, so the
-# validator's error-reporting half — `findings::add`, rule 10b/11c dirty paths,
-# the FYI abbr scan — actually executes under `validate/error-path`. `forge gen`
-# is UNSCALED (~100 groups, a handful of findings): a size-scaled densely-dirty
-# fixture needs a `forge scale` fault-density mode that does not exist yet. Seed 0
-# → byte-identical. gen writes to a timestamped run dir, so copy the candidate out
-# to the stable name the bench reads.
-dirty_out="$OUT_DIR/dirty.ags"
-if [ -f "$dirty_out" ] && [ "$force" -eq 0 ]; then
-    echo "  dirty.ags exists — skipping (use --force to regenerate)"
-else
-    dirty_tmp="$(mktemp -d)"
-    "$FORGE" gen --scaffold "$SCAFFOLD" \
-        --combine rule10a,rule10c,rule8,rule5,rule19,rule13 \
-        --seed "$SEED" --no-oracle --no-input --quiet --out-dir "$dirty_tmp" >/dev/null
-    cp "$(find "$dirty_tmp" -name '*.ags' | head -n 1)" "$dirty_out"
-    rm -rf "$dirty_tmp"
-    echo "  dirty.ags generated ($(wc -c < "$dirty_out" | tr -d ' ') bytes)"
-fi
+# The DIRTY rungs (T5): size-scaled, densely-dirty twins of `large`, via the
+# `forge scale` fault-density mode (`--inject` + `--density`). Same size + seed +
+# scaffold as large.ags, so each is a DIRECT clean-vs-dirty pair at 25 MB;
+# `--density 1.0` corrupts every applicable site. Two injectors, two questions
+# about the validator's error-reporting half:
+#   dirty-r16  (rule16, undefined-abbrev): ~hundreds of thousands of findings,
+#              cleanly (Rule 16 alone) — prices the emission MACHINERY
+#              (`findings::add` + per-finding message build) at scale.
+#   dirty-r10c (rule10c, orphan-samp): the RELATIONAL family (rule 10b's own
+#              module), cleanly (Rule 10c alone).
+# Rule 10b itself cannot be isolated at volume — its REQUIRED-non-KEY fields are
+# structural (TRAN_AGS/*_DESC), so a fileful of empty-REQUIRED faults cascades.
+# Its per-finding format!/join cost is priced by a cascade-free micro-bench in
+# benches/validate.rs, not by a fixture.
+DIRTY=(
+    "dirty-r16:rule16"
+    "dirty-r10c:rule10c"
+)
+for spec in "${DIRTY[@]}"; do
+    label="${spec%%:*}"
+    inj="${spec##*:}"
+    out="$OUT_DIR/$label.ags"
+    if [ -f "$out" ] && [ "$force" -eq 0 ]; then
+        echo "  $label.ags exists — skipping (use --force to regenerate)"
+        continue
+    fi
+    "$FORGE" scale --size 25MB --scaffold "$SCAFFOLD" --seed "$SEED" \
+        --inject "$inj" --density 1.0 --out "$out" | head -n 1
+done
 
 echo
 echo "fixtures in $OUT_DIR:"
