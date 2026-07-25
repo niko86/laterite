@@ -15,7 +15,7 @@
 use std::sync::Arc;
 
 use arrow::array::{
-    ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder,
+    ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, StringArray, StringBuilder,
     TimestampMicrosecondBuilder,
 };
 use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
@@ -23,7 +23,10 @@ use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
 use serde_json::Value;
 
-use crate::{CanonicalType, canonical_type, parse_datetime, parse_value};
+use crate::{
+    CanonicalType, canonical_type, parse_ags_decimal, parse_ags_integer, parse_datetime,
+    parse_value,
+};
 
 /// Caller-computed synthetic columns folded into a batch in ONE place, rather
 /// than bolted on per host afterward. `ids` prepends `_id` (col 0) / `_parent_id`
@@ -216,31 +219,69 @@ fn append_heading_columns<'a, F>(
     }
 }
 
+/// One `Utf8` column with `parse_value`'s String preprocessing — trim, then
+/// empty → typed null — and nothing else, skipping the per-cell canonical-type
+/// dispatch and the `serde_json::Value` boxing the old String arm paid.
+fn build_utf8<'a, F>(n_rows: usize, cell: F) -> StringArray
+where
+    F: Fn(usize) -> Option<&'a str>,
+{
+    let mut b = StringBuilder::new();
+    for row in 0..n_rows {
+        match cell(row).map(str::trim).filter(|s| !s.is_empty()) {
+            Some(s) => b.append_value(s),
+            None => b.append_null(),
+        }
+    }
+    b.finish()
+}
+
 /// Build one typed Arrow column of `n_rows` cells, reading each via
 /// `cell(row)`. Public so a host wanting per-column control (e.g. the
 /// native sparse-override pass) reuses the exact same casting.
+///
+/// Each arm parses the borrowed cell straight into its typed Arrow builder,
+/// bypassing `parse_value` — which re-resolved `canonical_type` per cell
+/// (`trim().to_uppercase()` + table lookups) and boxed every value through a
+/// `serde_json::Value`. Dropping that per-cell overhead is ~5× faster than the
+/// old path and byte-parity with it (proven cell-for-cell in
+/// `tests/typed_build_parity.rs`). Deliberately NOT via `arrow::compute::cast`:
+/// the cast is a touch slower here (it builds an intermediate `Utf8` column,
+/// then a second pass to the numeric type) AND it links the arrow-cast kernels,
+/// which bloats the wasm bundle ~3.5 MB — the direct parse needs neither.
 pub fn build_column<'a, F>(n_rows: usize, ags_type: &str, cell: F) -> (ArrayRef, DataType)
 where
     F: Fn(usize) -> Option<&'a str>,
 {
     match canonical_type(ags_type) {
         Some(CanonicalType::Integer) => {
+            // `parse_ags_integer` is `int(float(s))` (tolerates `"5.0"`/`"5.7"`,
+            // truncates toward zero) with the #611 i64 range guard nulling
+            // out-of-range values. A None/empty cell → null. Same result the old
+            // `parse_value` Integer arm produced, without the `Value` round-trip.
             let mut b = Int64Builder::with_capacity(n_rows);
             for row in 0..n_rows {
-                match parse_value(cell(row), ags_type) {
-                    Value::Number(num) => b.append_option(num.as_i64()),
-                    _ => b.append_null(),
-                }
+                b.append_option(
+                    cell(row)
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .and_then(parse_ags_integer),
+                );
             }
             (Arc::new(b.finish()) as ArrayRef, DataType::Int64)
         }
         Some(CanonicalType::Decimal) => {
+            // `parse_ags_decimal` is `s.parse::<f64>()` keeping only finite values
+            // (inf/NaN → null), so — unlike Arrow's string→float kernel — no
+            // separate finite reconciliation is needed. None/empty → null.
             let mut b = Float64Builder::with_capacity(n_rows);
             for row in 0..n_rows {
-                match parse_value(cell(row), ags_type) {
-                    Value::Number(num) => b.append_option(num.as_f64()),
-                    _ => b.append_null(),
-                }
+                b.append_option(
+                    cell(row)
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .and_then(parse_ags_decimal),
+                );
             }
             (Arc::new(b.finish()) as ArrayRef, DataType::Float64)
         }
@@ -274,20 +315,12 @@ where
         }
         // String / Enum / unknown(None). Date / Time canonical types never
         // arise from real AGS4 codes (only DT → Datetime), so they fall here
-        // → Utf8, defensively.
-        _ => {
-            let mut b = StringBuilder::new();
-            for row in 0..n_rows {
-                match parse_value(cell(row), ags_type) {
-                    Value::String(s) => b.append_value(s),
-                    Value::Null => b.append_null(),
-                    // String/Enum/unknown always yield String|Null; other
-                    // variants can't occur, but keep the match total.
-                    other => b.append_value(other.to_string()),
-                }
-            }
-            (Arc::new(b.finish()) as ArrayRef, DataType::Utf8)
-        }
+        // → Utf8, defensively. `parse_value`'s String arm was just trim +
+        // empty→null, which `build_utf8` does directly (no dispatch).
+        _ => (
+            Arc::new(build_utf8(n_rows, cell)) as ArrayRef,
+            DataType::Utf8,
+        ),
     }
 }
 

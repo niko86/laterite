@@ -231,7 +231,7 @@ as such, because they are counts, not timings.
 | # | candidate | band | frequency | prize (ceiling) | cost | bench | coverage gap to close with it |
 |---|---|---|---|---|---|---|---|
 | ~~1~~ | ~~parent KEY-tuple set rebuilt per child~~ | validator | per-row | **LANDED T1 — relational −13.9%** | contained | yes | cache-reuse test added |
-| 2 → **T3** | `build_column`'s string arm allocates a courier `String` per cell (`lib.rs:446` → `arrow_cols.rs:281`); `parse_value` re-resolves `canonical_type` per cell (`lib.rs:442` → `:96`, `trim().to_uppercase()`) | laterite-types | per-cell | **large** — string-family AGS types 60.3% of headings; typing is ~95% of the typed build, now measured at **75.9 ms** (T2). Rankable. | contained | **yes** (T2) | decoded-array-contents tests added (T2) |
+| ~~2~~ | ~~`build_column` casts per cell via `parse_value` (courier `String`, `canonical_type` re-resolved per cell)~~ | laterite-types | per-cell | **LANDED T3 — typed_read_file −78% (75.9→16.7 ms)** via direct per-cell parse (no arrow-cast) | contained | yes | `typed_build_parity.rs` pins `build_column` ≡ `parse_value` |
 | ~~3~~ | ~~`line_format`'s three per-line `chars()` walks~~ | validator | per-line | **LANDED T1 — line_format −48.5%** | contained | yes | `char_span` test added |
 | 4 | `raw_lines` pushes one owned `String` + full copy per line on the **default** validating profile (`parse/lib.rs:721`, `text.into_owned()`) | parse leaf | per-line | **medium** — inside `parse_bytes`, 142.8 ms, the largest stage of `check_file` (328 ms) | contained | yes | `RawLine.text` is `pub` at ~4 production + ~5 test sites; the lossy-replacement branch must keep its *decoded* text |
 | 5 | `Sidecar::assemble` runs a second full walk inside `mint`, over bytes `mint` has already parsed, plus a third full-buffer hash pass | core + trust | per-file | **medium** — `index_ags4_bytes` is 56.9 ms; `mint`'s total is **unmeasured** (no `benches/` in `laterite-ags4-trust`) | contained | partial | no test mints a file whose declared encoding is not UTF-8 |
@@ -363,17 +363,50 @@ cannot be reasoned about while the layer above it is unmeasured.
 **Exit:** a typed-read row exists on the baseline table, and #2 is rankable
 against a measured stage rather than a heading census.
 
-### T3 — The typed read's per-cell allocations
+### T3 — The typed read's per-cell overhead — ✅ DONE (2026-07-25)
 
-**Candidate:** #2, both halves in one edit — bypass `parse_value` in
-`build_column`'s fallback arm and hand-roll the trim + empty-is-null check on the
-borrowed cell before `append_value`. That removes the courier `String` *and* the
-redundant `canonical_type` resolution together. `StringBuilder::append_value`
-already accepts `&str`, so no arrow upgrade is involved.
-**Bench first:** T2's fixture rung. Do not start before T2 lands.
-**Coverage closed:** null-semantics pins asserted on the array, not on
-`parse_value`.
-**Exit:** ≥5% on the T2 rung, or declined **with the measured number**.
+**Landed:** `types/typed_read_file/large` **75.9 ms → 16.7 ms (−78%)**, 312 MiB/s
+→ 1.39 GiB/s — a **~4.5×** speedup on the exact `build_record_batch` every typed
+surface pays. Well past the 5% candidate floor and the 10% tranche floor.
+
+**What changed.** `build_column` matched `canonical_type` once per column, then
+called `parse_value` per cell — which re-resolved `canonical_type`
+(`trim().to_uppercase()` + table lookups) *again* for every cell and boxed the
+result through a `serde_json::Value`. The fix parses each borrowed cell straight
+into its typed Arrow builder, dropping both the redundant resolution and the
+boxing:
+
+- **String / Enum / unknown (~60% of headings):** build `Utf8` directly (trim +
+  empty→null) — no dispatch, no `Value`. This is the bulk of the win.
+- **Integer (`0DP`):** `parse_ags_integer` (== `int(float(s))`, range-guarded)
+  straight into an `Int64Builder`.
+- **Decimal (`nDP`/`nSF`/`nSCI`):** `parse_ags_decimal` (finite `f64` only)
+  straight into a `Float64Builder`.
+- **Bool (`YN`) / Datetime (`DT`):** unchanged custom arms.
+
+**Not via Arrow's cast kernel.** The owner first proposed building `Utf8` then
+bulk-casting the numerics through `arrow::compute::cast`. A spike (branch
+`spike/t3-arrow-cast`) proved that works and is parity-clean, but a **paired
+bench showed the direct parse is ~16% faster still** (the cast builds an
+intermediate `Utf8` column + a second pass, and needs a finite-null reconcile
+because Arrow's string→float admits inf/NaN) **and** referencing `cast` links the
+arrow-cast kernels into the wasm bundle, a **+3.5 MB (~50%)** bloat that broke the
+PWA precache limit (`e2e`). The direct parse needs neither — same speedup axis,
+zero wasm cost — so it replaced the cast approach.
+
+**Parity is the gate, and it holds.** `build_column` is byte-parity with the
+per-cell `parse_value` build — Arrow-representation identical (`ArrayData` logical
+equality, the object the C-data interface / IPC hand to polars / duckdb / arrow-js)
+over **663 columns / 2,557,209 cells** of the fixture plus the edge seams, pinned
+permanently in `laterite-types/tests/typed_build_parity.rs`. A live wheel diff
+confirmed it end-to-end: every group's polars DataFrame (schema + dtypes + values
++ nulls) unchanged, on both the frame and `keys=True` paths.
+
+**Surfaces inherit it free:** all typed surfaces funnel through `build_column`
+(py→polars via `build_record_batch_synth`, node→arrow-js and wasm→duckdb via IPC),
+so no API/feature change. The compat/pandas builder (`build_record_batch_compat`)
+is a separate all-`Utf8` path and is untouched, so python-ags4 parity is
+unaffected.
 
 ### T4 — The parse leaf and the redundant certify walk
 
