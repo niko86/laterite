@@ -4,7 +4,7 @@ title: "core perf baseline: where the time actually goes"
 status: drafted
 tags: [concept, architecture, performance, benchmark]
 volatile: [timings]
-volatile_asof: 2026-07-24
+volatile_asof: 2026-07-25
 ags_editions: []
 repo_refs:
   benches: "repo:rust-packages/laterite-ags4-validator/benches/validate.rs"
@@ -46,15 +46,24 @@ on any machine and in CI, carrying no real delivery data.
 
 ## The baseline (25 MB rung, release)
 
-| path | time | throughput |
-|---|---|---|
-| `parse_bytes` | 165 ms | 144 MiB/s |
-| `index_ags4_bytes` | 165 ms | 144 MiB/s |
-| `read_ags4_bytes` | 276 ms | 86 MiB/s |
-| `typed_read_file` (build_record_batch, T3) | **16.7 ms** | 1.39 GiB/s |
-| `check_parsed` (rules only) | 343 ms | 69 MiB/s |
-| `check_file` (I/O + parse + rules) | 516 ms | 46 MiB/s |
-| `mint` (validate + certify, T4/#5) | **280 ms** | 85 MiB/s |
+| path | time | throughput | Δ since #71 opened |
+|---|---|---|---|
+| `parse_bytes` | 142 ms | 167 MiB/s | **−14%** (was 165 ms) — DATA-cell double-alloc |
+| `index_ags4_bytes` | 45 ms | 528 MiB/s | **−73%** (was 165 ms — it *was* a full parse) |
+| `read_ags4_bytes` | 165 ms | 144 MiB/s | **−40%** (was 276 ms) — `from_shared` row projection |
+| `typed_read_file` (build_record_batch, T3) | **16.7 ms** | 1.39 GiB/s | **−78%** (was 75.9 ms) — T3 |
+| `check_parsed` (rules only) | 122 ms | 195 MiB/s | **−64%** (was 343 ms) — T1 line_format + relational |
+| `check_file` (I/O + parse + rules) | 269 ms | 88 MiB/s | **−48%** (was 516 ms) — the parse + rules wins combined |
+| `mint` (validate + certify, T4/#5) | **280 ms** | 85 MiB/s | **−14%** (was 324 ms) — T4/#5 |
+
+> [!note] **Refreshed 2026-07-25** on current `main`. Every row except `mint` was
+> re-measured this pass (25 MB rung, release); `mint` keeps its T4/#5 paired figure
+> (not re-run). The `Δ` column is against the establishing snapshot when #71 opened
+> (2026-07-24) — so the `index`/`read`/`check_*` fixes documented below, previously
+> visible only in the prose, now land in the headline numbers. Criterion's own
+> `change:` deltas are NOT used here: the stored per-bench baselines on the runner
+> are of mixed pre/post-tranche provenance, so each `Δ` is absolute-now vs the
+> recorded original, and every one is far above the ~20% run-to-run drift.
 
 > [!note] **The typed read landed on the axis in T2** (2026-07-24,
 > `types/typed_read_file/large`). This is `build_record_batch` — AGS4 strings →
@@ -77,8 +86,8 @@ on any machine and in CI, carrying no real delivery data.
 > arms. Byte-parity with the per-cell build is pinned cell-for-cell over the
 > fixture in `laterite-types/tests/typed_build_parity.rs`.
 
-`check_file` ≈ `parse_bytes` + `check_parsed` (508 ms), so I/O plus dictionary
-resolution is only ~8 ms and the split is self-consistent. That arithmetic is the
+`check_file` ≈ `parse_bytes` + `check_parsed` (264 ms), so I/O plus dictionary
+resolution is only ~5 ms and the split is self-consistent. That arithmetic is the
 point of benching the layers separately: the old single number could not say
 which half had moved.
 
