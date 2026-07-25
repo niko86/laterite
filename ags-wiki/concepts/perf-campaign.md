@@ -237,7 +237,7 @@ as such, because they are counts, not timings.
 | ~~5~~ | ~~`Sidecar::assemble` walks the file a second time inside `mint` to rebuild the byte index~~ | core + trust | per-file | **LANDED T4 — mint −13.3% (324→280 ms @ 25 MB)**: reuse the validating parse's source-true offsets instead of re-walking (`assemble_from_parsed`) | contained | yes (new `trust/mint` bench) | non-UTF-8 mint pinned (core fallback + trust end-to-end) |
 | ~~6~~ | ~~node's `table_ipc` has no `with_keys=false` escape, so the keychain pass runs on the default `table(code)` call and the keys are then stripped~~ | surfaces (node) | per-row | **LANDED T6 — default `read + table(all)` 692 → 152 ms (−78%)**: the keychain is ~96% of the native build (isolated: keyed `tableIpc(all)` 509 ms vs keyless 18 ms), so `withKeys=false` skips it on the keys-less default; only the explicit keyed variant still pays it | contained | yes (`node/bench/read.bench.ts`) | `.sql()`/`.at()` after a prior plain `table()` pinned (`p3-content-keys.test.ts`) |
 | ~~7~~ | ~~`parse_compat_arrow` builds a `RecordBatch` for every group even when `only_groups` narrows~~ | surfaces (compat) | per-group | **MEASURED → DEFERRED (issue #99): ~14 ms ≈ 9% of a 1-group narrowed read, 0 on a full read** — parse (143.7 ms) dominates and is shared; the build+cross of all 123 compat tables is only 14.1 ms. Clears the 5% floor but is the smallest candidate + narrowed-reads-only | contained | probe (`compat_narrow_probe` / `parse_equiv_probe`) | strict-check metadata + dup-heading / ragged / dup-GROUP raises must stay for *all* groups |
-| 8 | the GIL is never released anywhere in `laterite-py` (zero `allow_threads`/`detach`) | surfaces (wheel) | not hot — concurrency only | **unknown** — invisible to all five criterion benches by construction and to `test_perf_read.py` (single-threaded) | contained | **no** — needs a new *kind* of bench | no test anywhere exercises concurrent access to the wheel |
+| ~~8~~ | ~~the GIL is never released anywhere in `laterite-py` (zero `allow_threads`/`detach`)~~ | surfaces (wheel) | not hot — concurrency only | **LANDED T6 — concurrent throughput: validate 0.99 → 5.08×, read 0.96 → 3.53× @ 10 cores** (`Python::detach` around the pure-Rust compute in `run_check`/`parse_arrow`/`parse_compat_arrow`); single-call latency unchanged | contained | yes (`tools/bench-gil-throughput.py`, T6) | `test_gil_released.py` proves a concurrent thread advances *during* the native call |
 | 9 | `EmitGroup` owns `Vec<Vec<String>>`, so two callers deep-clone an already-owned matrix (`emit.rs:188`, node `lib.rs:243`) | emit + node | per-cell | **small** — `emit_ags4/report` is 22.4 ms and the writer is 2.9 ms of it | **invasive** — changes a public field type | partial | node and excel have no bench crate |
 
 Below the floor, measured out — recorded so they are not rediscovered:
@@ -519,11 +519,19 @@ is viable — but it lands the *same* 14 ms and touches the python-ags4 parity
 oracle, so its only payoff is one internal read path. Both options are captured in
 #99 for later; the small `only_groups` pushdown is the recommended form.
 
-**#8 — still no bench.** It needs a *new kind* of bench — a Python-level
-multi-threaded throughput test comparing wall-clock at N=1 against N=core-count. A
-held-GIL implementation shows flat N-times-serial time; a released one shows
-near-linear speedup. Single-threaded wall-clock, which is all `test_perf_read.py`
-measures, is identical either way.
+**#8 — LANDED (2026-07-25).** The single-threaded benches are blind to this by
+construction — the win is *concurrency*, not latency. A new throughput harness
+(`tools/bench-gil-throughput.py`) runs the same total work across 1 vs N threads
+(`ThreadPoolExecutor`). Before, N threads ≈ 1 thread (GIL held: validate 0.99×,
+read 0.96×). The three CPU-bound read/validate entry points — `run_check`,
+`parse_arrow`, `parse_compat_arrow` — now release the GIL for their pure-Rust
+compute (`Python::detach`, cloning the one Python-bound input, the cert, out
+first), so on the 25 MB rung across 10 cores concurrent **validate 5.08×** and
+**read 3.53×** throughput. Single-call latency is unchanged. The regression guard
+`test_gil_released.py` (every CI) proves a second Python thread advances *during*
+the native call — closing the "no test exercises concurrent access" gap. The same
+`detach` pattern extends to `mint`/`table_for`/emit/diff/merge/excel if a
+concurrent workload ever wants them.
 
 **Coverage closed:** #6's risk was node's single-cache-per-code architecture — a
 naive `with_keys` bolt-on would hand the keys-less table to the relational layer

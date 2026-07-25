@@ -305,20 +305,30 @@ fn run_check<'py>(
     // The Python layer used to make it itself, with its own conjunction of predicates.
     cert: Option<PyRef<'py, PySidecar>>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    match validate(
-        path.as_deref(),
-        text.as_deref(),
-        data.as_deref(),
-        dict_version.as_deref(),
-        include_warnings,
-        include_fyi,
-        check_files,
-        encoding.as_deref(),
-        dict_path.as_deref(),
-        dict_bytes.as_deref(),
-        dict_replace,
-        cert.as_ref().map(|c| &c.inner),
-    ) {
+    // Release the GIL for the whole parse+validate compute (pure Rust, touches no
+    // Python) so concurrent validators actually parallelise across cores instead
+    // of serialising behind the interpreter lock (#8). The cert is the only
+    // Python-bound input — clone its small Rust inner out first so the detached
+    // closure captures owned data (`Sidecar: Clone`, cheap: the byte index +
+    // hashes, not the file).
+    let cert_inner = cert.as_ref().map(|c| c.inner.clone());
+    let outcome = py.detach(|| {
+        validate(
+            path.as_deref(),
+            text.as_deref(),
+            data.as_deref(),
+            dict_version.as_deref(),
+            include_warnings,
+            include_fyi,
+            check_files,
+            encoding.as_deref(),
+            dict_path.as_deref(),
+            dict_bytes.as_deref(),
+            dict_replace,
+            cert_inner.as_ref(),
+        )
+    });
+    match outcome {
         Err((code, kind, msg)) => err_dict(py, code, &kind, &msg),
         Ok(checked) => {
             let Checked {
@@ -899,16 +909,24 @@ fn parse_compat_arrow(
         let label = encoding.as_deref().unwrap_or("");
         return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}"));
     };
-    let parsed = match (path.as_deref(), text.as_deref(), data.as_deref()) {
-        (Some(p), _, _) => {
-            laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc)
-        }
-        (_, Some(t), _) => laterite_ags4_parse::parse_str(t).map_err(ValidatorError::from),
-        (_, _, Some(d)) => laterite_ags4_parse::parse_bytes(d, enc).map_err(ValidatorError::from),
-        _ => {
-            return err_dict(py, 5, "bad_args", "one of path, text, or data is required");
-        }
-    };
+    if path.is_none() && text.is_none() && data.is_none() {
+        return err_dict(py, 5, "bad_args", "one of path, text, or data is required");
+    }
+    // Release the GIL for the parse (pure Rust, the dominant ~142 ms) so
+    // concurrent compat reads parallelise across cores (#8); only the cheaper
+    // per-group Arrow build + PyO3 crossing below stays under the lock.
+    let parsed = py.detach(
+        || match (path.as_deref(), text.as_deref(), data.as_deref()) {
+            (Some(p), _, _) => {
+                laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc)
+            }
+            (_, Some(t), _) => laterite_ags4_parse::parse_str(t).map_err(ValidatorError::from),
+            (_, _, Some(d)) => {
+                laterite_ags4_parse::parse_bytes(d, enc).map_err(ValidatorError::from)
+            }
+            _ => unreachable!("input presence checked above"),
+        },
+    );
     let pf = match parsed {
         Ok(pf) => pf,
         Err(e) => {
@@ -1357,14 +1375,24 @@ fn parse_arrow(
         let label = encoding.as_deref().unwrap_or("");
         return err_dict(py, 5, "bad_args", &format!("unknown encoding {label:?}"));
     };
-    let parsed = match (path.as_deref(), text.as_deref(), data.as_deref()) {
-        (Some(p), _, _) => {
-            laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc)
-        }
-        (_, Some(t), _) => laterite_ags4_parse::parse_str(t).map_err(ValidatorError::from),
-        (_, _, Some(d)) => laterite_ags4_parse::parse_bytes(d, enc).map_err(ValidatorError::from),
-        _ => return err_dict(py, 5, "bad_args", "one of path, text, or data is required"),
-    };
+    if path.is_none() && text.is_none() && data.is_none() {
+        return err_dict(py, 5, "bad_args", "one of path, text, or data is required");
+    }
+    // Release the GIL for the parse (pure Rust) so concurrent reads parallelise
+    // across cores rather than serialising behind the interpreter lock (#8). The
+    // input-presence check is above so the closure needs no GIL-bound early exit.
+    let parsed = py.detach(
+        || match (path.as_deref(), text.as_deref(), data.as_deref()) {
+            (Some(p), _, _) => {
+                laterite_ags4_validator::parse::parse_file_with_encoding(Path::new(p), enc)
+            }
+            (_, Some(t), _) => laterite_ags4_parse::parse_str(t).map_err(ValidatorError::from),
+            (_, _, Some(d)) => {
+                laterite_ags4_parse::parse_bytes(d, enc).map_err(ValidatorError::from)
+            }
+            _ => unreachable!("input presence checked above"),
+        },
+    );
     let pf = match parsed {
         Ok(pf) => pf,
         Err(e) => {
