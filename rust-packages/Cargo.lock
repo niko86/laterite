@@ -2227,6 +2227,7 @@ dependencies = [
 name = "laterite-ags4-trust"
 version = "0.7.0"
 dependencies = [
+ "criterion",
  "laterite-ags4-core",
  "laterite-ags4-parse",
  "laterite-ags4-validator",

@@ -37,6 +37,11 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 
 [dev-dependencies]
 tempfile = "3"
+criterion = "0.8"
+
+[[bench]]
+name = "mint"
+harness = false
 
 [lints]
 workspace = true

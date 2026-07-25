@@ -326,7 +326,11 @@ pub fn mint(
             count: count_of(&found, findings::Severity::Fyi),
         },
     };
-    Sidecar::assemble(bytes, stamp).map_err(|e: CliError| MintError::NotIndexable(e.to_string()))
+    // Reuse the parse we already did to validate — its source-true byte offsets
+    // are exactly what the index needs, so certifying does not walk the file a
+    // second time (#5, ~14% of a mint on a 25 MB file).
+    Sidecar::assemble_from_parsed(bytes, &parsed, stamp)
+        .map_err(|e: CliError| MintError::NotIndexable(e.to_string()))
 }
 
 /// Findings of one severity.

@@ -54,6 +54,7 @@ on any machine and in CI, carrying no real delivery data.
 | `typed_read_file` (build_record_batch, T3) | **16.7 ms** | 1.39 GiB/s |
 | `check_parsed` (rules only) | 343 ms | 69 MiB/s |
 | `check_file` (I/O + parse + rules) | 516 ms | 46 MiB/s |
+| `mint` (validate + certify, T4/#5) | **280 ms** | 85 MiB/s |
 
 > [!note] **The typed read landed on the axis in T2** (2026-07-24,
 > `types/typed_read_file/large`). This is `build_record_batch` — AGS4 strings →

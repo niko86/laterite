@@ -233,8 +233,8 @@ as such, because they are counts, not timings.
 | ~~1~~ | ~~parent KEY-tuple set rebuilt per child~~ | validator | per-row | **LANDED T1 — relational −13.9%** | contained | yes | cache-reuse test added |
 | ~~2~~ | ~~`build_column` casts per cell via `parse_value` (courier `String`, `canonical_type` re-resolved per cell)~~ | laterite-types | per-cell | **LANDED T3 — typed_read_file −78% (75.9→16.7 ms)** via direct per-cell parse (no arrow-cast) | contained | yes | `typed_build_parity.rs` pins `build_column` ≡ `parse_value` |
 | ~~3~~ | ~~`line_format`'s three per-line `chars()` walks~~ | validator | per-line | **LANDED T1 — line_format −48.5%** | contained | yes | `char_span` test added |
-| 4 | `raw_lines` pushes one owned `String` + full copy per line on the **default** validating profile (`parse/lib.rs:721`, `text.into_owned()`) | parse leaf | per-line | **medium** — inside `parse_bytes`, 142.8 ms, the largest stage of `check_file` (328 ms) | contained | yes | `RawLine.text` is `pub` at ~4 production + ~5 test sites; the lossy-replacement branch must keep its *decoded* text |
-| 5 | `Sidecar::assemble` runs a second full walk inside `mint`, over bytes `mint` has already parsed, plus a third full-buffer hash pass | core + trust | per-file | **medium** — `index_ags4_bytes` is 56.9 ms; `mint`'s total is **unmeasured** (no `benches/` in `laterite-ags4-trust`) | contained | partial | no test mints a file whose declared encoding is not UTF-8 |
+| ~~4~~ | ~~`raw_lines` pushes one owned `String` per line under `validating()` (`parse/lib.rs:721`)~~ | parse leaf | per-line | **DECLINED T4 — measured ~9.9 ms** (validating 144.2 vs lean 134.3 @ 25 MB): only ~6.9% of `parse_bytes`, ~1.9% of `check_file`, and that is the *ceiling* (a span rewrite keeps the `Vec` push) | **invasive** (ledger said contained — WRONG: removing the alloc needs `ParsedFile<'a>` / whole-file-decode + span, changing the `pub RawLine.text` API across `line_format`/`structure`/`fixes`/PyO3) | yes | fails the 20% invasive gate at ~5% realized |
+| ~~5~~ | ~~`Sidecar::assemble` walks the file a second time inside `mint` to rebuild the byte index~~ | core + trust | per-file | **LANDED T4 — mint −13.3% (324→280 ms @ 25 MB)**: reuse the validating parse's source-true offsets instead of re-walking (`assemble_from_parsed`) | contained | yes (new `trust/mint` bench) | non-UTF-8 mint pinned (core fallback + trust end-to-end) |
 | 6 | node's `table_ipc` has no `with_keys=false` escape, so the keychain pass runs on the default `table(code)` call and the keys are then stripped | surfaces (node) | per-row | **large** — Python's twin documents this pass as "the dominant read cost"; **unmeasured on node** | contained | **no** — node has no bench of any kind | no test asserts `.sql()`/`.at()` after a prior plain `table()` on the same group |
 | 7 | `parse_compat_arrow` builds a `RecordBatch` for every group even when `only_groups` narrows | surfaces (compat) | per-group | **medium** — unmeasured; `bench-vs-python-ags4.py` always calls the full read, so it is structurally blind to this | contained | no | the strict-check metadata must keep running for *all* groups |
 | 8 | the GIL is never released anywhere in `laterite-py` (zero `allow_threads`/`detach`) | surfaces (wheel) | not hot — concurrency only | **unknown** — invisible to all five criterion benches by construction and to `test_perf_read.py` (single-threaded) | contained | **no** — needs a new *kind* of bench | no test anywhere exercises concurrent access to the wheel |
@@ -411,16 +411,33 @@ unaffected.
 ### T4 — The parse leaf and the redundant certify walk
 
 **Candidates:** #4 (`raw_lines` span rewrite), then #5 (`assemble_from_parsed`).
-**Bench first, in this PR, before the #5 change:** a `laterite-ags4-trust` bench
-covering `mint`/`certify` end to end. The operation that pays for the walk twice
-is not measured at all, so "2× parse on a 25 MB file" is architecturally correct
-and currently unquantified. Write the bench, land it, take the number, *then*
-change the code.
-**Coverage closed:** the lossy-replacement branch for #4; a non-UTF-8 mint test
-for #5 — reuse probably *fixes* that, but a semantics change must not ride in
-silently as a side effect of a perf refactor.
-**Exit:** `parse_bytes` moves ≥5% and the new trust bench ≥10%. If `parse_bytes`
-does not move, the parse leaf is closed.
+
+**#4 — DECLINED (2026-07-25), measured.** A throwaway bench priced the raw_lines
+build directly: `parse_bytes_opts(validating)` **144.2 ms** vs `(lean)` **134.3 ms**
+@ 25 MB → the per-line `into_owned()` + push is **~9.9 ms**, only ~6.9% of
+`parse_bytes` and ~1.9% of `check_file`. That is the *ceiling* (full removal); a
+span rewrite keeps the `Vec` push, so the realized win is ~5%. And the ledger's
+"contained" was wrong: `raw_lines` is read by `line_format`/`structure`/`fixes`
+via the `pub RawLine.text` field, so removing the allocation needs a
+lifetime-bound `ParsedFile<'a>` (or a whole-file-decode + offset scheme) rippling
+across those rules, the PyO3 boundary, and tests — **invasive**. ~5% realized
+against a 20% invasive gate → not worth it. `parse_bytes` does not move ≥5% by any
+non-invasive means, so **by this tranche's own exit clause the parse leaf is
+closed.**
+
+**#5 — DONE (2026-07-25).** Bench-first established the first `mint` baseline
+(`trust/mint`, the trust crate had none): **mint 324 ms**, of which the redundant
+index walk (`index_walk`) is **45.3 ms = 14%**. `mint` parsed the file to validate
+it, then `Sidecar::assemble` walked it *again* via `index_ags4_bytes` to rebuild
+byte offsets the first parse already had. New `Sidecar::assemble_from_parsed`
+reuses that parse's `group_records` (guarded by `byte_offsets_source_true`, which
+is `true` for the clean UTF-8 files that certify); `mint` hands its validating
+parse straight in. **mint 324 → 280 ms, −13.3%** (p < 0.05), clearing the ≥10%
+exit. Semantics preserved: a non-UTF-8 parse is not source-true, so it falls back
+to the lean/`Reject` re-walk — the byte-identical rejection — pinned by
+`assemble_from_parsed_falls_back_when_not_source_true` (core) and
+`the_mint_still_rejects_a_non_utf8_file` (trust, closing the flagged gap). The
+`sha256` freshness pass stays (it is not redundant). This closes T4.
 
 ### T5 — A dirty fixture and the FYI tier (bench only)
 
