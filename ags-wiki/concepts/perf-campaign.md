@@ -236,7 +236,7 @@ as such, because they are counts, not timings.
 | ~~4~~ | ~~`raw_lines` pushes one owned `String` per line under `validating()` (`parse/lib.rs:721`)~~ | parse leaf | per-line | **DECLINED T4 — measured ~9.9 ms** (validating 144.2 vs lean 134.3 @ 25 MB): only ~6.9% of `parse_bytes`, ~1.9% of `check_file`, and that is the *ceiling* (a span rewrite keeps the `Vec` push) | **invasive** (ledger said contained — WRONG: removing the alloc needs `ParsedFile<'a>` / whole-file-decode + span, changing the `pub RawLine.text` API across `line_format`/`structure`/`fixes`/PyO3) | yes | fails the 20% invasive gate at ~5% realized |
 | ~~5~~ | ~~`Sidecar::assemble` walks the file a second time inside `mint` to rebuild the byte index~~ | core + trust | per-file | **LANDED T4 — mint −13.3% (324→280 ms @ 25 MB)**: reuse the validating parse's source-true offsets instead of re-walking (`assemble_from_parsed`) | contained | yes (new `trust/mint` bench) | non-UTF-8 mint pinned (core fallback + trust end-to-end) |
 | ~~6~~ | ~~node's `table_ipc` has no `with_keys=false` escape, so the keychain pass runs on the default `table(code)` call and the keys are then stripped~~ | surfaces (node) | per-row | **LANDED T6 — default `read + table(all)` 692 → 152 ms (−78%)**: the keychain is ~96% of the native build (isolated: keyed `tableIpc(all)` 509 ms vs keyless 18 ms), so `withKeys=false` skips it on the keys-less default; only the explicit keyed variant still pays it | contained | yes (`node/bench/read.bench.ts`) | `.sql()`/`.at()` after a prior plain `table()` pinned (`p3-content-keys.test.ts`) |
-| 7 | `parse_compat_arrow` builds a `RecordBatch` for every group even when `only_groups` narrows | surfaces (compat) | per-group | **medium** — unmeasured; `bench-vs-python-ags4.py` always calls the full read, so it is structurally blind to this | contained | no | the strict-check metadata must keep running for *all* groups |
+| ~~7~~ | ~~`parse_compat_arrow` builds a `RecordBatch` for every group even when `only_groups` narrows~~ | surfaces (compat) | per-group | **MEASURED → DEFERRED (issue #99): ~14 ms ≈ 9% of a 1-group narrowed read, 0 on a full read** — parse (143.7 ms) dominates and is shared; the build+cross of all 123 compat tables is only 14.1 ms. Clears the 5% floor but is the smallest candidate + narrowed-reads-only | contained | probe (`compat_narrow_probe` / `parse_equiv_probe`) | strict-check metadata + dup-heading / ragged / dup-GROUP raises must stay for *all* groups |
 | 8 | the GIL is never released anywhere in `laterite-py` (zero `allow_threads`/`detach`) | surfaces (wheel) | not hot — concurrency only | **unknown** — invisible to all five criterion benches by construction and to `test_perf_read.py` (single-threaded) | contained | **no** — needs a new *kind* of bench | no test anywhere exercises concurrent access to the wheel |
 | 9 | `EmitGroup` owns `Vec<Vec<String>>`, so two callers deep-clone an already-owned matrix (`emit.rs:188`, node `lib.rs:243`) | emit + node | per-cell | **small** — `emit_ags4/report` is 22.4 ms and the writer is 2.9 ms of it | **invasive** — changes a public field type | partial | node and excel have no bench crate |
 
@@ -488,12 +488,25 @@ Result: **default `read + table(all)` 692 → 152 ms (−78%)** — now only ~22
 parse. The keyed variant is unchanged (649 ms, within drift): the keychain is paid
 only when a caller asks for `_id`/`_parent_id`.
 
-**Still no bench:** compat is exercised only by `bench-vs-python-ags4.py`, which
-always calls the full read and so cannot see #7; #8 needs a *new kind* of bench —
-a Python-level multi-threaded throughput test comparing wall-clock at N=1 against
-N=core-count. A held-GIL implementation shows flat N-times-serial time; a released
-one shows near-linear speedup. Single-threaded wall-clock, which is all
-`test_perf_read.py` measures, is identical either way.
+**#7 — MEASURED, DEFERRED (2026-07-25, issue #99).** `bench-vs-python-ags4.py`
+always does a full read, so a targeted probe was needed: on the 25 MB rung the
+narrowed `AGS4_to_dataframe(only_groups=[1])` still costs 93% of the full read
+(158 vs 169 ms) because `parse_compat_arrow` builds + crosses all 123 compat
+tables regardless. But that build is only **14.1 ms** (`parse_compat_arrow` 157.8
+vs `parse_arrow` 143.7 — the parse is shared and dominates), so the ceiling is
+**~14 ms ≈ 9% of a 1-group narrowed read, 0 on a full read**. It clears the 5%
+candidate floor, but it is the smallest win on the board and narrowed-reads-only.
+A prototype (`parse_equiv_probe`) also proved the compat and native `read()`
+parses are byte-identical, so the "reimplement compat on the lazy handle" refactor
+is viable — but it lands the *same* 14 ms and touches the python-ags4 parity
+oracle, so its only payoff is one internal read path. Both options are captured in
+#99 for later; the small `only_groups` pushdown is the recommended form.
+
+**#8 — still no bench.** It needs a *new kind* of bench — a Python-level
+multi-threaded throughput test comparing wall-clock at N=1 against N=core-count. A
+held-GIL implementation shows flat N-times-serial time; a released one shows
+near-linear speedup. Single-threaded wall-clock, which is all `test_perf_read.py`
+measures, is identical either way.
 
 **Coverage closed:** #6's risk was node's single-cache-per-code architecture — a
 naive `with_keys` bolt-on would hand the keys-less table to the relational layer
