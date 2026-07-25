@@ -235,7 +235,7 @@ as such, because they are counts, not timings.
 | ~~3~~ | ~~`line_format`'s three per-line `chars()` walks~~ | validator | per-line | **LANDED T1 — line_format −48.5%** | contained | yes | `char_span` test added |
 | ~~4~~ | ~~`raw_lines` pushes one owned `String` per line under `validating()` (`parse/lib.rs:721`)~~ | parse leaf | per-line | **DECLINED T4 — measured ~9.9 ms** (validating 144.2 vs lean 134.3 @ 25 MB): only ~6.9% of `parse_bytes`, ~1.9% of `check_file`, and that is the *ceiling* (a span rewrite keeps the `Vec` push) | **invasive** (ledger said contained — WRONG: removing the alloc needs `ParsedFile<'a>` / whole-file-decode + span, changing the `pub RawLine.text` API across `line_format`/`structure`/`fixes`/PyO3) | yes | fails the 20% invasive gate at ~5% realized |
 | ~~5~~ | ~~`Sidecar::assemble` walks the file a second time inside `mint` to rebuild the byte index~~ | core + trust | per-file | **LANDED T4 — mint −13.3% (324→280 ms @ 25 MB)**: reuse the validating parse's source-true offsets instead of re-walking (`assemble_from_parsed`) | contained | yes (new `trust/mint` bench) | non-UTF-8 mint pinned (core fallback + trust end-to-end) |
-| 6 | node's `table_ipc` has no `with_keys=false` escape, so the keychain pass runs on the default `table(code)` call and the keys are then stripped | surfaces (node) | per-row | **large** — Python's twin documents this pass as "the dominant read cost"; **unmeasured on node** | contained | **no** — node has no bench of any kind | no test asserts `.sql()`/`.at()` after a prior plain `table()` on the same group |
+| 6 | node's `table_ipc` has no `with_keys=false` escape, so the keychain pass runs on the default `table(code)` call and the keys are then stripped | surfaces (node) | per-row | **large** — Python's twin documents this pass as "the dominant read cost"; now **benched on node**: default `table(all)` 692 ms ≈ keyed 693 ms, so the keychain is computed then discarded | contained | **yes** (`node/bench/read.bench.ts`, T6) | no test asserts `.sql()`/`.at()` after a prior plain `table()` on the same group |
 | 7 | `parse_compat_arrow` builds a `RecordBatch` for every group even when `only_groups` narrows | surfaces (compat) | per-group | **medium** — unmeasured; `bench-vs-python-ags4.py` always calls the full read, so it is structurally blind to this | contained | no | the strict-check metadata must keep running for *all* groups |
 | 8 | the GIL is never released anywhere in `laterite-py` (zero `allow_threads`/`detach`) | surfaces (wheel) | not hot — concurrency only | **unknown** — invisible to all five criterion benches by construction and to `test_perf_read.py` (single-threaded) | contained | **no** — needs a new *kind* of bench | no test anywhere exercises concurrent access to the wheel |
 | 9 | `EmitGroup` owns `Vec<Vec<String>>`, so two callers deep-clone an already-owned matrix (`emit.rs:188`, node `lib.rs:243`) | emit + node | per-cell | **small** — `emit_ags4/report` is 22.4 ms and the writer is 2.9 ms of it | **invasive** — changes a public field type | partial | node and excel have no bench crate |
@@ -461,12 +461,30 @@ this tranche.** Whatever they show re-enters the queue at the same 5% floor.
 
 ### T6 — The surfaces (only once the core stopping rule has fired)
 
-**Candidates:** #6, #7, #8. **Benches first: all three.** Node has no harness of
-any kind; compat is exercised only by `bench-vs-python-ags4.py`, which always
-calls the full read and so cannot see #7; #8 needs a *new kind* of bench — a
-Python-level multi-threaded throughput test comparing wall-clock at N=1 against
-N=core-count. A held-GIL implementation shows flat N-times-serial time; a
-released one shows near-linear speedup. Single-threaded wall-clock, which is all
+**Candidates:** #6, #7, #8. **Benches first: all three.**
+
+**Node harness — DONE (2026-07-25).** Node had no benchmark of any kind, so its
+read cost was invisible. `laterite-node/bench/read.bench.ts` (vitest `bench()`,
+no new dep, `npm run bench`) mirrors the Rust `typed_read_file` / Python read
+bench on the 25 MB rung. First numbers:
+
+| bench | mean |
+|---|---|
+| `read` (parse only) | 133 ms |
+| `read + table(all groups)` (default, keys stripped) | 692 ms |
+| `read + table(all, keys)` | 693 ms |
+
+Default ≈ keyed (692 vs 693 ms) is the finding that makes **#6 rankable**: the
+content-addressed keychain is computed on the default keys-less `table(code)` and
+then thrown away — the strip is free, the keychain is not. The ~558 ms the typed
+materialization adds over parse (native `tableIpc` build + IPC framing + JS
+apache-arrow decode) is the envelope #6's `withKeys=false` escape cuts into.
+
+**Still no bench:** compat is exercised only by `bench-vs-python-ags4.py`, which
+always calls the full read and so cannot see #7; #8 needs a *new kind* of bench —
+a Python-level multi-threaded throughput test comparing wall-clock at N=1 against
+N=core-count. A held-GIL implementation shows flat N-times-serial time; a released
+one shows near-linear speedup. Single-threaded wall-clock, which is all
 `test_perf_read.py` measures, is identical either way.
 
 **Coverage closed:** for #6, a test asserting `.sql()`/`.at()` correctness *after*
