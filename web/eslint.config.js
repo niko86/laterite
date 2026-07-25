@@ -51,6 +51,7 @@ export default tseslint.config(
           allowDefaultProject: [
             "vitest.config.ts",
             "vitest.wasm.config.ts",
+            "vitest.wasm-bench.config.ts",
             "vitest.wasm.setup.ts",
             "playwright.config.ts",
           ],

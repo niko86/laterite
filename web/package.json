@@ -25,6 +25,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:wasm": "vitest run --config vitest.wasm.config.ts",
+    "bench:wasm": "vitest bench --run --config vitest.wasm-bench.config.ts",
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
