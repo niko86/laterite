@@ -239,7 +239,7 @@ as such, because they are counts, not timings.
 | ~~7~~ | ~~`parse_compat_arrow` builds a `RecordBatch` for every group even when `only_groups` narrows~~ | surfaces (compat) | per-group | **MEASURED → DEFERRED (issue #99): ~14 ms ≈ 9% of a 1-group narrowed read, 0 on a full read** — parse (143.7 ms) dominates and is shared; the build+cross of all 123 compat tables is only 14.1 ms. Clears the 5% floor but is the smallest candidate + narrowed-reads-only | contained | probe (`compat_narrow_probe` / `parse_equiv_probe`) | strict-check metadata + dup-heading / ragged / dup-GROUP raises must stay for *all* groups |
 | ~~8~~ | ~~the GIL is never released anywhere in `laterite-py` (zero `allow_threads`/`detach`)~~ | surfaces (wheel) | not hot — concurrency only | **LANDED T6 — concurrent throughput: validate 0.99 → 5.08×, read 0.96 → 3.53× @ 10 cores** (`Python::detach` around the pure-Rust compute in `run_check`/`parse_arrow`/`parse_compat_arrow`); single-call latency unchanged | contained | yes (`tools/bench-gil-throughput.py`, T6) | `test_gil_released.py` proves a concurrent thread advances *during* the native call |
 | 9 | `EmitGroup` owns `Vec<Vec<String>>`, so two callers deep-clone an already-owned matrix (`emit.rs:188`, node `lib.rs:243`) | emit + node | per-cell | **small** — `emit_ags4/report` is 22.4 ms and the writer is 2.9 ms of it | **invasive** — changes a public field type | partial | node and excel have no bench crate |
-| 10 | the process uses the system allocator; `parse_bytes` is allocation-bound (~5M blocks / 25 MB, dhat-confirmed) | parse leaf → all surfaces | per-cell alloc | **PRICED — parse −21.5% (139.2 → 108.5 ms @ 25 MB, p<0.05)** via a mimalloc `#[global_allocator]` swap; flows to every read on every surface | trivial for `lat` (owns `main`); **dep-shape decision for the wheel** — a C `libmimalloc-sys` on the abi3 matrix + a library setting the host global allocator | probe (throwaway, reverted) | none — no logic changes; needs an owner call on the wheel dep-shape (T4-followup) |
+| ~~10~~ | ~~the process uses the system allocator; `parse_bytes` is allocation-bound (~5M blocks / 25 MB, dhat-confirmed)~~ | parse leaf → all surfaces | per-cell alloc | **LANDED — mimalloc `#[global_allocator]` on all 3 native artifacts: wheel end-to-end read −22%, validate −14%; lat/node the same read win** for +163 KB (.so) / +116 KB (lat) | contained (dep + 3 lines/artifact; C `libmimalloc-sys` on the abi3 matrix, the accepted dep-shape cost) | yes (dhat + wheel e2e) | wheel 681 + node 289 green; Arrow release-callback handoff proven safe |
 
 Below the floor, measured out — recorded so they are not rediscovered:
 
@@ -464,14 +464,38 @@ surfaced: `parse_bytes` is on **every** read across all four surfaces, so ~21% h
 flows everywhere, and dhat explains *why* it lands — an allocation-bound leaf is the
 canonical case a per-thread-heap allocator accelerates.
 
-**It clears every floor (5/10/20%) by a wide margin, so the gate is NOT perf — it
-is dep-shape, an owner call.** For the `lat` binary the swap is trivial and safe
-(it owns `main`). For the **shipped wheel** it is a real decision: a C-compiled
-`libmimalloc-sys` rides the abi3 cross-platform build matrix (musl/macOS/Windows),
-against a base dep-shape deliberately kept to polars+duckdb; and a *library* setting
-the host process's global allocator is a heavier commitment than a binary doing so.
-Recorded as **priced, viable, undecided** (queue #10) — not taken unilaterally,
-because the tradeoff is packaging, not code. See [[core-perf-baseline]].
+**It clears every floor (5/10/20%) by a wide margin, so the gate was never perf —
+it was dep-shape, an owner call.** For the `lat` binary the swap is trivial and
+safe (it owns `main`). For the **shipped wheel** it was a real decision: a
+C-compiled `libmimalloc-sys` rides the abi3 cross-platform build matrix
+(musl/macOS/Windows), against a base dep-shape deliberately kept to polars+duckdb;
+and a *library* setting the host process's global allocator is a heavier commitment
+than a binary doing so.
+
+**ADOPTED — the wheel measured, then taken on all three native surfaces.** Before
+deciding, the swap was measured end-to-end on the wheel (public `laterite.read`/
+`laterite.validate`, 25 MB, median of 9, reproduced), not just the isolated parse
+bench:
+
+| operation | baseline | + mimalloc | change |
+|---|---|---|---|
+| validate (parse + rules) | 260.4 ms | 224.0 ms | **−14.0%** |
+| read (parse + load engine) | 147.0 ms | 112.7 ms | **−23.3%** |
+| read + all groups (full typed) | 174.1 ms | 135.2 ms | **−22.3%** |
+
+The isolated ~21% parse win lands as **~22% faster reads and 14% faster validate**
+end-to-end (reads are parse-dominated; validate spends more in the rules engine,
+which the allocator doesn't touch). Size cost on the `.so`: **+162.6 KB (+0.77%)**
+of 20.1 MB; on `lat`: **+116 KB (+1.4%)**. Build cost: ~40 s one-time C compile per
+platform. The flagged risk — a library swapping the allocator corrupting the
+Arrow→polars/pyarrow handoff — **did not materialise**: the full read (all 123
+groups through the Arrow/DuckDB/polars bridge) and validate ran clean, because the
+engine leaves Rust via Arrow release callbacks, so Rust frees what Rust allocated.
+`#[global_allocator]` is set in each final artifact — `laterite-ags4-check` (`lat`),
+`laterite-py` (wheel), `laterite-node` (addon); a shared leaf crate cannot set one.
+**wasm is excluded** (different toolchain; already native-speed, keeps dlmalloc).
+Wheel suite 681 passed, node 289 passed, lat validates clean. See
+[[core-perf-baseline]].
 
 ### T5 — A dirty fixture and the FYI tier (bench only)
 

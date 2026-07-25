@@ -41,6 +41,11 @@ excel = ["dep:laterite-excel"]
 tui = ["dep:ratatui", "dep:crossterm"]
 
 [dependencies]
+# Faster allocator for the allocation-bound read hot-path (parse does ~5M
+# small allocations for a 25 MB file; see perf-campaign T4-followup). Paired
+# with the `#[global_allocator]` in the crate root — only a final artifact
+# (binary / cdylib) can set one, so it is declared per-surface, not in a leaf.
+mimalloc = "0.1"
 # The engine. Depended on via its public library API only — the split
 # has zero code-consumer breakage (every call site uses the re-exported
 # surface: CheckOptions / DictVersion / Findings / ValidatorError /
