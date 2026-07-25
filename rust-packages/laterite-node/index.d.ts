@@ -23,7 +23,7 @@ export declare class Reading {
    * SAME casting Python/wasm use — so a file types byte-identically across
    * hosts. Returns `null` if the code isn't in the file.
    */
-  tableIpc(code: string, contentHash?: boolean | undefined | null): Buffer | null
+  tableIpc(code: string, contentHash?: boolean | undefined | null, withKeys?: boolean | undefined | null): Buffer | null
   /**
    * Re-emit byte-faithful AGS4 text from the retained parse (the raw DATA
    * values, unchanged). = laterite-py's `Reading::emit`.

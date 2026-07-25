@@ -1,13 +1,7 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { type Table, tableFromIPC } from "apache-arrow";
-import {
-  DuckEngine,
-  type QueryOptions,
-  quoteId,
-  type Row,
-  stripSynthKeys,
-} from "./duckdb";
+import { DuckEngine, type QueryOptions, quoteId, type Row } from "./duckdb";
 import { Ags4Error, raiseFor } from "./errors";
 // The chained verbs (`fix`/`diff`/`toExcel`) reuse the free functions with this
 // handle's retained source, so the ONE engine call + error mapping lives in one
@@ -69,12 +63,18 @@ export interface CertifyOptions {
  */
 export class Ags4File {
   readonly #reading: Reading;
-  // One RAW keyed arrow-js Table per group, decoded once (with _id/_parent_id
-  // for known groups). The relational `#register` reads these.
+  // One RAW keyed arrow-js Table per group (with _id/_parent_id for known
+  // groups), built ONLY when keys are needed: table({keys:true}) and the
+  // relational sql()/at() layer (`#register`). The keychain is ~96% of the
+  // native build cost, so the DEFAULT keys-less table() must not come through
+  // here (#6).
   readonly #tables = new Map<string, Table>();
-  // The key-stripped frame VIEW per group (a zero-copy projection of the raw
-  // Table), memoised so `table(code)` keeps returning the same instance.
-  readonly #stripped = new Map<string, Table>();
+  // The DEFAULT keys-less typed Table per group — the native build with the
+  // keychain SKIPPED, cached independently so a plain table() never poisons the
+  // keyed `#tables` the relational layer needs (#6). Its columns equal the old
+  // stripped view's (data + trailing _content_hash), so table()'s output is
+  // unchanged — just ~28x cheaper to build.
+  readonly #framesKeyless = new Map<string, Table>();
   // The DuckDB engine — created lazily on first sql()/at()/connection.
   #engine: DuckEngine | null = null;
   // Memoised AGS4 re-emit (the `text`/`bytes` getters; the emit is O(size)).
@@ -167,17 +167,35 @@ export class Ags4File {
 
   // --- born-typed data (Arrow-direct) --------------------------------------
 
-  /** The raw keyed Table straight from IPC — a KNOWN group carries the two
-   * content-addressed key columns `_id`/`_parent_id` first (#303). Cached; both
-   * the frame accessor and the relational `#register` read it. */
+  /** The raw KEYED Table straight from IPC — a KNOWN group carries the two
+   * content-addressed key columns `_id`/`_parent_id` first (#303). Built only
+   * when keys are needed (`table({keys:true})` and the relational `#register`),
+   * because the keychain is ~96% of the native build (#6). Cached in `#tables`. */
   #rawTable(code: string): Table {
     const cached = this.#tables.get(code);
     if (cached !== undefined) return cached;
-    const ipc = this.#reading.tableIpc(code, this.#contentHash);
+    const ipc = this.#reading.tableIpc(code, this.#contentHash, true);
     if (ipc === null)
       throw new Error(`group ${JSON.stringify(code)} not in file`);
     const table = tableFromIPC(ipc);
     this.#tables.set(code, table);
+    return table;
+  }
+
+  /** The DEFAULT keys-less Table — the native build with the keychain SKIPPED
+   * (`withKeys=false`), so a keys-less read never pays for `_id`/`_parent_id` it
+   * would only strip (#6). Byte-equal columns to the old `stripSynthKeys(raw)`
+   * view (data + trailing `_content_hash`), so `table(code)`'s output is
+   * unchanged. Cached in `#framesKeyless`, kept separate from the keyed `#tables`
+   * so it never poisons the relational layer. */
+  #keylessTable(code: string): Table {
+    const cached = this.#framesKeyless.get(code);
+    if (cached !== undefined) return cached;
+    const ipc = this.#reading.tableIpc(code, this.#contentHash, false);
+    if (ipc === null)
+      throw new Error(`group ${JSON.stringify(code)} not in file`);
+    const table = tableFromIPC(ipc);
+    this.#framesKeyless.set(code, table);
     return table;
   }
 
@@ -186,18 +204,12 @@ export class Ags4File {
    * byte-identical by construction (one shared `build_record_batch`). Cached per
    * group. Throws if `code` isn't in the file.
    *
-   * By default the synthetic `_id`/`_parent_id` key columns are **dropped**; pass
+   * By default the synthetic `_id`/`_parent_id` key columns are **absent** (the
+   * native keychain is skipped entirely, not built-then-stripped — #6); pass
    * `{ keys: true }` to include them (the relational `sql()`/`at()` layer always
    * carries them regardless — that's what makes cross-group joins work). */
   table(code: string, opts?: { keys?: boolean }): Table {
-    const raw = this.#rawTable(code);
-    if (opts?.keys) return raw;
-    let stripped = this.#stripped.get(code);
-    if (stripped === undefined) {
-      stripped = stripSynthKeys(raw);
-      this.#stripped.set(code, stripped);
-    }
-    return stripped;
+    return opts?.keys ? this.#rawTable(code) : this.#keylessTable(code);
   }
 
   // --- emit / save ---------------------------------------------------------
@@ -569,6 +581,7 @@ export class Ags4File {
    * `using f = read(…)` runs this automatically. */
   close(): void {
     this.#tables.clear();
+    this.#framesKeyless.clear();
     if (this.#engine !== null) {
       this.#engine.close();
       this.#engine = null;
