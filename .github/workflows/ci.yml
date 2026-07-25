@@ -92,6 +92,17 @@ jobs:
           filters: |
             code:
               - 'rust-packages/**'
+              # ...EXCEPT laterite-node's non-Rust surface. laterite-node is a
+              # leaf consumer — nothing in the wheel/crate test set depends on it —
+              # so its TS + package config cannot change a Rust or Python outcome,
+              # yet a bench/config-only edit there was firing the ~12-min `python`
+              # job (and `rust`/`test`) via the broad glob above. Exclude only
+              # `.ts`/`.json`: the crate's `.rs`/`Cargo.toml` STAY in `code` so a
+              # real Rust change still runs clippy/fmt (dropping that would be a
+              # silent skip). The `node` filter below keeps watching all of
+              # rust-packages/**, so the node job still runs on these files.
+              - '!rust-packages/laterite-node/**/*.ts'
+              - '!rust-packages/laterite-node/**/*.json'
               - 'packages/**'
               - 'tests/**'              # the root suite = AGS4 dictionary-faithfulness tests (run below)
               - 'pyproject.toml'
