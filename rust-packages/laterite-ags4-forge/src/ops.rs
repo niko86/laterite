@@ -18,7 +18,8 @@
 
 use std::fmt;
 
-use laterite_ags4_parity::Rng;
+use laterite_ags4_parity::{Rng, reservoir};
+use laterite_ags4_validator::{DictVersion, Dictionary};
 
 use crate::synth::Scaffold;
 use crate::synth::emit::emit_to_string;
@@ -108,6 +109,21 @@ pub enum Injection {
     /// Point a heading's TYPE at a code the file's TYPE group doesn't
     /// define → Rule 17.
     UndefinedType,
+    /// Blank a REQUIRED (non-KEY) DATA cell → Rule 10b (the per-bad-row
+    /// "Empty REQUIRED fields" reconstruction). Dictionary-driven: the site is
+    /// a field whose status contains REQUIRED but *not* KEY (a KEY+REQUIRED
+    /// blank would additionally trip Rule 10a).
+    ///
+    /// A **multi-rule** injector at volume, like [`UnquotedField`]. On a
+    /// realistic scaffold the only REQUIRED-non-KEY fields are *structural* —
+    /// `TRAN_AGS` (drives dictionary-edition detection → Rule 7/9/18 when
+    /// blanked) and the `ABBR/UNIT/TYPE` `*_DESC` definitions — so a fileful of
+    /// empty-REQUIRED faults cascades rather than isolating Rule 10b. That is a
+    /// real property of AGS structure, not a fixture quirk: it makes 10b's
+    /// emission inherently bounded, so this injector is a realistic "messy
+    /// delivery" generator, not a single-rule probe. Rule 10b's *per-finding*
+    /// cost is priced by a cascade-free micro-bench instead.
+    EmptyRequired,
 }
 
 impl Injection {
@@ -124,6 +140,10 @@ impl Injection {
         Injection::DropTranData,
         Injection::UndefinedAbbrev,
         Injection::UndefinedType,
+        // Appended last on purpose: mine.rs pins MINEABLE indices and its
+        // C(n,2) count recomputes from the length, so appending keeps both
+        // valid where an insert would shift them.
+        Injection::EmptyRequired,
     ];
 }
 
@@ -141,6 +161,7 @@ impl Injection {
             "rule14" | "drop-tran-data" => Injection::DropTranData,
             "rule16" | "undefined-abbrev" => Injection::UndefinedAbbrev,
             "rule17" | "undefined-type" => Injection::UndefinedType,
+            "rule10b" | "empty-required" => Injection::EmptyRequired,
             _ => return None,
         })
     }
@@ -160,6 +181,7 @@ impl Injection {
             Injection::DropTranData => "rule14",
             Injection::UndefinedAbbrev => "rule16",
             Injection::UndefinedType => "rule17",
+            Injection::EmptyRequired => "rule10b",
         }
     }
 
@@ -180,6 +202,7 @@ impl Injection {
             Injection::UndefinedType => {
                 "point a heading's TYPE at a code absent from the TYPE group"
             }
+            Injection::EmptyRequired => "blank a REQUIRED (non-KEY) field in a DATA row",
         }
     }
 
@@ -197,16 +220,23 @@ impl Injection {
             Injection::DropTranData => "AGS Format Rule 14",
             Injection::UndefinedAbbrev => "AGS Format Rule 16",
             Injection::UndefinedType => "AGS Format Rule 17",
+            Injection::EmptyRequired => "AGS Format Rule 10b",
         })
     }
 
     /// Whether this injector needs the LOCA→SAMP scaffold. The relational
     /// injectors need a parent/child pair; `UndefinedAbbrev` needs a
-    /// PA-typed cell, which only the boreholes' `LOCA_TYPE/SAMP_TYPE` carry.
+    /// PA-typed cell, which only the boreholes' `LOCA_TYPE/SAMP_TYPE` carry;
+    /// `EmptyRequired` needs a pure-REQUIRED field, guaranteed by the
+    /// loca-samp/wide dimension groups (ABBR/UNIT/TYPE) — conservatively
+    /// `true` so it is never a silent no-op on a bare `Minimal`.
     pub fn needs_relational(self) -> bool {
         matches!(
             self,
-            Injection::DupSampKeyTuple | Injection::OrphanSampRow | Injection::UndefinedAbbrev
+            Injection::DupSampKeyTuple
+                | Injection::OrphanSampRow
+                | Injection::UndefinedAbbrev
+                | Injection::EmptyRequired
         )
     }
 
@@ -361,8 +391,207 @@ impl Injection {
                     model.groups[gi].types[ci] = "ZZ".to_string();
                 }
             }
+            // Blank *some* pure-REQUIRED (non-KEY) cell → Rule 10b. The site
+            // set is dictionary-driven (`empty_required_sites`); a KEY+REQUIRED
+            // field is excluded because blanking it would also trip Rule 10a.
+            Injection::EmptyRequired => {
+                let sites = empty_required_sites(model);
+                if !sites.is_empty() {
+                    let (gi, ri, ci) = *rng.choose(&sites);
+                    model.groups[gi].rows[ri].values[ci] = String::new();
+                }
+            }
         }
     }
+}
+
+impl Injection {
+    /// Whether a *density* (fraction of applicable sites) is meaningful for
+    /// this injector — i.e. it has a per-row/per-cell site set, not one fixed
+    /// site. The structural singletons (`DupSampKeyTuple`, `FiveLetterGroup`,
+    /// `DropProjData`, `DropTranData`, `UndefinedType`) corrupt a single
+    /// place, so `forge scale --density` rejects them at the CLI. The true-set
+    /// here MUST match the arms of [`apply_dense`].
+    #[must_use]
+    pub fn supports_density(self) -> bool {
+        matches!(
+            self,
+            Injection::EmptyRequired
+                | Injection::OrphanSampRow
+                | Injection::BadDtValue
+                | Injection::UnquotedField
+                | Injection::UndefinedAbbrev
+        )
+    }
+
+    /// Apply this injector to a deterministic `density` fraction of its
+    /// applicable sites (all of them at `density >= 1.0`), returning the count
+    /// mutated. The scaled counterpart of [`Injection::apply_model`]: one
+    /// seeded site becomes many, so a size-scaled fixture carries a
+    /// controllable *fault density* — what lets the validator's
+    /// error-emission path be priced at scale (T5).
+    ///
+    /// Deterministic. It seeds its own placement RNG from `seed` (never the
+    /// model-generation RNG, which would shift the clean base bytes and desync
+    /// the dirty fixture from its clean twin), and every mutation lands on a
+    /// *distinct* site, so the emitted bytes are independent of the reservoir's
+    /// internal selection order: same `(seed, density)` → byte-identical file.
+    ///
+    /// Only the density-capable injectors have an arm ([`supports_density`]);
+    /// the CLI rejects the rest, so the fallback is unreachable in practice.
+    #[must_use]
+    pub fn apply_dense(self, model: &mut ProjectModel, seed: u64, density: f64) -> usize {
+        let mut rng = Rng::seeded(seed ^ PLACEMENT_SALT);
+        match self {
+            // Pure-REQUIRED (non-KEY) cells, dictionary-driven → Rule 10b.
+            Injection::EmptyRequired => {
+                let chosen = pick_dense(empty_required_sites(model), density, &mut rng);
+                let n = chosen.len();
+                for (gi, ri, ci) in chosen {
+                    model.groups[gi].rows[ri].values[ci] = String::new();
+                }
+                n
+            }
+            // Every chosen SAMP row repointed at a DISTINCT missing LOCA →
+            // Rule 10c. The unique bogus id keeps SAMP's KEY tuple unique, so
+            // many orphans do not accidentally trip Rule 10a.
+            Injection::OrphanSampRow => {
+                let Some(gi) = model.groups.iter().position(|g| g.code == "SAMP") else {
+                    return 0;
+                };
+                let Some(col) = model.groups[gi].col("LOCA_ID") else {
+                    return 0;
+                };
+                let rows: Vec<usize> = (0..model.groups[gi].rows.len()).collect();
+                let chosen = pick_dense(rows, density, &mut rng);
+                let n = chosen.len();
+                for ri in chosen {
+                    model.groups[gi].rows[ri].values[col] = format!("ZZ_ORPHAN_{ri}");
+                }
+                n
+            }
+            // Non-date into DT-typed cells → Rule 8.
+            Injection::BadDtValue => {
+                let chosen = pick_dense(typed_cell_sites(model, "DT"), density, &mut rng);
+                let n = chosen.len();
+                for (gi, ri, ci) in chosen {
+                    model.groups[gi].rows[ri].values[ci] = "not-a-date".to_string();
+                }
+                n
+            }
+            // Non-empty DATA cells emitted unquoted → Rule 5.
+            Injection::UnquotedField => {
+                let chosen = pick_dense(nonempty_cell_sites(model), density, &mut rng);
+                let n = chosen.len();
+                for (gi, ri, ci) in chosen {
+                    model.groups[gi].rows[ri].faults.push(RowFault::Unquote(ci));
+                }
+                n
+            }
+            // Undefined code into PA-typed cells → Rule 16.
+            Injection::UndefinedAbbrev => {
+                let chosen = pick_dense(typed_cell_sites(model, "PA"), density, &mut rng);
+                let n = chosen.len();
+                for (gi, ri, ci) in chosen {
+                    model.groups[gi].rows[ri].values[ci] = "ZZ".to_string();
+                }
+                n
+            }
+            // Structural singletons have no per-site density; the CLI rejects
+            // them before this point.
+            _ => {
+                debug_assert!(false, "apply_dense on a non-density injector: {self}");
+                0
+            }
+        }
+    }
+}
+
+/// A field whose dictionary status marks it REQUIRED but *not* KEY — the clean
+/// Rule 10b site (a KEY+REQUIRED blank would also trip Rule 10a). Statuses are
+/// `+`-combined (e.g. `"KEY+REQUIRED"`), so read them part-wise, matching the
+/// reference crate's `is_key`.
+fn is_pure_required(status: &str) -> bool {
+    let mut required = false;
+    for part in status.split('+') {
+        let part = part.trim();
+        if part.eq_ignore_ascii_case("KEY") {
+            return false;
+        }
+        if part.eq_ignore_ascii_case("REQUIRED") {
+            required = true;
+        }
+    }
+    required
+}
+
+/// Every non-empty cell of a pure-REQUIRED (non-KEY) heading, in file order
+/// (groups → headings → rows). Dictionary-driven so it tracks the real
+/// REQUIRED set `rule_10b` checks rather than a hardcoded column; ordered Vecs
+/// only, so the site order — and the reservoir's pick from it — is deterministic.
+fn empty_required_sites(model: &ProjectModel) -> Vec<(usize, usize, usize)> {
+    let dict = Dictionary::bundled(DictVersion::V4_2);
+    let mut sites = Vec::new();
+    for (gi, g) in model.groups.iter().enumerate() {
+        for (ci, h) in g.headings.iter().enumerate() {
+            let pure_required = dict
+                .heading(&g.code, h)
+                .is_some_and(|hr| is_pure_required(hr.status));
+            if !pure_required {
+                continue;
+            }
+            for (ri, row) in g.rows.iter().enumerate() {
+                if row.values.get(ci).is_some_and(|v| !v.is_empty()) {
+                    sites.push((gi, ri, ci));
+                }
+            }
+        }
+    }
+    sites
+}
+
+/// Every cell whose heading has AGS type `ty` (e.g. `"DT"`, `"PA"`), in file
+/// order — the `BadDtValue`/`UndefinedAbbrev` dense sites.
+fn typed_cell_sites(model: &ProjectModel, ty: &str) -> Vec<(usize, usize, usize)> {
+    let mut sites = Vec::new();
+    for (gi, g) in model.groups.iter().enumerate() {
+        for (ci, t) in g.types.iter().enumerate() {
+            if t == ty {
+                for ri in 0..g.rows.len() {
+                    sites.push((gi, ri, ci));
+                }
+            }
+        }
+    }
+    sites
+}
+
+/// Every non-empty DATA cell, in file order — the `UnquotedField` dense sites.
+fn nonempty_cell_sites(model: &ProjectModel) -> Vec<(usize, usize, usize)> {
+    let mut sites = Vec::new();
+    for (gi, g) in model.groups.iter().enumerate() {
+        for (ri, row) in g.rows.iter().enumerate() {
+            for (ci, v) in row.values.iter().enumerate() {
+                if !v.is_empty() {
+                    sites.push((gi, ri, ci));
+                }
+            }
+        }
+    }
+    sites
+}
+
+/// Pick a deterministic `density` fraction of `sites`: all of them at
+/// `density >= 1.0` (no sampling — the fixture's common case, trivially
+/// reproducible), else `ceil(density * n)` reservoir-sampled with `rng`.
+fn pick_dense<T>(sites: Vec<T>, density: f64, rng: &mut Rng) -> Vec<T> {
+    let n = sites.len();
+    if n == 0 || density >= 1.0 {
+        return sites;
+    }
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let k = ((density * n as f64).ceil() as usize).clamp(1, n);
+    reservoir(sites.into_iter(), k, rng)
 }
 
 impl fmt::Display for Injection {
@@ -378,6 +607,7 @@ impl fmt::Display for Injection {
             Injection::DropTranData => "rule14:drop-tran-data",
             Injection::UndefinedAbbrev => "rule16:undefined-abbrev",
             Injection::UndefinedType => "rule17:undefined-type",
+            Injection::EmptyRequired => "rule10b:empty-required",
         };
         f.write_str(s)
     }
@@ -416,6 +646,83 @@ mod tests {
             }
         }
         out
+    }
+
+    /// `EmptyRequired`'s single-site form blanks exactly one non-empty
+    /// pure-REQUIRED cell (`empty_required_sites` returns only non-empty ones,
+    /// so its count drops by one).
+    #[test]
+    fn empty_required_blanks_one_pure_required_cell() {
+        let mut m = varied_model(Scaffold::LocaSamp, SEED);
+        let before = empty_required_sites(&m).len();
+        assert!(before > 0, "loca-samp carries pure-REQUIRED cells");
+        let mut rng = Rng::seeded(SEED ^ PLACEMENT_SALT);
+        Injection::EmptyRequired.apply_model(&mut m, &mut rng);
+        assert_eq!(
+            empty_required_sites(&m).len(),
+            before - 1,
+            "exactly one required cell blanked"
+        );
+    }
+
+    /// `apply_dense` corrupts exactly `k = ceil(density * n)` sites (all `n` at
+    /// density 1.0), and returns that count.
+    #[test]
+    fn dense_10b_count_matches_density() {
+        let n = empty_required_sites(&varied_model(Scaffold::Wide, SEED)).len();
+        assert!(n > 0, "wide carries pure-REQUIRED cells");
+
+        let mut full = varied_model(Scaffold::Wide, SEED);
+        assert_eq!(
+            Injection::EmptyRequired.apply_dense(&mut full, SEED, 1.0),
+            n
+        );
+        assert_eq!(
+            empty_required_sites(&full).len(),
+            0,
+            "density 1.0 blanks every site"
+        );
+
+        let mut half = varied_model(Scaffold::Wide, SEED);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let expected = ((0.5 * n as f64).ceil() as usize).clamp(1, n);
+        assert_eq!(
+            Injection::EmptyRequired.apply_dense(&mut half, SEED, 0.5),
+            expected
+        );
+    }
+
+    /// Same `(seed, density)` → byte-identical file, even at a partial density
+    /// where the reservoir samples (distinct sites + fixed emit order make the
+    /// bytes independent of selection order).
+    #[test]
+    fn dense_is_byte_deterministic() {
+        let build = |density| {
+            let mut m = varied_model(Scaffold::Wide, SEED);
+            let _ = Injection::EmptyRequired.apply_dense(&mut m, SEED, density);
+            emit_to_string(&m)
+        };
+        assert_eq!(build(0.5), build(0.5), "partial density is reproducible");
+        assert_eq!(build(1.0), build(1.0), "full density is reproducible");
+    }
+
+    /// The density-capable set is exactly the per-row/per-cell injectors — and
+    /// it must match `apply_dense`'s arms. Forces a deliberate call for any
+    /// future variant.
+    #[test]
+    fn supports_density_partitions_injectors() {
+        for &inj in Injection::ALL {
+            let expected = matches!(
+                inj,
+                Injection::EmptyRequired
+                    | Injection::OrphanSampRow
+                    | Injection::BadDtValue
+                    | Injection::UnquotedField
+                    | Injection::UndefinedAbbrev
+            );
+            assert_eq!(inj.supports_density(), expected, "{inj}");
+        }
+        assert!(!Injection::None.supports_density());
     }
 
     /// The catalog/injector contract: every injector in `ALL` has a target

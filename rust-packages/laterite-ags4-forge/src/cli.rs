@@ -259,6 +259,17 @@ pub struct ScaleArgs {
     /// Deterministic seed (same size + seed → byte-identical file).
     #[arg(long, default_value_t = 0)]
     pub seed: u64,
+    /// Spread a rule-fault across the scaled file at a controllable *density*
+    /// — the fault-density mode. Takes an `--inject` token, but only the
+    /// per-row/per-cell (density-capable) ones: `rule10b|rule10c|rule8|rule5|
+    /// rule16` (aliases too), or `none`. ABSENT → a clean scale, byte-identical
+    /// to the pre-density behaviour (the existing fixtures do not move).
+    #[arg(long = "inject")]
+    pub inject: Option<String>,
+    /// Fraction (0.0, 1.0] of the injector's applicable sites to corrupt.
+    /// Requires `--inject`. Default when `--inject` is given: 1.0 (all sites).
+    #[arg(long)]
+    pub density: Option<f64>,
     /// Where to write the .ags (default: <out-dir>/scale/<scaffold>_<size>.ags).
     #[arg(long)]
     pub out: Option<PathBuf>,

@@ -35,12 +35,16 @@ sources: []
 > signatures (`--always-validate` for all gaps). A combination's true
 > rule-set is always *read from the validator*, never assumed from the
 > injectors' targets (faults interact/mask/cascade). The injector set
-> covers AGS Format Rules 5/8/10a/10c/13/14/16/17/19; `catalog` prints the
-> injector→rule map (token, target, scaffold, mutation) plus the
-> documented record of which canonical rules aren't single-injectable
-> (1/2a/3/6 byte-level, 2b descriptor-order, 4 field-count, 9/18/19a/19b
-> heading-name co-trip, 10b/15 candidate-future, 11a/11b/11c record-link,
-> 20 FILE). The staged, matrix-driven plan for running `mine` over time to
+> covers AGS Format Rules 5/8/10a/10b/10c/13/14/16/17/19 — `rule10b`
+> (`empty-required`, dictionary-driven) is a *multi-rule* injector: a realistic
+> AGS file's only REQUIRED-non-KEY fields are structural (`TRAN_AGS` drives
+> edition detection; the `ABBR/UNIT/TYPE` `*_DESC` definitions), so blanking
+> them cascades rather than isolating Rule 10b (a real property of AGS
+> structure, not a fixture quirk). `catalog` prints the injector→rule map
+> (token, target, scaffold, mutation) plus the documented record of which
+> canonical rules aren't single-injectable (1/2a/3/6 byte-level, 2b
+> descriptor-order, 4 field-count, 9/18/19a/19b heading-name co-trip, 15
+> candidate-future, 11a/11b/11c record-link, 20 FILE). The staged, matrix-driven plan for running `mine` over time to
 > systematically harvest new divergences is [[strat-forge-divergence-mining-campaign]].
 > the agent (armed with this wiki) authors a declarative strategy;
 > the binary is the
@@ -60,7 +64,13 @@ sources: []
 > <500KB…1GB>` is the **scale ladder**: it calibrates the borehole count
 > (a cheap two-point byte measurement, id-width-corrected) to land near a
 > target size and streams the clean `wide` file to disk — the sized fixtures
-> the perf/compliance matrix consumes.
+> the perf/compliance matrix consumes. `scale --inject <token> --density <p>`
+> is the **fault-density mode**: it spreads a per-row/per-cell injector
+> (`rule10b|rule10c|rule8|rule5|rule16`) across that fraction of applicable
+> sites (deterministic, reservoir-sampled; `1.0` = every site), so a
+> size-scaled *densely-dirty* twin of a clean rung prices the validator's
+> error-emission path at scale (T5) — e.g. `--inject rule16 --density 1.0`
+> is ~314k Rule-16 findings on a 25 MB file.
 
 ## Inputs / outputs
 > [!quote] In: a declarative `strategy.toml` (the executable twin of a

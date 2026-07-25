@@ -566,11 +566,6 @@ pub fn catalog(ctx: Ctx) -> Result<i32> {
              (non-dictionary heading) and often a sibling — not isolable",
         ),
         note(
-            "10b",
-            "empty REQUIRED field needs per-group REQUIRED-status dict lookup \
-             (candidate future injector)",
-        ),
-        note(
             "11a, 11b, 11c",
             "Record-Link machinery (TRAN_DLIM/RCON + RL resolution) — \
              domain-specific setup",
@@ -664,6 +659,16 @@ pub fn scale(args: &crate::cli::ScaleArgs, ctx: Ctx) -> Result<i32> {
         }
     };
 
+    // Fault-density mode: resolve --inject/--density to an optional
+    // (injector, density). `None` = a clean scale (byte-identical to before).
+    let dirty = match resolve_scale_inject(args.inject.as_deref(), args.density) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return Ok(5);
+        }
+    };
+
     let out = forge_dir(args.out_dir.as_deref());
     let path = args.out.clone().unwrap_or_else(|| {
         out.join("scale").join(format!(
@@ -688,6 +693,18 @@ pub fn scale(args: &crate::cli::ScaleArgs, ctx: Ctx) -> Result<i32> {
         .with("target_bytes", target)
         .with("predicted_bytes", cal.predicted_bytes)
         .with("n_loca", cal.n_loca as u64)
+        .with(
+            "inject",
+            dirty
+                .as_ref()
+                .map_or_else(|| "none".to_string(), |(i, _)| i.token().to_string()),
+        )
+        .with(
+            "density",
+            dirty
+                .as_ref()
+                .map_or_else(|| "n/a".to_string(), |(_, d)| d.to_string()),
+        )
         .with("path", path.display().to_string());
         emit(&plan, &ctx)?;
         return Ok(0);
@@ -696,8 +713,13 @@ pub fn scale(args: &crate::cli::ScaleArgs, ctx: Ctx) -> Result<i32> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    // Build once, stream out (no second full-file buffer).
-    let model = crate::synth::model::varied_model_n(scaffold, args.seed, Some(cal.n_loca));
+    // Build once; corrupt in place if a fault-density mode is active (the
+    // clean twin is exactly this model with no `apply_dense`); stream out.
+    let mut model = crate::synth::model::varied_model_n(scaffold, args.seed, Some(cal.n_loca));
+    let dirty_sites = match dirty {
+        Some((inj, density)) => inj.apply_dense(&mut model, args.seed, density),
+        None => 0,
+    };
     let groups = model.groups.len();
     let file = std::fs::File::create(&path)?;
     let mut w = BufWriter::new(file);
@@ -705,15 +727,19 @@ pub fn scale(args: &crate::cli::ScaleArgs, ctx: Ctx) -> Result<i32> {
     w.flush()?;
     let actual = std::fs::metadata(&path)?.len();
 
+    let dirty_note = dirty.map_or_else(String::new, |(i, d)| {
+        format!(", inject={} density={d} ({dirty_sites} sites)", i.token())
+    });
     note(format!(
-        "scale → {} ({} bytes, {} boreholes, {} groups)",
+        "scale → {} ({} bytes, {} boreholes, {} groups{})",
         path.display(),
         actual,
         cal.n_loca,
-        groups
+        groups,
+        dirty_note
     ));
     let report = crate::report::ScaleReport {
-        schema: 1,
+        schema: 2,
         scaffold: args.scaffold.clone(),
         seed: args.seed,
         target_bytes: target,
@@ -722,9 +748,47 @@ pub fn scale(args: &crate::cli::ScaleArgs, ctx: Ctx) -> Result<i32> {
         n_loca: cal.n_loca,
         groups,
         path: path.display().to_string(),
+        inject: dirty.map(|(i, _)| i.token().to_string()),
+        density: dirty.map(|(_, d)| d),
+        dirty_sites,
     };
     emit(&report, &ctx)?;
     Ok(0)
+}
+
+/// Parse + validate `forge scale`'s `--inject`/`--density` into an optional
+/// (injector, density) pair. `None` = a clean scale (no `--inject`, or the
+/// explicit `none` token). Every `Err` maps to exit 5 (bad args) in `scale`;
+/// kept pure so it is unit-tested directly. `--density` defaults to `1.0`
+/// (every applicable site) when `--inject` is given without it.
+fn resolve_scale_inject(
+    inject: Option<&str>,
+    density: Option<f64>,
+) -> Result<Option<(Injection, f64)>, String> {
+    let Some(token) = inject else {
+        if density.is_some() {
+            return Err("--density requires --inject".into());
+        }
+        return Ok(None);
+    };
+    let Some(inj) = Injection::parse(token) else {
+        return Err(format!("unknown --inject '{token}'"));
+    };
+    if inj == Injection::None {
+        return Ok(None); // explicit clean; any --density is a no-op
+    }
+    if !inj.supports_density() {
+        return Err(format!(
+            "--inject '{token}' has a single fixed site; density-capable: \
+             rule10b|rule10c|rule8|rule5|rule16"
+        ));
+    }
+    // Rejects 0.0, negatives, > 1.0, and NaN (NaN fails both comparisons).
+    let density = density.unwrap_or(1.0);
+    if !(density > 0.0 && density <= 1.0) {
+        return Err("--density must be in (0.0, 1.0]".into());
+    }
+    Ok(Some((inj, density)))
 }
 
 /// `forge minimize <file>` — standalone ddmin (e.g. shrink a
@@ -923,4 +987,57 @@ fn emit_value(v: &serde_json::Value, ctx: Ctx) -> Result<()> {
         _ => laterite_cliutil::write_json_pretty(&mut o, v, ctx.colour())?,
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod scale_inject_tests {
+    use super::resolve_scale_inject;
+    use crate::ops::Injection;
+
+    #[test]
+    fn density_without_inject_is_error() {
+        assert!(resolve_scale_inject(None, Some(0.5)).is_err());
+    }
+
+    #[test]
+    fn clean_when_no_inject_or_none_token() {
+        assert_eq!(resolve_scale_inject(None, None).unwrap(), None);
+        // `none` is an explicit clean scale; any --density is a no-op, not an error.
+        assert_eq!(resolve_scale_inject(Some("none"), Some(0.5)).unwrap(), None);
+    }
+
+    #[test]
+    fn unknown_token_is_error() {
+        assert!(resolve_scale_inject(Some("rule999"), None).is_err());
+    }
+
+    #[test]
+    fn structural_singletons_are_rejected() {
+        for tok in ["rule10a", "rule19", "rule13", "rule14", "rule17"] {
+            assert!(resolve_scale_inject(Some(tok), None).is_err(), "{tok}");
+        }
+    }
+
+    #[test]
+    fn density_out_of_range_is_error() {
+        for d in [0.0, -1.0, 1.5, f64::NAN, f64::INFINITY] {
+            assert!(
+                resolve_scale_inject(Some("rule10b"), Some(d)).is_err(),
+                "{d}"
+            );
+        }
+    }
+
+    #[test]
+    fn density_capable_resolves_with_default_one() {
+        assert_eq!(
+            resolve_scale_inject(Some("rule10b"), Some(0.5)).unwrap(),
+            Some((Injection::EmptyRequired, 0.5))
+        );
+        // omitted --density defaults to 1.0 (every applicable site).
+        assert_eq!(
+            resolve_scale_inject(Some("rule16"), None).unwrap(),
+            Some((Injection::UndefinedAbbrev, 1.0))
+        );
+    }
 }
