@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import duckdb
 import laterite
 import polars as pl
 import pytest
@@ -358,6 +359,97 @@ def test_save_returns_path_and_reads_back(clean, tmp_path):
     assert out.exists()
     f2 = laterite.read(str(out))
     assert set(f2.groups) == set(clean.groups)
+
+
+# --- to_duckdb: persist the keyed relational store ------------------------
+
+
+def test_to_duckdb_writes_keyed_tables_that_still_join(tmp_path):
+    out = tmp_path / "store.duckdb"
+    stats = laterite.read(text=_RELATED_SRC).to_duckdb(out)
+    assert stats == {"path": out, "tables_written": 3, "rows_written": 1 + 3 + 4}
+    assert out.exists()
+
+    con = duckdb.connect(str(out))
+    try:
+        assert {r[0] for r in con.execute("SHOW TABLES").fetchall()} == {
+            "PROJ",
+            "LOCA",
+            "SAMP",
+        }
+        # A KNOWN group's table leads with the two content-addressed key columns...
+        cols = [r[0] for r in con.execute('DESCRIBE "SAMP"').fetchall()]
+        assert cols[:2] == ["_id", "_parent_id"]
+        # ...and the persisted keys still resolve a cross-group JOIN — the whole
+        # point of persisting them (and what the read_ags extension diffs on).
+        joined = con.execute(
+            "SELECT s.SAMP_REF FROM SAMP s JOIN LOCA l ON s._parent_id = l._id "
+            "ORDER BY s.SAMP_REF"
+        ).fetchall()
+        assert [r[0] for r in joined] == ["S1", "S2", "S3", "S4"]
+    finally:
+        con.close()
+
+
+def test_to_duckdb_is_faithful_to_the_in_memory_relational_layer(tmp_path):
+    out = tmp_path / "faithful.duckdb"
+    laterite.read(text=_RELATED_SRC).to_duckdb(out)
+    persisted = duckdb.connect(str(out))
+    mem = laterite.read(text=_RELATED_SRC).connection
+    try:
+        for code in ("PROJ", "LOCA", "SAMP"):
+            want = mem.execute(f'SELECT * FROM "{code}" ORDER BY ALL').fetchall()
+            got = persisted.execute(f'SELECT * FROM "{code}" ORDER BY ALL').fetchall()
+            assert got == want, code
+    finally:
+        persisted.close()
+
+
+def test_to_duckdb_refuses_to_overwrite(tmp_path):
+    out = tmp_path / "once.duckdb"
+    laterite.read(text=_RELATED_SRC).to_duckdb(out)
+    with pytest.raises(FileExistsError, match="fresh database"):
+        laterite.read(text=_RELATED_SRC).to_duckdb(out)
+
+
+def test_to_duckdb_groups_selects_a_subset(tmp_path):
+    out = tmp_path / "subset.duckdb"
+    stats = laterite.read(text=_RELATED_SRC).to_duckdb(out, groups=["SAMP", "PROJ"])
+    assert stats["tables_written"] == 2
+    con = duckdb.connect(str(out))
+    try:
+        assert {r[0] for r in con.execute("SHOW TABLES").fetchall()} == {"SAMP", "PROJ"}
+    finally:
+        con.close()
+
+
+def test_to_duckdb_unknown_group_raises_keyerror(tmp_path):
+    with pytest.raises(KeyError, match="not in file"):
+        laterite.read(text=_RELATED_SRC).to_duckdb(
+            tmp_path / "x.duckdb", groups=["NOPE"]
+        )
+
+
+def test_free_to_duckdb_matches_the_fluent_method(tmp_path):
+    a = tmp_path / "free.duckdb"
+    b = tmp_path / "fluent.duckdb"
+    laterite.to_duckdb(text=_RELATED_SRC, output=a)
+    laterite.read(text=_RELATED_SRC).to_duckdb(b)
+    ca, cb = duckdb.connect(str(a)), duckdb.connect(str(b))
+    try:
+        for code in ("PROJ", "LOCA", "SAMP"):
+            assert (
+                ca.execute(f'SELECT * FROM "{code}" ORDER BY ALL').fetchall()
+                == cb.execute(f'SELECT * FROM "{code}" ORDER BY ALL').fetchall()
+            ), code
+    finally:
+        ca.close()
+        cb.close()
+
+
+def test_free_to_duckdb_requires_an_output_path():
+    with pytest.raises(TypeError, match="output path"):
+        laterite.to_duckdb(text=_RELATED_SRC)
 
 
 # --- structure-preserving round-trip property -----------------------------

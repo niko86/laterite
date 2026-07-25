@@ -1,9 +1,22 @@
 // P3 — the optional DuckDB layer (Appender ingest, row-object output): sql()
 // cross-group JOINs, at()/AgsSubset key-filtering, the raw connection escape
 // hatch. Requires the optional @duckdb/node-api peer (a devDependency here).
+import { existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Table } from "apache-arrow";
 import { describe, expect, it } from "vitest";
-import { Ags4File, read } from "../ts/index";
+import { Ags4File, read, toDuckdb } from "../ts/index";
+
+/** The slice of the raw `@duckdb/node-api` connection the persistence checks use
+ * — reached via `Ags4File.connection`, so the tests never import the optional
+ * peer directly (the library is the only door to it). */
+type RawCon = {
+  run(sql: string): Promise<unknown>;
+  runAndReadAll(
+    sql: string,
+  ): Promise<{ getRowObjectsJS(): Record<string, unknown>[] }>;
+};
 
 const AGS =
   '"GROUP","LOCA"\r\n' +
@@ -128,5 +141,125 @@ describe("connection — raw escape hatch", () => {
     ags.close();
     ags.close(); // idempotent
     expect(ags).toBeInstanceOf(Ags4File);
+  });
+});
+
+describe("toDuckdb() — persist the keyed relational store", () => {
+  // PROJ (root) + LOCA + SAMP — a parent chain, so the persisted keys can be
+  // exercised across a cross-group JOIN.
+  const AGS_REL =
+    '"GROUP","PROJ"\r\n' +
+    '"HEADING","PROJ_ID"\r\n' +
+    '"UNIT",""\r\n' +
+    '"TYPE","ID"\r\n' +
+    '"DATA","P1"\r\n' +
+    AGS; // LOCA (2 rows) + SAMP (3 rows)
+
+  const outPath = (name: string) =>
+    join(mkdtempSync(join(tmpdir(), "lat-duckdb-")), name);
+
+  it("writes one keyed table per group and the keys still JOIN", async () => {
+    const out = outPath("store.duckdb");
+    using ags = read(undefined, { text: AGS_REL });
+    const stats = await ags.toDuckdb(out);
+    expect(stats).toEqual({
+      path: out,
+      tables_written: 3,
+      rows_written: 1 + 2 + 3,
+    });
+    expect(existsSync(out)).toBe(true);
+
+    // Attach the file we just wrote back into the live engine and read it — this
+    // proves it persisted, WITHOUT importing the optional peer directly.
+    const con = (await ags.connection) as RawCon;
+    await con.run(`ATTACH '${out}' AS chk (READ_ONLY)`);
+    const names = (
+      await con.runAndReadAll(
+        "SELECT table_name AS n FROM duckdb_tables() WHERE database_name = 'chk' ORDER BY 1",
+      )
+    ).getRowObjectsJS().map((r) => r.n);
+    expect(names).toEqual(["LOCA", "PROJ", "SAMP"]);
+    // SAMP leads with the two content-addressed key columns...
+    const cols = (await con.runAndReadAll('DESCRIBE chk."SAMP"'))
+      .getRowObjectsJS()
+      .map((r) => r.column_name);
+    expect(cols.slice(0, 2)).toEqual(["_id", "_parent_id"]);
+    // ...and the persisted keys resolve a cross-group JOIN.
+    const joined = (
+      await con.runAndReadAll(
+        "SELECT s.SAMP_ID FROM chk.SAMP s JOIN chk.LOCA l ON s._parent_id = l._id ORDER BY s.SAMP_ID",
+      )
+    ).getRowObjectsJS().map((r) => r.SAMP_ID);
+    expect(joined).toEqual(["S1", "S2", "S3"]);
+  });
+
+  it("is faithful to the in-memory relational layer, row for row", async () => {
+    const out = outPath("faithful.duckdb");
+    using ags = read(undefined, { text: AGS_REL });
+    await ags.toDuckdb(out);
+    const con = (await ags.connection) as RawCon;
+    await con.run(`ATTACH '${out}' AS chk (READ_ONLY)`);
+    for (const code of ["PROJ", "LOCA", "SAMP"]) {
+      // Persisted MINUS in-memory, both directions: any difference (incl. the
+      // synthetic keys) leaves a row. Tag rows with the code so a failure names
+      // the offending group (vitest's expect takes no message arg).
+      const diff = (
+        await con.runAndReadAll(
+          `SELECT '${code}' AS g, * FROM (
+             (SELECT * FROM chk."${code}" EXCEPT SELECT * FROM "${code}")
+             UNION ALL (SELECT * FROM "${code}" EXCEPT SELECT * FROM chk."${code}"))`,
+        )
+      ).getRowObjectsJS();
+      expect(diff).toEqual([]);
+    }
+  });
+
+  it("refuses to overwrite an existing database", async () => {
+    const out = outPath("once.duckdb");
+    using a = read(undefined, { text: AGS_REL });
+    await a.toDuckdb(out);
+    using b = read(undefined, { text: AGS_REL });
+    await expect(b.toDuckdb(out)).rejects.toThrow(/fresh database/);
+  });
+
+  it("groups= selects a subset", async () => {
+    const out = outPath("subset.duckdb");
+    using ags = read(undefined, { text: AGS_REL });
+    const stats = await ags.toDuckdb(out, { groups: ["SAMP", "PROJ"] });
+    expect(stats.tables_written).toBe(2);
+    const con = (await ags.connection) as RawCon;
+    await con.run(`ATTACH '${out}' AS chk (READ_ONLY)`);
+    const names = (
+      await con.runAndReadAll(
+        "SELECT table_name AS n FROM duckdb_tables() WHERE database_name = 'chk' ORDER BY 1",
+      )
+    ).getRowObjectsJS().map((r) => r.n);
+    expect(names).toEqual(["PROJ", "SAMP"]);
+  });
+
+  it("throws for an unknown group", async () => {
+    const out = outPath("bad.duckdb");
+    using ags = read(undefined, { text: AGS_REL });
+    await expect(
+      ags.toDuckdb(out, { groups: ["NOPE"] }),
+    ).rejects.toThrow(/not in file/);
+  });
+
+  it("the free toDuckdb matches the fluent method, byte for byte", async () => {
+    const a = outPath("free.duckdb");
+    const b = outPath("fluent.duckdb");
+    await toDuckdb(Buffer.from(AGS_REL), a);
+    using ags = read(undefined, { text: AGS_REL });
+    await ags.toDuckdb(b);
+    const con = (await ags.connection) as RawCon;
+    await con.run(`ATTACH '${a}' AS ca (READ_ONLY)`);
+    await con.run(`ATTACH '${b}' AS cb (READ_ONLY)`);
+    const diff = (
+      await con.runAndReadAll(
+        `(SELECT * FROM ca.SAMP EXCEPT SELECT * FROM cb.SAMP)
+         UNION ALL (SELECT * FROM cb.SAMP EXCEPT SELECT * FROM ca.SAMP)`,
+      )
+    ).getRowObjectsJS();
+    expect(diff).toHaveLength(0);
   });
 });
