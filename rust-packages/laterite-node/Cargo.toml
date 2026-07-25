@@ -24,6 +24,11 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
+# Faster allocator for the allocation-bound read hot-path (parse does ~5M
+# small allocations for a 25 MB file; see perf-campaign T4-followup). Paired
+# with the `#[global_allocator]` in the crate root — only a final artifact
+# (binary / cdylib) can set one, so it is declared per-surface, not in a leaf.
+mimalloc = "0.1"
 # `serde-json` lets `parseValue` return a `serde_json::Value` straight across the
 # boundary as native JS (number/string/bool/null) — the AGS type system's own
 # output shape, no hand-rolled union.

@@ -121,10 +121,13 @@ Two results worth keeping in view:
 > per cell, 160 MB live peak. A ~500× gap: the read path's allocation pressure is
 > entirely the parse leaf. That is why the next parse win is not a logic edit (#4
 > was declined as invasive at ~5%) but the **allocator**: a mimalloc
-> `#[global_allocator]` probe cut `parse_bytes` **−21.5% (139.2 → 108.5 ms,
+> `#[global_allocator]` swap cut `parse_bytes` **−21.5% (139.2 → 108.5 ms,
 > p<0.05)** — an allocation-bound leaf is the canonical case a per-thread-heap
-> allocator accelerates. Clears every perf floor; gated only on the wheel dep-shape
-> decision (a C `libmimalloc-sys` on the abi3 matrix). Queue #10 in [[perf-campaign]].
+> allocator accelerates. **ADOPTED** on all three native artifacts (`lat`, wheel,
+> node): measured end-to-end on the wheel it lands as **read −22% / validate −14%**
+> for **+163 KB** on the `.so`, and the Arrow release-callback boundary makes the
+> library-global-allocator swap safe (wheel 681 + node 289 green). wasm keeps its
+> own allocator (dlmalloc) and is already native-speed. Queue #10 in [[perf-campaign]].
 
 > [!note] **The wasm engine runs at native speed — 2026-07-25.** The browser
 > surface was the last with no perf floor; `web/bench/wasm-read.bench.ts` now drives

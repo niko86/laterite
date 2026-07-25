@@ -14,6 +14,15 @@ use std::process::exit;
 
 use clap::Parser;
 
+// The read/validate hot-path is allocation-bound in the parse leaf (~5M small
+// allocations for a 25 MB file — dhat, perf-campaign T4-followup), so the
+// allocator's per-alloc cost, not compute, gates it. mimalloc's per-thread heaps
+// cut parse ~21% and end-to-end read ~22% for ~116 KB of binary. A global
+// allocator can only be chosen by the final artifact, so it is set here rather
+// than in a shared crate.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 mod cli;
 mod commands;
 mod render;
