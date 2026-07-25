@@ -179,6 +179,20 @@ fn the_mint_refuses_a_file_with_errors_and_cannot_be_told_otherwise() {
 }
 
 #[test]
+fn the_mint_still_rejects_a_non_utf8_file() {
+    // #5 made `mint` reuse its validating parse for the byte index instead of
+    // walking the file a second time. That must NOT open a door for a non-UTF-8
+    // file: `assemble_from_parsed` falls back to the lean/`Reject` walk when the
+    // parse is not source-true, and a lossy-replaced byte is a Rule 1 error
+    // regardless — either way the file is rejected, exactly as before. (Closes the
+    // coverage gap the campaign flagged: nothing minted a non-UTF-8 file.)
+    let bad: &[u8] = b"\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+                       \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH\xff1\"\r\n";
+    mint(bad, &errors_only(), AT.to_string(), None)
+        .expect_err("a non-UTF-8 file must not be certifiable");
+}
+
+#[test]
 fn the_mint_records_a_warning_instead_of_refusing_it() {
     // A cert asserts ERROR-cleanliness, not perfection. A file may legitimately carry
     // warnings and still be a valid delivery — so they are recorded, not fatal. (The

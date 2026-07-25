@@ -35,7 +35,7 @@
 
 use std::collections::HashMap;
 
-use laterite_ags4_parse::{ParseOptions, parse_bytes_opts};
+use laterite_ags4_parse::{ParseOptions, ParsedFile, parse_bytes_opts};
 // The certificate records HOW the edition was chosen, not just which one — a cert that
 // said "exact" for a file whose edition was actually guessed (O-42) would misreport the
 // one thing it exists to vouch for. The reference leaf owns the enum; core is already a
@@ -111,9 +111,24 @@ pub fn index_ags4_bytes(bytes: &[u8]) -> Result<GroupIndex, CliError> {
         ..ParseOptions::lean()
     };
     let parsed = parse_bytes_opts(bytes, opts).map_err(crate::ags4_codec::map_parse_err)?;
-    // Defence in depth: a cert whose offsets don't index the original bytes is a
-    // lie. `lean()` rejects rather than substitutes, so this never fires today —
-    // but it must stay true if the profile ever changes.
+    group_index_from_parsed(&parsed)
+}
+
+/// Build the group-section index from an ALREADY-PARSED file, reusing its
+/// source-true byte offsets instead of re-walking `bytes`. `mint` parses the
+/// file once to validate it and then re-derived these same offsets with a second
+/// `index_ags4_bytes` walk (~45 ms on a 25 MB file, ~14% of a mint); handing that
+/// parse here removes the second walk (#5). The `group_records`/`group_order`/
+/// `total_bytes`/`byte_offsets_source_true` this reads are profile-independent —
+/// a `locate_only` lean parse and a full `validating` parse record identical
+/// GROUP offsets — so the index is byte-identical to `index_ags4_bytes`'s.
+///
+/// Guards source-truth exactly as `index_ags4_bytes` did: a cert whose offsets
+/// don't index the original bytes is a lie. A caller whose parse was NOT
+/// source-true (a lossy-replaced non-UTF-8 file) must NOT reach here with it —
+/// `Sidecar::assemble_from_parsed` falls back to the lean re-walk in that case,
+/// preserving the original rejection.
+pub fn group_index_from_parsed(parsed: &ParsedFile) -> Result<GroupIndex, CliError> {
     if !parsed.byte_offsets_source_true {
         return Err(CliError::Schema(
             "byte offsets are not source-true (encoding substitution shifted a record start)"
@@ -152,7 +167,7 @@ pub fn index_ags4_bytes(bytes: &[u8]) -> Result<GroupIndex, CliError> {
 
     Ok(GroupIndex {
         groups,
-        order: parsed.group_order,
+        order: parsed.group_order.clone(),
     })
 }
 
@@ -582,7 +597,38 @@ impl Sidecar {
     /// need a `Sidecar` without a verdict to trust.
     pub fn assemble(bytes: &[u8], validation: ValidationStamp) -> Result<Sidecar, CliError> {
         let index = index_ags4_bytes(bytes)?;
-        Ok(Sidecar {
+        Ok(Self::from_index(bytes, index, validation))
+    }
+
+    /// Like [`Sidecar::assemble`], but reuses a parse the caller already did
+    /// rather than walking `bytes` a second time to rebuild the byte index (#5).
+    /// `mint` validates the file by parsing it, then certifies it — this hands
+    /// that parse straight in, removing the redundant ~14%-of-mint index walk.
+    ///
+    /// The reuse is sound only when `parsed`'s offsets index the ORIGINAL bytes
+    /// (`byte_offsets_source_true`) — true for the clean UTF-8 files that certify.
+    /// A lossy-replaced non-UTF-8 parse shifts offsets, so it falls back to
+    /// [`index_ags4_bytes`], whose `Reject` profile produces the byte-identical
+    /// rejection `assemble` gave before. The hash is over `bytes` either way.
+    pub fn assemble_from_parsed(
+        bytes: &[u8],
+        parsed: &ParsedFile,
+        validation: ValidationStamp,
+    ) -> Result<Sidecar, CliError> {
+        let index = if parsed.byte_offsets_source_true {
+            group_index_from_parsed(parsed)?
+        } else {
+            index_ags4_bytes(bytes)?
+        };
+        Ok(Self::from_index(bytes, index, validation))
+    }
+
+    /// Assemble a `Sidecar` from a built `GroupIndex` + the caller's stamp,
+    /// hashing `bytes` for the freshness check. Shared by [`Sidecar::assemble`]
+    /// (which walks to build the index) and [`Sidecar::assemble_from_parsed`]
+    /// (which reuses a parse), so the two differ ONLY in how the index is built.
+    fn from_index(bytes: &[u8], index: GroupIndex, validation: ValidationStamp) -> Sidecar {
+        Sidecar {
             version: SIDECAR_VERSION,
             file: FileMeta {
                 size: bytes.len() as u64,
@@ -595,7 +641,7 @@ impl Sidecar {
             validation,
             groups: index.groups,
             order: index.order,
-        })
+        }
     }
 
     /// Record the remote origin's HTTP validators (`ETag` / `Last-Modified`)
@@ -1123,6 +1169,57 @@ mod tests {
             encoding: "UTF-8".into(),
             custom_dict: None,
         }
+    }
+
+    /// #5: `assemble_from_parsed` (the reuse path `mint` takes) must produce the
+    /// byte-identical `Sidecar` that `assemble` (the second walk) produced — same
+    /// index, same order, same hash. Parses with `validating()`, exactly the
+    /// profile `mint` hands in, so this pins the real reuse, not a lean twin.
+    #[test]
+    fn assemble_from_parsed_matches_the_walk() {
+        let bytes = TWO.as_bytes();
+        let walked = Sidecar::assemble(bytes, stamp()).unwrap();
+
+        let parsed = parse_bytes_opts(bytes, ParseOptions::validating()).unwrap();
+        assert!(
+            parsed.byte_offsets_source_true,
+            "a clean UTF-8 file parses source-true"
+        );
+        let reused = Sidecar::assemble_from_parsed(bytes, &parsed, stamp()).unwrap();
+
+        assert_eq!(reused.groups, walked.groups, "index groups identical");
+        assert_eq!(reused.order, walked.order, "order identical");
+        assert_eq!(reused.file.sha256, walked.file.sha256, "hash identical");
+        assert_eq!(reused.file.size, walked.file.size, "size identical");
+    }
+
+    /// #5: a non-UTF-8 file parsed under `validating()`'s lossy profile is NOT
+    /// source-true (its offsets shifted), so the reuse path must fall back to the
+    /// lean re-walk and reject it EXACTLY as `assemble` did — the non-UTF-8 mint
+    /// semantics must not change silently.
+    #[test]
+    fn assemble_from_parsed_falls_back_when_not_source_true() {
+        // A structurally-valid one-group file with an invalid byte (0xFF) in a
+        // DATA cell: `validating()` lossy-replaces it (parse succeeds, not
+        // source-true); `lean()`/`Reject` (index_ags4_bytes) rejects it.
+        let bytes: &[u8] =
+            b"\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"BH\xff01\"\n";
+
+        let parsed = parse_bytes_opts(bytes, ParseOptions::validating()).unwrap();
+        assert!(
+            !parsed.byte_offsets_source_true,
+            "a lossy-replaced byte makes offsets non-source-true"
+        );
+
+        let walked = Sidecar::assemble(bytes, stamp());
+        let reused = Sidecar::assemble_from_parsed(bytes, &parsed, stamp());
+        assert!(walked.is_err(), "the walk rejects non-UTF-8");
+        assert!(reused.is_err(), "the reuse path falls back and rejects too");
+        assert_eq!(
+            format!("{:?}", walked.unwrap_err()),
+            format!("{:?}", reused.unwrap_err()),
+            "the fallback yields the byte-identical rejection"
+        );
     }
 
     /// The bytes are sealed. The DECODER is not part of them — and the rules judge the
