@@ -63,6 +63,26 @@ for rung in "${RUNGS[@]}"; do
         | head -n 1
 done
 
+# The DIRTY rung (T5): a `wide` base with a combined multi-fault injection, so the
+# validator's error-reporting half — `findings::add`, rule 10b/11c dirty paths,
+# the FYI abbr scan — actually executes under `validate/error-path`. `forge gen`
+# is UNSCALED (~100 groups, a handful of findings): a size-scaled densely-dirty
+# fixture needs a `forge scale` fault-density mode that does not exist yet. Seed 0
+# → byte-identical. gen writes to a timestamped run dir, so copy the candidate out
+# to the stable name the bench reads.
+dirty_out="$OUT_DIR/dirty.ags"
+if [ -f "$dirty_out" ] && [ "$force" -eq 0 ]; then
+    echo "  dirty.ags exists — skipping (use --force to regenerate)"
+else
+    dirty_tmp="$(mktemp -d)"
+    "$FORGE" gen --scaffold "$SCAFFOLD" \
+        --combine rule10a,rule10c,rule8,rule5,rule19,rule13 \
+        --seed "$SEED" --no-oracle --no-input --quiet --out-dir "$dirty_tmp" >/dev/null
+    cp "$(find "$dirty_tmp" -name '*.ags' | head -n 1)" "$dirty_out"
+    rm -rf "$dirty_tmp"
+    echo "  dirty.ags generated ($(wc -c < "$dirty_out" | tr -d ' ') bytes)"
+fi
+
 echo
 echo "fixtures in $OUT_DIR:"
 ls -la "$OUT_DIR"/*.ags
