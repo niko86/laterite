@@ -148,10 +148,56 @@ fn bench_rule_families(c: &mut Criterion) {
     g.finish();
 }
 
+/// T5 — the error-reporting half of the engine, which the other three benches
+/// never execute: they run `CheckOptions::default()` (both tier gates OFF) over a
+/// file the forge asserts is CLEAN, so `findings::add`, rule 10b's per-bad-row
+/// `format!`/`join`, rule 11c, and the FYI abbreviation scan sit at zero coverage.
+/// This measures them two ways. It LANDS NOTHING — it only makes the error path
+/// rankable; whatever it shows re-enters the queue at the same 5% floor.
+fn bench_error_path(c: &mut Criterion) {
+    let mut g = c.benchmark_group("validate/error-path");
+    g.sample_size(10).measurement_time(Duration::from_secs(20));
+    // Both tier gates ON: WARNING + FYI findings now flow through `findings::add`,
+    // and rule 16's per-ABBR-row scan of the 3,471-entry abbreviation table runs.
+    let gated = CheckOptions {
+        include_warnings: true,
+        include_fyi: true,
+        ..CheckOptions::default()
+    };
+    // (a) The 25 MB CLEAN fixture with the gates on — the SIZE-SCALED cost of the
+    // tier traversal itself (rule 16's abbr scan scales with the file's ABBR
+    // rows). Clean, so nothing is emitted: this isolates the tier walk from
+    // finding-building, and it is the only size-scaled error-path number we can
+    // get today.
+    if let Some(path) = fixture("large") {
+        let len = std::fs::metadata(&path).expect("stat").len();
+        g.throughput(Throughput::Bytes(len));
+        g.bench_with_input(BenchmarkId::new("large", "gated"), &path, |b, path| {
+            b.iter(|| check_file(black_box(path), &gated).expect("validates"));
+        });
+    }
+    // (b) A DIRTY fixture (`forge gen --combine …`, ~100 groups, ~10 rules firing)
+    // with the gates on — now `findings::add` and the rule 10b/11c dirty paths
+    // actually run. UNSCALED (a handful of findings): a size-scaled densely-dirty
+    // rung needs a `forge scale` fault-density mode that does not exist yet, so
+    // this prices the error path's SHAPE, not its ceiling.
+    if let Some(path) = fixture("dirty") {
+        let len = std::fs::metadata(&path).expect("stat").len();
+        g.throughput(Throughput::Bytes(len));
+        g.bench_with_input(BenchmarkId::new("dirty", "gated"), &path, |b, path| {
+            b.iter(|| check_file(black_box(path), &gated).expect("validates"));
+        });
+    } else {
+        eprintln!("validate: no dirty fixture — run tools/gen-bench-fixtures.sh");
+    }
+    g.finish();
+}
+
 criterion_group!(
     benches,
     bench_check_file,
     bench_rules_only,
-    bench_rule_families
+    bench_rule_families,
+    bench_error_path
 );
 criterion_main!(benches);

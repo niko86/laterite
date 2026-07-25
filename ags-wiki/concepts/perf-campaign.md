@@ -262,7 +262,7 @@ Below the floor, measured out — recorded so they are not rediscovered:
 | **C1** | `from_shared` collapsed duplicate headings (`ags4_codec.rs`) | **LANDED** (#88) | wrong data, not merely lost data — see below |
 | **C2** | `arrow_in.rs` had zero tests and compiled under no CI test job | **LANDED** (#87) | untested code shipping inside the wheel and the node binding |
 | **M1** | `laterite-types/arrow` + `laterite-ags4-emit/arrow` (651 lines) were compiled out of the coverage build by resolver-2 feature unification once their only four enablers are excluded | **LANDED** (#87) | the 88% gate was not measuring the Arrow boundary at all |
-| **M2** | the bench fixture is **clean by construction**, so `findings::add`, rule 10b's per-bad-row `format!`/`join`, rule 11c's O(child × target) scan and the entire FYI tier are never executed by any bench | open — T5 | unknown by construction: validating a file *with errors* is an unmeasured workload |
+| **M2** | the bench fixture is **clean by construction**, so `findings::add`, rule 10b's per-bad-row `format!`/`join`, rule 11c's O(child × target) scan and the entire FYI tier are never executed by any bench | **LANDED T5** — `validate/error-path` now benches both gates on (clean-large + a `forge gen` dirty rung); the tier walk is <5% at scale, the emission path is ~3.2× slower/byte but unscaled | closed with numbers; the size-scaled dense fixture (a `forge scale` fault-density mode) is the remaining unmeasured axis |
 
 **C1, as measured rather than as queued.** The row above originally read
 "silently collapses duplicate headings". That understated it. Rows are keyed by
@@ -456,8 +456,25 @@ CLI already supports this), plus a rung with both tier gates on. Note the ceilin
 honestly: `gen` is unscaled, so this tops out at a handful of findings. A
 size-scaled densely-dirty fixture needs a fault-density mode in `forge
 scale`/`calibrate` that does not exist — scope that separately.
-**Exit:** the rungs are committed and produce numbers. **No optimisation lands in
-this tranche.** Whatever they show re-enters the queue at the same 5% floor.
+
+**DONE (2026-07-25) — numbers, no optimisation.** `gen-bench-fixtures.sh` now
+also emits `dirty.ags` (`forge gen --combine rule10a,rule10c,rule8,rule5,rule19,rule13`,
+seed 0 → ~64 KB, ~10 rules firing), and `validate/error-path` benches the
+error-reporting half two ways with both tier gates on:
+
+| bench | time | thrpt | reads as |
+|---|---|---|---|
+| `error-path/large/gated` (25 MB CLEAN, warnings+FYI on) | **274.6 ms** | 86.5 MiB/s | ~+2% over gates-off `check_file/large` (269 ms) — the FYI/warning tier walk (incl. rule 16's abbr scan) is **below the 5% floor at scale** |
+| `error-path/dirty/gated` (64 KB dirty) | **2.245 ms** | 27 MiB/s | the emission path (`findings::add`, rule 10b/11c dirty branches) runs at **27 vs 86 MiB/s clean — ~3.2× slower per byte** |
+
+So the error path is proportionally expensive *per byte* but the FYI tier walk is
+cheap at scale, and on a realistically-sparse dirty file the absolute cost is
+bounded by finding count — no error-path candidate clears the 5% floor at today's
+achievable fault density. **What would change that is the missing `forge scale`
+fault-density mode** (a size-scaled densely-dirty rung): only then can rule 11c's
+O(child × target) asymptotic and the 10b per-bad-row `format!`/`join` be priced at
+25 MB. Until it exists, this tranche is closed with the numbers above.
+**Exit met:** the rungs are committed and produce numbers; nothing landed.
 
 ### T6 — The surfaces (only once the core stopping rule has fired)
 
