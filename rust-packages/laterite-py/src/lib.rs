@@ -17,6 +17,16 @@
 
 use std::path::Path;
 
+// The read/validate hot-path is allocation-bound in the parse leaf (~5M small
+// allocations for a 25 MB file — dhat, perf-campaign T4-followup), so the process
+// allocator's per-alloc cost dominates. mimalloc's per-thread heaps cut this
+// wheel's end-to-end read ~22% and validate ~14% for +163 KB on the `.so`
+// (measured). Set here because only a final cdylib can choose the allocator; the
+// engine leaves the Rust boundary via Arrow release callbacks, so Rust frees what
+// Rust allocated (no cross-allocator handoff to polars/pyarrow).
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use laterite_ags4_core::error::CliError;
 use laterite_ags4_core::index::{Sidecar as CoreSidecar, TierCoverage};
 use laterite_ags4_validator::findings::{Severity, Target};

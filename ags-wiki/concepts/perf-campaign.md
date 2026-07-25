@@ -239,6 +239,7 @@ as such, because they are counts, not timings.
 | ~~7~~ | ~~`parse_compat_arrow` builds a `RecordBatch` for every group even when `only_groups` narrows~~ | surfaces (compat) | per-group | **MEASURED → DEFERRED (issue #99): ~14 ms ≈ 9% of a 1-group narrowed read, 0 on a full read** — parse (143.7 ms) dominates and is shared; the build+cross of all 123 compat tables is only 14.1 ms. Clears the 5% floor but is the smallest candidate + narrowed-reads-only | contained | probe (`compat_narrow_probe` / `parse_equiv_probe`) | strict-check metadata + dup-heading / ragged / dup-GROUP raises must stay for *all* groups |
 | ~~8~~ | ~~the GIL is never released anywhere in `laterite-py` (zero `allow_threads`/`detach`)~~ | surfaces (wheel) | not hot — concurrency only | **LANDED T6 — concurrent throughput: validate 0.99 → 5.08×, read 0.96 → 3.53× @ 10 cores** (`Python::detach` around the pure-Rust compute in `run_check`/`parse_arrow`/`parse_compat_arrow`); single-call latency unchanged | contained | yes (`tools/bench-gil-throughput.py`, T6) | `test_gil_released.py` proves a concurrent thread advances *during* the native call |
 | 9 | `EmitGroup` owns `Vec<Vec<String>>`, so two callers deep-clone an already-owned matrix (`emit.rs:188`, node `lib.rs:243`) | emit + node | per-cell | **small** — `emit_ags4/report` is 22.4 ms and the writer is 2.9 ms of it | **invasive** — changes a public field type | partial | node and excel have no bench crate |
+| ~~10~~ | ~~the process uses the system allocator; `parse_bytes` is allocation-bound (~5M blocks / 25 MB, dhat-confirmed)~~ | parse leaf → all surfaces | per-cell alloc | **LANDED — mimalloc `#[global_allocator]` on all 3 native artifacts: wheel end-to-end read −22%, validate −14%; lat/node the same read win** for +163 KB (.so) / +116 KB (lat) | contained (dep + 3 lines/artifact; C `libmimalloc-sys` on the abi3 matrix, the accepted dep-shape cost) | yes (dhat + wheel e2e) | wheel 681 + node 289 green; Arrow release-callback handoff proven safe |
 
 Below the floor, measured out — recorded so they are not rediscovered:
 
@@ -439,6 +440,63 @@ to the lean/`Reject` re-walk — the byte-identical rejection — pinned by
 `the_mint_still_rejects_a_non_utf8_file` (trust, closing the flagged gap). The
 `sha256` freshness pass stays (it is not redundant). This closes T4.
 
+**T4-followup — the deeper allocation profile, and the allocator candidate
+(2026-07-25).** The criterion benches TIME the read stages; they cannot say
+whether a stage is slow because it *allocates* or because it is
+compute/bandwidth-bound. A `dhat` heap profiler (`laterite-types/examples/dhat_read.rs`,
+dev-only, `arrow`-gated) attributes the allocations *inside* each stage over the
+25 MB `large` fixture, one stage per run:
+
+| stage | total | blocks | live peak | reads as |
+|---|---|---|---|---|
+| `build_record_batch` (all groups) | 61.3 MB | **9,967** | 782 KB / 27 blocks | **allocation-optimal** — ~10k allocs for a 25 MB build. The 16.7 ms (post-T3) is a compute/bandwidth **wall**, not an allocation problem. T3 is genuinely done. |
+| `parse_bytes` | 353.7 MB | **4,982,948** | 160.7 MB / 3.4M blocks | **allocation-bound** — ~5M allocations, ≈1 owned `String` per cell, 160 MB live. A ~500× allocation gap to the build. |
+
+So the read path's allocations live almost entirely in the parse leaf — exactly
+the `String`-per-cell that #4 named and that a non-invasive edit could not remove.
+That points at the allocator itself, and a global-allocator swap prices it without
+touching a line of parse logic:
+
+**mimalloc probe — parse `−21.5%` (139.2 → 108.5 ms @ 25 MB, p < 0.05).** A
+throwaway `#[global_allocator]` swap on the parse bench (reverted) turned a ~5M-alloc
+workload from 170 → 219 MiB/s. It is the single biggest cheap win the campaign has
+surfaced: `parse_bytes` is on **every** read across all four surfaces, so ~21% here
+flows everywhere, and dhat explains *why* it lands — an allocation-bound leaf is the
+canonical case a per-thread-heap allocator accelerates.
+
+**It clears every floor (5/10/20%) by a wide margin, so the gate was never perf —
+it was dep-shape, an owner call.** For the `lat` binary the swap is trivial and
+safe (it owns `main`). For the **shipped wheel** it was a real decision: a
+C-compiled `libmimalloc-sys` rides the abi3 cross-platform build matrix
+(musl/macOS/Windows), against a base dep-shape deliberately kept to polars+duckdb;
+and a *library* setting the host process's global allocator is a heavier commitment
+than a binary doing so.
+
+**ADOPTED — the wheel measured, then taken on all three native surfaces.** Before
+deciding, the swap was measured end-to-end on the wheel (public `laterite.read`/
+`laterite.validate`, 25 MB, median of 9, reproduced), not just the isolated parse
+bench:
+
+| operation | baseline | + mimalloc | change |
+|---|---|---|---|
+| validate (parse + rules) | 260.4 ms | 224.0 ms | **−14.0%** |
+| read (parse + load engine) | 147.0 ms | 112.7 ms | **−23.3%** |
+| read + all groups (full typed) | 174.1 ms | 135.2 ms | **−22.3%** |
+
+The isolated ~21% parse win lands as **~22% faster reads and 14% faster validate**
+end-to-end (reads are parse-dominated; validate spends more in the rules engine,
+which the allocator doesn't touch). Size cost on the `.so`: **+162.6 KB (+0.77%)**
+of 20.1 MB; on `lat`: **+116 KB (+1.4%)**. Build cost: ~40 s one-time C compile per
+platform. The flagged risk — a library swapping the allocator corrupting the
+Arrow→polars/pyarrow handoff — **did not materialise**: the full read (all 123
+groups through the Arrow/DuckDB/polars bridge) and validate ran clean, because the
+engine leaves Rust via Arrow release callbacks, so Rust frees what Rust allocated.
+`#[global_allocator]` is set in each final artifact — `laterite-ags4-check` (`lat`),
+`laterite-py` (wheel), `laterite-node` (addon); a shared leaf crate cannot set one.
+**wasm is excluded** (different toolchain; already native-speed, keeps dlmalloc).
+Wheel suite 681 passed, node 289 passed, lat validates clean. See
+[[core-perf-baseline]].
+
 ### T5 — A dirty fixture and the FYI tier (bench only)
 
 **M2.** Every validator bench runs against a file the forge *asserts* is clean,
@@ -521,6 +579,40 @@ bench on the 25 MB rung. First numbers:
 Default ≈ keyed (692 vs 693 ms) made **#6 rankable**: the content-addressed
 keychain is computed on the default keys-less `table(code)` and then thrown away —
 the strip is free, the keychain is not.
+
+**Wasm harness — DONE (2026-07-25).** The browser engine was the last surface with
+no perf floor. `web/bench/wasm-read.bench.ts` (vitest `bench()`, its own lane,
+`npm run bench:wasm`) drives the SAME browser cdylib the app loads — the glue
+instantiated straight from the built `.wasm` bytes — over the 25 MB `large`
+fixture, so its numbers sit on the shared axis. The JS→wasm boundary copy of the
+input and the Arrow-IPC return trip stay *in* the measured path, because a browser
+pays them for real:
+
+| bench | mean | native/node reference | reads as |
+|---|---|---|---|
+| `read` (parse only) | **118.2 ms** | native `parse_bytes` ~119 ms | wasm parses at **native speed** — the boundary copy is negligible against 25 MB of work |
+| `read + arrow_ipc(all groups)` (keyless) | **142.1 ms** | node `table(all)` 152 ms | the browser explorer's actual read cost, on par with node |
+| `read + arrow_ipc(all, keys)` | **995.7 ms** | keychain-dominated | the content-key chain again (cf. #6): ~850 ms over keyless, the same pass node pays |
+| `validate` (both gates off) | **273.4 ms** | native `check_file` 269.8 ms | within **1.3%** of native |
+
+**No wasm-specific candidate exists.** Parse is within 1% of native and validate
+within 1.3%; the boundary copy the surface was suspected to pay is lost in the
+noise at 25 MB. The only large cost is the keyed keychain, which is #6's cost, not
+a wasm one — and the keys-less default already skips it. The surface now has a
+floor; nothing to land.
+
+**Wasm allocator — investigated, dlmalloc kept (2026-07-25).** The wasm read path
+is allocation-bound for the *same* reason native is — it runs the identical
+`parse_bytes` leaf (~5M allocations / 25 MB, dhat above) — so the native mimalloc
+win was a natural thing to chase here too. But mimalloc (C, needs a native/WASI
+toolchain) **cannot target `wasm32-unknown-unknown`**, and the two serious
+pure-Rust alternatives both *lose* to the default **dlmalloc** on the read bench:
+**talc +5.7%** and **rlsf +25%** on parse (measured, both `#[global_allocator]`
+probes reverted). dlmalloc — the Rust wasm default — is already well-tuned for this
+~5M-small-alloc workload (it is also why wasm parses *faster* than native under the
+system malloc: 118 ms vs 139 ms). The size-optimised allocators (`wee_alloc`,
+`lol_alloc`) are slower by design and were not benched. **Decision: keep dlmalloc;
+there is no wasm allocator win.**
 
 **#6 — DONE (2026-07-25).** An isolation probe (parse once, then loop `tableIpc`
 over every group both ways) priced the keychain directly: keyed `tableIpc(all)`
@@ -685,10 +777,19 @@ delta as real.
 
 Beside the crate they measure. `tools/gen-bench-fixtures.sh` synthesises the
 criterion rungs (1/10/25 MB, forge `wide` scaffold, seed 0 — byte-identical for a
-given size+seed, and carrying no real delivery data).
+given size+seed, and carrying no real delivery data), plus the two clean-isolated
+dirty twins (`dirty-r16`, `dirty-r10c`) the T5 emission benches consume.
 `tools/bench-vs-python-ags4.py` reproduces the README's comparison tables, with
 the fixtures SHA-pinned so generator drift fails loudly instead of quietly moving
 the numbers.
+
+Per-surface read harnesses mirror the Rust rungs on the same 25 MB fixture, each
+in its own lane (not part of the unit suite): `laterite-node/bench/read.bench.ts`
+(`npm run bench`) and `web/bench/wasm-read.bench.ts` (`npm run bench:wasm`, driving
+the built browser cdylib from its `.wasm` bytes). For attribution rather than
+timing, `laterite-types/examples/dhat_read.rs` (dev-only, `arrow`-gated) is a
+`dhat` heap profile of the read stages — it says whether a stage is
+allocation-bound (fixable) or a compute/bandwidth wall.
 
 > [!note] An absent fixture SKIPS rather than fails, so a clean checkout still
 > works — but a skipped bench measures nothing, which is exactly how the

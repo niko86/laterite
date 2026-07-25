@@ -8,6 +8,15 @@
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
+// The read/validate hot-path is allocation-bound in the parse leaf (~5M small
+// allocations for a 25 MB file — dhat, perf-campaign T4-followup), so the
+// allocator's per-alloc cost dominates. mimalloc's per-thread heaps buy the same
+// ~22% end-to-end read win the wheel measured; the addon frames each group as
+// Arrow IPC bytes that JS decodes host-side, so Rust frees what Rust allocated.
+// Set here because only the final cdylib can choose the allocator.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use arrow::ipc::reader::StreamReader;
 use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};

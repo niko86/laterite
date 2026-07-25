@@ -112,6 +112,34 @@ Two results worth keeping in view:
   caller dropping that parse immediately. ~8.4M redundant key allocations plus
   ~8.4M value allocations on a 25 MB delivery. FIXED 2026-07-24 (see below).
 
+> [!note] **Where the read's *allocations* live — dhat, 2026-07-25.** Timing says
+> parse and build are both real; a `dhat` heap profile
+> (`laterite-types/examples/dhat_read.rs`) says only one of them is allocation-driven.
+> Over the 25 MB rung: `build_record_batch` does **9,967** allocations (61 MB total,
+> 782 KB live peak) — allocation-optimal, so its 16.7 ms is a compute/bandwidth
+> **wall** (T3 is done). `parse_bytes` does **4,982,948** — ~5M, ≈1 owned `String`
+> per cell, 160 MB live peak. A ~500× gap: the read path's allocation pressure is
+> entirely the parse leaf. That is why the next parse win is not a logic edit (#4
+> was declined as invasive at ~5%) but the **allocator**: a mimalloc
+> `#[global_allocator]` swap cut `parse_bytes` **−21.5% (139.2 → 108.5 ms,
+> p<0.05)** — an allocation-bound leaf is the canonical case a per-thread-heap
+> allocator accelerates. **ADOPTED** on all three native artifacts (`lat`, wheel,
+> node): measured end-to-end on the wheel it lands as **read −22% / validate −14%**
+> for **+163 KB** on the `.so`, and the Arrow release-callback boundary makes the
+> library-global-allocator swap safe (wheel 681 + node 289 green). wasm keeps its
+> own allocator (dlmalloc) and is already native-speed. Queue #10 in [[perf-campaign]].
+
+> [!note] **The wasm engine runs at native speed — 2026-07-25.** The browser
+> surface was the last with no perf floor; `web/bench/wasm-read.bench.ts` now drives
+> the built cdylib over the 25 MB rung. Parse **118.2 ms** (native `parse_bytes`
+> ~119) and validate **273.4 ms** (native `check_file` 269.8, +1.3%) — the JS→wasm
+> boundary copy is negligible against 25 MB of work. The only large wasm cost is the
+> keyed read (995.7 ms vs 142.1 ms keys-less), which is the content-key chain (#6),
+> not a wasm-specific one. The allocator lever that won on native does **not** carry
+> here: mimalloc can't target browser wasm, and the pure-Rust alternatives lose to
+> the default dlmalloc (talc +5.7%, rlsf +25% on parse) — so wasm keeps dlmalloc.
+> See [[perf-campaign]] T6.
+
 ## Rule-family attribution
 
 `rules::run_all` is `pub(crate)`, but every family's `check` is `pub`, so each can

@@ -36,6 +36,11 @@ name = "_laterite_native"
 crate-type = ["cdylib"]
 
 [dependencies]
+# Faster allocator for the allocation-bound read hot-path (parse does ~5M
+# small allocations for a 25 MB file; see perf-campaign T4-followup). Paired
+# with the `#[global_allocator]` in the crate root — only a final artifact
+# (binary / cdylib) can set one, so it is declared per-surface, not in a leaf.
+mimalloc = "0.1"
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 # The shared parse leaf (#168 Phase 3): the binding parses text/bytes through
 # the leaf directly (the validator is no longer on the parse hot-path); its
