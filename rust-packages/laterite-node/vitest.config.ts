@@ -3,6 +3,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
+    // Benchmarks (`npm run bench`, `vitest bench`) live in bench/, separate from
+    // the test run above. The first perf harness for this surface; not a CI gate,
+    // run on demand like the Rust criterion benches.
+    benchmark: { include: ["bench/**/*.bench.ts"] },
     // The napi loader (`index.js`) and the `.node` binary are native — keep Vite
     // from transforming them; require() them as-is in the node runtime.
     server: { deps: { external: [/index\.js$/, /\.node$/] } },
