@@ -142,7 +142,12 @@ impl Reading {
     /// hosts. Returns `null` if the code isn't in the file.
     #[napi]
     #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
-    pub fn table_ipc(&self, code: String, content_hash: Option<bool>) -> Result<Option<Buffer>> {
+    pub fn table_ipc(
+        &self,
+        code: String,
+        content_hash: Option<bool>,
+        with_keys: Option<bool>,
+    ) -> Result<Option<Buffer>> {
         let Some(group) = self.parsed.groups.get(&code) else {
             return Ok(None);
         };
@@ -153,6 +158,12 @@ impl Reading {
         // keychain (byte-identical to the DuckDB extension). A custom/passthrough
         // group is absent from the registry → unkeyed IPC (#303).
         //
+        // `with_keys` defaults ON (that relational contract). A keys-less read
+        // that never joins — the DEFAULT `table(code)`, which strips the columns
+        // anyway — passes `false` to skip the keychain compute wholesale rather
+        // than build-then-discard it (candidate #6/T6). The two-cache split in
+        // `Ags4File` keeps a later `sql()`/`at()` on the same group correct.
+        //
         // The hash needs NO registry — it hashes every heading rather than the
         // spec key-chain, so a custom/passthrough group (which gets no `_id` at
         // all) still gets a usable value fingerprint. Keying and hashing are
@@ -161,15 +172,19 @@ impl Reading {
         // trailing) so every host gets identical column order by construction —
         // mirrors laterite-py's `Reading::table_for`.
         let reg = laterite_ags4_core::registry::registry();
-        let ids = reg.get(&code).map(|_| {
-            laterite_ags4_core::keychain::group_row_ids(
-                reg,
-                &code,
-                &group.headings,
-                group.rows.len(),
-                |col, row| group.cell(col, row),
-            )
-        });
+        let ids = if with_keys.unwrap_or(true) {
+            reg.get(&code).map(|_| {
+                laterite_ags4_core::keychain::group_row_ids(
+                    reg,
+                    &code,
+                    &group.headings,
+                    group.rows.len(),
+                    |col, row| group.cell(col, row),
+                )
+            })
+        } else {
+            None
+        };
         let hashes = if content_hash.unwrap_or(false) {
             Some(laterite_ags4_core::keychain::group_content_hashes(
                 &code,
