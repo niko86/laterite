@@ -56,7 +56,7 @@ against the triggers below — never as a speculative "cleaner structure" move.
    Polyrepo forces land-Rust → publish → chase-the-Python-side, with a version
    matrix to keep aligned.
 3. **The project already deliberately consolidated.** The F2c arc (May 2026)
-   *deleted* `ags5-models` / `ags5-db` / `ags5-ags4`, folding them into Rust +
+   *deleted* `ags5-models` / `ags5-db` / `ags5-ags4`, folding them into Rust + <!-- historical -->
    `laterite` (`repo:ags-wiki/log.md`, F2c entries). Splitting now reverses
    recent, intentional work.
 4. **The dependency-weight win is already had without repos.**

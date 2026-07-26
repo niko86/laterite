@@ -14,7 +14,7 @@ sources: []
 
 ## Context
 The repo grew two parallel CLI implementations: the Python
-`ags5db-py` (`packages/ags5-db`) and the Rust `ags5db`
+`ags5db-py` (`packages/ags5-db`) and the Rust `ags5db` <!-- retired: ags5-db -->
 (`rust-packages/ags5db`). laterite-ags5-db reached **read+write parity**
 (every documented command implemented, NDJSON parity-verified against
 the Python reference). Maintaining a *shipped* Python binary alongside

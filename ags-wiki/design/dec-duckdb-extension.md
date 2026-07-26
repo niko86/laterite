@@ -384,8 +384,8 @@ single-source stay in the monorepo).
 ## Roadmap
 
 - **P1 `read_ags` + P2 metadata** — **MERGED** (PR #144).
-- **P3 `validate_ags` + `load_ags_script`** — **MERGED** (PR #147); the
-  `validate_ags(path, edition := …)` override follows in PR #150.
+- **P3 `validate_ags` + `load_ags_script`** — **MERGED** (PR #147); the <!-- retired: validate_ags -->
+  `validate_ags(path, edition := …)` override follows in PR #150. <!-- retired: validate_ags -->
 - **DuckDB 1.5.3 stack unification** — the prerequisite floor for remote (see the
   Consequences bullet above); its own PR.
 - **Remote / httpfs** (`file_system`) — **done**: every read in `source.rs` now
