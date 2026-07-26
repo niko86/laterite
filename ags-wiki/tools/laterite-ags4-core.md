@@ -10,7 +10,7 @@ ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-core"
   lib: "repo:rust-packages/laterite-ags4-core/src/lib.rs"
-related: [crate-map, laterite-types, laterite-ags4-reference, laterite-py, dec-dictionary-single-source]
+related: [crate-map, laterite-types, laterite-ags4-reference, laterite-transport, laterite-py, dec-dictionary-single-source]
 sources: []
 ---
 # laterite-ags4-core
@@ -71,4 +71,4 @@ flowchart LR
 
 ## Related
 
-[[crate-map]] · [[laterite-types]] · [[laterite-ags4-reference]] · laterite-ags5-db · [[laterite-py]] · laterite-py-ags5 · [[dec-dictionary-single-source]]
+[[crate-map]] · [[laterite-types]] · [[laterite-ags4-reference]] · [[laterite-transport]] · laterite-ags5-db · [[laterite-py]] · laterite-py-ags5 · [[dec-dictionary-single-source]]

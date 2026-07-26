@@ -12,7 +12,7 @@ repo_refs:
   web: "repo:web/"
   gitignore: "repo:.gitignore"
   types_leaf: "repo:rust-packages/laterite-types/src/lib.rs"
-related: [crate-map, validator-site, playwright-e2e, dec-laterite-types-leaf, dec-rust-drives-python, dec-duckdb-per-host-engine, laterite-types, ags4-output, DT, 0DP, YN, surface-census, data-single-source-audit]
+related: [crate-map, laterite-ags4-tokenizer-wasm, validator-site, playwright-e2e, dec-laterite-types-leaf, dec-rust-drives-python, dec-duckdb-per-host-engine, laterite-types, ags4-output, DT, 0DP, YN, surface-census, data-single-source-audit]
 sources: []
 ---
 # tech stack: the browser wasm path
@@ -200,4 +200,4 @@ rationale is [[dec-laterite-types-leaf]].
 
 ## Related
 
-[[crate-map]] · [[validator-site]] · ci-and-runners · [[dec-laterite-types-leaf]] · [[dec-rust-drives-python]] · [[dec-duckdb-per-host-engine]] · [[laterite-types]] · [[DT]] · [[0DP]] · [[YN]] · [[surface-census]] · [[data-single-source-audit]]
+[[crate-map]] · [[laterite-ags4-tokenizer-wasm]] · [[validator-site]] · ci-and-runners · [[dec-laterite-types-leaf]] · [[dec-rust-drives-python]] · [[dec-duckdb-per-host-engine]] · [[laterite-types]] · [[DT]] · [[0DP]] · [[YN]] · [[surface-census]] · [[data-single-source-audit]]

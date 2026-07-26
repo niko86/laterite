@@ -6,7 +6,7 @@ tags: [design, decision, architecture, trust, certificate]
 decided: "2026-07-14"
 supersedes: [dec-ags-idx-certificate]
 from_gap: []
-related: [dec-ags-idx-certificate, crate-map, laterite-ags4-core, laterite-ags4-validator, laterite-ags4-reference, laterite-ags4-check, laterite-py, laterite-node, laterite-ags4-wasm, surface-census, data-single-source-audit, dec-dictionary-single-source, strat-o27-rule20-ondisk, rule-20-file-fset, rule-families, O-42, modality-register, testing-strategy, dec-custom-dict-overlay, O-28]
+related: [dec-ags-idx-certificate, crate-map, laterite-ags4-trust, laterite-ags4-core, laterite-ags4-validator, laterite-ags4-reference, laterite-ags4-check, laterite-py, laterite-node, laterite-ags4-wasm, surface-census, data-single-source-audit, dec-dictionary-single-source, strat-o27-rule20-ondisk, rule-20-file-fset, rule-families, O-42, modality-register, testing-strategy, dec-custom-dict-overlay, O-28]
 sources: []
 ---
 
@@ -425,4 +425,4 @@ remove. PRs 8–9 remain `todo`. Flip a row's status as its PR lands.
 | **PR 9** | **Wiki.** [[dec-ags-idx-certificate]] rewritten to this document (flips its `status` to `superseded`, `superseded_by: [cert-trust-v2]`); [[crate-map]] gains `laterite-ags4-trust`; new `observations.json` entries for (a) the encoding-dependent Rule 1 severity flip as a cert input, (b) redeclared-`GROUP` index truncation (bug 7), (c) `check_files` silently no-op'ing without a source (bug 2). `reindex.py` + `lint.py` (LINT CLEAN) + `log.md`. | todo |
 
 ## Related
-[[dec-ags-idx-certificate]] · [[crate-map]] · [[laterite-ags4-core]] · [[laterite-ags4-validator]] · [[laterite-ags4-reference]] · [[laterite-ags4-check]] · [[laterite-py]] · [[laterite-node]] · [[laterite-ags4-wasm]] · [[surface-census]] · [[data-single-source-audit]] · [[dec-dictionary-single-source]] · [[strat-o27-rule20-ondisk]] · [[rule-20-file-fset]] · [[rule-families]] · [[O-42]] · [[modality-register]] · [[testing-strategy]] · [[dec-custom-dict-overlay]] · [[O-28]]
+[[dec-ags-idx-certificate]] · [[crate-map]] · [[laterite-ags4-trust]] · [[laterite-ags4-core]] · [[laterite-ags4-validator]] · [[laterite-ags4-reference]] · [[laterite-ags4-check]] · [[laterite-py]] · [[laterite-node]] · [[laterite-ags4-wasm]] · [[surface-census]] · [[data-single-source-audit]] · [[dec-dictionary-single-source]] · [[strat-o27-rule20-ondisk]] · [[rule-20-file-fset]] · [[rule-families]] · [[O-42]] · [[modality-register]] · [[testing-strategy]] · [[dec-custom-dict-overlay]] · [[O-28]]
