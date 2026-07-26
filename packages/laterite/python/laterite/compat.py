@@ -24,7 +24,10 @@ import datetime
 import hashlib
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, NoReturn
+
+if TYPE_CHECKING:
+    import polars as pl
 
 from . import _compat_desc
 from . import _laterite_native as _native
@@ -257,7 +260,7 @@ def AGS4_to_dict(
     encoding: str = "utf-8",
     get_line_numbers: bool = False,
     rename_duplicate_headers: bool = True,
-):
+) -> tuple[dict, ...]:
     """Load an AGS4 file to ``(data, headings[, line_numbers])`` — the
     python-ags4 ``AGS4_to_dict`` shape: ``data[GROUP]`` maps each
     column (``HEADING`` first) to ``[unit, type, *data]``."""
@@ -324,7 +327,7 @@ def AGS4_to_dataframe(
     only_groups: list[str] | None = None,
     backend: str | None = None,
     string_dtype: str | None = None,
-):
+) -> tuple[dict, ...]:
     """Load an AGS4 file to ``(tables, headings[, line_numbers])``.
 
     ``tables[GROUP]`` is a dataframe in the configured backend (default
@@ -383,7 +386,7 @@ def _ags4_to_dataframe_via_dict(
     rename_duplicate_headers: bool,
     only_groups: list[str] | None,
     be: str,
-):
+) -> tuple[dict, dict, dict]:
     """``get_line_numbers=True`` fallback: build frames from the primitives dict
     (the native-Arrow path carries no per-row line column). Kept on the proven
     reshape + ``materialize`` route since this flag has no shipped caller."""
@@ -410,7 +413,7 @@ def _ags4_to_dataframe_via_dict(
     return tables, headings, line_numbers
 
 
-def AGS4_to_dataframe_AGS3(*_a, **_k):
+def AGS4_to_dataframe_AGS3(*_a: object, **_k: object) -> NoReturn:
     """The clean-room engine deliberately refuses AGS3 rather than
     silently validating it against an AGS4 schema (O-30)."""
     from ._errors import UnsupportedEditionError
@@ -424,7 +427,7 @@ def AGS4_to_dataframe_AGS3(*_a, **_k):
 # --- writer ---------------------------------------------------------
 
 
-def _to_polars(df: Any):
+def _to_polars(df: Any) -> pl.DataFrame:
     """Any python-ags4-shaped frame (pandas / polars) -> polars, without
     narwhals — compat's cross-backend shim now branches on the native type.
     A polars frame passes through; a pandas frame converts via from_pandas."""
@@ -771,7 +774,7 @@ def check_file(
     rename_duplicate_headers: bool = True,
     encoding: str = "utf-8",
     match_python_ags4_wording: bool = True,
-):
+) -> dict[str, list[dict]]:
     """Validate an AGS4 file. Returns the **python-ags4-shaped dict**
     (``"AGS Format Rule N"`` keys plus ``General`` / ``Summary of
     data`` / ``Metadata``) so ``json.dumps`` of it matches

@@ -52,6 +52,10 @@ import sys
 import tomllib
 from collections import Counter
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 WIKI = Path(__file__).resolve().parent.parent
 REPO_ROOT = WIKI.parent
@@ -699,7 +703,7 @@ owns_conflicts = [
 ok = True
 
 
-def section(name, items, limit=15):
+def section(name: str, items: Sequence[object], limit: int = 15) -> None:
     global ok
     print(f"{name}: {len(items)}")
     if items:
@@ -710,7 +714,7 @@ def section(name, items, limit=15):
             print(f"  … +{len(items) - limit} more")
 
 
-def info_section(name, items, limit=25):
+def info_section(name: str, items: Sequence[object], limit: int = 25) -> None:
     # same rendering as section() but never touches `ok` — for Phase A
     # checks that are diagnostic-only until the A4 bulk repair lands.
     print(f"{name}: {len(items)}")

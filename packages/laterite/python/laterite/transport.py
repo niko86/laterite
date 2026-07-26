@@ -40,7 +40,7 @@ __all__ = [
 ]
 
 
-def _src_path(src, *, fn: str) -> Path:
+def _src_path(src: str | PathLike[str], *, fn: str) -> Path:
     """Normalise the first argument to a ``Path``, rejecting non-paths early — a
     non-path arg (e.g. an ``Ags4File``) fails *here* with an actionable message
     rather than deep in Rust."""
