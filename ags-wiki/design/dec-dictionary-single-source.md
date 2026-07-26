@@ -19,9 +19,10 @@ The AGS4 standard dictionary has one **origin**: the five official
 `repo:rust-packages/laterite-ags4-validator/data` (provenance: python-ags4
 1.2.0; see that crate's `PROVENANCE.md`; that claim went unchecked until
 **#558** — see [[vendored-authority-faithful]]). (Earlier, pre-registry dictionary
-population used ad hoc [[scaffolders]] to infer/merge entries from sample
-files instead of one canonical converter — not production code, but the
-predecessor this decision's single-converter approach supersedes.)
+population used ad hoc scaffolder scripts (dev satellite) to infer/merge
+entries from sample files instead of one canonical converter — not
+production code, but the predecessor this decision's single-converter
+approach supersedes.)
 
 dec-registry-driven-generation (#173) generated the consolidated, faithful
 multi-edition **union** `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json`

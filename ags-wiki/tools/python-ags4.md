@@ -9,7 +9,7 @@ artifact: python_ags4
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 repo_refs:
   root: ext:ags-python-library:python_ags4
-related: [py-ags4-check-json, parity-model, laterite-ags4-corpus-qa, observations-coverage-map, upstream-reporting, vendored-authority-faithful, O-49, O-50, numeric-type-count-uncapped-format-width, 0dp-integer-conversion-precision-loss]
+related: [parity-model, laterite-ags4-corpus-qa, observations-coverage-map, upstream-reporting, vendored-authority-faithful, O-49, O-50, numeric-type-count-uncapped-format-width, 0dp-integer-conversion-precision-loss]
 sources: []
 ---
 # python-ags4
@@ -40,7 +40,7 @@ flowchart LR
   parity --> ON[O-N observations]
 ```
 
-Wrapped by [[py-ags4-check-json]] (JSON contract for the harness); cross-checked against [[laterite-ags4-check]] by [[laterite-ags4-corpus-qa]] via [[parity-model]]; the source of [[observations-coverage-map]] and every [[O-01]]…[[O-34]]. Clean-room boundary: see [[upstream-reporting]].
+Wrapped by the `py_ags4_check_json.py` JSON contract (dev satellite — the parity harness's oracle input); cross-checked against [[laterite-ags4-check]] by [[laterite-ags4-corpus-qa]] via [[parity-model]]; the source of [[observations-coverage-map]] and every [[O-01]]…[[O-34]]. Clean-room boundary: see [[upstream-reporting]].
 
 Also the **root authority for the five vendored AGS4 `.ags` dictionaries** —
 [[vendored-authority-faithful]] checks them byte-for-byte against this
@@ -48,4 +48,4 @@ package's own installed copies (a declared dev dependency), not just against
 each other.
 
 ## Related
-[[py-ags4-check-json]] · [[parity-model]] · [[laterite-ags4-corpus-qa]] · [[observations-coverage-map]] · [[upstream-reporting]] · [[crate-map]] · [[laterite]] · [[vendored-authority-faithful]] · [[O-49]] · [[O-50]] · [[numeric-type-count-uncapped-format-width]] · [[0dp-integer-conversion-precision-loss]]
+[[parity-model]] · [[laterite-ags4-corpus-qa]] · [[observations-coverage-map]] · [[upstream-reporting]] · [[crate-map]] · [[laterite]] · [[vendored-authority-faithful]] · [[O-49]] · [[O-50]] · [[numeric-type-count-uncapped-format-width]] · [[0dp-integer-conversion-precision-loss]]
