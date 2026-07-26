@@ -120,10 +120,21 @@ pub fn row_ids<S: BuildHasher>(
 /// `laterite_types::arrow_cols::build_record_batch_with_ids`). Mirrors that
 /// builder's `(headings, n_rows, cell)` interface deliberately: a host computes
 /// the ids and the typed batch from the **same** inputs, so the two can never
-/// misalign. Each pair is [`row_ids`] stringified; `_parent_id` is `None`
-/// (→ a NULL Arrow cell) for a root group. Returns an empty `Vec` when `code`
-/// is not a known group — a custom / passthrough group carries no spec keys, so
-/// it gets no content-addressed ids (the caller then builds an unkeyed batch).
+/// misalign. `_parent_id` is `None` (→ a NULL Arrow cell) for a root group.
+/// Returns an empty `Vec` when `code` is not a known group — a custom /
+/// passthrough group carries no spec keys, so it gets no content-addressed ids
+/// (the caller then builds an unkeyed batch).
+///
+/// Only KEY columns feed a row's `_id`, so rather than rebuild a per-row
+/// `HashMap` over EVERY heading (the dominant read cost — a wide group clones
+/// dozens of throwaway strings per row) we resolve each own- and parent-KEY
+/// heading to its column index ONCE per group and read those cells positionally.
+/// Byte-identical to the old `row_ids`/map path **by construction**: `rposition`
+/// (last match) mirrors the `HashMap`'s last-insert-wins on a malformed duplicate
+/// heading, an absent heading resolves to `""` exactly as `value_of` did, and the
+/// same [`content_id`] hashes the same trimmed values — pinned by
+/// `content_id_pins_the_cross_surface_golden`. (`row_ids`/`key_chain_values` stay
+/// for the extension's per-row `HashMap` caller.)
 pub fn group_row_ids<'a, F>(
     reg: &Registry,
     code: &str,
@@ -137,18 +148,45 @@ where
     let Some(g) = reg.get(code) else {
         return Vec::new();
     };
+    // Resolve each KEY heading to its column index once. `None` ⇒ the KEY heading
+    // is absent from this file's group → its value is always "" (a partial key
+    // can't alias a complete one). `rposition` = last match, matching the old
+    // all-columns HashMap's last-insert-wins on a duplicate heading.
+    let key_cols = |desc: &GroupDescriptor| -> Vec<(String, Option<usize>)> {
+        desc.key_headings()
+            .map(|h| (h.name.clone(), headings.iter().rposition(|x| x == &h.name)))
+            .collect()
+    };
+    let own = key_cols(g);
+    // (parent domain code, parent KEY column indices), reconstructed from the
+    // child's denormalised row. `None` for a root or unregistered parent —
+    // exactly when the old `parent_chain_values` returned `None`.
+    let parent = g
+        .parent
+        .as_deref()
+        .and_then(|pcode| reg.get(pcode).map(|p| (pcode.to_string(), key_cols(p))));
+
     (0..n_rows)
         .map(|row| {
-            // row_ids reads KEY values BY NAME, so reconstruct this row's
-            // heading→value map. A short/ragged row leaves a heading absent →
-            // `value_of` resolves it to "" (so a partial key can't alias).
-            let map: HashMap<String, String> = headings
-                .iter()
-                .enumerate()
-                .map(|(col, h)| (h.clone(), cell(col, row).unwrap_or("").to_string()))
-                .collect();
-            let (id, parent) = row_ids(reg, g, &map);
-            (id.to_string(), parent.map(|u| u.to_string()))
+            // A KEY value read positionally + trimmed, matching `value_of`:
+            // absent column or short/ragged row → "".
+            let chain = |spec: &[(String, Option<usize>)]| -> Vec<(String, String)> {
+                spec.iter()
+                    .map(|(name, idx)| {
+                        let v = idx
+                            .and_then(|i| cell(i, row))
+                            .unwrap_or("")
+                            .trim()
+                            .to_string();
+                        (name.clone(), v)
+                    })
+                    .collect()
+            };
+            let id = content_id(&g.code, &chain(&own));
+            let parent_id = parent
+                .as_ref()
+                .map(|(pcode, pspec)| content_id(pcode, &chain(pspec)));
+            (id.to_string(), parent_id.map(|u| u.to_string()))
         })
         .collect()
 }
