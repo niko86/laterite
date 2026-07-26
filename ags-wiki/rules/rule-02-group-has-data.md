@@ -14,7 +14,7 @@ repo_refs:
   fixtures: "repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule2_no_data_rows.ags"
   regression: "repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule2_group_without_data_rows_flagged"
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 2"
-related: [rule-families, traceability-chain, parity-model]
+related: [rule-families, traceability-chain, parity-model, O-41]
 sources: [spec-4.2]
 ---
 # Rule 2 — group has data

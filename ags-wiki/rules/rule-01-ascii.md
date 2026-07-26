@@ -14,7 +14,7 @@ repo_refs:
   fixtures: "repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule1_non_ascii.ags"
   regression: "repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule1_non_ascii_flagged_at_its_line"
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 1"
-related: [rule-families, traceability-chain, parity-model]
+related: [rule-families, traceability-chain, parity-model, rule1-ascii-strict-vs-extended, strat-cp1252-rule1]
 sources: [spec-4.2]
 ---
 # Rule 1 — ascii

@@ -14,7 +14,7 @@ repo_refs:
   fixtures: "repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule9_unknown_heading.ags"
   regression: "repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule9_unknown_heading_flagged"
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 9"
-related: [rule-families, traceability-chain, parity-model]
+related: [rule-families, traceability-chain, parity-model, strat-elrg-recognition]
 sources: [spec-4.2]
 ---
 # Rule 9 — unknown headings

@@ -14,7 +14,7 @@ repo_refs:
   fixtures: "repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule15_unit_undef.ags"
   regression: "repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule15_undefined_unit_flagged"
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 15"
-related: [rule-families, traceability-chain, parity-model]
+related: [rule-families, traceability-chain, parity-model, rule15-example-tracks-eres-elrg-removal]
 sources: [spec-4.2]
 ---
 # Rule 15 — unit group

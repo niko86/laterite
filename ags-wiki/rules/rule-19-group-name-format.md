@@ -14,7 +14,7 @@ repo_refs:
   fixtures: "repo:rust-packages/laterite-ags4-validator/tests/fixtures/rule19_bad_group_name.ags"
   regression: "repo:rust-packages/laterite-ags4-validator/tests/regression.rs::rule19_bad_group_name_flagged"
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 19"
-related: [rule-families, traceability-chain, parity-model]
+related: [rule-families, traceability-chain, parity-model, rule19-spec-allows-numbers-validator-may-not]
 sources: [spec-4.2]
 ---
 # Rule 19 — group name format
