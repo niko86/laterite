@@ -166,26 +166,18 @@ where
         .as_deref()
         .and_then(|pcode| reg.get(pcode).map(|p| (pcode.to_string(), key_cols(p))));
 
+    // One hasher reused across every row and both ids (`finalize_reset`), fed the
+    // KEY cells as BORROWED `&str` — no per-row chain `Vec`, no `canonical_encode`
+    // `Vec<u8>`, no name clones (Step 2: a wide row drops from dozens of allocs to
+    // just the two id strings it returns). Byte-identical to `content_id`: the
+    // same `canonical_encode_into` over the same rposition-resolved, trimmed values.
+    let mut hasher = Sha256::new();
     (0..n_rows)
         .map(|row| {
-            // A KEY value read positionally + trimmed, matching `value_of`:
-            // absent column or short/ragged row → "".
-            let chain = |spec: &[(String, Option<usize>)]| -> Vec<(String, String)> {
-                spec.iter()
-                    .map(|(name, idx)| {
-                        let v = idx
-                            .and_then(|i| cell(i, row))
-                            .unwrap_or("")
-                            .trim()
-                            .to_string();
-                        (name.clone(), v)
-                    })
-                    .collect()
-            };
-            let id = content_id(&g.code, &chain(&own));
+            let id = row_id_streamed(&mut hasher, &g.code, &own, row, &cell);
             let parent_id = parent
                 .as_ref()
-                .map(|(pcode, pspec)| content_id(pcode, &chain(pspec)));
+                .map(|(pcode, pspec)| row_id_streamed(&mut hasher, pcode, pspec, row, &cell));
             (id.to_string(), parent_id.map(|u| u.to_string()))
         })
         .collect()
@@ -197,10 +189,19 @@ where
 /// for app-defined deterministic UUIDs) and the RFC variant bits.
 #[must_use]
 pub fn content_id(group_code: &str, chain: &[(String, String)]) -> Uuid {
-    let digest = Sha256::digest(canonical_encode(group_code, chain));
-    let mut bytes = [0u8; 16];
-    bytes.copy_from_slice(&digest[..16]);
-    Uuid::new_v8(bytes)
+    // Stream the canonical encoding straight into the hasher — no intermediate
+    // `Vec<u8>`. Byte-identical to `Sha256::digest(canonical_encode(...))`: the
+    // same `canonical_encode_into` defines the bytes for both.
+    let mut hasher = Sha256::new();
+    #[allow(clippy::cast_possible_truncation)]
+    let chain_len = chain.len() as u32;
+    canonical_encode_into(
+        &mut hasher,
+        group_code,
+        chain_len,
+        chain.iter().map(|(n, v)| (n.as_str(), v.as_str())),
+    );
+    v8_from_digest(&hasher.finalize())
 }
 
 /// Domain tag mixed into the group code for [`content_hash`], so a value-hash
@@ -348,16 +349,16 @@ where
 #[must_use]
 pub fn canonical_encode(group_code: &str, chain: &[(String, String)]) -> Vec<u8> {
     let mut out = Vec::with_capacity(8 + group_code.len() + chain.len() * 16);
-    put_lp(&mut out, group_code);
     // `chain` is one AGS4 group's KEY-heading tuple (a handful of entries by
     // dictionary construction), nowhere near u32::MAX.
     #[allow(clippy::cast_possible_truncation)]
     let chain_len = chain.len() as u32;
-    out.extend_from_slice(&chain_len.to_le_bytes());
-    for (name, value) in chain {
-        put_lp(&mut out, name);
-        put_lp(&mut out, value);
-    }
+    canonical_encode_into(
+        &mut out,
+        group_code,
+        chain_len,
+        chain.iter().map(|(n, v)| (n.as_str(), v.as_str())),
+    );
     out
 }
 
@@ -392,14 +393,94 @@ fn value_of<S: BuildHasher>(row: &HashMap<String, String, S>, name: &str) -> Str
         .unwrap_or_default()
 }
 
+/// A byte sink for the canonical key-chain encoding — implemented for both a
+/// `Vec<u8>` (the buffered public [`canonical_encode`]) and a streaming
+/// [`Sha256`] (the per-row hot path in [`group_row_ids`]). A single
+/// [`canonical_encode_into`] defines the byte layout over this trait, so the
+/// buffered and streamed encodings can never diverge.
+trait ByteSink {
+    fn put(&mut self, bytes: &[u8]);
+}
+impl ByteSink for Vec<u8> {
+    fn put(&mut self, bytes: &[u8]) {
+        self.extend_from_slice(bytes);
+    }
+}
+impl ByteSink for Sha256 {
+    fn put(&mut self, bytes: &[u8]) {
+        Digest::update(self, bytes);
+    }
+}
+
 /// Append a length-prefixed string: `u32` LE byte length, then the bytes.
 // `s` is a group code, a heading name, or a single AGS4 field's cell value —
 // bounded by that field's own line, which (per the parse leaf's tokenizer)
 // cannot realistically reach u32::MAX bytes for real geotechnical data.
 #[allow(clippy::cast_possible_truncation)]
-fn put_lp(out: &mut Vec<u8>, s: &str) {
-    out.extend_from_slice(&(s.len() as u32).to_le_bytes());
-    out.extend_from_slice(s.as_bytes());
+fn put_lp<S: ByteSink>(sink: &mut S, s: &str) {
+    sink.put(&(s.len() as u32).to_le_bytes());
+    sink.put(s.as_bytes());
+}
+
+/// The one definition of the (group, key-chain) byte layout: the group code
+/// (length-prefixed), the chain length (`u32` LE — fixed in so a trailing empty
+/// key can't alias a shorter chain), then each `(name, value)` length-prefixed.
+/// `chain` yields already-trimmed pairs; the sink is a `Vec` (buffered) or a
+/// `Sha256` (streamed), the same bytes either way. `name`/`value` are taken as
+/// `AsRef<str>` so the two can carry independent borrow lifetimes.
+fn canonical_encode_into<S, I, N, V>(sink: &mut S, group_code: &str, chain_len: u32, chain: I)
+where
+    S: ByteSink,
+    I: IntoIterator<Item = (N, V)>,
+    N: AsRef<str>,
+    V: AsRef<str>,
+{
+    put_lp(sink, group_code);
+    sink.put(&chain_len.to_le_bytes());
+    for (name, value) in chain {
+        put_lp(sink, name.as_ref());
+        put_lp(sink, value.as_ref());
+    }
+}
+
+/// The first 128 bits of a finished SHA-256 as a UUIDv8 (RFC 9562's app-defined
+/// version) — shared by [`content_id`] and the reused-hasher path so the id
+/// derivation is defined exactly once.
+fn v8_from_digest(digest: &[u8]) -> Uuid {
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    Uuid::new_v8(bytes)
+}
+
+/// One row's `_id` (or `_parent_id`), streamed into a REUSED `hasher`
+/// (`finalize_reset`) with each KEY column read positionally and trimmed — the
+/// allocation-free twin of `content_id(dom, &chain)` for the batch
+/// [`group_row_ids`] hot path. An absent column or short/ragged row resolves to
+/// `""`, exactly as `value_of` did.
+fn row_id_streamed<'a, F>(
+    hasher: &mut Sha256,
+    dom: &str,
+    spec: &[(String, Option<usize>)],
+    row: usize,
+    cell: &F,
+) -> Uuid
+where
+    F: Fn(usize, usize) -> Option<&'a str>,
+{
+    #[allow(clippy::cast_possible_truncation)]
+    let chain_len = spec.len() as u32;
+    canonical_encode_into(
+        hasher,
+        dom,
+        chain_len,
+        spec.iter().map(|(name, idx)| {
+            (
+                name.as_str(),
+                idx.and_then(|i| cell(i, row)).unwrap_or("").trim(),
+            )
+        }),
+    );
+    v8_from_digest(&hasher.finalize_reset())
 }
 
 #[cfg(test)]
