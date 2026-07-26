@@ -96,7 +96,7 @@ a **valid file in one call** instead of Rule 14/15/17 findings:
 - **PROJ** is never synthesized (real project identity, not derivable) → a missing
   PROJ stays a Rule 13 finding.
 
-One shared implementation in `repo:rust-packages/laterite-ags4-emit/src/emit.rs::synthesize_metadata`
+One shared implementation in `repo:rust-packages/laterite-ags4-emit/src/emit.rs::synthesise_metadata`
 (a new step before `write_ags4`, gated to AutoFix), so **all four surfaces** (PyO3,
 Node, both wasm paths) inherit it with zero per-binding work; `"report"`/`"strict"`
 are unchanged (they show/reject the gaps). Mirrors the existing forge synthesizer

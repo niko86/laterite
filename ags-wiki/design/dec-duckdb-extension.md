@@ -17,7 +17,7 @@ sources: []
 
 The toolkit could already turn an AGS4 file into typed tables, but only by
 going *through* a heavy host: the `.ags5db` writer
-(`repo:ags5/rust-packages/laterite-ags5-db/src/convert.rs`) ingests a file into a
+(`ags5/rust-packages/laterite-ags5-db/src/convert.rs`) ingests a file into a
 DuckDB database, minting **random UUID7 surrogate keys** + a content-hash
 lookup table to resolve parent links (exp-uuid7-surrogate-keys). That is
 the right shape for a *persisted, merge-able* store, but it is the wrong shape
@@ -230,7 +230,7 @@ exclusion at all (the crate isn't a workspace member to exclude); see
 ci-and-runners.
 
 It is also dropped from the **public *wheel* mirror** workspace: the `private`
-set in `repo:tools/release/rewrite-internal-refs.sh` lists `laterite-duckdb`
+set in `tools/release/rewrite-internal-refs.sh` lists `laterite-duckdb`
 alongside the three dev/QA crates, so the public `cargo build --workspace` never
 sees it. That is correct — it does **not** ship through the wheels — but it is
 not the whole story: a community extension is built from a **public repo with a
@@ -384,8 +384,8 @@ single-source stay in the monorepo).
 ## Roadmap
 
 - **P1 `read_ags` + P2 metadata** — **MERGED** (PR #144).
-- **P3 `validate_ags` + `load_ags_script`** — **MERGED** (PR #147); the
-  `validate_ags(path, edition := …)` override follows in PR #150.
+- **P3 `validate_ags` + `load_ags_script`** — **MERGED** (PR #147); the <!-- retired: validate_ags -->
+  `validate_ags(path, edition := …)` override follows in PR #150. <!-- retired: validate_ags -->
 - **DuckDB 1.5.3 stack unification** — the prerequisite floor for remote (see the
   Consequences bullet above); its own PR.
 - **Remote / httpfs** (`file_system`) — **done**: every read in `source.rs` now

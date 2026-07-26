@@ -6,7 +6,6 @@ tags: [concept, architecture]
 ags_editions: []
 repo_refs:
   workspace: "repo:rust-packages/Cargo.toml"
-  readme: "repo:rust-packages/README.md"
   packages: "repo:packages/"
 related: [start-here, repo-layout, crate-dependency-graph, tech-stack-wasm, pyo3-boundary, laterite-ags4-validator, laterite-ags4-reference, laterite-py, laterite-types, laterite-ags4-core, laterite, dec-laterite-types-leaf, dec-ags4-censor-leaf, dec-rust-drives-python, dec-monorepo-structure, dec-duckdb-extension, dec-duckdb-perf-architecture, dec-duckdb-per-host-engine, dec-dictionary-single-source, dec-ags4-merge-semantics, dec-custom-dict-overlay, ags4-output, modality-register, surface-census, edition-resolution, data-single-source-audit, cert-trust-v2, laterite-ags4-corpus-qa]
 sources: []
@@ -31,7 +30,7 @@ AGS5 strand to re-link against the shared libs (`laterite-types` /
 kept workspace now links **no bundled DuckDB** (that left with the AGS5 crates).
 
 The authoritative role table + dependency graph live in
-`repo:rust-packages/README.md`; this page ties the crates to their *why* (the
+[[crate-dependency-graph]]; this page ties the crates to their *why* (the
 `design` decisions) and groups them by **audience** — public contract vs.
 shipped product vs. internal implementation detail. For the zoom-*out* — what
 every top-level *directory* in the repo is for — see [[repo-layout]]. For the
@@ -358,7 +357,7 @@ as stable):
   extension-repo shape the monorepo mirror can't give; a sanctioned
   [[dec-monorepo-structure]] exception), **NOT the PyPI/npm wheel mirror** — so it
   stays in the `private` set of the wheel-mirror rewriter
-  (`repo:tools/release/rewrite-internal-refs.sh`). See
+  (`tools/release/rewrite-internal-refs.sh`, dev satellite). See
   [[dec-duckdb-extension]].
 
 **Dev / QA — never shipped:**

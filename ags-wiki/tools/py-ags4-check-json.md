@@ -7,8 +7,6 @@ tool_kind: script
 language: python
 artifact: py_ags4_check_json.py
 ags_editions: []
-repo_refs:
-  root: "repo:tools/py_ags4_check_json.py"
 related: [parity-model, laterite-ags4-check, python-ags4]
 sources: []
 ---
@@ -21,7 +19,7 @@ sources: []
 > [!quote] In: an .ags path (+ inert --encoding-fallback). Out: rule-keyed JSON of AGS4.check_file to stdout (exit 0/1/2/3); the JSON contract parity.rs consumes. Wraps [[python-ags4]].
 
 ## Where it lives
-`repo:tools/py_ags4_check_json.py`
+`tools/py_ags4_check_json.py`
 
 ## Relationship to other components
 ```mermaid

@@ -60,7 +60,7 @@ a `> [!spec-ambiguity]`/`> [!divergence]` callout), never silently
 - OBSERVATIONS entry — `` `repo:OBSERVATIONS.md#o-33` ``
 - dictionary entry — `` `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json groups[code=SAMP]` ``
 - spec PDF — `` `spec:AGS4-4.2-2025.pdf §4.1.1 Rule 8` `` (PDF lives at this vault root)
-- AGS library xlsx — `` `repo:reports/AGSL4_2_TRI.xlsx` ``
+- AGS library xlsx — `` `reports/AGSL4_2_TRI.xlsx` ``
 
 Paths are repo-root-relative, forward-slash, no backslashes.
 

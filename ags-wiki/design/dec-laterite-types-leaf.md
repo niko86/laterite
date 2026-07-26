@@ -23,7 +23,7 @@ browser wasm bundle.
 
 The browser **data explorer** (see [[validator-site]] Phase 2) must cast
 an AGS4 file's cells to typed columns *exactly* as the native `.ags5db`
-conversion does (`repo:ags5/rust-packages/laterite-ags5-db/src/convert.rs` casts off the
+conversion does (`ags5/rust-packages/laterite-ags5-db/src/convert.rs` casts off the
 file's TYPE row via the same functions) — otherwise the in-browser table
 and a real `.ags5db` would disagree on types/values. That casting logic
 *is* `ags_types`. So the explorer needs it without `laterite-ags4-core`'s
@@ -140,8 +140,8 @@ implementation.
 - Non-breaking: the `pub use` keeps `laterite_ags4_core::ags_types`;
   `laterite-types`/`laterite-ags4-core`/`ags5db` cargo suites stay green.
 - Allowlist + workspace/rewriter headers updated for the new crate
-  (`repo:tools/release/public-allowlist.txt`,
-  `repo:tools/release/rewrite-internal-refs.sh`).
+  (`tools/release/public-allowlist.txt`,
+  `tools/release/rewrite-internal-refs.sh`).
 
 ## Crate graph
 

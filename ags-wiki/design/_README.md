@@ -23,7 +23,7 @@ DuckDB extension, the monorepo structure). Three page kinds:
   / consequences (links the requirements + gaps it answers). Covers both
   shipped-AGS4 architecture and AGS5 design.
 - **experiment** — what was tried, the outcome (worked/partial/
-  failed), and *why*. Seeded from `repo:docs/history/*` (past phase
+  failed), and *why*. Seeded from `docs/history/*` (past phase
   write-ups) and the current architecture.
 
 ## Requirements (each must trace to a gap)

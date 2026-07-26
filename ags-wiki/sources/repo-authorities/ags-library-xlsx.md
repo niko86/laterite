@@ -5,7 +5,7 @@ status: stub
 tags: [source]
 source_kind: xlsx
 authority_for: [groups]
-location: "repo:reports/AGSL4_2_CON.xlsx"
+location: "reports/AGSL4_2_CON.xlsx"
 immutable: true
 anchor_scheme: see AGS-WIKI.md §1
 related: [_registry]
@@ -16,7 +16,7 @@ related: [_registry]
 > [!todo] Authority for groups.
 
 ## How to cite into it
-See `AGS-WIKI.md §1`. Location: `repo:reports/AGSL4_2_CON.xlsx`.
+See `AGS-WIKI.md §1`. Location: `reports/AGSL4_2_CON.xlsx`.
 
 ## Pages that depend on it
 <!-- maintained by Lint -->

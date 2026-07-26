@@ -14,7 +14,7 @@ sources: []
 
 ## Context
 The repo grew two parallel CLI implementations: the Python
-`ags5db-py` (`packages/ags5-db`) and the Rust `ags5db`
+`ags5db-py` (`packages/ags5-db`) and the Rust `ags5db` <!-- retired: ags5-db -->
 (`rust-packages/ags5db`). laterite-ags5-db reached **read+write parity**
 (every documented command implemented, NDJSON parity-verified against
 the Python reference). Maintaining a *shipped* Python binary alongside
@@ -67,7 +67,7 @@ Rust binary as its execution engine.
 
 > [!todo] **Known gaps — roadmap follow-ups (not in the cleanup pass)**
 > 1. `ags4-to-db --append` is declared but Phase E v1 always writes a
->    fresh dst (`repo:ags5/rust-packages/laterite-ags5-db/src/commands/ags4_to_db.rs:18`).
+>    fresh dst (`ags5/rust-packages/laterite-ags5-db/src/commands/ags4_to_db.rs:18`).
 >    Highest priority — Rust is now the only distribution.
 > 2. Stale comment at `…ags4_to_db.rs:19` claims passthrough errors
 >    out; it is in fact implemented (`build_passthrough_descriptors`,
