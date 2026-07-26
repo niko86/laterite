@@ -10,7 +10,7 @@ ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-excel"
   lib: "repo:rust-packages/laterite-excel/src/lib.rs"
-related: [crate-map, laterite-ags4-core, laterite-py, python-ags4, reliquary]
+related: [crate-map, laterite-ags4-core, laterite-py, python-ags4, reliquary, core-perf-baseline]
 sources: []
 ---
 # laterite-excel

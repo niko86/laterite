@@ -8,7 +8,7 @@ volatile_asof: 2026-06-08
 ags_editions: []
 repo_refs:
   latpy: "repo:rust-packages/laterite-py/Cargo.toml"
-related: [pyo3-boundary, crate-map, laterite-py]
+related: [pyo3-boundary, crate-map, laterite-py, core-perf-baseline]
 sources: []
 ---
 # abi3 performance: what the limited API costs laterite

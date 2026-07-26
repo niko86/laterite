@@ -9,7 +9,7 @@ artifact: py_ags4_check_json.py
 ags_editions: []
 repo_refs:
   root: "repo:tools/py_ags4_check_json.py"
-related: [parity-model, laterite-ags4-check]
+related: [parity-model, laterite-ags4-check, python-ags4]
 sources: []
 ---
 # py-ags4-check-json

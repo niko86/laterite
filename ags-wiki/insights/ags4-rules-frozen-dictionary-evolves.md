@@ -11,7 +11,7 @@ proposes_observation: false
 feeds_strategy: []
 feeds_ags5_req: []
 discovered_phase: A
-related: [start-here, edition-resolution]
+related: [start-here, edition-resolution, rule15-example-tracks-eres-elrg-removal]
 sources: [spec-4.2]
 ---
 # AGS4 Rules normatively frozen 4.0.3→4.2 while the data model kept growing

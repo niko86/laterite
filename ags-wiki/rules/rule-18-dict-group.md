@@ -14,7 +14,7 @@ repo_refs:
   fixtures: ""
   regression: ""
   spec: "spec:AGS4-4.2-2025.pdf §4.1.1 Rule 18"
-related: [rule-families, traceability-chain, parity-model]
+related: [rule-families, traceability-chain, parity-model, O-44]
 sources: [spec-4.2]
 ---
 # Rule 18 — dict group

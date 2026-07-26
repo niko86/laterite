@@ -18,7 +18,8 @@ mermaid-content checks (2026-07-10): the crate-map graph must name every
 must be a documented group code (in the AGS4 dictionary OR carrying a wiki
 group page — so AGS-L / concept groups aren't mis-flagged). The last three
 are the Phase D governance gates (2026-07-10): D2 hard-fails a `related:`
-target that resolves to no page (non-reciprocal edges stay advisory); D4
+target that resolves to no page (non-reciprocal edges stay advisory, and only
+for non-hub targets — degree-based, #75 2026-07-26); D4
 hard-fails a `status: superseded` page lacking `superseded_by:` (with every
 target resolving) or a read-time tombstone callout; D7 hard-fails an `owns:`
 topic slug claimed by more than one page (the one-owner-per-topic gate).
@@ -646,6 +647,22 @@ orphans_real = sorted(
 # Both sides of an edge landing on a HUB_STEMS/`_`-page are exempt — a hub
 # is *expected* to be linked asymmetrically (everything points at
 # start-here.md; start-here.md doesn't list everything back).
+# Beyond the four hand-named HUB_STEMS, a page is a hub whenever *many* others
+# name it in related: — a glossary/concept authority cited by dozens of pages
+# (e.g. heading-status-vocabulary, 194 inbound) should not list them all back.
+# Measured 2026-07-26 (#75): 86% of non-reciprocal edges point at a
+# >=RECIPROCITY_HUB_MIN-inbound page and are asymmetric BY DESIGN; the residue —
+# an edge to a low-inbound *peer* — is the real "someone forgot the back-link"
+# signal. So hub-ness is degree-based here (self-maintaining, not a hand-list),
+# and the reciprocity report covers only non-hub edges. The dangling-target HARD
+# check below is unaffected — it fires on every unresolvable target regardless.
+RECIPROCITY_HUB_MIN = 10
+related_inbound: Counter = Counter(
+    tgt
+    for _s, (tgts, _l) in related_map.items()
+    for tgt in tgts
+    if tgt != _s and tgt in stems
+)
 related_dangling: list[dict] = []
 related_asymmetric: list[dict] = []
 related_edges_checked = 0
@@ -656,6 +673,8 @@ for src, (targets, src_line) in related_map.items():
         if tgt not in stems:
             related_dangling.append({"file": f"{src}", "line": src_line, "target": tgt})
             continue
+        if related_inbound[tgt] >= RECIPROCITY_HUB_MIN:
+            continue  # degree-hub: asymmetric-by-design, not a missing back-link
         related_edges_checked += 1
         back_targets = related_map.get(tgt, ([], 0))[0]
         if src not in back_targets:
@@ -663,8 +682,10 @@ for src, (targets, src_line) in related_map.items():
 
 # D2 (HARD): a `related:` target that resolves to no page is a dead edge —
 # graduated from report-only to a hard check once the backlog hit 0 (same
-# path the orphan check took in D1). Non-reciprocal edges stay advisory
-# (69% of the graph is unidirectional-by-design — see the report-only block).
+# path the orphan check took in D1). Non-reciprocal edges stay advisory, and
+# now cover only non-hub targets (degree-based, see RECIPROCITY_HUB_MIN above) —
+# the hub-and-spoke bulk is asymmetric by design, so what remains is the small
+# peer-to-peer residue worth a look — see the report-only block).
 related_dangling_hard = [
     f"{d['file']}:{d['line']} -> related: [{d['target']}]" for d in related_dangling
 ]
@@ -1474,11 +1495,12 @@ _related_pct = (
     else 0
 )
 print(
-    f"\nrelated: non-reciprocal edges: {len(related_asymmetric)} of "
-    f"{related_edges_checked} checked ({_related_pct:.0f}%)"
+    f"\nrelated: non-reciprocal edges (non-hub targets only, <{RECIPROCITY_HUB_MIN} "
+    f"inbound): {len(related_asymmetric)} of {related_edges_checked} checked "
+    f"({_related_pct:.0f}%)"
 )
 info_section(
-    "  findings (A relates to B, B doesn't relate back to A)",
+    "  findings (A relates to B, B doesn't relate back to A; hub targets exempt)",
     [f"{d['file']}:{d['line']} -> {d['target']}" for d in related_asymmetric],
     limit=A_LIMIT,
 )
