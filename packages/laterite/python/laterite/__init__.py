@@ -2140,9 +2140,8 @@ def build_ags4(
         # falls through to the DuckDB bridge below (its existing pyarrow-free path),
         # so that branch stays reachable. A pure Rust fix would need a workspace
         # arrow/pyo3-arrow major bump across every binding; tracked separately.
-        if (
-            type(frame).__module__.partition(".")[0] == "pandas"
-            and hasattr(frame, "__arrow_c_stream__")
+        if type(frame).__module__.partition(".")[0] == "pandas" and hasattr(
+            frame, "__arrow_c_stream__"
         ):
             frame = pl.from_pandas(frame)
         if hasattr(frame, "__arrow_c_stream__"):
