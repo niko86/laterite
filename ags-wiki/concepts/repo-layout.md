@@ -62,7 +62,7 @@ allowlist, CI, and wiki `repo_refs` for a purely cosmetic gain.
 
 Each terse directory (`reports/`, `experiments/`, `tests/`, `demo/`) is a distinct,
 justified unit, and the paths are **encoded across the repo** — the public
-allowlist (`repo:tools/release/public-allowlist.txt`), CI workflows, and wiki `repo_refs`. A top-level move would touch many files (the root `tests/`
+allowlist (`tools/release/public-allowlist.txt`), CI workflows, and wiki `repo_refs`. A top-level move would touch many files (the root `tests/`
 alone is referenced in ~47) to break references for a cosmetic gain. The fix for
 "feels busy" is this map — *legibility over relocation*. If a specific consolidation
 is ever worth it, do it surgically with its blast radius on the table (and steer

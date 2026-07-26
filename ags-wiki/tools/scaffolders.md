@@ -7,8 +7,6 @@ tool_kind: script
 language: python
 artifact: experiments
 ags_editions: []
-repo_refs:
-  root: "repo:experiments"
 related: [parity-model, laterite-ags4-check]
 sources: []
 ---
@@ -24,7 +22,7 @@ sources: []
 > [!note] `backfill_dict_units.py --report-numeric-gaps`: of 65 numeric-typed headings with an empty `unit`, only **9** were real gaps (contractor sieve-size + test-date headings); the other **56** are correctly unitless per the AGS4 standard (counts, ratios, pH, dimensionless coefficients). So an empty UNIT on a numeric heading is usually *correct*, not a Rule-8/Rule-15 violation — worth remembering before "fixing" one. (`--diff-versions`: AGS4 4.2 adds 257 (group,heading)→unit pairs over 4.1 and drops 28, incl. `ERES_DTIM`'s unit.)
 
 ## Where it lives
-`repo:experiments`
+`experiments`
 
 ## Relationship to other components
 ```mermaid

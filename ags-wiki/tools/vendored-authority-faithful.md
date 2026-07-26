@@ -8,12 +8,9 @@ language: python
 artifact: "test_vendored_authority_faithful.py + check_upstream_pin.py"
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 repo_refs:
-  gate: "repo:tests/test_vendored_authority_faithful.py"
   pin_notice: "repo:tools/check_upstream_pin.py"
   ci_job: "repo:.github/workflows/parity.yml"
   provenance: "repo:rust-packages/laterite-ags4-validator/data/PROVENANCE.md"
-  sync_script: "repo:tools/sync-standard-dicts.sh"
-  fallback_edition: "repo:tools/gen_dictionary.py"
 related: [dec-dictionary-single-source, oracle-drift-pin, parity-model, laterite-ags4-reference, laterite-ags4-validator, testing-strategy, python-ags4, ags-dictionary-json]
 sources: []
 ---
@@ -26,7 +23,7 @@ sources: []
 > `tools/gen_dictionary.py` projects them into
 > `rust-packages/laterite-ags4-reference/data/ags_dictionary.json`, and the
 > validator, the wasm build, the typed-graph codegen, and the web all read
-> that union. `repo:tests/test_dictionary_faithful.py` (the "Faithfulness
+> that union. `tests/test_dictionary_faithful.py` (the "Faithfulness
 > gates" table's row 2 on [[testing-strategy]]) already proved the union is a
 > faithful *render* of these five files. It never proved the five files
 > themselves are faithful to what `data/PROVENANCE.md` claims they are — the
@@ -45,7 +42,7 @@ the typed graph with every existing gate green. This is #549's Shape 1 (the
 gate enforces a proxy for the promise, and nothing compares the proxy back
 to the promise) sitting at the dictionary's root.
 
-## The four checks (`repo:tests/test_vendored_authority_faithful.py`)
+## The four checks (`tests/test_vendored_authority_faithful.py`)
 
 Cheap to close because the source is **already installed** — `python-ags4`
 is a declared dev dependency (it is the parity oracle, see
@@ -111,7 +108,7 @@ not audit that source.
 
 Issue #558's own framing claimed the five `.ags` sources "have no
 provenance" and carry less metadata than
-`repo:tools/vendor/laterite-duckdb-functions.json`. That is false —
+`tools/vendor/laterite-duckdb-functions.json`. That is false —
 `data/PROVENANCE.md` predates this gate and was already thorough: source,
 retrieval date (2026-05-16), version, upstream URL, a reasoned licence
 position, a refresh recipe, and both a `.sh` and `.ps1` sync script. The
@@ -120,7 +117,7 @@ real gap was never *absence* of provenance; it was that the provenance was
 
 ## Where it lives
 
-`repo:tests/test_vendored_authority_faithful.py` (root pytest suite —
+`tests/test_vendored_authority_faithful.py` (root pytest suite —
 `uv run pytest tests/ -q`) and `repo:tools/check_upstream_pin.py` (invoked
 only from `.github/workflows/parity.yml`'s `upstream-pin` job, never
 locally-required, never on a PR).

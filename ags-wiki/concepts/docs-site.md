@@ -8,16 +8,12 @@ repo_refs:
   config: "repo:web/docs-site/mkdocs.yml"
   examples: "repo:web/docs-site/examples"
   fixture: "repo:examples/sample_site.ags"
-  runtime_gate: "repo:tests/test_docs_examples.py"
   node_gate: "repo:rust-packages/laterite-node/test/docs-examples.test.ts"
-  cli_gate: "repo:tests/test_docs_cli_examples.py"
-  duckdb_gate: "repo:tests/test_docs_duckdb_examples.py"
   link_gate: "repo:.github/workflows/ci.yml (docs job)"
   deploy: "repo:.github/workflows/deploy-validator.yml"
   catalogue: "repo:web/docs-site/scripts/gen_groups.py"
   glossary: "repo:web/docs-site/scripts/gen_types.py"
   catalogue_data: "repo:web/docs-site/scripts/catalogue_data.py"
-  catalogue_gate: "repo:tests/test_groups_catalogue_faithful.py"
   catalogue_js: "repo:web/docs-site/docs/javascripts/catalogue.js"
 related: [validator-site, playwright-e2e]
 sources: []
@@ -42,7 +38,7 @@ Key facts:
   non-Python trees; a changed return shape / dtype / printed format / method
   name turns a doc snippet **red in CI** — the example-first analogue of the
   OBSERVATIONS / `.pyi` drift gates):
-  - *python* — `repo:tests/test_docs_examples.py` runs each `ex*.py` as a
+  - *python* — `tests/test_docs_examples.py` runs each `ex*.py` as a
     subprocess against the installed wheel + the committed
     `repo:examples/sample_site.ags` fixture (`cwd` = repo root, so the literal
     `"examples/sample_site.ags"` path resolves); in-file `assert`s pin outputs.
@@ -51,14 +47,14 @@ Key facts:
     examples' literal `import … from "laterite"` resolves via a gitignored
     `node_modules/laterite` symlink beside them (the pack-smoke trick — ESM
     ignores `NODE_PATH`, and self-reference only works inside the package dir).
-  - *cli* — `repo:tests/test_docs_cli_examples.py` runs each `*.sh` with the
+  - *cli* — `tests/test_docs_cli_examples.py` runs each `*.sh` with the
     release `lat` on `PATH` (skipif not built, the `test_laterite.py`
     idiom), from a **temp dir** (scripts mint dirty files / certs), asserting
     the `# expect-exit: N` code and **byte-equality of stdout vs a committed
     sibling `.out`** — pages include the `[start:cmd]` section + the `.out`
     verbatim, so even the *output* blocks can't lie (the old hand-typed CLI
     table had already drifted from the binary's real box-drawing output).
-  - *duckdb* — `repo:tests/test_docs_duckdb_examples.py`, env-gated on
+  - *duckdb* — `tests/test_docs_duckdb_examples.py`, env-gated on
     `LATERITE_DUCKDB_EXT`; per-PR the `.sql` files are include-checked only
     (`--strict` + `check_paths`), the **monthly `compliance-report.yml`** runs
     them live against the from-source extension (fail-soft: ABI drift = visible
@@ -66,7 +62,7 @@ Key facts:
     include-only boilerplate.
   Browser tabs are **prose** (the web app has no user-facing code API).
 - **Changelog page — generated, version-stamped (#372).** `reference/changelog.md`
-  is built by `repo:web/docs-site/scripts/gen_changelog.py` (a `gen-files` script)
+  is built by `web/docs-site/scripts/gen_changelog.py` (a `gen-files` script)
   from the repo-root `CHANGELOG.md` plus the shipped version read from
   `packages/laterite/pyproject.toml` — **both derived at build**, so the page
   can't drift and needs no stamping. Repo-relative links are rewritten to the
@@ -97,7 +93,7 @@ Key facts:
   `TYPE` group + the `laterite-types` canonical mapping; heading tables deep-link
   each type code to its anchor). Pages are **NOT committed** (no 174-file churn per
   dict edit), so the drift guard is a pytest gate not a snapshot:
-  `repo:tests/test_groups_catalogue_faithful.py` (python job) asserts every group
+  `tests/test_groups_catalogue_faithful.py` (python job) asserts every group
   has a family, every declared family is non-empty, every *used* type code is
   documented, and provenance derives correctly — the catalogue-side analogue of the
   dictionary / OBSERVATIONS faithfulness gates. The paginate / filter / family-card

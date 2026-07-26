@@ -70,7 +70,7 @@ codes for `drop_custom`, off the dictionary SSOT rather than a re-embedded
 copy of `ags_dictionary.json`). `laterite-ags4-corpus-qa` now depends ON the leaf and
 keeps only its crawler/manifest/rayon/report wrapper
 (`repo:rust-packages/laterite-ags4-corpus-qa/src/censor.rs`). Added to the workspace
-members, the public-tree allowlist (`repo:tools/release/public-allowlist.txt`)
+members, the public-tree allowlist (`tools/release/public-allowlist.txt`)
 and a CI `wasm32-unknown-unknown` compile-guard — proven to compile for the
 browser target even though nothing consumes it there yet.
 

@@ -94,7 +94,7 @@ Planned `repo:rust-packages/laterite-ags4-forge` (sibling of
 `repo:rust-packages/laterite-ags4-validator/src/lib.rs`, the shared
 [[laterite-ags4-parity]] (extracted from
 `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs`), the python bridge
-`repo:tools/py_ags4_check_json.py`, and [[laterite-cliutil]] per the
+`tools/py_ags4_check_json.py`, and [[laterite-cliutil]] per the
 [[agent-first-cli-contract]].
 
 ## Relationship to other components

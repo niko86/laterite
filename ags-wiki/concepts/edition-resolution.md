@@ -10,9 +10,7 @@ repo_refs:
   build: "repo:rust-packages/laterite-ags4-reference/build.rs"
   gate_python: "repo:packages/laterite/tests/test_editions_single_source.py"
   gate_rust: "repo:rust-packages/laterite-ags4-check/src/commands/common.rs::every_bundled_edition_is_accepted"
-  web_generator: "repo:tools/gen_web_editions.py"
   web_generated: "repo:web/src/lib/editions.ts"
-  gate_web: "repo:tests/test_web_editions_match_generator.py"
 related: [start-here, parity-model, rule-families, surface-census, data-single-source-audit, laterite-ags4-reference, dec-edition-selection, laterite-ags4-validator, O-42, dec-custom-dict-overlay]
 sources: []
 ---

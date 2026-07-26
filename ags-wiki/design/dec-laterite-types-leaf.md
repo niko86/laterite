@@ -140,8 +140,8 @@ implementation.
 - Non-breaking: the `pub use` keeps `laterite_ags4_core::ags_types`;
   `laterite-types`/`laterite-ags4-core`/`ags5db` cargo suites stay green.
 - Allowlist + workspace/rewriter headers updated for the new crate
-  (`repo:tools/release/public-allowlist.txt`,
-  `repo:tools/release/rewrite-internal-refs.sh`).
+  (`tools/release/public-allowlist.txt`,
+  `tools/release/rewrite-internal-refs.sh`).
 
 ## Crate graph
 

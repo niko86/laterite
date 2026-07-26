@@ -25,8 +25,8 @@ predecessor this decision's single-converter approach supersedes.)
 
 dec-registry-driven-generation (#173) generated the consolidated, faithful
 multi-edition **union** `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json`
-from those `.ags` via `repo:tools/gen_dictionary.py`, with a CI faithfulness gate
-(`repo:tests/test_dictionary_faithful.py`). But the union didn't become the *only*
+from those `.ags` via `tools/gen_dictionary.py`, with a CI faithfulness gate
+(`tests/test_dictionary_faithful.py`). But the union didn't become the *only*
 representation: the same official data was still derived **twice** —
 
 1. `gen_dictionary.py` → `ags_dictionary.json` (consumed by the [[laterite-py]]
@@ -125,7 +125,7 @@ doesn't use them (it checks each heading's own declared unit/type).
   prove — that the five files themselves are faithful to the source
   `PROVENANCE.md` names. Measured, not argued: appending a fabricated group
   to `Standard_dictionary_v4_2.ags` and regenerating moved the union
-  174 → 175 groups with that gate still green. `repo:tests/test_vendored_authority_faithful.py`
+  174 → 175 groups with that gate still green. `tests/test_vendored_authority_faithful.py`
   closes it: byte-for-byte against the `python-ags4` copies installed as the
   dev-dependency oracle, the file *set*, `fallback_edition` against
   upstream's `LATEST_DICT_VERSION`, and the four hand-written `1.2.0`

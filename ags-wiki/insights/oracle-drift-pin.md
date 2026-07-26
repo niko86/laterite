@@ -31,7 +31,7 @@ sources: []
 
 ## Evidence
 - Was `repo:pyproject.toml` `"python-ags4>=1.2.0"`; `--selfcheck`
-  emitted only `{"ok":true}` (`repo:tools/py_ags4_check_json.py`).
+  emitted only `{"ok":true}` (`tools/py_ags4_check_json.py`).
 - `reconcile()` arms are literal python-source assumptions:
   `repo:rust-packages/laterite-ags4-corpus-qa/src/parity.rs` (O-2 Rule 6 no-op,
   O-3 Rule 5↔4, O-26 triple-19b, O-27 on-disk).
@@ -62,7 +62,7 @@ versioned conformance corpus + pinned reference oracle).
 > [!note] This page's fix pinned the *version string* and made drift loud
 > via `--selfcheck`; it never checked whether the five vendored `.ags`
 > dictionaries — themselves derived from that pinned python-ags4 — still
-> matched what `PROVENANCE.md` claims they are. `repo:tests/test_vendored_authority_faithful.py`
+> matched what `PROVENANCE.md` claims they are. `tests/test_vendored_authority_faithful.py`
 > now checks them byte-for-byte against the installed oracle (plus the file
 > set, the `fallback_edition` behaviour, and all four hand-written `1.2.0`
 > claims across the tree), and `repo:tools/check_upstream_pin.py` (a new

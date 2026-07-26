@@ -75,7 +75,7 @@ Commits the toolkit to: a single Cargo workspace + uv workspace; lockstep
 versioning across Rust and Python; capability/weight separation via wheel extras
 ([[crate-map]] "wheels split by weight, not repo"). Rules out: per-component
 repos, cross-repo version matrices, and N parallel release pipelines. The
-public/private split is handled at *file* level by `repo:.github/workflows/public-tree-gate.yml`,
+public/private split is handled at *file* level by `.github/workflows/public-tree-gate.yml`,
 not by a repo boundary — which keeps that concern orthogonal to this decision.
 
 > [!todo] **Revisit triggers — when a split (Option 4) earns itself**

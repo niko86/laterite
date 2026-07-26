@@ -28,7 +28,7 @@ repo) that **slurps + fully parses the whole file on every call**, and
 
 That's why the [[dec-duckdb-extension]] cross-surface perf run showed duckdb at
 ~5 MB/s for `parse-to-typed` while the in-memory surfaces hit 100–148 MB/s
-(`repo:docs/history/perf-matrix-2026-06-18.md`). The ~5 MB/s was a property of
+(`docs/history/perf-matrix-2026-06-18.md`). The ~5 MB/s was a property of
 the per-group access, not an engine limit.
 
 Two facts made the fix cheaper than first assumed:
@@ -105,7 +105,7 @@ accelerators** — the byte-index, the `.ags.idx` sidecar, the parse cache, and
 
 ## Consequences
 
-- **The fix is visible in the matrix** (`repo:docs/history/perf-matrix-2026-06-19.md`):
+- **The fix is visible in the matrix** (`docs/history/perf-matrix-2026-06-19.md`):
   with the cache, duckdb `parse-to-typed` (50 MB) rose **5 → 65 MB/s** (one parse,
   not 53), `query-filter` **193 → 3307 MB/s** (a repeat query is a cache hit, not a
   re-parse), and a new `query-loaded` op (materialise once, then scan the table)

@@ -230,7 +230,7 @@ exclusion at all (the crate isn't a workspace member to exclude); see
 ci-and-runners.
 
 It is also dropped from the **public *wheel* mirror** workspace: the `private`
-set in `repo:tools/release/rewrite-internal-refs.sh` lists `laterite-duckdb`
+set in `tools/release/rewrite-internal-refs.sh` lists `laterite-duckdb`
 alongside the three dev/QA crates, so the public `cargo build --workspace` never
 sees it. That is correct — it does **not** ship through the wheels — but it is
 not the whole story: a community extension is built from a **public repo with a
