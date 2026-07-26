@@ -177,7 +177,9 @@ describe("toDuckdb() — persist the keyed relational store", () => {
       await con.runAndReadAll(
         "SELECT table_name AS n FROM duckdb_tables() WHERE database_name = 'chk' ORDER BY 1",
       )
-    ).getRowObjectsJS().map((r) => r.n);
+    )
+      .getRowObjectsJS()
+      .map((r) => r.n);
     expect(names).toEqual(["LOCA", "PROJ", "SAMP"]);
     // SAMP leads with the two content-addressed key columns...
     const cols = (await con.runAndReadAll('DESCRIBE chk."SAMP"'))
@@ -189,7 +191,9 @@ describe("toDuckdb() — persist the keyed relational store", () => {
       await con.runAndReadAll(
         "SELECT s.SAMP_ID FROM chk.SAMP s JOIN chk.LOCA l ON s._parent_id = l._id ORDER BY s.SAMP_ID",
       )
-    ).getRowObjectsJS().map((r) => r.SAMP_ID);
+    )
+      .getRowObjectsJS()
+      .map((r) => r.SAMP_ID);
     expect(joined).toEqual(["S1", "S2", "S3"]);
   });
 
@@ -233,16 +237,18 @@ describe("toDuckdb() — persist the keyed relational store", () => {
       await con.runAndReadAll(
         "SELECT table_name AS n FROM duckdb_tables() WHERE database_name = 'chk' ORDER BY 1",
       )
-    ).getRowObjectsJS().map((r) => r.n);
+    )
+      .getRowObjectsJS()
+      .map((r) => r.n);
     expect(names).toEqual(["PROJ", "SAMP"]);
   });
 
   it("throws for an unknown group", async () => {
     const out = outPath("bad.duckdb");
     using ags = read(undefined, { text: AGS_REL });
-    await expect(
-      ags.toDuckdb(out, { groups: ["NOPE"] }),
-    ).rejects.toThrow(/not in file/);
+    await expect(ags.toDuckdb(out, { groups: ["NOPE"] })).rejects.toThrow(
+      /not in file/,
+    );
   });
 
   it("the free toDuckdb matches the fluent method, byte for byte", async () => {

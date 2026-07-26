@@ -1043,7 +1043,7 @@ class Ags4File:
         [`save`][laterite.Ags4File.save] (AGS4 text) and [`to_excel`][laterite.Ags4File.to_excel] (XLSX).
 
         Returns ``{"path", "tables_written", "rows_written"}`` (``path`` is the
-        written [`Path`][pathlib.Path]). ``groups`` optionally restricts / re-orders
+        written ``Path``). ``groups`` optionally restricts / re-orders
         the tables written (a subset of [`groups`][laterite.Ags4File.groups]); default
         is every group, in source order.
 
