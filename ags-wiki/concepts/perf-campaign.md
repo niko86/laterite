@@ -4,7 +4,7 @@ title: "perf campaign: the strategy, the stopping rule and the ledger"
 status: drafted
 tags: [concept, performance, process, register]
 volatile: [timings, status]
-volatile_asof: 2026-07-24
+volatile_asof: 2026-07-26
 ags_editions: []
 repo_refs:
   benches: "repo:rust-packages/laterite-ags4-validator/benches/validate.rs"
@@ -240,6 +240,23 @@ as such, because they are counts, not timings.
 | ~~8~~ | ~~the GIL is never released anywhere in `laterite-py` (zero `allow_threads`/`detach`)~~ | surfaces (wheel) | not hot — concurrency only | **LANDED T6 — concurrent throughput: validate 0.99 → 5.08×, read 0.96 → 3.53× @ 10 cores** (`Python::detach` around the pure-Rust compute in `run_check`/`parse_arrow`/`parse_compat_arrow`); single-call latency unchanged | contained | yes (`tools/bench-gil-throughput.py`, T6) | `test_gil_released.py` proves a concurrent thread advances *during* the native call |
 | 9 | `EmitGroup` owns `Vec<Vec<String>>`, so two callers deep-clone an already-owned matrix (`emit.rs:188`, node `lib.rs:243`) | emit + node | per-cell | **small** — `emit_ags4/report` is 22.4 ms and the writer is 2.9 ms of it | **invasive** — changes a public field type | partial | node and excel have no bench crate |
 | ~~10~~ | ~~the process uses the system allocator; `parse_bytes` is allocation-bound (~5M blocks / 25 MB, dhat-confirmed)~~ | parse leaf → all surfaces | per-cell alloc | **LANDED — mimalloc `#[global_allocator]` on all 3 native artifacts: wheel end-to-end read −22%, validate −14%; lat/node the same read win** for +163 KB (.so) / +116 KB (lat) | contained (dep + 3 lines/artifact; C `libmimalloc-sys` on the abi3 matrix, the accepted dep-shape cost) | yes (dhat + wheel e2e) | wheel 681 + node 289 green; Arrow release-callback handoff proven safe |
+| ~~11~~ | ~~the *keyed* keychain (`group_row_ids`) rebuilds a per-row all-columns `HashMap<String,String>` and re-hashes with a fresh `Sha256` per row — paid on every `.sql()`/`.at()`/`keys=True`/`to_duckdb` read (#6 skipped it on the keys-less default but left the keyed path untouched)~~ | reference leaf (keychain) → surfaces | per-row | **LANDED (Steps 1+2, #106/#108).** S1 `perf/keychain-positional-keys` — kill the per-row map, read KEY cells positionally: end-to-end node 25 MB **keyed** read **521 → 277 ms (−47%)**, keychain overhead ~386 → ~144 ms (−63%); isolated 1002 → 201 ns/row. S2 `perf/keychain-streaming-hash` — borrow + stream KEY cells into one reused `Sha256` (`finalize_reset`) behind a `ByteSink` trait: isolated `group_row_ids` **353 → 132 ns/row (2.68×)**. S2 end-to-end is flat — post-S1, id-minting sits one stage *behind* the Arrow key-column build + IPC, which now dominate the keyed read | contained (byte-identical; public signatures unchanged) | yes (`benches/keychain.rs` criterion + node `read.bench.ts`) | `content_id_pins_the_cross_surface_golden` + injectivity + node `p3-content-keys.test.ts` pin byte-identity |
+
+> [!note] **Keychain fast-follows (#11 continued) — priced, not taken.** After
+> S1+S2 the keyed read is bounded by the **Arrow key-column build + IPC**, not
+> id-minting, which reprioritises what remains of the plan:
+> - **S3 — memoise the parent `_id`** across a group's rows (siblings share a
+>   parent key-chain): ~5–15% of *id-minting*, concentrated on deep child groups
+>   (SAMP/SPEC/GEOL). But id-minting is no longer the dominant stage, so its
+>   *end-to-end* ceiling now falls below the tranche floor. Contained; recorded.
+> - **S4 — fuse UUID→string into the Arrow builder** (`laterite-types::arrow_cols`,
+>   a reused `[u8;36]`): this targets the *new* bottleneck, so it is the more
+>   promising end-to-end of the two (~15–30 ms / ~4–8% ceiling). Contained; the
+>   ranked fast-follow if the keyed path is reopened after 0.8.0.
+> - **S5 — emit `_id`/`_parent_id` as a 16-byte DuckDB `UUID`, not 36-char Utf8**
+>   (**FLAG** — changes the column *type*, not identity: proven round-trip-equal
+>   and join-compatible with existing VARCHAR `.duckdb` files). Its own design
+>   page and a deliberate owner decision, not a 0.8.0 slip-in.
 
 Below the floor, measured out — recorded so they are not rediscovered:
 
@@ -621,8 +638,9 @@ a minor pass. The native `table_ipc` gained a `with_keys` arg (defaults ON — t
 relational contract); the DEFAULT `table(code)` now calls it with `false`, so a
 keys-less read skips the keychain wholesale instead of building-then-stripping.
 Result: **default `read + table(all)` 692 → 152 ms (−78%)** — now only ~22 ms over
-parse. The keyed variant is unchanged (649 ms, within drift): the keychain is paid
-only when a caller asks for `_id`/`_parent_id`.
+parse. The keyed variant is unchanged *by #6* (649 ms, within drift): the keychain
+is paid only when a caller asks for `_id`/`_parent_id`. **The keyed keychain itself
+was then made cheaper as its own candidate — see queue #11 (Steps 1+2, #106/#108).**
 
 **#7 — MEASURED, DEFERRED (2026-07-25, issue #99).** `bench-vs-python-ags4.py`
 always does a full read, so a targeted probe was needed: on the 25 MB rung the
