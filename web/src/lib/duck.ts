@@ -227,6 +227,35 @@ export async function exportQuery(
   }
 }
 
+/** Export the whole ingested relational store as a DuckDB database file's bytes
+ *  — one keyed table per ingested group. The content-addressed `_id`/`_parent_id`
+ *  columns come along (ExplorePane ingests keys=true), so the downloaded `.duckdb`
+ *  joins and version-diffs by `_id`, matching the library's `to_duckdb()` and what
+ *  the `read_ags` DuckDB extension expects. ATTACH a virtual db, copy each table in
+ *  with a per-group CTAS, DETACH, then read the file back out (the same
+ *  COPY→`copyFileToBuffer` mechanism `exportQuery` uses). */
+export async function exportDuckdb(): Promise<Uint8Array> {
+  const { db, conn } = await getDuckDb();
+  if (ingested.size === 0) {
+    throw new Error(
+      "No tables loaded to export — open the Explore pane first.",
+    );
+  }
+  const file = `__export_${exportSeq++}.duckdb`;
+  try {
+    await conn.query(`ATTACH '${file}' AS _lat_out`);
+    for (const code of ingested) {
+      await conn.query(
+        `CREATE TABLE _lat_out."${code}" AS SELECT * FROM "${code}"`,
+      );
+    }
+    await conn.query("DETACH _lat_out"); // flush + close so the FS file is complete
+    return await db.copyFileToBuffer(file);
+  } finally {
+    await db.dropFile(file).catch(() => {});
+  }
+}
+
 /** Drop every ingested table and clear the ingested-set so the next file
  *  re-ingests from scratch. Awaited (not fire-and-forget) so a re-ingest of
  *  the same code can't race a late DROP of the freshly-created table. No-op

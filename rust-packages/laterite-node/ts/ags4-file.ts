@@ -1,7 +1,13 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { type Table, tableFromIPC } from "apache-arrow";
-import { DuckEngine, type QueryOptions, quoteId, type Row } from "./duckdb";
+import {
+  DuckEngine,
+  type DuckdbStats,
+  type QueryOptions,
+  quoteId,
+  type Row,
+} from "./duckdb";
 import { Ags4Error, raiseFor } from "./errors";
 // The chained verbs (`fix`/`diff`/`toExcel`) reuse the free functions with this
 // handle's retained source, so the ONE engine call + error mapping lives in one
@@ -250,6 +256,36 @@ export class Ags4File {
     return xlsxPath === undefined
       ? toExcelFree(this.bytes, undefined, opts)
       : toExcelFree(this.bytes, xlsxPath, opts);
+  }
+
+  /** Persist this file's groups to a DuckDB database at `path` — one born-typed
+   * table per group under its clean 4-letter code, each carrying the content-
+   * addressed `_id`/`_parent_id` key columns, so the store is join-ready and
+   * version-diffable by `_id` (what the `read_ags` DuckDB extension diffs on). The
+   * DuckDB counterpart to {@link save} (AGS4) and {@link toExcel} (XLSX).
+   *
+   * Returns `{ path, tables_written, rows_written }`. `groups` optionally
+   * restricts/re-orders the tables (default: all, source order). The tables are
+   * always keyed — unlike a {@link table} frame, which drops the ids for display.
+   * Refuses to overwrite an existing `path`. Needs the optional `@duckdb/node-api`
+   * peer. Mirrors `laterite.Ags4File.to_duckdb()`. */
+  async toDuckdb(
+    path: string,
+    opts: { groups?: string[] } = {},
+  ): Promise<DuckdbStats> {
+    if (existsSync(path)) {
+      throw new Ags4Error(
+        `${path} exists; toDuckdb writes a fresh database (remove it first)`,
+      );
+    }
+    const codes = opts.groups ?? this.groups;
+    for (const code of codes) {
+      if (!this.has(code)) throw new Ags4Error(`group '${code}' not in file`);
+    }
+    const engine = await this.#getEngine();
+    for (const code of codes) await this.#register(code, engine);
+    const rows = await engine.persist(path, codes);
+    return { path, tables_written: codes.length, rows_written: rows };
   }
 
   // --- fluent verbs (validate / fix / diff) --------------------------------

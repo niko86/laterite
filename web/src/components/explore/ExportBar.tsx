@@ -44,6 +44,23 @@ export const ExportBar: Component<{
     }
   };
 
+  // The whole keyed relational database — ALL groups (with _id/_parent_id), not
+  // just this query's result. The browser counterpart to the library's
+  // to_duckdb(); the download is ready to open in DuckDB or diff with read_ags.
+  const doExportDb = async () => {
+    setBusy("duckdb");
+    setNote(null);
+    try {
+      const { exportDuckdb } = await import("../../lib/duck");
+      const bytes = await exportDuckdb();
+      download(bytes, `${props.filename}.duckdb`, "application/octet-stream");
+    } catch (e) {
+      setNote(`DuckDB export failed: ${String(e)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <div class="flex flex-wrap items-center gap-2 text-xs">
       <span class="text-fg-muted">Export:</span>
@@ -51,6 +68,7 @@ export const ExportBar: Component<{
         {(fmt) => (
           <button
             type="button"
+            title={`This query's result as ${fmt.toUpperCase()}`}
             class="rounded border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-40"
             disabled={busy() !== null}
             onClick={() => void doExport(fmt)}
@@ -59,6 +77,15 @@ export const ExportBar: Component<{
           </button>
         )}
       </For>
+      <button
+        type="button"
+        title="The whole keyed database — every group with its _id/_parent_id keys, not just this query"
+        class="rounded border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-40"
+        disabled={busy() !== null}
+        onClick={() => void doExportDb()}
+      >
+        {busy() === "duckdb" ? "…" : "DuckDB"}
+      </button>
       <Show when={note()}>
         <span class="text-warn">{note()}</span>
       </Show>

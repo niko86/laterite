@@ -53,8 +53,10 @@ The host DuckDB per surface — **peers, not special cases**:
 
 > [!note] duckdb-wasm is the browser's host DuckDB — for reads **and** writes
 > `duckdb-wasm` plays the exact same role pip-`duckdb`/`@duckdb/node-api` play
-> natively. It ingests the Rust crate's Arrow IPC to query **and can persist**
-> (OPFS-backed databases / `COPY`/`EXPORT` to a downloadable file). The browser is
+> natively. It ingests the Rust crate's Arrow IPC to query **and persists**: the
+> Explore pane's **DuckDB** download writes the whole keyed store to a `.duckdb`
+> via `ATTACH` + a per-group CTAS + `copyFileToBuffer` (`repo:web/src/lib/duck.ts`
+> `exportDuckdb()`) — the same shape the native hosts use. The browser is
 > **not** a special case for materialise. What is genuinely native-only is a
 > different thing — Rust-side persistence accelerators (the `.ags.idx` byte-index
 > sidecar, the parse cache) need Rust filesystem access, which wasm-Rust lacks
@@ -115,6 +117,19 @@ and the host DuckDB writes the file (a plain queryable `.duckdb`, *not* `.ags5db
   the monorepo ([[dec-monorepo-structure]] — the extension is the sole justified split).
 - **wasm is uniform**: it reads and materialises via `duckdb-wasm` (Arrow IPC in,
   OPFS/export out). Only the Rust-side accelerators (sidecar/cache) stay native-only.
+- **The materialise terminal shipped (0.8.0) — `to_duckdb()`.** Each host writes the
+  keyed relational store to a `.duckdb` with the same shape: Python
+  `Ags4File.to_duckdb(path, *, groups=None)` (fluent) + `laterite.to_duckdb(src, out)`
+  (functional) (`repo:packages/laterite/python/laterite/__init__.py`); Node
+  `AgsFile.toDuckdb(path)` + top-level `toDuckdb()`
+  (`repo:rust-packages/laterite-node/ts/ags4-file.ts`); and the browser's Explore
+  **DuckDB** download (`repo:web/src/lib/duck.ts`). All three `ATTACH` the target and
+  copy each group in with a per-group CTAS, so every table carries `_id`/`_parent_id`
+  — the persisted store joins and version-diffs by `_id`, byte-identical to the
+  extension's `read_ags`/`load_ags`. They **refuse to overwrite** and (native) return
+  `{path, tables_written, rows_written}`. The `lat` CLI stays DuckDB-free; the
+  SQL-user path to a `.duckdb` is the extension's `load_ags` into a file-backed
+  database ([[dec-duckdb-extension]]).
 - The shared **UUIDv8 keychain** crate is the one piece the extension flows back into
   the libraries — **done (#303)**: every read surface (the Python wheel via
   `Reading::table_for`, the Node addon via `table_ipc`, and the browser via wasm

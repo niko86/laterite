@@ -45,6 +45,12 @@ _PAIRS = {
         {"source", "output", "path", "text", "data"},
         {"path"},
     ),
+    "to_duckdb": (
+        L.to_duckdb,
+        L.Ags4File.to_duckdb,
+        {"source", "output", "path", "text", "data"},
+        {"path"},
+    ),
 }
 
 

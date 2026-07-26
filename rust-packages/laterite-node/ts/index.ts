@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { type Table, tableFromArrays, tableToIPC } from "apache-arrow";
 import { Ags4File } from "./ags4-file";
 import { BuildResult } from "./build-result";
-import { stripSynthKeys } from "./duckdb";
+import { type DuckdbStats, stripSynthKeys } from "./duckdb";
 import {
   Ags4Error,
   FileNotFoundError,
@@ -849,6 +849,32 @@ export function toExcel(
 }
 
 /**
+ * Persist AGS4 to a DuckDB database — one born-typed, keyed table per group. The
+ * functional twin of the fluent {@link Ags4File.toDuckdb} (`read(src).toDuckdb(out)`).
+ *
+ * `source` is an AGS4 file path, raw `Uint8Array` bytes, or an already-{@link read}
+ * {@link Ags4File}; `output` is the `.duckdb` path to write (required — a database
+ * is a file, with no bytes-in-memory form). Returns
+ * `{ path, tables_written, rows_written }` and refuses to overwrite an existing
+ * `output`. `groups` optionally restricts/re-orders the tables. Each table carries
+ * the content-addressed `_id`/`_parent_id` keys, so the store joins and
+ * version-diffs by `_id`. Needs the optional `@duckdb/node-api` peer.
+ */
+export async function toDuckdb(
+  source: string | Uint8Array | Ags4File,
+  output: string,
+  opts: { groups?: string[] } & ReadOptions = {},
+): Promise<DuckdbStats> {
+  const owned = !(source instanceof Ags4File);
+  const file = owned ? read(source, opts) : source;
+  try {
+    return await file.toDuckdb(output, { groups: opts.groups });
+  } finally {
+    if (owned) file.close(); // free the intermediate handle's DuckDB engine
+  }
+}
+
+/**
  * Convert an AGS4-shaped `.xlsx` workbook to AGS4 (the Node analog of
  * `from_excel`). `source` is an `.xlsx` file path or raw `Uint8Array` bytes;
  * `formatNumericColumns` (default true) re-applies AGS4 numeric formatting.
@@ -884,7 +910,7 @@ export function fromExcel(
 
 export { Ags4File } from "./ags4-file";
 export { AgsSubset, type Filter } from "./subset";
-export type { QueryOptions, Row } from "./duckdb";
+export type { DuckdbStats, QueryOptions, Row } from "./duckdb";
 export { BuildResult, type BuildFinding } from "./build-result";
 export { FixResult, type AppliedFix } from "./fix-result";
 export {

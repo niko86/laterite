@@ -80,6 +80,7 @@ __all__ = [
     "merge",
     "read",
     "source",
+    "to_duckdb",
     "to_excel",
     "validate",
 ]
@@ -1029,6 +1030,57 @@ class Ags4File:
         Path(path).write_bytes(xlsx)
         return dict(stats)
 
+    def to_duckdb(
+        self,
+        path: str | os.PathLike[str],
+        *,
+        groups: list[str] | None = None,
+    ) -> dict:
+        """Persist this file's groups to a DuckDB database at ``path`` — one
+        born-typed table per group under its clean 4-letter code, each carrying the
+        content-addressed ``_id`` / ``_parent_id`` key columns, so the store is
+        join-ready and version-diffable by ``_id``. The DuckDB counterpart to
+        [`save`][laterite.Ags4File.save] (AGS4 text) and [`to_excel`][laterite.Ags4File.to_excel] (XLSX).
+
+        Returns ``{"path", "tables_written", "rows_written"}`` (``path`` is the
+        written ``Path``). ``groups`` optionally restricts / re-orders
+        the tables written (a subset of [`groups`][laterite.Ags4File.groups]); default
+        is every group, in source order.
+
+        The tables are **always keyed** — unlike a [`table`][laterite.Ags4File.table]
+        frame, which drops the ids for display: the joinable, diffable keys are the
+        whole point of the relational store, and a persisted ``_id`` is the
+        cross-version contract the ``read_ags`` DuckDB extension diffs on.
+
+        Refuses to overwrite an existing ``path`` — a database file is not clobbered
+        silently the way [`save`][laterite.Ags4File.save] rewrites an ``.ags``; remove
+        it first to replace it."""
+        path = Path(path)
+        if path.exists():
+            raise FileExistsError(
+                f"{path} exists; to_duckdb writes a fresh database (remove it first)"
+            )
+        codes = list(self._p["group_order"] if groups is None else groups)
+        con = self._engine()
+        for code in codes:
+            self._register(code)  # KeyError if a named group isn't in the file
+        # ATTACH the on-disk db and copy each in-memory group table into it. A
+        # per-group CTAS (not `COPY FROM DATABASE`) so a caller-`register()`ed frame
+        # can't leak in, and so `groups=` selects/orders exactly. The path is
+        # single-quote-escaped: DuckDB's ATTACH takes no bind parameter for it.
+        escaped = str(path).replace("'", "''")
+        con.execute(f"ATTACH '{escaped}' AS _lat_out")
+        rows = 0
+        try:
+            for code in codes:
+                con.execute(f'CREATE TABLE _lat_out."{code}" AS SELECT * FROM "{code}"')
+                rows += con.execute(
+                    f'SELECT count(*) FROM _lat_out."{code}"'
+                ).fetchone()[0]
+        finally:
+            con.execute("DETACH _lat_out")
+        return {"path": path, "tables_written": len(codes), "rows_written": rows}
+
     @property
     def fix_report(self) -> FixResult | None:
         """The [`FixResult`][laterite.FixResult] from the [`fix`][laterite.fix] that produced this handle —
@@ -1612,6 +1664,39 @@ def to_excel(
     # bytes-out (output None) or a text/bytes source → go through a handle, whose
     # to_excel writes the spec-correct re-emit or returns the workbook bytes.
     return read(path=p, text=txt, data=raw).to_excel(output, groups=groups)
+
+
+def to_duckdb(
+    source: Any = None,
+    output: str | os.PathLike[str] | None = None,
+    *,
+    path: str | os.PathLike[str] | None = None,
+    text: str | None = None,
+    data: bytes | bytearray | memoryview | None = None,
+    groups: list[str] | None = None,
+) -> dict:
+    """Persist AGS4 to a DuckDB database — one born-typed, keyed table per group.
+
+    ``source`` is anything [`read`][laterite.read] accepts (a path / file-like / bytes /
+    AGS4 text) or an already-[`read`][laterite.read] [`Ags4File`][laterite.Ags4File];
+    ``output`` is the ``.duckdb`` path to write — **required**, since a database is a
+    file with no bytes-in-memory form (unlike [`to_excel`][laterite.to_excel]). Returns
+    ``{"path", "tables_written", "rows_written"}`` and refuses to overwrite an
+    existing ``output``. ``groups`` optionally restricts / re-orders the tables.
+
+    The functional twin of the fluent [`Ags4File.to_duckdb`][laterite.Ags4File.to_duckdb]
+    (``read(src).to_duckdb(out)``). Each table carries the content-addressed
+    ``_id`` / ``_parent_id`` keys, so the store joins and version-diffs by ``_id``."""
+    if output is None:
+        raise TypeError("to_duckdb requires an output path (a DuckDB database file)")
+    if isinstance(source, Ags4File):
+        return source.to_duckdb(output, groups=groups)
+    p, txt, raw = _resolve_source(source, path=path, text=text, data=data)
+    handle = read(path=p, text=txt, data=raw)
+    try:
+        return handle.to_duckdb(output, groups=groups)
+    finally:
+        handle.close()  # free the intermediate handle's DuckDB engine
 
 
 def from_excel(

@@ -40,6 +40,14 @@ export interface QueryOptions {
   arrow?: boolean;
 }
 
+/** Stats from `toDuckdb` — the written `path` plus how many tables/rows landed.
+ * snake_case to match `laterite-py`'s `to_duckdb` dict and the Rust `ExcelStats`. */
+export interface DuckdbStats {
+  path: string;
+  tables_written: number;
+  rows_written: number;
+}
+
 // Minimal structural types for the slice of `@duckdb/node-api` we use — keeps
 // the package's own typecheck free of any static dependency on the optional peer
 // (the dynamic import below is deliberately untyped).
@@ -218,6 +226,36 @@ export class DuckEngine {
           `(${e instanceof Error ? e.message : String(e)})`,
       );
     }
+  }
+
+  /** Persist the given already-`register()`ed group tables to a DuckDB database
+   * at `path`: ATTACH the on-disk db, copy each group in with a per-group CTAS
+   * (not `COPY FROM DATABASE`, so a caller-registered view can't leak in and
+   * `codes` selects/orders exactly), then DETACH. The tables are copied WITH
+   * their `_id`/`_parent_id` keys — the point of a persisted store. Returns the
+   * total rows written. */
+  async persist(path: string, codes: string[]): Promise<number> {
+    // ATTACH takes no bind parameter for the path — single-quote-escape it.
+    const escaped = path.replace(/'/g, "''");
+    await this.#con.run(`ATTACH '${escaped}' AS _lat_out`);
+    let rows = 0;
+    try {
+      for (const code of codes) {
+        await this.#con.run(
+          `CREATE TABLE _lat_out.${quoteId(code)} AS SELECT * FROM ${quoteId(code)}`,
+        );
+        const r = await this.#con.runAndReadAll(
+          `SELECT count(*) AS n FROM _lat_out.${quoteId(code)}`,
+        );
+        // count(*) always yields exactly one row, so index [0] is present —
+        // cast past the `noUncheckedIndexedAccess` `| undefined`; `n` is a bigint.
+        const [row] = r.getRowObjectsJS() as [Row];
+        rows += Number(row.n);
+      }
+    } finally {
+      await this.#con.run("DETACH _lat_out");
+    }
+    return rows;
   }
 
   /** Close the connection (synchronous — mirrors `Ags4File.close`). */
