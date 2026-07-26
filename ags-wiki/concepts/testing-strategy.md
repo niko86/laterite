@@ -18,7 +18,7 @@ repo_refs:
   modality_output_gate_node: "repo:rust-packages/laterite-node/test/modality-output-parity.test.ts"
   output_value_gate: "repo:rust-packages/laterite-ags4-xcheck/src/bin/xcheck.rs"
   four_laterite_tuple_floor: "repo:rust-packages/laterite-ags4-compliance/src/main.rs"
-related: [parity-model, parity-confidence-model, modality-register, crate-map, pyo3-boundary, playwright-e2e, surface-census, data-single-source-audit, start-here, laterite-ags4-validator, cert-trust-v2, O-42, vendored-authority-faithful]
+related: [parity-model, parity-confidence-model, modality-register, crate-map, pyo3-boundary, playwright-e2e, surface-census, data-single-source-audit, start-here, laterite-ags4-validator, cert-trust-v2, coverage-campaign, O-42, vendored-authority-faithful]
 sources: []
 ---
 
@@ -153,4 +153,5 @@ flowchart LR
 - [[pyo3-boundary]] · [[crate-map]] — the surfaces the properties run across
 - [[playwright-e2e]] — the browser end of the test pyramid
 - [[core-perf-baseline]] — the criterion benches: what the core data path costs, and the rule-family attribution. A perf regression is a correctness-adjacent failure the test suite cannot see
+- [[coverage-campaign]] — the ranked work-list for raising every language's line floor to 95%, and the useful-not-gamed doctrine that governs it
 - [[start-here]]

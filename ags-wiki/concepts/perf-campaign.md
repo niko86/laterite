@@ -10,7 +10,7 @@ repo_refs:
   benches: "repo:rust-packages/laterite-ags4-validator/benches/validate.rs"
   fixtures: "repo:tools/gen-bench-fixtures.sh"
   readme_bench: "repo:tools/bench-vs-python-ags4.py"
-related: [core-perf-baseline, abi3-perf, testing-strategy, crate-map, reliquary]
+related: [core-perf-baseline, abi3-perf, testing-strategy, coverage-campaign, crate-map, reliquary]
 sources: []
 ---
 # perf campaign: the strategy, the stopping rule and the ledger
@@ -54,7 +54,8 @@ attribution is a guess with a number attached** — this ledger marks them as su
    is folklore. This applies to wiki numbers and README numbers equally.
 6. **Cover what you touch.** A perf change that moves a branch into a hot path
    without a test is a latent bug with better timing. If the area has a coverage
-   gap, close it *in the same change* — see the coverage column below.
+   gap, close it *in the same change* — see the coverage column below, and the
+   coverage sibling of this ledger, [[coverage-campaign]].
 
 ## Order of attack
 
@@ -818,4 +819,4 @@ allocation-bound (fixable) or a compute/bandwidth wall.
 [[core-perf-baseline]] — the findings this campaign produced.
 [[abi3-perf]] — the binding's cost, measured separately.
 
-[[core-perf-baseline]] · [[abi3-perf]] · [[testing-strategy]] · [[crate-map]] · [[reliquary]]
+[[core-perf-baseline]] · [[abi3-perf]] · [[testing-strategy]] · [[coverage-campaign]] · [[crate-map]] · [[reliquary]]
