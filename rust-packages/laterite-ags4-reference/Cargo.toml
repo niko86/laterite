@@ -62,5 +62,15 @@ encoding_rs = "0.8"
 phf_codegen = "0.14"
 serde_json = "1"
 
+[dev-dependencies]
+# Isolated micro-bench for the keychain hot path (group_row_ids). Dev-only, so it
+# never enters the reference leaf's NORMAL dep graph — tests/dep_graph.rs gates
+# that (it checks `cargo tree -e normal`).
+criterion = "0.8"
+
+[[bench]]
+name = "keychain"
+harness = false
+
 [lints]
 workspace = true
