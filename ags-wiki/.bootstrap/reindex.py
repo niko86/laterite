@@ -36,7 +36,7 @@ CLASSES = [
 CAMPAIGN = {c["dir"] for c in _CLASSES if c["campaign"]}
 
 
-def fmval(txt: str, key: str):
+def fmval(txt: str, key: str) -> str:
     m = re.search(rf"^{re.escape(key)}:\s*(.+?)\s*$", txt, re.M)
     return m.group(1).strip() if m else ""
 

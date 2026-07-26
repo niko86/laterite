@@ -12,9 +12,12 @@ always-available substrate (mandatory dep); the core surface returns polars
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # Module-level compat backend default. `compat.set_backend(...)`
 # mutates this; env LATERITE_COMPAT_BACKEND overrides the built-in
@@ -188,7 +191,9 @@ def _pyarrow_available() -> bool:
     return True
 
 
-def compat_materializer(backend: str, string_dtype: str):
+def compat_materializer(
+    backend: str, string_dtype: str
+) -> Callable[[Any, list[str]], Any]:
     """Resolve — ONCE, before the per-group loop — the cheapest hop from a native
     compat Arrow table (a leading `HEADING` tag column then one `Utf8` column per
     heading, positional field names) to `backend`, returning a

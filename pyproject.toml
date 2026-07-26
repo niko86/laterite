@@ -195,7 +195,7 @@ extend-exclude = [
 select = [
     "E", "F", "I", "B", "UP", "PIE",
     "SIM", "C4", "RET", "RSE", "PTH", "RUF", "PT", "TCH", "PERF", "FLY",
-    "LOG", "ICN", "G", "TRY",
+    "LOG", "ICN", "G", "TRY", "ANN",
 ]
 ignore = [
     "E501",  # line length — let the formatter handle it
@@ -214,6 +214,12 @@ ignore = [
     "RUF001",
     "RUF002",
     "RUF003",
+    # ANN401 (any-type): a library that accepts path/text/bytes/file-like and
+    # arbitrary dataframes legitimately types those boundaries `Any` — forbidding
+    # it means `# noqa` noise, not safety. The rest of ANN (missing arg/return
+    # annotations) IS enforced, so `ty` then type-checks what ANN forces you to
+    # write. Enabled repo-wide but per-file-ignored in tests/examples below.
+    "ANN401",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -221,12 +227,16 @@ ignore = [
 # diffable, matches the format's own line-per-record shape) then joined with
 # "\r\n" — the autofix collapses that into one unreadable mega-line, which is
 # a strictly worse trade for a one-off fixture literal.
-"tests/**" = ["B011", "FLY002"]
-"**/tests/**" = ["B011", "FLY002"]
+# ANN: a test's signature is not an API — annotating every `test_*(self) -> None`
+# and fixture arg is bulk with no safety gain (the test IS the check). Enforced in
+# shipped code + tools, ignored here.
+"tests/**" = ["B011", "FLY002", "ANN"]
+"**/tests/**" = ["B011", "FLY002", "ANN"]
 # Example scripts intentionally mutate sys.path/env before imports.
 # E402: marimo notebooks import inside @app.cell functions.
 # B018: a marimo cell's bare last expression IS its rendered output.
-"examples/**" = ["E402", "B018"]
+# ANN: illustrative demo scripts, not a typed surface.
+"examples/**" = ["E402", "B018", "ANN"]
 
 # --- Type-faithfulness gate (#303 Phase 1) --------------------------------
 # Astral `ty` (preview). Originally scoped to the SHIPPED `laterite` package

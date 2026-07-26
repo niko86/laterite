@@ -27,7 +27,10 @@ classes are passthrough leaves; their children, if any, attach via
 from __future__ import annotations
 
 import hashlib
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 __all__ = ["clear_cache", "get_or_register", "registered_classes"]
 
@@ -48,13 +51,13 @@ def _shape_key(headings: list[dict[str, Any]]) -> tuple[tuple[str, str], ...]:
     return tuple(sorted((h["name"], h.get("type", "X")) for h in headings))
 
 
-def _make_init(field_names: tuple[str, ...]):
+def _make_init(field_names: tuple[str, ...]) -> Callable[..., None]:
     """Build an ``__init__`` that accepts kwargs matching field_names
     only — anything else raises ``TypeError`` (mirrors the compiled
     ``#[pyclass]`` contract). Missing fields default to None."""
     field_set = frozenset(field_names)
 
-    def __init__(self, **kwargs):
+    def __init__(self: object, **kwargs: object) -> None:
         unknown = [k for k in kwargs if k not in field_set]
         if unknown:
             raise TypeError(
@@ -67,14 +70,14 @@ def _make_init(field_names: tuple[str, ...]):
     return __init__
 
 
-def _make_repr(name: str):
-    def __repr__(self):
+def _make_repr(name: str) -> Callable[..., str]:
+    def __repr__(self: object) -> str:
         return f"{name}(...)"
 
     return __repr__
 
 
-def _walk(self, code: str) -> list:
+def _walk(self: object, code: str) -> list:
     """Dynamic classes are passthrough — by policy ``walk`` returns
     ``[]``. Passthrough children attached via ``setattr`` from
     ``read_db`` are reachable via ``getattr(parent, child_field, [])``,

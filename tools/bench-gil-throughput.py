@@ -25,8 +25,12 @@ import argparse
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
 from laterite import _laterite_native as N
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 def synthetic_ags(n_rows: int) -> bytes:
@@ -49,7 +53,7 @@ def synthetic_ags(n_rows: int) -> bytes:
     return (head + rows + "\r\n").encode("utf-8")
 
 
-def wall(op, n_tasks: int, n_workers: int) -> float:
+def wall(op: Callable[[], object], n_tasks: int, n_workers: int) -> float:
     with ThreadPoolExecutor(max_workers=n_workers) as ex:
         t0 = time.perf_counter()
         list(ex.map(lambda _: op(), range(n_tasks)))

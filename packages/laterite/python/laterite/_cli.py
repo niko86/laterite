@@ -90,7 +90,7 @@ def _plain(file: str, findings: list[dict], n: int) -> str:
     return "\n".join(out) + "\n"
 
 
-def _engine(args) -> dict:
+def _engine(args: argparse.Namespace) -> dict:
     """A full rules pass — the `run_check` verdict dict every renderer below reads."""
     return _native.run_check(
         path=args.file,
@@ -104,7 +104,7 @@ def _engine(args) -> dict:
     )
 
 
-def _pin(args) -> Edition | None:
+def _pin(args: argparse.Namespace) -> Edition | None:
     """The edition pin as the *library* spells it: an edition, or `None` for none.
 
     `--dict-version` defaults to the string `"auto"`, which is the CLI's sentinel for
@@ -123,7 +123,7 @@ def _pin(args) -> Edition | None:
     return cast("Edition", dv)
 
 
-def _with_cert(args) -> dict:
+def _with_cert(args: argparse.Namespace) -> dict:
     """`--index <cert>`: give a `.ags.idx` certificate first refusal at the verdict.
 
     The cert POLICY is the library's — :func:`laterite.read` fails fast when the
@@ -171,7 +171,7 @@ def _with_cert(args) -> dict:
     return report._r
 
 
-def _run_validate(args) -> int:
+def _run_validate(args: argparse.Namespace) -> int:
     r = _with_cert(args) if args.index else _engine(args)
     if not r.get("ok"):
         print(f"error: {r.get('error')}", file=sys.stderr)
@@ -207,7 +207,7 @@ def _run_validate(args) -> int:
     return code
 
 
-def _run_fix(args) -> int:
+def _run_fix(args: argparse.Namespace) -> int:
     """`lat fix`: mechanically repair the file. Faithful to the Rust `fix`
     (sibling `<file>.fixed.ags` by default; `--in-place` / `--fix-out` redirect).
     Exit 0 clean · 1 residual · 3/4/5 read/parse/dict errors."""
@@ -312,7 +312,7 @@ def _list_rules(as_json: bool) -> int:
     return 0
 
 
-def _run_diff(args) -> int:
+def _run_diff(args: argparse.Namespace) -> int:
     """`lat diff <a> <b>`: the KEY-aware/type-aware revision delta. Faithful to
     the Rust `diff`: a per-group summary (or the full delta with `--json`)."""
     import json
@@ -346,7 +346,7 @@ def _run_diff(args) -> int:
     return 0
 
 
-def _run_merge(args) -> int:
+def _run_merge(args: argparse.Namespace) -> int:
     """`lat merge <files...> --out <merged.ags>` — reconcile N deliveries into one.
 
     Faithful to the Rust `merge`: argument order is the authority (the LAST file
@@ -435,7 +435,7 @@ def _run_merge(args) -> int:
     return 0
 
 
-def _run_certify(args) -> int:
+def _run_certify(args: argparse.Namespace) -> int:
     """`lat certify <file>`: mint the `.ags.idx` for an error-clean file.
 
     This function used to be the FIFTH place in the codebase that decided what a
@@ -493,7 +493,7 @@ used `JSON.stringify` — three libraries held byte-identical by discipline, wit
 no gate on `read` output (#530). """
 
 
-def _read_table(headings, rows) -> str:
+def _read_table(headings: list[str], rows: list[list[str]]) -> str:
     """A plain aligned table for `lat read <group>` — the human view (the Rust
     binary renders its own comfy-table box grid; only --json/--csv are byte-coherent)."""
     w = [len(h) for h in headings]
@@ -509,7 +509,7 @@ def _read_table(headings, rows) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _run_read(args) -> int:
+def _run_read(args: argparse.Namespace) -> int:
     """`lat read <file> [group]` — list the file's group codes, or dump a group
     as a table / CSV / JSON. Raw file cells via the native read codec, so the
     Rust binary and this CLI agree byte-for-byte on the group listing and on
@@ -558,7 +558,7 @@ def _run_read(args) -> int:
     return _emit(body, args.out)
 
 
-def _resolve_password(password_file, prompt: str) -> str:
+def _resolve_password(password_file: str | None, prompt: str) -> str:
     """Passphrase precedence — `--password-file` → `$LAT_TRANSPORT_PASSWORD` → an
     interactive prompt (never echoed). NEVER a `--password` flag: argv leaks into
     `ps` and shell history. Mirrors the Rust `lat`'s resolution exactly."""
@@ -575,7 +575,7 @@ def _resolve_password(password_file, prompt: str) -> str:
     return getpass.getpass(prompt)
 
 
-def _run_pack(args) -> int:
+def _run_pack(args: argparse.Namespace) -> int:
     from pathlib import Path
 
     from . import transport
@@ -592,7 +592,7 @@ def _run_pack(args) -> int:
     return 0
 
 
-def _run_unpack(args) -> int:
+def _run_unpack(args: argparse.Namespace) -> int:
     from pathlib import Path
 
     from . import transport
@@ -609,7 +609,7 @@ def _run_unpack(args) -> int:
     return 0
 
 
-def _run_lock(args) -> int:
+def _run_lock(args: argparse.Namespace) -> int:
     from pathlib import Path
 
     from . import transport
@@ -633,7 +633,7 @@ def _run_lock(args) -> int:
     return 0
 
 
-def _run_unlock(args) -> int:
+def _run_unlock(args: argparse.Namespace) -> int:
     from pathlib import Path
 
     from . import transport
@@ -651,7 +651,7 @@ def _run_unlock(args) -> int:
     return 0
 
 
-def _run_excel(args) -> int:
+def _run_excel(args: argparse.Namespace) -> int:
     """`lat excel <in> <out>` — AGS4 ↔ Excel. Direction is inferred from the
     output extension (`.xlsx` ⇒ export, `.ags` ⇒ import), or forced with
     `--export` / `--import`. Mirrors the Rust `lat excel`."""

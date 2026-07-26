@@ -43,6 +43,9 @@ from .registry import child_groups as _child_groups
 
 if TYPE_CHECKING:
     import builtins
+    from collections.abc import Callable, Iterable
+
+    import duckdb
 
 #: The AGS Format Rule labels whose findings [`fix`][laterite.fix] can repair — the
 #: valid values for ``fix(only=…, exclude=…)``. Kept in lock-step with the engine's
@@ -573,7 +576,7 @@ class Ags4File:
     # DuckDB and don't push predicates into a pyarrow Arrow-scan (whose is_in
     # kernel trips on DuckDB's string_view strings).
 
-    def _engine(self):
+    def _engine(self) -> duckdb.DuckDBPyConnection:
         if self._con is None:
             import duckdb
 
@@ -597,7 +600,7 @@ class Ags4File:
             con.unregister(tmp)
         self._registered.add(code)
 
-    def _xn_select(self, con, tmp: str, code: str) -> str:
+    def _xn_select(self, con: duckdb.DuckDBPyConnection, tmp: str, code: str) -> str:
         """The projection for ``xn="numeric"``: ``* REPLACE (...)`` casting this
         group's XN-typed columns to DOUBLE — non-numeric AGS qualifiers (NP, <5,
         >100, …) become null via ``TRY_CAST``. Registry-driven and intersected
@@ -622,7 +625,7 @@ class Ags4File:
         for code in self._p["group_order"]:
             self._register(code)
 
-    def _materialize(self, rel):
+    def _materialize(self, rel: duckdb.DuckDBPyRelation) -> Any:
         # polars via the Arrow capsule (pl.from_arrow) and pandas via DuckDB's
         # NumPy .df() are BOTH pyarrow-free; rel.pl() and polars->pandas would
         # both pull pyarrow, so we never take those.
@@ -641,7 +644,7 @@ class Ags4File:
         it again would make the flag a no-op."""
         return "* EXCLUDE (_id, _parent_id)" if _GROUPS.get(code) is not None else "*"
 
-    def table(self, code: str, *, keys: bool | None = None):
+    def table(self, code: str, *, keys: bool | None = None) -> Any:
         """One group, materialised to the handle's backend (born-typed). By
         default the synthetic ``_id``/``_parent_id`` key columns are dropped; pass
         ``keys=True`` (or ``read(..., keys=True)`` for the handle default) to keep
@@ -664,20 +667,20 @@ class Ags4File:
         select = "*" if want else self._frame_select(code)
         return self._materialize(self._engine().sql(f'SELECT {select} FROM "{code}"'))
 
-    def __getitem__(self, code: str):
+    def __getitem__(self, code: str) -> Any:
         """One group, materialised to the handle's backend (born-typed) — the
         handle's ``keys=`` default governs whether ``_id``/``_parent_id`` show."""
         return self.table(code)
 
     @property
-    def connection(self):
+    def connection(self) -> duckdb.DuckDBPyConnection:
         """The raw ``duckdb`` connection — every engine feature (parquet export,
         the relational API, Arrow via ``.arrow()``, …). Seeded with all of this
         file's groups under their clean names on first access."""
         self._register_all()
         return self._engine()
 
-    def sql(self, query: str):
+    def sql(self, query: str) -> duckdb.DuckDBPyRelation:
         """Run SQL over the file's groups by their clean names — e.g.
         ``ags.sql("SELECT * FROM LOCA JOIN SAMP USING (LOCA_ID) WHERE ...")`` —
         returning a **DuckDB relation**. The WHERE/SELECT push into the engine
@@ -687,7 +690,7 @@ class Ags4File:
         self._register_all()
         return self._engine().sql(query)
 
-    def at(self, group: str, values) -> AgsQuery:
+    def at(self, group: str, values: Iterable[object]) -> AgsQuery:
         """Filter to a parent entity's records — ``ags.at("LOCA", ["BH01", "BH02"])``
         returns an [`AgsQuery`][laterite.AgsQuery] whose ``sub[code]`` yields only the rows of each
         group whose ``{group}_ID`` (e.g. ``LOCA_ID``) is in ``values``, materialising
@@ -705,13 +708,13 @@ class Ags4File:
         (``.frame()`` / ``.to_polars()`` / ``.to_pandas()`` / ``.relation()``)."""
         return AgsQuery(self, base=sql)
 
-    def pipe(self, fn, /, *args, **kwargs):
+    def pipe(self, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
         """Apply ``fn(self, *args, **kwargs)`` and return its result — a functional
         escape hatch to slot a custom step into a chain
         (``read(p).pipe(my_transform).save(out)``) without leaving the fluent flow."""
         return fn(self, *args, **kwargs)
 
-    def register(self, name: str, frame) -> None:
+    def register(self, name: str, frame: Any) -> None:
         """Register YOUR frame (polars / pandas / pyarrow / arro3) into the
         engine as ``name``, so ``sql()`` can join it against the AGS groups."""
         native = frame.to_native() if hasattr(frame, "to_native") else frame
@@ -959,7 +962,7 @@ class Ags4File:
         dict_version: Edition | None,
         dictionary: str | Path | builtins.bytes | None = None,
         dict_replace: bool = False,
-    ):
+    ) -> _native.Sidecar:
         """Mint the ``Sidecar`` over the ORIGINAL source bytes.
 
         The mint validates; it is not told a verdict. There is no longer a parameter
@@ -1074,9 +1077,12 @@ class Ags4File:
         try:
             for code in codes:
                 con.execute(f'CREATE TABLE _lat_out."{code}" AS SELECT * FROM "{code}"')
-                rows += con.execute(
+                # count(*) always yields one row; the guard is for the type checker,
+                # since DuckDBPyConnection.fetchone() is typed Optional.
+                count_row = con.execute(
                     f'SELECT count(*) FROM _lat_out."{code}"'
-                ).fetchone()[0]
+                ).fetchone()
+                rows += count_row[0] if count_row is not None else 0
         finally:
             con.execute("DETACH _lat_out")
         return {"path": path, "tables_written": len(codes), "rows_written": rows}
@@ -1206,7 +1212,7 @@ class AgsQuery:
 
     # --- chaining (immutable builder; each returns a new AgsQuery) -------------
 
-    def _with(self, **changes) -> AgsQuery:
+    def _with(self, **changes: Any) -> AgsQuery:
         state = {
             "filters": self._filters,
             "base": self._base,
@@ -1216,7 +1222,7 @@ class AgsQuery:
         state.update(changes)
         return AgsQuery(self._parent, **state)
 
-    def at(self, group: str, values) -> AgsQuery:
+    def at(self, group: str, values: Iterable[object]) -> AgsQuery:
         """Add a parent-entity key filter — ``.at("LOCA", ["BH01", "BH02"])`` keeps only
         rows whose ``{group}_ID`` (e.g. ``LOCA_ID``) is in ``values``. Filters accumulate
         with AND, and a group that doesn't carry a given filter's key column passes
@@ -1251,7 +1257,7 @@ class AgsQuery:
         """Set (or replace) the base SQL the single-result relation reads from."""
         return self._with(base=sql)
 
-    def pipe(self, fn, /, *args, **kwargs):
+    def pipe(self, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Any:
         """Apply ``fn(self, *args, **kwargs)`` and return its result — a functional escape
         hatch to slot a custom step into a query chain without leaving the fluent flow.
 
@@ -1302,7 +1308,7 @@ class AgsQuery:
     def __contains__(self, code: str) -> bool:
         return code in self._parent
 
-    def __getitem__(self, code: str):
+    def __getitem__(self, code: str) -> Any:
         """``code`` filtered by every applicable ``.at()`` key (groups carrying none
         of the keys pass through), materialised to the handle's backend."""
         self._guard_fanout()
@@ -1327,7 +1333,7 @@ class AgsQuery:
 
     # --- single-result terminals (from .query / .filter / .select) ------------
 
-    def relation(self):
+    def relation(self) -> duckdb.DuckDBPyRelation:
         """The built DuckDB relation (lazy — ``.df()`` / ``pl.from_arrow`` to
         materialise, or chain more SQL). Requires a base set via [`Ags4File.query`][laterite.Ags4File.query]
         / [`query`][laterite.AgsQuery.query]; ``.at()`` filters and ``.filter()`` predicates that apply to
@@ -1352,17 +1358,17 @@ class AgsQuery:
             params=params or None,
         )
 
-    def frame(self):
+    def frame(self) -> Any:
         """Materialise the single-result relation to the handle's backend
         (polars / pandas)."""
         return self._parent._materialize(self.relation())
 
-    def to_polars(self):
+    def to_polars(self) -> pl.DataFrame:
         """Materialise the single-result relation to a polars frame (pyarrow-free),
         regardless of the handle's default backend."""
         return frame_from_arrow(self.relation())
 
-    def to_pandas(self):
+    def to_pandas(self) -> Any:
         """Materialise the single-result relation to a pandas frame (DuckDB's NumPy
         ``.df()``, pyarrow-free), regardless of the handle's default backend."""
         return self.relation().df()
@@ -1606,7 +1612,7 @@ def read(
 source = read
 
 
-def _excel_convert(fn, *args) -> dict:
+def _excel_convert(fn: Callable[..., Any], *args: Any) -> dict:
     """Call a native AGS4↔XLSX conversion fn and normalise its outcome: the stats
     PyDict becomes a plain ``dict``; the engine's "no valid AGS4 data" RuntimeError
     is re-raised as [`NotAgs4Error`][laterite.NotAgs4Error] to match the rest of the read surface."""
@@ -1618,7 +1624,7 @@ def _excel_convert(fn, *args) -> dict:
         raise
 
 
-def _excel_bytes_convert(fn, *args) -> tuple[bytes, dict]:
+def _excel_bytes_convert(fn: Callable[..., Any], *args: Any) -> tuple[bytes, dict]:
     """The in-memory twin of [`_excel_convert`][laterite._excel_convert] for the
     ``(bytes, stats)``-returning FS-free cores: normalise the stats to a plain
     ``dict`` and map the engine's "no valid AGS4 data" RuntimeError to
@@ -1963,7 +1969,7 @@ def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
     return items
 
 
-def _drop_synth_keys(frame):
+def _drop_synth_keys(frame: Any) -> Any:
     """Drop the synthetic ``_``-prefixed key columns (``_id`` / ``_parent_id``) a
     user frame may carry from ``read(keys=True)[code]`` — AGS4 emit is byte-faithful
     to the DATA and must never write a synthetic column out. AGS headings never

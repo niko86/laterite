@@ -56,6 +56,11 @@ import time
 from functools import partial
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from types import ModuleType
 
 REPO = Path(__file__).resolve().parent.parent
 OUT_DIR = REPO / "output" / "readme-bench"
@@ -184,26 +189,29 @@ def repack(paths: dict[str, Path]) -> None:
         )
 
 
-def best_of(fn, runs: int) -> float:
+def best_of(fn: Callable[[], object], runs: int) -> float:
     """Mean of `runs` warm timings, first run discarded (file cache, imports)."""
     fn()
     return statistics.mean(_time(fn) for _ in range(runs))
 
 
-def _time(fn) -> float:
+def _time(fn: Callable[[], object]) -> float:
     t0 = time.perf_counter()
     fn()
     return time.perf_counter() - t0
 
 
-def warn_if_debug_build(laterite_mod) -> None:
+def warn_if_debug_build(laterite_mod: ModuleType) -> None:
     """Refuse to publish numbers measured against a debug wheel.
 
     A debug build of the native module is roughly 5x slower across every path,
     which looks exactly like a catastrophic regression and is not one. The tell
     is size: the release abi3 module is a few MB, a debug one is tens.
     """
-    native = list(pathlib.Path(laterite_mod.__file__).parent.glob("*.so"))
+    mod_file = laterite_mod.__file__
+    if mod_file is None:
+        return  # namespace package with no single file — nothing to size-check
+    native = list(pathlib.Path(mod_file).parent.glob("*.so"))
     if not native:
         return
     mb = max(f.stat().st_size for f in native) / 1e6
