@@ -268,4 +268,15 @@ describe("toDuckdb() — persist the keyed relational store", () => {
     ).getRowObjectsJS();
     expect(diff).toHaveLength(0);
   });
+
+  it("the free toDuckdb leaves a caller's handle open (does not own it)", async () => {
+    const out = outPath("passed-handle.duckdb");
+    // Pass an already-read handle (owned=false): the free form must persist
+    // without closing it, so the caller's handle stays usable afterwards.
+    const ags = read(undefined, { text: AGS_REL });
+    const stats = await toDuckdb(ags, out);
+    expect(stats.tables_written).toBeGreaterThan(0);
+    expect(ags.has("SAMP")).toBe(true);
+    ags.close();
+  });
 });

@@ -237,7 +237,9 @@ export async function exportQuery(
 export async function exportDuckdb(): Promise<Uint8Array> {
   const { db, conn } = await getDuckDb();
   if (ingested.size === 0) {
-    throw new Error("No tables loaded to export — open the Explore pane first.");
+    throw new Error(
+      "No tables loaded to export — open the Explore pane first.",
+    );
   }
   const file = `__export_${exportSeq++}.duckdb`;
   try {

@@ -447,6 +447,19 @@ def test_free_to_duckdb_matches_the_fluent_method(tmp_path):
         cb.close()
 
 
+def test_free_to_duckdb_accepts_an_already_read_handle(tmp_path):
+    # The positional-source branch: pass an already-read Ags4File and the
+    # functional form delegates to its method (it does not own/close it).
+    out = tmp_path / "handle.duckdb"
+    handle = laterite.read(text=_RELATED_SRC)
+    try:
+        stats = laterite.to_duckdb(handle, out)
+        assert stats["tables_written"] == 3
+        assert "SAMP" in handle  # not closed out from under the caller
+    finally:
+        handle.close()
+
+
 def test_free_to_duckdb_requires_an_output_path():
     with pytest.raises(TypeError, match="output path"):
         laterite.to_duckdb(text=_RELATED_SRC)

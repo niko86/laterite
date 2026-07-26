@@ -247,8 +247,10 @@ export class DuckEngine {
         const r = await this.#con.runAndReadAll(
           `SELECT count(*) AS n FROM _lat_out.${quoteId(code)}`,
         );
-        const row = r.getRowObjectsJS()[0]; // count(*) → one row, `n` a bigint
-        rows += Number(row?.n ?? 0);
+        // count(*) always yields exactly one row, so index [0] is present —
+        // cast past the `noUncheckedIndexedAccess` `| undefined`; `n` is a bigint.
+        const [row] = r.getRowObjectsJS() as [Row];
+        rows += Number(row.n);
       }
     } finally {
       await this.#con.run("DETACH _lat_out");
