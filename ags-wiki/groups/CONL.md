@@ -22,7 +22,7 @@ sources: []
 
 > [!warning] AGS-L draft group — not in the AGS4 4.x spec
 > CONL is part of **AGS-L** (the AGS Library extension, expected publish 2026),
-> scaffolded from `repo:reports/AGSL4_2_*.xlsx`. It is **retained** in the
+> scaffolded from `reports/AGSL4_2_*.xlsx`. It is **retained** in the
 > dictionary (never deleted) but is **not** a standard AGS4 4.x group. The
 > AGS-L correction (PR #45) flags its dictionary `contents`
 > `(AGS-L draft, publish 2026)`. See [[ags-4.2]].

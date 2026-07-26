@@ -8,8 +8,6 @@ volatile_asof: 2026-05-30
 ags_editions: []
 repo_refs:
   latpy: "repo:rust-packages/laterite-py/Cargo.toml"
-  latpy5: "repo:ags5/rust-packages/laterite-py-ags5/Cargo.toml"
-  build: "repo:rust-packages/README.md"
 related: [crate-map, laterite-py, laterite, dec-rust-drives-python, dec-python-imports-rust-library, dec-monorepo-structure, abi3-perf, ags4-output]
 sources: []
 ---
@@ -28,7 +26,7 @@ CPython:
 - **AGS5 lane (parallel)**: `laterite-ags4-core` + `ags5db` → `laterite-py-ags5`
   (lib name `_laterite_ags5_native`, bundles DuckDB) →
   laterite-ags5, pulled by the `[ags5]` extra.
-  `repo:ags5/rust-packages/laterite-py-ags5/Cargo.toml`
+  `ags5/rust-packages/laterite-py-ags5/Cargo.toml`
 
 > [!stale-risk] sizes · as-of 2026-05-30
 > The AGS5 cdylib links DuckDB (~50 MB at time of writing) — which is why
@@ -60,7 +58,7 @@ no type casting) rather than the typed path's born-typed columns. python-ags4
 frames are raw-string either way, so this is a transport-cost fix, not a shape
 change: measured **~2× faster than python-ags4** (was ~2–7× slower — the old
 path reshaped Python primitives per cell; reproducible via
-`repo:tools/bench_compat_dataframe.py`). Each backend then takes its cheapest
+`tools/bench_compat_dataframe.py`, dev satellite). Each backend then takes its cheapest
 hop off that one table (`_frames.py::compat_materializer`): pyarrow's
 `to_pandas` when pyarrow happens to be importable (also the only route to
 `string_dtype="string"`, pandas' Arrow-backed `str`), else DuckDB's NumPy
@@ -106,9 +104,8 @@ These cdylibs are `extension-module` builds (no libpython at link time),
 so they **must** be built by maturin (`uv sync`, or each package's
 `[tool.maturin]`), which supplies the `-undefined dynamic_lookup` link
 args. A bare `cargo build --workspace` deliberately **excludes** them and
-will fail to link them on macOS — by design, not a regression
-(`repo:rust-packages/README.md` §Build). This is why the README's build
-recipe runs `cargo build --workspace --exclude laterite-py
+will fail to link them on macOS — by design, not a regression. This is
+why the build recipe runs `cargo build --workspace --exclude laterite-py
 --exclude laterite-py-ags5` then `uv sync`.
 
 The boundary is also **directional**: *Rust drives Python, never the

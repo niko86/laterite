@@ -114,7 +114,7 @@ per group** — no per-cell JS objects, no `TRY_CAST` in the browser.
   and `arrow_ipc(code)` (one typed Arrow IPC stream, built lazily).
 - Casting goes through `laterite-types::{canonical_type, parse_value,
   parse_datetime}` off the file's TYPE row, exactly as
-  `repo:ags5/rust-packages/laterite-ags5-db/src/convert.rs` does.
+  `ags5/rust-packages/laterite-ags5-db/src/convert.rs` does.
 - Arrow mapping: [[DT]] → `Timestamp(µs)` (tz-naive; full datetime,
   date-only → midnight, blank → null), [[0DP]] → `Int64`,
   `2DP/RL/nSF/nSCI` → `Float64`, [[YN]] → `Boolean`, `ID/X/PA/…` →
