@@ -33,6 +33,8 @@ Rule **normative content is unchanged across AGS 4.0.3 → 4.2** — verified by
 
 [[UNIT]] group lists all used units + PU-typed field values. Spec example was ERES_RUNI→ELRG_RUNI@4.1 — see [[rule15-example-tracks-eres-elrg-removal]].
 
+> [!note] **An empty UNIT on a *numeric* heading is usually correct, not a violation.** A dictionary audit (2026-05-15) of the 65 numeric-typed headings that carry an empty `unit` found only **9** real gaps (contractor sieve-size + test-date headings); the other **56** are legitimately unitless per the AGS4 standard — counts, ratios, pH, dimensionless coefficients. So a blank UNIT on a numeric field is *not* automatically a Rule 8 / Rule 15 breach — worth remembering before "fixing" one. (Edition delta: AGS4 4.2 adds 257 `(group,heading)`→unit pairs over 4.1 and drops 28, including `ERES_DTIM`'s unit.)
+
 *Clean-room: rule logic derived from the spec; python-ags4 (LGPL) read only for behavioural parity, never copied (see the module header).*
 
 ## Traceability chain

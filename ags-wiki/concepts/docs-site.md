@@ -38,7 +38,7 @@ Key facts:
   non-Python trees; a changed return shape / dtype / printed format / method
   name turns a doc snippet **red in CI** — the example-first analogue of the
   OBSERVATIONS / `.pyi` drift gates):
-  - *python* — `tests/test_docs_examples.py` runs each `ex*.py` as a
+  - *python* — `tests/test_docs_examples.py` (dev satellite) runs each `ex*.py` as a
     subprocess against the installed wheel + the committed
     `repo:examples/sample_site.ags` fixture (`cwd` = repo root, so the literal
     `"examples/sample_site.ags"` path resolves); in-file `assert`s pin outputs.
@@ -47,14 +47,14 @@ Key facts:
     examples' literal `import … from "laterite"` resolves via a gitignored
     `node_modules/laterite` symlink beside them (the pack-smoke trick — ESM
     ignores `NODE_PATH`, and self-reference only works inside the package dir).
-  - *cli* — `tests/test_docs_cli_examples.py` runs each `*.sh` with the
+  - *cli* — `tests/test_docs_cli_examples.py` (dev satellite) runs each `*.sh` with the
     release `lat` on `PATH` (skipif not built, the `test_laterite.py`
     idiom), from a **temp dir** (scripts mint dirty files / certs), asserting
     the `# expect-exit: N` code and **byte-equality of stdout vs a committed
     sibling `.out`** — pages include the `[start:cmd]` section + the `.out`
     verbatim, so even the *output* blocks can't lie (the old hand-typed CLI
     table had already drifted from the binary's real box-drawing output).
-  - *duckdb* — `tests/test_docs_duckdb_examples.py`, env-gated on
+  - *duckdb* — `tests/test_docs_duckdb_examples.py` (dev satellite), env-gated on
     `LATERITE_DUCKDB_EXT`; per-PR the `.sql` files are include-checked only
     (`--strict` + `check_paths`), the **monthly `compliance-report.yml`** runs
     them live against the from-source extension (fail-soft: ABI drift = visible
@@ -93,7 +93,7 @@ Key facts:
   `TYPE` group + the `laterite-types` canonical mapping; heading tables deep-link
   each type code to its anchor). Pages are **NOT committed** (no 174-file churn per
   dict edit), so the drift guard is a pytest gate not a snapshot:
-  `tests/test_groups_catalogue_faithful.py` (python job) asserts every group
+  `tests/test_groups_catalogue_faithful.py` (dev satellite, python job) asserts every group
   has a family, every declared family is non-empty, every *used* type code is
   documented, and provenance derives correctly — the catalogue-side analogue of the
   dictionary / OBSERVATIONS faithfulness gates. The paginate / filter / family-card
@@ -176,7 +176,7 @@ flowchart LR
   wheel["uv sync --group docs<br/>(local working-tree wheel)"] -->|mkdocstrings introspects| page
   reg["laterite.registry + ags_dictionary.json (eds)"] -->|gen_groups/gen_types| page
   cd["catalogue_data.py<br/>(families, provenance, TYPE_GLOSSARY)"] --> page
-  cd --> cgate["tests/test_groups_catalogue_faithful.py<br/>(python job)"]
+  cd --> cgate["tests/test_groups_catalogue_faithful.py<br/>(dev satellite, python job)"]
   page --> strict["mkdocs build --strict<br/>(docs job, builds the wheel)"]
   strict --> art["web/dist/docs"]
   vite["vite build → web/dist"] --> art
