@@ -394,4 +394,61 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn descriptor_table_and_view_names_are_prefixed_and_lowercased() {
+        let loca = registry().get("LOCA").expect("LOCA");
+        assert_eq!(loca.table(), "g_loca");
+        assert_eq!(loca.view(), "v_loca");
+    }
+
+    #[test]
+    fn group_depth_counts_in_map_ancestors_and_guards_cycles() {
+        use std::collections::HashMap;
+        let mk = |parent: Option<&str>| DictGroup {
+            parent: parent.map(str::to_string),
+            description: None,
+            headings: Vec::new(),
+        };
+        let mut groups: HashMap<String, DictGroup> = HashMap::new();
+        groups.insert("PROJ".into(), mk(None));
+        groups.insert("LOCA".into(), mk(Some("PROJ")));
+        groups.insert("SAMP".into(), mk(Some("LOCA")));
+        groups.insert("ORPH".into(), mk(Some("GHOST"))); // parent not in the map
+        assert_eq!(group_depth(&groups, "PROJ"), 0);
+        assert_eq!(group_depth(&groups, "LOCA"), 1);
+        assert_eq!(group_depth(&groups, "SAMP"), 2);
+        // an ancestor that isn't in the map neither counts nor recurses
+        assert_eq!(group_depth(&groups, "ORPH"), 0);
+
+        // a cycle must terminate at the 64-step guard, not spin forever
+        let mut cyc: HashMap<String, DictGroup> = HashMap::new();
+        cyc.insert("A".into(), mk(Some("B")));
+        cyc.insert("B".into(), mk(Some("A")));
+        assert_eq!(group_depth(&cyc, "A"), 65);
+    }
+
+    #[test]
+    fn registry_len_is_empty_and_json_reflect_the_group_set() {
+        use std::collections::HashMap;
+        let reg = registry();
+        assert!(
+            reg.len() > 100,
+            "the union is ~174 groups, got {}",
+            reg.len()
+        );
+        assert!(!reg.is_empty());
+        assert_eq!(reg.len(), reg.iter().count());
+        // an actually-empty registry reports empty / zero (the real one never is)
+        let empty = Registry {
+            entries: Vec::new(),
+            by_code: HashMap::new(),
+        };
+        assert!(empty.is_empty());
+        assert_eq!(empty.len(), 0);
+        // the JSON is a non-empty array that names the groups
+        let json = reg.to_groups_json();
+        assert!(json.starts_with('['), "not a JSON array: {}", &json[..20]);
+        assert!(json.contains("PROJ"));
+    }
 }
