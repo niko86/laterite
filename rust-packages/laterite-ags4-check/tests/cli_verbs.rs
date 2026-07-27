@@ -462,3 +462,282 @@ fn diff_unparseable_file_exits_4() {
     let o = lat(["diff", base.to_str().unwrap(), garbage.to_str().unwrap()]);
     assert_eq!(o.status.code(), Some(4), "stderr: {}", stderr(&o));
 }
+
+// --- read -------------------------------------------------------------------
+
+#[test]
+fn read_lists_group_codes_in_source_order() {
+    // No group named → the file's group codes, one per line, in source order.
+    let o = lat(["read", fixture("clean_minimal.ags").to_str().unwrap()]);
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    assert_eq!(stdout(&o), "PROJ\nTRAN\nUNIT\nTYPE\n");
+}
+
+#[test]
+fn read_json_lists_groups_as_an_array() {
+    let o = lat([
+        "read",
+        "--json",
+        fixture("clean_minimal.ags").to_str().unwrap(),
+    ]);
+    assert_eq!(o.status.code(), Some(0));
+    let v: Value = serde_json::from_str(&stdout(&o)).expect("read --json");
+    let codes: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c.as_str().unwrap())
+        .collect();
+    assert_eq!(codes, ["PROJ", "TRAN", "UNIT", "TYPE"]);
+}
+
+#[test]
+fn read_renders_a_named_groups_cells() {
+    // A named group → its rows; the projected cells (the id + the project name)
+    // appear, in the group's heading order.
+    let o = lat([
+        "read",
+        fixture("clean_minimal.ags").to_str().unwrap(),
+        "PROJ",
+    ]);
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    let out = stdout(&o);
+    assert!(
+        out.contains("PROJ_ID") && out.contains("PROJ_NAME"),
+        "headers: {out}"
+    );
+    assert!(
+        out.contains("P1") && out.contains("Clean minimal AGS4 fixture"),
+        "cells: {out}"
+    );
+}
+
+#[test]
+fn read_csv_quotes_the_comma_bearing_cell() {
+    // --csv is RFC-4180: the header row is the headings, and the project name
+    // (which contains commas) is double-quoted — real CSV, not a naive join.
+    let o = lat([
+        "read",
+        "--csv",
+        fixture("clean_minimal.ags").to_str().unwrap(),
+        "PROJ",
+    ]);
+    assert_eq!(o.status.code(), Some(0));
+    let out = stdout(&o);
+    assert_eq!(out.lines().next(), Some("PROJ_ID,PROJ_NAME"));
+    assert!(
+        out.contains("P1,\"Clean minimal"),
+        "row not RFC-4180 quoted: {out}"
+    );
+}
+
+#[test]
+fn read_unknown_group_exits_4_and_lists_whats_present() {
+    // A named-but-absent group is a schema miss (exit 4) that names the groups
+    // that ARE present, so the user can retry — not a bare failure.
+    let o = lat([
+        "read",
+        fixture("clean_minimal.ags").to_str().unwrap(),
+        "ZZZZ",
+    ]);
+    assert_eq!(o.status.code(), Some(4), "stderr: {}", stderr(&o));
+    let err = stderr(&o);
+    assert!(err.contains("not found"), "{err}");
+    assert!(err.contains("PROJ"), "present-list missing: {err}");
+}
+
+#[test]
+fn read_missing_file_exits_3_not_4() {
+    // A genuine I/O miss is exit 3 — read pre-checks existence so it isn't mapped
+    // to the codec's schema-error 4.
+    let o = lat(["read", "/no/such/file_xyz.ags"]);
+    assert_eq!(o.status.code(), Some(3), "stderr: {}", stderr(&o));
+    assert!(stderr(&o).contains("not found"), "{}", stderr(&o));
+}
+
+#[test]
+fn read_out_writes_the_body_and_keeps_stdout_clean() {
+    // --out sends the rendered body to a file (with a stderr note); stdout stays
+    // empty so a pipeline sees only what it redirected.
+    let d = scratch();
+    let out = d.join("proj.csv");
+    let o = lat([
+        "read",
+        "--csv",
+        fixture("clean_minimal.ags").to_str().unwrap(),
+        "PROJ",
+        "--out",
+        out.to_str().unwrap(),
+    ]);
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    assert!(stdout(&o).is_empty(), "stdout not clean: {}", stdout(&o));
+    assert!(stderr(&o).contains("written to"), "{}", stderr(&o));
+    let written = std::fs::read_to_string(&out).unwrap();
+    assert_eq!(written.lines().next(), Some("PROJ_ID,PROJ_NAME"));
+}
+
+// --- merge ------------------------------------------------------------------
+
+/// A base file and a revision of it: the revision changes PROJ P1's `PROJ_NAME`
+/// (a non-KEY field), so a KEY-aware merge reports exactly one row revision, won
+/// by the second (newer) file.
+fn write_merge_pair() -> (PathBuf, PathBuf, PathBuf) {
+    let dir = scratch();
+    let base_path = dir.join("a.ags");
+    let rev_path = dir.join("b.ags");
+    let base = std::fs::read_to_string(fixture("clean_minimal.ags")).unwrap();
+    let revised = base.replace(
+        "Clean minimal AGS4 fixture (hand-authored, MIT, ours)",
+        "Revised project name",
+    );
+    assert_ne!(
+        base, revised,
+        "fixture project name changed — update this test"
+    );
+    std::fs::write(&base_path, &base).unwrap();
+    std::fs::write(&rev_path, &revised).unwrap();
+    (dir, base_path, rev_path)
+}
+
+#[test]
+fn merge_reconciles_a_revision_last_wins() {
+    let (dir, base, rev) = write_merge_pair();
+    let out = dir.join("merged.ags");
+    let o = lat([
+        "merge",
+        base.to_str().unwrap(),
+        rev.to_str().unwrap(),
+        "--out",
+        out.to_str().unwrap(),
+    ]);
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    let summary = stdout(&o);
+    assert!(summary.contains("merged 2 files"), "{summary}");
+    assert!(
+        summary.contains("1 row revision"),
+        "revision not reported: {summary}"
+    );
+    assert!(
+        summary.contains("PROJ") && summary.contains("PROJ_NAME"),
+        "revision detail: {summary}"
+    );
+    // last wins: the merged file carries the revision's name, not the base's.
+    let merged = std::fs::read_to_string(&out).unwrap();
+    assert!(
+        merged.contains("Revised project name"),
+        "last-wins not applied: {merged}"
+    );
+    assert!(
+        !merged.contains("hand-authored"),
+        "old value survived: {merged}"
+    );
+}
+
+#[test]
+fn merge_json_reports_the_revision_and_the_tran_warning() {
+    let (dir, base, rev) = write_merge_pair();
+    let out = dir.join("merged.ags");
+    let o = lat([
+        "merge",
+        "--json",
+        base.to_str().unwrap(),
+        rev.to_str().unwrap(),
+        "--out",
+        out.to_str().unwrap(),
+    ]);
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    let v: Value = serde_json::from_str(&stdout(&o)).expect("merge --json");
+    // exactly the PROJ P1 revision, won by the second (index 1) file
+    let revs = v["revisions"].as_array().expect("revisions");
+    assert_eq!(revs.len(), 1, "{v}");
+    assert_eq!(revs[0]["group"], "PROJ");
+    assert_eq!(revs[0]["key"][0], "P1");
+    assert_eq!(revs[0]["changed"][0], "PROJ_NAME");
+    assert_eq!(revs[0]["winner_file"], 1);
+    // no TRAN stamp supplied → the documented fallback warning
+    let warns = v["warnings"].as_array().expect("warnings");
+    assert!(
+        warns
+            .iter()
+            .any(|entry| entry["kind"] == "tran_not_stamped"),
+        "{v}"
+    );
+    // the reported byte count is the file actually written
+    assert_eq!(
+        v["bytes"].as_u64().unwrap(),
+        std::fs::metadata(&out).unwrap().len()
+    );
+}
+
+#[test]
+fn merge_missing_file_exits_3() {
+    let (dir, base, _rev) = write_merge_pair();
+    let out = dir.join("merged.ags");
+    let o = lat([
+        "merge",
+        base.to_str().unwrap(),
+        "/no/such/file_xyz.ags",
+        "--out",
+        out.to_str().unwrap(),
+    ]);
+    assert_eq!(o.status.code(), Some(3), "stderr: {}", stderr(&o));
+}
+
+#[test]
+fn merge_unparseable_file_exits_4() {
+    let (dir, base, _rev) = write_merge_pair();
+    let garbage = dir.join("garbage.ags");
+    std::fs::write(&garbage, "not ags4 at all\r\n").unwrap();
+    let out = dir.join("merged.ags");
+    let o = lat([
+        "merge",
+        base.to_str().unwrap(),
+        garbage.to_str().unwrap(),
+        "--out",
+        out.to_str().unwrap(),
+    ]);
+    assert_eq!(o.status.code(), Some(4), "stderr: {}", stderr(&o));
+}
+
+#[test]
+fn merge_synthesises_a_tran_stamp_when_issue_and_date_are_given() {
+    // With BOTH --tran-issue and --tran-date, merge writes a fresh merge-TRAN — so
+    // the "not stamped" fallback warning disappears and the date + a "Merged from
+    // N deliveries" note land in the file's TRAN row. Without both, no stamp is
+    // made. Pins the (Some, Some) synthesis arm and the `tran` MergeOpts field the
+    // sweep found unasserted.
+    let (dir, base, rev) = write_merge_pair();
+    let out = dir.join("stamped.ags");
+    let o = lat([
+        "merge",
+        "--json",
+        base.to_str().unwrap(),
+        rev.to_str().unwrap(),
+        "--out",
+        out.to_str().unwrap(),
+        "--tran-issue",
+        "7",
+        "--tran-date",
+        "2026-07-27",
+    ]);
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    let v: Value = serde_json::from_str(&stdout(&o)).expect("merge --json");
+    // a supplied stamp silences the fallback warning...
+    let warns = v["warnings"].as_array().expect("warnings");
+    assert!(
+        !warns
+            .iter()
+            .any(|entry| entry["kind"] == "tran_not_stamped"),
+        "a supplied stamp must silence the fallback warning: {v}"
+    );
+    // ...and lands in the merged file's TRAN row.
+    let stamped = std::fs::read_to_string(&out).unwrap();
+    assert!(
+        stamped.contains("2026-07-27"),
+        "TRAN date not stamped: {stamped}"
+    );
+    assert!(
+        stamped.contains("Merged from 2 deliveries"),
+        "merge TRAN_REM missing: {stamped}"
+    );
+}
