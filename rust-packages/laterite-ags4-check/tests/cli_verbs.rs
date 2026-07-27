@@ -1,0 +1,410 @@
+//! End-to-end tests for the `lat` binary's core verbs — `validate`, `fix`,
+//! `rules`, `diff` (coverage campaign, Rust phase). Spawns the built binary and
+//! asserts the real exit code AND the substance of the output — the specific
+//! findings, that the three render formats agree on the count, that `fix`
+//! actually removes the defect it names, and the diff delta values — never
+//! merely "it runs" / "it's valid JSON". Exit codes: 0 clean · 1 findings ·
+//! 3 not-found/io · 4 parse · 5 bad-args/dict · 6 schema.
+
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+use serde_json::Value;
+
+/// The canonical hand-authored fixtures (referenced, not copied — a second copy
+/// is a second thing to drift). They live in the validator crate.
+fn fixture(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../laterite-ags4-validator/tests/fixtures")
+        .join(name)
+}
+
+fn scratch() -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("lat_verbs_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn lat<I, S>(args: I) -> Output
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
+    Command::new(env!("CARGO_BIN_EXE_lat"))
+        .args(args)
+        .output()
+        .expect("spawn lat")
+}
+
+fn stdout(o: &Output) -> String {
+    String::from_utf8_lossy(&o.stdout).into_owned()
+}
+fn stderr(o: &Output) -> String {
+    String::from_utf8_lossy(&o.stderr).into_owned()
+}
+
+/// The `validate --json` shape is `{file, findings: {rule: [..], ..}}`; the total
+/// finding count is the sum of the per-rule lists (what the plain "N finding(s)"
+/// header and the ndjson line count must both agree with).
+fn json_finding_count(v: &Value) -> usize {
+    v["findings"].as_object().map_or(0, |m| {
+        m.values().filter_map(|l| l.as_array()).map(Vec::len).sum()
+    })
+}
+
+fn has_rule(v: &Value, rule: &str) -> bool {
+    v["findings"].get(rule).is_some()
+}
+
+// A standalone LOCA group appended to make a file that differs by one group.
+const LOCA_GROUP: &str = "\r\n\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH1\"\r\n";
+
+// --- validate ---------------------------------------------------------------
+
+#[test]
+fn validate_clean_file_exits_0() {
+    let o = lat(["validate", fixture("clean_minimal.ags").to_str().unwrap()]);
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    assert!(stdout(&o).contains("clean (0 findings)"), "{}", stdout(&o));
+}
+
+#[test]
+fn bare_file_is_validate_shorthand() {
+    // `lat <file>` with no verb runs validate — same verdict as the explicit form.
+    let bare = lat([fixture("clean_minimal.ags").to_str().unwrap()]);
+    let explicit = lat(["validate", fixture("clean_minimal.ags").to_str().unwrap()]);
+    assert_eq!(bare.status.code(), Some(0), "stderr: {}", stderr(&bare));
+    assert_eq!(stdout(&bare), stdout(&explicit));
+}
+
+#[test]
+fn validate_dirty_file_names_the_specific_rules() {
+    // rule5_unquoted.ags carries exactly four findings: a missing TRAN/UNIT/TYPE
+    // group (Rules 14/15/17) plus the unquoted DATA field (Rule 5, line 5).
+    let o = lat(["validate", fixture("rule5_unquoted.ags").to_str().unwrap()]);
+    assert_eq!(o.status.code(), Some(1), "stderr: {}", stderr(&o));
+    let out = stdout(&o);
+    assert!(out.contains("4 finding(s)"), "{out}");
+    // the RIGHT problem is named, not just "some finding"
+    assert!(
+        out.contains("not enclosed in double quotes"),
+        "Rule 5 desc missing: {out}"
+    );
+    for rule in ["5", "14", "15", "17"] {
+        assert!(out.contains(rule), "rule {rule} absent from table: {out}");
+    }
+}
+
+#[test]
+fn validate_formats_agree_on_the_finding_set() {
+    // The plain header count, the --json total, and the --ndjson line count must
+    // all describe the SAME finding set — the contract that keeps a scripted
+    // consumer and a human reading the same file from disagreeing.
+    let f = fixture("rule5_unquoted.ags");
+    let plain = lat(["validate", f.to_str().unwrap()]);
+    let json = lat(["validate", "--json", f.to_str().unwrap()]);
+    let ndjson = lat(["validate", "--ndjson", f.to_str().unwrap()]);
+    assert_eq!(plain.status.code(), Some(1));
+
+    let v: Value = serde_json::from_str(&stdout(&json)).expect("valid JSON");
+    let json_n = json_finding_count(&v);
+    let ndjson_n = stdout(&ndjson)
+        .lines()
+        .filter(|l| !l.trim().is_empty())
+        .count();
+
+    assert_eq!(json_n, 4, "json findings: {}", stdout(&json));
+    assert_eq!(ndjson_n, 4, "ndjson lines: {}", stdout(&ndjson));
+    assert!(stdout(&plain).contains("4 finding(s)"));
+    // the Rule 5 finding is in the structured output with its real line number
+    assert!(has_rule(&v, "AGS Format Rule 5"));
+    assert_eq!(v["findings"]["AGS Format Rule 5"][0]["line"], 5);
+}
+
+#[test]
+fn validate_warnings_are_on_by_default_and_no_warnings_drops_them() {
+    // rule18_malformed_dict.ags carries a warning-tier finding on top of its
+    // errors. Warnings are ON by default (so the default run sees it) and
+    // --no-warnings drops exactly that one — pinning the flag → CheckOptions
+    // .include_warnings wiring that mutation testing showed was unasserted.
+    let f = fixture("rule18_malformed_dict.ags");
+    let default: Value =
+        serde_json::from_str(&stdout(&lat(["validate", "--json", f.to_str().unwrap()]))).unwrap();
+    let quiet: Value = serde_json::from_str(&stdout(&lat([
+        "validate",
+        "--no-warnings",
+        "--json",
+        f.to_str().unwrap(),
+    ])))
+    .unwrap();
+    assert_eq!(json_finding_count(&default), 4, "warnings on by default");
+    assert_eq!(
+        json_finding_count(&quiet),
+        3,
+        "--no-warnings drops the warning"
+    );
+}
+
+#[test]
+fn validate_missing_file_exits_3() {
+    let o = lat(["validate", "/no/such/file_xyz.ags"]);
+    assert_eq!(o.status.code(), Some(3));
+    assert!(stderr(&o).contains("read"), "{}", stderr(&o));
+}
+
+#[test]
+fn validate_out_writes_the_same_report_it_would_print() {
+    // --out redirects the plain report to a file; the file must carry the real
+    // report (the findings), not a stub — and stdout keeps only the confirmation.
+    let d = scratch();
+    let out = d.join("report.txt");
+    let o = lat([
+        "validate",
+        fixture("rule5_unquoted.ags").to_str().unwrap(),
+        "--out",
+        out.to_str().unwrap(),
+    ]);
+    assert_eq!(o.status.code(), Some(1));
+    assert!(stdout(&o).contains("wrote 4 finding(s)"), "{}", stdout(&o));
+    let written = std::fs::read_to_string(&out).unwrap();
+    assert!(
+        written.contains("not enclosed in double quotes") && written.contains("4 finding(s)"),
+        "redirected report is not the real report: {written}"
+    );
+}
+
+#[test]
+fn validate_json_out_tees_the_same_json_as_stdout() {
+    // The tee'd artifact must be byte-identical to what `--json` prints — one
+    // report, two destinations, no divergence.
+    let d = scratch();
+    let j = d.join("report.json");
+    let teed = lat([
+        "validate",
+        fixture("rule5_unquoted.ags").to_str().unwrap(),
+        "--json-out",
+        j.to_str().unwrap(),
+    ]);
+    assert_eq!(teed.status.code(), Some(1));
+    assert!(
+        stderr(&teed).contains("JSON written to"),
+        "{}",
+        stderr(&teed)
+    );
+    let stdout_json = lat([
+        "validate",
+        "--json",
+        fixture("rule5_unquoted.ags").to_str().unwrap(),
+    ]);
+    let artifact: Value = serde_json::from_str(&std::fs::read_to_string(&j).unwrap()).unwrap();
+    let printed: Value = serde_json::from_str(&stdout(&stdout_json)).unwrap();
+    assert_eq!(artifact, printed, "tee'd JSON differs from --json stdout");
+}
+
+// --- fix --------------------------------------------------------------------
+
+#[test]
+fn fix_clean_file_applies_nothing_and_stays_clean() {
+    let d = scratch();
+    let src = d.join("clean.ags");
+    std::fs::copy(fixture("clean_minimal.ags"), &src).unwrap();
+    let o = lat(["fix", src.to_str().unwrap()]);
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    assert!(stdout(&o).contains("no fixes applicable"), "{}", stdout(&o));
+    assert!(stdout(&o).contains("clean (0 findings)"), "{}", stdout(&o));
+    // the sibling is a faithful copy of an already-clean file
+    let sibling = std::fs::read(d.join("clean.fixed.ags")).unwrap();
+    assert_eq!(sibling, std::fs::read(&src).unwrap());
+}
+
+#[test]
+fn fix_repairs_the_defect_it_names() {
+    // rule8_dp_wrong_precision.ags has a 2DP value at the wrong precision — a
+    // mechanically-safe reformat. Assert fix (a) names that exact fix, and
+    // (b) actually removes the Rule 8 finding from the repaired file.
+    let d = scratch();
+    let src = d.join("r8.ags");
+    std::fs::copy(fixture("rule8_dp_wrong_precision.ags"), &src).unwrap();
+
+    // before: the file HAS a Rule 8 finding
+    let before: Value =
+        serde_json::from_str(&stdout(&lat(["validate", "--json", src.to_str().unwrap()]))).unwrap();
+    assert!(has_rule(&before, "AGS Format Rule 8"), "precondition");
+
+    let fixed = lat(["fix", "--json", "--in-place", src.to_str().unwrap()]);
+    let report: Value = serde_json::from_str(&stdout(&fixed)).expect("fix --json");
+    assert_eq!(report["applied"][0]["kind"], "reformat_numeric");
+    assert_eq!(report["applied"][0]["rule"], "AGS Format Rule 8");
+
+    // after: the repaired file no longer trips Rule 8
+    let after: Value =
+        serde_json::from_str(&stdout(&lat(["validate", "--json", src.to_str().unwrap()]))).unwrap();
+    assert!(
+        !has_rule(&after, "AGS Format Rule 8"),
+        "fix did not remove the Rule 8 defect"
+    );
+}
+
+#[test]
+fn fix_in_place_overwrites_source_without_a_sibling() {
+    let d = scratch();
+    let src = d.join("inplace.ags");
+    std::fs::copy(fixture("rule8_dp_wrong_precision.ags"), &src).unwrap();
+    let before = std::fs::read(&src).unwrap();
+    let o = lat(["fix", "--in-place", src.to_str().unwrap()]);
+    assert!(
+        o.status.code() == Some(0) || o.status.code() == Some(1),
+        "stderr: {}",
+        stderr(&o)
+    );
+    assert!(
+        !d.join("inplace.fixed.ags").exists(),
+        "no sibling on --in-place"
+    );
+    // the source itself was rewritten (the reformat landed)
+    assert_ne!(std::fs::read(&src).unwrap(), before, "source unchanged");
+}
+
+#[test]
+fn fix_missing_file_exits_3() {
+    let o = lat(["fix", "/no/such/file_xyz.ags"]);
+    assert_eq!(o.status.code(), Some(3));
+    assert!(stderr(&o).contains("error"), "{}", stderr(&o));
+}
+
+#[test]
+fn fix_out_write_failure_exits_3() {
+    // write_atomic creates missing parent dirs, so a genuine failure needs a
+    // parent that is a regular FILE (creating a dir under it is ENOTDIR).
+    let d = scratch();
+    let src = d.join("in2.ags");
+    std::fs::copy(fixture("clean_minimal.ags"), &src).unwrap();
+    let blocker = d.join("blocker");
+    std::fs::write(&blocker, b"i am a file, not a dir").unwrap();
+    let o = lat([
+        "fix",
+        src.to_str().unwrap(),
+        "--fix-out",
+        blocker.join("out.ags").to_str().unwrap(),
+    ]);
+    assert_eq!(o.status.code(), Some(3), "stderr: {}", stderr(&o));
+    assert!(stderr(&o).contains("writing"), "{}", stderr(&o));
+}
+
+// --- rules ------------------------------------------------------------------
+
+#[test]
+fn rules_table_and_json_agree_on_the_catalogue() {
+    let table = lat(["rules"]);
+    let json = lat(["rules", "--json"]);
+    assert_eq!(table.status.code(), Some(0));
+    assert_eq!(json.status.code(), Some(0));
+
+    let v: Value = serde_json::from_str(&stdout(&json)).expect("rules --json");
+    let rules = v["rules"].as_array().expect("rules array");
+    assert!(
+        rules.len() > 20,
+        "catalogue looks truncated: {}",
+        rules.len()
+    );
+
+    // the human table is the same catalogue: its header, a distinctive rule title
+    // (Rule 1 "Character Set"), and the multi-part rule ids (2a/10a) all appear.
+    let table_out = stdout(&table);
+    assert!(table_out.contains("Rule") && table_out.contains("Severity"));
+    let r1_title = rules[0]["title"].as_str().unwrap();
+    assert!(
+        table_out.contains(r1_title),
+        "table missing '{r1_title}': {table_out}"
+    );
+    for id in ["2a", "10a"] {
+        assert!(
+            rules.iter().any(|r| r["rule"] == id),
+            "json missing rule {id}"
+        );
+        assert!(table_out.contains(id), "table missing rule {id}");
+    }
+    // Rule 8 (numeric precision) is fixable — the flag the `fix` verb relies on,
+    // and which `fix_repairs_the_defect_it_names` exercises end-to-end.
+    let r8 = rules
+        .iter()
+        .find(|r| r["rule"] == "8")
+        .expect("Rule 8 in catalogue");
+    assert_eq!(r8["fixable"], true);
+}
+
+// --- diff -------------------------------------------------------------------
+
+fn write_pair() -> (PathBuf, PathBuf, PathBuf) {
+    let d = scratch();
+    let base = d.join("base.ags");
+    let plus = d.join("plus.ags");
+    let clean = std::fs::read(fixture("clean_minimal.ags")).unwrap();
+    std::fs::write(&base, &clean).unwrap();
+    let mut extended = clean.clone();
+    extended.extend_from_slice(LOCA_GROUP.as_bytes());
+    std::fs::write(&plus, &extended).unwrap();
+    (d, base, plus)
+}
+
+#[test]
+fn diff_identical_files_reports_zero_delta() {
+    let (_d, base, _plus) = write_pair();
+    let o = lat(["diff", base.to_str().unwrap(), base.to_str().unwrap()]);
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    let out = stdout(&o);
+    assert!(out.contains("total: +0 added"), "{out}");
+    assert!(
+        !out.contains("groups added:"),
+        "no groups should differ: {out}"
+    );
+}
+
+#[test]
+fn diff_names_the_added_and_removed_group() {
+    let (_d, base, plus) = write_pair();
+    // base → plus adds LOCA; plus → base removes it. The delta is symmetric.
+    let added = lat(["diff", base.to_str().unwrap(), plus.to_str().unwrap()]);
+    let a = stdout(&added);
+    assert_eq!(added.status.code(), Some(0));
+    assert!(a.contains("groups added:   LOCA"), "{a}");
+    assert!(!a.contains("groups removed:"), "{a}");
+
+    let removed = lat(["diff", plus.to_str().unwrap(), base.to_str().unwrap()]);
+    let r = stdout(&removed);
+    assert!(r.contains("groups removed: LOCA"), "{r}");
+    assert!(!r.contains("groups added:"), "{r}");
+}
+
+#[test]
+fn diff_json_carries_the_group_delta() {
+    let (_d, base, plus) = write_pair();
+    let o = lat([
+        "diff",
+        "--json",
+        base.to_str().unwrap(),
+        plus.to_str().unwrap(),
+    ]);
+    assert_eq!(o.status.code(), Some(0));
+    let v: Value = serde_json::from_str(&stdout(&o)).expect("diff --json");
+    // the structured delta agrees with the human summary: LOCA was added
+    let added = v["groups_added"].as_array().expect("groups_added");
+    assert_eq!(added.iter().filter(|g| *g == "LOCA").count(), 1, "{v}");
+}
+
+#[test]
+fn diff_missing_file_exits_3() {
+    let (_d, base, _plus) = write_pair();
+    let o = lat(["diff", base.to_str().unwrap(), "/no/such/file_xyz.ags"]);
+    assert_eq!(o.status.code(), Some(3));
+}
+
+#[test]
+fn diff_unparseable_file_exits_4() {
+    let d = scratch();
+    let garbage = d.join("garbage.ags");
+    std::fs::write(&garbage, "not ags4 at all\r\n").unwrap();
+    let (_d, base, _plus) = write_pair();
+    let o = lat(["diff", base.to_str().unwrap(), garbage.to_str().unwrap()]);
+    assert_eq!(o.status.code(), Some(4), "stderr: {}", stderr(&o));
+}
