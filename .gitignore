@@ -72,3 +72,7 @@ __marimo__/
 # proptest saved-failure seeds — regenerated locally per run; not committed
 # (consistent with the existing proptest suites, which commit none).
 *.proptest-regressions
+
+# cargo-mutants scratch output (the per-run mutation-sweep work dir).
+mutants.out/
+mutants.out.old/
