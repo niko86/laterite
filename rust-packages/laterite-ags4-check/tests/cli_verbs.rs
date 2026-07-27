@@ -291,6 +291,60 @@ fn fix_out_write_failure_exits_3() {
     assert!(stderr(&o).contains("writing"), "{}", stderr(&o));
 }
 
+#[test]
+fn fix_json_residual_counts_warnings_and_drives_the_exit_code() {
+    // rule18_malformed_dict carries three errors + one warning, none mechanically
+    // fixable, so fix leaves all four. `fix` runs with include_warnings=true, so
+    // the residual is 4 (not 3) and the exit is 1; a clean file leaves 0 and exits
+    // 0. Pins both the warnings-in-residual wiring and the sign of the --json exit
+    // code — two live behaviours mutation testing showed were unasserted.
+    let d = scratch();
+    let dirty = d.join("r18.ags");
+    std::fs::copy(fixture("rule18_malformed_dict.ags"), &dirty).unwrap();
+    let o = lat(["fix", "--json", dirty.to_str().unwrap()]);
+    let report: Value = serde_json::from_str(&stdout(&o)).expect("fix --json");
+    assert_eq!(
+        report["residual"],
+        4,
+        "residual must count the warning tier: {}",
+        stdout(&o)
+    );
+    assert_eq!(o.status.code(), Some(1), "residual > 0 must exit 1");
+
+    let clean = d.join("clean.ags");
+    std::fs::copy(fixture("clean_minimal.ags"), &clean).unwrap();
+    let c = lat(["fix", "--json", clean.to_str().unwrap()]);
+    let creport: Value = serde_json::from_str(&stdout(&c)).expect("fix --json clean");
+    assert_eq!(creport["residual"], 0, "a clean file has no residual");
+    assert_eq!(c.status.code(), Some(0), "residual == 0 must exit 0");
+}
+
+#[test]
+fn fix_risky_hint_shows_only_when_risky_fixes_are_withheld() {
+    // rule1_non_ascii has an intent-guessing (risky) transliteration fix that a
+    // plain `fix` withholds — the hint must name it and its count. A clean file
+    // has no withheld fix and must NOT print the hint. Pins the
+    // `!risky && risky_available > 0` gate the sweep found unasserted.
+    let d = scratch();
+    let risky = d.join("r1.ags");
+    std::fs::copy(fixture("rule1_non_ascii.ags"), &risky).unwrap();
+    let o = lat(["fix", risky.to_str().unwrap()]);
+    assert!(
+        stdout(&o).contains("1 more fixable with --fix-risky"),
+        "risky hint missing: {}",
+        stdout(&o)
+    );
+
+    let clean = d.join("clean.ags");
+    std::fs::copy(fixture("clean_minimal.ags"), &clean).unwrap();
+    let c = lat(["fix", clean.to_str().unwrap()]);
+    assert!(
+        !stdout(&c).contains("fix-risky"),
+        "hint shown for a file with no withheld fix: {}",
+        stdout(&c)
+    );
+}
+
 // --- rules ------------------------------------------------------------------
 
 #[test]
