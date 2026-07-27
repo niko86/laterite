@@ -61,6 +61,14 @@ old_re="${old//./\\.}"
 sed -i.bak "s/${old_re}/${new}/g" rust-packages/laterite-node/index.js
 rm -f rust-packages/laterite-node/index.js.bak
 
+# --- 1c. roll the CHANGELOG. It is generated from changelog.json (the SSOT):
+#         `--release` moves [Unreleased] into a dated `[$new]` section in the
+#         JSON and regenerates CHANGELOG.md. Refuses if [Unreleased] is empty
+#         (nothing to release) and runs the leak-gate over every entry. Replaces
+#         the old bump-my-version text-substitution (removed from [tool.bumpversion]).
+echo "bump-version: rolling the changelog ([Unreleased] -> $new)…"
+uv run --no-project python tools/gen_changelog.py --release "$new"
+
 # --- 2. regenerate every lockfile so it carries the new version.
 echo "bump-version: regenerating lockfiles…"
 uv lock --quiet                                   # uv.lock (workspace wheel version)
