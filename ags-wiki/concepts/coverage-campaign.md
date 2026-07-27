@@ -79,7 +79,7 @@ and the exclude set **together**.
 
 | language | measured | floor (the gate) | gate lives in | gap to 95 |
 |---|---|---|---|---|
-| **Python** | **83%** | 80 | `ci.yml` `pytest --cov=laterite` | **+12 pt (~274 stmts)** |
+| **Python** | **~99%** ✓ | **95** | `ci.yml` `pytest --cov=laterite` | **met** (floor ratcheted 80→95) |
 | **Rust** (shipped engine) | ~89.24% | 88 | `nightly.yml` `cargo llvm-cov` | +6 pt |
 | **Node** | not re-measured | 93 lines / 84 branches | `laterite-node/vitest.config.ts` | +2 pt |
 | **Web** | ~98% | 95 | `web/vitest.config.ts` | **met** |
@@ -96,15 +96,24 @@ every PR; they are out of the *measurement*, not the test authority.
 Ranked by (uncovered lines × how load-bearing the code is). Python first — the
 biggest gap and the cheapest to measure.
 
-### Python (83% → 95%)
+### Python (83% → ~99%) — **DONE** ✓
+
+All five queue items landed; floor ratcheted 80→95 in `ci.yml`. Final per-file:
+`compat.py` 71→**100** (#123-follow parity + error arms), `_cli.py` 78→**100**
+(end-to-end verb error paths), `__init__.py` 93→**99** (4 intricate long-tail
+lines left — the synthesised-handle direct-ctor path + the bytes no-HEADER excel
+arm), `_frames.py` 77→**100**, `dynamic.py` 83→**100**. Documented exclusions:
+the pandas<2.2 DuckDB emit fallback, the vestigial `except RuntimeError` excel
+translations (the native binding raises the typed error directly), and a couple
+of defensive `TypeError`/parse-invariant guards.
 
 | # | file | cover | missed | shape of the gap | test strategy |
 |---|---|---|---|---|---|
-| P1 | `compat.py` | 71% | 180 | the python-ags4 drop-in surface: `get_{DICT,ABBR,TYPE,UNIT}_table_from_json_file`, `format_numeric_column`/`_format_sf`, scattered error paths | **parity** for `format_numeric_column` (oracle has it); **faithfulness/invariant** for the JSON dict-table helpers (oracle lacks them — they serve the same data from laterite's JSON SSOT); behavioural for the `BadDictError`/error arms |
-| P2 | `_cli.py` | 78% | 114 | the Python CLI — subcommand argument handling + error/exit paths | invoke each subcommand through the CLI entry, assert exit code + output; deep unreachable error arms → documented exclusion |
-| P3 | `__init__.py` | 93% | 49 | scattered edge cases + guards in the main API surface | behavioural tests per uncovered branch; guards that can't be hit → exclusion |
-| P4 | `_frames.py` | 77% | 26 | pyarrow-vs-duckdb materialization backends | **run both backends** (rule 5 — install pyarrow to cover its arm), not a skip |
-| P5 | `dynamic.py` | 83% | 10 | dynamic group registration edges | behavioural |
+| P1 ✓ | `compat.py` | 71→**100** | 180 | the python-ags4 drop-in surface: `get_{DICT,ABBR,TYPE,UNIT}_table_from_json_file`, `format_numeric_column`/`_format_sf`, scattered error paths | **parity** vs the oracle (incl. byte-for-byte `write_error_report`); faithfulness/invariant for the JSON dict-table helpers; behavioural for the `BadDictError`/error arms |
+| P2 ✓ | `_cli.py` | 78→**100** | 114 | the Python CLI — subcommand argument handling + error/exit paths | invoke each subcommand through the CLI entry, assert exit code + output; `__main__` entry → documented exclusion |
+| P3 ✓ | `__init__.py` | 93→**99** | 49 | scattered edge cases + guards in the main API surface | behavioural tests per uncovered branch; unreachable guards → exclusion |
+| P4 ✓ | `_frames.py` | 77→**100** | 26 | pyarrow-vs-duckdb materialization backends | **ran both backends** (rule 5 — pyarrow present + simulated-absent), not a skip |
+| P5 ✓ | `dynamic.py` | 83→**100** | 10 | dynamic group registration edges | behavioural |
 
 ### Rust, Node, wasm — measure next
 
