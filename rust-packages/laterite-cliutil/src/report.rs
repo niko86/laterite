@@ -163,6 +163,28 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    fn ctx(mode: OutputMode) -> Ctx {
+        Ctx {
+            mode,
+            quiet: false,
+            dry_run: false,
+            no_input: false,
+            compact: false,
+            no_color: false,
+        }
+    }
+
+    #[derive(Serialize)]
+    struct Tiny {
+        n: u32,
+        tag: &'static str,
+    }
+    impl Report for Tiny {
+        fn render_table(&self, w: &mut dyn Write, _ctx: &Ctx) -> io::Result<()> {
+            write!(w, "tiny {} {}", self.n, self.tag)
+        }
+    }
+
     #[test]
     fn without_keys_drops_only_named_top_level_keys() {
         let v = json!({"schema": 1, "summary": {"a": 1}, "files": [1, 2, 3]});
@@ -170,5 +192,51 @@ mod tests {
         assert!(c.get("files").is_none());
         assert_eq!(c["schema"], 1);
         assert_eq!(c["summary"]["a"], 1);
+    }
+
+    /// The default `full_value`/`compact_value` serialize the *whole* report, not a
+    /// blank document — a report with fields round-trips to those fields, and
+    /// `compact` defaults to the full document. Catches a mutant returning
+    /// `Default::default()` (a bare JSON null).
+    #[test]
+    fn default_value_projections_carry_the_whole_report() {
+        let t = Tiny { n: 7, tag: "x" };
+        assert_eq!(t.full_value(), json!({"n": 7, "tag": "x"}));
+        assert_eq!(t.compact_value(), t.full_value());
+    }
+
+    /// `Plan::render_table` writes the dry-run headline, one line per detail (string
+    /// values unquoted, others as compact JSON), and the mutate-nothing footer. A
+    /// mutant short-circuiting to `Ok(())` writes nothing and is caught.
+    #[test]
+    fn plan_render_table_writes_headline_details_and_footer() {
+        let plan = Plan::new("crawl", "would crawl 3 dirs")
+            .with("files", 3) // non-string → compact JSON
+            .with("root", "/data"); // string → unquoted
+        let mut buf = Vec::new();
+        plan.render_table(&mut buf, &ctx(OutputMode::Table))
+            .unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(
+            s.contains("DRY RUN (crawl) — would crawl 3 dirs"),
+            "headline: {s}"
+        );
+        assert!(s.contains("\n  files: 3"), "non-string detail as JSON: {s}");
+        assert!(s.contains("\n  root: /data"), "string detail unquoted: {s}");
+        assert!(s.contains("nothing written"), "footer: {s}");
+    }
+
+    /// Colour is off for the machine `ndjson` stream, and off without a TTY. Under
+    /// the piped test harness a Table-mode ctx must still report colour off — a
+    /// return flipped to `true`, or the `&&` loosened to `||`, would turn it on.
+    /// (The `!=`→`==` and always-`false` mutants are TTY-masked here and recorded as
+    /// harness residuals — `colour_enabled` is `false` either way off a TTY.)
+    #[test]
+    fn colour_is_off_for_ndjson_and_off_a_tty() {
+        assert!(!ctx(OutputMode::Table).colour(), "no TTY → colour off");
+        assert!(
+            !ctx(OutputMode::Ndjson).colour(),
+            "ndjson is never coloured"
+        );
     }
 }

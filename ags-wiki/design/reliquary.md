@@ -6,7 +6,7 @@ tags: [design, decision, process, relics]
 decided: 2026-06-19
 supersedes: []
 from_gap: []
-related: [api-surface-1.0, ags4-output]
+related: [api-surface-1.0, ags4-output, mutation-sweep]
 sources: []
 ---
 
@@ -81,6 +81,8 @@ it, and name that PR in *Removed-in*). Verify `—` = display-only.
 | `crossterm` (opt dep) | `rust-packages/laterite-ags4-check/Cargo.toml::crossterm` | dependency | keep | — (owner call) | reached via `ratatui::crossterm`; needed by the `tui` feature gate |
 | `DuckParse::surface` field | `rust-packages/laterite-ags4-compliance/src/bin/duckdb_parse_check.rs::surface: String` | code | removed | ags5-relics PR | `#[allow(dead_code)]`; deserialized, never read |
 | `_ordered()` (modality helper) | `tools/gen_modality.py::def _ordered` | code | spotted | — | vulture-surfaced 2026-07-20, verified dead: 0 references repo-wide (module *or* test), superseded by `_columns()`/`_grid()`. Trivial standalone leftover — safe to drop in any pass that touches `gen_modality.py` |
+| `include_warnings: true` (diff) | `rust-packages/laterite-ags4-check/src/commands/diff.rs::include_warnings: true` | code | removed | mutation-sweep cleanup (coverage-rust) | inert survivor 2026-07-27: `diff` never runs the rule engine, so `opts.include_warnings` was never read — cargo-culted from `validate`/`fix`. Collapsed to `CheckOptions::default()`. See [[mutation-sweep]] |
+| `include_warnings: true` (merge) | `rust-packages/laterite-ags4-check/src/commands/merge.rs::include_warnings: true` | code | removed | mutation-sweep cleanup (coverage-rust) | same inert pattern as `diff` — `merge` parses/reconciles but never runs the rule engine, so `opts.include_warnings` was never read. Collapsed to `CheckOptions::default()` |
 
 ## Finding relics — tooling
 

@@ -298,4 +298,46 @@ mod tests {
             .collect();
         assert_eq!(values, ["error", "widen", "promote"]);
     }
+
+    /// The `encodings` table and the positional args must survive reflection.
+    ///
+    /// `encodings` is a load-bearing census output: the `cp1252x` policy pin (an
+    /// unknown label must resolve to `null`, never a silent UTF-8 fallback) and the
+    /// `latin9` alias that only the binary once accepted. Positional arguments (a
+    /// verb's `<file>`) are reflected as `<NAME>` so a launcher that drops one is
+    /// still visible to the diff. Neither had an assertion — a blanked `encodings`
+    /// table or a dropped-positionals arm went uncaught.
+    #[test]
+    fn census_carries_the_encodings_table_and_positional_args() {
+        let c = census_json();
+
+        // the encodings table: a known label resolves, an alias only the binary
+        // once knew resolves, and the cp1252x typo is refused (the policy pin).
+        let enc = &c["encodings"];
+        assert_eq!(enc["utf-8"], "UTF-8");
+        assert_eq!(enc["latin9"], "ISO-8859-15");
+        assert_eq!(
+            enc["cp1252x"],
+            Value::Null,
+            "an unknown label must resolve to null, not a silent fallback"
+        );
+
+        // positionals are reflected as <NAME> — validate's is present, not dropped.
+        let validate = c["verbs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["verb"] == "validate")
+            .expect("validate is a verb");
+        let names: Vec<&str> = validate["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a["name"].as_str().unwrap())
+            .collect();
+        assert!(
+            names.iter().any(|n| n.starts_with('<') && n.ends_with('>')),
+            "validate's positional argument is missing from the census: {names:?}"
+        );
+    }
 }

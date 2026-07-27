@@ -16,13 +16,7 @@ use crate::commands::common::apply_dict_args;
 /// otherwise a per-group summary. KEY headings come from the dictionary, edition
 /// picked from the revision's `TRAN_AGS` (forced by `--dict-version`).
 pub fn run(args: &DiffArgs, json: bool, quiet: bool) -> ! {
-    let opts = apply_dict_args(
-        CheckOptions {
-            include_warnings: true,
-            ..CheckOptions::default()
-        },
-        &args.dict,
-    );
+    let opts = apply_dict_args(CheckOptions::default(), &args.dict);
     let (a, b) = (args.file.as_path(), args.other.as_path());
     let spinner = Spinner::start("diffing...", quiet);
     let read = |p: &Path| match std::fs::read(p) {

@@ -18,13 +18,7 @@ use crate::commands::common::apply_dict_args;
 /// emits a `{warnings, revisions}` summary; otherwise a human summary. The merged
 /// bytes always go to `--out`, so stdout stays clean.
 pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
-    let opts = apply_dict_args(
-        CheckOptions {
-            include_warnings: true,
-            ..CheckOptions::default()
-        },
-        &args.dict,
-    );
+    let opts = apply_dict_args(CheckOptions::default(), &args.dict);
 
     let spinner = Spinner::start("merging...", quiet);
     let read = |p: &Path| match std::fs::read(p) {

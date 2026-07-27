@@ -108,3 +108,59 @@ pub fn report_certified_skip(sidecar: &Sidecar, world_checked: bool) {
         v.validator, v.checked_at
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::why;
+    use laterite_ags4_trust::{RevalidateReason, Tier};
+
+    /// `why` is the user-facing reason table, and its doc contract is that every
+    /// reason gets a **distinct** message naming its own cause. The end-to-end
+    /// certificate tests only exercise the "stale" arm, and cargo-mutants mutates
+    /// whole-function returns, not individual match-arm literals — so without this
+    /// the other twelve arms are unverified. Assert a discriminating phrase per
+    /// reason (a swapped or emptied arm then fails) and full pairwise distinctness.
+    #[test]
+    fn why_names_the_cause_of_every_revalidation_reason() {
+        use RevalidateReason::*;
+        // each reason's message names its own cause (a swapped/emptied arm fails)
+        assert!(why(FormatVersion).contains("older format"));
+        assert!(why(SizeChanged).contains("stale"));
+        assert!(why(ContentChanged).contains("stale"));
+        assert!(why(DifferentValidator).contains("different validator"));
+        assert!(why(DifferentEngine).contains("different rule engine"));
+        assert!(why(EditionDiffers).contains("--dict-version"));
+        assert!(why(DictionaryChanged).contains("custom dictionary"));
+        assert!(why(EncodingDiffers).contains("--encoding"));
+        assert!(why(TierNotMeasured(Tier::Errors)).contains("never measured errors"));
+        assert!(why(TierNotMeasured(Tier::Warnings)).contains("never measured warnings"));
+        assert!(why(TierNotMeasured(Tier::Fyi)).contains("never measured FYI"));
+        assert!(why(TierNotClean(Tier::Errors)).contains("recorded errors"));
+        assert!(why(TierNotClean(Tier::Warnings)).contains("recorded warnings"));
+        assert!(why(TierNotClean(Tier::Fyi)).contains("recorded FYI"));
+
+        // distinct facts → distinct messages (the doc's explicit contract): only
+        // SizeChanged/ContentChanged deliberately share, so the 13 non-shared
+        // reasons must yield 13 different texts.
+        let mut texts = [
+            why(FormatVersion),
+            why(SizeChanged),
+            why(DifferentValidator),
+            why(DifferentEngine),
+            why(EditionDiffers),
+            why(DictionaryChanged),
+            why(EncodingDiffers),
+            why(TierNotMeasured(Tier::Errors)),
+            why(TierNotMeasured(Tier::Warnings)),
+            why(TierNotMeasured(Tier::Fyi)),
+            why(TierNotClean(Tier::Errors)),
+            why(TierNotClean(Tier::Warnings)),
+            why(TierNotClean(Tier::Fyi)),
+        ];
+        let count = texts.len();
+        texts.sort_unstable();
+        let mut uniq = texts.to_vec();
+        uniq.dedup();
+        assert_eq!(uniq.len(), count, "reason messages are not distinct");
+    }
+}

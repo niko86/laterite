@@ -1,7 +1,7 @@
 ---
 type: index
-generated: 2026-07-26
-counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 28, concepts: 28, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 21}
+generated: 2026-07-27
+counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 28, concepts: 29, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 21}
 ---
 # AGS Wiki — Content Catalog
 
@@ -16,17 +16,17 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 28, concept
 | Types | 17 |
 | Observations | 48 |
 | Tools | 28 |
-| Concepts | 28 |
+| Concepts | 29 |
 | Editions | 5 |
 | Comparisons | 1 |
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
 | Design | 21 |
-| **Total (live)** | **395** |
+| **Total (live)** | **396** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 20 · `confirmed` 18 · `drafted` 327 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 5 · `stub` 13
+**Status distribution:** `accepted` 20 · `confirmed` 18 · `drafted` 328 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 5 · `stub` 13
 
 ## Rules
 
@@ -370,6 +370,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 28, concept
 | [[heading-status-vocabulary]] | drafted |
 | [[key-tuple-pseudo-keys]] | drafted |
 | [[modality-register]] | drafted |
+| [[mutation-sweep]] | drafted |
 | [[parent-child-graph]] | drafted |
 | [[parity-confidence-model]] | drafted |
 | [[parity-model]] | reviewed |

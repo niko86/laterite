@@ -124,3 +124,53 @@ fn with_default_subcommand(mut argv: Vec<String>) -> Vec<String> {
     // No positional at all (`lat`, `lat --json`) → let clap show help / error.
     argv
 }
+
+#[cfg(test)]
+mod tests {
+    use super::with_default_subcommand;
+
+    fn spliced(argv: &[&str]) -> String {
+        with_default_subcommand(argv.iter().map(|s| (*s).to_string()).collect()).join(" ")
+    }
+
+    /// The whole argv pre-scan, pinned: the loop bound, the help/version
+    /// alternatives, and the flag-skip step.
+    ///
+    /// A bare file (and a bare file behind a leading per-verb flag) splices
+    /// `validate` to the FRONT, so `--json` lands after the verb that owns it. An
+    /// explicit verb — including one still behind a pre-verb flag, which clap will
+    /// reject — is left untouched, as is the hidden `census` door (splicing in
+    /// front of it was the original bug). Help/version pass straight through even
+    /// with a trailing token. And a line with no positional is returned as-is
+    /// without walking off the end of argv.
+    #[test]
+    fn default_subcommand_prescan() {
+        // a bare file → validate, spliced at the front
+        assert_eq!(spliced(&["lat", "foo.ags"]), "lat validate foo.ags");
+        // a leading per-verb flag lands AFTER the spliced verb, where clap parses it
+        assert_eq!(
+            spliced(&["lat", "--json", "foo.ags"]),
+            "lat validate --json foo.ags"
+        );
+        // an explicit verb is left alone
+        assert_eq!(spliced(&["lat", "read", "foo.ags"]), "lat read foo.ags");
+        // a flag before an explicit verb is NOT spliced (clap rejects the pre-verb flag)
+        assert_eq!(
+            spliced(&["lat", "--json", "read", "foo.ags"]),
+            "lat --json read foo.ags"
+        );
+        // a hidden verb must not get validate spliced in front of it (the census bug)
+        assert_eq!(spliced(&["lat", "census"]), "lat census");
+        // help/version pass through to clap unchanged, even with a trailing token
+        for flag in ["-h", "--help", "-V", "--version"] {
+            assert_eq!(
+                spliced(&["lat", flag, "foo.ags"]),
+                format!("lat {flag} foo.ags"),
+                "{flag} must pass through to clap, not splice validate"
+            );
+        }
+        // no positional: returned untouched, and the walk must not run off the end
+        assert_eq!(spliced(&["lat"]), "lat");
+        assert_eq!(spliced(&["lat", "--quiet"]), "lat --quiet");
+    }
+}

@@ -12,7 +12,7 @@ repo_refs:
   python_scope: "repo:packages/laterite/pyproject.toml"
   node_thresholds: "repo:rust-packages/laterite-node/vitest.config.ts"
   web_thresholds: "repo:web/vitest.config.ts"
-related: [testing-strategy, perf-campaign, crate-map, reliquary]
+related: [testing-strategy, mutation-sweep, perf-campaign, crate-map, reliquary]
 sources: []
 ---
 # coverage campaign: the strategy, the stopping rule and the ledger
@@ -53,7 +53,9 @@ and the exclude set **together**.
 ## The rules of engagement
 
 1. **Test behaviour, not lines.** The target is a test that fails when the code is
-   wrong, not one that merely executes the line.
+   wrong, not one that merely executes the line. In the Rust phase this is
+   *enforced*, not just intended: each batch runs a [[mutation-sweep]], and a
+   surviving mutant is precisely a line that ran without being asserted.
 2. **Parity where an oracle exists.** `laterite.compat` is a python-ags4 drop-in;
    any function python-ags4 also exposes is tested by **differential assertion
    against the oracle** (`python_ags4.AGS4`, a dev dependency), the strongest
@@ -136,4 +138,4 @@ exclusion with a stated reason. Stop before that only with an owner decision
 
 ## Related
 
-[[testing-strategy]] · [[perf-campaign]] · [[parity-model]] · [[crate-map]] · [[reliquary]]
+[[testing-strategy]] · [[mutation-sweep]] · [[perf-campaign]] · [[parity-model]] · [[crate-map]] · [[reliquary]]
