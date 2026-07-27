@@ -306,4 +306,39 @@ mod tests {
         assert_eq!(r9.unwrap_or(0), 0, "PROJ_XX wrongly flagged: {f:?}");
         assert!(!f.contains_key(RULE_7), "unexpected Rule 7: {f:?}");
     }
+
+    /// The Rule 9 unknown-heading finding must carry its Location.
+    #[test]
+    fn rule_9_unknown_heading_finding_location() {
+        let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"LOCA_ZZZZ\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\"DATA\",\"BH1\",\"x\"\r\n";
+        let r = run(src);
+        let f = r
+            .get(RULE_9)
+            .unwrap()
+            .iter()
+            .find(|x| x.desc.contains("LOCA_ZZZZ"))
+            .expect("unknown heading flagged");
+        assert_eq!(f.location.target, Target::Heading);
+        assert_eq!(f.location.field_index, Some(1));
+        assert_eq!(f.location.heading.as_deref(), Some("LOCA_ZZZZ"));
+    }
+
+    /// `collect_file_dict` skips empty GROUP-type rows and de-duplicates a
+    /// heading declared twice for the same group.
+    #[test]
+    fn collect_file_dict_skips_empty_and_dedups() {
+        let src = "\"GROUP\",\"DICT\"\r\n\
+                   \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\"\r\n\
+                   \"UNIT\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"GROUP\",\"XXXX\",\"\"\r\n\
+                   \"DATA\",\"HEADING\",\"XXXX\",\"XXXX_ONE\"\r\n\
+                   \"DATA\",\"HEADING\",\"XXXX\",\"XXXX_ONE\"\r\n";
+        let pf = parse_str(src).unwrap();
+        let d = collect_file_dict(&pf);
+        assert_eq!(
+            d.get("XXXX").map(Vec::as_slice),
+            Some(&["XXXX_ONE".to_string()][..]),
+        );
+    }
 }

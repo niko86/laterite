@@ -313,4 +313,32 @@ mod tests {
             r#"{"line":2,"group":"SAMP","desc":"nope","target":"heading","field_index":3,"heading":"SAMP_FOO","severity":"warning"}"#
         );
     }
+
+    /// The three renderers must actually emit the finding content — a canned
+    /// empty/default return passes no assertion here.
+    #[test]
+    fn renderers_emit_the_finding_content() {
+        let mut f = Findings::new();
+        add(&mut f, "AGS Format Rule 8", Some(5), "LOCA", "boom");
+
+        let v = findings_json_value("d.ags", &f);
+        assert_eq!(v["file"], serde_json::json!("d.ags"));
+        assert_eq!(
+            v["findings"]["AGS Format Rule 8"][0]["desc"],
+            serde_json::json!("boom")
+        );
+
+        let json = findings_json("d.ags", &f);
+        assert!(json.contains("\"file\": \"d.ags\""), "{json}");
+        assert!(
+            json.contains("boom") && json.contains("AGS Format Rule 8"),
+            "{json}"
+        );
+
+        let nd = findings_ndjson(&f);
+        assert_eq!(
+            nd.trim(),
+            r#"{"rule":"AGS Format Rule 8","line":5,"group":"LOCA","desc":"boom"}"#
+        );
+    }
 }

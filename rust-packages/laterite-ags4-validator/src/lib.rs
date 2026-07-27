@@ -530,6 +530,113 @@ mod tests {
         assert_eq!(res, DictResolution::StructuralBase);
     }
 
+    #[test]
+    fn editions_joined_lists_the_bundled_editions() {
+        let s = editions_joined("|");
+        assert!(s.contains("4.0.3") && s.contains("4.2"), "{s}");
+        assert!(s.contains('|'), "{s}");
+        assert_eq!(s.split('|').count(), DictVersion::ALL.len());
+    }
+
+    /// An overlay that re-parents a standard group, demotes a standard KEY, and
+    /// retypes a standard non-KEY heading must WARN on each (honour + warn, #568).
+    #[test]
+    fn override_warnings_flag_reparent_demotion_and_type_change() {
+        let dict_json = br#"{"groups":{"SAMP":{"parent":"PROJ","headings":[
+            {"name":"SAMP_ID","type":"ID","status":"REQUIRED"},
+            {"name":"SAMP_TOP","type":"X","status":"REQUIRED"}
+        ]}}}"#;
+        let custom = overlay::parse_dict(
+            dict_json,
+            overlay::DictFormat::Json,
+            encoding_rs::UTF_8,
+            overlay::BaseSpec::Auto,
+            "test.json",
+        )
+        .expect("custom dict parses");
+        let opts = CheckOptions {
+            custom_dict: Some(custom),
+            ..Default::default()
+        };
+        let pf = parse::parse_str(
+            "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n",
+        )
+        .expect("parses");
+        let (found, _dv, _res) =
+            check_parsed_with_dict(&pf, &opts, &WorldScope::None).expect("runs");
+        let dict = found.get("DICT").expect("DICT override warnings");
+        assert!(
+            dict.iter()
+                .any(|f| f.desc.contains("re-parents") && f.desc.contains("SAMP")),
+            "re-parent warning missing: {dict:?}"
+        );
+        assert!(
+            dict.iter()
+                .any(|f| f.desc.contains("demotes") && f.desc.contains("SAMP_ID")),
+            "KEY-demotion warning missing: {dict:?}"
+        );
+        assert!(
+            dict.iter().any(|f| f.desc.contains("SAMP_TOP")),
+            "type-change warning missing: {dict:?}"
+        );
+    }
+
+    #[test]
+    fn override_warnings_distinguish_demote_from_type_and_status_change() {
+        // Re-declare three standard LOCA headings, each a DIFFERENT single-facet
+        // change, so every branch of the override-warning selector is pinned:
+        //   LOCA_ID   KEY/ID  → KEY/X      : KEY retained + type changed ⇒
+        //                                     "overrides", NOT "demotes".
+        //   LOCA_TYPE OTHER/PA → OTHER/X   : type-only change  ⇒ "overrides".
+        //   LOCA_REM  OTHER/X  → REQUIRED/X: status-only change ⇒ "overrides".
+        let dict_json = br#"{"groups":{"LOCA":{"parent":"PROJ","headings":[
+            {"name":"LOCA_ID","type":"X","status":"KEY"},
+            {"name":"LOCA_TYPE","type":"X","status":"OTHER"},
+            {"name":"LOCA_REM","type":"X","status":"REQUIRED"}
+        ]}}}"#;
+        let custom = overlay::parse_dict(
+            dict_json,
+            overlay::DictFormat::Json,
+            encoding_rs::UTF_8,
+            overlay::BaseSpec::Auto,
+            "test.json",
+        )
+        .expect("custom dict parses");
+        let opts = CheckOptions {
+            custom_dict: Some(custom),
+            ..Default::default()
+        };
+        let pf = parse::parse_str(
+            "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n",
+        )
+        .expect("parses");
+        let (found, _dv, _res) =
+            check_parsed_with_dict(&pf, &opts, &WorldScope::None).expect("runs");
+        let dict = found.get("DICT").expect("DICT override warnings");
+        let has = |needle: &str, hd: &str| {
+            dict.iter()
+                .any(|f| f.desc.contains(needle) && f.desc.contains(hd))
+        };
+        // KEY retained ⇒ an "overrides" line, and explicitly NOT a "demotes" one.
+        assert!(
+            has("overrides", "LOCA_ID"),
+            "LOCA_ID type-change override: {dict:?}"
+        );
+        assert!(
+            !has("demotes", "LOCA_ID"),
+            "LOCA_ID must not read as a demotion: {dict:?}"
+        );
+        // Single-facet type-only and status-only changes each still warn.
+        assert!(
+            has("overrides", "LOCA_TYPE"),
+            "LOCA_TYPE type-only override: {dict:?}"
+        );
+        assert!(
+            has("overrides", "LOCA_REM"),
+            "LOCA_REM status-only override: {dict:?}"
+        );
+    }
+
     fn r(t: &str) -> DictVersion {
         resolve_dict_version(None, Some(t)).expect("ok").0
     }

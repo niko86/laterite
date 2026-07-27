@@ -356,6 +356,38 @@ mod tests {
         assert_eq!(f2[RULE_1_FYI].len(), 1);
     }
 
+    // ---- mutation-sweep additions: the > 255 boundary and the char span ----
+
+    #[test]
+    fn first_codepoint_over_boundary() {
+        assert_eq!(first_codepoint_over("ÿ", 255), None); // 255 is not > 255
+        assert_eq!(first_codepoint_over("abĀ", 255), Some(2)); // Ā = 256 at index 2
+        assert_eq!(first_codepoint_over("plain", 255), None);
+    }
+
+    #[test]
+    fn rule_1_over_255_error_carries_a_single_char_span() {
+        let src = format!("{HEAD}\"GROUP\",\"A\u{0100}\"\r\n"); // U+0100 = 256
+        let f = run(&src, false);
+        let span = f.get(RULE_1).expect("rule 1 error")[0]
+            .location
+            .char_span
+            .expect("char_span present");
+        assert_eq!(span.1, span.0 + 1, "half-open single-char span");
+    }
+
+    #[test]
+    fn codepoint_exactly_255_is_fyi_not_an_over_255_error() {
+        let src = format!("{HEAD}\"GROUP\",\"A\u{00ff}\"\r\n"); // U+00FF = 255
+        let f = run(&src, true);
+        assert!(!f.contains_key(RULE_1), "255 is extended-ASCII, not > 255");
+        let span = f.get(RULE_1_FYI).expect("rule 1 fyi")[0]
+            .location
+            .char_span
+            .expect("fyi char_span present");
+        assert_eq!(span.1, span.0 + 1);
+    }
+
     #[test]
     fn rule_3_flags_bad_descriptor() {
         let src = format!("{HEAD}\"WIBBLE\",\"x\"\r\n");

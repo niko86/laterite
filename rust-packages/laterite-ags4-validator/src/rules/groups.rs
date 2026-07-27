@@ -902,6 +902,46 @@ mod tests {
         );
     }
 
+    /// A single-row group with EXACTLY one DATA row is correct — the `1 => {}`
+    /// arm of `single_row_group` must not flag it.
+    #[test]
+    fn single_row_group_accepts_exactly_one_row() {
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n";
+        assert!(!run(src).contains_key(RULE_13), "one row is valid");
+    }
+
+    /// Rule 17: a data type USED by a group but absent from the TYPE group is
+    /// flagged; the "TYPE" descriptor and empty type cells are never data types.
+    #[test]
+    fn rule_17_flags_a_used_type_absent_from_the_type_group() {
+        let src = "\"GROUP\",\"TYPE\"\r\n\"HEADING\",\"TYPE_TYPE\",\"TYPE_DESC\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\
+                   \"DATA\",\"ID\",\"id\"\r\n\"DATA\",\"X\",\"text\"\r\n\r\n\
+                   \"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"LOCA_FDEP\",\"LOCA_REM\"\r\n\
+                   \"UNIT\",\"\",\"m\",\"\"\r\n\"TYPE\",\"ID\",\"2DP\",\"\"\r\n\
+                   \"DATA\",\"BH1\",\"1.00\",\"note\"\r\n";
+        let f = run(src);
+        let r17 = f.get(RULE_17).expect("rule 17");
+        assert!(r17.iter().any(|x| x.desc.contains("2DP")), "{r17:?}"); // undefined
+        assert!(
+            !r17.iter()
+                .any(|x| x.desc.contains("\"TYPE\"") || x.desc.contains("Data type \"\"")),
+            "the TYPE descriptor / empty cells are not data types: {r17:?}"
+        );
+    }
+
+    /// An ABBR row with a picklist heading but an EMPTY code is skipped, not
+    /// flagged as non-standard (the empty-field guard).
+    #[test]
+    fn empty_abbr_code_produces_no_fyi() {
+        let f = run_fyi(&abbr_fixture("SAMP_TYPE", ""));
+        assert!(
+            !f.contains_key(RULE_16_FYI),
+            "empty code must not fire an FYI: {f:?}"
+        );
+    }
+
     #[test]
     fn rule_15_flags_unit_used_in_pu_typed_column() {
         // A `PU`-typed DATA cell carries a unit *value* ("kPa") that must

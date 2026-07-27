@@ -1583,6 +1583,9 @@ mod tests {
         assert!(row_is_clean("DATA,unquoted,fields"));
         assert!(!row_is_clean("\"DATA\",\"a\"b\"")); // stray after closing quote
         assert!(!row_is_clean("\"DATA\",\"BH01")); // unterminated quote
+        // An unquoted field must still be scanned to its comma and the REST of
+        // the row validated — a malformed tail after it is not clean.
+        assert!(!row_is_clean("AB,\"CD")); // unquoted field, then an unterminated quote
     }
 
     #[test]
@@ -1858,5 +1861,145 @@ mod tests {
             .map(std::string::ToString::to_string)
             .collect();
         assert_eq!(exported, from_consts);
+    }
+
+    #[test]
+    fn rule_8_fix_labels_name_their_operation() {
+        // The label wording is chosen by fix KIND (Canonicalise vs Reformat).
+        // Pin BOTH branches so the selector can't be flipped: a non-ISO DT cell
+        // (ISO canonicalisation) beside a mis-formatted numeric (reformat).
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\
+                   \"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\
+                   \"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_DATE\"\r\n\
+                   \"UNIT\",\"yyyy-mm-dd\"\r\n\"TYPE\",\"DT\"\r\n\"DATA\",\"18/08/2020\"\r\n\r\n\
+                   \"GROUP\",\"MOND\"\r\n\"HEADING\",\"MOND_A\"\r\n\"UNIT\",\"\"\r\n\
+                   \"TYPE\",\"2DP\"\r\n\"DATA\",\"1.5\"\r\n";
+        let (parsed, found) = check(src);
+        let fixes = compute_fixes(&parsed, &found);
+        let dt = fixes
+            .iter()
+            .find(|f| f.kind == FixKind::CanonicalizeDatetime)
+            .expect("DT canonicalisation fix");
+        assert!(
+            dt.label.contains("Canonicalise"),
+            "DT label: {:?}",
+            dt.label
+        );
+        let num = fixes
+            .iter()
+            .find(|f| f.kind == FixKind::ReformatNumeric)
+            .expect("numeric reformat fix");
+        assert!(
+            num.label.contains("Reformat"),
+            "numeric label: {:?}",
+            num.label
+        );
+    }
+
+    #[test]
+    fn apply_skips_an_out_of_range_edit_without_panicking() {
+        // A hand-built edit whose `end` runs past the line length must be
+        // dropped by the bounds guard (`e > len || s > e`), not indexed. If the
+        // guard's OR degrades to AND, `chars[s..e]` panics on this input — so a
+        // clean return IS the assertion.
+        let src = "\"GROUP\",\"X\"\r\n\"HEADING\",\"P\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"AA\"\r\n";
+        let parsed = parse_str(src).unwrap();
+        let fixes = vec![Fix {
+            kind: FixKind::ReformatNumeric,
+            label: String::new(),
+            rule: RULE_8.to_string(),
+            line: Some(5),
+            risk: FixRisk::Safe,
+            edits: vec![SpanEdit {
+                line: 5,
+                start: 0,
+                end: 9999, // past the line's char count
+                replacement: "zz".to_string(),
+                expected: "AA".to_string(),
+            }],
+        }];
+        let out = apply_fixes(src, parsed.has_bom, &fixes);
+        assert!(
+            out.contains("\"DATA\",\"AA\""),
+            "unchanged line expected: {out:?}"
+        );
+    }
+
+    #[test]
+    fn risky_fixes_are_counted_and_withheld_without_include_risky() {
+        // One ambiguous-DT cell (a RISKY ISO canonicalisation) beside two
+        // mis-formatted numerics (SAFE). Without include_risky the safe pair
+        // applies and the risky one is withheld — pins the risk COUNT (1, not
+        // the 2 safe ones) and the `if !include_risky` retain.
+        let src = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\
+                   \"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n\r\n\
+                   \"GROUP\",\"TRAN\"\r\n\"HEADING\",\"TRAN_DATE\"\r\n\
+                   \"UNIT\",\"yyyy-mm-dd\"\r\n\"TYPE\",\"DT\"\r\n\"DATA\",\"01/02/2020\"\r\n\r\n\
+                   \"GROUP\",\"MOND\"\r\n\"HEADING\",\"MOND_A\",\"MOND_B\"\r\n\"UNIT\",\"\",\"\"\r\n\
+                   \"TYPE\",\"2DP\",\"2DP\"\r\n\"DATA\",\"1.5\",\"2.5\"\r\n";
+        let opts = CheckOptions {
+            include_fyi: true,
+            ..Default::default()
+        };
+        let out = fix_document_selective(src.as_bytes(), &opts, false, None, &[]).expect("runs");
+        assert_eq!(
+            out.risky_available,
+            1,
+            "risky count: {:?}",
+            kinds(&out.applied)
+        );
+        assert!(
+            !kinds(&out.applied).contains(&FixKind::CanonicalizeDatetime),
+            "risky DT fix must be withheld: {:?}",
+            kinds(&out.applied)
+        );
+        assert_eq!(
+            kinds(&out.applied)
+                .iter()
+                .filter(|k| **k == FixKind::ReformatNumeric)
+                .count(),
+            2,
+            "both safe numeric reformats apply: {:?}",
+            kinds(&out.applied)
+        );
+    }
+
+    #[test]
+    fn rule_2a_all_lf_file_still_yields_one_crlf_fix() {
+        // EVERY line is LF-only. The NormalizeCrlf fix keys off
+        // `any(!had_crlf)`; the mixed-file sibling leaves some lines CRLF, so
+        // only an all-LF file makes that negation load-bearing (drop the `!`
+        // and `any(had_crlf)` is false here → the fix vanishes).
+        let src = "\"GROUP\",\"PROJ\"\n\"HEADING\",\"PROJ_ID\"\n\
+                   \"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"P1\"\n";
+        let (parsed, found) = check(src);
+        assert!(found.contains_key(RULE_2A), "all-LF should trip Rule 2a");
+        let fixes = compute_fixes(&parsed, &found);
+        assert!(
+            kinds(&fixes).contains(&FixKind::NormalizeCrlf),
+            "all-LF file must still yield a CRLF-normalise fix: {:?}",
+            kinds(&fixes)
+        );
+    }
+
+    #[test]
+    fn rule_6_embedded_lf_is_stripped() {
+        // #422: the quote-aware splitter keeps an embedded LF inside a quoted
+        // field. Rule 6 must flag+fix it — exercising the '\n' arm of the CR/LF
+        // strip filter that the embedded-CR sibling test never lands on.
+        let src = format!("{HEAD}\"DATA\",\"a\nb\"\r\n");
+        let (parsed, found) = check(&src);
+        let fixes = compute_fixes(&parsed, &found);
+        assert!(
+            kinds(&fixes).contains(&FixKind::StripEmbeddedCr),
+            "embedded LF should yield a strip fix: {:?}",
+            kinds(&fixes)
+        );
+        let out = apply_fixes(&src, parsed.has_bom, &fixes);
+        assert!(
+            !out.contains("\"a\nb\""),
+            "embedded LF not stripped: {out:?}"
+        );
     }
 }
