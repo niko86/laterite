@@ -58,7 +58,7 @@ Every batch in the Rust phase of [[coverage-campaign]] carries a sweep:
    batch, not later.
 4. **Record** the module in the ledger (date swept, mutants, residual).
 
-Four kinds of survivor — only the first is a test defect:
+Five kinds of survivor — only the first is a test defect:
 
 - **Real gap** — the mutated behaviour is observable at the boundary but no test
   asserts it → write the assertion.
@@ -80,6 +80,17 @@ Four kinds of survivor — only the first is a test defect:
   it**, and do not contort the program to kill it (adding a phantom flag just to
   make a test fail is the gaming this whole practice refuses). Record it as
   equivalent with the reason.
+- **Harness-bound survivor** — the mutated effect is real and user-visible, but only
+  through a channel the test *process* cannot observe: a live-terminal handle
+  (`indicatif` and `comfy-table` suppress drawing and colour off a TTY, so a zebra
+  stripe or a live progress bar renders identically to none), the terminal width, or
+  a write straight to the global `stdout`/`stderr` rather than an injected writer
+  (`emit` locks stdout; `note` is an `eprintln`). Not a test defect and not dead
+  code — a pty-driven or output-capturing integration test could kill it. Kill what
+  the harness *can* reach first (assert the returned handle's state, not its
+  rendering — e.g. a hidden bar has no `length()` even though `is_hidden()` can't see
+  the gate), then record the rest as harness-bound with the channel named. Prefer an
+  injectable writer where the design allows.
 
 **A clean sweep is not proof of total coverage.** `cargo-mutants` mutates at
 function granularity — whole-return replacement, operator flips — not every
@@ -110,15 +121,18 @@ the count of survivors left standing *with a non-defect reason*.
 | `commands/excel.rs` | laterite-ags4-check | 2026-07-27 | 6 | 6 killed / 0 | clean — the `direction` inference already had unit tests; the one survivor was `delete !` on `!args.no_format_numeric`, the import-side default. Killed by a binary-only round-trip: export a 3DP column holding an under-precise `523145.1`, then import — default padding gives `523145.100`, `--no-format-numeric` keeps `523145.1`. No new deps (export writes strings, so the diff needs a value non-canonical for its TYPE, not a numeric xlsx cell) |
 | `commands/census.rs` | laterite-ags4-check | 2026-07-27 | 7 | 6 killed / 1 equivalent | one unit test closed both real survivors — the `encodings` table (asserting `utf-8`/`latin9` resolve and the `cp1252x` typo → `null` policy pin) and the dropped-positionals arm (validate's `<file>` must survive reflection). The residual is an **equivalent mutant**: flipping the `is_positional()` guard to `true` is a no-op because the CLI has no short-only flags today |
 | `main.rs` (`with_default_subcommand`) | laterite-ags4-check | 2026-07-27 | 18 | 18 killed / 0 | one unit test pins the argv pre-scan directly (asserting its output as a joined string) rather than through fragile e2e stdout matching: the loop bound (a no-positional line must not walk off the end), the four help/version alternatives (each passes through even with a trailing token — killing the three `\|\| → &&` mutants), and the flag-skip `+=` (a leading flag before an explicit verb — killing `+= → -=`; the `+= → *=` infinite-loop mutant is caught by timeout). **The whole `laterite-ags4-check` binary is now swept.** |
+| `lib.rs` | laterite-cliutil | 2026-07-27 | 63 | 42 killed / 16 harness-bound (5 unviable) | new tests pin the pure layer: the coloured-JSON pretty-printer (each scalar's palette entry; a structure-preserving round-trip after stripping the palette back out — which catches the comma logic and empty-`[]`/`{}` rendering; per-depth indentation, incl. the array-of-object item recursion), the colour gate off a TTY, the progress-bar gate (via `length()` — `indicatif` auto-hides off a TTY so `is_hidden()` can't see the gate), and the spinner Live/Static gate. The 16 residuals are **harness-bound**: `comfy-table` drops colour off a TTY (zebra dim, 4), `indicatif` Live-only handles (Spinner set/drop + MultiLine set_line/set_header/suspend/drop/degenerate-gate, 7), `term_cols` width (2), `colour_enabled`'s TTY-masked terms (2), and the readme `process::exit` wrapper (1) |
+| `report.rs` | laterite-cliutil | 2026-07-27 | 11 | 6 killed / 4 harness-bound (1 unviable) | a tiny in-test `Report` pins the default `full_value`/`compact_value` projections (the whole document, not a null) and `Plan::render_table` (headline, string-vs-JSON detail lines, footer), plus the `Ctx::colour` gate. Residuals: `emit` writes to a locked `stdout` and `note` to `stderr` (neither capturable in-process — their component writers are all separately tested), plus two TTY-masked `colour` terms |
 
 ## The unswept surface
 
 Everything **not** in the ledger is unswept — assume non-falsifiable tests may
 hide there until a sweep says otherwise. The whole `laterite-ags4-check` binary
-(every `lat` command module + `main.rs`) is now swept; near-term Rust queue
-(tracks [[coverage-campaign]]'s): `laterite-cliutil` (the shared presentation
-crate), then the engine crates (`laterite-ags4-core`, `-validator`, `-emit`,
-`-parse`, `-reference`).
+(every `lat` command module + `main.rs`) and the shared `laterite-cliutil`
+presentation crate are now swept; near-term Rust queue (tracks
+[[coverage-campaign]]'s): the engine crates — `laterite-ags4-core`,
+`laterite-ags4-validator`, `laterite-ags4-emit`, `laterite-ags4-parse`,
+`laterite-ags4-reference`.
 
 **Tests written before this workflow (2026-07-27) were never swept.** That backlog
 is a standing GitHub issue (**#127**) — retro-sweep opportunistically whenever a
