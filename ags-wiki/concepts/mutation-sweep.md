@@ -63,8 +63,10 @@ Three kinds of survivor — only the first is a test defect:
 - **Real gap** — the mutated behaviour is observable at the boundary but no test
   asserts it → write the assertion.
 - **Inert code** — the mutated value genuinely does not affect this path's output
-  (e.g. an option a verb accepts but ignores) → not a test defect; note it, and
-  weigh whether the code should carry that field at all ([[reliquary]]).
+  (e.g. an option a verb accepts but ignores) → not a test defect: **remove the
+  dead code** (inventory in [[reliquary]], then delete in the same or a following
+  change) — never write a test around it, which would enshrine it as if it
+  mattered.
 - **`cfg`-false survivor** — `cargo-mutants` mutates *source text* blind to `cfg`,
   so `#[cfg(feature = "tui")]` code the default build never compiles shows phantom
   survivors. Score it honestly by building `--features tui`, or record it as
@@ -80,9 +82,9 @@ the count of survivors left standing *with a non-defect reason*.
 | `commands/validate.rs` | laterite-ags4-check | 2026-07-27 | 6 | 4 killed / 2 cfg-false | the `include_warnings` real gap closed; residual are `#[cfg(feature = "tui")]` (lines 103, 113) |
 | `commands/fix.rs` | laterite-ags4-check | 2026-07-27 | 10 | 10 killed / 0 | three real gaps closed by two new tests — warnings counted in the residual, the sign of the `--json` exit code, and the `!risky && risky_available > 0` hint gate |
 | `commands/rules.rs` | laterite-ags4-check | 2026-07-27 | 0 | n/a | `cargo-mutants` finds nothing mutable — the verb prints a static catalogue with no branch/return logic |
-| `commands/diff.rs` | laterite-ags4-check | 2026-07-27 | 3 | 2 killed / 1 inert | the surviving `include_warnings` mutant is an **inert relic**, not a test gap — `diff` never runs the rule engine, so the field is never read ([[reliquary]], row spotted). Not test-rounded |
+| `commands/diff.rs` | laterite-ags4-check | 2026-07-27 | 2 | 2 killed / 0 | clean — the lone survivor was the inert `include_warnings` field (`diff` never runs the rule engine, so it was never read); **removed**, not test-rounded ([[reliquary]]) |
 | `commands/read.rs` | laterite-ags4-check | 2026-07-27 | 9 | 5 killed / 0 (4 unviable) | clean — 7 new `run`-verb tests (group listing, render, `--csv` quoting, `--out`, not-found 3 vs 4) on top of the existing `render_group` unit tests; unviable mutants are on the `-> !` `run` signature |
-| `commands/merge.rs` | laterite-ags4-check | 2026-07-27 | 6 | 4 killed / 2 residual | 5 new tests (revision last-wins, `--json` summary, missing 3 / unparseable 4, and the `--tran-issue`/`--tran-date` stamp synthesis). Residual: `include_warnings` is inert like `diff`'s ([[reliquary]]); the `edition` field is live but its effect (KEY resolution) is observable only across editions with **differing** KEY structure — a documented gap needing an edition-divergent fixture, tracked in #127 |
+| `commands/merge.rs` | laterite-ags4-check | 2026-07-27 | 5 | 4 killed / 1 residual | 5 new tests (revision last-wins, `--json` summary, missing 3 / unparseable 4, and the `--tran-issue`/`--tran-date` stamp synthesis). The inert `include_warnings` field was **removed** ([[reliquary]]); the one residual is the `edition` field — live but observable only across editions with **differing** KEY structure, a documented gap needing an edition-divergent fixture (tracked in #127) |
 
 ## The unswept surface
 
