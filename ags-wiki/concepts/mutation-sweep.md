@@ -58,7 +58,7 @@ Every batch in the Rust phase of [[coverage-campaign]] carries a sweep:
    batch, not later.
 4. **Record** the module in the ledger (date swept, mutants, residual).
 
-Three kinds of survivor — only the first is a test defect:
+Four kinds of survivor — only the first is a test defect:
 
 - **Real gap** — the mutated behaviour is observable at the boundary but no test
   asserts it → write the assertion.
@@ -71,6 +71,15 @@ Three kinds of survivor — only the first is a test defect:
   so `#[cfg(feature = "tui")]` code the default build never compiles shows phantom
   survivors. Score it honestly by building `--features tui`, or record it as
   cfg-false with the line noted.
+- **Equivalent mutant** — the mutation changes the source but *no input reaches the
+  difference*, so behaviour is identical and no test can tell them apart. `arg_json`
+  guards a `None`-long argument with `is_positional()`; flipping that guard to
+  `true` changes nothing, because every no-long-name argument in the CLI today *is*
+  positional (there are no short-only flags). Unlike inert code it is not dead — the
+  guard earns its place the moment a short-only flag is added — so **do not remove
+  it**, and do not contort the program to kill it (adding a phantom flag just to
+  make a test fail is the gaming this whole practice refuses). Record it as
+  equivalent with the reason.
 
 **A clean sweep is not proof of total coverage.** `cargo-mutants` mutates at
 function granularity — whole-return replacement, operator flips — not every
@@ -99,13 +108,15 @@ the count of survivors left standing *with a non-defect reason*.
 | `commands/certify.rs` + `cert.rs` | laterite-ags4-check | 2026-07-27 | 6 | 5 killed / 0 (1 unviable) | 5 e2e tests: certify clean / errors(1) / missing(3), and the `validate --index` round-trip — a fresh cert **skips the engine**, a stale cert is **refused** and re-validated. **Plus** a `cert::why` unit test: cargo-mutants reported clean while only 2 of `why`'s 14 reason arms were exercised (see the blind-spot note) — the unit test pins all 14 |
 | `commands/common.rs` (shared flag folding) | laterite-ags4-check | 2026-07-27 | 6 | 5 killed / 0 (1 unviable) | 2 new e2e tests for the `--dict`/`--encoding` fold: a `--dict` overlay with a **forced base** (`--dict-version 4.2`) makes the bespoke `XTRA` group known (16 findings → 0) **without** tripping the `--dict-replace` conflict guard — killing `&& → \|\|` on `dict_replace && dict_version.is_some()`; and `--encoding` accepts `utf-8` / rejects an unknown label at exit 5 — killing `resolve_encoding → None`. The unviable mutant is on an `exit(5)` diverging path |
 | `commands/excel.rs` | laterite-ags4-check | 2026-07-27 | 6 | 6 killed / 0 | clean — the `direction` inference already had unit tests; the one survivor was `delete !` on `!args.no_format_numeric`, the import-side default. Killed by a binary-only round-trip: export a 3DP column holding an under-precise `523145.1`, then import — default padding gives `523145.100`, `--no-format-numeric` keeps `523145.1`. No new deps (export writes strings, so the diff needs a value non-canonical for its TYPE, not a numeric xlsx cell) |
+| `commands/census.rs` | laterite-ags4-check | 2026-07-27 | 7 | 6 killed / 1 equivalent | one unit test closed both real survivors — the `encodings` table (asserting `utf-8`/`latin9` resolve and the `cp1252x` typo → `null` policy pin) and the dropped-positionals arm (validate's `<file>` must survive reflection). The residual is an **equivalent mutant**: flipping the `is_positional()` guard to `true` is a no-op because the CLI has no short-only flags today |
 
 ## The unswept surface
 
 Everything **not** in the ledger is unswept — assume non-falsifiable tests may
-hide there until a sweep says otherwise. Near-term Rust queue (tracks
-[[coverage-campaign]]'s): the last `lat` command module (`census` — the biggest,
-13 KB), then `laterite-cliutil`, then the engine crates.
+hide there until a sweep says otherwise. Every `lat` command module is now swept;
+near-term Rust queue (tracks [[coverage-campaign]]'s): `main.rs` (the
+default-subcommand pre-scan and dispatch), then `laterite-cliutil`, then the
+engine crates.
 
 **Tests written before this workflow (2026-07-27) were never swept.** That backlog
 is a standing GitHub issue (**#127**) — retro-sweep opportunistically whenever a
