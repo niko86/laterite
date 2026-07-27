@@ -81,14 +81,15 @@ the count of survivors left standing *with a non-defect reason*.
 | `commands/fix.rs` | laterite-ags4-check | 2026-07-27 | 10 | 10 killed / 0 | three real gaps closed by two new tests — warnings counted in the residual, the sign of the `--json` exit code, and the `!risky && risky_available > 0` hint gate |
 | `commands/rules.rs` | laterite-ags4-check | 2026-07-27 | 0 | n/a | `cargo-mutants` finds nothing mutable — the verb prints a static catalogue with no branch/return logic |
 | `commands/diff.rs` | laterite-ags4-check | 2026-07-27 | 3 | 2 killed / 1 inert | the surviving `include_warnings` mutant is an **inert relic**, not a test gap — `diff` never runs the rule engine, so the field is never read ([[reliquary]], row spotted). Not test-rounded |
+| `commands/read.rs` | laterite-ags4-check | 2026-07-27 | 9 | 5 killed / 0 (4 unviable) | clean — 7 new `run`-verb tests (group listing, render, `--csv` quoting, `--out`, not-found 3 vs 4) on top of the existing `render_group` unit tests; unviable mutants are on the `-> !` `run` signature |
+| `commands/merge.rs` | laterite-ags4-check | 2026-07-27 | 6 | 4 killed / 2 residual | 5 new tests (revision last-wins, `--json` summary, missing 3 / unparseable 4, and the `--tran-issue`/`--tran-date` stamp synthesis). Residual: `include_warnings` is inert like `diff`'s ([[reliquary]]); the `edition` field is live but its effect (KEY resolution) is observable only across editions with **differing** KEY structure — a documented gap needing an edition-divergent fixture, tracked in #127 |
 
 ## The unswept surface
 
 Everything **not** in the ledger is unswept — assume non-falsifiable tests may
 hide there until a sweep says otherwise. Near-term Rust queue (tracks
 [[coverage-campaign]]'s): the remaining `lat` command modules (`cert`, `certify`,
-`read`, `transport`, `common`, `merge`, `excel`), then `laterite-cliutil`, then
-the engine crates.
+`transport`, `common`, `excel`), then `laterite-cliutil`, then the engine crates.
 
 **Tests written before this workflow (2026-07-27) were never swept.** That backlog
 is a standing GitHub issue (**#127**) — retro-sweep opportunistically whenever a

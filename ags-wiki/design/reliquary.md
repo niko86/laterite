@@ -82,6 +82,7 @@ it, and name that PR in *Removed-in*). Verify `—` = display-only.
 | `DuckParse::surface` field | `rust-packages/laterite-ags4-compliance/src/bin/duckdb_parse_check.rs::surface: String` | code | removed | ags5-relics PR | `#[allow(dead_code)]`; deserialized, never read |
 | `_ordered()` (modality helper) | `tools/gen_modality.py::def _ordered` | code | spotted | — | vulture-surfaced 2026-07-20, verified dead: 0 references repo-wide (module *or* test), superseded by `_columns()`/`_grid()`. Trivial standalone leftover — safe to drop in any pass that touches `gen_modality.py` |
 | `include_warnings: true` (diff) | `rust-packages/laterite-ags4-check/src/commands/diff.rs::include_warnings: true` | code | spotted | — | mutation-sweep survivor 2026-07-27, verified inert: `diff` never runs the rule engine, so `opts.include_warnings` is never read — cargo-culted from `validate`/`fix` where it is live. Drop to `..CheckOptions::default()` when `diff.rs` is next touched. See [[mutation-sweep]] |
+| `include_warnings: true` (merge) | `rust-packages/laterite-ags4-check/src/commands/merge.rs::include_warnings: true` | code | spotted | — | same inert pattern as the `diff` row above — `merge` parses and reconciles but never runs the rule engine, so `opts.include_warnings` is never read (mutation-sweep survivor 2026-07-27). Drop both together |
 
 ## Finding relics — tooling
 
