@@ -1134,6 +1134,33 @@ mod tests {
         assert_eq!(ENGINE_IDENTITY, "laterite_ags4");
     }
 
+    /// The small `TierCoverage`/`EditionInput` accessors `decide` is built on.
+    /// They read clean under mutation because every caller routes through
+    /// `decide`, which has many other reasons to revalidate — so a wrong
+    /// accessor is masked. Pin them directly.
+    #[test]
+    fn tier_and_edition_accessors_read_their_own_state() {
+        // is_measured_clean: TRUE only for a measured, zero-finding tier.
+        assert!(TierCoverage::Measured { count: 0 }.is_measured_clean());
+        assert!(!TierCoverage::Measured { count: 1 }.is_measured_clean());
+        assert!(!TierCoverage::NotMeasured.is_measured_clean());
+
+        // edition(): the resolved string for Auto, the forced string for Forced.
+        let auto = EditionInput::Auto {
+            resolved: "4.1".into(),
+            resolution: DictResolution::ExactTranAgs,
+        };
+        let forced = EditionInput::Forced {
+            edition: "4.0.4".into(),
+        };
+        assert_eq!(auto.edition(), "4.1");
+        assert_eq!(forced.edition(), "4.0.4");
+
+        // is_forced(): only Forced is forced.
+        assert!(!auto.is_forced());
+        assert!(forced.is_forced());
+    }
+
     fn stamp() -> ValidationStamp {
         ValidationStamp {
             validator: "test".into(),
@@ -1349,10 +1376,25 @@ mod tests {
             "fresh for the bytes it was built from"
         );
         assert!(sc.size_matches(bytes.len() as u64));
+        assert!(
+            !sc.size_matches(bytes.len() as u64 + 1),
+            "a different size does not match"
+        );
         // any change to the source busts it (the sha differs)
         let mut changed = bytes.to_vec();
         changed.push(b'\n');
         assert!(!sc.is_fresh_for(&changed), "a changed file is not fresh");
+        // SAME size, different content — the size clause passes, so only the sha
+        // clause can reject it. This is the case that separates the `size && sha`
+        // from a `size || sha`: a cert must not vouch for a same-length edit.
+        let mut same_len = bytes.to_vec();
+        let mid = same_len.len() / 2;
+        same_len[mid] ^= 0xFF;
+        assert_eq!(same_len.len(), bytes.len(), "the edit kept the length");
+        assert!(
+            !sc.is_fresh_for(&same_len),
+            "same size but different bytes is not fresh"
+        );
     }
 
     #[test]
@@ -1522,6 +1564,21 @@ mod tests {
             forced.decide(bytes, &errors_only(), &e),
             Decision::Revalidate(RevalidateReason::EditionDiffers),
             "a forced cert does not answer an auto request"
+        );
+        // Forced cert vs a request forcing a DIFFERENT edition. The guard is
+        // `edition == want`; without this case a cert forced at 4.0.4 would appear
+        // to answer a `--dict-version 4.2` request.
+        assert_eq!(
+            forced.decide(
+                bytes,
+                &Question {
+                    forced_edition: Some("4.2".into()),
+                    ..errors_only()
+                },
+                &e
+            ),
+            Decision::Revalidate(RevalidateReason::EditionDiffers),
+            "forcing a different edition is a different question",
         );
     }
 
