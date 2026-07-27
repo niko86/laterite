@@ -1903,7 +1903,11 @@ def _typed_graph_to_items(root: Any) -> list[tuple[str, pl.DataFrame]]:
         specs = getattr(type(node), "_ags_heading_specs", None)
         if specs:
             return [name for name, _type in specs]
-        raise TypeError(f"build_ags4: cannot determine headings for group {code!r}")
+        # Defensive: a validly-built typed node is either a dictionary group or a
+        # dynamic node carrying _ags_heading_specs, so neither branch above misses.
+        raise TypeError(  # pragma: no cover
+            f"build_ags4: cannot determine headings for group {code!r}"
+        )
 
     def visit(node: Any) -> None:
         code = _typed_group_code(node)
@@ -2147,13 +2151,16 @@ def build_ags4(
         if hasattr(frame, "__arrow_c_stream__"):
             tables.append((code, frame))
             continue
-        if con is None:
+        # DuckDB bridge for a frame with no Arrow C-stream capsule: only pandas
+        # <2.2 reaches here (>=2.2 has the capsule and was normalised above), so
+        # it is unreachable on the dev/CI pandas — kept live for the old floor.
+        if con is None:  # pragma: no cover
             import duckdb
 
             con = duckdb.connect()
-        name = f"_emit_{i}"
-        con.register(name, frame)
-        tables.append((code, con.sql(f'SELECT * FROM "{name}"')))
+        name = f"_emit_{i}"  # pragma: no cover
+        con.register(name, frame)  # pragma: no cover
+        tables.append((code, con.sql(f'SELECT * FROM "{name}"')))  # pragma: no cover
     data, findings_json, applied, _fixes = _native.emit_ags4_from_arrow(
         tables,
         dict_version,
