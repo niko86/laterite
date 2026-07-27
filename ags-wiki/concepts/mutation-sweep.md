@@ -97,13 +97,14 @@ the count of survivors left standing *with a non-defect reason*.
 | `commands/merge.rs` | laterite-ags4-check | 2026-07-27 | 5 | 4 killed / 1 residual | 5 new tests (revision last-wins, `--json` summary, missing 3 / unparseable 4, and the `--tran-issue`/`--tran-date` stamp synthesis). The inert `include_warnings` field was **removed** ([[reliquary]]); the one residual is the `edition` field — live but observable only across editions with **differing** KEY structure, a documented gap needing an edition-divergent fixture (tracked in #127) |
 | `commands/transport.rs` | laterite-ags4-check | 2026-07-27 | 3 | 3 killed / 0 | clean — 6 new tests: pack/unpack and lock/unlock round-trips (byte-identical), passphrase via both `--password-file` and `$LAT_TRANSPORT_PASSWORD`, wrong-pw exit 6, missing-input exit 3, non-envelope exit 6. The interactive TTY-prompt path is deliberately **not** e2e-tested (`rpassword` reads `/dev/tty`, so a subprocess test could hang) |
 | `commands/certify.rs` + `cert.rs` | laterite-ags4-check | 2026-07-27 | 6 | 5 killed / 0 (1 unviable) | 5 e2e tests: certify clean / errors(1) / missing(3), and the `validate --index` round-trip — a fresh cert **skips the engine**, a stale cert is **refused** and re-validated. **Plus** a `cert::why` unit test: cargo-mutants reported clean while only 2 of `why`'s 14 reason arms were exercised (see the blind-spot note) — the unit test pins all 14 |
+| `commands/common.rs` (shared flag folding) | laterite-ags4-check | 2026-07-27 | 6 | 5 killed / 0 (1 unviable) | 2 new e2e tests for the `--dict`/`--encoding` fold: a `--dict` overlay with a **forced base** (`--dict-version 4.2`) makes the bespoke `XTRA` group known (16 findings → 0) **without** tripping the `--dict-replace` conflict guard — killing `&& → \|\|` on `dict_replace && dict_version.is_some()`; and `--encoding` accepts `utf-8` / rejects an unknown label at exit 5 — killing `resolve_encoding → None`. The unviable mutant is on an `exit(5)` diverging path |
 
 ## The unswept surface
 
 Everything **not** in the ledger is unswept — assume non-falsifiable tests may
 hide there until a sweep says otherwise. Near-term Rust queue (tracks
-[[coverage-campaign]]'s): the remaining `lat` command modules (`common`, `excel`),
-then `laterite-cliutil`, then the engine crates.
+[[coverage-campaign]]'s): the remaining `lat` command module (`excel`), then
+`laterite-cliutil`, then the engine crates.
 
 **Tests written before this workflow (2026-07-27) were never swept.** That backlog
 is a standing GitHub issue (**#127**) — retro-sweep opportunistically whenever a
