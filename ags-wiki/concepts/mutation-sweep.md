@@ -109,14 +109,16 @@ the count of survivors left standing *with a non-defect reason*.
 | `commands/common.rs` (shared flag folding) | laterite-ags4-check | 2026-07-27 | 6 | 5 killed / 0 (1 unviable) | 2 new e2e tests for the `--dict`/`--encoding` fold: a `--dict` overlay with a **forced base** (`--dict-version 4.2`) makes the bespoke `XTRA` group known (16 findings → 0) **without** tripping the `--dict-replace` conflict guard — killing `&& → \|\|` on `dict_replace && dict_version.is_some()`; and `--encoding` accepts `utf-8` / rejects an unknown label at exit 5 — killing `resolve_encoding → None`. The unviable mutant is on an `exit(5)` diverging path |
 | `commands/excel.rs` | laterite-ags4-check | 2026-07-27 | 6 | 6 killed / 0 | clean — the `direction` inference already had unit tests; the one survivor was `delete !` on `!args.no_format_numeric`, the import-side default. Killed by a binary-only round-trip: export a 3DP column holding an under-precise `523145.1`, then import — default padding gives `523145.100`, `--no-format-numeric` keeps `523145.1`. No new deps (export writes strings, so the diff needs a value non-canonical for its TYPE, not a numeric xlsx cell) |
 | `commands/census.rs` | laterite-ags4-check | 2026-07-27 | 7 | 6 killed / 1 equivalent | one unit test closed both real survivors — the `encodings` table (asserting `utf-8`/`latin9` resolve and the `cp1252x` typo → `null` policy pin) and the dropped-positionals arm (validate's `<file>` must survive reflection). The residual is an **equivalent mutant**: flipping the `is_positional()` guard to `true` is a no-op because the CLI has no short-only flags today |
+| `main.rs` (`with_default_subcommand`) | laterite-ags4-check | 2026-07-27 | 18 | 18 killed / 0 | one unit test pins the argv pre-scan directly (asserting its output as a joined string) rather than through fragile e2e stdout matching: the loop bound (a no-positional line must not walk off the end), the four help/version alternatives (each passes through even with a trailing token — killing the three `\|\| → &&` mutants), and the flag-skip `+=` (a leading flag before an explicit verb — killing `+= → -=`; the `+= → *=` infinite-loop mutant is caught by timeout). **The whole `laterite-ags4-check` binary is now swept.** |
 
 ## The unswept surface
 
 Everything **not** in the ledger is unswept — assume non-falsifiable tests may
-hide there until a sweep says otherwise. Every `lat` command module is now swept;
-near-term Rust queue (tracks [[coverage-campaign]]'s): `main.rs` (the
-default-subcommand pre-scan and dispatch), then `laterite-cliutil`, then the
-engine crates.
+hide there until a sweep says otherwise. The whole `laterite-ags4-check` binary
+(every `lat` command module + `main.rs`) is now swept; near-term Rust queue
+(tracks [[coverage-campaign]]'s): `laterite-cliutil` (the shared presentation
+crate), then the engine crates (`laterite-ags4-core`, `-validator`, `-emit`,
+`-parse`, `-reference`).
 
 **Tests written before this workflow (2026-07-27) were never swept.** That backlog
 is a standing GitHub issue (**#127**) — retro-sweep opportunistically whenever a
