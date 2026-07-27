@@ -59,7 +59,7 @@ rayon = "1.10"
 clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-sha2 = "0.10"
+sha2 = "0.11"
 hex = "0.4"
 chrono = { version = "0.4", features = ["serde", "clock"] }
 thiserror = "2"
