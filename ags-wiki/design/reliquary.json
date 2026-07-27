@@ -1,0 +1,249 @@
+{
+  "target": "ags-wiki/design/reliquary.md",
+  "marker": "reliquary-register",
+  "generator": "tools/gen_wiki_tables.py",
+  "fields": [
+    {
+      "header": "Symbol",
+      "key": "symbol"
+    },
+    {
+      "header": "Verify",
+      "key": "verify"
+    },
+    {
+      "header": "Axis",
+      "key": "axis"
+    },
+    {
+      "header": "Status",
+      "key": "status"
+    },
+    {
+      "header": "Removed-in",
+      "key": "removed_in"
+    },
+    {
+      "header": "Evidence",
+      "key": "evidence"
+    }
+  ],
+  "rows": [
+    {
+      "symbol": "`truncate_dt_to_unit()`",
+      "verify": "`rust-packages/laterite-types/src/lib.rs::fn truncate_dt_to_unit`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "misc-deadcode PR",
+      "evidence": "AGS5 DT-precision writer; 0 shipped callers (only ags5/)"
+    },
+    {
+      "symbol": "`LineTerminator::as_bytes()`",
+      "verify": "`rust-packages/laterite-ags4-parse/src/lib.rs::as_bytes(self)`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "misc-deadcode PR",
+      "evidence": "unused ergonomic twin of `as_str()`; 0 call sites"
+    },
+    {
+      "symbol": "`tempfile` (dev-dep)",
+      "verify": "`rust-packages/laterite-transport/Cargo.toml::tempfile`",
+      "axis": "dependency",
+      "status": "removed",
+      "removed_in": "dep-hygiene PR",
+      "evidence": "declared, never used; tests use `env::temp_dir()`"
+    },
+    {
+      "symbol": "`chrono` (dep)",
+      "verify": "`rust-packages/laterite-ags4-core/Cargo.toml::chrono`",
+      "axis": "dependency",
+      "status": "removed",
+      "removed_in": "dep-hygiene PR",
+      "evidence": "0 chrono/DateTime uses in core src/tests"
+    },
+    {
+      "symbol": "`CliError::NotImpl`",
+      "verify": "`rust-packages/laterite-ags4-core/src/error.rs::NotImpl`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "core-relics PR",
+      "evidence": "ags5db stub variant; last use retired even in ags5"
+    },
+    {
+      "symbol": "`GroupDescriptor::non_key_headings()`",
+      "verify": "`rust-packages/laterite-ags4-core/src/registry.rs::fn non_key_headings`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "core-relics PR",
+      "evidence": "ergonomic pair of `key_headings()`; 0 shipped callers"
+    },
+    {
+      "symbol": "`Heading::py_name()`",
+      "verify": "`rust-packages/laterite-ags4-core/src/registry.rs::fn py_name`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "core-relics PR",
+      "evidence": "ags5 DuckDB column-alias helper; 0 shipped callers"
+    },
+    {
+      "symbol": "`count_by_group()`",
+      "verify": "`rust-packages/laterite-ags4-validator/src/findings.rs::fn count_by_group`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "misc-deadcode PR",
+      "evidence": "only its own unit test calls it"
+    },
+    {
+      "symbol": "`comfy-table` (dep)",
+      "verify": "`rust-packages/laterite-ags4-check/Cargo.toml::comfy-table =`",
+      "axis": "dependency",
+      "status": "removed",
+      "removed_in": "dep-hygiene PR",
+      "evidence": "0 direct use; served via `laterite-cliutil`"
+    },
+    {
+      "symbol": "`indicatif` (dep)",
+      "verify": "`rust-packages/laterite-ags4-check/Cargo.toml::indicatif =`",
+      "axis": "dependency",
+      "status": "removed",
+      "removed_in": "dep-hygiene PR",
+      "evidence": "0 direct use; served via `laterite-cliutil::Spinner`"
+    },
+    {
+      "symbol": "`SelfCheck.ok` field",
+      "verify": "`rust-packages/laterite-ags4-parity/src/oracle.rs::pub ok: bool`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "misc-deadcode PR",
+      "evidence": "hardcoded `true`; never read"
+    },
+    {
+      "symbol": "`rayon` (dep)",
+      "verify": "`rust-packages/laterite-ags4-forge/Cargo.toml::rayon`",
+      "axis": "dependency",
+      "status": "removed",
+      "removed_in": "dep-hygiene PR",
+      "evidence": "full parallelism crate, never called"
+    },
+    {
+      "symbol": "`registry_get_group()`",
+      "verify": "`rust-packages/laterite-py/src/registry_fns.rs::fn registry_get_group`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "python-registry PR",
+      "evidence": "dead PyO3 export; py loads via bulk JSON"
+    },
+    {
+      "symbol": "`Heading.indexed` field",
+      "verify": "`packages/laterite/python/laterite/registry.py::indexed`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "python-registry PR",
+      "evidence": "hardcoded `None` in registry.rs; never populated"
+    },
+    {
+      "symbol": "`GroupDescriptor.index_parent` field",
+      "verify": "`packages/laterite/python/laterite/registry.py::index_parent`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "python-registry PR",
+      "evidence": "hardcoded `None` in registry.rs; never populated"
+    },
+    {
+      "symbol": "`CanonicalType::Date`/`Time` variants",
+      "verify": "`rust-packages/laterite-types/src/lib.rs::CanonicalType::Time`",
+      "axis": "code",
+      "status": "keep",
+      "removed_in": "— (owner call)",
+      "evidence": "unreachable via `canonical_type()` but public + matched across 3 bindings — breaking to remove"
+    },
+    {
+      "symbol": "`laterite-ags4-parse` `serde` feature",
+      "verify": "`rust-packages/laterite-ags4-parse/Cargo.toml::serde`",
+      "axis": "dependency",
+      "status": "removed",
+      "removed_in": "ags5-relics PR",
+      "evidence": "dead #168 scaffold, 0 activators anywhere; dispense-with-ags5 sweep (#177 concept)"
+    },
+    {
+      "symbol": "`CliError` ags5-compat variants",
+      "verify": "`rust-packages/laterite-ags4-core/src/error.rs::PreVersion65`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "ags5-relics PR",
+      "evidence": "`PreVersion65`/`UnknownGroup`/`Predicate`/`UnsupportedFeature`/`Sql`/`Validation` — 0 shipped construction (ags5/ only); `CliError` now `FileNotFound`+`Schema`"
+    },
+    {
+      "symbol": "`Registry::extended_with()`",
+      "verify": "`rust-packages/laterite-ags4-core/src/registry.rs::fn extended_with`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "ags5-relics PR",
+      "evidence": "passthrough-registration; 0 shipped callers (2 in ags5/)"
+    },
+    {
+      "symbol": "`heading_storage_index()`",
+      "verify": "`rust-packages/laterite-ags4-core/src/registry.rs::fn heading_storage_index`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "ags5-relics PR",
+      "evidence": "ags5 parent-overlap-dedup helper; 0 shipped callers (2 in ags5/)"
+    },
+    {
+      "symbol": "`parse.rs` `pub use` block (6 dead names)",
+      "verify": "`rust-packages/laterite-ags4-validator/src/parse.rs::parse_bytes_opts`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "ags5-relics PR",
+      "evidence": "`InvalidUtf8`/`LineSpan`/`LineSpans`/`LineTerminator`/`ParseOptions`/`parse_bytes_opts` re-exported but imported by nobody; live names kept"
+    },
+    {
+      "symbol": "`Dictionary::group_count()`/`heading_count()`",
+      "verify": "`rust-packages/laterite-ags4-validator/src/dict.rs::fn group_count`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "ags5-relics PR",
+      "evidence": "test-only; call-sites inlined to `.groups.len()`/`.headings.len()`"
+    },
+    {
+      "symbol": "`crossterm` (opt dep)",
+      "verify": "`rust-packages/laterite-ags4-check/Cargo.toml::crossterm`",
+      "axis": "dependency",
+      "status": "keep",
+      "removed_in": "— (owner call)",
+      "evidence": "reached via `ratatui::crossterm`; needed by the `tui` feature gate"
+    },
+    {
+      "symbol": "`DuckParse::surface` field",
+      "verify": "`rust-packages/laterite-ags4-compliance/src/bin/duckdb_parse_check.rs::surface: String`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "ags5-relics PR",
+      "evidence": "`#[allow(dead_code)]`; deserialized, never read"
+    },
+    {
+      "symbol": "`_ordered()` (modality helper)",
+      "verify": "`tools/gen_modality.py::def _ordered`",
+      "axis": "code",
+      "status": "spotted",
+      "removed_in": "—",
+      "evidence": "vulture-surfaced 2026-07-20, verified dead: 0 references repo-wide (module *or* test), superseded by `_columns()`/`_grid()`. Trivial standalone leftover — safe to drop in any pass that touches `gen_modality.py`"
+    },
+    {
+      "symbol": "`include_warnings: true` (diff)",
+      "verify": "`rust-packages/laterite-ags4-check/src/commands/diff.rs::include_warnings: true`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "mutation-sweep cleanup (coverage-rust)",
+      "evidence": "inert survivor 2026-07-27: `diff` never runs the rule engine, so `opts.include_warnings` was never read — cargo-culted from `validate`/`fix`. Collapsed to `CheckOptions::default()`. See [[mutation-sweep]]"
+    },
+    {
+      "symbol": "`include_warnings: true` (merge)",
+      "verify": "`rust-packages/laterite-ags4-check/src/commands/merge.rs::include_warnings: true`",
+      "axis": "code",
+      "status": "removed",
+      "removed_in": "mutation-sweep cleanup (coverage-rust)",
+      "evidence": "same inert pattern as `diff` — `merge` parses/reconciles but never runs the rule engine, so `opts.include_warnings` was never read. Collapsed to `CheckOptions::default()`"
+    }
+  ]
+}

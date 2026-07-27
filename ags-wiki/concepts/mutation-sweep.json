@@ -1,0 +1,193 @@
+{
+  "target": "ags-wiki/concepts/mutation-sweep.md",
+  "marker": "sweep-ledger",
+  "generator": "tools/gen_wiki_tables.py",
+  "fields": [
+    {
+      "header": "module",
+      "key": "module"
+    },
+    {
+      "header": "crate",
+      "key": "crate"
+    },
+    {
+      "header": "swept",
+      "key": "swept"
+    },
+    {
+      "header": "mutants",
+      "key": "mutants"
+    },
+    {
+      "header": "killed / residual",
+      "key": "result"
+    },
+    {
+      "header": "notes",
+      "key": "notes"
+    }
+  ],
+  "rows": [
+    {
+      "module": "`commands/validate.rs`",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "6",
+      "result": "4 killed / 2 cfg-false",
+      "notes": "the `include_warnings` real gap closed; residual are `#[cfg(feature = \"tui\")]` (lines 103, 113)"
+    },
+    {
+      "module": "`commands/fix.rs`",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "10",
+      "result": "10 killed / 0",
+      "notes": "three real gaps closed by two new tests — warnings counted in the residual, the sign of the `--json` exit code, and the `!risky && risky_available > 0` hint gate"
+    },
+    {
+      "module": "`commands/rules.rs`",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "0",
+      "result": "n/a",
+      "notes": "`cargo-mutants` finds nothing mutable — the verb prints a static catalogue with no branch/return logic"
+    },
+    {
+      "module": "`commands/diff.rs`",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "2",
+      "result": "2 killed / 0",
+      "notes": "clean — the lone survivor was the inert `include_warnings` field (`diff` never runs the rule engine, so it was never read); **removed**, not test-rounded ([[reliquary]])"
+    },
+    {
+      "module": "`commands/read.rs`",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "9",
+      "result": "5 killed / 0 (4 unviable)",
+      "notes": "clean — 7 new `run`-verb tests (group listing, render, `--csv` quoting, `--out`, not-found 3 vs 4) on top of the existing `render_group` unit tests; unviable mutants are on the `-> !` `run` signature"
+    },
+    {
+      "module": "`commands/merge.rs`",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "5",
+      "result": "4 killed / 1 residual",
+      "notes": "5 new tests (revision last-wins, `--json` summary, missing 3 / unparseable 4, and the `--tran-issue`/`--tran-date` stamp synthesis). The inert `include_warnings` field was **removed** ([[reliquary]]); the one residual is the `edition` field — live but observable only across editions with **differing** KEY structure, a documented gap needing an edition-divergent fixture (tracked in #127)"
+    },
+    {
+      "module": "`commands/transport.rs`",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "3",
+      "result": "3 killed / 0",
+      "notes": "clean — 6 new tests: pack/unpack and lock/unlock round-trips (byte-identical), passphrase via both `--password-file` and `$LAT_TRANSPORT_PASSWORD`, wrong-pw exit 6, missing-input exit 3, non-envelope exit 6. The interactive TTY-prompt path is deliberately **not** e2e-tested (`rpassword` reads `/dev/tty`, so a subprocess test could hang)"
+    },
+    {
+      "module": "`commands/certify.rs` + `cert.rs`",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "6",
+      "result": "5 killed / 0 (1 unviable)",
+      "notes": "5 e2e tests: certify clean / errors(1) / missing(3), and the `validate --index` round-trip — a fresh cert **skips the engine**, a stale cert is **refused** and re-validated. **Plus** a `cert::why` unit test: cargo-mutants reported clean while only 2 of `why`'s 14 reason arms were exercised (see the blind-spot note) — the unit test pins all 14"
+    },
+    {
+      "module": "`commands/common.rs` (shared flag folding)",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "6",
+      "result": "5 killed / 0 (1 unviable)",
+      "notes": "2 new e2e tests for the `--dict`/`--encoding` fold: a `--dict` overlay with a **forced base** (`--dict-version 4.2`) makes the bespoke `XTRA` group known (16 findings → 0) **without** tripping the `--dict-replace` conflict guard — killing `&& → ||` on `dict_replace && dict_version.is_some()`; and `--encoding` accepts `utf-8` / rejects an unknown label at exit 5 — killing `resolve_encoding → None`. The unviable mutant is on an `exit(5)` diverging path"
+    },
+    {
+      "module": "`commands/excel.rs`",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "6",
+      "result": "6 killed / 0",
+      "notes": "clean — the `direction` inference already had unit tests; the one survivor was `delete !` on `!args.no_format_numeric`, the import-side default. Killed by a binary-only round-trip: export a 3DP column holding an under-precise `523145.1`, then import — default padding gives `523145.100`, `--no-format-numeric` keeps `523145.1`. No new deps (export writes strings, so the diff needs a value non-canonical for its TYPE, not a numeric xlsx cell)"
+    },
+    {
+      "module": "`commands/census.rs`",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "7",
+      "result": "6 killed / 1 equivalent",
+      "notes": "one unit test closed both real survivors — the `encodings` table (asserting `utf-8`/`latin9` resolve and the `cp1252x` typo → `null` policy pin) and the dropped-positionals arm (validate's `<file>` must survive reflection). The residual is an **equivalent mutant**: flipping the `is_positional()` guard to `true` is a no-op because the CLI has no short-only flags today"
+    },
+    {
+      "module": "`main.rs` (`with_default_subcommand`)",
+      "crate": "laterite-ags4-check",
+      "swept": "2026-07-27",
+      "mutants": "18",
+      "result": "18 killed / 0",
+      "notes": "one unit test pins the argv pre-scan directly (asserting its output as a joined string) rather than through fragile e2e stdout matching: the loop bound (a no-positional line must not walk off the end), the four help/version alternatives (each passes through even with a trailing token — killing the three `|| → &&` mutants), and the flag-skip `+=` (a leading flag before an explicit verb — killing `+= → -=`; the `+= → *=` infinite-loop mutant is caught by timeout). **The whole `laterite-ags4-check` binary is now swept.**"
+    },
+    {
+      "module": "`lib.rs`",
+      "crate": "laterite-cliutil",
+      "swept": "2026-07-27",
+      "mutants": "63",
+      "result": "42 killed / 16 harness-bound (5 unviable)",
+      "notes": "new tests pin the pure layer: the coloured-JSON pretty-printer (each scalar's palette entry; a structure-preserving round-trip after stripping the palette back out — which catches the comma logic and empty-`[]`/`{}` rendering; per-depth indentation, incl. the array-of-object item recursion), the colour gate off a TTY, the progress-bar gate (via `length()` — `indicatif` auto-hides off a TTY so `is_hidden()` can't see the gate), and the spinner Live/Static gate. The 16 residuals are **harness-bound**: `comfy-table` drops colour off a TTY (zebra dim, 4), `indicatif` Live-only handles (Spinner set/drop + MultiLine set_line/set_header/suspend/drop/degenerate-gate, 7), `term_cols` width (2), `colour_enabled`'s TTY-masked terms (2), and the readme `process::exit` wrapper (1)"
+    },
+    {
+      "module": "`report.rs`",
+      "crate": "laterite-cliutil",
+      "swept": "2026-07-27",
+      "mutants": "11",
+      "result": "6 killed / 4 harness-bound (1 unviable)",
+      "notes": "a tiny in-test `Report` pins the default `full_value`/`compact_value` projections (the whole document, not a null) and `Plan::render_table` (headline, string-vs-JSON detail lines, footer), plus the `Ctx::colour` gate. Residuals: `emit` writes to a locked `stdout` and `note` to `stderr` (neither capturable in-process — their component writers are all separately tested), plus two TTY-masked `colour` terms"
+    },
+    {
+      "module": "`lib.rs`",
+      "crate": "laterite-ags4-parse",
+      "swept": "2026-07-27",
+      "mutants": "152",
+      "result": "136 killed / 6 equivalent (10 unviable)",
+      "notes": "one new `tests/lib_coverage.rs` pins the untested public surface (the crate leans on `tests/*` integration files, but these paths had no asserting caller): `ParsedGroup::cell`/`col`; `LineTerminator::as_str` arms; `split_ags_line` junk-skip + unquoted splits; `field_span` exact char offsets (quoted + unquoted); the walk's encoding passthrough + `source_true` flag (a Windows-1252 `©` byte), the BOM-for-decode strip (asserting the decoded line-1 *text* — the tag is read BOM-tolerantly via `first_field`, so group detection alone can't see it), and AGS3-marker detection; and a doubled-quote line-scan that must not swallow the newline. 11 of the kills are by timeout on loop mutants. The 6 residuals are **equivalent/defensive**: the `FieldStart` CR/LF arm the `Unquoted` fallback also catches (450), the after-close `+1` whose closing-quote byte is never a delimiter (464), the `LineSpans::next` `pos > len` guard that never fires under the `pos ≤ len` invariant (511×3), and `rest`'s `len > 1` whose `>=` branch still yields the same empty `split_off(1)` (546)"
+    },
+    {
+      "module": "`scan.rs`",
+      "crate": "laterite-ags4-parse",
+      "swept": "2026-07-27",
+      "mutants": "72",
+      "result": "68 killed / 2 equivalent (2 unviable)",
+      "notes": "two unit tests pin the doubled-quote (`\"\"`) two-byte advance in both `scan_line` and `first_field_with` — the differential oracle deliberately **skips escape cases** (a borrowed slice can't unescape), so nothing else exercised that step; a mis-step overshoots the close (caught by the field bounds) or steps backward into a loop (timeout-killed). The 2 residuals are **equivalent**: `finish`'s `end - 1` in the `!closed && unterminated_to_eol` branch is reached only when `had_comma` is true, but an unterminated quoted field is always the trailing token (`had_comma = false`), so that sub-expression is unreachable"
+    },
+    {
+      "module": "(whole crate)",
+      "crate": "laterite-ags4-reference",
+      "swept": "2026-07-27",
+      "mutants": "223",
+      "result": "190 killed / 3 residual (30 unviable)",
+      "notes": "tests across five files pin the untested surface — **union** (`table`/`view` names, `group_depth` incl. its cycle guard, `Registry` len/is_empty/to_groups_json), **dict** (the custom-dict OVERLAY path: a directly-built `OwnedDelta` — its fields are public — drives `Dictionary::layered` through heading/group/group_codes/group_headings in both overlay and full-replacement forms, previously exercised only *downstream* in the validator, which this crate's own sweep never runs; plus `dictionary_dto` units/parents), **catalogue** (`rule_metadata_json`), **keychain** (`key_heading_names`/`shared_keys`), and **overlay** (`DictError` Display messages, `valid_status`, `desc_of`, and `build_delta`'s parent/description override + unit-wins-vs-inherits). The 3 residuals: `dict.rs` group_headings is an **equivalent** mutant (its branch is reached only with `fall_through=false`, where both sides yield the same empty result), and `detect_base`'s two edition-scoring mutants need a custom dict that scores *strictly higher on a non-newest edition* — a heading whose `(type,status)` diverges across editions, which the bundled dicts' cross-edition stability makes edition-archaeology (deferred)"
+    },
+    {
+      "module": "(whole crate)",
+      "crate": "laterite-ags4-core",
+      "swept": "2026-07-27",
+      "mutants": "121",
+      "result": "120 killed / 1 equivalent (28 unviable)",
+      "notes": "new tests across four files pin the untested surface — **error** (`exit_code` per variant + Display), **transport** (the thin `CliError` face over the shared leaf: `pack`/`unpack`/`lock`/`unlock`\\_bytes full round-trips, so no canned `Ok(vec![])` return can pass, plus the `FileNotFound`→exit-3 mapping), **ags4_codec** (`trim_owned` called directly across leading/trailing/both/all-whitespace, and the `Recover` re-check branch that only fires when a synthetic `__2` suffix collides with a real heading), and **index** (`TierCoverage::is_measured_clean`, `EditionInput::edition`/`is_forced`, `is_fresh_for` on a **same-size** edit, `size_matches` false, and `decide`'s `edition == want` guard against a *different* forced edition). Writing the `trim_owned` test **surfaced a live bug**: `end - lead` underflowed on an all-whitespace value — a debug-build panic on a valid all-spaces DATA cell (release wrapped and was accidentally correct); fixed with `saturating_sub`. The 1 residual is `index.rs:110` deleting `locate_only: true` — an **equivalent** mutant (the crate's own invariant: a locate-only lean parse and a full validating parse record byte-identical GROUP offsets, so the index is unchanged; the field is pure perf)"
+    },
+    {
+      "module": "(whole crate)",
+      "crate": "laterite-ags4-validator",
+      "swept": "2026-07-27",
+      "mutants": "625",
+      "result": "596 killed / 7 equivalent (22 unviable)",
+      "notes": "the numbered-rules engine, swept across every `rules/*` module + `fixes.rs`/`lib.rs`. The first batch pinned two dominant gaps — finding **Locations** (a rule asserted its finding *fired* but never its `target`/`heading`/`field_index`/`data_row` coords, nor the `ri + 1` row arithmetic) and predicate **boundaries** (a proptest suite proved valid values pass but never landed on the exact operator: `<` vs `<=`, `==` vs `!=`). The re-sweep's residuals closed here: the **`fixes.rs` autofix engine** (the DT-vs-numeric label selector 401; `apply_fixes`'s out-of-range bounds guard 855 — a hand-built past-EOL edit the mutant would index into a panic; the risky-fix count + `!include_risky` retain in `fix_document_selective` 981/983; the all-LF Rule-2a negation 149:72; the embedded-LF Rule-6 `'\\n'` filter arm 188), **`emit_override_warnings`**'s branch selector (458 + 473×3, killed by a single-facet overlay: LOCA_ID KEY-kept + type-changed ⇒ \"overrides\" not \"demotes\", plus type-only and status-only re-declarations), and **`EffectiveDict::fields_with_status`**'s dedup guard (143×3, a file DICT re-declaring the standard KEY heading LOCA_ID). The 7 residuals are all **equivalent** — a total downstream function subsuming a defensive guard: `parse::<usize>` over `!empty && all_digit` (fixes 648, typed_values 72), `and_hms_opt` over the hour/minute range check with the load-bearing `second>60` arm preserved (typed_values 573), `abbr_desc(empty)→None` (groups 133); plus three unreachable-branch cases — `is_nsci`'s `len < n+4` precondition making `i < len` invariant (276), `single_row_group`'s `rows[1..]` already empty at len==1 (284), and `RULE_2A present ⟺ a non-CRLF line exists` (149:36). The 6 timeouts are loop-termination mutants (Rule-7 suffix-search `*=`, `line_format` position `+=`, `consume_run` scan `==`) killed by timeout"
+    },
+    {
+      "module": "(whole crate)",
+      "crate": "laterite-ags4-emit",
+      "swept": "2026-07-27",
+      "mutants": "90",
+      "result": "76 killed / 3 equivalent (11 unviable)",
+      "notes": "the shared emit orchestrator + byte writer. The crate already had solid tests (the whole `arrow_in` transpose, the emit round-trips); the gaps were concentrated in the orchestrator's helpers. Nine new tests close the default-build survivors: **emit.rs** — the Strict error gate (BOTH sides: the `severity == Error` count and `errors > 0`, via a complete clean fixture vs a duplicate-KEY error one — Strict does *not* synthesize the mandatory TRAN/UNIT/TYPE, so the clean fixture carries them); `resolve_meta`'s override-wins-else-fill guard (explicit UNIT wins, blank falls back to the dict); `format_cell` emitting a `DT` **string** verbatim (not through `ags4_str`, which would strip a `T00:00:00`); `collect_units` (PU-typed columns only + non-blank) and `collect_types` (blank + literal-`\"TYPE\"` exclusion); and `concatenator` (a group's `TRAN_RCON`, else the AGS `\"+\"`). **error.rs** — `EmitError`'s per-variant `Display` (a whole-`fmt` replacement empties every message). **writer.rs** — the `write_ags4`/`write_ags4_matrix` `i > 0` group separators (one blank BETWEEN groups, none before the first — a single-group test sees neither edge). `arrow_in` is `#[cfg(feature = \"arrow\")]`, so its 16 mutants are **cfg-false** in the default sweep and were scored honestly with `--features arrow` (12 killed by the existing arm/transpose tests). The 3 residuals are all **equivalent**: the `Utf8`/`LargeUtf8` `cell_value` arms (Arrow's `ArrayFormatter` fallback renders a string identically to the arm's `Value::String`), and `validate()`'s `dict_version` field (`check_parsed` validates with the passed edition-matched `dict` and never reads `opts.dict_version` — it is consumed only by the path-based `check_file`/`fix_document`)"
+    }
+  ]
+}
