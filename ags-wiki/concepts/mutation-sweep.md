@@ -98,13 +98,14 @@ the count of survivors left standing *with a non-defect reason*.
 | `commands/transport.rs` | laterite-ags4-check | 2026-07-27 | 3 | 3 killed / 0 | clean — 6 new tests: pack/unpack and lock/unlock round-trips (byte-identical), passphrase via both `--password-file` and `$LAT_TRANSPORT_PASSWORD`, wrong-pw exit 6, missing-input exit 3, non-envelope exit 6. The interactive TTY-prompt path is deliberately **not** e2e-tested (`rpassword` reads `/dev/tty`, so a subprocess test could hang) |
 | `commands/certify.rs` + `cert.rs` | laterite-ags4-check | 2026-07-27 | 6 | 5 killed / 0 (1 unviable) | 5 e2e tests: certify clean / errors(1) / missing(3), and the `validate --index` round-trip — a fresh cert **skips the engine**, a stale cert is **refused** and re-validated. **Plus** a `cert::why` unit test: cargo-mutants reported clean while only 2 of `why`'s 14 reason arms were exercised (see the blind-spot note) — the unit test pins all 14 |
 | `commands/common.rs` (shared flag folding) | laterite-ags4-check | 2026-07-27 | 6 | 5 killed / 0 (1 unviable) | 2 new e2e tests for the `--dict`/`--encoding` fold: a `--dict` overlay with a **forced base** (`--dict-version 4.2`) makes the bespoke `XTRA` group known (16 findings → 0) **without** tripping the `--dict-replace` conflict guard — killing `&& → \|\|` on `dict_replace && dict_version.is_some()`; and `--encoding` accepts `utf-8` / rejects an unknown label at exit 5 — killing `resolve_encoding → None`. The unviable mutant is on an `exit(5)` diverging path |
+| `commands/excel.rs` | laterite-ags4-check | 2026-07-27 | 6 | 6 killed / 0 | clean — the `direction` inference already had unit tests; the one survivor was `delete !` on `!args.no_format_numeric`, the import-side default. Killed by a binary-only round-trip: export a 3DP column holding an under-precise `523145.1`, then import — default padding gives `523145.100`, `--no-format-numeric` keeps `523145.1`. No new deps (export writes strings, so the diff needs a value non-canonical for its TYPE, not a numeric xlsx cell) |
 
 ## The unswept surface
 
 Everything **not** in the ledger is unswept — assume non-falsifiable tests may
 hide there until a sweep says otherwise. Near-term Rust queue (tracks
-[[coverage-campaign]]'s): the remaining `lat` command module (`excel`), then
-`laterite-cliutil`, then the engine crates.
+[[coverage-campaign]]'s): the last `lat` command module (`census` — the biggest,
+13 KB), then `laterite-cliutil`, then the engine crates.
 
 **Tests written before this workflow (2026-07-27) were never swept.** That backlog
 is a standing GitHub issue (**#127**) — retro-sweep opportunistically whenever a
