@@ -1018,3 +1018,82 @@ fn validate_index_with_a_stale_cert_revalidates() {
         stdout(&o)
     );
 }
+
+// --- dict / encoding (shared flag folding: commands/common.rs) ---------------
+
+/// The `--dict` overlay changes the verdict, and a forced base (`--dict-version`)
+/// is a legitimate companion to it — not the `--dict-replace` conflict.
+///
+/// Bare, the bespoke `XTRA` group (hung off `SAMP`) is unknown and flagged across
+/// the delivery. With the overlay forced onto its own detected base (4.2), `XTRA`
+/// is first-class and those findings vanish — while the delivery's unrelated
+/// findings (a missing TRAN key) keep the exit at 1. The forced-base run must NOT
+/// trip the `--dict-replace`/`--dict-version` conflict guard, which would exit 5:
+/// the guard is `dict_replace && dict_version.is_some()`, so `--dict-version`
+/// alone alongside `--dict` is allowed.
+#[test]
+fn dict_overlay_makes_a_bespoke_group_known_without_tripping_the_conflict_guard() {
+    let delivery = fixture("custom_dict/delivery_with_xtra.ags");
+    let dict = fixture("custom_dict/xtra.dict.json");
+
+    // bare: XTRA is an unknown group, flagged across the delivery
+    let bare = lat(["validate", delivery.to_str().unwrap(), "--json"]);
+    assert_eq!(bare.status.code(), Some(1), "stderr: {}", stderr(&bare));
+    assert!(
+        stdout(&bare).contains("XTRA"),
+        "the bundled dictionary should flag the unknown XTRA group: {}",
+        stdout(&bare)
+    );
+
+    // overlay + forced base: no conflict (exit stays 1, not 5), XTRA now known
+    let over = lat([
+        "validate",
+        "--dict",
+        dict.to_str().unwrap(),
+        "--dict-version",
+        "4.2",
+        delivery.to_str().unwrap(),
+        "--json",
+    ]);
+    assert_eq!(
+        over.status.code(),
+        Some(1),
+        "a forced base must validate, not trip the conflict guard: {}",
+        stderr(&over)
+    );
+    assert!(
+        !stderr(&over).contains("cannot be combined"),
+        "--dict-version alongside --dict is not the --dict-replace conflict: {}",
+        stderr(&over)
+    );
+    assert!(
+        !stdout(&over).contains("XTRA"),
+        "the overlay should make XTRA a recognised group: {}",
+        stdout(&over)
+    );
+}
+
+/// `--encoding` resolves a valid label and rejects an unknown one (exit 5). A
+/// clean file read as utf-8 still validates clean; a bogus label is named and
+/// refused. Guards `resolve_encoding` against returning a blanket `None`, which
+/// would make even `utf-8` unrecognised and turn every `--encoding` into an exit 5.
+#[test]
+fn encoding_flag_accepts_a_valid_label_and_rejects_an_unknown_one() {
+    let clean = fixture("clean_minimal.ags");
+
+    let ok = lat(["validate", "--encoding", "utf-8", clean.to_str().unwrap()]);
+    assert_eq!(ok.status.code(), Some(0), "stderr: {}", stderr(&ok));
+
+    let bad = lat([
+        "validate",
+        "--encoding",
+        "no-such-encoding",
+        clean.to_str().unwrap(),
+    ]);
+    assert_eq!(bad.status.code(), Some(5), "stderr: {}", stderr(&bad));
+    assert!(
+        stderr(&bad).contains("not recognised"),
+        "the unknown label should be named: {}",
+        stderr(&bad)
+    );
+}
