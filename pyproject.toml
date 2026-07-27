@@ -312,17 +312,13 @@ filename = "packages/laterite/python/laterite/compat.py"
 search = "laterite {current_version} — compat:"
 replace = "laterite {new_version} — compat:"
 
-# CHANGELOG: roll [Unreleased] into the new version + date, and update the
-# compare/tag link refs (the old version's tag ref is left in place).
-[[tool.bumpversion.files]]
-filename = "CHANGELOG.md"
-search = "## [Unreleased]"
-replace = "## [Unreleased]\n\n## [{new_version}] — {now:%Y-%m-%d}"
-
-[[tool.bumpversion.files]]
-filename = "CHANGELOG.md"
-search = "compare/v{current_version}...HEAD"
-replace = "compare/v{new_version}...HEAD\n[{new_version}]: https://github.com/niko86/laterite/releases/tag/v{new_version}"
+# CHANGELOG: NOT rolled by bump-my-version any more. The changelog is generated
+# from `changelog.json` (the SSOT) by `tools/gen_changelog.py`; the release roll
+# ([Unreleased] → a dated version) happens there via `--release`, which
+# `tools/release/bump-version.sh` invokes with the new version. A `--check` CI
+# gate keeps CHANGELOG.md in lock-step with the JSON. (The old text-substitution
+# entries were removed here after the hand-maintained CHANGELOG.md was retired in
+# favour of the generated one — leaving them made a bump abort on a missing file.)
 
 # Rust crate suite: single-sourced via [workspace.package] version (every
 # member inherits it with version.workspace = true). Stamped here so a

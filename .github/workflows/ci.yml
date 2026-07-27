@@ -707,6 +707,16 @@ jobs:
         # build needed. `ruff format .` is the fix if this goes red.
         run: uv run ruff format --check .
 
+      - name: changelog drift gate (CHANGELOG.md == changelog.json render)
+        # CHANGELOG.md is GENERATED from changelog.json (the SSOT) by
+        # tools/gen_changelog.py, mirroring OBSERVATIONS.md ← observations.json.
+        # Fails if the committed Markdown drifts from a fresh render, OR if the
+        # leak-gate finds a forbidden token in an entry — the dormant AGS5 strand
+        # names, plus any private `.changelog-denylist` (company names, etc.). So
+        # the derived Markdown is never hand-edited and nothing sensitive reaches
+        # the public file. Regenerate with `python tools/gen_changelog.py`.
+        run: uv run --no-project python tools/gen_changelog.py --check
+
       - name: ty check (type-faithfulness gate)
         # Astral `ty` over the SHIPPED `laterite` package (scope + the abi3-py312
         # floor are set in pyproject `[tool.ty]`). Runs in the project venv (`uv
