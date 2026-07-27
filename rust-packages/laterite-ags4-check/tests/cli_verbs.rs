@@ -1097,3 +1097,60 @@ fn encoding_flag_accepts_a_valid_label_and_rejects_an_unknown_one() {
         stderr(&bad)
     );
 }
+
+// --- excel (AGS4 <-> XLSX round-trip) ---------------------------------------
+
+/// `lat excel` round-trips AGS4 → XLSX → AGS4, with `--no-format-numeric` toggling
+/// the numeric re-formatting on import.
+///
+/// Direction is inferred from the output extension (`.xlsx` ⇒ export, `.ags` ⇒
+/// import). On import, a DATA cell is re-formatted to its column's TYPE precision
+/// by default: a 3DP column holding `523145.1` becomes the canonical `523145.100`.
+/// `--no-format-numeric` leaves it raw. This pins the default-on wiring
+/// (`!args.no_format_numeric`) — a flipped default would silently stop padding.
+#[test]
+fn excel_round_trip_reformats_numerics_by_default_and_no_format_numeric_opts_out() {
+    let dir = scratch();
+    let src = dir.join("in.ags");
+    // a 3DP column carrying an under-precise value — its canonical form is 523145.100
+    std::fs::write(
+        &src,
+        "\"GROUP\",\"LOCA\"\r\n\
+         \"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+         \"UNIT\",\"\",\"m\"\r\n\
+         \"TYPE\",\"ID\",\"3DP\"\r\n\
+         \"DATA\",\"BH01\",\"523145.1\"\r\n",
+    )
+    .unwrap();
+    let xlsx = dir.join("mid.xlsx");
+
+    // export (direction inferred from the .xlsx output)
+    let exp = lat(["excel", src.to_str().unwrap(), xlsx.to_str().unwrap()]);
+    assert_eq!(exp.status.code(), Some(0), "stderr: {}", stderr(&exp));
+    assert!(xlsx.exists(), "no xlsx written");
+
+    // import, default: the 3DP cell is padded to its column precision
+    let fmt = dir.join("out_fmt.ags");
+    let imp = lat(["excel", xlsx.to_str().unwrap(), fmt.to_str().unwrap()]);
+    assert_eq!(imp.status.code(), Some(0), "stderr: {}", stderr(&imp));
+    let fmt_body = std::fs::read_to_string(&fmt).unwrap();
+    assert!(
+        fmt_body.contains("523145.100"),
+        "default import should re-format to the 3DP column precision: {fmt_body}"
+    );
+
+    // import with --no-format-numeric: the raw value is kept as-is
+    let raw = dir.join("out_raw.ags");
+    let imp2 = lat([
+        "excel",
+        "--no-format-numeric",
+        xlsx.to_str().unwrap(),
+        raw.to_str().unwrap(),
+    ]);
+    assert_eq!(imp2.status.code(), Some(0), "stderr: {}", stderr(&imp2));
+    let raw_body = std::fs::read_to_string(&raw).unwrap();
+    assert!(
+        raw_body.contains("523145.1\"") && !raw_body.contains("523145.100"),
+        "--no-format-numeric should keep the raw value, unpadded: {raw_body}"
+    );
+}
