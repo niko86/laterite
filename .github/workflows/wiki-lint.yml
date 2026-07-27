@@ -119,3 +119,10 @@ jobs:
       # can't drift the generated graph.
       - name: gen_crate_graph --check (graph == Cargo manifests)
         run: uv run --no-project python tools/gen_crate_graph.py --check
+
+      # The register/ledger tables — mutation-sweep's sweep ledger + reliquary's
+      # machine-checked register — are rendered from their JSON SSOTs into
+      # marker-delimited regions. This gate fails if the committed table drifts
+      # from a fresh render (a hand-edit inside the markers, or a stale checkout).
+      - name: gen_wiki_tables --check (ledger tables == their JSON)
+        run: uv run --no-project python tools/gen_wiki_tables.py --check

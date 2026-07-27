@@ -54,6 +54,7 @@ Seeded from the 2026-07-11 `workspace-bloat-audit` (find-only). Status vocab:
 deliberately retained; `removed` = expunged (flip the row in the PR that removes
 it, and name that PR in *Removed-in*). Verify `—` = display-only.
 
+<!-- BEGIN GENERATED: reliquary-register — from ags-wiki/design/reliquary.json; regenerate with `uv run --no-project python tools/gen_wiki_tables.py` (DO NOT EDIT THE TABLE BY HAND) -->
 | Symbol | Verify | Axis | Status | Removed-in | Evidence |
 |---|---|---|---|---|---|
 | `truncate_dt_to_unit()` | `rust-packages/laterite-types/src/lib.rs::fn truncate_dt_to_unit` | code | removed | misc-deadcode PR | AGS5 DT-precision writer; 0 shipped callers (only ags5/) |
@@ -83,6 +84,7 @@ it, and name that PR in *Removed-in*). Verify `—` = display-only.
 | `_ordered()` (modality helper) | `tools/gen_modality.py::def _ordered` | code | spotted | — | vulture-surfaced 2026-07-20, verified dead: 0 references repo-wide (module *or* test), superseded by `_columns()`/`_grid()`. Trivial standalone leftover — safe to drop in any pass that touches `gen_modality.py` |
 | `include_warnings: true` (diff) | `rust-packages/laterite-ags4-check/src/commands/diff.rs::include_warnings: true` | code | removed | mutation-sweep cleanup (coverage-rust) | inert survivor 2026-07-27: `diff` never runs the rule engine, so `opts.include_warnings` was never read — cargo-culted from `validate`/`fix`. Collapsed to `CheckOptions::default()`. See [[mutation-sweep]] |
 | `include_warnings: true` (merge) | `rust-packages/laterite-ags4-check/src/commands/merge.rs::include_warnings: true` | code | removed | mutation-sweep cleanup (coverage-rust) | same inert pattern as `diff` — `merge` parses/reconciles but never runs the rule engine, so `opts.include_warnings` was never read. Collapsed to `CheckOptions::default()` |
+<!-- END GENERATED: reliquary-register -->
 
 ## Finding relics — tooling
 
