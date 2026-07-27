@@ -85,13 +85,14 @@ the count of survivors left standing *with a non-defect reason*.
 | `commands/diff.rs` | laterite-ags4-check | 2026-07-27 | 2 | 2 killed / 0 | clean — the lone survivor was the inert `include_warnings` field (`diff` never runs the rule engine, so it was never read); **removed**, not test-rounded ([[reliquary]]) |
 | `commands/read.rs` | laterite-ags4-check | 2026-07-27 | 9 | 5 killed / 0 (4 unviable) | clean — 7 new `run`-verb tests (group listing, render, `--csv` quoting, `--out`, not-found 3 vs 4) on top of the existing `render_group` unit tests; unviable mutants are on the `-> !` `run` signature |
 | `commands/merge.rs` | laterite-ags4-check | 2026-07-27 | 5 | 4 killed / 1 residual | 5 new tests (revision last-wins, `--json` summary, missing 3 / unparseable 4, and the `--tran-issue`/`--tran-date` stamp synthesis). The inert `include_warnings` field was **removed** ([[reliquary]]); the one residual is the `edition` field — live but observable only across editions with **differing** KEY structure, a documented gap needing an edition-divergent fixture (tracked in #127) |
+| `commands/transport.rs` | laterite-ags4-check | 2026-07-27 | 3 | 3 killed / 0 | clean — 6 new tests: pack/unpack and lock/unlock round-trips (byte-identical), passphrase via both `--password-file` and `$LAT_TRANSPORT_PASSWORD`, wrong-pw exit 6, missing-input exit 3, non-envelope exit 6. The interactive TTY-prompt path is deliberately **not** e2e-tested (`rpassword` reads `/dev/tty`, so a subprocess test could hang) |
 
 ## The unswept surface
 
 Everything **not** in the ledger is unswept — assume non-falsifiable tests may
 hide there until a sweep says otherwise. Near-term Rust queue (tracks
 [[coverage-campaign]]'s): the remaining `lat` command modules (`cert`, `certify`,
-`transport`, `common`, `excel`), then `laterite-cliutil`, then the engine crates.
+`common`, `excel`), then `laterite-cliutil`, then the engine crates.
 
 **Tests written before this workflow (2026-07-27) were never swept.** That backlog
 is a standing GitHub issue (**#127**) — retro-sweep opportunistically whenever a
