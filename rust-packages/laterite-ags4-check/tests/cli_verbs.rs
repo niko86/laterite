@@ -902,3 +902,119 @@ fn lock_reads_the_passphrase_from_the_env_var() {
         "env-passphrase round-trip differs"
     );
 }
+
+// --- certify / cert (the .ags.idx certificate) ------------------------------
+
+#[test]
+fn certify_a_clean_file_writes_a_valid_cert() {
+    let dir = scratch();
+    let src = dir.join("c.ags");
+    std::fs::copy(fixture("clean_minimal.ags"), &src).unwrap();
+    let o = lat(["certify", src.to_str().unwrap()]);
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    assert!(
+        stdout(&o).contains("certificate written to"),
+        "{}",
+        stdout(&o)
+    );
+    // the sidecar is real: format 2, the file's true size, the laterite validator
+    let cert = dir.join("c.ags.idx");
+    let v: Value =
+        serde_json::from_str(&std::fs::read_to_string(&cert).unwrap()).expect("cert is JSON");
+    assert_eq!(v["version"], 2);
+    assert_eq!(v["file"]["size"], 726);
+    assert_eq!(v["validation"]["validator"], "laterite_ags4");
+}
+
+#[test]
+fn certify_a_file_with_errors_is_not_certifiable() {
+    let dir = scratch();
+    let src = dir.join("dirty.ags");
+    std::fs::copy(fixture("rule5_unquoted.ags"), &src).unwrap();
+    let o = lat(["certify", src.to_str().unwrap()]);
+    assert_eq!(o.status.code(), Some(1), "stderr: {}", stderr(&o));
+    let err = stderr(&o);
+    assert!(
+        err.contains("cannot certify") && err.contains("error-severity"),
+        "{err}"
+    );
+    assert!(
+        err.contains("lat validate"),
+        "no pointer to validate: {err}"
+    );
+    // no certificate is minted for an uncertifiable file
+    assert!(
+        !dir.join("dirty.ags.idx").exists(),
+        "a cert was written despite errors"
+    );
+}
+
+#[test]
+fn certify_missing_file_exits_3() {
+    let o = lat(["certify", "/no/such/file_xyz.ags"]);
+    assert_eq!(o.status.code(), Some(3), "stderr: {}", stderr(&o));
+}
+
+#[test]
+fn validate_index_with_a_fresh_cert_skips_the_engine() {
+    let dir = scratch();
+    let src = dir.join("c.ags");
+    std::fs::copy(fixture("clean_minimal.ags"), &src).unwrap();
+    let cert = dir.join("c.ags.idx");
+    assert_eq!(
+        lat(["certify", src.to_str().unwrap()]).status.code(),
+        Some(0)
+    );
+
+    let o = lat([
+        "validate",
+        "--index",
+        cert.to_str().unwrap(),
+        src.to_str().unwrap(),
+    ]);
+    assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
+    // the engine was skipped on the certificate's authority, and the run says so
+    assert!(
+        stderr(&o).contains("certified clean by") && stderr(&o).contains("rule engine skipped"),
+        "no skip note: {}",
+        stderr(&o)
+    );
+    assert!(stdout(&o).contains("clean (0 findings)"), "{}", stdout(&o));
+}
+
+#[test]
+fn validate_index_with_a_stale_cert_revalidates() {
+    let dir = scratch();
+    let src = dir.join("c.ags");
+    std::fs::copy(fixture("clean_minimal.ags"), &src).unwrap();
+    let cert = dir.join("c.ags.idx");
+    assert_eq!(
+        lat(["certify", src.to_str().unwrap()]).status.code(),
+        Some(0)
+    );
+
+    // change the file after minting: the cert is now stale and must NOT be trusted
+    let mut bytes = std::fs::read(&src).unwrap();
+    bytes.extend_from_slice(b"\r\n\"GROUP\",\"XXXX\"\r\n");
+    std::fs::write(&src, &bytes).unwrap();
+
+    let o = lat([
+        "validate",
+        "--index",
+        cert.to_str().unwrap(),
+        src.to_str().unwrap(),
+    ]);
+    // the engine runs for real (the junk group trips findings) — the cert was
+    // refused with the "stale" reason, not silently honoured
+    assert_eq!(o.status.code(), Some(1), "stderr: {}", stderr(&o));
+    assert!(
+        stderr(&o).contains("stale") && stderr(&o).contains("not used"),
+        "no stale note: {}",
+        stderr(&o)
+    );
+    assert!(
+        !stdout(&o).contains("clean (0 findings)"),
+        "a stale cert was trusted: {}",
+        stdout(&o)
+    );
+}
