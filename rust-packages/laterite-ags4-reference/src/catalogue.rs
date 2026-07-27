@@ -33,3 +33,19 @@ pub const RULE_LABELS: &[&str] = &[
 pub fn rule_metadata_json() -> &'static str {
     include_str!("../data/rules_meta.json")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::rule_metadata_json;
+
+    #[test]
+    fn rule_metadata_json_is_valid_and_covers_the_labels() {
+        let s = rule_metadata_json();
+        assert!(!s.is_empty(), "embedded rules_meta.json is empty");
+        let _: serde_json::Value =
+            serde_json::from_str(s).expect("rules_meta.json must be valid JSON");
+        // it describes the numbered rules — spot-check one that a blanked or
+        // replaced payload would not contain
+        assert!(s.contains("10a"), "rules_meta.json should mention rule 10a");
+    }
+}

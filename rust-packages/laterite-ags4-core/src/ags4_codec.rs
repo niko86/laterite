@@ -282,7 +282,12 @@ fn trim_owned(mut s: String) -> String {
         return s;
     }
     s.drain(..lead);
-    s.truncate(end - lead);
+    // `end` is the trimmed length measured from the ORIGINAL start; after draining
+    // `lead` leading bytes the survivor is `end - lead` long. For an all-whitespace
+    // value `trim_start` consumes everything, so `lead == s.len()` while `end == 0`
+    // — and `end - lead` underflows. Saturate: the result is the empty string, and
+    // `end >= lead` in every other case, so this is a plain subtraction there.
+    s.truncate(end.saturating_sub(lead));
     s
 }
 
@@ -484,5 +489,41 @@ mod tests {
             strict.get("LOCA").unwrap().headings,
             recover.get("LOCA").unwrap().headings
         );
+    }
+
+    /// `trim_owned`'s in-place path only runs when there is whitespace to strip —
+    /// and quoted AGS values almost never have any, so the fixtures above exercise
+    /// only its no-op fast path. These call it directly across all four cases so
+    /// the guard (`lead == 0 && end == len`) and the `end - lead` truncation are
+    /// each pinned by a value that changes if either is wrong.
+    #[test]
+    fn trim_owned_strips_leading_trailing_and_both() {
+        assert_eq!(trim_owned("x".to_string()), "x"); // fast path: nothing to do
+        assert_eq!(trim_owned("  x".to_string()), "x"); // leading only
+        assert_eq!(trim_owned("x  ".to_string()), "x"); // trailing only
+        // Leading AND trailing of DIFFERENT widths — `end - lead` must be the new
+        // length; `end + lead` leaves trailing space, `end / lead` truncates short.
+        assert_eq!(trim_owned("  hello   ".to_string()), "hello");
+        assert_eq!(trim_owned("   ".to_string()), ""); // all whitespace
+    }
+
+    /// The re-check branch `resolve_headings` runs only under `Recover`: a
+    /// generated `NAME__2` can collide with a real heading that already ends
+    /// `__2`. Nothing else exercises it — a normal Recover file never hits the
+    /// collision — so without this the whole `policy == Recover` guard reads clean.
+    #[test]
+    fn recovery_rejects_a_synthetic_suffix_that_collides_with_a_real_heading() {
+        // Two LOCA_ID (the 2nd → LOCA_ID__2) plus a real LOCA_ID__2 already present.
+        let src = b"\"GROUP\",\"LOCA\"\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_ID\",\"LOCA_ID__2\"\n\
+\"DATA\",\"a\",\"b\",\"c\"\n";
+        let opts = ReadOptions {
+            duplicate_headings: DuplicateHeadings::Recover,
+        };
+        let err = read_ags4_bytes_with(src, opts).unwrap_err();
+        let CliError::DuplicateHeading { group, heading } = err else {
+            panic!("expected DuplicateHeading from the re-check, got {err:?}");
+        };
+        assert_eq!((group.as_str(), heading.as_str()), ("LOCA", "LOCA_ID__2"));
     }
 }

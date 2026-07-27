@@ -684,4 +684,130 @@ mod tests {
         }
         assert!(d.abbr_codes("NOPE_HDNG").is_empty());
     }
+
+    // ---- layered (custom-dict overlay) paths ----
+    // The bundled tests above never build a `Dictionary::Layered`, so the delta
+    // arms of heading/group/group_codes/group_headings went unexercised at the
+    // reference level (they are covered downstream by the validator, which this
+    // crate's own sweep does not run). Build a delta directly — its fields are
+    // public — and pin both the overlay (fall-through) and replacement forms.
+    use crate::overlay::{OwnedDelta, OwnedDictEntry, OwnedGroupMeta};
+    use std::collections::HashMap;
+
+    fn entry(ags_type: &str, status: &str, unit: &str) -> OwnedDictEntry {
+        OwnedDictEntry {
+            ags_type: ags_type.into(),
+            status: status.into(),
+            unit: unit.into(),
+            desc: String::new(),
+        }
+    }
+
+    // A delta over 4.2: a new XTRA group, an override of LOCA's metadata and
+    // LOCA_ID's type, and a heading appended to LOCA — enough to reach every
+    // layered arm. `fall_through` selects overlay vs full replacement.
+    fn sample_delta(fall_through: bool) -> OwnedDelta {
+        OwnedDelta {
+            base_version: DictVersion::V4_2,
+            fall_through,
+            groups: HashMap::from([
+                (
+                    "XTRA".to_string(),
+                    OwnedGroupMeta {
+                        parent: "LOCA".into(),
+                        desc: "Extra".into(),
+                    },
+                ),
+                (
+                    "LOCA".to_string(),
+                    OwnedGroupMeta {
+                        parent: "PROJ".into(),
+                        desc: "Overridden".into(),
+                    },
+                ),
+            ]),
+            headings: HashMap::from([
+                (heading_key("XTRA", "XTRA_ID"), entry("ID", "KEY", "")),
+                (heading_key("LOCA", "LOCA_ID"), entry("XOVR", "KEY", "")),
+                (heading_key("LOCA", "LOCA_EXTRA"), entry("X", "OTHER", "m")),
+            ]),
+            group_headings: HashMap::from([
+                ("XTRA".to_string(), vec!["XTRA_ID".to_string()]),
+                ("LOCA".to_string(), vec!["LOCA_EXTRA".to_string()]),
+            ]),
+            abbrs: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn layered_overlay_adds_new_groups_overrides_and_falls_through() {
+        let delta = sample_delta(true);
+        let d = Dictionary::layered(&delta);
+        // a brand-new group and heading resolve through the delta
+        assert_eq!(d.group("XTRA").map(|g| g.parent), Some("LOCA"));
+        assert_eq!(d.heading("XTRA", "XTRA_ID").map(|h| h.ags_type), Some("ID"));
+        // the delta OVERRIDES a base heading (delta wins over the base)
+        assert_eq!(
+            d.heading("LOCA", "LOCA_ID").map(|h| h.ags_type),
+            Some("XOVR")
+        );
+        // fall-through keeps the base groups visible, and an overridden base group
+        // is listed once (by the base), not duplicated by the delta
+        let codes: Vec<&str> = d.group_codes().collect();
+        assert!(codes.contains(&"XTRA"), "new code missing: {codes:?}");
+        assert!(codes.contains(&"PROJ"), "base code missing (fall-through)");
+        assert_eq!(
+            codes.iter().filter(|c| **c == "LOCA").count(),
+            1,
+            "override duplicated LOCA: {codes:?}"
+        );
+        // a touched base group keeps its base headings and appends the delta's
+        let loca_h = d.group_headings("LOCA");
+        assert!(loca_h.contains(&"LOCA_ID"), "base heading lost: {loca_h:?}");
+        assert!(
+            loca_h.contains(&"LOCA_EXTRA"),
+            "delta heading not appended: {loca_h:?}"
+        );
+    }
+
+    #[test]
+    fn layered_replacement_hides_the_base() {
+        let repl = sample_delta(false);
+        let d = Dictionary::layered(&repl);
+        // replacement: base-only lookups return None, base codes vanish
+        assert!(
+            d.heading("PROJ", "PROJ_ID").is_none(),
+            "base heading leaked"
+        );
+        assert!(d.group("PROJ").is_none(), "base group leaked");
+        let codes: Vec<&str> = d.group_codes().collect();
+        assert!(codes.contains(&"XTRA"));
+        assert!(
+            !codes.contains(&"PROJ"),
+            "replacement must hide the base: {codes:?}"
+        );
+        // a delta group's headings are the delta's alone (no base prefix)
+        assert_eq!(d.group_headings("XTRA").as_ref(), &["XTRA_ID"]);
+        // an untouched base group is empty under replacement
+        assert!(d.group_headings("SAMP").is_empty());
+    }
+
+    #[test]
+    fn dictionary_dto_carries_units_and_parents() {
+        let dto = dictionary_dto(DictVersion::V4_2);
+        let loca = dto
+            .groups
+            .iter()
+            .find(|g| g.code == "LOCA")
+            .expect("LOCA in the DTO");
+        // LOCA hangs off PROJ — a non-empty parent survives as Some
+        assert_eq!(loca.parent.as_deref(), Some("PROJ"));
+        // at least one LOCA heading keeps its unit (units must not be dropped)
+        assert!(
+            loca.headings
+                .iter()
+                .any(|h| h.unit.as_deref().is_some_and(|u| !u.is_empty())),
+            "no LOCA heading kept its unit"
+        );
+    }
 }

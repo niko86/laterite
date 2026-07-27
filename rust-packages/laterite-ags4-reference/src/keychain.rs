@@ -542,6 +542,32 @@ mod tests {
     }
 
     #[test]
+    fn key_heading_names_lists_the_denormalised_key_chain() {
+        // SAMP's identifying chain carries its own SAMP_ID and the inherited
+        // LOCA_ID — a blanked or bogus list would drop them.
+        let samp = registry().get("SAMP").expect("SAMP");
+        let names = key_heading_names(samp);
+        assert!(names.contains(&"SAMP_ID"), "own KEY missing: {names:?}");
+        assert!(
+            names.contains(&"LOCA_ID"),
+            "inherited KEY missing: {names:?}"
+        );
+    }
+
+    #[test]
+    fn shared_keys_are_the_link_to_the_parent() {
+        // SAMP links to LOCA through the LOCA_ID it repeats; a root group shares
+        // nothing, so its list is empty.
+        let reg = registry();
+        let samp = reg.get("SAMP").expect("SAMP");
+        assert!(shared_keys(reg, samp).contains(&"LOCA_ID".to_string()));
+        assert!(
+            shared_keys(reg, reg.get("PROJ").expect("PROJ")).is_empty(),
+            "a root group shares no keys"
+        );
+    }
+
+    #[test]
     fn content_id_pins_the_cross_surface_golden() {
         // The SINGLE SOURCE of the golden UUIDv8s that the Python / Node / wasm
         // surface tests all assert — `test_content_keys.py`, `p3-content-keys.test.ts`,

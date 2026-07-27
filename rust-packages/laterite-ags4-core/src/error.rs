@@ -37,3 +37,44 @@ impl CliError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The exit codes are the CLI/CI self-correction contract (`_cli.py`'s
+    /// documented 0-8), so pin the exact numbers, not just "non-zero". A missing
+    /// file is its own recoverable class (3); anything structural is 6.
+    #[test]
+    fn exit_codes_mirror_the_documented_cli_contract() {
+        assert_eq!(CliError::FileNotFound("x".into()).exit_code(), 3);
+        assert_eq!(CliError::Schema("boom".into()).exit_code(), 6);
+        assert_eq!(
+            CliError::DuplicateHeading {
+                group: "LOCA".into(),
+                heading: "LOCA_ID".into(),
+            }
+            .exit_code(),
+            6,
+        );
+    }
+
+    #[test]
+    fn display_names_the_offending_file_group_and_heading() {
+        assert_eq!(
+            CliError::FileNotFound("d.ags".into()).to_string(),
+            "file not found: d.ags"
+        );
+        assert_eq!(
+            CliError::Schema("bad row".into()).to_string(),
+            "schema error: bad row"
+        );
+        let dup = CliError::DuplicateHeading {
+            group: "LOCA".into(),
+            heading: "LOCA_ID".into(),
+        }
+        .to_string();
+        assert!(dup.contains("LOCA_ID") && dup.contains("LOCA"), "{dup}");
+        assert!(dup.contains("Rule 7"), "{dup}");
+    }
+}

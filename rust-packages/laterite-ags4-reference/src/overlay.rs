@@ -797,4 +797,136 @@ mod tests {
         let c = parse(changed, DictFormat::Json, BaseSpec::Auto);
         assert_ne!(a.hash, c.hash);
     }
+
+    #[test]
+    fn dict_error_messages_name_the_problem() {
+        // A blanked Display would emit empty diagnostics; each variant must name
+        // its own cause (the surface prints these before any data rule runs).
+        assert!(format!("{}", DictError::Empty).contains("no groups"));
+        let us = DictError::UnknownStatus {
+            line: 7,
+            token: "ZZ".into(),
+        };
+        let msg = format!("{us}");
+        assert!(msg.contains("ZZ") && msg.contains("KEY"), "{msg}");
+        assert!(
+            format!(
+                "{}",
+                DictError::DuplicateHeading {
+                    group: "SAMP".into(),
+                    heading: "SAMP_ID".into()
+                }
+            )
+            .contains("twice")
+        );
+    }
+
+    #[test]
+    fn valid_status_accepts_the_vocab_and_empty_only() {
+        assert!(valid_status("KEY"));
+        assert!(valid_status("required")); // case-insensitive
+        assert!(valid_status(""), "empty is treated as OTHER downstream");
+        assert!(!valid_status("BOGUS"), "an unknown status must be rejected");
+    }
+
+    #[test]
+    fn desc_of_returns_the_description_or_empty() {
+        use crate::union::DictGroup;
+        let with = DictGroup {
+            parent: None,
+            description: Some("A group".into()),
+            headings: Vec::new(),
+        };
+        let without = DictGroup {
+            parent: None,
+            description: None,
+            headings: Vec::new(),
+        };
+        assert_eq!(desc_of(&with), "A group");
+        assert_eq!(desc_of(&without), "");
+    }
+
+    #[test]
+    fn build_delta_records_a_parent_override() {
+        // Re-parenting SAMP (base parent LOCA → PROJ) must land in the delta as a
+        // group override — pins that the override fires on a DIFFERING parent, and
+        // that a parent OR description change is enough (not both).
+        let j = br#"{"groups":{"SAMP":{"parent":"PROJ","headings":[
+            {"name":"SAMP_ID","type":"ID","status":"KEY"}
+        ]}}}"#;
+        let delta = parse(j, DictFormat::Json, BaseSpec::Auto)
+            .build_delta()
+            .expect("delta");
+        assert_eq!(
+            delta.group("SAMP").map(|g| g.parent),
+            Some("PROJ"),
+            "parent override not recorded"
+        );
+    }
+
+    #[test]
+    fn build_delta_records_a_description_override() {
+        // Restating SAMP's parent (unchanged) but a new description overrides only
+        // on the description — pins the description-difference predicate.
+        let j = br#"{"groups":{"SAMP":{"parent":"LOCA","description":"Bespoke samples","headings":[
+            {"name":"SAMP_ID","type":"ID","status":"KEY"}
+        ]}}}"#;
+        let delta = parse(j, DictFormat::Json, BaseSpec::Auto)
+            .build_delta()
+            .expect("delta");
+        assert_eq!(
+            delta.group("SAMP").map(|g| g.desc),
+            Some("Bespoke samples"),
+            "description override not recorded"
+        );
+    }
+
+    #[test]
+    fn build_delta_unit_wins_when_present_and_inherits_when_empty() {
+        // Override a base heading in overlay mode, mirroring the base type/status so
+        // ONLY the unit differs. A non-empty custom unit wins; overriding a base
+        // heading does not re-list it as a new name.
+        let base = Dictionary::bundled(DictVersion::V4_2);
+        let bh = base.heading("LOCA", "LOCA_NATE").expect("LOCA_NATE");
+        assert!(!bh.unit.is_empty(), "test needs a heading with a base unit");
+
+        let unit_json = format!(
+            r#"{{"groups":{{"LOCA":{{"parent":"PROJ","headings":[
+                {{"name":"LOCA_NATE","type":"{t}","status":"{s}","unit":"ZZ"}}
+            ]}}}}}}"#,
+            t = bh.ags_type,
+            s = bh.status,
+        );
+        let delta = parse(unit_json.as_bytes(), DictFormat::Json, BaseSpec::Auto)
+            .build_delta()
+            .expect("delta");
+        let e = delta
+            .heading(&heading_key("LOCA", "LOCA_NATE"))
+            .expect("a unit-only difference must land in the delta");
+        assert_eq!(e.unit, "ZZ", "a non-empty custom unit must win");
+        assert!(
+            delta.added_headings("LOCA").is_empty(),
+            "overriding a base heading must not re-list it as new: {:?}",
+            delta.added_headings("LOCA")
+        );
+
+        // A present-but-EMPTY unit must inherit the base unit (not blank it). Force
+        // the heading into the delta via a type change so we can read its unit.
+        let inherit_json = format!(
+            r#"{{"groups":{{"LOCA":{{"parent":"PROJ","headings":[
+                {{"name":"LOCA_NATE","type":"X","status":"{s}","unit":""}}
+            ]}}}}}}"#,
+            s = bh.status,
+        );
+        let delta2 = parse(inherit_json.as_bytes(), DictFormat::Json, BaseSpec::Auto)
+            .build_delta()
+            .expect("delta");
+        let e2 = delta2
+            .heading(&heading_key("LOCA", "LOCA_NATE"))
+            .expect("a type override must land in the delta");
+        assert_eq!(
+            e2.unit, bh.unit,
+            "an empty custom unit must inherit the base unit"
+        );
+    }
 }
