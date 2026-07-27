@@ -193,9 +193,9 @@ def _resolve_source(
         try:
             if Path(s).exists():  # a path that exists on disk is unambiguous
                 return s, None, None
-        except OSError:
+        except OSError:  # pragma: no cover (3.12+ pathlib swallows this itself)
             pass  # interior NUL / over-long → not a usable path; fall through
-        except ValueError:
+        except ValueError:  # pragma: no cover (3.12+ pathlib swallows this itself)
             pass  # path-check raised on a non-path string → treat as content below
         if _looks_like_ags_text(s):
             return None, s, None
@@ -2130,6 +2130,20 @@ def build_ags4(
     con = None
     for i, (code, frame) in enumerate(items):
         frame = _drop_synth_keys(frame)  # never emit a read(keys=True) _id/_parent_id
+        # A pandas >=2.2 frame exposes a *pyarrow-backed* Arrow C-stream capsule;
+        # handing it straight to the native emit corrupts the process heap and
+        # hard-crashes a later in-process native call — a use-after-free in the
+        # pyo3-arrow/arrow-rs consumer of a pyarrow-produced stream (polars' native
+        # stream is unaffected; reproduces from `build_ags4({g: pandas_frame})`).
+        # Normalise those to a native polars capsule first — the guard compat's
+        # writer (`_to_polars`) also applies. A pandas <2.2 frame has no capsule and
+        # falls through to the DuckDB bridge below (its existing pyarrow-free path),
+        # so that branch stays reachable. A pure Rust fix would need a workspace
+        # arrow/pyo3-arrow major bump across every binding; tracked separately.
+        if type(frame).__module__.partition(".")[0] == "pandas" and hasattr(
+            frame, "__arrow_c_stream__"
+        ):
+            frame = pl.from_pandas(frame)
         if hasattr(frame, "__arrow_c_stream__"):
             tables.append((code, frame))
             continue
