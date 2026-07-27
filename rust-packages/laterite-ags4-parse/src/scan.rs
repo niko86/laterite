@@ -345,3 +345,39 @@ mod differential {
         assert_eq!(mismatches, 0, "{mismatches} first-field mismatches");
     }
 }
+
+#[cfg(test)]
+mod bounds {
+    use super::*;
+
+    /// The doubled-quote (`""`) advance must step past *both* quotes so the field
+    /// closes at its real terminating quote. The differential test skips escape
+    /// cases (a borrowed slice can't unescape), so this is the only guard on that
+    /// two-byte step — a mis-step overshoots the close and swallows the rest of the
+    /// field. Uses a value long enough that `+2` and `*2` land in different places.
+    #[test]
+    fn doubled_quote_advance_keeps_the_field_bounds() {
+        let line = "\"abcd\"\"e\"";
+        let fields = scan_line(line, RAW);
+        assert_eq!(fields.len(), 1);
+        assert!(
+            fields[0].has_escape,
+            "the \"\" must be flagged as an escape"
+        );
+        assert_eq!(
+            &line[fields[0].value_start..fields[0].value_end],
+            "abcd\"\"e",
+            "the escaped quote must not desync the field close"
+        );
+    }
+
+    /// `first_field` carries its own copy of the same scan, and the differential
+    /// oracle skips escapes — so pin the doubled-quote path here too. It returns the
+    /// raw (still-escaped) inner value; the two-byte step must land on the closing
+    /// quote, neither overshooting nor stepping backwards into a loop.
+    #[test]
+    fn first_field_reads_a_doubled_quote_field_raw() {
+        assert_eq!(first_field("\"abcd\"\"e\""), Some("abcd\"\"e"));
+        assert_eq!(first_field("\"GROUP\",\"LOCA\""), Some("GROUP"));
+    }
+}
