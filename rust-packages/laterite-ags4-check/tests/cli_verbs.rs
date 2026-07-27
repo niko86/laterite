@@ -751,3 +751,154 @@ fn merge_synthesises_a_tran_stamp_when_issue_and_date_are_given() {
         "merge TRAN_REM missing: {stamped}"
     );
 }
+
+// --- transport (pack / unpack / lock / unlock) ------------------------------
+
+fn pw_file(dir: &Path, name: &str, pw: &str) -> PathBuf {
+    let p = dir.join(name);
+    std::fs::write(&p, pw).unwrap();
+    p
+}
+
+#[test]
+fn pack_then_unpack_round_trips() {
+    // The zstd envelope is lossless: unpack(pack(x)) == x, byte for byte.
+    let dir = scratch();
+    let src = fixture("clean_minimal.ags");
+    let packed = dir.join("c.lat.zst");
+    let out = dir.join("c.ags");
+    let p = lat(["pack", src.to_str().unwrap(), packed.to_str().unwrap()]);
+    assert_eq!(p.status.code(), Some(0), "stderr: {}", stderr(&p));
+    assert!(stderr(&p).contains("packed"), "{}", stderr(&p));
+    let u = lat(["unpack", packed.to_str().unwrap(), out.to_str().unwrap()]);
+    assert_eq!(u.status.code(), Some(0), "stderr: {}", stderr(&u));
+    assert_eq!(
+        std::fs::read(&src).unwrap(),
+        std::fs::read(&out).unwrap(),
+        "pack → unpack changed the bytes"
+    );
+}
+
+#[test]
+fn lock_then_unlock_round_trips_with_a_passphrase() {
+    // The age passphrase envelope: unlock(lock(x, pw), pw) == x. --log-n 2 keeps
+    // the scrypt KDF fast for the test (18 is the shipped default).
+    let dir = scratch();
+    let src = fixture("clean_minimal.ags");
+    let pw = pw_file(&dir, "pw.txt", "hunter2");
+    let locked = dir.join("c.lat.age");
+    let out = dir.join("c.ags");
+    let l = lat([
+        "lock",
+        src.to_str().unwrap(),
+        locked.to_str().unwrap(),
+        "--password-file",
+        pw.to_str().unwrap(),
+        "--log-n",
+        "2",
+    ]);
+    assert_eq!(l.status.code(), Some(0), "stderr: {}", stderr(&l));
+    let u = lat([
+        "unlock",
+        locked.to_str().unwrap(),
+        out.to_str().unwrap(),
+        "--password-file",
+        pw.to_str().unwrap(),
+    ]);
+    assert_eq!(u.status.code(), Some(0), "stderr: {}", stderr(&u));
+    assert_eq!(
+        std::fs::read(&src).unwrap(),
+        std::fs::read(&out).unwrap(),
+        "lock → unlock changed the bytes"
+    );
+    // the locked file is genuinely encrypted, not the plaintext copied through
+    assert_ne!(
+        std::fs::read(&locked).unwrap(),
+        std::fs::read(&src).unwrap()
+    );
+}
+
+#[test]
+fn unlock_with_the_wrong_passphrase_exits_6() {
+    let dir = scratch();
+    let src = fixture("clean_minimal.ags");
+    let right = pw_file(&dir, "right.txt", "correct-horse");
+    let wrong = pw_file(&dir, "wrong.txt", "battery-staple");
+    let locked = dir.join("c.lat.age");
+    let out = dir.join("c.ags");
+    let l = lat([
+        "lock",
+        src.to_str().unwrap(),
+        locked.to_str().unwrap(),
+        "--password-file",
+        right.to_str().unwrap(),
+        "--log-n",
+        "2",
+    ]);
+    assert_eq!(l.status.code(), Some(0), "stderr: {}", stderr(&l));
+    let u = lat([
+        "unlock",
+        locked.to_str().unwrap(),
+        out.to_str().unwrap(),
+        "--password-file",
+        wrong.to_str().unwrap(),
+    ]);
+    assert_eq!(u.status.code(), Some(6), "stderr: {}", stderr(&u));
+    assert!(stderr(&u).contains("decrypt"), "{}", stderr(&u));
+}
+
+#[test]
+fn pack_missing_input_exits_3() {
+    let dir = scratch();
+    let out = dir.join("x.zst");
+    let p = lat(["pack", "/no/such/file_xyz.ags", out.to_str().unwrap()]);
+    assert_eq!(p.status.code(), Some(3), "stderr: {}", stderr(&p));
+    assert!(stderr(&p).contains("not found"), "{}", stderr(&p));
+}
+
+#[test]
+fn unpack_a_non_envelope_exits_6() {
+    // A plain .ags is not a zstd frame → a schema/transport error, not a crash.
+    let dir = scratch();
+    let out = dir.join("x.ags");
+    let u = lat([
+        "unpack",
+        fixture("clean_minimal.ags").to_str().unwrap(),
+        out.to_str().unwrap(),
+    ]);
+    assert_eq!(u.status.code(), Some(6), "stderr: {}", stderr(&u));
+}
+
+#[test]
+fn lock_reads_the_passphrase_from_the_env_var() {
+    // With no --password-file, the passphrase comes from $LAT_TRANSPORT_PASSWORD.
+    // Set per-child via Command::env (NOT env::set_var), so there is no cross-test
+    // race. Round-trips through unlock reading the same env var.
+    let dir = scratch();
+    let src = fixture("clean_minimal.ags");
+    let locked = dir.join("c.lat.age");
+    let out = dir.join("c.ags");
+    let lock = Command::new(env!("CARGO_BIN_EXE_lat"))
+        .args([
+            "lock",
+            src.to_str().unwrap(),
+            locked.to_str().unwrap(),
+            "--log-n",
+            "2",
+        ])
+        .env("LAT_TRANSPORT_PASSWORD", "hunter2")
+        .output()
+        .expect("spawn lat");
+    assert_eq!(lock.status.code(), Some(0), "stderr: {}", stderr(&lock));
+    let unlock = Command::new(env!("CARGO_BIN_EXE_lat"))
+        .args(["unlock", locked.to_str().unwrap(), out.to_str().unwrap()])
+        .env("LAT_TRANSPORT_PASSWORD", "hunter2")
+        .output()
+        .expect("spawn lat");
+    assert_eq!(unlock.status.code(), Some(0), "stderr: {}", stderr(&unlock));
+    assert_eq!(
+        std::fs::read(&src).unwrap(),
+        std::fs::read(&out).unwrap(),
+        "env-passphrase round-trip differs"
+    );
+}
