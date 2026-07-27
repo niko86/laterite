@@ -734,10 +734,11 @@ jobs:
         # 99%) and replaced the python-ags4 sibling-clone compat fixtures with
         # committed clean-room synthetic ones; #88 did the same for the
         # round-trip/dedup fixture. So those tests now RUN in CI instead of
-        # silently skipping, and local + CI agree (~83%) — the old "local
-        # over-reports because the sibling clone is absent in CI" caveat is
-        # gone. (compat.py's remaining uncovered blocks are Rust-backed Excel
-        # I/O — covered in laterite-ags4-core/excel.rs, not via Python.)
+        # silently skipping, and local + CI agree — the old "local over-reports
+        # because the sibling clone is absent in CI" caveat is gone. The 95%
+        # coverage campaign then took compat.py + _cli.py to 100% and the whole
+        # surface to ~99% (see ags-wiki/concepts/coverage-campaign.md), so the
+        # floor is RATCHETED to 95 — the campaign's target, with real headroom.
         run: |
           # The root `tests/` (the AGS4 dictionary-faithfulness suite) is
           # private-only — it's blocklisted from the public mirror
@@ -753,7 +754,7 @@ jobs:
             $([ -d tests ] && echo tests) \
             -n 4 --durations=20 -q --tb=short \
             --cov=laterite \
-            --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+            --cov-report=term-missing --cov-report=xml --cov-fail-under=95
 
       # Codecov `python` flag — public repo only (niko86/laterite), where the
       # badge lives + CODECOV_TOKEN is set. coverage.xml is written by the

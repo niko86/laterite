@@ -1008,5 +1008,5 @@ def main(argv: list[str] | None = None) -> int:
     return _run_validate(args)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - module entry point
     raise SystemExit(main())
