@@ -541,4 +541,137 @@ mod tests {
         // After `--`, args are passthrough — don't treat as the flag.
         assert!(!v(&["run", "--", "--readme"]));
     }
+
+    fn strip_ansi(s: &str) -> String {
+        [C_RESET, C_KEY, C_STRING, C_NUMBER, C_LITERAL, C_STRUCT]
+            .iter()
+            .fold(s.to_string(), |acc, c| acc.replace(c, ""))
+    }
+
+    /// The coloured pretty-printer must preserve structure exactly and paint each
+    /// token its own colour. Stripping the palette back out must yield valid,
+    /// correctly-indented JSON that round-trips — which pins the comma logic (a
+    /// wrong separator is invalid JSON), the inline empty-collection rendering
+    /// (`[]`/`{}`, not a multi-line pair), and the two-space-per-depth indentation.
+    /// The raw output pins each scalar arm to its own palette entry (an arm deleted
+    /// to the `_ => Ok(())` catch-all writes nothing, and its colour disappears).
+    #[test]
+    fn coloured_pretty_preserves_structure_and_paints_each_scalar() {
+        let v = json!({
+            "nil": null,
+            "flag": true,
+            "count": 2,
+            "name": "hi",
+            "empty_arr": [],
+            "empty_obj": {},
+            "nested": {"s": "hi"},
+            "nums": [1, 2],
+            // a non-scalar array element, so the item-recursion depth is observable
+            "arr_of_obj": [{"deep": 1}],
+        });
+        let mut buf = Vec::new();
+        write_coloured_pretty(&mut buf, &v, 0).unwrap();
+        let cs = String::from_utf8(buf).unwrap();
+
+        // each scalar carries its own palette entry
+        assert!(
+            cs.contains(&format!("{C_LITERAL}null{C_RESET}")),
+            "null colour"
+        );
+        assert!(
+            cs.contains(&format!("{C_LITERAL}true{C_RESET}")),
+            "bool colour"
+        );
+        assert!(
+            cs.contains(&format!("{C_NUMBER}2{C_RESET}")),
+            "number colour"
+        );
+        assert!(
+            cs.contains(&format!("{C_STRING}\"hi\"{C_RESET}")),
+            "string colour"
+        );
+
+        // strip the palette → must be valid, structure-preserving JSON
+        let plain = strip_ansi(&cs);
+        let back: Value = serde_json::from_str(&plain)
+            .unwrap_or_else(|e| panic!("stripped output is not valid JSON ({e}):\n{plain}"));
+        assert_eq!(back, v, "coloured pretty changed the data");
+
+        // empty collections render inline, not as a multi-line pair
+        assert!(
+            plain.contains("\"empty_arr\": []"),
+            "empty array not inline:\n{plain}"
+        );
+        assert!(
+            plain.contains("\"empty_obj\": {}"),
+            "empty object not inline:\n{plain}"
+        );
+
+        // two spaces per depth: a nested object key and an array element both sit at
+        // depth 2 (four leading spaces)
+        assert!(
+            plain.contains("\n    \"s\": "),
+            "nested key mis-indented:\n{plain}"
+        );
+        assert!(
+            plain.contains("\n    1"),
+            "array element mis-indented:\n{plain}"
+        );
+        // a non-scalar array element carries the item-recursion depth: its key sits
+        // one level deeper again (six spaces)
+        assert!(
+            plain.contains("\n      \"deep\": "),
+            "array-of-object element mis-indented:\n{plain}"
+        );
+    }
+
+    /// The colour gate is off whenever `no_color` is set — and, in a piped test
+    /// harness, off regardless (stdout is not a TTY). Asserting it stays off for
+    /// both argument values pins the `!no_color && … && is_terminal()` conjunction:
+    /// a return flipped to `true`, or an `&&` loosened to `||`, would let the
+    /// NO_COLOR-unset term turn colour on where the real gate keeps it off.
+    /// (The dropped-`!` and always-`false` mutants are TTY-masked here — both sides
+    /// are `false` off a TTY — and are recorded as harness residuals.)
+    #[test]
+    fn colour_gate_stays_off_off_a_tty() {
+        assert!(
+            !colour_enabled(true),
+            "explicit no_color must force colour off"
+        );
+        assert!(
+            !colour_enabled(false),
+            "no TTY under cargo test → colour off"
+        );
+    }
+
+    /// A determinate bar is hidden off a stderr TTY (piped/CI) and under `--quiet`.
+    /// `is_hidden()` cannot see the gate — indicatif auto-hides a stderr bar off a
+    /// TTY, so even a broken gate's live bar reads hidden — but a hidden bar carries
+    /// no length while `ProgressBar::new(len)` does, so `length()` distinguishes
+    /// them. `cargo test` pipes stderr, so both cases must have `None`; a flipped
+    /// `&&` or dropped `!` would build a `Some(len)` bar.
+    #[test]
+    fn progress_bar_is_hidden_off_a_tty_and_under_quiet() {
+        assert_eq!(progress_bar(10, false).length(), None);
+        assert_eq!(progress_bar(10, true).length(), None);
+    }
+
+    fn spinner_kind(s: &Spinner) -> &'static str {
+        match &s.inner {
+            Kind::Live(_) => "live",
+            Kind::Static => "static",
+            Kind::Quiet => "quiet",
+        }
+    }
+
+    /// The spinner gate: `--quiet` → a silent no-op; off a stderr TTY → one static
+    /// line, never a live ticker. `cargo test` pipes stderr, so the non-quiet case
+    /// must be Static — a dropped `!` on the TTY check would build a Live spinner.
+    #[test]
+    fn spinner_gating_is_quiet_and_nontty_safe() {
+        assert_eq!(spinner_kind(&Spinner::start("m", true)), "quiet");
+        assert_eq!(spinner_kind(&Spinner::start("m", false)), "static");
+        // mutators on a non-Live spinner must not panic
+        Spinner::start("m", true).set("x");
+    }
 }
