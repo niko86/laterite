@@ -786,4 +786,223 @@ mod tests {
             "Report must not synthesize TRAN, got:\n{text}"
         );
     }
+
+    #[test]
+    fn strict_mode_rejects_error_findings_and_accepts_a_clean_file() {
+        // Pins the Strict gate: `count(severity == Error)` and `errors > 0`.
+        // Strict does NOT synthesize the mandatory metadata groups (AutoFix
+        // does), so a genuinely clean fixture must carry PROJ + TRAN + the
+        // UNIT/TYPE catalogs itself (mirroring `synthesise_metadata`).
+        let strict = EmitOpts {
+            mode: EmitMode::Strict,
+            ..Default::default()
+        };
+        let cat = |code: &str, key: &str, desc: &str, syms: &[&str]| GroupInput {
+            code: code.into(),
+            headings: vec![key.into(), desc.into()],
+            units: Some(vec![String::new(), String::new()]),
+            types: Some(vec!["X".into(), "X".into()]),
+            rows: syms.iter().map(|s| vec![json!(s), json!(s)]).collect(),
+        };
+        let tran = || GroupInput {
+            code: "TRAN".into(),
+            headings: [
+                "TRAN_ISNO",
+                "TRAN_DATE",
+                "TRAN_PROD",
+                "TRAN_STAT",
+                "TRAN_AGS",
+                "TRAN_RECV",
+                "TRAN_DLIM",
+                "TRAN_RCON",
+            ]
+            .map(String::from)
+            .to_vec(),
+            units: Some(
+                ["", "yyyy-mm-dd", "", "", "", "", "", ""]
+                    .map(String::from)
+                    .to_vec(),
+            ),
+            types: Some(
+                ["X", "DT", "X", "X", "X", "X", "X", "X"]
+                    .map(String::from)
+                    .to_vec(),
+            ),
+            rows: vec![vec![
+                json!("1"),
+                json!("1900-01-01"),
+                json!("TBC"),
+                json!("TBC"),
+                json!("4.1.1"),
+                json!("TBC"),
+                json!("|"),
+                json!("+"),
+            ]],
+        };
+        let clean_file = || {
+            vec![
+                proj(),
+                tran(),
+                cat("UNIT", "UNIT_UNIT", "UNIT_DESC", &["yyyy-mm-dd"]),
+                cat("TYPE", "TYPE_TYPE", "TYPE_DESC", &["DT", "ID", "X"]),
+            ]
+        };
+        let clean = emit_ags4(&clean_file(), &strict);
+        assert!(
+            clean.is_ok(),
+            "a complete file passes Strict, err: {:?}",
+            clean.as_ref().err()
+        );
+
+        // The same file plus a duplicate-KEY LOCA (Rule 10a error) → Strict Err.
+        let mut with_dup = clean_file();
+        with_dup.push(GroupInput {
+            code: "LOCA".into(),
+            headings: vec!["LOCA_ID".into()],
+            units: None,
+            types: None,
+            rows: vec![vec![json!("BH01")], vec![json!("BH01")]],
+        });
+        let bad = emit_ags4(&with_dup, &strict);
+        assert!(
+            matches!(bad, Err(EmitError::Invalid(_))),
+            "error findings ⇒ Strict Err (was_ok={})",
+            bad.is_ok()
+        );
+    }
+
+    #[test]
+    fn explicit_unit_override_wins_but_a_blank_one_falls_back_to_the_dict() {
+        // LOCA_GL carries UNIT "m" in the dict. An explicit non-blank UNIT
+        // override must WIN; a blank ("") override must FALL BACK to the dict —
+        // pinning the `Some(s) if !s.trim().is_empty()` guard both ways.
+        let base = |units: Option<Vec<String>>| GroupInput {
+            code: "LOCA".into(),
+            headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
+            units,
+            types: None,
+            rows: vec![vec![json!("BH01"), json!(12.3)]],
+        };
+        let opts = EmitOpts {
+            mode: EmitMode::Report,
+            ..Default::default()
+        };
+        let win = emit_ags4(
+            &[proj(), base(Some(vec![String::new(), "furlong".into()]))],
+            &opts,
+        )
+        .unwrap();
+        let tw = String::from_utf8(win.bytes).unwrap();
+        assert!(
+            tw.contains("\"UNIT\",\"\",\"furlong\""),
+            "explicit override wins, got:\n{tw}"
+        );
+        let fallback = emit_ags4(
+            &[proj(), base(Some(vec![String::new(), String::new()]))],
+            &opts,
+        )
+        .unwrap();
+        let tf = String::from_utf8(fallback.bytes).unwrap();
+        assert!(
+            tf.contains("\"UNIT\",\"\",\"m\""),
+            "blank override falls back to the dict, got:\n{tf}"
+        );
+    }
+
+    #[test]
+    fn report_mode_emits_a_dt_string_verbatim_not_through_ags4_str() {
+        // A DT-typed STRING with a `T00:00:00` tail: `ags4_str` would drop the
+        // midnight time, but format_cell's `Value::String` arm emits strings
+        // verbatim so the validity MODE owns canonicalisation. Report keeps it.
+        let loca = GroupInput {
+            code: "LOCA".into(),
+            headings: vec!["LOCA_ID".into(), "LOCA_STAR".into()], // LOCA_STAR is DT
+            units: None,
+            types: None,
+            rows: vec![vec![json!("BH01"), json!("2023-02-22T00:00:00")]],
+        };
+        let r = emit_ags4(
+            &[proj(), loca],
+            &EmitOpts {
+                mode: EmitMode::Report,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let t = String::from_utf8(r.bytes).unwrap();
+        assert!(
+            t.contains("\"2023-02-22T00:00:00\""),
+            "DT string stays verbatim in Report, got:\n{t}"
+        );
+    }
+
+    #[test]
+    fn collect_units_gathers_unit_rows_and_pu_columns_only() {
+        // 379: only PU-typed columns contribute data-cell units (`== "PU"`).
+        // 382: blank PU cells are skipped (`!v.is_empty()`).
+        let g = OwnedGroup {
+            code: "X".into(),
+            headings: vec!["A".into(), "B".into()],
+            units: vec!["m".into(), "UNIT".into()], // "m" kept; literal "UNIT" excluded
+            types: vec!["PU".into(), "X".into()],   // col A is PU, col B is not
+            rows: vec![
+                vec!["kPa".into(), "notpu".into()], // kPa from the PU col; B ignored
+                vec![String::new(), "blankpu".into()], // blank PU cell skipped
+            ],
+        };
+        let units = collect_units(std::iter::once(&g));
+        assert!(units.contains("m"), "UNIT-row value: {units:?}");
+        assert!(units.contains("kPa"), "PU-column value: {units:?}");
+        assert!(
+            !units.contains("notpu"),
+            "non-PU column must not contribute: {units:?}"
+        );
+        assert!(
+            !units.contains(""),
+            "blank PU cell must be skipped: {units:?}"
+        );
+        assert!(
+            !units.contains("UNIT"),
+            "the literal UNIT header excluded: {units:?}"
+        );
+    }
+
+    #[test]
+    fn collect_types_excludes_blanks_and_the_literal_type() {
+        // 400: `!t.is_empty() && t != "TYPE"` — a blank or the literal "TYPE"
+        // is dropped; flipping `&&` to `||` would admit them.
+        let g = OwnedGroup {
+            code: "X".into(),
+            headings: vec!["A".into(), "B".into(), "C".into()],
+            units: vec![String::new(), String::new(), String::new()],
+            types: vec!["ID".into(), String::new(), "TYPE".into()],
+            rows: vec![],
+        };
+        let types: Vec<String> = collect_types(std::iter::once(&g)).into_iter().collect();
+        assert_eq!(types, vec!["ID".to_string()], "only the real type survives");
+    }
+
+    #[test]
+    fn concatenator_reads_tran_rcon_else_defaults_to_plus() {
+        // No TRAN group → the AGS standard "+".
+        let loca = OwnedGroup {
+            code: "LOCA".into(),
+            headings: vec![],
+            units: vec![],
+            types: vec![],
+            rows: vec![],
+        };
+        assert_eq!(concatenator(&[loca]), "+");
+        // A TRAN group with an explicit non-blank TRAN_RCON wins — pins the
+        // code=="TRAN" (464), heading=="TRAN_RCON" (465), non-blank (468) and
+        // whole-return (463) all at once.
+        let tran = OwnedGroup {
+            code: "TRAN".into(),
+            headings: vec!["TRAN_DLIM".into(), "TRAN_RCON".into()],
+            units: vec![String::new(), String::new()],
+            types: vec!["X".into(), "X".into()],
+            rows: vec![vec!["|".into(), "~".into()]],
+        };
+        assert_eq!(concatenator(&[tran]), "~", "explicit TRAN_RCON wins");
+    }
 }

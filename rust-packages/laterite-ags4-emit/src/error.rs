@@ -53,3 +53,30 @@ impl fmt::Display for EmitError {
 }
 
 impl std::error::Error for EmitError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Each variant renders a specific, non-empty message — a whole-`fmt`
+    /// replacement (`Ok(default())` = empty string) must fail every assertion.
+    #[test]
+    fn display_is_specific_per_variant() {
+        assert!(
+            EmitError::Write("disk full".into())
+                .to_string()
+                .contains("write failed")
+        );
+        assert!(
+            EmitError::Reparse("bad utf8".into())
+                .to_string()
+                .contains("re-parse")
+        );
+        let nl = EmitError::EmbeddedNewline {
+            tag: "DATA".into(),
+            field: 2,
+        }
+        .to_string();
+        assert!(nl.contains("Rule 6") && nl.contains("field 2"), "got: {nl}");
+    }
+}

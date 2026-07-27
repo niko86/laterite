@@ -340,4 +340,51 @@ mod tests {
         let text = String::from_utf8(buf).unwrap();
         assert!(text.contains("\"line one \t line two\""), "got: {text}");
     }
+
+    /// `write_ags4` puts ONE blank line BETWEEN groups (the `i > 0` guard) and
+    /// none before the first — a single-group test can't see either edge.
+    #[test]
+    fn write_ags4_separates_groups_with_a_blank_line_and_no_leading_one() {
+        let groups = vec![
+            EmitGroup {
+                code: "PROJ",
+                headings: vec!["PROJ_ID"],
+                units: vec![""],
+                types: vec!["ID"],
+                rows: vec![vec!["P1".into()]],
+            },
+            EmitGroup {
+                code: "LOCA",
+                headings: vec!["LOCA_ID"],
+                units: vec![""],
+                types: vec!["ID"],
+                rows: vec![vec!["BH01".into()]],
+            },
+        ];
+        let mut buf = Vec::new();
+        write_ags4(&mut buf, &groups).unwrap();
+        let s = String::from_utf8(buf).unwrap();
+        assert!(
+            s.contains("\"DATA\",\"P1\"\r\n\r\n\"GROUP\",\"LOCA\""),
+            "one blank line BETWEEN groups: {s:?}"
+        );
+        assert!(
+            s.starts_with("\"GROUP\",\"PROJ\""),
+            "no leading blank: {s:?}"
+        );
+    }
+
+    /// The matrix writer's `i > 0` guard likewise emits no blank BEFORE the
+    /// first group — the existing shape tests check the between/trailing blanks
+    /// but not the leading edge, so `> 0 → >= 0` slipped through.
+    #[test]
+    fn write_ags4_matrix_has_no_leading_blank_before_the_first_group() {
+        let mut out = Vec::new();
+        write_ags4_matrix(&mut out, &matrix_two_groups(), false).unwrap();
+        let s = String::from_utf8(out).unwrap();
+        assert!(
+            s.starts_with("\"GROUP\",\"PROJ\""),
+            "must not start with a blank line: {s:?}"
+        );
+    }
 }
