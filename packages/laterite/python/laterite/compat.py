@@ -363,7 +363,9 @@ def AGS4_to_dataframe(
     headings: dict[str, list[str]] = {}
     for code in p["group_order"]:
         g = groups.get(code)
-        if g is None:
+        if (
+            g is None
+        ):  # pragma: no cover - group_order ⊆ groups (native-parse invariant)
             continue
         headings[code] = [
             "HEADING",
@@ -698,7 +700,10 @@ def convert_to_text(dataframe: Any, dictionary: str | None = None) -> Any:
             return ""
         try:
             x = float(v)
-        except (TypeError, ValueError):
+        except (
+            TypeError,
+            ValueError,
+        ):  # pragma: no cover - fmt runs only on numeric-dtype cols, where float() can't fail
             return str(v)
         if "DP" in t:
             return f"{x:.{int(t.strip('DP') or 0)}f}"
@@ -976,7 +981,10 @@ def AGS4_to_excel(
             str(output_file),
             ordered_keys,
         )
-    except RuntimeError as exc:
+    # The native binding raises Ags4Error (== AGS4Error) directly on invalid input,
+    # so this arm catches only *other* RuntimeErrors; the no-data translation is
+    # unreachable on the current binding but kept as a guard against binding drift.
+    except RuntimeError as exc:  # pragma: no cover
         if "No valid AGS4 data" in str(exc):
             raise AGS4Error(str(exc)) from exc
         raise
@@ -1024,8 +1032,11 @@ def excel_to_AGS4(
             bool(format_numeric_columns),
         )
     except RuntimeError as exc:
+        # A no-data XLSX surfaces as Ags4Error (== AGS4Error) directly from the
+        # binding, so this translation is unreachable; a genuine open/parse
+        # RuntimeError (e.g. "Cannot detect file format") falls through to re-raise.
         if "No valid AGS4 data" in str(exc):
-            raise AGS4Error(str(exc)) from exc
+            raise AGS4Error(str(exc)) from exc  # pragma: no cover
         raise
 
     if dictionary is not None:
