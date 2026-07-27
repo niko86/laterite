@@ -21,6 +21,9 @@ for the switch:
 Modes:
   gen_changelog.py                 regenerate CHANGELOG.md from changelog.json
   gen_changelog.py --check         exit 1 if CHANGELOG.md is stale (CI drift gate)
+  gen_changelog.py --advise        read [Unreleased] and recommend the next bump
+                                   (the fix backlog IS `unreleased.fixed`, so this
+                                   flags when accumulated fixes warrant a patch cut)
   gen_changelog.py --release X [--date YYYY-MM-DD]
                                    roll `unreleased` into a new [X] release in
                                    changelog.json, then regenerate. Replaces the
@@ -203,9 +206,89 @@ def _write(data: dict) -> None:
     print(f"gen_changelog: wrote {MD_PATH.relative_to(ROOT)}")
 
 
+# Categories whose only presence still means "bug-fix release" — a patch, per
+# SemVer. Anything in `added` (a feature) or a **Breaking:** marker escalates it.
+_PATCH_ONLY = {"fixed", "security"}
+_BREAKING = re.compile(r"\bbreaking\b", re.IGNORECASE)
+
+
+def _breaking_count(block: dict) -> int:
+    """How many entries carry a **Breaking:** marker (KaC house style)."""
+    n = 0
+    for cat in CATEGORIES:
+        for e in block.get(cat) or []:
+            if _BREAKING.search(e.get("text", "")):
+                n += 1
+    return n
+
+
+def _bump(base: str, part: str) -> str:
+    """Increment a clean `X.Y.Z`. Pre-1.0, a breaking change is a MINOR (this
+    project's practice — the 0.6.0 typed-graph move was a minor), so `major` is
+    only reachable once the project is >= 1.0.0."""
+    major, minor, patch = (int(x) for x in base.split("."))
+    if part == "major":
+        return f"{major + 1}.0.0"
+    if part == "minor":
+        return f"{major}.{minor + 1}.0"
+    return f"{major}.{minor}.{patch + 1}"
+
+
+def do_advise(data: dict) -> None:
+    """Read `unreleased` and recommend the next bump. The fix backlog is exactly
+    `unreleased.fixed` — no second register to drift — so this is where an
+    accumulation of fixes surfaces as 'time for a patch'."""
+    unreleased = data.get("unreleased", {})
+    counts = {c: len(unreleased.get(c) or []) for c in CATEGORIES}
+    breaking = _breaking_count(unreleased)
+    current = data["releases"][0]["version"] if data.get("releases") else "0.0.0"
+
+    print(f"gen_changelog: release advisor (current shipped: {current})")
+    populated = [(c, n) for c, n in counts.items() if n]
+    if not populated:
+        print("  [Unreleased] is empty — nothing to release.")
+        return
+    print("  [Unreleased] holds:")
+    for c, n in populated:
+        tag = (
+            f"  ({breaking} breaking)"
+            if c in ("changed", "removed") and breaking
+            else ""
+        )
+        print(f"    {c:<10} {n}{tag}")
+
+    has_feature = counts["added"] > 0
+    if has_feature or breaking:
+        part = "major" if breaking and not current.startswith("0.") else "minor"
+        why = []
+        if has_feature:
+            why.append("new features (added)")
+        if breaking:
+            why.append("a breaking change")
+        reason = " and ".join(why)
+        print(f"\n  Recommended bump: {part.upper()} → {_bump(current, part)}")
+        print(f"    Why: [Unreleased] carries {reason} — a {part}, not a patch.")
+        if counts["fixed"] or counts["security"]:
+            ship = counts["fixed"] + counts["security"]
+            print(f"    The {ship} queued fix(es)/security item(s) ship with it.")
+    else:
+        fixes = counts["fixed"] + counts["security"]
+        print(f"\n  Recommended bump: PATCH → {_bump(current, 'patch')}")
+        print("    Why: only bug fixes / non-breaking changes are queued.")
+        if fixes:
+            print(
+                f"    → {fixes} fix(es)/security item(s) are ready — cut a patch to ship them."
+            )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description="Generate CHANGELOG.md from changelog.json"
+    )
+    ap.add_argument(
+        "--advise",
+        action="store_true",
+        help="recommend the next SemVer bump from [Unreleased] (fix-backlog signal)",
     )
     ap.add_argument(
         "--check", action="store_true", help="fail if CHANGELOG.md is stale (CI gate)"
@@ -230,6 +313,10 @@ def main() -> None:
         for h in hits:
             print(f"  {h}", file=sys.stderr)
         sys.exit(2)
+
+    if args.advise:
+        do_advise(data)
+        return
 
     if args.release:
         do_release(args.release, args.date)
