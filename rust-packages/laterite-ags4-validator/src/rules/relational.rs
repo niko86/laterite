@@ -665,6 +665,28 @@ mod tests {
         \"DATA\",\"BH1\",\"10.00\",\"T1\",\"1\",\"\"\r\n";
 
     #[test]
+    fn fields_with_status_dedups_a_std_heading_redeclared_in_file_dict() {
+        // A file DICT overlay re-declares the standard KEY heading LOCA_ID with
+        // the SAME status, so it appears in BOTH passes of fields_with_status
+        // (standard headings first, then the file_hdng overlay). The dedup guard
+        // must return it exactly once — a flipped guard double-pushes it, which
+        // would corrupt the KEY tuple the relational rules build from this.
+        let src = "\"GROUP\",\"DICT\"\r\n\
+            \"HEADING\",\"DICT_TYPE\",\"DICT_GRP\",\"DICT_HDNG\",\"DICT_STAT\",\"DICT_PGRP\"\r\n\
+            \"UNIT\",\"\",\"\",\"\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\",\"X\",\"X\",\"X\"\r\n\
+            \"DATA\",\"HEADING\",\"LOCA\",\"LOCA_ID\",\"KEY\",\"\"\r\n";
+        let parsed = parse_str(src).expect("fixture parses");
+        let dict = Dictionary::bundled(DictVersion::V4_2);
+        let eff = EffectiveDict::build(&parsed, dict);
+        let keys = eff.fields_with_status("LOCA", "KEY");
+        assert_eq!(
+            keys.iter().filter(|h| h.as_str() == "LOCA_ID").count(),
+            1,
+            "LOCA_ID must appear once, not duplicated: {keys:?}"
+        );
+    }
+
+    #[test]
     fn rule_10c_pmtl_parent_is_edition_dependent() {
         // #222 / O-42: the parent PMTL is checked against differs by edition.
         let pmtl_orphans = |v| {
