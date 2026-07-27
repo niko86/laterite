@@ -301,4 +301,27 @@ mod tests {
             "valid borrowed-heading shape flagged: {f:?}"
         );
     }
+
+    /// The naming findings must carry their Location: Rule 19 targets the GROUP;
+    /// 19a/19b target the HEADING and name it + its column index.
+    #[test]
+    fn naming_findings_carry_locations() {
+        let g = run("\"GROUP\",\"TOOLONG\"\r\n\"HEADING\",\"TOOL_X\"\r\n\
+                     \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"v\"\r\n");
+        assert_eq!(g.get(RULE_19).unwrap()[0].location.target, Target::Group);
+
+        let a = run("\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_TOOLONGNAME\"\r\n\
+                     \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"a\"\r\n");
+        let la = &a.get(RULE_19A).unwrap()[0].location;
+        assert_eq!(la.target, Target::Heading);
+        assert_eq!(la.field_index, Some(0));
+        assert_eq!(la.heading.as_deref(), Some("PROJ_TOOLONGNAME"));
+
+        let b = run("\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"NOUS\"\r\n\
+                     \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"v\"\r\n");
+        let lb = &b.get(RULE_19B).unwrap()[0].location;
+        assert_eq!(lb.target, Target::Heading);
+        assert_eq!(lb.field_index, Some(0));
+        assert_eq!(lb.heading.as_deref(), Some("NOUS"));
+    }
 }

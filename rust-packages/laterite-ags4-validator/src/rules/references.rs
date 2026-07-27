@@ -353,6 +353,40 @@ mod tests {
         assert!(!run(ok).contains_key(RULE_20), "{:?}", run(ok));
     }
 
+    /// Reference findings must carry their Location: Rule 19b (unknown prefix)
+    /// targets the HEADING; Rule 20 (undefined `FILE_FSET`) targets the CELL with
+    /// its column, heading name, and 1-based row.
+    #[test]
+    fn reference_findings_carry_locations() {
+        let r = run(
+            "\"GROUP\",\"SAMP\"\r\n\"HEADING\",\"SAMP_ID\",\"ZZZZ_FOO\"\r\n\
+                     \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\"DATA\",\"S1\",\"x\"\r\n",
+        );
+        let f19b = r
+            .get(RULE_19B)
+            .unwrap()
+            .iter()
+            .find(|x| x.desc.contains("could not be"))
+            .expect("19b_2 fired");
+        assert_eq!(f19b.location.target, Target::Heading);
+        assert_eq!(f19b.location.field_index, Some(1));
+        assert_eq!(f19b.location.heading.as_deref(), Some("ZZZZ_FOO"));
+
+        let bad = run(
+            "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"FILE_FSET\"\r\n\
+                       \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\
+                       \"DATA\",\"BH1\",\"FS9\"\r\n\r\n\
+                       \"GROUP\",\"FILE\"\r\n\"HEADING\",\"FILE_FSET\",\"FILE_NAME\"\r\n\
+                       \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\
+                       \"DATA\",\"FS1\",\"photo.jpg\"\r\n",
+        );
+        let f20 = &bad.get(RULE_20).expect("rule 20")[0];
+        assert_eq!(f20.location.target, Target::Cell);
+        assert_eq!(f20.location.field_index, Some(1));
+        assert_eq!(f20.location.heading.as_deref(), Some("FILE_FSET"));
+        assert_eq!(f20.location.data_row, Some(1));
+    }
+
     #[test]
     fn unknown_prefix_also_emits_19b_3_when_heading_orphaned() {
         // ZZZZ_FOO: prefix ZZZZ names no group (19b_2) AND ZZZZ_FOO is

@@ -894,6 +894,135 @@ mod tests {
         );
     }
 
+    // ---- mutation-sweep additions: finding LOCATIONS + fetch_count bounds ----
+    //
+    // The existing tests assert a finding *fired* and its message; these pin the
+    // Location it carries (target / heading / field_index / 1-based data_row) and
+    // the exact fetch_count guards — the coordinates every surface renders.
+
+    /// Rule 10a: a missing KEY points at the HEADING row naming the field; a
+    /// duplicate KEY points at the offending 1-based data row.
+    #[test]
+    fn rule_10a_finding_locations() {
+        let dup = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"LOCA_FDEP\"\r\n\
+                   \"UNIT\",\"\",\"m\"\r\n\"TYPE\",\"ID\",\"2DP\"\r\n\
+                   \"DATA\",\"BH1\",\"1.00\"\r\n\"DATA\",\"BH1\",\"2.00\"\r\n";
+        let r = run(dup);
+        let dupf = r
+            .get(RULE_10A)
+            .unwrap()
+            .iter()
+            .find(|x| x.desc.contains("Duplicate") && x.location.data_row == Some(2))
+            .expect("2nd duplicate row flagged at data_row 2");
+        assert_eq!(dupf.location.target, Target::Cell);
+
+        let miss = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_FDEP\"\r\n\
+                    \"UNIT\",\"m\"\r\n\"TYPE\",\"2DP\"\r\n\"DATA\",\"1.00\"\r\n";
+        let missf = run(miss)
+            .get(RULE_10A)
+            .unwrap()
+            .iter()
+            .find(|x| x.desc.contains("not present"))
+            .cloned()
+            .expect("missing KEY flagged");
+        assert_eq!(missf.location.target, Target::Heading);
+        assert_eq!(missf.location.heading.as_deref(), Some("LOCA_ID"));
+    }
+
+    /// Rule 10b: a missing REQUIRED field is flagged at the HEADING row (naming
+    /// it — the present-check must actually compare names); an empty REQUIRED
+    /// cell is flagged at its 1-based data row.
+    #[test]
+    fn rule_10b_finding_locations() {
+        let miss = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_NAME\"\r\n\
+                    \"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"Site\"\r\n";
+        let missf = run(miss)
+            .get(RULE_10B)
+            .expect("missing REQUIRED fires")
+            .iter()
+            .find(|x| x.desc.contains("PROJ_ID") && x.desc.contains("not present"))
+            .cloned()
+            .expect("PROJ_ID missing flagged");
+        assert_eq!(missf.location.target, Target::Heading);
+        assert_eq!(missf.location.heading.as_deref(), Some("PROJ_ID"));
+
+        let empty = "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\",\"PROJ_NAME\"\r\n\
+                     \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"X\"\r\n\"DATA\",\"\",\"Site\"\r\n";
+        let r = run(empty);
+        let emptyf = &r.get(RULE_10B).expect("empty REQUIRED fires")[0];
+        assert_eq!(emptyf.location.target, Target::Cell);
+        assert_eq!(emptyf.location.data_row, Some(1));
+    }
+
+    /// Rule 10c orphan finding points at the offending child row (1-based).
+    #[test]
+    fn rule_10c_orphan_finding_location() {
+        let src = "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH1\"\r\n\r\n\
+                   \"GROUP\",\"SAMP\"\r\n\
+                   \"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\",\"SAMP_TYPE\",\"SAMP_ID\"\r\n\
+                   \"UNIT\",\"\",\"m\",\"\",\"\",\"\"\r\n\
+                   \"TYPE\",\"ID\",\"2DP\",\"X\",\"PA\",\"ID\"\r\n\
+                   \"DATA\",\"BH1\",\"1.00\",\"S1\",\"B\",\"BH1S1\"\r\n\
+                   \"DATA\",\"BH9\",\"2.00\",\"S2\",\"B\",\"BH9S2\"\r\n";
+        let orphan = run(src)
+            .get(RULE_10C)
+            .expect("orphan fires")
+            .iter()
+            .find(|x| x.desc.contains("BH9"))
+            .cloned()
+            .expect("BH9 orphan");
+        assert_eq!(orphan.location.target, Target::Cell);
+        assert_eq!(orphan.location.data_row, Some(2)); // BH9 is SAMP's 2nd row
+    }
+
+    /// Rule 11c: a bad record link points at the RL cell (column index + 1-based
+    /// row); a link resolving to EXACTLY one record is not flagged.
+    #[test]
+    fn rule_11c_finding_location_and_valid_link_passes() {
+        let bad = "\"GROUP\",\"TRAN\"\r\n\
+                   \"HEADING\",\"TRAN_DLIM\",\"TRAN_RCON\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\"DATA\",\"|\",\"+\"\r\n\r\n\
+                   \"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+                   \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH1\"\r\n\r\n\
+                   \"GROUP\",\"SAMP\"\r\n\"HEADING\",\"LOCA_ID\",\"SAMP_LINK\"\r\n\
+                   \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"RL\"\r\n\
+                   \"DATA\",\"BH1\",\"LOCA|BH404\"\r\n";
+        let rbad = run(bad);
+        let f = &rbad.get(RULE_11C).expect("bad link fires")[0];
+        assert_eq!(f.location.target, Target::Cell);
+        assert_eq!(f.location.field_index, Some(1)); // SAMP_LINK is column 1
+        assert_eq!(f.location.data_row, Some(1)); // the only SAMP row
+
+        let good = "\"GROUP\",\"TRAN\"\r\n\
+                    \"HEADING\",\"TRAN_DLIM\",\"TRAN_RCON\"\r\n\
+                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"X\",\"X\"\r\n\"DATA\",\"|\",\"+\"\r\n\r\n\
+                    \"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\"\r\n\
+                    \"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"BH1\"\r\n\r\n\
+                    \"GROUP\",\"SAMP\"\r\n\"HEADING\",\"LOCA_ID\",\"SAMP_LINK\"\r\n\
+                    \"UNIT\",\"\",\"\"\r\n\"TYPE\",\"ID\",\"RL\"\r\n\
+                    \"DATA\",\"BH1\",\"LOCA|BH1\"\r\n";
+        assert!(
+            !run(good).contains_key(RULE_11C),
+            "a link matching exactly one record must not be flagged"
+        );
+    }
+
+    /// `fetch_count` guards: empty keys must NOT match every row, and fewer keys
+    /// than columns is the normal (matching) case.
+    #[test]
+    fn fetch_count_key_guards() {
+        let pf = parse_str(
+            "\"GROUP\",\"LOCA\"\r\n\"HEADING\",\"LOCA_ID\",\"LOCA_FDEP\"\r\n\
+             \"UNIT\",\"\",\"m\"\r\n\"TYPE\",\"ID\",\"2DP\"\r\n\
+             \"DATA\",\"BH1\",\"1.00\"\r\n\"DATA\",\"BH2\",\"2.00\"\r\n",
+        )
+        .unwrap();
+        assert_eq!(fetch_count(&pf, &["LOCA"]), 0); // no keys → not "all rows"
+        assert_eq!(fetch_count(&pf, &["LOCA", "BH1"]), 1); // fewer keys than cols
+        assert_eq!(fetch_count(&pf, &["NOPE", "x"]), 0); // unknown group
+    }
+
     #[test]
     fn rule_11_silent_when_tran_has_no_data_row() {
         // TRAN group with the delimiter headings but zero DATA rows →

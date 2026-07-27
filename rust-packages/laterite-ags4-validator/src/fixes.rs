@@ -1583,6 +1583,9 @@ mod tests {
         assert!(row_is_clean("DATA,unquoted,fields"));
         assert!(!row_is_clean("\"DATA\",\"a\"b\"")); // stray after closing quote
         assert!(!row_is_clean("\"DATA\",\"BH01")); // unterminated quote
+        // An unquoted field must still be scanned to its comma and the REST of
+        // the row validated — a malformed tail after it is not clean.
+        assert!(!row_is_clean("AB,\"CD")); // unquoted field, then an unterminated quote
     }
 
     #[test]

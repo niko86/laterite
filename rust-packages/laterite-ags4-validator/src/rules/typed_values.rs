@@ -825,6 +825,130 @@ mod tests {
             \"DATA\",\"P2\",\"\"\r\n";
         assert!(run(src).is_empty());
     }
+
+    // ---- mutation-sweep additions: routing, finding location, and the
+    //      exact operator boundaries the proptest suite never lands on ----
+
+    fn grp(ty: &str, unit: &str, vals: &[&str]) -> String {
+        use std::fmt::Write as _;
+        let mut s = format!(
+            "\"GROUP\",\"TEST\"\n\"HEADING\",\"TEST_VAL\"\n\"UNIT\",\"{unit}\"\n\"TYPE\",\"{ty}\"\n"
+        );
+        for v in vals {
+            writeln!(s, "\"DATA\",\"{v}\"").unwrap();
+        }
+        s
+    }
+
+    /// Each TYPE code must route to ITS checker (the `classify` arm) and flag
+    /// only bad values (the `!` in `check`). A deleted arm skips the column, so
+    /// a bad value goes unflagged; a deleted `!` flags a good value.
+    #[test]
+    fn each_type_routes_to_its_checker_and_flags_only_bad_values() {
+        assert!(!run(&grp("YN", "", &["Y", "N", "y", "n"])).contains_key(RULE_8));
+        assert!(run(&grp("YN", "", &["Maybe"])).contains_key(RULE_8));
+        assert!(!run(&grp("DMS", "", &["12:34:56"])).contains_key(RULE_8));
+        assert!(run(&grp("DMS", "", &["12:99:00"])).contains_key(RULE_8));
+        assert!(!run(&grp("T", "hh:mm", &["100:30"])).contains_key(RULE_8));
+        assert!(run(&grp("T", "hh:mm", &["1:99"])).contains_key(RULE_8));
+        assert!(!run(&grp("U", "", &["1.5"])).contains_key(RULE_8));
+        assert!(run(&grp("U", "", &["abc"])).contains_key(RULE_8));
+    }
+
+    /// A Rule 8 finding must point at the right heading and 1-based row, and
+    /// carry the UNIT hint for DT/T types (and only when the UNIT is non-empty).
+    #[test]
+    fn rule_8_finding_location_and_unit_hint() {
+        // bad DT on the SECOND data row (ri=1 → data_row 2), non-empty UNIT.
+        let f = run(&grp("DT", "yyyy-mm-dd", &["2020-01-01", "2020-13-01"]));
+        let finding = &f.get(RULE_8).expect("rule 8 fired")[0];
+        assert_eq!(finding.location.heading.as_deref(), Some("TEST_VAL"));
+        assert_eq!(finding.location.data_row, Some(2));
+        assert!(
+            finding.desc.contains("/ UNIT \"yyyy-mm-dd\""),
+            "{}",
+            finding.desc
+        );
+        // empty UNIT on a DT still fires (O-31) but carries NO unit hint.
+        let f = run(&grp("DT", "", &["2020-01-01"]));
+        let finding = &f.get(RULE_8).expect("empty-unit DT fires")[0];
+        assert!(!finding.desc.contains("/ UNIT"), "{}", finding.desc);
+    }
+
+    /// A duplicate-ID finding carries the Cell target, the column index, and the
+    /// 1-based row.
+    #[test]
+    fn duplicate_id_finding_location() {
+        let src = "\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\"\n\"UNIT\",\"\"\n\"TYPE\",\"ID\"\n\"DATA\",\"BH1\"\n\"DATA\",\"BH1\"\n";
+        let v = run(src);
+        let r8 = v.get(RULE_8).expect("dup id fires");
+        let second = r8
+            .iter()
+            .find(|x| x.location.data_row == Some(2))
+            .expect("row 2 flagged");
+        assert_eq!(second.location.target, Target::Cell);
+        assert_eq!(second.location.field_index, Some(0));
+    }
+
+    #[test]
+    fn is_nsci_boundaries() {
+        assert!(is_nsci("1.5e2", 1));
+        assert!(!is_nsci("a.5e2", 1)); // non-digit lead with '.' at [1]
+        assert!(!is_nsci("1.5000", 1)); // no exponent marker
+        assert!(!is_nsci("1.5e+", 1)); // exponent sign but no digits
+    }
+
+    #[test]
+    fn is_dms_rejects_nondigit_degrees() {
+        assert!(is_dms("12:34:56"));
+        assert!(!is_dms("1a:05:09")); // degrees non-digit
+    }
+
+    #[test]
+    fn is_elapsed_time_boundaries() {
+        assert!(is_elapsed_time("12:30", "hh:mm"));
+        assert!(!is_elapsed_time("ab:30", "hh:mm")); // hh non-digit
+        assert!(!is_elapsed_time("12:99", "hh:mm")); // mm out of range
+        assert!(is_elapsed_time("05:09", "mm:ss")); // its own arm
+        assert!(!is_elapsed_time("99:30", "mm:ss")); // first field out of range
+        assert!(!is_elapsed_time("05:99", "mm:ss")); // second field out of range
+        assert!(is_elapsed_time("1:02:03", "hh:mm:ss"));
+        assert!(!is_elapsed_time(":02:03", "hh:mm:ss")); // empty hours
+        assert!(!is_elapsed_time("1:99:03", "hh:mm:ss")); // mm out
+        assert!(!is_elapsed_time("1:02:99", "hh:mm:ss")); // ss out
+    }
+
+    #[test]
+    fn structural_dt_tz_sign() {
+        // A `+` UNIT char accepts `+` or `-` in the value, and nothing else.
+        assert!(structural_dt_match("12+05", "hh+hh"));
+        assert!(structural_dt_match("12-05", "hh+hh"));
+        assert!(!structural_dt_match("12x05", "hh+hh"));
+    }
+
+    #[test]
+    fn lex_two_digit_year_pivot() {
+        // yy < 70 → 20yy; yy >= 70 → 19yy (python pd.to_datetime convention).
+        assert_eq!(lex_unit_value("yy", "70").unwrap().year, Some(1970));
+        assert_eq!(lex_unit_value("yy", "69").unwrap().year, Some(2069));
+    }
+
+    #[test]
+    fn lex_tz_sign_accepts_plus_and_minus() {
+        assert!(lex_unit_value("hh+", "12+").is_some());
+        assert!(lex_unit_value("hh+", "12-").is_some());
+        assert!(lex_unit_value("hh+", "12x").is_none());
+    }
+
+    #[test]
+    fn dt_semantic_time_bounds() {
+        assert!(dt_semantic_ok("23:00", "hh:mm")); // hour 23 boundary ok
+        assert!(!dt_semantic_ok("24:00", "hh:mm")); // hour 24 rejected
+        assert!(dt_semantic_ok("00:59", "hh:mm")); // minute 59 ok
+        assert!(!dt_semantic_ok("00:60", "hh:mm")); // minute 60 rejected
+        assert!(dt_semantic_ok("00:00:60", "hh:mm:ss")); // leap second ok
+        assert!(!dt_semantic_ok("00:00:61", "hh:mm:ss")); // second 61 rejected
+    }
 }
 
 /// Property-based tests for the Rule 8 typed-value helpers.
