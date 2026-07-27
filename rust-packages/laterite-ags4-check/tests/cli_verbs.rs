@@ -8,6 +8,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde_json::Value;
 
@@ -20,7 +21,16 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 fn scratch() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("lat_verbs_{}", std::process::id()));
+    // A fresh dir per call. Tests run in parallel threads of ONE process, so a
+    // pid-only dir would let two tests collide on a shared filename (e.g. two
+    // `clean.ags`) — one test's `fs::copy` truncating the file mid-read of
+    // another. The counter isolates every scratch to its own caller.
+    static N: AtomicUsize = AtomicUsize::new(0);
+    let dir = std::env::temp_dir().join(format!(
+        "lat_verbs_{}_{}",
+        std::process::id(),
+        N.fetch_add(1, Ordering::Relaxed)
+    ));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }
