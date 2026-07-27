@@ -31,7 +31,7 @@ The doctrine this repo tests by: **prove invariants across the input domain, not
 The three test layers, by what only they can reach:
 - **Rust engine properties** (`proptest`) — hammer the fix/parse/emit internals (cell-preservation, the ASCII fold over the whole `char` domain, bounded fixpoint) directly, with no host in the way.
 - **Python API properties** (`hypothesis`) — the *public fluent-API* surface across encodings the engine tests can't see (the `read().fix().validate()` chain, `None`-vs-explicit encoding, the DuckDB frame doors).
-- **Cross-surface value gates** — pin that node/py/wasm/CLI agree on *values* (accepted edition strings, the error-kind→exit-code table, severity tokens), not just param *shapes* (see [[modality-register]] for the I/O-form axis, [[parity-model]] for the finding-verdict axis). The narrowest instance of this class is **cross-modality**, not cross-surface: does `read(path)`/`read(text)`/`read(bytes)` on the *same* language return the *same* verdict for identical bytes, not just offer the same knobs — [[modality-register]] tri-states form presence but is silent on this; bug 4 below is why it now has its own gate. The *general* form of this layer landed as ags4-output-value-gate (#519–525): a committed (op × input) case manifest pushed through every surface **leg**, compared as OUTPUT VALUES with the in-process Rust leaf as an authority column (not a peer) — where the modality gate above pins one narrow axis (I/O form), this one pins the full door set the census enumerates.
+- **Cross-surface value gates** — pin that node/py/wasm/CLI agree on *values* (accepted edition strings, the error-kind→exit-code table, severity tokens), not just param *shapes* (see [[modality-register]] for the I/O-form axis, [[parity-model]] for the finding-verdict axis). The narrowest instance of this class is **cross-modality**, not cross-surface: does `read(path)`/`read(text)`/`read(bytes)` on the *same* language return the *same* verdict for identical bytes, not just offer the same knobs — [[modality-register]] tri-states form presence but is silent on this; bug 4 below is why it now has its own gate. The *general* form of this layer landed as ags4-output-value-gate: a committed (op × input) case manifest pushed through every surface **leg**, compared as OUTPUT VALUES with the in-process Rust leaf as an authority column (not a peer) — where the modality gate above pins one narrow axis (I/O form), this one pins the full door set the census enumerates.
 
 ## Why it matters — the post-mortem that motivated it
 
@@ -60,9 +60,57 @@ The lesson, stated once: **a "no exception" or "it runs" assertion is the weakes
 | CLI argument-declaration SSOT | `repo:rust-packages/laterite-ags4-check/src/commands/census.rs::census_knows_which_flags_take_a_value` | every launcher's own parser agrees, per verb, on which flags/positionals it accepts and whether each **eats the next token** — the census's own authority answer was wrong (`get_num_args()` vs the action) before this pinned it |
 | `--index` cert-skip output shape | `repo:packages/laterite/tests/test_cli_index.py` | a certified `validate()` reports `report.certified` and the *same* `--json` shape a full engine run does — not merely "it exits 0" (the property that caught the `--dict-version auto` sentinel silently disarming the skip). `certified` used to be a *value of* `resolution` (`"certified"` in place of `"exact"`), which conflated two questions — WHICH dictionary judged the file, and WHETHER the engine ran; [[cert-trust-v2]] split them |
 | modality output-value agreement | `repo:packages/laterite/tests/test_modality_output_parity.py`, `repo:rust-packages/laterite-node/test/modality-output-parity.test.ts` | `read(path)`, `read(text)`, and `read(bytes)` return the identical `dict_version`/`resolution`/`count`/`is_valid`/`exit_code`/finding-list for the same bytes, across three fixtures × three severity-tier combinations — the property that caught bug 4 (the O-42 guard reaching path but not bytes/text) |
-| 4-laterite finding-tuple floor | `repo:rust-packages/laterite-ags4-compliance/src/main.rs` | rust/python-laterite/node/wasm's finding FLOOR compared as full TUPLES (`rule`, `line`, `group`, `desc`, `field_index`) in a count-sensitive sorted multiset — not the deduplicated rule-LABEL set it compared before #555 part 1, which could not see two surfaces agreeing on *which* rules fired but disagreeing on *where*/*how many*/*what*; the python-ags4 leg stays label-based (`classify` is defined over labels, since python-ags4 emits only labels). First run: 83/83 fixtures identical, 403 tuples byte-matched across all four surfaces; a wasm `field_index` mutation with the label set unchanged now provably splits |
-| cross-surface output-value agreement | `repo:rust-packages/laterite-ags4-xcheck/src/bin/xcheck.rs` | 21 committed (op × input) cases across 8 legs (`rust-leaf`/`python`/`python-compat`/`node`/`wasm-engine`/`cli-native`/`cli-uvx`/`cli-npx`) agree on OUTPUT VALUES, with the in-process Rust leaf as an authority column (not a peer) plus an `emit_reparses` spec invariant and a declared cross-path equivalence check — the general form of the layer above; found and fixed npx's `lat fix` default-destination bug in the landing PR, and closed `lat read`'s CSV/JSON renderers from having no gate at all. #548 (2026-07-17) then deepened `fix_dest` itself, the leg behind that npx fix: it had only ever compared the repaired file's NAME (a proxy for the repair — drift #3), never its CONTENT, so a launcher whose repair diverged in the bytes while writing the same filename was invisible; the fix-repaired content pin (dev satellite) now pins the repaired bytes (CRLF preserved via `newline=""`) alongside the existing name+exit check, proven live by a content-only mutation on `cli-npx` the old observation could not have caught. See ags4-output-value-gate. |
-| xcheck verb-coverage ratchet (dev satellite) | driven against the public gate above | every `lat` verb (from the census SSOT) either has a case in the table above or is named in a shrink-only `_UNCOVERED` allowlist with a reason — a covered verb left in the allowlist fails, so a case forces its own entry's removal. #548's shape ("nothing asserts the gate's own coverage") caught inside the gate above: `lat rules` had zero cases and crashed on npx (#508) invisibly; now pinned covered. #555 part 2 then wrote the remaining deterministic verbs' cases (`diff`/`merge`/`pack`/`unpack` + validate's second `--ndjson` renderer), shrinking `_UNCOVERED` 8 → 4 — only the verbs proven non-deterministic or npx-absent (`certify`/`lock`/`unlock`/`excel`) remain, each with an empirically-grounded reason. |
+| 4-laterite finding-tuple floor | `repo:rust-packages/laterite-ags4-compliance/src/main.rs` | rust/python-laterite/node/wasm's finding FLOOR compared as full TUPLES (`rule`, `line`, `group`, `desc`, `field_index`) in a count-sensitive sorted multiset, not a deduplicated rule-LABEL set — so surfaces agreeing on *which* rules fired but disagreeing on *where*/*how many*/*what* is caught (a `field_index`-only divergence splits a tuple gate, is invisible to a label gate). The python-ags4 leg stays label-based (`classify` is defined over labels; python-ags4 emits only labels) |
+| cross-surface output-value agreement | `repo:rust-packages/laterite-ags4-xcheck/src/bin/xcheck.rs` | committed (op × input) cases across 8 legs (rust-leaf / python / python-compat / node / wasm-engine / cli-native / cli-uvx / cli-npx) agree on OUTPUT VALUES — with the in-process Rust leaf as an authority column (not a peer), plus an `emit_reparses` spec invariant and a cross-path equivalence check. The general form of the layer above; the `fix_dest` leg pins the repaired *bytes* (CRLF-preserving), not just the filename. See ags4-output-value-gate |
+| xcheck verb-coverage ratchet (dev satellite) | driven against the public gate above | every `lat` verb (from the census SSOT) either has a case in the gate above or sits in a shrink-only `_UNCOVERED` allowlist with a reason — a covered verb left in the allowlist fails, so adding a case forces its own removal. Stops the value gate from silently under-covering the verb set (only verbs proven non-deterministic or npx-absent — `certify`/`lock`/`unlock`/`excel` — stay uncovered) |
+
+## Test-quality ruleset (cross-language)
+
+The property catalog above is *this repo's* invariants, named after the files that
+hold them; below is the **portable** distillation — the answer to "does this work
+across languages?" is **the principles port, the enforcement doesn't.** The
+checklist (situation → strongest assertion) is language-independent; the tooling
+that enforces it is a per-language stack, because no linter scores "meaningful
+assertion" — the hard part, "is this assertion tautological *in its context*?", is
+semantic, not syntactic.
+
+**The checklist** — for each shape, the weak test to reject and the strongest
+property the contract can carry (the Definition's ladder, applied). The property
+catalog above is where this repo discharges each row:
+
+| Situation | Weak (reject) | Strongest the contract carries |
+|---|---|---|
+| pure function / codec | "runs without panic" | round-trip `f⁻¹(f(x)) == x` over a generated domain |
+| a fix / normaliser | "output differs" | idempotence *and* the named defect is gone on re-check |
+| an error path | "raises something" | the *specific* error / exit-code / message named |
+| multi-format render | "each format parses" | every format describes the *same* set |
+| a flag / option | "the flag parses" | the flag *changes the observable outcome* |
+| cross-surface / modality | "same knobs offered" | same *values* returned for identical input |
+| a redirect / tee | "the file exists" | written bytes == what stdout would carry |
+| a generated artifact | (none) | `committed == render(SSOT)` |
+
+**The enforcement ladder** — each rung catches only what the one below cannot, so
+the strong signal lives near the top:
+
+| Rung | Catches | Gameable? | Here |
+|---|---|---|---|
+| coverage | what *executed* | yes — a zero-assertion test scores 100% | llvm-cov / pytest-cov / vitest-v8, floored in CI |
+| smell linters | *syntactic* fluff (no-assert, `assert True`, skipped, conditional-in-test) | partly | ruff `PT`+`B` (Python), `@vitest/eslint-plugin`'s `expect-expect` (JS); Rust: convention only |
+| **mutation testing** | assertions that *cannot fail* — weak/missing, and coverage-blind | **no** | `cargo-mutants` (Rust), `mutmut`/`cosmic-ray` (Python), Stryker (JS) — run scoped, never per-commit |
+| human review | is this the *right* invariant | n/a | this doctrine + PR review |
+
+Only the bottom rung (coverage) and the top (review) are standing CI gates here;
+the middle two are the fit tooling for this stack but currently run **ad-hoc, not
+yet wired as gates**. Mutation testing is the automated form of the *manual*
+mutation checks this page already leans on.
+The transferable lesson: **coverage says the line ran; only a
+surviving mutant proves a bug in that line would have failed the suite** — the
+Definition's strength ladder made falsifiable. It earns its keep in practice: a
+`cargo-mutants` run on the `lat`-verb CLI tests survived a green-covered mutant
+where a flag's wiring executed but went unasserted — a gap the coverage number
+could not see, now closed. One durable gotcha: cargo-mutants mutates *source
+text* blind to `cfg`, so feature-gated code (`#[cfg(feature = "tui")]`) shows
+false survivors unless you build the feature in.
 
 ## Faithfulness gates (generated artifacts)
 

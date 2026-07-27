@@ -45,7 +45,7 @@ wasm-pack downloads rejects unless every feature is enabled.
 
 > [!important] The generated bindings are **gitignored** — regenerate on a
 > fresh clone. `wasm-pack` writes the JS glue, the `.d.ts`, and `_bg.wasm`
-> into `repo:web/src/wasm/`, which `.gitignore` excludes (the directory
+> into `web/src/wasm/`, which `.gitignore` excludes (the directory
 > also carries its own `*` ignore). They are **never committed, only
 > built** — so a fresh checkout has *no* bindings and `web/` won't
 > typecheck, build, or run until they're regenerated:
