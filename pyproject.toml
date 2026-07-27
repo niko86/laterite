@@ -189,6 +189,13 @@ extend-exclude = [
     "examples/output",
     "output",
     "rust-packages",
+    # ruff 0.16 began formatting Python fenced in Markdown, and it rewrites the
+    # mkdocs snippet directive `--8<-- "…"` into `--8 < --"…"` (parsing the
+    # include marker as Python operators), corrupting the docs. The snippets'
+    # SSOT is the `.py` under web/docs-site/examples/ (still ruff-formatted); the
+    # `.md` only `--8<--`-includes them, so ruff never needs to touch Markdown.
+    # This restores the pre-0.16 scope (`.py` only) under both ruff versions.
+    "*.md",
 ]
 
 [tool.ruff.lint]
