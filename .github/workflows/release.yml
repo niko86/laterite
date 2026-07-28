@@ -758,10 +758,32 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
+          dest=$(mktemp -d)
           for pkg in . npm/*/; do
             name=$(node -p "require('./$pkg/package.json').name")
-            if npm pack --dry-run --json --prefix "$pkg" 2>/dev/null \
-                 | node -e 'const d=JSON.parse(require("fs").readFileSync(0));process.exit(d[0].files.some(f=>f.path==="LICENSE")?0:1)'; then
+            # Pack for real and read the TARBALL, rather than parsing
+            # `npm pack --dry-run --json`. Parsing that JSON is what broke this
+            # guard on its first real run (it was added after 0.7.0, so 0.8.0 was
+            # the first release to execute it): the reader threw on the runner's
+            # npm and reported all four packages as missing the notice — while
+            # the staging step above reported success for every one of them.
+            # That disagreement is the tell that the CHECK was broken, not the
+            # packages. A tarball listing has no output schema to drift.
+            #
+            # `cd` into the package too: `npm pack --prefix "$pkg"` does NOT
+            # choose which package is packed (npm reads package.json from the
+            # CWD), so the old form silently inspected the ROOT package every
+            # time — it could only ever have passed all or failed all.
+            #
+            # stderr is deliberately NOT swallowed: it goes to the job log, so a
+            # check that cannot run says so instead of masquerading as a package
+            # that failed the check.
+            if ! tgz=$( cd "$pkg" && npm pack --pack-destination "$dest" | tail -1 ); then
+              echo "  FAIL $name — npm pack errored (the check could not run)"
+              fail=1
+              continue
+            fi
+            if tar -tzf "$dest/$tgz" | grep -qx 'package/LICENSE'; then
               echo "  ok   $name carries LICENSE"
             else
               echo "  FAIL $name would publish WITHOUT the ©AGS notice"
