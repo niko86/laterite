@@ -6,230 +6,182 @@
 
 A modern **AGS4 toolkit** for the [AGS4](https://www.ags.org.uk/data-format/)
 geotechnical data format: validate, read as born-typed data, query, build, fix,
-diff, certify, and convert ↔ Excel. One fast Rust engine drives it, surfaced
-natively for **Python, Node.js, the CLI, DuckDB and the browser**.
+diff, certify, and convert ↔ Excel.
+
+**One Rust engine, surfaced natively for Python, Node.js, the CLI, DuckDB and the
+browser** — the same rules, the same bytes, the same findings on every one.
 
 Files come back born-typed — a `2DP` heading is a float, a `DT` a datetime, an
 `ID` a string — so polars, SQL and the typed graph see real types, not text.
 
-The closest open-source tool is
-[`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library), and
-it's what inspired laterite. laterite takes that idea, rebuilds it on a Rust
-core for speed, and uses that core to bring AGS4 to more languages. Already on
-python-ags4? There's a drop-in — swap `from python_ags4 import AGS4` for
-`from laterite import compat as AGS4` and keep your code.
-
 [![ci](https://github.com/niko86/laterite/actions/workflows/ci.yml/badge.svg)](https://github.com/niko86/laterite/actions/workflows/ci.yml)
-[![rust cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=rust&label=rust%20cov)](https://codecov.io/gh/niko86/laterite)
-[![python cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=python&label=python%20cov)](https://codecov.io/gh/niko86/laterite)
-[![web cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=web&label=web%20cov)](https://codecov.io/gh/niko86/laterite)
-[![node cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=node&label=node%20cov)](https://codecov.io/gh/niko86/laterite)
 [![PyPI](https://img.shields.io/pypi/v/laterite.svg)](https://pypi.org/project/laterite/)
 [![npm](https://img.shields.io/npm/v/laterite.svg)](https://www.npmjs.com/package/laterite)
 [![DuckDB](https://img.shields.io/badge/DuckDB-laterite__ags4-FFF000?logo=duckdb&logoColor=black)](https://community-extensions.duckdb.org/extensions/laterite_ags4.html)
 [![Python versions](https://img.shields.io/pypi/pyversions/laterite.svg)](https://pypi.org/project/laterite/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![rust cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=rust&label=rust%20cov)](https://codecov.io/gh/niko86/laterite)
+[![python cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=python&label=python%20cov)](https://codecov.io/gh/niko86/laterite)
+[![node cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=node&label=node%20cov)](https://codecov.io/gh/niko86/laterite)
+[![web cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=web&label=web%20cov)](https://codecov.io/gh/niko86/laterite)
 
-📖 **[Full documentation](https://niko86.github.io/laterite/docs/)** · 🌐 **[Browser validator + data explorer](https://niko86.github.io/laterite/)**
+📖 **[Documentation](https://niko86.github.io/laterite/docs/)** · 🌐 **[Browser validator + data explorer](https://niko86.github.io/laterite/)** · 📓 **[Cookbook](https://niko86.github.io/laterite/docs/cookbook/)**
 
-## Part of the laterite suite
+## Pick your surface
 
-One Rust AGS4 engine, surfaced for every stack:
+Every surface is the same engine — no surface re-implements a rule, and
+scriptable output is byte-identical across them.
 
-| Surface | Package | Get it |
-|---|---|---|
-| **Python** | [`laterite`](https://pypi.org/project/laterite/) — PyPI | `pip install laterite` |
-| **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm | `npm install laterite` |
-| **Rust / CLI** | [`lat`](https://github.com/niko86/laterite/releases) | GitHub Releases |
-| **DuckDB** | [`laterite_ags4`](https://community-extensions.duckdb.org/extensions/laterite_ags4.html) — community extension | `INSTALL laterite_ags4 FROM community;` |
-| **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser |
+| Surface | Get it | Use it for | Docs |
+|---|---|---|---|
+| **Python** | `pip install laterite` | polars frames, the typed graph, the `python-ags4` drop-in | [guide](https://niko86.github.io/laterite/docs/surfaces/python/) |
+| **Node.js** | `npm install laterite` | apache-arrow tables, server-side validation | [guide](https://niko86.github.io/laterite/docs/node/) |
+| **CLI — `lat`** | [Releases](https://github.com/niko86/laterite/releases), or `pip install laterite` / `npx laterite` | pipelines, CI gates, one-off checks | [guide](https://niko86.github.io/laterite/docs/surfaces/cli/) |
+| **DuckDB** | `INSTALL laterite_ags4 FROM community;` | SQL straight over `.ags` files, no conversion step | [guide](https://niko86.github.io/laterite/docs/duckdb/) |
+| **Browser** | [open the app](https://niko86.github.io/laterite/) | validate + explore without uploading a file anywhere | [guide](https://niko86.github.io/laterite/docs/surfaces/browser/) |
 
-## Install
-
-```bash
-pip install laterite                     # base AGS4 (polars + duckdb)
-pip install "laterite[compat]"           # + pandas (python-ags4 drop-in) — pyarrow-free
-pip install "laterite[compat,pyarrow]"   # + optional pyarrow accelerator (or [all])
-```
-
-Requires Python ≥ 3.12. The `[compat]` drop-in is pyarrow-free and fast on its
-own; adding `pyarrow` swaps the pandas step for pyarrow's `to_pandas` and
-unlocks the Arrow-backed `string` dtype — an optional accelerator, never
-required.
-
-## Use
-
-The same engine drives every surface — pick your stack. Full guides and the API
-reference live in the [documentation](https://niko86.github.io/laterite/docs/).
-
-### Python
+## Quickstart
 
 ```python
 import laterite
 
-# Validate — errors + warnings by default (FYI is opt-in)
-report = laterite.validate("delivery.ags")
+report = laterite.validate("delivery.ags")   # errors + warnings (FYI is opt-in)
 report.is_valid
-for rule, findings in report.by_rule().items():
-    print(rule, len(findings))
 
-# Read born-typed columns: a 2DP heading is a float, a DT a datetime
-ags = laterite.read("delivery.ags")
-ags.groups                       # ['PROJ', 'LOCA', 'SAMP', …]
-ags["LOCA"]["LOCA_GL"][0]        # → 12.3  (a polars DataFrame per group)
+ags = laterite.read("delivery.ags")          # born-typed polars frames
+ags["LOCA"]["LOCA_GL"][0]                    # → 12.3, a float — not "12.30"
+```
 
+<details>
+<summary><b>Node.js</b></summary>
+
+```ts
+import { read, validate, buildAgs4 } from "laterite";
+
+const ags = read("delivery.ags");                  // or read(bytes) / read(undefined, { text })
+ags.table("LOCA").getChild("LOCA_GL")?.get(0);     // → 12.3, born-typed apache-arrow
+
+validate("delivery.ags").toJson();                 // byte-identical to `lat validate --json`
+
+buildAgs4(new Map([
+  ["PROJ", [{ PROJ_ID: "P1", PROJ_NAME: "Demo" }]],
+  ["LOCA", [{ LOCA_ID: "BH01", LOCA_GL: 12.3 }]],
+])).save("out.ags");
+```
+
+Cross-group SQL (`ags.sql(...)` / `ags.at(...)`) needs the optional peer `@duckdb/node-api`.
+</details>
+
+<details>
+<summary><b>CLI — <code>lat</code></b></summary>
+
+```bash
+lat delivery.ags                       # shorthand for `lat validate`
+lat validate delivery.ags --json       # machine-readable findings
+lat validate delivery.ags --no-warnings   # errors only
+lat fix delivery.ags                   # repair → sibling .fixed.ags (safe fixes)
+lat diff old.ags new.ags               # KEY-aware revision delta
+lat certify delivery.ags               # mint delivery.ags.idx if clean
+lat rules                              # the AGS4 rule catalogue
+```
+
+Exit codes: `0` clean · `1` findings · `3` unreadable · `4` not AGS4 · `5` bad args · `6` schema.
+`lat --readme` prints the full guide.
+</details>
+
+<details>
+<summary><b>DuckDB</b></summary>
+
+```sql
+INSTALL laterite_ags4 FROM community;
+LOAD laterite_ags4;
+
+-- every row carries an `_id` / `_parent_id` (UUIDv8 over the AGS key), so
+-- parent↔child joins need no hand-written key list
+SELECT l.loca_id, s.samp_ref, s.samp_top
+FROM read_ags('delivery.ags', 'SAMP') s
+JOIN read_ags('delivery.ags', 'LOCA') l ON s._parent_id = l._id;
+```
+</details>
+
+<details>
+<summary><b>Python — typed graph and the <code>python-ags4</code> drop-in</b></summary>
+
+```python
 # Typed graph: PROJ → LOCA → SAMP → …
 from laterite.ags4 import read_typed
-proj = read_typed("delivery.ags")
-for loca in proj.locas:
+for loca in read_typed("delivery.ags").locas:
     print(loca.loca_id, loca.loca_gl)
 
 # python-ags4 drop-in — swap the import, keep your code
 from laterite import compat as AGS4
 tables, headings = AGS4.AGS4_to_dataframe("delivery.ags")
-AGS4.dataframe_to_AGS4(tables, headings, "round-trip.ags")
 ```
 
-### Node.js
+The drop-in mirrors python-ags4's **library** API name for name. Its CLI is
+deliberately not mirrored — see [Parity](#parity-with-python-ags4).
+</details>
 
-```ts
-import { read, validate, buildAgs4 } from "laterite";
+The [cookbook](https://niko86.github.io/laterite/docs/cookbook/) shows each task
+side by side across all five surfaces.
 
-const ags = read("delivery.ags");      // path, or read(bytes) / read(undefined, { text })
-ags.groups;                            // ["PROJ", "LOCA", "SAMP", …]
-ags.table("LOCA").getChild("LOCA_GL")?.get(0);   // → 12.3 (born-typed apache-arrow)
+## What it does
 
-const report = validate("delivery.ags");
-report.isValid;                        // boolean
-report.toJson();                       // byte-identical to `lat validate --json`
-
-// Produce valid AGS4 from plain rows (or a typed PROJ/LOCA graph)
-const res = buildAgs4(new Map([
-  ["PROJ", [{ PROJ_ID: "P1", PROJ_NAME: "Demo" }]],
-  ["LOCA", [{ LOCA_ID: "BH01", LOCA_GL: 12.3 }]],
-]), { mode: "autofix" });
-res.save("out.ags");
-```
-
-Cross-group SQL (`ags.sql(...)` / `ags.at(...)`) needs the optional peer `@duckdb/node-api`.
-
-### CLI (`lat`)
-
-```bash
-lat validate delivery.ags              # human report; exit 0 clean / 1 findings
-lat delivery.ags                       # shorthand for `lat validate delivery.ags`
-lat validate delivery.ags --json       # machine-readable findings (pretty JSON)
-lat validate delivery.ags --no-warnings   # errors only (warnings show by default)
-lat fix delivery.ags                   # repair → sibling .fixed.ags (safe fixes)
-lat diff old.ags new.ags               # KEY-aware revision delta (+added -removed ~changed)
-lat certify delivery.ags               # mint delivery.ags.idx if clean
-lat rules                              # the AGS4 rule catalogue (no input needed)
-```
-
-Exit codes: `0` clean · `1` findings · `3` unreadable · `4` not AGS4 · `5` bad args · `6` schema.
-Run `lat --readme` for the full guide.
-
-## A full AGS4 toolkit
-
-laterite covers the whole AGS4 workflow, not just read and write. The closest
-open-source tool, `python-ags4`, focuses on Python validation and pandas I/O;
-laterite matches that and adds a cross-surface toolchain on top:
+The closest open-source tool, [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library),
+focuses on Python validation and pandas I/O — and inspired this project. laterite
+matches that and adds a cross-surface toolchain on top:
 
 | | `laterite` | `python-ags4` |
 |---|:---:|:---:|
 | Runs on | Python · Node · CLI · DuckDB · browser | Python |
 | Validate — numbered AGS4 rules | ✅ | ✅ |
-| Read → typed data | ✅ born-typed (polars) | strings; opt-in `convert_to_numeric` |
-| Build / write AGS4 | ✅ | ✅ |
-| Excel ↔ AGS4 | ✅ | ✅ |
-| Repair engine (`fix`) — CRLF / BOM / short-row pad / embedded-CR… | ✅ | — |
-| SQL across groups | ✅ (DuckDB) | — |
-| Revision diff | ✅ | — |
+| Read → typed data | ✅ born-typed | strings; opt-in `convert_to_numeric` |
+| Build / write AGS4 · Excel ↔ AGS4 | ✅ | ✅ |
+| Repair engine (`fix`) | ✅ | — |
+| SQL across groups · revision diff | ✅ | — |
 | Validity certificates (`.ags.idx`) | ✅ | — |
 | Transport — compress + encrypt | ✅ | — |
 | Typed PROJ → LOCA → SAMP graph | ✅ | — |
-| Command-line interface | ✅ standalone binary **+ `pip install`** (`lat`) | ✅ Python (`ags4_cli`) |
-
-laterite reports the same findings as `python-ags4`, with 10 documented
-exceptions (see [Parity](#parity-with-python-ags4)).
 
 ## Performance
 
-Timings on synthetic, spec-valid AGS4 files generated by `ags4-forge` — the
-`wide` scaffold: **123 groups**, a realistic type mix, clean (zero findings).
+Synthetic, spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123
+groups**, realistic type mix, zero findings. macOS arm64, hot files, mean of 5
+warm runs, against `python-ags4` 1.2.0. Each cell is laterite's time and its
+speedup.
 
-Reproduce the whole table with `tools/bench-vs-python-ags4.py`, which generates
-the rungs, verifies each against a pinned SHA-256
-(`tools/readme-bench-fixtures.json`) so a change to the generator cannot move the
-numbers unnoticed, and prints these tables. Files read hot, on macOS arm64,
-against `python-ags4` 1.2.0; each cell is the mean of 5 warm runs (3 at the two
-largest rungs, where a single run is already tens of seconds).
+| File (123 groups) | `validate` | read → typed | read → strings (`compat`) |
+|---:|---:|---:|---:|
+| 4.9 MB · 459 BH | 50 ms · **30.0×** | 26 ms · **7.2×** | 49 ms · **2.9×** |
+| 24.9 MB · 2,219 BH | 266 ms · **13.9×** | 136 ms · **6.0×** | 206 ms · **3.5×** |
+| 102.7 MB · 8,872 BH | 1.1 s · **11.7×** | 541 ms · **6.3×** | 870 ms · **3.2×** |
 
-**Validation** (`AGS4.check_file` vs `laterite.validate`, all rules):
+Reproduce with `uv run python tools/bench-vs-python-ags4.py`. It generates the
+rungs, verifies each against a pinned SHA-256 so a change to the generator can't
+move the numbers unnoticed, and prints these tables. `node tools/bench-node.mjs`
+does the same for the Node surface.
 
-| File (123 groups) | `python-ags4` | `laterite.validate` | speedup |
-|---:|---:|---:|:---:|
-| 4.9 MB · 459 BH | 1.5 s | 62 ms | **24.7×** |
-| 24.9 MB · 2,219 BH | 3.8 s | 296 ms | **12.7×** |
-| 102.7 MB · 8,872 BH | 12.7 s | 1.2 s | **10.5×** |
-| 275.5 MB · 22,813 BH | 33.4 s | 3.2 s | **10.6×** |
-| 549.7 MB · 45,107 BH | 77.2 s | 7.2 s | **10.7×** |
-
-**Read, strings** — like-for-like, both sides return the same all-string pandas
-frames: `compat.AGS4_to_dataframe` vs `python-ags4`'s `AGS4_to_dataframe`:
-
-| File | `python-ags4` `AGS4_to_dataframe` | `compat` | speedup |
-|---:|---:|---:|:---:|
-| 4.9 MB | 143 ms | 53 ms | **2.7×** |
-| 24.9 MB | 696 ms | 224 ms | **3.1×** |
-| 102.7 MB | 2.9 s | 903 ms | **3.2×** |
-| 275.5 MB | 7.6 s | 2.4 s | **3.1×** |
-| 549.7 MB | 16.7 s | 5.4 s | **3.1×** |
-
-**Read, typed** — real typed columns (floats, dates). python-ags4 gets there with
-`AGS4_to_dataframe` + `convert_to_numeric` on every group; `laterite.read` is
-born-typed, so the typing is inline — and it types dates too, which
-`convert_to_numeric` skips:
-
-| File | `python-ags4` + `convert_to_numeric` | `laterite.read` (born-typed) | speedup |
-|---:|---:|---:|:---:|
-| 4.9 MB · 459 BH | 187 ms | 29 ms | **6.5×** |
-| 24.9 MB · 2,219 BH | 827 ms | 147 ms | **5.6×** |
-| 102.7 MB · 8,872 BH | 3.3 s | 601 ms | **5.5×** |
-| 275.5 MB · 22,813 BH | 10.2 s | 1.7 s | **5.8×** |
-| 549.7 MB · 45,107 BH | 20.8 s | 3.7 s | **5.7×** |
-
-`laterite.read` hands back born-typed polars frames (a `2DP` heading is a
-`Float64`, a `DT` a `Datetime`) ready for `.sql()` — the same data python-ags4
-gives you only after a separate conversion pass.
+Read-typed is the honest comparison for real work: python-ags4 needs
+`AGS4_to_dataframe` + `convert_to_numeric` on every group to get there, and still
+skips dates — `laterite.read` is born-typed, dates included.
 
 ## Parity with python-ags4
 
 121 / 131 of python-ags4 1.2.0's own test suite passes through
 `laterite.compat` (92 %). The 10 remaining are deliberate non-closures,
-documented rule by rule:
+documented rule by rule in [COMPAT.md](COMPAT.md) and the
+[parity coverage map](docs/parity-coverage-map.md). A weekly job compares the two
+public surfaces, so a function added upstream can't quietly go missing here.
 
-- [COMPAT.md](COMPAT.md) — the rule-by-rule differences and why
-- [docs/parity-coverage-map.md](docs/parity-coverage-map.md) — the
-  test-level map of laterite ↔ python-ags4
-
-The drop-in covers python-ags4's **library** API: `AGS4.*` and `utils.*` are
-mirrored name for name, so the one import line changes and the rest of your
-code doesn't. A weekly job compares the two public surfaces, so a function
-added upstream can't quietly go missing here.
-
-**The CLI is deliberately not mirrored.** There is no `compat` equivalent of
-python-ags4's `ags4_cli` commands — laterite ships [`lat`](#cli-lat) instead: a
-standalone binary (also installed by `pip install laterite`) with its own
-JSON / NDJSON output shapes. That's a different CLI on purpose, not a missing
-feature, so a *script* that shells out to `ags4_cli` needs porting rather than
-an import swap. Your Python code is unaffected.
+**The CLI is deliberately not mirrored.** laterite ships `lat` instead, with its
+own JSON / NDJSON shapes — so a *script* that shells out to `ags4_cli` needs
+porting rather than an import swap. Your Python code is unaffected.
 
 Every validator rule is written from the published AGS4 specification, not
-adapted from another library's source — which is what lets laterite ship under
-a permissive MIT licence.
+adapted from another library's source — which is what lets laterite ship under a
+permissive MIT licence.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: PRs welcome, CI
-gates `cargo test` + `pytest` + the python-ags4 parity oracle.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: PRs welcome; CI gates
+`cargo test` + `pytest` + the python-ags4 parity oracle.

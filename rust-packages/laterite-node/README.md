@@ -1,6 +1,6 @@
 # laterite
 
-AGS4 geotechnical data for **Node.js** — read, validate, produce, and query, backed by a Rust engine (the Node port of the [`laterite`](https://pypi.org/project/laterite/) Python toolkit).
+AGS4 geotechnical data for **Node.js** — read, validate, produce, and query, backed by a Rust engine (the Node surface of the [`laterite`](https://github.com/niko86/laterite) toolkit).
 
 Born-typed: a `2DP` heading comes back as a JavaScript number, an `ID` as a string, a `DT` as a `Date` — decoded directly from the engine's typed Arrow, the same typing the Python and browser-wasm hosts produce.
 
@@ -8,37 +8,7 @@ Born-typed: a `2DP` heading comes back as a JavaScript number, an `ID` as a stri
 npm install laterite
 ```
 
-Prebuilt native binaries ship for linux-x64-gnu, darwin-arm64, and win32-x64-msvc (auto-selected via `optionalDependencies`).
-
-## Part of the laterite suite
-
-One clean-room Rust AGS4 engine, surfaced for every stack:
-
-| Surface        | Package                                                                | Get it                 |
-| -------------- | ---------------------------------------------------------------------- | ---------------------- |
-| **Python**     | [`laterite`](https://pypi.org/project/laterite/) — PyPI                | `pip install laterite` |
-| **Node.js**    | [`laterite`](https://www.npmjs.com/package/laterite) — npm             | `npm install laterite` |
-| **Rust / CLI** | [`lat`](https://github.com/niko86/laterite/releases)                   | GitHub Releases        |
-| **Browser**    | [validator + data explorer](https://niko86.github.io/laterite/) — WASM | open in a browser      |
-
-## Command line — `npx laterite`
-
-The package ships the **`lat`** CLI too — the same AGS4 tool as the Rust binary and
-`uvx --from laterite lat`, one launcher per ecosystem:
-
-```bash
-npx laterite validate delivery.ags          # or `lat …` after a global install
-npx laterite read delivery.ags LOCA --csv    # dump a group (raw file cells)
-npx laterite diff old.ags new.ags            # revision delta
-npx laterite pack delivery.ags delivery.ags.zst
-npx laterite excel delivery.ags delivery.xlsx
-```
-
-Verbs: `validate` (the default — a bare `lat <file>` runs it) · `read` · `fix` ·
-`diff` · `certify` · `rules` · `pack` / `unpack` / `lock` / `unlock` · `excel`. The
-scriptable outputs (`validate --json` / `--ndjson`, `read --json` / `--csv`,
-`rules --json`) are **byte-identical** to the Rust binary; `lock` / `unlock` take
-the passphrase from `--password-file` or `$LAT_TRANSPORT_PASSWORD` (never a flag).
+Prebuilt native binaries ship for linux-x64-gnu, darwin-arm64, and win32-x64-msvc (auto-selected via `optionalDependencies`). No build step, no Python, no toolchain.
 
 ## Read & validate
 
@@ -74,6 +44,8 @@ const res = buildAgs4(
 res.text; // the AGS4 document
 res.save("out.ags");
 ```
+
+The engine formats each cell from the heading's declared AGS4 TYPE — a `2DP` column emits `12.30`, a `3SF` column `1.23e4`, a `DT` a spec-shaped timestamp — so pass raw typed values and let it render. Pre-stringified cells are written through verbatim.
 
 …or from a **typed builder graph** (`import { PROJ, LOCA } from "laterite"`):
 
@@ -111,11 +83,68 @@ const frames = await ags.at("LOCA", ["BH01", "BH02"]).frames();
 const table = await ags.sql("SELECT * FROM LOCA", { arrow: true });
 ```
 
+## Command line — `npx laterite`
+
+The package ships the **`lat`** CLI too — the same AGS4 tool as the standalone Rust binary and `uvx --from laterite lat`, one launcher per ecosystem:
+
+```bash
+npx laterite validate delivery.ags          # or `lat …` after a global install
+npx laterite read delivery.ags LOCA --csv    # dump a group (raw file cells)
+npx laterite diff old.ags new.ags            # revision delta
+npx laterite pack delivery.ags delivery.ags.zst
+npx laterite excel delivery.ags delivery.xlsx
+```
+
+Verbs: `validate` (the default — a bare `lat <file>` runs it) · `read` · `fix` ·
+`diff` · `certify` · `rules` · `pack` / `unpack` / `lock` / `unlock` · `excel`. The
+scriptable outputs (`validate --json` / `--ndjson`, `read --json` / `--csv`,
+`rules --json`) are **byte-identical** to the Rust binary; `lock` / `unlock` take
+the passphrase from `--password-file` or `$LAT_TRANSPORT_PASSWORD` (never a flag).
+
+## Performance
+
+Node 24, macOS arm64, hot files, mean of 5 warm runs. Fixtures are synthetic,
+spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123 groups**,
+realistic type mix, zero findings.
+
+|   File (123 groups) |            `read` |        `validate` | `read` + all typed tables |
+| ------------------: | ----------------: | ----------------: | ------------------------: |
+|     4.9 MB · 459 BH |  24 ms · 203 MB/s |   53 ms · 92 MB/s |          32 ms · 153 MB/s |
+|  24.9 MB · 2,219 BH | 121 ms · 205 MB/s | 229 ms · 109 MB/s |         135 ms · 184 MB/s |
+| 102.7 MB · 8,872 BH | 451 ms · 227 MB/s | 921 ms · 111 MB/s |         619 ms · 166 MB/s |
+
+`read` parses and holds the file; the third column adds materialising **every**
+group to an apache-arrow Table, which is what a consumer actually pays. Throughput
+is flat across two orders of magnitude — there is no cliff at delivery scale.
+
+Reproduce with `node tools/bench-node.mjs` in the repo. It generates the rungs and
+verifies each against a pinned SHA-256, so a change to the fixture generator can't
+move these numbers unnoticed.
+
 ## Also exported
 
 - `agsTypes` — `canonicalType` / `displayHint` / `parseValue`
 - `registry` — `GROUPS`, `childGroups`, `ancestorChain`, …
 - `transport` — `pack` / `unpack` (zstd) + `lock` / `unlock` (age passphrase)
+
+## Part of the laterite suite
+
+One clean-room Rust AGS4 engine, surfaced for every stack. Scriptable output is byte-identical across all of them, so a CI gate and a notebook can't disagree.
+
+| Surface     | Package                                                                                                        | Get it                                  |
+| ----------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm                                                     | `npm install laterite`                  |
+| **Python**  | [`laterite`](https://pypi.org/project/laterite/) — PyPI                                                        | `pip install laterite`                  |
+| **CLI**     | [`lat`](https://github.com/niko86/laterite/releases)                                                           | bundled here, or GitHub Releases        |
+| **DuckDB**  | [`laterite_ags4`](https://community-extensions.duckdb.org/extensions/laterite_ags4.html) — community extension | `INSTALL laterite_ags4 FROM community;` |
+| **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM                                         | open in a browser                       |
+
+**Running in a browser?** This package is Node-only — it loads a native addon via
+`optionalDependencies` and touches the filesystem. Use the
+[wasm build](https://github.com/niko86/laterite/tree/main/rust-packages/laterite-ags4-wasm)
+instead: same engine, same rules, no `fs`.
+
+📖 [Documentation](https://niko86.github.io/laterite/docs/) · [Node guide](https://niko86.github.io/laterite/docs/node/) · [Cookbook](https://niko86.github.io/laterite/docs/cookbook/)
 
 ## License
 

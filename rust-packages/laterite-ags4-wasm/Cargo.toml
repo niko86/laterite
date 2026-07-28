@@ -21,6 +21,10 @@ edition = "2024"
 rust-version = "1.85"
 description = "Browser wasm wrapper around the clean-room AGS4 validator"
 license = "MIT"
+# Named explicitly so wasm-pack copies it into `pkg/` — that README is what a
+# published wasm package would show, and it documents the constraints (init(),
+# bytes-only input, no transport) that don't exist on the native surfaces.
+readme = "README.md"
 publish = false
 
 [lib]
