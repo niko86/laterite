@@ -8,13 +8,207 @@
         "build": [
           {
             "code": "PROJ",
-            "headings": ["PROJ_ID", "PROJ_NAME"],
-            "rows": [["P1", "Test Project"]]
+            "headings": [
+              "PROJ_ID",
+              "PROJ_NAME"
+            ],
+            "rows": [
+              [
+                "P1",
+                "Test Project"
+              ]
+            ]
           }
         ]
       },
-      "legs": ["rust-leaf", "python", "node", "wasm-engine"],
+      "legs": [
+        "rust-leaf",
+        "python",
+        "node",
+        "wasm-engine"
+      ],
       "spec_ref": "The data→AGS4 door (`build_ags4`) across all four surfaces. Each has its OWN input idiom — a polars frame (python), row-objects (node `buildAgs4`), a JSON string (wasm `build_ags4`), a `GroupInput` (rust-leaf) — but all route through the ONE shared emit orchestrator, so the built bytes (with the dictionary-filled UNIT/TYPE and the AutoFix-added TRAN/UNIT/TYPE groups) must be byte-identical. A surface re-implementing build would diverge from the leaf."
+    },
+    {
+      "id": "emit.build.numeric_precision",
+      "op": "build_typed",
+      "input": {
+        "build": [
+          {
+            "code": "PROJ",
+            "headings": [
+              "PROJ_ID"
+            ],
+            "rows": [
+              [
+                "P1"
+              ]
+            ]
+          },
+          {
+            "code": "LOCA",
+            "headings": [
+              "LOCA_ID",
+              "LOCA_NATE"
+            ],
+            "rows": [
+              [
+                "BH01",
+                12.3
+              ],
+              [
+                "BH02",
+                100.456
+              ]
+            ]
+          }
+        ]
+      },
+      "legs": [
+        "rust-leaf",
+        "python",
+        "node",
+        "wasm-engine"
+      ],
+      "spec_ref": "AGS4 numeric rendering is the ENGINE's job, from the declared TYPE: `laterite-types::ags4_str` formats a JSON number per its type (2DP `LOCA_NATE`: 12.3 -> `12.30`, 100.456 -> `100.46`), and every surface routes through it. A surface that stringified numbers itself — the obvious thing for a host binding to do — would emit `12.3` here and split from the leaf. NOTE: this case deliberately carries no INTEGER-valued cell. Adding one splits the node leg, which renders a whole JS number as `5.0` where rust/python/wasm render `5` (every JS number is an f64); that divergence is real and unresolved, so pin it in its own case once ruled on rather than smuggling it in here."
+    },
+    {
+      "id": "emit.build.field_quoting",
+      "op": "build_typed",
+      "input": {
+        "build": [
+          {
+            "code": "PROJ",
+            "headings": [
+              "PROJ_ID"
+            ],
+            "rows": [
+              [
+                "P1"
+              ]
+            ]
+          },
+          {
+            "code": "LOCA",
+            "headings": [
+              "LOCA_ID",
+              "LOCA_REM"
+            ],
+            "rows": [
+              [
+                "BH01",
+                "He said \"stop\", then left"
+              ]
+            ]
+          }
+        ]
+      },
+      "legs": [
+        "rust-leaf",
+        "python",
+        "node",
+        "wasm-engine"
+      ],
+      "spec_ref": "AGS4 Rule-1 field escaping (a literal `\"` doubled to `\"\"`, a comma kept inside the quoted field) has ONE authority — `laterite-types::write_quoted_field` — which the byte writer streams through and the browser tokenizer reuses. A surface re-implementing quoting would corrupt exactly this value."
+    },
+    {
+      "id": "emit.build.null_cell",
+      "op": "build_typed",
+      "input": {
+        "build": [
+          {
+            "code": "PROJ",
+            "headings": [
+              "PROJ_ID"
+            ],
+            "rows": [
+              [
+                "P1"
+              ]
+            ]
+          },
+          {
+            "code": "LOCA",
+            "headings": [
+              "LOCA_ID",
+              "LOCA_NATE"
+            ],
+            "rows": [
+              [
+                "BH01",
+                null
+              ],
+              [
+                "BH02",
+                7.5
+              ]
+            ]
+          }
+        ]
+      },
+      "legs": [
+        "rust-leaf",
+        "python",
+        "node",
+        "wasm-engine"
+      ],
+      "spec_ref": "A null cell is an EMPTY AGS4 field, not the string `null`/`None`/`NaN`. Each surface carries its own null idiom (polars null, JS null, JSON null, serde `Value::Null`) and they must all land on `\"\"` via `ags4_str`'s null branch — the classic place a host binding leaks its own representation into the bytes."
+    },
+    {
+      "id": "emit.build.parent_child_groups",
+      "op": "build_typed",
+      "input": {
+        "build": [
+          {
+            "code": "PROJ",
+            "headings": [
+              "PROJ_ID",
+              "PROJ_NAME"
+            ],
+            "rows": [
+              [
+                "P1",
+                "Demo"
+              ]
+            ]
+          },
+          {
+            "code": "LOCA",
+            "headings": [
+              "LOCA_ID",
+              "LOCA_TYPE"
+            ],
+            "rows": [
+              [
+                "BH01",
+                "CP"
+              ]
+            ]
+          },
+          {
+            "code": "SAMP",
+            "headings": [
+              "LOCA_ID",
+              "SAMP_TOP",
+              "SAMP_REF"
+            ],
+            "rows": [
+              [
+                "BH01",
+                1.5,
+                "S1"
+              ]
+            ]
+          }
+        ]
+      },
+      "legs": [
+        "rust-leaf",
+        "python",
+        "node",
+        "wasm-engine"
+      ],
+      "spec_ref": "A three-group build with a parent/child chain (PROJ -> LOCA -> SAMP): group ORDER is preserved as given, each group's UNIT/TYPE rows are filled from the dictionary, and the shared KEY heading `LOCA_ID` appears in both parent and child. Pins that no surface reorders groups or fills metadata differently."
     }
   ]
 }
