@@ -160,9 +160,12 @@ is written through verbatim; don't pre-format.
 
 `mode` is `"autofix"` (default) · `"report"` · `"strict"`. Note that `autofix`
 repairs what the input contains but does **not** mint the mandatory UNIT / TYPE /
-TRAN / ABBR catalogues — that is opt-in via the trailing `synthesise_metadata`
-argument, so a data-only build reports Rules 14/15/17 instead of silently
-inventing metadata.
+TRAN / ABBR catalogues — a data-only build reports Rules 14/15/17 rather than
+silently inventing metadata. Opt in with the trailing 4th argument:
+
+```ts
+build_ags4(groupsJson, "4.1.1", "autofix", true);   // synthesise_metadata
+```
 
 For large, already-columnar data (a duckdb-wasm result), `build_ags4_ipc` takes
 `[{ code, ipc }]` and skips the per-cell JSON round-trip entirely.
