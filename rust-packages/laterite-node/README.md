@@ -107,15 +107,18 @@ Node 24, macOS arm64, hot files, mean of 5 warm runs. Fixtures are synthetic,
 spec-valid AGS4 from `ags4-forge` — the `wide` scaffold: **123 groups**,
 realistic type mix, zero findings.
 
-|   File (123 groups) |            `read` |        `validate` | `read` + all typed tables |
-| ------------------: | ----------------: | ----------------: | ------------------------: |
-|     4.9 MB · 459 BH |  24 ms · 203 MB/s |   53 ms · 92 MB/s |          32 ms · 153 MB/s |
-|  24.9 MB · 2,219 BH | 121 ms · 205 MB/s | 229 ms · 109 MB/s |         135 ms · 184 MB/s |
-| 102.7 MB · 8,872 BH | 451 ms · 227 MB/s | 921 ms · 111 MB/s |         619 ms · 166 MB/s |
+|    File (123 groups) |            `read` |        `validate` | `read` + all typed tables |
+| -------------------: | ----------------: | ----------------: | ------------------------: |
+|      4.9 MB · 459 BH |  24 ms · 203 MB/s |   53 ms · 92 MB/s |          32 ms · 153 MB/s |
+|   24.9 MB · 2,219 BH | 121 ms · 205 MB/s | 229 ms · 109 MB/s |         135 ms · 184 MB/s |
+|  102.7 MB · 8,872 BH | 451 ms · 227 MB/s | 921 ms · 111 MB/s |         619 ms · 166 MB/s |
+| 275.5 MB · 22,813 BH |  1.2 s · 238 MB/s |  2.4 s · 117 MB/s |          1.8 s · 151 MB/s |
+| 549.7 MB · 45,107 BH |  2.7 s · 206 MB/s |  5.0 s · 111 MB/s |          3.9 s · 141 MB/s |
 
 `read` parses and holds the file; the third column adds materialising **every**
 group to an apache-arrow Table, which is what a consumer actually pays. Throughput
-is flat across two orders of magnitude — there is no cliff at delivery scale.
+holds across the whole range — a half-gigabyte delivery is the 4.9 MB rate, not a
+cliff.
 
 Reproduce with `node tools/bench-node.mjs` in the repo. It generates the rungs and
 verifies each against a pinned SHA-256, so a change to the fixture generator can't

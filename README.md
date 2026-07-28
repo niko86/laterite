@@ -155,6 +155,8 @@ speedup.
 | 4.9 MB · 459 BH | 50 ms · **30.0×** | 26 ms · **7.2×** | 49 ms · **2.9×** |
 | 24.9 MB · 2,219 BH | 266 ms · **13.9×** | 136 ms · **6.0×** | 206 ms · **3.5×** |
 | 102.7 MB · 8,872 BH | 1.1 s · **11.7×** | 541 ms · **6.3×** | 870 ms · **3.2×** |
+| 275.5 MB · 22,813 BH | 2.6 s · **13.0×** | 1.4 s · **6.4×** | 2.2 s · **3.3×** |
+| 549.7 MB · 45,107 BH | 5.4 s · **12.9×** | 2.9 s · **6.0×** | 4.6 s · **3.3×** |
 
 Reproduce with `uv run python tools/bench-vs-python-ags4.py`. It generates the
 rungs, verifies each against a pinned SHA-256 so a change to the generator can't
