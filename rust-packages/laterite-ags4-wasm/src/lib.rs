@@ -281,6 +281,7 @@ fn build_ags4_from_json(
     groups_json: &str,
     edition: Option<&str>,
     mode: Option<&str>,
+    synthesise_metadata: bool,
 ) -> Result<BuildAgs4Report, String> {
     let parsed: Vec<GroupInputJson> =
         serde_json::from_str(groups_json).map_err(|e| format!("invalid groups JSON: {e}"))?;
@@ -294,7 +295,7 @@ fn build_ags4_from_json(
             rows: g.rows,
         })
         .collect();
-    emit_report(groups, edition, mode)
+    emit_report(groups, edition, mode, synthesise_metadata)
 }
 
 /// Run the shared orchestrator over already-built `GroupInput`s and shape the
@@ -303,14 +304,23 @@ fn emit_report(
     groups: Vec<laterite_ags4_emit::GroupInput>,
     edition: Option<&str>,
     mode: Option<&str>,
+    synthesise_metadata: bool,
 ) -> Result<BuildAgs4Report, String> {
     let opts = laterite_ags4_emit::EmitOpts {
         mode: emit_mode(mode)?,
         edition: emit_edition(edition)?,
-        // Metadata synthesis inherits the default, which is now OFF
-        // (2026-07-24): no surface mints GROUPs the caller never wrote without
-        // being asked. See EmitOpts::synthesise_metadata.
-        ..laterite_ags4_emit::EmitOpts::default()
+        // Synthesis is OFF unless asked for (2026-07-24): no surface mints
+        // GROUPs the caller never wrote without being told to. The caller's
+        // ability to *ask* is the parity part — Python takes
+        // `synthesise_metadata=`, Node `{ synthesiseMetadata }`, and this is
+        // the browser's. See EmitOpts::synthesise_metadata.
+        synthesise_metadata,
+        // Every field listed explicitly, with NO `..default()` tail — on
+        // purpose. Inheriting defaults is what made this surface silently lose
+        // `synthesise_metadata` when it went opt-in: the option existed, wasm
+        // just never passed it, and nothing failed. Spelling the struct out
+        // turns the next new EmitOpts field into a compile error here, forcing
+        // a decision about whether the browser should expose it.
     };
     let res = laterite_ags4_emit::emit_ags4(&groups, &opts).map_err(|e| e.to_string())?;
     let findings = res
@@ -387,6 +397,11 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
 ///   repairs what the input contains. It does NOT mint the mandatory
 ///   UNIT/TYPE/TRAN/ABBR catalogs — that became opt-in on 2026-07-24, so a
 ///   data-only build reports Rule 14/15/17 rather than silently filling them.
+/// * `synthesise_metadata` — `None`/`false` (default) | `true` to mint the
+///   mandatory UNIT/TYPE/TRAN/ABBR catalogs a data-only build is missing,
+///   clearing Rule 14/15/17. Only meaningful under `"autofix"`. This is the
+///   browser twin of Python's `synthesise_metadata=` and Node's
+///   `{ synthesiseMetadata }`.
 ///
 /// Returns `{ text, findings, fixes_applied }`; `text` is the AGS4 document
 /// (UTF-8, CRLF) for the browser to wrap in a `Blob`.
@@ -395,10 +410,16 @@ pub fn build_ags4(
     groups_json: &str,
     dict_version: Option<String>,
     mode: Option<String>,
+    synthesise_metadata: Option<bool>,
 ) -> Result<JsValue, JsError> {
     console_error_panic_hook::set_once();
-    let report = build_ags4_from_json(groups_json, dict_version.as_deref(), mode.as_deref())
-        .map_err(|e| JsError::new(&e))?;
+    let report = build_ags4_from_json(
+        groups_json,
+        dict_version.as_deref(),
+        mode.as_deref(),
+        synthesise_metadata.unwrap_or(false),
+    )
+    .map_err(|e| JsError::new(&e))?;
     serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
 }
 
@@ -409,7 +430,7 @@ pub fn build_ags4(
 /// * `groups` — a JS array of `{ code: string, ipc: Uint8Array }`, each `ipc`
 ///   an Arrow **IPC stream** for one group (its schema's field names are the
 ///   AGS headings). Order is preserved (put `PROJ` first).
-/// * `dict_version` / `mode` — as [`build_ags4`].
+/// * `dict_version` / `mode` / `synthesise_metadata` — as [`build_ags4`].
 ///
 /// Returns the same `{ text, findings, fixes_applied }`. The Arrow→AGS
 /// transpose is the read path's IPC reversed.
@@ -418,6 +439,7 @@ pub fn build_ags4_ipc(
     groups: JsValue,
     dict_version: Option<String>,
     mode: Option<String>,
+    synthesise_metadata: Option<bool>,
 ) -> Result<JsValue, JsError> {
     use wasm_bindgen::JsCast;
     console_error_panic_hook::set_once();
@@ -436,8 +458,13 @@ pub fn build_ags4_ipc(
             .to_vec();
         inputs.push(group_from_ipc(code, &ipc).map_err(|e| JsError::new(&e))?);
     }
-    let report = emit_report(inputs, dict_version.as_deref(), mode.as_deref())
-        .map_err(|e| JsError::new(&e))?;
+    let report = emit_report(
+        inputs,
+        dict_version.as_deref(),
+        mode.as_deref(),
+        synthesise_metadata.unwrap_or(false),
+    )
+    .map_err(|e| JsError::new(&e))?;
     serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
 }
 
@@ -451,7 +478,7 @@ mod build_ags4_tests {
           {"code":"PROJ","headings":["PROJ_ID","PROJ_NAME"],"rows":[["P1","Demo"]]},
           {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01",12.3]]}
         ]"#;
-        let r = build_ags4_from_json(json, Some("4.1.1"), Some("autofix")).unwrap();
+        let r = build_ags4_from_json(json, Some("4.1.1"), Some("autofix"), false).unwrap();
         assert!(
             r.text.contains("\"12.30\""),
             "expected canonical 2DP:\n{}",
@@ -467,13 +494,66 @@ mod build_ags4_tests {
         assert!(parsed.groups.contains_key("LOCA"));
     }
 
+    /// The browser can ASK for metadata synthesis. Synthesis went opt-in on
+    /// 2026-07-24 and Python/Node each gained a flag to opt back in, but wasm
+    /// took `EmitOpts::default()` with no override — so on this surface the
+    /// capability was unreachable, not merely off. Both directions are pinned
+    /// here: a canned `true` that never reaches `EmitOpts` fails the second
+    /// half, and a hardcoded `true` fails the first.
+    #[test]
+    fn synthesise_metadata_is_opt_in_and_reachable() {
+        // Data only: no TRAN/UNIT/TYPE catalogs, so Rules 14/15/17 fire.
+        let json = r#"[
+          {"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]},
+          {"code":"LOCA","headings":["LOCA_ID"],"rows":[["BH01"]]}
+        ]"#;
+        let metadata_rules = |r: &BuildAgs4Report| -> Vec<String> {
+            let mut v: Vec<String> = r
+                .findings
+                .iter()
+                .map(|f| f.rule.clone())
+                .filter(|rule| ["14", "15", "17"].iter().any(|n| rule.contains(n)))
+                .collect();
+            v.sort();
+            v.dedup();
+            v
+        };
+
+        // Default (and explicit false): the catalogs are NOT minted.
+        let off = build_ags4_from_json(json, None, Some("autofix"), false).unwrap();
+        assert!(
+            !metadata_rules(&off).is_empty(),
+            "a data-only build should report the missing metadata catalogs:\n{}",
+            off.text
+        );
+        assert!(
+            !off.text.contains("\"GROUP\",\"TRAN\""),
+            "nothing should be minted unasked:\n{}",
+            off.text
+        );
+
+        // Opt in: the catalogs are minted and those findings clear.
+        let on = build_ags4_from_json(json, None, Some("autofix"), true).unwrap();
+        assert!(
+            on.text.contains("\"GROUP\",\"TRAN\""),
+            "synthesise_metadata=true should mint TRAN:\n{}",
+            on.text
+        );
+        assert!(
+            metadata_rules(&on).len() < metadata_rules(&off).len(),
+            "synthesis should clear metadata findings (was {:?}, now {:?})",
+            metadata_rules(&off),
+            metadata_rules(&on)
+        );
+    }
+
     #[test]
     fn autofix_pads_a_string_numeric() {
         let json = r#"[
           {"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]},
           {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}
         ]"#;
-        let r = build_ags4_from_json(json, None, Some("autofix")).unwrap();
+        let r = build_ags4_from_json(json, None, Some("autofix"), false).unwrap();
         assert!(r.fixes_applied >= 1, "AutoFix should apply a safe fix");
         assert!(r.text.contains("\"12.30\""), "{}", r.text);
     }
@@ -481,7 +561,7 @@ mod build_ags4_tests {
     #[test]
     fn report_keeps_strings_verbatim() {
         let json = r#"[{"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}]"#;
-        let r = build_ags4_from_json(json, None, Some("report")).unwrap();
+        let r = build_ags4_from_json(json, None, Some("report"), false).unwrap();
         assert!(r.text.contains("\"12.3\""));
         assert_eq!(r.fixes_applied, 0);
     }
@@ -489,8 +569,8 @@ mod build_ags4_tests {
     #[test]
     fn rejects_unknown_mode_and_edition() {
         let json = r#"[{"code":"LOCA","headings":["LOCA_ID"],"rows":[["BH01"]]}]"#;
-        assert!(build_ags4_from_json(json, None, Some("banana")).is_err());
-        assert!(build_ags4_from_json(json, Some("9.9"), None).is_err());
+        assert!(build_ags4_from_json(json, None, Some("banana"), false).is_err());
+        assert!(build_ags4_from_json(json, Some("9.9"), None, false).is_err());
     }
 
     #[test]
@@ -536,7 +616,7 @@ mod build_ags4_tests {
         // Decode each IPC stream via the shared transpose, then emit.
         let proj = group_from_ipc("PROJ".into(), &ipc_bytes(&proj_schema, &proj_batch)).unwrap();
         let loca = group_from_ipc("LOCA".into(), &ipc_bytes(&loca_schema, &loca_batch)).unwrap();
-        let r = emit_report(vec![proj, loca], Some("4.1.1"), Some("autofix")).unwrap();
+        let r = emit_report(vec![proj, loca], Some("4.1.1"), Some("autofix"), false).unwrap();
 
         assert!(r.text.contains("\"12.30\""), "float64 → 2DP:\n{}", r.text);
         assert!(r.text.contains("\"13.00\""), "{}", r.text);
