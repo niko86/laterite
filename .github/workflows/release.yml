@@ -783,7 +783,25 @@ jobs:
               fail=1
               continue
             fi
-            if tar -tzf "$dest/$tgz" | grep -qx 'package/LICENSE'; then
+            # List to a FILE, then grep the file — deliberately not
+            # `tar -tzf ... | grep -q`. `grep -q` exits on its first match, and
+            # `package/LICENSE` sorts first, so tar takes EPIPE while still
+            # writing the remaining entries and exits non-zero; under
+            # `set -o pipefail` that makes the pipeline false and reports a
+            # package that DOES carry the notice as failing. It only bites once
+            # the listing outgrows the pipe buffer, so the 15-file root package
+            # failed while the 4-file platform packages passed — and a macOS
+            # repro passed too. No pipe, no SIGPIPE, and the listing survives
+            # for debugging.
+            # `$name` is scoped (@laterite/native-*), so flatten the slash before
+            # using it as a filename.
+            safe="${name//\//_}"
+            if ! tar -tzf "$dest/$tgz" > "$dest/$safe.list"; then
+              echo "  FAIL $name — could not read the packed tarball (the check could not run)"
+              fail=1
+              continue
+            fi
+            if grep -qx 'package/LICENSE' "$dest/$safe.list"; then
               echo "  ok   $name carries LICENSE"
             else
               echo "  FAIL $name would publish WITHOUT the ©AGS notice"
