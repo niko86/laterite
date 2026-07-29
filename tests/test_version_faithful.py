@@ -71,18 +71,40 @@ def test_node_package_and_native_deps_match() -> None:
     assert pkg["version"] == CANONICAL, (
         f"npm package version {pkg['version']!r} != shipped wheel {CANONICAL!r}"
     )
-    # The three platform addons must move with the package — a lag makes
-    # `laterite` resolve a stale native binary.
-    native = {
-        k: v
-        for k, v in pkg.get("optionalDependencies", {}).items()
+
+    # The `@laterite/native-*` pins are deliberately ABSENT from the committed
+    # manifest, and this asserts they stay absent. `napi pre-publish` rewrites
+    # the whole optionalDependencies block at publish time from `napi.targets`
+    # and the package version, so a committed copy can only be redundant — and
+    # it was actively harmful: bump-version.sh regenerates package-lock.json
+    # immediately after stamping, when version N is not yet on npm, so npm wrote
+    # `{"optional": true}` placeholders that stopped satisfying the manifest the
+    # moment N published. That broke `npm ci` on main after 0.8.0 (#155).
+    committed = [
+        k
+        for k in pkg.get("optionalDependencies", {})
         if k.startswith("@laterite/native-")
+    ]
+    assert not committed, (
+        f"{committed} pinned in package.json — remove them. napi writes these at "
+        "publish time; committing them makes the lockfile unresolvable until the "
+        "version is published, which breaks `npm ci` (#155)"
+    )
+
+    # What DOES need guarding is the input napi derives those pins from: every
+    # platform the release builds must be a declared napi target, or that
+    # platform ships with no addon to resolve.
+    targets = set(pkg["napi"]["targets"])
+    expected = {
+        "x86_64-unknown-linux-gnu",
+        "aarch64-apple-darwin",
+        "x86_64-pc-windows-msvc",
     }
-    assert native, "no @laterite/native-* optionalDependencies found"
-    for name, ver in native.items():
-        assert ver == CANONICAL, (
-            f"{name} pinned at {ver!r} != shipped wheel {CANONICAL!r}"
-        )
+    assert targets == expected, (
+        f"napi.targets {sorted(targets)} != the release build matrix "
+        f"{sorted(expected)} — release.yml's build-node matrix and this list "
+        "must agree, or a platform publishes without its native addon"
+    )
 
 
 def test_compat_version_prefix_matches() -> None:
