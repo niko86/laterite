@@ -13,15 +13,16 @@ graph to the emitter — use this when your data is already a graph in memory
     ```
 
     ```text
-    groups: ['PROJ', 'LOCA', 'TRAN', 'UNIT', 'TYPE']
-    findings: 0
+    groups: ['PROJ', 'LOCA']
+    findings: 3
     ```
 
-    `build_ags4(PROJ(...))` walks the graph depth-first (#214) and emits a
-    **valid** file. You handed it a `PROJ` with one `LOCA` child; it handed back
-    five groups — autofix synthesizes the mandatory metadata catalogs (`TRAN`,
-    `UNIT`, `TYPE`, plus `ABBR` for any `PA` pick-list codes) around your data, so a
-    sparse graph builds clean in one call.
+    `build_ags4(PROJ(...))` walks the graph depth-first (#214) and emits exactly
+    the groups you built. You handed it a `PROJ` with one `LOCA` child; you got
+    those two back, plus three findings naming the mandatory metadata catalogs your
+    graph doesn't carry — Rules 14 (`TRAN`), 15 (`UNIT`) and 17 (`TYPE`). Pass
+    `synthesise_metadata=True` to derive them (`ABBR` too, when `PA` pick-list codes
+    are used) and a sparse graph builds clean in one call.
 
     Children attach two ways, shown above: `.locas.append(LOCA(...))` after the
     fact, or the `locas=[...]` constructor kwarg up front. Either way the typed-graph
@@ -39,8 +40,8 @@ graph to the emitter — use this when your data is already a graph in memory
     ```
 
     ```text
-    groups: [ 'PROJ', 'LOCA', 'TRAN', 'UNIT', 'TYPE' ]
-    findings: 0
+    groups: [ 'PROJ', 'LOCA' ]
+    findings: 3
     ```
 
     The same typed classes are named exports — `import { PROJ, LOCA } from
@@ -48,15 +49,17 @@ graph to the emitter — use this when your data is already a graph in memory
     child array per parent (`p.locas`). Build the tree with the constructor's
     `locas: [...]` field or `push` onto it, then hand the root to `buildAgs4`; it
     walks the graph depth-first and returns the same `BuildResult` the frames door
-    does. (Node's `locas` is a plain array — the append-only guard is a
-    Python-only nicety.)
+    does, with `{ synthesiseMetadata: true }` deriving the catalogs the same way.
+    (Node's `locas` is a plain array — the append-only guard is a Python-only
+    nicety.)
 
 === "Browser"
 
     Open the [web app](../surfaces/browser.md)'s **Export** pane: whether you
     assemble data as a graph or as per-group tables, the same WebAssembly emitter
-    fills in the `TRAN`/`UNIT`/`TYPE` metadata and hands you a valid AGS4 file to
-    download — nothing uploaded.
+    builds the file client-side — nothing uploaded. Direct wasm callers take
+    `synthesise_metadata` on `build_ags4` / `build_ags4_ipc` to derive the
+    `TRAN`/`UNIT`/`TYPE` catalogs.
 
 !!! tip
 `build_ags4` / `buildAgs4` returns a `BuildResult` whichever door you use.
