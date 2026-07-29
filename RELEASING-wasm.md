@@ -19,11 +19,17 @@ the split buys nothing yet. It is the shape [#153](https://github.com/niko86/lat
 
 ## One-time owner setup
 
-**Add a `wasm-v*` tag rule to the `npm` GitHub environment.** `wasm-publish` is
-bound to `environment: npm`, whose `deployment_branch_policy` currently allows
-only `node-v*` refs — so a `wasm-v*` tag would be rejected before a step runs.
-Environments take multiple rules (the `pypi` env already has `branch: main` *and*
-`tag: v*`), so this is one added rule, not a second environment:
+**The `wasm-v*` tag rule on the `npm` GitHub environment — DONE 2026-07-29.**
+`wasm-publish` is bound to `environment: npm`, whose `deployment_branch_policy`
+allowed only `node-v*` refs, so a `wasm-v*` tag would have been rejected before a
+step ran. Environments take multiple rules (the `pypi` env already has
+`branch: main` *and* `tag: v*`), so this was one added rule, not a second
+environment. The `npm` env now carries both:
+
+    tag: node-v*   (id 51972923)
+    tag: wasm-v*   (id 55964567)
+
+Recorded for the next person who wonders where the gate lives. To recreate it:
 
 > repo Settings → Environments → `npm` → Deployment branches and tags →
 > **Add rule** → `wasm-v*`

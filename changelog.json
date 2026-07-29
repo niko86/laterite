@@ -4,12 +4,38 @@
   "keepachangelog": "1.1.0",
   "semver": true,
   "unreleased": {
-    "summary": "",
-    "added": [],
+    "summary": "The browser build ships as an npm package for the first time, carrying two things the other surfaces already had: reachable metadata synthesis, and a visible AutoFix ledger.",
+    "added": [
+      {
+        "text": "**`@laterite/ags4-wasm` — the browser build, published.** The wasm surface ships to npm for the first time, from its own `wasm-v*` tag so a browser-only fix no longer has to move the Node package. The `.wasm` embeds the AGS4 dictionary, so the third-party notice rides in the package and a release gate verifies it inside the tarball npm would upload.",
+        "prs": [
+          165
+        ]
+      },
+      {
+        "text": "**`applied` on the wasm build result.** `build_ags4` / `build_ags4_ipc` now return the ledger of what AutoFix rewrote — `{kind, label, rule, line, risk}` per fix — matching Python's `BuildResult.applied` and Node's `EmitResult.applied`. AutoFix returns only *residual* findings, so the previous count alone could say how many fixes ran but never which.",
+        "prs": [
+          165
+        ]
+      }
+    ],
     "changed": [],
     "deprecated": [],
     "removed": [],
-    "fixed": [],
+    "fixed": [
+      {
+        "text": "**`synthesise_metadata` is reachable from the browser.** `build_ags4` and `build_ags4_ipc` took no such argument, so a wasm caller could not opt in to the mandatory `UNIT`/`TYPE`/`TRAN`/`ABBR` catalogs. The flag reached Python and Node when synthesis became opt-in, but missed the wasm door.",
+        "prs": [
+          149
+        ]
+      },
+      {
+        "text": "**The produce/build docs described the pre-opt-in synthesis behaviour.** Three pages claimed `mode=\"autofix\"` synthesises the metadata catalogs, and that `mode=\"strict\"` is how you skip synthesis. Synthesis is opt-in and independent of mode; `strict` is a hard gate that rejects the build rather than emitting it.",
+        "prs": [
+          165
+        ]
+      }
+    ],
     "security": []
   },
   "releases": [
