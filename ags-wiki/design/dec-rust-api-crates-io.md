@@ -13,7 +13,7 @@ sources:
 repo_refs:
   workspace: "repo:rust-packages/Cargo.toml"
   fingerprint: "repo:rust-packages/laterite-ags4-validator/build.rs"
-  duckdb_consumer: "repo:../laterite-duckdb/Cargo.toml"
+  duckdb_consumer: "ext:niko86/laterite-duckdb:Cargo.toml"
 ---
 
 # laterite — the public Rust API surface, and publishing the engine to crates.io
