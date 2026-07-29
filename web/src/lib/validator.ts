@@ -169,10 +169,23 @@ export interface ExportFinding {
   severity?: string;
 }
 
+/** One fix AutoFix applied, as recorded in the export ledger. Same shape as
+ *  Python's `BuildResult.applied` and Node's `EmitResult.applied`. */
+export interface AppliedFix {
+  kind: string;
+  label: string;
+  rule: string;
+  line: number | null;
+  risk: "safe" | "risky";
+}
+
 export interface ExportResult {
   /** The AGS4 document text (UTF-8, CRLF) — wrap in a Blob to download. */
   text: string;
   findings: ExportFinding[];
+  /** What AutoFix rewrote. AutoFix returns only *residual* findings, so this is
+   *  the only way to show which fixes ran (empty for report/strict). */
+  applied: AppliedFix[];
   /** Count of safe mechanical fixes AutoFix applied (0 for report/strict). */
   fixes_applied: number;
 }

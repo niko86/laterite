@@ -15,7 +15,7 @@
 use laterite_ags4_parse::{ParsedFile, parse_bytes};
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, WorldScope, check_parsed_with_dict,
-    dict::Dictionary, dict::FALLBACK, findings, overlay, resolve_dict_version, tran_ags_of,
+    dict::Dictionary, dict::FALLBACK, findings, fixes, overlay, resolve_dict_version, tran_ags_of,
 };
 use laterite_types::sql_type;
 use serde::{Deserialize, Serialize};
@@ -243,12 +243,37 @@ struct EmitFinding {
     severity: Option<String>,
 }
 
+/// One fix the emit actually applied. Deliberately NOT the engine's `Fix`:
+/// that carries `edits` (the spans describing how a *proposed* fix would be
+/// applied), which say nothing once it has been. `{kind, label, rule, line,
+/// risk}` is the shape Python's `BuildResult.applied` and Node's
+/// `EmitResult.applied` present, so all three surfaces read identically
+/// (#294 F#7). `kind`/`risk` are the serde `snake_case` strings — the enums
+/// carry `rename_all`, so embedding them emits exactly the strings the other
+/// two hand-map to.
+#[derive(Serialize)]
+struct AppliedFix {
+    kind: fixes::FixKind,
+    label: String,
+    rule: String,
+    line: Option<u32>,
+    risk: fixes::FixRisk,
+}
+
 /// The `build_ags4` result. `text` is the AGS4 document (UTF-8, CRLF line
 /// endings) — the browser wraps it in a `Blob` to download.
+///
+/// `applied` is the ledger of what AutoFix rewrote; `fixes_applied` is its
+/// length, kept because it is the released shape. Both are needed: AutoFix
+/// returns only *residual* findings, so without the ledger a caller can say
+/// "3 fixes applied" but not which — recoverable only by re-emitting in
+/// `report` mode and re-running `compute_fixes`, which re-parses and
+/// re-validates to recover what this call already computed.
 #[derive(Serialize)]
 struct BuildAgs4Report {
     text: String,
     findings: Vec<EmitFinding>,
+    applied: Vec<AppliedFix>,
     fixes_applied: usize,
 }
 
@@ -339,9 +364,21 @@ fn emit_report(
             })
         })
         .collect();
+    let applied = res
+        .applied
+        .iter()
+        .map(|f| AppliedFix {
+            kind: f.kind,
+            label: f.label.clone(),
+            rule: f.rule.clone(),
+            line: f.line,
+            risk: f.risk,
+        })
+        .collect();
     Ok(BuildAgs4Report {
         text: String::from_utf8_lossy(&res.bytes).into_owned(),
         findings,
+        applied,
         fixes_applied: res.fixes_applied,
     })
 }
@@ -403,8 +440,10 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
 ///   browser twin of Python's `synthesise_metadata=` and Node's
 ///   `{ synthesiseMetadata }`.
 ///
-/// Returns `{ text, findings, fixes_applied }`; `text` is the AGS4 document
-/// (UTF-8, CRLF) for the browser to wrap in a `Blob`.
+/// Returns `{ text, findings, applied, fixes_applied }`; `text` is the AGS4
+/// document (UTF-8, CRLF) for the browser to wrap in a `Blob`. `applied` is the
+/// ledger of what AutoFix rewrote (`{kind, label, rule, line, risk}` per fix —
+/// the same shape Python and Node present), `fixes_applied` its length.
 #[wasm_bindgen]
 pub fn build_ags4(
     groups_json: &str,
@@ -432,7 +471,7 @@ pub fn build_ags4(
 ///   AGS headings). Order is preserved (put `PROJ` first).
 /// * `dict_version` / `mode` / `synthesise_metadata` — as [`build_ags4`].
 ///
-/// Returns the same `{ text, findings, fixes_applied }`. The Arrow→AGS
+/// Returns the same `{ text, findings, applied, fixes_applied }`. The Arrow→AGS
 /// transpose is the read path's IPC reversed.
 #[wasm_bindgen]
 pub fn build_ags4_ipc(
@@ -564,6 +603,33 @@ mod build_ags4_tests {
         let r = build_ags4_from_json(json, None, Some("report"), false).unwrap();
         assert!(r.text.contains("\"12.3\""));
         assert_eq!(r.fixes_applied, 0);
+        assert!(r.applied.is_empty(), "report mode rewrites nothing");
+    }
+
+    /// The count alone cannot say WHICH fix ran, and AutoFix returns only
+    /// residual findings — so a caller with `fixes_applied: 1` and no ledger has
+    /// no way to review the rewrite short of re-emitting and re-validating.
+    /// Asserts the ledger is populated AND agrees with the count, because the
+    /// two coming apart is the failure that would look fine in a UI.
+    #[test]
+    fn autofix_reports_which_fixes_it_applied() {
+        let json = r#"[
+          {"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]},
+          {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}
+        ]"#;
+        let r = build_ags4_from_json(json, None, Some("autofix"), false).unwrap();
+        assert_eq!(
+            r.applied.len(),
+            r.fixes_applied,
+            "the ledger and the count must describe the same work"
+        );
+        let numeric = r
+            .applied
+            .iter()
+            .find(|f| f.kind == fixes::FixKind::ReformatNumeric)
+            .expect("the 12.3 → 12.30 pad is a ReformatNumeric fix");
+        assert_eq!(numeric.rule, "AGS Format Rule 8");
+        assert_eq!(numeric.risk, fixes::FixRisk::Safe);
     }
 
     #[test]
