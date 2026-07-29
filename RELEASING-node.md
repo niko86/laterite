@@ -62,7 +62,7 @@ deleted. `--provenance` works under both.
    add a tag rule **`node-v*`**. This is the environment-level half of the publish
    gate (mirrors the `pypi` env).
 
-### After the first release — switch to OIDC (optional, recommended)
+### After the first release — switch to OIDC — **DONE**
 
 Once the four packages exist on npm:
 
@@ -70,9 +70,17 @@ Once the four packages exist on npm:
    `@laterite/native-linux-x64-gnu`, `@laterite/native-win32-x64-msvc`: package
    Settings → *Trusted Publisher* → GitHub Actions, with Repository = the repo
    hosting `release.yml`, Workflow = `release.yml`, Environment = `npm`.
+   **Done** — proven by `node-v0.7.0` and `node-v0.8.0` publishing cleanly on an
+   already-expired token, which only OIDC can explain.
 2. Next release uses OIDC with no workflow change (npm prefers the trusted
-   publisher when `id-token` is present). You can then **delete the `NPM_TOKEN`
-   secret**.
+   publisher when `id-token` is present).
+3. **Delete the token from the job.** Done for `npm-publish` — it passes no
+   `NODE_AUTH_TOKEN` at all. This is not tidying: a token behind a working
+   trusted publisher is never read, so its only reachable effect is to turn "the
+   publisher is misconfigured" into a misleading `E404`. Removing it changes the
+   failure path, not the success path. See the job comment and RELEASING-wasm.md.
+4. **Delete the `NPM_TOKEN` repository secret.** Nothing in `release.yml`
+   references it any more — owner action, not something CI can do.
 
 ## What the `node-v*` tag triggers
 
@@ -118,8 +126,9 @@ provenance-signed; a real `npm install laterite` reads + validates against the
 published binary). The shakedown surfaced three gotchas, all now guarded against
 above: the committed napi loader (else the publish-only `build:ts` breaks — see
 the packaging smoke in the `node` CI job), the **Automation** token (2FA/`EOTP`),
-and `publishConfig.access=public` (scoped-private `E402`). Next: wire OIDC
-trusted publishers and delete `NPM_TOKEN`.
+and `publishConfig.access=public` (scoped-private `E402`). The trusted publishers
+are wired and the job no longer passes a token; only deleting the now-unreferenced
+`NPM_TOKEN` secret remains.
 
 ## Why the native pins are NOT in the committed `package.json` (the `EUSAGE` cycle)
 

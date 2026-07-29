@@ -744,11 +744,12 @@ jobs:
     #   1. Workflow-level (this `if:`): only FINAL `v*` tag pushes (no rc/dev).
     #   2. Environment-level (`environment: npm`'s deployment_branch_policy):
     #      the `npm` env only allows deployments from `v*` tag refs.
-    #   3. npm-side auth: the `NPM_TOKEN` secret for the FIRST release (npm can't
-    #      pre-configure a trusted publisher for a not-yet-existing package, so
-    #      OIDC alone can't bootstrap the four packages). After they exist + you
-    #      add the per-package trusted publishers (RELEASING-node.md), npm uses
-    #      OIDC automatically — `id-token` stays on below — and the token can go.
+    #   3. npm-side auth: OIDC via the per-package trusted publishers and the
+    #      `id-token` below. NO token — see the publish steps for why that is a
+    #      diagnostic improvement, not just tidying. (A token WAS needed to
+    #      bootstrap these four names, because npm cannot pre-configure a trusted
+    #      publisher for a package that does not exist yet; once they existed the
+    #      token stopped being consulted.)
     # Owner npm prerequisites are in RELEASING-node.md.
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/node-v') && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'dev')
     name: npm (laterite + @laterite/native-*)
@@ -826,21 +827,22 @@ jobs:
       # package's optionalDependencies to this version), then the main package.
       # `--provenance` attaches the build provenance attestation.
       #
-      # Auth: `NODE_AUTH_TOKEN` (the `NPM_TOKEN` secret) writes the `.npmrc` line.
-      # This is what the FIRST release uses, because npm — unlike PyPI — can't
-      # configure a trusted publisher for a package that doesn't exist yet. Once
-      # the four packages exist and you've added their trusted publishers (see
-      # RELEASING-node.md), npm uses OIDC automatically (it prefers the trusted
-      # publisher when `id-token` is available) — no workflow change, and you can
-      # then delete the token. `--provenance` works either way.
+      # Auth: OIDC only. NO `NODE_AUTH_TOKEN` — the four packages have trusted
+      # publishers, so `id-token: write` above is the whole credential story.
+      #
+      # A token here is not a fallback behind that, it is a blindfold. The one
+      # this job used had expired 2026-06-22 and nobody noticed for FIVE WEEKS:
+      # `node-v0.7.0` and `node-v0.8.0` both published fine, because npm prefers
+      # the trusted publisher and never consulted it. It only surfaced when a
+      # brand-new package — which by definition cannot have a publisher yet —
+      # fell back to it and got `E404`, an error naming neither the expiry nor
+      # the real cause. With nothing to fall back to, a publisher problem reports
+      # itself as one. Proven on `wasm-v0.8.2` (#172), the first tokenless
+      # publish: OIDC authenticated first try, provenance attached.
       - name: Publish @laterite/native-* (platform packages)
         run: npm run prepublish:napi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish laterite (main package)
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   # --- the browser package: @laterite/ags4-wasm, on its own `wasm-v*` tag -----
   #
