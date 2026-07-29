@@ -41,10 +41,23 @@ gh api -X POST repos/niko86/laterite/environments/npm/deployment-branch-policies
   -f name='wasm-v*' -f type='tag'
 ```
 
-**Add the trusted publisher** — package Settings → *Trusted Publisher* → GitHub
-Actions, Repository = this repo, Workflow = `release.yml`, Environment = `npm`.
-Do this immediately after the bootstrap below; it is what makes every subsequent
-release credential-free.
+**The trusted publisher — DONE 2026-07-30.** Package Settings → *Trusted
+Publisher* → GitHub Actions, Repository = this repo, Workflow = `release.yml`,
+Environment = `npm`. Do this immediately after the bootstrap below; it is what
+makes every subsequent release credential-free.
+
+**And then delete the token from the job.** `wasm-publish` no longer passes
+`NODE_AUTH_TOKEN` at all (#172). Once a trusted publisher exists, a token is not a
+fallback behind it — it is the thing that hides a misconfiguration. It is why the
+first `wasm-v0.8.1` attempt was slow to read: OIDC could not engage, npm fell back
+to a credential that had expired five weeks earlier, and the answer was `E404`,
+which names neither fact. With nothing to fall back to, "the publisher is wrong"
+reports itself as an auth error instead of a missing package.
+
+`npm-publish` (the node train) still carries its token. By this same argument it is
+also dead weight — `node-v0.7.0` and `node-v0.8.0` both published on that expired
+token because OIDC was already covering those four packages — so drop it on the next
+`node-v*`, when a release can actually prove it.
 
 ## Bootstrapping a new package name (how 0.8.1 actually shipped)
 
