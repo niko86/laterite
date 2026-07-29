@@ -14,6 +14,24 @@
   },
   "releases": [
     {
+      "version": "0.8.2",
+      "date": "2026-07-30",
+      "summary": "No functional change on any surface. The browser package is republished from CI so it carries a build provenance attestation, which 0.8.1 could not.",
+      "added": [],
+      "changed": [
+        {
+          "text": "**`@laterite/ags4-wasm` is published by CI with a build provenance attestation.** 0.8.1 was published by hand because npm cannot configure a trusted publisher for a package that does not exist yet, so it is the one version carrying no attestation. **The wasm bytes are unchanged from 0.8.1** — if you verify provenance in your supply chain, take 0.8.2; otherwise there is nothing here to upgrade for.",
+          "prs": [
+            172
+          ]
+        }
+      ],
+      "deprecated": [],
+      "removed": [],
+      "fixed": [],
+      "security": []
+    },
+    {
       "version": "0.8.1",
       "date": "2026-07-29",
       "summary": "The browser build ships as an npm package for the first time, carrying two things the other surfaces already had: reachable metadata synthesis, and a visible AutoFix ledger.",
