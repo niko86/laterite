@@ -179,10 +179,14 @@ deciding that question now.
   reads "AGS4 type system"; the name should say so. crates.io has no rename, so this is
   free now and irreversible later. Requires regenerating [[crate-dependency-graph]]
   (`tools/gen_crate_graph.py`), which is CI-gated.
-- **laterite#161 — DuckDB naming in a format-neutral leaf.**
+- **laterite#161 — DuckDB naming in a format-neutral leaf, and it is dead.**
   `GroupDescriptor::table()`/`view()` return `g_<code>`/`v_<code>`, documented as the
-  DuckDB table and view names, from the reference-data leaf. Publishing freezes an
-  unrelated product's schema conventions into a dictionary crate's public API.
+  DuckDB table and view names, from the reference-data leaf. Publishing would freeze an
+  unrelated product's schema conventions into a dictionary crate's public API — but the
+  sharper finding is that **they have no callers**: the only occurrences repo-wide are
+  the two functions and their own unit test, and `laterite-duckdb` never references
+  `GroupDescriptor` or builds a `g_`/`v_` name at all. So the fix is deletion, not
+  relocation. Inventoried in [[reliquary]] as `spotted`.
 
 **`laterite-transport` keeps its name.** Its header records that the age + zstd
 envelope works on any file; it is the one engine crate that would carry over unchanged
