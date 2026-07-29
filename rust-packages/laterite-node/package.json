@@ -82,11 +82,6 @@
   "dependencies": {
     "apache-arrow": "^21.1.0"
   },
-  "optionalDependencies": {
-    "@laterite/native-darwin-arm64": "0.8.0",
-    "@laterite/native-linux-x64-gnu": "0.8.0",
-    "@laterite/native-win32-x64-msvc": "0.8.0"
-  },
   "peerDependencies": {
     "@duckdb/node-api": ">=1.5.0"
   },

@@ -5,8 +5,8 @@
 (`@laterite/native-darwin-arm64`, `@laterite/native-linux-x64-gnu`,
 `@laterite/native-win32-x64-msvc`) as `optionalDependencies`. As of #372 it
 **shares the single project version** with the wheel + CLI:
-`tools/release/bump-version.sh` stamps `package.json` + the three native pins and
-regenerates `package-lock.json`, so the version bump is covered in RELEASING.md —
+`tools/release/bump-version.sh` stamps `package.json` and regenerates
+`package-lock.json`, so the version bump is covered in RELEASING.md —
 including how to cut the `node-v*` tag on the mirror. **This doc keeps only the
 npm-specific one-time owner setup and the publish-path gotchas** (they bit us on
 the 0.1.0 shakedown). `release.yml`'s `build-node` + `npm-publish` jobs do the
@@ -100,14 +100,35 @@ the packaging smoke in the `node` CI job), the **Automation** token (2FA/`EOTP`)
 and `publishConfig.access=public` (scoped-private `E402`). Next: wire OIDC
 trusted publishers and delete `NPM_TOKEN`.
 
-> **The `package-lock.json` regen (now automatic).** The `@laterite/native-*`
-> optional deps are pinned to the package version. While a version is unpublished
-> the lockfile records them as *unresolved*; once published, `npm ci` resolves
-> them against the registry and a stale lockfile entry no longer matches →
-> **`EUSAGE` "lock file ... does not satisfy"**. `tools/release/bump-version.sh`
-> now regenerates `package-lock.json` as part of the bump (via `npm install
-> --package-lock-only`), so a routine release no longer needs a manual step. If
-> you ever hit `EUSAGE` out-of-band, `cd rust-packages/laterite-node && npm
-> install` and commit the updated lock. (Don't use `npm ci --omit=optional` to
-> dodge it — that also drops rollup's own platform binary and breaks the `tsup`
-> build.)
+## Why the native pins are NOT in the committed `package.json` (the `EUSAGE` cycle)
+
+This bit twice, so the fix is structural rather than procedural.
+
+The `@laterite/native-*` optional deps used to be pinned in the committed
+manifest at the package version. While that version is unpublished npm cannot
+resolve them, so `package-lock.json` records `{"optional": true}` placeholders;
+once the version publishes, `npm ci` validates the lock against the registry, the
+placeholders no longer satisfy the manifest, and every install fails with
+**`EUSAGE` "lock file ... does not satisfy"**.
+
+The first fix was procedural — have `bump-version.sh` regenerate the lock during
+the bump. That cannot work, because the bump happens *before* the publish: the
+regenerated lock just gets fresh placeholders. `npm ci` duly broke on `main`
+again immediately after 0.8.0 published (#155).
+
+So the pins are gone from the committed manifest entirely. `napi pre-publish`
+rewrites the whole `optionalDependencies` block at publish time anyway, deriving
+each pin from `napi.targets` and the package version — a committed copy could
+only ever be redundant, and could never make the published pins more correct than
+the tool that writes them. With nothing pinned, there is nothing unresolvable to
+lock.
+
+`test_version_faithful.py::test_node_package_and_native_deps_match` asserts the
+pins stay absent, and that `napi.targets` matches `release.yml`'s `build-node`
+matrix — the input napi actually derives them from.
+
+If you ever hit `EUSAGE` out-of-band anyway: `cd rust-packages/laterite-node &&
+npm install --package-lock-only` and commit the lock. **Don't reach for
+`npm ci --omit=optional`** — it does not dodge the error (the manifest/lock sync
+check runs before install strategy, verified), and it would drop rollup's own
+platform binary and break the `tsup` build.
