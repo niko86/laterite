@@ -19,8 +19,19 @@ sources: []
 
 > [!note] **Internal implementation detail** — a browser cdylib, not a
 > public Rust API. It is the wasm engine behind the validator site /
-> data explorer ([[validator-site]]), consumed only by that front-end's
-> JavaScript.
+> data explorer ([[validator-site]]).
+
+> [!important] No longer in-tree only — **published to npm as of 0.8.1 (2026-07-29)**
+> This page said the crate was "consumed only by that front-end's JavaScript"
+> until `@laterite/ags4-wasm@0.8.1` shipped. It now has an **external consumer**,
+> which changes what a change here costs: the wasm exports are a **released
+> surface**, versioned on their own `wasm-v*` tag train, and breaking one breaks
+> a downstream browser consumer rather than a co-located front-end you can fix in
+> the same PR.
+>
+> The crate stays tagged `internal` — the same convention [[laterite-node]] uses.
+> The *crate* is plumbing; the *artifact* is public. See `repo:RELEASING-wasm.md`
+> for the tag train and what bootstrapping the name cost.
 
 > [!note] Not the only browser wasm module
 > Since #533 (part of the #527 convergence arc) the browser also loads a

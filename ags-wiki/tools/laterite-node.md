@@ -18,10 +18,16 @@ sources: []
 ---
 # laterite-node
 
-> [!note] **Internal implementation detail (in progress)** — the napi-rs
+> [!note] **Internal implementation detail** — the napi-rs
 > cdylib + co-located TS package: the **Node.js** host binding, the direct
-> analog of [[laterite-py]] for the JS/TS half of the toolchain. Not yet
-> published to npm (that is P4).
+> analog of [[laterite-py]] for the JS/TS half of the toolchain.
+
+> [!important] **Published.** `laterite` shipped to npm at **0.1.0 (2026-06-15)**
+> This page claimed "not yet published to npm (that is P4)" for six weeks after it
+> stopped being true — `laterite@0.8.0` is current, alongside the three
+> `@laterite/native-*` platform packages, and releases run from CI via OIDC with
+> provenance. The npm package is a **released surface** on its own `node-v*` tag
+> train. See `repo:RELEASING-node.md`.
 
 ## What it is
 
