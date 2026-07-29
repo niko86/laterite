@@ -94,10 +94,17 @@ bump-version: committed 'release: $new' on branch '$branch'.
 Next (see RELEASING.md):
   1. Open a PR into main and merge it (this also republishes the docs at
      /laterite/docs/ with $new + its notes — derived at build, nothing to run).
-  2. On the merged main, cut BOTH tags to publish:
+  2. On the merged main, cut a tag per surface that ACTUALLY CHANGED. Each tag
+     drives its own train and is independent — cutting one does not oblige the
+     others, and republishing an unchanged surface is noise (0.8.1 shipped the
+     browser package alone, because only the wasm crate had changed):
        gh release create v$new       --title v$new       --generate-notes  # wheels -> PyPI, CLI -> GH release
-       gh release create node-v$new  --title node-v$new  --generate-notes  # npm addon + @laterite/native-*
+       gh release create node-v$new  --title node-v$new  --generate-notes  # npm 'laterite' + @laterite/native-*
+       git tag wasm-v$new && git push origin wasm-v$new                    # npm '@laterite/ags4-wasm' (browser)
+     To see what changed since the last release of a surface:
+       git diff --name-only v<prev>..HEAD -- <its paths>
   3. Approve the 'pypi' / 'npm' environments on the resulting Actions runs.
+     (The 'npm' env gates node-v* AND wasm-v*; see RELEASING-wasm.md.)
   4. Cut the DuckDB extension at the SAME version (its own repo):
        cd <niko86/laterite-duckdb> && bash scripts/release.sh $new
 EOF
