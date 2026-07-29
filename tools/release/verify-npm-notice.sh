@@ -47,7 +47,10 @@ for pkg in "${pkgs[@]}"; do
     fail=1
     continue
   fi
-  name="$(node -p "require('./$pkg/package.json').name")"
+  # `path.resolve` rather than a hardcoded `./` prefix: the npm job passes
+  # relative dirs (`.`, `npm/*/`) but the wasm job passes an absolute one, and
+  # `./` + an absolute path is `.//private/...`, which does not resolve.
+  name="$(node -p "require(require('path').resolve('$pkg','package.json')).name")"
 
   # `cd` into the package: `npm pack --prefix` does not select what is packed.
   # stderr is deliberately NOT swallowed — it reaches the job log, so a check

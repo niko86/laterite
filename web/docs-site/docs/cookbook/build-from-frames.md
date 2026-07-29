@@ -3,8 +3,8 @@
 **Available in:** Python · Node · Browser
 
 **What / when:** you have your data as per-group tables (one per group, columns named
-for the AGS headings) and want a **valid** AGS4 file back — without hand-writing the
-`TRAN` / `UNIT` / `TYPE` boilerplate.
+for the AGS headings) and want an AGS4 file back — optionally with the
+`TRAN` / `UNIT` / `TYPE` boilerplate derived for you.
 
 === "Python"
 
@@ -13,26 +13,35 @@ for the AGS headings) and want a **valid** AGS4 file back — without hand-writi
     ```
 
     ```text
-    groups: ['PROJ', 'LOCA', 'TRAN', 'UNIT', 'TYPE']
-    findings: 0
+    groups: ['PROJ', 'LOCA']
+    findings: 3
     ```
 
     `build_ags4` takes a `{code: frame}` mapping — each frame's columns *are* the AGS
-    headings for that group — and returns a `BuildResult`. You handed it two data
-    groups (`PROJ`, `LOCA`); it handed back five. In `mode="autofix"` (the default)
-    it synthesizes the mandatory metadata catalogs — `TRAN`, `UNIT`, `TYPE`, plus
-    `ABBR` for any `PA` pick-list codes — so a data-only build passes the rule
-    engine in one call. The result carries the file three ways:
+    headings for that group — and returns a `BuildResult` containing exactly the
+    groups you supplied. AGS4 also mandates the metadata catalogs, which your frames
+    don't carry, so they are **reported, not invented**: the three findings are Rules
+    14 (`TRAN`), 15 (`UNIT`) and 17 (`TYPE`). The result carries the file three ways:
 
     - `res.text` — the AGS4 as a `str` (in memory)
     - `res.bytes` — the byte-faithful encoding (what `read(data=…)` consumes above)
     - `res.save("out.ags")` — persist to disk
 
-    **Variation:** pass `mode="strict"` to skip the metadata synthesis — then you
-    own the `TRAN`/`UNIT`/`TYPE` groups and findings will flag anything missing.
-    **Gotcha:** the emitter writes **only the headings (columns) you supply** — it
-    never invents data columns, only the catalog groups around them — so a sparse
-    frame builds clean rather than padding out the full dictionary.
+    **To get the catalogs:** pass `synthesise_metadata=True`. `UNIT` and `TYPE` are
+    derived from your columns, `ABBR` from the standard table when `PA` codes are
+    used, and `TRAN` written as a placeholder you overwrite — five groups, no
+    findings. `PROJ` and `DICT` are *never* synthesised: a project identity and a
+    schema extension are authorial facts, and inventing a `DICT` parent would turn a
+    loud Rule 18 error into a silent false statement Rule 10's relational checks then
+    trust.
+
+    **Gotcha:** synthesis is independent of `mode`, and only `mode="autofix"` (the
+    default) honours it. `mode="report"` emits unmodified and hands you the findings;
+    `mode="strict"` is a hard gate that *rejects* the build outright if the output
+    violates any error-severity rule — so a data-only build under `strict` raises
+    rather than emitting. The emitter also writes **only the headings you supply**,
+    never inventing data columns, so a sparse frame builds clean rather than padding
+    out the full dictionary.
 
 === "Node"
 
@@ -41,30 +50,30 @@ for the AGS headings) and want a **valid** AGS4 file back — without hand-writi
     ```
 
     ```text
-    groups: [ 'PROJ', 'LOCA', 'TRAN', 'UNIT', 'TYPE' ]
-    findings: 0
+    groups: [ 'PROJ', 'LOCA' ]
+    findings: 3
     ```
 
     `buildAgs4` takes a `Map` (or array) of `[code, rows]` entries — each row a
     plain object whose **keys are the AGS headings** — or an arrow-js `Table` per
     group. Group order is preserved, so put `PROJ` first. It returns the same
     `BuildResult` as Python: `res.bytes` / `res.text` carry the document and
-    `res.findings` is the residual the mode couldn't clear. The default
-    `{ mode: "autofix" }` synthesizes `TRAN`/`UNIT`/`TYPE` (and `ABBR` for `PA`
-    codes); pass `{ mode: "strict" }` to own that metadata yourself. No DuckDB
+    `res.findings` is the residual the mode couldn't clear. Pass
+    `{ synthesiseMetadata: true }` to derive `TRAN`/`UNIT`/`TYPE` (and `ABBR` for
+    `PA` codes); without it those gaps are reported as Rules 14/15/17. No DuckDB
     peer needed — emit is pure.
 
 === "Browser"
 
     Open the [web app](../surfaces/browser.md)'s **Export** pane: assemble or
-    paste your per-group data and export a valid AGS4 file. The same emitter runs
-    compiled to WebAssembly and synthesizes the `TRAN`/`UNIT`/`TYPE` metadata
-    client-side, so the file you download passes the rule engine — and nothing is
-    uploaded to build it.
+    paste your per-group data and export an AGS4 file. The same emitter runs
+    compiled to WebAssembly, and nothing is uploaded to build it. Direct wasm
+    callers take `synthesise_metadata` on `build_ags4` / `build_ags4_ipc` — the
+    browser twin of the Python and Node flags.
 
-Every door runs the same emitter over the same dictionary: hand it data groups,
-get back a valid file with the metadata catalogs filled in. Reach for
-`mode="strict"` on any surface when you want to own the `TRAN`/`UNIT`/`TYPE`
-groups yourself.
+Every door runs the same emitter over the same dictionary, and metadata synthesis
+is opt-in on all of them — `synthesise_metadata=` in Python, `{ synthesiseMetadata }`
+in Node, `synthesise_metadata` in the browser build. Without it you get exactly the
+groups you supplied, plus findings naming the catalogs you didn't.
 
 See also: [Build from a typed graph](./build-from-typed-graph.md) · [Produce AGS4](../learn/produce.md)
