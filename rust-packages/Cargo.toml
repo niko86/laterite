@@ -65,7 +65,7 @@ members = [
 # Python wheels — see root pyproject [tool.bumpversion]); the published
 # npm `laterite` versions on its own `node-v*` track.
 [workspace.package]
-version = "0.8.1"
+version = "0.8.2"
 
 # Workspace-wide clippy pedantic (lever 6, chore/clippy-pedantic): every member
 # opts in via `[lints] workspace = true` (see each member's Cargo.toml), except
