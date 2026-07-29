@@ -930,8 +930,8 @@ jobs:
   wasm-publish:
     # Gated exactly like `npm-publish`: workflow-level (this `if:`) for FINAL
     # `wasm-v*` tags only, then environment-level via the `npm` env's
-    # deployment_branch_policy — which needs a `wasm-v*` tag rule adding
-    # alongside the existing `node-v*` one (RELEASING-wasm.md).
+    # deployment_branch_policy, which carries a `wasm-v*` tag rule alongside the
+    # existing `node-v*` one (added 2026-07-29; RELEASING-wasm.md).
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/wasm-v') && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'dev')
     name: npm (@laterite/ags4-wasm)
     runs-on: ubuntu-latest
@@ -979,8 +979,14 @@ jobs:
       # passed the flag explicitly (and the `@laterite/native-*` packages get it
       # from `napi pre-publish`, not from a bare `npm publish`) — so match the
       # invocation that is known to work rather than rely on the manifest.
+      # NO `NODE_AUTH_TOKEN` here, deliberately. The trusted publisher is wired
+      # (2026-07-30), so this job authenticates by OIDC via `id-token: write`
+      # above — and a token left in place would be strictly harmful rather than a
+      # fallback. It is what made the first `wasm-v0.8.1` attempt so slow to
+      # diagnose: an EXPIRED `NPM_TOKEN` turned "OIDC did not engage" into the
+      # misleading `E404` documented below, instead of a plain auth error naming
+      # the real problem. With nothing to fall back to, a publisher
+      # misconfiguration says so. See RELEASING-wasm.md.
       - name: Publish @laterite/ags4-wasm
         working-directory: wasm-pkg
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
