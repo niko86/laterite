@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-07-29
+
 The browser build ships as an npm package for the first time, carrying two things the other surfaces already had: reachable metadata synthesis, and a visible AutoFix ledger.
 
 ### Added
@@ -123,7 +125,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/niko86/laterite/releases/tag/v0.8.1
 [0.8.0]: https://github.com/niko86/laterite/releases/tag/v0.8.0
 [0.7.0]: https://github.com/niko86/laterite/releases/tag/v0.7.0
 [0.6.2]: https://github.com/niko86/laterite/releases/tag/v0.6.2
