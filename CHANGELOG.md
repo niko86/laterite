@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-07-29
+
+The browser build ships as an npm package for the first time, carrying two things the other surfaces already had: reachable metadata synthesis, and a visible AutoFix ledger.
+
+### Added
+
+- **`@laterite/ags4-wasm` — the browser build, published.** The wasm surface ships to npm for the first time, from its own `wasm-v*` tag so a browser-only fix no longer has to move the Node package. The `.wasm` embeds the AGS4 dictionary, so the third-party notice rides in the package and a release gate verifies it inside the tarball npm would upload. ([#165](https://github.com/niko86/laterite/pull/165))
+- **`applied` on the wasm build result.** `build_ags4` / `build_ags4_ipc` now return the ledger of what AutoFix rewrote — `{kind, label, rule, line, risk}` per fix — matching Python's `BuildResult.applied` and Node's `EmitResult.applied`. AutoFix returns only *residual* findings, so the previous count alone could say how many fixes ran but never which. ([#165](https://github.com/niko86/laterite/pull/165))
+
+### Fixed
+
+- **`synthesise_metadata` is reachable from the browser.** `build_ags4` and `build_ags4_ipc` took no such argument, so a wasm caller could not opt in to the mandatory `UNIT`/`TYPE`/`TRAN`/`ABBR` catalogs. The flag reached Python and Node when synthesis became opt-in, but missed the wasm door. ([#149](https://github.com/niko86/laterite/pull/149))
+- **The produce/build docs described the pre-opt-in synthesis behaviour.** Three pages claimed `mode="autofix"` synthesises the metadata catalogs, and that `mode="strict"` is how you skip synthesis. Synthesis is opt-in and independent of mode; `strict` is a hard gate that rejects the build rather than emitting it. ([#165](https://github.com/niko86/laterite/pull/165))
+
 ## [0.8.0] — 2026-07-28
 
 A performance pass on the read path (a typed read is now ~4× faster) and a new `to_duckdb()` persistence door, plus one breaking change: metadata synthesis is now opt-in.
@@ -111,7 +125,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/niko86/laterite/releases/tag/v0.8.1
 [0.8.0]: https://github.com/niko86/laterite/releases/tag/v0.8.0
 [0.7.0]: https://github.com/niko86/laterite/releases/tag/v0.7.0
 [0.6.2]: https://github.com/niko86/laterite/releases/tag/v0.6.2

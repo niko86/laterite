@@ -2080,7 +2080,7 @@ checksum = "bf36173d4167ed999940f804952e6b08197cae5ad5d572eb4db150ce8ad5d58f"
 
 [[package]]
 name = "laterite-ags4-censor"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
@@ -2091,7 +2091,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-check"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "chrono",
  "clap",
@@ -2113,7 +2113,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-compliance"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-parity",
@@ -2124,7 +2124,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-core"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "criterion",
  "laterite-ags4-parse",
@@ -2141,7 +2141,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-corpus-qa"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2165,7 +2165,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-diff"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
@@ -2175,7 +2175,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-emit"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "arrow",
  "criterion",
@@ -2188,7 +2188,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-forge"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2204,7 +2204,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-merge"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "laterite-ags4-emit",
  "laterite-ags4-parse",
@@ -2216,7 +2216,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-parity"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "laterite-ags4-validator",
  "serde",
@@ -2225,7 +2225,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-parse"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "criterion",
  "encoding_rs",
@@ -2235,7 +2235,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-perf"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-validator",
@@ -2246,7 +2246,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-reference"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "criterion",
  "encoding_rs",
@@ -2262,7 +2262,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-tokenizer-wasm"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-types",
@@ -2273,7 +2273,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-trust"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "criterion",
  "laterite-ags4-core",
@@ -2284,7 +2284,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-validator"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "chrono",
  "criterion",
@@ -2305,7 +2305,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-wasm"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "arrow",
  "chrono",
@@ -2332,7 +2332,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-xcheck"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-emit",
@@ -2344,7 +2344,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-cliutil"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "clap",
  "comfy-table",
@@ -2356,7 +2356,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-excel"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "calamine",
  "laterite-ags4-core",
@@ -2369,7 +2369,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-node"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "arrow",
  "encoding_rs",
@@ -2392,7 +2392,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-py"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "arrow",
  "chrono",
@@ -2415,7 +2415,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-transport"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "age",
  "thiserror 2.0.19",
@@ -2424,7 +2424,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-types"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "arrow",
  "chrono",
