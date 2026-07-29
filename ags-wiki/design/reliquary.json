@@ -244,6 +244,14 @@
       "status": "removed",
       "removed_in": "mutation-sweep cleanup (coverage-rust)",
       "evidence": "same inert pattern as `diff` — `merge` parses/reconciles but never runs the rule engine, so `opts.include_warnings` was never read. Collapsed to `CheckOptions::default()`"
+    },
+    {
+      "symbol": "`GroupDescriptor::table()`/`view()`",
+      "verify": "`rust-packages/laterite-ags4-reference/src/union.rs::fn table`",
+      "axis": "code",
+      "status": "spotted",
+      "removed_in": "—",
+      "evidence": "DuckDB `g_<code>`/`v_<code>` name builders on the reference-data leaf. Verified dead 2026-07-29: the only occurrences repo-wide are the two fns and their own unit test (union.rs:401-402), and `laterite-duckdb` never references `GroupDescriptor` — it builds no `g_`/`v_` names at all. Publishing would freeze an unrelated product's naming into a dictionary crate's public API. See [[dec-rust-api-crates-io]], laterite#161"
     }
   ]
 }
