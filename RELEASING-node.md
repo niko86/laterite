@@ -27,15 +27,36 @@ deleted. `--provenance` works under both.
 
 1. **Create the `@laterite` org** on npm (free, for public packages). Done — it
    owns the three scoped native packages.
-2. **Create a classic _Automation_ token** (npm → *Access Tokens* → *Generate New
-   Token* → **Classic Token** → **Automation**). Add it as the **repo secret
-   `NPM_TOKEN`** (repo Settings → Secrets and variables → Actions).
-   - **Use Automation, not a granular/publish token, if your account has 2FA.**
-     Automation tokens are the documented exception that **bypass 2FA** in CI;
-     granular and classic-publish tokens respect the account's
-     "two-factor for writes" setting and the publish fails with **`EOTP` — "this
-     operation requires a one-time password"** (learned the hard way on the
-     0.1.0 release). Account-wide scope is fine; delete it once OIDC is wired.
+2. ~~**Create a classic _Automation_ token**~~ — **NO LONGER POSSIBLE (checked
+   2026-07-29).** npm has removed classic tokens from the UI: only *granular*
+   access tokens can be created, and npm actively advises against the
+   bypass-2FA option they replaced. It also prints, on any publish using a
+   2FA-bypassing credential, that such tokens *"are being restricted for account
+   changes and direct publishing"*
+   ([deprecation notice](https://gh.io/npm-gat-bypass2fa-deprecation)).
+
+   The historical reasoning, kept because it explains the shape of what follows:
+   Automation tokens were the documented exception that bypassed 2FA in CI, while
+   granular and classic-publish tokens respect the account's "two-factor for
+   writes" setting and fail with **`EOTP` — "this operation requires a one-time
+   password"** (learned on the 0.1.0 release). With Automation tokens gone, **there
+   is no CI-usable credential that dodges 2FA** — which is why the bootstrap route
+   below changed.
+
+   **What to do instead:** don't create a token at all. Bootstrap a new package
+   with ONE authenticated publish from a workstation (`npm login`, then
+   `npm publish <dir> --access public --otp=<code>`), then wire its trusted
+   publisher so every later release comes from CI via OIDC with provenance and no
+   credential in the loop. See RELEASING-wasm.md, which walks the full sequence
+   including the three separate auth failures it surfaces.
+
+   > **If a `NPM_TOKEN` secret still exists, treat it as a liability, not a
+   > fallback.** This repo's expired on **2026-06-22** and nobody noticed for five
+   > weeks — `node-v0.7.0` (2026-07-08) and `node-v0.8.0` (2026-07-28) both
+   > published fine, because OIDC covered the four existing packages and the token
+   > was never consulted. It only surfaced when a package that *cannot* use OIDC —
+   > a brand-new one — fell back to it and got `E404`. Deleting the token once OIDC
+   > is live (step 2 of the next section) would have made that loud immediately.
 3. **Create the `npm` GitHub environment** (repo Settings → Environments → *New
    environment* `npm`) with a **deployment branch/tag policy** → *Selected* →
    add a tag rule **`node-v*`**. This is the environment-level half of the publish

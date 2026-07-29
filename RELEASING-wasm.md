@@ -41,12 +41,52 @@ gh api -X POST repos/niko86/laterite/environments/npm/deployment-branch-policies
   -f name='wasm-v*' -f type='tag'
 ```
 
-**After the first publish**, add the trusted publisher so npm switches to OIDC:
-package Settings → *Trusted Publisher* → GitHub Actions, Repository = this repo,
-Workflow = `release.yml`, Environment = `npm`. Until then the publish
-authenticates with the existing `NPM_TOKEN` secret — npm cannot pre-configure a
-trusted publisher for a package that does not yet exist, the same bootstrap
-problem RELEASING-node.md documents.
+**Add the trusted publisher** — package Settings → *Trusted Publisher* → GitHub
+Actions, Repository = this repo, Workflow = `release.yml`, Environment = `npm`.
+Do this immediately after the bootstrap below; it is what makes every subsequent
+release credential-free.
+
+## Bootstrapping a new package name (how 0.8.1 actually shipped)
+
+npm cannot pre-configure a trusted publisher for a package that does not exist, so
+**OIDC cannot create a name** — and as of 2026-07-29 there is no CI-usable
+credential that can either: npm removed classic *Automation* tokens (the documented
+2FA-bypass exception) and restricts 2FA-bypassing credentials for direct publishing.
+
+So the name is created by **one authenticated publish from a workstation**, after
+which CI takes over. That is what happened for `0.8.1`:
+
+```bash
+wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir /tmp/wasm-pkg
+tools/release/prepare-wasm-package.sh /tmp/wasm-pkg
+tools/release/verify-npm-notice.sh /tmp/wasm-pkg     # prove the notice rides
+npm login
+npm publish /tmp/wasm-pkg --access public --otp=<6-digit>
+```
+
+**Three separate auth failures sit on that path, in this order.** Each reports a
+different code and none of them names its real cause:
+
+1. **`E404` on PUT** while the CI job used `NPM_TOKEN`. Not "missing" — *refused*.
+   npm will not confirm whether a scoped name exists, so an unusable credential on
+   a new scoped package surfaces as 404 rather than 401/402. The token had **expired
+   on 2026-06-22** and nobody noticed for five weeks, because OIDC covered the four
+   existing packages and never consulted it (`node-v0.7.0` and `node-v0.8.0` both
+   published fine after it died). A `NPM_TOKEN` left in place after OIDC is wired is
+   a liability: it converts "no credential" into a misleading 404.
+2. **`EOTP` — "this operation requires a one-time password."** The account has
+   two-factor required for writes, and no CI-usable token now dodges that. Hence
+   `--otp=` on the manual publish.
+3. **`E403` "You cannot publish over the previously published versions: 0.8.1"**
+   *while* `GET` on the package still returned 404. The write side is authoritative
+   and the read replica lags — 0.8.1 took **~45 s** to become readable. Do not
+   re-attempt on the strength of a 404; check the direct registry endpoint first.
+
+**Consequence for the tag.** `0.8.1` was published by hand, so the `wasm-v0.8.1`
+CI run's publish job **stays red permanently** — the version already exists and npm
+will not accept it twice. Nothing is broken and the tag still correctly marks the
+source commit. From `0.8.2` the trusted publisher makes CI the only publisher, with
+provenance attached (a manual publish carries none).
 
 ## What a `wasm-v*` tag triggers
 
