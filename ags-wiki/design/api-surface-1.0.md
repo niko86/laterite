@@ -6,7 +6,7 @@ tags: [design, decision, api, duckdb, polars]
 decided: 2026-06-12
 supersedes: []
 from_gap: []
-related: [dec-rust-drives-python, dec-laterite-types-leaf, crate-map, pyo3-boundary, abi3-perf, tech-stack-wasm, ags4-output, reliquary, dec-duckdb-extension]
+related: [dec-rust-drives-python, dec-laterite-types-leaf, crate-map, pyo3-boundary, abi3-perf, tech-stack-wasm, ags4-output, reliquary, dec-duckdb-extension, dec-rust-api-crates-io]
 sources:
   - "https://duckdb.org/docs/stable/internals/storage"
   - "https://duckdb.org/docs/stable/sql/statements/attach"
@@ -149,3 +149,10 @@ feeds it as IPC.
 > chose, from one obvious door; the cost was paid once, in Rust at parse time and once more
 > as a native DuckDB table; writing it back unchanged is byte-identical — proven by a
 > property test, not a promise.
+
+## Related
+
+The **Rust** counterpart to this page is [[dec-rust-api-crates-io]] — the public Rust
+API surface and the crates.io publishing decision. It borrows this page's verb and
+option vocabulary deliberately (`read`, `validate`, `build_ags4`, `warnings`, `fyi`,
+`risky`, `on_type_clash`), so the two surfaces read alike where the languages allow.
