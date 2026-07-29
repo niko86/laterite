@@ -1,11 +1,12 @@
 # Vendored BS 5930 soil-description data
 
-These three JSON files are vendored verbatim from the owner's
-`solmek-field-app` repository, the `bs5930-soil-description` skill:
+These three JSON files are vendored verbatim from a **private first-party
+repository** — the owner's own field-data app — specifically its
+`bs5930-soil-description` skill:
 
-- **source:** `niko86/solmek-field-app`
+- **source:** a private first-party repository (name withheld; this repo is a
+  public mirror). The owner can resolve it from the commit below.
 - **path:** `.agents/skills/bs5930-soil-description/data/`
-- **ref:** `claude/bold-noether-84onlg`
 - **commit:** `3f93315b6e905e9f8563dfdddca9b52aac89065a`
 - **retrieved:** 2026-06-18
 

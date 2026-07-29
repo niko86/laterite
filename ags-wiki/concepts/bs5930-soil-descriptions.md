@@ -27,9 +27,10 @@ layer (proper strata descriptions), not merely structurally valid. Lives at
   relative density, colour lightness·chroma·hue, particle angularity, size
   sub-bands) are parsed at runtime (`include_str!` + serde) from the
   vendored skill data at `repo:rust-packages/laterite-ags4-forge/data/bs5930/`
-  (`terms.json`, `particle-sizes.json`) — copied verbatim from the owner's
-  `solmek-field-app` `bs5930-soil-description` skill (see that dir's
-  `PROVENANCE.md` for the source ref + commit). They stay synced to that
+  (`terms.json`, `particle-sizes.json`) — copied verbatim from a private
+  first-party repository's `bs5930-soil-description` skill (see that dir's
+  `PROVENANCE.md` for the pinned commit; the repository is deliberately
+  unnamed here, as this repo is a public mirror). They stay synced to that
   source.
 - **The constraint engine (Rust).** The secondary-constituent proportion
   bands (Tables 16/17), the cumulative-≤100% rule, the silty/clayey mutual

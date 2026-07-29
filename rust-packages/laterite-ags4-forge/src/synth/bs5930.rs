@@ -4,7 +4,7 @@
 //! The open vocabularies (strength/consistency, relative density, colour,
 //! particle angularity, size sub-bands) are parsed from the vendored skill
 //! data under `data/bs5930/` — see that dir's `PROVENANCE.md` — so they
-//! stay synced to the owner's `solmek-field-app` source. The *constraint
+//! stay synced to that vendored first-party source. The *constraint
 //! engine* (the secondary-constituent proportion bands of Tables 16/17,
 //! the cumulative-≤100% rule, the silty/clayey mutual exclusion, the
 //! coarse-then-fine word order, the colour lightness·chroma·hue order) is
