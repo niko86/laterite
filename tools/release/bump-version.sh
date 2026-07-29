@@ -100,7 +100,11 @@ Next (see RELEASING.md):
      browser package alone, because only the wasm crate had changed):
        gh release create v$new       --title v$new       --generate-notes  # wheels -> PyPI, CLI -> GH release
        gh release create node-v$new  --title node-v$new  --generate-notes  # npm 'laterite' + @laterite/native-*
-       git tag wasm-v$new && git push origin wasm-v$new                    # npm '@laterite/ags4-wasm' (browser)
+       git tag --no-sign wasm-v$new && git push origin wasm-v$new           # npm '@laterite/ags4-wasm' (browser)
+     (--no-sign because tag.gpgsign is on here: a bare 'git tag' implies a
+      SIGNED ANNOTATED tag, dies with 'fatal: no tag message?', and would not
+      match v*/node-v* anyway — those are lightweight, cut server-side by
+      'gh release create'.)
      To see what changed since the last release of a surface:
        git diff --name-only v<prev>..HEAD -- <its paths>
   3. Approve the 'pypi' / 'npm' environments on the resulting Actions runs.

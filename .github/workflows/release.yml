@@ -968,8 +968,19 @@ jobs:
       - name: Verify the package to be published carries the notice
         run: tools/release/verify-npm-notice.sh "$GITHUB_WORKSPACE/wasm-pkg"
 
+      # `--access public` is NOT redundant with the manifest's
+      # `publishConfig.access`. Creating a BRAND-NEW scoped package is where the
+      # two diverge: the first `wasm-v0.8.1` attempt carried publishConfig and
+      # still died with `E404 PUT .../@laterite%2fags4-wasm — Not found ... or you
+      # do not have permission`, with the token present and provenance already
+      # signed. npm reports a permission/visibility refusal on a scoped name as
+      # 404 rather than 402/401 (it will not confirm whether the name exists), so
+      # the error names neither cause. The sibling `laterite` publish has always
+      # passed the flag explicitly (and the `@laterite/native-*` packages get it
+      # from `napi pre-publish`, not from a bare `npm publish`) — so match the
+      # invocation that is known to work rather than rely on the manifest.
       - name: Publish @laterite/ags4-wasm
         working-directory: wasm-pkg
-        run: npm publish --provenance
+        run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

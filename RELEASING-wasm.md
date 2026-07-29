@@ -70,11 +70,26 @@ enrols itself in the Python release.
 
 ## The two traps this path already accounts for
 
-**`E402` — scoped packages default to private.** `@laterite/ags4-wasm` is scoped,
-and publishing a scoped package without `publishConfig.access = "public"` fails
-with *"you must sign up for private packages"*. That is how the 0.1.0 npm
-shakedown failed for the `@laterite/native-*` packages. `prepare-wasm-package.sh`
-sets it and `wasm-verify` asserts it.
+**Scoped packages default to private, and the manifest alone is not enough.**
+`@laterite/ags4-wasm` is scoped, so without `access: public` a publish is refused.
+`prepare-wasm-package.sh` sets `publishConfig.access` and `wasm-verify` asserts it
+— but **`npm publish` must ALSO pass `--access public`**, and the first
+`wasm-v0.8.1` attempt proved it: with the token present, provenance signed, and
+`publishConfig.access: "public"` in the manifest, the PUT still failed with
+
+    npm error code E404
+    npm error 404 Not Found - PUT https://registry.npmjs.org/@laterite%2fags4-wasm
+    npm error 404  ... could not be found or you do not have permission to access it.
+
+**Read that 404 as "refused", not "missing".** npm will not confirm whether a
+scoped name exists, so a permission or visibility refusal on a *new* scoped
+package surfaces as 404 rather than 402 or 401 — the error names neither cause,
+which is what makes it slow to diagnose. The sibling `laterite` publish has always
+passed the flag explicitly; the `@laterite/native-*` packages get it from
+`napi pre-publish` rather than from a bare `npm publish`, which is why nothing in
+the existing setup had exercised this path. (The related `E402 you must sign up for
+private packages` is the same root cause wearing its other error code — that is how
+the 0.1.0 shakedown failed for the native packages.)
 
 **The ©AGS third-party notice.** The `.wasm` **embeds the AGS4 dictionary** (the
 reference leaf's `include_str!`), so the notice has to ride with it exactly as it
