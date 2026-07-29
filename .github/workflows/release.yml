@@ -30,10 +30,19 @@ permissions:
 on:
   push:
     # `v*` drives the Python release (wheels + binaries + PyPI); `node-v*` drives
-    # the npm release (build-node + npm-publish) independently. Each job is gated
-    # to its own prefix below, so a `node-v0.1.0` tag never builds wheels and a
+    # the npm release (build-node + npm-publish) independently; `wasm-v*` drives
+    # the browser package (build-wasm + wasm-publish). Each job is gated to its
+    # own prefix below, so a `node-v0.1.0` tag never builds wheels and a
     # `v0.3.0` tag never publishes to npm.
-    tags: ["v*", "node-v*"]
+    #
+    # The build jobs are written as EXCLUSIONS ("everything except the other
+    # release trains"), not as a positive `v*` test — so adding a tag prefix
+    # here without also excluding it below silently enrols it in the Python
+    # release. `build-wheels`/`build-binaries`/`github-release` guard only on
+    # `!node-v`, which a `wasm-v0.8.1` push satisfies; without the matching
+    # `!wasm-v` added to each, a browser tag would build wheels and cut a
+    # GitHub release. Keep the two lists in step.
+    tags: ["v*", "node-v*", "wasm-v*"]
   # Publishing a GitHub Release on a NEW tag fires BOTH a `push` (tag) event AND
   # a `release` event. Creating the release from the UI / `gh release create` is
   # how a release is cut (no persistent local clone of the public mirror) — and
@@ -86,7 +95,7 @@ jobs:
     # republishing pulls existing wheels from a prior release. Also skip on a
     # `node-v*` tag and on any `release` event (Python releases come via `v*`
     # tag pushes / dispatch, never the Releases UI).
-    if: inputs.republish_tag == '' && !startsWith(github.ref, 'refs/tags/node-v') && github.event_name != 'release'
+    if: inputs.republish_tag == '' && !startsWith(github.ref, 'refs/tags/node-v') && !startsWith(github.ref, 'refs/tags/wasm-v') && github.event_name != 'release'
     runs-on: ${{ matrix.os }}
     env:
       # macOS Tart VM has CommandLineTools, not full Xcode. Set both:
@@ -291,7 +300,7 @@ jobs:
     name: binaries (${{ matrix.target }})
     # Python CLI binaries — skip on republish, on a `node-v*` (npm) tag, and on
     # any `release` event.
-    if: inputs.republish_tag == '' && !startsWith(github.ref, 'refs/tags/node-v') && github.event_name != 'release'
+    if: inputs.republish_tag == '' && !startsWith(github.ref, 'refs/tags/node-v') && !startsWith(github.ref, 'refs/tags/wasm-v') && github.event_name != 'release'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -389,7 +398,7 @@ jobs:
     # A GitHub release is the Python artefacts' home — skip on a `node-v*` tag
     # (npm-publish ships to the registry with `--skip-gh-release`) and on any
     # `release` event (a published release must not recurse into building one).
-    if: (github.event_name == 'push' || (inputs.dry_run != true && inputs.republish_tag == '')) && !startsWith(github.ref, 'refs/tags/node-v') && github.event_name != 'release'
+    if: (github.event_name == 'push' || (inputs.dry_run != true && inputs.republish_tag == '')) && !startsWith(github.ref, 'refs/tags/node-v') && !startsWith(github.ref, 'refs/tags/wasm-v') && github.event_name != 'release'
     permissions:
       contents: write
     steps:
@@ -830,5 +839,137 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Publish laterite (main package)
         run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # --- the browser package: @laterite/ags4-wasm, on its own `wasm-v*` tag -----
+  #
+  # A separate tag train from `node-v*` so a browser-only fix can ship without
+  # moving the Node package. Under today's lockstep versioning both still carry
+  # the same number, so the split buys nothing YET — it is the shape #153
+  # (per-surface release tagging) needs, built while the plumbing was open.
+  #
+  # Built ONCE and carried as an artifact: `wasm-verify` and `wasm-publish` both
+  # consume the same bytes, so what was checked is what ships. (The npm side
+  # re-assembles in each job because its inputs are three per-platform `.node`s
+  # from a build matrix; there is only one wasm artefact, so there is no reason
+  # to rebuild it and every reason not to.)
+  build-wasm:
+    name: wasm (browser package)
+    if: >-
+      (github.event_name == 'workflow_dispatch'
+       || (github.event_name == 'push'
+           && startsWith(github.ref, 'refs/tags/wasm-v')))
+      && github.event_name != 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 22
+      - name: Install wasm-pack
+        run: command -v wasm-pack >/dev/null 2>&1 || cargo install wasm-pack --locked
+
+      # `--target web`: the ESM + explicit `init()` shape the crate's README
+      # documents and the web app already consumes. Not `bundler` — that output
+      # only works under a webpack-style loader, while `web` works there AND
+      # from a plain module script.
+      - name: wasm-pack build
+        run: wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir "$GITHUB_WORKSPACE/wasm-pkg"
+
+      # Rewrites the wasm-pack manifest to the published name, sets
+      # publishConfig.access (scoped packages default to PRIVATE → E402), and
+      # stages the ©AGS notice the .wasm's embedded dictionary requires.
+      - name: Prepare the publishable package
+        run: tools/release/prepare-wasm-package.sh "$GITHUB_WORKSPACE/wasm-pkg"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: wasm-pkg
+          path: wasm-pkg/
+          if-no-files-found: error
+
+  # Packaging checks with no environment and no secrets — the rehearsal door.
+  # Same split, and same reasoning, as `npm-verify`: `wasm-publish` is bound to
+  # the `npm` environment, so a workflow_dispatch aimed at it is rejected before
+  # a step runs. This job is reachable on any ref, so the checks can be exercised
+  # without a tag; it also runs on real tag pushes as a fail-fast gate ahead of
+  # the environment.
+  wasm-verify:
+    name: wasm packaging checks (no publish)
+    if: >-
+      (github.event_name == 'workflow_dispatch'
+       || (github.event_name == 'push'
+           && startsWith(github.ref, 'refs/tags/wasm-v')))
+      && github.event_name != 'release'
+    runs-on: ubuntu-latest
+    needs: build-wasm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: wasm-pkg
+          path: wasm-pkg
+      - name: Verify the package carries the ©AGS notice
+        run: tools/release/verify-npm-notice.sh "$GITHUB_WORKSPACE/wasm-pkg"
+      - name: Verify the published name and access
+        run: |
+          set -euo pipefail
+          NAME=$(node -p "require('$GITHUB_WORKSPACE/wasm-pkg/package.json').name")
+          ACCESS=$(node -p "require('$GITHUB_WORKSPACE/wasm-pkg/package.json').publishConfig?.access ?? ''")
+          test "$NAME" = "@laterite/ags4-wasm" || { echo "name is $NAME"; exit 1; }
+          test "$ACCESS" = "public" || { echo "access is '$ACCESS' — a scoped package without it fails E402"; exit 1; }
+          echo "  ok   $NAME (access=$ACCESS)"
+
+  wasm-publish:
+    # Gated exactly like `npm-publish`: workflow-level (this `if:`) for FINAL
+    # `wasm-v*` tags only, then environment-level via the `npm` env's
+    # deployment_branch_policy — which needs a `wasm-v*` tag rule adding
+    # alongside the existing `node-v*` one (RELEASING-wasm.md).
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/wasm-v') && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'dev')
+    name: npm (@laterite/ags4-wasm)
+    runs-on: ubuntu-latest
+    needs: [build-wasm, wasm-verify]
+    environment: npm
+    permissions:
+      id-token: write   # OIDC token exchange for npm trusted publishing
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # npm trusted publishing (OIDC) needs npm >= 11.5.1; node 22 ships npm 10.
+      - name: Upgrade npm (OIDC trusted-publishing support)
+        run: npm install -g npm@latest
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: wasm-pkg
+          path: wasm-pkg
+
+      - name: Verify tag matches package version
+        run: |
+          set -euo pipefail
+          PKG=$(node -p "require('$GITHUB_WORKSPACE/wasm-pkg/package.json').version")
+          TAG="${GITHUB_REF_NAME#wasm-v}"   # wasm-v0.8.1 → 0.8.1
+          test "$PKG" = "$TAG" || { echo "tag wasm-v$TAG != package $PKG"; exit 1; }
+
+      # Re-verified HERE as well as in wasm-verify: this job publishes, so it
+      # checks the artefact it is about to upload rather than trusting another
+      # job's report. One script, so the two callers cannot drift.
+      - name: Verify the package to be published carries the notice
+        run: tools/release/verify-npm-notice.sh "$GITHUB_WORKSPACE/wasm-pkg"
+
+      - name: Publish @laterite/ags4-wasm
+        working-directory: wasm-pkg
+        run: npm publish --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
