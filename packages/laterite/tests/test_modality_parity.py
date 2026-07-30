@@ -532,7 +532,6 @@ def _wasm_verbs() -> set[str]:
 #: prove the machinery (the decode trait, the unknown-key guard, the hand-written
 #: TS interfaces) on the two exports with the smallest blast radius.
 _ARITY_EXEMPT: dict[str, str] = {
-    "merge": "5 args; options-object migration, the phase after build",
     "diff": "4 args; not yet scoped — the plan records it as its own follow-up",
     "censor": "6 args; not yet scoped — same follow-up as diff",
 }

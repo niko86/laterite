@@ -204,6 +204,27 @@ For large, already-columnar data (a duckdb-wasm result), `build_ags4_ipc` takes
 `certify` · `compute_fixes` / `apply_fixes` · `diff` · `merge` ·
 `ags4_to_xlsx` / `xlsx_to_ags4` · `list_rules` · `dictionary` · `censor`.
 
+### Two calling conventions, and which is which
+
+The surface is **mid-migration**, so read this before guessing:
+
+| Export | Shape |
+|---|---|
+| `validate` · `certify` · `build_ags4` · `build_ags4_ipc` · `merge` | `(inputs…, opts?)` — **named options**, unknown keys refused |
+| `compute_fixes` · `apply_fixes` · `diff` · `censor` · `read` · `ags4_to_xlsx` · `xlsx_to_ags4` | still **positional** |
+
+The migrated exports call the text-encoding option `encoding`, matching Python,
+Node and the CLI. The positional ones still name it `encoding_label` — the
+browser was the only surface ever carrying that `_label` suffix, and the name
+moves with each export rather than being changed underneath a signature that
+hasn't. So a mixed spelling in one module is a **recorded state**, not an
+oversight; it ends when the table's second row empties.
+
+An arity gate (`test_modality_parity.py`) holds the migrated exports at their
+current shape and lists the rest with the reason, because CI excludes this crate
+from clippy — `too_many_arguments` has never fired here and would not fire on
+the next export either.
+
 ## See it running
 
 <https://niko86.github.io/laterite/> is this module — a full AGS4 validator and
