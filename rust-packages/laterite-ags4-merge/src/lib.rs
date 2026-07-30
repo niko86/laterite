@@ -26,7 +26,7 @@
 //!
 //!   Widen is emission-only: it rewrites the merged TYPE row and nothing else.
 //!   Promote is the one place merge **rewrites a cell**, and it is confined to
-//!   appending zeros to a decimal (`laterite_ags4_types::pad_decimals` — string-only,
+//!   appending zeros to a decimal (`laterite_types::pad_decimals` — string-only,
 //!   never via `f64`, never rounding). Neither changes how rows were *matched*
 //!   (that is per-file `parse_value`) nor any content-addressed key.
 //!
@@ -47,7 +47,7 @@ use laterite_ags4_parse::{ParsedFile, ParsedGroup};
 use laterite_ags4_reference::dict::DictVersion;
 use laterite_ags4_reference::keychain::key_heading_names;
 use laterite_ags4_reference::union::registry;
-use laterite_ags4_types::{decimal_places, pad_decimals, parse_value};
+use laterite_types::{decimal_places, pad_decimals, parse_value};
 use serde_json::Value;
 
 /// What to do when two files declare a different AGS TYPE for the same heading.
@@ -124,15 +124,12 @@ impl std::str::FromStr for TypeClashMode {
 /// Caller-supplied metadata for the merged file's own TRAN row. The merged file
 /// genuinely *is* a new transmission, so it gets a fresh TRAN describing that
 /// transmission (not a copy of any input's) — see the module note on TRAN.
-#[derive(Debug, Clone, Default)]
-pub struct TranStamp {
-    pub isno: String,
-    pub date: String,
-    pub prod: String,
-    pub recv: String,
-    pub stat: String,
-    pub ags: String,
-}
+///
+/// Re-exported from [`laterite_ags4_emit`] rather than defined here: the emit
+/// path needs the same fields for the same reason, and two identical structs
+/// one crate apart is a hand-copy waiting to drift. Merge's public API is
+/// unchanged — `laterite_ags4_merge::TranStamp` still resolves.
+pub use laterite_ags4_emit::TranStamp;
 
 /// Merge options.
 #[derive(Debug, Clone)]
@@ -284,7 +281,7 @@ pub fn merge_parsed(files: &[ParsedFile], opts: &MergeOpts) -> Result<MergeResul
         if code == "TRAN" {
             match &opts.tran {
                 Some(stamp) => {
-                    inputs.push(synthesise_tran(files, stamp));
+                    inputs.push(synthesise_tran(files, stamp, opts.edition));
                     continue;
                 }
                 None => warnings.push(MergeWarning {
@@ -844,7 +841,7 @@ fn reconcile_rows(
 
 /// Build the merged file's own single-row TRAN from the caller's stamp, recording
 /// the input files' ISNO/DATE in `TRAN_REM` so the merge is self-documenting.
-fn synthesise_tran(files: &[ParsedFile], stamp: &TranStamp) -> GroupInput {
+fn synthesise_tran(files: &[ParsedFile], stamp: &TranStamp, edition: DictVersion) -> GroupInput {
     let provenance = {
         let parts: Vec<String> = files
             .iter()
@@ -865,7 +862,15 @@ fn synthesise_tran(files: &[ParsedFile], stamp: &TranStamp) -> GroupInput {
         )
     };
 
-    let headings = vec![
+    // TRAN_REM carries merge's provenance — a derived fact, not the caller's.
+    // A caller-supplied remark doesn't replace it: both are true, so both are
+    // written. Dropping either would make the row a partial account of itself.
+    let remarks = match &stamp.rem {
+        Some(r) if !r.trim().is_empty() => format!("{provenance}; {r}"),
+        _ => provenance,
+    };
+
+    let mut headings = vec![
         "TRAN_ISNO".to_string(),
         "TRAN_DATE".to_string(),
         "TRAN_PROD".to_string(),
@@ -874,15 +879,27 @@ fn synthesise_tran(files: &[ParsedFile], stamp: &TranStamp) -> GroupInput {
         "TRAN_RECV".to_string(),
         "TRAN_REM".to_string(),
     ];
-    let row = vec![
+    let mut row = vec![
         Value::String(stamp.isno.clone()),
         Value::String(stamp.date.clone()),
         Value::String(stamp.prod.clone()),
         Value::String(stamp.stat.clone()),
-        Value::String(stamp.ags.clone()),
+        // TRAN_AGS is REQUIRED and derivable: the edition merge resolved is the
+        // edition the output is written against. `TranStamp::new` leaves it
+        // empty precisely so callers can't contradict it — fill it here, the
+        // same way emit's `synth_tran` does.
+        Value::String(if stamp.ags.trim().is_empty() {
+            edition.as_str().to_string()
+        } else {
+            stamp.ags.clone()
+        }),
         Value::String(stamp.recv.clone()),
-        Value::String(provenance),
+        Value::String(remarks),
     ];
+    if let Some(d) = &stamp.desc {
+        headings.push("TRAN_DESC".to_string());
+        row.push(Value::String(d.clone()));
+    }
     GroupInput {
         code: "TRAN".to_string(),
         headings,

@@ -220,6 +220,34 @@ export type GroupRows = Array<Record<string, unknown>>;
 /** One group's data for `buildAgs4` — an arrow-js `Table` or row objects. */
 export type GroupData = Table | GroupRows;
 
+/** The transmission a file represents — the caller's half of a synthesised `TRAN`.
+ *
+ * The five members are **required together**, because all five are REQUIRED
+ * headings in the dictionary: a partial stamp emits a `TRAN` that fails Rule
+ * 10b on every cell it leaves blank. Supply the object or omit it; there is no
+ * meaningful half.
+ *
+ * `TRAN_AGS`, `TRAN_DLIM` and `TRAN_RCON` are absent on purpose — they describe
+ * the syntax of the file the emitter is writing, so it fills them. A value you
+ * passed could only contradict the bytes. */
+export interface TranStamp {
+  /** `TRAN_ISNO` — the issue sequence reference. */
+  issue: string;
+  /** `TRAN_DATE` — `yyyy-mm-dd`. */
+  date: string;
+  /** `TRAN_PROD` — who produced the file. */
+  producer: string;
+  /** `TRAN_RECV` — who it is for. */
+  recipient: string;
+  /** `TRAN_STAT` — e.g. `"FINAL"`. */
+  status: string;
+  /** `TRAN_DESC` — what was transferred. Optional. */
+  description?: string;
+  /** `TRAN_REM` — free remarks. Optional. On a merge these are appended to the
+   *  provenance note, not substituted for it. */
+  remarks?: string;
+}
+
 export interface EmitOptions {
   /** `"4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2"` (default `"4.1.1"`). */
   dictVersion?: string;
@@ -232,14 +260,19 @@ export interface EmitOptions {
   /** Per-heading AGS data-TYPE overrides, same `{ code: { heading: type } }` shape. */
   types?: Record<string, Record<string, string>>;
   /** Mint the mandatory metadata catalogs your data doesn't carry — UNIT and
-   *  TYPE (derived from the data), a placeholder TRAN, and ABBR when PA picklist
-   *  codes are used. `"autofix"` mode only. Default **false**.
+   *  TYPE (derived from the data), and ABBR when PA picklist codes are used.
+   *  `"autofix"` mode only. Default **false**. `TRAN` is NOT among them: pass
+   *  `tran` to state one.
    *
    *  Off by default on purpose: synthesis adds whole *groups* you never wrote,
    *  which should be asked for rather than discovered. Left off, a data-only
    *  build reports Rule 14/15/17 so you can see what is missing. `PROJ` and
    *  `DICT` are never synthesised at all — those are authorial facts. */
   synthesiseMetadata?: boolean;
+  /** The transmission this file represents. Omit it and no `TRAN` is minted —
+   *  Rule 14 reports the gap, rather than a placeholder that would *satisfy*
+   *  Rule 14 while asserting a transmission that never happened. */
+  tran?: TranStamp;
 }
 
 /** Transpose row objects → an arrow-js Table (column types inferred from the
@@ -393,6 +426,7 @@ export function buildAgs4(
     opts.units,
     opts.types,
     opts.synthesiseMetadata,
+    opts.tran,
   );
   const byRule = JSON.parse(res.findingsJson) as Record<
     string,
@@ -732,17 +766,10 @@ export interface MergeOptions {
   dictVersion?: string;
   /** Source encoding label for path / bytes inputs (default `"utf-8"`). */
   encoding?: string;
-  /** `TRAN_ISNO` for a synthesised merge-TRAN. Requires `tranDate` too; without
-   * both, no merge-TRAN is written and the inputs' TRAN is reconciled instead. */
-  tranIssue?: string;
-  /** `TRAN_DATE` for the synthesised merge-TRAN (requires `tranIssue`). */
-  tranDate?: string;
-  /** `TRAN_PROD` for the synthesised merge-TRAN. */
-  tranProducer?: string;
-  /** `TRAN_RECV` for the synthesised merge-TRAN. */
-  tranRecipient?: string;
-  /** `TRAN_STAT` for the synthesised merge-TRAN. */
-  tranStatus?: string;
+  /** The transmission the merged file represents. Omit it and `TRAN` is
+   *  reconciled like any other group (newest wins), with a warning noting no
+   *  merge-transmission stamp was supplied. */
+  tran?: TranStamp;
 }
 
 /** A merge input: a file path (`string`), raw bytes, or an already-read `Ags4File`. */
@@ -760,7 +787,7 @@ export type MergeSource = string | Uint8Array | Ags4File;
  * kept, since silence is not deletion). A heading two files typed differently
  * throws {@link MergeConflictError} unless `opts.onTypeClash` settles it — `"widen"`
  * falls back to `X` (raw values kept), `"promote"` keeps the greatest `nDP` precision
- * (zero-padding the coarser values). Pass `opts.tranIssue` **and** `opts.tranDate` to
+ * (zero-padding the coarser values). Pass a complete `opts.tran` to
  * stamp a synthesised merge-TRAN recording the inputs' issues/dates in `TRAN_REM`.
  *
  * @param sources - Two or more documents to merge (path / bytes / `Ags4File`).
@@ -785,11 +812,7 @@ export function merge(
       opts.onTypeClash,
       opts.dictVersion,
       opts.encoding,
-      opts.tranIssue,
-      opts.tranDate,
-      opts.tranProducer,
-      opts.tranRecipient,
-      opts.tranStatus,
+      opts.tran,
     );
     const bytes = new Uint8Array(out.bytes);
     return {

@@ -17,9 +17,9 @@ on:
   # and the deploy still publishes them). The negation must follow `web/**`.
   push:
     branches: [main]
-    paths: ["web/**", "!web/docs-site/**", "rust-packages/laterite-ags4-wasm/**", "rust-packages/laterite-ags4-tokenizer-wasm/**", "rust-packages/laterite-ags4-parse/**", "rust-packages/laterite-ags4-censor/**", "rust-packages/laterite-ags4-types/**", ".github/workflows/e2e.yml"]
+    paths: ["web/**", "!web/docs-site/**", "rust-packages/laterite-ags4-wasm/**", "rust-packages/laterite-ags4-tokenizer-wasm/**", "rust-packages/laterite-ags4-parse/**", "rust-packages/laterite-ags4-censor/**", "rust-packages/laterite-types/**", ".github/workflows/e2e.yml"]
   pull_request:
-    paths: ["web/**", "!web/docs-site/**", "rust-packages/laterite-ags4-wasm/**", "rust-packages/laterite-ags4-tokenizer-wasm/**", "rust-packages/laterite-ags4-parse/**", "rust-packages/laterite-ags4-censor/**", "rust-packages/laterite-ags4-types/**", ".github/workflows/e2e.yml"]
+    paths: ["web/**", "!web/docs-site/**", "rust-packages/laterite-ags4-wasm/**", "rust-packages/laterite-ags4-tokenizer-wasm/**", "rust-packages/laterite-ags4-parse/**", "rust-packages/laterite-ags4-censor/**", "rust-packages/laterite-types/**", ".github/workflows/e2e.yml"]
   workflow_dispatch:
 
 concurrency:

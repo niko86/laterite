@@ -12,14 +12,7 @@ fn load(name: &str) -> ParsedFile {
 }
 
 fn stamp() -> TranStamp {
-    TranStamp {
-        isno: "3".into(),
-        date: "2024-03-01".into(),
-        prod: "Merger".into(),
-        recv: "Client".into(),
-        stat: "Merged".into(),
-        ags: "4.1.1".into(),
-    }
+    TranStamp::new("3", "2024-03-01", "Merger", "Client", "Merged")
 }
 
 fn lenient() -> MergeOpts {

@@ -7,7 +7,7 @@ decided: 2026-06-17
 owns: [duckdb-sql-extension]
 supersedes: []
 from_gap: []
-related: [dec-python-imports-rust-library, dec-laterite-ags4-types-leaf, dec-rust-drives-python, crate-map, dec-duckdb-perf-architecture, dec-ags4-merge-semantics, design/_README]
+related: [dec-python-imports-rust-library, dec-laterite-types-leaf, dec-rust-drives-python, crate-map, dec-duckdb-perf-architecture, dec-ags4-merge-semantics, design/_README]
 sources: []
 ---
 
@@ -92,8 +92,8 @@ builds green, but the public wasm *publish* is not yet live.
 It reuses the pure-Rust engine wholesale: `laterite-ags4-core`'s AGS4 codec
 (`ags4_codec::read_ags4_bytes`, via
 `ext:niko86/laterite-duckdb:src/source.rs`), the deterministic-key
-**keychain** (below), and `laterite-ags4-types`' single typing authority
-([[dec-laterite-ags4-types-leaf]]) — no re-implementation.
+**keychain** (below), and `laterite-types`' single typing authority
+([[dec-laterite-types-leaf]]) — no re-implementation.
 
 ### The crown jewel — deterministic content-addressed keychain
 
@@ -154,7 +154,7 @@ Implemented + merged (P1 + P2, PR #144):
 
 | function | what | source |
 |---|---|---|
-| `read_ags(path, group)` | typed columns from the file's **own TYPE row** via `laterite_ags4_types::parse_value` (the single typing authority); `_id` + `_parent_id` columns first, trailing always-on `_content_hash`; lazy vector-chunk (≈2048-row) streaming | `ext:niko86/laterite-duckdb:src/read_ags.rs`, `typing.rs` |
+| `read_ags(path, group)` | typed columns from the file's **own TYPE row** via `laterite_types::parse_value` (the single typing authority); `_id` + `_parent_id` columns first, trailing always-on `_content_hash`; lazy vector-chunk (≈2048-row) streaming | `ext:niko86/laterite-duckdb:src/read_ags.rs`, `typing.rs` |
 | `ags_groups(path)` | the file's group list (rows, headings, parent) | `ext:niko86/laterite-duckdb:src/meta.rs` |
 | `ags_headings(path)` | per-heading unit/type from the file's UNIT/TYPE rows, enriched with registry KEY status | `ext:niko86/laterite-duckdb:src/meta.rs` |
 | `ags_dictionary()` | the embedded single-source dictionary as a table | `ext:niko86/laterite-duckdb:src/dict_fns.rs` |
@@ -421,7 +421,7 @@ single-source stay in the monorepo).
 ```mermaid
 graph TD
   subgraph PURE["pure Rust engine (reused, no re-impl)"]
-    types["laterite-ags4-types<br/>single typing authority"]
+    types["laterite-types<br/>single typing authority"]
     keychain["laterite-ags4-core::keychain<br/>deterministic content-addressed UUIDv8"]
     codec["laterite-ags4-core::ags4_codec<br/>parse + registry"]
   end
@@ -449,7 +449,7 @@ graph TD
 
 dec-ags5db-submarine ·
 [[dec-python-imports-rust-library|laterite: the Python→Rust exception]] ·
-[[dec-laterite-ags4-types-leaf|laterite-ags4-types: one typing source]] ·
+[[dec-laterite-types-leaf|laterite-types: one typing source]] ·
 [[dec-rust-drives-python]] ·
 dec-rust-engine-staged-adoption ·
 UUID7 surrogate keys (the writer's contrast) ·

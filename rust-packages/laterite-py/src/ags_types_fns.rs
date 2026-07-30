@@ -15,7 +15,7 @@
 //! The parsing itself is NOT re-implemented here: the format tables and the
 //! typed parsers (`parse_datetime` / `parse_date` / `parse_time` /
 //! `parse_bool`) live in the leaf (`laterite_ags4_core::ags_types`, i.e.
-//! `laterite-ags4-types`) and back the leaf's own `parse_value` too, so there is
+//! `laterite-types`) and back the leaf's own `parse_value` too, so there is
 //! one parser and one set of format tables (#531). This wrapper only
 //! dispatches on `canonical_type` and maps each parsed value to its Python
 //! object — the same canonicalisation that feeds `_content_hash`, now with
@@ -37,7 +37,7 @@ use pyo3::types::PyNone;
 /// nothing; unknown codes pass through to string in `parse_value`).
 #[pyfunction]
 fn canonical_type(ags_type: &str) -> Option<&'static str> {
-    rs_canonical_type(ags_type).map(laterite_ags4_types::CanonicalType::as_str)
+    rs_canonical_type(ags_type).map(laterite_types::CanonicalType::as_str)
 }
 
 /// Presentation hint for numeric AGS types: `"2DP"` → `Some("%.2f")`,

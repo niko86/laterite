@@ -506,11 +506,21 @@ _WEB_ALLOW = {"ready"}  # worker readiness handshake, not a capability verb
 
 
 def _wasm_verbs() -> set[str]:
-    """Top-level `#[wasm_bindgen] pub fn` verbs — the bare attr at col 0 directly
-    above a col-0 `pub fn` (so impl-block getters and `pub struct`/`impl` are
-    excluded)."""
+    """Top-level `#[wasm_bindgen] pub fn` verbs — the bare attr at col 0 above a
+    col-0 `pub fn` (so impl-block getters and `pub struct`/`impl` are excluded).
+
+    Any number of FURTHER col-0 attributes may sit between the two. That is not
+    cosmetic tolerance: this used to require the two lines be adjacent, so adding
+    an `#[allow(...)]` to an export made it invisible here. For an existing verb
+    that fails loudly as a `stale` entry — but for a NEW one it fails *silently*,
+    since an undiscovered verb simply never appears in `unregistered` and the
+    guard passes while the export is unmapped. Exactly what this test exists to
+    prevent.
+    """
     src = WASM_LIB.read_text(encoding="utf-8")
-    return set(re.findall(r"^#\[wasm_bindgen\]\n^pub fn (\w+)", src, re.M))
+    return set(
+        re.findall(r"^#\[wasm_bindgen\]\n(?:^#\[[^\n]*\]\n)*^pub fn (\w+)", src, re.M)
+    )
 
 
 def test_wasm_orphan_guard():

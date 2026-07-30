@@ -13,11 +13,11 @@
 // #168 Phase 3: parse types + tokenizer come straight from the leaf
 // (encoding_rs + memchr only — wasm-safe); the validator dep stays for rules.
 use laterite_ags4_parse::{ParsedFile, parse_bytes};
-use laterite_ags4_types::sql_type;
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, WorldScope, check_parsed_with_dict,
     dict::Dictionary, dict::FALLBACK, findings, fixes, overlay, resolve_dict_version, tran_ags_of,
 };
+use laterite_types::sql_type;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -300,6 +300,60 @@ fn emit_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode, String> {
     }
 }
 
+/// The `tran` argument's wire shape — one object, not five positional slots.
+///
+/// Every field is `Option` here and required by `TranStamp::from_parts`, which
+/// is what makes a typo loud on this surface: `{ producer }` misspelled leaves
+/// `producer` unset, and "all five or none" reports it by name. That matters,
+/// because `serde(deny_unknown_fields)` is a **no-op** under serde-wasm-bindgen
+/// — its `ObjectAccess` walks serde's known fields and `Reflect`-gets each,
+/// never enumerating what the caller actually passed. Requiredness is doing the
+/// work an unknown-key guard cannot do here.
+#[derive(serde::Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+struct TranInput {
+    issue: Option<String>,
+    date: Option<String>,
+    producer: Option<String>,
+    recipient: Option<String>,
+    status: Option<String>,
+    description: Option<String>,
+    remarks: Option<String>,
+}
+
+/// The thin JS→Rust shim. Deliberately holds no policy: the decision about what
+/// constitutes a complete stamp lives in `TranStamp::from_parts` in the emit
+/// crate, which is host-testable. This crate's tests run on the HOST with no
+/// `wasm-bindgen-test`, so anything with `JsValue` in it ships unexecuted.
+fn tran_from_js(v: Option<JsValue>) -> Result<Option<laterite_ags4_emit::TranStamp>, JsError> {
+    // `Option<JsValue>` rather than bare `JsValue` so wasm-bindgen emits
+    // `tran?: any` — omitting the stamp is the common case (no TRAN, Rule 14
+    // reports the gap) and should not require passing `undefined` by hand.
+    let Some(v) = v.filter(|v| !v.is_undefined() && !v.is_null()) else {
+        return Ok(None);
+    };
+    let t: TranInput = serde_wasm_bindgen::from_value(v)
+        .map_err(|e| JsError::new(&format!("invalid tran: {e}")))?;
+    let stamp = laterite_ags4_emit::TranStamp::from_parts(
+        t.issue,
+        t.date,
+        t.producer,
+        t.recipient,
+        t.status,
+    )
+    .map_err(|e| JsError::new(&e.to_string()))?;
+    Ok(stamp.map(|s| {
+        let s = match t.description {
+            Some(d) => s.with_description(d),
+            None => s,
+        };
+        match t.remarks {
+            Some(r) => s.with_remarks(r),
+            None => s,
+        }
+    }))
+}
+
 /// Core of [`build_ags4`], host-testable (no `JsValue`): parse the JSON, run
 /// the shared `laterite-ags4-emit` orchestrator, flatten the findings.
 fn build_ags4_from_json(
@@ -307,6 +361,7 @@ fn build_ags4_from_json(
     edition: Option<&str>,
     mode: Option<&str>,
     synthesise_metadata: bool,
+    tran: Option<laterite_ags4_emit::TranStamp>,
 ) -> Result<BuildAgs4Report, String> {
     let parsed: Vec<GroupInputJson> =
         serde_json::from_str(groups_json).map_err(|e| format!("invalid groups JSON: {e}"))?;
@@ -320,7 +375,7 @@ fn build_ags4_from_json(
             rows: g.rows,
         })
         .collect();
-    emit_report(groups, edition, mode, synthesise_metadata)
+    emit_report(groups, edition, mode, synthesise_metadata, tran)
 }
 
 /// Run the shared orchestrator over already-built `GroupInput`s and shape the
@@ -330,10 +385,16 @@ fn emit_report(
     edition: Option<&str>,
     mode: Option<&str>,
     synthesise_metadata: bool,
+    tran: Option<laterite_ags4_emit::TranStamp>,
 ) -> Result<BuildAgs4Report, String> {
     let opts = laterite_ags4_emit::EmitOpts {
         mode: emit_mode(mode)?,
         edition: emit_edition(edition)?,
+        // `None` here means no TRAN is minted and Rule 14 reports the gap. The
+        // browser gets the same five caller-supplied fields `merge` already
+        // takes, because who sent what to whom is not something the engine can
+        // derive — see EmitOpts::tran.
+        tran,
         // Synthesis is OFF unless asked for (2026-07-24): no surface mints
         // GROUPs the caller never wrote without being told to. The caller's
         // ability to *ask* is the parity part — Python takes
@@ -435,10 +496,20 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
 ///   UNIT/TYPE/TRAN/ABBR catalogs — that became opt-in on 2026-07-24, so a
 ///   data-only build reports Rule 14/15/17 rather than silently filling them.
 /// * `synthesise_metadata` — `None`/`false` (default) | `true` to mint the
-///   mandatory UNIT/TYPE/TRAN/ABBR catalogs a data-only build is missing,
-///   clearing Rule 14/15/17. Only meaningful under `"autofix"`. This is the
-///   browser twin of Python's `synthesise_metadata=` and Node's
-///   `{ synthesiseMetadata }`.
+///   mandatory UNIT/TYPE/ABBR catalogs a data-only build is missing, clearing
+///   Rule 15/17. Only meaningful under `"autofix"`. This is the browser twin of
+///   Python's `synthesise_metadata=` and Node's `{ synthesiseMetadata }`.
+/// * `tran_issue` / `tran_date` / `tran_producer` / `tran_recipient` /
+///   `tran_status` — the transmission this file represents. Supply them and
+///   synthesis stamps a real TRAN; omit them and **no TRAN is written**, so
+///   Rule 14 reports the gap.
+///
+///   That asymmetry is the point. A stub reading `TBC`/`1900-01-01` still
+///   SATISFIES Rule 14, so a recipient cannot tell an invented transmission
+///   record from a real one and nothing downstream flags it. Who produced a
+///   file, for whom, when and at what status is knowable only to the caller —
+///   the same reason PROJ and DICT are never synthesised. These are the five
+///   arguments `merge` already takes, named identically.
 ///
 /// Returns `{ text, findings, applied, fixes_applied }`; `text` is the AGS4
 /// document (UTF-8, CRLF) for the browser to wrap in a `Blob`. `applied` is the
@@ -450,6 +521,14 @@ pub fn build_ags4(
     dict_version: Option<String>,
     mode: Option<String>,
     synthesise_metadata: Option<bool>,
+    // The transmission this file represents, as ONE object:
+    // `{ issue, date, producer, recipient, status, description?, remarks? }`.
+    // Five REQUIRED headings travelled here as five consecutive same-typed
+    // positional slots, which is a transposition waiting to happen and drove the
+    // argument count to nine. Omit it entirely and no TRAN is minted — Rule 14
+    // reports the gap, which is the honest outcome. Supply it partially and you
+    // get an error naming the missing fields.
+    tran: Option<JsValue>,
 ) -> Result<JsValue, JsError> {
     console_error_panic_hook::set_once();
     let report = build_ags4_from_json(
@@ -457,6 +536,7 @@ pub fn build_ags4(
         dict_version.as_deref(),
         mode.as_deref(),
         synthesise_metadata.unwrap_or(false),
+        tran_from_js(tran)?,
     )
     .map_err(|e| JsError::new(&e))?;
     serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
@@ -479,6 +559,14 @@ pub fn build_ags4_ipc(
     dict_version: Option<String>,
     mode: Option<String>,
     synthesise_metadata: Option<bool>,
+    // The transmission this file represents, as ONE object:
+    // `{ issue, date, producer, recipient, status, description?, remarks? }`.
+    // Five REQUIRED headings travelled here as five consecutive same-typed
+    // positional slots, which is a transposition waiting to happen and drove the
+    // argument count to nine. Omit it entirely and no TRAN is minted — Rule 14
+    // reports the gap, which is the honest outcome. Supply it partially and you
+    // get an error naming the missing fields.
+    tran: Option<JsValue>,
 ) -> Result<JsValue, JsError> {
     use wasm_bindgen::JsCast;
     console_error_panic_hook::set_once();
@@ -502,6 +590,7 @@ pub fn build_ags4_ipc(
         dict_version.as_deref(),
         mode.as_deref(),
         synthesise_metadata.unwrap_or(false),
+        tran_from_js(tran)?,
     )
     .map_err(|e| JsError::new(&e))?;
     serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
@@ -517,7 +606,7 @@ mod build_ags4_tests {
           {"code":"PROJ","headings":["PROJ_ID","PROJ_NAME"],"rows":[["P1","Demo"]]},
           {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01",12.3]]}
         ]"#;
-        let r = build_ags4_from_json(json, Some("4.1.1"), Some("autofix"), false).unwrap();
+        let r = build_ags4_from_json(json, Some("4.1.1"), Some("autofix"), false, None).unwrap();
         assert!(
             r.text.contains("\"12.30\""),
             "expected canonical 2DP:\n{}",
@@ -559,7 +648,7 @@ mod build_ags4_tests {
         };
 
         // Default (and explicit false): the catalogs are NOT minted.
-        let off = build_ags4_from_json(json, None, Some("autofix"), false).unwrap();
+        let off = build_ags4_from_json(json, None, Some("autofix"), false, None).unwrap();
         assert!(
             !metadata_rules(&off).is_empty(),
             "a data-only build should report the missing metadata catalogs:\n{}",
@@ -571,18 +660,45 @@ mod build_ags4_tests {
             off.text
         );
 
-        // Opt in: the catalogs are minted and those findings clear.
-        let on = build_ags4_from_json(json, None, Some("autofix"), true).unwrap();
+        // Opt in WITHOUT a stamp: the derivable catalogs are minted and their
+        // findings clear, but no TRAN is invented — Rule 14 keeps reporting.
+        let on = build_ags4_from_json(json, None, Some("autofix"), true, None).unwrap();
         assert!(
-            on.text.contains("\"GROUP\",\"TRAN\""),
-            "synthesise_metadata=true should mint TRAN:\n{}",
+            !on.text.contains("\"GROUP\",\"TRAN\""),
+            "an unstamped build must not invent a TRAN:\n{}",
             on.text
         );
         assert!(
             metadata_rules(&on).len() < metadata_rules(&off).len(),
-            "synthesis should clear metadata findings (was {:?}, now {:?})",
+            "synthesis should clear the DERIVABLE metadata findings (was {:?}, now {:?})",
             metadata_rules(&off),
             metadata_rules(&on)
+        );
+
+        // Opt in WITH a stamp: TRAN appears, carrying the caller's values.
+        let stamped = build_ags4_from_json(
+            json,
+            None,
+            Some("autofix"),
+            true,
+            Some(laterite_ags4_emit::TranStamp::new(
+                "1",
+                "2026-07-30",
+                "Acme Ground Engineering",
+                "Client Ltd",
+                "FINAL",
+            )),
+        )
+        .unwrap();
+        assert!(
+            stamped.text.contains("\"GROUP\",\"TRAN\""),
+            "a stamped build should carry a TRAN:\n{}",
+            stamped.text
+        );
+        assert!(
+            stamped.text.contains("Acme Ground Engineering") && !stamped.text.contains("TBC"),
+            "the TRAN must be the caller's, never a placeholder:\n{}",
+            stamped.text
         );
     }
 
@@ -592,7 +708,7 @@ mod build_ags4_tests {
           {"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]},
           {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}
         ]"#;
-        let r = build_ags4_from_json(json, None, Some("autofix"), false).unwrap();
+        let r = build_ags4_from_json(json, None, Some("autofix"), false, None).unwrap();
         assert!(r.fixes_applied >= 1, "AutoFix should apply a safe fix");
         assert!(r.text.contains("\"12.30\""), "{}", r.text);
     }
@@ -600,7 +716,7 @@ mod build_ags4_tests {
     #[test]
     fn report_keeps_strings_verbatim() {
         let json = r#"[{"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}]"#;
-        let r = build_ags4_from_json(json, None, Some("report"), false).unwrap();
+        let r = build_ags4_from_json(json, None, Some("report"), false, None).unwrap();
         assert!(r.text.contains("\"12.3\""));
         assert_eq!(r.fixes_applied, 0);
         assert!(r.applied.is_empty(), "report mode rewrites nothing");
@@ -617,7 +733,7 @@ mod build_ags4_tests {
           {"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]},
           {"code":"LOCA","headings":["LOCA_ID","LOCA_GL"],"rows":[["BH01","12.3"]]}
         ]"#;
-        let r = build_ags4_from_json(json, None, Some("autofix"), false).unwrap();
+        let r = build_ags4_from_json(json, None, Some("autofix"), false, None).unwrap();
         assert_eq!(
             r.applied.len(),
             r.fixes_applied,
@@ -635,8 +751,8 @@ mod build_ags4_tests {
     #[test]
     fn rejects_unknown_mode_and_edition() {
         let json = r#"[{"code":"LOCA","headings":["LOCA_ID"],"rows":[["BH01"]]}]"#;
-        assert!(build_ags4_from_json(json, None, Some("banana"), false).is_err());
-        assert!(build_ags4_from_json(json, Some("9.9"), None, false).is_err());
+        assert!(build_ags4_from_json(json, None, Some("banana"), false, None).is_err());
+        assert!(build_ags4_from_json(json, Some("9.9"), None, false, None).is_err());
     }
 
     #[test]
@@ -682,7 +798,14 @@ mod build_ags4_tests {
         // Decode each IPC stream via the shared transpose, then emit.
         let proj = group_from_ipc("PROJ".into(), &ipc_bytes(&proj_schema, &proj_batch)).unwrap();
         let loca = group_from_ipc("LOCA".into(), &ipc_bytes(&loca_schema, &loca_batch)).unwrap();
-        let r = emit_report(vec![proj, loca], Some("4.1.1"), Some("autofix"), false).unwrap();
+        let r = emit_report(
+            vec![proj, loca],
+            Some("4.1.1"),
+            Some("autofix"),
+            false,
+            None,
+        )
+        .unwrap();
 
         assert!(r.text.contains("\"12.30\""), "float64 → 2DP:\n{}", r.text);
         assert!(r.text.contains("\"13.00\""), "{}", r.text);
@@ -1314,7 +1437,7 @@ pub fn xlsx_to_ags4(data: &[u8], format_numeric: bool) -> Result<ExcelResult, Js
 // bytes; DuckDB-wasm's `insertArrowFromIPCStream` ingests it as the final
 // typed table — no per-cell JS objects, no staging table, no TRY_CAST.
 //
-// Typing uses the SAME laterite_ags4_types::{canonical_type, parse_value,
+// Typing uses the SAME laterite_types::{canonical_type, parse_value,
 // parse_datetime} the native DuckDB conversion uses, off the file's own
 // TYPE row (convert.rs does the same), so the explorer casts a file
 // IDENTICALLY to the native DuckDB conversion — parity by construction.
@@ -1404,7 +1527,7 @@ impl ParsedDataset {
             .get(code)
             .ok_or_else(|| JsError::new(&format!("group {code:?} not in dataset")))?;
 
-        // Typed columns + IPC framing both come from laterite-ags4-types now
+        // Typed columns + IPC framing both come from laterite-types now
         // (`ipc::build_group_ipc_synth` = the shared `arrow_cols` cast + StreamWriter,
         // `_id`/`_parent_id` col 0/1, `_content_hash` trailing) — the SAME
         // composition the napi host frames, so the browser, Node and Python type
@@ -1432,8 +1555,8 @@ impl ParsedDataset {
         } else {
             None
         };
-        let buf = laterite_ags4_types::ipc::build_group_ipc_synth(
-            &laterite_ags4_types::arrow_cols::SynthColumns {
+        let buf = laterite_types::ipc::build_group_ipc_synth(
+            &laterite_types::arrow_cols::SynthColumns {
                 ids: ids.as_deref(),
                 hashes: hashes.as_deref(),
             },
@@ -1525,23 +1648,20 @@ impl MergeResult {
 /// wins a KEY conflict). Rows are matched by their dictionary KEY headings. A
 /// heading the two files typed differently is a `JsError` unless `on_type_clash`
 /// settles it — `"widen"` falls back to `X` (raw values kept), `"promote"` keeps the
-/// greatest nDP precision (zero-padding the coarser values). `tran_issue` +
-/// `tran_date` (both) stamp a synthesised
-/// merge-TRAN. The edition is `b`'s `TRAN_AGS`, falling back to the standard.
-#[allow(clippy::too_many_arguments)]
+/// greatest nDP precision (zero-padding the coarser values). A complete `tran`
+/// object stamps a synthesised merge-TRAN; omit it and TRAN is reconciled like
+/// any other group. The edition is `b`'s `TRAN_AGS`, falling back to the standard.
 #[wasm_bindgen]
 pub fn merge(
     a: &[u8],
     b: &[u8],
     encoding_label: Option<String>,
     on_type_clash: Option<String>,
-    tran_issue: Option<String>,
-    tran_date: Option<String>,
-    tran_producer: Option<String>,
-    tran_recipient: Option<String>,
-    tran_status: Option<String>,
+    // One object, same shape as `build_ags4`'s: `{ issue, date, producer,
+    // recipient, status, description?, remarks? }`.
+    tran: Option<JsValue>,
 ) -> Result<MergeResult, JsError> {
-    use laterite_ags4_merge::{MergeOpts, TranStamp, TypeClashMode, merge_parsed};
+    use laterite_ags4_merge::{MergeOpts, TypeClashMode, merge_parsed};
 
     console_error_panic_hook::set_once();
     let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
@@ -1555,18 +1675,10 @@ pub fn merge(
         .map(|(dv, _)| dv)
         .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
 
-    // A merge-TRAN is synthesised only when both an issue and a date are given.
-    let tran = match (tran_issue, tran_date) {
-        (Some(isno), Some(date)) => Some(TranStamp {
-            isno,
-            date,
-            prod: tran_producer.unwrap_or_default(),
-            recv: tran_recipient.unwrap_or_default(),
-            stat: tran_status.unwrap_or_default(),
-            ags: dv.as_str().to_string(),
-        }),
-        _ => None,
-    };
+    // All five or none — the shared rule, in the shared place. `ags` is merge's
+    // to fill from `dv` (resolved just above); a caller-stated edition could
+    // only contradict the file merge is about to write.
+    let tran = tran_from_js(tran)?;
 
     // One vocabulary for every surface: accepted tokens + rejection message come
     // from the merge crate's FromStr, so the browser cannot drift from the CLI.
@@ -1733,14 +1845,14 @@ mod tests {
     //!
     //! `build_column` is the whole casting surface (the wasm-bindgen
     //! wrappers above only marshal it), and it casts through the SAME
-    //! `laterite_ags4_types` fns — off the file's TYPE row — that the native
+    //! `laterite_types` fns — off the file's TYPE row — that the native
     //! DuckDB conversion uses (`laterite-ags5-db/src/convert.rs`). So asserting the
     //! Arrow `DataType` + cell values here proves the explorer casts a
     //! file identically to that native conversion, with no DuckDB/Node/wasm runtime.
     //! The datetime oracle is computed independently via `chrono`.
     use super::*;
     // `Array` provides `is_null`/`len`; ArrayRef/DataType/TimeUnit assert the
-    // shape of what the shared laterite-ags4-types builder hands back.
+    // shape of what the shared laterite-types builder hands back.
     use arrow::array::{
         Array, ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray,
         TimestampMicrosecondArray,
@@ -1779,13 +1891,13 @@ mod tests {
     }
 
     /// Build the typed column for `group`'s heading `name`, returning the
-    /// array + its `DataType`. Routes through the shared laterite-ags4-types builder
+    /// array + its `DataType`. Routes through the shared laterite-types builder
     /// (the production path), feeding it this column's cells.
     fn column(file: &ParsedFile, group: &str, name: &str) -> (ArrayRef, DataType) {
         let g = &file.groups[group];
         let col = g.headings.iter().position(|h| h == name).expect("heading");
         let ags_type = &g.types[col];
-        laterite_ags4_types::arrow_cols::build_column(g.rows.len(), ags_type, |row| {
+        laterite_types::arrow_cols::build_column(g.rows.len(), ags_type, |row| {
             g.rows
                 .get(row)
                 .and_then(|r| r.values.get(col))

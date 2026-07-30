@@ -44,9 +44,11 @@ describe("typed-graph builder → buildAgs4", () => {
   });
 
   it("synthesiseMetadata mints the derivable catalogs, but never PROJ or DICT", () => {
-    // Opting in derives UNIT/TYPE from the data and stubs TRAN, so the same
-    // sparse graph builds valid in one call. PROJ here comes from the graph
-    // itself, not from synthesis — the boundary is derivable vs authorial.
+    // Opting in derives UNIT/TYPE from the data. TRAN is NOT derivable — the
+    // engine cannot know who sent what to whom — so it is stamped from the
+    // caller's own values here. PROJ likewise comes from the graph itself, not
+    // from synthesis. The boundary is derivable vs authorial, and TRAN sits on
+    // the authorial side despite living in the same opt-in.
     const proj = new PROJ({ PROJ_ID: "P1", PROJ_NAME: "Demo project" });
     proj.locas.push(new LOCA({ LOCA_ID: "BH01", LOCA_GL: 12.3 }));
 
@@ -54,6 +56,13 @@ describe("typed-graph builder → buildAgs4", () => {
       dictVersion: "4.1.1",
       mode: "autofix",
       synthesiseMetadata: true,
+      tran: {
+        issue: "1",
+        date: "2026-07-30",
+        producer: "Demo Producer",
+        recipient: "Demo Recipient",
+        status: "Final",
+      },
     });
     const back = read(undefined, { text: res.text });
     expect(back.groups).toEqual(

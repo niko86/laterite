@@ -30,10 +30,10 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use laterite_ags4_types::arrow_cols::{
+use laterite_types::arrow_cols::{
     build_record_batch, build_record_batch_compat, build_record_batch_with_ids,
 };
-use laterite_ags4_types::ipc::build_group_ipc;
+use laterite_types::ipc::build_group_ipc;
 
 const N_ROWS: usize = 50_000;
 

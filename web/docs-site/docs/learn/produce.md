@@ -21,14 +21,31 @@ never wrote.
 To get them, ask:
 
 ```python
-res = laterite.build_ags4({"PROJ": proj, "LOCA": loca}, synthesise_metadata=True)
+res = laterite.build_ags4(
+    {"PROJ": proj, "LOCA": loca},
+    synthesise_metadata=True,
+    tran=laterite.TranStamp(
+        issue="1",
+        date="2026-07-30",
+        producer="Your Firm",
+        recipient="The Client",
+        status="Final",
+    ),
+)
 ```
 
-`UNIT` and `TYPE` are then derived from your columns and `TRAN` written as a
-placeholder you overwrite — five groups, no findings. It is opt-in on every
-surface (`synthesise_metadata=` in Python, `{ synthesiseMetadata }` in Node,
-`synthesise_metadata` in the browser wasm build) so nothing appears in your file
-that you didn't ask for.
+`UNIT` and `TYPE` are derived from your columns. `TRAN` is not derivable — only
+you know who sent what to whom — so you state it. Omit the stamp and no `TRAN`
+is written and Rule 14 reports the gap, rather than a placeholder being invented
+that would _satisfy_ the rule while asserting a transmission that never happened.
+All five are required together — they are REQUIRED headings, so `TranStamp`
+demands them rather than letting a half-stamp reach the file. `TRAN_AGS`,
+`TRAN_DLIM` and `TRAN_RCON` are absent from it on purpose: they describe the
+file the emitter is writing, so it fills them.
+
+Synthesis is opt-in on every surface (`synthesise_metadata=` in Python,
+`{ synthesiseMetadata }` in Node, `synthesise_metadata` in the browser wasm
+build) so nothing appears in your file that you didn't ask for.
 
 ## From a typed PROJ graph
 

@@ -38,7 +38,7 @@ Probed 2026-07-20 (`ags-wiki/.bootstrap/probes/probe_sf_count_dos.py` →
   `10000000SF` → a 10,000,001-char string in 1 ms. The crafted
   `9999999999SF` computes `i ≈ 9,999,999,998` → a **~10 GB** string request →
   MemoryError/DoS.
-- **laterite** was *also* vulnerable pre-#610: `repo:rust-packages/laterite-ags4-types/src/lib.rs::format_nsf`
+- **laterite** was *also* vulnerable pre-#610: `repo:rust-packages/laterite-types/src/lib.rs::format_nsf`
   did `(n as i32)`, which **wraps** `9999999999` to a *positive*
   `1_410_065_407` → a ~1.4 GB requested width → OOM; `format_ndp`/`format_nsci`
   fed a bare `n: usize` straight into `{:.n$}` with the same unbounded read.
@@ -73,9 +73,9 @@ by this page's clamp.
 ## OBSERVATIONS entry — **ratified as [[O-49]]**
 > [!note] Written into `repo:OBSERVATIONS.md#o-49` (5-field house style).
 > **Our decision** (#610): clamp the count to `MAX_NUMERIC_COUNT = 30` at all
-> six sites (`laterite-ags4-types` nDP/nSF/nSCI + `laterite-excel` Dp/Sci/
+> six sites (`laterite-types` nDP/nSF/nSCI + `laterite-excel` Dp/Sci/
 > `format_sf`) before it reaches a format width. Regression tests
-> `repo:rust-packages/laterite-ags4-types/src/lib.rs::nsf_count_is_clamped_so_a_crafted_type_cannot_dos`
+> `repo:rust-packages/laterite-types/src/lib.rs::nsf_count_is_clamped_so_a_crafted_type_cannot_dos`
 > and
 > `repo:rust-packages/laterite-excel/src/lib.rs::format_sf_count_is_clamped_so_a_crafted_type_cannot_dos`
 > assert a crafted/`usize::MAX` count stays bounded *and* that legitimate

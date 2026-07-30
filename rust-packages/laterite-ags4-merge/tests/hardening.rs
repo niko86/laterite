@@ -265,14 +265,16 @@ fn merge_tran_stamp_lands_even_when_no_input_has_tran() {
     let f = "\"GROUP\",\"LOCA\"\n\"HEADING\",\"LOCA_ID\",\"LOCA_GL\"\n\"UNIT\",\"\",\"m\"\n\"TYPE\",\"ID\",\"2DP\"\n\"DATA\",\"BH1\",\"10.00\"\n";
     let opts = MergeOpts {
         on_type_clash: TypeClashMode::Widen,
-        tran: Some(TranStamp {
-            isno: "9".into(),
-            date: "2024-05-01".into(),
-            prod: "Merger".into(),
-            recv: String::new(),
-            stat: String::new(),
-            ags: "4.1.1".into(),
-        }),
+        // Was a PARTIAL stamp (empty recv/stat) — unconstructible now, and it
+        // was never what this test is about: the assertion is that the stamp
+        // LANDS when no input carries a TRAN, not that a half-stamp is accepted.
+        tran: Some(TranStamp::new(
+            "9",
+            "2024-05-01",
+            "Merger",
+            "Client",
+            "Merged",
+        )),
         ..Default::default()
     };
     let res = merge_parsed(&[p(f), p(f)], &opts).unwrap();

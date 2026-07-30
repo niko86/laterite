@@ -6,7 +6,7 @@ tags: [design, decision, architecture]
 decided: 2026-06-16
 supersedes: []
 from_gap: []
-related: [crate-map, dec-rust-drives-python, pyo3-boundary, dec-python-imports-rust-library, dec-laterite-ags4-types-leaf, design/_README]
+related: [crate-map, dec-rust-drives-python, pyo3-boundary, dec-python-imports-rust-library, dec-laterite-types-leaf, design/_README]
 sources: []
 ---
 
@@ -27,7 +27,7 @@ all shipped from a single tree. The dictionary is single-sourced at
 generates from it.
 
 ## Options considered
-1. **Split docling-style** — per-component repos (e.g. `laterite-ags4-types`,
+1. **Split docling-style** — per-component repos (e.g. `laterite-types`,
    `laterite-ags4-core`, `laterite-validator`, `laterite-ags5`), each released
    independently.
 2. **One repo, one package** — collapse everything into a single wheel.
@@ -82,7 +82,7 @@ not by a repo boundary — which keeps that concern orthogonal to this decision.
 > Carve a single component out to its own repo only if one of these becomes
 > concretely true (not before):
 > 1. A component gains **genuine external consumers on a faster cadence** than
->    the rest — the realistic candidates are [[dec-laterite-ags4-types-leaf|laterite-ags4-types]]
+>    the rest — the realistic candidates are [[dec-laterite-types-leaf|laterite-types]]
 >    or the wasm validator becoming a standalone library others depend on directly.
 > 2. A **separate maintainer** should own one component without commit rights to
 >    the whole tree.
@@ -106,6 +106,6 @@ not by a repo boundary — which keeps that concern orthogonal to this decision.
 ## Related
 [[crate-map]] · [[dec-rust-drives-python|Rust ships, Python is a library]] ·
 [[pyo3-boundary]] · [[dec-python-imports-rust-library|laterite: scoped Python→Rust exception]] ·
-[[dec-laterite-ags4-types-leaf|laterite-ags4-types wasm-safe leaf]] ·
+[[dec-laterite-types-leaf|laterite-types wasm-safe leaf]] ·
 AGS5 decoupled to ags5/ ·
 [[design/_README|AGS5 design register]]

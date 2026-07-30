@@ -2,7 +2,7 @@
 //! (#533). Two thin `#[wasm_bindgen]` wrappers over the shared Rust leaves so
 //! the browser drives off the same authority as every other surface:
 //!   - [`tokenize_spans`] wraps `laterite_ags4_parse::scan::scan_line`;
-//!   - [`quote_field`] wraps `laterite_ags4_types::quote_field`.
+//!   - [`quote_field`] wraps `laterite_types::quote_field`.
 //!
 //! No engine, no validator, no arrow — just the two line primitives, so the
 //! compiled artifact stays tiny (a size gate keeps that honest). The old TS
@@ -110,8 +110,8 @@ impl<'a> ByteToCodePoint<'a> {
 }
 
 /// Quote one raw value as an AGS4 field (wrap in `"`, double any embedded `"`).
-/// The wasm face of `laterite_ags4_types::quote_field` — the browser's `quoteAgsField`.
+/// The wasm face of `laterite_types::quote_field` — the browser's `quoteAgsField`.
 #[wasm_bindgen]
 pub fn quote_field(value: &str) -> String {
-    laterite_ags4_types::quote_field(value)
+    laterite_types::quote_field(value)
 }

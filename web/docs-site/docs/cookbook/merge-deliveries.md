@@ -45,7 +45,10 @@ _revisions_ a later file made, plus any warnings.
 
     res = laterite.merge(
         "phase1.ags", "phase2.ags",
-        tran_issue="3", tran_date="2024-01-15",
+        tran=TranStamp(
+            issue="3", date="2024-01-15", producer="Us",
+            recipient="Client", status="Merged",
+        ),
     )
     for rev in res.revisions:
         print(rev["group"], rev["key"], "changed", rev["changed"])
@@ -66,7 +69,10 @@ _revisions_ a later file made, plus any warnings.
     import { merge } from "laterite";
 
     const res = merge(["phase1.ags", "phase2.ags"], {
-      tranIssue: "3", tranDate: "2024-01-15",
+      tran: {
+        issue: "3", date: "2024-01-15", producer: "Us",
+        recipient: "Client", status: "Merged",
+      },
     });
     for (const rev of res.revisions) {
       console.log(rev.group, rev.key, "changed", rev.changed);

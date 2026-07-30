@@ -8,7 +8,7 @@
 //!
 //! Parser-agnostic by construction — the caller passes headings, AGS type
 //! codes, the row count, and a positional `cell(col, row)` accessor — so
-//! `laterite-ags4-types` stays the parser-free wasm-safe leaf (it gains no
+//! `laterite-types` stays the parser-free wasm-safe leaf (it gains no
 //! dependency on whatever `ParsedGroup` the hosts happen to hold).
 
 use arrow::error::ArrowError;

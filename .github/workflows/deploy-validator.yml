@@ -15,7 +15,7 @@ name: Deploy AGS4 validator site
 
 on:
   # Auto-deploy when the built artifact's sources change on main. The
-  # site embeds laterite-ags4-wasm, which wraps laterite-ags4-validator + laterite-ags4-types, so a
+  # site embeds laterite-ags4-wasm, which wraps laterite-ags4-validator + laterite-types, so a
   # change to any of those (or the web app, or this workflow) should
   # rebuild + republish.
   push:
@@ -24,7 +24,7 @@ on:
       - "web/**"
       - "rust-packages/laterite-ags4-wasm/**"
       - "rust-packages/laterite-ags4-validator/**"
-      - "rust-packages/laterite-ags4-types/**"
+      - "rust-packages/laterite-types/**"
       # The tiny main-thread tokenizer wasm (#533) + its other leaf source
       # (parse; types already listed above).
       - "rust-packages/laterite-ags4-tokenizer-wasm/**"

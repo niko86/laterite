@@ -6,7 +6,7 @@ tags: [design, decision, architecture, crate-map]
 decided: "2026-07-11"
 supersedes: []
 from_gap: []
-related: [crate-map, laterite-ags4-core, laterite-ags4-reference, laterite-py, dec-duckdb-extension, dec-laterite-ags4-types-leaf]
+related: [crate-map, laterite-ags4-core, laterite-ags4-reference, laterite-py, dec-duckdb-extension, dec-laterite-types-leaf]
 sources: []
 ---
 
@@ -67,7 +67,7 @@ edge collapses to **moving one conversion to its one consumer**:
 laterite-ags4-emit` no longer lists `core`), so the `core → emit → validator`
 transitive chain is broken and the crate-map edge is gone. The rejected **Option C**
 (flip the impl into `emit`) still stands rejected — `emit` deliberately avoids `core`
-to stay a wasm-lean leaf ([[dec-laterite-ags4-types-leaf]]).
+to stay a wasm-lean leaf ([[dec-laterite-types-leaf]]).
 
 **Caveat — payoff is latent.** No shipped consumer avoids `emit`/`validator` *today*,
 so this shows no binary-size win yet; its value is structural — the layering is now
@@ -90,4 +90,4 @@ owner/mirror-gated (its own repo, `niko86/laterite-duckdb`).
 
 ## Related
 
-[[crate-map]] · [[laterite-ags4-core]] · [[laterite-ags4-reference]] · [[laterite-py]] · [[dec-duckdb-extension|laterite-duckdb: the lean read-only reader]] · [[dec-laterite-ags4-types-leaf|the wasm-lean leaf precedent]]
+[[crate-map]] · [[laterite-ags4-core]] · [[laterite-ags4-reference]] · [[laterite-py]] · [[dec-duckdb-extension|laterite-duckdb: the lean read-only reader]] · [[dec-laterite-types-leaf|the wasm-lean leaf precedent]]

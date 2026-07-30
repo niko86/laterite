@@ -4,7 +4,8 @@
 
 **What / when:** you have your data as per-group tables (one per group, columns named
 for the AGS headings) and want an AGS4 file back — optionally with the
-`TRAN` / `UNIT` / `TYPE` boilerplate derived for you.
+`UNIT` / `TYPE` boilerplate derived for you and `TRAN` stamped from your own
+transmission details.
 
 === "Python"
 
@@ -28,12 +29,18 @@ for the AGS headings) and want an AGS4 file back — optionally with the
     - `res.save("out.ags")` — persist to disk
 
     **To get the catalogs:** pass `synthesise_metadata=True`. `UNIT` and `TYPE` are
-    derived from your columns, `ABBR` from the standard table when `PA` codes are
-    used, and `TRAN` written as a placeholder you overwrite — five groups, no
-    findings. `PROJ` and `DICT` are *never* synthesised: a project identity and a
-    schema extension are authorial facts, and inventing a `DICT` parent would turn a
-    loud Rule 18 error into a silent false statement Rule 10's relational checks then
-    trust.
+    derived from your columns and `ABBR` from the standard table when `PA` codes are
+    used. `PROJ`, `DICT` and `TRAN` are *never* synthesised: a project identity, a
+    schema extension and a record of transmission are authorial facts. Inventing a
+    `DICT` parent would turn a loud Rule 18 error into a silent false statement Rule
+    10's relational checks then trust; inventing a `TRAN` would *satisfy* Rule 14
+    while asserting a transmission that never happened.
+
+    **To get a `TRAN`:** state it — `tran=TranStamp(issue=…, date=…, producer=…,
+    recipient=…, status=…)`. All five are required together because all five are
+    REQUIRED headings; the dataclass enforces that at your call site rather than
+    letting a half-stamp become a Rule 10b finding. Pass nothing and Rule 14
+    reports the gap instead.
 
     **Gotcha:** synthesis is independent of `mode`, and only `mode="autofix"` (the
     default) honours it. `mode="report"` emits unmodified and hands you the findings;
@@ -59,8 +66,9 @@ for the AGS headings) and want an AGS4 file back — optionally with the
     group. Group order is preserved, so put `PROJ` first. It returns the same
     `BuildResult` as Python: `res.bytes` / `res.text` carry the document and
     `res.findings` is the residual the mode couldn't clear. Pass
-    `{ synthesiseMetadata: true }` to derive `TRAN`/`UNIT`/`TYPE` (and `ABBR` for
-    `PA` codes); without it those gaps are reported as Rules 14/15/17. No DuckDB
+    `{ synthesiseMetadata: true }` to derive `UNIT`/`TYPE` (and `ABBR` for `PA`
+    codes) and `tran: { issue, date, producer, recipient, status }` to stamp a
+    `TRAN`; without them those gaps are reported as Rules 14/15/17. No DuckDB
     peer needed — emit is pure.
 
 === "Browser"

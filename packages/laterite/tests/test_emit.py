@@ -12,6 +12,20 @@ import pandas as pd
 import polars as pl
 import pytest
 
+# A complete transmission stamp. All five, because TRAN_PROD/RECV/STAT are
+# REQUIRED by the dictionary: issue+date alone mint a TRAN that then reports
+# Rule 10b on the empty cells. The old placeholder wrote "TBC" into all three,
+# which is precisely how it silenced both Rule 14 and Rule 10b at once.
+_TRAN = {
+    "tran": laterite.TranStamp(
+        issue="1",
+        date="2026-07-30",
+        producer="Acme Ground Engineering",
+        recipient="Client Ltd",
+        status="FINAL",
+    )
+}
+
 
 def _proj() -> pd.DataFrame:
     return pd.DataFrame({"PROJ_ID": ["P1"], "PROJ_NAME": ["Demo project"]})
@@ -269,12 +283,21 @@ def test_typed_graph_childless_root_builds():
 
 
 def test_synthesise_metadata_mints_the_missing_catalogs_when_asked():
-    # Opted in, build_ags4 mints the mandatory UNIT/TYPE catalogs (from the data)
-    # and a placeholder TRAN, so a data-only build is valid in one call.
+    # Opted in AND with the transmission stated, build_ags4 mints the mandatory
+    # UNIT/TYPE catalogs (from the data) plus a TRAN carrying the caller's own
+    # values, so a data-only build is valid in one call.
     loca = pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_GL": [12.3]})
-    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, synthesise_metadata=True)
+    res = laterite.build_ags4(
+        {"PROJ": _proj(), "LOCA": loca},
+        synthesise_metadata=True,
+        **_TRAN,
+    )
     assert {"TRAN", "UNIT", "TYPE"}.issubset(laterite.read(data=res.bytes).groups)
     assert not res.findings  # fully valid, no Rule 14/15/17
+    # The caller's values, never a placeholder — "TBC"/"1900-01-01" satisfied
+    # Rule 14 while asserting a transmission that never happened.
+    assert "Acme Ground Engineering" in res.text
+    assert "TBC" not in res.text and "1900-01-01" not in res.text
 
     # Report mode never synthesises, opted in or not — it reports, it doesn't fix.
     rep = laterite.build_ags4(
@@ -300,7 +323,9 @@ def test_synthesise_metadata_mints_abbr_for_pa_codes():
     # When the data uses a PA picklist code (LOCA_TYPE is a PA heading), opted-in
     # synthesis also mints ABBR (Rule 16) defining that code.
     loca = pl.DataFrame({"LOCA_ID": ["BH01"], "LOCA_TYPE": ["TP"]})
-    res = laterite.build_ags4({"PROJ": _proj(), "LOCA": loca}, synthesise_metadata=True)
+    res = laterite.build_ags4(
+        {"PROJ": _proj(), "LOCA": loca}, synthesise_metadata=True, **_TRAN
+    )
     assert "ABBR" in laterite.read(data=res.bytes).groups
     assert '"DATA","LOCA_TYPE","TP"' in res.text
     assert not res.findings  # fully valid, incl. Rule 16
@@ -313,10 +338,10 @@ def test_typed_graph_emits_only_set_columns():
     # edition-specific / PA headings would trip Rule 9 / 16).
     proj = laterite.groups.PROJ(proj_id="LAT-DEMO", proj_name="Demo")
     proj.locas.append(laterite.groups.LOCA(loca_id="BH01", loca_gl=12.50))
-    # Synthesis on: a clean baseline is this test's precondition — the claim is
-    # that PRUNING doesn't trip Rule 9/16, which needs the metadata gaps closed
-    # so they don't drown the signal.
-    res = laterite.build_ags4(proj, synthesise_metadata=True)
+    # Synthesis on + a stamped TRAN: a clean baseline is this test's
+    # precondition — the claim is that PRUNING doesn't trip Rule 9/16, which
+    # needs the metadata gaps closed so they don't drown the signal.
+    res = laterite.build_ags4(proj, synthesise_metadata=True, **_TRAN)
     hdr = next(
         ln for ln in res.text.splitlines() if ln.startswith('"HEADING","LOCA_ID"')
     )
@@ -331,7 +356,7 @@ def test_typed_graph_emits_only_set_columns():
     )
     assert "LOCA_VSSL" in laterite.build_ags4(p2).text
     assert not laterite.build_ags4(
-        p2, dict_version="4.2", synthesise_metadata=True
+        p2, dict_version="4.2", synthesise_metadata=True, **_TRAN
     ).findings
 
 

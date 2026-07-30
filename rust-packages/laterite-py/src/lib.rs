@@ -709,19 +709,17 @@ fn merge_core(
     )
     .map_or(laterite_ags4_validator::dict::FALLBACK, |(dv, _)| dv);
 
-    // A merge-TRAN is synthesised only when both an issue and a date are given.
+    // All five or none — the shared rule. `ags` is merge's to fill from the
+    // edition it resolved; a caller-stated value could only contradict it.
     let (isno, date, prod, recv, stat) = tran;
-    let tran = match (isno, date) {
-        (Some(isno), Some(date)) => Some(TranStamp {
-            isno: isno.to_string(),
-            date: date.to_string(),
-            prod: prod.unwrap_or_default().to_string(),
-            recv: recv.unwrap_or_default().to_string(),
-            stat: stat.unwrap_or_default().to_string(),
-            ags: dv.as_str().to_string(),
-        }),
-        _ => None,
-    };
+    let tran = TranStamp::from_parts(
+        isno.map(str::to_string),
+        date.map(str::to_string),
+        prod.map(str::to_string),
+        recv.map(str::to_string),
+        stat.map(str::to_string),
+    )
+    .map_err(|e| (5, "bad_args".to_string(), e.to_string()))?;
 
     let opts = MergeOpts {
         on_type_clash: clash,
@@ -985,7 +983,7 @@ fn parse_compat_arrow(
             .collect();
         gd.set_item("ragged", ragged)?;
 
-        let batch = laterite_ags4_types::arrow_cols::build_record_batch_compat(
+        let batch = laterite_types::arrow_cols::build_record_batch_compat(
             &g.headings,
             &g.units,
             &g.types,
@@ -1067,7 +1065,7 @@ impl Reading {
     /// per-group lazy: `read()` / `scan()` only pay for the groups actually
     /// touched, so a 69-group file you query two groups of builds two
     /// `RecordBatches`, not 69. Returns `None` if `code` isn't in the file.
-    /// Same shared emitter (`laterite_ags4_types::arrow_cols`) as the old eager build —
+    /// Same shared emitter (`laterite_types::arrow_cols`) as the old eager build —
     /// byte-identical columns, and still the SAME cast the browser's IPC path
     /// uses. The Python `Ags4File` memoises the result per code.
     /// `content_hash` appends a trailing `_content_hash` column — the typed,
@@ -1138,8 +1136,8 @@ impl Reading {
         } else {
             None
         };
-        let batch = laterite_ags4_types::arrow_cols::build_record_batch_synth(
-            &laterite_ags4_types::arrow_cols::SynthColumns {
+        let batch = laterite_types::arrow_cols::build_record_batch_synth(
+            &laterite_types::arrow_cols::SynthColumns {
                 ids: ids.as_deref(),
                 hashes: hashes.as_deref(),
             },
@@ -1367,7 +1365,7 @@ impl PySidecar {
 /// (`headings/units/types/line_numbers`). The typed Arrow table for a group is
 /// NOT built here — it is built lazily, per group, on first touch via the
 /// `_handle`'s `Reading::table_for` (cast by the one shared emitter
-/// `laterite_ags4_types::arrow_cols`, byte-identical to the browser's IPC path). The
+/// `laterite_types::arrow_cols`, byte-identical to the browser's IPC path). The
 /// raw parse stays Rust-side in that `Reading` handle, also feeding
 /// byte-faithful `write()`; no per-cell `PyObject` rows cross the boundary.
 #[pyfunction]

@@ -70,7 +70,7 @@
         "node",
         "wasm-engine"
       ],
-      "spec_ref": "AGS4 numeric rendering is the ENGINE's job, from the declared TYPE: `laterite-ags4-types::ags4_str` formats a JSON number per its type (2DP `LOCA_NATE`: 12.3 -> `12.30`, 100.456 -> `100.46`), and every surface routes through it. A surface that stringified numbers itself — the obvious thing for a host binding to do — would emit `12.3` here and split from the leaf. NOTE: this case deliberately carries no INTEGER-valued cell. Adding one splits the node leg, which renders a whole JS number as `5.0` where rust/python/wasm render `5` (every JS number is an f64); that divergence is real and unresolved, so pin it in its own case once ruled on rather than smuggling it in here."
+      "spec_ref": "AGS4 numeric rendering is the ENGINE's job, from the declared TYPE: `laterite-types::ags4_str` formats a JSON number per its type (2DP `LOCA_NATE`: 12.3 -> `12.30`, 100.456 -> `100.46`), and every surface routes through it. A surface that stringified numbers itself — the obvious thing for a host binding to do — would emit `12.3` here and split from the leaf. NOTE: this case deliberately carries no INTEGER-valued cell. Adding one splits the node leg, which renders a whole JS number as `5.0` where rust/python/wasm render `5` (every JS number is an f64); that divergence is real and unresolved, so pin it in its own case once ruled on rather than smuggling it in here."
     },
     {
       "id": "emit.build.field_quoting",
@@ -109,7 +109,7 @@
         "node",
         "wasm-engine"
       ],
-      "spec_ref": "AGS4 Rule-1 field escaping (a literal `\"` doubled to `\"\"`, a comma kept inside the quoted field) has ONE authority — `laterite-ags4-types::write_quoted_field` — which the byte writer streams through and the browser tokenizer reuses. A surface re-implementing quoting would corrupt exactly this value."
+      "spec_ref": "AGS4 Rule-1 field escaping (a literal `\"` doubled to `\"\"`, a comma kept inside the quoted field) has ONE authority — `laterite-types::write_quoted_field` — which the byte writer streams through and the browser tokenizer reuses. A surface re-implementing quoting would corrupt exactly this value."
     },
     {
       "id": "emit.build.null_cell",

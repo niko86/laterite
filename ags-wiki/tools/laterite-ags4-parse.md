@@ -12,7 +12,7 @@ repo_refs:
   lib: "repo:rust-packages/laterite-ags4-parse/src/lib.rs"
   scan: "repo:rust-packages/laterite-ags4-parse/src/scan.rs"
   benches: "repo:rust-packages/laterite-ags4-parse/benches/parse.rs"
-related: [crate-map, laterite-ags4-core, laterite-ags4-validator, laterite-ags4-types, core-perf-baseline, testing-strategy]
+related: [crate-map, laterite-ags4-core, laterite-ags4-validator, laterite-types, core-perf-baseline, testing-strategy]
 sources: []
 ---
 # laterite-ags4-parse
@@ -40,7 +40,7 @@ its benches exist and why it has absorbed most of the perf work in
 Dependencies are `encoding_rs` (the decode front door) and `memchr` (newline
 scan) — **nothing else**. That is a constraint, not an accident: the crate must
 stay filesystem-free and wasm-clean, so it returns raw strings and leaves typing
-to [[laterite-ags4-types]]. Anything that would drag in DuckDB, `age`, or an
+to [[laterite-types]]. Anything that would drag in DuckDB, `age`, or an
 allocator-heavy dependency belongs above it.
 
 ## The two coordinate systems
@@ -153,4 +153,4 @@ until it is already large.
 
 ## Related
 
-[[crate-map]] · [[laterite-ags4-core]] · [[laterite-ags4-validator]] · [[laterite-ags4-types]] · [[core-perf-baseline]] · [[testing-strategy]]
+[[crate-map]] · [[laterite-ags4-core]] · [[laterite-ags4-validator]] · [[laterite-types]] · [[core-perf-baseline]] · [[testing-strategy]]

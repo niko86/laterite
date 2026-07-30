@@ -6,7 +6,7 @@
 //! learn *which* TYPE codes it validates and *how* it interprets each
 //! (facts about the AGS standard, not copyrightable). No code,
 //! structure, or wording was copied. The nSF expected-form algorithm
-//! is ported from this workspace's own MIT `laterite-ags4-types`
+//! is ported from this workspace's own MIT `laterite-types`
 //! (`ags4_str`), which was independently fitted to python-ags4's output.
 //!
 //! Spec text (verbatim, AGS 4.2 §4.1.1, p.155 — AGS 4.1 identical):
@@ -584,7 +584,7 @@ fn dt_semantic_ok(value: &str, unit: &str) -> bool {
 }
 
 // The nDP / nSCI / nSF expected forms come from the AGS type-system leaf —
-// the SAME functions `laterite_ags4_types::ags4_str` uses to WRITE a typed value,
+// the SAME functions `laterite_types::ags4_str` uses to WRITE a typed value,
 // so the form Rule 8 EXPECTS and the form `build_ags4` EMITS cannot drift
 // (#528). All three were a hand-port here, kept honest only by a "ported from
 // ags_types::ags4_str" comment: it agreed with the authority, but nothing
@@ -597,7 +597,7 @@ fn dt_semantic_ok(value: &str, unit: &str) -> bool {
 // "0.00200"). The format↔validate inverse proptests below now guard the LEAF's
 // formatters against this crate's grammar. (laterite-excel keeps a
 // deliberately divergent formatter — by-design, pinned in xcheck-allow.json.)
-pub(crate) use laterite_ags4_types::{format_ndp, format_nsci, format_nsf};
+pub(crate) use laterite_types::{format_ndp, format_nsci, format_nsf};
 
 #[cfg(test)]
 mod tests {

@@ -49,7 +49,7 @@ laterite-ags4-reference = { path = "../laterite-ags4-reference" }
 # + serde_json (already linked transitively — see the serde note). Arrow is
 # OPTIONAL in that crate and stays off here, so the lean/wasm-safe dep-graph
 # guarantee (no pyo3|polars|walkdir|rayon|ratatui) is untouched.
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-types = { path = "../laterite-types" }
 thiserror = "2"
 # Rule 1 risky fix: transliterate any non-ASCII character to a sensible ASCII
 # equivalent (µ→"u", °→"deg", ß→"ss", accents→base letter) so a file can be

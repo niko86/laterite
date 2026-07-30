@@ -129,9 +129,16 @@ export interface MergeReq {
   bBytes: ArrayBuffer;
   encoding: string;
   onTypeClash: TypeClashMode;
-  tranIssue: string | null;
-  tranDate: string | null;
-  tranProducer: string | null;
+  /** All five TRAN members or nothing — the engine refuses a partial stamp. */
+  tran: {
+    issue: string;
+    date: string;
+    producer: string;
+    recipient: string;
+    status: string;
+    description?: string;
+    remarks?: string;
+  } | null;
 }
 /** Per-action cell/structure counts from the shared scrub engine — the leaf's
  *  `Tally`, snake_case as serialised across the wasm boundary. */
@@ -382,9 +389,7 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
         new Uint8Array(req.bBytes),
         req.encoding,
         req.onTypeClash,
-        req.tranIssue ?? undefined,
-        req.tranDate ?? undefined,
-        req.tranProducer ?? undefined,
+        req.tran ?? undefined,
       );
       const buf = out.bytes.slice().buffer;
       reply(

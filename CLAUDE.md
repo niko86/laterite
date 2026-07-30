@@ -110,7 +110,7 @@ Generators that consume the JSON:
 Rust workspace crates (mapped in `ags-wiki/concepts/crate-map.md`); the
 load-bearing chain:
 
-- `laterite-ags4-types` — shared typed-Arrow column builder + the AGS type system
+- `laterite-types` — shared typed-Arrow column builder + the AGS type system
   (`ags_types`), a wasm-safe leaf.
 - `laterite-ags4-parse` — the shared parse leaf: one tolerant tokenizer
   (`split_ags_line`/`field_span`) + one source-true byte/line/char walk

@@ -16,7 +16,7 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use serde_json::{Number, Value};
 
 // Typed Arrow column/record-batch building. Behind the `arrow` feature so
-// laterite-ags4-types stays a tiny wasm-safe leaf for consumers that only need the
+// laterite-types stays a tiny wasm-safe leaf for consumers that only need the
 // type system (e.g. laterite-ags4-core's downstream consumers). Enabled by the two hosts that emit
 // Arrow: laterite-ags4-wasm (→ IPC stream) and laterite-py (→ zero-copy capsule).
 #[cfg(feature = "arrow")]

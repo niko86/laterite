@@ -64,6 +64,12 @@ fn merge_widen_writes_output_and_reports_the_real_revision() {
             "3",
             "--tran-date",
             "2024-03-01",
+            "--tran-producer",
+            "Merger",
+            "--tran-recipient",
+            "Client",
+            "--tran-status",
+            "Merged",
         ])
         .output()
         .unwrap();
@@ -162,4 +168,53 @@ fn merge_rejects_an_unknown_clash_mode() {
     for mode in ["error", "widen", "promote"] {
         assert!(err.contains(mode), "lists {mode}: {err}");
     }
+}
+
+/// Four of five `--tran-*` flags is a USAGE error naming what's missing — not a
+/// silently unstamped file, and not a TRAN with three blank REQUIRED cells.
+///
+/// The old rule was issue+date, so this exact invocation used to succeed and
+/// write `TRAN_PROD`/`TRAN_RECV`/`TRAN_STAT` empty. The CLI arm of "all five or none".
+#[test]
+fn merge_rejects_a_partial_tran_stamp_naming_the_missing_flags() {
+    let d = scratch();
+    let (a, b, out) = (
+        d.join("partial_a.ags"),
+        d.join("partial_b.ags"),
+        d.join("partial.ags"),
+    );
+    std::fs::write(&a, A).unwrap();
+    std::fs::write(&b, B).unwrap();
+    let _ = std::fs::remove_file(&out);
+
+    let o = Command::new(env!("CARGO_BIN_EXE_lat"))
+        .args(["merge"])
+        .args([&a, &b])
+        .arg("--out")
+        .arg(&out)
+        .args([
+            "--on-type-clash",
+            "widen",
+            "--tran-issue",
+            "3",
+            "--tran-date",
+            "2024-03-01",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!o.status.success(), "a partial stamp must not merge");
+    let err = String::from_utf8_lossy(&o.stderr);
+    for missing in ["producer", "recipient", "status"] {
+        assert!(
+            err.contains(missing),
+            "the error must name {missing}, so the user knows which flag to add:\n{err}"
+        );
+    }
+    // Naming what WAS supplied would send the user to change the wrong flag.
+    assert!(
+        !err.contains("missing issue") && !err.contains("issue,"),
+        "it must not name the flags that were supplied:\n{err}"
+    );
+    assert!(!out.exists(), "nothing should be written on a usage error");
 }

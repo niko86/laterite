@@ -6,7 +6,7 @@ tags: [design, decision, api, rust, crates-io, versioning]
 decided: 2026-07-29
 supersedes: []
 from_gap: []
-related: [api-surface-1.0, dec-rust-drives-python, dec-laterite-ags4-types-leaf, crate-map, crate-dependency-graph, dec-monorepo-structure, dec-duckdb-extension, pyo3-boundary, reliquary]
+related: [api-surface-1.0, dec-rust-drives-python, dec-laterite-types-leaf, crate-map, crate-dependency-graph, dec-monorepo-structure, dec-duckdb-extension, pyo3-boundary, reliquary]
 sources:
   - "https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html"
   - "https://doc.rust-lang.org/cargo/reference/publishing.html"
@@ -175,7 +175,7 @@ deciding that question now.
 - **laterite#159 — no `include` allowlist.** `cargo package` ships everything not
   excluded, permanently and immutably. On a repo with a private-corpus discipline this
   is a leak path the existing diff-grep habit does not cover.
-- **laterite#160 — rename `laterite-ags4-types` → `laterite-ags4-types`.** Its own header
+- **laterite#160 — rename `laterite-types` → `laterite-ags4-types`.** Its own header
   reads "AGS4 type system"; the name should say so. crates.io has no rename, so this is
   free now and irreversible later. Requires regenerating [[crate-dependency-graph]]
   (`tools/gen_crate_graph.py`), which is CI-gated.
@@ -213,5 +213,5 @@ change.
 
 ## Related
 
-[[api-surface-1.0]] · [[dec-rust-drives-python]] · [[dec-laterite-ags4-types-leaf]] ·
+[[api-surface-1.0]] · [[dec-rust-drives-python]] · [[dec-laterite-types-leaf]] ·
 [[crate-map]] · [[crate-dependency-graph]] · [[dec-duckdb-extension]]

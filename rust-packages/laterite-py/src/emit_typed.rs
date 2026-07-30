@@ -18,7 +18,7 @@ use arrow::array::{
 use arrow::datatypes::DataType;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
 use laterite_ags4_emit::{DictVersion, EmitMode, EmitOpts, GroupInput, emit_ags4};
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3_arrow::PyTable;
@@ -63,7 +63,8 @@ fn parse_mode(s: Option<&str>) -> PyResult<EmitMode> {
 /// is the safe-fix ledger (the same `{kind,label,rule,line,risk}` shape `fix()`
 /// returns) `AutoFix` made — `fixes_applied` is its length (#294 F#7).
 #[pyfunction]
-#[pyo3(signature = (tables, edition=None, mode=None, units=None, types=None, synthesise_metadata=false))]
+#[allow(clippy::too_many_arguments)]
+#[pyo3(signature = (tables, edition=None, mode=None, units=None, types=None, synthesise_metadata=false, tran_issue=None, tran_date=None, tran_producer=None, tran_recipient=None, tran_status=None))]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
 pub fn emit_ags4_from_arrow(
@@ -78,10 +79,27 @@ pub fn emit_ags4_from_arrow(
     // Off unless asked: minting UNIT/TYPE/TRAN/ABBR the caller never wrote is
     // opt-in across every surface (2026-07-24). See EmitOpts::synthesise_metadata.
     synthesise_metadata: bool,
+    // The transmission this file represents. `None` (all five absent) means no
+    // TRAN is minted and Rule 14 reports the gap — the engine cannot know who
+    // sent what to whom, and a placeholder that SATISFIES Rule 14 is worse than
+    // an honest absence. Same five arguments `merge` takes on this surface.
+    tran_issue: Option<String>,
+    tran_date: Option<String>,
+    tran_producer: Option<String>,
+    tran_recipient: Option<String>,
+    tran_status: Option<String>,
 ) -> PyResult<(Py<PyBytes>, String, Bound<'_, pyo3::types::PyList>, usize)> {
     let opts = EmitOpts {
         mode: parse_mode(mode.as_deref())?,
         edition: parse_edition(edition.as_deref())?,
+        tran: laterite_ags4_emit::TranStamp::from_parts(
+            tran_issue,
+            tran_date,
+            tran_producer,
+            tran_recipient,
+            tran_status,
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?,
         synthesise_metadata,
     };
 

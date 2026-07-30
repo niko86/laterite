@@ -9,7 +9,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 
-import type { MergeOptions, Report, ValidateOptions } from "./index";
+import type { MergeOptions, Report, TranStamp, ValidateOptions } from "./index";
 import {
   diff,
   fromExcel,
@@ -708,6 +708,28 @@ function runDiff(p: Parsed, json: boolean): number {
 // into a single file. Argument order IS the authority (the last file wins a KEY
 // conflict), and `--out` is required rather than defaulted: writing over one of the
 // inputs by default would make a destructive merge the easy path.
+
+/** Fold the five `--tran-*` flags into the one object the library takes.
+ *
+ * CLI flags are irreducibly five independent optionals, so the flattening has to
+ * happen somewhere; doing it here keeps `TranStamp`'s "all five or none" rule as
+ * the single arbiter — the native side rejects a partial object by name. A flag
+ * set to the empty string counts as unset, matching `from_parts`. */
+function tranFromFlags(
+  flags: Record<string, string | boolean>,
+): TranStamp | undefined {
+  const issue = str(flags["tran-issue"]);
+  const date = str(flags["tran-date"]);
+  const producer = str(flags["tran-producer"]);
+  const recipient = str(flags["tran-recipient"]);
+  const status = str(flags["tran-status"]);
+  if (!issue && !date && !producer && !recipient && !status) return undefined;
+  // Deliberately NOT validated here: passing the partial object through means
+  // the error text comes from the one place that owns the rule, so the CLI can
+  // never disagree with the library about what a complete stamp is.
+  return { issue, date, producer, recipient, status } as TranStamp;
+}
+
 function runMerge(p: Parsed, json: boolean): number {
   const files = p.positionals;
   if (files.length < 2) fail("merge needs at least two files", 5);
@@ -739,11 +761,7 @@ function runMerge(p: Parsed, json: boolean): number {
       onTypeClash,
       dictVersion: str(p.flags["dict-version"]),
       encoding: str(p.flags["encoding"]),
-      tranIssue: str(p.flags["tran-issue"]),
-      tranDate: str(p.flags["tran-date"]),
-      tranProducer: str(p.flags["tran-producer"]),
-      tranRecipient: str(p.flags["tran-recipient"]),
-      tranStatus: str(p.flags["tran-status"]),
+      tran: tranFromFlags(p.flags),
     });
   } catch (e) {
     fail((e as Error).message, exitCodeFor(e));

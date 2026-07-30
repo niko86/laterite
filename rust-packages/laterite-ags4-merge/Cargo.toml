@@ -11,7 +11,7 @@
 #                                validator, since emit validates its output — so
 #                                merge is NOT a reference-only leaf, but stays
 #                                wasm-safe, as every one of these deps already is).
-#   - laterite-ags4-types           — parse_value, the canonical cast that makes row
+#   - laterite-types           — parse_value, the canonical cast that makes row
 #                                reconciliation type-aware (per-side, so files
 #                                that typed a column differently still compare).
 [package]
@@ -31,7 +31,7 @@ path = "src/lib.rs"
 laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 laterite-ags4-reference = { path = "../laterite-ags4-reference" }
 laterite-ags4-emit = { path = "../laterite-ags4-emit" }
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-types = { path = "../laterite-types" }
 serde_json = "1"
 
 [dev-dependencies]

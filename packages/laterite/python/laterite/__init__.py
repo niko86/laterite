@@ -12,6 +12,7 @@ AGS4``. For the CLI use ``lat`` (byte-faithful to the Rust binary).
 
 from __future__ import annotations
 
+import dataclasses
 import os
 from collections.abc import Mapping
 from pathlib import Path
@@ -70,6 +71,7 @@ __all__ = [
     "NotAgs4Error",
     "Report",
     "StaleCertError",
+    "TranStamp",
     "UnsupportedEditionError",
     "WorldCheckRequiresSourceError",
     "XnMode",
@@ -1797,6 +1799,56 @@ def _validate_fixable(
     return list(names)
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class TranStamp:
+    """The transmission a file represents — the caller's half of a synthesised ``TRAN``.
+
+    The five fields are **required together** because all five are REQUIRED
+    headings in the dictionary. A partial stamp doesn't merely look thin: it
+    emits a ``TRAN`` that fails Rule 10b on every cell it leaves blank. Making
+    them positional-or-keyword fields with no defaults means a half-stamp is a
+    ``TypeError`` where you wrote it, not a finding buried in the output.
+
+    ``TRAN_AGS``, ``TRAN_DLIM`` and ``TRAN_RCON`` are deliberately absent. They
+    describe the syntax of the file the emitter is writing, so it fills them —
+    a value you passed could only contradict the bytes.
+
+    ``FILE_FSET`` is also absent: it references an associated file set (Rule 20),
+    and offering it without the ``FILE`` group machinery would let you mint a
+    reference to nothing.
+
+    Example::
+
+        laterite.build_ags4(
+            frames,
+            synthesise_metadata=True,
+            tran=laterite.TranStamp(
+                issue="1",
+                date="2026-07-30",
+                producer="Acme Ground Engineering",
+                recipient="Client Ltd",
+                status="FINAL",
+            ),
+        )
+    """
+
+    issue: str
+    """``TRAN_ISNO`` — the issue sequence reference."""
+    date: str
+    """``TRAN_DATE`` — ``yyyy-mm-dd``."""
+    producer: str
+    """``TRAN_PROD`` — who produced the file."""
+    recipient: str
+    """``TRAN_RECV`` — who it is for."""
+    status: str
+    """``TRAN_STAT`` — e.g. ``"FINAL"``."""
+    description: str | None = None
+    """``TRAN_DESC`` — what was transferred. Optional."""
+    remarks: str | None = None
+    """``TRAN_REM`` — free remarks. Optional. On a merge these are appended to
+    the provenance note rather than replacing it."""
+
+
 class BuildResult:
     """What [`build_ags4`][laterite.build_ags4] hands back: a finished AGS4 file plus the verdict on it.
 
@@ -1998,6 +2050,7 @@ def build_ags4(
     units: Mapping[str, Mapping[str, str]] | None = None,
     types: Mapping[str, Mapping[str, str]] | None = None,
     synthesise_metadata: bool = False,
+    tran: TranStamp | None = None,
 ) -> BuildResult:
     """Build AGS4 from your own per-group data — the data→AGS4 door.
 
@@ -2014,8 +2067,8 @@ def build_ags4(
       subtree: the root-metadata groups (TRAN/UNIT/TYPE/ABBR/DICT) aren't children
       of ``PROJ``, so reach for the ``(code, frame)`` form if you need to carry
       those — or pass ``synthesise_metadata=True`` to have the derivable ones
-      (UNIT/TYPE from your data, a placeholder TRAN, and ABBR when PA picklist
-      codes are used) minted for you. That is **opt-in**: by default a typed-graph
+      (UNIT/TYPE from your data, and ABBR when PA picklist codes are used) minted
+      for you; pass ``tran=TranStamp(...)`` to stamp a TRAN as well. That is **opt-in**: by default a typed-graph
       build reports Rule 14/15/16/17 rather than quietly filling the gaps, so you
       can see what is missing. PROJ (real project identity) and DICT (your schema
       extension) are never synthesised at all.
@@ -2055,8 +2108,9 @@ def build_ags4(
         types: Per-heading AGS data-TYPE overrides, same ``{code: {heading: type}}``
             shape (e.g. ``{"LOCA": {"LOCA_XTRA": "3DP"}}``).
         synthesise_metadata: Mint the mandatory metadata catalogs your data doesn't
-            carry — UNIT and TYPE (derived from the data), a placeholder TRAN, and
-            ABBR when PA picklist codes are used. ``"autofix"`` mode only.
+            carry — UNIT and TYPE (derived from the data), and ABBR when PA picklist
+            codes are used. ``"autofix"`` mode only. A TRAN is minted only if you
+            also supply ``tran=TranStamp(...)`` (see below).
 
             **Off by default, deliberately.** Synthesis adds whole *groups* you
             never wrote, and that should be something you ask for rather than
@@ -2067,10 +2121,40 @@ def build_ags4(
                 res = build_ags4(frames, synthesise_metadata=True)
 
             Only *derivable* metadata is ever minted. ``PROJ`` (your project
-            identity) and ``DICT`` (your schema extension) are never synthesised —
-            those are facts only you know, and a guessed ``DICT`` parent would turn
-            a visible Rule 18 error into a silent false statement about your data
+            identity), ``DICT`` (your schema extension) and ``TRAN`` (the
+            transmission — see below) are never synthesised from nothing: those
+            are facts only you know, and a guessed ``DICT`` parent would turn a
+            visible Rule 18 error into a silent false statement about your data
             model that the relational checks then trust.
+        tran: The transmission this file represents, as a
+            [`TranStamp`][laterite.TranStamp]. All five of its required fields
+            are REQUIRED headings, so the dataclass demands them together — a
+            half-stamp is a ``TypeError`` at your call site rather than a Rule
+            10b finding in the output.
+
+            Pass one (with ``synthesise_metadata=True``) and the build stamps a
+            TRAN describing *your* transmission::
+
+                res = build_ags4(
+                    frames,
+                    synthesise_metadata=True,
+                    tran=TranStamp(
+                        issue="1",
+                        date="2026-07-30",
+                        producer="Acme Ground Engineering",
+                        recipient="Client Ltd",
+                        status="FINAL",
+                    ),
+                )
+
+            **Leave it out and no TRAN is written at all** — Rule 14 then reports
+            the gap. That is deliberate. Until 0.8.2 this minted a stub reading
+            ``TRAN_DATE="1900-01-01"`` with ``"TBC"`` for producer/recipient/status,
+            and that combination *satisfies* Rule 14: the file asserted a
+            transmission that never happened, passed validation, and gave a
+            recipient no way to tell it from a real transmission record. A missing
+            TRAN that reports honestly is strictly better than a present one that
+            lies. Same five arguments [`merge`][laterite.merge] takes.
 
     Returns:
         A [`BuildResult`][laterite.BuildResult] carrying the AGS4 ``bytes``, the validator
@@ -2168,6 +2252,11 @@ def build_ags4(
         {k: dict(v) for k, v in units.items()} if units else None,
         {k: dict(v) for k, v in types.items()} if types else None,
         synthesise_metadata,
+        tran.issue if tran else None,
+        tran.date if tran else None,
+        tran.producer if tran else None,
+        tran.recipient if tran else None,
+        tran.status if tran else None,
     )
     by_rule: dict[str, list[dict]] = json.loads(findings_json)
     findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]
@@ -2493,11 +2582,7 @@ def merge(
     on_type_clash: TypeClashMode = "error",
     dict_version: Edition | None = None,
     encoding: str | None = None,
-    tran_issue: str | None = None,
-    tran_date: str | None = None,
-    tran_producer: str | None = None,
-    tran_recipient: str | None = None,
-    tran_status: str | None = None,
+    tran: TranStamp | None = None,
 ) -> MergeResult:
     """Reconcile two or more AGS4 deliveries of one project into a single file.
 
@@ -2537,12 +2622,11 @@ def merge(
     (``X``), ``UNIT`` has none, and silently picking one would mislabel the other
     file's values.
 
-    The merged file genuinely *is* a new transmission, so pass ``tran_issue`` **and**
-    ``tran_date`` (both required together) to stamp it with a synthesised ``TRAN``
-    row that records the input issues/dates in ``TRAN_REM`` for provenance;
-    ``tran_producer`` / ``tran_recipient`` / ``tran_status`` fill the rest. Omit them
-    and the inputs' own ``TRAN`` rows are reconciled like any other group, with a
-    warning that no merge-transmission stamp was supplied.
+    The merged file genuinely *is* a new transmission, so pass a ``tran`` to stamp
+    it with a synthesised ``TRAN`` row, which also records the input issues/dates
+    in ``TRAN_REM`` for provenance. Omit it and the inputs' own ``TRAN`` rows are
+    reconciled like any other group, with a warning that no merge-transmission
+    stamp was supplied.
 
     Returns a [`MergeResult`][laterite.MergeResult] — the merged ``bytes`` plus the
     ``warnings`` and per-row ``revisions`` audit. This is the same engine
@@ -2559,13 +2643,12 @@ def merge(
         dict_version: Dictionary edition used to resolve each group's KEY headings.
             Defaults to ``None`` (taken from the newest file's ``TRAN_AGS``).
         encoding: Source text encoding for every input. Defaults to ``None`` (sniffed).
-        tran_issue: ``TRAN_ISNO`` for the synthesised merge-TRAN. Requires
-            ``tran_date`` too; without both, no merge-TRAN is written.
-        tran_date: ``TRAN_DATE`` for the synthesised merge-TRAN (requires
-            ``tran_issue``).
-        tran_producer: ``TRAN_PROD`` for the synthesised merge-TRAN.
-        tran_recipient: ``TRAN_RECV`` for the synthesised merge-TRAN.
-        tran_status: ``TRAN_STAT`` for the synthesised merge-TRAN.
+        tran: The transmission the merged file represents, as a
+            [`TranStamp`][laterite.TranStamp]. Omit it and ``TRAN`` is reconciled
+            like any other group (newest wins), with a warning noting no
+            merge-transmission stamp was supplied. ``remarks`` is *appended* to
+            merge's own provenance note (``"Merged from N deliveries: …"``)
+            rather than replacing it — both are true of the merged file.
 
     Returns:
         A [`MergeResult`][laterite.MergeResult]: the merged ``bytes`` and the
@@ -2587,11 +2670,11 @@ def merge(
         on_type_clash=on_type_clash,
         dict_version=dict_version,
         encoding=encoding,
-        tran_issue=tran_issue,
-        tran_date=tran_date,
-        tran_producer=tran_producer,
-        tran_recipient=tran_recipient,
-        tran_status=tran_status,
+        tran_issue=tran.issue if tran else None,
+        tran_date=tran.date if tran else None,
+        tran_producer=tran.producer if tran else None,
+        tran_recipient=tran.recipient if tran else None,
+        tran_status=tran.status if tran else None,
     )
     r = raise_for(r)
     return MergeResult(

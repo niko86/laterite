@@ -6,7 +6,7 @@ tags: [design, decision, api, wasm, output]
 decided: 2026-06-12
 supersedes: []
 from_gap: []
-related: [api-surface-1.0, pyo3-boundary, crate-map, tech-stack-wasm, dec-laterite-ags4-types-leaf, reliquary]
+related: [api-surface-1.0, pyo3-boundary, crate-map, tech-stack-wasm, dec-laterite-types-leaf, reliquary]
 sources: []
 ---
 
@@ -24,12 +24,12 @@ sources: []
 
 - **P0 — crate placement: a new wasm-safe `laterite-ags4-emit` leaf** (the recommended option). `write_ags4`
   moved out of `laterite-ags4-core`; `laterite_ags4_core::ags4_writer` is now a re-export shim; `From<EmitError> for
-  CliError` keeps `excel` + `db-to-ags4` callers on `?`. Deps `laterite-ags4-types` + `laterite-ags4-validator` only —
+  CliError` keeps `excel` + `db-to-ags4` callers on `?`. Deps `laterite-types` + `laterite-ags4-validator` only —
   both already wasm-safe `laterite-ags4-wasm` deps. See [[crate-map]] (now 13 crates). First step relieving
   the `laterite-ags4-core` naming smell.
 - **P1 — the orchestrator `emit_ags4(groups, opts) -> EmitResult`** in the leaf: hybrid UNIT/TYPE
   fill from the **per-edition `laterite-ags4-validator` Dictionary** (chosen over `laterite-ags4-core::registry` — it's
-  edition-aware *and* already wasm-safe), cell formatting via `laterite_ags4_types::ags4_str` (typed) /
+  edition-aware *and* already wasm-safe), cell formatting via `laterite_types::ags4_str` (typed) /
   verbatim (string), then `write_ags4`, then `Strict | Report | AutoFix` (chains the validator's
   `parse_bytes`/`run_all`/`compute_fixes`/`apply_fixes`, filtered to `FixRisk::Safe`). 7 tests.
 - **P2a — native door `laterite.emit_ags4(groups, *, edition, mode) -> EmitResult`** (+ the
@@ -59,7 +59,7 @@ sources: []
 - **DRY — the Arrow→`serde_json::Value` transpose is shared, not copied.** `laterite-ags4-emit` gained an
   optional `arrow` feature exposing `group_from_arrow(code, schema, batches)` + `cell_value`; both
   hosts use it — native (`laterite-py`, off the DuckDB capsule) and wasm (`laterite-ags4-wasm`, off the IPC
-  `StreamReader`). Symmetric with the read path's shared *builder* `laterite-ags4-types::arrow_cols`
+  `StreamReader`). Symmetric with the read path's shared *builder* `laterite-types::arrow_cols`
   (`Value`→Arrow). `arrow` stays `default-features=false` so the display fallback adds no
   comfy-table to the wasm bundle.
 - **P4 — the web Export tab** (`web/src/components/export/ExportPane.tsx`, SolidJS). A reference UI
@@ -188,7 +188,7 @@ deferred) was the owner's, 2026-06-25.
                          ┌───────────────────────────────────────────────────────┐
    PyO3:  Arrow tables ──┤  emit_ags4(groups, dict, opts)            ── NEW (small)│
    (polars/pandas)       │   ├─ format each typed cell -> AGS4 string             │
-                         │   │     via laterite_ags4_types::ags4_str            ── SHIPPED  │
+                         │   │     via laterite_types::ags4_str            ── SHIPPED  │
    wasm:  JSON / Arrow ──┤   ├─ fill UNIT/TYPE from laterite-ags4-core::registry ── SHIPPED │
    (browser)             │   │     where the caller omits them                    │
                          │   ├─ laterite-ags4-core::ags4_writer::write_ags4     ── SHIPPED  │
@@ -203,10 +203,10 @@ deferred) was the owner's, 2026-06-25.
 - **Emitter:** `laterite-ags4-core::ags4_writer::write_ags4(out, &[EmitGroup])` — byte-faithful (CRLF,
   every field quoted, `"`→`""`, UNIT padded to heading width, TYPE defaulting `"X"`). Wasm-safe.
   `EmitGroup { code, headings, units, types, rows: Vec<Vec<String>> }`.
-- **Typed→string formatter:** `laterite_ags4_types::ags4_str(value: &serde_json::Value, ags_type) ->
+- **Typed→string formatter:** `laterite_types::ags4_str(value: &serde_json::Value, ags_type) ->
   String` (lib.rs:128) — the **inverse of `parse_value`**: Null→`""`, YN→`Y`/`N`, DT
   date/precision normalization, `0DP`→int, `nDP`→`{:.n}`, `nSF`→sig-figs fixed-point,
-  `nSCI`→scientific, else passthrough. Already in the **wasm-safe `laterite-ags4-types`** crate that
+  `nSCI`→scientific, else passthrough. Already in the **wasm-safe `laterite-types`** crate that
   `laterite-ags4-wasm` already depends on; well-tested. Plus `truncate_dt_to_unit` (lib.rs:234) for
   DT-vs-UNIT precision (Rule 8).
 - **UNIT/TYPE source:** `laterite-ags4-core::registry` — standard headings/units/types per group.
@@ -307,10 +307,10 @@ minimised by Arrow for columnar input.
 ## Crate placement (Phase 0 — decide before code)
 
 The orchestrator needs a wasm-safe home, and `laterite-ags4-wasm` currently depends only on
-`laterite-ags4-validator` + `laterite-ags4-types` (NOT `laterite-ags4-core`, where `ags4_writer` + `registry` live). Two
+`laterite-ags4-validator` + `laterite-types` (NOT `laterite-ags4-core`, where `ags4_writer` + `registry` live). Two
 options:
 - **(recommended) Extract a small wasm-safe `laterite-ags4-emit` leaf** holding `write_ags4` (moved from
-  `laterite-ags4-core`) + `emit_ags4`, depending on `laterite-ags4-types` (`ags4_str`) + the registry. `laterite-ags4-core`
+  `laterite-ags4-core`) + `emit_ags4`, depending on `laterite-types` (`ags4_str`) + the registry. `laterite-ags4-core`
   (its excel / db-export paths), `laterite-ags4-wasm`, and `laterite-py` all depend on it. Keeps
   `laterite-ags4-wasm`'s dep graph lean (no pulling all of `laterite-ags4-core`, whose `excel` / `transport` may
   not be wasm-safe) **and** is the first concrete step of resolving the `laterite-ags4-core` naming / scope

@@ -94,12 +94,16 @@ describe("merge → MergeResult", () => {
     expect((err as Error).message).toContain("LOCA_NATE");
   });
 
-  it("synthesises a merge-TRAN from tranIssue + tranDate", () => {
+  it("synthesises a merge-TRAN from a complete tran stamp", () => {
     const res = merge([Buffer.from(A), Buffer.from(B)], {
       onTypeClash: "widen",
-      tranIssue: "9",
-      tranDate: "2024-05-01",
-      tranProducer: "Merger",
+      tran: {
+        issue: "9",
+        date: "2024-05-01",
+        producer: "Merger",
+        recipient: "Client",
+        status: "Merged",
+      },
     });
     expect(res.text).toContain('"GROUP","TRAN"');
     expect(res.text).toContain('"9"');

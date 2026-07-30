@@ -8771,6 +8771,11 @@ def emit_ags4_from_arrow(
     units: Any = ...,
     types: Any = ...,
     synthesise_metadata: Any = ...,
+    tran_issue: Any = ...,
+    tran_date: Any = ...,
+    tran_producer: Any = ...,
+    tran_recipient: Any = ...,
+    tran_status: Any = ...,
 ) -> Any: ...
 def excel_to_ags4(
     input_file: Any, output_file: Any, format_numeric_columns: Any = ...

@@ -90,7 +90,7 @@ Key facts:
   union and drops `eds`/`by_ed`). The shared, side-effect-free
   `repo:web/docs-site/scripts/catalogue_data.py` holds the **family taxonomy**, the
   provenance helpers, and `TYPE_GLOSSARY` (sourced from the standard dictionary's
-  `TYPE` group + the `laterite-ags4-types` canonical mapping; heading tables deep-link
+  `TYPE` group + the `laterite-types` canonical mapping; heading tables deep-link
   each type code to its anchor). Pages are **NOT committed** (no 174-file churn per
   dict edit), so the drift guard is a pytest gate not a snapshot:
   `tests/test_groups_catalogue_faithful.py` (dev satellite, python job) asserts every group

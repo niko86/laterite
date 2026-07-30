@@ -7,7 +7,7 @@
 //!
 //! Deliberately decoupled from any parser type. The caller supplies the
 //! headings, the per-column AGS type codes, the row count, and a
-//! `cell(col, row)` accessor — so `laterite-ags4-types` keeps being the tiny
+//! `cell(col, row)` accessor — so `laterite-types` keeps being the tiny
 //! wasm-safe leaf it is, gaining (behind the `arrow` feature) the `arrow`
 //! dependency but NOT a dependency on the `laterite-ags4-validator` parser whose
 //! `ParsedGroup` the callers happen to hold.
@@ -121,7 +121,7 @@ where
 /// which wraps the one `keychain::row_ids` the extension also calls); a row past
 /// the end of `ids` (defensive — callers pass `ids.len() == n_rows`) yields a
 /// null id pair. This leaf stays **keychain-free**: the caller owns the id
-/// computation, so `laterite-ags4-types` keeps its minimal wasm-safe dependency set.
+/// computation, so `laterite-types` keeps its minimal wasm-safe dependency set.
 pub fn build_record_batch_with_ids<'a, F>(
     ids: &[(String, Option<String>)],
     headings: &[String],
