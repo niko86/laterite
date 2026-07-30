@@ -2041,13 +2041,20 @@ impl MergeResult {
 #[derive(serde::Deserialize, Default)]
 #[serde(default, rename_all = "camelCase")]
 struct MergeOptions {
+    /// Force the edition instead of reading it from `b`'s `TRAN_AGS`.
+    ///
+    /// Added because the cross-surface parity gate found it missing: Python's
+    /// `merge` and `lat merge` both take it, and this surface hard-coded `None`
+    /// — so a browser user merging files whose `TRAN_AGS` was wrong or absent
+    /// had no way to say so, while every other door did.
+    dict_version: Option<String>,
     encoding: Option<String>,
     on_type_clash: Option<String>,
     tran: Option<TranInput>,
 }
 
 impl WasmOptions for MergeOptions {
-    const KEYS: &'static [&'static str] = &["encoding", "onTypeClash", "tran"];
+    const KEYS: &'static [&'static str] = &["dictVersion", "encoding", "onTypeClash", "tran"];
     const WHAT: &'static str = "merge options";
 }
 
@@ -2055,6 +2062,8 @@ impl WasmOptions for MergeOptions {
 const TS_MERGE_OPTIONS: &'static str = r#"
 /** Named options for `merge`. */
 export interface MergeOptions {
+  /** Force the edition rather than reading it from `b`'s `TRAN_AGS`. */
+  dictVersion?: "auto" | "4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2";
   /** `"utf-8"` (default) or `"windows-1252"`, applied to BOTH inputs. */
   encoding?: "utf-8" | "windows-1252";
   /** What to do when two files declare a different AGS TYPE for one heading.
@@ -2111,7 +2120,8 @@ pub fn merge(a: &[u8], b: &[u8], opts: Option<MergeOptionsJs>) -> Result<MergeRe
         parse_bytes(b, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
 
     // Edition from the newest file (b)'s TRAN_AGS, falling back to the standard.
-    let dv = resolve_dict_version(None, tran_ags_of(&pb).as_deref())
+    let over = resolve_dict_override(o.dict_version.as_deref()).map_err(|m| JsError::new(&m))?;
+    let dv = resolve_dict_version(over, tran_ags_of(&pb).as_deref())
         .map(|(dv, _)| dv)
         .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
 
