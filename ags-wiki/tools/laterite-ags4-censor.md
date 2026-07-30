@@ -10,7 +10,7 @@ ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-censor"
   lib: "repo:rust-packages/laterite-ags4-censor/src/lib.rs"
-related: [crate-map, crate-dependency-graph, laterite-ags4-parse, laterite-types, laterite-ags4-reference, laterite-ags4-corpus-qa, laterite-ags4-wasm, laterite-ags4-tokenizer-wasm, dec-ags4-censor-leaf]
+related: [crate-map, crate-dependency-graph, laterite-ags4-parse, laterite-ags4-types, laterite-ags4-reference, laterite-ags4-corpus-qa, laterite-ags4-wasm, laterite-ags4-tokenizer-wasm, dec-ags4-censor-leaf]
 sources: []
 ---
 # laterite-ags4-censor
@@ -28,7 +28,7 @@ browser Anonymiser drives the *same* engine (through the engine wasm) instead of
 hand-written TypeScript reimplementation. It is part of the #527 cross-surface
 convergence arc and the sibling of the #533 tokenizer/quoter work: the scrub reads
 fields through the shared [[laterite-ags4-parse]] leaf (`scan_line`) and re-quotes
-through [[laterite-types]] (`quote_field`), so there is **no fourth AGS4
+through [[laterite-ags4-types]] (`quote_field`), so there is **no fourth AGS4
 tokenizer**. The design rationale is [[dec-ags4-censor-leaf]].
 
 **Cell-surgical, defect-preserving.** Only DATA cells that actually change are
@@ -63,7 +63,7 @@ of:
 
 `repo:rust-packages/laterite-ags4-censor`. Deps [[laterite-ags4-parse]] (the line
 tokenizer), [[laterite-ags4-reference]] (standard group/heading codes for
-`drop_custom`, from the dictionary SSOT), and [[laterite-types]] (`quote_field`),
+`drop_custom`, from the dictionary SSOT), and [[laterite-ags4-types]] (`quote_field`),
 plus `serde`/`serde_json`. Default features keep arrow off, so it stays a light,
 wasm-clean leaf. Consumers: [[laterite-ags4-corpus-qa]] and
 [[laterite-ags4-wasm]].
@@ -77,11 +77,11 @@ The full workspace graph is in [[crate-map]] (dependency form in
 flowchart LR
   parse[laterite-ags4-parse] --> censor[laterite-ags4-censor]
   ref[laterite-ags4-reference] --> censor
-  types[laterite-types] --> censor
+  types[laterite-ags4-types] --> censor
   censor --> corpusqa[laterite-ags4-corpus-qa]
   censor --> wasm["laterite-ags4-wasm<br/>(browser Anonymiser)"]
 ```
 
 ## Related
 
-[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-parse]] · [[laterite-types]] · [[laterite-ags4-reference]] · [[laterite-ags4-corpus-qa]] · [[laterite-ags4-wasm]] · [[laterite-ags4-tokenizer-wasm]] · [[dec-ags4-censor-leaf]]
+[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-parse]] · [[laterite-ags4-types]] · [[laterite-ags4-reference]] · [[laterite-ags4-corpus-qa]] · [[laterite-ags4-wasm]] · [[laterite-ags4-tokenizer-wasm]] · [[dec-ags4-censor-leaf]]

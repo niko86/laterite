@@ -17,7 +17,7 @@ use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, WorldScope, check_parsed_with_dict,
     dict::Dictionary, dict::FALLBACK, findings, fixes, overlay, resolve_dict_version, tran_ags_of,
 };
-use laterite_types::sql_type;
+use laterite_ags4_types::sql_type;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -1314,7 +1314,7 @@ pub fn xlsx_to_ags4(data: &[u8], format_numeric: bool) -> Result<ExcelResult, Js
 // bytes; DuckDB-wasm's `insertArrowFromIPCStream` ingests it as the final
 // typed table — no per-cell JS objects, no staging table, no TRY_CAST.
 //
-// Typing uses the SAME laterite_types::{canonical_type, parse_value,
+// Typing uses the SAME laterite_ags4_types::{canonical_type, parse_value,
 // parse_datetime} the native DuckDB conversion uses, off the file's own
 // TYPE row (convert.rs does the same), so the explorer casts a file
 // IDENTICALLY to the native DuckDB conversion — parity by construction.
@@ -1404,7 +1404,7 @@ impl ParsedDataset {
             .get(code)
             .ok_or_else(|| JsError::new(&format!("group {code:?} not in dataset")))?;
 
-        // Typed columns + IPC framing both come from laterite-types now
+        // Typed columns + IPC framing both come from laterite-ags4-types now
         // (`ipc::build_group_ipc_synth` = the shared `arrow_cols` cast + StreamWriter,
         // `_id`/`_parent_id` col 0/1, `_content_hash` trailing) — the SAME
         // composition the napi host frames, so the browser, Node and Python type
@@ -1432,8 +1432,8 @@ impl ParsedDataset {
         } else {
             None
         };
-        let buf = laterite_types::ipc::build_group_ipc_synth(
-            &laterite_types::arrow_cols::SynthColumns {
+        let buf = laterite_ags4_types::ipc::build_group_ipc_synth(
+            &laterite_ags4_types::arrow_cols::SynthColumns {
                 ids: ids.as_deref(),
                 hashes: hashes.as_deref(),
             },
@@ -1733,14 +1733,14 @@ mod tests {
     //!
     //! `build_column` is the whole casting surface (the wasm-bindgen
     //! wrappers above only marshal it), and it casts through the SAME
-    //! `laterite_types` fns — off the file's TYPE row — that the native
+    //! `laterite_ags4_types` fns — off the file's TYPE row — that the native
     //! DuckDB conversion uses (`laterite-ags5-db/src/convert.rs`). So asserting the
     //! Arrow `DataType` + cell values here proves the explorer casts a
     //! file identically to that native conversion, with no DuckDB/Node/wasm runtime.
     //! The datetime oracle is computed independently via `chrono`.
     use super::*;
     // `Array` provides `is_null`/`len`; ArrayRef/DataType/TimeUnit assert the
-    // shape of what the shared laterite-types builder hands back.
+    // shape of what the shared laterite-ags4-types builder hands back.
     use arrow::array::{
         Array, ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray,
         TimestampMicrosecondArray,
@@ -1779,13 +1779,13 @@ mod tests {
     }
 
     /// Build the typed column for `group`'s heading `name`, returning the
-    /// array + its `DataType`. Routes through the shared laterite-types builder
+    /// array + its `DataType`. Routes through the shared laterite-ags4-types builder
     /// (the production path), feeding it this column's cells.
     fn column(file: &ParsedFile, group: &str, name: &str) -> (ArrayRef, DataType) {
         let g = &file.groups[group];
         let col = g.headings.iter().position(|h| h == name).expect("heading");
         let ags_type = &g.types[col];
-        laterite_types::arrow_cols::build_column(g.rows.len(), ags_type, |row| {
+        laterite_ags4_types::arrow_cols::build_column(g.rows.len(), ags_type, |row| {
             g.rows
                 .get(row)
                 .and_then(|r| r.values.get(col))

@@ -107,7 +107,7 @@ jobs:
             --exclude laterite-ags4-corpus-qa \
             --exclude laterite-ags4-perf \
             --exclude laterite-ags4-compliance \
-            --features laterite-ags4-emit/arrow,laterite-types/arrow
+            --features laterite-ags4-emit/arrow,laterite-ags4-types/arrow
 
       - name: cargo llvm-cov (line-coverage floor)
         working-directory: rust-packages
@@ -119,7 +119,7 @@ jobs:
         # only comparable run-to-run while the denominator is.
         #
         # The denominator grew on 2026-07-24: `--features` above brought
-        # `laterite-types::{arrow_cols, ipc}` and `laterite-ags4-emit::arrow_in`
+        # `laterite-ags4-types::{arrow_cols, ipc}` and `laterite-ags4-emit::arrow_in`
         # back into BOTH numerator and denominator. They had been silently absent
         # — not by any decision, but because resolver-2 unifies features across
         # selected packages only, and the four crates that request `arrow` are all

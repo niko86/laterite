@@ -4,7 +4,7 @@
 //! revision `b`). Rows within a group are matched by the group's *dictionary*
 //! KEY headings, not by line order — so a re-sorted or re-numbered file still
 //! pairs the same boreholes/samples. Matched cells are compared through
-//! `laterite_types::parse_value`, so a formatting-only change ("1.0" → "1.00",
+//! `laterite_ags4_types::parse_value`, so a formatting-only change ("1.0" → "1.00",
 //! trailing whitespace, an equivalent datetime spelling) is NOT reported —
 //! only a genuine typed change is. This is the engine-consistent diff a
 //! plain line diff can't be: it understands the data model.
@@ -17,7 +17,7 @@ use laterite_ags4_parse::{DataRow, ParsedFile, ParsedGroup};
 use laterite_ags4_reference::dict::Dictionary;
 use laterite_ags4_reference::keychain::key_heading_names;
 use laterite_ags4_reference::union::registry;
-use laterite_types::parse_value;
+use laterite_ags4_types::parse_value;
 use serde::Serialize;
 
 /// One changed cell of a matched row.

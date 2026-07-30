@@ -29,7 +29,7 @@ use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, WorldScope, fix_document_selective, overlay,
     rule_metadata_json, tran_ags_of,
 };
-use laterite_types::sql_type;
+use laterite_ags4_types::sql_type;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde_json::{Map, Value};
@@ -146,7 +146,7 @@ impl Reading {
 
     /// One group's rows as an Arrow **IPC stream** (`Buffer`), columns already
     /// correctly typed. The Node analog of the pyo3-arrow capsule: the typed
-    /// columns come from the one shared emitter (`laterite_types::arrow_cols`), the
+    /// columns come from the one shared emitter (`laterite_ags4_types::arrow_cols`), the
     /// SAME casting Python/wasm use — so a file types byte-identically across
     /// hosts. Returns `null` if the code isn't in the file.
     #[napi]
@@ -206,8 +206,8 @@ impl Reading {
         } else {
             None
         };
-        let buf = laterite_types::ipc::build_group_ipc_synth(
-            &laterite_types::arrow_cols::SynthColumns {
+        let buf = laterite_ags4_types::ipc::build_group_ipc_synth(
+            &laterite_ags4_types::arrow_cols::SynthColumns {
                 ids: ids.as_deref(),
                 hashes: hashes.as_deref(),
             },

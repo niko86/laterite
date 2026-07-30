@@ -47,7 +47,7 @@ read negligible, noted as a caveat in the report).
 
 ## Where it lives
 `repo:rust-packages/laterite-ags4-perf` (`[[bin]]` `laterite-ags4-perf`).
-Deps only [[laterite-ags4-validator]] + `laterite-ags4-parse` + `laterite-types`
+Deps only [[laterite-ags4-validator]] + `laterite-ags4-parse` + `laterite-ags4-types`
 (the `arrow` feature) — all already public, none of them the DuckDB-ingest
 codec — so the harness materialises types on the **same path the shipped
 bindings take**.
@@ -58,7 +58,7 @@ flowchart LR
   forge[laterite-ags4-forge] -->|size ladder| perf[laterite-ags4-perf]
   val[laterite-ags4-validator lib] --> perf
   parse[laterite-ags4-parse] --> perf
-  types[laterite-types arrow] --> perf
+  types[laterite-ags4-types arrow] --> perf
   perf -->|rust.json| matrix[tools/perf-matrix.py]
 ```
 

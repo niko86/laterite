@@ -10,7 +10,7 @@ ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-diff"
   lib: "repo:rust-packages/laterite-ags4-diff/src/lib.rs"
-related: [crate-map, crate-dependency-graph, laterite-ags4-parse, laterite-types, laterite-ags4-reference, laterite-ags4-merge, laterite-ags4-check, laterite-ags4-wasm, laterite-py, laterite-node]
+related: [crate-map, crate-dependency-graph, laterite-ags4-parse, laterite-ags4-types, laterite-ags4-reference, laterite-ags4-merge, laterite-ags4-check, laterite-ags4-wasm, laterite-py, laterite-node]
 sources: []
 ---
 # laterite-ags4-diff
@@ -32,7 +32,7 @@ understands the data model:
   identity comes from [[laterite-ags4-reference]]'s keychain — the same
   definition [[laterite-ags4-merge]] consumes, so "what identifies a row" is
   defined once.
-- **Matched cells are compared through `laterite_types::parse_value.`** A
+- **Matched cells are compared through `laterite_ags4_types::parse_value.`** A
   formatting-only change — `"1.0" → "1.00"`, trailing whitespace, an equivalent
   datetime spelling — is **not** reported; only a genuine *typed* change is.
 
@@ -51,7 +51,7 @@ unchanged across hosts (`serde`). No DuckDB, no rules engine; it is **wasm-safe*
 
 `repo:rust-packages/laterite-ags4-diff`. Deps [[laterite-ags4-parse]] (the
 tokenised rows it walks), [[laterite-ags4-reference]] (KEY headings + types), and
-[[laterite-types]] (`parse_value`, the cast that suppresses formatting-only
+[[laterite-ags4-types]] (`parse_value`, the cast that suppresses formatting-only
 noise). Consumers: [[laterite-ags4-check]], [[laterite-ags4-wasm]],
 [[laterite-node]], [[laterite-py]].
 
@@ -64,7 +64,7 @@ The full workspace graph is in [[crate-map]] (dependency form in
 flowchart LR
   parse[laterite-ags4-parse] --> diff[laterite-ags4-diff]
   ref[laterite-ags4-reference] --> diff
-  types[laterite-types] --> diff
+  types[laterite-ags4-types] --> diff
   diff --> check["laterite-ags4-check<br/>(lat diff)"]
   diff --> wasm[laterite-ags4-wasm]
   diff --> node[laterite-node]
@@ -73,4 +73,4 @@ flowchart LR
 
 ## Related
 
-[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-parse]] · [[laterite-types]] · [[laterite-ags4-reference]] · [[laterite-ags4-merge]] · [[laterite-ags4-check]] · [[laterite-ags4-wasm]] · [[laterite-py]] · [[laterite-node]]
+[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-parse]] · [[laterite-ags4-types]] · [[laterite-ags4-reference]] · [[laterite-ags4-merge]] · [[laterite-ags4-check]] · [[laterite-ags4-wasm]] · [[laterite-py]] · [[laterite-node]]

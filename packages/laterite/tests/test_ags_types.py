@@ -27,7 +27,7 @@ from laterite.ags_types import (
 #
 # NOTE on the "all 8 enum members" coverage goal: only FIVE of the eight
 # `CanonicalType` members are reachable through `canonical_type(ags_type)`.
-# The Rust mapping (`laterite-types::canonical_type`) routes AGS4 type codes to
+# The Rust mapping (`laterite-ags4-types::canonical_type`) routes AGS4 type codes to
 # STRING / INTEGER / DECIMAL / DATETIME / BOOL only — DATE / TIME / ENUM
 # exist in the enum for the type system's completeness (DuckDB `sql_type`
 # DATE/TIME/VARCHAR storage) but no AGS4 type code resolves to them. We

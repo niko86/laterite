@@ -2084,7 +2084,7 @@ version = "0.8.2"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
- "laterite-types",
+ "laterite-ags4-types",
  "serde",
  "serde_json",
 ]
@@ -2129,8 +2129,8 @@ dependencies = [
  "criterion",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
+ "laterite-ags4-types",
  "laterite-transport",
- "laterite-types",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -2169,7 +2169,7 @@ version = "0.8.2"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
- "laterite-types",
+ "laterite-ags4-types",
  "serde",
 ]
 
@@ -2180,8 +2180,8 @@ dependencies = [
  "arrow",
  "criterion",
  "encoding_rs",
+ "laterite-ags4-types",
  "laterite-ags4-validator",
- "laterite-types",
  "proptest",
  "serde_json",
 ]
@@ -2209,7 +2209,7 @@ dependencies = [
  "laterite-ags4-emit",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
- "laterite-types",
+ "laterite-ags4-types",
  "proptest",
  "serde_json",
 ]
@@ -2238,8 +2238,8 @@ name = "laterite-ags4-perf"
 version = "0.8.2"
 dependencies = [
  "laterite-ags4-parse",
+ "laterite-ags4-types",
  "laterite-ags4-validator",
- "laterite-types",
  "serde",
  "serde_json",
 ]
@@ -2251,7 +2251,7 @@ dependencies = [
  "criterion",
  "encoding_rs",
  "laterite-ags4-parse",
- "laterite-types",
+ "laterite-ags4-types",
  "phf 0.14.0",
  "phf_codegen 0.14.0",
  "serde",
@@ -2265,7 +2265,7 @@ name = "laterite-ags4-tokenizer-wasm"
 version = "0.8.2"
 dependencies = [
  "laterite-ags4-parse",
- "laterite-types",
+ "laterite-ags4-types",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
@@ -2283,6 +2283,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "laterite-ags4-types"
+version = "0.8.2"
+dependencies = [
+ "arrow",
+ "chrono",
+ "criterion",
+ "dhat",
+ "encoding_rs",
+ "laterite-ags4-parse",
+ "proptest",
+ "serde_json",
+]
+
+[[package]]
 name = "laterite-ags4-validator"
 version = "0.8.2"
 dependencies = [
@@ -2293,7 +2307,7 @@ dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
- "laterite-types",
+ "laterite-ags4-types",
  "proptest",
  "serde",
  "serde_json",
@@ -2320,9 +2334,9 @@ dependencies = [
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-trust",
+ "laterite-ags4-types",
  "laterite-ags4-validator",
  "laterite-excel",
- "laterite-types",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
@@ -2361,7 +2375,7 @@ dependencies = [
  "calamine",
  "laterite-ags4-core",
  "laterite-ags4-emit",
- "laterite-types",
+ "laterite-ags4-types",
  "rust_xlsxwriter",
  "serde_json",
  "tempfile",
@@ -2379,10 +2393,10 @@ dependencies = [
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-trust",
+ "laterite-ags4-types",
  "laterite-ags4-validator",
  "laterite-excel",
  "laterite-transport",
- "laterite-types",
  "mimalloc",
  "napi",
  "napi-build",
@@ -2404,9 +2418,9 @@ dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
  "laterite-ags4-trust",
+ "laterite-ags4-types",
  "laterite-ags4-validator",
  "laterite-excel",
- "laterite-types",
  "mimalloc",
  "pyo3",
  "pyo3-arrow",
@@ -2420,20 +2434,6 @@ dependencies = [
  "age",
  "thiserror 2.0.19",
  "zstd",
-]
-
-[[package]]
-name = "laterite-types"
-version = "0.8.2"
-dependencies = [
- "arrow",
- "chrono",
- "criterion",
- "dhat",
- "encoding_rs",
- "laterite-ags4-parse",
- "proptest",
- "serde_json",
 ]
 
 [[package]]

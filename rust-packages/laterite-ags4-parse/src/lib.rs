@@ -74,7 +74,7 @@ pub struct ParsedGroup {
 impl ParsedGroup {
     /// Raw value at `(col, row)` by position, or `None` for a short/ragged
     /// row. Borrowing accessor every typed-Arrow host feeds to
-    /// `laterite_types::arrow_cols` — keeps typing out of the parse leaf.
+    /// `laterite_ags4_types::arrow_cols` — keeps typing out of the parse leaf.
     pub fn cell(&self, col: usize, row: usize) -> Option<&str> {
         self.rows
             .get(row)

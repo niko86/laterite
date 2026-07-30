@@ -13,7 +13,7 @@ repo_refs:
   root: "repo:rust-packages/laterite-node"
   lib: "repo:rust-packages/laterite-node/src/lib.rs"
   ts: "repo:rust-packages/laterite-node/ts/index.ts"
-related: [crate-map, laterite-ags4-validator, laterite-types, laterite-py, laterite-ags4-wasm, pyo3-boundary, dec-rust-drives-python, ags4-output, dec-ags4-merge-semantics, edition-resolution, laterite-ags4-reference, surface-census, data-single-source-audit, dec-ags-idx-certificate]
+related: [crate-map, laterite-ags4-validator, laterite-ags4-types, laterite-py, laterite-ags4-wasm, pyo3-boundary, dec-rust-drives-python, ags4-output, dec-ags4-merge-semantics, edition-resolution, laterite-ags4-reference, surface-census, data-single-source-audit, dec-ags-idx-certificate]
 sources: []
 ---
 # laterite-node
@@ -43,9 +43,9 @@ co-located TypeScript `laterite` package layers the high-level API on top
 
 The typing is **byte-identical across hosts by construction**: the addon,
 [[laterite-py]] and [[laterite-ags4-wasm]] all call the one shared
-`laterite_types::arrow_cols::build_record_batch` (a 2DP heading → Float64, YN →
+`laterite_ags4_types::arrow_cols::build_record_batch` (a 2DP heading → Float64, YN →
 Bool, DT → Timestamp(µs), ID/X → Utf8). Engine crates reused unchanged:
-[[laterite-ags4-validator]], [[laterite-types]] (`arrow`), `laterite-ags4-emit` (`arrow`).
+[[laterite-ags4-validator]], [[laterite-ags4-types]] (`arrow`), `laterite-ags4-emit` (`arrow`).
 
 ## Two layers
 
@@ -57,7 +57,7 @@ Bool, DT → Timestamp(µs), ID/X → Utf8). Engine crates reused unchanged:
   `findings_json`/`findings_ndjson`); `emitAgs4FromIpc` (data → AGS4 via
   `group_from_ipc` + `laterite_ags4_emit::emit_ags4`). Auto-camelCased; auto
   `index.d.ts`.
-  Plus `canonicalType`/`displayHint`/`parseValue` (over `laterite_types`) and
+  Plus `canonicalType`/`displayHint`/`parseValue` (over `laterite_ags4_types`) and
   `transportPack`/`Unpack`/`Lock`/`Unlock` (zstd + age, reimplemented on
   `zstd`/`age` directly — NOT laterite-ags4-core, which would drag in Excel/csv for a
   niche feature; the age envelope stays pyrage-interoperable). Also
@@ -252,4 +252,4 @@ Arrow-IPC producer work.
 
 ## Related
 
-[[crate-map]] · [[laterite-py]] · [[laterite-ags4-wasm]] · [[laterite-ags4-validator]] · [[laterite-types]] · `laterite-ags4-emit` · [[pyo3-boundary]] · [[dec-rust-drives-python]] · [[ags4-output]] · [[dec-ags4-merge-semantics]] · [[edition-resolution]] · [[laterite-ags4-reference]] · [[surface-census]] · [[data-single-source-audit]] · [[dec-ags-idx-certificate]] · dec-rust-engine-staged-adoption
+[[crate-map]] · [[laterite-py]] · [[laterite-ags4-wasm]] · [[laterite-ags4-validator]] · [[laterite-ags4-types]] · `laterite-ags4-emit` · [[pyo3-boundary]] · [[dec-rust-drives-python]] · [[ags4-output]] · [[dec-ags4-merge-semantics]] · [[edition-resolution]] · [[laterite-ags4-reference]] · [[surface-census]] · [[data-single-source-audit]] · [[dec-ags-idx-certificate]] · dec-rust-engine-staged-adoption
