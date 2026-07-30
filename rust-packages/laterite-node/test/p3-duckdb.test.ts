@@ -5,8 +5,17 @@ import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Table } from "apache-arrow";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Ags4File, read, toDuckdb } from "../ts/index";
+
+// Every case below stands up its own DuckDB instance, and the first one in a
+// cold checkout also downloads an extension — work that is not bounded by
+// vitest's 5s default. One `describe` here already carried its own 60s
+// override; the other four did not, and CI duly timed one of them out at
+// 5000ms on a busy runner while the diff under test touched no Node code.
+// The headroom is a property of the engine this file drives, so it is set once
+// for the file rather than remembered per block.
+vi.setConfig({ testTimeout: 60_000 });
 
 /** The slice of the raw `@duckdb/node-api` connection the persistence checks use
  * — reached via `Ags4File.connection`, so the tests never import the optional
@@ -88,7 +97,7 @@ describe("sql({ arrow: true }) — opt-in arrow-js Table output", () => {
     expect(table.numRows).toBe(2); // BH01's two samples
     expect(table.getChild("SAMP_ID")!.type.toString()).toMatch(/Utf8/);
   });
-}, 60_000); // first-run extension download headroom
+});
 
 describe("at() / AgsSubset — key filtering across related groups", () => {
   it("filters every related group to the chosen LOCA_IDs", async () => {
