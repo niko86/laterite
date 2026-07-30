@@ -35,7 +35,7 @@ res = laterite.build_ags4(
 `UNIT` and `TYPE` are derived from your columns. `TRAN` is not derivable — only
 you know who sent what to whom — so you state it. Omit the stamp and no `TRAN`
 is written and Rule 14 reports the gap, rather than a placeholder being invented
-that would *satisfy* the rule while asserting a transmission that never happened.
+that would _satisfy_ the rule while asserting a transmission that never happened.
 All five values are needed for a finding-free file, because `TRAN_PROD`,
 `TRAN_RECV` and `TRAN_STAT` are REQUIRED headings.
 
