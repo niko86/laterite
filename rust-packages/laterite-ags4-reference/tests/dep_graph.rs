@@ -1,6 +1,6 @@
 //! Leaf-purity guard for the reference crate (#568 §4).
 //!
-//! `laterite-ags4-reference` is a *near-leaf*: it takes `laterite-types` (for
+//! `laterite-ags4-reference` is a *near-leaf*: it takes `laterite-ags4-types` (for
 //! `keychain`) and, since #568, `laterite-ags4-parse` (the runtime `.ags`
 //! custom-dict reader). Both are wasm-clean sibling leaves — the whole point of
 //! adding the parse dep here rather than reimplementing a tokenizer is that it
@@ -16,7 +16,7 @@
 use std::process::Command;
 
 /// Crates that must never appear in `laterite-ags4-reference`'s normal graph.
-/// `laterite-types` and `laterite-ags4-parse` are deliberately ABSENT — they are
+/// `laterite-ags4-types` and `laterite-ags4-parse` are deliberately ABSENT — they are
 /// the two allowed workspace deps. The rest would signal wasm-hostility (age,
 /// zstd, getrandom-via-age), an up-dep (core/validator), or heavy coupling.
 const FORBIDDEN: &[&str] = &[
@@ -64,7 +64,7 @@ fn reference_leaf_default_dep_graph_is_pure() {
     assert!(
         leaked.is_empty(),
         "laterite-ags4-reference leaked forbidden crate(s): {leaked:?}\n\
-         The reference leaf may take only laterite-types + laterite-ags4-parse\n\
+         The reference leaf may take only laterite-ags4-types + laterite-ags4-parse\n\
          from the workspace, and nothing wasm-hostile.\n\
          Full tree:\n{tree}"
     );

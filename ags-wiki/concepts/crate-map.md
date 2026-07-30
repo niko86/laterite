@@ -7,7 +7,7 @@ ags_editions: []
 repo_refs:
   workspace: "repo:rust-packages/Cargo.toml"
   packages: "repo:packages/"
-related: [start-here, repo-layout, crate-dependency-graph, tech-stack-wasm, pyo3-boundary, laterite-ags4-validator, laterite-ags4-reference, laterite-py, laterite-types, laterite-ags4-core, laterite, dec-laterite-types-leaf, dec-ags4-censor-leaf, dec-rust-drives-python, dec-monorepo-structure, dec-duckdb-extension, dec-duckdb-perf-architecture, dec-duckdb-per-host-engine, dec-dictionary-single-source, dec-ags4-merge-semantics, dec-custom-dict-overlay, ags4-output, modality-register, surface-census, edition-resolution, data-single-source-audit, cert-trust-v2, laterite-ags4-corpus-qa]
+related: [start-here, repo-layout, crate-dependency-graph, tech-stack-wasm, pyo3-boundary, laterite-ags4-validator, laterite-ags4-reference, laterite-py, laterite-ags4-types, laterite-ags4-core, laterite, dec-laterite-ags4-types-leaf, dec-ags4-censor-leaf, dec-rust-drives-python, dec-monorepo-structure, dec-duckdb-extension, dec-duckdb-perf-architecture, dec-duckdb-per-host-engine, dec-dictionary-single-source, dec-ags4-merge-semantics, dec-custom-dict-overlay, ags4-output, modality-register, surface-census, edition-resolution, data-single-source-audit, cert-trust-v2, laterite-ags4-corpus-qa]
 sources: []
 ---
 # crate map
@@ -25,7 +25,7 @@ The experimental AGS5 (`.ags5db` / `.agsx`) crates and wheels —
 `laterite-ags5` / `laterite-ags5x` Python packages — were **decoupled to the
 dormant `ags5/` holding folder** (dec-ags5-decouple, 2026-06-21): preserved
 intact but out of the Cargo workspace and the shipped product, for a future
-AGS5 strand to re-link against the shared libs (`laterite-types` /
+AGS5 strand to re-link against the shared libs (`laterite-ags4-types` /
 `laterite-ags4-core` / `laterite-ags4-validator`). A clean side-effect: the
 kept workspace now links **no bundled DuckDB** (that left with the AGS5 crates).
 
@@ -69,7 +69,7 @@ as stable):
   moved to `ags5/` (see *Decoupled AGS5* below).
 
 **Internal implementation — crates with no external audience** (free to churn):
-- [[laterite-types]] — the wasm-safe typing leaf ([[dec-laterite-types-leaf]]); an optional
+- [[laterite-ags4-types]] — the wasm-safe typing leaf ([[dec-laterite-ags4-types-leaf]]); an optional
   `arrow` feature adds `arrow_cols` (the shared typed-Arrow column builder the native read
   boundary `laterite-py`+`pyo3-arrow` and the wasm explorer emit through) and `ipc`
   (`build_group_ipc` = that builder + StreamWriter framing — the single parser-agnostic
@@ -80,11 +80,11 @@ as stable):
   doubling an embedded quote. `laterite-ags4-emit`'s byte-faithful `write_row` streams through
   it; the browser reaches it via the new tiny `laterite-ags4-tokenizer-wasm` (below), retiring
   the hand-written copy that used to live in `web/src/lib/agsline.ts`. See
-  [[dec-laterite-types-leaf]] for the home-of-the-quoter decision.
+  [[dec-laterite-ags4-types-leaf]] for the home-of-the-quoter decision.
 - [[laterite-ags4-parse]] — the shared AGS4 **parse leaf** (#168): one tolerant tokenizer
   (`split_ags_line`/`field_span`) + one source-true byte/line/char walk (`parse_bytes`/`parse_str`/
-  `parse_bytes_opts`). A SIBLING leaf to `laterite-types` (no edge between them); deps `encoding_rs` +
-  `memchr` only — wasm-clean, FS-free, returns raw strings (typing stays in `laterite-types`). The
+  `parse_bytes_opts`). A SIBLING leaf to `laterite-ags4-types` (no edge between them); deps `encoding_rs` +
+  `memchr` only — wasm-clean, FS-free, returns raw strings (typing stays in `laterite-ags4-types`). The
   convergence target both `laterite-ags4-core::ags4_codec` and `laterite-ags4-validator::parse` fold
   into, so the two historical parsers stop drifting. **Phases 1–5 shipped — convergence COMPLETE**:
   the leaf stands alone (Phase 1); the **validator's `parse` became a thin adapter over it** (Phase 2);
@@ -135,14 +135,14 @@ as stable):
   dictionary projection this paragraph otherwise describes — but **#550** (2026-07-16) widened it to
   also hash every in-workspace crate the verdict runs through, discovered by walking `[dependencies]`
   path deps transitively (dev-/build-deps excluded): this leaf's `build.rs` (which *generates* the
-  phf tables, not just the JSON it reads), `laterite-types` (`format_nsf`, Rule 8's verdict) and
+  phf tables, not just the JSON it reads), `laterite-ags4-types` (`format_nsf`, Rule 8's verdict) and
   `laterite-ags4-parse` (field-boundary tokenizing) all joined the covered set
   (`repo:rust-packages/laterite-ags4-validator/build.rs`). Near-leaf: `serde`/`serde_json`/`phf` at runtime, `phf_codegen` at build
-  time, and — since `keychain::content_hash` (#448) — **one** workspace dep, `laterite-types`, for
+  time, and — since `keychain::content_hash` (#448) — **one** workspace dep, `laterite-ags4-types`, for
   `parse_value`. That edge is deliberate: the value-hash canonicalises each cell through the SAME
   function `laterite-ags4-merge`'s revision report and `laterite-ags4-diff` already trust to decide two
   cells are equal, so "are these cells the same" has one authority instead of three that agree by luck.
-  `laterite-types` does NOT depend on this crate, so the edge is cycle-free, and it is itself wasm-safe
+  `laterite-ags4-types` does NOT depend on this crate, so the edge is cycle-free, and it is itself wasm-safe
   — which keeps the reference leaf wasm-clean (wasm consumes `keychain` for `_id`/`_parent_id`). **PR3** (#493, an in-tree follow-up) took half of the
   enabled payoff: `laterite-ags4-diff` now depends on the leaf directly instead of the whole validator
   (diff only ever touched `Dictionary`/`DictVersion`, never the rule engine), and [[laterite-py]]'s
@@ -174,7 +174,7 @@ as stable):
   FIRST runtime `.ags` DICT-group reader; the bundled dictionaries are all compiled in) — and
   `Dictionary` became lifetime-parametric (`Bundled(BundledDict)` vs `Layered { base, delta }`,
   still `Copy`). This is a NEW workspace dependency: the leaf now takes `laterite-ags4-parse` (for
-  `dict_read.rs`'s tokenizing) alongside its existing `laterite-types` edge — both wasm-clean
+  `dict_read.rs`'s tokenizing) alongside its existing `laterite-ags4-types` edge — both wasm-clean
   sibling leaves, so the reference leaf stays wasm-safe. See [[dec-custom-dict-overlay]].
 - `laterite-transport` — the shared transport leaf (#327): the zstd + age passphrase file
   envelope (`pack`/`unpack`/`lock`/`unlock` + byte-level `encrypt`/`decrypt_with_passphrase`), with
@@ -191,7 +191,7 @@ as stable):
   browser-locked `.zst.age` opens with `lat unlock` / `pyrage` and vice-versa. For that interop `lock`
   pins scrypt `log_N` to 18 (`SCRYPT_LOG_N`, #369) — age's machine-calibrated 20+ is above the ceiling
   conservative decoders like `age-encryption` accept. See the reliquary (#16).
-- [[laterite-ags4-core]] — DuckDB-free pure-string core; re-exports `laterite-types` as `ags_types`.
+- [[laterite-ags4-core]] — DuckDB-free pure-string core; re-exports `laterite-ags4-types` as `ags_types`.
   Holds the byte-offset `index` module (`index_ags4_bytes` / `parse_group_slice`) and the
   `ags4_codec` read path — **both now leaf-backed** (#168 Phases 4–5; `csv`-free), reused by the
   duckdb extension's read path ([[dec-duckdb-perf-architecture]]). Its own `keychain` module is now
@@ -221,11 +221,11 @@ as stable):
   `laterite-ags4-core` naming/scope smell.
 - `laterite-ags4-emit` — the wasm-safe AGS4 *producer* leaf: `write_ags4` (lifted out of `laterite-ags4-core`)
   + the `emit_ags4(groups, opts)` orchestrator (typed cells → valid AGS4 via `ags4_str` +
-  per-edition dict UNIT/TYPE fill + Strict/Report/AutoFix). Deps: `laterite-types` + `laterite-ags4-validator`
+  per-edition dict UNIT/TYPE fill + Strict/Report/AutoFix). Deps: `laterite-ags4-types` + `laterite-ags4-validator`
   only — both already wasm-safe, so `laterite-ags4-wasm` can reach it without `laterite-ags4-core`'s wasm-hostile
   deps. First step relieving the `laterite-ags4-core` naming/scope smell. See [[ags4-output]]. Its
   byte-faithful `writer.rs::write_row` no longer carries its own quote-doubling logic — it streams each
-  cell through `laterite_types::write_quoted_field` (#533), the same quoter the browser now reaches via
+  cell through `laterite_ags4_types::write_quoted_field` (#533), the same quoter the browser now reaches via
   `laterite-ags4-tokenizer-wasm` (below). The old
   `core → emit` layering inversion (`core` depended on `emit` solely for `From<EmitError> for CliError`) was
   **cut** in #441: that conversion moved to its sole consumer `laterite-excel`, so `core` no longer depends on
@@ -235,14 +235,14 @@ as stable):
   by the group's dictionary KEY headings, cells compared through `parse_value` so a formatting-only
   change — `"1.0"` → `"1.00"` — is suppressed). Extracted out of `laterite-ags4-wasm` so PyO3, the CLI
   and `laterite-node` (#294 Batch E/#4) reuse the same diff the browser's Tools tab uses; deps
-  `laterite-ags4-parse` + [[laterite-ags4-reference]] + `laterite-types` (all already wasm-safe). diff
+  `laterite-ags4-parse` + [[laterite-ags4-reference]] + `laterite-ags4-types` (all already wasm-safe). diff
   only ever touched `Dictionary`/`DictVersion` — never the validator's rule engine — so #475's follow-up
   (#493) repointed it at the reference leaf directly, dropping the whole validator as a transitive dep.
   The host parses + resolves the dictionary; the leaf is pure.
 - `laterite-ags4-merge` — the wasm-safe **N-way merge leaf** (2026-07-12, new crate): reconciles N AGS4
   *deliveries* of one project into one file (`merge_parsed(files: &[ParsedFile], opts: &MergeOpts) ->
   Result<MergeResult, MergeError>`). Deps `laterite-ags4-parse` + [[laterite-ags4-reference]] +
-  `laterite-ags4-emit` + `laterite-types` + `serde_json` — pulling `emit` (which re-validates its output)
+  `laterite-ags4-emit` + `laterite-ags4-types` + `serde_json` — pulling `emit` (which re-validates its output)
   means merge is not a reference-only leaf like diff, but every one of its deps is already wasm-safe, so
   it stays wasm-clean. Row identity comes from the reference leaf's shared `keychain::key_heading_names`
   (above) — the same definition `laterite-ags4-diff` consumes, so merge never re-derives "what identifies
@@ -263,7 +263,7 @@ as stable):
   launchers. [[surface-census]] closed that blind spot by reflecting each launcher's own parser
   instead of hand-listing verbs, and `merge` now reaches all three.
 - `laterite-ags4-censor` — the wasm-clean **shared scrub-engine leaf** (#581, 2026-07-18, Phase 1 of
-  the sibling axis [[dec-laterite-types-leaf|#533]] left open — both children of the #527 cross-surface
+  the sibling axis [[dec-laterite-ags4-types-leaf|#533]] left open — both children of the #527 cross-surface
   convergence arc): the five AGS4 anonymisation actions (filehash/pseudonym/blank/token/brackets), the
   two-pass per-heading pseudonym map, custom group/column/orphan-def dropping, and ABBR-of-sensitive
   tokenisation — `censor(text, file_id, &Policy, &CensorOptions) -> (String, Tally)` +
@@ -271,7 +271,7 @@ as stable):
   `censor.rs`, which now depends ON this leaf and keeps only its crawler/manifest/rayon/report wrapper.
   Deps: `laterite-ags4-parse` (tokenizes via the shared `scan_line`, retiring `censor.rs`'s own
   private `parse_fields`/`emit_fields` — the fourth AGS4 tokenizer this convergence arc has now folded
-  away), `laterite-types` (`quote_field` re-quoting scrubbed cells), `laterite-ags4-reference` (standard
+  away), `laterite-ags4-types` (`quote_field` re-quoting scrubbed cells), `laterite-ags4-reference` (standard
   group/heading codes for `drop_custom`, off the dictionary SSOT rather than a re-embedded copy). Proven
   to compile to `wasm32-unknown-unknown` (a CI compile-guard, same shape as the tokenizer wasm's). Three
   behaviour reconciliations landed with the extraction: the `filehash` action is now the full 64-hex
@@ -304,7 +304,7 @@ as stable):
 - `laterite-ags4-tokenizer-wasm` — a SEPARATE, deliberately tiny browser cdylib (#533, part of the
   #527 convergence arc; new crate, 2026-07-17): two `#[wasm_bindgen]` wrappers,
   `tokenize_spans`/`quote_field`, over `laterite-ags4-parse::scan::scan_line` and
-  `laterite-types::quote_field` — nothing else. Deps: `laterite-ags4-parse` + `laterite-types` only
+  `laterite-ags4-types::quote_field` — nothing else. Deps: `laterite-ags4-parse` + `laterite-ags4-types` only
   (both already wasm-clean, `arrow` OFF), so the compiled artifact is ~30 KB / ~13 KB gzipped versus
   the 6.9 MB engine wasm (`laterite-ags4-wasm`) it deliberately does NOT reuse — a size gate
   (`repo:web/scripts/check-wasm-tokenizer-size.mjs`, 150 KiB ceiling) proves that stays true. Built via
@@ -331,7 +331,7 @@ as stable):
   **Node.js** host binding (the Node analog of `laterite-py`), re-expressing the
   DuckDB-free engine through `#[napi]` as per-group Arrow IPC `Buffer`s (the same
   marshalling `laterite-ags4-wasm` frames for the browser). Deps: `laterite-ags4-validator` +
-  `laterite-types` + `laterite-ags4-emit` (both `arrow`). In progress (P1+P2 of 4:
+  `laterite-ags4-types` + `laterite-ags4-emit` (both `arrow`). In progress (P1+P2 of 4:
   read/validate/emit Arrow-direct; DuckDB/typed-graph/npm = P3–P4).
 - `laterite_ags4` — the **DuckDB loadable extension** (crate `laterite-duckdb`):
   reads AGS4 files as typed, UUID-keyed tables straight from SQL (`read_ags(path,
@@ -350,7 +350,7 @@ as stable):
   its own canonical repo `niko86/laterite-duckdb` with its own CI (a now-retired
   in-workspace copy drifted; [[dec-duckdb-extension]] → Distribution). It reuses
   the pure-Rust engine wholesale — `laterite-ags4-core`'s codec + the
-  deterministic-key `keychain` + `laterite-types`' typing, pulled via a git
+  deterministic-key `keychain` + `laterite-ags4-types`' typing, pulled via a git
   submodule of the public mirror. **Ships via DuckDB Community Extensions
   from a *dedicated* public repo** (`niko86/laterite-duckdb`, which submodules
   the wheel mirror for its lib deps — community-extensions needs a root-`Cargo.toml`
@@ -376,7 +376,7 @@ built or shipped; a future AGS5 strand re-links them — dec-ags5-decouple):
 
 ```mermaid
 flowchart LR
-  types[laterite-types] --> core[laterite-ags4-core]
+  types[laterite-ags4-types] --> core[laterite-ags4-core]
   types --> reference
   core --> parse[laterite-ags4-parse]
   core --> reference[laterite-ags4-reference]
@@ -456,10 +456,10 @@ flowchart LR
 ## Where it shows up
 
 Every crate's own tool page links back here for the whole-workspace
-view; the wheel-weight rationale is [[dec-laterite-types-leaf]], the
+view; the wheel-weight rationale is [[dec-laterite-ags4-types-leaf]], the
 Rust↔Python direction is [[dec-rust-drives-python]], the typed-graph
 generation is dec-registry-driven-generation.
 
 ## Related
 
-[[start-here]] · [[tech-stack-wasm]] · [[pyo3-boundary]] · [[laterite-ags4-validator]] · [[laterite-ags4-reference]] · [[laterite-py]] · laterite-ags5-db · laterite-py-ags5 · [[laterite]] · laterite-ags5 · [[laterite-node]] · [[dec-laterite-types-leaf]] · [[dec-ags4-censor-leaf]] · [[dec-rust-drives-python]] · [[dec-monorepo-structure]] · dec-ags5-decouple · [[dec-duckdb-extension]] · [[dec-duckdb-per-host-engine]] · [[dec-dictionary-single-source]] · [[dec-ags4-merge-semantics]] · [[dec-custom-dict-overlay]] · [[modality-register]] · [[surface-census]] · [[edition-resolution]] · [[data-single-source-audit]] · [[cert-trust-v2]] · [[laterite-ags4-corpus-qa]]
+[[start-here]] · [[tech-stack-wasm]] · [[pyo3-boundary]] · [[laterite-ags4-validator]] · [[laterite-ags4-reference]] · [[laterite-py]] · laterite-ags5-db · laterite-py-ags5 · [[laterite]] · laterite-ags5 · [[laterite-node]] · [[dec-laterite-ags4-types-leaf]] · [[dec-ags4-censor-leaf]] · [[dec-rust-drives-python]] · [[dec-monorepo-structure]] · dec-ags5-decouple · [[dec-duckdb-extension]] · [[dec-duckdb-per-host-engine]] · [[dec-dictionary-single-source]] · [[dec-ags4-merge-semantics]] · [[dec-custom-dict-overlay]] · [[modality-register]] · [[surface-census]] · [[edition-resolution]] · [[data-single-source-audit]] · [[cert-trust-v2]] · [[laterite-ags4-corpus-qa]]

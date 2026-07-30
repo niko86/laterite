@@ -12,7 +12,7 @@ volatile_asof: 2026-05-30
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-wasm"
   lib: "repo:rust-packages/laterite-ags4-wasm/src/lib.rs"
-related: [crate-map, laterite-ags4-validator, laterite-types, tech-stack-wasm, validator-site, dec-ags4-merge-semantics, O-42, cert-trust-v2, dec-ags4-censor-leaf, laterite-ags4-corpus-qa]
+related: [crate-map, laterite-ags4-validator, laterite-ags4-types, tech-stack-wasm, validator-site, dec-ags4-merge-semantics, O-42, cert-trust-v2, dec-ags4-censor-leaf, laterite-ags4-corpus-qa]
 sources: []
 ---
 # laterite-ags4-wasm
@@ -37,7 +37,7 @@ sources: []
 > Since #533 (part of the #527 convergence arc) the browser also loads a
 > SEPARATE, deliberately tiny sibling cdylib, `laterite-ags4-tokenizer-wasm`
 > (~30 KB vs this crate's ~6.9 MB) — two `#[wasm_bindgen]` wrappers over
-> `laterite-ags4-parse::scan::scan_line` and `laterite-types::quote_field` for
+> `laterite-ags4-parse::scan::scan_line` and `laterite-ags4-types::quote_field` for
 > the inline line editor/preview, instantiated on the main thread rather than
 > in this crate's Web Worker. It shares no dependency edge with this crate.
 > See [[crate-map]] for its full listing.
@@ -97,7 +97,7 @@ Seven exports (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`):
 - `diff(a, b, encoding, max_rows_per_group)` → a `RevisionDelta` (the
   **Tools → Revision diff**). Parses both files, matches rows by each
   group's *dictionary* KEY headings (order-independent), and compares
-  matched cells type-aware through [[laterite-types]] `parse_value` — so a
+  matched cells type-aware through [[laterite-ags4-types]] `parse_value` — so a
   formatting-only change (`1.0`→`1.00`) is not a diff, only a genuine
   typed change is. A group with no dictionary KEYs present in both files
   falls back to whole-row matching (`keyed=false`). Counts are true
@@ -146,12 +146,12 @@ JSON-compatible report mirroring the CLI's `--json` shape. Out (parse):
 one typed Apache Arrow IPC stream per group, handed to DuckDB-wasm with
 no per-cell JS objects and no `TRY_CAST` — the explorer casts a file
 *identically* to a `.ags5db` because it calls the same
-[[laterite-types]] `canonical_type` / `parse_value` / `parse_datetime`.
+[[laterite-ags4-types]] `canonical_type` / `parse_value` / `parse_datetime`.
 
 ## Where it lives
 
 `repo:rust-packages/laterite-ags4-wasm` — depends on [[laterite-ags4-validator]] (the
-engine), [[laterite-types]] (shared casting), `laterite-ags4-censor` (the
+engine), [[laterite-ags4-types]] (shared casting), `laterite-ags4-censor` (the
 `censor` export, #581 Phase 2), and `arrow` (IPC feature only). Excluded from
 the host `cargo build/clippy/test --workspace` (CI's `--exclude
 laterite-ags4-wasm`); built *for wasm* only via wasm-pack in the deploy
@@ -169,7 +169,7 @@ Full graph in [[crate-map]]; immediate edges:
 ```mermaid
 flowchart LR
   validator[laterite-ags4-validator] --> wasm[laterite-ags4-wasm]
-  types[laterite-types] --> wasm
+  types[laterite-ags4-types] --> wasm
   merge[laterite-ags4-merge] --> wasm
   censor[laterite-ags4-censor] --> wasm
   wasm -. arrow ipc .-> explorer([validator-site / data explorer])
@@ -178,4 +178,4 @@ flowchart LR
 
 ## Related
 
-[[crate-map]] · [[laterite-ags4-validator]] · [[laterite-types]] · [[tech-stack-wasm]] · [[validator-site]] · [[dec-ags4-merge-semantics]] · [[O-42]] · [[cert-trust-v2]] · [[dec-ags4-censor-leaf]] · [[laterite-ags4-corpus-qa]]
+[[crate-map]] · [[laterite-ags4-validator]] · [[laterite-ags4-types]] · [[tech-stack-wasm]] · [[validator-site]] · [[dec-ags4-merge-semantics]] · [[O-42]] · [[cert-trust-v2]] · [[dec-ags4-censor-leaf]] · [[laterite-ags4-corpus-qa]]

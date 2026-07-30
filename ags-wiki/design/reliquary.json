@@ -31,7 +31,7 @@
   "rows": [
     {
       "symbol": "`truncate_dt_to_unit()`",
-      "verify": "`rust-packages/laterite-types/src/lib.rs::fn truncate_dt_to_unit`",
+      "verify": "`rust-packages/laterite-ags4-types/src/lib.rs::fn truncate_dt_to_unit`",
       "axis": "code",
       "status": "removed",
       "removed_in": "misc-deadcode PR",
@@ -151,7 +151,7 @@
     },
     {
       "symbol": "`CanonicalType::Date`/`Time` variants",
-      "verify": "`rust-packages/laterite-types/src/lib.rs::CanonicalType::Time`",
+      "verify": "`rust-packages/laterite-ags4-types/src/lib.rs::CanonicalType::Time`",
       "axis": "code",
       "status": "keep",
       "removed_in": "— (owner call)",

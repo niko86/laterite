@@ -69,7 +69,7 @@ laterite-ags4-trust = { path = "../laterite-ags4-trust" }
 laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # The shared AGS4 emit orchestrator (`to_ags4`): typed/string cells ->
 # valid AGS4 + AutoFix. Same core the native PyO3 binding uses; depends
-# only on laterite-types + laterite-ags4-validator, so it adds no wasm-hostile weight.
+# only on laterite-ags4-types + laterite-ags4-validator, so it adds no wasm-hostile weight.
 # The `arrow` feature pulls the shared Arrow→Value transpose (group_from_arrow)
 # for the columnar `to_ags4_ipc` path — the same conversion the native host
 # uses, not a copy. arrow's display fallback stays comfy-table-free.
@@ -77,7 +77,7 @@ laterite-ags4-emit = { path = "../laterite-ags4-emit", features = ["arrow"] }
 # The KEY-aware/type-aware revision diff core (`diff_parsed`), extracted
 # out of this crate as a wasm-safe leaf so the same engine-consistent diff
 # is shared by wasm + PyO3 + the CLI. Depends only on the parse leaf +
-# validator dict + laterite-types, all already pulled here — no new weight.
+# validator dict + laterite-ags4-types, all already pulled here — no new weight.
 laterite-ags4-diff = { path = "../laterite-ags4-diff" }
 # `merge()` — reconcile N deliveries into one file (KEY-aware, argument-order
 # recency, widen-to-X). Wasm-safe: it pulls only parse + emit + reference, all
@@ -103,9 +103,9 @@ laterite-excel = { path = "../laterite-excel", features = ["wasm"] }
 # (parity by construction). The `arrow` feature pulls in arrow_cols, the
 # shared typed-Arrow column/record-batch builder both hosts emit through —
 # so the browser and the native PyCapsule path cast byte-identically.
-laterite-types = { path = "../laterite-types", features = ["arrow"] }
+laterite-ags4-types = { path = "../laterite-ags4-types", features = ["arrow"] }
 # Arrow IPC framing only. The typed columns are built by the shared emitter
-# in laterite-types (arrow_cols); here we just StreamWriter that batch into an
+# in laterite-ags4-types (arrow_cols); here we just StreamWriter that batch into an
 # IPC stream for duckdb-wasm (the native side hands the same batch to
 # pyo3-arrow as a zero-copy capsule instead). `ipc` pulls StreamWriter + the
 # core array/schema/record_batch crates; default-features=false drops
@@ -136,6 +136,6 @@ hex = "0.4"
 
 [dev-dependencies]
 # Independent datetime oracle for the typed-Arrow parity test: the
-# production cast goes through laterite_types::parse_datetime, the test
+# production cast goes through laterite_ags4_types::parse_datetime, the test
 # computes the expected epoch-µs instant straight from chrono.
 chrono = { version = "0.4", default-features = false, features = ["std"] }

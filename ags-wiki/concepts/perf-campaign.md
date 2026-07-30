@@ -232,7 +232,7 @@ as such, because they are counts, not timings.
 | # | candidate | band | frequency | prize (ceiling) | cost | bench | coverage gap to close with it |
 |---|---|---|---|---|---|---|---|
 | ~~1~~ | ~~parent KEY-tuple set rebuilt per child~~ | validator | per-row | **LANDED T1 — relational −13.9%** | contained | yes | cache-reuse test added |
-| ~~2~~ | ~~`build_column` casts per cell via `parse_value` (courier `String`, `canonical_type` re-resolved per cell)~~ | laterite-types | per-cell | **LANDED T3 — typed_read_file −78% (75.9→16.7 ms)** via direct per-cell parse (no arrow-cast) | contained | yes | `typed_build_parity.rs` pins `build_column` ≡ `parse_value` |
+| ~~2~~ | ~~`build_column` casts per cell via `parse_value` (courier `String`, `canonical_type` re-resolved per cell)~~ | laterite-ags4-types | per-cell | **LANDED T3 — typed_read_file −78% (75.9→16.7 ms)** via direct per-cell parse (no arrow-cast) | contained | yes | `typed_build_parity.rs` pins `build_column` ≡ `parse_value` |
 | ~~3~~ | ~~`line_format`'s three per-line `chars()` walks~~ | validator | per-line | **LANDED T1 — line_format −48.5%** | contained | yes | `char_span` test added |
 | ~~4~~ | ~~`raw_lines` pushes one owned `String` per line under `validating()` (`parse/lib.rs:721`)~~ | parse leaf | per-line | **DECLINED T4 — measured ~9.9 ms** (validating 144.2 vs lean 134.3 @ 25 MB): only ~6.9% of `parse_bytes`, ~1.9% of `check_file`, and that is the *ceiling* (a span rewrite keeps the `Vec` push) | **invasive** (ledger said contained — WRONG: removing the alloc needs `ParsedFile<'a>` / whole-file-decode + span, changing the `pub RawLine.text` API across `line_format`/`structure`/`fixes`/PyO3) | yes | fails the 20% invasive gate at ~5% realized |
 | ~~5~~ | ~~`Sidecar::assemble` walks the file a second time inside `mint` to rebuild the byte index~~ | core + trust | per-file | **LANDED T4 — mint −13.3% (324→280 ms @ 25 MB)**: reuse the validating parse's source-true offsets instead of re-walking (`assemble_from_parsed`) | contained | yes (new `trust/mint` bench) | non-UTF-8 mint pinned (core fallback + trust end-to-end) |
@@ -250,7 +250,7 @@ as such, because they are counts, not timings.
 >   parent key-chain): ~5–15% of *id-minting*, concentrated on deep child groups
 >   (SAMP/SPEC/GEOL). But id-minting is no longer the dominant stage, so its
 >   *end-to-end* ceiling now falls below the tranche floor. Contained; recorded.
-> - **S4 — fuse UUID→string into the Arrow builder** (`laterite-types::arrow_cols`,
+> - **S4 — fuse UUID→string into the Arrow builder** (`laterite-ags4-types::arrow_cols`,
 >   a reused `[u8;36]`): this targets the *new* bottleneck, so it is the more
 >   promising end-to-end of the two (~15–30 ms / ~4–8% ceiling). Contained; the
 >   ranked fast-follow if the keyed path is reopened after 0.8.0.
@@ -280,7 +280,7 @@ Below the floor, measured out — recorded so they are not rediscovered:
 |---|---|---|---|
 | **C1** | `from_shared` collapsed duplicate headings (`ags4_codec.rs`) | **LANDED** (#88) | wrong data, not merely lost data — see below |
 | **C2** | `arrow_in.rs` had zero tests and compiled under no CI test job | **LANDED** (#87) | untested code shipping inside the wheel and the node binding |
-| **M1** | `laterite-types/arrow` + `laterite-ags4-emit/arrow` (651 lines) were compiled out of the coverage build by resolver-2 feature unification once their only four enablers are excluded | **LANDED** (#87) | the 88% gate was not measuring the Arrow boundary at all |
+| **M1** | `laterite-ags4-types/arrow` + `laterite-ags4-emit/arrow` (651 lines) were compiled out of the coverage build by resolver-2 feature unification once their only four enablers are excluded | **LANDED** (#87) | the 88% gate was not measuring the Arrow boundary at all |
 | **M2** | the bench fixture is **clean by construction**, so `findings::add`, rule 10b's per-bad-row `format!`/`join`, rule 11c's O(child × target) scan and the entire FYI tier are never executed by any bench | **LANDED T5 + T5-followup** — `validate/error-path` benches both gates on over SIZE-SCALED dirty twins (`forge scale --inject --density`); emitting 314k findings is **−6% vs clean**, 10b's line ~310 ns/finding but structurally capped | **closed, ceiling measured: DECLINED** — below the 5% floor at any realistic fault density; 11c stays unreachable (the `wide` scaffold has zero RL columns) |
 
 **C1, as measured rather than as queued.** The row above originally read
@@ -417,7 +417,7 @@ zero wasm cost — so it replaced the cast approach.
 per-cell `parse_value` build — Arrow-representation identical (`ArrayData` logical
 equality, the object the C-data interface / IPC hand to polars / duckdb / arrow-js)
 over **663 columns / 2,557,209 cells** of the fixture plus the edge seams, pinned
-permanently in `laterite-types/tests/typed_build_parity.rs`. A live wheel diff
+permanently in `laterite-ags4-types/tests/typed_build_parity.rs`. A live wheel diff
 confirmed it end-to-end: every group's polars DataFrame (schema + dtypes + values
 + nulls) unchanged, on both the frame and `keys=True` paths.
 
@@ -461,7 +461,7 @@ to the lean/`Reject` re-walk — the byte-identical rejection — pinned by
 **T4-followup — the deeper allocation profile, and the allocator candidate
 (2026-07-25).** The criterion benches TIME the read stages; they cannot say
 whether a stage is slow because it *allocates* or because it is
-compute/bandwidth-bound. A `dhat` heap profiler (`laterite-types/examples/dhat_read.rs`,
+compute/bandwidth-bound. A `dhat` heap profiler (`laterite-ags4-types/examples/dhat_read.rs`,
 dev-only, `arrow`-gated) attributes the allocations *inside* each stage over the
 25 MB `large` fixture, one stage per run:
 
@@ -685,8 +685,8 @@ out to dominate there.
 ### Refuted — do not chase
 
 > [!warning] **Ledger correction.** The old Open row reading
-> "`laterite-types::arrow_cols` … never benched in isolation" was **wrong**.
-> `rust-packages/laterite-types/benches/arrow_cols.rs` benches
+> "`laterite-ags4-types::arrow_cols` … never benched in isolation" was **wrong**.
+> `rust-packages/laterite-ags4-types/benches/arrow_cols.rs` benches
 > `build_record_batch` **per type family and mixed**. What is genuinely unbenched
 > is narrower: no file rung; the `Integer`/`Bool` arms; the null/empty branch;
 > and `build_record_batch_compat`, `build_record_batch_with_ids` and `ipc.rs`.
@@ -806,7 +806,7 @@ Per-surface read harnesses mirror the Rust rungs on the same 25 MB fixture, each
 in its own lane (not part of the unit suite): `laterite-node/bench/read.bench.ts`
 (`npm run bench`) and `web/bench/wasm-read.bench.ts` (`npm run bench:wasm`, driving
 the built browser cdylib from its `.wasm` bytes). For attribution rather than
-timing, `laterite-types/examples/dhat_read.rs` (dev-only, `arrow`-gated) is a
+timing, `laterite-ags4-types/examples/dhat_read.rs` (dev-only, `arrow`-gated) is a
 `dhat` heap profile of the read stages — it says whether a stage is
 allocation-bound (fixable) or a compute/bandwidth wall.
 

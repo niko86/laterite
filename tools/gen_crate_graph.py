@@ -35,7 +35,7 @@ PAGE = REPO / "ags-wiki" / "concepts" / "crate-dependency-graph.md"
 # crate missing here renders as "?" and is flagged, forcing a deliberate
 # assignment when a crate is added.
 LAYER = {
-    "laterite-types": 0,
+    "laterite-ags4-types": 0,
     "laterite-ags4-parse": 0,
     "laterite-ags4-reference": 0,
     "laterite-transport": 0,
@@ -65,7 +65,7 @@ LAYER = {
 }
 LAYER_NAME = {
     # NOT "leaves (no internal deps)" — that was false from the moment
-    # `laterite-ags4-reference` took its `laterite-types` edge, and it was the
+    # `laterite-ags4-reference` took its `laterite-ags4-types` edge, and it was the
     # SECOND copy of the claim (the first sat in reference's own Cargo.toml
     # header). Both were prose; nothing compared either to the manifests. What
     # is actually true — and what the inversion check below enforces — is that
@@ -83,11 +83,11 @@ LAYER_NAME = {
 # itself and update automatically; these are the interpretation.
 NOTES = [
     (
-        "`core`'s `laterite-types` re-export is dead weight",
+        "`core`'s `laterite-ags4-types` re-export is dead weight",
         "minor · cheap",
-        "`core/src/lib.rs`'s `pub use laterite_types as ags_types;` is used "
+        "`core/src/lib.rs`'s `pub use laterite_ags4_types as ags_types;` is used "
         "internally nowhere — only by `laterite-py`, which already depends on "
-        "`laterite-types` directly. Cuttable with a one-line import change.",
+        "`laterite-ags4-types` directly. Cuttable with a one-line import change.",
     ),
     (
         "#441 (`core → emit`) — CUT 2026-07-11",
@@ -278,7 +278,7 @@ def _computed_findings(
     # alone leaves ties in hash-iteration order — which differs BETWEEN processes
     # (PYTHONHASHSEED), so the page rendered differently run to run and the
     # `--check` gate became a coin flip. Latent until the reference leaf's
-    # laterite-types edge (#448) created the graph's first in-degree tie. The
+    # laterite-ags4-types edge (#448) created the graph's first in-degree tie. The
     # table at the top of this function already tie-breaks this way.
     hubs = [
         f"`{n}` (in-degree {indeg[n]})"

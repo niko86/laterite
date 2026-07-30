@@ -1,6 +1,6 @@
 ---
 type: index
-generated: 2026-07-29
+generated: 2026-07-30
 counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 28, concepts: 29, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 22}
 ---
 # AGS Wiki — Content Catalog
@@ -338,6 +338,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 28, concept
 | [[laterite-ags4-reference]] | drafted | crate |
 | [[laterite-ags4-tokenizer-wasm]] | drafted | crate |
 | [[laterite-ags4-trust]] | drafted | crate |
+| [[laterite-ags4-types]] | drafted | crate |
 | [[laterite-ags4-validator]] | drafted | crate |
 | [[laterite-ags4-wasm]] | drafted | crate |
 | [[laterite-ags4-xcheck]] | drafted | crate |
@@ -346,7 +347,6 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 28, concept
 | [[laterite-node]] | drafted | crate |
 | [[laterite-py]] | drafted | crate |
 | [[laterite-transport]] | drafted | crate |
-| [[laterite-types]] | drafted | crate |
 | [[laterite]] | drafted | python-package |
 | [[python-ags4]] | drafted | reference-impl |
 | [[vendored-authority-faithful]] | reviewed | script |
@@ -480,7 +480,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 48, tools: 28, concept
 | [[dec-duckdb-per-host-engine]] | accepted | — |
 | [[dec-duckdb-perf-architecture]] | accepted | — |
 | [[dec-edition-selection]] | accepted | — |
-| [[dec-laterite-types-leaf]] | accepted | — |
+| [[dec-laterite-ags4-types-leaf]] | accepted | — |
 | [[dec-monorepo-structure]] | accepted | — |
 | [[dec-python-imports-rust-library]] | accepted | — |
 | [[dec-rust-api-crates-io]] | accepted | — |

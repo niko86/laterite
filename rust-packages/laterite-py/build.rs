@@ -240,7 +240,7 @@ fn py_name(heading: &str) -> String {
     heading.to_ascii_lowercase()
 }
 
-/// Mirror `laterite_types::canonical_type` minus the public API —
+/// Mirror `laterite_ags4_types::canonical_type` minus the public API —
 /// build.rs can't easily call the crate's function (would create a
 /// build-dep cycle), so we duplicate the small classification logic.
 /// The two MUST stay in lockstep; a parity probe in F2b-6 will catch

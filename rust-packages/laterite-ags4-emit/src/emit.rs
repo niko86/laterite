@@ -6,7 +6,7 @@
 //!   1. resolve each heading's UNIT/TYPE — **hybrid**: the caller's
 //!      explicit value wins, else the per-edition standard dictionary fills,
 //!      else `""` / `"X"`;
-//!   2. format each cell — typed values via `laterite_types::ags4_str` (the
+//!   2. format each cell — typed values via `laterite_ags4_types::ags4_str` (the
 //!      canonical AGS4 string per type), string values verbatim (so the
 //!      *mode* below is the single owner of any canonicalisation);
 //!   3. `write_ags4` the sections;
@@ -18,12 +18,12 @@
 //! Steps 1–3 are pure formatting; step 4 reuses the validator's shipped
 //! parse / `run_all` / `compute_fixes` / `apply_fixes` — no new fix logic.
 
+use laterite_ags4_types::ags4_str;
 use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};
 use laterite_ags4_validator::fixes::{Fix, FixRisk, apply_fixes, compute_fixes};
 use laterite_ags4_validator::parse::{ParsedFile, parse_bytes};
 use laterite_ags4_validator::{CheckOptions, DictVersion, WorldScope, check_parsed};
-use laterite_types::ags4_str;
 use serde_json::Value;
 use std::collections::BTreeSet;
 

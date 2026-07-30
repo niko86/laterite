@@ -50,13 +50,13 @@ wasm = ["rust_xlsxwriter/wasm"]
 # The round-trip tests write a workbook to a temp dir and read it back.
 tempfile = "3"
 # TEST-ONLY authority for the numeric-formatter gate (`formatter_authority`
-# module in src/lib.rs). `laterite_types::ags4_str` is the canonical AGS4
+# module in src/lib.rs). `laterite_ags4_types::ags4_str` is the canonical AGS4
 # numeric formatter; excel's `NumericFormat` is a HAND-COPY of the same logic
 # (it deps types nowhere at runtime — that copy is why the two can drift). The
 # gate imports the real authority so any drift between them is a red test, not a
-# silent double-implementation. Dev-only: no runtime coupling, and `laterite-types`
+# silent double-implementation. Dev-only: no runtime coupling, and `laterite-ags4-types`
 # is a leaf, so there is no dependency cycle.
-laterite-types = { path = "../laterite-types" }
+laterite-ags4-types = { path = "../laterite-ags4-types" }
 # `ags4_str` takes a `serde_json::Value`; the gate builds one with `json!`.
 serde_json = "1"
 

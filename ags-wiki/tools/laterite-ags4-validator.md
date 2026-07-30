@@ -118,7 +118,7 @@ for an `.ags.idx` certificate, rather than the hand-bumped `VERSION`
 (`CARGO_PKG_VERSION`), which does not change when a rule's logic does. As
 shipped in PR 2 the hash covered only this crate's own rule sources plus the
 reference leaf's two bundled JSON files; **#550** (2026-07-16) found that left
-three verdict-determining paths uncovered — `laterite-types::format_nsf`
+three verdict-determining paths uncovered — `laterite-ags4-types::format_nsf`
 (computes Rule 8's verdict), `laterite-ags4-parse` (decides field boundaries),
 and `laterite-ags4-reference`'s `build.rs` (generates the per-edition
 dictionary tables the JSON projects into) — and widened `build.rs` to derive

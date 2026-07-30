@@ -27,7 +27,7 @@
 use std::collections::HashMap;
 use std::hash::BuildHasher;
 
-use laterite_types::parse_value;
+use laterite_ags4_types::parse_value;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -117,7 +117,7 @@ pub fn row_ids<S: BuildHasher>(
 
 /// Stringified `(_id, _parent_id)` for every row of a group — ready to prepend
 /// as the two Arrow key columns (see
-/// `laterite_types::arrow_cols::build_record_batch_with_ids`). Mirrors that
+/// `laterite_ags4_types::arrow_cols::build_record_batch_with_ids`). Mirrors that
 /// builder's `(headings, n_rows, cell)` interface deliberately: a host computes
 /// the ids and the typed batch from the **same** inputs, so the two can never
 /// misalign. `_parent_id` is `None` (→ a NULL Arrow cell) for a root group.
@@ -230,7 +230,7 @@ const CONTENT_HASH_DOMAIN: &str = "\u{1f}CONTENT2";
 /// splitting identity across formatters. A *value* hash has the opposite need —
 /// a producer re-emitting `1.0` as `1.00` has changed nothing, and reporting it
 /// as a revision is a false positive. So values go through
-/// [`laterite_types::parse_value`], the same canonicaliser
+/// [`laterite_ags4_types::parse_value`], the same canonicaliser
 /// `laterite-ags4-merge` uses to decide a cell actually changed and
 /// `laterite-ags4-diff` uses to ignore formatting-only edits. One authority for
 /// "are these two cells the same", by construction rather than by coincidence.
@@ -954,7 +954,7 @@ mod tests {
     /// is caught even when it preserves every relationship. If these literals
     /// move — because you bumped the domain, or `parse_value` changed (see the
     /// twin pin-table `parse_value_canonical_form_is_pinned_for_the_content_hash_contract`
-    /// in `laterite-types`) — updating them here is the deliberate, reviewable
+    /// in `laterite-ags4-types`) — updating them here is the deliberate, reviewable
     /// record that every previously-computed hash just changed.
     #[test]
     fn content_hash_golden_literals() {
