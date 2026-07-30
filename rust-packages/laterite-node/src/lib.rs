@@ -24,12 +24,12 @@ use laterite_ags4_validator::fixes::Fix;
 // #168 Phase 3: text/bytes parse through the leaf directly; the FS entry
 // (`parse_file_with_encoding`) stays in the validator (it owns NotFound/Io).
 use laterite_ags4_parse::{ParsedFile, parse_bytes, parse_str};
+use laterite_ags4_types::sql_type;
 use laterite_ags4_validator::parse::parse_file_with_encoding;
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, WorldScope, fix_document_selective, overlay,
     rule_metadata_json, tran_ags_of,
 };
-use laterite_ags4_types::sql_type;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde_json::{Map, Value};

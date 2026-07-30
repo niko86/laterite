@@ -13,11 +13,11 @@
 // #168 Phase 3: parse types + tokenizer come straight from the leaf
 // (encoding_rs + memchr only — wasm-safe); the validator dep stays for rules.
 use laterite_ags4_parse::{ParsedFile, parse_bytes};
+use laterite_ags4_types::sql_type;
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, WorldScope, check_parsed_with_dict,
     dict::Dictionary, dict::FALLBACK, findings, fixes, overlay, resolve_dict_version, tran_ags_of,
 };
-use laterite_ags4_types::sql_type;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
