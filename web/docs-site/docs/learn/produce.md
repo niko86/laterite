@@ -24,11 +24,13 @@ To get them, ask:
 res = laterite.build_ags4(
     {"PROJ": proj, "LOCA": loca},
     synthesise_metadata=True,
-    tran_issue="1",
-    tran_date="2026-07-30",
-    tran_producer="Your Firm",
-    tran_recipient="The Client",
-    tran_status="Final",
+    tran=laterite.TranStamp(
+        issue="1",
+        date="2026-07-30",
+        producer="Your Firm",
+        recipient="The Client",
+        status="Final",
+    ),
 )
 ```
 
@@ -36,8 +38,10 @@ res = laterite.build_ags4(
 you know who sent what to whom — so you state it. Omit the stamp and no `TRAN`
 is written and Rule 14 reports the gap, rather than a placeholder being invented
 that would _satisfy_ the rule while asserting a transmission that never happened.
-All five values are needed for a finding-free file, because `TRAN_PROD`,
-`TRAN_RECV` and `TRAN_STAT` are REQUIRED headings.
+All five are required together — they are REQUIRED headings, so `TranStamp`
+demands them rather than letting a half-stamp reach the file. `TRAN_AGS`,
+`TRAN_DLIM` and `TRAN_RCON` are absent from it on purpose: they describe the
+file the emitter is writing, so it fills them.
 
 Synthesis is opt-in on every surface (`synthesise_metadata=` in Python,
 `{ synthesiseMetadata }` in Node, `synthesise_metadata` in the browser wasm

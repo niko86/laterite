@@ -461,15 +461,26 @@ export function revisionDiff(
  *  precision and zero-pads the coarser values. A conflicting UNIT is fatal in every
  *  mode. The optional `tran*` stamp a synthesised merge-TRAN. Rejects (an unsettled
  *  clash / parse error) with the engine message. */
+/** The transmission a merged file represents. All five members are required
+ *  together — they are REQUIRED TRAN headings, so the engine rejects a partial
+ *  stamp rather than writing blank cells that then fail Rule 10b. */
+export interface TranStamp {
+  issue: string;
+  date: string;
+  producer: string;
+  recipient: string;
+  status: string;
+  description?: string;
+  remarks?: string;
+}
+
 export function mergeFiles(
   a: Uint8Array,
   b: Uint8Array,
   opts: {
     encoding: EncodingOpt;
     onTypeClash: TypeClashMode;
-    tranIssue?: string | null;
-    tranDate?: string | null;
-    tranProducer?: string | null;
+    tran?: TranStamp | null;
   },
 ): Promise<MergeConversion> {
   return new Promise((resolve, reject) => {
@@ -480,9 +491,7 @@ export function mergeFiles(
         bBytes: new ArrayBuffer(0), // replaced inside postDual()
         encoding: opts.encoding,
         onTypeClash: opts.onTypeClash,
-        tranIssue: opts.tranIssue ?? null,
-        tranDate: opts.tranDate ?? null,
-        tranProducer: opts.tranProducer ?? null,
+        tran: opts.tran ?? null,
       },
       a,
       b,

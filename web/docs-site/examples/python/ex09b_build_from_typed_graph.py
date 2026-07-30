@@ -28,11 +28,13 @@ assert res.findings
 full = build_ags4(
     p,
     synthesise_metadata=True,
-    tran_issue="1",
-    tran_date="2026-07-30",
-    tran_producer="Demo Producer",
-    tran_recipient="Demo Recipient",
-    tran_status="Final",
+    tran=laterite.TranStamp(
+        issue="1",
+        date="2026-07-30",
+        producer="Demo Producer",
+        recipient="Demo Recipient",
+        status="Final",
+    ),
 )
 assert {"PROJ", "LOCA", "TRAN", "UNIT", "TYPE"}.issubset(
     laterite.read(data=full.bytes).groups

@@ -28,6 +28,8 @@ from typing import TYPE_CHECKING, cast
 if TYPE_CHECKING:
     from laterite import Edition
 
+    from . import TranStamp
+
 from . import _laterite_native as _native
 
 #: `--dict-version` choices — ASKED OF THE DICTIONARY, not hand-listed. The editions
@@ -346,6 +348,37 @@ def _run_diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def _tran_from_args(args: argparse.Namespace) -> TranStamp | None:
+    """Fold the five ``--tran-*`` flags into the one object the library takes.
+
+    CLI flags are irreducibly five independent optionals, so the flattening has
+    to happen somewhere. Doing it here — and refusing a partial set with the
+    library's own vocabulary — keeps "all five or none" answered in one place.
+    """
+    parts = {
+        "issue": args.tran_issue,
+        "date": args.tran_date,
+        "producer": args.tran_producer,
+        "recipient": args.tran_recipient,
+        "status": args.tran_status,
+    }
+    missing = [k for k, v in parts.items() if not (v or "").strip()]
+    if len(missing) == 5:
+        return None  # nothing stated: no merge-TRAN, and that is reported
+    if missing:
+        raise SystemExit(
+            f"error: incomplete TRAN: missing {', '.join(missing)}. All five are "
+            "REQUIRED headings (TRAN_ISNO/DATE/PROD/RECV/STAT), so a partial "
+            "stamp would emit a TRAN that fails Rule 10b. Supply all five, or "
+            "none to omit TRAN.\n"
+            "       flags: --tran-issue --tran-date --tran-producer "
+            "--tran-recipient --tran-status"
+        )
+    from . import TranStamp as _TranStamp
+
+    return _TranStamp(**parts)
+
+
 def _run_merge(args: argparse.Namespace) -> int:
     """`lat merge <files...> --out <merged.ags>` — reconcile N deliveries into one.
 
@@ -377,11 +410,7 @@ def _run_merge(args: argparse.Namespace) -> int:
             on_type_clash=args.on_type_clash,
             dict_version=dv,
             encoding=args.encoding,
-            tran_issue=args.tran_issue,
-            tran_date=args.tran_date,
-            tran_producer=args.tran_producer,
-            tran_recipient=args.tran_recipient,
-            tran_status=args.tran_status,
+            tran=_tran_from_args(args),
         )
     except laterite.MergeConflictError as e:
         # The library message already carries the full guidance (which modes settle

@@ -40,11 +40,13 @@ def _valid_accented_ags() -> str:
     return L.build_ags4(
         {"PROJ": proj},
         synthesise_metadata=True,
-        tran_issue="1",
-        tran_date="2026-07-30",
-        tran_producer="Acme Ground Engineering",
-        tran_recipient="Client Ltd",
-        tran_status="FINAL",
+        tran=L.TranStamp(
+            issue="1",
+            date="2026-07-30",
+            producer="Acme Ground Engineering",
+            recipient="Client Ltd",
+            status="FINAL",
+        ),
     ).text
 
 
@@ -105,8 +107,16 @@ def test_synthesis_never_invents_proj() -> None:
         {"LOCA": pl.DataFrame({"LOCA_ID": ["BH1"]})},
         mode="autofix",
         synthesise_metadata=True,
-        tran_issue="1",
-        tran_date="2026-07-30",
+        # All five: the stamp is required-complete now, so a build that WANTS a
+        # TRAN must state a whole transmission. Two-of-five used to be accepted
+        # and wrote three REQUIRED cells empty.
+        tran=L.TranStamp(
+            issue="1",
+            date="2026-07-30",
+            producer="Acme Ground Engineering",
+            recipient="Client Ltd",
+            status="FINAL",
+        ),
     )
     groups = L.read(data=res.bytes).groups
     assert "PROJ" not in groups

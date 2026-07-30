@@ -56,11 +56,13 @@ describe("typed-graph builder → buildAgs4", () => {
       dictVersion: "4.1.1",
       mode: "autofix",
       synthesiseMetadata: true,
-      tranIssue: "1",
-      tranDate: "2026-07-30",
-      tranProducer: "Demo Producer",
-      tranRecipient: "Demo Recipient",
-      tranStatus: "Final",
+      tran: {
+        issue: "1",
+        date: "2026-07-30",
+        producer: "Demo Producer",
+        recipient: "Demo Recipient",
+        status: "Final",
+      },
     });
     const back = read(undefined, { text: res.text });
     expect(back.groups).toEqual(

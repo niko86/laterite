@@ -48,17 +48,26 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
     )
     .map_or(FALLBACK, |(dv, _)| dv);
 
-    // A merge-TRAN is synthesised only when both an issue and a date are given.
-    let tran = match (&args.tran_issue, &args.tran_date) {
-        (Some(isno), Some(date)) => Some(TranStamp {
-            isno: isno.clone(),
-            date: date.clone(),
-            prod: args.tran_producer.clone().unwrap_or_default(),
-            recv: args.tran_recipient.clone().unwrap_or_default(),
-            stat: args.tran_status.clone().unwrap_or_default(),
-            ags: dv.as_str().to_string(),
-        }),
-        _ => None,
+    // All five `--tran-*` flags or none: the shared rule, in the shared place.
+    // This was a hand-rolled issue+date match that let producer/recipient/status
+    // default to empty — three REQUIRED headings, silently blank. Four-of-five is
+    // now a usage error naming the missing flags, not a quietly incomplete file.
+    // `ags` is left to merge, which knows the edition it resolved.
+    let tran = match TranStamp::from_parts(
+        args.tran_issue.clone(),
+        args.tran_date.clone(),
+        args.tran_producer.clone(),
+        args.tran_recipient.clone(),
+        args.tran_status.clone(),
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("error: {e}");
+            eprintln!(
+                "       flags: --tran-issue --tran-date --tran-producer --tran-recipient --tran-status"
+            );
+            exit(2); // usage, not data — the files were never the problem
+        }
     };
 
     let merge_opts = MergeOpts {

@@ -710,12 +710,15 @@ fn merge_unparseable_file_exits_4() {
 }
 
 #[test]
-fn merge_synthesises_a_tran_stamp_when_issue_and_date_are_given() {
-    // With BOTH --tran-issue and --tran-date, merge writes a fresh merge-TRAN — so
-    // the "not stamped" fallback warning disappears and the date + a "Merged from
-    // N deliveries" note land in the file's TRAN row. Without both, no stamp is
-    // made. Pins the (Some, Some) synthesis arm and the `tran` MergeOpts field the
-    // sweep found unasserted.
+fn merge_synthesises_a_tran_stamp_when_a_complete_stamp_is_given() {
+    // With all five --tran-* flags, merge writes a fresh merge-TRAN — so the "not
+    // stamped" fallback warning disappears and the date + a "Merged from N
+    // deliveries" note land in the file's TRAN row. Pins the synthesis arm and the
+    // `tran` MergeOpts field the sweep found unasserted.
+    //
+    // Was issue+date only. That is now a usage error rather than a stamp with
+    // three blank REQUIRED cells — see
+    // cli_merge::merge_rejects_a_partial_tran_stamp_naming_the_missing_flags.
     let (dir, base, rev) = write_merge_pair();
     let out = dir.join("stamped.ags");
     let o = lat([
@@ -729,6 +732,12 @@ fn merge_synthesises_a_tran_stamp_when_issue_and_date_are_given() {
         "7",
         "--tran-date",
         "2026-07-27",
+        "--tran-producer",
+        "Merger",
+        "--tran-recipient",
+        "Client",
+        "--tran-status",
+        "Merged",
     ]);
     assert_eq!(o.status.code(), Some(0), "stderr: {}", stderr(&o));
     let v: Value = serde_json::from_str(&stdout(&o)).expect("merge --json");

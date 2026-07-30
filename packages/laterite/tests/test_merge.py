@@ -96,14 +96,18 @@ def test_merge_strict_type_conflict_raises():
 
 
 def test_merge_synthesises_a_merge_tran(tmp_path):
-    """tran_issue + tran_date stamp a synthesised merge-TRAN; save() writes bytes."""
+    """A complete tran stamps a synthesised merge-TRAN; save() writes bytes."""
     res = laterite.merge(
         _A,
         _B,
         on_type_clash="widen",
-        tran_issue="9",
-        tran_date="2024-05-01",
-        tran_producer="Merger",
+        tran=laterite.TranStamp(
+            issue="9",
+            date="2024-05-01",
+            producer="Merger",
+            recipient="Client",
+            status="Merged",
+        ),
     )
     assert '"GROUP","TRAN"' in res.text
     assert '"9"' in res.text

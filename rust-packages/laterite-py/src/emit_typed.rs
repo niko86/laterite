@@ -18,7 +18,7 @@ use arrow::array::{
 use arrow::datatypes::DataType;
 use arrow::util::display::{ArrayFormatter, FormatOptions};
 use laterite_ags4_emit::{DictVersion, EmitMode, EmitOpts, GroupInput, emit_ags4};
-use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 use pyo3_arrow::PyTable;
@@ -98,8 +98,8 @@ pub fn emit_ags4_from_arrow(
             tran_producer,
             tran_recipient,
             tran_status,
-            String::new(),
-        ),
+        )
+        .map_err(|e| PyValueError::new_err(e.to_string()))?,
         synthesise_metadata,
     };
 

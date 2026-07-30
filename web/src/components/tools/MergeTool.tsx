@@ -58,6 +58,11 @@ export const MergeTool: Component = () => {
   const [issue, setIssue] = createSignal("");
   const [date, setDate] = createSignal("");
   const [producer, setProducer] = createSignal("");
+  // All five, because all five are REQUIRED TRAN headings. The form used to
+  // collect three and let the engine write the other two empty, which produced
+  // a TRAN that failed Rule 10b on cells the user was never asked about.
+  const [recipient, setRecipient] = createSignal("");
+  const [status, setStatus] = createSignal("");
 
   // Seed the baseline with the file already loaded in the app — the common case
   // is "merge an incoming delivery into what I'm working on".
@@ -77,18 +82,29 @@ export const MergeTool: Component = () => {
             issue: issue(),
             date: date(),
             producer: producer(),
+            recipient: recipient(),
+            status: status(),
           }
         : null;
     },
-    ({ x, y, onTypeClash, issue, date, producer }) =>
-      mergeFiles(x.bytes, y.bytes, {
+    ({ x, y, onTypeClash, issue, date, producer, recipient, status }) => {
+      // All five or none: a partial stamp is rejected by the engine, so an
+      // incomplete form means "no merge-TRAN" rather than an error the user
+      // can't act on while they are still typing.
+      const t = {
+        issue: issue.trim(),
+        date: date.trim(),
+        producer: producer.trim(),
+        recipient: recipient.trim(),
+        status: status.trim(),
+      };
+      const tran = Object.values(t).every((v) => v) ? t : null;
+      return mergeFiles(x.bytes, y.bytes, {
         encoding: "utf-8",
         onTypeClash,
-        // A merge-TRAN is stamped only when both an issue and a date are given.
-        tranIssue: issue.trim() || null,
-        tranDate: date.trim() || null,
-        tranProducer: producer.trim() || null,
-      }),
+        tran,
+      });
+    },
   );
 
   const pick = (set: (p: Picked) => void) => (e: Event) => {
@@ -142,7 +158,7 @@ export const MergeTool: Component = () => {
         </label>
         <span class="flex items-center gap-1.5">
           <span class="text-fg-dim">
-            Stamp a merge transmission (optional):
+            Stamp a merge transmission (all five, or none):
           </span>
           <input
             class={`${controlCompact} w-16`}
@@ -161,6 +177,18 @@ export const MergeTool: Component = () => {
             placeholder="producer"
             value={producer()}
             onInput={(e) => setProducer(e.currentTarget.value)}
+          />
+          <input
+            class={`${controlCompact} w-24`}
+            placeholder="recipient"
+            value={recipient()}
+            onInput={(e) => setRecipient(e.currentTarget.value)}
+          />
+          <input
+            class={`${controlCompact} w-20`}
+            placeholder="status"
+            value={status()}
+            onInput={(e) => setStatus(e.currentTarget.value)}
           />
         </span>
       </div>

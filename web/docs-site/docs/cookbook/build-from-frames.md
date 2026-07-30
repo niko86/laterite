@@ -36,10 +36,11 @@ transmission details.
     10's relational checks then trust; inventing a `TRAN` would *satisfy* Rule 14
     while asserting a transmission that never happened.
 
-    **To get a `TRAN`:** state it — `tran_issue=`, `tran_date=`, `tran_producer=`,
-    `tran_recipient=`, `tran_status=`. All five are needed for a finding-free file,
-    because `TRAN_PROD`, `TRAN_RECV` and `TRAN_STAT` are REQUIRED headings. Supply
-    none and Rule 14 reports the gap instead.
+    **To get a `TRAN`:** state it — `tran=TranStamp(issue=…, date=…, producer=…,
+    recipient=…, status=…)`. All five are required together because all five are
+    REQUIRED headings; the dataclass enforces that at your call site rather than
+    letting a half-stamp become a Rule 10b finding. Pass nothing and Rule 14
+    reports the gap instead.
 
     **Gotcha:** synthesis is independent of `mode`, and only `mode="autofix"` (the
     default) honours it. `mode="report"` emits unmodified and hands you the findings;
@@ -66,8 +67,8 @@ transmission details.
     `BuildResult` as Python: `res.bytes` / `res.text` carry the document and
     `res.findings` is the residual the mode couldn't clear. Pass
     `{ synthesiseMetadata: true }` to derive `UNIT`/`TYPE` (and `ABBR` for `PA`
-    codes) and the five `tranIssue`/`tranDate`/… fields to stamp a `TRAN`; without
-    them those gaps are reported as Rules 14/15/17. No DuckDB
+    codes) and `tran: { issue, date, producer, recipient, status }` to stamp a
+    `TRAN`; without them those gaps are reported as Rules 14/15/17. No DuckDB
     peer needed — emit is pure.
 
 === "Browser"

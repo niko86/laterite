@@ -17,11 +17,13 @@ import pytest
 # Rule 10b on the empty cells. The old placeholder wrote "TBC" into all three,
 # which is precisely how it silenced both Rule 14 and Rule 10b at once.
 _TRAN = {
-    "tran_issue": "1",
-    "tran_date": "2026-07-30",
-    "tran_producer": "Acme Ground Engineering",
-    "tran_recipient": "Client Ltd",
-    "tran_status": "FINAL",
+    "tran": laterite.TranStamp(
+        issue="1",
+        date="2026-07-30",
+        producer="Acme Ground Engineering",
+        recipient="Client Ltd",
+        status="FINAL",
+    )
 }
 
 

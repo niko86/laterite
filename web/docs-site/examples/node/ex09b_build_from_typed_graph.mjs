@@ -32,11 +32,13 @@ assert.ok(res.findings.length > 0);
 // while asserting a transmission that never happened.
 const full = buildAgs4(p, {
   synthesiseMetadata: true,
-  tranIssue: "1",
-  tranDate: "2026-07-30",
-  tranProducer: "Demo Producer",
-  tranRecipient: "Demo Recipient",
-  tranStatus: "Final",
+  tran: {
+    issue: "1",
+    date: "2026-07-30",
+    producer: "Demo Producer",
+    recipient: "Demo Recipient",
+    status: "Final",
+  },
 });
 const fullGroups = read(full.bytes).groups;
 assert.ok(

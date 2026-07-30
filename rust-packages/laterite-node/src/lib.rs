@@ -678,6 +678,48 @@ pub fn diff(
 /// `revisionsJson` are the advisory-notes and per-row-revision audits (arrays of
 /// `{kind,group,heading,message}` / `{group,key,changed,winnerFile}`) that the TS
 /// `merge()` parses — the same shape PyO3's `merge()` returns.
+/// The transmission a file represents, as ONE napi object.
+///
+/// Five REQUIRED headings crossed this boundary as five consecutive same-typed
+/// `Option<String>` parameters, hand-flattened by `ts/index.ts` — a transposition
+/// no compiler on either side could catch. Named fields end that.
+#[napi(object)]
+pub struct TranInput {
+    pub issue: Option<String>,
+    pub date: Option<String>,
+    pub producer: Option<String>,
+    pub recipient: Option<String>,
+    pub status: Option<String>,
+    pub description: Option<String>,
+    pub remarks: Option<String>,
+}
+
+impl TranInput {
+    /// Fold to the shared type. Policy lives in `TranStamp::from_parts` — all
+    /// five or none — so Node cannot answer "is this enough" differently from
+    /// the CLI, Python or the browser.
+    fn fold(self) -> Result<Option<laterite_ags4_emit::TranStamp>> {
+        let stamp = laterite_ags4_emit::TranStamp::from_parts(
+            self.issue,
+            self.date,
+            self.producer,
+            self.recipient,
+            self.status,
+        )
+        .map_err(|e| Error::from_reason(e.to_string()))?;
+        Ok(stamp.map(|s| {
+            let s = match self.description {
+                Some(d) => s.with_description(d),
+                None => s,
+            };
+            match self.remarks {
+                Some(r) => s.with_remarks(r),
+                None => s,
+            }
+        }))
+    }
+}
+
 #[napi(object)]
 pub struct MergeOutput {
     pub bytes: Buffer,
@@ -692,9 +734,9 @@ pub struct MergeOutput {
 /// headings. A heading two files typed differently throws `MergeConflictError`
 /// unless `onTypeClash` settles it — `"widen"` falls back to `X` (raw values kept),
 /// `"promote"` keeps the greatest nDP precision (zero-padding the coarser values).
-/// `tranIssue` + `tranDate` (both) stamp a
-/// synthesised merge-TRAN. The edition is the newest file's `TRAN_AGS` unless
-/// `dictVersion` forces it. Parse failure throws the mapped error.
+/// A complete `tran` stamps a synthesised merge-TRAN; omit it and TRAN is
+/// reconciled like any other group. The edition is the newest file's `TRAN_AGS`
+/// unless `dictVersion` forces it. Parse failure throws the mapped error.
 #[napi]
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
@@ -703,13 +745,9 @@ pub fn merge(
     on_type_clash: Option<String>,
     dict_version: Option<String>,
     encoding: Option<String>,
-    tran_issue: Option<String>,
-    tran_date: Option<String>,
-    tran_producer: Option<String>,
-    tran_recipient: Option<String>,
-    tran_status: Option<String>,
+    tran: Option<TranInput>,
 ) -> Result<MergeOutput> {
-    use laterite_ags4_merge::{MergeError, MergeOpts, TranStamp, TypeClashMode, merge_parsed};
+    use laterite_ags4_merge::{MergeError, MergeOpts, TypeClashMode, merge_parsed};
 
     if files.len() < 2 {
         return Err(Error::from_reason(format!(
@@ -738,18 +776,11 @@ pub fn merge(
     )
     .map_or(laterite_ags4_validator::dict::FALLBACK, |(dv, _)| dv);
 
-    // A merge-TRAN is synthesised only when both an issue and a date are given.
-    let tran = match (tran_issue, tran_date) {
-        (Some(isno), Some(date)) => Some(TranStamp {
-            isno,
-            date,
-            prod: tran_producer.unwrap_or_default(),
-            recv: tran_recipient.unwrap_or_default(),
-            stat: tran_status.unwrap_or_default(),
-            ags: dv.as_str().to_string(),
-        }),
-        _ => None,
-    };
+    // All five or none — the shared rule, in the shared place. This was a
+    // hand-rolled issue+date match letting producer/recipient/status default to
+    // empty: three REQUIRED headings, silently blank. `ags` is merge's to fill
+    // from the edition it resolved, so the caller no longer states it.
+    let tran = tran.map(TranInput::fold).transpose()?.flatten();
 
     // One vocabulary for every surface: the accepted tokens and the rejection
     // message come from the merge crate's FromStr, so Node cannot drift from the CLI.
@@ -1297,22 +1328,12 @@ pub fn emit_ags4_from_ipc(
     // The transmission this file represents. Absent ⇒ no TRAN is minted and
     // Rule 14 reports the gap, rather than a placeholder that SATISFIES Rule 14
     // while asserting a transmission that never happened. Folded by the ONE
-    // shared rule (`TranStamp::from_parts`): issue + date are both required.
-    tran_issue: Option<String>,
-    tran_date: Option<String>,
-    tran_producer: Option<String>,
-    tran_recipient: Option<String>,
-    tran_status: Option<String>,
+    // shared rule (`TranStamp::from_parts`): all five or none, since all five
+    // are REQUIRED headings and a partial stamp fails Rule 10b.
+    tran: Option<TranInput>,
 ) -> Result<EmitResult> {
     let opts = laterite_ags4_emit::EmitOpts {
-        tran: laterite_ags4_emit::TranStamp::from_parts(
-            tran_issue,
-            tran_date,
-            tran_producer,
-            tran_recipient,
-            tran_status,
-            String::new(),
-        ),
+        tran: tran.map(TranInput::fold).transpose()?.flatten(),
         mode: resolve_mode(mode.as_deref())?,
         edition: resolve_edition(edition.as_deref())
             .map_err(Error::from_reason)?

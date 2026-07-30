@@ -179,7 +179,7 @@ export declare function editions(): Array<string>
  * Build valid AGS4 from per-group **Arrow IPC** streams (the columnar
  * producer; the read boundary reversed). = `laterite-ags4-wasm`'s `to_ags4_ipc`.
  */
-export declare function emitAgs4FromIpc(groups: Array<GroupIpc>, edition?: string | undefined | null, mode?: string | undefined | null, units?: Record<string, Record<string, string>> | undefined | null, types?: Record<string, Record<string, string>> | undefined | null, synthesiseMetadata?: boolean | undefined | null, tranIssue?: string | undefined | null, tranDate?: string | undefined | null, tranProducer?: string | undefined | null, tranRecipient?: string | undefined | null, tranStatus?: string | undefined | null): EmitResult
+export declare function emitAgs4FromIpc(groups: Array<GroupIpc>, edition?: string | undefined | null, mode?: string | undefined | null, units?: Record<string, Record<string, string>> | undefined | null, types?: Record<string, Record<string, string>> | undefined | null, synthesiseMetadata?: boolean | undefined | null, tran?: TranInput | undefined | null): EmitResult
 
 /**
  * The emit result. `bytes` is the AGS4 document; `findingsJson` is the
@@ -307,18 +307,12 @@ export declare function listRules(): string
  * headings. A heading two files typed differently throws `MergeConflictError`
  * unless `onTypeClash` settles it — `"widen"` falls back to `X` (raw values kept),
  * `"promote"` keeps the greatest nDP precision (zero-padding the coarser values).
- * `tranIssue` + `tranDate` (both) stamp a
- * synthesised merge-TRAN. The edition is the newest file's `TRAN_AGS` unless
- * `dictVersion` forces it. Parse failure throws the mapped error.
+ * A complete `tran` stamps a synthesised merge-TRAN; omit it and TRAN is
+ * reconciled like any other group. The edition is the newest file's `TRAN_AGS`
+ * unless `dictVersion` forces it. Parse failure throws the mapped error.
  */
-export declare function merge(files: Array<Uint8Array>, onTypeClash?: string | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, tranIssue?: string | undefined | null, tranDate?: string | undefined | null, tranProducer?: string | undefined | null, tranRecipient?: string | undefined | null, tranStatus?: string | undefined | null): MergeOutput
+export declare function merge(files: Array<Uint8Array>, onTypeClash?: string | undefined | null, dictVersion?: string | undefined | null, encoding?: string | undefined | null, tran?: TranInput | undefined | null): MergeOutput
 
-/**
- * The merge result. `bytes` is the reconciled AGS4 document; `warningsJson` and
- * `revisionsJson` are the advisory-notes and per-row-revision audits (arrays of
- * `{kind,group,heading,message}` / `{group,key,changed,winnerFile}`) that the TS
- * `merge()` parses — the same shape PyO3's `merge()` returns.
- */
 export interface MergeOutput {
   bytes: Buffer
   warningsJson: string
@@ -436,6 +430,27 @@ export declare function resolveEncodingLabel(label?: string | undefined | null):
  * errors-only. `includeFyi` (default `false`) adds the low-signal FYI tier.
  */
 export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null, cert?: Sidecar | undefined | null): ValidationReport
+
+/**
+ * The merge result. `bytes` is the reconciled AGS4 document; `warningsJson` and
+ * `revisionsJson` are the advisory-notes and per-row-revision audits (arrays of
+ * `{kind,group,heading,message}` / `{group,key,changed,winnerFile}`) that the TS
+ * `merge()` parses — the same shape PyO3's `merge()` returns.
+ * The transmission a file represents, as ONE napi object.
+ *
+ * Five REQUIRED headings crossed this boundary as five consecutive same-typed
+ * `Option<String>` parameters, hand-flattened by `ts/index.ts` — a transposition
+ * no compiler on either side could catch. Named fields end that.
+ */
+export interface TranInput {
+  issue?: string
+  date?: string
+  producer?: string
+  recipient?: string
+  status?: string
+  description?: string
+  remarks?: string
+}
 
 /**
  * zstd-compress, then age-encrypt with `password` → `dest`. Compress-then-

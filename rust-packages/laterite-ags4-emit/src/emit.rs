@@ -57,15 +57,33 @@ pub enum EmitMode {
     AutoFix,
 }
 
-/// Caller-supplied metadata for a synthesised TRAN row.
+/// The transmission a file represents — the caller's half of a synthesised TRAN.
 ///
 /// Lives here, the lowest crate that needs it, so `laterite-ags4-merge` and the
 /// emit path describe a transmission with ONE type rather than two that drift.
-/// `merge` re-exports it, so its public API is unchanged.
+/// `merge` re-exports it.
 ///
-/// Every field is the caller's to state. The engine can derive `ags` from the
-/// edition, but nothing else here is derivable — which is precisely why an
-/// absent stamp means "emit no TRAN" rather than "emit a guess".
+/// **The dictionary splits TRAN's headings three ways, and this type encodes
+/// that split rather than documenting it.**
+///
+/// * `TRAN_ISNO` (KEY), `TRAN_DATE`, `TRAN_PROD`, `TRAN_RECV`, `TRAN_STAT` are
+///   REQUIRED *and* authorial — no engine can know who sent what to whom. They
+///   are constructor arguments, so a stamp missing any of them cannot be built.
+///   That matters: they are REQUIRED headings, so a partial stamp doesn't just
+///   look thin, it trips Rule 10b on every cell it leaves empty. The predecessor
+///   of this type took five `Option`s, demanded only two, and let the other three
+///   default to `""` — shipping exactly that half-true record.
+/// * `TRAN_AGS`, `TRAN_DLIM`, `TRAN_RCON` are REQUIRED-or-OTHER but *derivable*:
+///   they describe the syntax of the file the emitter is writing. They are absent
+///   from this type on purpose. A caller-supplied value could only contradict the
+///   bytes, and "the delimiter is `|`" is not a fact anyone should have to repeat
+///   to the thing that chose it. `synth_tran` fills them.
+/// * `TRAN_DESC` and `TRAN_REM` are OTHER and authorial — genuinely optional, so
+///   they are builder methods rather than constructor arguments.
+///
+/// `FILE_FSET` is deliberately NOT exposed. It references an associated file set
+/// (Rule 20), and offering it without the `FILE` group machinery would let a
+/// caller mint a reference to nothing — inventing again, one heading further out.
 #[derive(Debug, Clone, Default)]
 pub struct TranStamp {
     pub isno: String,
@@ -73,45 +91,123 @@ pub struct TranStamp {
     pub prod: String,
     pub recv: String,
     pub stat: String,
+    /// The AGS edition. Engine-derived: left empty by `new`, filled by
+    /// `synth_tran` from the dictionary in force. `merge` sets it directly
+    /// because it resolves the edition from the newest input file.
     pub ags: String,
+    /// `TRAN_DESC` — optional, authorial.
+    pub desc: Option<String>,
+    /// `TRAN_REM` — optional, authorial.
+    pub rem: Option<String>,
 }
 
 impl TranStamp {
-    /// Fold a surface's five optional TRAN arguments into a stamp, or `None`.
-    ///
-    /// **One rule, one place.** A stamp is minted only when BOTH an issue number
-    /// and a date are supplied — the two fields that make a transmission
-    /// identifiable at all, and both REQUIRED by the dictionary. Anything less
-    /// would produce a TRAN missing its own mandatory fields, which is the class
-    /// of half-true record this whole change exists to stop.
-    ///
-    /// This lived as a private helper on each surface, and they had already
-    /// drifted: `merge` required issue+date while the browser's `build_ags4`
-    /// accepted any one of the five. Every surface now folds its arguments the
-    /// same way, so "what counts as enough to stamp a TRAN" cannot answer
-    /// differently depending on which door you came through.
+    /// State a transmission. All five are REQUIRED headings, so all five are
+    /// required arguments — the type makes a half-stamp unconstructible rather
+    /// than leaving it to a rule to report after the fact.
+    pub fn new(
+        isno: impl Into<String>,
+        date: impl Into<String>,
+        prod: impl Into<String>,
+        recv: impl Into<String>,
+        stat: impl Into<String>,
+    ) -> TranStamp {
+        TranStamp {
+            isno: isno.into(),
+            date: date.into(),
+            prod: prod.into(),
+            recv: recv.into(),
+            stat: stat.into(),
+            ags: String::new(),
+            desc: None,
+            rem: None,
+        }
+    }
+
+    /// `TRAN_DESC` — what was transferred.
     #[must_use]
+    pub fn with_description(mut self, desc: impl Into<String>) -> TranStamp {
+        self.desc = Some(desc.into());
+        self
+    }
+
+    /// `TRAN_REM` — free remarks.
+    #[must_use]
+    pub fn with_remarks(mut self, rem: impl Into<String>) -> TranStamp {
+        self.rem = Some(rem.into());
+        self
+    }
+
+    /// Fold a surface's five loose optional values into a stamp, or `None`.
+    ///
+    /// **The boundary adapter, not a constructor.** Public because the binding
+    /// crates need it: CLI flags, Python kwargs and JSON objects all arrive as
+    /// independent optionals whatever the type says. Every surface funnels
+    /// through here so exactly one place decides what counts as enough — and it
+    /// is `all five or nothing`, matching `new`. It used to be issue+date, which
+    /// is how the three REQUIRED cells came to be silently empty.
+    ///
+    /// Prefer `new` wherever the values are already known to be present; reach
+    /// for this only at a boundary that genuinely holds five optionals.
+    ///
+    /// `Err` carries the names of the missing fields: a caller who supplied four
+    /// of five made a mistake and should be told which, not handed a silent
+    /// `None` that reads identically to "I meant not to stamp one".
     pub fn from_parts(
         isno: Option<String>,
         date: Option<String>,
         prod: Option<String>,
         recv: Option<String>,
         stat: Option<String>,
-        ags: String,
-    ) -> Option<TranStamp> {
-        match (isno, date) {
-            (Some(isno), Some(date)) => Some(TranStamp {
-                isno,
-                date,
-                prod: prod.unwrap_or_default(),
-                recv: recv.unwrap_or_default(),
-                stat: stat.unwrap_or_default(),
-                ags,
+    ) -> Result<Option<TranStamp>, TranStampError> {
+        let parts = [
+            ("issue", &isno),
+            ("date", &date),
+            ("producer", &prod),
+            ("recipient", &recv),
+            ("status", &stat),
+        ];
+        let missing: Vec<&str> = parts
+            .iter()
+            .filter(|(_, v)| v.as_ref().is_none_or(|s| s.trim().is_empty()))
+            .map(|(n, _)| *n)
+            .collect();
+        match missing.len() {
+            5 => Ok(None), // nothing stated: no TRAN, and Rule 14 reports the gap
+            0 => Ok(Some(TranStamp::new(
+                isno.unwrap(),
+                date.unwrap(),
+                prod.unwrap(),
+                recv.unwrap(),
+                stat.unwrap(),
+            ))),
+            _ => Err(TranStampError {
+                missing: missing.iter().map(|s| (*s).to_string()).collect(),
             }),
-            _ => None,
         }
     }
 }
+
+/// A partially-stated transmission — some TRAN fields given, others not.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TranStampError {
+    pub missing: Vec<String>,
+}
+
+impl std::fmt::Display for TranStampError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "incomplete TRAN: missing {}. All five are REQUIRED headings \
+             (TRAN_ISNO/DATE/PROD/RECV/STAT), so a partial stamp would emit a \
+             TRAN that fails Rule 10b. Supply all five, or none to omit TRAN \
+             and let Rule 14 report the gap.",
+            self.missing.join(", ")
+        )
+    }
+}
+
+impl std::error::Error for TranStampError {}
 
 /// Emit options. `edition` selects which AGS4 standard dictionary fills
 /// UNIT/TYPE and which rule set validity is judged against.
@@ -518,40 +614,56 @@ fn synth_catalog(code: &str, key: &str, desc: &str, symbols: &BTreeSet<String>) 
 /// better, which produced a file that SATISFIED Rule 14 while asserting a
 /// transmission that never happened. It is now unreachable without a stamp.
 fn synth_tran(dict: &Dictionary, stamp: &TranStamp) -> OwnedGroup {
+    // The five authorial cells, then the three the emitter knows because it is
+    // writing the file: the edition in force, and the delimiter + concatenator
+    // this emitter uses. `stamp.ags` wins only for `merge`, which resolves the
+    // edition from its newest input rather than from `opts.edition`.
+    let mut headings = vec![
+        "TRAN_ISNO",
+        "TRAN_DATE",
+        "TRAN_PROD",
+        "TRAN_STAT",
+        "TRAN_AGS",
+        "TRAN_RECV",
+        "TRAN_DLIM",
+        "TRAN_RCON",
+    ];
+    let mut units = vec!["", "yyyy-mm-dd", "", "", "", "", "", ""];
+    let mut row = vec![
+        stamp.isno.clone(),
+        stamp.date.clone(),
+        stamp.prod.clone(),
+        stamp.stat.clone(),
+        if stamp.ags.trim().is_empty() {
+            dict.tran_ags().to_string()
+        } else {
+            stamp.ags.clone()
+        },
+        stamp.recv.clone(),
+        "|".to_string(),
+        "+".to_string(),
+    ];
+
+    // OTHER headings, emitted only when stated. An empty TRAN_DESC column is not
+    // free: every heading present must also be covered by the TYPE catalog, so a
+    // column nobody filled buys a catalog row that describes nothing.
+    for (name, value) in [("TRAN_DESC", &stamp.desc), ("TRAN_REM", &stamp.rem)] {
+        if let Some(v) = value {
+            headings.push(name);
+            units.push("");
+            row.push(v.clone());
+        }
+    }
+
     OwnedGroup {
         code: "TRAN".to_string(),
-        headings: [
-            "TRAN_ISNO",
-            "TRAN_DATE",
-            "TRAN_PROD",
-            "TRAN_STAT",
-            "TRAN_AGS",
-            "TRAN_RECV",
-            "TRAN_DLIM",
-            "TRAN_RCON",
-        ]
-        .map(String::from)
-        .to_vec(),
-        units: ["", "yyyy-mm-dd", "", "", "", "", "", ""]
-            .map(String::from)
-            .to_vec(),
-        types: ["X", "DT", "X", "X", "X", "X", "X", "X"]
-            .map(String::from)
-            .to_vec(),
-        rows: vec![vec![
-            stamp.isno.clone(),
-            stamp.date.clone(),
-            stamp.prod.clone(),
-            stamp.stat.clone(),
-            if stamp.ags.trim().is_empty() {
-                dict.tran_ags().to_string()
-            } else {
-                stamp.ags.clone()
-            },
-            stamp.recv.clone(),
-            "|".to_string(),
-            "+".to_string(),
-        ]],
+        types: headings
+            .iter()
+            .map(|h| if *h == "TRAN_DATE" { "DT" } else { "X" }.to_string())
+            .collect(),
+        headings: headings.into_iter().map(String::from).collect(),
+        units: units.into_iter().map(String::from).collect(),
+        rows: vec![row],
     }
 }
 
@@ -767,15 +879,117 @@ mod tests {
         }
     }
 
-    fn stamp() -> TranStamp {
-        TranStamp {
-            isno: "1".into(),
-            date: "2026-07-30".into(),
-            prod: "Acme Ground Engineering".into(),
-            recv: "Client Ltd".into(),
-            stat: "FINAL".into(),
-            ags: String::new(),
+    /// Four of five is an ERROR naming the gaps, and zero of five is `None`.
+    ///
+    /// These are different answers to different questions and they used to be
+    /// the same one: the old rule minted a stamp on issue+date and let the other
+    /// three default to `""`, so "I forgot the producer" and "I meant not to
+    /// stamp a TRAN" both produced a file, one of them silently wrong.
+    #[test]
+    fn a_partial_stamp_is_an_error_but_an_empty_one_is_simply_no_tran() {
+        let none = TranStamp::from_parts(None, None, None, None, None).unwrap();
+        assert!(none.is_none(), "nothing stated means no TRAN, not an error");
+
+        let err = TranStamp::from_parts(
+            Some("1".into()),
+            Some("2026-07-30".into()),
+            None,
+            None,
+            None,
+        )
+        .unwrap_err();
+        assert_eq!(err.missing, ["producer", "recipient", "status"]);
+        // The message must name the gaps: a caller four-fifths of the way there
+        // needs to know WHICH, not merely that something is wrong.
+        let msg = err.to_string();
+        for m in ["producer", "recipient", "status"] {
+            assert!(msg.contains(m), "message should name {m}: {msg}");
         }
+
+        // Whitespace is not a value — " " in a REQUIRED cell is still a Rule 10b
+        // failure, so it counts as missing rather than sneaking past the check.
+        let blank = TranStamp::from_parts(
+            Some("1".into()),
+            Some("2026-07-30".into()),
+            Some("   ".into()),
+            Some("r".into()),
+            Some("s".into()),
+        )
+        .unwrap_err();
+        assert_eq!(blank.missing, ["producer"]);
+    }
+
+    /// Every distinct value lands in its own heading, and the three derivable
+    /// cells are filled by the emitter.
+    ///
+    /// Five same-typed fields in a row are a transposition waiting to happen —
+    /// swap two and nothing fails to compile. Distinct sentinel values make a
+    /// swap visible. The `TRAN_AGS`/`DLIM`/`RCON` assertions pin the other half
+    /// of the contract: the caller CANNOT state them, so the engine must.
+    #[test]
+    fn each_tran_value_lands_in_its_own_heading_and_the_rest_are_derived() {
+        let stamp = TranStamp::new("ISNO-1", "2026-07-30", "PROD-2", "RECV-3", "STAT-4")
+            .with_description("DESC-5")
+            .with_remarks("REM-6");
+        let res = emit_ags4(
+            &[proj(), loca()],
+            &EmitOpts {
+                synthesise_metadata: true,
+                tran: Some(stamp),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let text = String::from_utf8(res.bytes).unwrap();
+        let tran = text
+            .lines()
+            .skip_while(|l| !l.contains("\"TRAN\""))
+            .take(6)
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let headings: Vec<&str> = tran
+            .lines()
+            .find(|l| l.starts_with("\"HEADING\""))
+            .unwrap()
+            .split(',')
+            .map(|c| c.trim_matches('"'))
+            .collect();
+        let data: Vec<&str> = tran
+            .lines()
+            .find(|l| l.starts_with("\"DATA\""))
+            .unwrap()
+            .split(',')
+            .map(|c| c.trim_matches('"'))
+            .collect();
+        let cell = |h: &str| {
+            let i = headings.iter().position(|x| *x == h).unwrap_or_else(|| {
+                panic!("TRAN should carry {h}:\n{tran}");
+            });
+            data[i]
+        };
+
+        assert_eq!(cell("TRAN_ISNO"), "ISNO-1");
+        assert_eq!(cell("TRAN_DATE"), "2026-07-30");
+        assert_eq!(cell("TRAN_PROD"), "PROD-2");
+        assert_eq!(cell("TRAN_RECV"), "RECV-3");
+        assert_eq!(cell("TRAN_STAT"), "STAT-4");
+        assert_eq!(cell("TRAN_DESC"), "DESC-5");
+        assert_eq!(cell("TRAN_REM"), "REM-6");
+        // Derived, not stated: absent from TranStamp entirely.
+        assert!(!cell("TRAN_AGS").is_empty(), "the edition must be filled");
+        assert_eq!(cell("TRAN_DLIM"), "|");
+        assert_eq!(cell("TRAN_RCON"), "+");
+    }
+
+    fn stamp() -> TranStamp {
+        TranStamp::new(
+            "1",
+            "2026-07-30",
+            "Acme Ground Engineering",
+            "Client Ltd",
+            "FINAL",
+        )
     }
 
     /// Opting in WITH a stamp yields a valid file in one call. The

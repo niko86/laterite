@@ -709,7 +709,8 @@ fn merge_core(
     )
     .map_or(laterite_ags4_validator::dict::FALLBACK, |(dv, _)| dv);
 
-    // A merge-TRAN is synthesised only when both an issue and a date are given.
+    // All five or none — the shared rule. `ags` is merge's to fill from the
+    // edition it resolved; a caller-stated value could only contradict it.
     let (isno, date, prod, recv, stat) = tran;
     let tran = TranStamp::from_parts(
         isno.map(str::to_string),
@@ -717,8 +718,8 @@ fn merge_core(
         prod.map(str::to_string),
         recv.map(str::to_string),
         stat.map(str::to_string),
-        dv.as_str().to_string(),
-    );
+    )
+    .map_err(|e| (5, "bad_args".to_string(), e.to_string()))?;
 
     let opts = MergeOpts {
         on_type_clash: clash,

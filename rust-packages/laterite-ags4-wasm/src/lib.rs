@@ -300,6 +300,60 @@ fn emit_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode, String> {
     }
 }
 
+/// The `tran` argument's wire shape — one object, not five positional slots.
+///
+/// Every field is `Option` here and required by `TranStamp::from_parts`, which
+/// is what makes a typo loud on this surface: `{ producer }` misspelled leaves
+/// `producer` unset, and "all five or none" reports it by name. That matters,
+/// because `serde(deny_unknown_fields)` is a **no-op** under serde-wasm-bindgen
+/// — its `ObjectAccess` walks serde's known fields and `Reflect`-gets each,
+/// never enumerating what the caller actually passed. Requiredness is doing the
+/// work an unknown-key guard cannot do here.
+#[derive(serde::Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+struct TranInput {
+    issue: Option<String>,
+    date: Option<String>,
+    producer: Option<String>,
+    recipient: Option<String>,
+    status: Option<String>,
+    description: Option<String>,
+    remarks: Option<String>,
+}
+
+/// The thin JS→Rust shim. Deliberately holds no policy: the decision about what
+/// constitutes a complete stamp lives in `TranStamp::from_parts` in the emit
+/// crate, which is host-testable. This crate's tests run on the HOST with no
+/// `wasm-bindgen-test`, so anything with `JsValue` in it ships unexecuted.
+fn tran_from_js(v: Option<JsValue>) -> Result<Option<laterite_ags4_emit::TranStamp>, JsError> {
+    // `Option<JsValue>` rather than bare `JsValue` so wasm-bindgen emits
+    // `tran?: any` — omitting the stamp is the common case (no TRAN, Rule 14
+    // reports the gap) and should not require passing `undefined` by hand.
+    let Some(v) = v.filter(|v| !v.is_undefined() && !v.is_null()) else {
+        return Ok(None);
+    };
+    let t: TranInput = serde_wasm_bindgen::from_value(v)
+        .map_err(|e| JsError::new(&format!("invalid tran: {e}")))?;
+    let stamp = laterite_ags4_emit::TranStamp::from_parts(
+        t.issue,
+        t.date,
+        t.producer,
+        t.recipient,
+        t.status,
+    )
+    .map_err(|e| JsError::new(&e.to_string()))?;
+    Ok(stamp.map(|s| {
+        let s = match t.description {
+            Some(d) => s.with_description(d),
+            None => s,
+        };
+        match t.remarks {
+            Some(r) => s.with_remarks(r),
+            None => s,
+        }
+    }))
+}
+
 /// Core of [`build_ags4`], host-testable (no `JsValue`): parse the JSON, run
 /// the shared `laterite-ags4-emit` orchestrator, flatten the findings.
 fn build_ags4_from_json(
@@ -462,17 +516,19 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
 /// ledger of what AutoFix rewrote (`{kind, label, rule, line, risk}` per fix —
 /// the same shape Python and Node present), `fixes_applied` its length.
 #[wasm_bindgen]
-#[allow(clippy::too_many_arguments)]
 pub fn build_ags4(
     groups_json: &str,
     dict_version: Option<String>,
     mode: Option<String>,
     synthesise_metadata: Option<bool>,
-    tran_issue: Option<String>,
-    tran_date: Option<String>,
-    tran_producer: Option<String>,
-    tran_recipient: Option<String>,
-    tran_status: Option<String>,
+    // The transmission this file represents, as ONE object:
+    // `{ issue, date, producer, recipient, status, description?, remarks? }`.
+    // Five REQUIRED headings travelled here as five consecutive same-typed
+    // positional slots, which is a transposition waiting to happen and drove the
+    // argument count to nine. Omit it entirely and no TRAN is minted — Rule 14
+    // reports the gap, which is the honest outcome. Supply it partially and you
+    // get an error naming the missing fields.
+    tran: Option<JsValue>,
 ) -> Result<JsValue, JsError> {
     console_error_panic_hook::set_once();
     let report = build_ags4_from_json(
@@ -480,14 +536,7 @@ pub fn build_ags4(
         dict_version.as_deref(),
         mode.as_deref(),
         synthesise_metadata.unwrap_or(false),
-        laterite_ags4_emit::TranStamp::from_parts(
-            tran_issue,
-            tran_date,
-            tran_producer,
-            tran_recipient,
-            tran_status,
-            String::new(),
-        ),
+        tran_from_js(tran)?,
     )
     .map_err(|e| JsError::new(&e))?;
     serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
@@ -505,17 +554,19 @@ pub fn build_ags4(
 /// Returns the same `{ text, findings, applied, fixes_applied }`. The Arrow→AGS
 /// transpose is the read path's IPC reversed.
 #[wasm_bindgen]
-#[allow(clippy::too_many_arguments)]
 pub fn build_ags4_ipc(
     groups: JsValue,
     dict_version: Option<String>,
     mode: Option<String>,
     synthesise_metadata: Option<bool>,
-    tran_issue: Option<String>,
-    tran_date: Option<String>,
-    tran_producer: Option<String>,
-    tran_recipient: Option<String>,
-    tran_status: Option<String>,
+    // The transmission this file represents, as ONE object:
+    // `{ issue, date, producer, recipient, status, description?, remarks? }`.
+    // Five REQUIRED headings travelled here as five consecutive same-typed
+    // positional slots, which is a transposition waiting to happen and drove the
+    // argument count to nine. Omit it entirely and no TRAN is minted — Rule 14
+    // reports the gap, which is the honest outcome. Supply it partially and you
+    // get an error naming the missing fields.
+    tran: Option<JsValue>,
 ) -> Result<JsValue, JsError> {
     use wasm_bindgen::JsCast;
     console_error_panic_hook::set_once();
@@ -539,14 +590,7 @@ pub fn build_ags4_ipc(
         dict_version.as_deref(),
         mode.as_deref(),
         synthesise_metadata.unwrap_or(false),
-        laterite_ags4_emit::TranStamp::from_parts(
-            tran_issue,
-            tran_date,
-            tran_producer,
-            tran_recipient,
-            tran_status,
-            String::new(),
-        ),
+        tran_from_js(tran)?,
     )
     .map_err(|e| JsError::new(&e))?;
     serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
@@ -637,14 +681,13 @@ mod build_ags4_tests {
             None,
             Some("autofix"),
             true,
-            laterite_ags4_emit::TranStamp::from_parts(
-                Some("1".into()),
-                Some("2026-07-30".into()),
-                Some("Acme Ground Engineering".into()),
-                Some("Client Ltd".into()),
-                Some("FINAL".into()),
-                String::new(),
-            ),
+            Some(laterite_ags4_emit::TranStamp::new(
+                "1",
+                "2026-07-30",
+                "Acme Ground Engineering",
+                "Client Ltd",
+                "FINAL",
+            )),
         )
         .unwrap();
         assert!(
@@ -1605,23 +1648,20 @@ impl MergeResult {
 /// wins a KEY conflict). Rows are matched by their dictionary KEY headings. A
 /// heading the two files typed differently is a `JsError` unless `on_type_clash`
 /// settles it — `"widen"` falls back to `X` (raw values kept), `"promote"` keeps the
-/// greatest nDP precision (zero-padding the coarser values). `tran_issue` +
-/// `tran_date` (both) stamp a synthesised
-/// merge-TRAN. The edition is `b`'s `TRAN_AGS`, falling back to the standard.
-#[allow(clippy::too_many_arguments)]
+/// greatest nDP precision (zero-padding the coarser values). A complete `tran`
+/// object stamps a synthesised merge-TRAN; omit it and TRAN is reconciled like
+/// any other group. The edition is `b`'s `TRAN_AGS`, falling back to the standard.
 #[wasm_bindgen]
 pub fn merge(
     a: &[u8],
     b: &[u8],
     encoding_label: Option<String>,
     on_type_clash: Option<String>,
-    tran_issue: Option<String>,
-    tran_date: Option<String>,
-    tran_producer: Option<String>,
-    tran_recipient: Option<String>,
-    tran_status: Option<String>,
+    // One object, same shape as `build_ags4`'s: `{ issue, date, producer,
+    // recipient, status, description?, remarks? }`.
+    tran: Option<JsValue>,
 ) -> Result<MergeResult, JsError> {
-    use laterite_ags4_merge::{MergeOpts, TranStamp, TypeClashMode, merge_parsed};
+    use laterite_ags4_merge::{MergeOpts, TypeClashMode, merge_parsed};
 
     console_error_panic_hook::set_once();
     let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
@@ -1635,18 +1675,10 @@ pub fn merge(
         .map(|(dv, _)| dv)
         .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
 
-    // A merge-TRAN is synthesised only when both an issue and a date are given.
-    let tran = match (tran_issue, tran_date) {
-        (Some(isno), Some(date)) => Some(TranStamp {
-            isno,
-            date,
-            prod: tran_producer.unwrap_or_default(),
-            recv: tran_recipient.unwrap_or_default(),
-            stat: tran_status.unwrap_or_default(),
-            ags: dv.as_str().to_string(),
-        }),
-        _ => None,
-    };
+    // All five or none — the shared rule, in the shared place. `ags` is merge's
+    // to fill from `dv` (resolved just above); a caller-stated edition could
+    // only contradict the file merge is about to write.
+    let tran = tran_from_js(tran)?;
 
     // One vocabulary for every surface: accepted tokens + rejection message come
     // from the merge crate's FromStr, so the browser cannot drift from the CLI.
