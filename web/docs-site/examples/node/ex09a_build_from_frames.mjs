@@ -33,15 +33,24 @@ for (const r of [
   assert.ok(rules.has(r), `expected ${r}`);
 }
 
-// Ask for them and they're derived from your data — UNIT and TYPE from the
-// columns, TRAN as a placeholder you overwrite. Opt-in, so nothing appears in
-// your file that you didn't ask for.
+// Ask for them and UNIT and TYPE are derived from your columns. TRAN is not
+// derivable — only you know who sent what to whom — so you state it, and a
+// build that doesn't reports the gap instead of inventing a placeholder that
+// would satisfy the rule while asserting a transmission that never happened.
+// Opt-in either way, so nothing appears in your file that you didn't ask for.
 const full = buildAgs4(
   new Map([
     ["PROJ", proj],
     ["LOCA", loca],
   ]),
-  { synthesiseMetadata: true },
+  {
+    synthesiseMetadata: true,
+    tranIssue: "1",
+    tranDate: "2026-07-30",
+    tranProducer: "Demo Producer",
+    tranRecipient: "Demo Recipient",
+    tranStatus: "Final",
+  },
 );
 const fullGroups = read(full.bytes).groups;
 assert.ok(

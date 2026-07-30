@@ -21,14 +21,27 @@ never wrote.
 To get them, ask:
 
 ```python
-res = laterite.build_ags4({"PROJ": proj, "LOCA": loca}, synthesise_metadata=True)
+res = laterite.build_ags4(
+    {"PROJ": proj, "LOCA": loca},
+    synthesise_metadata=True,
+    tran_issue="1",
+    tran_date="2026-07-30",
+    tran_producer="Your Firm",
+    tran_recipient="The Client",
+    tran_status="Final",
+)
 ```
 
-`UNIT` and `TYPE` are then derived from your columns and `TRAN` written as a
-placeholder you overwrite — five groups, no findings. It is opt-in on every
-surface (`synthesise_metadata=` in Python, `{ synthesiseMetadata }` in Node,
-`synthesise_metadata` in the browser wasm build) so nothing appears in your file
-that you didn't ask for.
+`UNIT` and `TYPE` are derived from your columns. `TRAN` is not derivable — only
+you know who sent what to whom — so you state it. Omit the stamp and no `TRAN`
+is written and Rule 14 reports the gap, rather than a placeholder being invented
+that would *satisfy* the rule while asserting a transmission that never happened.
+All five values are needed for a finding-free file, because `TRAN_PROD`,
+`TRAN_RECV` and `TRAN_STAT` are REQUIRED headings.
+
+Synthesis is opt-in on every surface (`synthesise_metadata=` in Python,
+`{ synthesiseMetadata }` in Node, `synthesise_metadata` in the browser wasm
+build) so nothing appears in your file that you didn't ask for.
 
 ## From a typed PROJ graph
 

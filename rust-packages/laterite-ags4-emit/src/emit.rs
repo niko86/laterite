@@ -141,10 +141,11 @@ pub struct EmitOpts {
     ///
     /// Only *derivable* metadata is ever minted: UNIT and TYPE are pure
     /// functions of the data, ABBR comes from the standard table and only when
-    /// PA codes are used, TRAN is a placeholder stub. PROJ and DICT are never
-    /// synthesised — a project identity and a schema extension are authorial
-    /// facts, and inventing a DICT parent would turn a loud Rule 18 error into
-    /// a silent false statement that Rule 10's relational checks then trust.
+    /// PA codes are used. PROJ, DICT and TRAN are never synthesised — a project
+    /// identity, a schema extension and a record of transmission are authorial
+    /// facts. Inventing a DICT parent would turn a loud Rule 18 error into a
+    /// silent false statement that Rule 10's relational checks then trust; TRAN
+    /// is stamped from `EmitOpts::tran` or omitted, never guessed.
     ///
     /// Separated from `mode` so it can be MEASURED: it is a distinct stage
     /// (step 2.5), and folding it into `AutoFix` meant the only observable
@@ -237,9 +238,10 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
     // --- step 2.5: synthesize missing mandatory metadata groups -------
     // AutoFix only: a data-only build (notably a typed PROJ graph, which
     // can't reach the parentless root-metadata groups) still yields a valid
-    // file — mint UNIT/TYPE (derived from the data), a placeholder TRAN, and
-    // ABBR (when PA codes are used) for whichever are absent. PROJ is never
-    // synthesized (real project identity), so a missing PROJ stays a Rule 13 finding.
+    // file — mint UNIT/TYPE (derived from the data) and ABBR (when PA codes are
+    // used) for whichever are absent, plus TRAN when the caller stamped one.
+    // PROJ is never synthesized (real project identity), so a missing PROJ stays
+    // a Rule 13 finding.
     if opts.mode == EmitMode::AutoFix && opts.synthesise_metadata {
         let synth = synthesise_metadata(&owned, &dict, opts.tran.as_ref());
         owned.extend(synth);
@@ -392,11 +394,11 @@ fn validate(bytes: &[u8], edition: DictVersion) -> Result<(ParsedFile, Findings)
 
 /// Under `AutoFix`, synthesize whichever mandatory metadata catalog group is
 /// absent so a data-only build still yields a valid file. UNIT and TYPE are
-/// pure derivations of the data; TRAN is a placeholder stub the caller
-/// overwrites; ABBR is minted when (and only when) the data uses PA picklist
-/// codes (Rule 16). PROJ is deliberately never synthesized — it carries real
-/// project identity, not derivable metadata, so a missing PROJ stays a Rule 13
-/// finding.
+/// pure derivations of the data; ABBR is minted when (and only when) the data
+/// uses PA picklist codes (Rule 16); TRAN is written only from a caller-supplied
+/// `TranStamp`, never invented. PROJ is deliberately never synthesized — it
+/// carries real project identity, not derivable metadata, so a missing PROJ
+/// stays a Rule 13 finding.
 fn synthesise_metadata(
     owned: &[OwnedGroup],
     dict: &Dictionary,

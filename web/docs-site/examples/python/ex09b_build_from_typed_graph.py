@@ -20,10 +20,20 @@ assert set(laterite.read(data=res.bytes).groups) == {"PROJ", "LOCA"}
 assert res.findings
 
 # `synthesise_metadata=True` derives the ones that CAN be derived — UNIT and TYPE
-# from your data, a placeholder TRAN, ABBR when PA codes are used. PROJ and DICT
-# are never invented: a project identity and a schema extension are yours to
-# state, and a guessed DICT parent would quietly mislead the relational checks.
-full = build_ags4(p, synthesise_metadata=True)
+# from your data, ABBR when PA codes are used. PROJ, DICT and TRAN are never
+# invented: a project identity, a schema extension and a record of transmission
+# are yours to state. A guessed DICT parent would quietly mislead the relational
+# checks, and a placeholder TRAN would satisfy the rule while asserting a
+# transmission that never happened.
+full = build_ags4(
+    p,
+    synthesise_metadata=True,
+    tran_issue="1",
+    tran_date="2026-07-30",
+    tran_producer="Demo Producer",
+    tran_recipient="Demo Recipient",
+    tran_status="Final",
+)
 assert {"PROJ", "LOCA", "TRAN", "UNIT", "TYPE"}.issubset(
     laterite.read(data=full.bytes).groups
 )

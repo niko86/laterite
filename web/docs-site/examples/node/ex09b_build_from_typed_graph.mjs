@@ -25,10 +25,19 @@ console.log("findings:", res.findings.length);
 assert.deepEqual(groups, ["PROJ", "LOCA"]);
 assert.ok(res.findings.length > 0);
 
-// `synthesiseMetadata` derives the ones that CAN be derived. PROJ and DICT are
-// never invented: a project identity and a schema extension are yours to state,
-// and a guessed DICT parent would quietly mislead the relational checks.
-const full = buildAgs4(p, { synthesiseMetadata: true });
+// `synthesiseMetadata` derives the ones that CAN be derived. PROJ, DICT and
+// TRAN are never invented: a project identity, a schema extension and a record
+// of transmission are yours to state. A guessed DICT parent would quietly
+// mislead the relational checks, and a placeholder TRAN would satisfy the rule
+// while asserting a transmission that never happened.
+const full = buildAgs4(p, {
+  synthesiseMetadata: true,
+  tranIssue: "1",
+  tranDate: "2026-07-30",
+  tranProducer: "Demo Producer",
+  tranRecipient: "Demo Recipient",
+  tranStatus: "Final",
+});
 const fullGroups = read(full.bytes).groups;
 assert.ok(
   ["PROJ", "LOCA", "TRAN", "UNIT", "TYPE"].every((c) => fullGroups.includes(c)),
