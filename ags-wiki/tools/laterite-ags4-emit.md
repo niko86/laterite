@@ -12,7 +12,7 @@ repo_refs:
   lib: "repo:rust-packages/laterite-ags4-emit/src/lib.rs"
   writer: "repo:rust-packages/laterite-ags4-emit/src/writer.rs"
   orchestrator: "repo:rust-packages/laterite-ags4-emit/src/emit.rs"
-related: [crate-map, laterite-types, laterite-ags4-validator, laterite-ags4-xcheck, dec-laterite-types-leaf]
+related: [crate-map, laterite-ags4-types, laterite-ags4-validator, laterite-ags4-xcheck, dec-laterite-ags4-types-leaf]
 sources: []
 ---
 # laterite-ags4-emit
@@ -31,7 +31,7 @@ its own crate is the wasm host — the byte writer used to live inside
 browser could parse AGS4 but not produce it. Extracting the writer (and, with
 it, the shared orchestrator) let all four surfaces emit through *one*
 implementation instead of one per host. Same leaf-extraction reasoning as
-[[dec-laterite-types-leaf]].
+[[dec-laterite-ags4-types-leaf]].
 
 Two layers, both public:
 
@@ -45,7 +45,7 @@ Two layers, both public:
   host-agnostic orchestrator every surface actually calls: resolve UNIT/TYPE per
   heading (**hybrid** — the caller's explicit value wins, else the per-edition
   standard dictionary fills, else `""` / `"X"`), format each cell
-  (`laterite_types::ags4_str` for typed values, verbatim for strings), write the
+  (`laterite_ags4_types::ags4_str` for typed values, verbatim for strings), write the
   sections, then apply the chosen `EmitMode`.
 
 `EmitMode` is the crate's one policy knob: **Strict** refuses to emit output that
@@ -70,7 +70,7 @@ UTF-8 encoding for the validation leg, so what is written is what is re-read.
 
 ## Where it lives
 
-`repo:rust-packages/laterite-ags4-emit`. Deps [[laterite-types]] (`ags4_str` +
+`repo:rust-packages/laterite-ags4-emit`. Deps [[laterite-ags4-types]] (`ags4_str` +
 the quoting primitive) and [[laterite-ags4-validator]] (the per-edition
 dictionary, parse, `run_all`, the fix machinery), plus `serde_json` and
 `encoding_rs` — no DuckDB, no `laterite-ags4-core`, so it stays wasm-clean. It
@@ -89,7 +89,7 @@ The full workspace graph is in [[crate-map]]; this crate's immediate edges:
 
 ```mermaid
 flowchart LR
-  types[laterite-types] --> emit[laterite-ags4-emit]
+  types[laterite-ags4-types] --> emit[laterite-ags4-emit]
   val[laterite-ags4-validator] --> emit
   emit --> latpy[laterite-py]
   emit --> latnode[laterite-node]
@@ -101,4 +101,4 @@ flowchart LR
 
 ## Related
 
-[[crate-map]] · [[laterite-types]] · [[laterite-ags4-validator]] · [[laterite-ags4-xcheck]] · [[dec-laterite-types-leaf]]
+[[crate-map]] · [[laterite-ags4-types]] · [[laterite-ags4-validator]] · [[laterite-ags4-xcheck]] · [[dec-laterite-ags4-types-leaf]]

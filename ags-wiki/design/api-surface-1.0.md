@@ -6,7 +6,7 @@ tags: [design, decision, api, duckdb, polars]
 decided: 2026-06-12
 supersedes: []
 from_gap: []
-related: [dec-rust-drives-python, dec-laterite-types-leaf, crate-map, pyo3-boundary, abi3-perf, tech-stack-wasm, ags4-output, reliquary, dec-duckdb-extension, dec-rust-api-crates-io]
+related: [dec-rust-drives-python, dec-laterite-ags4-types-leaf, crate-map, pyo3-boundary, abi3-perf, tech-stack-wasm, ags4-output, reliquary, dec-duckdb-extension, dec-rust-api-crates-io]
 sources:
   - "https://duckdb.org/docs/stable/internals/storage"
   - "https://duckdb.org/docs/stable/sql/statements/attach"
@@ -76,7 +76,7 @@ Read handles are context managers (`with read(p) as ags:` + `close()`); there is
 
 ## The engine + the boundary
 
-Rust parses → typed Arrow per group (`laterite-types::arrow_cols`, the *same* emitter the wasm
+Rust parses → typed Arrow per group (`laterite-ags4-types::arrow_cols`, the *same* emitter the wasm
 explorer frames as IPC) → handed to Python zero-copy as an **Arrow PyCapsule** (`pyo3-arrow`,
 abi3-safe) → loaded into DuckDB as a **native CTAS table** (NOT a view over external Arrow —
 that tripped pyarrow's `string_view` `is_in` kernel on joins). Group frames come back out
@@ -91,9 +91,9 @@ feeds it as IPC.
 - **base = `polars + duckdb`.** No narwhals, no pyarrow.
 - **`[compat]` = `pandas<3`** — pyarrow-free by default. `AGS4_to_dataframe`'s common
   path (2026-07-20 perf pass) reads a **Rust-built all-`Utf8` Arrow table**
-  (`build_record_batch_compat` in `laterite-types::arrow_cols` → `parse_compat_arrow`,
+  (`build_record_batch_compat` in `laterite-ags4-types::arrow_cols` → `parse_compat_arrow`,
   no per-cell `PyObject` boxing —
-  `repo:rust-packages/laterite-types/src/arrow_cols.rs`,
+  `repo:rust-packages/laterite-ags4-types/src/arrow_cols.rs`,
   `repo:rust-packages/laterite-py/src/lib.rs`) and hands pandas an object-dtype frame
   via DuckDB's NumPy `rel.df()` (the same trick as the core) — already **~2× faster
   than python-ags4** (was ~2–7× slower before the Arrow move; reproducible via

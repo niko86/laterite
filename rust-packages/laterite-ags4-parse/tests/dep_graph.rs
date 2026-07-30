@@ -10,7 +10,7 @@
 use std::process::Command;
 
 /// Crates that must never appear in `laterite-ags4-parse`'s normal graph:
-/// the parser stays a pure tokenizer + decoder. `laterite-types` is listed
+/// the parser stays a pure tokenizer + decoder. `laterite-ags4-types` is listed
 /// so `parse` and `types` remain SIBLING leaves (no edge between them).
 const FORBIDDEN: &[&str] = &[
     "csv",
@@ -23,7 +23,7 @@ const FORBIDDEN: &[&str] = &[
     "walkdir",
     "rayon",
     "ratatui",
-    "laterite-types",
+    "laterite-ags4-types",
 ];
 
 #[test]

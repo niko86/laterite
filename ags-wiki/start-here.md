@@ -113,7 +113,7 @@ graph TD
 
 - **[[parent-child-graph]]** — full group hierarchy · **[[rule-families]]** · **[[traceability-chain]]** · **[[parity-model]]** · **[[edition-resolution]]**
 - **[[evolutionary-dogfooding]]** — manufacture & prove divergences · **[[parity-confidence-model]]** — adaptive oracle gating · **[[agent-first-cli-contract]]** — the CLI lineage/contract · **[[testing-strategy]]** — invariant-first hardening doctrine
-- **[[validator-site]]** — the browser AGS4 validator + data-explorer roadmap (wasm) · **[[dec-laterite-types-leaf]]** — shared wasm-safe typing crate · **cli-cloud-workflow** — handing off work between CLI & cloud sessions
+- **[[validator-site]]** — the browser AGS4 validator + data-explorer roadmap (wasm) · **[[dec-laterite-ags4-types-leaf]]** — shared wasm-safe typing crate · **cli-cloud-workflow** — handing off work between CLI & cloud sessions
 - **[[crate-map]]** — the 20-crate / 1-wheel workspace map · **[[tech-stack-wasm]]** — the browser wasm + typed-Arrow path · **[[pyo3-boundary]]** — where Rust drives Python
 - **Rules** — `rules/` (28 pages, Rules 1–20 + sub-rules)
 - **Groups** — `groups/` (92 pages — a bootstrap-era subset; the shipped

@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-07-30
+
+The browser API breaks: every `@laterite/ags4-wasm` export now takes an options object instead of a positional tail. And a synthesised `TRAN` is the caller's to supply — the placeholder the emitter used to invent satisfied Rule 14, so files could assert a transmission that never happened and pass validation doing it.
+
+### Added
+
+- **A transmission can carry a description and remarks.** `TranStamp` takes optional `description` and `remarks` (`TRAN_DESC` / `TRAN_REM`), emitted only when set. `TRAN_AGS`, `TRAN_DLIM` and `TRAN_RCON` remain derived and are deliberately not accepted from callers — they describe the syntax of the bytes the emitter is writing, so a supplied value could only contradict them. ([#178](https://github.com/niko86/laterite/pull/178))
+- **The browser's `merge` accepts `dictVersion`**, so an edition can be forced from wasm as it always could from Python, Node and the CLI. This gap was found by the new cross-surface knob gate on its first run — the browser had simply never been held to the same option set as the other surfaces. ([#182](https://github.com/niko86/laterite/pull/182))
+
+### Changed
+
+- **Breaking: every `@laterite/ags4-wasm` export takes an options object.** `validate`, `certify`, `build_ags4`, `build_ags4_ipc` and `merge` had grown positional tails of up to nine arguments, where `undefined, undefined, true` was an ordinary thing to write and slot order was the only thing keeping it correct. Each now takes one named object — `{ dictVersion, warnings, fyi, … }` — every field optional and defaulted to match the other surfaces. Named options introduce a mistake positional ones could not have (you cannot misspell slot 3), so **an unrecognised key is refused with a suggestion** rather than silently ignored: `unknown build option 'synthesizeMetadata' — did you mean 'synthesiseMetadata'?`. Call sites need rewriting; there is no positional fallback. ([#179](https://github.com/niko86/laterite/pull/179), [#180](https://github.com/niko86/laterite/pull/180), [#181](https://github.com/niko86/laterite/pull/181))
+- **Breaking: a synthesised `TRAN` is stamped by the caller, never invented.** With metadata synthesis on, the emitter used to write `"TBC"` into `TRAN_PROD`/`TRAN_RECV`/`TRAN_STAT` and a fixed `1900-01-01` date — a combination that **satisfies Rule 14**. The file asserted a transmission that never happened, passed validation, and gave a recipient no way to tell it from a real transmission record. The five REQUIRED values are now supplied together or not at all: **Python and Node take a `TranStamp` object in place of the five `tran_*` arguments**, and the CLI's `--tran-*` flags are all-or-none (a partial set exits 2, naming what is missing). With no stamp, no `TRAN` is minted and Rule 14 reports the gap honestly. Note that **a clean file now genuinely needs all five values** — the placeholder had also been silencing Rule 10b on three REQUIRED headings, which is why dropping it surfaces findings that were always true. ([#178](https://github.com/niko86/laterite/pull/178))
+
+### Fixed
+
+- **Metadata synthesis could mint an empty `UNIT` group** — itself a Rule 2 error. The unconditional `TRAN`'s `"yyyy-mm-dd"` on `TRAN_DATE` had quietly been the only guarantee that any unit existed at all, so synthesis was trading a Rule 15 finding for a Rule 2 one and reporting success. `UNIT` is now skipped when nothing uses one. ([#178](https://github.com/niko86/laterite/pull/178))
+- **The browser's `merge` no longer leaks its result.** The wasm `MergeResult` is freed once its fields have been read, rather than being left to the caller to remember. ([#181](https://github.com/niko86/laterite/pull/181))
+
 ## [0.8.2] — 2026-07-30
 
 No functional change on any surface. The browser package is republished from CI so it carries a build provenance attestation, which 0.8.1 could not.
@@ -133,7 +152,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/niko86/laterite/releases/tag/v0.9.0
 [0.8.2]: https://github.com/niko86/laterite/releases/tag/v0.8.2
 [0.8.1]: https://github.com/niko86/laterite/releases/tag/v0.8.1
 [0.8.0]: https://github.com/niko86/laterite/releases/tag/v0.8.0

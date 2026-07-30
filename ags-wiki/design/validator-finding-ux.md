@@ -118,7 +118,7 @@ UX **preview-diff then apply**. (All three the B1-recommended path.)
   `validate` + a fresh `compute_fixes` reactively (bounded iteration cap).
 - **B1 mismatch caught:** no `convert_to_text` exists in Rust. Rule 8
   reformat reuses the validator's own `typed_values::format_nsf` (+ new
-  sibling `format_ndp`/`format_nsci`) rather than pulling in `laterite-types`
+  sibling `format_ndp`/`format_nsci`) rather than pulling in `laterite-ags4-types`
   (`ags4_str` needs a typed `Value` and lives in a crate the validator
   doesn't depend on) — keeps the lean dep-graph.
 - **Conditional-safe flags** (surface in the UI): Rule 7 `X`→`X_1` may then

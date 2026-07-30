@@ -18,7 +18,7 @@ Two things live here that the registry can't give us:
    union the registry serves is latest-edition-flattened and has no such field.
 2. **The AGS data-type glossary.** The type codes (`ID`, `2DP`, `DT`, …) are
    defined in the standard dictionary's own `TYPE` group; the canonical mapping +
-   validation rules live in `laterite-types`. `TYPE_GLOSSARY` is the synthesis of
+   validation rules live in `laterite-ags4-types`. `TYPE_GLOSSARY` is the synthesis of
    both, anchored so heading tables can deep-link each code.
 """
 

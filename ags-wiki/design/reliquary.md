@@ -57,7 +57,7 @@ it, and name that PR in *Removed-in*). Verify `—` = display-only.
 <!-- BEGIN GENERATED: reliquary-register — from ags-wiki/design/reliquary.json; regenerate with `uv run --no-project python tools/gen_wiki_tables.py` (DO NOT EDIT THE TABLE BY HAND) -->
 | Symbol | Verify | Axis | Status | Removed-in | Evidence |
 |---|---|---|---|---|---|
-| `truncate_dt_to_unit()` | `rust-packages/laterite-types/src/lib.rs::fn truncate_dt_to_unit` | code | removed | misc-deadcode PR | AGS5 DT-precision writer; 0 shipped callers (only ags5/) |
+| `truncate_dt_to_unit()` | `rust-packages/laterite-ags4-types/src/lib.rs::fn truncate_dt_to_unit` | code | removed | misc-deadcode PR | AGS5 DT-precision writer; 0 shipped callers (only ags5/) |
 | `LineTerminator::as_bytes()` | `rust-packages/laterite-ags4-parse/src/lib.rs::as_bytes(self)` | code | removed | misc-deadcode PR | unused ergonomic twin of `as_str()`; 0 call sites |
 | `tempfile` (dev-dep) | `rust-packages/laterite-transport/Cargo.toml::tempfile` | dependency | removed | dep-hygiene PR | declared, never used; tests use `env::temp_dir()` |
 | `chrono` (dep) | `rust-packages/laterite-ags4-core/Cargo.toml::chrono` | dependency | removed | dep-hygiene PR | 0 chrono/DateTime uses in core src/tests |
@@ -72,7 +72,7 @@ it, and name that PR in *Removed-in*). Verify `—` = display-only.
 | `registry_get_group()` | `rust-packages/laterite-py/src/registry_fns.rs::fn registry_get_group` | code | removed | python-registry PR | dead PyO3 export; py loads via bulk JSON |
 | `Heading.indexed` field | `packages/laterite/python/laterite/registry.py::indexed` | code | removed | python-registry PR | hardcoded `None` in registry.rs; never populated |
 | `GroupDescriptor.index_parent` field | `packages/laterite/python/laterite/registry.py::index_parent` | code | removed | python-registry PR | hardcoded `None` in registry.rs; never populated |
-| `CanonicalType::Date`/`Time` variants | `rust-packages/laterite-types/src/lib.rs::CanonicalType::Time` | code | keep | — (owner call) | unreachable via `canonical_type()` but public + matched across 3 bindings — breaking to remove |
+| `CanonicalType::Date`/`Time` variants | `rust-packages/laterite-ags4-types/src/lib.rs::CanonicalType::Time` | code | keep | — (owner call) | unreachable via `canonical_type()` but public + matched across 3 bindings — breaking to remove |
 | `laterite-ags4-parse` `serde` feature | `rust-packages/laterite-ags4-parse/Cargo.toml::serde` | dependency | removed | ags5-relics PR | dead #168 scaffold, 0 activators anywhere; dispense-with-ags5 sweep (#177 concept) |
 | `CliError` ags5-compat variants | `rust-packages/laterite-ags4-core/src/error.rs::PreVersion65` | code | removed | ags5-relics PR | `PreVersion65`/`UnknownGroup`/`Predicate`/`UnsupportedFeature`/`Sql`/`Validation` — 0 shipped construction (ags5/ only); `CliError` now `FileNotFound`+`Schema` |
 | `Registry::extended_with()` | `rust-packages/laterite-ags4-core/src/registry.rs::fn extended_with` | code | removed | ags5-relics PR | passthrough-registration; 0 shipped callers (2 in ags5/) |

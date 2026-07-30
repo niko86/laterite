@@ -2080,18 +2080,18 @@ checksum = "bf36173d4167ed999940f804952e6b08197cae5ad5d572eb4db150ce8ad5d58f"
 
 [[package]]
 name = "laterite-ags4-censor"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
- "laterite-types",
+ "laterite-ags4-types",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "laterite-ags4-check"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "chrono",
  "clap",
@@ -2113,7 +2113,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-compliance"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-parity",
@@ -2124,13 +2124,13 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-core"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
+ "laterite-ags4-types",
  "laterite-transport",
- "laterite-types",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -2141,7 +2141,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-corpus-qa"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2165,30 +2165,30 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-diff"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
- "laterite-types",
+ "laterite-ags4-types",
  "serde",
 ]
 
 [[package]]
 name = "laterite-ags4-emit"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "arrow",
  "criterion",
  "encoding_rs",
+ "laterite-ags4-types",
  "laterite-ags4-validator",
- "laterite-types",
  "proptest",
  "serde_json",
 ]
 
 [[package]]
 name = "laterite-ags4-forge"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2204,19 +2204,19 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-merge"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "laterite-ags4-emit",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
- "laterite-types",
+ "laterite-ags4-types",
  "proptest",
  "serde_json",
 ]
 
 [[package]]
 name = "laterite-ags4-parity"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "laterite-ags4-validator",
  "serde",
@@ -2225,7 +2225,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-parse"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "encoding_rs",
@@ -2235,23 +2235,23 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-perf"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "laterite-ags4-parse",
+ "laterite-ags4-types",
  "laterite-ags4-validator",
- "laterite-types",
  "serde",
  "serde_json",
 ]
 
 [[package]]
 name = "laterite-ags4-reference"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "encoding_rs",
  "laterite-ags4-parse",
- "laterite-types",
+ "laterite-ags4-types",
  "phf 0.14.0",
  "phf_codegen 0.14.0",
  "serde",
@@ -2262,10 +2262,10 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-tokenizer-wasm"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "laterite-ags4-parse",
- "laterite-types",
+ "laterite-ags4-types",
  "serde",
  "serde-wasm-bindgen",
  "wasm-bindgen",
@@ -2273,7 +2273,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-trust"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "laterite-ags4-core",
@@ -2283,8 +2283,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "laterite-ags4-types"
+version = "0.9.0"
+dependencies = [
+ "arrow",
+ "chrono",
+ "criterion",
+ "dhat",
+ "encoding_rs",
+ "laterite-ags4-parse",
+ "proptest",
+ "serde_json",
+]
+
+[[package]]
 name = "laterite-ags4-validator"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "chrono",
  "criterion",
@@ -2293,7 +2307,7 @@ dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
- "laterite-types",
+ "laterite-ags4-types",
  "proptest",
  "serde",
  "serde_json",
@@ -2305,7 +2319,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-wasm"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "arrow",
  "chrono",
@@ -2320,9 +2334,9 @@ dependencies = [
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-trust",
+ "laterite-ags4-types",
  "laterite-ags4-validator",
  "laterite-excel",
- "laterite-types",
  "serde",
  "serde-wasm-bindgen",
  "serde_bytes",
@@ -2333,7 +2347,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-xcheck"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-emit",
@@ -2345,7 +2359,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-cliutil"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "clap",
  "comfy-table",
@@ -2357,12 +2371,12 @@ dependencies = [
 
 [[package]]
 name = "laterite-excel"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "calamine",
  "laterite-ags4-core",
  "laterite-ags4-emit",
- "laterite-types",
+ "laterite-ags4-types",
  "rust_xlsxwriter",
  "serde_json",
  "tempfile",
@@ -2370,7 +2384,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-node"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "arrow",
  "encoding_rs",
@@ -2380,10 +2394,10 @@ dependencies = [
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-trust",
+ "laterite-ags4-types",
  "laterite-ags4-validator",
  "laterite-excel",
  "laterite-transport",
- "laterite-types",
  "mimalloc",
  "napi",
  "napi-build",
@@ -2393,7 +2407,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-py"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "arrow",
  "chrono",
@@ -2405,9 +2419,9 @@ dependencies = [
  "laterite-ags4-parse",
  "laterite-ags4-reference",
  "laterite-ags4-trust",
+ "laterite-ags4-types",
  "laterite-ags4-validator",
  "laterite-excel",
- "laterite-types",
  "mimalloc",
  "pyo3",
  "pyo3-arrow",
@@ -2416,25 +2430,11 @@ dependencies = [
 
 [[package]]
 name = "laterite-transport"
-version = "0.8.2"
+version = "0.9.0"
 dependencies = [
  "age",
  "thiserror 2.0.19",
  "zstd",
-]
-
-[[package]]
-name = "laterite-types"
-version = "0.8.2"
-dependencies = [
- "arrow",
- "chrono",
- "criterion",
- "dhat",
- "encoding_rs",
- "laterite-ags4-parse",
- "proptest",
- "serde_json",
 ]
 
 [[package]]

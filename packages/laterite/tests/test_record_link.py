@@ -5,7 +5,7 @@ An RL cell is a delimited reference — `GROUP|KEY1|KEY2`, split on `TRAN_DLIM`
 DOUBLE and `parse_value` returned Null: every record link was **silently
 destroyed on read**, coming back as an all-null f64 column.
 
-Two unit tests in laterite-types pinned the wrong answer, which is how it
+Two unit tests in laterite-ags4-types pinned the wrong answer, which is how it
 survived. These pin the right one, at the surface where the damage showed.
 """
 

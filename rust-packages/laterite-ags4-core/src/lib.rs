@@ -19,12 +19,12 @@
 //! uses `laterite_ags4_core::…` directly.
 
 pub mod ags4_codec;
-// The AGS type system now lives in the wasm-safe leaf crate `laterite-types`
+// The AGS type system now lives in the wasm-safe leaf crate `laterite-ags4-types`
 // (so `laterite-ags4-wasm` can share the exact casting logic). Re-exported here
 // as `laterite_ags4_core::ags_types` so every existing consumer — the
 // original DuckDB-backed crate's {convert,query,spec_tables} modules and its
 // own 2nd-hop `ags_types` re-export, laterite-py — keeps working unchanged.
-pub use laterite_types as ags_types;
+pub use laterite_ags4_types as ags_types;
 pub mod error;
 pub mod index;
 pub mod keychain;

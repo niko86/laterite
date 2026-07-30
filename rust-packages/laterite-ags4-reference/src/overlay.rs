@@ -202,11 +202,11 @@ pub(crate) fn valid_status(s: &str) -> bool {
 }
 
 /// Is `t` a recognised AGS data type? Empty is accepted (stored, treated as
-/// String downstream). The authority is `laterite_types::canonical_type`, the
+/// String downstream). The authority is `laterite_ags4_types::canonical_type`, the
 /// same one the read codec + DDL builder trust — so the dict validator and the
 /// value casters agree on what a type IS.
 pub(crate) fn valid_type(t: &str) -> bool {
-    t.is_empty() || laterite_types::canonical_type(t).is_some()
+    t.is_empty() || laterite_ags4_types::canonical_type(t).is_some()
 }
 
 /// A parsed, base-resolved custom dictionary. Built once at the surface boundary

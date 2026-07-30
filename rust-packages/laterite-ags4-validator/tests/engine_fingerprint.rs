@@ -129,7 +129,7 @@ fn the_fingerprint_covers_every_crate_the_verdict_runs_through() {
     // (file, why it decides a verdict)
     let must_cover = [
         (
-            "laterite-types/src/lib.rs",
+            "laterite-ags4-types/src/lib.rs",
             "owns format_nsf — the formatter that COMPUTES Rule 8's verdict (#528 routed \
              the validator's hand-port through it)",
         ),

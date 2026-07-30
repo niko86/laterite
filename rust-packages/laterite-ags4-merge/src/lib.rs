@@ -26,7 +26,7 @@
 //!
 //!   Widen is emission-only: it rewrites the merged TYPE row and nothing else.
 //!   Promote is the one place merge **rewrites a cell**, and it is confined to
-//!   appending zeros to a decimal (`laterite_types::pad_decimals` — string-only,
+//!   appending zeros to a decimal (`laterite_ags4_types::pad_decimals` — string-only,
 //!   never via `f64`, never rounding). Neither changes how rows were *matched*
 //!   (that is per-file `parse_value`) nor any content-addressed key.
 //!
@@ -47,7 +47,7 @@ use laterite_ags4_parse::{ParsedFile, ParsedGroup};
 use laterite_ags4_reference::dict::DictVersion;
 use laterite_ags4_reference::keychain::key_heading_names;
 use laterite_ags4_reference::union::registry;
-use laterite_types::{decimal_places, pad_decimals, parse_value};
+use laterite_ags4_types::{decimal_places, pad_decimals, parse_value};
 use serde_json::Value;
 
 /// What to do when two files declare a different AGS TYPE for the same heading.

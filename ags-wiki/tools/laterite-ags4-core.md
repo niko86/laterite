@@ -10,7 +10,7 @@ ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-core"
   lib: "repo:rust-packages/laterite-ags4-core/src/lib.rs"
-related: [crate-map, laterite-types, laterite-ags4-reference, laterite-transport, laterite-py, dec-dictionary-single-source]
+related: [crate-map, laterite-ags4-types, laterite-ags4-reference, laterite-transport, laterite-py, dec-dictionary-single-source]
 sources: []
 ---
 # laterite-ags4-core
@@ -49,12 +49,12 @@ laterite-ags5-db.
 ## Where it lives
 
 `repo:rust-packages/laterite-ags4-core` — depends on the typing leaf
-[[laterite-types]], which it **re-exports as `laterite_ags4_core::ags_types`**
-(`pub use laterite_types as ags_types;` in
+[[laterite-ags4-types]], which it **re-exports as `laterite_ags4_core::ags_types`**
+(`pub use laterite_ags4_types as ags_types;` in
 `repo:rust-packages/laterite-ags4-core/src/lib.rs`) so every downstream consumer
 keeps the old `ags_types` path working unchanged. Beyond that leaf it
 carries the wasm-hostile deps (age / zstd / calamine / rpassword / csv)
-that kept them *out* of [[laterite-types]].
+that kept them *out* of [[laterite-ags4-types]].
 
 ## Where it fits
 
@@ -62,7 +62,7 @@ Full graph in [[crate-map]]; immediate edges:
 
 ```mermaid
 flowchart LR
-  types[laterite-types] --> core[laterite-ags4-core]
+  types[laterite-ags4-types] --> core[laterite-ags4-core]
   reference[laterite-ags4-reference] --> core
   core --> cli[ags5db]
   core --> latpy[laterite-py]
@@ -71,4 +71,4 @@ flowchart LR
 
 ## Related
 
-[[crate-map]] · [[laterite-types]] · [[laterite-ags4-reference]] · [[laterite-transport]] · laterite-ags5-db · [[laterite-py]] · laterite-py-ags5 · [[dec-dictionary-single-source]]
+[[crate-map]] · [[laterite-ags4-types]] · [[laterite-ags4-reference]] · [[laterite-transport]] · laterite-ags5-db · [[laterite-py]] · laterite-py-ags5 · [[dec-dictionary-single-source]]

@@ -21,7 +21,7 @@
 //!
 //! 2. **Every in-workspace crate the verdict is expressed THROUGH**, discovered by
 //!    walking `[dependencies]` path deps transitively (#550). This half used to be
-//!    missing, and it was not a small gap: `laterite-types` owns `format_nsf`, the
+//!    missing, and it was not a small gap: `laterite-ags4-types` owns `format_nsf`, the
 //!    formatter that *computes* Rule 8's verdict; `laterite-ags4-parse` owns the
 //!    tokenizer that *decides field boundaries*; `laterite-ags4-reference`'s
 //!    `build.rs` *generates* the per-edition dictionary tables (the JSON was hashed
@@ -54,7 +54,7 @@
 //! revalidation (safe, and invisible to users — their engine changes per release
 //! anyway, and any release touches something), while an under-broad hash is a false
 //! clean. When in doubt, hash it. If that ever gets genuinely expensive — a leaf
-//! churning on code that cannot reach a verdict, `laterite-types::arrow_cols` say —
+//! churning on code that cannot reach a verdict, `laterite-ags4-types::arrow_cols` say —
 //! the answer is to SPLIT the leaf so the validator stops depending on the
 //! non-verdict half, not to reintroduce a curated list here. A crate holding both
 //! verdict and non-verdict code is a boundary smell, and this file is where it
@@ -186,7 +186,7 @@ fn path_deps(manifest_toml: &Path) -> Vec<String> {
 /// dictionary tables), and its bundled `data/` — then recurse into its own path deps.
 ///
 /// `seen` is keyed on the canonical dir because the graph is a diamond, not a tree:
-/// the validator depends on `laterite-types` directly AND through
+/// the validator depends on `laterite-ags4-types` directly AND through
 /// `laterite-ags4-reference`. Without it those files would be hashed twice — harmless
 /// for the digest's correctness, but it would make the covered set a lie.
 fn collect_crate(dir: &Path, out: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>) {
