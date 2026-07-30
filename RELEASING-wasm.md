@@ -98,8 +98,22 @@ different code and none of them names its real cause:
 **Consequence for the tag.** `0.8.1` was published by hand, so the `wasm-v0.8.1`
 CI run's publish job **stays red permanently** — the version already exists and npm
 will not accept it twice. Nothing is broken and the tag still correctly marks the
-source commit. From `0.8.2` the trusted publisher makes CI the only publisher, with
-provenance attached (a manual publish carries none).
+source commit.
+
+**`0.8.2` closed it out (2026-07-30) — and it worked first try.** A patch release
+with no code change at all, cut for two reasons: to give the package the provenance
+attestation `0.8.1` structurally could not have, and to prove the tokenless path.
+Both landed. The registry now answers `200` on
+`/-/npm/v1/attestations/@laterite/ags4-wasm@0.8.2` and `404` on `@0.8.1`, and the
+publish log reads *"Signed provenance statement with source and build information
+from GitHub Actions"* (Sigstore log index 2285019141). OIDC authenticated with **no
+credential in the job**.
+
+One expectation that proved wrong, worth recording: **the `npm` environment did not
+pause for approval.** It carries deployment tag policies but no required reviewer, so
+a `wasm-v*` or `node-v*` tag push publishes with no human checkpoint after the tag.
+If you want one, add a required reviewer to the environment — the tag itself is
+currently the only gate.
 
 ## What a `wasm-v*` tag triggers
 
