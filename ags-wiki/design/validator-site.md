@@ -6,7 +6,7 @@ tags: [design, decision, roadmap]
 decided: 2026-05-30
 supersedes: []
 from_gap: []
-related: [dec-laterite-types-leaf, playwright-e2e, docs-site, validator-finding-ux, laterite-ags4-check, parity-model, effective-dictionary, design/_README]
+related: [dec-laterite-ags4-types-leaf, playwright-e2e, docs-site, validator-finding-ux, laterite-ags4-check, parity-model, effective-dictionary, design/_README]
 sources: []
 ---
 
@@ -106,13 +106,13 @@ dates) and agree with what a native `.ags5db` would store. Approach:
 **build typed Apache Arrow in Rust and hand DuckDB-wasm one IPC stream
 per group** — no per-cell JS objects, no `TRY_CAST` in the browser.
 
-- The casting logic lives in the shared `laterite-types` leaf crate so the
+- The casting logic lives in the shared `laterite-ags4-types` leaf crate so the
   native engine and the wasm explorer cast identically — see
-  [[dec-laterite-types-leaf]].
+  [[dec-laterite-ags4-types-leaf]].
 - `laterite-ags4-wasm::parse(bytes, encoding)` → `ParsedDataset` with
   `group_codes()`, `meta(code)` (`{headings, units, types, sql_types}`),
   and `arrow_ipc(code)` (one typed Arrow IPC stream, built lazily).
-- Casting goes through `laterite-types::{canonical_type, parse_value,
+- Casting goes through `laterite-ags4-types::{canonical_type, parse_value,
   parse_datetime}` off the file's TYPE row, exactly as
   `ags5/rust-packages/laterite-ags5-db/src/convert.rs` does.
 - Arrow mapping: [[DT]] → `Timestamp(µs)` (tz-naive; full datetime,
@@ -121,7 +121,7 @@ per group** — no per-cell JS objects, no `TRY_CAST` in the browser.
   `Utf8`.
 
 **Verified:**
-- `laterite-types` / `laterite-ags4-core` / `ags5db` cargo suites green (the
+- `laterite-ags4-types` / `laterite-ags4-core` / `ags5db` cargo suites green (the
   re-export is non-breaking).
 - `cargo build -p laterite-ags4-wasm --target wasm32-unknown-unknown` green; the
   wasm-pack release module loads under Node.
@@ -142,7 +142,7 @@ Commit `6b3bb17` on branch the validator-site branch.
 > check would convert a fixture both ways and diff the typed cell values.
 > The host unit test proves the casting *logic*; the "identical to
 > `.ags5db`" claim currently rests on both sides calling the one shared
-> crate ([[dec-laterite-types-leaf]]).
+> crate ([[dec-laterite-ags4-types-leaf]]).
 
 ## Phase 3 — Explore + Fix + Tools UI ✅ (delivered)
 Delivered as an incremental PR series (#27–#37, one PR per branch, merged
@@ -626,6 +626,6 @@ graph LR
 ```
 
 ## Related
-[[dec-laterite-types-leaf]] · cli-cloud-workflow · ci-and-runners · [[playwright-e2e]] · [[docs-site]] · [[validator-finding-ux]] · [[laterite-ags4-check]] ·
+[[dec-laterite-ags4-types-leaf]] · cli-cloud-workflow · ci-and-runners · [[playwright-e2e]] · [[docs-site]] · [[validator-finding-ux]] · [[laterite-ags4-check]] ·
 laterite-ags5-db · [[parity-model]] · [[effective-dictionary]] ·
 [[design/_README\|AGS5 register]]

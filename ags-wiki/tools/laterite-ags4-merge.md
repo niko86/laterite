@@ -10,7 +10,7 @@ ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-merge"
   lib: "repo:rust-packages/laterite-ags4-merge/src/lib.rs"
-related: [crate-map, crate-dependency-graph, laterite-ags4-parse, laterite-ags4-reference, laterite-ags4-emit, laterite-types, laterite-ags4-diff, dec-ags4-merge-semantics, laterite-ags4-check]
+related: [crate-map, crate-dependency-graph, laterite-ags4-parse, laterite-ags4-reference, laterite-ags4-emit, laterite-ags4-types, laterite-ags4-diff, dec-ags4-merge-semantics, laterite-ags4-check]
 sources: []
 ---
 # laterite-ags4-merge
@@ -65,7 +65,7 @@ contract, not merge's.
 
 `repo:rust-packages/laterite-ags4-merge`. Deps [[laterite-ags4-parse]],
 [[laterite-ags4-reference]] (the keychain), [[laterite-ags4-emit]] (the writer),
-and [[laterite-types]] (`pad_decimals`), plus `serde_json`. DuckDB-free.
+and [[laterite-ags4-types]] (`pad_decimals`), plus `serde_json`. DuckDB-free.
 Consumers: [[laterite-ags4-check]] and the bindings.
 
 ## Relationship to other components
@@ -77,11 +77,11 @@ The full workspace graph is in [[crate-map]] (dependency form in
 flowchart LR
   parse[laterite-ags4-parse] --> merge[laterite-ags4-merge]
   ref[laterite-ags4-reference] --> merge
-  types[laterite-types] --> merge
+  types[laterite-ags4-types] --> merge
   merge --> emit[laterite-ags4-emit]
   merge --> check["laterite-ags4-check<br/>(lat merge)"]
 ```
 
 ## Related
 
-[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-parse]] · [[laterite-ags4-reference]] · [[laterite-ags4-emit]] · [[laterite-types]] · [[laterite-ags4-diff]] · [[dec-ags4-merge-semantics]] · [[laterite-ags4-check]]
+[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-parse]] · [[laterite-ags4-reference]] · [[laterite-ags4-emit]] · [[laterite-ags4-types]] · [[laterite-ags4-diff]] · [[dec-ags4-merge-semantics]] · [[laterite-ags4-check]]

@@ -1,19 +1,19 @@
 ---
 type: tool
-title: laterite-types
+title: laterite-ags4-types
 status: drafted
 tags: [tool, internal]
 tool_kind: crate
 language: rust
-artifact: laterite-types
+artifact: laterite-ags4-types
 ags_editions: []
 repo_refs:
-  root: "repo:rust-packages/laterite-types"
-  lib: "repo:rust-packages/laterite-types/src/lib.rs"
-related: [crate-map, laterite-ags4-core, laterite-ags4-wasm, dec-laterite-types-leaf, dec-ags4-merge-semantics]
+  root: "repo:rust-packages/laterite-ags4-types"
+  lib: "repo:rust-packages/laterite-ags4-types/src/lib.rs"
+related: [crate-map, laterite-ags4-core, laterite-ags4-wasm, dec-laterite-ags4-types-leaf, dec-ags4-merge-semantics]
 sources: []
 ---
-# laterite-types
+# laterite-ags4-types
 
 > [!note] **Internal implementation detail** — a workspace leaf crate, not a
 > public API. The published surface is the [[laterite]] wheel's
@@ -25,10 +25,10 @@ The AGS4 **type system** as a deliberately tiny, wasm-safe leaf crate:
 the canonical-type taxonomy plus the permissive AGS4-string → typed-value
 casting that both the native DuckDB engine and the browser data explorer
 share. "DuckDB-free, wasm-safe" is the whole point — see the design
-decision [[dec-laterite-types-leaf]] for *why* it was extracted out of
+decision [[dec-laterite-ags4-types-leaf]] for *why* it was extracted out of
 `laterite-ags4-core`, rather than restating it here.
 
-Key API (`repo:rust-packages/laterite-types/src/lib.rs`): `CanonicalType`
+Key API (`repo:rust-packages/laterite-ags4-types/src/lib.rs`): `CanonicalType`
 (the 8-member target taxonomy + its `as_str` / `sql_type` mappings),
 `canonical_type` (AGS code → canonical type), `parse_value` (raw string →
 `serde_json::Value`, `Null` on unparseable), `parse_datetime`, and
@@ -49,7 +49,7 @@ doubling an embedded `"`; the streaming form is the field primitive
 `laterite-ags4-tokenizer-wasm` crate wraps it (alongside
 `laterite-ags4-parse::scan::scan_line`) for the browser's inline line
 editor/preview, retiring the hand-written TS copy that used to live in
-`web/src/lib/agsline.ts`. See [[dec-laterite-types-leaf]] for the
+`web/src/lib/agsline.ts`. See [[dec-laterite-ags4-types-leaf]] for the
 home-of-the-quoter decision (Option C: beside `ags4_str`, zero new
 dependency edges).
 
@@ -67,7 +67,7 @@ through to string storage; unparseable values return `Value::Null`
 
 ## Where it lives
 
-`repo:rust-packages/laterite-types` — a true dependency **leaf**: chrono
+`repo:rust-packages/laterite-ags4-types` — a true dependency **leaf**: chrono
 (no-clock, no-wasmbind) + `serde_json` only, none of `laterite-ags4-core`'s
 wasm-hostile deps (age / zstd / calamine / rpassword / csv). Re-exported
 by `laterite-ags4-core` as `laterite_ags4_core::ags_types`
@@ -81,11 +81,11 @@ edges:
 
 ```mermaid
 flowchart LR
-  types[laterite-types] --> core[laterite-ags4-core]
+  types[laterite-ags4-types] --> core[laterite-ags4-core]
   types --> wasm[laterite-ags4-wasm]
   types --> tokwasm[laterite-ags4-tokenizer-wasm]
 ```
 
 ## Related
 
-[[crate-map]] · [[laterite-ags4-core]] · [[laterite-ags4-wasm]] · [[dec-laterite-types-leaf]] · [[dec-ags4-merge-semantics]]
+[[crate-map]] · [[laterite-ags4-core]] · [[laterite-ags4-wasm]] · [[dec-laterite-ags4-types-leaf]] · [[dec-ags4-merge-semantics]]

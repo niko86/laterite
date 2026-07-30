@@ -6,7 +6,7 @@ tags: [design, decision]
 decided: "2026-07-18"
 supersedes: []
 from_gap: []
-related: [dec-laterite-types-leaf, crate-map, crate-dependency-graph, laterite-ags4-corpus-qa, data-single-source-audit, laterite-ags4-wasm, dec-ags4-merge-semantics]
+related: [dec-laterite-ags4-types-leaf, crate-map, crate-dependency-graph, laterite-ags4-corpus-qa, data-single-source-audit, laterite-ags4-wasm, dec-ags4-merge-semantics]
 sources: []
 ---
 
@@ -28,7 +28,7 @@ tokenizer to apply them: the corpus tool's private `parse_fields`/
 `emit_fields`, and the browser's `splitAgsFields`/`quoteAgsField`
 (`repo:web/src/lib/agsline.ts`). That private tokenizer was a **fourth**
 independent AGS4 line tokenizer, alongside the three `laterite-ags4-parse`
-had already converged onto ([[dec-laterite-types-leaf]], #168, #533) — exactly
+had already converged onto ([[dec-laterite-ags4-types-leaf]], #168, #533) — exactly
 the drift shape the #527 cross-surface convergence arc exists to close.
 
 ## Options considered
@@ -39,7 +39,7 @@ the drift shape the #527 cross-surface convergence arc exists to close.
    they weren't as small as they looked, and a fourth private tokenizer is
    the exact anti-pattern #168/#533 spent two arcs eliminating.
 2. **Port the Rust logic to TypeScript, keeping two hand-synced copies.**
-   Rejected for the same reason [[dec-laterite-types-leaf]]'s Option 2 was:
+   Rejected for the same reason [[dec-laterite-ags4-types-leaf]]'s Option 2 was:
    guarantees drift the first time one side changes and the other doesn't.
 3. **Move the engine into `laterite-ags4-core` or `laterite-ags4-validator`.**
    Rejected: neither is wasm-clean (core carries `age`/`zstd`/`calamine`; the
@@ -47,7 +47,7 @@ the drift shape the #527 cross-surface convergence arc exists to close.
    from a browser surface would re-import wasm-hostile deps or force every
    Anonymiser call through the full engine bundle regardless.
 4. **Extract a dedicated leaf**, the same shape as `laterite-ags4-parse`
-   (#168), `laterite-types` (this decision), `laterite-ags4-diff` (#204) and
+   (#168), `laterite-ags4-types` (this decision), `laterite-ags4-diff` (#204) and
    `laterite-ags4-merge`: wasm-clean, depending only on other already
    wasm-clean leaves.
 
@@ -64,7 +64,7 @@ scrub actions (filehash / pseudonym / blank / token / brackets), the two-pass
 per-heading pseudonym map, custom group/column/orphan-def dropping, and the
 ABBR-of-sensitive tokenisation. Deps — all already wasm-clean:
 `laterite-ags4-parse` (tokenizes via the shared `scan_line`, retiring the
-corpus tool's own private tokenizer), `laterite-types` (`quote_field`
+corpus tool's own private tokenizer), `laterite-ags4-types` (`quote_field`
 re-quoting scrubbed cells), `laterite-ags4-reference` (standard group/heading
 codes for `drop_custom`, off the dictionary SSOT rather than a re-embedded
 copy of `ags_dictionary.json`). `laterite-ags4-corpus-qa` now depends ON the leaf and
@@ -98,7 +98,7 @@ selection collapsed to heading **codes** so a pseudonym for a shared code
 stays consistent across groups (`Policy::retain_codes` takes codes, not
 group/heading pairs). `agsline.ts`'s `splitAgsFields`/`quoteAgsField` are
 untouched — they stay for the browser's own GROUP-block/alignment DISPLAY
-use, per [[dec-laterite-types-leaf]]'s description of what `agsline.ts`
+use, per [[dec-laterite-ags4-types-leaf]]'s description of what `agsline.ts`
 keeps; the scrub tokenizer was always the leaf's `laterite-ags4-parse`
 dependency, never `agsline.ts`.
 
@@ -122,7 +122,7 @@ ABBR-of-sensitive tokenisation, neither of which the browser had. So Phase 1
 makes the Rust engine the single authority, and Phase 2 is the browser
 *gaining* capability (structural scrub, preserved line endings, full 64-hex),
 not losing anything — the same "engine is the ground truth, surfaces adopt
-it" shape [[dec-laterite-types-leaf]] and [[dec-ags4-merge-semantics]]
+it" shape [[dec-laterite-ags4-types-leaf]] and [[dec-ags4-merge-semantics]]
 already established, applied to a different feature.
 
 ## Behaviour reconciliations (four decisions)
@@ -153,7 +153,7 @@ behaviours that had never been directly compared before:
    the tokenizer/quoter specifically because that pair is needed
    synchronously on every keystroke of the inline line editor — loading the
    6.9 MB engine wasm for that would be the wrong trade
-   ([[dec-laterite-types-leaf]]'s "B-tiny" framing). Censor has no such
+   ([[dec-laterite-ags4-types-leaf]]'s "B-tiny" framing). Censor has no such
    latency constraint: the Anonymiser's Download button is a one-shot,
    per-file, already-async action, so Phase 2 reaches `laterite-ags4-censor`
    through the engine wasm ([[laterite-ags4-wasm]]) that Anonymiser's
@@ -203,7 +203,7 @@ graph TD
 graph TD
   parse[laterite-ags4-parse] --> censor[laterite-ags4-censor]
   reference[laterite-ags4-reference] --> censor
-  types[laterite-types] --> censor
+  types[laterite-ags4-types] --> censor
   ssot[sensitive_headings.json SSOT] -. Policy::from_sensitive_json .-> censor
   censor --> corpusqa[laterite-ags4-corpus-qa]
   censor --> wasm[laterite-ags4-wasm]
@@ -212,6 +212,6 @@ graph TD
 
 ## Related
 
-[[dec-laterite-types-leaf]] · [[crate-map]] · [[crate-dependency-graph]] ·
+[[dec-laterite-ags4-types-leaf]] · [[crate-map]] · [[crate-dependency-graph]] ·
 [[laterite-ags4-corpus-qa]] · [[data-single-source-audit]] · [[laterite-ags4-wasm]] ·
 [[dec-ags4-merge-semantics]]

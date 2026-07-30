@@ -12,7 +12,7 @@
 //! diverge (truncation direction, the i64 range guard, inf/NaN, f64-precision
 //! boundaries) plus every column of the forge fixture (self-skips if absent).
 //!
-//! Run: `cargo test -p laterite-types --features arrow --test typed_build_parity`
+//! Run: `cargo test -p laterite-ags4-types --features arrow --test typed_build_parity`
 #![cfg(feature = "arrow")]
 
 use std::path::PathBuf;
@@ -26,8 +26,8 @@ use arrow::datatypes::{DataType, TimeUnit};
 use arrow::util::display::{ArrayFormatter, FormatOptions};
 use serde_json::Value;
 
-use laterite_types::arrow_cols::build_column;
-use laterite_types::{CanonicalType, canonical_type, parse_datetime, parse_value};
+use laterite_ags4_types::arrow_cols::build_column;
+use laterite_ags4_types::{CanonicalType, canonical_type, parse_datetime, parse_value};
 
 /// The pre-T3 per-cell build — the semantic reference `build_column` must match.
 /// Deliberately a straight transcription of the old arms so a future change to

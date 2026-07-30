@@ -1,9 +1,9 @@
 // "Why is this column typed as X?" — a plain-English description of an AGS4
 // TYPE code for the Explore "Analyse" view. The human DESCRIPTIONS here are
 // web-authored display prose: this file is their home — they live nowhere else
-// (laterite-types holds the type *classification*, not these glosses). The
+// (laterite-ags4-types holds the type *classification*, not these glosses). The
 // CATEGORY each code falls in (numeric / date / pick-list / text) tracks
-// `laterite-types::canonical_type`, the gated authority for the actual in-browser
+// `laterite-ags4-types::canonical_type`, the gated authority for the actual in-browser
 // DuckDB column type. A drift test (agsTypeInfo.test.ts) pins every AGS type code
 // in the dictionary to a real description, so a newly-added code can't silently
 // fall back to "text".

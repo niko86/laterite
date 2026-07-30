@@ -7,7 +7,7 @@
 # cross-surface convergence arc, the sibling of the #533 tokenizer/quoter work.
 #
 # A wasm-clean leaf by construction: it tokenizes via the shared parse leaf
-# (`tokenize_spans`), re-quotes via `laterite-types` (`quote_field`), and reads
+# (`tokenize_spans`), re-quotes via `laterite-ags4-types` (`quote_field`), and reads
 # the standard-code set from the reference leaf — the same three leaves the
 # engine wasm already carries. No FS, no rayon, no CLI: the crawler/manifest/
 # report wrapper stays in `ags4-corpus-qa`, which now depends ON this leaf.
@@ -31,7 +31,7 @@ laterite-ags4-reference = { path = "../laterite-ags4-reference" }
 # Canonical AGS4 field quoting for re-emitted (scrubbed / column-dropped) cells:
 # `quote_field` — the quoter authority (#528/#533 Decision C). Default features
 # (arrow off) keep this leaf light + wasm-clean.
-laterite-types = { path = "../laterite-types" }
+laterite-ags4-types = { path = "../laterite-ags4-types" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

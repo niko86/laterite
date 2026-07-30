@@ -8,7 +8,7 @@
 # packages/laterite/pyproject.toml [tool.maturin]).
 #
 # Boundary shape (1.0 phase 1): the READ path emits typed Apache Arrow per
-# group — Rust builds the RecordBatch (laterite-types::arrow_cols) and hands it
+# group — Rust builds the RecordBatch (laterite-ags4-types::arrow_cols) and hands it
 # over zero-copy as an Arrow PyCapsule via pyo3-arrow, which polars ingests
 # pyarrow-free. This is abi3-safe (the Arrow C Data Interface + capsules,
 # NOT the pyo3-polars ABI coupling the design doc flagged) so the single
@@ -77,7 +77,7 @@ laterite-ags4-merge = { path = "../laterite-ags4-merge" }
 # Direct dep for the shared typed-Arrow column builder (`arrow_cols`, behind
 # the `arrow` feature). Phase 1 of the 1.0 redesign emits typed Arrow per
 # group on the read path — the SAME emitter the wasm explorer frames as IPC.
-laterite-types = { path = "../laterite-types", features = ["arrow"] }
+laterite-ags4-types = { path = "../laterite-ags4-types", features = ["arrow"] }
 # arrow 59 (matching pyo3-arrow 0.18) for the emit *consume* direction:
 # read each cell out of the RecordBatch DuckDB streams in. ArrayFormatter
 # (default features) is the robust fallback for temporal/decimal columns.
@@ -88,7 +88,7 @@ arrow = "59"
 # The floor is 3.12, not lower, because the generated #[pyclass(dict)] classes
 # need the 3.12 limited API (`dict` isn't exposed below it). Proven on
 pyo3 = { version = "0.29", features = ["extension-module", "chrono", "abi3-py312"] }
-# Zero-copy Arrow boundary for the read path: wraps the RecordBatch laterite-types
+# Zero-copy Arrow boundary for the read path: wraps the RecordBatch laterite-ags4-types
 # builds and hands it to Python as an Arrow PyCapsule (PyTable ->
 # __arrow_c_stream__), which polars ingests pyarrow-free. arrow 59 + pyo3 0.29
 # match our pins; the capsule protocol is the Arrow C Data Interface (NOT the

@@ -126,7 +126,7 @@ jobs:
               - 'tools/wheel_smoke.py'   # the wheel-smoke job's post-install smoke (#554)
             node:
               # The napi addon links sibling crates — laterite-ags4-validator,
-              # laterite-types, laterite-ags4-emit (see laterite-node/Cargo.toml) —
+              # laterite-ags4-types, laterite-ags4-emit (see laterite-node/Cargo.toml) —
               # so a change to ANY of them rebuilds + can break the node addon.
               # Watching only laterite-node/** silently SKIPPED the node job on a
               # dependency change (a validator/types/emit edit ran rust + python but
@@ -583,7 +583,7 @@ jobs:
         # `--features` is load-bearing, not decoration. The `arrow` feature is
         # enabled ONLY by the four crates excluded here, and resolver-2 unifies
         # features across the SELECTED packages only — so without this flag
-        # `laterite-types::{arrow_cols, ipc}` and `laterite-ags4-emit::arrow_in`
+        # `laterite-ags4-types::{arrow_cols, ipc}` and `laterite-ags4-emit::arrow_in`
         # are `#[cfg]`-ed out and their tests never compile, let alone run. That
         # is the Arrow boundary that ships inside the wheel and the node binding.
         run: |
@@ -592,7 +592,7 @@ jobs:
             --exclude laterite-ags4-tokenizer-wasm \
             --exclude laterite-py \
             --exclude laterite-node \
-            --features laterite-ags4-emit/arrow,laterite-types/arrow
+            --features laterite-ags4-emit/arrow,laterite-ags4-types/arrow
 
       - name: sccache stats
         if: always()

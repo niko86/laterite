@@ -1,6 +1,6 @@
 ---
 type: decision
-title: "laterite-types as a wasm-safe leaf crate (one casting source for native + browser)"
+title: "laterite-ags4-types as a wasm-safe leaf crate (one casting source for native + browser)"
 status: accepted
 tags: [design, decision]
 decided: 2026-05-30
@@ -10,12 +10,12 @@ related: [validator-site, dec-rust-drives-python, laterite-ags4-check, DT, 0DP, 
 sources: []
 ---
 
-# laterite-types as a wasm-safe leaf crate
+# laterite-ags4-types as a wasm-safe leaf crate
 
 ## Context
 The AGS type system — `canonical_type(code)`, `parse_value(raw, code)`,
 `ags4_str`, the `CanonicalType` enum and SQL-type mapping
-(`repo:rust-packages/laterite-types/src/lib.rs`) — was a module inside
+(`repo:rust-packages/laterite-ags4-types/src/lib.rs`) — was a module inside
 `laterite-ags4-core` (`ags_types.rs`). `laterite-ags4-core` is DuckDB-free but still
 heavy: it carries `age`, `zstd`, `calamine`, `rust_xlsxwriter`, `csv`,
 `rpassword` — none of which belong in (or cross-compile cleanly to) a
@@ -42,16 +42,16 @@ wasm-hostile deps.
 4. **Extract a tiny leaf crate both sides depend on.**
 
 ## Decision
-Option 4. Extract the type system into a leaf crate **`laterite-types`** with
+Option 4. Extract the type system into a leaf crate **`laterite-ags4-types`** with
 a deliberately minimal, wasm-safe dependency set: `chrono`
 (`default-features = false`, `features = ["std"]` — no `clock`, no
 `wasmbind`) and `serde_json`. `laterite-ags4-core` keeps the module path working
-via a re-export — `pub use laterite_types as ags_types;`
+via a re-export — `pub use laterite_ags4_types as ags_types;`
 (`repo:rust-packages/laterite-ags4-core/src/lib.rs`) — so every existing consumer
 (`ddl.rs`, `ags5db`'s convert/query/spec_tables, the `ags5db::ags_types`
 second-hop re-export, `laterite-py`) compiles unchanged. Both the native
 engine (`laterite-ags4-core` → `ags5db`) and the browser explorer (`laterite-ags4-wasm`)
-now depend on the **same** `laterite-types`.
+now depend on the **same** `laterite-ags4-types`.
 
 Typed parsers ride alongside `parse_value`. `parse_datetime(s) ->
 Option<NaiveDateTime>` came first — the *typed* datetime the Arrow
@@ -70,7 +70,7 @@ nDP / nSF / nSCI arms became `format_ndp` / `format_nsf` / `format_nsci`
 engine re-export those instead of the hand-port they carried — so the
 formatter that *judges* a typed value is the same one that *writes* it.
 `ags4_str` keeps its separate truncating `0DP` path in front of the nDP arm;
-that stays deliberate. The validator gained a direct `laterite-types` edge for
+that stays deliberate. The validator gained a direct `laterite-ags4-types` edge for
 this at zero build cost — it was already transitive via
 [[laterite-ags4-reference]], and the generated [[crate-dependency-graph]]
 records its transitive count unmoved (3) while direct deps went 2→3.
@@ -83,10 +83,10 @@ convergence arc): `write_quoted_field<W: Write>`/`quote_field`, added beside
 `ags4_str` — the inverse of a tokenizer's inner-value unescape, and the single
 authority for AGS4 field quoting (wrap in `"…"`, double an embedded `"`,
 Rule-1 escaping). Its **home** was itself a small ultracode-panel decision:
-Option C, `laterite-types` next to `ags4_str`, over the alternatives (a new
+Option C, `laterite-ags4-types` next to `ags4_str`, over the alternatives (a new
 standalone quoting crate, or leaving it hand-copied per surface) — it adds
 **zero new dependency edges** (`laterite-ags4-emit` already depends on
-`laterite-types`) and matches the #528 precedent directly above: the sibling
+`laterite-ags4-types`) and matches the #528 precedent directly above: the sibling
 value→AGS4-string formatter already lives here, so the field-level wire-form
 authority does too. `laterite-ags4-emit`'s byte-faithful `writer.rs::write_row`
 now streams every cell through `write_quoted_field` instead of its own inline
@@ -99,7 +99,7 @@ The browser reaches both new primitives — `laterite-ags4-parse::scan::scan_lin
 ported verbatim from the hand-written TS state machine that used to live in
 `web/src/lib/agsline.ts`) and `quote_field` — through a **new, deliberately
 tiny** wasm crate, `laterite-ags4-tokenizer-wasm` (deps: `laterite-ags4-parse`
-+ `laterite-types` only, both already wasm-safe). This is "approach B-tiny" in
++ `laterite-ags4-types` only, both already wasm-safe). This is "approach B-tiny" in
 #533's own framing: a dedicated tiny cdylib (~30 KB / ~13 KB gzipped, proven by
 a size gate — `repo:web/scripts/check-wasm-tokenizer-size.mjs`), not gating the
 old TS copy behind a value-gate case and not calling the 6.9 MB engine wasm
@@ -123,7 +123,7 @@ the engine wasm, retiring its hand-written TS scrub. See
 ## Why
 One source of truth for typing, shared by the shipped engine and the
 browser. `laterite-ags4-wasm`'s `parse()` and `ags5db`'s `convert` both call
-`laterite-types::{canonical_type, parse_value, parse_datetime}` off the
+`laterite-ags4-types::{canonical_type, parse_value, parse_datetime}` off the
 file's TYPE row, so the explorer casts a file **identically** to a
 `.ags5db` — parity by construction, not by a fragile second
 implementation.
@@ -134,11 +134,11 @@ implementation.
 > the wasm runtime, so no `js`-feature workaround is needed.
 
 ## Consequences
-- Commits the toolchain to `laterite-types` as the canonical typing crate;
+- Commits the toolchain to `laterite-ags4-types` as the canonical typing crate;
   `concepts` and tool pages that cited `ags5db/src/ags_types.rs` now
-  point at `laterite-types/src/lib.rs`.
+  point at `laterite-ags4-types/src/lib.rs`.
 - Non-breaking: the `pub use` keeps `laterite_ags4_core::ags_types`;
-  `laterite-types`/`laterite-ags4-core`/`ags5db` cargo suites stay green.
+  `laterite-ags4-types`/`laterite-ags4-core`/`ags5db` cargo suites stay green.
 - Allowlist + workspace/rewriter headers updated for the new crate
   (`tools/release/public-allowlist.txt`,
   `tools/release/rewrite-internal-refs.sh`).
@@ -159,12 +159,12 @@ graph TD
   core -. needs ags_types but<br/>can't take the deps .-> wasm
 ```
 
-**After** — `laterite-types` is a leaf both the native engine and the browser
+**After** — `laterite-ags4-types` is a leaf both the native engine and the browser
 explorer depend on; `laterite-ags4-core` re-exports it as `ags_types`:
 
 ```mermaid
 graph TD
-  types["laterite-types<br/>chrono + serde_json (wasm-safe)"]
+  types["laterite-ags4-types<br/>chrono + serde_json (wasm-safe)"]
   core["laterite-ags4-core<br/>age, zstd, calamine, csv"]
   db["ags5db (+ DuckDB)"]
   laterite["laterite-py"]

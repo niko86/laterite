@@ -33,7 +33,7 @@ the bundled `ags_dictionary.json` / `rules_meta.json` JSON, single-sourced in
 one wasm-safe crate — the multi-edition dictionary registry, the per-edition
 `phf`-compiled dictionary projection, and the rules-catalogue data accessors.
 "Leaf" names its position, not its dep count: it is **not dependency-free** —
-it takes `laterite-types` for `keychain`, which is why #550's engine-fingerprint
+it takes `laterite-ags4-types` for `keychain`, which is why #550's engine-fingerprint
 walk must recurse *through* it to reach that crate. The page said
 "dependency-free" until #557; it was one of six hand-copied copies of a claim
 that stopped being true when the types edge landed, and nothing compared any of
@@ -152,7 +152,7 @@ module, `overlay` (`repo:rust-packages/laterite-ags4-reference/src/overlay.rs`
 `Layered { base: BundledDict, delta: &'a OwnedDelta }`, still `Copy` since
 both arms are refs/statics — so every existing `dict: Dictionary` call site
 is unaffected. This is a NEW workspace-crate dependency: `laterite-ags4-parse`
-joins `laterite-types` as the leaf's second edge (`dict_read.rs` reuses the
+joins `laterite-ags4-types` as the leaf's second edge (`dict_read.rs` reuses the
 shared tokenizer rather than a second parser); both are wasm-clean sibling
 leaves, so the reference leaf stays wasm-safe. See [[dec-custom-dict-overlay]].
 
