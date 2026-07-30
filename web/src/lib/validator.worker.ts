@@ -389,19 +389,38 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
       const out = merge(
         new Uint8Array(req.aBytes),
         new Uint8Array(req.bBytes),
-        req.encoding,
-        req.onTypeClash,
-        req.tran ?? undefined,
+        {
+          encoding: req.encoding,
+          onTypeClash: req.onTypeClash,
+          tran: req.tran ?? undefined,
+        },
       );
-      const buf = out.bytes.slice().buffer;
+      // `MergeResult` is a wasm-owned handle: read every getter, then free it.
+      // This branch was the ONLY one that never did — the dataset at :342 and
+      // the Excel result at :486 both free theirs — so every merge leaked its
+      // handle for the life of the worker. A merge tool is used repeatedly by
+      // design (that is what merging deliveries IS), so the leak grew with use.
+      // `finally`, because a getter throwing must not turn a leak into the
+      // second bug of the session.
+      let outBytes: Uint8Array;
+      let warningsJson: string;
+      let revisionsJson: string;
+      try {
+        outBytes = out.bytes;
+        warningsJson = out.warnings_json;
+        revisionsJson = out.revisions_json;
+      } finally {
+        out.free();
+      }
+      const buf = outBytes.slice().buffer;
       reply(
         {
           id: req.id,
           ok: true,
           kind: "mergeResult",
           bytes: buf,
-          warningsJson: out.warnings_json,
-          revisionsJson: out.revisions_json,
+          warningsJson,
+          revisionsJson,
         },
         [buf],
       );

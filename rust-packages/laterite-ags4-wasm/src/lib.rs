@@ -358,19 +358,6 @@ impl TranInput {
     }
 }
 
-/// The JS→Rust shim for the exports that still take `tran` positionally.
-fn tran_from_js(v: Option<JsValue>) -> Result<Option<laterite_ags4_emit::TranStamp>, JsError> {
-    // `Option<JsValue>` rather than bare `JsValue` so wasm-bindgen emits
-    // `tran?: any` — omitting the stamp is the common case (no TRAN, Rule 14
-    // reports the gap) and should not require passing `undefined` by hand.
-    let Some(v) = v.filter(|v| !v.is_undefined() && !v.is_null()) else {
-        return Ok(None);
-    };
-    let t: TranInput = serde_wasm_bindgen::from_value(v)
-        .map_err(|e| JsError::new(&format!("invalid tran: {e}")))?;
-    t.fold().map_err(|m| JsError::new(&m))
-}
-
 /// `build_ags4` / `build_ags4_ipc`'s named options.
 ///
 /// `tran` is a NESTED struct rather than a `JsValue`, so serde builds it
@@ -1464,7 +1451,9 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
 
 #[cfg(test)]
 mod options_tests {
-    use super::{BuildOptions, CertifyOptions, ValidateOptions, WasmOptions, unknown_key};
+    use super::{
+        BuildOptions, CertifyOptions, MergeOptions, ValidateOptions, WasmOptions, unknown_key,
+    };
 
     /// `KEYS` must name exactly the struct's own serde fields.
     ///
@@ -1503,6 +1492,7 @@ mod options_tests {
         assert_keys_match::<ValidateOptions>();
         assert_keys_match::<CertifyOptions>();
         assert_keys_match::<BuildOptions>();
+        assert_keys_match::<MergeOptions>();
     }
 
     /// A misspelled key is REFUSED, by name, with a suggestion.
@@ -2040,27 +2030,81 @@ impl MergeResult {
     }
 }
 
-/// Merge two AGS4 deliveries of one project into one file (`a` then `b` — `b`
-/// wins a KEY conflict). Rows are matched by their dictionary KEY headings. A
-/// heading the two files typed differently is a `JsError` unless `on_type_clash`
-/// settles it — `"widen"` falls back to `X` (raw values kept), `"promote"` keeps the
-/// greatest nDP precision (zero-padding the coarser values). A complete `tran`
-/// object stamps a synthesised merge-TRAN; omit it and TRAN is reconciled like
-/// any other group. The edition is `b`'s `TRAN_AGS`, falling back to the standard.
-#[wasm_bindgen]
-pub fn merge(
-    a: &[u8],
-    b: &[u8],
-    encoding_label: Option<String>,
+/// `merge`'s named options.
+///
+/// `encoding` rather than `encodingLabel`: every other surface calls this
+/// concept `encoding`, and the browser was the only one carrying the `_label`
+/// suffix. See the README's note on which exports still take it positionally —
+/// the ones not yet migrated keep the old name until they are, so the split is
+/// a recorded state rather than an accident.
+#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(serde::Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+struct MergeOptions {
+    encoding: Option<String>,
     on_type_clash: Option<String>,
-    // One object, same shape as `build_ags4`'s: `{ issue, date, producer,
-    // recipient, status, description?, remarks? }`.
-    tran: Option<JsValue>,
-) -> Result<MergeResult, JsError> {
+    tran: Option<TranInput>,
+}
+
+impl WasmOptions for MergeOptions {
+    const KEYS: &'static [&'static str] = &["encoding", "onTypeClash", "tran"];
+    const WHAT: &'static str = "merge options";
+}
+
+#[wasm_bindgen(typescript_custom_section)]
+const TS_MERGE_OPTIONS: &'static str = r#"
+/** Named options for `merge`. */
+export interface MergeOptions {
+  /** `"utf-8"` (default) or `"windows-1252"`, applied to BOTH inputs. */
+  encoding?: "utf-8" | "windows-1252";
+  /** What to do when two files declare a different AGS TYPE for one heading.
+   *  `"error"` (default) refuses; `"widen"` falls back to `X`, keeping raw
+   *  values but discarding the type; `"promote"` keeps the greatest `nDP`
+   *  precision, zero-padding the coarser values. */
+  onTypeClash?: "error" | "widen" | "promote";
+  /** The transmission the MERGED file represents — it genuinely is a new one.
+   *  Omit it and `TRAN` is reconciled like any other group (newest wins), with
+   *  a warning noting no merge-transmission stamp was supplied.
+   *
+   *  `remarks` is APPENDED to merge's own provenance note ("Merged from N
+   *  deliveries: …") rather than replacing it: both are true of the result. */
+  tran?: TranStamp;
+}
+"#;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "MergeOptions")]
+    pub type MergeOptionsJs;
+}
+
+/// Merge two AGS4 deliveries of one project into one file (`a` then `b` — `b`
+/// wins a KEY conflict). Rows are matched by their dictionary KEY headings.
+///
+/// * `opts` — a [`MergeOptions`] object; every field optional, so
+///   `merge(a, b)` is a complete call. An unrecognised key is refused by name.
+///
+/// A heading the two files typed differently is a `JsError` unless
+/// `onTypeClash` settles it. A complete `tran` stamps a synthesised merge-TRAN;
+/// omit it and TRAN is reconciled like any other group, with a warning. The
+/// edition is `b`'s `TRAN_AGS`, falling back to the standard.
+///
+/// The returned [`MergeResult`] is a wasm-owned handle: read its getters and
+/// call `.free()`. The web worker leaked one per merge until this was written
+/// down here.
+#[wasm_bindgen]
+pub fn merge(a: &[u8], b: &[u8], opts: Option<MergeOptionsJs>) -> Result<MergeResult, JsError> {
     use laterite_ags4_merge::{MergeOpts, TypeClashMode, merge_parsed};
 
     console_error_panic_hook::set_once();
-    let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
+    let o: MergeOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    let tran = o
+        .tran
+        .map(TranInput::fold)
+        .transpose()
+        .map_err(|m| JsError::new(&m))?
+        .flatten();
+    let encoding = resolve_encoding(o.encoding.as_deref()).map_err(|m| JsError::new(&m))?;
     let pa =
         parse_bytes(a, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
     let pb =
@@ -2071,14 +2115,10 @@ pub fn merge(
         .map(|(dv, _)| dv)
         .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
 
-    // All five or none — the shared rule, in the shared place. `ags` is merge's
-    // to fill from `dv` (resolved just above); a caller-stated edition could
-    // only contradict the file merge is about to write.
-    let tran = tran_from_js(tran)?;
-
     // One vocabulary for every surface: accepted tokens + rejection message come
     // from the merge crate's FromStr, so the browser cannot drift from the CLI.
-    let clash: TypeClashMode = on_type_clash
+    let clash: TypeClashMode = o
+        .on_type_clash
         .as_deref()
         .unwrap_or("error")
         .parse()
