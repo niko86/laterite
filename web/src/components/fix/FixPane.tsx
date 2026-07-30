@@ -9,6 +9,7 @@ import {
 import { fileStore } from "../../lib/fileStore";
 import { computeFixes, applyFixes, validate } from "../../lib/validatorClient";
 import type { Fix, ValidationReport } from "../../lib/validator";
+import { severityOf } from "../../lib/validator";
 import type { Severity } from "../validate/FilterBar";
 import {
   dictVersion,
@@ -51,7 +52,7 @@ function buildSevIndex(report: ValidationReport | undefined): SevIndex {
   if (report)
     for (const g of report.findings)
       for (const it of g.items) {
-        const s = it.severity ?? "warning";
+        const s = severityOf(it);
         if (it.line != null) {
           const k = `${g.rule}|${it.line}`;
           const prev = byRuleLine.get(k);
@@ -96,7 +97,11 @@ export const FixPane: Component = () => {
     (src) => validate(src.b, src.dict, true, src.enc, null),
   );
   const sevIndex = createMemo(() => buildSevIndex(report()));
-  const severityOf = (f: Fix): Severity => fixSeverity(sevIndex(), f);
+  // Named for its argument: this resolves a FIX's severity (by looking up the
+  // finding it came from), distinct from `severityOf`, which resolves a
+  // finding's own. The two used to share a name, and the shadowing hid which
+  // was which at each call site.
+  const fixSeverityOf = (f: Fix): Severity => fixSeverity(sevIndex(), f);
   // Whether any safe fix also resolves an FYI advisory tied to the same issue
   // (e.g. the Rule 1 BOM strip clears both the Rule 1 finding AND its
   // "FYI (Related to Rule 1)" sibling). Drives the one-line explainer below so
@@ -107,9 +112,7 @@ export const FixPane: Component = () => {
     if (!r) return false;
     const rulesWithFyi = new Set(
       r.findings
-        .filter((g) =>
-          g.items.some((it) => (it.severity ?? "warning") === "fyi"),
-        )
+        .filter((g) => g.items.some((it) => severityOf(it) === "fyi"))
         .map((g) => g.rule),
     );
     // The BOM's FYI is filed under a sibling "FYI (Related to Rule 1)" rule, so
@@ -397,7 +400,7 @@ export const FixPane: Component = () => {
             onToggle={toggleFix}
             onApply={(sel) => void applySelected(sel)}
             aligned={aligned}
-            severityOf={severityOf}
+            severityOf={fixSeverityOf}
           />
         </Show>
 

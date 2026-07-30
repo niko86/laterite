@@ -1,10 +1,14 @@
 import { For, Show, createMemo, type Component } from "solid-js";
-import type { FindingDto, ValidationReport } from "../../lib/validator";
+import type { Severity, ValidationReport } from "../../lib/validator";
+import { severityOf } from "../../lib/validator";
 import { shortRule } from "../../lib/rules";
 import { Disclosure } from "../Disclosure";
 import { createMediaQuery } from "../../lib/media";
 
-export type Severity = NonNullable<FindingDto["severity"]>;
+// Re-exported so the many components that import `Severity` from here keep
+// working. The definition lives with `severityOf` in lib/validator, because the
+// resolved union and the resolver have to agree.
+export type { Severity } from "../../lib/validator";
 
 /** Filter state lives in ParentPane and is threaded in/out here, mirroring
  *  how `aligned` is threaded. A muted rule/severity/group is one NOT present
@@ -48,7 +52,7 @@ export const FilterBar: Component<{
     const counts = new Map<Severity, number>();
     for (const g of props.report.findings) {
       for (const f of g.items) {
-        const s = f.severity ?? "warning";
+        const s = severityOf(f);
         counts.set(s, (counts.get(s) ?? 0) + 1);
       }
     }

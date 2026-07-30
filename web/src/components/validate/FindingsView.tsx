@@ -8,7 +8,12 @@ import {
   type JSX,
 } from "solid-js";
 import { createVirtualizer } from "@tanstack/solid-virtual";
-import type { FindingDto, ValidationReport } from "../../lib/validator";
+import type {
+  FindingDto,
+  Severity,
+  ValidationReport,
+} from "../../lib/validator";
+import { severityOf } from "../../lib/validator";
 import { ruleAnchor, shortRule } from "../../lib/rules";
 import { Chevron } from "../Chevron";
 import {
@@ -43,9 +48,13 @@ function snippet(
   return out;
 }
 
-/** Hit-row band background, keyed off severity (falls back to the
- *  historical amber when severity is absent). */
-function severityBand(severity: FindingDto["severity"]): string {
+/** Hit-row band background, keyed off the RESOLVED severity.
+ *
+ *  This used to take the raw wire field and fall back to amber when it was
+ *  absent — which painted every error in the warning colour, because absent is
+ *  exactly what an error looks like on the wire. Taking `Severity` makes the
+ *  switch exhaustive, so there is no fallback arm left to be wrong. */
+function severityBand(severity: Severity): string {
   switch (severity) {
     case "error":
       return "bg-rose-500/10";
@@ -53,8 +62,6 @@ function severityBand(severity: FindingDto["severity"]): string {
       return "bg-amber-500/10";
     case "fyi":
       return "bg-accent/10";
-    default:
-      return "bg-amber-500/10";
   }
 }
 
@@ -184,7 +191,7 @@ const FindingRow: Component<{
                       <div
                         class="min-w-max"
                         classList={{
-                          [severityBand(props.f.severity)]: row.hit,
+                          [severityBand(severityOf(props.f))]: row.hit,
                         }}
                       >
                         <span class="mr-3 inline-block w-10 select-none text-right text-fg-dim">
@@ -202,7 +209,7 @@ const FindingRow: Component<{
                       <div
                         class="min-w-max"
                         classList={{
-                          [severityBand(props.f.severity)]: row.hit,
+                          [severityBand(severityOf(props.f))]: row.hit,
                         }}
                       >
                         <span class="mr-3 inline-block w-10 select-none text-right text-fg-dim">
@@ -231,7 +238,7 @@ const FindingRow: Component<{
                   <div
                     class="min-w-max"
                     classList={{
-                      [severityBand(props.f.severity)]: row.hit,
+                      [severityBand(severityOf(props.f))]: row.hit,
                     }}
                   >
                     <span class="mr-3 inline-block w-10 select-none text-right text-fg-dim">

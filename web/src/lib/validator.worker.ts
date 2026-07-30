@@ -343,7 +343,7 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
       const ds = read(new Uint8Array(req.bytes), req.encoding);
       dataset = ds;
       const groups: GroupMeta[] = ds.group_codes().map((code) => {
-        const m = ds.meta(code) as Omit<GroupMeta, "code"> | null;
+        const m = ds.meta(code);
         return m
           ? { code, ...m }
           : { code, headings: [], units: [], types: [], sql_types: [] };
@@ -439,7 +439,7 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
         req.token,
         req.dropCustom,
         req.includeFreetext,
-      ) as { text: string; tally: CensorTally };
+      );
       reply({
         id: req.id,
         ok: true,
@@ -468,10 +468,13 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
       // (Under the old positional signature these were slots 4 and 5, unpassed
       // and therefore invisible — the options object at least makes their
       // absence something you can see.)
+      // No cast: `build_ags4` is typed `BuildReport` by the crate now, and
+      // `ExportResult` is an alias onto it. The old `as ExportResult` was
+      // asserting a shape nothing checked, over a return typed `any`.
       const result = build_ags4(req.groupsJson, {
         dictVersion: req.edition ?? undefined,
         mode: req.mode,
-      }) as ExportResult;
+      });
       reply({ id: req.id, ok: true, kind: "toAgs4", result });
       return;
     }
@@ -531,7 +534,7 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
       maxPerRule: req.maxPerRule ?? undefined,
       dictionary: req.dictBytes ?? undefined,
       dictReplace: req.dictReplace ?? false,
-    }) as ValidationReport;
+    });
 
     if (req.gzip) {
       const bytes = await gzipBytes(JSON.stringify(report));

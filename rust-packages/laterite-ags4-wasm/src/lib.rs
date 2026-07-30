@@ -21,6 +21,30 @@ use laterite_ags4_validator::{
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
+/// Declare a block of TypeScript for the generated `.d.ts`, keeping a plain
+/// `const` copy the tests can read.
+///
+/// Both are needed, and the duplication is only apparent. wasm-bindgen's
+/// `typescript_custom_section` **consumes** the item it decorates — the const is
+/// gone by the time the rest of the crate compiles — and its parser matches on
+/// `syn::Lit::Str`, so it will not accept a reference to a const defined
+/// elsewhere. Emitting the same literal token into both positions from one
+/// `$src` is what lets `ts_result_shape_tests` read the exact string that ships,
+/// rather than a second copy that could drift from it.
+///
+/// The readable copy is `#[cfg(test)]`: nothing but the tests reads it, so
+/// outside them it is dead weight in a binary whose whole point is being small.
+macro_rules! ts_section {
+    ($(#[$meta:meta])* $name:ident, $section:ident, $src:literal) => {
+        $(#[$meta])*
+        #[cfg(test)]
+        const $name: &str = $src;
+
+        #[wasm_bindgen(typescript_custom_section)]
+        const $section: &'static str = $src;
+    };
+}
+
 /// One rule violation — mirrors the CLI's `{line, group, desc}` JSON,
 /// plus the additive rule-aware location/severity fields (omitted when
 /// unset so the base shape is unchanged). `target`/`severity` use
@@ -123,6 +147,90 @@ impl ValidationReport {
             revalidate_reason: None,
         }
     }
+}
+
+// The TS shapes for the results above. These used to be maintained by hand in
+// the *consumer* (`web/src/lib/validator.ts`), because wasm-bindgen types a
+// `JsValue` return as `any` — so every consumer had to re-describe the report
+// for itself, and a downstream browser consumer duly reported `build_ags4`
+// returning `any` as a defect. Declaring them here makes the crate that
+// serialises the shape the crate that publishes it.
+//
+// Nothing in wasm-bindgen binds an interface written here to the serde struct
+// above it, so `ts_interfaces_match_the_serde_structs` does: it parses these
+// strings and compares field names against the structs' own serialised keys.
+// Without that this is prettier `any` — a second hand-maintained mirror, one
+// directory closer.
+ts_section! {
+    TS_VALIDATE_RESULT,
+    TS_VALIDATE_RESULT_SECTION,
+    r#"
+/** One rule violation. */
+export interface FindingDto {
+  /** 1-based source line, or `null` for a whole-file finding. */
+  line: number | null;
+  group: string;
+  desc: string;
+  /** Present only when the finding is narrower than a whole line. */
+  target?: "line" | "heading" | "cell" | "group";
+  /** Tag-stripped column index — the raw on-line field is `field_index + 1`,
+   *  because field 0 is the HEADING tag. */
+  field_index?: number;
+  heading?: string;
+  /** 1-based row ordinal *within the group*, distinct from `line`. */
+  data_row?: number;
+  /** Half-open `[start, end)` char offsets within the raw line. */
+  char_span?: [number, number];
+  /** **Absent means `"error"`.** The engine omits the field for errors rather
+   *  than writing it, so `severity === undefined` is the most severe case, not
+   *  a missing annotation. Read it as `severity ?? "error"`. */
+  severity?: "warning" | "fyi";
+}
+
+/** Findings for a single rule. */
+export interface RuleGroup {
+  rule: string;
+  /** True per-rule count, **before** any `maxPerRule` cap; `items.length` may
+   *  be smaller, which is why both exist. */
+  total: number;
+  items: FindingDto[];
+}
+
+/** An un-validatable input — not a rule violation. */
+export interface ValErr {
+  /** Stable machine token: `not_ags4` | `unsupported_edition` | `bad_args` | … */
+  kind: string;
+  message: string;
+}
+
+/** The whole result of a validation run. */
+export interface ValidationReport {
+  /** `error === null && finding_count === 0`. */
+  ok: boolean;
+  /** The bundled edition judged against (`"4.1.1"`, …); `""` on error. */
+  dict_version: string;
+  /** How that edition was chosen: `forced` | `exact` | `guessed` | `fallback`;
+   *  `""` on error. */
+  resolution: string;
+  /** True total across every rule, independent of any cap. */
+  finding_count: number;
+  /** How many findings were actually serialised (≤ `finding_count` when capped). */
+  shown_count: number;
+  findings: RuleGroup[];
+  error: ValErr | null;
+  /** Why a proffered `.ags.idx` cert did not stand in for the engine. **Always
+   *  `null` on this surface** — `validate` has no cert-consume door, so none is
+   *  ever offered to reject. Present so the report shape matches Python's
+   *  `Report.revalidate_reason` and Node's `revalidateReason`. */
+  revalidate_reason: string | null;
+}
+"#
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "ValidationReport")]
+    pub type ValidationReportJs;
 }
 
 /// Map a `ValidatorError` to a `(kind, message)`. In the wasm path only
@@ -275,6 +383,66 @@ struct BuildAgs4Report {
     findings: Vec<EmitFinding>,
     applied: Vec<AppliedFix>,
     fixes_applied: usize,
+}
+
+// `build_ags4` returning `any` is the specific defect a downstream browser
+// consumer reported: the call that produces a *file* told them nothing about
+// what it handed back, so `.text` was reached for on faith. Held by
+// `ts_interfaces_match_the_serde_structs`; the two enum unions are held by
+// `fix_unions_match_the_validators_enums`, which asks serde itself for the
+// authoritative variant list rather than trusting this comment.
+ts_section! {
+    TS_BUILD_RESULT,
+    TS_BUILD_RESULT_SECTION,
+    r#"
+/** A residual finding from an emit — what AutoFix could *not* resolve. */
+export interface EmitFinding {
+  rule: string;
+  line: number | null;
+  group: string;
+  desc: string;
+  /** **Absent means `"error"`** — see `FindingDto.severity`. */
+  severity?: "warning" | "fyi";
+}
+
+/** One fix the emit actually applied. Deliberately not the engine's proposed
+ *  `Fix`: the `edits` spans describe how a fix *would* be applied and say
+ *  nothing once it has been. */
+export interface AppliedFix {
+  kind: "normalize_crlf" | "strip_bom" | "strip_embedded_cr"
+      | "rename_duplicate_heading" | "insert_tran_dlim" | "insert_tran_rcon"
+      | "reformat_numeric" | "canonicalize_datetime" | "normalize_typography"
+      | "pad_short_row";
+  label: string;
+  /** The exact rule label (`"AGS Format Rule 8"`, …), for cross-linking back
+   *  to the originating finding. */
+  rule: string;
+  line: number | null;
+  /** `safe` rewrites are unambiguous from the file alone; `risky` ones guess
+   *  intent and are excluded from bulk apply. */
+  risk: "safe" | "risky";
+}
+
+/** The `build_ags4` / `build_ags4_ipc` result. */
+export interface BuildReport {
+  /** The AGS4 document: UTF-8, CRLF line endings. */
+  text: string;
+  /** Findings AutoFix did NOT resolve — residual, not everything found. */
+  findings: EmitFinding[];
+  /** The ledger of what AutoFix rewrote. Needed alongside `fixes_applied`
+   *  because AutoFix returns only residual findings: without it a caller can
+   *  say "3 fixes applied" but not which. */
+  applied: AppliedFix[];
+  /** `applied.length`, kept because it is the released shape. */
+  fixes_applied: number;
+}
+"#
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "BuildReport")]
+    pub type BuildReportJs;
 }
 
 fn emit_edition(s: Option<&str>) -> Result<DictVersion, String> {
@@ -588,7 +756,10 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
 /// ledger of what AutoFix rewrote (`{kind, label, rule, line, risk}` per fix —
 /// the same shape Python and Node present), `fixes_applied` its length.
 #[wasm_bindgen]
-pub fn build_ags4(groups_json: &str, opts: Option<BuildOptionsJs>) -> Result<JsValue, JsError> {
+pub fn build_ags4(
+    groups_json: &str,
+    opts: Option<BuildOptionsJs>,
+) -> Result<BuildReportJs, JsError> {
     console_error_panic_hook::set_once();
     let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
     let tran = o
@@ -605,7 +776,9 @@ pub fn build_ags4(groups_json: &str, opts: Option<BuildOptionsJs>) -> Result<JsV
         tran,
     )
     .map_err(|e| JsError::new(&e))?;
-    serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
+    serde_wasm_bindgen::to_value(&report)
+        .map(JsCast::unchecked_into)
+        .map_err(|e| JsError::new(&e.to_string()))
 }
 
 /// Build valid AGS4 from **columnar Arrow IPC** input — the same as
@@ -627,7 +800,7 @@ pub fn build_ags4_ipc(
     // columnar door exists to avoid. Only the OPTION tail moved.
     groups: JsValue,
     opts: Option<BuildOptionsJs>,
-) -> Result<JsValue, JsError> {
+) -> Result<BuildReportJs, JsError> {
     use wasm_bindgen::JsCast;
     console_error_panic_hook::set_once();
     let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
@@ -660,7 +833,9 @@ pub fn build_ags4_ipc(
         tran,
     )
     .map_err(|e| JsError::new(&e))?;
-    serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
+    serde_wasm_bindgen::to_value(&report)
+        .map(JsCast::unchecked_into)
+        .map_err(|e| JsError::new(&e.to_string()))
 }
 
 #[cfg(test)]
@@ -1115,7 +1290,7 @@ extern "C" {
 /// Returns a [`ValidationReport`] as a plain JS object (json-compatible:
 /// `None` → `null`, matching the CLI's `--json`).
 #[wasm_bindgen]
-pub fn validate(data: &[u8], opts: Option<ValidateOptionsJs>) -> JsValue {
+pub fn validate(data: &[u8], opts: Option<ValidateOptionsJs>) -> ValidationReportJs {
     console_error_panic_hook::set_once();
 
     // A bad option key is a caller mistake, and `run` already reports every
@@ -1131,7 +1306,8 @@ pub fn validate(data: &[u8], opts: Option<ValidateOptionsJs>) -> JsValue {
             let serializer = serde_wasm_bindgen::Serializer::json_compatible();
             return report
                 .serialize(&serializer)
-                .expect("ValidationReport is plain data and always serialises");
+                .expect("ValidationReport is plain data and always serialises")
+                .unchecked_into();
         }
     };
 
@@ -1142,6 +1318,7 @@ pub fn validate(data: &[u8], opts: Option<ValidateOptionsJs>) -> JsValue {
     report
         .serialize(&serializer)
         .expect("ValidationReport is plain data and always serialises")
+        .unchecked_into()
 }
 
 /// Mint a `.ags.idx` validity certificate, entirely client-side (#360). Returns the
@@ -1548,6 +1725,263 @@ mod options_tests {
     }
 }
 
+/// The result interfaces published in the `typescript_custom_section` blocks are
+/// hand-written strings. wasm-bindgen copies them into the `.d.ts` verbatim and
+/// never compares them to the Rust structs they claim to describe — so on their
+/// own they are a second hand-maintained mirror, one directory closer to the
+/// engine than the app's was. These tests are what make them a contract.
+///
+/// Host-testable by construction: they read the `const &str` and serialise plain
+/// structs, so no `JsValue` and no `wasm-bindgen-test` (which `ci.yml` does not
+/// run for this crate) is involved.
+#[cfg(test)]
+mod ts_result_shape_tests {
+    use super::*;
+
+    /// Field names declared by one `export interface` inside a TS source block.
+    ///
+    /// Deliberately a small hand-rolled scan rather than a TS parser: it only
+    /// needs to survive the shape *we* write here — `name?: type;` one per line,
+    /// with `/** … */` doc comments and `|` continuation lines between. A field
+    /// line is one containing `:` before any `/`, outside a doc comment.
+    fn declared_fields(block: &str, interface: &str) -> Vec<String> {
+        let start = block
+            .find(&format!("export interface {interface} {{"))
+            .unwrap_or_else(|| panic!("no `export interface {interface}` in the TS block"));
+        let body = &block[start..];
+        let end = body
+            .find("\n}")
+            .unwrap_or_else(|| panic!("unterminated `interface {interface}`"));
+        let mut fields = Vec::new();
+        let mut in_doc = false;
+        for line in body[..end].lines().skip(1) {
+            let t = line.trim();
+            if in_doc {
+                in_doc = !t.contains("*/");
+                continue;
+            }
+            if t.starts_with("/**") {
+                // A one-line `/** … */` opens and closes on the same line.
+                in_doc = !t.contains("*/");
+                continue;
+            }
+            let Some((name, _)) = t.split_once(':') else {
+                continue; // a `|` union continuation line
+            };
+            let name = name.trim().trim_end_matches('?');
+            if !name.is_empty() && name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                fields.push(name.to_string());
+            }
+        }
+        assert!(!fields.is_empty(), "parsed no fields out of {interface}");
+        fields
+    }
+
+    /// Serialised keys of a value, as serde actually emits them.
+    fn serde_keys<T: Serialize>(v: &T) -> Vec<String> {
+        serde_json::to_value(v)
+            .expect("plain data")
+            .as_object()
+            .expect("serialises as an object")
+            .keys()
+            .cloned()
+            .collect()
+    }
+
+    /// Sorted on both sides: `serde_json`'s `preserve_order` IS on for this crate
+    /// (via the validator / core / reference deps), so key order is declaration
+    /// order, and an unsorted compare would fail on ORDER rather than NAMES.
+    fn assert_same(interface: &str, mut declared: Vec<String>, mut actual: Vec<String>) {
+        declared.sort();
+        declared.dedup();
+        actual.sort();
+        assert_eq!(
+            declared, actual,
+            "TS `{interface}` and its Rust struct have drifted"
+        );
+    }
+
+    /// Every field must be populated here — a `None` in a `skip_serializing_if`
+    /// field would vanish from the serialised keys and the test would then be
+    /// asserting that an OPTIONAL field may be undeclared, which is the drift it
+    /// exists to catch.
+    fn a_finding() -> FindingDto {
+        FindingDto {
+            line: Some(1),
+            group: "LOCA".into(),
+            desc: "d".into(),
+            target: Some("cell".into()),
+            field_index: Some(0),
+            heading: Some("LOCA_ID".into()),
+            data_row: Some(1),
+            char_span: Some([0, 1]),
+            severity: Some("warning".into()),
+        }
+    }
+
+    #[test]
+    fn ts_interfaces_match_the_serde_structs() {
+        assert_same(
+            "FindingDto",
+            declared_fields(TS_VALIDATE_RESULT, "FindingDto"),
+            serde_keys(&a_finding()),
+        );
+        assert_same(
+            "RuleGroup",
+            declared_fields(TS_VALIDATE_RESULT, "RuleGroup"),
+            serde_keys(&RuleGroup {
+                rule: "AGS Format Rule 1".into(),
+                total: 1,
+                items: vec![a_finding()],
+            }),
+        );
+        assert_same(
+            "ValErr",
+            declared_fields(TS_VALIDATE_RESULT, "ValErr"),
+            serde_keys(&ValErr {
+                kind: "not_ags4".into(),
+                message: "m".into(),
+            }),
+        );
+        assert_same(
+            "ValidationReport",
+            declared_fields(TS_VALIDATE_RESULT, "ValidationReport"),
+            serde_keys(&ValidationReport::failure("not_ags4", "m".into())),
+        );
+        assert_same(
+            "EmitFinding",
+            declared_fields(TS_BUILD_RESULT, "EmitFinding"),
+            serde_keys(&EmitFinding {
+                rule: "AGS Format Rule 1".into(),
+                line: Some(1),
+                group: "LOCA".into(),
+                desc: "d".into(),
+                severity: Some("warning".into()),
+            }),
+        );
+        assert_same(
+            "AppliedFix",
+            declared_fields(TS_BUILD_RESULT, "AppliedFix"),
+            serde_keys(&AppliedFix {
+                kind: fixes::FixKind::StripBom,
+                label: "l".into(),
+                rule: "AGS Format Rule 1".into(),
+                line: Some(1),
+                risk: fixes::FixRisk::Safe,
+            }),
+        );
+        assert_same(
+            "BuildReport",
+            declared_fields(TS_BUILD_RESULT, "BuildReport"),
+            serde_keys(&BuildAgs4Report {
+                text: String::new(),
+                findings: Vec::new(),
+                applied: Vec::new(),
+                fixes_applied: 0,
+            }),
+        );
+        assert_same(
+            "CensorTally",
+            declared_fields(TS_CENSOR_RESULT, "CensorTally"),
+            serde_keys(&laterite_ags4_censor::Tally::default()),
+        );
+        assert_same(
+            "CensorResult",
+            declared_fields(TS_CENSOR_RESULT, "CensorResult"),
+            serde_keys(&CensorDto {
+                text: String::new(),
+                tally: laterite_ags4_censor::Tally::default(),
+            }),
+        );
+        assert_same(
+            "GroupMeta",
+            declared_fields(TS_GROUP_META, "GroupMeta"),
+            serde_keys(&GroupMeta {
+                headings: Vec::new(),
+                units: Vec::new(),
+                types: Vec::new(),
+                sql_types: Vec::new(),
+            }),
+        );
+    }
+
+    /// The parser must be able to fail. Without this, a `declared_fields` that
+    /// silently returned the wrong thing would make every assertion above pass
+    /// against itself.
+    #[test]
+    fn the_interface_parser_can_see_a_missing_field() {
+        let mut fields = declared_fields(TS_VALIDATE_RESULT, "ValErr");
+        assert_eq!(fields, vec!["kind", "message"]);
+        fields.pop();
+        assert_ne!(fields, serde_keys(&a_finding()));
+    }
+
+    /// `AppliedFix.kind` / `.risk` are unions over enums owned by
+    /// **laterite-ags4-validator**. A new `FixKind` variant there would otherwise
+    /// silently fall outside the union we publish here, and the `.d.ts` would lie
+    /// about a value consumers can actually receive.
+    ///
+    /// Rather than keep a second hand-written variant list to compare against,
+    /// this asks serde for the authoritative one: deserialising a bogus token
+    /// fails with `unknown variant ..., expected one of ...`, which enumerates
+    /// every variant the enum really has.
+    #[test]
+    fn fix_unions_match_the_validators_enums() {
+        fn variants<'de, T: serde::Deserialize<'de>>() -> Vec<String> {
+            // `.err()` rather than `expect_err`: the latter needs `T: Debug`,
+            // and these enums are only required to be Deserialize.
+            let err = serde_json::from_str::<T>("\"__not_a_variant__\"")
+                .err()
+                .expect("a bogus token must not deserialise");
+            let msg = err.to_string();
+            // Read the backticked tokens rather than a fixed phrase: serde says
+            // "expected one of `a`, `b`, `c`" for three or more variants but
+            // "expected `safe` or `risky`" for two, and FixRisk has two. The
+            // first backticked token is always the bogus name we passed in.
+            let all: Vec<String> = msg
+                .split('`')
+                .skip(1)
+                .step_by(2)
+                .map(str::to_string)
+                .collect();
+            let (first, rest) = all
+                .split_first()
+                .unwrap_or_else(|| panic!("serde changed its unknown-variant message: {msg}"));
+            assert_eq!(
+                first, "__not_a_variant__",
+                "unexpected message shape: {msg}"
+            );
+            assert!(!rest.is_empty(), "no variants listed in: {msg}");
+            rest.to_vec()
+        }
+
+        fn union_members(block: &str, field: &str) -> Vec<String> {
+            let at = block.find(field).expect("field is declared");
+            let body = &block[at..];
+            let end = body.find(';').expect("field declaration ends in `;`");
+            body[..end]
+                .split('"')
+                .skip(1)
+                .step_by(2)
+                .map(str::to_string)
+                .collect()
+        }
+
+        for (field, mut actual) in [
+            ("kind:", variants::<fixes::FixKind>()),
+            ("risk:", variants::<fixes::FixRisk>()),
+        ] {
+            let mut declared = union_members(TS_BUILD_RESULT, field);
+            declared.sort();
+            actual.sort();
+            assert_eq!(
+                declared, actual,
+                "TS `AppliedFix.{field}` union and the validator's enum have drifted"
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod dict_overlay_tests {
     use super::{ValidateOptions, run};
@@ -1838,6 +2272,31 @@ pub struct ParsedDataset {
     parsed: ParsedFile,
 }
 
+ts_section! {
+    TS_GROUP_META,
+    TS_GROUP_META_SECTION,
+    r#"
+/** Per-group schema: four PARALLEL arrays, one entry per heading, so
+ *  `headings[i]` / `units[i]` / `types[i]` / `sql_types[i]` describe the same
+ *  column. `meta()` returns `null` for a code the file does not contain. */
+export interface GroupMeta {
+  headings: string[];
+  units: string[];
+  /** AGS TYPE codes from the file's TYPE row (`"2DP"`, `"DT"`, `"ID"`, …). */
+  types: string[];
+  /** The DuckDB column type each heading lands as (`"DOUBLE"`, `"BIGINT"`,
+   *  `"TIMESTAMP"`, `"VARCHAR"`, …) — what the table will report. */
+  sql_types: string[];
+}
+"#
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "GroupMeta | null")]
+    pub type GroupMetaJs;
+}
+
 /// Per-group schema for the UI: parallel arrays (one entry per heading).
 #[derive(Serialize)]
 struct GroupMeta {
@@ -1859,9 +2318,9 @@ impl ParsedDataset {
 
     /// `{headings, units, types, sql_types}` for one group, or `null` if
     /// the code isn't present.
-    pub fn meta(&self, code: &str) -> JsValue {
+    pub fn meta(&self, code: &str) -> GroupMetaJs {
         let Some(group) = self.parsed.groups.get(code) else {
-            return JsValue::NULL;
+            return JsValue::NULL.unchecked_into();
         };
         let n = group.headings.len();
         let types: Vec<String> = (0..n)
@@ -1882,7 +2341,9 @@ impl ParsedDataset {
             types,
         };
         let serializer = serde_wasm_bindgen::Serializer::json_compatible();
-        meta.serialize(&serializer).unwrap_or(JsValue::NULL)
+        meta.serialize(&serializer)
+            .unwrap_or(JsValue::NULL)
+            .unchecked_into()
     }
 
     /// One group's rows as an Arrow IPC **stream** (Uint8Array), columns
@@ -2231,6 +2692,42 @@ struct CensorDto {
     tally: laterite_ags4_censor::Tally,
 }
 
+ts_section! {
+    TS_CENSOR_RESULT,
+    TS_CENSOR_RESULT_SECTION,
+    r#"
+/** Per-action counts from an anonymisation pass. Every field is a count of
+ *  cells or structures affected, so `0` everywhere means nothing matched. */
+export interface CensorTally {
+  pseudonym: number;
+  blank: number;
+  token: number;
+  /** Bracketed geological units stripped from description cells. */
+  brackets: number;
+  /** Substrings replaced by the keyword pass. */
+  keyword: number;
+  /** Custom (non-dictionary) columns deleted. */
+  dropped_cols: number;
+  /** Custom (non-dictionary) groups deleted. */
+  dropped_groups: number;
+  /** Orphaned DICT/ABBR definition rows of dropped custom groups/headings. */
+  dropped_defs: number;
+}
+
+/** The `censor` result: the anonymised file plus what was changed. */
+export interface CensorResult {
+  text: string;
+  tally: CensorTally;
+}
+"#
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "CensorResult")]
+    pub type CensorResultJs;
+}
+
 /// Anonymise `data` with the shared engine. `sensitive_json` is the
 /// classification SSOT (`sensitive_headings.json`); `selected_codes` (a JS
 /// array of heading codes, or `null` for every classified heading) restricts
@@ -2250,7 +2747,7 @@ pub fn censor(
     token: &str,
     drop_custom: bool,
     include_freetext: bool,
-) -> Result<JsValue, JsError> {
+) -> Result<CensorResultJs, JsError> {
     console_error_panic_hook::set_once();
 
     // Lossy decode (matches the Anonymiser's `TextDecoder({fatal:false})`): a
@@ -2282,6 +2779,7 @@ pub fn censor(
     };
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();
     dto.serialize(&serializer)
+        .map(JsCast::unchecked_into)
         .map_err(|e| JsError::new(&e.to_string()))
 }
 

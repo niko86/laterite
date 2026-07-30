@@ -29,6 +29,12 @@
           "prs": [
             182
           ]
+        },
+        {
+          "text": "**The browser package ships its own result types.** `validate`, `build_ags4`, `build_ags4_ipc`, `censor` and `ParsedDataset.meta` were typed `any` in the generated `.d.ts`, so every consumer had to re-describe the report shape by hand — a downstream browser consumer reported `build_ags4` returning `any` as a defect. The crate now publishes `ValidationReport`, `RuleGroup`, `FindingDto`, `ValErr`, `BuildReport`, `EmitFinding`, `AppliedFix`, `CensorResult`, `CensorTally` and `GroupMeta`, so **you can delete your copy**. Two tests bind the published interfaces to the Rust serde structs and the `AppliedFix` unions to the validator's enums, so they cannot drift into being prettier `any`. `diff`, `compute_fixes` and `dictionary` still return `any`: their shapes belong to other crates, and hand-mirroring them here would rebuild the very problem this removes.",
+          "prs": [
+            185
+          ]
         }
       ],
       "changed": [
@@ -60,6 +66,12 @@
           "text": "**The browser's `merge` no longer leaks its result.** The wasm `MergeResult` is freed once its fields have been read, rather than being left to the caller to remember.",
           "prs": [
             181
+          ]
+        },
+        {
+          "text": "**The browser mis-classified every error as a warning.** `severity` is *absent* on an error — the engine writes the field only for `warning`/`fyi` — but the app's hand-written type declared `\"error\"` as a value it might receive, and five call sites resolved the absent case with `?? \"warning\"`. So the summary banner's split counted errors as warnings, the severity filter hid them from the **error** selection while showing them under **warning**, and a finding's highlight band rendered amber instead of red. Found by replacing that hand-written type with the engine's own, which stopped the app compiling in exactly the six places the assumption had spread to. All resolution now goes through one `severityOf` helper.",
+          "prs": [
+            185
           ]
         }
       ],
