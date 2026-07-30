@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-07-30
+
 The browser API breaks: every `@laterite/ags4-wasm` export now takes an options object instead of a positional tail. And a synthesised `TRAN` is the caller's to supply — the placeholder the emitter used to invent satisfied Rule 14, so files could assert a transmission that never happened and pass validation doing it.
 
 ### Added
@@ -150,7 +152,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/niko86/laterite/releases/tag/v0.9.0
 [0.8.2]: https://github.com/niko86/laterite/releases/tag/v0.8.2
 [0.8.1]: https://github.com/niko86/laterite/releases/tag/v0.8.1
 [0.8.0]: https://github.com/niko86/laterite/releases/tag/v0.8.0

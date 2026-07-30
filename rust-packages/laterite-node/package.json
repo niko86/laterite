@@ -1,6 +1,6 @@
 {
   "name": "laterite",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "AGS4 geotechnical data for Node.js — read, validate, produce, and query (the Node port of the laterite Python toolkit, Rust-backed).",
   "license": "MIT",
   "author": "niko86",
