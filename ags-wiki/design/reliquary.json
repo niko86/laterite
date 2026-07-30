@@ -249,9 +249,9 @@
       "symbol": "`GroupDescriptor::table()`/`view()`",
       "verify": "`rust-packages/laterite-ags4-reference/src/union.rs::fn table`",
       "axis": "code",
-      "status": "spotted",
-      "removed_in": "—",
-      "evidence": "DuckDB `g_<code>`/`v_<code>` name builders on the reference-data leaf. Verified dead 2026-07-29: the only occurrences repo-wide are the two fns and their own unit test (union.rs:401-402), and `laterite-duckdb` never references `GroupDescriptor` — it builds no `g_`/`v_` names at all. Publishing would freeze an unrelated product's naming into a dictionary crate's public API. See [[dec-rust-api-crates-io]], laterite#161"
+      "status": "removed",
+      "removed_in": "laterite#161",
+      "evidence": "DuckDB `g_<code>`/`v_<code>` name builders on the reference-data leaf. Verified dead 2026-07-29: the only occurrences repo-wide were the two fns and their own unit test, and `laterite-duckdb` never referenced `GroupDescriptor` — it builds no `g_`/`v_` names at all, so the original issue's premise (relocate to its only caller) was wrong. Removed with the test that existed solely to exercise them. Publishing would have frozen an unrelated product's naming into a dictionary crate's public API. See [[dec-rust-api-crates-io]], laterite#161"
     }
   ]
 }
