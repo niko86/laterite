@@ -806,6 +806,208 @@ mod tests {
         "\"DATA\",\"BH02\",\"523200.00\"\r\n",
     );
 
+    /// The UNIT/TYPE rows must actually SURVIVE the xlsx round trip.
+    ///
+    /// The existing round-trip asserted `LOCA_NATE == "523145.10"` on a fixture
+    /// whose input was **already** `"523145.10"` — so it passed whether or not
+    /// the TYPE row made it across, and `write_group_row` (which writes only the
+    /// UNIT and TYPE rows) could be stubbed to `Ok(())` with every assertion
+    /// still green. A non-falsifiable assertion, found by mutation sweep
+    /// (laterite#127).
+    ///
+    /// The fix is a fixture where survival CHANGES the value: `523145.1` is only
+    /// re-formatted to `523145.10` if the `2DP` TYPE row round-tripped. Losing
+    /// the TYPE row, shifting it a column (so its tag is overwritten and the row
+    /// is dropped as unrecognised), or dropping the reader's `"UNIT"`/`"TYPE"`
+    /// match arms all now fail here.
+    #[test]
+    fn unit_and_type_rows_survive_the_round_trip_and_drive_formatting() {
+        let src = concat!(
+            "\"GROUP\",\"LOCA\"\r\n",
+            "\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n",
+            "\"UNIT\",\"\",\"m\"\r\n",
+            "\"TYPE\",\"ID\",\"2DP\"\r\n",
+            // deliberately NOT already 2DP-formatted
+            "\"DATA\",\"BH01\",\"523145.1\"\r\n",
+        );
+        let (xlsx, _) = ags4_bytes_to_xlsx(src.as_bytes(), None).unwrap();
+        let (ags4, _) = xlsx_bytes_to_ags4(&xlsx, true).unwrap();
+        let back = read_ags4_bytes(&ags4).unwrap();
+        let loca = &back.groups["LOCA"];
+
+        assert_eq!(
+            loca.units,
+            vec![String::new(), "m".to_string()],
+            "the UNIT row must survive the trip through the sheet"
+        );
+        assert_eq!(
+            loca.types,
+            vec!["ID".to_string(), "2DP".to_string()],
+            "the TYPE row must survive — it is what drives re-formatting"
+        );
+        assert_eq!(
+            loca.rows[0]["LOCA_NATE"], "523145.10",
+            "2DP re-formatting only happens if the TYPE row came back"
+        );
+    }
+
+    /// `column_width` mirrors python-ags4's `min(max(13, max_len + 1), 75)`, so
+    /// it is parity behaviour rather than decoration — and nothing asserted it,
+    /// leaving the whole function replaceable by a constant.
+    #[test]
+    // Exact comparison is right: the function clamps a usize into f64, so
+    // every value it can return is exactly representable.
+    #[allow(clippy::float_cmp)]
+    fn column_width_matches_the_python_ags4_formula() {
+        let mk = |headings: Vec<&str>, units: Vec<&str>, types: Vec<&str>, values: Vec<&str>| {
+            let keys: Vec<std::sync::Arc<str>> =
+                headings.iter().map(|h| std::sync::Arc::from(*h)).collect();
+            let row: HashMap<std::sync::Arc<str>, String> = keys
+                .iter()
+                .zip(values.iter())
+                .map(|(k, v)| (std::sync::Arc::clone(k), (*v).to_string()))
+                .collect();
+            AgsGroup {
+                code: "LOCA".into(),
+                headings: headings.iter().map(|s| (*s).to_string()).collect(),
+                units: units.iter().map(|s| (*s).to_string()).collect(),
+                types: types.iter().map(|s| (*s).to_string()).collect(),
+                rows: vec![row],
+            }
+        };
+
+        // Short content clamps UP to the 13 floor.
+        let g = mk(vec!["LOCA_ID"], vec![""], vec!["ID"], vec!["BH01"]);
+        assert_eq!(column_width("LOCA_ID", &g), 13.0);
+
+        // Mid content is exactly max_len + 1 — the unclamped band, which is the
+        // only place `+ 1` is observable (a `-` or `*` here changes the number).
+        let v = "x".repeat(29);
+        let g = mk(vec!["LOCA_ID"], vec![""], vec!["ID"], vec![&v]);
+        assert_eq!(column_width("LOCA_ID", &g), 30.0, "29 + 1, not 29 or 28");
+
+        // Long content clamps DOWN to the 75 ceiling.
+        let v = "x".repeat(200);
+        let g = mk(vec!["LOCA_ID"], vec![""], vec!["ID"], vec![&v]);
+        assert_eq!(column_width("LOCA_ID", &g), 75.0);
+    }
+
+    /// The UNIT/TYPE lookup must use the heading's OWN column index. Matching on
+    /// `!=` would take the first *other* column and size against its metadata.
+    #[test]
+    // Exact comparison is right: the function clamps a usize into f64, so
+    // every value it can return is exactly representable.
+    #[allow(clippy::float_cmp)]
+    fn column_width_reads_unit_and_type_at_the_headings_own_index() {
+        // Column 0 carries a long UNIT; column 1's own UNIT/TYPE are short. If
+        // the index match inverts, LOCA_ID's width is computed from column 1 and
+        // LOCA_NATE's from column 0 — so LOCA_NATE would inherit the long unit.
+        let long_unit = "u".repeat(40);
+        let keys: Vec<std::sync::Arc<str>> = ["LOCA_NATE", "LOCA_ID"]
+            .iter()
+            .map(|h| std::sync::Arc::from(*h))
+            .collect();
+        let row: HashMap<std::sync::Arc<str>, String> = keys
+            .iter()
+            .zip(["1.0", "BH01"].iter())
+            .map(|(k, v)| (std::sync::Arc::clone(k), (*v).to_string()))
+            .collect();
+        let g = AgsGroup {
+            code: "LOCA".into(),
+            headings: vec!["LOCA_NATE".into(), "LOCA_ID".into()],
+            units: vec![long_unit, String::new()],
+            types: vec!["2DP".into(), "ID".into()],
+            rows: vec![row],
+        };
+
+        assert_eq!(
+            column_width("LOCA_NATE", &g),
+            41.0,
+            "LOCA_NATE is column 0 and owns the 40-char unit"
+        );
+        assert_eq!(
+            column_width("LOCA_ID", &g),
+            13.0,
+            "LOCA_ID is column 1: its own unit is blank, so it clamps to the floor"
+        );
+    }
+
+    /// The all-digits guard in `numeric_prefix` is load-bearing, not redundant
+    /// with the `parse` that follows it.
+    ///
+    /// It looks redundant — anything non-numeric would fail `parse::<usize>()`
+    /// anyway — but Rust's integer `FromStr` **accepts a leading `+`**, so
+    /// `"+5".parse::<usize>()` is `Ok(5)`. Drop the guard and a malformed TYPE of
+    /// `"+5DP"` silently becomes a valid 5-decimal-place format instead of being
+    /// rejected. Mutation sweep flagged this as a survivor (laterite#127) and it
+    /// was nearly dismissed as an equivalent mutant.
+    #[test]
+    fn numeric_prefix_rejects_signs_that_rust_would_otherwise_parse() {
+        assert_eq!(numeric_prefix("5DP", "DP"), Some(5), "the ordinary case");
+        assert_eq!(
+            numeric_prefix("+5DP", "DP"),
+            None,
+            "`+5` parses as 5 in Rust — the digit guard is what rejects it"
+        );
+        assert_eq!(numeric_prefix("DP", "DP"), None, "empty prefix");
+        assert_eq!(numeric_prefix("A5DP", "DP"), None, "non-digit prefix");
+        assert_eq!(numeric_prefix("5SF", "DP"), None, "suffix does not match");
+    }
+
+    /// A blank row in a sheet is *skipped*, not warned about.
+    ///
+    /// Only reachable from a hand-edited or third-party workbook — our own
+    /// writer never emits one — so no round-trip test can cover it, and the arm
+    /// survived the sweep. Built here with `rust_xlsxwriter` directly so the
+    /// empty-row path is actually exercised: delete the `""` arm and this row
+    /// falls through to the catch-all and produces a spurious warning.
+    #[test]
+    fn a_blank_row_is_skipped_without_a_warning() {
+        let mut wb = Workbook::new();
+        let sheet = wb.add_worksheet().set_name("LOCA").unwrap();
+        sheet.write_string(0, 0, "HEADING").unwrap();
+        sheet.write_string(0, 1, "LOCA_ID").unwrap();
+        sheet.write_string(1, 0, "UNIT").unwrap();
+        sheet.write_string(2, 0, "TYPE").unwrap();
+        sheet.write_string(2, 1, "ID").unwrap();
+        // row 3 left entirely empty — the separator case
+        sheet.write_string(4, 0, "DATA").unwrap();
+        sheet.write_string(4, 1, "BH01").unwrap();
+        let xlsx = wb.save_to_buffer().unwrap();
+
+        let (ags4, stats) = xlsx_bytes_to_ags4(&xlsx, true).unwrap();
+        assert_eq!(
+            stats.warnings,
+            Vec::<String>::new(),
+            "a blank row is an expected separator, not something to warn about"
+        );
+        assert_eq!(stats.rows_written, 1, "only the DATA row counts");
+        let back = read_ags4_bytes(&ags4).unwrap();
+        assert_eq!(back.groups["LOCA"].rows[0]["LOCA_ID"], "BH01");
+    }
+
+    /// The `i < 0` boundary in `format_sf`. At `i == 0` the two arms are NOT
+    /// interchangeable: `{:.0}` rounds half-to-even (matching python-ags4's
+    /// `f"{v:.0f}"`), while the `i < 0` arm's `.round()` rounds half away from
+    /// zero. `12.5` at 2SF is exactly that boundary — "12" if the comparison is
+    /// right, "13" if it is `<=`.
+    #[test]
+    fn format_sf_boundary_at_i_zero_keeps_python_rounding() {
+        assert_eq!(
+            format_sf(12.5, 2),
+            "12",
+            "2SF of 12.5 → i == 0 → half-to-even, as python-ags4 formats it"
+        );
+        assert_eq!(
+            format_sf(13.5, 2),
+            "14",
+            "half-to-even rounds 13.5 up to 14"
+        );
+        // i > 0 and i < 0 either side, so the boundary is pinned from both.
+        assert_eq!(format_sf(12.5, 3), "12.5");
+        assert_eq!(format_sf(1250.0, 2), "1300");
+    }
+
     #[test]
     fn ags4_to_excel_then_back_round_trips() {
         let dir = tempdir().unwrap();

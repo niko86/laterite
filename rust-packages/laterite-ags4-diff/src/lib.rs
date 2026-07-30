@@ -354,6 +354,16 @@ mod tests {
     use laterite_ags4_parse::parse_str;
     use laterite_ags4_reference::dict::DictVersion;
 
+    /// An identical PROJ on both sides — present so the file-level tests have a
+    /// group that must NOT be reported as different.
+    fn proj() -> &'static str {
+        "\"GROUP\",\"PROJ\"\r\n\
+\"HEADING\",\"PROJ_ID\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"P1\"\r\n"
+    }
+
     #[test]
     fn diff_group_is_key_aware_and_type_aware() {
         // Baseline: BH01..BH03. Revision: BH01 unchanged-but-reformatted
@@ -395,6 +405,269 @@ mod tests {
         assert_eq!(changed[0].cells[0].heading, "LOCA_NATE");
         assert_eq!(changed[0].cells[0].a.as_deref(), Some("523200.00"));
         assert_eq!(changed[0].cells[0].b.as_deref(), Some("523200.50"));
+    }
+
+    /// One LOCA group, `n` rows, ids `BH{i:02}` and eastings that differ from
+    /// `base` by row — enough to make every row *changed* between two calls.
+    fn loca(n: usize, base: f64) -> String {
+        let mut s = String::from(
+            "\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+\"UNIT\",\"\",\"m\"\r\n\
+\"TYPE\",\"ID\",\"2DP\"\r\n",
+        );
+        for i in 1..=n {
+            use std::fmt::Write as _;
+            let _ = writeln!(s, "\"DATA\",\"BH{i:02}\",\"{:.2}\"\r", base + i as f64);
+        }
+        s
+    }
+
+    /// `diff_parsed` is the crate's ONLY public function — every surface
+    /// (`lat diff`, Python, Node, wasm) enters here — and until this test it had
+    /// no coverage at all: the suite exercised the private helpers underneath it
+    /// and nothing walked the file-level union, the totals, or the decision to
+    /// include a group. A mutation sweep found 18 survivors in this one function
+    /// (laterite#127).
+    #[test]
+    fn diff_parsed_unions_groups_and_totals_across_the_file() {
+        // A has LOCA + ABBR; B has LOCA + SAMP. So SAMP is added, ABBR removed,
+        // LOCA changed — one of each arm, plus a group present and IDENTICAL on
+        // both sides (PROJ) that must NOT be reported.
+        let a = format!(
+            "{}{}{}",
+            proj(),
+            loca(2, 100.0),
+            "\"GROUP\",\"ABBR\"\r\n\
+\"HEADING\",\"ABBR_HDNG\",\"ABBR_CODE\"\r\n\
+\"UNIT\",\"\",\"\"\r\n\
+\"TYPE\",\"X\",\"X\"\r\n\
+\"DATA\",\"LOCA_TYPE\",\"TP\"\r\n"
+        );
+        let b = format!(
+            "{}{}{}",
+            proj(),
+            loca(2, 200.0),
+            "\"GROUP\",\"SAMP\"\r\n\
+\"HEADING\",\"SAMP_ID\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"S1\"\r\n"
+        );
+        let pa = parse_str(&a).unwrap();
+        let pb = parse_str(&b).unwrap();
+        let dict = Dictionary::bundled(DictVersion::V4_1_1);
+        let d = diff_parsed(&pa, &pb, &dict, None);
+
+        assert_eq!(d.groups_added, vec!["SAMP".to_string()], "SAMP is B-only");
+        assert_eq!(
+            d.groups_removed,
+            vec!["ABBR".to_string()],
+            "ABBR is A-only — reached through the `!b.groups.contains_key` arm"
+        );
+
+        // Totals are the SUM across groups, not any single group's count.
+        assert_eq!(d.total_changed, 2, "both LOCA rows changed easting");
+        assert_eq!(d.total_added, 0);
+        assert_eq!(d.total_removed, 0);
+
+        // An unchanged group is omitted; a changed one is kept.
+        let codes: Vec<&str> = d.groups.iter().map(|g| g.code.as_str()).collect();
+        assert_eq!(
+            codes,
+            vec!["LOCA"],
+            "only groups with a difference are included — PROJ is identical"
+        );
+    }
+
+    /// Totals must ACCUMULATE across groups, and the include-predicate must be a
+    /// sum rather than any other combination of the three counts.
+    ///
+    /// Deliberately built so that zero is never the witness: the first sweep left
+    /// six survivors here precisely because the earlier test had
+    /// `total_added == total_removed == 0`, and 0 is a fixed point of both `-=`
+    /// and `*=`. A count only proves an operator when the count is non-zero and
+    /// the operands differ.
+    ///
+    /// - `LOCA` gains one row and loses one (added 1, removed 1) — under
+    ///   `added - removed` the group nets to zero and DISAPPEARS from the report.
+    /// - `ZZZZ` only gains rows (added 2, removed 0) — under `added * removed`
+    ///   it nets to zero and disappears instead.
+    ///
+    /// One of the two vanishes under each wrong operator, so asserting both are
+    /// present pins the arithmetic from both sides.
+    #[test]
+    fn totals_accumulate_and_the_include_predicate_is_a_sum() {
+        let a = "\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"BH01\"\r\n\
+\"DATA\",\"BH02\"\r\n\
+\"GROUP\",\"ZZZZ\"\r\n\
+\"HEADING\",\"ZZZZ_A\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"X\"\r\n\
+\"DATA\",\"keep\"\r\n";
+        let b = "\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"BH02\"\r\n\
+\"DATA\",\"BH03\"\r\n\
+\"GROUP\",\"ZZZZ\"\r\n\
+\"HEADING\",\"ZZZZ_A\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"X\"\r\n\
+\"DATA\",\"keep\"\r\n\
+\"DATA\",\"new1\"\r\n\
+\"DATA\",\"new2\"\r\n";
+        let pa = parse_str(a).unwrap();
+        let pb = parse_str(b).unwrap();
+        let dict = Dictionary::bundled(DictVersion::V4_1_1);
+        let d = diff_parsed(&pa, &pb, &dict, None);
+
+        // 1 (BH03) + 2 (new1, new2); a `*=` accumulator would leave this 0.
+        assert_eq!(d.total_added, 3, "adds must SUM across groups");
+        assert_eq!(d.total_removed, 1, "BH01, from LOCA only");
+        assert_eq!(d.total_changed, 0);
+
+        let codes: Vec<&str> = d.groups.iter().map(|g| g.code.as_str()).collect();
+        assert!(
+            codes.contains(&"LOCA"),
+            "LOCA nets 1 added + 1 removed and must still be reported: {codes:?}"
+        );
+        assert!(
+            codes.contains(&"ZZZZ"),
+            "ZZZZ nets 2 added + 0 removed and must still be reported: {codes:?}"
+        );
+    }
+
+    /// A group whose ROWS are identical but whose HEADINGS differ must still be
+    /// reported. Guards the second arm of the include-predicate: counting rows
+    /// alone would drop a schema-only change entirely.
+    #[test]
+    fn diff_parsed_includes_a_group_changed_only_by_its_headings() {
+        let a = format!("{}{}", proj(), loca(1, 100.0));
+        let b = format!(
+            "{}{}",
+            proj(),
+            "\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\",\"LOCA_GL\"\r\n\
+\"UNIT\",\"\",\"m\",\"m\"\r\n\
+\"TYPE\",\"ID\",\"2DP\",\"2DP\"\r\n\
+\"DATA\",\"BH01\",\"101.00\",\"\"\r\n"
+        );
+        let pa = parse_str(&a).unwrap();
+        let pb = parse_str(&b).unwrap();
+        let dict = Dictionary::bundled(DictVersion::V4_1_1);
+        let d = diff_parsed(&pa, &pb, &dict, None);
+
+        assert_eq!(d.total_added + d.total_removed + d.total_changed, 0);
+        let loca_delta = d
+            .groups
+            .iter()
+            .find(|g| g.code == "LOCA")
+            .expect("a heading-only change must still surface the group");
+        assert_eq!(loca_delta.headings_added, vec!["LOCA_GL".to_string()]);
+        assert!(loca_delta.headings_removed.is_empty());
+    }
+
+    /// `headings_removed` is the mirror arm, and inverting either filter is
+    /// silent without an assertion on both.
+    #[test]
+    fn heading_added_and_removed_are_not_interchangeable() {
+        let a = "\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_GONE\"\r\n\
+\"UNIT\",\"\",\"\"\r\n\
+\"TYPE\",\"ID\",\"X\"\r\n\
+\"DATA\",\"BH01\",\"x\"\r\n";
+        let b = "\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NEW\"\r\n\
+\"UNIT\",\"\",\"\"\r\n\
+\"TYPE\",\"ID\",\"X\"\r\n\
+\"DATA\",\"BH01\",\"x\"\r\n";
+        let pa = parse_str(a).unwrap();
+        let pb = parse_str(b).unwrap();
+        let dict = Dictionary::bundled(DictVersion::V4_1_1);
+        let d = diff_group("LOCA", &pa.groups["LOCA"], &pb.groups["LOCA"], &dict, None);
+
+        assert_eq!(
+            d.headings_added,
+            vec!["LOCA_NEW".to_string()],
+            "added = in B, not in A"
+        );
+        assert_eq!(
+            d.headings_removed,
+            vec!["LOCA_GONE".to_string()],
+            "removed = in A, not in B"
+        );
+    }
+
+    /// A KEY heading present on only ONE side cannot index the other, so it must
+    /// not be used as a key. Requiring both sides is an `&&`; an `||` here would
+    /// build a key from a heading half the rows do not have.
+    #[test]
+    fn a_key_heading_missing_from_one_side_is_not_used_as_a_key() {
+        // SAMP's KEY tuple includes LOCA_ID + SAMP_TOP + SAMP_REF + SAMP_TYPE;
+        // B drops SAMP_TOP, so the surviving key set must exclude it.
+        let a = "\"GROUP\",\"SAMP\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"SAMP_TOP\",\"SAMP_REF\"\r\n\
+\"UNIT\",\"\",\"m\",\"\"\r\n\
+\"TYPE\",\"ID\",\"2DP\",\"X\"\r\n\
+\"DATA\",\"BH01\",\"1.00\",\"R1\"\r\n";
+        let b = "\"GROUP\",\"SAMP\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"SAMP_REF\"\r\n\
+\"UNIT\",\"\",\"\"\r\n\
+\"TYPE\",\"ID\",\"X\"\r\n\
+\"DATA\",\"BH01\",\"R1\"\r\n";
+        let pa = parse_str(a).unwrap();
+        let pb = parse_str(b).unwrap();
+        let dict = Dictionary::bundled(DictVersion::V4_1_1);
+        let d = diff_group("SAMP", &pa.groups["SAMP"], &pb.groups["SAMP"], &dict, None);
+
+        assert!(
+            !d.key_headings.iter().any(|h| h == "SAMP_TOP"),
+            "SAMP_TOP is absent from B and cannot key it: {:?}",
+            d.key_headings
+        );
+        for h in &d.key_headings {
+            assert!(
+                pa.groups["SAMP"].headings.contains(h) && pb.groups["SAMP"].headings.contains(h),
+                "every key heading must exist on BOTH sides, {h} does not"
+            );
+        }
+    }
+
+    /// `max_rows_per_group` caps the SERIALIZED rows only — the counts stay true
+    /// totals. Both halves matter: a cap that also truncated the counts would
+    /// under-report a diff, and the doc comment promises it does not.
+    #[test]
+    fn the_row_cap_limits_serialized_rows_but_not_the_counts() {
+        let pa = parse_str(&loca(5, 100.0)).unwrap();
+        let pb = parse_str(&loca(5, 200.0)).unwrap();
+        let dict = Dictionary::bundled(DictVersion::V4_1_1);
+
+        let uncapped = diff_group("LOCA", &pa.groups["LOCA"], &pb.groups["LOCA"], &dict, None);
+        assert_eq!(uncapped.changed, 5);
+        assert_eq!(uncapped.rows.len(), 5);
+
+        let capped = diff_group(
+            "LOCA",
+            &pa.groups["LOCA"],
+            &pb.groups["LOCA"],
+            &dict,
+            Some(2),
+        );
+        assert_eq!(
+            capped.changed, 5,
+            "the cap must not touch the count — it is the true total"
+        );
+        assert_eq!(
+            capped.rows.len(),
+            2,
+            "exactly `cap` rows are serialized, not cap-1 and not cap+1"
+        );
     }
 
     #[test]
