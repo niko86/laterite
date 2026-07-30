@@ -417,10 +417,8 @@ mod tests {
 \"TYPE\",\"ID\",\"2DP\"\r\n",
         );
         for i in 1..=n {
-            s.push_str(&format!(
-                "\"DATA\",\"BH{i:02}\",\"{:.2}\"\r\n",
-                base + i as f64
-            ));
+            use std::fmt::Write as _;
+            let _ = writeln!(s, "\"DATA\",\"BH{i:02}\",\"{:.2}\"\r", base + i as f64);
         }
         s
     }
