@@ -1,0 +1,79 @@
+# Require a changelog entry from any PR that changes a shipped surface.
+#
+# The hole this closes: PRs #178-#182 all merged with `[Unreleased]` EMPTY, four
+# of them carrying a `!` breaking change. Nothing in CI reads `unreleased` — the
+# only consumer is `bump-version.sh`, at RELEASE time — so the omission surfaced
+# days later as "the release refuses to cut", with the notes for two breaking
+# changes still unwritten and the authors' context gone. See
+# `tools/check_changelog.py` for the rule and the four ways to pass.
+#
+# There is deliberately NO trigger-level `paths:` filter, for the reason
+# wiki-lint.yml records at length and paid for once: a required check behind a
+# workflow-level `paths:` filter is UNSATISFIABLE. A PR touching nothing the
+# filter matches never fires the workflow, never creates a check run, and the
+# requirement sits pending forever — the only way through is the admin bypass,
+# i.e. exactly the enforcement-that-doesn't-run failure a gate exists to prevent.
+# Path-scoping belongs inside the script (which decides what counts as a shipped
+# surface and says so), not in the trigger.
+#
+# Cheap enough to run unfiltered: `check_changelog.py` is stdlib-only — no wheel,
+# no Rust, no `uv sync` (which would build the PyO3 cdylib this job exists to
+# avoid). `uv run --no-project` gets the pinned interpreter without touching the
+# workspace lockfile.
+name: changelog
+
+on:
+  pull_request:
+    branches: [main]
+    # `labeled`/`unlabeled` are load-bearing, not tidiness: the `no-changelog`
+    # escape hatch is read from the PR's labels at run time, so without these a
+    # contributor adding the label would have no way to re-run the gate short of
+    # pushing an empty commit.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+
+concurrency:
+  group: changelog-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changelog:
+    # Free to rename WHILE this stays advisory. A job `name:` IS the
+    # status-check context a ruleset matches by exact text, with nothing linking
+    # the two — so once this is added to ruleset 19425032, a later rename leaves
+    # the rule waiting on a context that no longer exists: the check never
+    # reports, the PR is unmergeable, and the only exit is the admin bypass.
+    # (wiki-lint.yml carries the same warning for the same reason.)
+    name: changelog entry
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: the gate needs a merge-base with the PR's base branch,
+          # which a shallow (default) checkout does not have. The script treats
+          # an unresolvable base or an empty diff as an ERROR rather than a pass,
+          # so a shallow clone here goes RED instead of silently greenlighting
+          # every PR forever — the failure mode check_parity.py records eating a
+          # job, where a broken clone collected 0 tests and printed a clean run.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+
+      - name: changelog entry present (or `no-changelog`)
+        env:
+          # Evaluated here rather than inline in `run:` so a label containing
+          # shell metacharacters can't reach the command line.
+          SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+        run: |
+          args=(--base "origin/${{ github.base_ref }}")
+          if [ "$SKIP" = "true" ]; then
+            args+=(--allow-empty)
+          fi
+          uv run --no-project python tools/check_changelog.py "${args[@]}"
