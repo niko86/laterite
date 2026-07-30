@@ -117,6 +117,13 @@ wasm-bindgen = "0.2"
 # pull each `ipc` Uint8Array's bytes (Reflect + Uint8Array::to_vec).
 js-sys = "0.3"
 serde = { version = "1", features = ["derive"] }
+# Bulk byte transfer for the options objects' `dictionary` field. Without it a
+# `Vec<u8>` routes through serde's `deserialize_seq`, which serde-wasm-bindgen
+# services with `js_sys::try_iter` — one boxed JsValue per BYTE. A 1 MB custom
+# dictionary becomes ~1M round trips where the positional `Option<Vec<u8>>`
+# parameter was a single bulk copy. `deserialize_byte_buf` restores that
+# (serde-wasm-bindgen 0.6.5, de.rs: `Uint8Array::to_vec`).
+serde_bytes = "0.11"
 # parse_value returns a serde_json::Value; parse() matches its variants
 # (Number/Bool/String/Null) to fill the typed Arrow column builders.
 serde_json = "1"

@@ -58,12 +58,21 @@ you're calling.
 import init, { validate, read, version } from "./pkg/ags4_wasm.js";
 
 await init();                       // required, once, before anything else
-version();                          // "0.8.0"
+version();                          // "0.8.2"
 
 const bytes = new Uint8Array(await file.arrayBuffer());
 
-// Validate — same findings as every other surface, shaped for a UI
-const report = validate(bytes, undefined, true, false, undefined, undefined, undefined, false);
+// Validate — same findings as every other surface, shaped for a UI.
+// Every option is named and optional; `warnings` defaults ON, `fyi` OFF.
+const report = validate(bytes);
+
+// …or with options. An unrecognised key is REFUSED by name (with a suggestion),
+// rather than silently taking its default:
+const report = validate(bytes, {
+  dictVersion: "4.1.1",   // "auto" (or omitted) reads the file's TRAN_AGS
+  fyi: true,
+  maxPerRule: 50,         // clip what CROSSES the boundary; totals stay true
+});
 
 report.ok;                 // the verdict: no error and no findings
 report.dict_version;       // the edition judged against, e.g. "4.1.1"

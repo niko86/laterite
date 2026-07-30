@@ -523,6 +523,127 @@ def _wasm_verbs() -> set[str]:
     )
 
 
+#: Exports still carrying a positional tail, each with the reason and the work
+#: that retires it. An entry here is a RECORDED COMMITMENT, not a permanent
+#: exemption — the point of listing them is that "not yet migrated" and "nobody
+#: noticed" stop looking the same from outside.
+#:
+#: `validate` and `certify` are deliberately absent: they were migrated first, to
+#: prove the machinery (the decode trait, the unknown-key guard, the hand-written
+#: TS interfaces) on the two exports with the smallest blast radius.
+_ARITY_EXEMPT: dict[str, str] = {
+    "build_ags4": "5 args; options-object migration, next phase",
+    "build_ags4_ipc": "5 args; migrates with build_ags4 — they share BuildOptions",
+    "merge": "5 args; options-object migration, the phase after build",
+    "diff": "4 args; not yet scoped — the plan records it as its own follow-up",
+    "censor": "6 args; not yet scoped — same follow-up as diff",
+}
+
+#: A wasm export takes its inputs, then ONE options object. Two positional
+#: arguments is the shape (`data` + `opts`); three allows a genuine second input
+#: (`merge(a, b, opts)`).
+_MAX_WASM_ARITY = 3
+
+
+def _wasm_verb_arity() -> dict[str, int]:
+    """Each top-level `#[wasm_bindgen] pub fn`'s parameter count.
+
+    Counts top-level commas only, so a generic or slice parameter
+    (`Option<Vec<u8>>`, `&[u8]`) is one parameter rather than however many commas
+    it encloses. `//` comments are stripped first — the parameter lists carry
+    why-comments, and those contain prose commas that would otherwise be counted
+    as parameters (which is exactly how this parser was wrong on first write).
+    """
+    src = WASM_LIB.read_text(encoding="utf-8")
+    out: dict[str, int] = {}
+    for m in re.finditer(
+        r"^#\[wasm_bindgen\]\n(?:^#\[[^\n]*\]\n)*^pub fn (\w+)\s*\(", src, re.M
+    ):
+        depth, end = 1, m.end()
+        for i, ch in enumerate(src[m.end() :], start=m.end()):
+            if ch in "(<[":
+                depth += 1
+            elif ch in ")>]":
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        body = re.sub(r"//[^\n]*", "", src[m.end() : end])
+        depth, params, buf = 0, [], ""
+        for ch in body:
+            if ch in "(<[":
+                depth += 1
+            elif ch in ")>]":
+                depth -= 1
+            if depth == 0 and ch == ",":
+                params.append(buf)
+                buf = ""
+            else:
+                buf += ch
+        params.append(buf)
+        out[m.group(1)] = len([p for p in params if p.strip()])
+    return out
+
+
+def test_wasm_exports_take_an_options_object_not_a_positional_tail():
+    """No wasm export may grow a positional tail.
+
+    **Nothing else enforces this.** `ci.yml:266` runs
+    `cargo clippy --workspace ... --exclude laterite-ags4-wasm`, so
+    `clippy::too_many_arguments` has never fired on this crate and would not fire
+    on the next export either — the `#[allow(too_many_arguments)]` attributes
+    that used to sit on these functions were decorative.
+
+    That mattered: `build_ags4` reached NINE parameters, five of them consecutive
+    same-typed `Option<String>`, and a browser caller had to pass five
+    `undefined`s to reach the sixth. The options-object migration fixed the
+    instances; this fixes the class.
+    """
+    over = {
+        name: n
+        for name, n in _wasm_verb_arity().items()
+        if n > _MAX_WASM_ARITY and name not in _ARITY_EXEMPT
+    }
+    assert not over, (
+        f"wasm exports with a positional tail: {over}. "
+        f"An export takes its inputs then ONE options object (max {_MAX_WASM_ARITY} "
+        "parameters). Add the option as a field on the export's options struct — "
+        "and remember to add it to that struct's `KEYS`, which "
+        "`option_keys_match_the_structs` enforces. If an export genuinely needs "
+        "more, add it to _ARITY_EXEMPT with the reason."
+    )
+
+
+def test_arity_exemptions_are_live():
+    """Every exemption must still be needed, and must name a real export.
+
+    A stale entry is worse than none: it reads as "known and tracked" while the
+    export has either been migrated (so the exemption hides that the gate now
+    passes on its own) or renamed (so the exemption silently protects nothing).
+    The same reasoning as `test_allowlist_is_live` in the cross-surface gate.
+    """
+    arities = _wasm_verb_arity()
+    unknown = set(_ARITY_EXEMPT) - set(arities)
+    assert not unknown, f"exemptions naming exports that do not exist: {unknown}"
+    no_longer_needed = {
+        name for name in _ARITY_EXEMPT if arities[name] <= _MAX_WASM_ARITY
+    }
+    assert not no_longer_needed, (
+        f"these exports no longer need an exemption — delete their entries: "
+        f"{no_longer_needed}"
+    )
+
+
+def test_arity_gate_can_see_the_exports():
+    """Zero is a bad witness: an empty parse would make the gate above vacuous."""
+    arities = _wasm_verb_arity()
+    assert len(arities) > 5, f"the arity parser found almost nothing: {arities}"
+    # A known shape, so a parser that returns 0 for everything is caught too.
+    assert arities.get("validate") == 2, (
+        f"validate should be (data, opts): {arities.get('validate')}"
+    )
+
+
 def test_wasm_orphan_guard():
     discovered = _wasm_verbs()
     mapped = set(_WASM_VERB_CAP) | _WASM_META_ALLOW

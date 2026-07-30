@@ -53,15 +53,22 @@ interface WasmDataset {
 interface WasmGlue {
   default(init: { module_or_path: Uint8Array }): Promise<unknown>;
   read(bytes: Uint8Array): WasmDataset;
+  // WARNING: a SHADOW of the real signature, and nothing checks it against the
+  // generated .d.ts — `bench:wasm` runs in no workflow, and `npm run typecheck`
+  // validates this file against this very interface. When the wasm surface
+  // changes, this must be updated BY HAND or the bench silently benchmarks a
+  // call shape that no longer exists.
   validate(
     bytes: Uint8Array,
-    dictVersion: string | undefined,
-    includeWarnings: boolean,
-    includeFyi: boolean,
-    encoding: string,
-    maxPerRule: number | undefined,
-    dictBytes: Uint8Array | undefined,
-    dictReplace: boolean,
+    opts?: {
+      dictVersion?: string;
+      warnings?: boolean;
+      fyi?: boolean;
+      encoding?: string;
+      maxPerRule?: number;
+      dictionary?: Uint8Array;
+      dictReplace?: boolean;
+    },
   ): unknown;
 }
 
@@ -109,15 +116,12 @@ describe.skipIf(!ready)("wasm/read", () => {
   // The validator path, both tier gates off — comparable to the Rust
   // `check_file/large` baseline (269 ms @ 25 MB, native).
   bench("validate [large]", () => {
-    glue.validate(
-      bytes,
-      undefined,
-      false,
-      false,
-      "utf-8",
-      undefined,
-      undefined,
-      false,
-    );
+    glue.validate(bytes, {
+      // Both tier gates OFF explicitly: `warnings` now defaults to true, so
+      // omitting it would quietly change what this benchmark measures.
+      warnings: false,
+      fyi: false,
+      encoding: "utf-8",
+    });
   });
 });

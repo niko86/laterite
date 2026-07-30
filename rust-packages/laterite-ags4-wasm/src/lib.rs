@@ -819,56 +819,256 @@ mod build_ags4_tests {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Options objects
+// ---------------------------------------------------------------------------
+//
+// The browser reached these verbs through positional slots, so `validate`'s
+// third argument was a bare `true` at every call site and the eighth was
+// unreachable without passing five `undefined`s. Named fields fix that, but
+// they introduce a hazard positional arguments structurally cannot have: a
+// MISSPELLED key. You cannot typo slot 3; you can very easily write
+// `synthesizeMetadata`.
+//
+// `#[serde(deny_unknown_fields)]` does NOT catch it here. serde-wasm-bindgen's
+// `ObjectAccess::next_key_seed` walks serde's list of KNOWN fields and
+// `Reflect`-gets each one — it never enumerates what the caller actually
+// passed, so an unrecognised key is invisible to serde and the option silently
+// takes its default. Writing that attribute would look like protection and be
+// none, which is why it is deliberately absent below. `reject_unknown_keys`
+// does the work instead, by enumeration.
+
+/// Binds an options struct to the key list its callers may use.
+///
+/// **Why a trait and not a `&[&str]` argument to `decode_opts`:** several
+/// exports each have their own key list, and four interchangeable `&[&str]`
+/// consts passed by hand is a silent failure waiting — hand `CertifyOptions`'
+/// keys to `validate` and every `validate` typo is accepted again, while a
+/// drift test that only checks each const against its own struct stays green.
+/// Bound to the type, the pairing cannot be got wrong.
+trait WasmOptions: serde::de::DeserializeOwned + Default {
+    /// Every accepted key, in the caller's camelCase spelling. Kept honest
+    /// against the struct's own serde names by `option_keys_match_the_structs`.
+    const KEYS: &'static [&'static str];
+    /// What to call this object in an error message.
+    const WHAT: &'static str;
+}
+
+/// Is `present` an accepted key, and if not, what should we say about it?
+///
+/// **Pure, and host-testable, on purpose.** `ci.yml` runs this crate's tests on
+/// the HOST and the crate carries no `wasm-bindgen-test`, so anything holding a
+/// `JsValue` ships with zero executed coverage. Only the key *enumeration*
+/// genuinely needs wasm; the decision and the message do not, so they live here
+/// where the test suite can actually reach them.
+fn unknown_key(known: &[&str], present: &str) -> Option<String> {
+    if known.contains(&present) {
+        return None;
+    }
+    // The realistic typos are casing (`DictVersion`) and the s/z spelling split
+    // (`synthesizeMetadata`), not arbitrary edit distance — so normalise exactly
+    // those two and offer a direct suggestion when one matches.
+    let norm = |s: &str| s.to_ascii_lowercase().replace('z', "s");
+    Some(match known.iter().find(|k| norm(k) == norm(present)) {
+        Some(k) => format!("unknown option {present:?} — did you mean {k:?}?"),
+        None => format!(
+            "unknown option {present:?}; expected one of {}",
+            known.join(", ")
+        ),
+    })
+}
+
+/// Decode an options object, refusing keys the struct does not know.
+///
+/// Returns the message rather than a `JsError` so each export can route it into
+/// the channel it already uses: `validate` folds it into a
+/// `ValidationReport::failure("bad_args", …)` like every other caller mistake
+/// it reports, while `certify` — already fallible — throws. One decoder, two
+/// existing channels, no new third way for an argument to be wrong.
+fn decode_opts<T: WasmOptions>(opts: Option<JsValue>) -> Result<T, String> {
+    use wasm_bindgen::JsCast;
+
+    let Some(v) = opts.filter(|v| !v.is_undefined() && !v.is_null()) else {
+        return Ok(T::default());
+    };
+    if !v.is_object() {
+        return Err(format!(
+            "{} must be an object of named options, e.g. {{ {} }}",
+            T::WHAT,
+            T::KEYS.first().copied().unwrap_or_default()
+        ));
+    }
+    let obj: &js_sys::Object = v.unchecked_ref();
+    for key in js_sys::Object::keys(obj).iter() {
+        if let Some(k) = key.as_string()
+            && let Some(msg) = unknown_key(T::KEYS, &k)
+        {
+            return Err(format!("{}: {msg}", T::WHAT));
+        }
+    }
+    serde_wasm_bindgen::from_value(v).map_err(|e| format!("{}: {e}", T::WHAT))
+}
+
+/// `validate`'s named options. Note the ABSENT `deny_unknown_fields` — see the
+/// module comment above; `decode_opts` enumerates instead.
+///
+/// `Serialize` is test-only: it costs nothing in the shipped wasm and, unlike a
+/// `cfg(test)` `deny_unknown_fields`, it fabricates no behaviour — the drift
+/// test reads the SAME `rename_all` config the shipped deserialize path uses.
+#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(serde::Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+struct ValidateOptions {
+    dict_version: Option<String>,
+    /// Defaults to **true** (`.unwrap_or(true)` at the call site, not here).
+    /// The positional parameter this replaces was a required `bool`, so there
+    /// was no default to preserve — but Python and Node both promise warnings
+    /// ON, and a plain `Option<bool>` silently unwrapping to `false` would have
+    /// made the browser the one surface that disagreed.
+    warnings: Option<bool>,
+    fyi: Option<bool>,
+    encoding: Option<String>,
+    max_per_rule: Option<u32>,
+    #[serde(with = "serde_bytes")]
+    dictionary: Option<Vec<u8>>,
+    dict_replace: Option<bool>,
+}
+
+impl WasmOptions for ValidateOptions {
+    const KEYS: &'static [&'static str] = &[
+        "dictVersion",
+        "warnings",
+        "fyi",
+        "encoding",
+        "maxPerRule",
+        "dictionary",
+        "dictReplace",
+    ];
+    const WHAT: &'static str = "validate options";
+}
+
+/// `certify`'s named options — `ValidateOptions`' dictionary half plus the
+/// clock. No `warnings`/`fyi`/`maxPerRule`: the mint measures every tier itself
+/// and reports counts, so there is nothing for a caller to include or exclude.
+#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(serde::Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+struct CertifyOptions {
+    dict_version: Option<String>,
+    encoding: Option<String>,
+    /// RFC-3339, from the browser (`new Date().toISOString()`). Required —
+    /// wasm has no clock — but typed `Option` so its absence is OUR error
+    /// message naming the field, not serde's generic missing-field text.
+    checked_at: Option<String>,
+    #[serde(with = "serde_bytes")]
+    dictionary: Option<Vec<u8>>,
+    dict_replace: Option<bool>,
+}
+
+impl WasmOptions for CertifyOptions {
+    const KEYS: &'static [&'static str] = &[
+        "dictVersion",
+        "encoding",
+        "checkedAt",
+        "dictionary",
+        "dictReplace",
+    ];
+    const WHAT: &'static str = "certify options";
+}
+
+// The TypeScript the consumer actually sees. Hand-written rather than derived:
+// a generator emits `dictVersion?: string`, where this gives the real edition
+// union and per-field docs — and those unions are the single biggest ergonomic
+// win in the change. Revisit `tsify` if the struct count grows past four, or if
+// the RESULT interfaces (which nothing currently guards) start to drift.
+#[wasm_bindgen(typescript_custom_section)]
+const TS_OPTIONS: &'static str = r#"
+/** Named options for `validate`. */
+export interface ValidateOptions {
+  /** Force an AGS4 edition instead of reading the file's `TRAN_AGS`.
+   *  `"auto"` (and omitting it) reads the file's own `TRAN_AGS`. */
+  dictVersion?: "auto" | "4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2";
+  /** Surface WARNING-severity findings. Default **true**. */
+  warnings?: boolean;
+  /** Surface FYI-severity findings. Default **false**. */
+  fyi?: boolean;
+  /** `"utf-8"` (default) or `"windows-1252"` for legacy files. */
+  encoding?: "utf-8" | "windows-1252";
+  /** Cap findings *serialised* per rule. Every rule still runs over every
+   *  line and the reported totals stay uncapped — this only bounds how much
+   *  crosses the wasm→JS boundary for an interactive view. */
+  maxPerRule?: number;
+  /** A custom AGS4 dictionary (`.ags` or JSON) as raw bytes. */
+  dictionary?: Uint8Array;
+  /** With `dictionary`, replace the bundled base entirely rather than
+   *  overlaying on it. Contradicts `dictVersion`; both is a `bad_dict` error. */
+  dictReplace?: boolean;
+}
+
+/** Named options for `certify`. */
+export interface CertifyOptions {
+  dictVersion?: "auto" | "4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2";
+  encoding?: "utf-8" | "windows-1252";
+  /** RFC-3339, e.g. `new Date().toISOString()`. Required: wasm has no clock. */
+  checkedAt: string;
+  dictionary?: Uint8Array;
+  dictReplace?: boolean;
+}
+"#;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "ValidateOptions")]
+    pub type ValidateOptionsJs;
+    #[wasm_bindgen(typescript_type = "CertifyOptions")]
+    pub type CertifyOptionsJs;
+}
+
 /// Validate AGS4 bytes in the browser.
 ///
 /// * `data` — the file bytes (from a `FileReader`/textarea, never uploaded).
-/// * `dict_version` — `None`/`"auto"` to detect from `TRAN_AGS`, or a
-///   forced edition string.
-/// * `include_warnings` — surface WARNING-severity findings (e.g. Rule 18).
-/// * `include_fyi` — surface FYI-severity findings (e.g. Rule 1 FYI).
-/// * `encoding_label` — `None`/`"utf-8"` or `"windows-1252"` for legacy files.
-/// * `max_per_rule` — cap on how many findings per rule are **serialized**
-///   into the report. `None` (the download path) serializes everything;
-///   `Some(n)` (the interactive UI) clips each group to its first `n` so a
-///   pathologically dirty file moves tens of thousands of rows across the
-///   wasm→JS boundary, not the full millions. The cap is purely on output:
-///   every rule still runs over every line, and `finding_count` /
-///   `RuleGroup.total` always report the true, uncapped counts.
-/// * `dict_bytes` — an optional custom AGS4 dictionary (`.ags` or JSON),
-///   supplied as raw bytes (#568). The browser has no filesystem, so — unlike
-///   `lat --dict <path>` — the dict always arrives in memory. `None` uses the
-///   bundled edition. A bespoke group declared here becomes first-class instead
-///   of being flagged as unknown.
-/// * `dict_replace` — with `dict_bytes`, drop the bundled base entirely (the dict
-///   fully replaces the standard) rather than overlaying on top of it. Contradicts
-///   a forced `dict_version`; supplying both is a `bad_dict` error.
+/// * `opts` — a [`ValidateOptions`] object; every field optional, so
+///   `validate(bytes)` is a complete call. An unrecognised key is REFUSED by
+///   name rather than silently taking its default (see the options module
+///   comment for why serde cannot do that itself).
+///
+/// This took EIGHT positional arguments, of which three were `bool`. Reaching
+/// `dictReplace` meant passing five `undefined`s, and swapping the two adjacent
+/// severity flags compiled cleanly on every surface that called it.
+///
+/// Defaults, matching every other surface: `warnings` **on**, `fyi` **off**,
+/// `dictReplace` **off**, edition read from the file's `TRAN_AGS`.
+///
+/// Infallible by design. A bad option — unknown key, unknown edition, unknown
+/// encoding, unparseable dictionary — comes back as
+/// `report.error = { kind: "bad_args" | "bad_dict", message }`, the same channel
+/// the caller already handles, rather than as a thrown exception that the UI
+/// would have to catch somewhere else.
 ///
 /// Returns a [`ValidationReport`] as a plain JS object (json-compatible:
 /// `None` → `null`, matching the CLI's `--json`).
-#[allow(clippy::too_many_arguments)] // the wasm surface mirrors lat's positional flags
 #[wasm_bindgen]
-pub fn validate(
-    data: &[u8],
-    dict_version: Option<String>,
-    include_warnings: bool,
-    include_fyi: bool,
-    encoding_label: Option<String>,
-    max_per_rule: Option<u32>,
-    dict_bytes: Option<Vec<u8>>,
-    dict_replace: bool,
-) -> JsValue {
+pub fn validate(data: &[u8], opts: Option<ValidateOptionsJs>) -> JsValue {
     console_error_panic_hook::set_once();
 
-    let report = run(
-        data,
-        dict_version.as_deref(),
-        include_warnings,
-        include_fyi,
-        encoding_label.as_deref(),
-        max_per_rule.map(|c| c as usize),
-        dict_bytes.as_deref(),
-        dict_replace,
-    );
+    // A bad option key is a caller mistake, and `run` already reports every
+    // other caller mistake — unknown edition, unknown encoding, unparseable
+    // dictionary — as `bad_args`/`bad_dict` in the report itself. Throwing here
+    // instead would split one error channel in two: some argument errors the UI
+    // renders through `report.error.kind`, others arriving as a rejected
+    // promise. `validate` stays infallible.
+    let o: ValidateOptions = match decode_opts(opts.map(JsValue::from)) {
+        Ok(o) => o,
+        Err(message) => {
+            let report = ValidationReport::failure("bad_args", message);
+            let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+            return report
+                .serialize(&serializer)
+                .expect("ValidationReport is plain data and always serialises");
+        }
+    };
+
+    let report = run(data, &o);
     // json_compatible so the JS side sees plain objects + null (not Map
     // / undefined) — same shape the CLI emits.
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();
@@ -902,20 +1102,33 @@ pub fn validate(
 /// `{name, hash}` so a later `validate --index` on any surface re-validates (never
 /// silently vouches) when the effective dictionary differs (O-48, record-not-contract).
 #[wasm_bindgen]
-pub fn certify(
-    data: &[u8],
-    dict_version: Option<String>,
-    encoding_label: Option<String>,
-    checked_at: String,
-    dict_bytes: Option<Vec<u8>>,
-    dict_replace: bool,
-) -> Result<String, JsError> {
+pub fn certify(data: &[u8], opts: CertifyOptionsJs) -> Result<String, JsError> {
     console_error_panic_hook::set_once();
 
-    let dict_over = resolve_dict_override(dict_version.as_deref()).map_err(|m| JsError::new(&m))?;
-    let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
-    let custom_dict = build_custom_dict(dict_bytes.as_deref(), dict_replace, dict_over, encoding)
-        .map_err(|m| JsError::new(&m))?;
+    // certify is already fallible, so its decode errors throw — the channel it
+    // has, not a new one. (Contrast `validate`, which reports them.)
+    let o: CertifyOptions = decode_opts(Some(JsValue::from(opts))).map_err(|m| JsError::new(&m))?;
+    certify_core(data, &o).map_err(|m| JsError::new(&m))
+}
+
+/// The host-testable core of [`certify`], for the same reason [`run`] is one:
+/// a `JsValue` in the signature puts a function beyond `cargo test`, which is
+/// the only lane this crate has.
+fn certify_core(data: &[u8], o: &CertifyOptions) -> Result<String, String> {
+    let checked_at = o.checked_at.clone().ok_or_else(|| {
+        "certify options: `checkedAt` is required — wasm has no clock, so the caller supplies \
+         the timestamp (e.g. new Date().toISOString())"
+            .to_string()
+    })?;
+
+    let dict_over = resolve_dict_override(o.dict_version.as_deref())?;
+    let encoding = resolve_encoding(o.encoding.as_deref())?;
+    let custom_dict = build_custom_dict(
+        o.dictionary.as_deref(),
+        o.dict_replace.unwrap_or(false),
+        dict_over,
+        encoding,
+    )?;
 
     let opts = CheckOptions {
         dict_version: dict_over,
@@ -923,12 +1136,10 @@ pub fn certify(
         custom_dict,
         ..CheckOptions::default()
     };
-    let sidecar = laterite_ags4_trust::mint(data, &opts, checked_at, None)
-        .map_err(|e| JsError::new(&e.to_string()))?;
-    let json = sidecar
-        .to_json()
-        .map_err(|e| JsError::new(&e.to_string()))?;
-    String::from_utf8(json).map_err(|e| JsError::new(&e.to_string()))
+    let sidecar =
+        laterite_ags4_trust::mint(data, &opts, checked_at, None).map_err(|e| e.to_string())?;
+    let json = sidecar.to_json().map_err(|e| e.to_string())?;
+    String::from_utf8(json).map_err(|e| e.to_string())
 }
 
 /// The AGS4 rule catalogue as the gated `rules_meta.json` JSON string — the
@@ -1000,22 +1211,27 @@ mod char_span_tests {
     }
 }
 
-#[allow(clippy::too_many_arguments)] // mirrors the public `validate` arg list one-to-one
-fn run(
-    data: &[u8],
-    dict_version: Option<&str>,
-    include_warnings: bool,
-    include_fyi: bool,
-    encoding_label: Option<&str>,
-    max_per_rule: Option<usize>,
-    dict_bytes: Option<&[u8]>,
-    dict_replace: bool,
-) -> ValidationReport {
-    let dict_over = match resolve_dict_override(dict_version) {
+/// The host-testable core of [`validate`]: no `JsValue`, so `cargo test` can
+/// actually reach it (this crate's tests run on the host and it carries no
+/// `wasm-bindgen-test`).
+///
+/// Takes the decoded options struct rather than eight positional parameters.
+/// Three of those were `bool` — `include_warnings`, `include_fyi`,
+/// `dict_replace` — so `run(data, None, true, true, None, None, None, false)`
+/// was a legal call in which swapping the two adjacent flags compiled cleanly
+/// and silently changed what the report contained. Field names remove that; the
+/// defaults still resolve here, so every door gets the same ones.
+fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
+    let include_warnings = o.warnings.unwrap_or(true);
+    let include_fyi = o.fyi.unwrap_or(false);
+    let max_per_rule = o.max_per_rule.map(|c| c as usize);
+    let dict_bytes = o.dictionary.as_deref();
+
+    let dict_over = match resolve_dict_override(o.dict_version.as_deref()) {
         Ok(v) => v,
         Err(message) => return ValidationReport::failure("bad_args", message),
     };
-    let encoding = match resolve_encoding(encoding_label) {
+    let encoding = match resolve_encoding(o.encoding.as_deref()) {
         Ok(e) => e,
         // Same channel a bad dict_version uses: the caller SEES the bad label,
         // instead of getting findings that are artefacts of a UTF-8 fallback.
@@ -1024,7 +1240,12 @@ fn run(
     // The custom-dict overlay is resolved (base detected, delta built, hash minted)
     // once here, before parsing the delivery — a bad dictionary is the DICTIONARY's
     // problem and is reported as such, on the same channel a bad dict_version uses.
-    let custom_dict = match build_custom_dict(dict_bytes, dict_replace, dict_over, encoding) {
+    let custom_dict = match build_custom_dict(
+        dict_bytes,
+        o.dict_replace.unwrap_or(false),
+        dict_over,
+        encoding,
+    ) {
         Ok(c) => c,
         Err(message) => return ValidationReport::failure("bad_dict", message),
     };
@@ -1162,8 +1383,103 @@ fn run(
 }
 
 #[cfg(test)]
+mod options_tests {
+    use super::{CertifyOptions, ValidateOptions, WasmOptions, unknown_key};
+
+    /// `KEYS` must name exactly the struct's own serde fields.
+    ///
+    /// The list is what `reject_unknown_keys` accepts and the struct is what
+    /// serde reads; nothing but this test makes them agree. Drift in either
+    /// direction is a silent bug — a key present in `KEYS` but absent from the
+    /// struct is accepted and then ignored, and one present in the struct but
+    /// absent from `KEYS` is refused despite working.
+    ///
+    /// Sorted on BOTH sides deliberately: `serde_json`'s `preserve_order` IS on
+    /// for this crate (via laterite-ags4-validator / -core / -reference, which
+    /// it depends on), so `to_value` yields declaration order, not sorted. An
+    /// equality check against an assumed-sorted Map would pass or fail on field
+    /// ORDER rather than field NAMES.
+    fn assert_keys_match<T: WasmOptions + serde::Serialize>() {
+        let v = serde_json::to_value(T::default()).expect("options are plain data");
+        let mut from_struct: Vec<String> = v
+            .as_object()
+            .expect("options serialise as an object")
+            .keys()
+            .cloned()
+            .collect();
+        let mut declared: Vec<String> = T::KEYS.iter().map(|s| (*s).to_string()).collect();
+        from_struct.sort();
+        declared.sort();
+        assert_eq!(
+            declared,
+            from_struct,
+            "{}: KEYS and the struct's serde fields have drifted",
+            T::WHAT
+        );
+    }
+
+    #[test]
+    fn option_keys_match_the_structs() {
+        assert_keys_match::<ValidateOptions>();
+        assert_keys_match::<CertifyOptions>();
+    }
+
+    /// A misspelled key is REFUSED, by name, with a suggestion.
+    ///
+    /// This is the whole reason the guard exists. `#[serde(deny_unknown_fields)]`
+    /// cannot do it under serde-wasm-bindgen — `ObjectAccess` walks serde's
+    /// KNOWN fields and `Reflect`-gets each, so it never sees a key the caller
+    /// invented. Under positional arguments this failure mode did not exist:
+    /// you cannot typo slot 3.
+    #[test]
+    fn a_misspelled_option_is_refused_and_the_right_one_suggested() {
+        // Exact match: accepted.
+        assert!(unknown_key(ValidateOptions::KEYS, "dictVersion").is_none());
+
+        // The s/z spelling split — the realistic typo for a British-spelled API.
+        let msg = unknown_key(&["synthesiseMetadata"], "synthesizeMetadata")
+            .expect("a z-spelling must not be silently ignored");
+        assert!(
+            msg.contains("did you mean") && msg.contains("synthesiseMetadata"),
+            "suggest the real key: {msg}"
+        );
+
+        // Casing.
+        let msg = unknown_key(ValidateOptions::KEYS, "DictVersion").expect("casing must not pass");
+        assert!(msg.contains("dictVersion"), "suggest the real key: {msg}");
+
+        // Nothing close: list what IS accepted rather than guessing.
+        let msg = unknown_key(ValidateOptions::KEYS, "wibble").expect("unknown must not pass");
+        assert!(msg.contains("expected one of"), "{msg}");
+        assert!(msg.contains("maxPerRule"), "list the real keys: {msg}");
+        assert!(!msg.contains("did you mean"), "no false suggestion: {msg}");
+    }
+
+    /// Omitted flags take the values every other surface promises.
+    ///
+    /// `warnings` is the one that matters: the positional parameter it replaces
+    /// was a REQUIRED `bool`, so there was no default to preserve — and a plain
+    /// `Option<bool>` unwrapping to `false` would have made the browser the
+    /// only surface that hides warnings unless asked.
+    #[test]
+    fn omitted_flags_default_the_way_every_other_surface_does() {
+        let o = ValidateOptions::default();
+        assert!(o.warnings.unwrap_or(true), "warnings default ON");
+        assert!(!o.fyi.unwrap_or(false), "fyi default OFF");
+        assert!(!o.dict_replace.unwrap_or(false), "dict_replace default OFF");
+
+        // And an explicit `false` still wins — the default must not be a floor.
+        let quiet = ValidateOptions {
+            warnings: Some(false),
+            ..Default::default()
+        };
+        assert!(!quiet.warnings.unwrap_or(true));
+    }
+}
+
+#[cfg(test)]
 mod dict_overlay_tests {
-    use super::run;
+    use super::{ValidateOptions, run};
 
     // The #568 Phase-3 end-to-end fixtures, shared with the validator's `custom_dict.rs`
     // so the browser is proven against the same bytes: a bespoke `XTRA` group hung off
@@ -1193,7 +1509,14 @@ mod dict_overlay_tests {
                 .map(|e| e.message.clone())
                 .unwrap_or_default()
         };
-        let without = run(DELIVERY, None, true, true, None, None, None, false);
+        let opts = |dictionary: Option<&[u8]>, dict_replace: bool| ValidateOptions {
+            warnings: Some(true),
+            fyi: Some(true),
+            dictionary: dictionary.map(<[u8]>::to_vec),
+            dict_replace: Some(dict_replace),
+            ..Default::default()
+        };
+        let without = run(DELIVERY, &opts(None, false));
         assert!(
             without.error.is_none(),
             "delivery parses: {}",
@@ -1206,16 +1529,7 @@ mod dict_overlay_tests {
 
         // With the custom dictionary supplied as bytes (the browser's only form),
         // XTRA is a first-class group and draws no findings.
-        let with = run(
-            DELIVERY,
-            None,
-            true,
-            true,
-            None,
-            None,
-            Some(DICT_JSON),
-            false,
-        );
+        let with = run(DELIVERY, &opts(Some(DICT_JSON), false));
         assert!(
             with.error.is_none(),
             "delivery parses with dict: {}",
@@ -1238,13 +1552,14 @@ mod dict_overlay_tests {
         // The one contradiction: a full replacement cannot also force a base edition.
         let report = run(
             DELIVERY,
-            Some("4.2"),
-            true,
-            true,
-            None,
-            None,
-            Some(DICT_JSON),
-            true,
+            &ValidateOptions {
+                dict_version: Some("4.2".into()),
+                warnings: Some(true),
+                fyi: Some(true),
+                dictionary: Some(DICT_JSON.to_vec()),
+                dict_replace: Some(true),
+                ..Default::default()
+            },
         );
         let err = report
             .error
@@ -1917,20 +2232,22 @@ mod tests {
     const CLEAN_FIXTURE: &[u8] =
         include_bytes!("../../laterite-ags4-validator/tests/fixtures/clean_minimal.ags");
 
+    /// Certify options carrying only the clock — the one field with no default,
+    /// since wasm cannot read one.
+    fn stamped_at(when: &str) -> CertifyOptions {
+        CertifyOptions {
+            checked_at: Some(when.to_string()),
+            ..Default::default()
+        }
+    }
+
     /// A wasm-minted certificate now carries the shared engine identity — it used
     /// to stamp "laterite-ags4-wasm", which siloed browser certs from every other
     /// surface. Now a cert downloaded from the web app is one every surface can read.
     /// (#430 PR 1a)
     #[test]
     fn certify_stamps_the_unified_engine_identity() {
-        let json = match certify(
-            CLEAN_FIXTURE,
-            None,
-            None,
-            "2020-01-01T00:00:00Z".to_string(),
-            None,
-            false,
-        ) {
+        let json = match certify_core(CLEAN_FIXTURE, &stamped_at("2020-01-01T00:00:00Z")) {
             Ok(s) => s,
             Err(_) => panic!("a clean minimal AGS4 file must certify"),
         };
@@ -1945,15 +2262,8 @@ mod tests {
     /// surface would have believed. Every tier a wasm cert names, it looked at.
     #[test]
     fn a_browser_minted_certificate_measured_every_tier_it_names() {
-        let json = certify(
-            CLEAN_FIXTURE,
-            None,
-            None,
-            "2020-01-01T00:00:00Z".to_string(),
-            None,
-            false,
-        )
-        .unwrap_or_else(|_| panic!("a clean minimal AGS4 file must certify"));
+        let json = certify_core(CLEAN_FIXTURE, &stamped_at("2020-01-01T00:00:00Z"))
+            .unwrap_or_else(|_| panic!("a clean minimal AGS4 file must certify"));
         let v: serde_json::Value = serde_json::from_str(&json).expect("the cert is JSON");
         for tier in ["errors", "warnings", "fyi"] {
             assert_eq!(
@@ -1968,15 +2278,8 @@ mod tests {
     /// otherwise: nothing a browser mints can claim Rule 20's on-disk half ran.
     #[test]
     fn a_browser_minted_certificate_cannot_claim_a_world_check() {
-        let json = certify(
-            CLEAN_FIXTURE,
-            None,
-            None,
-            "2020-01-01T00:00:00Z".to_string(),
-            None,
-            false,
-        )
-        .unwrap_or_else(|_| panic!("a clean minimal AGS4 file must certify"));
+        let json = certify_core(CLEAN_FIXTURE, &stamped_at("2020-01-01T00:00:00Z"))
+            .unwrap_or_else(|_| panic!("a clean minimal AGS4 file must certify"));
         assert!(
             !json.contains("check_files"),
             "the stamp must carry no world claim at all: {json}"
