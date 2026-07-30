@@ -1,66 +1,50 @@
 // Shared types + data for the Rust `laterite-ags4-wasm` validator. This module is
 // deliberately wasm-free so it's safe to import from the main thread: ALL
 // wasm calls (validate + the Apply-Fixes engine) live in
-// `validator.worker.ts`, driven through `validatorClient.ts`. The wasm
-// `.d.ts` types the returns as `any`, so the json-compatible shapes
-// (`ValidationReport`, `Fix`) are mirrored here in one place.
+// `validator.worker.ts`, driven through `validatorClient.ts`.
+//
+// The report shapes used to be re-declared here by hand, because wasm-bindgen
+// typed the returns as `any`. The crate now publishes them in its own `.d.ts`,
+// so this re-exports them instead of maintaining a second description of the
+// same bytes — a mirror can only ever be right by accident, and this one was
+// wrong about `severity` (see `reportIsOnlyFyi`).
+//
+// `import type` is erased at compile time, so pulling these from the wasm
+// package adds NO runtime import and the module stays main-thread-safe.
+export type {
+  FindingDto,
+  RuleGroup,
+  ValErr,
+  ValidationReport,
+} from "../wasm/ags4_wasm";
 
-export interface FindingDto {
-  line: number | null;
-  group: string;
-  desc: string;
-  // Rule-aware location + severity (additive; serde emits these
-  // snake_case keys only when set, so older line-only findings omit
-  // them). `field_index` is the tag-stripped column index — the raw
-  // on-line field is `field_index + 1` (field 0 is the HEADING tag).
-  target?: "line" | "heading" | "cell" | "group";
-  field_index?: number;
-  heading?: string;
-  data_row?: number;
-  char_span?: [number, number];
-  severity?: "error" | "warning" | "fyi";
-}
-export interface RuleGroup {
-  rule: string;
-  /** True per-rule count, before any cap; `items.length` may be smaller. */
-  total: number;
-  items: FindingDto[];
-}
-export interface ValErr {
-  /** stable machine token: not_ags4 | unsupported_edition | bad_args | … */
-  kind: string;
-  message: string;
-}
-export interface ValidationReport {
-  ok: boolean;
-  /** bundled edition judged against ("4.1.1", …); "" on error */
-  dict_version: string;
-  /** how it was chosen: forced | exact | guessed | fallback; "" on error */
-  resolution: string;
-  /** true total across all rules, independent of any cap */
-  finding_count: number;
-  /** how many findings were actually serialized (≤ finding_count when capped) */
-  shown_count: number;
-  findings: RuleGroup[];
-  error: ValErr | null;
-  /** Why a proffered `.ags.idx` cert did NOT stand in for the engine (the stable
-   *  snake_case token), else `null`. Mirrors `Report.revalidateReason` (Node) and
-   *  `laterite.Report.revalidate_reason` (Python) for cross-surface shape parity.
-   *  Always `null` on this surface: `validate` has no cert-consume door, so the
-   *  engine always ran and no certificate was ever offered to reject (#568). */
-  revalidate_reason: string | null;
+import type { FindingDto, ValidationReport } from "../wasm/ags4_wasm";
+
+/** The three severities the UI displays.
+ *
+ *  Deliberately NOT `NonNullable<FindingDto["severity"]>`: the WIRE type has two
+ *  members because the engine omits the field entirely for errors. This is the
+ *  RESOLVED union — what a finding means once `severityOf` has read it. */
+export type Severity = "error" | "warning" | "fyi";
+
+/** Resolve a finding's severity. **Absent means `"error"`.**
+ *
+ *  Every caller must come through here rather than writing `?? …` at the point
+ *  of use. The app used to default to `"warning"` at five separate sites, which
+ *  silently reclassified every error in the browser: the summary banner's split
+ *  counted errors as warnings, and the severity filter hid them from the "error"
+ *  selection while showing them under "warning". One resolver, one place to be
+ *  right. */
+export function severityOf(f: Pick<FindingDto, "severity">): Severity {
+  return f.severity ?? "error";
 }
 
 /** True when a report has findings but EVERY one is FYI (informational) — the
- *  signal the SummaryBanner uses to show amber rather than red. `severity`
- *  defaults to "warning" when absent, so an un-tagged finding still counts as
- *  non-FYI (one real error among many FYI ⇒ false ⇒ red). */
+ *  signal the SummaryBanner uses to show amber rather than red. */
 export function reportIsOnlyFyi(report: ValidationReport): boolean {
   return (
     report.finding_count > 0 &&
-    !report.findings.some((g) =>
-      g.items.some((it) => (it.severity ?? "warning") !== "fyi"),
-    )
+    !report.findings.some((g) => g.items.some((it) => severityOf(it) !== "fyi"))
   );
 }
 
@@ -70,15 +54,15 @@ export interface SeverityCounts {
   fyi: number;
 }
 
-/** Per-severity counts summed from the SERIALIZED findings (severity defaults
- *  to "warning" when a finding predates the field). Exact when the report is
- *  uncapped (`shown_count === finding_count`); on a per-rule-capped report the
- *  items are clipped, so the sum undercounts — see {@link reportSeverity},
- *  which falls back to the true grand total in that case. */
+/** Per-severity counts summed from the SERIALIZED findings. Exact when the
+ *  report is uncapped (`shown_count === finding_count`); on a per-rule-capped
+ *  report the items are clipped, so the sum undercounts — see
+ *  {@link reportSeverity}, which falls back to the true grand total in that
+ *  case. */
 export function severityCounts(report: ValidationReport): SeverityCounts {
   const c: SeverityCounts = { error: 0, warning: 0, fyi: 0 };
   for (const g of report.findings)
-    for (const it of g.items) c[it.severity ?? "warning"]++;
+    for (const it of g.items) c[severityOf(it)]++;
   return c;
 }
 
@@ -159,36 +143,16 @@ export type TypeClashMode = "error" | "widen" | "promote";
 // strict. ---
 export type EmitMode = "autofix" | "report" | "strict";
 
-/** One finding on the *emitted* output (post-fix in AutoFix). `severity`
- *  omitted ⇒ error, matching the engine. */
-export interface ExportFinding {
-  rule: string;
-  line?: number | null;
-  group: string;
-  desc: string;
-  severity?: string;
-}
-
-/** One fix AutoFix applied, as recorded in the export ledger. Same shape as
- *  Python's `BuildResult.applied` and Node's `EmitResult.applied`. */
-export interface AppliedFix {
-  kind: string;
-  label: string;
-  rule: string;
-  line: number | null;
-  risk: "safe" | "risky";
-}
-
-export interface ExportResult {
-  /** The AGS4 document text (UTF-8, CRLF) — wrap in a Blob to download. */
-  text: string;
-  findings: ExportFinding[];
-  /** What AutoFix rewrote. AutoFix returns only *residual* findings, so this is
-   *  the only way to show which fixes ran (empty for report/strict). */
-  applied: AppliedFix[];
-  /** Count of safe mechanical fixes AutoFix applied (0 for report/strict). */
-  fixes_applied: number;
-}
+// The second hand-written mirror this file used to carry: `build_ags4` returned
+// `any`, so its result shape was re-described here and the worker cast to it.
+// The crate publishes it now, so these are aliases onto the generated types —
+// the local names stay so the Export tab and the worker are unchanged, but
+// there is one description of the shape instead of two. The old copies were
+// also looser than the engine (`severity?: string`, `kind: string`); the
+// published unions are exact.
+export type { EmitFinding as ExportFinding } from "../wasm/ags4_wasm";
+export type { AppliedFix } from "../wasm/ags4_wasm";
+export type { BuildReport as ExportResult } from "../wasm/ags4_wasm";
 
 // --- Standard dictionary (Tools reference): one edition of the AGS4 standard
 // dictionary (canonical names, descriptions, units, types, status). Now produced

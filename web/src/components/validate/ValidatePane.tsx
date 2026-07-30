@@ -8,6 +8,7 @@ import {
 } from "solid-js";
 import {
   DEFAULT_MAX_PER_RULE,
+  severityOf,
   type ValidationReport,
 } from "../../lib/validator";
 import { validate as runValidate } from "../../lib/validatorClient";
@@ -161,7 +162,7 @@ export const ValidatePane: Component = () => {
         rule: g.rule,
         total: g.total,
         items: g.items.filter((f) => {
-          if (!sevs.has(f.severity ?? "warning")) return false;
+          if (!sevs.has(severityOf(f))) return false;
           if (!groups.has(f.group || "—")) return false;
           if (q) {
             const src = f.line != null ? (lines[f.line - 1] ?? "") : "";
