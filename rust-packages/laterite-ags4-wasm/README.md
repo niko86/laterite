@@ -155,7 +155,7 @@ const res = build_ags4(JSON.stringify([
     headings: ["LOCA_ID", "LOCA_GL"],
     rows: [["BH01", 12.3], ["BH02", 9.87]],
   },
-]), "4.1.1", "autofix");
+]), { dictVersion: "4.1.1", mode: "autofix" });
 
 res.text;             // the AGS4 document (UTF-8, CRLF) — wrap in a Blob
 res.findings;
@@ -169,12 +169,32 @@ is written through verbatim; don't pre-format.
 
 `mode` is `"autofix"` (default) · `"report"` · `"strict"`. Note that `autofix`
 repairs what the input contains but does **not** mint the mandatory UNIT / TYPE /
-TRAN / ABBR catalogues — a data-only build reports Rules 14/15/17 rather than
-silently inventing metadata. Opt in with the trailing 4th argument:
+ABBR catalogues — a data-only build reports Rules 14/15/17 rather than silently
+inventing metadata. Opt in with `synthesiseMetadata`:
 
 ```ts
-build_ags4(groupsJson, "4.1.1", "autofix", true);   // synthesise_metadata
+build_ags4(groupsJson, { synthesiseMetadata: true });
 ```
+
+`TRAN` is **never** synthesised, even with that on: only you know who sent what
+to whom, and a placeholder that *satisfies* Rule 14 asserts a transmission that
+never happened. State it instead — all five are REQUIRED headings, so they are
+required together:
+
+```ts
+build_ags4(groupsJson, {
+  synthesiseMetadata: true,
+  tran: {
+    issue: "1",
+    date: "2026-07-30",
+    producer: "Your Firm",
+    recipient: "The Client",
+    status: "FINAL",
+  },
+});
+```
+
+Omit `tran` and no `TRAN` is written; Rule 14 reports the gap.
 
 For large, already-columnar data (a duckdb-wasm result), `build_ags4_ipc` takes
 `[{ code, ipc }]` and skips the per-cell JSON round-trip entirely.

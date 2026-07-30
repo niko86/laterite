@@ -53,7 +53,7 @@ async function runNode(cases, repoRoot) {
       const build = aCase.input?.build;
       if (build == null) return null;
       try {
-        return { ok: mod.buildAgs4(toNodeGroups(build)).text };
+        return { ok: mod.buildAgs4(toNodeGroups(build), buildOpts(aCase)).text };
       } catch (e) {
         return { err: (e?.name ?? "Error").replace(/Error$/, "") };
       }
@@ -61,6 +61,21 @@ async function runNode(cases, repoRoot) {
     return null;
   };
   return collect("node", cases, observe);
+}
+
+/** The two knobs the build legs share, in each surface's own spelling.
+ *
+ * Node and wasm take the SAME object shape here, which is the point: the case
+ * manifest states one transmission and both doors must reproduce the same
+ * bytes from it. `null` when the case sets no options, so the default-path
+ * cases keep exercising the defaults. */
+function buildOpts(aCase) {
+  const o = aCase.input?.build_opts;
+  if (o == null) return undefined;
+  return {
+    synthesiseMetadata: Boolean(o.synthesise_metadata),
+    ...(o.tran ? { tran: o.tran } : {}),
+  };
 }
 
 async function runWasm(cases, repoRoot) {
@@ -73,8 +88,9 @@ async function runWasm(cases, repoRoot) {
       if (build == null) return null;
       try {
         // wasm's build_ags4 takes the groups_json string DIRECTLY — the same
-        // {code, headings, units?, types?, rows} shape the manifest carries.
-        return { ok: glue.build_ags4(JSON.stringify(build), undefined, undefined).text };
+        // {code, headings, units?, types?, rows} shape the manifest carries —
+        // then ONE named options object.
+        return { ok: glue.build_ags4(JSON.stringify(build), buildOpts(aCase)).text };
       } catch (e) {
         return { err: (e?.message ?? "Error").split("\n")[0] };
       }

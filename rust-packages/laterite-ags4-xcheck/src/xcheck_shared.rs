@@ -71,6 +71,36 @@ pub struct Input {
     /// polars frame, node row-objects, the wasm JSON string).
     #[serde(default)]
     pub build: Option<Vec<BuildGroup>>,
+    /// Options for the `build_typed` op. Absent means every surface's defaults
+    /// (`AutoFix`, fallback edition, synthesis OFF, no `TRAN`) — which is what all
+    /// the original build cases exercise.
+    ///
+    /// A case that sets these is checking that the surfaces agree on the
+    /// SYNTHESIS path too, not just the passthrough one. That path mints whole
+    /// groups the caller never wrote, so a surface diverging there produces a
+    /// file with different GROUPS, not merely different bytes.
+    #[serde(default)]
+    pub build_opts: Option<BuildOpts>,
+}
+
+/// The `build_typed` knobs, in the shared vocabulary every surface uses.
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct BuildOpts {
+    #[serde(default)]
+    pub synthesise_metadata: bool,
+    /// All five or none — the shared `TranStamp` rule. A partial stamp is an
+    /// error on every surface, so a case cannot express one here either.
+    #[serde(default)]
+    pub tran: Option<TranParts>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct TranParts {
+    pub issue: String,
+    pub date: String,
+    pub producer: String,
+    pub recipient: String,
+    pub status: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]

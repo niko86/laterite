@@ -83,25 +83,38 @@ def observe_python(case: dict, repo_root: Path) -> dict | None:
         if build is None:
             return None
         try:
-            return build_typed(build)
+            return build_typed(build, case["input"].get("build_opts"))
         except Exception as e:
             return {"err": type(e).__name__}
     return None
 
 
-def build_typed(groups: list[dict]) -> dict:
+def build_typed(groups: list[dict], opts: dict | None = None) -> dict:
     """`laterite.build_ags4` — the data→AGS4 door. Construct a polars frame per
     group from the typed inline rows (columns = headings, cells = the JSON
     values), and let build_ags4's shared orchestrator + dictionary fill the
     rest. Routes through the same emitter as the rust-leaf authority, so it must
-    reproduce it byte-for-byte."""
+    reproduce it byte-for-byte.
+
+    `build_opts` carries the two knobs the build legs share — synthesis, and the
+    transmission stamp. A case that sets them checks that the surfaces agree on
+    the SYNTHESIS path, where a divergence changes which GROUPS a file has, not
+    merely its bytes."""
     import polars as pl
 
     tables = {
         g["code"]: pl.DataFrame(g["rows"], schema=g["headings"], orient="row")
         for g in groups
     }
-    return {"ok": laterite.build_ags4(tables).text}
+    opts = opts or {}
+    tran = opts.get("tran")
+    return {
+        "ok": laterite.build_ags4(
+            tables,
+            synthesise_metadata=bool(opts.get("synthesise_metadata", False)),
+            tran=laterite.TranStamp(**tran) if tran else None,
+        ).text
+    }
 
 
 # --- the `python-compat` leg (the python-ags4 shim) ------------------
