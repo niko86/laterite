@@ -27,6 +27,8 @@ import init, {
 import type { ParsedDataset } from "../wasm/ags4_wasm.js";
 import wasmUrl from "../wasm/ags4_wasm_bg.wasm?url";
 import type {
+  DictVersionOpt,
+  EncodingOpt,
   ValidationReport,
   Fix,
   RevisionDelta,
@@ -41,9 +43,9 @@ export interface ValidateReq {
   kind: "validate";
   /** Transferred from the main thread; the worker views it as bytes. */
   bytes: ArrayBuffer;
-  dict: string | null;
+  dict: DictVersionOpt | null;
   includeFyi: boolean;
-  encoding: string;
+  encoding: EncodingOpt;
   /** `null` = uncapped (the full-report download path). */
   maxPerRule: number | null;
   /** When set, gzip the JSON in-worker and return bytes, not the object —
@@ -60,8 +62,8 @@ export interface ComputeFixesReq {
   id: number;
   kind: "computeFixes";
   bytes: ArrayBuffer;
-  dict: string | null;
-  encoding: string;
+  dict: DictVersionOpt | null;
+  encoding: EncodingOpt;
 }
 /** Mint a `.ags.idx` certificate for a clean file (Validate → download).
  *  Carries the file bytes + the browser's RFC-3339 timestamp (wasm has no
@@ -70,8 +72,8 @@ export interface CertifyReq {
   id: number;
   kind: "certify";
   bytes: ArrayBuffer;
-  dict: string | null;
-  encoding: string;
+  dict: DictVersionOpt | null;
+  encoding: EncodingOpt;
   checkedAt: string;
   /** Mint against a custom dictionary (#568); the cert records its `{name, hash}`
    *  so a later `validate --index` re-validates when the effective dict differs. */
@@ -84,7 +86,7 @@ export interface ApplyFixesReq {
   id: number;
   kind: "applyFixes";
   bytes: ArrayBuffer;
-  encoding: string;
+  encoding: EncodingOpt;
   fixes: Fix[];
 }
 /** Parse a file to a typed dataset, held in the worker. Returns the per-
@@ -94,7 +96,7 @@ export interface ParseReq {
   id: number;
   kind: "parse";
   bytes: ArrayBuffer;
-  encoding: string;
+  encoding: EncodingOpt;
 }
 /** Pull one group's typed Arrow IPC stream from the held ParsedDataset.
  *  Carries no bytes — it reads the most recently parsed dataset. */
@@ -114,7 +116,7 @@ export interface RevisionDiffReq {
   kind: "revisionDiff";
   aBytes: ArrayBuffer;
   bBytes: ArrayBuffer;
-  encoding: string;
+  encoding: EncodingOpt;
   /** per-group cap on serialized row deltas (counts stay true totals). */
   maxRowsPerGroup: number | null;
 }
@@ -127,7 +129,7 @@ export interface MergeReq {
   kind: "merge";
   aBytes: ArrayBuffer;
   bBytes: ArrayBuffer;
-  encoding: string;
+  encoding: EncodingOpt;
   onTypeClash: TypeClashMode;
   /** All five TRAN members or nothing — the engine refuses a partial stamp. */
   tran: {
@@ -449,14 +451,13 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
     if (req.kind === "certify") {
       // `certify` throws (a JsError) on a dirty/unparseable file; the outer
       // catch turns that into an `ok: false` reply the client rejects.
-      const json = certify(
-        new Uint8Array(req.bytes),
-        req.dict,
-        req.encoding,
-        req.checkedAt,
-        req.dictBytes,
-        req.dictReplace ?? false,
-      );
+      const json = certify(new Uint8Array(req.bytes), {
+        dictVersion: req.dict ?? undefined,
+        encoding: req.encoding,
+        checkedAt: req.checkedAt,
+        dictionary: req.dictBytes ?? undefined,
+        dictReplace: req.dictReplace ?? false,
+      });
       reply({ id: req.id, ok: true, kind: "cert", json });
       return;
     }
@@ -490,18 +491,19 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
       return;
     }
 
-    const report = validate(
-      new Uint8Array(req.bytes),
-      req.dict,
-      // include_warnings: warnings are produced always (Rule 18 etc.) — the
-      // severity FilterBar (error+warning on by default) controls display.
-      true,
-      req.includeFyi,
-      req.encoding,
-      req.maxPerRule,
-      req.dictBytes,
-      req.dictReplace ?? false,
-    ) as ValidationReport;
+    const report = validate(new Uint8Array(req.bytes), {
+      dictVersion: req.dict ?? undefined,
+      // Warnings are produced always (Rule 18 etc.) — the severity FilterBar
+      // (error+warning on by default) controls display. This is also the
+      // engine default now, but stated rather than assumed: the display
+      // decision is this app's, not the engine's to change under it.
+      warnings: true,
+      fyi: req.includeFyi,
+      encoding: req.encoding,
+      maxPerRule: req.maxPerRule ?? undefined,
+      dictionary: req.dictBytes ?? undefined,
+      dictReplace: req.dictReplace ?? false,
+    }) as ValidationReport;
 
     if (req.gzip) {
       const bytes = await gzipBytes(JSON.stringify(report));
