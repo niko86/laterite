@@ -6,7 +6,7 @@ tags: [design, decision]
 decided: 2026-05-18
 supersedes: []
 from_gap: []
-related: [build-rust, design/_README, dec-python-imports-rust-library, dec-laterite-ags4-types-leaf, dec-monorepo-structure, dec-duckdb-extension]
+related: [build-rust, design/_README, dec-python-imports-rust-library, dec-laterite-types-leaf, dec-monorepo-structure, dec-duckdb-extension]
 sources: []
 ---
 
@@ -110,7 +110,7 @@ laterite-ags5-db · [[build-rust]] · [[design/_README\|AGS5 register]] ·
 [[dec-python-imports-rust-library|laterite: the scoped Python→Rust exception]] ·
 staged adoption roadmap (A→F) ·
 Stage F1: msgspec kernel retirement path ·
-[[dec-laterite-ags4-types-leaf|laterite-ags4-types wasm-safe leaf crate]] ·
+[[dec-laterite-types-leaf|laterite-types wasm-safe leaf crate]] ·
 [[dec-monorepo-structure|one repo, many artifacts — stay monorepo]] ·
 [[dec-duckdb-extension|laterite-duckdb: AGS4 read surface for the DuckDB host]] ·
 #177: AGS5 decoupled into the dormant ags5/ strand

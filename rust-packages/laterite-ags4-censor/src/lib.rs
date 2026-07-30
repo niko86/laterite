@@ -5,7 +5,7 @@
 //! engine wasm) instead of a hand-written TS reimplementation. Part of the #527
 //! cross-surface convergence arc — the sibling of the #533 tokenizer/quoter
 //! work: the scrub now reads fields through the shared [`scan_line`] parse
-//! leaf and re-quotes through `laterite-ags4-types`, so no fourth AGS4 tokenizer.
+//! leaf and re-quotes through `laterite-types`, so no fourth AGS4 tokenizer.
 //!
 //! **Cell-surgical, defect-preserving.** Only DATA cells that actually change
 //! are rewritten; every other byte — GROUP/HEADING/UNIT/TYPE rows, blank lines,
@@ -32,7 +32,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 
 use laterite_ags4_parse::scan::{DISPLAY, RawField, scan_line};
-use laterite_ags4_types::quote_field;
+use laterite_types::quote_field;
 use serde::Deserialize;
 
 // --- classification (the SSOT `sensitive_headings.json` shape) --------------

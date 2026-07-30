@@ -232,14 +232,28 @@ export interface EmitOptions {
   /** Per-heading AGS data-TYPE overrides, same `{ code: { heading: type } }` shape. */
   types?: Record<string, Record<string, string>>;
   /** Mint the mandatory metadata catalogs your data doesn't carry — UNIT and
-   *  TYPE (derived from the data), a placeholder TRAN, and ABBR when PA picklist
-   *  codes are used. `"autofix"` mode only. Default **false**.
+   *  TYPE (derived from the data), and ABBR when PA picklist codes are used.
+   *  `"autofix"` mode only. Default **false**. A TRAN is minted only if you also
+   *  supply `tranIssue` + `tranDate`.
    *
    *  Off by default on purpose: synthesis adds whole *groups* you never wrote,
    *  which should be asked for rather than discovered. Left off, a data-only
    *  build reports Rule 14/15/17 so you can see what is missing. `PROJ` and
    *  `DICT` are never synthesised at all — those are authorial facts. */
   synthesiseMetadata?: boolean;
+  /** `TRAN_ISNO` for a synthesised TRAN. Requires `tranDate` too — together they
+   *  are what make a transmission identifiable, and both are REQUIRED by the
+   *  dictionary, so one without the other would mint a TRAN missing its own
+   *  mandatory fields. */
+  tranIssue?: string;
+  /** `TRAN_DATE` (`yyyy-mm-dd`). Requires `tranIssue`. */
+  tranDate?: string;
+  /** `TRAN_PROD` — who produced the file. */
+  tranProducer?: string;
+  /** `TRAN_RECV` — who it is for. */
+  tranRecipient?: string;
+  /** `TRAN_STAT` — e.g. `"FINAL"`. */
+  tranStatus?: string;
 }
 
 /** Transpose row objects → an arrow-js Table (column types inferred from the
@@ -393,6 +407,11 @@ export function buildAgs4(
     opts.units,
     opts.types,
     opts.synthesiseMetadata,
+    opts.tranIssue,
+    opts.tranDate,
+    opts.tranProducer,
+    opts.tranRecipient,
+    opts.tranStatus,
   );
   const byRule = JSON.parse(res.findingsJson) as Record<
     string,

@@ -1,4 +1,4 @@
-//! napi wrappers over `laterite_ags4_types` — the AGS4 type system, the Node analog of
+//! napi wrappers over `laterite_types` — the AGS4 type system, the Node analog of
 //! laterite-py's `ags_types_fns`. The parsing *logic* stays native (one shared
 //! engine across hosts); only the data-holder layers (registry, typed-graph) are
 //! TS-generated. napi camelCases: `canonical_type` → `canonicalType`, etc.
@@ -11,7 +11,7 @@ use napi_derive::napi;
 #[napi]
 #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn canonical_type(ags_type: String) -> Option<String> {
-    laterite_ags4_types::canonical_type(&ags_type).map(|c| c.as_str().to_string())
+    laterite_types::canonical_type(&ags_type).map(|c| c.as_str().to_string())
 }
 
 /// Presentation hint for a numeric AGS type: `"2DP"` → `"%.2f"`, `"3SF"` →
@@ -19,7 +19,7 @@ pub fn canonical_type(ags_type: String) -> Option<String> {
 #[napi]
 #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn display_hint(ags_type: String) -> Option<String> {
-    laterite_ags4_types::display_hint(&ags_type)
+    laterite_types::display_hint(&ags_type)
 }
 
 /// Parse an AGS4-shaped raw string into its canonical value — the same engine
@@ -30,14 +30,14 @@ pub fn display_hint(ags_type: String) -> Option<String> {
 #[napi]
 #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn parse_value(raw: Option<String>, ags_type: String) -> serde_json::Value {
-    laterite_ags4_types::parse_value(raw.as_deref(), &ags_type)
+    laterite_types::parse_value(raw.as_deref(), &ags_type)
 }
 
 // These `#[napi]` fns live in a private module, so in a `cargo test` build —
 // where the napi registration glue that references them isn't emitted — the
 // dead_code lint flags them. Exercising them here both clears that noise and
 // pins the napi-layer behaviour (the parsing logic itself is covered in
-// laterite-ags4-types; this guards the Node binding).
+// laterite-types; this guards the Node binding).
 #[cfg(test)]
 mod tests {
     use super::*;

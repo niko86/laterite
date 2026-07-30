@@ -19,7 +19,7 @@ export declare class Reading {
   /**
    * One group's rows as an Arrow **IPC stream** (`Buffer`), columns already
    * correctly typed. The Node analog of the pyo3-arrow capsule: the typed
-   * columns come from the one shared emitter (`laterite_ags4_types::arrow_cols`), the
+   * columns come from the one shared emitter (`laterite_types::arrow_cols`), the
    * SAME casting Python/wasm use — so a file types byte-identically across
    * hosts. Returns `null` if the code isn't in the file.
    */
@@ -179,7 +179,7 @@ export declare function editions(): Array<string>
  * Build valid AGS4 from per-group **Arrow IPC** streams (the columnar
  * producer; the read boundary reversed). = `laterite-ags4-wasm`'s `to_ags4_ipc`.
  */
-export declare function emitAgs4FromIpc(groups: Array<GroupIpc>, edition?: string | undefined | null, mode?: string | undefined | null, units?: Record<string, Record<string, string>> | undefined | null, types?: Record<string, Record<string, string>> | undefined | null, synthesiseMetadata?: boolean | undefined | null): EmitResult
+export declare function emitAgs4FromIpc(groups: Array<GroupIpc>, edition?: string | undefined | null, mode?: string | undefined | null, units?: Record<string, Record<string, string>> | undefined | null, types?: Record<string, Record<string, string>> | undefined | null, synthesiseMetadata?: boolean | undefined | null, tranIssue?: string | undefined | null, tranDate?: string | undefined | null, tranProducer?: string | undefined | null, tranRecipient?: string | undefined | null, tranStatus?: string | undefined | null): EmitResult
 
 /**
  * The emit result. `bytes` is the AGS4 document; `findingsJson` is the

@@ -7,7 +7,7 @@ decided: 2026-06-20
 owns: [duckdb-host-engine]
 supersedes: []
 from_gap: []
-related: [dec-duckdb-perf-architecture, dec-duckdb-extension, dec-rust-drives-python, dec-laterite-ags4-types-leaf, pyo3-boundary, crate-map, tech-stack-wasm, api-surface-1.0]
+related: [dec-duckdb-perf-architecture, dec-duckdb-extension, dec-rust-drives-python, dec-laterite-types-leaf, pyo3-boundary, crate-map, tech-stack-wasm, api-surface-1.0]
 sources: []
 ---
 
@@ -36,11 +36,11 @@ Rust (parse → typed Arrow [+ UUIDv8 keys])
 Rust supplies the data (and, for materialise, the deterministic content-addressed
 keys); the **host's own DuckDB** does the I/O. Read and write are the *same* spine —
 only the direction differs. The genuinely **shared** library is the pure-Rust,
-**DuckDB-free** core (typing leaf [[laterite-ags4-types]] + the codec in `laterite-ags4-core`
+**DuckDB-free** core (typing leaf [[laterite-types]] + the codec in `laterite-ags4-core`
 + the keychain in [[laterite-ags4-reference]] (re-exported at the historical
 `laterite-ags4-core::keychain` path so every consumer is unchanged) + the validator)
 **plus typed Apache Arrow as the one contract**
-([[pyo3-boundary]], [[dec-laterite-ags4-types-leaf]]). DuckDB is a per-host detail bolted
+([[pyo3-boundary]], [[dec-laterite-types-leaf]]). DuckDB is a per-host detail bolted
 on top.
 
 The host DuckDB per surface — **peers, not special cases**:
@@ -146,4 +146,4 @@ and the host DuckDB writes the file (a plain queryable `.duckdb`, *not* `.ags5db
 
 ## Related
 
-[[dec-duckdb-perf-architecture]] · [[dec-duckdb-extension]] · [[dec-rust-drives-python]] · [[dec-laterite-ags4-types-leaf]] · dec-ags5db-submarine · [[pyo3-boundary]] · [[crate-map]] · [[tech-stack-wasm]] · exp-uuid7-surrogate-keys · [[api-surface-1.0]]
+[[dec-duckdb-perf-architecture]] · [[dec-duckdb-extension]] · [[dec-rust-drives-python]] · [[dec-laterite-types-leaf]] · dec-ags5db-submarine · [[pyo3-boundary]] · [[crate-map]] · [[tech-stack-wasm]] · exp-uuid7-surrogate-keys · [[api-surface-1.0]]

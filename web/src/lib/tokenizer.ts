@@ -3,7 +3,7 @@
 //
 // This retires the hand-written TS state machine that used to live in
 // agsline.ts: `splitAgsFields` now wraps `laterite_ags4_parse::scan::scan_line`
-// and `quoteAgsField` wraps `laterite_ags4_types::quote_field`, so the browser
+// and `quoteAgsField` wraps `laterite_types::quote_field`, so the browser
 // tokenizes/quotes through the SAME authority as every other surface (the
 // engine wasm, the wheel, the node binding, the CLI) instead of a second copy.
 //

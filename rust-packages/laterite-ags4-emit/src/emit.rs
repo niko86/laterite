@@ -6,7 +6,7 @@
 //!   1. resolve each heading's UNIT/TYPE — **hybrid**: the caller's
 //!      explicit value wins, else the per-edition standard dictionary fills,
 //!      else `""` / `"X"`;
-//!   2. format each cell — typed values via `laterite_ags4_types::ags4_str` (the
+//!   2. format each cell — typed values via `laterite_types::ags4_str` (the
 //!      canonical AGS4 string per type), string values verbatim (so the
 //!      *mode* below is the single owner of any canonicalisation);
 //!   3. `write_ags4` the sections;
@@ -18,12 +18,12 @@
 //! Steps 1–3 are pure formatting; step 4 reuses the validator's shipped
 //! parse / `run_all` / `compute_fixes` / `apply_fixes` — no new fix logic.
 
-use laterite_ags4_types::ags4_str;
 use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};
 use laterite_ags4_validator::fixes::{Fix, FixRisk, apply_fixes, compute_fixes};
 use laterite_ags4_validator::parse::{ParsedFile, parse_bytes};
 use laterite_ags4_validator::{CheckOptions, DictVersion, WorldScope, check_parsed};
+use laterite_types::ags4_str;
 use serde_json::Value;
 use std::collections::BTreeSet;
 
@@ -57,12 +57,79 @@ pub enum EmitMode {
     AutoFix,
 }
 
+/// Caller-supplied metadata for a synthesised TRAN row.
+///
+/// Lives here, the lowest crate that needs it, so `laterite-ags4-merge` and the
+/// emit path describe a transmission with ONE type rather than two that drift.
+/// `merge` re-exports it, so its public API is unchanged.
+///
+/// Every field is the caller's to state. The engine can derive `ags` from the
+/// edition, but nothing else here is derivable — which is precisely why an
+/// absent stamp means "emit no TRAN" rather than "emit a guess".
+#[derive(Debug, Clone, Default)]
+pub struct TranStamp {
+    pub isno: String,
+    pub date: String,
+    pub prod: String,
+    pub recv: String,
+    pub stat: String,
+    pub ags: String,
+}
+
+impl TranStamp {
+    /// Fold a surface's five optional TRAN arguments into a stamp, or `None`.
+    ///
+    /// **One rule, one place.** A stamp is minted only when BOTH an issue number
+    /// and a date are supplied — the two fields that make a transmission
+    /// identifiable at all, and both REQUIRED by the dictionary. Anything less
+    /// would produce a TRAN missing its own mandatory fields, which is the class
+    /// of half-true record this whole change exists to stop.
+    ///
+    /// This lived as a private helper on each surface, and they had already
+    /// drifted: `merge` required issue+date while the browser's `build_ags4`
+    /// accepted any one of the five. Every surface now folds its arguments the
+    /// same way, so "what counts as enough to stamp a TRAN" cannot answer
+    /// differently depending on which door you came through.
+    #[must_use]
+    pub fn from_parts(
+        isno: Option<String>,
+        date: Option<String>,
+        prod: Option<String>,
+        recv: Option<String>,
+        stat: Option<String>,
+        ags: String,
+    ) -> Option<TranStamp> {
+        match (isno, date) {
+            (Some(isno), Some(date)) => Some(TranStamp {
+                isno,
+                date,
+                prod: prod.unwrap_or_default(),
+                recv: recv.unwrap_or_default(),
+                stat: stat.unwrap_or_default(),
+                ags,
+            }),
+            _ => None,
+        }
+    }
+}
+
 /// Emit options. `edition` selects which AGS4 standard dictionary fills
 /// UNIT/TYPE and which rule set validity is judged against.
 #[derive(Debug, Clone)]
 pub struct EmitOpts {
     pub mode: EmitMode,
     pub edition: DictVersion,
+    /// The TRAN row to stamp when synthesis is on and the input carries no TRAN.
+    ///
+    /// `None` means **emit no TRAN at all** — deliberately, and this is the
+    /// point. The engine cannot know who produced a file, for whom, on what
+    /// date, at what status; a stub asserting `TBC`/`1900-01-01` still SATISFIES
+    /// Rule 14, so a recipient has no way to tell an invented transmission
+    /// record from a real one and nothing downstream flags it. A missing TRAN
+    /// that reports Rule 14 is strictly more honest than a present one that
+    /// lies. Same reasoning already applied to PROJ and DICT: never invent what
+    /// only the caller can know.
+    pub tran: Option<TranStamp>,
     /// Mint the mandatory metadata catalogs (UNIT / TYPE / TRAN / ABBR) the
     /// input doesn't carry. `AutoFix` only — `Strict`/`Report` always show or
     /// reject the gaps rather than filling them.
@@ -105,6 +172,7 @@ impl Default for EmitOpts {
         EmitOpts {
             mode: EmitMode::AutoFix,
             edition: DictVersion::V4_1_1,
+            tran: None,
             synthesise_metadata: false,
         }
     }
@@ -173,7 +241,7 @@ pub fn emit_ags4(groups: &[GroupInput], opts: &EmitOpts) -> Result<EmitResult, E
     // ABBR (when PA codes are used) for whichever are absent. PROJ is never
     // synthesized (real project identity), so a missing PROJ stays a Rule 13 finding.
     if opts.mode == EmitMode::AutoFix && opts.synthesise_metadata {
-        let synth = synthesise_metadata(&owned, &dict);
+        let synth = synthesise_metadata(&owned, &dict, opts.tran.as_ref());
         owned.extend(synth);
     }
 
@@ -329,19 +397,38 @@ fn validate(bytes: &[u8], edition: DictVersion) -> Result<(ParsedFile, Findings)
 /// codes (Rule 16). PROJ is deliberately never synthesized — it carries real
 /// project identity, not derivable metadata, so a missing PROJ stays a Rule 13
 /// finding.
-fn synthesise_metadata(owned: &[OwnedGroup], dict: &Dictionary) -> Vec<OwnedGroup> {
+fn synthesise_metadata(
+    owned: &[OwnedGroup],
+    dict: &Dictionary,
+    tran: Option<&TranStamp>,
+) -> Vec<OwnedGroup> {
     let present: BTreeSet<&str> = owned.iter().map(|g| g.code.as_str()).collect();
     let mut synth: Vec<OwnedGroup> = Vec::new();
 
     // TRAN first: its DT `TRAN_DATE` introduces the `yyyy-mm-dd` unit and the
     // `DT` type that the UNIT/TYPE catalogs below must then cover.
-    if !present.contains("TRAN") {
-        synth.push(synth_tran(dict));
+    //
+    // Only when the caller supplied one. Without a stamp we emit NO TRAN and let
+    // Rule 14 report it — see `EmitOpts::tran` for why a placeholder is worse
+    // than an absence.
+    if !present.contains("TRAN")
+        && let Some(t) = tran
+    {
+        synth.push(synth_tran(dict, t));
     }
     // UNIT: one row per distinct unit used across all groups (Rule 15).
+    //
+    // Skipped when nothing uses a unit. An empty catalog is not a neutral
+    // no-op — a group with no DATA rows is itself a Rule 2 error, so minting
+    // one would trade a Rule 15 finding for a Rule 2 finding and call it
+    // synthesis. This became reachable when TRAN stopped being minted
+    // unconditionally: its `yyyy-mm-dd` on TRAN_DATE was quietly the thing
+    // guaranteeing at least one unit existed.
     if !present.contains("UNIT") {
         let units = collect_units(owned.iter().chain(synth.iter()));
-        synth.push(synth_catalog("UNIT", "UNIT_UNIT", "UNIT_DESC", &units));
+        if !units.is_empty() {
+            synth.push(synth_catalog("UNIT", "UNIT_UNIT", "UNIT_DESC", &units));
+        }
     }
     // TYPE: one row per distinct type code used (Rule 17). Force `X` — every
     // synthesized metadata group is all-`X`, so the catalog must self-cover.
@@ -418,12 +505,17 @@ fn synth_catalog(code: &str, key: &str, desc: &str, symbols: &BTreeSet<String>) 
     }
 }
 
-/// A minimal valid TRAN stub. `TRAN_AGS` is the edition's expected value (no
-/// unrecognised-edition warning); `TRAN_DLIM`/`TRAN_RCON` are the AGS standard
-/// `"|"`/`"+"`. The REQUIRED transmission fields the build can't know
-/// (producer, recipient, status) are `"TBC"` placeholders and `TRAN_DATE` a
-/// fixed placeholder date — all meant to be overwritten by the caller.
-fn synth_tran(dict: &Dictionary) -> OwnedGroup {
+/// The TRAN row for a synthesised transmission, built from the CALLER's
+/// [`TranStamp`].
+///
+/// `TRAN_DLIM`/`TRAN_RCON` are the AGS standard `"|"`/`"+"`, and an empty
+/// `stamp.ags` falls back to the edition's expected value (so no
+/// unrecognised-edition warning). Every other field comes from the caller.
+///
+/// This function used to write `"TBC"` and `"1900-01-01"` when it had nothing
+/// better, which produced a file that SATISFIED Rule 14 while asserting a
+/// transmission that never happened. It is now unreachable without a stamp.
+fn synth_tran(dict: &Dictionary, stamp: &TranStamp) -> OwnedGroup {
     OwnedGroup {
         code: "TRAN".to_string(),
         headings: [
@@ -445,12 +537,16 @@ fn synth_tran(dict: &Dictionary) -> OwnedGroup {
             .map(String::from)
             .to_vec(),
         rows: vec![vec![
-            "1".to_string(),
-            "1900-01-01".to_string(),
-            "TBC".to_string(),
-            "TBC".to_string(),
-            dict.tran_ags().to_string(),
-            "TBC".to_string(),
+            stamp.isno.clone(),
+            stamp.date.clone(),
+            stamp.prod.clone(),
+            stamp.stat.clone(),
+            if stamp.ags.trim().is_empty() {
+                dict.tran_ags().to_string()
+            } else {
+                stamp.ags.clone()
+            },
+            stamp.recv.clone(),
             "|".to_string(),
             "+".to_string(),
         ]],
@@ -659,25 +755,38 @@ mod tests {
         );
     }
 
-    /// Opting IN yields a valid file in one call — the capability is unchanged,
-    /// only its default. The `..Default::default()` spread is deliberate: this
-    /// must keep passing if other defaults move.
-    #[test]
-    fn autofix_synthesises_missing_metadata_groups_when_asked() {
-        // A data-only build (PROJ + LOCA, no TRAN/UNIT/TYPE) under AutoFix WITH
-        // synthesis mints the missing root-metadata groups and comes back valid.
-        let loca = GroupInput {
+    fn loca() -> GroupInput {
+        GroupInput {
             code: "LOCA".into(),
             headings: vec!["LOCA_ID".into(), "LOCA_GL".into()],
             units: None,
             types: None,
             rows: vec![vec![json!("BH01"), json!(12.3)]],
-        };
+        }
+    }
+
+    fn stamp() -> TranStamp {
+        TranStamp {
+            isno: "1".into(),
+            date: "2026-07-30".into(),
+            prod: "Acme Ground Engineering".into(),
+            recv: "Client Ltd".into(),
+            stat: "FINAL".into(),
+            ags: String::new(),
+        }
+    }
+
+    /// Opting in WITH a stamp yields a valid file in one call. The
+    /// `..Default::default()` spread is deliberate: this must keep passing if
+    /// other defaults move.
+    #[test]
+    fn autofix_synthesises_missing_metadata_groups_when_asked() {
         let opts = EmitOpts {
             synthesise_metadata: true,
+            tran: Some(stamp()),
             ..EmitOpts::default()
         };
-        let r = emit_ags4(&[proj(), loca], &opts).unwrap();
+        let r = emit_ags4(&[proj(), loca()], &opts).unwrap();
         let text = String::from_utf8(r.bytes.clone()).unwrap();
         for g in ["TRAN", "UNIT", "TYPE"] {
             assert!(
@@ -697,6 +806,69 @@ mod tests {
             "synthesised build should be error-free, findings:\n{:?}",
             r.findings
         );
+    }
+
+    /// The TRAN row carries the CALLER's values, not placeholders.
+    ///
+    /// Guards the actual defect: a stub reading `TBC`/`1900-01-01` SATISFIES
+    /// Rule 14, so a recipient cannot distinguish an invented transmission from
+    /// a real one. Asserting the absence of those two literals is the point —
+    /// if they ever come back, this file is lying again and passing while it
+    /// does.
+    #[test]
+    fn synthesised_tran_carries_caller_values_not_placeholders() {
+        let opts = EmitOpts {
+            synthesise_metadata: true,
+            tran: Some(stamp()),
+            ..EmitOpts::default()
+        };
+        let r = emit_ags4(&[proj(), loca()], &opts).unwrap();
+        let text = String::from_utf8(r.bytes).unwrap();
+        for v in [
+            "2026-07-30",
+            "Acme Ground Engineering",
+            "Client Ltd",
+            "FINAL",
+        ] {
+            assert!(text.contains(v), "TRAN should carry {v:?}, got:\n{text}");
+        }
+        assert!(
+            !text.contains("TBC") && !text.contains("1900-01-01"),
+            "no placeholder may survive into a synthesised TRAN, got:\n{text}"
+        );
+    }
+
+    /// Synthesis WITHOUT a stamp mints no TRAN and lets Rule 14 report it.
+    ///
+    /// The honest half of the contract: the engine cannot know who transmitted
+    /// what to whom, so it declines to say. A caller who wants a clean file
+    /// supplies the transmission; a caller who does not gets told what is
+    /// missing rather than handed a fiction that validates.
+    #[test]
+    fn synthesis_without_a_stamp_omits_tran_and_reports_rule_14() {
+        let opts = EmitOpts {
+            synthesise_metadata: true,
+            tran: None,
+            ..EmitOpts::default()
+        };
+        let r = emit_ags4(&[proj(), loca()], &opts).unwrap();
+        let text = String::from_utf8(r.bytes.clone()).unwrap();
+        assert!(
+            !text.contains("\"GROUP\",\"TRAN\""),
+            "no TRAN may be invented without a stamp, got:\n{text}"
+        );
+        assert!(
+            r.findings.contains_key("AGS Format Rule 14"),
+            "the missing TRAN must be REPORTED, not silently absent: {:?}",
+            r.findings
+        );
+        // UNIT/TYPE are still derivable, so they are still minted.
+        for g in ["UNIT", "TYPE"] {
+            assert!(
+                text.contains(&format!("\"GROUP\",\"{g}\"")),
+                "{g} is derivable and should still be synthesised, got:\n{text}"
+            );
+        }
     }
 
     /// The NEW default: `AutoFix` still fixes what the caller wrote, but does not
@@ -744,6 +916,10 @@ mod tests {
         };
         let opts = EmitOpts {
             synthesise_metadata: true,
+            // Stamped, so the file can reach error-free — this test is about
+            // ABBR, and an unstamped build would fail on Rule 14 for unrelated
+            // reasons (see `synthesis_without_a_stamp_omits_tran_...`).
+            tran: Some(stamp()),
             ..EmitOpts::default()
         };
         let r = emit_ags4(&[proj(), loca], &opts).unwrap();

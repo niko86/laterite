@@ -46,15 +46,15 @@ sources: [spec-4.2]
   Integer arm un-converged (the #503 record-link lesson: a typed-read object
   and the hash canonicalisation can silently drift from each other when they
   don't share one function).
-- **#611**: `parse_ags_integer` (`repo:rust-packages/laterite-ags4-types/src/lib.rs::parse_ags_integer`)
+- **#611**: `parse_ags_integer` (`repo:rust-packages/laterite-types/src/lib.rs::parse_ags_integer`)
   range-guards via `f64_fits_i64`
-  (`repo:rust-packages/laterite-ags4-types/src/lib.rs::f64_fits_i64`) before the
+  (`repo:rust-packages/laterite-types/src/lib.rs::f64_fits_i64`) before the
   cast — out of `i64` range → `None` (a Null typed value / Python `None`);
   in-range is untouched (`"5.0"`→5, `"5.7"`→5, `"1E-30"`→0, so
   `_content_hash` is byte-identical for every real value). Regression tests
-  `repo:rust-packages/laterite-ags4-types/src/lib.rs::parse_ags_integer_guards_the_i64_range`
+  `repo:rust-packages/laterite-types/src/lib.rs::parse_ags_integer_guards_the_i64_range`
   and
-  `repo:rust-packages/laterite-ags4-types/src/lib.rs::parse_value_0dp_overflow_is_null_not_fabricated`
+  `repo:rust-packages/laterite-types/src/lib.rs::parse_value_0dp_overflow_is_null_not_fabricated`
   pin both the guard and that unchanged behaviour. `laterite-py`'s Integer/
   Decimal `parse_value` arms
   (`repo:rust-packages/laterite-py/src/ags_types_fns.rs`) now route through

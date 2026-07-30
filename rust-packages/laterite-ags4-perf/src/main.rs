@@ -23,8 +23,8 @@ use std::hint::black_box;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use laterite_ags4_types::arrow_cols::build_record_batch;
 use laterite_ags4_validator::{CheckOptions, check_file};
+use laterite_types::arrow_cols::build_record_batch;
 use serde::{Deserialize, Serialize};
 
 /// The forge ladder manifest (only the fields this harness reads).

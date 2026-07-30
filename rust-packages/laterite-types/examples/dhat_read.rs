@@ -20,7 +20,7 @@
 
 use std::hint::black_box;
 
-use laterite_ags4_types::arrow_cols::build_record_batch;
+use laterite_types::arrow_cols::build_record_batch;
 
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;

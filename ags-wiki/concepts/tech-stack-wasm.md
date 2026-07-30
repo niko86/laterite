@@ -11,8 +11,8 @@ repo_refs:
   deploy: "repo:.github/workflows/deploy-validator.yml"
   web: "repo:web/"
   gitignore: "repo:.gitignore"
-  types_leaf: "repo:rust-packages/laterite-ags4-types/src/lib.rs"
-related: [crate-map, laterite-ags4-tokenizer-wasm, validator-site, playwright-e2e, dec-laterite-ags4-types-leaf, dec-rust-drives-python, dec-duckdb-per-host-engine, laterite-ags4-types, ags4-output, DT, 0DP, YN, surface-census, data-single-source-audit]
+  types_leaf: "repo:rust-packages/laterite-types/src/lib.rs"
+related: [crate-map, laterite-ags4-tokenizer-wasm, validator-site, playwright-e2e, dec-laterite-types-leaf, dec-rust-drives-python, dec-duckdb-per-host-engine, laterite-types, ags4-output, DT, 0DP, YN, surface-census, data-single-source-audit]
 sources: []
 ---
 # tech stack: the browser wasm path
@@ -25,8 +25,8 @@ sources: []
 > gzipped) — instantiated once on the **main thread** at boot, purely for the
 > inline line editor/preview's synchronous tokenize/quote calls
 > (`web/src/lib/tokenizer.ts`). It shares no code with this crate; both
-> depend on `laterite-ags4-types`, and the tokenizer additionally depends on
-> `laterite-ags4-parse`. See [[crate-map]] and [[dec-laterite-ags4-types-leaf]]
+> depend on `laterite-types`, and the tokenizer additionally depends on
+> `laterite-ags4-parse`. See [[crate-map]] and [[dec-laterite-types-leaf]]
 > for the full picture — this page's build/worker/Arrow-IPC detail is about
 > the engine wasm only.
 
@@ -83,7 +83,7 @@ The crate exposes **seven** `#[wasm_bindgen]` entry points
   so applying a fix to a cp1252 file also normalises its encoding.
 - `diff(a_bytes, b_bytes, encoding, max_rows_per_group)` → a type-aware,
   KEY-matched `RevisionDelta` between two files (the Tools revision-diff),
-  engine-consistent because it parses both to the typed graph via [[laterite-ags4-types]].
+  engine-consistent because it parses both to the typed graph via [[laterite-types]].
   The dictionary edition is derived **internally** from the new (B) file's
   `TRAN_AGS` (not a parameter); `max_rows_per_group` caps how many per-row
   deltas are serialized per group (the counts stay true totals).
@@ -123,10 +123,10 @@ for the phase table + the OSTN15 note (linked, not duplicated here).
 
 ## Why it matters
 
-The casting in `parse()` shares the [[laterite-ags4-types]] leaf crate, so the
+The casting in `parse()` shares the [[laterite-types]] leaf crate, so the
 browser casts a file **identically** to a native `.ags5db` — parity by
 construction, not a second implementation that can drift
-([[dec-laterite-ags4-types-leaf]]). Arrow type mapping (off the file's TYPE row):
+([[dec-laterite-types-leaf]]). Arrow type mapping (off the file's TYPE row):
 [[DT]] → `Timestamp(µs)` (tz-naive), [[0DP]] → `Int64`,
 `2DP/RL/nSF/nSCI` → `Float64`, [[YN]] → `Boolean`, `ID/X/PA/…` → `Utf8`.
 
@@ -173,7 +173,7 @@ never reaches the main thread. See [[validator-site]] Phase 1.5.
 > [!todo] Deferred E2E parity
 > End-to-end value parity against a *live* native `.ags5db` was not run.
 > The "identical to `.ags5db`" claim rests on both sides calling the one
-> shared [[laterite-ags4-types]] crate; host unit tests prove the casting logic.
+> shared [[laterite-types]] crate; host unit tests prove the casting logic.
 > Tracked in [[validator-site]].
 
 ## Diagram
@@ -194,10 +194,10 @@ graph LR
 ## Where it shows up
 
 `laterite-ags4-wasm` is the browser arm of the [[crate-map]] (validator → wasm
-cdylib + the shared [[laterite-ags4-types]] leaf). The roadmap, phase status, and
+cdylib + the shared [[laterite-types]] leaf). The roadmap, phase status, and
 verification notes live in [[validator-site]]; the single-typing-source
-rationale is [[dec-laterite-ags4-types-leaf]].
+rationale is [[dec-laterite-types-leaf]].
 
 ## Related
 
-[[crate-map]] · [[laterite-ags4-tokenizer-wasm]] · [[validator-site]] · ci-and-runners · [[dec-laterite-ags4-types-leaf]] · [[dec-rust-drives-python]] · [[dec-duckdb-per-host-engine]] · [[laterite-ags4-types]] · [[DT]] · [[0DP]] · [[YN]] · [[surface-census]] · [[data-single-source-audit]]
+[[crate-map]] · [[laterite-ags4-tokenizer-wasm]] · [[validator-site]] · ci-and-runners · [[dec-laterite-types-leaf]] · [[dec-rust-drives-python]] · [[dec-duckdb-per-host-engine]] · [[laterite-types]] · [[DT]] · [[0DP]] · [[YN]] · [[surface-census]] · [[data-single-source-audit]]

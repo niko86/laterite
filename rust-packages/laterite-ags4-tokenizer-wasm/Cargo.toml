@@ -4,7 +4,7 @@
 # The browser used to carry its own hand-written tokenizer/quoter
 # (`web/src/lib/agsline.ts`). This crate retires that copy: it compiles the
 # shared Rust primitives — `laterite_ags4_parse::tokenize_spans` and
-# `laterite_ags4_types::quote_field` — to a SEPARATE, minimal wasm so the browser
+# `laterite_types::quote_field` — to a SEPARATE, minimal wasm so the browser
 # drives off the same authority as every other surface, WITHOUT loading the
 # 6.9 MB engine wasm (`laterite-ags4-wasm`) on the main thread.
 #
@@ -44,7 +44,7 @@ wasm-opt = ['-O', '-all']
 laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # quote_field — the shared AGS4 field quoter, beside ags4_str. Default features
 # (arrow OFF) keep this a tiny wasm-clean leaf (chrono-std + serde_json).
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-types = { path = "../laterite-types" }
 wasm-bindgen = "0.2"
 # The AgsSpan array crosses to JS as `{text,start,end,valueStart,valueEnd}[]`.
 serde = { version = "1", features = ["derive"] }

@@ -4,7 +4,7 @@
 // tokenizer/quoter WITHOUT the 6.9 MB engine — its whole justification is that
 // it stays tiny. That premise must be PROVEN, not asserted: this gate trips if
 // the artifact balloons, which is exactly what an accidental heavy dependency
-// (e.g. laterite-ags4-types' optional `arrow` feature getting turned on, or a
+// (e.g. laterite-types' optional `arrow` feature getting turned on, or a
 // non-leaf crate creeping into the dep graph) would cause.
 //
 // Ceiling is generous (~5x the ~30 KB baseline) so ordinary growth is fine, but
@@ -44,7 +44,7 @@ if (size > MAX_BYTES) {
   console.error(
     `[wasm-tokenizer-size] FAIL: ags4_tokenizer_bg.wasm is ${kib} KiB, over the ${MAX_BYTES / 1024} KiB ceiling.\n` +
       `  The tiny tokenizer wasm must stay tiny — a jump this size means a heavy dependency crept in\n` +
-      `  (check laterite-ags4-types' 'arrow' feature is OFF and only parse+types are in the dep graph).`,
+      `  (check laterite-types' 'arrow' feature is OFF and only parse+types are in the dep graph).`,
   );
   process.exit(1);
 }

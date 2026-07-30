@@ -1,4 +1,4 @@
-# laterite-ags4-types — the AGS type system as a wasm-safe leaf crate.
+# laterite-types — the AGS type system as a wasm-safe leaf crate.
 #
 # Extracted from `laterite-ags4-core/src/ags_types.rs` (Phase 2 of the AGS4
 # validator wasm site) so it can be the SINGLE source of AGS typing for
@@ -11,7 +11,7 @@
 # rpassword/csv) — those live in other laterite-ags4-core modules, not here.
 
 [package]
-name = "laterite-ags4-types"
+name = "laterite-types"
 version.workspace = true
 edition = "2024"
 rust-version = "1.85"
@@ -56,7 +56,7 @@ criterion = "0.8"
 # `build_record_batch` over that file's real cells — so the typed build lands on
 # the same MB/s axis as `parse_bytes` (see the perf-campaign T2 tranche). Both
 # are dev-only leaves; `laterite-ags4-parse` (encoding_rs + memchr) does NOT
-# depend on `laterite-ags4-types`, so there is no cycle.
+# depend on `laterite-types`, so there is no cycle.
 laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 encoding_rs = "0.8"
 # Heap-allocation profiler for the read path (examples/dhat_read.rs). dev-only,

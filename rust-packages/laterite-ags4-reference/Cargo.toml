@@ -4,7 +4,7 @@
 # extension, laterite-ags4-diff — needn't pull the rest of core/validator). The
 # per-edition phf projection + the rules catalogue join it in PR2.
 #
-# A near-leaf: its TWO workspace deps are `laterite-ags4-types` (wasm consumes `keychain`
+# A near-leaf: its TWO workspace deps are `laterite-types` (wasm consumes `keychain`
 # for `_id`/`_parent_id`) and `laterite-ags4-parse` (the #568 runtime `.ags` custom-
 # dict reader reuses the shared tokenizer — both are wasm-clean sibling leaves, so no
 # added wasm weight). It said "a true leaf: no workspace-crate deps" until #557; that
@@ -45,7 +45,7 @@ uuid = { version = "1", features = ["v8"] }
 # does NOT depend on this crate, so the edge is cycle-free and keeps the
 # reference leaf wasm-clean (wasm consumes keychain for `_id`/`_parent_id`).
 # Default features only — the `arrow` feature stays off here.
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-types = { path = "../laterite-types" }
 # The shared tolerant AGS4 tokenizer (#168 leaf) — reused by `dict_read.rs` to read
 # a runtime `--dict` custom dictionary from a plain `.ags` file (#568). A wasm-clean
 # sibling leaf (`encoding_rs` + `memchr` only), so it adds zero wasm-hostile weight;

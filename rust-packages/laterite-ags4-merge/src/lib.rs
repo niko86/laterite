@@ -26,7 +26,7 @@
 //!
 //!   Widen is emission-only: it rewrites the merged TYPE row and nothing else.
 //!   Promote is the one place merge **rewrites a cell**, and it is confined to
-//!   appending zeros to a decimal (`laterite_ags4_types::pad_decimals` — string-only,
+//!   appending zeros to a decimal (`laterite_types::pad_decimals` — string-only,
 //!   never via `f64`, never rounding). Neither changes how rows were *matched*
 //!   (that is per-file `parse_value`) nor any content-addressed key.
 //!
@@ -47,7 +47,7 @@ use laterite_ags4_parse::{ParsedFile, ParsedGroup};
 use laterite_ags4_reference::dict::DictVersion;
 use laterite_ags4_reference::keychain::key_heading_names;
 use laterite_ags4_reference::union::registry;
-use laterite_ags4_types::{decimal_places, pad_decimals, parse_value};
+use laterite_types::{decimal_places, pad_decimals, parse_value};
 use serde_json::Value;
 
 /// What to do when two files declare a different AGS TYPE for the same heading.
@@ -124,15 +124,12 @@ impl std::str::FromStr for TypeClashMode {
 /// Caller-supplied metadata for the merged file's own TRAN row. The merged file
 /// genuinely *is* a new transmission, so it gets a fresh TRAN describing that
 /// transmission (not a copy of any input's) — see the module note on TRAN.
-#[derive(Debug, Clone, Default)]
-pub struct TranStamp {
-    pub isno: String,
-    pub date: String,
-    pub prod: String,
-    pub recv: String,
-    pub stat: String,
-    pub ags: String,
-}
+///
+/// Re-exported from [`laterite_ags4_emit`] rather than defined here: the emit
+/// path needs the same six fields for the same reason, and two identical structs
+/// one crate apart is a hand-copy waiting to drift. Merge's public API is
+/// unchanged — `laterite_ags4_merge::TranStamp` still resolves.
+pub use laterite_ags4_emit::TranStamp;
 
 /// Merge options.
 #[derive(Debug, Clone)]

@@ -30,7 +30,22 @@ def _valid_accented_ags() -> str:
     # `synthesise_metadata=True` because a VALID file is this helper's
     # precondition, not its subject — without the catalogs the file trips
     # Rule 14/15/17 and the certify guard under test is never reached.
-    return L.build_ags4({"PROJ": proj}, synthesise_metadata=True).text
+    # The TRAN stamp is part of that precondition: since 0.8.2 the engine mints
+    # no TRAN unless the caller states the transmission, so an unstamped build
+    # would trip Rule 14 and never reach the guard either.
+    # All five, not just issue+date: TRAN_PROD/RECV/STAT are REQUIRED by the
+    # dictionary, so a partial stamp is minted but reports Rule 10b (empty
+    # REQUIRED field) — which is the honest outcome, and exactly what the old
+    # "TBC" placeholder used to hide.
+    return L.build_ags4(
+        {"PROJ": proj},
+        synthesise_metadata=True,
+        tran_issue="1",
+        tran_date="2026-07-30",
+        tran_producer="Acme Ground Engineering",
+        tran_recipient="Client Ltd",
+        tran_status="FINAL",
+    ).text
 
 
 def test_certify_rejects_a_non_utf8_source(tmp_path: Path) -> None:
@@ -82,19 +97,34 @@ def test_strict_build_raises_and_never_returns_findings() -> None:
 
 
 def test_synthesis_never_invents_proj() -> None:
-    """Opted-in synthesis mints the mandatory metadata catalogs (TRAN/UNIT/TYPE),
-    but must NEVER invent a PROJ — PROJ_ID is project identity a machine cannot
-    fabricate without corrupting provenance. The boundary is derivable-vs-authorial,
-    which is also why DICT is never minted."""
+    """Opted-in synthesis mints the derivable catalogs, but must NEVER invent a
+    PROJ — PROJ_ID is project identity a machine cannot fabricate without
+    corrupting provenance. The boundary is derivable-vs-authorial, which is also
+    why DICT is never minted, and since 0.8.2 why TRAN needs a caller stamp."""
     res = L.build_ags4(
         {"LOCA": pl.DataFrame({"LOCA_ID": ["BH1"]})},
         mode="autofix",
         synthesise_metadata=True,
+        tran_issue="1",
+        tran_date="2026-07-30",
     )
     groups = L.read(data=res.bytes).groups
     assert "PROJ" not in groups
     assert "DICT" not in groups
     assert {"TRAN", "UNIT", "TYPE"}.issubset(groups)  # the ones it DOES synthesise
+
+    # ...and the same build WITHOUT a stamp mints no TRAN at all, rather than a
+    # placeholder that would satisfy Rule 14 while asserting a transmission that
+    # never happened. TRAN is authorial, exactly like PROJ and DICT.
+    unstamped = L.build_ags4(
+        {"LOCA": pl.DataFrame({"LOCA_ID": ["BH1"]})},
+        mode="autofix",
+        synthesise_metadata=True,
+    )
+    assert "TRAN" not in L.read(data=unstamped.bytes).groups
+    assert any(f["rule"] == "AGS Format Rule 14" for f in unstamped.findings), (
+        f"the missing TRAN must be REPORTED, not silently absent: {unstamped.findings}"
+    )
 
 
 def test_autofix_does_not_synthesise_by_default() -> None:

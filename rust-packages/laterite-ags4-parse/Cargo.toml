@@ -2,7 +2,7 @@
 # byte/line/char walk, below BOTH laterite-ags4-core and laterite-ags4-validator
 # — so the two historical parsers (core::ags4_codec, validator::parse) converge
 # here instead of drifting. FS-free + wasm-clean by construction: it returns raw
-# strings (no typing — that stays in laterite-ags4-types), and depends only on
+# strings (no typing — that stays in laterite-types), and depends only on
 # encoding_rs (the decode front door, moved down from the validator) + memchr
 # (newline scan). Additive in Phase 1 — nothing consumes it yet.
 [package]

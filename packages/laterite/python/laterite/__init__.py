@@ -1998,6 +1998,11 @@ def build_ags4(
     units: Mapping[str, Mapping[str, str]] | None = None,
     types: Mapping[str, Mapping[str, str]] | None = None,
     synthesise_metadata: bool = False,
+    tran_issue: str | None = None,
+    tran_date: str | None = None,
+    tran_producer: str | None = None,
+    tran_recipient: str | None = None,
+    tran_status: str | None = None,
 ) -> BuildResult:
     """Build AGS4 from your own per-group data — the data→AGS4 door.
 
@@ -2014,8 +2019,8 @@ def build_ags4(
       subtree: the root-metadata groups (TRAN/UNIT/TYPE/ABBR/DICT) aren't children
       of ``PROJ``, so reach for the ``(code, frame)`` form if you need to carry
       those — or pass ``synthesise_metadata=True`` to have the derivable ones
-      (UNIT/TYPE from your data, a placeholder TRAN, and ABBR when PA picklist
-      codes are used) minted for you. That is **opt-in**: by default a typed-graph
+      (UNIT/TYPE from your data, and ABBR when PA picklist codes are used) minted
+      for you; add ``tran_issue`` + ``tran_date`` to stamp a TRAN as well. That is **opt-in**: by default a typed-graph
       build reports Rule 14/15/16/17 rather than quietly filling the gaps, so you
       can see what is missing. PROJ (real project identity) and DICT (your schema
       extension) are never synthesised at all.
@@ -2055,8 +2060,9 @@ def build_ags4(
         types: Per-heading AGS data-TYPE overrides, same ``{code: {heading: type}}``
             shape (e.g. ``{"LOCA": {"LOCA_XTRA": "3DP"}}``).
         synthesise_metadata: Mint the mandatory metadata catalogs your data doesn't
-            carry — UNIT and TYPE (derived from the data), a placeholder TRAN, and
-            ABBR when PA picklist codes are used. ``"autofix"`` mode only.
+            carry — UNIT and TYPE (derived from the data), and ABBR when PA picklist
+            codes are used. ``"autofix"`` mode only. A TRAN is minted only if you
+            also supply ``tran_issue`` + ``tran_date`` (see below).
 
             **Off by default, deliberately.** Synthesis adds whole *groups* you
             never wrote, and that should be something you ask for rather than
@@ -2067,10 +2073,48 @@ def build_ags4(
                 res = build_ags4(frames, synthesise_metadata=True)
 
             Only *derivable* metadata is ever minted. ``PROJ`` (your project
-            identity) and ``DICT`` (your schema extension) are never synthesised —
-            those are facts only you know, and a guessed ``DICT`` parent would turn
-            a visible Rule 18 error into a silent false statement about your data
+            identity), ``DICT`` (your schema extension) and ``TRAN`` (the
+            transmission — see below) are never synthesised from nothing: those
+            are facts only you know, and a guessed ``DICT`` parent would turn a
+            visible Rule 18 error into a silent false statement about your data
             model that the relational checks then trust.
+        tran_issue: ``TRAN_ISNO`` for a synthesised TRAN. Requires ``tran_date``
+            too — the two together are what make a transmission identifiable, and
+            both are REQUIRED by the dictionary, so one without the other would
+            mint a TRAN missing its own mandatory fields.
+        tran_date: ``TRAN_DATE`` (``yyyy-mm-dd``). Requires ``tran_issue``.
+        tran_producer: ``TRAN_PROD`` — who produced the file.
+        tran_recipient: ``TRAN_RECV`` — who it is for.
+        tran_status: ``TRAN_STAT`` — e.g. ``"FINAL"``.
+
+            ``tran_issue`` + ``tran_date`` are the minimum to *mint* a TRAN, but
+            ``TRAN_PROD``, ``TRAN_RECV`` and ``TRAN_STAT`` are REQUIRED by the
+            dictionary — leave them out and the TRAN is written with those cells
+            empty and the build reports Rule 10b against them. That is deliberate:
+            the old placeholder wrote ``"TBC"`` into all three, which silenced
+            Rule 10b as well as Rule 14. **Supply all five for a clean file.**
+
+            Supply ``tran_issue`` + ``tran_date`` (with ``synthesise_metadata=True``)
+            and the build stamps a TRAN describing *your* transmission::
+
+                res = build_ags4(
+                    frames,
+                    synthesise_metadata=True,
+                    tran_issue="1",
+                    tran_date="2026-07-30",
+                    tran_producer="Acme Ground Engineering",
+                    tran_recipient="Client Ltd",
+                    tran_status="FINAL",
+                )
+
+            **Leave them out and no TRAN is written at all** — Rule 14 then reports
+            the gap. That is deliberate. Until 0.8.2 this minted a stub reading
+            ``TRAN_DATE="1900-01-01"`` with ``"TBC"`` for producer/recipient/status,
+            and that combination *satisfies* Rule 14: the file asserted a
+            transmission that never happened, passed validation, and gave a
+            recipient no way to tell it from a real transmission record. A missing
+            TRAN that reports honestly is strictly better than a present one that
+            lies. Same five arguments [`merge`][laterite.merge] takes.
 
     Returns:
         A [`BuildResult`][laterite.BuildResult] carrying the AGS4 ``bytes``, the validator
@@ -2168,6 +2212,11 @@ def build_ags4(
         {k: dict(v) for k, v in units.items()} if units else None,
         {k: dict(v) for k, v in types.items()} if types else None,
         synthesise_metadata,
+        tran_issue,
+        tran_date,
+        tran_producer,
+        tran_recipient,
+        tran_status,
     )
     by_rule: dict[str, list[dict]] = json.loads(findings_json)
     findings = [{"rule": rule, **f} for rule, items_ in by_rule.items() for f in items_]

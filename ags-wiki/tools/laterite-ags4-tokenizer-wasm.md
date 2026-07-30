@@ -10,7 +10,7 @@ ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-tokenizer-wasm"
   lib: "repo:rust-packages/laterite-ags4-tokenizer-wasm/src/lib.rs"
-related: [crate-map, crate-dependency-graph, laterite-ags4-parse, laterite-ags4-types, laterite-ags4-wasm, laterite-ags4-censor, tech-stack-wasm]
+related: [crate-map, crate-dependency-graph, laterite-ags4-parse, laterite-types, laterite-ags4-wasm, laterite-ags4-censor, tech-stack-wasm]
 sources: []
 ---
 # laterite-ags4-tokenizer-wasm
@@ -28,7 +28,7 @@ copy:
 
 - **`tokenize_spans`** wraps `laterite_ags4_parse::scan::scan_line`
   ([[laterite-ags4-parse]]) — the offset-preserving line tokenizer.
-- **`quote_field`** wraps `laterite_ags4_types::quote_field` ([[laterite-ags4-types]]) — the
+- **`quote_field`** wraps `laterite_types::quote_field` ([[laterite-types]]) — the
   canonical AGS4 field quoter.
 
 It is deliberately minimal: **no engine, no validator, no arrow** — just the two
@@ -50,7 +50,7 @@ what lets the editor map a token back to its exact position in the source line.
 ## Where it lives
 
 `repo:rust-packages/laterite-ags4-tokenizer-wasm`, a `cdylib`. Deps
-[[laterite-ags4-parse]] and [[laterite-ags4-types]] (the two leaves it wraps), plus
+[[laterite-ags4-parse]] and [[laterite-types]] (the two leaves it wraps), plus
 `wasm-bindgen`, `serde`, and `serde-wasm-bindgen`. It has **no in-workspace Rust
 consumer** — its consumer is the web frontend, which loads the compiled wasm
 directly (see [[tech-stack-wasm]]). It is a *separate*, deliberately-tiny module
@@ -65,10 +65,10 @@ The full workspace graph is in [[crate-map]] (dependency form in
 ```mermaid
 flowchart LR
   parse[laterite-ags4-parse] --> tokwasm[laterite-ags4-tokenizer-wasm]
-  types[laterite-ags4-types] --> tokwasm
+  types[laterite-types] --> tokwasm
   tokwasm --> web["web frontend<br/>(AGS4 line editor)"]
 ```
 
 ## Related
 
-[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-parse]] · [[laterite-ags4-types]] · [[laterite-ags4-wasm]] · [[laterite-ags4-censor]] · [[tech-stack-wasm]]
+[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-parse]] · [[laterite-types]] · [[laterite-ags4-wasm]] · [[laterite-ags4-censor]] · [[tech-stack-wasm]]

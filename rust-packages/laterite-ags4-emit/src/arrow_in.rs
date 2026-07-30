@@ -8,7 +8,7 @@
 //!
 //! Living in `laterite-ags4-emit` keeps the type→`Value` mapping in one place, so the
 //! two hosts can't drift. Symmetric with the read path's shared *builder*
-//! (`laterite-ags4-types::arrow_cols`, `Value`→Arrow).
+//! (`laterite-types::arrow_cols`, `Value`→Arrow).
 
 use arrow::array::{
     Array, BooleanArray, Float32Array, Float64Array, Int8Array, Int16Array, Int32Array, Int64Array,

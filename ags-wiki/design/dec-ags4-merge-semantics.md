@@ -6,7 +6,7 @@ tags: [design, decision, architecture, merge]
 decided: "2026-07-12"
 supersedes: []
 from_gap: []
-related: [crate-map, laterite-ags4-reference, laterite-ags4-types, rule-08-typed-values, rule-17-type-group, dec-duckdb-extension]
+related: [crate-map, laterite-ags4-reference, laterite-types, rule-08-typed-values, rule-17-type-group, dec-duckdb-extension]
 sources: []
 ---
 
@@ -27,7 +27,7 @@ opts: &MergeOpts) -> Result<MergeResult, MergeError>`
 It reuses the shipped primitives rather than reinventing them: the shared
 parse leaf (`laterite-ags4-parse`) for tokenising, the reference leaf
 (`laterite-ags4-reference`) for the dictionary + the row-identity keychain,
-`laterite-ags4-types::parse_value` for type-aware cell comparison, and
+`laterite-types::parse_value` for type-aware cell comparison, and
 `laterite-ags4-emit` for byte-faithful output. Landed alongside a **row-
 identity consolidation**: `keychain` (with its `key_heading_names` — the one
 definition of "what KEY headings identify a row") moved from
@@ -106,7 +106,7 @@ deprecated alias.
   `nSCI`, `DT`, `X`, any cross-family clash — falls through to `widen`,
   deliberately: `canonical_type` maps `2DP`/`3SF`/`2SCI` all to the same
   `Decimal` bucket, too coarse to drive this, so the lattice keys on the AGS
-  **code family** via the new `laterite_ags4_types::decimal_places(code) ->
+  **code family** via the new `laterite_types::decimal_places(code) ->
   Option<usize>` (`nDP` only — narrower than `canonical_type` on purpose).
   Padding *decimal places* is a formatting change; padding *significant
   figures* would overstate measurement precision (`3SF` → `5SF` asserts two
@@ -119,7 +119,7 @@ makes the outcome **independent of argument order**, deliberately unlike the
 KEY-conflict rule (later argument wins).
 
 **`promote` is the only mode in which merge rewrites a cell.** The new
-`laterite_ags4_types::pad_decimals(raw, n) -> Option<String>` does it —
+`laterite_types::pad_decimals(raw, n) -> Option<String>` does it —
 **string-only, never via `f64`**: the validator's existing `format_ndp` is an
 f64 round-and-render (right for a Rule 8 *fix*, where rounding is the intent;
 wrong for a *widen*, and an f64 round-trip silently perturbs a value past
@@ -262,4 +262,4 @@ not a capability gap in the underlying leaf (which is N-ary).
 
 ## Related
 
-[[crate-map]] · [[laterite-ags4-reference]] · [[laterite-ags4-types]] · [[rule-08-typed-values]] · [[rule-17-type-group]] · [[dec-duckdb-extension]] · dec-registry-driven-generation · AGS5 experiment: dual dedup (raw-string _content_hash contrast)
+[[crate-map]] · [[laterite-ags4-reference]] · [[laterite-types]] · [[rule-08-typed-values]] · [[rule-17-type-group]] · [[dec-duckdb-extension]] · dec-registry-driven-generation · AGS5 experiment: dual dedup (raw-string _content_hash contrast)

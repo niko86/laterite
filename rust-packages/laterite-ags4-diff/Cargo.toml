@@ -17,7 +17,7 @@
 #                                leaf directly (not the validator) means diff
 #                                pulls in dictionary data only, not the rule
 #                                engine (#475 follow-up).
-#   - laterite-ags4-types           — parse_value, the canonical cast that makes the
+#   - laterite-types           — parse_value, the canonical cast that makes the
 #                                cell comparison type-aware ("1.0" == "1.00").
 # All three are already dependencies of `laterite-ags4-wasm`, so repointing it
 # at this leaf adds no new wasm-hostile weight to the browser bundle.
@@ -37,7 +37,7 @@ laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # The per-edition standard Dictionary: KEY headings (row matching) + types.
 laterite-ags4-reference = { path = "../laterite-ags4-reference" }
 # parse_value — the canonical cast that suppresses formatting-only changes.
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-types = { path = "../laterite-types" }
 # RevisionDelta + nested structs serialise to JS/JSON unchanged across hosts.
 serde = { version = "1", features = ["derive"] }
 

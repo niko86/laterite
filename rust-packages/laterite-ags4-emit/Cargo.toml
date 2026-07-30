@@ -10,7 +10,7 @@
 #
 # Reuses the shipped, well-tested pieces so the only new code is the
 # orchestrator:
-#   - laterite-ags4-types::ags4_str — typed value -> AGS4 string per canonical type
+#   - laterite-types::ags4_str — typed value -> AGS4 string per canonical type
 #                            (the inverse of parse_value); wasm-safe leaf.
 #   - laterite-ags4-validator       — the per-edition standard dictionary (UNIT/TYPE
 #                            fill) + parse + validate + the safe-fix
@@ -30,7 +30,7 @@ publish = false
 [dependencies]
 # ags4_str (typed -> AGS4 string) + parse_value (string -> typed), the
 # exact casting both hosts already share via laterite-ags4-wasm / the native DuckDB path.
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-types = { path = "../laterite-types" }
 # The per-edition standard Dictionary (UNIT/TYPE fill), parse_bytes,
 # rules::run_all (validate), and compute_fixes/apply_fixes (AutoFix).
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }

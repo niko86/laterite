@@ -24,12 +24,12 @@ use laterite_ags4_validator::fixes::Fix;
 // #168 Phase 3: text/bytes parse through the leaf directly; the FS entry
 // (`parse_file_with_encoding`) stays in the validator (it owns NotFound/Io).
 use laterite_ags4_parse::{ParsedFile, parse_bytes, parse_str};
-use laterite_ags4_types::sql_type;
 use laterite_ags4_validator::parse::parse_file_with_encoding;
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, WorldScope, fix_document_selective, overlay,
     rule_metadata_json, tran_ags_of,
 };
+use laterite_types::sql_type;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde_json::{Map, Value};
@@ -146,7 +146,7 @@ impl Reading {
 
     /// One group's rows as an Arrow **IPC stream** (`Buffer`), columns already
     /// correctly typed. The Node analog of the pyo3-arrow capsule: the typed
-    /// columns come from the one shared emitter (`laterite_ags4_types::arrow_cols`), the
+    /// columns come from the one shared emitter (`laterite_types::arrow_cols`), the
     /// SAME casting Python/wasm use — so a file types byte-identically across
     /// hosts. Returns `null` if the code isn't in the file.
     #[napi]
@@ -206,8 +206,8 @@ impl Reading {
         } else {
             None
         };
-        let buf = laterite_ags4_types::ipc::build_group_ipc_synth(
-            &laterite_ags4_types::arrow_cols::SynthColumns {
+        let buf = laterite_types::ipc::build_group_ipc_synth(
+            &laterite_types::arrow_cols::SynthColumns {
                 ids: ids.as_deref(),
                 hashes: hashes.as_deref(),
             },
@@ -1282,6 +1282,7 @@ pub struct EmitResult {
 #[napi]
 #[allow(clippy::needless_pass_by_value)]
 #[allow(clippy::implicit_hasher)]
+#[allow(clippy::too_many_arguments)]
 pub fn emit_ags4_from_ipc(
     groups: Vec<GroupIpc>,
     edition: Option<String>,
@@ -1293,8 +1294,25 @@ pub fn emit_ags4_from_ipc(
     // Off unless asked: no surface mints GROUPs the caller never wrote without
     // being told to (2026-07-24). See EmitOpts::synthesise_metadata.
     synthesise_metadata: Option<bool>,
+    // The transmission this file represents. Absent ⇒ no TRAN is minted and
+    // Rule 14 reports the gap, rather than a placeholder that SATISFIES Rule 14
+    // while asserting a transmission that never happened. Folded by the ONE
+    // shared rule (`TranStamp::from_parts`): issue + date are both required.
+    tran_issue: Option<String>,
+    tran_date: Option<String>,
+    tran_producer: Option<String>,
+    tran_recipient: Option<String>,
+    tran_status: Option<String>,
 ) -> Result<EmitResult> {
     let opts = laterite_ags4_emit::EmitOpts {
+        tran: laterite_ags4_emit::TranStamp::from_parts(
+            tran_issue,
+            tran_date,
+            tran_producer,
+            tran_recipient,
+            tran_status,
+            String::new(),
+        ),
         mode: resolve_mode(mode.as_deref())?,
         edition: resolve_edition(edition.as_deref())
             .map_err(Error::from_reason)?

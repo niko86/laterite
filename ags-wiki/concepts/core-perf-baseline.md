@@ -11,7 +11,7 @@ repo_refs:
   fixtures: "repo:tools/gen-bench-fixtures.sh"
   relational: "repo:rust-packages/laterite-ags4-validator/src/rules/relational.rs"
   line_format: "repo:rust-packages/laterite-ags4-validator/src/rules/line_format.rs"
-related: [crate-map, testing-strategy, abi3-perf, laterite-ags4-validator, laterite-ags4-emit, laterite-ags4-types, laterite-ags4-core, laterite-ags4-parse, laterite-excel, perf-campaign]
+related: [crate-map, testing-strategy, abi3-perf, laterite-ags4-validator, laterite-ags4-emit, laterite-types, laterite-ags4-core, laterite-ags4-parse, laterite-excel, perf-campaign]
 sources: []
 ---
 # core perf baseline: where the time actually goes
@@ -84,7 +84,7 @@ on any machine and in CI, carrying no real delivery data.
 > `Utf8` column + a second pass, and links the arrow-cast kernels — a ~3.5 MB wasm
 > bloat the direct parse avoids). Bool (`YN`) / Datetime (`DT`) keep their custom
 > arms. Byte-parity with the per-cell build is pinned cell-for-cell over the
-> fixture in `laterite-ags4-types/tests/typed_build_parity.rs`.
+> fixture in `laterite-types/tests/typed_build_parity.rs`.
 
 `check_file` ≈ `parse_bytes` + `check_parsed` (264 ms), so I/O plus dictionary
 resolution is only ~5 ms and the split is self-consistent. That arithmetic is the
@@ -114,7 +114,7 @@ Two results worth keeping in view:
 
 > [!note] **Where the read's *allocations* live — dhat, 2026-07-25.** Timing says
 > parse and build are both real; a `dhat` heap profile
-> (`laterite-ags4-types/examples/dhat_read.rs`) says only one of them is allocation-driven.
+> (`laterite-types/examples/dhat_read.rs`) says only one of them is allocation-driven.
 > Over the 25 MB rung: `build_record_batch` does **9,967** allocations (61 MB total,
 > 782 KB live peak) — allocation-optimal, so its 16.7 ms is a compute/bandwidth
 > **wall** (T3 is done). `parse_bytes` does **4,982,948** — ~5M, ≈1 owned `String`
@@ -381,7 +381,7 @@ about mechanism and a stopwatch does not make one.
 ## Where it shows up
 
 Benches live beside the crate they measure —
-[[laterite-ags4-validator]], [[laterite-ags4-core]], [[laterite-ags4-types]],
+[[laterite-ags4-validator]], [[laterite-ags4-core]], [[laterite-types]],
 [[laterite-ags4-emit]], and the parse leaf. Run them with
 `tools/gen-bench-fixtures.sh` then `cargo bench`; an absent fixture skips rather
 than fails, so a clean checkout still works — but a skipped bench measures
@@ -389,4 +389,4 @@ nothing, which is exactly how the previous one sat silently dead.
 
 ## Related
 
-[[perf-campaign]] · [[crate-map]] · [[testing-strategy]] · [[abi3-perf]] · [[laterite-ags4-validator]] · [[laterite-ags4-emit]] · [[laterite-ags4-types]] · [[laterite-ags4-core]] · [[laterite-ags4-parse]] · [[laterite-excel]] · [[ags4-output]]
+[[perf-campaign]] · [[crate-map]] · [[testing-strategy]] · [[abi3-perf]] · [[laterite-ags4-validator]] · [[laterite-ags4-emit]] · [[laterite-types]] · [[laterite-ags4-core]] · [[laterite-ags4-parse]] · [[laterite-excel]] · [[ags4-output]]

@@ -35,7 +35,7 @@ CPython:
 
 The boundary's **read path carries typed Apache Arrow** (the 0.3 DuckDB-engine
 redesign): the Rust parser builds one `RecordBatch` per group via
-`laterite-ags4-types::arrow_cols` (the *same* emitter the wasm explorer frames as IPC)
+`laterite-types::arrow_cols` (the *same* emitter the wasm explorer frames as IPC)
 and hands it to Python **zero-copy as an Arrow PyCapsule** through `pyo3-arrow`,
 **pyarrow-free and born-typed** (a 2DP heading is `Float64`, not `str`). That
 Arrow is built **lazily, per group, on first touch** (`Reading::table_for`)
@@ -50,8 +50,8 @@ and the rarely-used `get_line_numbers=True` arm of `AGS4_to_dataframe` (no
 shipped caller) all still cross that way. But **`compat.AGS4_to_dataframe`'s
 common path moved onto its own Arrow builder (2026-07-20 perf pass)**:
 `parse_compat_arrow` (`repo:rust-packages/laterite-py/src/lib.rs`) drives
-`laterite-ags4-types::arrow_cols::build_record_batch_compat`
-(`repo:rust-packages/laterite-ags4-types/src/arrow_cols.rs`) — same "no per-cell
+`laterite-types::arrow_cols::build_record_batch_compat`
+(`repo:rust-packages/laterite-types/src/arrow_cols.rs`) — same "no per-cell
 `PyObject`" property as the typed read path, but the python-ags4 frame *shape*
 (a leading `HEADING` tag column, `UNIT`/`TYPE`/`DATA` rows, raw-string cells,
 no type casting) rather than the typed path's born-typed columns. python-ags4

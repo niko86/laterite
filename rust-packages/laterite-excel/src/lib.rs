@@ -971,8 +971,8 @@ mod tests {
 /// **The numeric-formatter authority gate.**
 ///
 /// AGS4's numeric spelling (`"0.00"`, `"1.23e4"`, `"1230"` …) is defined by ONE function,
-/// [`laterite_ags4_types::ags4_str`]. This crate's [`NumericFormat`] is a *hand-copy* of that
-/// logic — it deps `laterite-ags4-types` nowhere at runtime — and a hand-copy is a thing that
+/// [`laterite_types::ags4_str`]. This crate's [`NumericFormat`] is a *hand-copy* of that
+/// logic — it deps `laterite-types` nowhere at runtime — and a hand-copy is a thing that
 /// drifts. It has: excel spells `nSCI` with an **uppercase `E`** where the authority uses
 /// lowercase `e`, and excel spells `nSF` of zero as a bare `"0"` where the authority pads
 /// to the figure count (`"0.00"`).
@@ -999,7 +999,7 @@ mod tests {
 #[cfg(test)]
 mod formatter_authority {
     use super::{NumericFormat, format_sf};
-    use laterite_ags4_types::ags4_str;
+    use laterite_types::ags4_str;
     use serde_json::json;
 
     /// Format `value` under `spec` the way the canonical AGS4 emitter does.
