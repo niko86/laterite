@@ -309,6 +309,7 @@ fn emit_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode, String> {
 /// — its `ObjectAccess` walks serde's known fields and `Reflect`-gets each,
 /// never enumerating what the caller actually passed. Requiredness is doing the
 /// work an unknown-key guard cannot do here.
+#[cfg_attr(test, derive(serde::Serialize))]
 #[derive(serde::Deserialize, Default)]
 #[serde(default, rename_all = "camelCase")]
 struct TranInput {
@@ -325,6 +326,39 @@ struct TranInput {
 /// constitutes a complete stamp lives in `TranStamp::from_parts` in the emit
 /// crate, which is host-testable. This crate's tests run on the HOST with no
 /// `wasm-bindgen-test`, so anything with `JsValue` in it ships unexecuted.
+impl TranInput {
+    /// Fold to the shared type. The policy — all five or none — lives in
+    /// `TranStamp::from_parts` in the emit crate, so no surface can answer
+    /// "is this enough to stamp a TRAN" differently from the others.
+    ///
+    /// Pure, and that also gives the NESTED object typo protection the
+    /// top-level guard cannot reach: `reject_unknown_keys` enumerates only the
+    /// outer object's keys, so a misspelled `producr` inside `tran` slips past
+    /// it — but then `producer` is unset, and "all five or none" reports it by
+    /// name. Requiredness covers what enumeration does not.
+    fn fold(self) -> Result<Option<laterite_ags4_emit::TranStamp>, String> {
+        let stamp = laterite_ags4_emit::TranStamp::from_parts(
+            self.issue,
+            self.date,
+            self.producer,
+            self.recipient,
+            self.status,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok(stamp.map(|s| {
+            let s = match self.description {
+                Some(d) => s.with_description(d),
+                None => s,
+            };
+            match self.remarks {
+                Some(r) => s.with_remarks(r),
+                None => s,
+            }
+        }))
+    }
+}
+
+/// The JS→Rust shim for the exports that still take `tran` positionally.
 fn tran_from_js(v: Option<JsValue>) -> Result<Option<laterite_ags4_emit::TranStamp>, JsError> {
     // `Option<JsValue>` rather than bare `JsValue` so wasm-bindgen emits
     // `tran?: any` — omitting the stamp is the common case (no TRAN, Rule 14
@@ -334,24 +368,75 @@ fn tran_from_js(v: Option<JsValue>) -> Result<Option<laterite_ags4_emit::TranSta
     };
     let t: TranInput = serde_wasm_bindgen::from_value(v)
         .map_err(|e| JsError::new(&format!("invalid tran: {e}")))?;
-    let stamp = laterite_ags4_emit::TranStamp::from_parts(
-        t.issue,
-        t.date,
-        t.producer,
-        t.recipient,
-        t.status,
-    )
-    .map_err(|e| JsError::new(&e.to_string()))?;
-    Ok(stamp.map(|s| {
-        let s = match t.description {
-            Some(d) => s.with_description(d),
-            None => s,
-        };
-        match t.remarks {
-            Some(r) => s.with_remarks(r),
-            None => s,
-        }
-    }))
+    t.fold().map_err(|m| JsError::new(&m))
+}
+
+/// `build_ags4` / `build_ags4_ipc`'s named options.
+///
+/// `tran` is a NESTED struct rather than a `JsValue`, so serde builds it
+/// directly and `TranInput::fold` applies the shared completeness rule. See
+/// that method for why the nested object does not need its own key guard.
+#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(serde::Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+struct BuildOptions {
+    dict_version: Option<String>,
+    mode: Option<String>,
+    synthesise_metadata: Option<bool>,
+    tran: Option<TranInput>,
+}
+
+impl WasmOptions for BuildOptions {
+    const KEYS: &'static [&'static str] = &["dictVersion", "mode", "synthesiseMetadata", "tran"];
+    const WHAT: &'static str = "build options";
+}
+
+#[wasm_bindgen(typescript_custom_section)]
+const TS_BUILD_OPTIONS: &'static str = r#"
+/** The transmission a built file represents. All five are required together —
+ *  they are REQUIRED `TRAN` headings, so a partial stamp emits a `TRAN` that
+ *  fails Rule 10b. Omit the whole object and no `TRAN` is written; Rule 14 then
+ *  reports the gap, which is the honest outcome.
+ *
+ *  `TRAN_AGS`, `TRAN_DLIM` and `TRAN_RCON` are absent on purpose: they describe
+ *  the file the emitter is writing, so it fills them. */
+export interface TranStamp {
+  /** `TRAN_ISNO` — the issue sequence reference. */
+  issue: string;
+  /** `TRAN_DATE` — `yyyy-mm-dd`. */
+  date: string;
+  /** `TRAN_PROD` — who produced the file. */
+  producer: string;
+  /** `TRAN_RECV` — who it is for. */
+  recipient: string;
+  /** `TRAN_STAT` — e.g. `"FINAL"`. */
+  status: string;
+  /** `TRAN_DESC` — what was transferred. */
+  description?: string;
+  /** `TRAN_REM` — free remarks. */
+  remarks?: string;
+}
+
+/** Named options for `build_ags4` and `build_ags4_ipc`. */
+export interface BuildOptions {
+  /** The edition to write against. `"auto"` (or omitted) uses the standard. */
+  dictVersion?: "auto" | "4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2";
+  /** `"autofix"` (default) repairs what it safely can, `"report"` emits
+   *  unmodified with findings, `"strict"` refuses invalid output. */
+  mode?: "autofix" | "report" | "strict";
+  /** Mint the mandatory catalogs your data doesn't carry — `UNIT` and `TYPE`
+   *  from the columns, `ABBR` when `PA` codes are used. Default **false**.
+   *  `PROJ`, `DICT` and `TRAN` are never invented; `TRAN` comes from `tran`. */
+  synthesiseMetadata?: boolean;
+  /** The transmission this file represents. */
+  tran?: TranStamp;
+}
+"#;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "BuildOptions")]
+    pub type BuildOptionsJs;
 }
 
 /// Core of [`build_ags4`], host-testable (no `JsValue`): parse the JSON, run
@@ -516,27 +601,21 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
 /// ledger of what AutoFix rewrote (`{kind, label, rule, line, risk}` per fix —
 /// the same shape Python and Node present), `fixes_applied` its length.
 #[wasm_bindgen]
-pub fn build_ags4(
-    groups_json: &str,
-    dict_version: Option<String>,
-    mode: Option<String>,
-    synthesise_metadata: Option<bool>,
-    // The transmission this file represents, as ONE object:
-    // `{ issue, date, producer, recipient, status, description?, remarks? }`.
-    // Five REQUIRED headings travelled here as five consecutive same-typed
-    // positional slots, which is a transposition waiting to happen and drove the
-    // argument count to nine. Omit it entirely and no TRAN is minted — Rule 14
-    // reports the gap, which is the honest outcome. Supply it partially and you
-    // get an error naming the missing fields.
-    tran: Option<JsValue>,
-) -> Result<JsValue, JsError> {
+pub fn build_ags4(groups_json: &str, opts: Option<BuildOptionsJs>) -> Result<JsValue, JsError> {
     console_error_panic_hook::set_once();
+    let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    let tran = o
+        .tran
+        .map(TranInput::fold)
+        .transpose()
+        .map_err(|m| JsError::new(&m))?
+        .flatten();
     let report = build_ags4_from_json(
         groups_json,
-        dict_version.as_deref(),
-        mode.as_deref(),
-        synthesise_metadata.unwrap_or(false),
-        tran_from_js(tran)?,
+        o.dict_version.as_deref(),
+        o.mode.as_deref(),
+        o.synthesise_metadata.unwrap_or(false),
+        tran,
     )
     .map_err(|e| JsError::new(&e))?;
     serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
@@ -555,21 +634,22 @@ pub fn build_ags4(
 /// transpose is the read path's IPC reversed.
 #[wasm_bindgen]
 pub fn build_ags4_ipc(
+    // Stays a raw `JsValue` on its own hand-written `Reflect` path below. An
+    // array of `{ code, ipc: Uint8Array }` routed through serde would put every
+    // `ipc` BYTE through `deserialize_seq` — which is the exact cost this
+    // columnar door exists to avoid. Only the OPTION tail moved.
     groups: JsValue,
-    dict_version: Option<String>,
-    mode: Option<String>,
-    synthesise_metadata: Option<bool>,
-    // The transmission this file represents, as ONE object:
-    // `{ issue, date, producer, recipient, status, description?, remarks? }`.
-    // Five REQUIRED headings travelled here as five consecutive same-typed
-    // positional slots, which is a transposition waiting to happen and drove the
-    // argument count to nine. Omit it entirely and no TRAN is minted — Rule 14
-    // reports the gap, which is the honest outcome. Supply it partially and you
-    // get an error naming the missing fields.
-    tran: Option<JsValue>,
+    opts: Option<BuildOptionsJs>,
 ) -> Result<JsValue, JsError> {
     use wasm_bindgen::JsCast;
     console_error_panic_hook::set_once();
+    let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    let tran = o
+        .tran
+        .map(TranInput::fold)
+        .transpose()
+        .map_err(|m| JsError::new(&m))?
+        .flatten();
     let arr = js_sys::Array::from(&groups);
     let mut inputs: Vec<laterite_ags4_emit::GroupInput> = Vec::with_capacity(arr.length() as usize);
     for item in arr.iter() {
@@ -587,10 +667,10 @@ pub fn build_ags4_ipc(
     }
     let report = emit_report(
         inputs,
-        dict_version.as_deref(),
-        mode.as_deref(),
-        synthesise_metadata.unwrap_or(false),
-        tran_from_js(tran)?,
+        o.dict_version.as_deref(),
+        o.mode.as_deref(),
+        o.synthesise_metadata.unwrap_or(false),
+        tran,
     )
     .map_err(|e| JsError::new(&e))?;
     serde_wasm_bindgen::to_value(&report).map_err(|e| JsError::new(&e.to_string()))
@@ -1384,7 +1464,7 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
 
 #[cfg(test)]
 mod options_tests {
-    use super::{CertifyOptions, ValidateOptions, WasmOptions, unknown_key};
+    use super::{BuildOptions, CertifyOptions, ValidateOptions, WasmOptions, unknown_key};
 
     /// `KEYS` must name exactly the struct's own serde fields.
     ///
@@ -1422,6 +1502,7 @@ mod options_tests {
     fn option_keys_match_the_structs() {
         assert_keys_match::<ValidateOptions>();
         assert_keys_match::<CertifyOptions>();
+        assert_keys_match::<BuildOptions>();
     }
 
     /// A misspelled key is REFUSED, by name, with a suggestion.

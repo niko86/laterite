@@ -28,6 +28,7 @@ import type { ParsedDataset } from "../wasm/ags4_wasm.js";
 import wasmUrl from "../wasm/ags4_wasm_bg.wasm?url";
 import type {
   DictVersionOpt,
+  EmitMode,
   EncodingOpt,
   ValidationReport,
   Fix,
@@ -184,10 +185,9 @@ export interface ToAgs4Req {
   id: number;
   kind: "toAgs4";
   groupsJson: string;
-  /** "auto"/null → 4.1.1; else 4.0.3|4.0.4|4.1|4.1.1|4.2. */
-  edition: string | null;
-  /** autofix | report | strict. */
-  mode: string;
+  /** `"auto"`/null → the standard edition; else a concrete one. */
+  edition: DictVersionOpt | null;
+  mode: EmitMode;
 }
 /** AGS4 bytes → an `.xlsx` workbook (Tools → Excel, export direction). */
 export interface ExcelExportReq {
@@ -439,11 +439,20 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
 
     if (req.kind === "toAgs4") {
       // Throws (→ caught below) on invalid JSON or a strict-mode rejection.
-      const result = build_ags4(
-        req.groupsJson,
-        req.edition ?? undefined,
-        req.mode,
-      ) as ExportResult;
+      // `synthesiseMetadata` and `tran` are deliberately NOT wired through
+      // yet. The export pane has no UI for either, and both are opt-in for the
+      // same reason: synthesis adds whole groups the user never entered, and a
+      // TRAN asserts a transmission only they can state. Exporting with
+      // synthesis silently on would produce a file carrying groups they did not
+      // author. When the pane grows the fields, they belong here.
+      //
+      // (Under the old positional signature these were slots 4 and 5, unpassed
+      // and therefore invisible — the options object at least makes their
+      // absence something you can see.)
+      const result = build_ags4(req.groupsJson, {
+        dictVersion: req.edition ?? undefined,
+        mode: req.mode,
+      }) as ExportResult;
       reply({ id: req.id, ok: true, kind: "toAgs4", result });
       return;
     }

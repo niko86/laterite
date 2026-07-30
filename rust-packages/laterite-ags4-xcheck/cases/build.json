@@ -27,7 +27,7 @@
         "node",
         "wasm-engine"
       ],
-      "spec_ref": "The data→AGS4 door (`build_ags4`) across all four surfaces. Each has its OWN input idiom — a polars frame (python), row-objects (node `buildAgs4`), a JSON string (wasm `build_ags4`), a `GroupInput` (rust-leaf) — but all route through the ONE shared emit orchestrator, so the built bytes (with the dictionary-filled UNIT/TYPE and the AutoFix-added TRAN/UNIT/TYPE groups) must be byte-identical. A surface re-implementing build would diverge from the leaf."
+      "spec_ref": "The data\u2192AGS4 door (`build_ags4`) across all four surfaces. Each has its OWN input idiom \u2014 a polars frame (python), row-objects (node `buildAgs4`), a JSON string (wasm `build_ags4`), a `GroupInput` (rust-leaf) \u2014 but all route through the ONE shared emit orchestrator, so the built bytes (with the dictionary-filled UNIT/TYPE and the AutoFix-added TRAN/UNIT/TYPE groups) must be byte-identical. A surface re-implementing build would diverge from the leaf."
     },
     {
       "id": "emit.build.numeric_precision",
@@ -70,7 +70,7 @@
         "node",
         "wasm-engine"
       ],
-      "spec_ref": "AGS4 numeric rendering is the ENGINE's job, from the declared TYPE: `laterite-types::ags4_str` formats a JSON number per its type (2DP `LOCA_NATE`: 12.3 -> `12.30`, 100.456 -> `100.46`), and every surface routes through it. A surface that stringified numbers itself — the obvious thing for a host binding to do — would emit `12.3` here and split from the leaf. NOTE: this case deliberately carries no INTEGER-valued cell. Adding one splits the node leg, which renders a whole JS number as `5.0` where rust/python/wasm render `5` (every JS number is an f64); that divergence is real and unresolved, so pin it in its own case once ruled on rather than smuggling it in here."
+      "spec_ref": "AGS4 numeric rendering is the ENGINE's job, from the declared TYPE: `laterite-types::ags4_str` formats a JSON number per its type (2DP `LOCA_NATE`: 12.3 -> `12.30`, 100.456 -> `100.46`), and every surface routes through it. A surface that stringified numbers itself \u2014 the obvious thing for a host binding to do \u2014 would emit `12.3` here and split from the leaf. NOTE: this case deliberately carries no INTEGER-valued cell. Adding one splits the node leg, which renders a whole JS number as `5.0` where rust/python/wasm render `5` (every JS number is an f64); that divergence is real and unresolved, so pin it in its own case once ruled on rather than smuggling it in here."
     },
     {
       "id": "emit.build.field_quoting",
@@ -109,7 +109,7 @@
         "node",
         "wasm-engine"
       ],
-      "spec_ref": "AGS4 Rule-1 field escaping (a literal `\"` doubled to `\"\"`, a comma kept inside the quoted field) has ONE authority — `laterite-types::write_quoted_field` — which the byte writer streams through and the browser tokenizer reuses. A surface re-implementing quoting would corrupt exactly this value."
+      "spec_ref": "AGS4 Rule-1 field escaping (a literal `\"` doubled to `\"\"`, a comma kept inside the quoted field) has ONE authority \u2014 `laterite-types::write_quoted_field` \u2014 which the byte writer streams through and the browser tokenizer reuses. A surface re-implementing quoting would corrupt exactly this value."
     },
     {
       "id": "emit.build.null_cell",
@@ -152,7 +152,7 @@
         "node",
         "wasm-engine"
       ],
-      "spec_ref": "A null cell is an EMPTY AGS4 field, not the string `null`/`None`/`NaN`. Each surface carries its own null idiom (polars null, JS null, JSON null, serde `Value::Null`) and they must all land on `\"\"` via `ags4_str`'s null branch — the classic place a host binding leaks its own representation into the bytes."
+      "spec_ref": "A null cell is an EMPTY AGS4 field, not the string `null`/`None`/`NaN`. Each surface carries its own null idiom (polars null, JS null, JSON null, serde `Value::Null`) and they must all land on `\"\"` via `ags4_str`'s null branch \u2014 the classic place a host binding leaks its own representation into the bytes."
     },
     {
       "id": "emit.build.parent_child_groups",
@@ -209,6 +209,57 @@
         "wasm-engine"
       ],
       "spec_ref": "A three-group build with a parent/child chain (PROJ -> LOCA -> SAMP): group ORDER is preserved as given, each group's UNIT/TYPE rows are filled from the dictionary, and the shared KEY heading `LOCA_ID` appears in both parent and child. Pins that no surface reorders groups or fills metadata differently."
+    },
+    {
+      "id": "emit.build.synthesis_and_tran",
+      "op": "build_typed",
+      "input": {
+        "build": [
+          {
+            "code": "PROJ",
+            "headings": [
+              "PROJ_ID",
+              "PROJ_NAME"
+            ],
+            "rows": [
+              [
+                "P1",
+                "Test Project"
+              ]
+            ]
+          },
+          {
+            "code": "LOCA",
+            "headings": [
+              "LOCA_ID",
+              "LOCA_GL"
+            ],
+            "rows": [
+              [
+                "BH01",
+                12.34
+              ]
+            ]
+          }
+        ],
+        "build_opts": {
+          "synthesise_metadata": true,
+          "tran": {
+            "issue": "1",
+            "date": "2026-07-30",
+            "producer": "Test Producer",
+            "recipient": "Test Recipient",
+            "status": "FINAL"
+          }
+        }
+      },
+      "legs": [
+        "rust-leaf",
+        "python",
+        "node",
+        "wasm-engine"
+      ],
+      "spec_ref": "The SYNTHESIS path of the build door, which every earlier build case leaves off. Synthesis mints whole GROUPS the caller never wrote (UNIT/TYPE from the data, ABBR for PA codes) and stamps the caller's TRAN, so a surface that diverges here produces a file with different groups, not merely different bytes - and nothing else compares that across surfaces. It also pins the five TRAN values landing in their own headings on all four legs at once: they are same-typed and adjacent in every surface's internal call, so a transposition is invisible to every compiler involved."
     }
   ]
 }

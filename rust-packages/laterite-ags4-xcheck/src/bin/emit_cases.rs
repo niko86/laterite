@@ -16,7 +16,8 @@ use std::path::PathBuf;
 #[path = "../xcheck_shared.rs"]
 mod shared;
 use shared::{
-    AUTHORITY, BuildGroup, Case, InlineGroup, LegObservations, Observation, load_manifests,
+    AUTHORITY, BuildGroup, BuildOpts, Case, InlineGroup, LegObservations, Observation,
+    load_manifests,
 };
 
 /// Canonical re-emit: parse a fixture and write it back through the shared
@@ -108,7 +109,7 @@ fn emit_typed_verbatim(groups: &[InlineGroup]) -> Observation {
 /// `build_ags4` — routes through this same orchestrator, so this column is the
 /// reference they must reproduce; a surface that re-implemented build would
 /// diverge from it.
-fn build_typed(groups: &[BuildGroup]) -> Observation {
+fn build_typed(groups: &[BuildGroup], build_opts: Option<&BuildOpts>) -> Observation {
     let inputs: Vec<laterite_ags4_emit::GroupInput> = groups
         .iter()
         .map(|g| laterite_ags4_emit::GroupInput {
@@ -120,8 +121,21 @@ fn build_typed(groups: &[BuildGroup]) -> Observation {
         })
         .collect();
     // AutoFix + 4.1.1 — the resolved project defaults every surface's build door
-    // uses when the caller names neither.
-    let opts = laterite_ags4_emit::EmitOpts::default();
+    // uses when the caller names neither. A case may turn on synthesis and state
+    // a transmission; those are the only two knobs the build legs share.
+    let opts = laterite_ags4_emit::EmitOpts {
+        synthesise_metadata: build_opts.is_some_and(|o| o.synthesise_metadata),
+        tran: build_opts.and_then(|o| o.tran.as_ref()).map(|t| {
+            laterite_ags4_emit::TranStamp::new(
+                &t.issue,
+                &t.date,
+                &t.producer,
+                &t.recipient,
+                &t.status,
+            )
+        }),
+        ..laterite_ags4_emit::EmitOpts::default()
+    };
     match laterite_ags4_emit::emit_ags4(&inputs, &opts) {
         Ok(res) => match String::from_utf8(res.bytes) {
             Ok(text) => Observation::Ok(serde_json::Value::String(text)),
@@ -143,7 +157,7 @@ fn observe(case: &Case, repo_root: &std::path::Path) -> Option<Observation> {
         }
         "build_typed" => {
             let groups = case.input.build.as_ref()?;
-            Some(build_typed(groups))
+            Some(build_typed(groups, case.input.build_opts.as_ref()))
         }
         // Unknown op: the leg records nothing; `xcheck --require-legs all` turns
         // a case the authority silently skipped into a hard failure, so a new op
