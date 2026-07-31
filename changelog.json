@@ -11,6 +11,10 @@
         "prs": [
           188
         ]
+      },
+      {
+        "text": "**The fingerprint build refuses to emit a digest that covers too little.** It previously narrowed in silence — the dependency walk simply found nothing and carried on. It now fails the build, naming what it found. The existing coverage test cannot do this job: tests do not ship in a published crate, so the one build that had the defect was also the one build with nothing checking it.",
+        "prs": []
       }
     ],
     "changed": [
@@ -36,7 +40,12 @@
         ]
       }
     ],
-    "fixed": [],
+    "fixed": [
+      {
+        "text": "**The engine fingerprint no longer forgets its dependencies when built from a published crate.** A certificate records which engine judged a file, and the engine's identity is a hash over everything that can change a verdict — the rules, plus the crates they run through. `cargo publish` rewrites the packaged manifest and strips the `path` key from every dependency, and the hash found those crates BY that key, so a build from a crates.io tarball covered 14 files in 1 crate instead of 29 across 4, without a word. A consumer who picked up a new `laterite-ags4-parse` — the tokenizer that decides where fields end — would have kept trusting every certificate minted before it. Our own crates are now identified by `name@version` when their sources are not reachable, which is sound precisely there: a published version's content is immutable. The in-workspace fingerprint is unchanged, so no existing certificate is affected.",
+        "prs": []
+      }
+    ],
     "security": []
   },
   "releases": [

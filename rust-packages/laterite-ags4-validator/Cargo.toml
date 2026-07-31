@@ -120,6 +120,10 @@ criterion = "0.8"
 # workspace lockfile via ags4-corpus-qa → the library's lean dep-graph
 # guarantee (no walkdir/rayon/ratatui) is untouched.
 tempfile = "3"
+# `tests/manifest_deps.rs` re-parses this manifest, and a synthetic PACKAGED one, to
+# hold the fingerprint's dependency discovery honest (#158). Same crate build.rs
+# already uses; a dev-dep, so the library's lean runtime dep-graph is untouched.
+toml = "1"
 # (serde_json is a normal dependency now — see the note above — so the
 # findings.rs byte-identity tests reach it without a dev-dep entry.)
 # Property-based tests: the AGS4 field splitter round-trip + field_span
