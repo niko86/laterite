@@ -26,7 +26,9 @@
       },
       {
         "text": "**The engine crates carry the metadata a crates.io page is made of.** `repository`, `keywords` and `categories` were absent, and seven of the eight round-one crates had no README. That is not a cosmetic gap: crates.io bakes metadata into the PUBLISHED VERSION, so adding it afterwards fixes future versions only — the pages for a version already on the registry would keep no link back to the source, permanently, and seven of them would have been a one-line description and nothing else. Each README is written to stand alone on the registry rather than assume the repository around it. The packaging gate caught all seven new files, which is what it is for.",
-        "prs": []
+        "prs": [
+          195
+        ]
       }
     ],
     "changed": [
