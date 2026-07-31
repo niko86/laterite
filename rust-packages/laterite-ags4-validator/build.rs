@@ -61,6 +61,48 @@
 //! shows up.
 //!
 //! Also not hashed: `Cargo.toml`, tests, benches, and the crate's own version.
+//!
+//! # When the sources are not there to hash (#158)
+//!
+//! Everything above describes a build from this workspace. Built from a crates.io
+//! tarball it was silently false: `cargo publish` REWRITES the packaged manifest and
+//! strips the `path` key from every dependency, keeping only `version`. So
+//! `path_deps` found nothing, the recursion never happened, and the covered set
+//! collapsed from **29 files across 4 crates to 14 files in 1** — the validator's
+//! own. Nothing failed. `walk` panics on a missing directory, but this code never
+//! asked for one; it just stopped.
+//!
+//! That is not a cosmetic narrowing. A consumer pinning
+//! `laterite-ags4-validator 0.1.0` picks up `laterite-ags4-parse 0.1.1` on any
+//! `cargo update` — the tokenizer that decides where fields end — and every
+//! certificate they hold keeps reading `Vouched` against an engine that now decides
+//! differently. Precisely the bug #550 fixed, reopened for registry consumers only.
+//!
+//! So when an in-workspace dependency's sources are NOT reachable, its identity goes
+//! into the digest as `name@version` instead. That is sound in exactly the place it
+//! is used: crates.io is immutable, so a published `laterite-ags4-parse 0.1.1` can
+//! never be different bytes than it was. The objection that sank `CARGO_PKG_VERSION`
+//! for THIS crate — a local edit does not move it — cannot happen to a registry
+//! artefact, because there is no local edit.
+//!
+//! The consequence, accepted deliberately: the same source tree yields a different
+//! fingerprint depending on whether it was built here or from a tarball. That lands
+//! on the SAFE side of the asymmetry this file already commits to — a mismatch costs
+//! one redundant revalidation, never a false clean.
+//!
+//! "In-workspace" is decided by the `laterite` name prefix rather than by the
+//! presence of a `path` key, because the `path` key is the very thing publishing
+//! removes. `laterite_deps_are_exactly_the_path_deps` holds that prefix honest: in
+//! this workspace the two sets must be identical, so a `laterite*` dependency that
+//! is NOT ours, or an in-workspace crate that is not named `laterite*`, fails loudly
+//! rather than being silently mis-sorted.
+//!
+//! One thing this still does not normalise: file names are fed to the digest
+//! relative to the crate directory's PARENT, which in a registry checkout is
+//! `laterite-ags4-validator-0.9.0` rather than `laterite-ags4-validator`. Published
+//! builds therefore also re-fingerprint on a version bump with no code change. Same
+//! safe direction, left alone rather than fixed here because changing the naming
+//! moves the fingerprint for every existing certificate.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -88,12 +130,13 @@ fn main() {
     ];
     collect_rs(&manifest.join("src/rules"), &mut files);
 
-    // (2) Every in-workspace crate the verdict is expressed through.
+    // (2) Every in-workspace crate the verdict is expressed through — by source
+    // where the sources are reachable, else by the `name@version` that identifies
+    // the immutable published artefact (#158).
     let mut seen: BTreeSet<PathBuf> = BTreeSet::new();
+    let mut pinned: BTreeSet<String> = BTreeSet::new();
     seen.insert(canon(&manifest)); // don't re-walk this crate under rule (1)
-    for rel in path_deps(&manifest.join("Cargo.toml")) {
-        collect_crate(&manifest.join(&rel), &mut files, &mut seen);
-    }
+    resolve_deps(&manifest, &mut files, &mut seen, &mut pinned);
 
     // Sort so the digest doesn't depend on directory-walk or dep-declaration order.
     files.sort();
@@ -123,6 +166,19 @@ fn main() {
         println!("cargo::rerun-if-changed={}", f.display());
         names.push(name);
     }
+
+    // Then the deps identified by version rather than by source. Fed with a `dep:`
+    // marker and no content, so a pinned entry can never collide with a file whose
+    // path happens to look like `name@version`.
+    for p in &pinned {
+        h.update(b"dep:");
+        h.update(p.as_bytes());
+        h.update([0]);
+        names.push(p.clone());
+    }
+
+    coverage_floor(&names, &pinned);
+
     let digest = h.finalize();
     // 16 hex chars (64 bits) — plenty to distinguish engine builds, short enough
     // to read in a `.ags.idx` and in a diff.
@@ -140,6 +196,53 @@ fn main() {
     );
 }
 
+/// Refuse to emit a fingerprint that covers obviously too little.
+///
+/// `tests/engine_fingerprint.rs` already holds a coverage floor, and it is the
+/// better place for the detailed one — it can name specific files and say why each
+/// matters. But a test cannot run where this defect lives: tests are not in the
+/// published tarball at all, so the packaged build that silently fingerprinted a
+/// quarter of the engine had nothing checking it and never would have.
+///
+/// Hence a floor HERE, in the one piece of code that runs in every build context.
+/// It is deliberately coarse — an exact count would be a second thing to update on
+/// every refactor, and a floor that people edit reflexively stops being a floor.
+/// What it asserts is structural: the rule modules were found, and every one of our
+/// own dependencies was accounted for somehow.
+fn coverage_floor(names: &[String], pinned: &BTreeSet<String>) {
+    let rules = names
+        .iter()
+        // No extension test: `collect_rs` only ever collects `.rs`, so anything
+        // under `src/rules/` in the covered set is a rule source by construction.
+        .filter(|n| n.contains("/src/rules/"))
+        .count();
+    assert!(
+        rules >= 5,
+        "engine fingerprint: only {rules} rule source(s) covered — the walk over \
+         src/rules found almost nothing, so the digest describes an engine that is not \
+         the one being built.\nCovered: {}",
+        names.join(", "),
+    );
+
+    // At least one dependency must be accounted for, by either route. Zero means the
+    // manifest parse silently produced nothing — the exact shape of #158, where
+    // `[dependencies]` was read but every entry filtered away.
+    let by_source = names
+        .iter()
+        .any(|n| !n.contains('@') && !n.starts_with(CRATE));
+    assert!(
+        by_source || !pinned.is_empty(),
+        "engine fingerprint: not one dependency was covered, by source or by version. \
+         The verdict runs through laterite-ags4-parse, -types and -reference; a digest \
+         over this crate alone would vouch for certificates those crates can invalidate.",
+    );
+}
+
+/// This crate's own directory name, used to tell its files apart from a dependency's
+/// in the covered set. Not `CARGO_PKG_NAME`: the names in the covered set are paths,
+/// and in a registry checkout the directory carries the version too.
+const CRATE: &str = "laterite-ags4-validator";
+
 fn canon(p: &Path) -> PathBuf {
     p.canonicalize().unwrap_or_else(|e| {
         panic!(
@@ -149,36 +252,20 @@ fn canon(p: &Path) -> PathBuf {
     })
 }
 
-/// The `[dependencies]` entries of `manifest_toml` that are in-workspace path deps,
-/// as declared relative paths.
-///
-/// `[dev-dependencies]` and `[build-dependencies]` are deliberately not read: neither
-/// can reach a verdict, and following the dev-dep on `laterite-ags4-core` would walk
-/// back into a crate that depends on this one.
-fn path_deps(manifest_toml: &Path) -> Vec<String> {
+// `OwnDep` + `own_deps_from` — shared verbatim with `tests/manifest_deps.rs` so the
+// packaged-manifest branch is reachable from a test rather than only from a real
+// publish. See that file's header for why it is `include!`d rather than a module.
+include!("src/manifest_deps.rs");
+
+/// [`own_deps_from`] over a manifest on disk.
+fn own_deps(manifest_toml: &Path) -> Vec<OwnDep> {
     let text = std::fs::read_to_string(manifest_toml).unwrap_or_else(|e| {
         panic!(
             "engine fingerprint: cannot read {}: {e}",
             manifest_toml.display()
         )
     });
-    // `Table`, not `Value`: a manifest is a TOML *document*, and `Value`'s FromStr
-    // parses a bare value — it rejects the leading comment on line 1.
-    let doc: toml::Table = text.parse().unwrap_or_else(|e| {
-        panic!(
-            "engine fingerprint: cannot parse {}: {e}",
-            manifest_toml.display()
-        )
-    });
-    let Some(deps) = doc.get("dependencies").and_then(toml::Value::as_table) else {
-        return Vec::new();
-    };
-    let mut out: Vec<String> = deps
-        .values()
-        .filter_map(|spec| spec.get("path")?.as_str().map(str::to_string))
-        .collect();
-    out.sort();
-    out
+    own_deps_from(&text, &manifest_toml.display().to_string())
 }
 
 /// One in-workspace crate's hash-relevant files — every source file, its `build.rs`
@@ -189,7 +276,12 @@ fn path_deps(manifest_toml: &Path) -> Vec<String> {
 /// the validator depends on `laterite-ags4-types` directly AND through
 /// `laterite-ags4-reference`. Without it those files would be hashed twice — harmless
 /// for the digest's correctness, but it would make the covered set a lie.
-fn collect_crate(dir: &Path, out: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf>) {
+fn collect_crate(
+    dir: &Path,
+    out: &mut Vec<PathBuf>,
+    seen: &mut BTreeSet<PathBuf>,
+    pinned: &mut BTreeSet<String>,
+) {
     let dir = canon(dir);
     if !seen.insert(dir.clone()) {
         return;
@@ -203,8 +295,41 @@ fn collect_crate(dir: &Path, out: &mut Vec<PathBuf>, seen: &mut BTreeSet<PathBuf
     if data.is_dir() {
         collect_any(&data, out);
     }
-    for rel in path_deps(&dir.join("Cargo.toml")) {
-        collect_crate(&dir.join(&rel), out, seen);
+    resolve_deps(&dir, out, seen, pinned);
+}
+
+/// Account for every one of our own crates that `dir`'s manifest depends on —
+/// by SOURCE where the sources are there, by `name@version` where they are not.
+///
+/// The second arm is the packaged case: publishing strips `path`, so there is no
+/// directory to walk, and the version requirement left behind is the only handle on
+/// the dependency's identity. It is a sufficient one, because that version's content
+/// is immutable on crates.io.
+///
+/// A dependency with neither is a hard error rather than a skip. Skipping is exactly
+/// what this code did before, and it is why a published build fingerprinted a quarter
+/// of its own engine without saying so.
+fn resolve_deps(
+    dir: &Path,
+    out: &mut Vec<PathBuf>,
+    seen: &mut BTreeSet<PathBuf>,
+    pinned: &mut BTreeSet<String>,
+) {
+    for dep in own_deps(&dir.join("Cargo.toml")) {
+        let by_path = dep.path.as_ref().map(|rel| dir.join(rel));
+        match (by_path, &dep.version) {
+            (Some(p), _) if p.is_dir() => collect_crate(&p, out, seen, pinned),
+            (_, Some(v)) => {
+                pinned.insert(format!("{}@{v}", dep.name));
+            }
+            (_, None) => panic!(
+                "engine fingerprint: dependency `{}` of {} has neither reachable sources \
+                 nor a version requirement, so nothing identifies it — refusing to emit a \
+                 fingerprint that silently omits a crate the verdict runs through",
+                dep.name,
+                dir.display(),
+            ),
+        }
     }
 }
 

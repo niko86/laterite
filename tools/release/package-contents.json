@@ -93,6 +93,7 @@
     "src/findings.rs",
     "src/fixes.rs",
     "src/lib.rs",
+    "src/manifest_deps.rs",
     "src/parse.rs",
     "src/rules/dictionary.rs",
     "src/rules/groups.rs",
