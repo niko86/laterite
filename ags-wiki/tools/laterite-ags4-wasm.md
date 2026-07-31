@@ -43,8 +43,8 @@ sources: []
 > See [[crate-map]] for its full listing.
 
 > [!note] A seventh export: `censor` (#581 Phase 2, 2026-07-18)
-> `censor(data, sensitiveJson, selectedCodes, token, dropCustom,
-> includeFreetext) -> { text, tally }` wraps the shared `laterite-ags4-censor`
+> `censor(data, sensitiveJson, { selectedCodes, token, dropCustom,
+> includeFreetext }) -> { text, tally }` wraps the shared `laterite-ags4-censor`
 > scrub engine, so the browser Anonymiser's Download action drives the SAME
 > anonymisation logic `laterite-ags4-corpus-qa` uses instead of a hand-written TS
 > scrub. It SHA-256-hashes the input bytes for `PROJ_ID`'s filehash (the full
@@ -94,7 +94,7 @@ Seven exports (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`):
   also risky.
 - `parse(...)` → `ParsedDataset` (`group_codes` / `meta` / `arrow_ipc`)
   for the data **Explore** tab.
-- `diff(a, b, encoding, max_rows_per_group)` → a `RevisionDelta` (the
+- `diff(a, b, { encoding, maxRowsPerGroup })` → a `RevisionDelta` (the
   **Tools → Revision diff**). Parses both files, matches rows by each
   group's *dictionary* KEY headings (order-independent), and compares
   matched cells type-aware through [[laterite-ags4-types]] `parse_value` — so a
@@ -104,10 +104,11 @@ Seven exports (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`):
   totals; `max_rows_per_group` only caps the serialized per-row deltas.
   This is the data-model-aware diff the front-end's pure-text line diff
   (`FileDiff`, Fix tab) cannot be.
-- `merge(a, b, encoding_label, on_type_clash, tran_issue, tran_date, tran_producer,
-  tran_recipient, tran_status)` → a `MergeResult` (the **Tools → Merge** tab,
-  2026-07-12; the 3-way `on_type_clash` string replaced the original `lenient:
-  bool` param, before either had shipped a release).
+- `merge(a, b, { dictVersion, encoding, onTypeClash, tran })` → a `MergeResult`
+  (the **Tools → Merge** tab, 2026-07-12; the 3-way `onTypeClash` string replaced
+  the original `lenient: bool` param, before either had shipped a release). The
+  five `tran_*` parameters this used to take are now the fields of one nested
+  `tran` object.
   Reconciles exactly two AGS4 deliveries over the shared `laterite-ags4-merge`
   leaf — union semantics (a row in one file, absent in the other, is kept),
   `b` wins a KEY conflict, `on_type_clash` (`"error"` default / `"widen"` /
@@ -119,8 +120,8 @@ Seven exports (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`):
   UI's checkbox is now a 3-way `<select>`
   (`repo:web/src/components/tools/MergeTool.tsx`). See
   [[dec-ags4-merge-semantics]].
-- `censor(data, sensitive_json, selected_codes, token, drop_custom,
-  include_freetext)` → `{ text, tally }` (the **Tools → Anonymiser** Download
+- `censor(data, sensitiveJson, { selectedCodes, token, dropCustom,
+  includeFreetext })` → `{ text, tally }` (the **Tools → Anonymiser** Download
   action, #581 Phase 2, 2026-07-18). SHA-256-hashes `data` for `PROJ_ID`'s
   filehash (full 64-hex), lossily decodes it, resolves
   `sensitive_headings.json` into a `Policy` via

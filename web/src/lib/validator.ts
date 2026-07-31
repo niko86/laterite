@@ -80,45 +80,19 @@ export function reportSeverity(report: ValidationReport): {
 }
 
 // ---- Apply-Fixes (a separate engine surface from validate) ----
-// Mirrors the Rust `laterite_ags4_validator::fixes` serde shape (snake_case).
-export type FixKind =
-  | "normalize_crlf"
-  | "strip_bom"
-  | "strip_embedded_cr"
-  | "rename_duplicate_heading"
-  | "insert_tran_dlim"
-  | "insert_tran_rcon"
-  | "reformat_numeric"
-  | "canonicalize_datetime"
-  | "normalize_typography"
-  | "pad_short_row";
+// `compute_fixes` now returns `Fix[]` rather than `any`, so these are the
+// engine's own published shapes. `FixKind`/`FixRisk` were local unions here;
+// they are the members of `Fix`'s fields upstream (there is no named type to
+// import), so they stay named here — derived from `Fix` rather than retyped, so
+// a new variant in the Rust enum cannot leave this list behind.
+export type { Fix, SpanEdit } from "../wasm/ags4_wasm";
+import type { Fix } from "../wasm/ags4_wasm";
+
+export type FixKind = Fix["kind"];
 
 /** Safe = bulk-applicable (fix-all-safe); risky = guesses intent (lossy /
- *  surprising), opt-in only. Mirrors the Rust `FixRisk`. */
-export type FixRisk = "safe" | "risky";
-
-/** One in-line text edit: replace char range [start, end) on a 1-based
- *  line with `replacement`. `expected` is what the span should currently
- *  hold; the engine skips the edit if it doesn't (stale-span guard). */
-export interface SpanEdit {
-  line: number;
-  start: number;
-  end: number;
-  replacement: string;
-  expected: string;
-}
-export interface Fix {
-  kind: FixKind;
-  label: string;
-  /** exact rule label ("AGS Format Rule 8", …) for cross-linking. */
-  rule: string;
-  /** anchor line for ordering/preview; null for whole-file kinds. */
-  line: number | null;
-  /** safe (bulk) vs risky (opt-in). */
-  risk: FixRisk;
-  /** empty for the byte-level kinds (normalize_crlf / strip_bom). */
-  edits: SpanEdit[];
-}
+ *  surprising), opt-in only. */
+export type FixRisk = Fix["risk"];
 
 // `computeFixes` / `applyFixes` live in `validatorClient.ts` — they round-
 // trip through the worker (the only wasm owner) and so are async there.
@@ -155,71 +129,26 @@ export type { AppliedFix } from "../wasm/ags4_wasm";
 export type { BuildReport as ExportResult } from "../wasm/ags4_wasm";
 
 // --- Standard dictionary (Tools reference): one edition of the AGS4 standard
-// dictionary (canonical names, descriptions, units, types, status). Now produced
-// by `lib/dict.ts::projectEdition` from the canonical union `ags_dictionary.json`
-// (the single web dict source); shape kept identical to the prior wasm
-// `dictionary(edition)` result so the Tools UIs render unchanged. ---
-export interface DictHeading {
-  name: string;
-  status: string;
-  /** AGS TYPE code (ID, X, 2DP, DT, …). */
-  type: string;
-  unit?: string;
-  description: string;
-}
-export interface DictGroup {
-  code: string;
-  /** the group's standard description / "contents". */
-  contents: string;
-  parent?: string;
-  headings: DictHeading[];
-}
-export interface StandardDict {
-  /** the edition this dictionary is for ("4.1.1", …). */
-  ags_edition: string;
-  groups: DictGroup[];
-}
+// dictionary (canonical names, descriptions, units, types, status). The VALUE is
+// produced locally by `lib/dict.ts::projectEdition` from the canonical union
+// `ags_dictionary.json` (the single web dict source), but the TYPE is the
+// engine's, so the local projection has to keep conforming to what
+// `dictionary(edition)` returns — which is the contract that comment used to
+// assert by hand. ---
+export type {
+  DictGroup,
+  DictHeading,
+  StandardDict,
+} from "../wasm/ags4_wasm";
 
 // --- Revision diff (Tools): the `laterite-ags4-wasm` diff(a, b) result. KEY-aware,
-// type-aware comparison of two AGS4 files. Mirrors the Rust serde shapes.
-export interface CellDelta {
-  heading: string;
-  /** AGS TYPE code the cells were compared as. */
-  type: string;
-  /** raw value in the baseline / revision (null if the row is short). */
-  a: string | null;
-  b: string | null;
-}
-export interface RowDelta {
-  kind: "added" | "removed" | "changed";
-  /** the KEY values (or whole-row tuple, when unkeyed) identifying the row. */
-  key: string[];
-  line_a: number | null;
-  line_b: number | null;
-  /** changed cells — populated only for kind === "changed". */
-  cells: CellDelta[];
-}
-export interface GroupDelta {
-  code: string;
-  /** true totals, independent of any rows cap. */
-  added: number;
-  removed: number;
-  changed: number;
-  headings_added: string[];
-  headings_removed: string[];
-  /** false ⇒ matched on whole-row tuple (no dictionary KEY headings). */
-  keyed: boolean;
-  key_headings: string[];
-  rows: RowDelta[];
-}
-export interface RevisionDelta {
-  groups: GroupDelta[];
-  groups_added: string[];
-  groups_removed: string[];
-  total_added: number;
-  total_removed: number;
-  total_changed: number;
-}
+// type-aware comparison of two AGS4 files. ---
+export type {
+  CellDelta,
+  GroupDelta,
+  RevisionDelta,
+  RowDelta,
+} from "../wasm/ags4_wasm";
 
 /** Per-rule serialization cap for the interactive UI. The engine still
  *  finds every violation; this only bounds how many rows per rule cross

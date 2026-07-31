@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The browser package publishes its remaining result types, and `any` is gone from its `.d.ts` entirely.** `diff`, `dictionary` and `compute_fixes` were the three still returning `any`; they now return `RevisionDelta`, `StandardDict` and `Fix[]`, joining the shapes published previously. Consumers can delete their hand-written `RevisionDelta` / `StandardDict` / `Fix` / `SpanEdit` / `CellDelta` / `RowDelta` / `GroupDelta` / `DictGroup` / `DictHeading` mirrors — the validator site deleted ~120 lines of exactly those. Each new interface is bound to the Rust struct that serialises it by the same drift test as the others, and `Fix`'s `kind`/`risk` unions are checked against the validator's own enums, so a new fix kind cannot ship a `.d.ts` that lies about what you can receive.
+
+### Changed
+
+- **Breaking: `diff` and `censor` take an options object too.** They were the last two `@laterite/ags4-wasm` exports with a positional tail — `diff(a, b, encoding, maxRowsPerGroup)` and `censor(data, sensitiveJson, selectedCodes, token, dropCustom, includeFreetext)`, the latter six-deep with three consecutive booleans. Both now take one named object after their inputs (`diff(a, b, { encoding, maxRowsPerGroup })`, `censor(data, sensitiveJson, { selectedCodes, token, dropCustom, includeFreetext })`), every field optional and defaulted, with the same unknown-key refusal the other exports got. The test that recorded these two as "not yet migrated" now has nothing left to exempt.
+
 ## [0.9.0] — 2026-07-30
 
 The browser API breaks: every `@laterite/ags4-wasm` export now takes an options object instead of a positional tail. And a synthesised `TRAN` is the caller's to supply — the placeholder the emitter used to invent satisfied Rule 14, so files could assert a transmission that never happened and pass validation doing it.
