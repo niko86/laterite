@@ -509,9 +509,14 @@ fn synthesise_metadata(
     // Only when the caller supplied one. Without a stamp we emit NO TRAN and let
     // Rule 14 report it — see `EmitOpts::tran` for why a placeholder is worse
     // than an absence.
-    if !present.contains("TRAN")
-        && let Some(t) = tran
-    {
+    //
+    // `filter` rather than the `&& let` chain this obviously wants to be: let
+    // chains stabilised in 1.88, and this crate's `rust-version` promises 1.85.
+    // The nested-`if` alternative reads better but trips clippy's
+    // `collapsible_if`, whose suggested fix is the let chain again. Don't
+    // "simplify" this back — `msrv` in CI will catch it, which is how it was
+    // found.
+    if let Some(t) = tran.filter(|_| !present.contains("TRAN")) {
         synth.push(synth_tran(dict, t));
     }
     // UNIT: one row per distinct unit used across all groups (Rule 15).

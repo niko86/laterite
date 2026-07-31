@@ -1,0 +1,65 @@
+pub mod laterite_ags4_trust
+pub use laterite_ags4_trust::CustomDictRef
+pub use laterite_ags4_trust::Decision
+pub use laterite_ags4_trust::ENGINE_IDENTITY
+pub use laterite_ags4_trust::EditionInput
+pub use laterite_ags4_trust::EngineId
+pub use laterite_ags4_trust::Question
+pub use laterite_ags4_trust::RevalidateReason
+pub use laterite_ags4_trust::Sidecar
+pub use laterite_ags4_trust::Tier
+pub use laterite_ags4_trust::TierCoverage
+pub use laterite_ags4_trust::ValidationStamp
+pub enum laterite_ags4_trust::MintError
+pub laterite_ags4_trust::MintError::NotCertifiable
+pub laterite_ags4_trust::MintError::NotCertifiable::errors: u32
+pub laterite_ags4_trust::MintError::NotIndexable(alloc::string::String)
+pub laterite_ags4_trust::MintError::Validate(laterite_ags4_validator::error::ValidatorError)
+impl laterite_ags4_trust::MintError
+pub fn laterite_ags4_trust::MintError::exit_code(&self) -> i32
+impl core::convert::From<laterite_ags4_validator::error::ValidatorError> for laterite_ags4_trust::MintError
+pub fn laterite_ags4_trust::MintError::from(laterite_ags4_validator::error::ValidatorError) -> Self
+impl core::error::Error for laterite_ags4_trust::MintError
+impl core::fmt::Debug for laterite_ags4_trust::MintError
+pub fn laterite_ags4_trust::MintError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for laterite_ags4_trust::MintError
+pub fn laterite_ags4_trust::MintError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_trust::MintError
+impl core::marker::Send for laterite_ags4_trust::MintError
+impl core::marker::Sync for laterite_ags4_trust::MintError
+impl core::marker::Unpin for laterite_ags4_trust::MintError
+impl core::marker::UnsafeUnpin for laterite_ags4_trust::MintError
+impl !core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::MintError
+impl !core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::MintError
+pub struct laterite_ags4_trust::Outcome
+pub laterite_ags4_trust::Outcome::certified: bool
+pub laterite_ags4_trust::Outcome::dict_version: laterite_ags4_reference::dict::dict_data::DictVersion
+pub laterite_ags4_trust::Outcome::findings: laterite_ags4_validator::findings::Findings
+pub laterite_ags4_trust::Outcome::resolution: laterite_ags4_reference::dict::DictResolution
+pub laterite_ags4_trust::Outcome::revalidate_reason: core::option::Option<laterite_ags4_core::index::RevalidateReason>
+impl core::fmt::Debug for laterite_ags4_trust::Outcome
+pub fn laterite_ags4_trust::Outcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_trust::Outcome
+impl core::marker::Send for laterite_ags4_trust::Outcome
+impl core::marker::Sync for laterite_ags4_trust::Outcome
+impl core::marker::Unpin for laterite_ags4_trust::Outcome
+impl core::marker::UnsafeUnpin for laterite_ags4_trust::Outcome
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::Outcome
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::Outcome
+pub struct laterite_ags4_trust::Request<'a>
+pub laterite_ags4_trust::Request::bytes: &'a [u8]
+pub laterite_ags4_trust::Request::cert: core::option::Option<&'a laterite_ags4_core::index::Sidecar>
+pub laterite_ags4_trust::Request::compat: core::option::Option<alloc::string::String>
+pub laterite_ags4_trust::Request::opts: &'a laterite_ags4_validator::CheckOptions
+pub laterite_ags4_trust::Request::world: laterite_ags4_validator::world::WorldScope
+impl<'a> core::marker::Freeze for laterite_ags4_trust::Request<'a>
+impl<'a> core::marker::Send for laterite_ags4_trust::Request<'a>
+impl<'a> core::marker::Sync for laterite_ags4_trust::Request<'a>
+impl<'a> core::marker::Unpin for laterite_ags4_trust::Request<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite_ags4_trust::Request<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_trust::Request<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_trust::Request<'a>
+pub fn laterite_ags4_trust::check(laterite_ags4_trust::Request<'_>) -> core::result::Result<laterite_ags4_trust::Outcome, laterite_ags4_validator::error::ValidatorError>
+pub fn laterite_ags4_trust::engine_id(core::option::Option<alloc::string::String>) -> laterite_ags4_core::index::EngineId
+pub fn laterite_ags4_trust::mint(&[u8], &laterite_ags4_validator::CheckOptions, alloc::string::String, core::option::Option<alloc::string::String>) -> core::result::Result<laterite_ags4_core::index::Sidecar, laterite_ags4_trust::MintError>
+pub fn laterite_ags4_trust::split_options(&laterite_ags4_validator::CheckOptions, laterite_ags4_validator::world::WorldScope) -> core::result::Result<(laterite_ags4_core::index::Question, laterite_ags4_validator::world::WorldScope), laterite_ags4_validator::error::ValidatorError>

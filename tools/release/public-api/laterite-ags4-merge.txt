@@ -1,0 +1,124 @@
+pub mod laterite_ags4_merge
+pub use laterite_ags4_merge::TranStamp
+pub enum laterite_ags4_merge::MergeError
+pub laterite_ags4_merge::MergeError::Emit(alloc::string::String)
+pub laterite_ags4_merge::MergeError::TypeConflict
+pub laterite_ags4_merge::MergeError::TypeConflict::group: alloc::string::String
+pub laterite_ags4_merge::MergeError::TypeConflict::heading: alloc::string::String
+pub laterite_ags4_merge::MergeError::TypeConflict::types: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_merge::MergeError::UnitConflict
+pub laterite_ags4_merge::MergeError::UnitConflict::group: alloc::string::String
+pub laterite_ags4_merge::MergeError::UnitConflict::heading: alloc::string::String
+pub laterite_ags4_merge::MergeError::UnitConflict::units: alloc::vec::Vec<alloc::string::String>
+impl core::error::Error for laterite_ags4_merge::MergeError
+impl core::fmt::Debug for laterite_ags4_merge::MergeError
+pub fn laterite_ags4_merge::MergeError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for laterite_ags4_merge::MergeError
+pub fn laterite_ags4_merge::MergeError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_merge::MergeError
+impl core::marker::Send for laterite_ags4_merge::MergeError
+impl core::marker::Sync for laterite_ags4_merge::MergeError
+impl core::marker::Unpin for laterite_ags4_merge::MergeError
+impl core::marker::UnsafeUnpin for laterite_ags4_merge::MergeError
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_merge::MergeError
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_merge::MergeError
+pub enum laterite_ags4_merge::TypeClashMode
+pub laterite_ags4_merge::TypeClashMode::Error
+pub laterite_ags4_merge::TypeClashMode::Promote
+pub laterite_ags4_merge::TypeClashMode::Widen
+impl laterite_ags4_merge::TypeClashMode
+pub const laterite_ags4_merge::TypeClashMode::ALL: [laterite_ags4_merge::TypeClashMode; 3]
+pub fn laterite_ags4_merge::TypeClashMode::as_str(self) -> &'static str
+impl core::clone::Clone for laterite_ags4_merge::TypeClashMode
+pub fn laterite_ags4_merge::TypeClashMode::clone(&self) -> laterite_ags4_merge::TypeClashMode
+impl core::cmp::Eq for laterite_ags4_merge::TypeClashMode
+impl core::cmp::PartialEq for laterite_ags4_merge::TypeClashMode
+pub fn laterite_ags4_merge::TypeClashMode::eq(&self, &laterite_ags4_merge::TypeClashMode) -> bool
+impl core::default::Default for laterite_ags4_merge::TypeClashMode
+pub fn laterite_ags4_merge::TypeClashMode::default() -> laterite_ags4_merge::TypeClashMode
+impl core::fmt::Debug for laterite_ags4_merge::TypeClashMode
+pub fn laterite_ags4_merge::TypeClashMode::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_merge::TypeClashMode
+impl core::marker::StructuralPartialEq for laterite_ags4_merge::TypeClashMode
+impl core::str::traits::FromStr for laterite_ags4_merge::TypeClashMode
+pub type laterite_ags4_merge::TypeClashMode::Err = alloc::string::String
+pub fn laterite_ags4_merge::TypeClashMode::from_str(&str) -> core::result::Result<Self, Self::Err>
+impl core::marker::Freeze for laterite_ags4_merge::TypeClashMode
+impl core::marker::Send for laterite_ags4_merge::TypeClashMode
+impl core::marker::Sync for laterite_ags4_merge::TypeClashMode
+impl core::marker::Unpin for laterite_ags4_merge::TypeClashMode
+impl core::marker::UnsafeUnpin for laterite_ags4_merge::TypeClashMode
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_merge::TypeClashMode
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_merge::TypeClashMode
+pub struct laterite_ags4_merge::MergeOpts
+pub laterite_ags4_merge::MergeOpts::edition: laterite_ags4_reference::dict::dict_data::DictVersion
+pub laterite_ags4_merge::MergeOpts::emit_mode: laterite_ags4_emit::emit::EmitMode
+pub laterite_ags4_merge::MergeOpts::on_type_clash: laterite_ags4_merge::TypeClashMode
+pub laterite_ags4_merge::MergeOpts::tran: core::option::Option<laterite_ags4_emit::emit::TranStamp>
+impl core::clone::Clone for laterite_ags4_merge::MergeOpts
+pub fn laterite_ags4_merge::MergeOpts::clone(&self) -> laterite_ags4_merge::MergeOpts
+impl core::default::Default for laterite_ags4_merge::MergeOpts
+pub fn laterite_ags4_merge::MergeOpts::default() -> Self
+impl core::fmt::Debug for laterite_ags4_merge::MergeOpts
+pub fn laterite_ags4_merge::MergeOpts::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_merge::MergeOpts
+impl core::marker::Send for laterite_ags4_merge::MergeOpts
+impl core::marker::Sync for laterite_ags4_merge::MergeOpts
+impl core::marker::Unpin for laterite_ags4_merge::MergeOpts
+impl core::marker::UnsafeUnpin for laterite_ags4_merge::MergeOpts
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_merge::MergeOpts
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_merge::MergeOpts
+pub struct laterite_ags4_merge::MergeResult
+pub laterite_ags4_merge::MergeResult::bytes: alloc::vec::Vec<u8>
+pub laterite_ags4_merge::MergeResult::revisions: alloc::vec::Vec<laterite_ags4_merge::RevisionNote>
+pub laterite_ags4_merge::MergeResult::warnings: alloc::vec::Vec<laterite_ags4_merge::MergeWarning>
+impl core::fmt::Debug for laterite_ags4_merge::MergeResult
+pub fn laterite_ags4_merge::MergeResult::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_merge::MergeResult
+impl core::marker::Send for laterite_ags4_merge::MergeResult
+impl core::marker::Sync for laterite_ags4_merge::MergeResult
+impl core::marker::Unpin for laterite_ags4_merge::MergeResult
+impl core::marker::UnsafeUnpin for laterite_ags4_merge::MergeResult
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_merge::MergeResult
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_merge::MergeResult
+pub struct laterite_ags4_merge::MergeWarning
+pub laterite_ags4_merge::MergeWarning::group: core::option::Option<alloc::string::String>
+pub laterite_ags4_merge::MergeWarning::heading: core::option::Option<alloc::string::String>
+pub laterite_ags4_merge::MergeWarning::kind: &'static str
+pub laterite_ags4_merge::MergeWarning::message: alloc::string::String
+impl core::clone::Clone for laterite_ags4_merge::MergeWarning
+pub fn laterite_ags4_merge::MergeWarning::clone(&self) -> laterite_ags4_merge::MergeWarning
+impl core::cmp::Eq for laterite_ags4_merge::MergeWarning
+impl core::cmp::PartialEq for laterite_ags4_merge::MergeWarning
+pub fn laterite_ags4_merge::MergeWarning::eq(&self, &laterite_ags4_merge::MergeWarning) -> bool
+impl core::fmt::Debug for laterite_ags4_merge::MergeWarning
+pub fn laterite_ags4_merge::MergeWarning::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_merge::MergeWarning
+impl core::marker::Freeze for laterite_ags4_merge::MergeWarning
+impl core::marker::Send for laterite_ags4_merge::MergeWarning
+impl core::marker::Sync for laterite_ags4_merge::MergeWarning
+impl core::marker::Unpin for laterite_ags4_merge::MergeWarning
+impl core::marker::UnsafeUnpin for laterite_ags4_merge::MergeWarning
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_merge::MergeWarning
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_merge::MergeWarning
+pub struct laterite_ags4_merge::RevisionNote
+pub laterite_ags4_merge::RevisionNote::changed: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_merge::RevisionNote::group: alloc::string::String
+pub laterite_ags4_merge::RevisionNote::key: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_merge::RevisionNote::winner_file: usize
+impl core::clone::Clone for laterite_ags4_merge::RevisionNote
+pub fn laterite_ags4_merge::RevisionNote::clone(&self) -> laterite_ags4_merge::RevisionNote
+impl core::cmp::Eq for laterite_ags4_merge::RevisionNote
+impl core::cmp::PartialEq for laterite_ags4_merge::RevisionNote
+pub fn laterite_ags4_merge::RevisionNote::eq(&self, &laterite_ags4_merge::RevisionNote) -> bool
+impl core::fmt::Debug for laterite_ags4_merge::RevisionNote
+pub fn laterite_ags4_merge::RevisionNote::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_merge::RevisionNote
+impl core::marker::Freeze for laterite_ags4_merge::RevisionNote
+impl core::marker::Send for laterite_ags4_merge::RevisionNote
+impl core::marker::Sync for laterite_ags4_merge::RevisionNote
+impl core::marker::Unpin for laterite_ags4_merge::RevisionNote
+impl core::marker::UnsafeUnpin for laterite_ags4_merge::RevisionNote
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_merge::RevisionNote
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_merge::RevisionNote
+pub fn laterite_ags4_merge::merge_parsed(&[laterite_ags4_parse::ParsedFile], &laterite_ags4_merge::MergeOpts) -> core::result::Result<laterite_ags4_merge::MergeResult, laterite_ags4_merge::MergeError>

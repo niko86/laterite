@@ -1,0 +1,447 @@
+pub mod laterite_ags4_core
+pub use laterite_ags4_core::ags_types
+pub mod laterite_ags4_core::ags4_codec
+pub enum laterite_ags4_core::ags4_codec::DuplicateHeadings
+pub laterite_ags4_core::ags4_codec::DuplicateHeadings::Error
+pub laterite_ags4_core::ags4_codec::DuplicateHeadings::Recover
+impl core::clone::Clone for laterite_ags4_core::ags4_codec::DuplicateHeadings
+pub fn laterite_ags4_core::ags4_codec::DuplicateHeadings::clone(&self) -> laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::cmp::Eq for laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::cmp::PartialEq for laterite_ags4_core::ags4_codec::DuplicateHeadings
+pub fn laterite_ags4_core::ags4_codec::DuplicateHeadings::eq(&self, &laterite_ags4_core::ags4_codec::DuplicateHeadings) -> bool
+impl core::default::Default for laterite_ags4_core::ags4_codec::DuplicateHeadings
+pub fn laterite_ags4_core::ags4_codec::DuplicateHeadings::default() -> laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::fmt::Debug for laterite_ags4_core::ags4_codec::DuplicateHeadings
+pub fn laterite_ags4_core::ags4_codec::DuplicateHeadings::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::marker::StructuralPartialEq for laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::marker::Freeze for laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::marker::Send for laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::marker::Sync for laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::marker::Unpin for laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::marker::UnsafeUnpin for laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::ags4_codec::DuplicateHeadings
+pub struct laterite_ags4_core::ags4_codec::AgsGroup
+pub laterite_ags4_core::ags4_codec::AgsGroup::code: alloc::string::String
+pub laterite_ags4_core::ags4_codec::AgsGroup::headings: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_core::ags4_codec::AgsGroup::rows: alloc::vec::Vec<std::collections::hash::map::HashMap<alloc::sync::Arc<str>, alloc::string::String>>
+pub laterite_ags4_core::ags4_codec::AgsGroup::types: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_core::ags4_codec::AgsGroup::units: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for laterite_ags4_core::ags4_codec::AgsGroup
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::clone(&self) -> laterite_ags4_core::ags4_codec::AgsGroup
+impl core::fmt::Debug for laterite_ags4_core::ags4_codec::AgsGroup
+pub fn laterite_ags4_core::ags4_codec::AgsGroup::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_core::ags4_codec::AgsGroup
+impl core::marker::Send for laterite_ags4_core::ags4_codec::AgsGroup
+impl core::marker::Sync for laterite_ags4_core::ags4_codec::AgsGroup
+impl core::marker::Unpin for laterite_ags4_core::ags4_codec::AgsGroup
+impl core::marker::UnsafeUnpin for laterite_ags4_core::ags4_codec::AgsGroup
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::ags4_codec::AgsGroup
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::ags4_codec::AgsGroup
+pub struct laterite_ags4_core::ags4_codec::ParsedAgs4
+pub laterite_ags4_core::ags4_codec::ParsedAgs4::groups: std::collections::hash::map::HashMap<alloc::string::String, laterite_ags4_core::ags4_codec::AgsGroup>
+pub laterite_ags4_core::ags4_codec::ParsedAgs4::order: alloc::vec::Vec<alloc::string::String>
+impl laterite_ags4_core::ags4_codec::ParsedAgs4
+pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::get(&self, &str) -> core::option::Option<&laterite_ags4_core::ags4_codec::AgsGroup>
+impl core::clone::Clone for laterite_ags4_core::ags4_codec::ParsedAgs4
+pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::clone(&self) -> laterite_ags4_core::ags4_codec::ParsedAgs4
+impl core::fmt::Debug for laterite_ags4_core::ags4_codec::ParsedAgs4
+pub fn laterite_ags4_core::ags4_codec::ParsedAgs4::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_core::ags4_codec::ParsedAgs4
+impl core::marker::Send for laterite_ags4_core::ags4_codec::ParsedAgs4
+impl core::marker::Sync for laterite_ags4_core::ags4_codec::ParsedAgs4
+impl core::marker::Unpin for laterite_ags4_core::ags4_codec::ParsedAgs4
+impl core::marker::UnsafeUnpin for laterite_ags4_core::ags4_codec::ParsedAgs4
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::ags4_codec::ParsedAgs4
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::ags4_codec::ParsedAgs4
+pub struct laterite_ags4_core::ags4_codec::ReadOptions
+pub laterite_ags4_core::ags4_codec::ReadOptions::duplicate_headings: laterite_ags4_core::ags4_codec::DuplicateHeadings
+impl core::clone::Clone for laterite_ags4_core::ags4_codec::ReadOptions
+pub fn laterite_ags4_core::ags4_codec::ReadOptions::clone(&self) -> laterite_ags4_core::ags4_codec::ReadOptions
+impl core::default::Default for laterite_ags4_core::ags4_codec::ReadOptions
+pub fn laterite_ags4_core::ags4_codec::ReadOptions::default() -> laterite_ags4_core::ags4_codec::ReadOptions
+impl core::fmt::Debug for laterite_ags4_core::ags4_codec::ReadOptions
+pub fn laterite_ags4_core::ags4_codec::ReadOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_core::ags4_codec::ReadOptions
+impl core::marker::Freeze for laterite_ags4_core::ags4_codec::ReadOptions
+impl core::marker::Send for laterite_ags4_core::ags4_codec::ReadOptions
+impl core::marker::Sync for laterite_ags4_core::ags4_codec::ReadOptions
+impl core::marker::Unpin for laterite_ags4_core::ags4_codec::ReadOptions
+impl core::marker::UnsafeUnpin for laterite_ags4_core::ags4_codec::ReadOptions
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::ags4_codec::ReadOptions
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::ags4_codec::ReadOptions
+pub fn laterite_ags4_core::ags4_codec::read_ags4(&std::path::Path) -> core::result::Result<laterite_ags4_core::ags4_codec::ParsedAgs4, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::ags4_codec::read_ags4_bytes(&[u8]) -> core::result::Result<laterite_ags4_core::ags4_codec::ParsedAgs4, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::ags4_codec::read_ags4_bytes_with(&[u8], laterite_ags4_core::ags4_codec::ReadOptions) -> core::result::Result<laterite_ags4_core::ags4_codec::ParsedAgs4, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::ags4_codec::read_ags4_with(&std::path::Path, laterite_ags4_core::ags4_codec::ReadOptions) -> core::result::Result<laterite_ags4_core::ags4_codec::ParsedAgs4, laterite_ags4_core::error::CliError>
+pub mod laterite_ags4_core::error
+pub enum laterite_ags4_core::error::CliError
+pub laterite_ags4_core::error::CliError::DuplicateHeading
+pub laterite_ags4_core::error::CliError::DuplicateHeading::group: alloc::string::String
+pub laterite_ags4_core::error::CliError::DuplicateHeading::heading: alloc::string::String
+pub laterite_ags4_core::error::CliError::FileNotFound(alloc::string::String)
+pub laterite_ags4_core::error::CliError::Schema(alloc::string::String)
+impl laterite_ags4_core::error::CliError
+pub fn laterite_ags4_core::error::CliError::exit_code(&self) -> i32
+impl core::convert::From<laterite_transport::TransportError> for laterite_ags4_core::error::CliError
+pub fn laterite_ags4_core::error::CliError::from(laterite_transport::TransportError) -> Self
+impl core::error::Error for laterite_ags4_core::error::CliError
+impl core::fmt::Debug for laterite_ags4_core::error::CliError
+pub fn laterite_ags4_core::error::CliError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for laterite_ags4_core::error::CliError
+pub fn laterite_ags4_core::error::CliError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_core::error::CliError
+impl core::marker::Send for laterite_ags4_core::error::CliError
+impl core::marker::Sync for laterite_ags4_core::error::CliError
+impl core::marker::Unpin for laterite_ags4_core::error::CliError
+impl core::marker::UnsafeUnpin for laterite_ags4_core::error::CliError
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::error::CliError
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::error::CliError
+pub mod laterite_ags4_core::index
+pub enum laterite_ags4_core::index::Decision
+pub laterite_ags4_core::index::Decision::Revalidate(laterite_ags4_core::index::RevalidateReason)
+pub laterite_ags4_core::index::Decision::Vouched
+impl core::clone::Clone for laterite_ags4_core::index::Decision
+pub fn laterite_ags4_core::index::Decision::clone(&self) -> laterite_ags4_core::index::Decision
+impl core::cmp::Eq for laterite_ags4_core::index::Decision
+impl core::cmp::PartialEq for laterite_ags4_core::index::Decision
+pub fn laterite_ags4_core::index::Decision::eq(&self, &laterite_ags4_core::index::Decision) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::Decision
+pub fn laterite_ags4_core::index::Decision::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::Decision
+impl core::marker::Freeze for laterite_ags4_core::index::Decision
+impl core::marker::Send for laterite_ags4_core::index::Decision
+impl core::marker::Sync for laterite_ags4_core::index::Decision
+impl core::marker::Unpin for laterite_ags4_core::index::Decision
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::Decision
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::Decision
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::Decision
+pub enum laterite_ags4_core::index::EditionInput
+pub laterite_ags4_core::index::EditionInput::Auto
+pub laterite_ags4_core::index::EditionInput::Auto::resolution: laterite_ags4_reference::dict::DictResolution
+pub laterite_ags4_core::index::EditionInput::Auto::resolved: alloc::string::String
+pub laterite_ags4_core::index::EditionInput::Forced
+pub laterite_ags4_core::index::EditionInput::Forced::edition: alloc::string::String
+impl laterite_ags4_core::index::EditionInput
+pub fn laterite_ags4_core::index::EditionInput::edition(&self) -> &str
+pub fn laterite_ags4_core::index::EditionInput::is_forced(&self) -> bool
+pub fn laterite_ags4_core::index::EditionInput::resolution(&self) -> laterite_ags4_reference::dict::DictResolution
+impl core::clone::Clone for laterite_ags4_core::index::EditionInput
+pub fn laterite_ags4_core::index::EditionInput::clone(&self) -> laterite_ags4_core::index::EditionInput
+impl core::cmp::Eq for laterite_ags4_core::index::EditionInput
+impl core::cmp::PartialEq for laterite_ags4_core::index::EditionInput
+pub fn laterite_ags4_core::index::EditionInput::eq(&self, &laterite_ags4_core::index::EditionInput) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::EditionInput
+pub fn laterite_ags4_core::index::EditionInput::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::EditionInput
+impl serde_core::ser::Serialize for laterite_ags4_core::index::EditionInput
+pub fn laterite_ags4_core::index::EditionInput::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_core::index::EditionInput
+pub fn laterite_ags4_core::index::EditionInput::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_core::index::EditionInput
+impl core::marker::Send for laterite_ags4_core::index::EditionInput
+impl core::marker::Sync for laterite_ags4_core::index::EditionInput
+impl core::marker::Unpin for laterite_ags4_core::index::EditionInput
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::EditionInput
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::EditionInput
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::EditionInput
+pub enum laterite_ags4_core::index::RemoteFreshness
+pub laterite_ags4_core::index::RemoteFreshness::MustRehash
+pub laterite_ags4_core::index::RemoteFreshness::ProbablyFresh
+pub laterite_ags4_core::index::RemoteFreshness::Trusted
+impl core::clone::Clone for laterite_ags4_core::index::RemoteFreshness
+pub fn laterite_ags4_core::index::RemoteFreshness::clone(&self) -> laterite_ags4_core::index::RemoteFreshness
+impl core::cmp::Eq for laterite_ags4_core::index::RemoteFreshness
+impl core::cmp::PartialEq for laterite_ags4_core::index::RemoteFreshness
+pub fn laterite_ags4_core::index::RemoteFreshness::eq(&self, &laterite_ags4_core::index::RemoteFreshness) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::RemoteFreshness
+pub fn laterite_ags4_core::index::RemoteFreshness::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_core::index::RemoteFreshness
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::RemoteFreshness
+impl core::marker::Freeze for laterite_ags4_core::index::RemoteFreshness
+impl core::marker::Send for laterite_ags4_core::index::RemoteFreshness
+impl core::marker::Sync for laterite_ags4_core::index::RemoteFreshness
+impl core::marker::Unpin for laterite_ags4_core::index::RemoteFreshness
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::RemoteFreshness
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::RemoteFreshness
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::RemoteFreshness
+pub enum laterite_ags4_core::index::RevalidateReason
+pub laterite_ags4_core::index::RevalidateReason::ContentChanged
+pub laterite_ags4_core::index::RevalidateReason::DictionaryChanged
+pub laterite_ags4_core::index::RevalidateReason::DifferentEngine
+pub laterite_ags4_core::index::RevalidateReason::DifferentValidator
+pub laterite_ags4_core::index::RevalidateReason::EditionDiffers
+pub laterite_ags4_core::index::RevalidateReason::EncodingDiffers
+pub laterite_ags4_core::index::RevalidateReason::FormatVersion
+pub laterite_ags4_core::index::RevalidateReason::SizeChanged
+pub laterite_ags4_core::index::RevalidateReason::TierNotClean(laterite_ags4_core::index::Tier)
+pub laterite_ags4_core::index::RevalidateReason::TierNotMeasured(laterite_ags4_core::index::Tier)
+impl laterite_ags4_core::index::RevalidateReason
+pub fn laterite_ags4_core::index::RevalidateReason::as_str(self) -> &'static str
+impl core::clone::Clone for laterite_ags4_core::index::RevalidateReason
+pub fn laterite_ags4_core::index::RevalidateReason::clone(&self) -> laterite_ags4_core::index::RevalidateReason
+impl core::cmp::Eq for laterite_ags4_core::index::RevalidateReason
+impl core::cmp::PartialEq for laterite_ags4_core::index::RevalidateReason
+pub fn laterite_ags4_core::index::RevalidateReason::eq(&self, &laterite_ags4_core::index::RevalidateReason) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::RevalidateReason
+pub fn laterite_ags4_core::index::RevalidateReason::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_core::index::RevalidateReason
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::RevalidateReason
+impl core::marker::Freeze for laterite_ags4_core::index::RevalidateReason
+impl core::marker::Send for laterite_ags4_core::index::RevalidateReason
+impl core::marker::Sync for laterite_ags4_core::index::RevalidateReason
+impl core::marker::Unpin for laterite_ags4_core::index::RevalidateReason
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::RevalidateReason
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::RevalidateReason
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::RevalidateReason
+pub enum laterite_ags4_core::index::Tier
+pub laterite_ags4_core::index::Tier::Errors
+pub laterite_ags4_core::index::Tier::Fyi
+pub laterite_ags4_core::index::Tier::Warnings
+impl core::clone::Clone for laterite_ags4_core::index::Tier
+pub fn laterite_ags4_core::index::Tier::clone(&self) -> laterite_ags4_core::index::Tier
+impl core::cmp::Eq for laterite_ags4_core::index::Tier
+impl core::cmp::PartialEq for laterite_ags4_core::index::Tier
+pub fn laterite_ags4_core::index::Tier::eq(&self, &laterite_ags4_core::index::Tier) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::Tier
+pub fn laterite_ags4_core::index::Tier::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_core::index::Tier
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::Tier
+impl serde_core::ser::Serialize for laterite_ags4_core::index::Tier
+pub fn laterite_ags4_core::index::Tier::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_core::index::Tier
+pub fn laterite_ags4_core::index::Tier::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_core::index::Tier
+impl core::marker::Send for laterite_ags4_core::index::Tier
+impl core::marker::Sync for laterite_ags4_core::index::Tier
+impl core::marker::Unpin for laterite_ags4_core::index::Tier
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::Tier
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::Tier
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::Tier
+pub enum laterite_ags4_core::index::TierCoverage
+pub laterite_ags4_core::index::TierCoverage::Measured
+pub laterite_ags4_core::index::TierCoverage::Measured::count: u32
+pub laterite_ags4_core::index::TierCoverage::NotMeasured
+impl laterite_ags4_core::index::TierCoverage
+pub fn laterite_ags4_core::index::TierCoverage::is_measured_clean(self) -> bool
+impl core::clone::Clone for laterite_ags4_core::index::TierCoverage
+pub fn laterite_ags4_core::index::TierCoverage::clone(&self) -> laterite_ags4_core::index::TierCoverage
+impl core::cmp::Eq for laterite_ags4_core::index::TierCoverage
+impl core::cmp::PartialEq for laterite_ags4_core::index::TierCoverage
+pub fn laterite_ags4_core::index::TierCoverage::eq(&self, &laterite_ags4_core::index::TierCoverage) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::TierCoverage
+pub fn laterite_ags4_core::index::TierCoverage::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_core::index::TierCoverage
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::TierCoverage
+impl serde_core::ser::Serialize for laterite_ags4_core::index::TierCoverage
+pub fn laterite_ags4_core::index::TierCoverage::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_core::index::TierCoverage
+pub fn laterite_ags4_core::index::TierCoverage::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_core::index::TierCoverage
+impl core::marker::Send for laterite_ags4_core::index::TierCoverage
+impl core::marker::Sync for laterite_ags4_core::index::TierCoverage
+impl core::marker::Unpin for laterite_ags4_core::index::TierCoverage
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::TierCoverage
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::TierCoverage
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::TierCoverage
+pub struct laterite_ags4_core::index::CustomDictRef
+pub laterite_ags4_core::index::CustomDictRef::hash: alloc::string::String
+pub laterite_ags4_core::index::CustomDictRef::name: alloc::string::String
+impl core::clone::Clone for laterite_ags4_core::index::CustomDictRef
+pub fn laterite_ags4_core::index::CustomDictRef::clone(&self) -> laterite_ags4_core::index::CustomDictRef
+impl core::cmp::Eq for laterite_ags4_core::index::CustomDictRef
+impl core::cmp::PartialEq for laterite_ags4_core::index::CustomDictRef
+pub fn laterite_ags4_core::index::CustomDictRef::eq(&self, &laterite_ags4_core::index::CustomDictRef) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::CustomDictRef
+pub fn laterite_ags4_core::index::CustomDictRef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::CustomDictRef
+impl serde_core::ser::Serialize for laterite_ags4_core::index::CustomDictRef
+pub fn laterite_ags4_core::index::CustomDictRef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_core::index::CustomDictRef
+pub fn laterite_ags4_core::index::CustomDictRef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_core::index::CustomDictRef
+impl core::marker::Send for laterite_ags4_core::index::CustomDictRef
+impl core::marker::Sync for laterite_ags4_core::index::CustomDictRef
+impl core::marker::Unpin for laterite_ags4_core::index::CustomDictRef
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::CustomDictRef
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::CustomDictRef
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::CustomDictRef
+pub struct laterite_ags4_core::index::EngineId
+pub laterite_ags4_core::index::EngineId::compat: core::option::Option<alloc::string::String>
+pub laterite_ags4_core::index::EngineId::fingerprint: alloc::string::String
+pub laterite_ags4_core::index::EngineId::validator: alloc::string::String
+impl core::clone::Clone for laterite_ags4_core::index::EngineId
+pub fn laterite_ags4_core::index::EngineId::clone(&self) -> laterite_ags4_core::index::EngineId
+impl core::cmp::Eq for laterite_ags4_core::index::EngineId
+impl core::cmp::PartialEq for laterite_ags4_core::index::EngineId
+pub fn laterite_ags4_core::index::EngineId::eq(&self, &laterite_ags4_core::index::EngineId) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::EngineId
+pub fn laterite_ags4_core::index::EngineId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::EngineId
+impl core::marker::Freeze for laterite_ags4_core::index::EngineId
+impl core::marker::Send for laterite_ags4_core::index::EngineId
+impl core::marker::Sync for laterite_ags4_core::index::EngineId
+impl core::marker::Unpin for laterite_ags4_core::index::EngineId
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::EngineId
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::EngineId
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::EngineId
+pub struct laterite_ags4_core::index::FileMeta
+pub laterite_ags4_core::index::FileMeta::etag: core::option::Option<alloc::string::String>
+pub laterite_ags4_core::index::FileMeta::last_modified: core::option::Option<alloc::string::String>
+pub laterite_ags4_core::index::FileMeta::sha256: alloc::string::String
+pub laterite_ags4_core::index::FileMeta::size: u64
+impl core::clone::Clone for laterite_ags4_core::index::FileMeta
+pub fn laterite_ags4_core::index::FileMeta::clone(&self) -> laterite_ags4_core::index::FileMeta
+impl core::cmp::Eq for laterite_ags4_core::index::FileMeta
+impl core::cmp::PartialEq for laterite_ags4_core::index::FileMeta
+pub fn laterite_ags4_core::index::FileMeta::eq(&self, &laterite_ags4_core::index::FileMeta) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::FileMeta
+pub fn laterite_ags4_core::index::FileMeta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::FileMeta
+impl serde_core::ser::Serialize for laterite_ags4_core::index::FileMeta
+pub fn laterite_ags4_core::index::FileMeta::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_core::index::FileMeta
+pub fn laterite_ags4_core::index::FileMeta::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_core::index::FileMeta
+impl core::marker::Send for laterite_ags4_core::index::FileMeta
+impl core::marker::Sync for laterite_ags4_core::index::FileMeta
+impl core::marker::Unpin for laterite_ags4_core::index::FileMeta
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::FileMeta
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::FileMeta
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::FileMeta
+pub struct laterite_ags4_core::index::GroupIndex
+pub laterite_ags4_core::index::GroupIndex::groups: std::collections::hash::map::HashMap<alloc::string::String, alloc::vec::Vec<laterite_ags4_core::index::Range>>
+pub laterite_ags4_core::index::GroupIndex::order: alloc::vec::Vec<alloc::string::String>
+impl laterite_ags4_core::index::GroupIndex
+pub fn laterite_ags4_core::index::GroupIndex::is_unambiguous(&self, &str) -> bool
+pub fn laterite_ags4_core::index::GroupIndex::range(&self, &str) -> core::option::Option<laterite_ags4_core::index::Range>
+pub fn laterite_ags4_core::index::GroupIndex::spans(&self, &str) -> &[laterite_ags4_core::index::Range]
+impl core::clone::Clone for laterite_ags4_core::index::GroupIndex
+pub fn laterite_ags4_core::index::GroupIndex::clone(&self) -> laterite_ags4_core::index::GroupIndex
+impl core::cmp::Eq for laterite_ags4_core::index::GroupIndex
+impl core::cmp::PartialEq for laterite_ags4_core::index::GroupIndex
+pub fn laterite_ags4_core::index::GroupIndex::eq(&self, &laterite_ags4_core::index::GroupIndex) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::GroupIndex
+pub fn laterite_ags4_core::index::GroupIndex::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::GroupIndex
+impl core::marker::Freeze for laterite_ags4_core::index::GroupIndex
+impl core::marker::Send for laterite_ags4_core::index::GroupIndex
+impl core::marker::Sync for laterite_ags4_core::index::GroupIndex
+impl core::marker::Unpin for laterite_ags4_core::index::GroupIndex
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::GroupIndex
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::GroupIndex
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::GroupIndex
+pub struct laterite_ags4_core::index::Question
+pub laterite_ags4_core::index::Question::custom_dict: core::option::Option<laterite_ags4_core::index::CustomDictRef>
+pub laterite_ags4_core::index::Question::encoding: alloc::string::String
+pub laterite_ags4_core::index::Question::forced_edition: core::option::Option<alloc::string::String>
+pub laterite_ags4_core::index::Question::want_fyi: bool
+pub laterite_ags4_core::index::Question::want_warnings: bool
+impl core::clone::Clone for laterite_ags4_core::index::Question
+pub fn laterite_ags4_core::index::Question::clone(&self) -> laterite_ags4_core::index::Question
+impl core::cmp::Eq for laterite_ags4_core::index::Question
+impl core::cmp::PartialEq for laterite_ags4_core::index::Question
+pub fn laterite_ags4_core::index::Question::eq(&self, &laterite_ags4_core::index::Question) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::Question
+pub fn laterite_ags4_core::index::Question::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::Question
+impl core::marker::Freeze for laterite_ags4_core::index::Question
+impl core::marker::Send for laterite_ags4_core::index::Question
+impl core::marker::Sync for laterite_ags4_core::index::Question
+impl core::marker::Unpin for laterite_ags4_core::index::Question
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::Question
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::Question
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::Question
+pub struct laterite_ags4_core::index::Sidecar
+pub laterite_ags4_core::index::Sidecar::file: laterite_ags4_core::index::FileMeta
+pub laterite_ags4_core::index::Sidecar::groups: std::collections::hash::map::HashMap<alloc::string::String, alloc::vec::Vec<laterite_ags4_core::index::Range>>
+pub laterite_ags4_core::index::Sidecar::order: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_core::index::Sidecar::validation: laterite_ags4_core::index::ValidationStamp
+pub laterite_ags4_core::index::Sidecar::version: u32
+impl laterite_ags4_core::index::Sidecar
+pub fn laterite_ags4_core::index::Sidecar::assemble(&[u8], laterite_ags4_core::index::ValidationStamp) -> core::result::Result<laterite_ags4_core::index::Sidecar, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::index::Sidecar::assemble_from_parsed(&[u8], &laterite_ags4_parse::ParsedFile, laterite_ags4_core::index::ValidationStamp) -> core::result::Result<laterite_ags4_core::index::Sidecar, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::index::Sidecar::decide(&self, &[u8], &laterite_ags4_core::index::Question, &laterite_ags4_core::index::EngineId) -> laterite_ags4_core::index::Decision
+pub fn laterite_ags4_core::index::Sidecar::from_json(&[u8]) -> core::result::Result<laterite_ags4_core::index::Sidecar, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::index::Sidecar::index(&self) -> laterite_ags4_core::index::GroupIndex
+pub fn laterite_ags4_core::index::Sidecar::is_fresh_for(&self, &[u8]) -> bool
+pub fn laterite_ags4_core::index::Sidecar::is_fresh_for_remote(&self, u64, core::option::Option<&str>, core::option::Option<&str>) -> laterite_ags4_core::index::RemoteFreshness
+pub fn laterite_ags4_core::index::Sidecar::size_matches(&self, u64) -> bool
+pub fn laterite_ags4_core::index::Sidecar::to_json(&self) -> core::result::Result<alloc::vec::Vec<u8>, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::index::Sidecar::with_origin(self, core::option::Option<alloc::string::String>, core::option::Option<alloc::string::String>) -> Self
+impl core::clone::Clone for laterite_ags4_core::index::Sidecar
+pub fn laterite_ags4_core::index::Sidecar::clone(&self) -> laterite_ags4_core::index::Sidecar
+impl core::cmp::Eq for laterite_ags4_core::index::Sidecar
+impl core::cmp::PartialEq for laterite_ags4_core::index::Sidecar
+pub fn laterite_ags4_core::index::Sidecar::eq(&self, &laterite_ags4_core::index::Sidecar) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::Sidecar
+pub fn laterite_ags4_core::index::Sidecar::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::Sidecar
+impl serde_core::ser::Serialize for laterite_ags4_core::index::Sidecar
+pub fn laterite_ags4_core::index::Sidecar::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_core::index::Sidecar
+pub fn laterite_ags4_core::index::Sidecar::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_core::index::Sidecar
+impl core::marker::Send for laterite_ags4_core::index::Sidecar
+impl core::marker::Sync for laterite_ags4_core::index::Sidecar
+impl core::marker::Unpin for laterite_ags4_core::index::Sidecar
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::Sidecar
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::Sidecar
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::Sidecar
+pub struct laterite_ags4_core::index::ValidationStamp
+pub laterite_ags4_core::index::ValidationStamp::checked_at: alloc::string::String
+pub laterite_ags4_core::index::ValidationStamp::compat: core::option::Option<alloc::string::String>
+pub laterite_ags4_core::index::ValidationStamp::custom_dict: core::option::Option<laterite_ags4_core::index::CustomDictRef>
+pub laterite_ags4_core::index::ValidationStamp::edition: laterite_ags4_core::index::EditionInput
+pub laterite_ags4_core::index::ValidationStamp::encoding: alloc::string::String
+pub laterite_ags4_core::index::ValidationStamp::engine: alloc::string::String
+pub laterite_ags4_core::index::ValidationStamp::errors: laterite_ags4_core::index::TierCoverage
+pub laterite_ags4_core::index::ValidationStamp::fyi: laterite_ags4_core::index::TierCoverage
+pub laterite_ags4_core::index::ValidationStamp::validator: alloc::string::String
+pub laterite_ags4_core::index::ValidationStamp::warnings: laterite_ags4_core::index::TierCoverage
+impl core::clone::Clone for laterite_ags4_core::index::ValidationStamp
+pub fn laterite_ags4_core::index::ValidationStamp::clone(&self) -> laterite_ags4_core::index::ValidationStamp
+impl core::cmp::Eq for laterite_ags4_core::index::ValidationStamp
+impl core::cmp::PartialEq for laterite_ags4_core::index::ValidationStamp
+pub fn laterite_ags4_core::index::ValidationStamp::eq(&self, &laterite_ags4_core::index::ValidationStamp) -> bool
+impl core::fmt::Debug for laterite_ags4_core::index::ValidationStamp
+pub fn laterite_ags4_core::index::ValidationStamp::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_core::index::ValidationStamp
+impl serde_core::ser::Serialize for laterite_ags4_core::index::ValidationStamp
+pub fn laterite_ags4_core::index::ValidationStamp::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_core::index::ValidationStamp
+pub fn laterite_ags4_core::index::ValidationStamp::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_core::index::ValidationStamp
+impl core::marker::Send for laterite_ags4_core::index::ValidationStamp
+impl core::marker::Sync for laterite_ags4_core::index::ValidationStamp
+impl core::marker::Unpin for laterite_ags4_core::index::ValidationStamp
+impl core::marker::UnsafeUnpin for laterite_ags4_core::index::ValidationStamp
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_core::index::ValidationStamp
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_core::index::ValidationStamp
+pub const laterite_ags4_core::index::ENGINE_IDENTITY: &str
+pub const laterite_ags4_core::index::SIDECAR_VERSION: u32
+pub fn laterite_ags4_core::index::group_index_from_parsed(&laterite_ags4_parse::ParsedFile) -> core::result::Result<laterite_ags4_core::index::GroupIndex, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::index::index_ags4_bytes(&[u8]) -> core::result::Result<laterite_ags4_core::index::GroupIndex, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::index::parse_group_slice(&[u8], laterite_ags4_core::index::Range, &str) -> core::result::Result<laterite_ags4_core::ags4_codec::AgsGroup, laterite_ags4_core::error::CliError>
+pub type laterite_ags4_core::index::Range = (u64, u64)
+pub mod laterite_ags4_core::keychain
+pub use laterite_ags4_core::keychain::<<laterite_ags4_reference::keychain::*>>
+pub mod laterite_ags4_core::read_render
+pub fn laterite_ags4_core::read_render::csv_row<'a>(impl core::iter::traits::iterator::Iterator<Item = &'a str>) -> alloc::string::String
+pub fn laterite_ags4_core::read_render::render_rows_csv(&[alloc::string::String], &[alloc::vec::Vec<alloc::string::String>]) -> alloc::string::String
+pub fn laterite_ags4_core::read_render::render_rows_json(&[alloc::string::String], &[alloc::vec::Vec<alloc::string::String>]) -> alloc::string::String
+pub mod laterite_ags4_core::registry
+pub use laterite_ags4_core::registry::<<laterite_ags4_reference::union::*>>
+pub mod laterite_ags4_core::transport
+pub use laterite_ags4_core::transport::PackStats
+pub use laterite_ags4_core::transport::SCRYPT_LOG_N
+pub use laterite_ags4_core::transport::UnpackStats
+pub fn laterite_ags4_core::transport::lock(&std::path::Path, &std::path::Path, &str, i32, u8) -> core::result::Result<laterite_transport::PackStats, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::transport::lock_bytes(&[u8], &str, i32, u8) -> core::result::Result<alloc::vec::Vec<u8>, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::transport::pack(&std::path::Path, &std::path::Path, i32) -> core::result::Result<laterite_transport::PackStats, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::transport::pack_bytes(&[u8], i32) -> core::result::Result<alloc::vec::Vec<u8>, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::transport::unlock(&std::path::Path, &std::path::Path, &str) -> core::result::Result<laterite_transport::UnpackStats, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::transport::unlock_bytes(&[u8], &str) -> core::result::Result<alloc::vec::Vec<u8>, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::transport::unpack(&std::path::Path, &std::path::Path) -> core::result::Result<laterite_transport::UnpackStats, laterite_ags4_core::error::CliError>
+pub fn laterite_ags4_core::transport::unpack_bytes(&[u8]) -> core::result::Result<alloc::vec::Vec<u8>, laterite_ags4_core::error::CliError>
