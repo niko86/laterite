@@ -135,11 +135,7 @@ export type { BuildReport as ExportResult } from "../wasm/ags4_wasm";
 // engine's, so the local projection has to keep conforming to what
 // `dictionary(edition)` returns — which is the contract that comment used to
 // assert by hand. ---
-export type {
-  DictGroup,
-  DictHeading,
-  StandardDict,
-} from "../wasm/ags4_wasm";
+export type { DictGroup, DictHeading, StandardDict } from "../wasm/ags4_wasm";
 
 // --- Revision diff (Tools): the `laterite-ags4-wasm` diff(a, b) result. KEY-aware,
 // type-aware comparison of two AGS4 files. ---
