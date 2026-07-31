@@ -1,0 +1,70 @@
+pub mod laterite_ags4_types
+pub mod laterite_ags4_types::arrow_cols
+pub struct laterite_ags4_types::arrow_cols::SynthColumns<'a>
+pub laterite_ags4_types::arrow_cols::SynthColumns::hashes: core::option::Option<&'a [alloc::string::String]>
+pub laterite_ags4_types::arrow_cols::SynthColumns::ids: core::option::Option<&'a [(alloc::string::String, core::option::Option<alloc::string::String>)]>
+impl<'a> core::default::Default for laterite_ags4_types::arrow_cols::SynthColumns<'a>
+pub fn laterite_ags4_types::arrow_cols::SynthColumns<'a>::default() -> laterite_ags4_types::arrow_cols::SynthColumns<'a>
+impl<'a> core::marker::Freeze for laterite_ags4_types::arrow_cols::SynthColumns<'a>
+impl<'a> core::marker::Send for laterite_ags4_types::arrow_cols::SynthColumns<'a>
+impl<'a> core::marker::Sync for laterite_ags4_types::arrow_cols::SynthColumns<'a>
+impl<'a> core::marker::Unpin for laterite_ags4_types::arrow_cols::SynthColumns<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite_ags4_types::arrow_cols::SynthColumns<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_types::arrow_cols::SynthColumns<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_types::arrow_cols::SynthColumns<'a>
+pub fn laterite_ags4_types::arrow_cols::build_column<'a, F>(usize, &str, F) -> (arrow_array::array::ArrayRef, arrow_schema::datatype::DataType) where F: core::ops::function::Fn(usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_types::arrow_cols::build_record_batch<'a, F>(&[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<arrow_array::record_batch::RecordBatch, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_types::arrow_cols::build_record_batch_compat<'a, F>(&[alloc::string::String], &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<arrow_array::record_batch::RecordBatch, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_types::arrow_cols::build_record_batch_synth<'a, F>(&laterite_ags4_types::arrow_cols::SynthColumns<'_>, &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<arrow_array::record_batch::RecordBatch, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_types::arrow_cols::build_record_batch_with_ids<'a, F>(&[(alloc::string::String, core::option::Option<alloc::string::String>)], &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<arrow_array::record_batch::RecordBatch, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub mod laterite_ags4_types::ipc
+pub fn laterite_ags4_types::ipc::build_group_ipc<'a, F>(&[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<alloc::vec::Vec<u8>, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_types::ipc::build_group_ipc_synth<'a, F>(&laterite_ags4_types::arrow_cols::SynthColumns<'_>, &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<alloc::vec::Vec<u8>, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_types::ipc::build_group_ipc_with_ids<'a, F>(&[(alloc::string::String, core::option::Option<alloc::string::String>)], &[alloc::string::String], &[alloc::string::String], usize, F) -> core::result::Result<alloc::vec::Vec<u8>, arrow_schema::error::ArrowError> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_types::ipc::record_batch_to_ipc(&arrow_array::record_batch::RecordBatch) -> core::result::Result<alloc::vec::Vec<u8>, arrow_schema::error::ArrowError>
+pub enum laterite_ags4_types::CanonicalType
+pub laterite_ags4_types::CanonicalType::Bool
+pub laterite_ags4_types::CanonicalType::Date
+pub laterite_ags4_types::CanonicalType::Datetime
+pub laterite_ags4_types::CanonicalType::Decimal
+pub laterite_ags4_types::CanonicalType::Enum
+pub laterite_ags4_types::CanonicalType::Integer
+pub laterite_ags4_types::CanonicalType::String
+pub laterite_ags4_types::CanonicalType::Time
+impl laterite_ags4_types::CanonicalType
+pub fn laterite_ags4_types::CanonicalType::as_str(self) -> &'static str
+pub fn laterite_ags4_types::CanonicalType::sql_type(self) -> &'static str
+impl core::clone::Clone for laterite_ags4_types::CanonicalType
+pub fn laterite_ags4_types::CanonicalType::clone(&self) -> laterite_ags4_types::CanonicalType
+impl core::cmp::Eq for laterite_ags4_types::CanonicalType
+impl core::cmp::PartialEq for laterite_ags4_types::CanonicalType
+pub fn laterite_ags4_types::CanonicalType::eq(&self, &laterite_ags4_types::CanonicalType) -> bool
+impl core::fmt::Debug for laterite_ags4_types::CanonicalType
+pub fn laterite_ags4_types::CanonicalType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_types::CanonicalType
+impl core::marker::StructuralPartialEq for laterite_ags4_types::CanonicalType
+impl core::marker::Freeze for laterite_ags4_types::CanonicalType
+impl core::marker::Send for laterite_ags4_types::CanonicalType
+impl core::marker::Sync for laterite_ags4_types::CanonicalType
+impl core::marker::Unpin for laterite_ags4_types::CanonicalType
+impl core::marker::UnsafeUnpin for laterite_ags4_types::CanonicalType
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_types::CanonicalType
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_types::CanonicalType
+pub fn laterite_ags4_types::ags4_str(&serde_json::value::Value, &str) -> alloc::string::String
+pub fn laterite_ags4_types::canonical_type(&str) -> core::option::Option<laterite_ags4_types::CanonicalType>
+pub fn laterite_ags4_types::decimal_places(&str) -> core::option::Option<usize>
+pub fn laterite_ags4_types::display_hint(&str) -> core::option::Option<alloc::string::String>
+pub fn laterite_ags4_types::format_ndp(f64, usize) -> alloc::string::String
+pub fn laterite_ags4_types::format_nsci(f64, usize) -> alloc::string::String
+pub fn laterite_ags4_types::format_nsf(f64, usize) -> alloc::string::String
+pub fn laterite_ags4_types::pad_decimals(&str, usize) -> core::option::Option<alloc::string::String>
+pub fn laterite_ags4_types::parse_ags_decimal(&str) -> core::option::Option<f64>
+pub fn laterite_ags4_types::parse_ags_integer(&str) -> core::option::Option<i64>
+pub fn laterite_ags4_types::parse_bool(&str) -> core::option::Option<bool>
+pub fn laterite_ags4_types::parse_date(&str) -> core::option::Option<chrono::naive::date::NaiveDate>
+pub fn laterite_ags4_types::parse_datetime(&str) -> core::option::Option<chrono::naive::datetime::NaiveDateTime>
+pub fn laterite_ags4_types::parse_time(&str) -> core::option::Option<chrono::naive::time::NaiveTime>
+pub fn laterite_ags4_types::parse_value(core::option::Option<&str>, &str) -> serde_json::value::Value
+pub fn laterite_ags4_types::quote_field(&str) -> alloc::string::String
+pub fn laterite_ags4_types::sql_type(&str) -> &'static str
+pub fn laterite_ags4_types::write_quoted_field<W: core::io::write::Write>(&mut W, &str) -> core::io::error::Result<()>

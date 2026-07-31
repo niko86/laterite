@@ -1,0 +1,66 @@
+pub mod laterite_ags4_diff
+pub struct laterite_ags4_diff::CellDelta
+pub laterite_ags4_diff::CellDelta::a: core::option::Option<alloc::string::String>
+pub laterite_ags4_diff::CellDelta::ags_type: alloc::string::String
+pub laterite_ags4_diff::CellDelta::b: core::option::Option<alloc::string::String>
+pub laterite_ags4_diff::CellDelta::heading: alloc::string::String
+impl serde_core::ser::Serialize for laterite_ags4_diff::CellDelta
+pub fn laterite_ags4_diff::CellDelta::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_diff::CellDelta
+impl core::marker::Send for laterite_ags4_diff::CellDelta
+impl core::marker::Sync for laterite_ags4_diff::CellDelta
+impl core::marker::Unpin for laterite_ags4_diff::CellDelta
+impl core::marker::UnsafeUnpin for laterite_ags4_diff::CellDelta
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_diff::CellDelta
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_diff::CellDelta
+pub struct laterite_ags4_diff::GroupDelta
+pub laterite_ags4_diff::GroupDelta::added: usize
+pub laterite_ags4_diff::GroupDelta::changed: usize
+pub laterite_ags4_diff::GroupDelta::code: alloc::string::String
+pub laterite_ags4_diff::GroupDelta::headings_added: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_diff::GroupDelta::headings_removed: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_diff::GroupDelta::key_headings: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_diff::GroupDelta::keyed: bool
+pub laterite_ags4_diff::GroupDelta::removed: usize
+pub laterite_ags4_diff::GroupDelta::rows: alloc::vec::Vec<laterite_ags4_diff::RowDelta>
+impl serde_core::ser::Serialize for laterite_ags4_diff::GroupDelta
+pub fn laterite_ags4_diff::GroupDelta::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_diff::GroupDelta
+impl core::marker::Send for laterite_ags4_diff::GroupDelta
+impl core::marker::Sync for laterite_ags4_diff::GroupDelta
+impl core::marker::Unpin for laterite_ags4_diff::GroupDelta
+impl core::marker::UnsafeUnpin for laterite_ags4_diff::GroupDelta
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_diff::GroupDelta
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_diff::GroupDelta
+pub struct laterite_ags4_diff::RevisionDelta
+pub laterite_ags4_diff::RevisionDelta::groups: alloc::vec::Vec<laterite_ags4_diff::GroupDelta>
+pub laterite_ags4_diff::RevisionDelta::groups_added: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_diff::RevisionDelta::groups_removed: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_diff::RevisionDelta::total_added: usize
+pub laterite_ags4_diff::RevisionDelta::total_changed: usize
+pub laterite_ags4_diff::RevisionDelta::total_removed: usize
+impl serde_core::ser::Serialize for laterite_ags4_diff::RevisionDelta
+pub fn laterite_ags4_diff::RevisionDelta::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_diff::RevisionDelta
+impl core::marker::Send for laterite_ags4_diff::RevisionDelta
+impl core::marker::Sync for laterite_ags4_diff::RevisionDelta
+impl core::marker::Unpin for laterite_ags4_diff::RevisionDelta
+impl core::marker::UnsafeUnpin for laterite_ags4_diff::RevisionDelta
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_diff::RevisionDelta
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_diff::RevisionDelta
+pub struct laterite_ags4_diff::RowDelta
+pub laterite_ags4_diff::RowDelta::cells: alloc::vec::Vec<laterite_ags4_diff::CellDelta>
+pub laterite_ags4_diff::RowDelta::key: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_diff::RowDelta::kind: &'static str
+pub laterite_ags4_diff::RowDelta::line_a: core::option::Option<u32>
+pub laterite_ags4_diff::RowDelta::line_b: core::option::Option<u32>
+impl serde_core::ser::Serialize for laterite_ags4_diff::RowDelta
+pub fn laterite_ags4_diff::RowDelta::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_diff::RowDelta
+impl core::marker::Send for laterite_ags4_diff::RowDelta
+impl core::marker::Sync for laterite_ags4_diff::RowDelta
+impl core::marker::Unpin for laterite_ags4_diff::RowDelta
+impl core::marker::UnsafeUnpin for laterite_ags4_diff::RowDelta
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_diff::RowDelta
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_diff::RowDelta
+pub fn laterite_ags4_diff::diff_parsed(&laterite_ags4_parse::ParsedFile, &laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, core::option::Option<usize>) -> laterite_ags4_diff::RevisionDelta

@@ -1,0 +1,464 @@
+pub mod laterite_ags4_reference
+pub mod laterite_ags4_reference::catalogue
+pub const laterite_ags4_reference::catalogue::RULE_LABELS: &[&str]
+pub fn laterite_ags4_reference::catalogue::rule_metadata_json() -> &'static str
+pub mod laterite_ags4_reference::dict
+pub enum laterite_ags4_reference::dict::DictResolution
+pub laterite_ags4_reference::dict::DictResolution::ExactTranAgs
+pub laterite_ags4_reference::dict::DictResolution::Fallback
+pub laterite_ags4_reference::dict::DictResolution::Forced
+pub laterite_ags4_reference::dict::DictResolution::GuessedPatch
+pub laterite_ags4_reference::dict::DictResolution::Replacement
+pub laterite_ags4_reference::dict::DictResolution::StructuralBase
+impl laterite_ags4_reference::dict::DictResolution
+pub fn laterite_ags4_reference::dict::DictResolution::as_str(self) -> &'static str
+impl core::clone::Clone for laterite_ags4_reference::dict::DictResolution
+pub fn laterite_ags4_reference::dict::DictResolution::clone(&self) -> laterite_ags4_reference::dict::DictResolution
+impl core::cmp::Eq for laterite_ags4_reference::dict::DictResolution
+impl core::cmp::PartialEq for laterite_ags4_reference::dict::DictResolution
+pub fn laterite_ags4_reference::dict::DictResolution::eq(&self, &laterite_ags4_reference::dict::DictResolution) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::dict::DictResolution
+pub fn laterite_ags4_reference::dict::DictResolution::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_reference::dict::DictResolution
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::dict::DictResolution
+impl serde_core::ser::Serialize for laterite_ags4_reference::dict::DictResolution
+pub fn laterite_ags4_reference::dict::DictResolution::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_reference::dict::DictResolution
+pub fn laterite_ags4_reference::dict::DictResolution::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_reference::dict::DictResolution
+impl core::marker::Send for laterite_ags4_reference::dict::DictResolution
+impl core::marker::Sync for laterite_ags4_reference::dict::DictResolution
+impl core::marker::Unpin for laterite_ags4_reference::dict::DictResolution
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::DictResolution
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::DictResolution
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::DictResolution
+pub enum laterite_ags4_reference::dict::DictVersion
+pub laterite_ags4_reference::dict::DictVersion::V4_0_3
+pub laterite_ags4_reference::dict::DictVersion::V4_0_4
+pub laterite_ags4_reference::dict::DictVersion::V4_1
+pub laterite_ags4_reference::dict::DictVersion::V4_1_1
+pub laterite_ags4_reference::dict::DictVersion::V4_2
+impl laterite_ags4_reference::dict::DictVersion
+pub const laterite_ags4_reference::dict::DictVersion::ALL: &'static [laterite_ags4_reference::dict::DictVersion]
+pub fn laterite_ags4_reference::dict::DictVersion::as_str(self) -> &'static str
+pub fn laterite_ags4_reference::dict::DictVersion::from_edition(&str) -> core::option::Option<laterite_ags4_reference::dict::DictVersion>
+impl core::clone::Clone for laterite_ags4_reference::dict::DictVersion
+pub fn laterite_ags4_reference::dict::DictVersion::clone(&self) -> laterite_ags4_reference::dict::DictVersion
+impl core::cmp::Eq for laterite_ags4_reference::dict::DictVersion
+impl core::cmp::PartialEq for laterite_ags4_reference::dict::DictVersion
+pub fn laterite_ags4_reference::dict::DictVersion::eq(&self, &laterite_ags4_reference::dict::DictVersion) -> bool
+impl core::default::Default for laterite_ags4_reference::dict::DictVersion
+pub fn laterite_ags4_reference::dict::DictVersion::default() -> laterite_ags4_reference::dict::DictVersion
+impl core::fmt::Debug for laterite_ags4_reference::dict::DictVersion
+pub fn laterite_ags4_reference::dict::DictVersion::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_reference::dict::DictVersion
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::dict::DictVersion
+impl core::marker::Freeze for laterite_ags4_reference::dict::DictVersion
+impl core::marker::Send for laterite_ags4_reference::dict::DictVersion
+impl core::marker::Sync for laterite_ags4_reference::dict::DictVersion
+impl core::marker::Unpin for laterite_ags4_reference::dict::DictVersion
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::DictVersion
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::DictVersion
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::DictVersion
+pub enum laterite_ags4_reference::dict::Dictionary<'a>
+pub laterite_ags4_reference::dict::Dictionary::Bundled(laterite_ags4_reference::dict::BundledDict)
+pub laterite_ags4_reference::dict::Dictionary::Layered
+pub laterite_ags4_reference::dict::Dictionary::Layered::base: laterite_ags4_reference::dict::BundledDict
+pub laterite_ags4_reference::dict::Dictionary::Layered::delta: &'a laterite_ags4_reference::overlay::OwnedDelta
+impl<'a> laterite_ags4_reference::dict::Dictionary<'a>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::abbr_codes(&self, &str) -> alloc::vec::Vec<&'a str>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::abbr_desc(&self, &str, &str) -> core::option::Option<&'a str>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::all_heading_names(&self) -> impl core::iter::traits::iterator::Iterator<Item = &'a str> + 'a
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::bundled(laterite_ags4_reference::dict::DictVersion) -> laterite_ags4_reference::dict::Dictionary<'static>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::group(&self, &str) -> core::option::Option<laterite_ags4_reference::dict::GroupRef<'a>>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::group_codes(&self) -> impl core::iter::traits::iterator::Iterator<Item = &'a str> + 'a
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::group_headings(&self, &str) -> alloc::borrow::Cow<'a, [&'a str]>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::heading(&self, &str, &str) -> core::option::Option<laterite_ags4_reference::dict::HeadingRef<'a>>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::layered(&'a laterite_ags4_reference::overlay::OwnedDelta) -> laterite_ags4_reference::dict::Dictionary<'a>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::tran_ags(&self) -> &'a str
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::version(&self) -> laterite_ags4_reference::dict::DictVersion
+impl<'a> core::clone::Clone for laterite_ags4_reference::dict::Dictionary<'a>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::clone(&self) -> laterite_ags4_reference::dict::Dictionary<'a>
+impl<'a> core::fmt::Debug for laterite_ags4_reference::dict::Dictionary<'a>
+pub fn laterite_ags4_reference::dict::Dictionary<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Copy for laterite_ags4_reference::dict::Dictionary<'a>
+impl<'a> core::marker::Freeze for laterite_ags4_reference::dict::Dictionary<'a>
+impl<'a> core::marker::Send for laterite_ags4_reference::dict::Dictionary<'a>
+impl<'a> core::marker::Sync for laterite_ags4_reference::dict::Dictionary<'a>
+impl<'a> core::marker::Unpin for laterite_ags4_reference::dict::Dictionary<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite_ags4_reference::dict::Dictionary<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::Dictionary<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::Dictionary<'a>
+pub struct laterite_ags4_reference::dict::BundledDict
+impl laterite_ags4_reference::dict::BundledDict
+pub fn laterite_ags4_reference::dict::BundledDict::bundled(laterite_ags4_reference::dict::DictVersion) -> Self
+impl core::clone::Clone for laterite_ags4_reference::dict::BundledDict
+pub fn laterite_ags4_reference::dict::BundledDict::clone(&self) -> laterite_ags4_reference::dict::BundledDict
+impl core::fmt::Debug for laterite_ags4_reference::dict::BundledDict
+pub fn laterite_ags4_reference::dict::BundledDict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_reference::dict::BundledDict
+impl core::marker::Freeze for laterite_ags4_reference::dict::BundledDict
+impl core::marker::Send for laterite_ags4_reference::dict::BundledDict
+impl core::marker::Sync for laterite_ags4_reference::dict::BundledDict
+impl core::marker::Unpin for laterite_ags4_reference::dict::BundledDict
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::BundledDict
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::BundledDict
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::BundledDict
+pub struct laterite_ags4_reference::dict::DictEntry
+pub laterite_ags4_reference::dict::DictEntry::ags_type: &'static str
+pub laterite_ags4_reference::dict::DictEntry::desc: &'static str
+pub laterite_ags4_reference::dict::DictEntry::status: &'static str
+pub laterite_ags4_reference::dict::DictEntry::unit: &'static str
+impl core::clone::Clone for laterite_ags4_reference::dict::DictEntry
+pub fn laterite_ags4_reference::dict::DictEntry::clone(&self) -> laterite_ags4_reference::dict::DictEntry
+impl core::cmp::Eq for laterite_ags4_reference::dict::DictEntry
+impl core::cmp::PartialEq for laterite_ags4_reference::dict::DictEntry
+pub fn laterite_ags4_reference::dict::DictEntry::eq(&self, &laterite_ags4_reference::dict::DictEntry) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::dict::DictEntry
+pub fn laterite_ags4_reference::dict::DictEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_reference::dict::DictEntry
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::dict::DictEntry
+impl core::marker::Freeze for laterite_ags4_reference::dict::DictEntry
+impl core::marker::Send for laterite_ags4_reference::dict::DictEntry
+impl core::marker::Sync for laterite_ags4_reference::dict::DictEntry
+impl core::marker::Unpin for laterite_ags4_reference::dict::DictEntry
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::DictEntry
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::DictEntry
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::DictEntry
+pub struct laterite_ags4_reference::dict::DictGroupDto
+pub laterite_ags4_reference::dict::DictGroupDto::code: alloc::string::String
+pub laterite_ags4_reference::dict::DictGroupDto::contents: alloc::string::String
+pub laterite_ags4_reference::dict::DictGroupDto::headings: alloc::vec::Vec<laterite_ags4_reference::dict::DictHeadingDto>
+pub laterite_ags4_reference::dict::DictGroupDto::parent: core::option::Option<alloc::string::String>
+impl serde_core::ser::Serialize for laterite_ags4_reference::dict::DictGroupDto
+pub fn laterite_ags4_reference::dict::DictGroupDto::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_reference::dict::DictGroupDto
+impl core::marker::Send for laterite_ags4_reference::dict::DictGroupDto
+impl core::marker::Sync for laterite_ags4_reference::dict::DictGroupDto
+impl core::marker::Unpin for laterite_ags4_reference::dict::DictGroupDto
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::DictGroupDto
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::DictGroupDto
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::DictGroupDto
+pub struct laterite_ags4_reference::dict::DictHeadingDto
+pub laterite_ags4_reference::dict::DictHeadingDto::ags_type: alloc::string::String
+pub laterite_ags4_reference::dict::DictHeadingDto::description: alloc::string::String
+pub laterite_ags4_reference::dict::DictHeadingDto::name: alloc::string::String
+pub laterite_ags4_reference::dict::DictHeadingDto::status: alloc::string::String
+pub laterite_ags4_reference::dict::DictHeadingDto::unit: core::option::Option<alloc::string::String>
+impl serde_core::ser::Serialize for laterite_ags4_reference::dict::DictHeadingDto
+pub fn laterite_ags4_reference::dict::DictHeadingDto::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_reference::dict::DictHeadingDto
+impl core::marker::Send for laterite_ags4_reference::dict::DictHeadingDto
+impl core::marker::Sync for laterite_ags4_reference::dict::DictHeadingDto
+impl core::marker::Unpin for laterite_ags4_reference::dict::DictHeadingDto
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::DictHeadingDto
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::DictHeadingDto
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::DictHeadingDto
+pub struct laterite_ags4_reference::dict::DictionaryDto
+pub laterite_ags4_reference::dict::DictionaryDto::ags_edition: alloc::string::String
+pub laterite_ags4_reference::dict::DictionaryDto::groups: alloc::vec::Vec<laterite_ags4_reference::dict::DictGroupDto>
+impl serde_core::ser::Serialize for laterite_ags4_reference::dict::DictionaryDto
+pub fn laterite_ags4_reference::dict::DictionaryDto::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl core::marker::Freeze for laterite_ags4_reference::dict::DictionaryDto
+impl core::marker::Send for laterite_ags4_reference::dict::DictionaryDto
+impl core::marker::Sync for laterite_ags4_reference::dict::DictionaryDto
+impl core::marker::Unpin for laterite_ags4_reference::dict::DictionaryDto
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::DictionaryDto
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::DictionaryDto
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::DictionaryDto
+pub struct laterite_ags4_reference::dict::GroupMeta
+pub laterite_ags4_reference::dict::GroupMeta::desc: &'static str
+pub laterite_ags4_reference::dict::GroupMeta::parent: &'static str
+impl core::clone::Clone for laterite_ags4_reference::dict::GroupMeta
+pub fn laterite_ags4_reference::dict::GroupMeta::clone(&self) -> laterite_ags4_reference::dict::GroupMeta
+impl core::cmp::Eq for laterite_ags4_reference::dict::GroupMeta
+impl core::cmp::PartialEq for laterite_ags4_reference::dict::GroupMeta
+pub fn laterite_ags4_reference::dict::GroupMeta::eq(&self, &laterite_ags4_reference::dict::GroupMeta) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::dict::GroupMeta
+pub fn laterite_ags4_reference::dict::GroupMeta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_reference::dict::GroupMeta
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::dict::GroupMeta
+impl core::marker::Freeze for laterite_ags4_reference::dict::GroupMeta
+impl core::marker::Send for laterite_ags4_reference::dict::GroupMeta
+impl core::marker::Sync for laterite_ags4_reference::dict::GroupMeta
+impl core::marker::Unpin for laterite_ags4_reference::dict::GroupMeta
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::dict::GroupMeta
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::GroupMeta
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::GroupMeta
+pub struct laterite_ags4_reference::dict::GroupRef<'a>
+pub laterite_ags4_reference::dict::GroupRef::desc: &'a str
+pub laterite_ags4_reference::dict::GroupRef::parent: &'a str
+impl<'a> core::clone::Clone for laterite_ags4_reference::dict::GroupRef<'a>
+pub fn laterite_ags4_reference::dict::GroupRef<'a>::clone(&self) -> laterite_ags4_reference::dict::GroupRef<'a>
+impl<'a> core::cmp::Eq for laterite_ags4_reference::dict::GroupRef<'a>
+impl<'a> core::cmp::PartialEq for laterite_ags4_reference::dict::GroupRef<'a>
+pub fn laterite_ags4_reference::dict::GroupRef<'a>::eq(&self, &laterite_ags4_reference::dict::GroupRef<'a>) -> bool
+impl<'a> core::fmt::Debug for laterite_ags4_reference::dict::GroupRef<'a>
+pub fn laterite_ags4_reference::dict::GroupRef<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Copy for laterite_ags4_reference::dict::GroupRef<'a>
+impl<'a> core::marker::StructuralPartialEq for laterite_ags4_reference::dict::GroupRef<'a>
+impl<'a> core::marker::Freeze for laterite_ags4_reference::dict::GroupRef<'a>
+impl<'a> core::marker::Send for laterite_ags4_reference::dict::GroupRef<'a>
+impl<'a> core::marker::Sync for laterite_ags4_reference::dict::GroupRef<'a>
+impl<'a> core::marker::Unpin for laterite_ags4_reference::dict::GroupRef<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite_ags4_reference::dict::GroupRef<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::GroupRef<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::GroupRef<'a>
+pub struct laterite_ags4_reference::dict::HeadingRef<'a>
+pub laterite_ags4_reference::dict::HeadingRef::ags_type: &'a str
+pub laterite_ags4_reference::dict::HeadingRef::desc: &'a str
+pub laterite_ags4_reference::dict::HeadingRef::status: &'a str
+pub laterite_ags4_reference::dict::HeadingRef::unit: &'a str
+impl<'a> core::clone::Clone for laterite_ags4_reference::dict::HeadingRef<'a>
+pub fn laterite_ags4_reference::dict::HeadingRef<'a>::clone(&self) -> laterite_ags4_reference::dict::HeadingRef<'a>
+impl<'a> core::cmp::Eq for laterite_ags4_reference::dict::HeadingRef<'a>
+impl<'a> core::cmp::PartialEq for laterite_ags4_reference::dict::HeadingRef<'a>
+pub fn laterite_ags4_reference::dict::HeadingRef<'a>::eq(&self, &laterite_ags4_reference::dict::HeadingRef<'a>) -> bool
+impl<'a> core::fmt::Debug for laterite_ags4_reference::dict::HeadingRef<'a>
+pub fn laterite_ags4_reference::dict::HeadingRef<'a>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Copy for laterite_ags4_reference::dict::HeadingRef<'a>
+impl<'a> core::marker::StructuralPartialEq for laterite_ags4_reference::dict::HeadingRef<'a>
+impl<'a> core::marker::Freeze for laterite_ags4_reference::dict::HeadingRef<'a>
+impl<'a> core::marker::Send for laterite_ags4_reference::dict::HeadingRef<'a>
+impl<'a> core::marker::Sync for laterite_ags4_reference::dict::HeadingRef<'a>
+impl<'a> core::marker::Unpin for laterite_ags4_reference::dict::HeadingRef<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite_ags4_reference::dict::HeadingRef<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::dict::HeadingRef<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::dict::HeadingRef<'a>
+pub const laterite_ags4_reference::dict::FALLBACK: laterite_ags4_reference::dict::DictVersion
+pub fn laterite_ags4_reference::dict::dictionary_dto(laterite_ags4_reference::dict::DictVersion) -> laterite_ags4_reference::dict::DictionaryDto
+pub fn laterite_ags4_reference::dict::heading_key(&str, &str) -> alloc::string::String
+pub mod laterite_ags4_reference::keychain
+pub fn laterite_ags4_reference::keychain::canonical_encode(&str, &[(alloc::string::String, alloc::string::String)]) -> alloc::vec::Vec<u8>
+pub fn laterite_ags4_reference::keychain::content_hash(&str, &[(&str, &str, &str, &str)]) -> uuid::Uuid
+pub fn laterite_ags4_reference::keychain::content_id(&str, &[(alloc::string::String, alloc::string::String)]) -> uuid::Uuid
+pub fn laterite_ags4_reference::keychain::group_content_hashes<'a, F>(&str, &[alloc::string::String], &[alloc::string::String], &[alloc::string::String], usize, F) -> alloc::vec::Vec<alloc::string::String> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_reference::keychain::group_row_ids<'a, F>(&laterite_ags4_reference::union::Registry, &str, &[alloc::string::String], usize, F) -> alloc::vec::Vec<(alloc::string::String, core::option::Option<alloc::string::String>)> where F: core::ops::function::Fn(usize, usize) -> core::option::Option<&'a str>
+pub fn laterite_ags4_reference::keychain::key_chain_values<S: core::hash::BuildHasher>(&laterite_ags4_reference::union::GroupDescriptor, &std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String, S>) -> alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub fn laterite_ags4_reference::keychain::key_heading_names(&laterite_ags4_reference::union::GroupDescriptor) -> alloc::vec::Vec<&str>
+pub fn laterite_ags4_reference::keychain::parent_chain_values<S: core::hash::BuildHasher>(&laterite_ags4_reference::union::Registry, &laterite_ags4_reference::union::GroupDescriptor, &std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String, S>) -> core::option::Option<alloc::vec::Vec<(alloc::string::String, alloc::string::String)>>
+pub fn laterite_ags4_reference::keychain::row_ids<S: core::hash::BuildHasher>(&laterite_ags4_reference::union::Registry, &laterite_ags4_reference::union::GroupDescriptor, &std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String, S>) -> (uuid::Uuid, core::option::Option<uuid::Uuid>)
+pub fn laterite_ags4_reference::keychain::shared_keys(&laterite_ags4_reference::union::Registry, &laterite_ags4_reference::union::GroupDescriptor) -> alloc::vec::Vec<alloc::string::String>
+pub mod laterite_ags4_reference::overlay
+pub enum laterite_ags4_reference::overlay::BaseSpec
+pub laterite_ags4_reference::overlay::BaseSpec::Auto
+pub laterite_ags4_reference::overlay::BaseSpec::Force(laterite_ags4_reference::dict::DictVersion)
+pub laterite_ags4_reference::overlay::BaseSpec::Replace
+impl core::clone::Clone for laterite_ags4_reference::overlay::BaseSpec
+pub fn laterite_ags4_reference::overlay::BaseSpec::clone(&self) -> laterite_ags4_reference::overlay::BaseSpec
+impl core::cmp::Eq for laterite_ags4_reference::overlay::BaseSpec
+impl core::cmp::PartialEq for laterite_ags4_reference::overlay::BaseSpec
+pub fn laterite_ags4_reference::overlay::BaseSpec::eq(&self, &laterite_ags4_reference::overlay::BaseSpec) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::overlay::BaseSpec
+pub fn laterite_ags4_reference::overlay::BaseSpec::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_reference::overlay::BaseSpec
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::overlay::BaseSpec
+impl core::marker::Freeze for laterite_ags4_reference::overlay::BaseSpec
+impl core::marker::Send for laterite_ags4_reference::overlay::BaseSpec
+impl core::marker::Sync for laterite_ags4_reference::overlay::BaseSpec
+impl core::marker::Unpin for laterite_ags4_reference::overlay::BaseSpec
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::overlay::BaseSpec
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::overlay::BaseSpec
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::overlay::BaseSpec
+pub enum laterite_ags4_reference::overlay::DictError
+pub laterite_ags4_reference::overlay::DictError::BadGroupRowArity
+pub laterite_ags4_reference::overlay::DictError::BadGroupRowArity::line: u32
+pub laterite_ags4_reference::overlay::DictError::DuplicateHeading
+pub laterite_ags4_reference::overlay::DictError::DuplicateHeading::group: alloc::string::String
+pub laterite_ags4_reference::overlay::DictError::DuplicateHeading::heading: alloc::string::String
+pub laterite_ags4_reference::overlay::DictError::Empty
+pub laterite_ags4_reference::overlay::DictError::MalformedJson
+pub laterite_ags4_reference::overlay::DictError::MalformedJson::col: usize
+pub laterite_ags4_reference::overlay::DictError::MalformedJson::line: usize
+pub laterite_ags4_reference::overlay::DictError::MalformedJson::msg: alloc::string::String
+pub laterite_ags4_reference::overlay::DictError::NotADictionary
+pub laterite_ags4_reference::overlay::DictError::Parse(alloc::string::String)
+pub laterite_ags4_reference::overlay::DictError::UnknownParent
+pub laterite_ags4_reference::overlay::DictError::UnknownParent::group: alloc::string::String
+pub laterite_ags4_reference::overlay::DictError::UnknownParent::parent: alloc::string::String
+pub laterite_ags4_reference::overlay::DictError::UnknownStatus
+pub laterite_ags4_reference::overlay::DictError::UnknownStatus::line: u32
+pub laterite_ags4_reference::overlay::DictError::UnknownStatus::token: alloc::string::String
+pub laterite_ags4_reference::overlay::DictError::UnknownType
+pub laterite_ags4_reference::overlay::DictError::UnknownType::line: u32
+pub laterite_ags4_reference::overlay::DictError::UnknownType::token: alloc::string::String
+impl core::clone::Clone for laterite_ags4_reference::overlay::DictError
+pub fn laterite_ags4_reference::overlay::DictError::clone(&self) -> laterite_ags4_reference::overlay::DictError
+impl core::cmp::Eq for laterite_ags4_reference::overlay::DictError
+impl core::cmp::PartialEq for laterite_ags4_reference::overlay::DictError
+pub fn laterite_ags4_reference::overlay::DictError::eq(&self, &laterite_ags4_reference::overlay::DictError) -> bool
+impl core::error::Error for laterite_ags4_reference::overlay::DictError
+impl core::fmt::Debug for laterite_ags4_reference::overlay::DictError
+pub fn laterite_ags4_reference::overlay::DictError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for laterite_ags4_reference::overlay::DictError
+pub fn laterite_ags4_reference::overlay::DictError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::overlay::DictError
+impl core::marker::Freeze for laterite_ags4_reference::overlay::DictError
+impl core::marker::Send for laterite_ags4_reference::overlay::DictError
+impl core::marker::Sync for laterite_ags4_reference::overlay::DictError
+impl core::marker::Unpin for laterite_ags4_reference::overlay::DictError
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::overlay::DictError
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::overlay::DictError
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::overlay::DictError
+pub enum laterite_ags4_reference::overlay::DictFormat
+pub laterite_ags4_reference::overlay::DictFormat::Ags
+pub laterite_ags4_reference::overlay::DictFormat::Auto
+pub laterite_ags4_reference::overlay::DictFormat::Json
+impl core::clone::Clone for laterite_ags4_reference::overlay::DictFormat
+pub fn laterite_ags4_reference::overlay::DictFormat::clone(&self) -> laterite_ags4_reference::overlay::DictFormat
+impl core::cmp::Eq for laterite_ags4_reference::overlay::DictFormat
+impl core::cmp::PartialEq for laterite_ags4_reference::overlay::DictFormat
+pub fn laterite_ags4_reference::overlay::DictFormat::eq(&self, &laterite_ags4_reference::overlay::DictFormat) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::overlay::DictFormat
+pub fn laterite_ags4_reference::overlay::DictFormat::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_reference::overlay::DictFormat
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::overlay::DictFormat
+impl core::marker::Freeze for laterite_ags4_reference::overlay::DictFormat
+impl core::marker::Send for laterite_ags4_reference::overlay::DictFormat
+impl core::marker::Sync for laterite_ags4_reference::overlay::DictFormat
+impl core::marker::Unpin for laterite_ags4_reference::overlay::DictFormat
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::overlay::DictFormat
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::overlay::DictFormat
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::overlay::DictFormat
+pub struct laterite_ags4_reference::overlay::CustomDict
+pub laterite_ags4_reference::overlay::CustomDict::base_score: f32
+pub laterite_ags4_reference::overlay::CustomDict::base_version: laterite_ags4_reference::dict::DictVersion
+pub laterite_ags4_reference::overlay::CustomDict::fall_through: bool
+pub laterite_ags4_reference::overlay::CustomDict::hash: [u8; 32]
+pub laterite_ags4_reference::overlay::CustomDict::name: alloc::string::String
+pub laterite_ags4_reference::overlay::CustomDict::resolution: laterite_ags4_reference::dict::DictResolution
+impl laterite_ags4_reference::overlay::CustomDict
+pub fn laterite_ags4_reference::overlay::CustomDict::build_delta(&self) -> core::result::Result<laterite_ags4_reference::overlay::OwnedDelta, laterite_ags4_reference::overlay::DictError>
+impl core::clone::Clone for laterite_ags4_reference::overlay::CustomDict
+pub fn laterite_ags4_reference::overlay::CustomDict::clone(&self) -> laterite_ags4_reference::overlay::CustomDict
+impl core::fmt::Debug for laterite_ags4_reference::overlay::CustomDict
+pub fn laterite_ags4_reference::overlay::CustomDict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_reference::overlay::CustomDict
+impl core::marker::Send for laterite_ags4_reference::overlay::CustomDict
+impl core::marker::Sync for laterite_ags4_reference::overlay::CustomDict
+impl core::marker::Unpin for laterite_ags4_reference::overlay::CustomDict
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::overlay::CustomDict
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::overlay::CustomDict
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::overlay::CustomDict
+pub struct laterite_ags4_reference::overlay::OwnedDelta
+pub laterite_ags4_reference::overlay::OwnedDelta::abbrs: std::collections::hash::map::HashMap<alloc::string::String, alloc::string::String>
+pub laterite_ags4_reference::overlay::OwnedDelta::base_version: laterite_ags4_reference::dict::DictVersion
+pub laterite_ags4_reference::overlay::OwnedDelta::fall_through: bool
+pub laterite_ags4_reference::overlay::OwnedDelta::group_headings: std::collections::hash::map::HashMap<alloc::string::String, alloc::vec::Vec<alloc::string::String>>
+pub laterite_ags4_reference::overlay::OwnedDelta::groups: std::collections::hash::map::HashMap<alloc::string::String, laterite_ags4_reference::overlay::OwnedGroupMeta>
+pub laterite_ags4_reference::overlay::OwnedDelta::headings: std::collections::hash::map::HashMap<alloc::string::String, laterite_ags4_reference::overlay::OwnedDictEntry>
+impl core::clone::Clone for laterite_ags4_reference::overlay::OwnedDelta
+pub fn laterite_ags4_reference::overlay::OwnedDelta::clone(&self) -> laterite_ags4_reference::overlay::OwnedDelta
+impl core::fmt::Debug for laterite_ags4_reference::overlay::OwnedDelta
+pub fn laterite_ags4_reference::overlay::OwnedDelta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_reference::overlay::OwnedDelta
+impl core::marker::Send for laterite_ags4_reference::overlay::OwnedDelta
+impl core::marker::Sync for laterite_ags4_reference::overlay::OwnedDelta
+impl core::marker::Unpin for laterite_ags4_reference::overlay::OwnedDelta
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::overlay::OwnedDelta
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::overlay::OwnedDelta
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::overlay::OwnedDelta
+pub struct laterite_ags4_reference::overlay::OwnedDictEntry
+pub laterite_ags4_reference::overlay::OwnedDictEntry::ags_type: alloc::string::String
+pub laterite_ags4_reference::overlay::OwnedDictEntry::desc: alloc::string::String
+pub laterite_ags4_reference::overlay::OwnedDictEntry::status: alloc::string::String
+pub laterite_ags4_reference::overlay::OwnedDictEntry::unit: alloc::string::String
+impl core::clone::Clone for laterite_ags4_reference::overlay::OwnedDictEntry
+pub fn laterite_ags4_reference::overlay::OwnedDictEntry::clone(&self) -> laterite_ags4_reference::overlay::OwnedDictEntry
+impl core::cmp::Eq for laterite_ags4_reference::overlay::OwnedDictEntry
+impl core::cmp::PartialEq for laterite_ags4_reference::overlay::OwnedDictEntry
+pub fn laterite_ags4_reference::overlay::OwnedDictEntry::eq(&self, &laterite_ags4_reference::overlay::OwnedDictEntry) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::overlay::OwnedDictEntry
+pub fn laterite_ags4_reference::overlay::OwnedDictEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::overlay::OwnedDictEntry
+impl core::marker::Freeze for laterite_ags4_reference::overlay::OwnedDictEntry
+impl core::marker::Send for laterite_ags4_reference::overlay::OwnedDictEntry
+impl core::marker::Sync for laterite_ags4_reference::overlay::OwnedDictEntry
+impl core::marker::Unpin for laterite_ags4_reference::overlay::OwnedDictEntry
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::overlay::OwnedDictEntry
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::overlay::OwnedDictEntry
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::overlay::OwnedDictEntry
+pub struct laterite_ags4_reference::overlay::OwnedGroupMeta
+pub laterite_ags4_reference::overlay::OwnedGroupMeta::desc: alloc::string::String
+pub laterite_ags4_reference::overlay::OwnedGroupMeta::parent: alloc::string::String
+impl core::clone::Clone for laterite_ags4_reference::overlay::OwnedGroupMeta
+pub fn laterite_ags4_reference::overlay::OwnedGroupMeta::clone(&self) -> laterite_ags4_reference::overlay::OwnedGroupMeta
+impl core::cmp::Eq for laterite_ags4_reference::overlay::OwnedGroupMeta
+impl core::cmp::PartialEq for laterite_ags4_reference::overlay::OwnedGroupMeta
+pub fn laterite_ags4_reference::overlay::OwnedGroupMeta::eq(&self, &laterite_ags4_reference::overlay::OwnedGroupMeta) -> bool
+impl core::fmt::Debug for laterite_ags4_reference::overlay::OwnedGroupMeta
+pub fn laterite_ags4_reference::overlay::OwnedGroupMeta::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_reference::overlay::OwnedGroupMeta
+impl core::marker::Freeze for laterite_ags4_reference::overlay::OwnedGroupMeta
+impl core::marker::Send for laterite_ags4_reference::overlay::OwnedGroupMeta
+impl core::marker::Sync for laterite_ags4_reference::overlay::OwnedGroupMeta
+impl core::marker::Unpin for laterite_ags4_reference::overlay::OwnedGroupMeta
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::overlay::OwnedGroupMeta
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::overlay::OwnedGroupMeta
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::overlay::OwnedGroupMeta
+pub fn laterite_ags4_reference::overlay::parse_dict(&[u8], laterite_ags4_reference::overlay::DictFormat, &'static encoding_rs::Encoding, laterite_ags4_reference::overlay::BaseSpec, &str) -> core::result::Result<laterite_ags4_reference::overlay::CustomDict, laterite_ags4_reference::overlay::DictError>
+pub mod laterite_ags4_reference::union
+pub struct laterite_ags4_reference::union::GroupDescriptor
+pub laterite_ags4_reference::union::GroupDescriptor::code: alloc::string::String
+pub laterite_ags4_reference::union::GroupDescriptor::contents: alloc::string::String
+pub laterite_ags4_reference::union::GroupDescriptor::headings: alloc::vec::Vec<laterite_ags4_reference::union::Heading>
+pub laterite_ags4_reference::union::GroupDescriptor::parent: core::option::Option<alloc::string::String>
+impl laterite_ags4_reference::union::GroupDescriptor
+pub fn laterite_ags4_reference::union::GroupDescriptor::key_headings(&self) -> impl core::iter::traits::iterator::Iterator<Item = &laterite_ags4_reference::union::Heading>
+impl core::clone::Clone for laterite_ags4_reference::union::GroupDescriptor
+pub fn laterite_ags4_reference::union::GroupDescriptor::clone(&self) -> laterite_ags4_reference::union::GroupDescriptor
+impl core::fmt::Debug for laterite_ags4_reference::union::GroupDescriptor
+pub fn laterite_ags4_reference::union::GroupDescriptor::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for laterite_ags4_reference::union::GroupDescriptor
+pub fn laterite_ags4_reference::union::GroupDescriptor::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_reference::union::GroupDescriptor
+pub fn laterite_ags4_reference::union::GroupDescriptor::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_reference::union::GroupDescriptor
+impl core::marker::Send for laterite_ags4_reference::union::GroupDescriptor
+impl core::marker::Sync for laterite_ags4_reference::union::GroupDescriptor
+impl core::marker::Unpin for laterite_ags4_reference::union::GroupDescriptor
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::union::GroupDescriptor
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::union::GroupDescriptor
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::union::GroupDescriptor
+pub struct laterite_ags4_reference::union::Heading
+pub laterite_ags4_reference::union::Heading::ags_type: alloc::string::String
+pub laterite_ags4_reference::union::Heading::description: alloc::string::String
+pub laterite_ags4_reference::union::Heading::name: alloc::string::String
+pub laterite_ags4_reference::union::Heading::status: alloc::string::String
+pub laterite_ags4_reference::union::Heading::unit: core::option::Option<alloc::string::String>
+impl laterite_ags4_reference::union::Heading
+pub fn laterite_ags4_reference::union::Heading::is_key(&self) -> bool
+impl core::clone::Clone for laterite_ags4_reference::union::Heading
+pub fn laterite_ags4_reference::union::Heading::clone(&self) -> laterite_ags4_reference::union::Heading
+impl core::fmt::Debug for laterite_ags4_reference::union::Heading
+pub fn laterite_ags4_reference::union::Heading::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl serde_core::ser::Serialize for laterite_ags4_reference::union::Heading
+pub fn laterite_ags4_reference::union::Heading::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for laterite_ags4_reference::union::Heading
+pub fn laterite_ags4_reference::union::Heading::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+impl core::marker::Freeze for laterite_ags4_reference::union::Heading
+impl core::marker::Send for laterite_ags4_reference::union::Heading
+impl core::marker::Sync for laterite_ags4_reference::union::Heading
+impl core::marker::Unpin for laterite_ags4_reference::union::Heading
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::union::Heading
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::union::Heading
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::union::Heading
+pub struct laterite_ags4_reference::union::Registry
+pub laterite_ags4_reference::union::Registry::entries: alloc::vec::Vec<(alloc::string::String, laterite_ags4_reference::union::GroupDescriptor)>
+impl laterite_ags4_reference::union::Registry
+pub fn laterite_ags4_reference::union::Registry::get(&self, &str) -> core::option::Option<&laterite_ags4_reference::union::GroupDescriptor>
+pub fn laterite_ags4_reference::union::Registry::is_empty(&self) -> bool
+pub fn laterite_ags4_reference::union::Registry::iter(&self) -> impl core::iter::traits::iterator::Iterator<Item = &laterite_ags4_reference::union::GroupDescriptor>
+pub fn laterite_ags4_reference::union::Registry::len(&self) -> usize
+pub fn laterite_ags4_reference::union::Registry::to_groups_json(&self) -> alloc::string::String
+impl core::marker::Freeze for laterite_ags4_reference::union::Registry
+impl core::marker::Send for laterite_ags4_reference::union::Registry
+impl core::marker::Sync for laterite_ags4_reference::union::Registry
+impl core::marker::Unpin for laterite_ags4_reference::union::Registry
+impl core::marker::UnsafeUnpin for laterite_ags4_reference::union::Registry
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_reference::union::Registry
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_reference::union::Registry
+pub fn laterite_ags4_reference::union::ancestor_chain<'a>(&'a laterite_ags4_reference::union::Registry, &str) -> alloc::vec::Vec<&'a laterite_ags4_reference::union::GroupDescriptor>
+pub fn laterite_ags4_reference::union::inherited_key_names(&laterite_ags4_reference::union::Registry, &laterite_ags4_reference::union::GroupDescriptor) -> std::collections::hash::set::HashSet<alloc::string::String>
+pub fn laterite_ags4_reference::union::registry() -> &'static laterite_ags4_reference::union::Registry
+pub fn laterite_ags4_reference::union::union_groups() -> alloc::vec::Vec<laterite_ags4_reference::union::GroupDescriptor>

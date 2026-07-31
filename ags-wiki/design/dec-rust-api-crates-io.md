@@ -220,10 +220,42 @@ to a non-AGS4 format, so `laterite-ags4-transport` would be actively wrong. This
 counter-example to "prefix everything": the rule is *encode format-boundedness*, and
 that rule splits these two crates in opposite directions.
 
-**Gates that must predate the first publish**: `cargo public-api --diff`,
-`cargo semver-checks`, a `cargo package --list` diff per crate, an MSRV job, and
-`Send`/`Sync` static assertions on every public handle (auto-traits leak through
-`impl Trait` returns and become a silent major bump otherwise).
+**Gates that must predate the first publish. DONE.** The `cargo package --list`
+diff landed in #189; the other four landed together as the `publish-gates` CI job.
+Each turned out to be a slightly different shape than the one-line plan implied:
+
+- **Public API — a checked-in snapshot, not a `--diff` invocation.**
+  `tools/check_public_api.py` renders each crate with `cargo public-api
+  --all-features --omit blanket-impls` and compares it to
+  `tools/release/public-api/<crate>.txt` exactly. A diff-against-a-baseline run
+  reports; a snapshot puts the whole surface **into the PR's own diff**, which is
+  the property that matters here — see the #178 warning above, where nothing
+  could see two public functions come back from the dead.
+- **`Send`/`Sync` — mechanical for named types, asserted for opaque ones.**
+  `cargo public-api` renders auto-trait impls as lines, so the snapshot already
+  carries `impl Send for …` for every public type and the tool fails when one is
+  missing. No hand-maintained list, so nothing to go stale. `impl Trait` returns
+  are the exception the original note flagged: rustdoc renders the declared
+  bounds and stops, so the leaked auto traits appear nowhere. Those four are
+  asserted at compile time in `laterite-ags4-reference/tests/auto_traits.rs`, and
+  the tool refuses any `-> impl` the test file does not name.
+- **MSRV — the floor comes from the manifests.** `tools/check_msrv.py` reads each
+  crate's `rust-version` and builds it on exactly that, so raising the floor
+  cannot leave the gate testing the old one. **Libraries only**: `criterion`
+  needs 1.86, and widening to `--all-targets` would fail on a dev-dependency that
+  is not part of the promise. The first run found the promise already broken — a
+  `let` chain (stable in 1.88) in `laterite-ags4-emit`.
+- **`cargo semver-checks` — baselined on `main` until there is something better.**
+  Nothing is on crates.io, so the registry baseline does not exist yet; at first
+  publish it should switch to `--baseline-version`. Note the consequence of it
+  being a *blocking* gate: a PR that deliberately breaks an engine crate's API
+  now fails until the version bump that justifies it is in the same PR. That is
+  the intended trade — the alternative is a gate that reports and never stops
+  anything — but it makes a breaking reshape a louder, more deliberate event than
+  it used to be.
+
+The job is a **new required-status-check context** (`publish-gates`) and gates
+nothing until branch protection is told about it.
 
 **Deliberately deferred**: diff and merge ship in 0.2, not 0.1 — keeping two crates off
 crates.io and the frozen surface smaller. `laterite-duckdb` migrates off its submodule

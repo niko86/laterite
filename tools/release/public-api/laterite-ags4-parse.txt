@@ -1,0 +1,280 @@
+pub mod laterite_ags4_parse
+pub mod laterite_ags4_parse::scan
+pub struct laterite_ags4_parse::scan::RawField
+pub laterite_ags4_parse::scan::RawField::had_comma: bool
+pub laterite_ags4_parse::scan::RawField::has_escape: bool
+pub laterite_ags4_parse::scan::RawField::quoted: bool
+pub laterite_ags4_parse::scan::RawField::token_end: usize
+pub laterite_ags4_parse::scan::RawField::token_start: usize
+pub laterite_ags4_parse::scan::RawField::value_end: usize
+pub laterite_ags4_parse::scan::RawField::value_start: usize
+impl core::clone::Clone for laterite_ags4_parse::scan::RawField
+pub fn laterite_ags4_parse::scan::RawField::clone(&self) -> laterite_ags4_parse::scan::RawField
+impl core::cmp::Eq for laterite_ags4_parse::scan::RawField
+impl core::cmp::PartialEq for laterite_ags4_parse::scan::RawField
+pub fn laterite_ags4_parse::scan::RawField::eq(&self, &laterite_ags4_parse::scan::RawField) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::scan::RawField
+pub fn laterite_ags4_parse::scan::RawField::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_parse::scan::RawField
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::scan::RawField
+impl core::marker::Freeze for laterite_ags4_parse::scan::RawField
+impl core::marker::Send for laterite_ags4_parse::scan::RawField
+impl core::marker::Sync for laterite_ags4_parse::scan::RawField
+impl core::marker::Unpin for laterite_ags4_parse::scan::RawField
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::scan::RawField
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::scan::RawField
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::scan::RawField
+pub struct laterite_ags4_parse::scan::ValuePolicy
+pub laterite_ags4_parse::scan::ValuePolicy::trim_unquoted: bool
+pub laterite_ags4_parse::scan::ValuePolicy::unterminated_to_eol: bool
+impl core::clone::Clone for laterite_ags4_parse::scan::ValuePolicy
+pub fn laterite_ags4_parse::scan::ValuePolicy::clone(&self) -> laterite_ags4_parse::scan::ValuePolicy
+impl core::cmp::Eq for laterite_ags4_parse::scan::ValuePolicy
+impl core::cmp::PartialEq for laterite_ags4_parse::scan::ValuePolicy
+pub fn laterite_ags4_parse::scan::ValuePolicy::eq(&self, &laterite_ags4_parse::scan::ValuePolicy) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::scan::ValuePolicy
+pub fn laterite_ags4_parse::scan::ValuePolicy::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_parse::scan::ValuePolicy
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::scan::ValuePolicy
+impl core::marker::Freeze for laterite_ags4_parse::scan::ValuePolicy
+impl core::marker::Send for laterite_ags4_parse::scan::ValuePolicy
+impl core::marker::Sync for laterite_ags4_parse::scan::ValuePolicy
+impl core::marker::Unpin for laterite_ags4_parse::scan::ValuePolicy
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::scan::ValuePolicy
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::scan::ValuePolicy
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::scan::ValuePolicy
+pub const laterite_ags4_parse::scan::DISPLAY: laterite_ags4_parse::scan::ValuePolicy
+pub const laterite_ags4_parse::scan::RAW: laterite_ags4_parse::scan::ValuePolicy
+pub fn laterite_ags4_parse::scan::first_field(&str) -> core::option::Option<&str>
+pub fn laterite_ags4_parse::scan::first_field_with(&str, laterite_ags4_parse::scan::ValuePolicy) -> core::option::Option<&str>
+pub fn laterite_ags4_parse::scan::scan_line(&str, laterite_ags4_parse::scan::ValuePolicy) -> alloc::vec::Vec<laterite_ags4_parse::scan::RawField>
+pub enum laterite_ags4_parse::InvalidUtf8
+pub laterite_ags4_parse::InvalidUtf8::LossyReplace
+pub laterite_ags4_parse::InvalidUtf8::Reject
+impl core::clone::Clone for laterite_ags4_parse::InvalidUtf8
+pub fn laterite_ags4_parse::InvalidUtf8::clone(&self) -> laterite_ags4_parse::InvalidUtf8
+impl core::cmp::Eq for laterite_ags4_parse::InvalidUtf8
+impl core::cmp::PartialEq for laterite_ags4_parse::InvalidUtf8
+pub fn laterite_ags4_parse::InvalidUtf8::eq(&self, &laterite_ags4_parse::InvalidUtf8) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::InvalidUtf8
+pub fn laterite_ags4_parse::InvalidUtf8::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_parse::InvalidUtf8
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::InvalidUtf8
+impl core::marker::Freeze for laterite_ags4_parse::InvalidUtf8
+impl core::marker::Send for laterite_ags4_parse::InvalidUtf8
+impl core::marker::Sync for laterite_ags4_parse::InvalidUtf8
+impl core::marker::Unpin for laterite_ags4_parse::InvalidUtf8
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::InvalidUtf8
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::InvalidUtf8
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::InvalidUtf8
+pub enum laterite_ags4_parse::LineTerminator
+pub laterite_ags4_parse::LineTerminator::Cr
+pub laterite_ags4_parse::LineTerminator::Crlf
+pub laterite_ags4_parse::LineTerminator::Lf
+pub laterite_ags4_parse::LineTerminator::Unterminated
+impl laterite_ags4_parse::LineTerminator
+pub fn laterite_ags4_parse::LineTerminator::as_str(self) -> &'static str
+impl core::clone::Clone for laterite_ags4_parse::LineTerminator
+pub fn laterite_ags4_parse::LineTerminator::clone(&self) -> laterite_ags4_parse::LineTerminator
+impl core::cmp::Eq for laterite_ags4_parse::LineTerminator
+impl core::cmp::PartialEq for laterite_ags4_parse::LineTerminator
+pub fn laterite_ags4_parse::LineTerminator::eq(&self, &laterite_ags4_parse::LineTerminator) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::LineTerminator
+pub fn laterite_ags4_parse::LineTerminator::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_parse::LineTerminator
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::LineTerminator
+impl core::marker::Freeze for laterite_ags4_parse::LineTerminator
+impl core::marker::Send for laterite_ags4_parse::LineTerminator
+impl core::marker::Sync for laterite_ags4_parse::LineTerminator
+impl core::marker::Unpin for laterite_ags4_parse::LineTerminator
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::LineTerminator
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::LineTerminator
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::LineTerminator
+pub enum laterite_ags4_parse::ParseError
+pub laterite_ags4_parse::ParseError::NotAgs4(alloc::string::String)
+pub laterite_ags4_parse::ParseError::NotUtf8
+pub laterite_ags4_parse::ParseError::Structure(alloc::string::String)
+pub laterite_ags4_parse::ParseError::UnsupportedEdition
+pub laterite_ags4_parse::ParseError::UnsupportedEdition::found: alloc::string::String
+impl core::clone::Clone for laterite_ags4_parse::ParseError
+pub fn laterite_ags4_parse::ParseError::clone(&self) -> laterite_ags4_parse::ParseError
+impl core::cmp::Eq for laterite_ags4_parse::ParseError
+impl core::cmp::PartialEq for laterite_ags4_parse::ParseError
+pub fn laterite_ags4_parse::ParseError::eq(&self, &laterite_ags4_parse::ParseError) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::ParseError
+pub fn laterite_ags4_parse::ParseError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::ParseError
+impl core::marker::Freeze for laterite_ags4_parse::ParseError
+impl core::marker::Send for laterite_ags4_parse::ParseError
+impl core::marker::Sync for laterite_ags4_parse::ParseError
+impl core::marker::Unpin for laterite_ags4_parse::ParseError
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::ParseError
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::ParseError
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::ParseError
+pub struct laterite_ags4_parse::DataRow
+pub laterite_ags4_parse::DataRow::byte_offset: u64
+pub laterite_ags4_parse::DataRow::line: u32
+pub laterite_ags4_parse::DataRow::values: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for laterite_ags4_parse::DataRow
+pub fn laterite_ags4_parse::DataRow::clone(&self) -> laterite_ags4_parse::DataRow
+impl core::cmp::Eq for laterite_ags4_parse::DataRow
+impl core::cmp::PartialEq for laterite_ags4_parse::DataRow
+pub fn laterite_ags4_parse::DataRow::eq(&self, &laterite_ags4_parse::DataRow) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::DataRow
+pub fn laterite_ags4_parse::DataRow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::DataRow
+impl core::marker::Freeze for laterite_ags4_parse::DataRow
+impl core::marker::Send for laterite_ags4_parse::DataRow
+impl core::marker::Sync for laterite_ags4_parse::DataRow
+impl core::marker::Unpin for laterite_ags4_parse::DataRow
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::DataRow
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::DataRow
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::DataRow
+pub struct laterite_ags4_parse::GroupRecord
+pub laterite_ags4_parse::GroupRecord::byte_offset: u64
+pub laterite_ags4_parse::GroupRecord::code: alloc::string::String
+pub laterite_ags4_parse::GroupRecord::line: u32
+impl core::clone::Clone for laterite_ags4_parse::GroupRecord
+pub fn laterite_ags4_parse::GroupRecord::clone(&self) -> laterite_ags4_parse::GroupRecord
+impl core::cmp::Eq for laterite_ags4_parse::GroupRecord
+impl core::cmp::PartialEq for laterite_ags4_parse::GroupRecord
+pub fn laterite_ags4_parse::GroupRecord::eq(&self, &laterite_ags4_parse::GroupRecord) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::GroupRecord
+pub fn laterite_ags4_parse::GroupRecord::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::GroupRecord
+impl core::marker::Freeze for laterite_ags4_parse::GroupRecord
+impl core::marker::Send for laterite_ags4_parse::GroupRecord
+impl core::marker::Sync for laterite_ags4_parse::GroupRecord
+impl core::marker::Unpin for laterite_ags4_parse::GroupRecord
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::GroupRecord
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::GroupRecord
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::GroupRecord
+pub struct laterite_ags4_parse::LineSpan
+pub laterite_ags4_parse::LineSpan::body_end: usize
+pub laterite_ags4_parse::LineSpan::next: usize
+pub laterite_ags4_parse::LineSpan::start: usize
+pub laterite_ags4_parse::LineSpan::term: laterite_ags4_parse::LineTerminator
+impl core::clone::Clone for laterite_ags4_parse::LineSpan
+pub fn laterite_ags4_parse::LineSpan::clone(&self) -> laterite_ags4_parse::LineSpan
+impl core::cmp::Eq for laterite_ags4_parse::LineSpan
+impl core::cmp::PartialEq for laterite_ags4_parse::LineSpan
+pub fn laterite_ags4_parse::LineSpan::eq(&self, &laterite_ags4_parse::LineSpan) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::LineSpan
+pub fn laterite_ags4_parse::LineSpan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_parse::LineSpan
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::LineSpan
+impl core::marker::Freeze for laterite_ags4_parse::LineSpan
+impl core::marker::Send for laterite_ags4_parse::LineSpan
+impl core::marker::Sync for laterite_ags4_parse::LineSpan
+impl core::marker::Unpin for laterite_ags4_parse::LineSpan
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::LineSpan
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::LineSpan
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::LineSpan
+pub struct laterite_ags4_parse::LineSpans<'a>
+impl core::iter::traits::iterator::Iterator for laterite_ags4_parse::LineSpans<'_>
+pub type laterite_ags4_parse::LineSpans<'_>::Item = laterite_ags4_parse::LineSpan
+pub fn laterite_ags4_parse::LineSpans<'_>::next(&mut self) -> core::option::Option<laterite_ags4_parse::LineSpan>
+impl<'a> core::marker::Freeze for laterite_ags4_parse::LineSpans<'a>
+impl<'a> core::marker::Send for laterite_ags4_parse::LineSpans<'a>
+impl<'a> core::marker::Sync for laterite_ags4_parse::LineSpans<'a>
+impl<'a> core::marker::Unpin for laterite_ags4_parse::LineSpans<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite_ags4_parse::LineSpans<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::LineSpans<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::LineSpans<'a>
+pub struct laterite_ags4_parse::ParseOptions
+pub laterite_ags4_parse::ParseOptions::encoding: &'static encoding_rs::Encoding
+pub laterite_ags4_parse::ParseOptions::locate_only: bool
+pub laterite_ags4_parse::ParseOptions::on_invalid_utf8: laterite_ags4_parse::InvalidUtf8
+pub laterite_ags4_parse::ParseOptions::retain_raw_lines: bool
+pub laterite_ags4_parse::ParseOptions::strict_structure: bool
+impl laterite_ags4_parse::ParseOptions
+pub fn laterite_ags4_parse::ParseOptions::lean() -> Self
+pub fn laterite_ags4_parse::ParseOptions::validating() -> Self
+impl core::clone::Clone for laterite_ags4_parse::ParseOptions
+pub fn laterite_ags4_parse::ParseOptions::clone(&self) -> laterite_ags4_parse::ParseOptions
+impl core::fmt::Debug for laterite_ags4_parse::ParseOptions
+pub fn laterite_ags4_parse::ParseOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_parse::ParseOptions
+impl core::marker::Freeze for laterite_ags4_parse::ParseOptions
+impl core::marker::Send for laterite_ags4_parse::ParseOptions
+impl core::marker::Sync for laterite_ags4_parse::ParseOptions
+impl core::marker::Unpin for laterite_ags4_parse::ParseOptions
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::ParseOptions
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::ParseOptions
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::ParseOptions
+pub struct laterite_ags4_parse::ParsedFile
+pub laterite_ags4_parse::ParsedFile::byte_offsets_source_true: bool
+pub laterite_ags4_parse::ParsedFile::group_order: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parse::ParsedFile::group_records: alloc::vec::Vec<laterite_ags4_parse::GroupRecord>
+pub laterite_ags4_parse::ParsedFile::groups: alloc::collections::btree::map::BTreeMap<alloc::string::String, laterite_ags4_parse::ParsedGroup>
+pub laterite_ags4_parse::ParsedFile::has_bom: bool
+pub laterite_ags4_parse::ParsedFile::raw_lines: alloc::vec::Vec<laterite_ags4_parse::RawLine>
+pub laterite_ags4_parse::ParsedFile::total_bytes: u64
+pub laterite_ags4_parse::ParsedFile::total_lines: u32
+impl core::clone::Clone for laterite_ags4_parse::ParsedFile
+pub fn laterite_ags4_parse::ParsedFile::clone(&self) -> laterite_ags4_parse::ParsedFile
+impl core::fmt::Debug for laterite_ags4_parse::ParsedFile
+pub fn laterite_ags4_parse::ParsedFile::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite_ags4_parse::ParsedFile
+impl core::marker::Send for laterite_ags4_parse::ParsedFile
+impl core::marker::Sync for laterite_ags4_parse::ParsedFile
+impl core::marker::Unpin for laterite_ags4_parse::ParsedFile
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::ParsedFile
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::ParsedFile
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::ParsedFile
+pub struct laterite_ags4_parse::ParsedGroup
+pub laterite_ags4_parse::ParsedGroup::code: alloc::string::String
+pub laterite_ags4_parse::ParsedGroup::group_byte: u64
+pub laterite_ags4_parse::ParsedGroup::group_line: u32
+pub laterite_ags4_parse::ParsedGroup::heading_line: core::option::Option<u32>
+pub laterite_ags4_parse::ParsedGroup::headings: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parse::ParsedGroup::rows: alloc::vec::Vec<laterite_ags4_parse::DataRow>
+pub laterite_ags4_parse::ParsedGroup::type_line: core::option::Option<u32>
+pub laterite_ags4_parse::ParsedGroup::types: alloc::vec::Vec<alloc::string::String>
+pub laterite_ags4_parse::ParsedGroup::unit_line: core::option::Option<u32>
+pub laterite_ags4_parse::ParsedGroup::units: alloc::vec::Vec<alloc::string::String>
+impl laterite_ags4_parse::ParsedGroup
+pub fn laterite_ags4_parse::ParsedGroup::cell(&self, usize, usize) -> core::option::Option<&str>
+pub fn laterite_ags4_parse::ParsedGroup::col(&self, &str) -> core::option::Option<usize>
+impl core::clone::Clone for laterite_ags4_parse::ParsedGroup
+pub fn laterite_ags4_parse::ParsedGroup::clone(&self) -> laterite_ags4_parse::ParsedGroup
+impl core::cmp::Eq for laterite_ags4_parse::ParsedGroup
+impl core::cmp::PartialEq for laterite_ags4_parse::ParsedGroup
+pub fn laterite_ags4_parse::ParsedGroup::eq(&self, &laterite_ags4_parse::ParsedGroup) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::ParsedGroup
+pub fn laterite_ags4_parse::ParsedGroup::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::ParsedGroup
+impl core::marker::Freeze for laterite_ags4_parse::ParsedGroup
+impl core::marker::Send for laterite_ags4_parse::ParsedGroup
+impl core::marker::Sync for laterite_ags4_parse::ParsedGroup
+impl core::marker::Unpin for laterite_ags4_parse::ParsedGroup
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::ParsedGroup
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::ParsedGroup
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::ParsedGroup
+pub struct laterite_ags4_parse::RawLine
+pub laterite_ags4_parse::RawLine::byte_offset: u64
+pub laterite_ags4_parse::RawLine::had_crlf: bool
+pub laterite_ags4_parse::RawLine::number: u32
+pub laterite_ags4_parse::RawLine::text: alloc::string::String
+impl core::clone::Clone for laterite_ags4_parse::RawLine
+pub fn laterite_ags4_parse::RawLine::clone(&self) -> laterite_ags4_parse::RawLine
+impl core::cmp::Eq for laterite_ags4_parse::RawLine
+impl core::cmp::PartialEq for laterite_ags4_parse::RawLine
+pub fn laterite_ags4_parse::RawLine::eq(&self, &laterite_ags4_parse::RawLine) -> bool
+impl core::fmt::Debug for laterite_ags4_parse::RawLine
+pub fn laterite_ags4_parse::RawLine::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for laterite_ags4_parse::RawLine
+impl core::marker::Freeze for laterite_ags4_parse::RawLine
+impl core::marker::Send for laterite_ags4_parse::RawLine
+impl core::marker::Sync for laterite_ags4_parse::RawLine
+impl core::marker::Unpin for laterite_ags4_parse::RawLine
+impl core::marker::UnsafeUnpin for laterite_ags4_parse::RawLine
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_parse::RawLine
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_parse::RawLine
+pub fn laterite_ags4_parse::field_span(&str, u32) -> core::option::Option<(u32, u32)>
+pub fn laterite_ags4_parse::line_spans(&[u8]) -> laterite_ags4_parse::LineSpans<'_>
+pub fn laterite_ags4_parse::parse_bytes(&[u8], &'static encoding_rs::Encoding) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_parse::ParseError>
+pub fn laterite_ags4_parse::parse_bytes_opts(&[u8], laterite_ags4_parse::ParseOptions) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_parse::ParseError>
+pub fn laterite_ags4_parse::parse_str(&str) -> core::result::Result<laterite_ags4_parse::ParsedFile, laterite_ags4_parse::ParseError>
+pub fn laterite_ags4_parse::resolve_encoding(core::option::Option<&str>) -> core::option::Option<&'static encoding_rs::Encoding>
+pub fn laterite_ags4_parse::split_ags_line(&str) -> alloc::vec::Vec<alloc::string::String>

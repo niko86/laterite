@@ -199,6 +199,102 @@ jobs:
         working-directory: rust-packages
         run: cargo deny check
 
+  # The three gates that have to work BEFORE the first crates.io publish, not
+  # after — a published version's API and its MSRV are both frozen, and the only
+  # remedy for either being wrong is a version bump every consumer must follow.
+  #
+  # Its own job rather than steps on `rust` because it needs two extra
+  # toolchains (nightly for rustdoc JSON, 1.85 for the MSRV floor) and two extra
+  # cargo subcommands. Putting that on the critical path of every PR to run a
+  # check that only matters to ten of the twenty-four crates is a poor trade;
+  # `rust` stays lean and this runs beside it.
+  #
+  # NOTE for branch protection: this is a NEW status-check context
+  # (`publish-gates`). It gates nothing until it is marked required.
+  publish-gates:
+    needs: changes
+    # See the `deny` job for why `!cancelled()` is load-bearing here.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.code == 'true') }}
+    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) || github.event_name == 'schedule') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
+    timeout-minutes: 30
+    steps:
+      # fetch-depth: 0 is REQUIRED, not a default worth trimming: cargo
+      # semver-checks resolves `--baseline-rev origin/main` by checking that
+      # commit out, and a shallow clone does not have it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+
+      # The two extra toolchains, installed by hand because the action above
+      # takes one channel and makes it the default — and the default must stay
+      # stable so the tools below behave as they do locally.
+      #
+      # `nightly`: rustdoc's JSON output is unstable, and cargo public-api reads
+      # it. There is no flag to point it elsewhere; it finds nightly via rustup.
+      #
+      # `1.85`: the `rust-version` every crate declares. It is a promise to a
+      # stranger's toolchain, and until this job existed nothing tested it — the
+      # first run found a let chain (stable in 1.88) in laterite-ags4-emit, so
+      # the promise had already been broken for a while.
+      - name: Install the nightly + MSRV toolchains
+        run: |
+          rustup toolchain install nightly --profile minimal
+          rustup toolchain install 1.85 --profile minimal
+
+      - uses: ./.github/actions/build-accel
+
+      - name: install cargo-public-api + cargo-semver-checks
+        uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
+        with:
+          tool: cargo-public-api,cargo-semver-checks
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+
+      # LIBRARIES ONLY — no `--all-targets`. A consumer on 1.85 compiles the
+      # library; they never build our benches, and `criterion` (a dev-dependency)
+      # requires 1.86. Widening this to --all-targets would fail on a dependency
+      # that is not part of the promise, and the obvious "fix" — raising
+      # rust-version — would break the promise to make the gate green.
+      - name: MSRV (the publish set builds on the rust-version it declares)
+        run: uv run --no-project python tools/check_msrv.py
+
+      # Puts the whole public surface into the PR diff. laterite#178 restored two
+      # deleted public functions by being branched before the PR that removed
+      # them; the tree compiled, every test passed, and it went unnoticed for
+      # nine days. A snapshot makes that a red line on the reviewer's screen.
+      - name: public API snapshot (crates.io freezes what ships)
+        run: uv run --no-project python tools/check_public_api.py
+
+      # The snapshot says WHAT changed; this says whether it is BREAKING.
+      # Baseline is `main`, because nothing is on crates.io yet — at first
+      # publish the stronger baseline (the released version) becomes available
+      # and should replace it.
+      - name: cargo semver-checks (against main)
+        working-directory: rust-packages
+        # The explicit fetch is belt-and-braces on top of fetch-depth: 0 — on a
+        # pull_request event the checked-out ref is the merge ref, and a missing
+        # `origin/main` here would read as a tooling failure rather than the
+        # configuration mistake it is.
+        #
+        # The crate list is read from the packaging gate's manifest rather than
+        # spelled out, for the same reason the Python gates import PUBLISH_SET:
+        # a fourth copy of these ten names is a fourth chance for one to be
+        # quietly dropped.
+        run: |
+          git fetch --no-tags origin main
+          cargo semver-checks --baseline-rev origin/main \
+            $(python3 -c "import json; print(' '.join('-p ' + c for c in json.load(open('../tools/release/package-contents.json'))))")
+
   rust:
     needs: changes
     # `!cancelled()` is load-bearing, NOT decoration: GitHub applies an implicit
