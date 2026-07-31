@@ -23,6 +23,14 @@ struct OwnDep {
     /// workspace the version is inherited (`version.workspace = true`), which is a
     /// table with no string `version`, so this is `None` and the path is used.
     version: Option<String>,
+    /// `{ workspace = true }` — BOTH path and version live in the workspace root's
+    /// `[workspace.dependencies]`, so this entry carries neither and the caller must
+    /// look them up there. Note the path found that way is relative to the workspace
+    /// root, not to the crate.
+    ///
+    /// Never true in a packaged manifest: `cargo publish` inlines inherited
+    /// dependencies, the same rewrite that strips `path`.
+    workspace: bool,
 }
 
 /// Our own crates among `manifest_text`'s `[dependencies]`.
@@ -62,8 +70,46 @@ fn own_deps_from(manifest_text: &str, whence: &str) -> Vec<OwnDep> {
                 .as_str()
                 .or_else(|| spec.get("version")?.as_str())
                 .map(str::to_string),
+            workspace: spec
+                .get("workspace")
+                .and_then(toml::Value::as_bool)
+                .unwrap_or(false),
         })
         .collect();
     out.sort_by(|a, b| a.name.cmp(&b.name));
     out
+}
+
+/// `[workspace.dependencies]` from a workspace ROOT manifest, as `name -> (path,
+/// version)`.
+///
+/// The inherited half of the lookup above. Both fields are optional here for the
+/// same reasons they are on [`OwnDep`]: a packaged manifest has no paths, and an
+/// entry may legitimately be version-only.
+fn workspace_deps_from(manifest_text: &str, whence: &str) -> Vec<OwnDep> {
+    let doc: toml::Table = manifest_text
+        .parse()
+        .unwrap_or_else(|e| panic!("engine fingerprint: cannot parse {whence}: {e}"));
+    let Some(deps) = doc
+        .get("workspace")
+        .and_then(|w| w.get("dependencies"))
+        .and_then(toml::Value::as_table)
+    else {
+        return Vec::new();
+    };
+    deps.iter()
+        .filter(|(name, _)| name.starts_with("laterite"))
+        .map(|(name, spec)| OwnDep {
+            name: name.clone(),
+            path: spec
+                .get("path")
+                .and_then(toml::Value::as_str)
+                .map(str::to_string),
+            version: spec
+                .as_str()
+                .or_else(|| spec.get("version")?.as_str())
+                .map(str::to_string),
+            workspace: false,
+        })
+        .collect()
 }

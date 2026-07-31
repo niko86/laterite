@@ -35,10 +35,10 @@ name = "laterite_ags4_merge"
 path = "src/lib.rs"
 
 [dependencies]
-laterite-ags4-parse = { path = "../laterite-ags4-parse" }
-laterite-ags4-reference = { path = "../laterite-ags4-reference" }
-laterite-ags4-emit = { path = "../laterite-ags4-emit" }
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-ags4-parse = { workspace = true }
+laterite-ags4-reference = { workspace = true }
+laterite-ags4-emit = { workspace = true }
+laterite-ags4-types = { workspace = true }
 serde_json = "1"
 
 [dev-dependencies]

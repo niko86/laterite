@@ -54,12 +54,12 @@ uuid = { version = "1", features = ["v8"] }
 # does NOT depend on this crate, so the edge is cycle-free and keeps the
 # reference leaf wasm-clean (wasm consumes keychain for `_id`/`_parent_id`).
 # Default features only — the `arrow` feature stays off here.
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-ags4-types = { workspace = true }
 # The shared tolerant AGS4 tokenizer (#168 leaf) — reused by `dict_read.rs` to read
 # a runtime `--dict` custom dictionary from a plain `.ags` file (#568). A wasm-clean
 # sibling leaf (`encoding_rs` + `memchr` only), so it adds zero wasm-hostile weight;
 # `tests/dep_graph.rs` pins that.
-laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+laterite-ags4-parse = { workspace = true }
 # The custom-dict API takes a `&'static Encoding` (a `--dict` file may not be UTF-8);
 # `encoding_rs` is already in-tree via the parse leaf and is wasm-clean.
 encoding_rs = "0.8"

@@ -37,10 +37,10 @@ include = [
 [dependencies]
 # ags4_str (typed -> AGS4 string) + parse_value (string -> typed), the
 # exact casting both hosts already share via laterite-ags4-wasm / the native DuckDB path.
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-ags4-types = { workspace = true }
 # The per-edition standard Dictionary (UNIT/TYPE fill), parse_bytes,
 # rules::run_all (validate), and compute_fixes/apply_fixes (AutoFix).
-laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+laterite-ags4-validator = { workspace = true }
 # Cells arrive as serde_json::Value (typed from Arrow/frames, or strings
 # from browser JSON); ags4_str/parse_value already speak this shape.
 serde_json = "1"

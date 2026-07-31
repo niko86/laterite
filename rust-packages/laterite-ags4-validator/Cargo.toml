@@ -49,7 +49,7 @@ toml = "1"
 # moved out of this crate's own build.rs into a wasm-safe leaf (#475 PR2) so
 # non-validator consumers (the DuckDB extension, laterite-ags4-diff) can
 # depend on the dictionary without pulling the rest of the rule engine.
-laterite-ags4-reference = { path = "../laterite-ags4-reference" }
+laterite-ags4-reference = { workspace = true }
 # The AGS type-system leaf: Rule 8 + the fixes engine re-export its numeric
 # expected-forms (format_ndp/format_nsf/format_nsci) instead of hand-porting
 # them, so the formatter that JUDGES a typed value is the same one that WRITES
@@ -59,7 +59,7 @@ laterite-ags4-reference = { path = "../laterite-ags4-reference" }
 # + serde_json (already linked transitively — see the serde note). Arrow is
 # OPTIONAL in that crate and stays off here, so the lean/wasm-safe dep-graph
 # guarantee (no pyo3|polars|walkdir|rayon|ratatui) is untouched.
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-ags4-types = { workspace = true }
 thiserror = "2"
 # Rule 1 risky fix: transliterate any non-ASCII character to a sensible ASCII
 # equivalent (µ→"u", °→"deg", ß→"ss", accents→base letter) so a file can be
@@ -71,7 +71,7 @@ deunicode = "1"
 # re-exports its types/tokenizer (`pub use`) + wraps parse_bytes/parse_str/
 # parse_file* to keep returning ValidatorError (so every consumer is
 # unchanged). Pure leaf (encoding_rs + memchr) → engine-purity guard intact.
-laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+laterite-ags4-parse = { workspace = true }
 # Rule 8 DT/T validity: pandas-equivalent calendar/clock checking
 # (python-ags4 uses pandas.to_datetime). default-features off keeps it
 # lean — no clock, no serde; just the Naive parsers. Already in the

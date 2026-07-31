@@ -66,6 +66,36 @@ def test_rust_workspace_matches() -> None:
     )
 
 
+def test_workspace_dependency_versions_match() -> None:
+    """The engine crates' `[workspace.dependencies]` versions track the workspace.
+
+    These exist so `cargo package` will accept the crates at all — publishing strips
+    `path`, so a dependency with no version requirement is rejected outright. They
+    are inert locally (the path still wins), which is exactly what makes them easy
+    to leave behind: nothing in a normal build or test run reads them, so a stale
+    one would surface only at publish, as crates pinned to a version that no longer
+    matches the engine they shipped with.
+
+    They ride the same `version = "{current_version}"` substitution as
+    `workspace.package.version` — same file, and bump-my-version rewrites every
+    occurrence, not just the first. This test is what says that out loud, so the
+    lockstep is asserted rather than assumed to hold.
+    """
+    deps = _toml("rust-packages/Cargo.toml")["workspace"].get("dependencies", {})
+    ours = {n: s for n, s in deps.items() if n.startswith("laterite")}
+    assert ours, "no in-workspace [workspace.dependencies] entries found at all"
+    for name, spec in ours.items():
+        assert spec.get("version") == CANONICAL, (
+            f"[workspace.dependencies] {name} is pinned to {spec.get('version')!r}, "
+            f"not the shipped {CANONICAL!r} — a publish would declare a dependency "
+            "on a version that is not this engine"
+        )
+        assert "path" in spec, (
+            f"[workspace.dependencies] {name} lost its `path` — the local build "
+            "would resolve it from crates.io instead of the tree beside it"
+        )
+
+
 def test_node_package_and_native_deps_match() -> None:
     pkg = json.loads((_REPO / "rust-packages/laterite-node/package.json").read_text())
     assert pkg["version"] == CANONICAL, (

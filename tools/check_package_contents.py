@@ -38,13 +38,20 @@ result. An `include` that drops a build-time input (a `build.rs`, a `data/` file
 read by one) still produces a listable tarball that fails to compile for the
 consumer.
 
-`cargo package` without `--list` does run that verification build — but only for
-crates whose dependencies all carry version requirements, and the in-workspace
-deps here do not have them yet (they are `{ path = "..." }` with the version
-inherited from the workspace). So today the verification build is reachable for
-the dependency-free leaves only, and `--verify-buildable` runs it for exactly
-those. When the version fields land as part of publish prep, that set widens on
-its own — the flag re-derives it rather than reading a second hard-coded list.
+`cargo package` without `--list` does run that verification build, and
+`--verify-buildable` invokes it for every crate it can. How far that reaches is a
+moving target, so the flag re-derives it each run rather than reading a second
+hard-coded list:
+
+- The in-workspace deps carry version requirements now, so cargo no longer refuses
+  outright — that was the first ceiling and it is gone.
+- The ceiling now is that a verification build resolves its dependencies from
+  crates.io, where none of these are published. So the three dependency-free
+  leaves build, and the other seven cannot until the wave beneath them exists on
+  the registry. That is inherent to a first publish, not a defect.
+
+Every skip prints its reason. A gate that quietly verified almost nothing would be
+indistinguishable from one that verified everything.
 
 Usage:
     python tools/check_package_contents.py            # compare against the manifest
@@ -125,12 +132,38 @@ def collect() -> dict[str, list[str]]:
     return {crate: package_list(crate) for crate in PUBLISH_SET}
 
 
+#: `cargo package` failures that mean "not publishable YET", not "broken".
+#:
+#: Both are states of publish prep, and each is a strictly better place to be than
+#: the last:
+#:
+#: 1. No version requirement on an in-workspace dep — cargo refuses outright. This
+#:    was every dependent crate until the `[workspace.dependencies]` entries landed.
+#: 2. The dependency has a version but is not ON crates.io yet, so the verification
+#:    build cannot resolve it. Inherent to a first publish and the reason the plan
+#:    publishes in waves: the leaves go first, and each wave becomes verifiable only
+#:    once the wave under it is on the registry.
+#:
+#: Matched narrowly on OUR crate names. A missing EXTERNAL crate is a real failure
+#: and must stay one — that is a broken dependency, not an unpublished sibling.
+NOT_YET_PUBLISHABLE = (
+    (
+        "must have a version requirement",
+        "an in-workspace dep has no version requirement",
+    ),
+    (
+        "no matching package named `laterite",
+        "depends on a sibling not yet on crates.io",
+    ),
+)
+
+
 def verify_buildable() -> int:
     """Run the real verification build wherever it is reachable today.
 
-    A crate whose deps lack version requirements cannot be packaged at all, so
-    it is SKIPPED rather than failed — that is a known state of publish prep,
-    not a defect in its `include`. Skips are printed, because a gate that
+    A crate that cannot be packaged for one of the [`NOT_YET_PUBLISHABLE`] reasons
+    is SKIPPED rather than failed — those are known states of publish prep, not
+    defects in its `include`. Skips are printed WITH the reason, because a gate that
     silently skipped everything would look identical to one that passed.
     """
     failed = 0
@@ -148,12 +181,13 @@ def verify_buildable() -> int:
             capture_output=True,
             text=True,
         )
+        reason = next(
+            (why for needle, why in NOT_YET_PUBLISHABLE if needle in proc.stderr), None
+        )
         if proc.returncode == 0:
             print(f"  built   {crate}")
-        elif "must have a version requirement" in proc.stderr:
-            print(
-                f"  skipped {crate} (in-workspace dep has no version requirement yet)"
-            )
+        elif reason:
+            print(f"  skipped {crate} ({reason})")
         else:
             print(f"  FAILED  {crate}\n{proc.stderr.strip()}", file=sys.stderr)
             failed += 1
