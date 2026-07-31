@@ -45,6 +45,10 @@
         "do_not_enforce_on_create": false,
         "required_status_checks": [
           {
+            "context": "changelog entry",
+            "integration_id": 15368
+          },
+          {
             "context": "changes"
           },
           {
@@ -60,6 +64,10 @@
           },
           {
             "context": "parity",
+            "integration_id": 15368
+          },
+          {
+            "context": "publish-gates",
             "integration_id": 15368
           },
           {
@@ -80,7 +88,7 @@
             "context": "wheel-smoke"
           }
         ],
-        "strict_required_status_checks_policy": false
+        "strict_required_status_checks_policy": true
       },
       "type": "required_status_checks"
     }
