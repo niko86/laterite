@@ -75,8 +75,8 @@ and a CI `wasm32-unknown-unknown` compile-guard — proven to compile for the
 browser target even though nothing consumes it there yet.
 
 **Phase 2 (done, 2026-07-18):** a `censor` export on the engine wasm
-([[laterite-ags4-wasm]]): `censor(data, sensitiveJson, selectedCodes, token,
-dropCustom, includeFreetext) -> { text, tally }`. It SHA-256-hashes the input
+([[laterite-ags4-wasm]]): `censor(data, sensitiveJson, { selectedCodes, token,
+dropCustom, includeFreetext }) -> { text, tally }`. It SHA-256-hashes the input
 bytes for `PROJ_ID`'s filehash (the full 64-hex — the same digest the leaf's
 `filehash` action always used), lossily decodes the bytes (matching the
 browser's existing `TextDecoder({fatal:false})` policy), resolves the

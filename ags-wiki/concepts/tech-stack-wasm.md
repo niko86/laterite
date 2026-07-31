@@ -81,11 +81,11 @@ The crate exposes **seven** `#[wasm_bindgen]` entry points
   file as **UTF-8 bytes**; thrown as a JS exception on failure since 2026-07-14 —
   it used to be infallible). Decodes with the given encoding then re-encodes UTF-8,
   so applying a fix to a cp1252 file also normalises its encoding.
-- `diff(a_bytes, b_bytes, encoding, max_rows_per_group)` → a type-aware,
+- `diff(a_bytes, b_bytes, { encoding, maxRowsPerGroup })` → a type-aware,
   KEY-matched `RevisionDelta` between two files (the Tools revision-diff),
   engine-consistent because it parses both to the typed graph via [[laterite-ags4-types]].
   The dictionary edition is derived **internally** from the new (B) file's
-  `TRAN_AGS` (not a parameter); `max_rows_per_group` caps how many per-row
+  `TRAN_AGS` (not an option); `maxRowsPerGroup` caps how many per-row
   deltas are serialized per group (the counts stay true totals).
 - `to_ags4(groups_json, edition, mode)` → `{ text, findings, fixes_applied }` —
   the **AGS4 *producer*** (the read path reversed): a JSON array of

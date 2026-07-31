@@ -144,17 +144,11 @@ export interface MergeReq {
   } | null;
 }
 /** Per-action cell/structure counts from the shared scrub engine — the leaf's
- *  `Tally`, snake_case as serialised across the wasm boundary. */
-export interface CensorTally {
-  pseudonym: number;
-  blank: number;
-  token: number;
-  brackets: number;
-  keyword: number;
-  dropped_cols: number;
-  dropped_groups: number;
-  dropped_defs: number;
-}
+ *  `Tally`, snake_case as serialised across the wasm boundary. Re-exported from
+ *  the crate rather than re-declared: `censor` returns a typed `CensorResult`
+ *  now, so this file's copy was a third description of the same eight counters. */
+export type { CensorTally } from "../wasm/ags4_wasm";
+import type { CensorTally } from "../wasm/ags4_wasm";
 /** Anonymise a file with the shared scrub engine (Tools → Anonymiser, #581).
  *  Carries the file bytes, transferred; `sensitiveJson` is the classification
  *  SSOT; `selectedCodes` (null = every classified heading) restricts the policy
@@ -320,7 +314,7 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
         new Uint8Array(req.bytes),
         req.dict,
         req.encoding,
-      ) as Fix[];
+      );
       reply({ id: req.id, ok: true, kind: "fixes", fixes });
       return;
     }
@@ -376,9 +370,11 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
       const delta = diff(
         new Uint8Array(req.aBytes),
         new Uint8Array(req.bBytes),
-        req.encoding,
-        req.maxRowsPerGroup ?? undefined,
-      ) as RevisionDelta;
+        {
+          encoding: req.encoding,
+          maxRowsPerGroup: req.maxRowsPerGroup ?? undefined,
+        },
+      );
       reply({ id: req.id, ok: true, kind: "revisionDelta", delta });
       return;
     }
@@ -432,14 +428,12 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
       // decodes lossily, applies the (optionally column-restricted) policy, and
       // returns the anonymised text + per-action tally. Never throws for normal
       // input; a bad sensitiveJson → JsError → outer catch → ok:false.
-      const res = censor(
-        new Uint8Array(req.bytes),
-        req.sensitiveJson,
-        req.selectedCodes,
-        req.token,
-        req.dropCustom,
-        req.includeFreetext,
-      );
+      const res = censor(new Uint8Array(req.bytes), req.sensitiveJson, {
+        selectedCodes: req.selectedCodes,
+        token: req.token,
+        dropCustom: req.dropCustom,
+        includeFreetext: req.includeFreetext,
+      });
       reply({
         id: req.id,
         ok: true,
@@ -451,7 +445,7 @@ self.onmessage = async (e: MessageEvent<WorkerReq>) => {
     }
 
     if (req.kind === "dictionary") {
-      const dict = dictionary(req.edition ?? undefined) as StandardDict;
+      const dict = dictionary(req.edition ?? undefined);
       reply({ id: req.id, ok: true, kind: "dictionary", dict });
       return;
     }

@@ -1629,7 +1629,8 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
 #[cfg(test)]
 mod options_tests {
     use super::{
-        BuildOptions, CertifyOptions, MergeOptions, ValidateOptions, WasmOptions, unknown_key,
+        BuildOptions, CensorOptions, CertifyOptions, DiffOptions, MergeOptions, ValidateOptions,
+        WasmOptions, unknown_key,
     };
 
     /// `KEYS` must name exactly the struct's own serde fields.
@@ -1670,6 +1671,8 @@ mod options_tests {
         assert_keys_match::<CertifyOptions>();
         assert_keys_match::<BuildOptions>();
         assert_keys_match::<MergeOptions>();
+        assert_keys_match::<DiffOptions>();
+        assert_keys_match::<CensorOptions>();
     }
 
     /// A misspelled key is REFUSED, by name, with a suggestion.
@@ -1903,6 +1906,113 @@ mod ts_result_shape_tests {
                 sql_types: Vec::new(),
             }),
         );
+
+        let cell = || laterite_ags4_diff::CellDelta {
+            heading: "LOCA_ID".into(),
+            ags_type: "ID".into(),
+            a: Some("BH01".into()),
+            b: Some("BH02".into()),
+        };
+        let row = || laterite_ags4_diff::RowDelta {
+            kind: "changed",
+            key: vec!["BH01".into()],
+            line_a: Some(1),
+            line_b: Some(1),
+            cells: vec![cell()],
+        };
+        assert_same(
+            "CellDelta",
+            declared_fields(TS_DIFF_RESULT, "CellDelta"),
+            serde_keys(&cell()),
+        );
+        assert_same(
+            "RowDelta",
+            declared_fields(TS_DIFF_RESULT, "RowDelta"),
+            serde_keys(&row()),
+        );
+        assert_same(
+            "GroupDelta",
+            declared_fields(TS_DIFF_RESULT, "GroupDelta"),
+            serde_keys(&laterite_ags4_diff::GroupDelta {
+                code: "LOCA".into(),
+                added: 0,
+                removed: 0,
+                changed: 1,
+                headings_added: Vec::new(),
+                headings_removed: Vec::new(),
+                keyed: true,
+                key_headings: vec!["LOCA_ID".into()],
+                rows: vec![row()],
+            }),
+        );
+        assert_same(
+            "RevisionDelta",
+            declared_fields(TS_DIFF_RESULT, "RevisionDelta"),
+            serde_keys(&laterite_ags4_diff::RevisionDelta {
+                groups: Vec::new(),
+                groups_added: Vec::new(),
+                groups_removed: Vec::new(),
+                total_added: 0,
+                total_removed: 0,
+                total_changed: 0,
+            }),
+        );
+
+        // Straight off the real builder rather than a hand-made value: these
+        // three carry `skip_serializing_if` fields (`unit`, `parent`), and a
+        // literal with them set to `None` would drop the keys and quietly assert
+        // that an optional field may go undeclared.
+        let dict = laterite_ags4_validator::dict::dictionary_dto(FALLBACK);
+        let group = dict
+            .groups
+            .iter()
+            .find(|g| g.parent.is_some())
+            .expect("a non-root group");
+        let heading = group
+            .headings
+            .iter()
+            .find(|h| h.unit.is_some())
+            .expect("a heading with a unit");
+        assert_same(
+            "DictHeading",
+            declared_fields(TS_DICT_RESULT, "DictHeading"),
+            serde_keys(heading),
+        );
+        assert_same(
+            "DictGroup",
+            declared_fields(TS_DICT_RESULT, "DictGroup"),
+            serde_keys(group),
+        );
+        assert_same(
+            "StandardDict",
+            declared_fields(TS_DICT_RESULT, "StandardDict"),
+            serde_keys(&dict),
+        );
+
+        let edit = || fixes::SpanEdit {
+            line: 1,
+            start: 0,
+            end: 1,
+            replacement: "b".into(),
+            expected: "a".into(),
+        };
+        assert_same(
+            "SpanEdit",
+            declared_fields(TS_FIXES_RESULT, "SpanEdit"),
+            serde_keys(&edit()),
+        );
+        assert_same(
+            "Fix",
+            declared_fields(TS_FIXES_RESULT, "Fix"),
+            serde_keys(&fixes::Fix {
+                kind: fixes::FixKind::StripBom,
+                label: "l".into(),
+                rule: "AGS Format Rule 1".into(),
+                line: Some(1),
+                risk: fixes::FixRisk::Safe,
+                edits: vec![edit()],
+            }),
+        );
     }
 
     /// The parser must be able to fail. Without this, a `declared_fields` that
@@ -1967,17 +2077,23 @@ mod ts_result_shape_tests {
                 .collect()
         }
 
-        for (field, mut actual) in [
-            ("kind:", variants::<fixes::FixKind>()),
-            ("risk:", variants::<fixes::FixRisk>()),
-        ] {
-            let mut declared = union_members(TS_BUILD_RESULT, field);
-            declared.sort();
-            actual.sort();
-            assert_eq!(
-                declared, actual,
-                "TS `AppliedFix.{field}` union and the validator's enum have drifted"
-            );
+        // Both blocks: `AppliedFix` (what `build_ags4` reports it did) and `Fix`
+        // (what `compute_fixes` offers) publish the SAME two unions from the same
+        // two enums, in two separately-written strings. Checking only one leaves
+        // the other free to drift.
+        for (block, what) in [(TS_BUILD_RESULT, "AppliedFix"), (TS_FIXES_RESULT, "Fix")] {
+            for (field, mut actual) in [
+                ("kind:", variants::<fixes::FixKind>()),
+                ("risk:", variants::<fixes::FixRisk>()),
+            ] {
+                let mut declared = union_members(block, field);
+                declared.sort();
+                actual.sort();
+                assert_eq!(
+                    declared, actual,
+                    "TS `{what}.{field}` union and the validator's enum have drifted"
+                );
+            }
         }
     }
 }
@@ -2093,24 +2209,24 @@ pub fn compute_fixes(
     data: &[u8],
     dict_version: Option<String>,
     encoding_label: Option<String>,
-) -> JsValue {
+) -> FixesJs {
     console_error_panic_hook::set_once();
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();
     let empty: Vec<laterite_ags4_validator::fixes::Fix> = Vec::new();
 
     let dict_over = match resolve_dict_override(dict_version.as_deref()) {
         Ok(v) => v,
-        Err(_) => return empty.serialize(&serializer).unwrap(),
+        Err(_) => return empty.serialize(&serializer).unwrap().unchecked_into(),
     };
     // An unknown label yields no fixes rather than fixes computed against the
     // wrong decoding — this fn has no error channel, and silently "fixing" text
     // we mis-decoded is the worst option on the table.
     let Ok(encoding) = resolve_encoding(encoding_label.as_deref()) else {
-        return empty.serialize(&serializer).unwrap();
+        return empty.serialize(&serializer).unwrap().unchecked_into();
     };
     let parsed = match parse_bytes(data, encoding) {
         Ok(p) => p,
-        Err(_) => return empty.serialize(&serializer).unwrap(),
+        Err(_) => return empty.serialize(&serializer).unwrap().unchecked_into(),
     };
     let opts = CheckOptions {
         dict_version: dict_over,
@@ -2123,13 +2239,17 @@ pub fn compute_fixes(
     // No error channel here: a failure yields no fixes rather than fixes derived from
     // the wrong dictionary.
     let Ok((found, _dv, _kind)) = check_parsed_with_dict(&parsed, &opts, &WorldScope::None) else {
-        return empty.serialize(&serializer).unwrap_or(JsValue::NULL);
+        return empty
+            .serialize(&serializer)
+            .unwrap_or(JsValue::NULL)
+            .unchecked_into();
     };
 
     let fixes = laterite_ags4_validator::fixes::compute_fixes(&parsed, &found);
     fixes
         .serialize(&serializer)
         .expect("Fixes is plain data and always serialises")
+        .unchecked_into()
 }
 
 /// Apply a user-selected subset of fixes to AGS4 bytes, returning the new
@@ -2430,18 +2550,123 @@ pub fn read(data: &[u8], encoding_label: Option<String>) -> Result<ParsedDataset
     Ok(ParsedDataset { parsed })
 }
 
-/// Compare two AGS4 files. `max_rows_per_group` caps how many per-row deltas
-/// each group serialises (the `added`/`removed`/`changed` counts are always
-/// the true totals); `None` serialises everything.
+// The `diff` result. The shapes are `laterite-ags4-diff`'s, not this crate's —
+// but publishing them here is still right: this is the door a JS caller comes
+// through, and the alternative (what the web app did) is every consumer keeping
+// its own copy. `ts_interfaces_match_the_serde_structs` binds these to the leaf's
+// real structs, so "owned elsewhere" does not mean "unchecked here".
+ts_section! {
+    TS_DIFF_RESULT,
+    TS_DIFF_RESULT_SECTION,
+    r#"
+/** One changed cell of a row matched on both sides. */
+export interface CellDelta {
+  heading: string;
+  /** The AGS TYPE code the two cells were compared AS — a numeric compare is
+   *  value-wise, so `"1.50"` and `"1.5"` are equal under `2DP` but differ as
+   *  raw text. */
+  type: string;
+  /** Raw value on each side; `null` when that side's row is shorter than the
+   *  heading list. */
+  a: string | null;
+  b: string | null;
+}
+
+/** One row's verdict. */
+export interface RowDelta {
+  kind: "added" | "removed" | "changed";
+  /** The KEY values identifying the row — or the whole-row tuple when the
+   *  group has no dictionary KEY headings (see `GroupDelta.keyed`). */
+  key: string[];
+  line_a: number | null;
+  line_b: number | null;
+  /** Populated only for `kind === "changed"`. */
+  cells: CellDelta[];
+}
+
+/** One group's change summary. */
+export interface GroupDelta {
+  code: string;
+  /** TRUE totals, independent of any `maxRowsPerGroup` cap — so `rows.length`
+   *  may be smaller than `added + removed + changed`. */
+  added: number;
+  removed: number;
+  changed: number;
+  /** Structural change: headings present on only one side. */
+  headings_added: string[];
+  headings_removed: string[];
+  /** `false` ⇒ rows were matched on the whole-row tuple because the dictionary
+   *  gave this group no KEY headings. Matching is weaker; a row that changed
+   *  in every cell reads as one removal plus one addition. */
+  keyed: boolean;
+  key_headings: string[];
+  rows: RowDelta[];
+}
+
+/** The `diff` result: a KEY-aware, type-aware comparison of two files. */
+export interface RevisionDelta {
+  /** Groups with at least one row or heading change, in `b`'s file order,
+   *  then the groups only `a` had. */
+  groups: GroupDelta[];
+  groups_added: string[];
+  groups_removed: string[];
+  total_added: number;
+  total_removed: number;
+  total_changed: number;
+}
+"#
+}
+
 #[wasm_bindgen]
-pub fn diff(
-    a: &[u8],
-    b: &[u8],
-    encoding_label: Option<String>,
+extern "C" {
+    #[wasm_bindgen(typescript_type = "RevisionDelta")]
+    pub type RevisionDeltaJs;
+}
+
+/// `diff`'s named options. `encoding`, not `encodingLabel` — see [`MergeOptions`].
+#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(serde::Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+struct DiffOptions {
+    encoding: Option<String>,
     max_rows_per_group: Option<u32>,
-) -> Result<JsValue, JsError> {
+}
+
+impl WasmOptions for DiffOptions {
+    const KEYS: &'static [&'static str] = &["encoding", "maxRowsPerGroup"];
+    const WHAT: &'static str = "diff options";
+}
+
+#[wasm_bindgen(typescript_custom_section)]
+const TS_DIFF_OPTIONS: &'static str = r#"
+/** Named options for `diff`. */
+export interface DiffOptions {
+  /** `"utf-8"` (default) or `"windows-1252"`, applied to BOTH inputs. */
+  encoding?: "utf-8" | "windows-1252";
+  /** Cap how many per-row deltas each group SERIALISES. The
+   *  `added`/`removed`/`changed` counts stay true totals either way, so a cap
+   *  bounds the payload without lying about the size of the change. Omit for
+   *  everything. */
+  maxRowsPerGroup?: number;
+}
+"#;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "DiffOptions")]
+    pub type DiffOptionsJs;
+}
+
+/// Compare two AGS4 files.
+///
+/// * `opts` — a [`DiffOptions`] object; every field optional, so `diff(a, b)`
+///   is a complete call. An unrecognised key is refused by name.
+#[wasm_bindgen]
+pub fn diff(a: &[u8], b: &[u8], opts: Option<DiffOptionsJs>) -> Result<RevisionDeltaJs, JsError> {
     console_error_panic_hook::set_once();
-    let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
+    let o: DiffOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    let encoding = resolve_encoding(o.encoding.as_deref()).map_err(|m| JsError::new(&m))?;
+    let max_rows_per_group = o.max_rows_per_group;
     let pa =
         parse_bytes(a, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
     let pb =
@@ -2462,6 +2687,7 @@ pub fn diff(
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();
     delta
         .serialize(&serializer)
+        .map(JsCast::unchecked_into)
         .map_err(|e| JsError::new(&e.to_string()))
 }
 
@@ -2641,9 +2867,6 @@ pub fn merge(a: &[u8], b: &[u8], opts: Option<MergeOptionsJs>) -> Result<MergeRe
 // 4.0.3 … 4.2 (the same data the engine validates against).
 // ---------------------------------------------------------------------
 
-/// Serialise the bundled standard dictionary for `dict_version`
-/// (`None`/`"auto"` → the [`FALLBACK`] edition; else `4.0.3|4.0.4|4.1|4.1.1|
-/// 4.2`). Groups are sorted by code; each group's headings keep the canonical
 /// The crate version — the same answer Node's `version()` gives, from the same
 /// `CARGO_PKG_VERSION`.
 ///
@@ -2659,11 +2882,103 @@ pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+// The `dictionary` result — `laterite-ags4-reference`'s `DictionaryDto`, which
+// PyO3 and Node also render, from the one shared builder. Bound to that struct
+// by `ts_interfaces_match_the_serde_structs`.
+ts_section! {
+    TS_DICT_RESULT,
+    TS_DICT_RESULT_SECTION,
+    r#"
+/** One heading in the standard dictionary. */
+export interface DictHeading {
+  name: string;
+  /** `KEY` | `REQUIRED` | `OTHER` — whether the AGS standard requires it. */
+  status: string;
+  /** AGS TYPE code (`ID`, `X`, `2DP`, `DT`, …). */
+  type: string;
+  /** Absent when the heading is unitless — not `""`. */
+  unit?: string;
+  description: string;
+}
+
+/** One group in the standard dictionary. */
+export interface DictGroup {
+  code: string;
+  /** The group's standard description — its "contents". */
+  contents: string;
+  /** Absent for a root group (`PROJ`). */
+  parent?: string;
+  headings: DictHeading[];
+}
+
+/** One bundled edition of the AGS4 standard dictionary: groups sorted by code,
+ *  each group's headings in canonical dictionary order. */
+export interface StandardDict {
+  /** The edition this is for (`"4.1.1"`, …). */
+  ags_edition: string;
+  groups: DictGroup[];
+}
+"#
+}
+
+// The `compute_fixes` result — `laterite-ags4-validator`'s `fixes::Fix`. The
+// `kind`/`risk` unions are the same two enums `AppliedFix` carries, and are
+// checked against the enums themselves by `fix_unions_match_the_validators_enums`
+// rather than trusted as prose.
+ts_section! {
+    TS_FIXES_RESULT,
+    TS_FIXES_RESULT_SECTION,
+    r#"
+/** One in-line text edit: replace the half-open char range `[start, end)` on a
+ *  1-based line. */
+export interface SpanEdit {
+  line: number;
+  start: number;
+  end: number;
+  replacement: string;
+  /** What the span should currently hold. The engine SKIPS the edit if it does
+   *  not match, so a stale fix computed against older bytes cannot corrupt the
+   *  file — it simply does nothing. */
+  expected: string;
+}
+
+/** One fix the engine can apply. */
+export interface Fix {
+  kind: "normalize_crlf" | "strip_bom" | "strip_embedded_cr"
+      | "rename_duplicate_heading" | "insert_tran_dlim" | "insert_tran_rcon"
+      | "reformat_numeric" | "canonicalize_datetime" | "normalize_typography"
+      | "pad_short_row";
+  label: string;
+  /** The exact rule label (`"AGS Format Rule 8"`, …), for cross-linking back to
+   *  the finding it resolves. */
+  rule: string;
+  /** Anchor line for ordering/preview; `null` for whole-file kinds. */
+  line: number | null;
+  /** `safe` is bulk-applicable; `risky` guesses intent and is opt-in only. */
+  risk: "safe" | "risky";
+  /** EMPTY for the byte-level kinds (`normalize_crlf`, `strip_bom`), which
+   *  operate on the whole document rather than a span. */
+  edits: SpanEdit[];
+}
+"#
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "StandardDict")]
+    pub type StandardDictJs;
+    #[wasm_bindgen(typescript_type = "Fix[]")]
+    pub type FixesJs;
+}
+
+/// Serialise the bundled standard dictionary for `dict_version`
+/// (`None`/`"auto"` → the [`FALLBACK`] edition; else `4.0.3|4.0.4|4.1|4.1.1|
+/// 4.2`). Groups are sorted by code; each group's headings keep the canonical
 /// dictionary order. Returns the web reference UI's `{ags_edition, groups:[…]}`
 /// shape — built by the shared `dict::dictionary_dto` (#294 F#6), the same
 /// source `laterite.registry.dictionary()` and Node's render.
 #[wasm_bindgen]
-pub fn dictionary(dict_version: Option<String>) -> Result<JsValue, JsError> {
+pub fn dictionary(dict_version: Option<String>) -> Result<StandardDictJs, JsError> {
     console_error_panic_hook::set_once();
     let version = resolve_dict_override(dict_version.as_deref())
         .map_err(|e| JsError::new(&e))?
@@ -2671,6 +2986,7 @@ pub fn dictionary(dict_version: Option<String>) -> Result<JsValue, JsError> {
     let dto = laterite_ags4_validator::dict::dictionary_dto(version);
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();
     dto.serialize(&serializer)
+        .map(JsCast::unchecked_into)
         .map_err(|e| JsError::new(&e.to_string()))
 }
 
@@ -2728,13 +3044,61 @@ extern "C" {
     pub type CensorResultJs;
 }
 
-/// Anonymise `data` with the shared engine. `sensitive_json` is the
-/// classification SSOT (`sensitive_headings.json`); `selected_codes` (a JS
-/// array of heading codes, or `null` for every classified heading) restricts
-/// the policy to the user's ticked columns; `token` replaces token/brackets
-/// hits; `drop_custom` removes non-dictionary groups/columns + their orphaned
-/// DICT/ABBR rows; `include_freetext` tokenises descriptions instead of
-/// stripping their `[units]`. Returns `{ text, tally }`.
+/// `censor`'s named options — the four policy knobs, off the argument list.
+///
+/// This was the widest export in the crate at six positional arguments, four of
+/// them a `JsValue`/`&str`/`bool`/`bool` tail. `censor(d, j, null, "X", true,
+/// false)` is unreadable at the call site and two adjacent booleans are exactly
+/// where a silent transposition lives.
+#[cfg_attr(test, derive(serde::Serialize))]
+#[derive(serde::Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+struct CensorOptions {
+    selected_codes: Option<Vec<String>>,
+    token: Option<String>,
+    drop_custom: Option<bool>,
+    include_freetext: Option<bool>,
+}
+
+impl WasmOptions for CensorOptions {
+    const KEYS: &'static [&'static str] =
+        &["selectedCodes", "token", "dropCustom", "includeFreetext"];
+    const WHAT: &'static str = "censor options";
+}
+
+#[wasm_bindgen(typescript_custom_section)]
+const TS_CENSOR_OPTIONS: &'static str = r#"
+/** Named options for `censor`. */
+export interface CensorOptions {
+  /** Restrict the policy to these heading codes — the user's ticked columns.
+   *  Omit (or `null`) to apply it to EVERY classified heading, which is the
+   *  broader action, so the default is the safe one. */
+  selectedCodes?: string[] | null;
+  /** Replacement for token/brackets hits. Default `"[REDACTED]"`. */
+  token?: string;
+  /** Also delete non-dictionary groups and columns, plus the DICT/ABBR rows
+   *  that defined them. Default **false** — this discards data, so it is opt-in. */
+  dropCustom?: boolean;
+  /** Tokenise description free-text rather than only stripping its `[units]`.
+   *  Default **false**. */
+  includeFreetext?: boolean;
+}
+"#;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "CensorOptions")]
+    pub type CensorOptionsJs;
+}
+
+/// Anonymise `data` with the shared engine.
+///
+/// * `sensitive_json` — the classification SSOT (`sensitive_headings.json`).
+///   Required: without it there is no policy and nothing would be scrubbed,
+///   which is the one outcome a caller must never get by accident.
+/// * `opts` — a [`CensorOptions`] object; every field optional, so
+///   `censor(data, json)` is a complete call. An unrecognised key is refused
+///   by name.
 ///
 /// `PROJ_ID`'s filehash is the full 64-hex SHA-256 of `data` (a KEY field —
 /// full width so a collision is cryptographically nil); the leaf takes that id
@@ -2743,12 +3107,13 @@ extern "C" {
 pub fn censor(
     data: &[u8],
     sensitive_json: &str,
-    selected_codes: JsValue,
-    token: &str,
-    drop_custom: bool,
-    include_freetext: bool,
+    opts: Option<CensorOptionsJs>,
 ) -> Result<CensorResultJs, JsError> {
     console_error_panic_hook::set_once();
+    let o: CensorOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    let include_freetext = o.include_freetext.unwrap_or(false);
+    let drop_custom = o.drop_custom.unwrap_or(false);
+    let token = o.token.unwrap_or_else(|| "[REDACTED]".to_string());
 
     // Lossy decode (matches the Anonymiser's `TextDecoder({fatal:false})`): a
     // browser anonymises what it can rather than skipping non-UTF-8 outright.
@@ -2758,16 +3123,16 @@ pub fn censor(
     let mut policy =
         laterite_ags4_censor::Policy::from_sensitive_json(sensitive_json, include_freetext)
             .map_err(|e| JsError::new(&e.to_string()))?;
-    // null → keep the full policy (every classified heading); an array
-    // restricts it to the browser's column selection.
-    let selected: Option<Vec<String>> =
-        serde_wasm_bindgen::from_value(selected_codes).map_err(|e| JsError::new(&e.to_string()))?;
-    if let Some(codes) = selected {
+    // Omitted/null → keep the full policy (every classified heading); a list
+    // restricts it to the browser's column selection. Note the asymmetry is
+    // deliberate: the default is the WIDER scrub, so forgetting the option
+    // over-redacts rather than leaking.
+    if let Some(codes) = o.selected_codes {
         policy.retain_codes(&codes.into_iter().collect());
     }
 
     let opts = laterite_ags4_censor::CensorOptions {
-        token: token.to_string(),
+        token,
         keywords: Vec::new(),
         drop_custom,
     };

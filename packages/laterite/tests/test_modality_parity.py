@@ -528,13 +528,12 @@ def _wasm_verbs() -> set[str]:
 #: exemption — the point of listing them is that "not yet migrated" and "nobody
 #: noticed" stop looking the same from outside.
 #:
-#: `validate` and `certify` are deliberately absent: they were migrated first, to
-#: prove the machinery (the decode trait, the unknown-key guard, the hand-written
-#: TS interfaces) on the two exports with the smallest blast radius.
-_ARITY_EXEMPT: dict[str, str] = {
-    "diff": "4 args; not yet scoped — the plan records it as its own follow-up",
-    "censor": "6 args; not yet scoped — same follow-up as diff",
-}
+#: **Empty, and that is the finished state.** `diff` and `censor` were the last
+#: two; both now take an options object, so every wasm export satisfies the gate
+#: unaided. `test_arity_exemptions_are_live` is what emptied it — leaving the
+#: migrated entries in would have failed as stale, which is the point of writing
+#: the commitment down rather than a comment.
+_ARITY_EXEMPT: dict[str, str] = {}
 
 #: A wasm export takes its inputs, then ONE options object. Two positional
 #: arguments is the shape (`data` + `opts`); three allows a genuine second input
@@ -585,16 +584,16 @@ def _wasm_verb_arity() -> dict[str, int]:
 def test_wasm_exports_take_an_options_object_not_a_positional_tail():
     """No wasm export may grow a positional tail.
 
-    **Nothing else enforces this.** `ci.yml:266` runs
-    `cargo clippy --workspace ... --exclude laterite-ags4-wasm`, so
-    `clippy::too_many_arguments` has never fired on this crate and would not fire
-    on the next export either — the `#[allow(too_many_arguments)]` attributes
-    that used to sit on these functions were decorative.
+    Clippy does now see this crate (the `--exclude laterite-ags4-wasm` came off
+    the workspace lint in #187), but `clippy::too_many_arguments` only fires at
+    SEVEN — and seven positional parameters is already far past the shape that
+    caused the trouble. This is the gate that holds the line at three.
 
-    That mattered: `build_ags4` reached NINE parameters, five of them consecutive
-    same-typed `Option<String>`, and a browser caller had to pass five
-    `undefined`s to reach the sixth. The options-object migration fixed the
-    instances; this fixes the class.
+    That line is not arbitrary: `build_ags4` reached NINE parameters, five of them
+    consecutive same-typed `Option<String>`, and a browser caller had to pass
+    five `undefined`s to reach the sixth. Clippy would have shrugged at eight of
+    those nine. The options-object migration fixed the instances; this fixes the
+    class.
     """
     over = {
         name: n
