@@ -66,6 +66,14 @@ members = [
 # npm `laterite` versions on its own `node-v*` track.
 [workspace.package]
 version = "0.9.0"
+# crates.io bakes metadata into the PUBLISHED VERSION, not into the crate. Adding
+# `repository` after a publish fixes future versions only — the pages for the
+# version already out there keep no link back to the source, permanently. So it
+# has to be right before the first publish rather than after it.
+#
+# `homepage` is deliberately absent: it would be this same URL, and crates.io
+# renders both. `documentation` too — docs.rs is linked automatically.
+repository = "https://github.com/niko86/laterite"
 
 # The engine-tier crates, carrying BOTH a path and a version.
 #

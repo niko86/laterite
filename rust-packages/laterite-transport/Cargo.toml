@@ -18,6 +18,9 @@ edition = "2024"
 rust-version = "1.85"
 description = "Shared zstd + age passphrase file transport (pack/unpack/lock/unlock)"
 license = "MIT"
+repository.workspace = true
+keywords = ["zstd", "age", "encryption", "compression", "archive"]
+categories = ["compression", "cryptography", "filesystem"]
 publish = false
 
 # What `cargo package` may put in the tarball. Explicit because the default is
@@ -25,6 +28,7 @@ publish = false
 # publish cannot be taken back. See laterite#159.
 include = [
     "/src/**",
+    "/README.md",
 ]
 
 [dependencies]

@@ -12,6 +12,9 @@ edition = "2024"
 rust-version = "1.85"
 description = "Shared, source-true AGS4 line/field parser (the convergence leaf)"
 license = "MIT"
+repository.workspace = true
+keywords = ["ags", "ags4", "geotechnical", "parser", "csv"]
+categories = ["science::geo", "parser-implementations", "encoding"]
 publish = false
 
 # What `cargo package` may put in the tarball. Explicit because the default is
@@ -19,6 +22,7 @@ publish = false
 # publish cannot be taken back. See laterite#159.
 include = [
     "/src/**",
+    "/README.md",
 ]
 
 [dependencies]
