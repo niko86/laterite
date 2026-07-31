@@ -217,8 +217,24 @@ jobs:
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.code == 'true') }}
-    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) || github.event_name == 'schedule') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
-    timeout-minutes: 30
+    # NOT the fork-routing ternary every other job uses — ubuntu-latest
+    # unconditionally, which is the one job here that needs it.
+    #
+    # `cargo-public-api` publishes no prebuilt binaries, so taiki-e/install-action
+    # can only build it from source, and it depends (not optionally) on `curl` →
+    # `curl-sys` → `openssl-sys`. The self-hosted image carries no OpenSSL
+    # development headers, so the install fails there before any gate runs. The
+    # GitHub-hosted image has them.
+    #
+    # The pool is not much of a loss here anyway: its value is sccache-on-NFS for
+    # the bundled-DuckDB and PyO3 builds, and this job touches neither — the ten
+    # engine crates are the lean half of the workspace. Swatinem's cache covers
+    # the rest, including `~/.cargo/bin`, so the two source-built tools are
+    # rebuilt once and then restored.
+    runs-on: ubuntu-latest
+    # Generous: the first run on a cold cache builds both cargo subcommands from
+    # source, then rustdoc-JSONs ten crates and builds a semver baseline of each.
+    timeout-minutes: 45
     steps:
       # fetch-depth: 0 is REQUIRED, not a default worth trimming: cargo
       # semver-checks resolves `--baseline-rev origin/main` by checking that
@@ -248,7 +264,14 @@ jobs:
           rustup toolchain install nightly --profile minimal
           rustup toolchain install 1.85 --profile minimal
 
-      - uses: ./.github/actions/build-accel
+      # No build-accel: that turns on the self-hosted pool's sccache + mold, and
+      # this job does not run there. Swatinem is the cache instead — same reason
+      # deploy-validator.yml uses it, and `cache-bin` (on by default) is what
+      # keeps the two source-built cargo subcommands from being rebuilt every run.
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: rust-packages
 
       - name: install cargo-public-api + cargo-semver-checks
         uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
