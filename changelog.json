@@ -19,10 +19,23 @@
         "prs": [
           188
         ]
+      },
+      {
+        "text": "**Every engine crate now declares what it may publish.** `cargo package` ships whatever sits in a crate directory and is not excluded, and no crate here specified `include` — `laterite-ags4-validator` alone would have put 41 test and bench files plus 2.1 MB of reference data no code reads into its tarball. All ten engine-tier crates now carry an explicit allowlist, and a CI gate diffs `cargo package --list` against a checked-in manifest so a new file entering a tarball turns the build red. This had to land before the first publish rather than after: crates.io is append-only, and `yank` stops new resolution without removing the tarball.",
+        "prs": [
+          189
+        ]
       }
     ],
     "deprecated": [],
-    "removed": [],
+    "removed": [
+      {
+        "text": "**`GroupDescriptor::table()` / `view()` are gone** (again). The two DuckDB `g_<code>`/`v_<code>` name builders sat on the format-neutral reference-data leaf with no callers but their own unit test, and publishing that crate would have frozen an unrelated product's schema naming into its public API. They were deleted in #175 — but #178 branched before it and squash-merged after, so its diff restored them, and the closed issue made the reverted state read as the finished one.",
+        "prs": [
+          189
+        ]
+      }
+    ],
     "fixed": [],
     "security": []
   },

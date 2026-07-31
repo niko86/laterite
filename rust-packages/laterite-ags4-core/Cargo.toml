@@ -23,6 +23,14 @@ description = "DuckDB-free pure-string core modules for the AGS4 toolchain"
 license = "MIT"
 publish = false
 
+# What `cargo package` may put in the tarball. Explicit because the default is
+# "everything not excluded", and crates.io is append-only — a file that rides one
+# publish cannot be taken back. See laterite#159.
+include = [
+    "/src/**",
+    "/data/**",
+]
+
 [dependencies]
 # The AGS type system (canonical types + value casting), extracted to a
 # wasm-safe leaf so the browser explorer (`laterite-ags4-wasm`) shares the exact

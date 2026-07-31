@@ -14,6 +14,13 @@ description = "Shared, source-true AGS4 line/field parser (the convergence leaf)
 license = "MIT"
 publish = false
 
+# What `cargo package` may put in the tarball. Explicit because the default is
+# "everything not excluded", and crates.io is append-only — a file that rides one
+# publish cannot be taken back. See laterite#159.
+include = [
+    "/src/**",
+]
+
 [dependencies]
 encoding_rs = "0.8"
 memchr = "2"

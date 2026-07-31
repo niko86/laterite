@@ -21,6 +21,15 @@ description = "AGS4 reference data: the multi-edition dictionary registry, singl
 license = "MIT"
 publish = false
 
+# What `cargo package` may put in the tarball. Explicit because the default is
+# "everything not excluded", and crates.io is append-only — a file that rides one
+# publish cannot be taken back. See laterite#159.
+include = [
+    "/src/**",
+    "/build.rs",
+    "/data/**",
+]
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 # preserve_order keeps to_groups_json's keys in declaration order, matching the

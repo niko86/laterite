@@ -27,6 +27,13 @@ description = "AGS4 producer — typed data -> valid AGS4 plaintext, DuckDB-free
 license = "MIT"
 publish = false
 
+# What `cargo package` may put in the tarball. Explicit because the default is
+# "everything not excluded", and crates.io is append-only — a file that rides one
+# publish cannot be taken back. See laterite#159.
+include = [
+    "/src/**",
+]
+
 [dependencies]
 # ags4_str (typed -> AGS4 string) + parse_value (string -> typed), the
 # exact casting both hosts already share via laterite-ags4-wasm / the native DuckDB path.

@@ -310,6 +310,33 @@ jobs:
         working-directory: rust-packages
         run: cargo test -p laterite-ags4-wasm
 
+      # What each publish-set crate would put in its `.crate` tarball, compared
+      # against a checked-in manifest. A step in THIS job rather than a workflow
+      # of its own: it needs the Rust toolchain already set up here, and a new
+      # job would mean a new status-check context to keep in sync with the
+      # ruleset by hand (changelog.yml and wiki-lint.yml both carry the warning
+      # about what a renamed `name:` does to a required check).
+      #
+      # Why it must predate the first publish rather than follow it: crates.io
+      # is append-only. `yank` stops new resolution; it does not remove the
+      # tarball. A fixture or a stray directory that rides one publish is public
+      # for good, and the repo's grep-the-diff habit never sees a tarball,
+      # because the tarball is assembled at publish time from `include` rules
+      # nobody re-reads.
+      #
+      # `--verify-buildable` additionally BUILDS each packaged tarball wherever
+      # the dependency versions allow it — which today is the three
+      # dependency-free leaves, because the in-workspace deps still carry no
+      # version requirement. It prints what it skipped and why, so a run that
+      # verified almost nothing cannot be mistaken for one that verified
+      # everything.
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+      - name: cargo package contents (crates.io allowlist)
+        run: uv run --no-project python tools/check_package_contents.py --verify-buildable
+
       # sccache hit/miss visibility (no-op if sccache isn't on this runner).
       - name: sccache stats
         if: always()
