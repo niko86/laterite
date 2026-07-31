@@ -247,11 +247,21 @@ jobs:
         working-directory: rust-packages
         run: cargo fmt --all -- --check
 
-      # laterite-ags4-wasm is a wasm32 cdylib (the browser validator); it is
-      # built + linted for its real target via wasm-pack in
-      # deploy-validator.yml. Exclude it from the host workspace
-      # clippy — compiling wasm-bindgen macro output on the host
-      # under -D warnings is toolchain-fragile and serves no purpose.
+      # The two wasm32 cdylibs used to be excluded here, justified as "built +
+      # linted for its real target via wasm-pack in deploy-validator.yml".
+      # That was not true: deploy-validator.yml runs `wasm-pack build`, which
+      # BUILDS and does not lint, and no other workflow linted them either — so
+      # the browser validator, the largest single source file in the workspace,
+      # was linted nowhere at all. The cost showed up in 0.9.0: four dead
+      # constants and three `ok_expect` hits sat in laterite-ags4-wasm, found
+      # only by running clippy on it by hand.
+      #
+      # Both crates are clippy-clean under -D warnings on the HOST, which is
+      # also where their tests already run (see the `test` job) — wasm-bindgen's
+      # macros expand on any target. If a future toolchain does make the macro
+      # output noisy, that is a loud failure to handle, not a reason to lint
+      # nothing.
+      #
       # Debug, not --release: nothing in CI asserts wall-clock (no perf gate), so
       # the release profile's thin-LTO + codegen-units=1 just burned compile time.
       # The `laterite_ags4` DuckDB loadable extension is NOT built here — it lives
@@ -263,7 +273,7 @@ jobs:
       - name: cargo clippy
         working-directory: rust-packages
         # --all-targets lints tests/benches/examples too, not just lib/bin code.
-        run: cargo clippy --workspace --all-targets --exclude laterite-ags4-wasm --exclude laterite-ags4-tokenizer-wasm -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       # The shared parse leaf (#168) becomes a wasm dependency of the browser
       # validator from Phase 3 on. Build it for wasm32 NOW so a

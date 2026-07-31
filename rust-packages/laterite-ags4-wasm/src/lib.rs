@@ -3180,14 +3180,17 @@ mod tests {
 
         // keys=true → the golden UUIDv8s; child._parent_id links to parent._id;
         // a root group's _parent_id is NULL.
+        // `unwrap_or_else(|_| panic!(…))`, NOT `.expect(…)`: the error is a
+        // `JsError`, which does not implement `Debug`, so `.expect()` will not
+        // compile. This read `.ok().expect(…)` for that reason and clippy's
+        // `ok_expect` fires on it — but taking clippy's suggestion literally
+        // breaks the build, so the escape is to drop the error explicitly.
         let proj = ds
             .arrow_ipc("PROJ", Some(true), None)
-            .ok()
-            .expect("PROJ keyed");
+            .unwrap_or_else(|_| panic!("PROJ keyed"));
         let loca = ds
             .arrow_ipc("LOCA", Some(true), None)
-            .ok()
-            .expect("LOCA keyed");
+            .unwrap_or_else(|_| panic!("LOCA keyed"));
         assert_eq!(
             first(&proj, "_id").as_deref(),
             Some("ac30a95d-e0ca-85f9-83c8-37a64af2762b"),
@@ -3203,7 +3206,9 @@ mod tests {
         assert_eq!(first(&proj, "_parent_id"), None);
 
         // The default (no keys) strips: a plain frame carries no `_id` column.
-        let plain = ds.arrow_ipc("PROJ", None, None).ok().expect("PROJ plain");
+        let plain = ds
+            .arrow_ipc("PROJ", None, None)
+            .unwrap_or_else(|_| panic!("PROJ plain"));
         assert!(
             first(&plain, "_id").is_none(),
             "default arrow_ipc must not carry _id",
