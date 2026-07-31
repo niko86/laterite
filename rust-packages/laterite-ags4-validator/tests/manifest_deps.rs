@@ -71,38 +71,92 @@ fn external_crates_are_never_ours() {
     }
 }
 
-/// The `laterite` prefix must select exactly the set the old `path` key did.
+/// Every `laterite*` dependency must resolve to sources in THIS tree.
 ///
-/// This is what makes the prefix safe to rely on. It fails loudly if a `laterite*`
-/// crate is ever depended on FROM crates.io rather than in-workspace (it would be
-/// hashed by version while its sources sat right there), or if an in-workspace crate
-/// is ever named without the prefix (it would vanish from the covered set — the #158
-/// failure again, by a different route).
+/// This is what makes the name prefix safe to rely on. It fails loudly if a
+/// `laterite*` crate is ever consumed FROM crates.io rather than from the workspace
+/// (it would be hashed by version while its sources sat right there), or if an
+/// in-workspace crate is ever named without the prefix (it would vanish from the
+/// covered set — the #158 failure again, by another route).
+///
+/// "Resolves to sources" is now two shapes, not one. It used to be a `path` key.
+/// Since the publish-prep version requirements landed, a member says
+/// `{ workspace = true }` and BOTH the path and the version live in the workspace
+/// root's `[workspace.dependencies]`. An assertion that only knew the first shape
+/// would read the second as "no path — must be a registry crate", which is the
+/// wrong answer about the crate sitting in the next directory.
 #[test]
-fn laterite_deps_are_exactly_the_path_deps() {
+fn every_laterite_dep_resolves_to_sources_in_this_tree() {
     let text = std::fs::read_to_string(manifest()).unwrap();
-    let by_prefix: Vec<String> = own_deps_from(&text, "manifest")
-        .into_iter()
-        .map(|d| d.name)
-        .collect();
-
-    let doc: toml::Table = text.parse().unwrap();
-    let mut by_path: Vec<String> = doc["dependencies"]
-        .as_table()
-        .unwrap()
-        .iter()
-        .filter(|(_, spec)| spec.get("path").is_some())
-        .map(|(name, _)| name.clone())
-        .collect();
-    by_path.sort();
-
-    assert_eq!(
-        by_prefix, by_path,
-        "the `laterite` prefix and the in-workspace path deps have diverged — the \
-         fingerprint would either hash a crate by version while its sources are \
-         present, or drop one entirely",
+    let deps = own_deps_from(&text, "manifest");
+    assert!(
+        !deps.is_empty(),
+        "zero is a bad witness: no laterite deps found"
     );
-    assert!(!by_path.is_empty(), "zero is a bad witness for both sets");
+
+    let ws_text = std::fs::read_to_string(workspace_manifest()).unwrap();
+    let ws = workspace_deps_from(&ws_text, "workspace");
+    assert!(
+        !ws.is_empty(),
+        "[workspace.dependencies] has no laterite entries"
+    );
+
+    for d in &deps {
+        if d.workspace {
+            let e = ws.iter().find(|e| e.name == d.name).unwrap_or_else(|| {
+                panic!(
+                    "`{}` says `workspace = true` but no workspace entry defines it",
+                    d.name
+                )
+            });
+            assert!(
+                e.path.is_some(),
+                "[workspace.dependencies] `{}` has no path — it would resolve from \
+                 crates.io, and the fingerprint would identify it by version while its \
+                 sources sit in this tree",
+                d.name,
+            );
+        } else {
+            assert!(
+                d.path.is_some(),
+                "`{}` has neither a path nor workspace inheritance — an in-workspace \
+                 crate consumed as if it were external",
+                d.name,
+            );
+        }
+    }
+}
+
+/// Every entry in `[workspace.dependencies]` carries a version, which is the whole
+/// reason they exist: `cargo package` rejects a dependency without one, so 7 of the
+/// 10 engine-tier crates could not be packaged at all before they were added.
+#[test]
+fn every_workspace_entry_carries_a_version() {
+    let ws_text = std::fs::read_to_string(workspace_manifest()).unwrap();
+    let ws = workspace_deps_from(&ws_text, "workspace");
+    assert!(!ws.is_empty(), "zero is a bad witness");
+    for e in &ws {
+        assert!(
+            e.version.is_some(),
+            "[workspace.dependencies] `{}` has no version — `cargo package` refuses \
+             a dependency with no version requirement, because publishing strips the \
+             path and leaves nothing to identify it",
+            e.name,
+        );
+    }
+}
+
+/// A member that inherits carries neither field itself — the shape the resolver has
+/// to look up rather than read.
+#[test]
+fn an_inherited_dep_carries_neither_path_nor_version() {
+    let deps = own_deps_from(
+        "[dependencies]\nlaterite-ags4-parse = { workspace = true }\n",
+        "inherited",
+    );
+    assert_eq!(deps.len(), 1);
+    assert!(deps[0].workspace);
+    assert!(deps[0].path.is_none() && deps[0].version.is_none());
 }
 
 /// A dependency table with no `[dependencies]` at all is empty, not a panic — a leaf
@@ -114,4 +168,11 @@ fn a_manifest_without_dependencies_is_empty_not_an_error() {
 
 fn manifest() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")
+}
+
+fn workspace_manifest() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("the crate dir has a parent")
+        .join("Cargo.toml")
 }

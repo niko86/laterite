@@ -31,6 +31,12 @@
         "prs": [
           189
         ]
+      },
+      {
+        "text": "**The engine crates declare the versions a publish needs.** `cargo package` rejects a dependency with no version requirement — publishing strips the `path` and the version is all that survives to identify it — so 7 of the 10 engine-tier crates could not be packaged at all. The 21 in-workspace dependency sites now inherit from `[workspace.dependencies]`, which carries both a path and a version. Nothing changes locally: the path still wins, and `Cargo.lock` is untouched. The versions sit in `rust-packages/Cargo.toml` specifically so the release bump rewrites them alongside the workspace version rather than leaving them behind, and a test asserts that lockstep instead of assuming it.",
+        "prs": [
+          191
+        ]
       }
     ],
     "deprecated": [],

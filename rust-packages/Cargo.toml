@@ -67,6 +67,45 @@ members = [
 [workspace.package]
 version = "0.9.0"
 
+# The engine-tier crates, carrying BOTH a path and a version.
+#
+# `cargo package` refuses a dependency that has no version requirement — "all
+# dependencies must have a version requirement specified when packaging" — because
+# publishing strips `path` and the version is all that survives to identify the
+# dependency. Without these, 7 of the 10 engine-tier crates could not be packaged at
+# all, and `check_package_contents.py --verify-buildable` could only ever reach the
+# three leaves that depend on nothing.
+#
+# In THIS workspace the path still wins, so nothing about the local build or the
+# resolved graph changes; the version is inert until a publish.
+#
+# They live in this file rather than inline at the 21 call sites for one reason:
+# `[tool.bumpversion]` stamps `version = "{current_version}"` in
+# `rust-packages/Cargo.toml`, and it rewrites EVERY occurrence in the file, not just
+# the first (verified against a dry run — the log reports only the first match, which
+# reads misleadingly). So these bump in lockstep with `workspace.package.version`
+# above, with no second place to remember. Inline versions would have sat at the old
+# number after a release and published crates pinned to a version that no longer
+# matched the engine.
+#
+# Only the crates that are DEPENDED ON are listed; diff, merge and trust are leaves
+# of this graph — nothing in the publish set depends on them.
+[workspace.dependencies]
+# `default-features = false` HERE rather than at the call site, because cargo
+# refuses to let a member turn a workspace entry's default features off
+# ("`default-features = false` cannot override workspace's `default-features`").
+# Correct for its only publish-set consumer: `laterite-ags4-trust` wants the pure
+# keychain/registry/codec without the `transport` feature, whose `age` dependency
+# pulls getrandom. A future member that wants the default build asks for it by
+# name — `{ workspace = true, features = ["transport"] }`.
+laterite-ags4-core = { path = "laterite-ags4-core", version = "0.9.0", default-features = false }
+laterite-ags4-emit = { path = "laterite-ags4-emit", version = "0.9.0" }
+laterite-ags4-parse = { path = "laterite-ags4-parse", version = "0.9.0" }
+laterite-ags4-reference = { path = "laterite-ags4-reference", version = "0.9.0" }
+laterite-ags4-types = { path = "laterite-ags4-types", version = "0.9.0" }
+laterite-ags4-validator = { path = "laterite-ags4-validator", version = "0.9.0" }
+laterite-transport = { path = "laterite-transport", version = "0.9.0" }
+
 # Workspace-wide clippy pedantic (lever 6, chore/clippy-pedantic): every member
 # opts in via `[lints] workspace = true` (see each member's Cargo.toml), except
 # the two wasm crates CI already excludes from clippy.

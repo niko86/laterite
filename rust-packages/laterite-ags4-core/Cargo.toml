@@ -35,17 +35,17 @@ include = [
 # The AGS type system (canonical types + value casting), extracted to a
 # wasm-safe leaf so the browser explorer (`laterite-ags4-wasm`) shares the exact
 # casting logic. Re-exported as `laterite_ags4_core::ags_types` (see lib.rs).
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-ags4-types = { workspace = true }
 # The shared parse leaf (#168 Phase 4): the `.ags.idx` byte-offset index
 # (index.rs) now sources GROUP record starts from the leaf's source-true byte
 # walk instead of the csv reader — the csv index was off-by-one for CRLF and
 # absorbed leading blanks (see O-40). Pure leaf (encoding_rs + memchr). Phase 5
 # extends this dep to core's read path.
-laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+laterite-ags4-parse = { workspace = true }
 # The AGS4 dictionary registry (union projection), extracted to its own leaf
 # (#475) so dictionary-only consumers needn't pull the rest of core. Re-exported
 # as `laterite_ags4_core::registry` (see registry.rs) — an API-preserving move.
-laterite-ags4-reference = { path = "../laterite-ags4-reference" }
+laterite-ags4-reference = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 # preserve_order keeps JSON output keys in insertion order, matching
 # Python's dict-preserving json.dumps. Same rationale used elsewhere in the workspace.
@@ -58,7 +58,7 @@ thiserror = "2"
 # transport.rs is a thin CliError-returning face over it (mapping
 # TransportError→CliError); the age/zstd/rpassword/secrecy direct deps left with
 # the logic.
-laterite-transport = { path = "../laterite-transport", optional = true }
+laterite-transport = { workspace = true, optional = true }
 # The deterministic keychain (keychain.rs) hashes the spec key-chain with
 # SHA-256 → UUIDv8. (calamine + rust_xlsxwriter + hex left with excel.rs when
 # the Excel I/O moved out to the laterite-excel crate, 2026-06-18.)

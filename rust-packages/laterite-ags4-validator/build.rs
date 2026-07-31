@@ -257,6 +257,31 @@ fn canon(p: &Path) -> PathBuf {
 // publish. See that file's header for why it is `include!`d rather than a module.
 include!("src/manifest_deps.rs");
 
+/// The `[workspace.dependencies]` entry for `name`, plus the workspace root it was
+/// found in (paths there are relative to it, not to the member).
+///
+/// Walks up from `start` looking for a manifest with a `[workspace]` table, rather
+/// than assuming the root is one level up. It is today — every member is a direct
+/// child of `rust-packages/` — but that is a layout detail, and a build script that
+/// silently resolves nothing when it changes is the failure this whole file is about.
+fn workspace_entry(start: &Path, name: &str) -> Option<(OwnDep, PathBuf)> {
+    for root in start.ancestors().skip(1) {
+        let manifest = root.join("Cargo.toml");
+        if !manifest.is_file() {
+            continue;
+        }
+        let text = std::fs::read_to_string(&manifest).ok()?;
+        if !text.contains("[workspace]") {
+            continue;
+        }
+        let found = workspace_deps_from(&text, &manifest.display().to_string())
+            .into_iter()
+            .find(|d| d.name == name)?;
+        return Some((found, root.to_path_buf()));
+    }
+    None
+}
+
 /// [`own_deps_from`] over a manifest on disk.
 fn own_deps(manifest_toml: &Path) -> Vec<OwnDep> {
     let text = std::fs::read_to_string(manifest_toml).unwrap_or_else(|e| {
@@ -306,9 +331,16 @@ fn collect_crate(
 /// the dependency's identity. It is a sufficient one, because that version's content
 /// is immutable on crates.io.
 ///
-/// A dependency with neither is a hard error rather than a skip. Skipping is exactly
-/// what this code did before, and it is why a published build fingerprinted a quarter
-/// of its own engine without saying so.
+/// A `{ workspace = true }` entry carries neither, and is resolved against the
+/// workspace root's `[workspace.dependencies]` first — where the path is relative to
+/// that root rather than to `dir`. Publishing inlines those entries, so this arm is
+/// in-tree only; it exists because the version requirements the publish set needs
+/// live in the workspace table, and reading a member manifest alone now sees
+/// `{ workspace = true }` and nothing else.
+///
+/// A dependency with none of the three is a hard error rather than a skip. Skipping is
+/// exactly what this code did before, and it is why a published build fingerprinted a
+/// quarter of its own engine without saying so.
 fn resolve_deps(
     dir: &Path,
     out: &mut Vec<PathBuf>,
@@ -316,7 +348,20 @@ fn resolve_deps(
     pinned: &mut BTreeSet<String>,
 ) {
     for dep in own_deps(&dir.join("Cargo.toml")) {
-        let by_path = dep.path.as_ref().map(|rel| dir.join(rel));
+        let (dep, base) = if dep.workspace {
+            match workspace_entry(dir, &dep.name) {
+                Some((inherited, root)) => (inherited, root),
+                None => panic!(
+                    "engine fingerprint: `{}` of {} is declared `workspace = true` but no \
+                     `[workspace.dependencies]` entry defines it",
+                    dep.name,
+                    dir.display(),
+                ),
+            }
+        } else {
+            (dep, dir.to_path_buf())
+        };
+        let by_path = dep.path.as_ref().map(|rel| base.join(rel));
         match (by_path, &dep.version) {
             (Some(p), _) if p.is_dir() => collect_crate(&p, out, seen, pinned),
             (_, Some(v)) => {

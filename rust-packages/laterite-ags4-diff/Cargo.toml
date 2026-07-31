@@ -40,11 +40,11 @@ include = [
 
 [dependencies]
 # ParsedFile/ParsedGroup/DataRow — the tokenised rows the diff walks.
-laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+laterite-ags4-parse = { workspace = true }
 # The per-edition standard Dictionary: KEY headings (row matching) + types.
-laterite-ags4-reference = { path = "../laterite-ags4-reference" }
+laterite-ags4-reference = { workspace = true }
 # parse_value — the canonical cast that suppresses formatting-only changes.
-laterite-ags4-types = { path = "../laterite-ags4-types" }
+laterite-ags4-types = { workspace = true }
 # RevisionDelta + nested structs serialise to JS/JSON unchanged across hosts.
 serde = { version = "1", features = ["derive"] }
 

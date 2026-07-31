@@ -36,11 +36,11 @@ path = "src/lib.rs"
 # The `.ags.idx` format: Sidecar, ValidationStamp, TierCoverage, EditionInput, and
 # `Sidecar::decide` — the trust rule itself. default-features = false: the age/zstd
 # transport is wasm-hostile and has nothing to do with trust.
-laterite-ags4-core = { path = "../laterite-ags4-core", default-features = false }
+laterite-ags4-core = { workspace = true }
 # The rule engine + `WorldScope` + `ENGINE_FINGERPRINT`.
-laterite-ags4-validator = { path = "../laterite-ags4-validator" }
+laterite-ags4-validator = { workspace = true }
 # Parsing bytes/text without going through the validator's path-only entry point.
-laterite-ags4-parse = { path = "../laterite-ags4-parse" }
+laterite-ags4-parse = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"
