@@ -1,0 +1,115 @@
+{
+  "laterite-ags4-core": [
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "data/sensitive_headings.json",
+    "src/ags4_codec.rs",
+    "src/error.rs",
+    "src/index.rs",
+    "src/keychain.rs",
+    "src/lib.rs",
+    "src/read_render.rs",
+    "src/registry.rs",
+    "src/transport.rs"
+  ],
+  "laterite-ags4-diff": [
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "src/lib.rs"
+  ],
+  "laterite-ags4-emit": [
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "src/arrow_in.rs",
+    "src/emit.rs",
+    "src/error.rs",
+    "src/lib.rs",
+    "src/writer.rs"
+  ],
+  "laterite-ags4-merge": [
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "src/lib.rs"
+  ],
+  "laterite-ags4-parse": [
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "src/lib.rs",
+    "src/scan.rs"
+  ],
+  "laterite-ags4-reference": [
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "build.rs",
+    "data/ags_dictionary.json",
+    "data/rules_meta.json",
+    "src/catalogue.rs",
+    "src/dict.rs",
+    "src/dict_read.rs",
+    "src/keychain.rs",
+    "src/lib.rs",
+    "src/overlay.rs",
+    "src/union.rs"
+  ],
+  "laterite-ags4-trust": [
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "src/lib.rs",
+    "src/tests.rs"
+  ],
+  "laterite-ags4-types": [
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "src/arrow_cols.rs",
+    "src/ipc.rs",
+    "src/lib.rs"
+  ],
+  "laterite-ags4-validator": [
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "README.md",
+    "build.rs",
+    "data/PROVENANCE.md",
+    "src/catalogue.rs",
+    "src/error.rs",
+    "src/findings.rs",
+    "src/fixes.rs",
+    "src/lib.rs",
+    "src/parse.rs",
+    "src/rules/dictionary.rs",
+    "src/rules/groups.rs",
+    "src/rules/line_format.rs",
+    "src/rules/mod.rs",
+    "src/rules/naming.rs",
+    "src/rules/references.rs",
+    "src/rules/relational.rs",
+    "src/rules/structure.rs",
+    "src/rules/typed_values.rs",
+    "src/world.rs"
+  ],
+  "laterite-transport": [
+    ".cargo_vcs_info.json",
+    "Cargo.lock",
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "src/lib.rs"
+  ]
+}

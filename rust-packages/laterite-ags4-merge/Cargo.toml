@@ -23,6 +23,13 @@ description = "AGS4 merge — reconcile N deliveries into one file (KEY-aware, r
 license = "MIT"
 publish = false
 
+# What `cargo package` may put in the tarball. Explicit because the default is
+# "everything not excluded", and crates.io is append-only — a file that rides one
+# publish cannot be taken back. See laterite#159.
+include = [
+    "/src/**",
+]
+
 [lib]
 name = "laterite_ags4_merge"
 path = "src/lib.rs"

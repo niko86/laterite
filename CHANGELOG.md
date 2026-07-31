@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Breaking: `diff` and `censor` take an options object too.** They were the last two `@laterite/ags4-wasm` exports with a positional tail — `diff(a, b, encoding, maxRowsPerGroup)` and `censor(data, sensitiveJson, selectedCodes, token, dropCustom, includeFreetext)`, the latter six-deep with three consecutive booleans. Both now take one named object after their inputs (`diff(a, b, { encoding, maxRowsPerGroup })`, `censor(data, sensitiveJson, { selectedCodes, token, dropCustom, includeFreetext })`), every field optional and defaulted, with the same unknown-key refusal the other exports got. The test that recorded these two as "not yet migrated" now has nothing left to exempt. ([#188](https://github.com/niko86/laterite/pull/188))
+- **Every engine crate now declares what it may publish.** `cargo package` ships whatever sits in a crate directory and is not excluded, and no crate here specified `include` — `laterite-ags4-validator` alone would have put 41 test and bench files plus 2.1 MB of reference data no code reads into its tarball. All ten engine-tier crates now carry an explicit allowlist, and a CI gate diffs `cargo package --list` against a checked-in manifest so a new file entering a tarball turns the build red. This had to land before the first publish rather than after: crates.io is append-only, and `yank` stops new resolution without removing the tarball.
+
+### Removed
+
+- **`GroupDescriptor::table()` / `view()` are gone** (again). The two DuckDB `g_<code>`/`v_<code>` name builders sat on the format-neutral reference-data leaf with no callers but their own unit test, and publishing that crate would have frozen an unrelated product's schema naming into its public API. They were deleted in #175 — but #178 branched before it and squash-merged after, so its diff restored them, and the closed issue made the reverted state read as the finished one.
 
 ## [0.9.0] — 2026-07-30
 

@@ -58,18 +58,6 @@ pub struct GroupDescriptor {
 }
 
 impl GroupDescriptor {
-    /// `g_<code>` — the DuckDB table name.
-    #[must_use]
-    pub fn table(&self) -> String {
-        format!("g_{}", self.code.to_lowercase())
-    }
-
-    /// `v_<code>` — the DuckDB view name.
-    #[must_use]
-    pub fn view(&self) -> String {
-        format!("v_{}", self.code.to_lowercase())
-    }
-
     pub fn key_headings(&self) -> impl Iterator<Item = &Heading> {
         self.headings.iter().filter(|h| h.is_key())
     }
@@ -393,13 +381,6 @@ mod tests {
                 "official group {code} must be present"
             );
         }
-    }
-
-    #[test]
-    fn descriptor_table_and_view_names_are_prefixed_and_lowercased() {
-        let loca = registry().get("LOCA").expect("LOCA");
-        assert_eq!(loca.table(), "g_loca");
-        assert_eq!(loca.view(), "v_loca");
     }
 
     #[test]

@@ -172,21 +172,40 @@ deciding that question now.
   regresses to exactly the stale-`Vouched` bug #550 fixed. The recommended API exposes
   `engine_fingerprint()` publicly, which turns an internal narrowing into a published
   contract that misreports itself.
-- **laterite#159 — no `include` allowlist.** `cargo package` ships everything not
+- **laterite#159 — no `include` allowlist. DONE.** `cargo package` ships everything not
   excluded, permanently and immutably. On a repo with a private-corpus discipline this
-  is a leak path the existing diff-grep habit does not cover.
-- **laterite#160 — rename `laterite-ags4-types` → `laterite-ags4-types`.** Its own header
-  reads "AGS4 type system"; the name should say so. crates.io has no rename, so this is
-  free now and irreversible later. Requires regenerating [[crate-dependency-graph]]
-  (`tools/gen_crate_graph.py`), which is CI-gated.
-- **laterite#161 — DuckDB naming in a format-neutral leaf, and it is dead.**
-  `GroupDescriptor::table()`/`view()` return `g_<code>`/`v_<code>`, documented as the
-  DuckDB table and view names, from the reference-data leaf. Publishing would freeze an
-  unrelated product's schema conventions into a dictionary crate's public API — but the
-  sharper finding is that **they have no callers**: the only occurrences repo-wide are
+  is a leak path the existing diff-grep habit does not cover. Each of the ten engine-tier
+  crates now carries an explicit `include`, and `tools/check_package_contents.py`
+  diffs `cargo package --list` against `tools/release/package-contents.json` in the
+  `rust` CI job so a new file entering a tarball goes red rather than being discovered
+  after it is immutable.
+- **laterite#160 — rename `laterite-types` → `laterite-ags4-types`. DONE.** Its own header
+  reads "AGS4 type system"; the name should say so. crates.io has no rename, so this was
+  free then and irreversible later. Landed in #176, reverted by #178 (below), restored
+  in #184. Regenerating [[crate-dependency-graph]] (`tools/gen_crate_graph.py`) is
+  CI-gated and passes.
+- **laterite#161 — DuckDB naming in a format-neutral leaf, and it is dead. DONE (twice).**
+  `GroupDescriptor::table()`/`view()` returned `g_<code>`/`v_<code>`, documented as the
+  DuckDB table and view names, from the reference-data leaf. Publishing would have frozen
+  an unrelated product's schema conventions into a dictionary crate's public API — but the
+  sharper finding was that **they had no callers**: the only occurrences repo-wide were
   the two functions and their own unit test, and `laterite-duckdb` never references
-  `GroupDescriptor` or builds a `g_`/`v_` name at all. So the fix is deletion, not
-  relocation. Inventoried in [[reliquary]] as `spotted`.
+  `GroupDescriptor` or builds a `g_`/`v_` name at all. So the fix was deletion, not
+  relocation.
+
+> [!warning] #178 reverted two merged PRs, and the second went unnoticed for days
+> #178 was branched before #175 and #176 and squash-merged after them, so its diff
+> restored what both had deleted. The #176 casualty (the 104-file crate rename) was
+> caught during the 0.9.0 cut and fixed in #184. The #175 casualty — these two
+> functions — was **not**, because laterite#161 was already closed as completed, so
+> the reverted state read as the finished state. It was re-deleted during the #159
+> work, when the crate's `include` put it back under scrutiny.
+>
+> No gate could see either one. The tree compiled, every test passed, and the result
+> was internally consistent — a self-consistent revert is invisible to CI by
+> construction. What closed the class was requiring branches to be up to date before
+> merge (`strict_required_status_checks_policy`); what would have caught THIS instance
+> sooner is not trusting a closed issue as evidence about the tree.
 
 **`laterite-transport` keeps its name.** Its header records that the age + zstd
 envelope works on any file; it is the one engine crate that would carry over unchanged

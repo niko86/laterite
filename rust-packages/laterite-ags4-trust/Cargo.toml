@@ -21,6 +21,13 @@ description = "The certificate trust model for AGS4: one door for check + mint"
 license = "MIT"
 publish = false
 
+# What `cargo package` may put in the tarball. Explicit because the default is
+# "everything not excluded", and crates.io is append-only — a file that rides one
+# publish cannot be taken back. See laterite#159.
+include = [
+    "/src/**",
+]
+
 [lib]
 name = "laterite_ags4_trust"
 path = "src/lib.rs"

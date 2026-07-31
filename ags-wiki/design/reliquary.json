@@ -249,9 +249,9 @@
       "symbol": "`GroupDescriptor::table()`/`view()`",
       "verify": "`rust-packages/laterite-ags4-reference/src/union.rs::fn table`",
       "axis": "code",
-      "status": "spotted",
-      "removed_in": "—",
-      "evidence": "DuckDB `g_<code>`/`v_<code>` name builders on the reference-data leaf. Verified dead 2026-07-29: the only occurrences repo-wide are the two fns and their own unit test (union.rs:401-402), and `laterite-duckdb` never references `GroupDescriptor` — it builds no `g_`/`v_` names at all. Publishing would freeze an unrelated product's naming into a dictionary crate's public API. See [[dec-rust-api-crates-io]], laterite#161"
+      "status": "removed",
+      "removed_in": "#175, re-removed in #189",
+      "evidence": "DuckDB `g_<code>`/`v_<code>` name builders on the reference-data leaf. Verified dead 2026-07-29: the only occurrences repo-wide were the two fns and their own unit test, and `laterite-duckdb` never references `GroupDescriptor` — it builds no `g_`/`v_` names at all. Publishing would have frozen an unrelated product's naming into a dictionary crate's public API. Deleted in #175; **#178 restored them** (it branched before #175 and squash-merged after, so its diff undid the removal — the same revert that took out the #176 crate rename). Re-deleted in #189. See [[dec-rust-api-crates-io]], laterite#161"
     }
   ]
 }

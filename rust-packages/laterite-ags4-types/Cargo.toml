@@ -19,6 +19,13 @@ description = "AGS4 type system (canonical types + permissive value casting) —
 license = "MIT"
 publish = false
 
+# What `cargo package` may put in the tarball. Explicit because the default is
+# "everything not excluded", and crates.io is append-only — a file that rides one
+# publish cannot be taken back. See laterite#159.
+include = [
+    "/src/**",
+]
+
 [dependencies]
 # Calendar/clock-free date parsing for canonical-type casting. `std`
 # (which implies `alloc`) is enough for parse_from_str + format!-to-

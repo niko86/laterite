@@ -31,6 +31,13 @@ description = "AGS4 revision diff — KEY-aware/type-aware comparison of two fil
 license = "MIT"
 publish = false
 
+# What `cargo package` may put in the tarball. Explicit because the default is
+# "everything not excluded", and crates.io is append-only — a file that rides one
+# publish cannot be taken back. See laterite#159.
+include = [
+    "/src/**",
+]
+
 [dependencies]
 # ParsedFile/ParsedGroup/DataRow — the tokenised rows the diff walks.
 laterite-ags4-parse = { path = "../laterite-ags4-parse" }
