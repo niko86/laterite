@@ -144,6 +144,12 @@
         "prs": [
           203
         ]
+      },
+      {
+        "text": "**The surface census had a gate that could never pass, so nothing ran it.** `tools/gen_census.py --check` is what stops the three `lat` launchers drifting apart — it was written after `lat merge` shipped in the native binary and never reached the uvx or npx launchers with every gate green. But its renderer emitted a `repo_ref` to `tests/test_census_faithful.py`, a file that has never existed in this repository, and the wiki lint's dead-reference scan is hard over live content — so the rendered page had that line stripped by hand, which made `--check` report the page stale on every run, forever. An unpassable check does not get wired into CI, and it wasn't: no job invoked it, so the census could drift from the launchers in silence, which is the exact failure it was built to catch. The false reference is gone, `--check` passes with no change to the committed page or SSOT, and ci.yml's python job now runs it — a step rather than a test, because the check needs BUILT launchers and a test would have had to skip without them.",
+        "prs": [
+          207
+        ]
       }
     ],
     "security": []

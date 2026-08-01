@@ -42,9 +42,12 @@ No single CI job builds all three launchers (python builds the wheel + `lat`; no
 builds `dist/`). Rather than add a job, the **committed SSOT is the shared contract**
 and each job pins the surfaces it already has:
 
-  * python job — `tests/test_census_faithful.py` runs `--check`, which probes the
-    launchers present and asserts each still answers exactly what the SSOT records,
-    then that every divergence is declared.
+  * python job — runs `--check` directly as a step (it has both `lat` and the
+    wheel), which probes the launchers present and asserts each still answers exactly
+    what the SSOT records, then that every divergence is declared. A step rather than
+    a pytest test on purpose: the check needs BUILT launchers, so as a test it would
+    have to skip when they are absent — and a gate that skips itself is the failure
+    this whole file exists to prevent.
   * node job   — `test/census.test.ts` asserts npx's live `census()` equals the
     SSOT's `cli-npx` entry.
 
@@ -392,7 +395,13 @@ def render(ssot: dict) -> str:
         "repo_refs:",
         '  census: "repo:surface-census.json"',
         '  generator: "repo:tools/gen_census.py"',
-        '  gate_python: "repo:tests/test_census_faithful.py"',
+        # No `gate_python:` ref. The python-side gate is a STEP in ci.yml's python
+        # job, not a file, so there is nothing here to cite — and the wiki lint's
+        # dead-`repo:`-ref scan is hard over live content, so naming a file that does
+        # not exist would fail it. This line used to name `tests/test_census_faithful.py`,
+        # which has never been in this repo; the rendered page had it stripped by hand
+        # to keep the lint green, and that hand-edit is what made `--check` report
+        # stale forever — the one thing it could never be made to pass.
         '  gate_node: "repo:rust-packages/laterite-node/test/census.test.ts"',
         '  authority: "repo:rust-packages/laterite-cli/src/commands/census.rs"',
         "related: [modality-register, crate-map, agent-first-cli-contract, parity-model, start-here, laterite-ags4-xcheck]",
@@ -402,8 +411,8 @@ def render(ssot: dict) -> str:
         "# surface census",
         "",
         "> **Generated** by `tools/gen_census.py` — do not hand-edit.",
-        "> Gated by `tests/test_census_faithful.py` (native + uvx) and",
-        "> `rust-packages/laterite-node/test/census.test.ts` (npx).",
+        "> Gated by the `surface census --check` step in ci.yml's python job",
+        "> (native + uvx) and `rust-packages/laterite-node/test/census.test.ts` (npx).",
         "",
         "## Definition",
         "",

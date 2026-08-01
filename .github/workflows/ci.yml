@@ -850,6 +850,22 @@ jobs:
         working-directory: rust-packages
         run: cargo build --release -p laterite-cli
 
+      - name: surface census --check (launchers == surface-census.json)
+        # This job has both launchers the census names here — the `lat` release
+        # binary built above (the AUTHORITY) and the wheel — so it is the job that
+        # pins them; the node job pins npx against the same committed SSOT.
+        #
+        # A step, not a pytest test: the check needs BUILT launchers, so as a test it
+        # would have to skip when they are absent, and a gate that skips itself is
+        # what this whole census exists to prevent. (`lat merge` shipped in the binary
+        # and never reached the other two launchers with every gate green.)
+        #
+        # Wired late: the generator emitted a `repo_ref` to a file that has never been
+        # in this repo, the rendered page had that line stripped by hand to keep the
+        # wiki lint's dead-ref scan green, and so `--check` reported stale forever —
+        # unpassable, therefore never run, therefore the census could drift in silence.
+        run: uv run --no-sync python tools/gen_census.py --check
+
       - name: ruff check
         run: uv run ruff check .
 
