@@ -114,6 +114,43 @@ fn requesting_the_on_disk_check_on_bytes_is_refused() {
         .run()
         .expect_err("must refuse rather than report Rule 20 clean");
     assert_eq!(err.kind(), laterite::ErrorKind::InvalidArgument);
+
+    // The refusal has to say what the caller did wrong. `cannot validate 210
+    // bytes` is true, useless, and was what this printed to begin with.
+    let msg = err.to_string();
+    for expected in ["check_files", "validate_bytes", "Rule 20"] {
+        assert!(
+            msg.contains(expected),
+            "the message must name {expected} so the caller can act on it: {msg}"
+        );
+    }
+
+    // ...once. The engine's own wording says the same thing, so carrying it as a
+    // cause made `{:#}` and every anyhow chain print the explanation twice.
+    assert_eq!(
+        format!("{err:#}"),
+        msg,
+        "the explanation is already in the message; a cause here only repeats it"
+    );
+}
+
+/// `{}` stays terse so wrappers do not print the cause twice; `{:#}` shows it.
+#[test]
+fn the_alternate_format_appends_the_cause() {
+    let err = ags4::validate("no-such-file-anywhere.ags")
+        .run()
+        .expect_err("missing file");
+
+    let terse = format!("{err}");
+    let full = format!("{err:#}");
+    assert!(
+        full.starts_with(&terse),
+        "the alternate form must extend the terse one, not replace it: {full}"
+    );
+    assert!(
+        full.len() > terse.len(),
+        "`{{:#}}` added nothing, so the cause is still invisible: {full}"
+    );
 }
 
 /// The counterpart: from a path the same request is answerable, and answers.

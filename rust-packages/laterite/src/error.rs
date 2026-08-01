@@ -75,8 +75,8 @@ impl ErrorKind {
 pub struct Error {
     kind: ErrorKind,
     message: String,
-    /// The engine error, kept only so `{:#}` and an `anyhow`/`eyre` chain render
-    /// the underlying detail. It is wrapped in a PRIVATE newtype (see [`Source`]),
+    /// The engine error, kept so `{:#}` and an `anyhow`/`eyre` chain render the
+    /// underlying detail. It is wrapped in a PRIVATE newtype (see [`Source`]),
     /// so `source()` can be walked and printed but never `downcast_ref` onto an
     /// engine type — which would put that type back in the public API through
     /// the back door.
@@ -141,8 +141,22 @@ impl Error {
 }
 
 impl fmt::Display for Error {
+    /// `{}` is the message alone; `{:#}` appends the cause.
+    ///
+    /// Plain `{}` stays terse because that is what a wrapper expects: `anyhow`
+    /// and `eyre` walk `source()` themselves and print each link with `{}`, so an
+    /// error that appended its own cause would render it twice in every chain.
+    ///
+    /// `{:#}` exists because the terse form alone is not always enough to act on,
+    /// and a caller who is *not* using one of those crates has otherwise no way to
+    /// see the cause short of walking `source()` by hand. The field's doc has
+    /// claimed `{:#}` did this since the crate was written; it does now.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
+        f.write_str(&self.message)?;
+        if let Some(source) = self.source.as_ref().filter(|_| f.alternate()) {
+            write!(f, ": {source}")?;
+        }
+        Ok(())
     }
 }
 
