@@ -21,7 +21,7 @@ license = "MIT"
 repository.workspace = true
 keywords = ["zstd", "age", "encryption", "compression", "archive"]
 categories = ["compression", "cryptography", "filesystem"]
-publish = false
+publish = true
 
 # What `cargo package` may put in the tarball. Explicit because the default is
 # "everything not excluded", and crates.io is append-only — a file that rides one
