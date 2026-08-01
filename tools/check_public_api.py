@@ -187,6 +187,47 @@ def check_auto_traits(crate: str, lines: list[str]) -> list[str]:
     ]
 
 
+#: The crate whose whole purpose is to have no third-party type in its API.
+FACADE = "laterite"
+
+#: Path roots a facade signature may mention. Everything else is somebody's
+#: crate, and a crate in a signature is a crate whose major version can force
+#: ours.
+ALLOWED_ROOTS = frozenset({"laterite", "core", "alloc", "std"})
+
+#: A leading path segment: `core::fmt::…`, `serde_json::Value`. Segments AFTER
+#: the first are inner modules of whatever the first names, so only roots — the
+#: text at a line start or after a delimiter — are checked.
+ROOT = re.compile(r"(?:^|[ (<&\[,])([a-z_][a-z0-9_]*)::")
+
+
+def check_no_third_party(crate: str, lines: list[str]) -> list[str]:
+    """The facade's public API must name no crate but its own and the standard library.
+
+    This is the highest-leverage rule in `dec-rust-api-crates-io.md`, and the
+    one most easily lost by accident: returning a `serde_json::Value` or taking
+    an `encoding_rs::Encoding` is a one-line convenience that permanently binds
+    this crate's major version to that dependency's. Every such slip is visible
+    in the rendered API, so it can simply be forbidden rather than reviewed for.
+
+    Only the facade is held to this. The engine crates traffic in `arrow`,
+    `encoding_rs` and `serde` on purpose — being the layer that does, so this one
+    does not, is the entire point of the split.
+    """
+    if crate != FACADE:
+        return []
+    bad: dict[str, str] = {}
+    for ln in lines:
+        for root in ROOT.findall(ln):
+            if root not in ALLOWED_ROOTS:
+                bad.setdefault(root, ln)
+    return [
+        f"  {crate}: `{root}` appears in the public API — a third-party type in a "
+        f"signature binds this crate's semver to that dependency's:\n      {ln}"
+        for root, ln in sorted(bad.items())
+    ]
+
+
 def check_impl_trait_is_asserted(crate: str, lines: list[str]) -> list[str]:
     """Every `-> impl Trait` must be named in the crate's `tests/auto_traits.rs`.
 
@@ -244,6 +285,7 @@ def main() -> int:
 
         problems += check_auto_traits(crate, lines)
         problems += check_impl_trait_is_asserted(crate, lines)
+        problems += check_no_third_party(crate, lines)
 
     if args.write and not problems:
         print(

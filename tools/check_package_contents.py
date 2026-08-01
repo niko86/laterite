@@ -71,12 +71,21 @@ REPO = Path(__file__).resolve().parent.parent
 WORKSPACE = REPO / "rust-packages" / "Cargo.toml"
 MANIFEST = REPO / "tools" / "release" / "package-contents.json"
 
-#: The engine tier from `ags-wiki/design/dec-rust-api-crates-io.md` — ten crates,
-#: verified dependency-closed. Round one publishes eight of them (diff and merge
-#: are held for 0.2), but all ten are gated here: the allowlist has to be right
-#: before a crate publishes, and "we'll add the gate when we publish it" is how
-#: the ungated one goes out.
+#: Every crate that may reach crates.io, gated whether or not it has published
+#: yet — "we'll add the gate when we publish it" is how the ungated one goes out.
+#:
+#: Two tiers, from `ags-wiki/design/dec-rust-api-crates-io.md`:
+#:
+#: * `laterite` — the USER-FACING facade, on its own 0.1.x clock. The only one a
+#:   stranger is expected to depend on directly.
+#: * the ten `laterite-ags4-*` / `laterite-transport` ENGINE crates, lockstep on
+#:   the workspace version, which reshape as the format work demands.
+#:
+#: Both tiers are gated identically. The facade exists so the engine can move
+#: without breaking consumers, but the engine is published too, so its surface
+#: is a promise as well — just a promise to fewer people.
 PUBLISH_SET = [
+    "laterite",
     "laterite-ags4-core",
     "laterite-ags4-diff",
     "laterite-ags4-emit",

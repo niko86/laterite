@@ -269,6 +269,39 @@ whose stated posture is that AGS5 is a dormant concept.
 `laterite-ags4-core`, so it cannot be dropped without a breaking default-feature
 change.
 
+## `laterite` 0.1.0 — the facade exists
+
+Built 2026-08-01, after the engine tier was already published. Scope is **read,
+validate, write**; diff, merge, typed cells and the indexed `scan()` path stay
+0.2 as planned, and all four are additive so nothing here has to move to admit
+them.
+
+The Option-C rules held in practice, and the rendered API is the evidence:
+
+- Everything under `laterite::ags4`; the crate root carries only `Error` and
+  `ErrorKind`.
+- Handles opaque, `Debug` written by hand rather than derived — a derived
+  `Debug` on `Document` prints every cell of a delivery file, which turns a
+  stray `dbg!` or a panic message into a data dump and quietly makes the
+  engine's field names part of what consumers see.
+- **Zero third-party types in the public API**, now MECHANICALLY ENFORCED rather
+  than reviewed for: `check_public_api.py`'s `check_no_third_party` requires
+  every path root in the facade's rendered surface to be `laterite`, `core`,
+  `alloc` or `std`. Verified to catch both leak shapes (a `serde_json::Value`
+  return, an `encoding_rs::Encoding` argument), and it exempts the engine
+  crates, which traffic in those on purpose.
+- `encoding_rs` is not even a dependency: resolving the encoding inline lets
+  inference carry the type, so the crate is absent rather than merely
+  absent-from-signatures.
+
+Two things the build changed elsewhere. `ErrorKind` gained an `Other` variant —
+the engine's `ValidatorError::kind()` is documented as the single producer of
+that token domain, so the facade maps from the token rather than re-matching
+variants, and an unmapped future token needs an honest home rather than being
+filed under whichever kind looked closest. And `publish_crates.py` now reads
+**per-crate** versions: one `workspace_version()` would have asked crates.io
+about `laterite 0.9.0`, been told no, and tried to publish it.
+
 ## The first publish happened — 0.9.0, 2026-08-01
 
 All eight went out: `laterite-ags4-parse`, `-types`, `laterite-transport`,
