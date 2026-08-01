@@ -51,7 +51,7 @@ uv run ruff check .                              # lint (the only linter; CI run
 uv run ruff format --check .                     # format gate (CI enforces it)
 uv run ty check                                  # Astral `ty` type-faithfulness gate over the shipped package
 
-uv run lat validate delivery.ags --json          # the shipped AGS4 validator CLI (laterite-ags4-check)
+uv run lat validate delivery.ags --json          # the shipped AGS4 validator CLI (laterite-cli)
 
 ./tools/run_python_ags4_tests.sh                 # python-ags4's own suite vs laterite.compat
                                                  # (parity oracle; needs ../ags-python-library cloned from GitLab)
@@ -128,7 +128,7 @@ load-bearing chain:
   dictionary editions + rules catalogue from `laterite-ags4-reference`.
 
 Surfaces: `laterite-py` (PyO3 → the `laterite` wheel), `laterite-node` (napi-rs),
-`laterite-ags4-wasm` (browser). CLI: **`lat`** (`laterite-ags4-check`). Supporting
+`laterite-ags4-wasm` (browser). CLI: **`lat`** (`laterite-cli`). Supporting
 crates include the `laterite-ags4-{parity,forge,corpus-qa,perf}` QA tools,
 `laterite-ags4-xcheck` (cross-surface output-value gate), and `laterite-excel`
 (AGS4↔XLSX, extracted so its `calamine`/`rust_xlsxwriter` deps don't ride into

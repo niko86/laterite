@@ -6,7 +6,7 @@ tags: [design, decision]
 decided: 2026-05-30
 supersedes: []
 from_gap: []
-related: [validator-site, dec-rust-drives-python, laterite-ags4-check, DT, 0DP, effective-dictionary, dec-duckdb-extension, design/_README, crate-map, dec-ags4-censor-leaf]
+related: [validator-site, dec-rust-drives-python, laterite-cli, DT, 0DP, effective-dictionary, dec-duckdb-extension, design/_README, crate-map, dec-ags4-censor-leaf]
 sources: []
 ---
 
@@ -183,7 +183,7 @@ graph TD
 
 ## Related
 [[validator-site]] · single-JSON dictionary generation ·
-[[dec-rust-drives-python]] · laterite-ags5-db · [[laterite-ags4-check]] · [[DT]] · [[0DP]] ·
+[[dec-rust-drives-python]] · laterite-ags5-db · [[laterite-cli]] · [[DT]] · [[0DP]] ·
 [[effective-dictionary]] · [[dec-duckdb-extension|laterite-duckdb reuses this typing authority]] ·
 [[design/_README\|AGS5 register]] · [[crate-map|laterite-ags4-tokenizer-wasm's full crate listing]] ·
 the #555 gate the browser's char-offset span is excluded from ·

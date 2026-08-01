@@ -60,7 +60,7 @@ LAYER = {
     "laterite-py": 4,
     "laterite-node": 4,
     "laterite-ags4-wasm": 4,
-    "laterite-ags4-check": 4,
+    "laterite-cli": 4,
     "laterite-ags4-tokenizer-wasm": 4,
 }
 LAYER_NAME = {

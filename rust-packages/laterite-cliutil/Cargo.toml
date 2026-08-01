@@ -3,7 +3,7 @@
 # Single source of truth for the loading/activity animation, the
 # aligned UTF8 table, the colour gate, atomic file writes, and the
 # rich-style coloured JSON / output-mode dispatch. Previously these
-# were copied verbatim across `laterite-ags4-check` and `ags4-corpus-qa`
+# were copied verbatim across `laterite-cli` and `ags4-corpus-qa`
 # ("copied, not imported" because they lived in bins) — this crate is
 # the de-duplication.
 #

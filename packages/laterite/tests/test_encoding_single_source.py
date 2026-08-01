@@ -174,7 +174,7 @@ def test_census_probe_lists_agree() -> None:
     rust = (
         Path(__file__).resolve().parents[3]
         / "rust-packages"
-        / "laterite-ags4-check"
+        / "laterite-cli"
         / "src"
         / "commands"
         / "census.rs"

@@ -3,7 +3,7 @@
 # Members:
 #   laterite-ags4-validator    Clean-room Rust AGS4 validator — library only
 #                     (lean, wasm-safe leaf). The CLI is `lat`.
-#   laterite-ags4-check  The `lat` CLI front-end for the validator
+#   laterite-cli  The `lat` CLI front-end for the validator
 #                     (owns the comfy-table/indicatif + optional TUI
 #                     deps). Depends on the validator library API only.
 #   laterite-ags4-wasm         Browser wasm (cdylib) wrapper around the validator
@@ -45,7 +45,7 @@ members = [
     "laterite-ags4-censor",
     "laterite-ags4-validator",
     "laterite-ags4-trust",
-    "laterite-ags4-check",
+    "laterite-cli",
     "laterite-ags4-wasm",
     "laterite-ags4-tokenizer-wasm",
     "laterite-cliutil",

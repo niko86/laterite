@@ -322,7 +322,7 @@ jobs:
       # cli-native leg: the release binary the launcher-leg subprocesses invoke
       # (emit_cli.py looks for rust-packages/target/release/lat).
       - name: Build lat CLI (release)
-        run: cargo build --release --manifest-path rust-packages/Cargo.toml -p laterite-ags4-check
+        run: cargo build --release --manifest-path rust-packages/Cargo.toml -p laterite-cli
       # Emit one observation file per leg, then compare. `xcheck` exits non-zero on
       # any unexplained split; ZERO normalisation, JSON value equality.
       - name: Cross-surface output-value gate

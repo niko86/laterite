@@ -11,7 +11,7 @@ repo_refs:
   root: "repo:rust-packages/laterite-ags4-validator"
   lib: "repo:rust-packages/laterite-ags4-validator/src/lib.rs"
   observations: "repo:OBSERVATIONS.md"
-related: [crate-map, laterite-ags4-reference, laterite-ags4-check, laterite-ags4-wasm, laterite-py, parity-model, dec-rust-drives-python, cert-trust-v2, O-42, modality-register, testing-strategy, dec-custom-dict-overlay, O-28]
+related: [crate-map, laterite-ags4-reference, laterite-cli, laterite-ags4-wasm, laterite-py, parity-model, dec-rust-drives-python, cert-trust-v2, O-42, modality-register, testing-strategy, dec-custom-dict-overlay, O-28]
 sources: []
 ---
 # laterite-ags4-validator
@@ -46,7 +46,7 @@ fix engine?) stays in this crate's own `src/catalogue.rs` — it needs
 `crate::fixes::FIXABLE_RULE_LABELS`, which the leaf deliberately can't see.
 
 This page documents the **engine library** (`laterite_ags4_validator`). It is
-distinct from the [[laterite-ags4-check]] binary, which is a thin CLI front-end
+distinct from the [[laterite-cli]] binary, which is a thin CLI front-end
 over this same library. The engine is also embedded by laterite-ags5-db,
 [[laterite-ags4-wasm]], [[laterite-py]], laterite-py-ags5, and the parity
 harness — see [[parity-model]].
@@ -166,4 +166,4 @@ flowchart LR
 
 ## Related
 
-[[crate-map]] · [[laterite-ags4-reference]] · [[laterite-ags4-check]] · [[laterite-ags4-wasm]] · [[laterite-py]] · laterite-py-ags5 · [[parity-model]] · [[dec-rust-drives-python]] · [[cert-trust-v2]] · [[O-42]] · [[modality-register]] · [[testing-strategy]] · [[dec-custom-dict-overlay]] · [[O-28]]
+[[crate-map]] · [[laterite-ags4-reference]] · [[laterite-cli]] · [[laterite-ags4-wasm]] · [[laterite-py]] · laterite-py-ags5 · [[parity-model]] · [[dec-rust-drives-python]] · [[cert-trust-v2]] · [[O-42]] · [[modality-register]] · [[testing-strategy]] · [[dec-custom-dict-overlay]] · [[O-28]]

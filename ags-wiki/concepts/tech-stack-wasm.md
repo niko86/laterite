@@ -69,7 +69,7 @@ The crate exposes **seven** `#[wasm_bindgen]` entry points
   `shown_count` reports what crossed the boundary. This is a UI safety
   ceiling — a pathologically dirty file can yield millions of findings
   (hundreds of MB of JSON) — and is **wasm-only**: the CLI's `--json` is
-  built independently in `repo:rust-packages/laterite-ags4-check/src/main.rs`.
+  built independently in `repo:rust-packages/laterite-cli/src/main.rs`.
 - `parse(bytes, encoding)` → a `ParsedDataset` exposing `group_codes()`,
   `meta(code)` (`{headings, units, types, sql_types}`), and
   `arrow_ipc(code)` — one **typed Apache Arrow IPC stream per group**,

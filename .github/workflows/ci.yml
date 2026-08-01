@@ -848,7 +848,7 @@ jobs:
         # above wraps CC/CXX/rustc). Release, not debug: the test hard-codes
         # the target/release path (matching how the binary ships).
         working-directory: rust-packages
-        run: cargo build --release -p laterite-ags4-check
+        run: cargo build --release -p laterite-cli
 
       - name: ruff check
         run: uv run ruff check .

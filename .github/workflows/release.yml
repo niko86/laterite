@@ -347,7 +347,7 @@ jobs:
         working-directory: rust-packages
         shell: bash
         run: |
-          cargo build --release --target ${{ matrix.target }} -p laterite-ags4-check
+          cargo build --release --target ${{ matrix.target }} -p laterite-cli
 
       - if: runner.os == 'Windows'
         name: Build CLI binary (Windows)
@@ -356,7 +356,7 @@ jobs:
         # the default shell on Windows runners hits Restricted policy.
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
         run: |
-          cargo build --release --target ${{ matrix.target }} -p laterite-ags4-check
+          cargo build --release --target ${{ matrix.target }} -p laterite-cli
 
       # Bundle step: bash for Linux/macOS, pwsh for Windows. The
       # archive format differs (tar.gz vs zip) and we no longer want

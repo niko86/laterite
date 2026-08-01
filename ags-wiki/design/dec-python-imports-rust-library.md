@@ -6,7 +6,7 @@ tags: [design, decision]
 decided: 2026-05-18
 supersedes: []
 from_gap: []
-related: [dec-rust-drives-python, design/_README, laterite-ags4-check, parity-model, dec-duckdb-extension]
+related: [dec-rust-drives-python, design/_README, laterite-cli, parity-model, dec-duckdb-extension]
 sources: []
 ---
 
@@ -85,7 +85,7 @@ One engine, one source of truth. Re-implementing (opt 2) or refusing
 shelling out (opt 3) is not a library. The [[parity-model]] stays
 intact precisely because `laterite` *is* the same `laterite_ags4_validator`
 binary's engine: `laterite.compat.check_file` /
-`laterite.validate().to_json()` are byte-identical to `[[laterite-ags4-check]]`
+`laterite.validate().to_json()` are byte-identical to `[[laterite-cli]]`
 (verified across the validator fixture corpus), so a divergence is
 still, by construction, Rust-vs-`python-ags4` — never a new
 laterite-vs-Rust axis. The "never the reverse" clause exists to keep
@@ -116,5 +116,5 @@ change.
 
 ## Related
 [[dec-rust-drives-python]] · dec-rust-engine-staged-adoption · [[design/_README|AGS5 register]] ·
-[[laterite-ags4-check]] · laterite-ags5-db · [[parity-model]] ·
+[[laterite-cli]] · laterite-ags5-db · [[parity-model]] ·
 [[dec-duckdb-extension|laterite-duckdb: the DuckDB-host read surface]]

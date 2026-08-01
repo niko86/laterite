@@ -33,4 +33,4 @@ flowchart LR
 ```
 
 ## Related
-<!-- [[parity-model]] · [[laterite-ags4-check]] · [[<other tool>]] -->
+<!-- [[parity-model]] · [[laterite-cli]] · [[<other tool>]] -->

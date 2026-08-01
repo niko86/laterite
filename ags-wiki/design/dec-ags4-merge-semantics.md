@@ -257,7 +257,7 @@ not a capability gap in the underlying leaf (which is N-ary).
   collapsing with zero revisions), 16 Python
   (`packages/laterite/tests/test_merge.py`), 14 Node
   (`rust-packages/laterite-node/test/p3-merge.test.ts`), CLI integration
-  tests (`rust-packages/laterite-ags4-check/tests/cli_merge.rs`), and a
+  tests (`rust-packages/laterite-cli/tests/cli_merge.rs`), and a
   browser e2e (`web/e2e/merge.spec.ts`).
 
 ## Related

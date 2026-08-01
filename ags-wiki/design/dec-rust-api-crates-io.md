@@ -338,6 +338,44 @@ dependencies; this is the first evidence that the published artefacts resolve an
 build as a stranger receives them — which is precisely the thing
 [[dec-rust-api-crates-io|#158]] was about.
 
+## The CLI is `laterite-cli`, and it cannot publish yet
+
+Renamed from `laterite-ags4-check` on 2026-08-01. The binary it ships is still
+`lat` — only the crate is renamed, so nothing a user types changes.
+
+The rename happened **now** for one reason: crates.io has no rename. A crate name
+is free to change until its first publish and irreversible after, which is the
+[[reliquary|#160]] lesson learned somewhere cheaper. `laterite-ags4-check` named
+a crate that stopped being a checker several verbs ago — it reads, fixes, diffs,
+merges, certifies, packs and converts — and `-ags4-` marks the engine tier, which
+this is not.
+
+It was **not** added to the publish set, and the reason is worth writing down
+because it looks like an oversight:
+
+- **A binary's dependencies are still dependencies.** Publishing strips `path`,
+  so every in-workspace dep must itself be on the registry. `laterite-cli` needs
+  `laterite-ags4-diff` and `laterite-ags4-merge` — both deliberately held for 0.2
+  — plus `laterite-cliutil` and `laterite-excel`, which carry `publish = false`
+  and have never been considered for the registry at all. Publishing the CLI
+  means publishing four more crates, two of them against a decision recorded
+  above. That is the trade the crate split bought us, seen from the other side:
+  the CLI is separate *precisely* so its `clap`/`ratatui`/`calamine` weight stays
+  off every library consumer, and the same boundary means it drags its own tier
+  along when it goes out.
+- **Both publish gates assume a library.** `check_public_api.py` renders with
+  `cargo public-api` and `check_semver.py` runs `cargo semver-checks`; a bin-only
+  crate has no lib target for either to read. `PUBLISH_SET` is the single list
+  both gates and the packaging gate share, so adding the CLI to it breaks two of
+  the three. The fix is an exemption — a binary has no public API to freeze, so
+  there is genuinely nothing for those gates to check — and **not** a `src/lib.rs`
+  invented to satisfy a tool.
+
+So the CLI ships with 0.2, alongside the diff/merge publish it already depends
+on. Until then `lat` is distributed as it is today: per-target binaries from the
+release workflow. `cargo install laterite-cli` is a convenience, not an API
+promise, and it is the one part of this plan with a good reason to wait.
+
 ## Related
 
 [[api-surface-1.0]] · [[dec-rust-drives-python]] · [[dec-laterite-ags4-types-leaf]] ·

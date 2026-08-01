@@ -6,7 +6,7 @@ tags: [design, decision, roadmap]
 decided: 2026-05-30
 supersedes: []
 from_gap: []
-related: [validator-site, tech-stack-wasm, pyo3-boundary, crate-map, laterite-ags4-check, parity-model, dec-rust-drives-python, design/_README]
+related: [validator-site, tech-stack-wasm, pyo3-boundary, crate-map, laterite-cli, parity-model, dec-rust-drives-python, design/_README]
 sources: []
 ---
 
@@ -319,4 +319,4 @@ The B1 doc pair (fixability survey + fix-engine architecture) reported:
 
 ## Related
 
-[[validator-site]] · [[tech-stack-wasm]] · [[pyo3-boundary]] · [[crate-map]] · [[laterite-ags4-check]] · [[parity-model]] · [[dec-rust-drives-python]]
+[[validator-site]] · [[tech-stack-wasm]] · [[pyo3-boundary]] · [[crate-map]] · [[laterite-cli]] · [[parity-model]] · [[dec-rust-drives-python]]

@@ -99,7 +99,7 @@ jobs:
         run: uv run --no-project python ags-wiki/.bootstrap/reindex.py --check
 
       # The CLI verb-table faithfulness gate, run HERE too (stdlib-only, no wheel)
-      # so a wiki-only edit of tools/laterite-ags4-check.md — which skips ci.yml's
+      # so a wiki-only edit of tools/laterite-cli.md — which skips ci.yml's
       # python job — still can't drift the table from the shipped `lat --readme`
       # guide. Fires on both ags-wiki/** and rust-packages/** (README-cli.md), so
       # either side of the SSOT→page relationship reruns it.

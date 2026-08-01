@@ -8,7 +8,7 @@
 # embedder (laterite-ags5-db, laterite-py, laterite-ags4-wasm) inherits.
 
 [package]
-name = "laterite-ags4-check"
+name = "laterite-cli"
 version.workspace = true
 edition = "2024"
 rust-version = "1.85"

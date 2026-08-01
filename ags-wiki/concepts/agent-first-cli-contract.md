@@ -9,7 +9,7 @@ repo_refs:
   cli: "rust-packages/laterite-ags4-corpus-qa/src/cli.rs"
   main: "rust-packages/laterite-ags4-corpus-qa/src/main.rs"
   output: "rust-packages/laterite-ags4-corpus-qa/src/output.rs"
-related: [laterite-cliutil, laterite-ags4-corpus-qa, laterite-ags4-check, laterite-ags4-forge, laterite-ags4-parity, surface-census]
+related: [laterite-cliutil, laterite-ags4-corpus-qa, laterite-cli, laterite-ags4-forge, laterite-ags4-parity, surface-census]
 sources: []
 ---
 # agent-first CLI contract
@@ -63,9 +63,9 @@ flowchart LR
 ```
 
 ## Where it shows up
-[[laterite-ags4-check]], [[laterite-ags4-corpus-qa]], laterite-ags5-db today; [[laterite-ags4-forge]]
+[[laterite-cli]], [[laterite-ags4-corpus-qa]], laterite-ags5-db today; [[laterite-ags4-forge]]
 next. The shared primitives live in [[laterite-cliutil]]; the report-doc
 half of the contract is the [[laterite-ags4-corpus-qa]] `output.rs` pattern.
 
 ## Related
-[[laterite-cliutil]] · [[laterite-ags4-corpus-qa]] · [[laterite-ags4-check]] · laterite-ags5-db · [[laterite-ags4-forge]] · [[laterite-ags4-parity]] · [[surface-census]]
+[[laterite-cliutil]] · [[laterite-ags4-corpus-qa]] · [[laterite-cli]] · laterite-ags5-db · [[laterite-ags4-forge]] · [[laterite-ags4-parity]] · [[surface-census]]

@@ -9,7 +9,7 @@ artifact: laterite-ags4-corpus-qa
 ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-corpus-qa"
-related: [parity-model, laterite-ags4-check, laterite-ags4-parity, laterite-ags4-forge, data-single-source-audit, edition-resolution, crate-map, dec-ags4-censor-leaf, laterite-ags4-wasm]
+related: [parity-model, laterite-cli, laterite-ags4-parity, laterite-ags4-forge, data-single-source-audit, edition-resolution, crate-map, dec-ags4-censor-leaf, laterite-ags4-wasm]
 sources: []
 ---
 # laterite-ags4-corpus-qa
@@ -82,4 +82,4 @@ so [[laterite-ags4-forge]] shares the identical `classify`/`reconcile` without
 duplication (behaviour-neutral refactor).
 
 ## Related
-[[parity-model]] · [[laterite-ags4-check]] · [[laterite-ags4-parity]] · [[laterite-ags4-forge]] · [[crate-map]] · [[data-single-source-audit]] · [[edition-resolution]] · [[dec-ags4-censor-leaf]] · [[laterite-ags4-wasm]]
+[[parity-model]] · [[laterite-cli]] · [[laterite-ags4-parity]] · [[laterite-ags4-forge]] · [[crate-map]] · [[data-single-source-audit]] · [[edition-resolution]] · [[dec-ags4-censor-leaf]] · [[laterite-ags4-wasm]]

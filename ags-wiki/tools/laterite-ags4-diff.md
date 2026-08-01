@@ -10,13 +10,13 @@ ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-diff"
   lib: "repo:rust-packages/laterite-ags4-diff/src/lib.rs"
-related: [crate-map, crate-dependency-graph, laterite-ags4-parse, laterite-ags4-types, laterite-ags4-reference, laterite-ags4-merge, laterite-ags4-check, laterite-ags4-wasm, laterite-py, laterite-node]
+related: [crate-map, crate-dependency-graph, laterite-ags4-parse, laterite-ags4-types, laterite-ags4-reference, laterite-ags4-merge, laterite-cli, laterite-ags4-wasm, laterite-py, laterite-node]
 sources: []
 ---
 # laterite-ags4-diff
 
 > [!note] **Internal implementation detail** — a workspace crate, not a public
-> API. It ships as the `lat diff` verb ([[laterite-ags4-check]]) and the diff
+> API. It ships as the `lat diff` verb ([[laterite-cli]]) and the diff
 > surface on every binding ([[laterite-py]], [[laterite-node]],
 > [[laterite-ags4-wasm]]).
 
@@ -52,7 +52,7 @@ unchanged across hosts (`serde`). No DuckDB, no rules engine; it is **wasm-safe*
 `repo:rust-packages/laterite-ags4-diff`. Deps [[laterite-ags4-parse]] (the
 tokenised rows it walks), [[laterite-ags4-reference]] (KEY headings + types), and
 [[laterite-ags4-types]] (`parse_value`, the cast that suppresses formatting-only
-noise). Consumers: [[laterite-ags4-check]], [[laterite-ags4-wasm]],
+noise). Consumers: [[laterite-cli]], [[laterite-ags4-wasm]],
 [[laterite-node]], [[laterite-py]].
 
 ## Relationship to other components
@@ -65,7 +65,7 @@ flowchart LR
   parse[laterite-ags4-parse] --> diff[laterite-ags4-diff]
   ref[laterite-ags4-reference] --> diff
   types[laterite-ags4-types] --> diff
-  diff --> check["laterite-ags4-check<br/>(lat diff)"]
+  diff --> check["laterite-cli<br/>(lat diff)"]
   diff --> wasm[laterite-ags4-wasm]
   diff --> node[laterite-node]
   diff --> py[laterite-py]
@@ -73,4 +73,4 @@ flowchart LR
 
 ## Related
 
-[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-parse]] · [[laterite-ags4-types]] · [[laterite-ags4-reference]] · [[laterite-ags4-merge]] · [[laterite-ags4-check]] · [[laterite-ags4-wasm]] · [[laterite-py]] · [[laterite-node]]
+[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-parse]] · [[laterite-ags4-types]] · [[laterite-ags4-reference]] · [[laterite-ags4-merge]] · [[laterite-cli]] · [[laterite-ags4-wasm]] · [[laterite-py]] · [[laterite-node]]

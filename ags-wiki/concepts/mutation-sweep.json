@@ -31,7 +31,7 @@
   "rows": [
     {
       "module": "`commands/validate.rs`",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "6",
       "result": "4 killed / 2 cfg-false",
@@ -39,7 +39,7 @@
     },
     {
       "module": "`commands/fix.rs`",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "10",
       "result": "10 killed / 0",
@@ -47,7 +47,7 @@
     },
     {
       "module": "`commands/rules.rs`",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "0",
       "result": "n/a",
@@ -55,7 +55,7 @@
     },
     {
       "module": "`commands/diff.rs`",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "2",
       "result": "2 killed / 0",
@@ -63,7 +63,7 @@
     },
     {
       "module": "`commands/read.rs`",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "9",
       "result": "5 killed / 0 (4 unviable)",
@@ -71,7 +71,7 @@
     },
     {
       "module": "`commands/merge.rs`",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "5",
       "result": "4 killed / 1 residual",
@@ -79,7 +79,7 @@
     },
     {
       "module": "`commands/transport.rs`",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "3",
       "result": "3 killed / 0",
@@ -87,7 +87,7 @@
     },
     {
       "module": "`commands/certify.rs` + `cert.rs`",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "6",
       "result": "5 killed / 0 (1 unviable)",
@@ -95,7 +95,7 @@
     },
     {
       "module": "`commands/common.rs` (shared flag folding)",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "6",
       "result": "5 killed / 0 (1 unviable)",
@@ -103,7 +103,7 @@
     },
     {
       "module": "`commands/excel.rs`",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "6",
       "result": "6 killed / 0",
@@ -111,7 +111,7 @@
     },
     {
       "module": "`commands/census.rs`",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "7",
       "result": "6 killed / 1 equivalent",
@@ -119,11 +119,11 @@
     },
     {
       "module": "`main.rs` (`with_default_subcommand`)",
-      "crate": "laterite-ags4-check",
+      "crate": "laterite-cli",
       "swept": "2026-07-27",
       "mutants": "18",
       "result": "18 killed / 0",
-      "notes": "one unit test pins the argv pre-scan directly (asserting its output as a joined string) rather than through fragile e2e stdout matching: the loop bound (a no-positional line must not walk off the end), the four help/version alternatives (each passes through even with a trailing token — killing the three `|| → &&` mutants), and the flag-skip `+=` (a leading flag before an explicit verb — killing `+= → -=`; the `+= → *=` infinite-loop mutant is caught by timeout). **The whole `laterite-ags4-check` binary is now swept.**"
+      "notes": "one unit test pins the argv pre-scan directly (asserting its output as a joined string) rather than through fragile e2e stdout matching: the loop bound (a no-positional line must not walk off the end), the four help/version alternatives (each passes through even with a trailing token — killing the three `|| → &&` mutants), and the flag-skip `+=` (a leading flag before an explicit verb — killing `+= → -=`; the `+= → *=` infinite-loop mutant is caught by timeout). **The whole `laterite-cli` binary is now swept.**"
     },
     {
       "module": "`lib.rs`",

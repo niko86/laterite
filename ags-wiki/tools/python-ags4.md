@@ -40,7 +40,7 @@ flowchart LR
   parity --> ON[O-N observations]
 ```
 
-Wrapped by the `py_ags4_check_json.py` JSON contract (dev satellite — the parity harness's oracle input); cross-checked against [[laterite-ags4-check]] by [[laterite-ags4-corpus-qa]] via [[parity-model]]; the source of [[observations-coverage-map]] and every [[O-01]]…[[O-34]]. Clean-room boundary: see [[upstream-reporting]].
+Wrapped by the `py_ags4_check_json.py` JSON contract (dev satellite — the parity harness's oracle input); cross-checked against [[laterite-cli]] by [[laterite-ags4-corpus-qa]] via [[parity-model]]; the source of [[observations-coverage-map]] and every [[O-01]]…[[O-34]]. Clean-room boundary: see [[upstream-reporting]].
 
 Also the **root authority for the five vendored AGS4 `.ags` dictionaries** —
 [[vendored-authority-faithful]] checks them byte-for-byte against this
