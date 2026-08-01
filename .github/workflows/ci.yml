@@ -302,21 +302,18 @@ jobs:
       # Baseline is `main`, because nothing is on crates.io yet — at first
       # publish the stronger baseline (the released version) becomes available
       # and should replace it.
+      # The explicit fetch is belt-and-braces on top of fetch-depth: 0 — on a
+      # pull_request event the checked-out ref is the merge ref, and a missing
+      # `origin/main` would read as a tooling failure rather than the
+      # configuration mistake it is.
+      #
+      # A script rather than one cargo command because a crate that does not
+      # exist at the baseline aborts the WHOLE run rather than being skipped —
+      # see the module docstring. It reports what it skipped and why.
       - name: cargo semver-checks (against main)
-        working-directory: rust-packages
-        # The explicit fetch is belt-and-braces on top of fetch-depth: 0 — on a
-        # pull_request event the checked-out ref is the merge ref, and a missing
-        # `origin/main` here would read as a tooling failure rather than the
-        # configuration mistake it is.
-        #
-        # The crate list is read from the packaging gate's manifest rather than
-        # spelled out, for the same reason the Python gates import PUBLISH_SET:
-        # a fourth copy of these ten names is a fourth chance for one to be
-        # quietly dropped.
         run: |
           git fetch --no-tags origin main
-          cargo semver-checks --baseline-rev origin/main \
-            $(python3 -c "import json; print(' '.join('-p ' + c for c in json.load(open('../tools/release/package-contents.json'))))")
+          uv run --no-project python tools/check_semver.py
 
   rust:
     needs: changes
