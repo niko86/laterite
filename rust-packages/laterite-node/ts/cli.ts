@@ -23,6 +23,7 @@ import { StaleCertError } from "./errors";
 import { FixResult } from "./fix-result";
 import {
   editions as nativeEditions,
+  engineFingerprint,
   fallbackEdition,
   fixFile,
   listRules as rulesMetaJson,
@@ -243,9 +244,14 @@ export function census(): unknown {
     // See CENSUS_VERSION in the Rust census — bumped when a TABLE is added, so a
     // launcher built before a table existed fails loudly rather than reporting it
     // empty (which would read as "no drift").
-    census_version: 5,
+    census_version: 6,
     surface: "cli-npx",
     authority: false,
+    // The ENGINE this launcher carries, asked of the addon rather than restated
+    // here — so it reports what it is actually running, not what this file was
+    // written believing. Not a table and not in the census snapshot; see the note
+    // at the same key in the Rust census for why.
+    engine: engineFingerprint(),
     // Reflected from SPECS — the same declaration that parses argv and rejects an
     // unknown flag. Before, this reported `args: []` for every verb, because there
     // WAS no per-verb flag table: the census could only say "this launcher has no

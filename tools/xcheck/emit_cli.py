@@ -340,6 +340,41 @@ def observe(argv0: list[str], case: dict, repo_root: Path) -> dict | None:
     return None
 
 
+def engine_of(argv0: list[str], repo_root: Path) -> str | None:
+    """The engine digest this launcher is ACTUALLY carrying, via `census`.
+
+    Asked of the launcher rather than read from the tree, because that is the whole
+    point: each of these three drives a BUILT artefact — a release binary, an
+    installed wheel, a tsup dist — any of which can be stale while every case still
+    matches, since a stale engine and a current one usually agree.
+
+    `None` when the launcher cannot answer, which `xcheck` reports as an unchecked
+    leg by name rather than as agreement. A launcher built before census schema 6
+    lands here too, and that is correct: it has no engine to report, not an engine
+    that happens to match.
+    """
+    try:
+        out = subprocess.run(
+            # Bare `census` — the dump IS JSON, and the native binary rejects a
+            # `--json` the other two tolerate. Same argv `tools/gen_census.py` uses.
+            [*argv0, "census"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=repo_root,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if out.returncode != 0 or not out.stdout.strip():
+        return None
+    try:
+        census = json.loads(out.stdout)
+    except json.JSONDecodeError:
+        return None
+    engine = census.get("engine")
+    return engine if isinstance(engine, str) and engine else None
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="output/xcheck")
@@ -356,6 +391,7 @@ def main() -> None:
         if argv0 is None:
             print(f"{leg}: launcher unavailable — skipping", flush=True)
             continue
+        engine = engine_of(argv0, repo_root)
         observations: dict[str, dict] = {}
         for case in cases:
             if leg not in case["legs"]:
@@ -365,9 +401,16 @@ def main() -> None:
                 observations[case["id"]] = obs
         path = out_dir / f"{leg}.json"
         path.write_text(
-            json.dumps({"schema": 1, "leg": leg, "cases": observations}, indent=2)
+            json.dumps(
+                {"schema": 1, "leg": leg, "engine": engine, "cases": observations},
+                indent=2,
+            )
         )
-        print(f"{leg}: {len(observations)} cases -> {path}", flush=True)
+        engine_note = engine or "NOT REPORTED"
+        print(
+            f"{leg}: {len(observations)} cases, engine {engine_note} -> {path}",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":

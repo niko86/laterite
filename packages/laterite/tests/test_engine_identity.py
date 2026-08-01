@@ -12,6 +12,7 @@ be compared across surfaces and believed; a matching version number only shows
 two things shipped together.
 """
 
+import json
 import re
 import subprocess
 import sys
@@ -80,3 +81,30 @@ def test_the_cli_reports_the_same_engine_as_the_library() -> None:
         check=True,
     )
     assert out.stdout.strip() == laterite.engine_fingerprint()
+
+
+def test_the_uvx_launcher_reports_the_engine_it_is_running() -> None:
+    """`lat census` carries the engine, and it is ASKED rather than restated.
+
+    This is the door `laterite-ags4-xcheck` uses to identity-check the three
+    launcher legs. Before it existed the cross-surface gate compared their bytes
+    without knowing whether they were the same build — and a launcher driving a
+    stale artefact agrees with a current one on almost every case, so the gate
+    would have reported identity it never checked.
+
+    Asserting it equals `laterite.engine_fingerprint()` is the load-bearing half:
+    a hard-coded digest here would satisfy a "is it 16 hex chars" test forever
+    while reporting an engine this launcher is not running.
+    """
+    out = subprocess.run(
+        [sys.executable, "-m", "laterite._cli", "census"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    census = json.loads(out.stdout)
+    assert census["engine"] == laterite.engine_fingerprint()
+    assert census["census_version"] >= 6, (
+        "the engine field arrived in census schema 6; a launcher answering an "
+        "older schema has no engine to report and must not be read as agreeing"
+    )

@@ -65,6 +65,12 @@
         "prs": [
           204
         ]
+      },
+      {
+        "text": "**All eight cross-surface legs now prove they were running the same engine — the three `lat` launchers included.** #204 gave five of them a fingerprint to compare and left `cli-native`, `cli-uvx` and `cli-npx` naming themselves as unchecked, because a launcher is a subprocess and none of the three would say what engine it carried. They say it now, through `lat census` — the hidden machine dump all three already implement and `tools/gen_census.py` already diffs them across. A second machine door would have been a second thing to keep in step, which is the failure the census exists to catch. `engine` is deliberately NOT a census table and is absent from `surface-census.json`: a fingerprint moves whenever a rule is edited, so snapshotting it would churn a checked-in file on every rule change while saying nothing about the surfaces. The schema version still bumped, because a launcher built before the field answers with it MISSING and missing is indistinguishable from a launcher with nothing to report — it would opt itself out of the identity check in silence. That version is hand-declared in four places and nothing had ever pinned them equal; a test now does, since a bump that reaches three of four makes the fourth launcher permanently \"stale\" to the generator, which reads as a build problem rather than the typo it is.",
+        "prs": [
+          205
+        ]
       }
     ],
     "changed": [

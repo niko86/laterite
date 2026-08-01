@@ -958,9 +958,14 @@ def census() -> dict:
         # See CENSUS_VERSION in the Rust census — bumped when a TABLE is added, so a
         # launcher built before a table existed fails loudly rather than reporting it
         # empty (which would read as "no drift").
-        "census_version": 5,
+        "census_version": 6,
         "surface": "cli-uvx",
         "authority": False,
+        # The ENGINE this launcher carries, asked of the native module rather than
+        # restated here — so it reports what it is actually running, not what this
+        # file was written believing. Not a table and not in the census snapshot; see
+        # the note at the same key in the Rust census for why.
+        "engine": _native.engine_fingerprint(),
         "verbs": verbs,
         "global_args": global_args,
         "documented_verbs": list(_subcommands(p)),

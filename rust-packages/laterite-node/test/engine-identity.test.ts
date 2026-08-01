@@ -13,6 +13,7 @@
 // and be harder to spot, so the shape is asserted rather than assumed.
 import { describe, expect, it } from "vitest";
 import { engineFingerprint, engineVersion, version } from "../ts/index";
+import { census } from "../ts/cli";
 
 // `build.rs` truncates the SHA-256 to 16 hex chars.
 const FINGERPRINT = /^[0-9a-f]{16}$/;
@@ -43,5 +44,23 @@ describe("engine identity", () => {
     expect(version()).toMatch(/^\d+\.\d+\.\d+/);
     expect(typeof engineVersion()).toBe("string");
     expect(typeof engineFingerprint()).toBe("string");
+  });
+
+  it("the npx launcher's census reports the engine it is running", () => {
+    // `lat census` is the door `laterite-ags4-xcheck` uses to identity-check the
+    // three launcher legs. Before it existed the cross-surface gate compared their
+    // bytes without knowing whether they were the same build — and a launcher
+    // driving a stale dist agrees with a current one on almost every case, so the
+    // gate would have reported an identity it never checked.
+    //
+    // Comparing against engineFingerprint() is the load-bearing half: a hard-coded
+    // digest here would satisfy a shape check forever while naming an engine this
+    // launcher is not carrying.
+    const c = census() as { engine: string; census_version: number };
+    expect(c.engine).toBe(engineFingerprint());
+    expect(
+      c.census_version,
+      "the engine field arrived in census schema 6; an older schema has no engine to report",
+    ).toBeGreaterThanOrEqual(6);
   });
 });

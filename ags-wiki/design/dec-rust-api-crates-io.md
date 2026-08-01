@@ -543,18 +543,36 @@ Verified by falsification rather than by reasoning — doctoring `wasm-engine`'s
 digest fails the run with `engine-mismatch` and exit 1, and rebuilding the leg
 clears it.
 
-**Five of eight legs report.** `cli-native`, `cli-uvx` and `cli-npx` drive a
-subprocess and none of the three launchers prints its engine, so the comparator
-**names them** on every run:
+**Eight of eight legs report.** The three `cli-*` legs drive a subprocess, so they
+needed a door to ask through. That door is `lat census` — the hidden machine dump
+all three launchers already implement, already version-negotiated, and already the
+thing `tools/gen_census.py` diffs them across. Adding a second machine door would
+have been a second thing to keep in step, which is the failure the census itself
+exists to catch.
+
+`engine` is not a census TABLE and is deliberately absent from
+`surface-census.json`: a fingerprint moves whenever a rule is edited, so recording
+it would churn a checked-in file on every rule change while saying nothing about
+the surfaces. The census answers *what can this launcher do*; the fingerprint
+answers *which rules is it running*. Only the run-time comparison needs the second
+question, so only `xcheck` asks it.
+
+The schema still bumped (5 → 6), because a launcher built before the field
+answers with it **missing**, and missing is indistinguishable from a launcher with
+nothing to report — it would opt itself out of the identity check in silence. Four
+sites declare that version by hand and nothing had ever pinned them equal; a test
+now does.
+
+Until this landed the comparator **named** the three rather than passing over
+them:
 
 ```
 xcheck: 3 leg(s) reported no engine fingerprint and were NOT identity-checked: cli-native, cli-npx, cli-uvx
 ```
 
-rather than passing over them. A gate that quietly checked five of eight looks
-exactly like one that checked all eight. Closing it means giving the three
-launchers a shared door to report through — they are byte-faithful to each other
-by design, so it is one contract, not three.
+That warning path stays, because it is what makes a future unreporting leg visible
+instead of comfortable. A gate that quietly checked five of eight looks exactly
+like one that checked all eight.
 
 Deliberately not built: nightly or prerelease channels (nobody consumes builds
 between releases, and PyPI, npm and cargo disagree on the syntax — `0.9.0-nightly`

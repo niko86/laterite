@@ -90,8 +90,9 @@ _LAT_CANDIDATES = [_TARGET / "release" / "lat", _TARGET / "debug" / "lat"]
 #: otherwise report a table it has never heard of as EMPTY — which is indistinguishable
 #: from "no drift", i.e. a gate that quietly disarms itself. That is not hypothetical:
 #: the release `lat` from one commit earlier answered `census` perfectly well and
-#: reported no editions at all.
-CENSUS_VERSION = 5
+#: reported no editions at all. Schema 6 adds `engine`, which is not a table but is
+#: refused-when-missing for exactly that reason.
+CENSUS_VERSION = 6
 
 
 class StaleLauncher(Exception):
@@ -135,6 +136,12 @@ def shape(census: dict) -> dict:
 
     Every table here is an enumeration the toolchain used to hand-copy per surface.
     Adding one is how a whole class of drift gets closed at once.
+
+    `engine` is deliberately absent. A dump carries it (schema 6) and the launchers
+    must agree on it, but it belongs to `laterite-ags4-xcheck`, which asks the BUILT
+    launchers at run time. Snapshotting it here would rewrite `surface-census.json`
+    on every rule edit while telling a reader nothing about the surfaces — the census
+    records what a launcher can do, not which rules it is carrying today.
     """
     return {
         # The doors. `census` itself is a hidden machine door, dropped by the diff.
