@@ -9,7 +9,7 @@ repo_refs:
   dict_version: "repo:rust-packages/laterite-ags4-reference/src/dict.rs"
   build: "repo:rust-packages/laterite-ags4-reference/build.rs"
   gate_python: "repo:packages/laterite/tests/test_editions_single_source.py"
-  gate_rust: "repo:rust-packages/laterite-ags4-check/src/commands/common.rs::every_bundled_edition_is_accepted"
+  gate_rust: "repo:rust-packages/laterite-cli/src/commands/common.rs::every_bundled_edition_is_accepted"
   web_generated: "repo:web/src/lib/editions.ts"
 related: [start-here, parity-model, rule-families, surface-census, data-single-source-audit, laterite-ags4-reference, dec-edition-selection, laterite-ags4-validator, O-42, dec-custom-dict-overlay]
 sources: []
@@ -36,7 +36,7 @@ needed the closed set of valid `--dict-version` strings.
 > [!bug] Until 2026-07 the set was **hand-copied roughly nine times**: three
 > separate `match` arms re-listed the five editions instead of asking
 > `DictVersion::from_edition` — `lat`'s own `--dict-version` flag
-> (`laterite-ags4-check/src/commands/common.rs`), `laterite-py`'s
+> (`laterite-cli/src/commands/common.rs`), `laterite-py`'s
 > `emit_typed.rs` (a *second*, hand-written edition parser sitting in the
 > same crate as `lib.rs::parse_dv`, which already asked the authority),
 > and `laterite-ags4-corpus-qa`'s `validate.rs`. The sharpest trap was the CLI's:

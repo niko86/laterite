@@ -14,7 +14,7 @@ repo_refs:
   pyproject: "repo:packages/laterite/pyproject.toml"
   readme: "repo:packages/laterite/README.md"
   native: "repo:rust-packages/laterite-py"
-related: [crate-map, laterite-py, python-ags4, parity-model, laterite-ags4-check, dec-rust-drives-python, surface-census, dec-ags-idx-certificate, cert-trust-v2]
+related: [crate-map, laterite-py, python-ags4, parity-model, laterite-cli, dec-rust-drives-python, surface-census, dec-ags-idx-certificate, cert-trust-v2]
 sources: []
 ---
 # laterite
@@ -92,7 +92,7 @@ The external API contract — what a developer gets after `import laterite`
 It also installs an **`lat` console script**
 (`repo:packages/laterite/pyproject.toml [project.scripts]`) — deliberately
 byte-faithful (flags, JSON/NDJSON shape, exit codes) to the Rust
-[[laterite-ags4-check]] binary. Same CLI, Python face.
+[[laterite-cli]] binary. Same CLI, Python face.
 
 **`lat validate --index <cert>`** (`_cli.py::_with_cert`, 2026-07-14) is a door this
 launcher was simply missing until the surface census's per-verb arguments table
@@ -134,4 +134,4 @@ the python-ags4 parity verdicts.
 
 ## Related
 
-[[crate-map]] · [[laterite-py]] · laterite-ags5 · [[python-ags4]] · [[parity-model]] · [[laterite-ags4-check]] · [[dec-rust-drives-python]] · [[surface-census]] · [[dec-ags-idx-certificate]] · [[cert-trust-v2]]
+[[crate-map]] · [[laterite-py]] · laterite-ags5 · [[python-ags4]] · [[parity-model]] · [[laterite-cli]] · [[dec-rust-drives-python]] · [[surface-census]] · [[dec-ags-idx-certificate]] · [[cert-trust-v2]]

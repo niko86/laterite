@@ -10,14 +10,14 @@ ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-trust"
   lib: "repo:rust-packages/laterite-ags4-trust/src/lib.rs"
-related: [crate-map, crate-dependency-graph, laterite-ags4-core, laterite-ags4-validator, laterite-ags4-parse, dec-ags-idx-certificate, cert-trust-v2, laterite-ags4-check, laterite-py, laterite-node]
+related: [crate-map, crate-dependency-graph, laterite-ags4-core, laterite-ags4-validator, laterite-ags4-parse, dec-ags-idx-certificate, cert-trust-v2, laterite-cli, laterite-py, laterite-node]
 sources: []
 ---
 # laterite-ags4-trust
 
 > [!note] **Internal implementation detail** — a workspace crate, not a public
 > API. It is the single implementation behind `lat validate`/`certify`
-> ([[laterite-ags4-check]]) and every binding's validate+certify surface. The
+> ([[laterite-cli]]) and every binding's validate+certify surface. The
 > format is [[dec-ags-idx-certificate]]; the trust model is [[cert-trust-v2]].
 
 ## What it is
@@ -62,7 +62,7 @@ certificate's freshness is judged against.
 to trust; it consumes the `.ags.idx` `Sidecar`/`ValidationStamp` types and
 `Sidecar::decide`), [[laterite-ags4-validator]] (the rule engine + `WorldScope` +
 `ENGINE_FINGERPRINT`), and [[laterite-ags4-parse]] (parsing bytes/text without the
-validator's path-only entry point). Consumers: [[laterite-ags4-check]] and the
+validator's path-only entry point). Consumers: [[laterite-cli]] and the
 bindings.
 
 ## Relationship to other components
@@ -75,11 +75,11 @@ flowchart LR
   core[laterite-ags4-core] --> trust[laterite-ags4-trust]
   val[laterite-ags4-validator] --> trust
   parse[laterite-ags4-parse] --> trust
-  trust --> check["laterite-ags4-check<br/>(validate / certify)"]
+  trust --> check["laterite-cli<br/>(validate / certify)"]
   trust --> py[laterite-py]
   trust --> node[laterite-node]
 ```
 
 ## Related
 
-[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-core]] · [[laterite-ags4-validator]] · [[laterite-ags4-parse]] · [[dec-ags-idx-certificate]] · [[cert-trust-v2]] · [[laterite-ags4-check]] · [[laterite-py]] · [[laterite-node]]
+[[crate-map]] · [[crate-dependency-graph]] · [[laterite-ags4-core]] · [[laterite-ags4-validator]] · [[laterite-ags4-parse]] · [[dec-ags-idx-certificate]] · [[cert-trust-v2]] · [[laterite-cli]] · [[laterite-py]] · [[laterite-node]]

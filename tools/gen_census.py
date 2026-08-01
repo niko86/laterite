@@ -101,7 +101,7 @@ class StaleLauncher(Exception):
         super().__init__(
             f"{cmd[0]} answers census_version {got}, this generator needs "
             f"{CENSUS_VERSION} — it is built from older sources. Rebuild it "
-            f"(cargo build -p laterite-ags4-check; maturin develop; npm run build)."
+            f"(cargo build -p laterite-cli; maturin develop; npm run build)."
         )
 
 
@@ -387,7 +387,7 @@ def render(ssot: dict) -> str:
         '  generator: "repo:tools/gen_census.py"',
         '  gate_python: "repo:tests/test_census_faithful.py"',
         '  gate_node: "repo:rust-packages/laterite-node/test/census.test.ts"',
-        '  authority: "repo:rust-packages/laterite-ags4-check/src/commands/census.rs"',
+        '  authority: "repo:rust-packages/laterite-cli/src/commands/census.rs"',
         "related: [modality-register, crate-map, agent-first-cli-contract, parity-model, start-here, laterite-ags4-xcheck]",
         "sources: []",
         "---",
@@ -618,7 +618,7 @@ def main() -> int:
         if missing:
             print(
                 f"error: cannot write the census without {sorted(missing)} — build them "
-                f"first (cargo build -p laterite-ags4-check; npm run build in "
+                f"first (cargo build -p laterite-cli; npm run build in "
                 f"rust-packages/laterite-node)",
                 file=sys.stderr,
             )
@@ -669,7 +669,7 @@ def main() -> int:
     if AUTHORITY not in live:
         print(
             f"error: the authority ({AUTHORITY}) is not built — the census cannot be "
-            f"checked against anything. Run `cargo build -p laterite-ags4-check`.",
+            f"checked against anything. Run `cargo build -p laterite-cli`.",
             file=sys.stderr,
         )
         return 2

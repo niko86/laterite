@@ -34,9 +34,9 @@ ship. Every edge here is a real Cargo coupling by construction.
 ```mermaid
 flowchart TD
   subgraph L4["L4 · surfaces + CLI"]
-    laterite_ags4_check[laterite-ags4-check]
     laterite_ags4_tokenizer_wasm[laterite-ags4-tokenizer-wasm]
     laterite_ags4_wasm[laterite-ags4-wasm]
+    laterite_cli[laterite-cli]
     laterite_node[laterite-node]
     laterite_py[laterite-py]
   end
@@ -76,14 +76,6 @@ flowchart TD
   laterite_ags4_censor --> laterite_ags4_parse
   laterite_ags4_censor --> laterite_ags4_reference
   laterite_ags4_censor --> laterite_ags4_types
-  laterite_ags4_check --> laterite_ags4_core
-  laterite_ags4_check --> laterite_ags4_diff
-  laterite_ags4_check --> laterite_ags4_merge
-  laterite_ags4_check --> laterite_ags4_parse
-  laterite_ags4_check --> laterite_ags4_trust
-  laterite_ags4_check --> laterite_ags4_validator
-  laterite_ags4_check --> laterite_cliutil
-  laterite_ags4_check --> laterite_excel
   laterite_ags4_compliance --> laterite_ags4_core
   laterite_ags4_compliance --> laterite_ags4_parity
   laterite_ags4_compliance --> laterite_ags4_validator
@@ -135,6 +127,14 @@ flowchart TD
   laterite_ags4_xcheck --> laterite_ags4_emit
   laterite_ags4_xcheck --> laterite_ags4_parse
   laterite_ags4_xcheck --> laterite_ags4_validator
+  laterite_cli --> laterite_ags4_core
+  laterite_cli --> laterite_ags4_diff
+  laterite_cli --> laterite_ags4_merge
+  laterite_cli --> laterite_ags4_parse
+  laterite_cli --> laterite_ags4_trust
+  laterite_cli --> laterite_ags4_validator
+  laterite_cli --> laterite_cliutil
+  laterite_cli --> laterite_excel
   laterite_excel --> laterite_ags4_core
   laterite_excel --> laterite_ags4_emit
   laterite_node --> laterite_ags4_core
@@ -185,9 +185,9 @@ flowchart TD
 | `laterite-ags4-forge` | L3 | 3 | 0 | 6 |
 | `laterite-ags4-perf` | L3 | 3 | 0 | 4 |
 | `laterite-ags4-xcheck` | L3 | 4 | 0 | 7 |
-| `laterite-ags4-check` | L4 | 8 | 0 | 12 |
 | `laterite-ags4-tokenizer-wasm` | L4 | 2 | 0 | 2 |
 | `laterite-ags4-wasm` | L4 | 10 | 0 | 12 |
+| `laterite-cli` | L4 | 8 | 0 | 12 |
 | `laterite-node` | L4 | 10 | 0 | 11 |
 | `laterite-py` | L4 | 10 | 0 | 11 |
 | `laterite` | L? | 5 | 0 | 7 |

@@ -8,7 +8,7 @@ repo_refs:
   census: "repo:surface-census.json"
   generator: "repo:tools/gen_census.py"
   gate_node: "repo:rust-packages/laterite-node/test/census.test.ts"
-  authority: "repo:rust-packages/laterite-ags4-check/src/commands/census.rs"
+  authority: "repo:rust-packages/laterite-cli/src/commands/census.rs"
 related: [modality-register, crate-map, agent-first-cli-contract, parity-model, start-here, laterite-ags4-xcheck]
 sources: []
 ---

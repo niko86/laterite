@@ -22,10 +22,10 @@ try {
     # Run cargo bare (not `2>&1 |`); cargo writes progress to stderr and
     # ErrorActionPreference + pipeline-redirect makes that fatal.
     #
-    # `-p laterite-ags4-check` builds the crate that carries the `lat` binary.
+    # `-p laterite-cli` builds the crate that carries the `lat` binary.
     $prev_ea = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
-    cargo build --release -p laterite-ags4-check
+    cargo build --release -p laterite-cli
     $cargo_exit = $LASTEXITCODE
     $ErrorActionPreference = $prev_ea
     if ($cargo_exit -ne 0) {

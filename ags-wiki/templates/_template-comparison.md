@@ -3,7 +3,7 @@ type: comparison
 title: "<A> vs <B>"
 status: stub
 tags: [comparison]
-compares: []              # [ags-4.1, ags-4.2] | [laterite-ags4-check, py-ags4-check-json]
+compares: []              # [ags-4.1, ags-4.2] | [laterite-cli, py-ags4-check-json]
 origin_query: ""          # the Query (log ref) that produced this page
 ags_editions: []
 repo_refs: {}

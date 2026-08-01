@@ -78,7 +78,7 @@ comparisons/ sources/{repo-authorities/,external/} templates/
 | group | `<CODE>.md` (exact 4-letter AGS code) | `SAMP.md` |
 | type | `<code>.md` (verbatim AGS token) | `nDP.md`, `0DP.md` |
 | observation | `O-NN.md` (zero-padded) | `O-07.md`, `O-33.md` |
-| tool | `<repo-artifact-name>.md` | `laterite-ags4-check.md` |
+| tool | `<repo-artifact-name>.md` | `laterite-cli.md` |
 | concept/comparison | `<kebab>.md` | `parity-model.md` |
 | edition | `ags-<version>.md` | `ags-4.2.md` |
 | meta | leading `_` (sorts top, Dataview-excluded) | `_template-rule.md`, `_registry.md` |

@@ -95,7 +95,7 @@
     },
     {
       "symbol": "`comfy-table` (dep)",
-      "verify": "`rust-packages/laterite-ags4-check/Cargo.toml::comfy-table =`",
+      "verify": "`rust-packages/laterite-cli/Cargo.toml::comfy-table =`",
       "axis": "dependency",
       "status": "removed",
       "removed_in": "dep-hygiene PR",
@@ -103,7 +103,7 @@
     },
     {
       "symbol": "`indicatif` (dep)",
-      "verify": "`rust-packages/laterite-ags4-check/Cargo.toml::indicatif =`",
+      "verify": "`rust-packages/laterite-cli/Cargo.toml::indicatif =`",
       "axis": "dependency",
       "status": "removed",
       "removed_in": "dep-hygiene PR",
@@ -207,7 +207,7 @@
     },
     {
       "symbol": "`crossterm` (opt dep)",
-      "verify": "`rust-packages/laterite-ags4-check/Cargo.toml::crossterm`",
+      "verify": "`rust-packages/laterite-cli/Cargo.toml::crossterm`",
       "axis": "dependency",
       "status": "keep",
       "removed_in": "— (owner call)",
@@ -231,7 +231,7 @@
     },
     {
       "symbol": "`include_warnings: true` (diff)",
-      "verify": "`rust-packages/laterite-ags4-check/src/commands/diff.rs::include_warnings: true`",
+      "verify": "`rust-packages/laterite-cli/src/commands/diff.rs::include_warnings: true`",
       "axis": "code",
       "status": "removed",
       "removed_in": "mutation-sweep cleanup (coverage-rust)",
@@ -239,7 +239,7 @@
     },
     {
       "symbol": "`include_warnings: true` (merge)",
-      "verify": "`rust-packages/laterite-ags4-check/src/commands/merge.rs::include_warnings: true`",
+      "verify": "`rust-packages/laterite-cli/src/commands/merge.rs::include_warnings: true`",
       "axis": "code",
       "status": "removed",
       "removed_in": "mutation-sweep cleanup (coverage-rust)",

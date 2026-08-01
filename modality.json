@@ -53,7 +53,7 @@
     {
       "id": "cli",
       "label": "lat CLI",
-      "source": "rust-packages/laterite-ags4-check/src/main.rs",
+      "source": "rust-packages/laterite-cli/src/main.rs",
       "reflection": "documentation"
     },
     {

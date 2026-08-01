@@ -509,7 +509,7 @@ platform. The flagged risk — a library swapping the allocator corrupting the
 Arrow→polars/pyarrow handoff — **did not materialise**: the full read (all 123
 groups through the Arrow/DuckDB/polars bridge) and validate ran clean, because the
 engine leaves Rust via Arrow release callbacks, so Rust frees what Rust allocated.
-`#[global_allocator]` is set in each final artifact — `laterite-ags4-check` (`lat`),
+`#[global_allocator]` is set in each final artifact — `laterite-cli` (`lat`),
 `laterite-py` (wheel), `laterite-node` (addon); a shared leaf crate cannot set one.
 **wasm is excluded** (different toolchain; already native-speed, keeps dlmalloc).
 Wheel suite 681 passed, node 289 passed, lat validates clean. See

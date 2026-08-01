@@ -7,7 +7,7 @@ tags: [design, decision]
 decided: 2026-06-20
 supersedes: []
 from_gap: []
-related: [dec-duckdb-perf-architecture, crate-map, laterite-ags4-core, surface-census, data-single-source-audit, laterite-ags4-check, laterite-node, cert-trust-v2]
+related: [dec-duckdb-perf-architecture, crate-map, laterite-ags4-core, surface-census, data-single-source-audit, laterite-cli, laterite-node, cert-trust-v2]
 sources: []
 ---
 
@@ -194,4 +194,4 @@ version bump, `deny_unknown_fields`, required non-Option fields.
 | `StaleCertError` | `repo:packages/laterite/python/laterite/_errors.py` | **done** |
 
 ## Related
-[[dec-duckdb-perf-architecture]] · [[crate-map]] · [[laterite-ags4-core]] · [[surface-census]] · [[data-single-source-audit]] · [[laterite-ags4-check]] · [[laterite-node]]
+[[dec-duckdb-perf-architecture]] · [[crate-map]] · [[laterite-ags4-core]] · [[surface-census]] · [[data-single-source-audit]] · [[laterite-cli]] · [[laterite-node]]

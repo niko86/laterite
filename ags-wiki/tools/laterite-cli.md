@@ -1,6 +1,6 @@
 ---
 type: tool
-title: laterite-ags4-check
+title: laterite-cli
 status: reviewed
 tags: [tool]
 tool_kind: cli
@@ -8,11 +8,11 @@ language: rust
 artifact: lat
 ags_editions: []
 repo_refs:
-  root: "repo:rust-packages/laterite-ags4-check"
-related: [parity-model, laterite-ags4-check, edition-resolution, surface-census, data-single-source-audit, dec-ags-idx-certificate, cert-trust-v2]
+  root: "repo:rust-packages/laterite-cli"
+related: [parity-model, laterite-cli, edition-resolution, surface-census, data-single-source-audit, dec-ags-idx-certificate, cert-trust-v2]
 sources: []
 ---
-# laterite-ags4-check
+# laterite-cli
 
 ## What it is
 > [!quote] The clean-room Rust AGS4 validator CLI crate; ships the `lat` binary (lib `laterite_ags4_validator` + bin). Implements Rules 1–20 from the spec PDF (clean-room: python-ags4 LGPL read only for behavioural parity, never copied). Edition auto-resolved from TRAN_AGS (lib.rs::resolve_dict_version).
@@ -21,7 +21,7 @@ sources: []
 
 `lat` is a subcommand tool — a bare `lat <file.ags>` is shorthand for `lat validate`. Each verb owns its flags (`lat <verb> --help`); the table below is generated from the shipped guide (`lat --readme`) so it can't drift from the tool:
 
-<!-- generated:cli-verbs — DO NOT EDIT; source repo:rust-packages/laterite-ags4-check/README-cli.md (== `lat --readme`); regenerate: uv run --no-sync python tools/gen_wiki_cli.py -->
+<!-- generated:cli-verbs — DO NOT EDIT; source repo:rust-packages/laterite-cli/README-cli.md (== `lat --readme`); regenerate: uv run --no-sync python tools/gen_wiki_cli.py -->
 | Verb | Arguments | What it does |
 |---|---|---|
 | `validate` | `<file>` | run the numbered AGS Format Rules and report (the default) |
@@ -54,7 +54,7 @@ This binary is the census's **authority** (`census.rs::arg_json`) — every othe
 The same census run found a divergence in this binary's own `--index` handling — `commands/cert.rs::try_certified_skip` skipped the rule engine on cert freshness + checker identity + profile coverage alone, regardless of `--no-warnings`/`--show-fyi`, where the Python/Node library refused to skip on a warnings/FYI request at all. It was invisible to a declaration-level census (both launchers declare `--index` identically), and it turned out to be the visible edge of **five** hand-written trust conjunctions, four of which could report a file clean that was not. **Closed 2026-07-14**: `try_certified_skip` is deleted and this binary calls `laterite-ags4-trust::check` like every other surface — a certificate may stand in for a tier iff it MEASURED that tier and found it EMPTY. `certify` lost `--check-files` (a certificate is a statement about bytes; the directory beside them is not one) and no longer needs a prior validate — it runs one. See [[cert-trust-v2]].
 
 ## Where it lives
-`repo:rust-packages/laterite-ags4-check`
+`repo:rust-packages/laterite-cli`
 
 ## Relationship to other components
 ```mermaid
@@ -70,4 +70,4 @@ See [[crate-map]] for the workspace dependency graph.
 See [[parity-model]] for the lat ↔ py-ags4-check-json cross-check.
 
 ## Related
-[[parity-model]] · [[laterite-ags4-check]] · [[crate-map]] · [[edition-resolution]] · [[surface-census]] · [[data-single-source-audit]] · [[dec-ags-idx-certificate]] · [[cert-trust-v2]]
+[[parity-model]] · [[laterite-cli]] · [[crate-map]] · [[edition-resolution]] · [[surface-census]] · [[data-single-source-audit]] · [[dec-ags-idx-certificate]] · [[cert-trust-v2]]

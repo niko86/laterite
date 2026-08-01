@@ -17,7 +17,7 @@ sources: []
 
 > [!note] **Internal implementation detail** — a workspace crate, not a public
 > API. Its operations reach users through `lat pack`/`unpack`/`lock`/`unlock`
-> ([[laterite-ags4-check]]) and the wheel's `transport` surface ([[laterite]]),
+> ([[laterite-cli]]) and the wheel's `transport` surface ([[laterite]]),
 > never as a crate a consumer names directly.
 
 ## What it is

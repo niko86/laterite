@@ -105,7 +105,7 @@ serde = { version = "1", features = ["derive"] }
 # `rule`-first and then splices in the serialized Finding body, and the report
 # root is `{file, findings}`. Without insertion order, serde_json::Map sorts
 # alphabetically and BOTH key orders change — i.e. the rendered bytes change.
-# Every consumer (laterite-ags4-check, laterite-py, laterite-node) already
+# Every consumer (laterite-cli, laterite-py, laterite-node) already
 # enables it, so today it arrives by feature unification; declaring it here
 # makes the guarantee explicit instead of accidental.
 serde_json = { version = "1", features = ["preserve_order"] }

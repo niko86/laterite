@@ -23,8 +23,8 @@ repo=$(cd "$script_dir/.." && pwd)
 
 (
   cd "$repo/rust-packages"
-  # `-p laterite-ags4-check` builds the crate that carries the `lat` binary.
-  cargo build --release -p laterite-ags4-check
+  # `-p laterite-cli` builds the crate that carries the `lat` binary.
+  cargo build --release -p laterite-cli
 )
 
 src="$repo/rust-packages/target/release/lat"

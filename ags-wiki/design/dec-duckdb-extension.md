@@ -197,7 +197,7 @@ neither survives in the current (0.7.0, read-only) surface:
 
 - `validate_ags(path)` wrapped the clean-room [[laterite-ags4-validator]]'s <!-- retired: validate_ags -->
   `check_file` — opt-in, never a gate on `read_ags`, no repair surface
-  (mutation stayed in `lat`, [[laterite-ags4-check]]). **Removed** in the
+  (mutation stayed in `lat`, [[laterite-cli]]). **Removed** in the
   0.7.0 read-only rework; validation is a CLI/library operation now, the
   extension only consumes an externally-minted `.ags.idx`.
 - `load_ags_script(path)` — generated a `CREATE TABLE ags_<g> AS SELECT *

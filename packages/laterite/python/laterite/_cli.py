@@ -1,7 +1,7 @@
 """``lat`` — the Python face of the Rust ``lat`` binary (the ``uvx`` launcher).
 
 A clap-style subcommand tool whose output, ``--json`` / ``--ndjson`` byte-shape and
-exit codes are faithful to ``rust-packages/laterite-ags4-check`` (the JSON/NDJSON
+exit codes are faithful to ``rust-packages/laterite-cli`` (the JSON/NDJSON
 strings are built by the *same* serde_json calls in the native module). A bare
 ``lat <file>`` is shorthand for ``lat validate <file>``. Exit codes: 0 clean ·
 1 findings · 3 not-found/io · 4 not-utf8/not-ags4/unsupported-edition ·

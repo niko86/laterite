@@ -6,7 +6,7 @@ tags: [design, decision, roadmap]
 decided: 2026-05-30
 supersedes: []
 from_gap: []
-related: [dec-laterite-ags4-types-leaf, playwright-e2e, docs-site, validator-finding-ux, laterite-ags4-check, parity-model, effective-dictionary, design/_README]
+related: [dec-laterite-ags4-types-leaf, playwright-e2e, docs-site, validator-finding-ux, laterite-cli, parity-model, effective-dictionary, design/_README]
 sources: []
 ---
 
@@ -35,7 +35,7 @@ between work sessions (see cli-cloud-workflow).
 
 ## Phase 0 — CLI split ✅
 `laterite-ags4-validator` became a pure, filesystem-free library (the CLI lives in
-[[laterite-ags4-check]]). This is what lets the same engine compile to wasm with
+[[laterite-cli]]). This is what lets the same engine compile to wasm with
 no CLI/TUI deps. Commit `6794f2e`.
 
 ## Phase 1 — client-side validator ✅
@@ -61,7 +61,7 @@ make the UI never-freeze and never hide an error:
    `ValidationReport.finding_count` always carry the true, uncapped
    counts; new `shown_count` is what actually crossed the boundary, so the
    UI says "showing N of M". **Wasm-only by construction**: the CLI builds
-   its `--json` independently in `repo:rust-packages/laterite-ags4-check/src/main.rs`,
+   its `--json` independently in `repo:rust-packages/laterite-cli/src/main.rs`,
    so its shape is untouched. The interactive UI passes 10k/rule
    (`DEFAULT_MAX_PER_RULE`); the download passes `None`.
 2. **Web Worker.** wasm instantiation + `validate()` moved off the main
@@ -82,7 +82,7 @@ make the UI never-freeze and never hide an error:
    bytes — the multi-hundred-MB string never reaches the main thread.
    gzip not zstd (no native browser zstd encoder; the report is a
    throwaway artifact, not re-ingested by laterite). Above 500k findings
-   the UI points at the native [[laterite-ags4-check]] CLI instead.
+   the UI points at the native [[laterite-cli]] CLI instead.
 5. **Dark/light theme.** Tailwind v4 `@custom-variant dark` + semantic
    CSS-variable tokens (`surface`/`line`/`fg` tiers + `ok/warn/err/accent`)
    that flip once under `.dark`; a `theme.ts` store ↔ `localStorage` and a
@@ -626,6 +626,6 @@ graph LR
 ```
 
 ## Related
-[[dec-laterite-ags4-types-leaf]] · cli-cloud-workflow · ci-and-runners · [[playwright-e2e]] · [[docs-site]] · [[validator-finding-ux]] · [[laterite-ags4-check]] ·
+[[dec-laterite-ags4-types-leaf]] · cli-cloud-workflow · ci-and-runners · [[playwright-e2e]] · [[docs-site]] · [[validator-finding-ux]] · [[laterite-cli]] ·
 laterite-ags5-db · [[parity-model]] · [[effective-dictionary]] ·
 [[design/_README\|AGS5 register]]

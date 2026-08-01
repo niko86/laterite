@@ -9,7 +9,7 @@ artifact: laterite-cliutil
 ags_editions: []
 repo_refs:
   root: "repo:rust-packages/laterite-cliutil"
-related: [parity-model, laterite-ags4-check, laterite-ags4-forge, agent-first-cli-contract]
+related: [parity-model, laterite-cli, laterite-ags4-forge, agent-first-cli-contract]
 sources: []
 ---
 # laterite-cliutil
@@ -40,4 +40,4 @@ cross-check, and [[agent-first-cli-contract]] for the behavioural
 contract these primitives encode.
 
 ## Related
-[[parity-model]] · [[laterite-ags4-check]] · [[laterite-ags4-forge]] · [[agent-first-cli-contract]] · [[crate-map]]
+[[parity-model]] · [[laterite-cli]] · [[laterite-ags4-forge]] · [[agent-first-cli-contract]] · [[crate-map]]

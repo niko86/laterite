@@ -16,7 +16,7 @@ from pathlib import Path
 import mkdocs_gen_files
 
 _REPO = Path(__file__).resolve().parents[3]
-_README_CLI = _REPO / "rust-packages" / "laterite-ags4-check" / "README-cli.md"
+_README_CLI = _REPO / "rust-packages" / "laterite-cli" / "README-cli.md"
 
 _guide = _README_CLI.read_text()
 

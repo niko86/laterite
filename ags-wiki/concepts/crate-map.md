@@ -251,7 +251,7 @@ as stable):
   original `lenient: bool` before it ever shipped a release — the KEY-correction-vs-new-row
   limit, the optional merge-TRAN stamp) are in
   [[dec-ags4-merge-semantics]]. Consumers: `lat merge <files...> --out` (N-ary,
-  `repo:rust-packages/laterite-ags4-check/src/commands/merge.rs`), `laterite.merge(*sources, …)`
+  `repo:rust-packages/laterite-cli/src/commands/merge.rs`), `laterite.merge(*sources, …)`
   (N-ary PyO3, `merge_files` in `repo:rust-packages/laterite-py/src/lib.rs`), Node `merge(sources[], …)`
   (N-ary napi, `repo:rust-packages/laterite-node/src/lib.rs` + `ts/index.ts`), and the browser
   **Tools → Merge** tab (2-file only, `repo:rust-packages/laterite-ags4-wasm/src/lib.rs::merge` +
@@ -296,7 +296,7 @@ as stable):
   enforces is the CONTENT/WORLD partition: a certificate may only stand in for computations
   that are a pure function of the certified bytes, and Rule 20's on-disk `FILE/` check never
   is, so it re-runs on every call. See [[cert-trust-v2]]. Consumers: all four surfaces
-  (`repo:rust-packages/laterite-ags4-check/src/commands/{validate,certify}.rs`,
+  (`repo:rust-packages/laterite-cli/src/commands/{validate,certify}.rs`,
   `repo:rust-packages/laterite-py/src/lib.rs`, `repo:rust-packages/laterite-node/src/lib.rs`,
   `repo:rust-packages/laterite-ags4-wasm/src/lib.rs`).
 - `laterite-py` — the PyO3 cdylib behind the `laterite` wheel ([[pyo3-boundary]]).
@@ -392,7 +392,7 @@ flowchart LR
   excel --> latpy[laterite-py]
   excel --> latnode
   excel --> wasm
-  validator --> check[laterite-ags4-check<br/>lat]
+  validator --> check[laterite-cli<br/>lat]
   validator --> wasm
   core --> trust[laterite-ags4-trust]
   validator --> trust

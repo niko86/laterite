@@ -1,14 +1,14 @@
 """Render the `lat` verb table into the wiki's CLI tool page from the shipped
 CLI guide — so the page can't drift from the tool (wiki-reliability plan, C4).
 
-The wiki page `ags-wiki/tools/laterite-ags4-check.md` used to hand-list the CLI
+The wiki page `ags-wiki/tools/laterite-cli.md` used to hand-list the CLI
 surface and it rotted the way API docs always do — by *omission and phantom*,
 which the dead-`repo:`-ref and retired-term checks structurally cannot catch: it
 still described the pre-#430 flat-flag interface (`--fix` / `--diff` /
 `--emit-index`) long after those became the `fix` / `diff` / `certify`
 subcommands, and never mentioned `read` / `pack` / `lock` / `excel` at all.
 
-The single source of truth is `rust-packages/laterite-ags4-check/README-cli.md`
+The single source of truth is `rust-packages/laterite-cli/README-cli.md`
 — it *is* what `lat --readme` prints (embedded verbatim via `include_str!`), the
 same guide the docs-site renders (`web/docs-site/scripts/gen_cli.py`). We parse
 its `## Commands` block and render a table into a marked block on the wiki page.
@@ -28,13 +28,13 @@ import sys
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[1]
-_README = _REPO / "rust-packages" / "laterite-ags4-check" / "README-cli.md"
-_CLI_RS = _REPO / "rust-packages" / "laterite-ags4-check" / "src" / "cli.rs"
-_PAGE = _REPO / "ags-wiki" / "tools" / "laterite-ags4-check.md"
+_README = _REPO / "rust-packages" / "laterite-cli" / "README-cli.md"
+_CLI_RS = _REPO / "rust-packages" / "laterite-cli" / "src" / "cli.rs"
+_PAGE = _REPO / "ags-wiki" / "tools" / "laterite-cli.md"
 
 _BEGIN = (
     "<!-- generated:cli-verbs — DO NOT EDIT; source "
-    "repo:rust-packages/laterite-ags4-check/README-cli.md (== `lat --readme`); "
+    "repo:rust-packages/laterite-cli/README-cli.md (== `lat --readme`); "
     "regenerate: uv run --no-sync python tools/gen_wiki_cli.py -->"
 )
 _END = "<!-- /generated:cli-verbs -->"
@@ -107,7 +107,7 @@ def main(argv: list[str]) -> int:
     if "--check" in argv:
         if extract_block(page) != block:
             print(
-                "DRIFT: ags-wiki/tools/laterite-ags4-check.md verb table is stale "
+                "DRIFT: ags-wiki/tools/laterite-cli.md verb table is stale "
                 "— run `uv run --no-sync python tools/gen_wiki_cli.py`",
                 file=sys.stderr,
             )
