@@ -19,6 +19,9 @@ edition = "2024"
 rust-version = "1.85"
 description = "The certificate trust model for AGS4: one door for check + mint"
 license = "MIT"
+repository.workspace = true
+keywords = ["ags", "ags4", "geotechnical", "certificate", "checksum"]
+categories = ["science::geo", "cryptography"]
 publish = false
 
 # What `cargo package` may put in the tarball. Explicit because the default is
@@ -26,6 +29,7 @@ publish = false
 # publish cannot be taken back. See laterite#159.
 include = [
     "/src/**",
+    "/README.md",
 ]
 
 [lib]

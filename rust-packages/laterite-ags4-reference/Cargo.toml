@@ -19,6 +19,9 @@ edition = "2024"
 rust-version = "1.85"
 description = "AGS4 reference data: the multi-edition dictionary registry, single-sourced from ags_dictionary.json (a wasm-safe leaf)"
 license = "MIT"
+repository.workspace = true
+keywords = ["ags", "ags4", "geotechnical", "dictionary", "schema"]
+categories = ["science::geo", "data-structures"]
 publish = false
 
 # What `cargo package` may put in the tarball. Explicit because the default is
@@ -28,6 +31,7 @@ include = [
     "/src/**",
     "/build.rs",
     "/data/**",
+    "/README.md",
 ]
 
 [dependencies]

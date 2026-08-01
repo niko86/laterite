@@ -17,6 +17,9 @@ edition = "2024"
 rust-version = "1.85"
 description = "AGS4 type system (canonical types + permissive value casting) — DuckDB-free, wasm-safe"
 license = "MIT"
+repository.workspace = true
+keywords = ["ags", "ags4", "geotechnical", "types", "arrow"]
+categories = ["science::geo", "data-structures", "encoding"]
 publish = false
 
 # What `cargo package` may put in the tarball. Explicit because the default is
@@ -24,6 +27,7 @@ publish = false
 # publish cannot be taken back. See laterite#159.
 include = [
     "/src/**",
+    "/README.md",
 ]
 
 [dependencies]

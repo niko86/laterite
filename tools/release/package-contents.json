@@ -4,6 +4,7 @@
     "Cargo.lock",
     "Cargo.toml",
     "Cargo.toml.orig",
+    "README.md",
     "data/sensitive_headings.json",
     "src/ags4_codec.rs",
     "src/error.rs",
@@ -26,6 +27,7 @@
     "Cargo.lock",
     "Cargo.toml",
     "Cargo.toml.orig",
+    "README.md",
     "src/arrow_in.rs",
     "src/emit.rs",
     "src/error.rs",
@@ -44,6 +46,7 @@
     "Cargo.lock",
     "Cargo.toml",
     "Cargo.toml.orig",
+    "README.md",
     "src/lib.rs",
     "src/scan.rs"
   ],
@@ -52,6 +55,7 @@
     "Cargo.lock",
     "Cargo.toml",
     "Cargo.toml.orig",
+    "README.md",
     "build.rs",
     "data/ags_dictionary.json",
     "data/rules_meta.json",
@@ -68,6 +72,7 @@
     "Cargo.lock",
     "Cargo.toml",
     "Cargo.toml.orig",
+    "README.md",
     "src/lib.rs",
     "src/tests.rs"
   ],
@@ -76,6 +81,7 @@
     "Cargo.lock",
     "Cargo.toml",
     "Cargo.toml.orig",
+    "README.md",
     "src/arrow_cols.rs",
     "src/ipc.rs",
     "src/lib.rs"
@@ -111,6 +117,7 @@
     "Cargo.lock",
     "Cargo.toml",
     "Cargo.toml.orig",
+    "README.md",
     "src/lib.rs"
   ]
 }

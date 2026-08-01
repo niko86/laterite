@@ -12,6 +12,9 @@ edition = "2024"
 rust-version = "1.85"
 description = "Clean-room Rust validator for the AGS4 geotechnical transfer format"
 license = "MIT"
+repository.workspace = true
+keywords = ["ags", "ags4", "geotechnical", "validator", "linter"]
+categories = ["science::geo", "parser-implementations"]
 publish = false
 
 # What `cargo package` may put in the tarball. Explicit because the default is

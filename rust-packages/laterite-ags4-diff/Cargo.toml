@@ -29,6 +29,9 @@ edition = "2024"
 rust-version = "1.85"
 description = "AGS4 revision diff — KEY-aware/type-aware comparison of two files, DuckDB-free + wasm-safe"
 license = "MIT"
+repository.workspace = true
+keywords = ["ags", "ags4", "geotechnical", "diff", "revision"]
+categories = ["science::geo", "data-structures"]
 publish = false
 
 # What `cargo package` may put in the tarball. Explicit because the default is
