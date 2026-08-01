@@ -67,6 +67,12 @@
         "prs": [
           191
         ]
+      },
+      {
+        "text": "**The CLI crate is `laterite-cli`.** `laterite-ags4-check` named a checker; the crate reads, fixes, diffs, merges, certifies, packs, converts and mints certificates, and `-ags4-` marks the engine tier, which a product binary is not. The shipped binary is still `lat` — nothing a user types changes. Renamed now because crates.io has no rename: a name is free until its first publish and irreversible after, and the engine tier went out yesterday. It is deliberately NOT added to the publish set, which looks like an oversight and is not: a binary's dependencies are still dependencies, so publishing it requires `laterite-ags4-diff` and `-merge` (held for 0.2) plus `laterite-cliutil` and `laterite-excel` (never considered for the registry) — and both publish gates render a lib target that a bin-only crate does not have. The CLI ships with 0.2, alongside the diff/merge publish it already depends on.",
+        "prs": [
+          199
+        ]
       }
     ],
     "deprecated": [],
