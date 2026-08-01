@@ -27,11 +27,16 @@ export default defineConfig({
       // Regression floor: node was the lowest-covered surface (~59% lines at
       // 2026-07); the in-process CLI suite (test/cli-inprocess.test.ts) drives
       // `cli.ts` through the coverage instrument the subprocess test can't reach,
-      // taking lines to ~96% / branches to ~86%. The floors sit a couple points
-      // under current so a genuine drop reds the `node` job without a
-      // normal-fluctuation false-red — RATCHET UP as coverage climbs, like the
-      // rust (88) and python (80) floors.
-      thresholds: { lines: 93, branches: 84 },
+      // and the error-path suites (errors / ags4-file-sources / index-guards) took
+      // it to ~98% lines / ~90% branches. The floors sit a couple points under
+      // current so a genuine drop reds the `node` job without a
+      // normal-fluctuation false-red — RATCHET UP as coverage climbs.
+      //
+      // BRANCHES is the number that matters for the Codecov badge: a line whose
+      // branch is half-taken counts as HIT here and as a PARTIAL there, which is
+      // why this file can read ~98% while the `node` flag reads ~90%. Codecov's is
+      // the stricter measure, so branch coverage is what actually moves it.
+      thresholds: { lines: 97, branches: 89 },
     },
   },
 });
