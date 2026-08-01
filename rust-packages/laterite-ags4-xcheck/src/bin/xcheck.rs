@@ -15,7 +15,12 @@
 //! very drift it exists to catch). Exits non-zero on any unexplained split.
 //!
 //!   xcheck --check <out-dir> --allow <file> [--cases <dir>] [--repo-root <dir>]
-//!          [--require-legs all|present]
+//!          [--require-legs all|present] [--require-engines all]
+//!
+//! The two `--require-*` switches are the anti-rot pair, and both are CI-only:
+//! locally a missing leg or an unreported engine is a fact about your working
+//! tree, but on a runner each means a surface silently dropped out of the
+//! comparison while the run still printed OK.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -132,6 +137,7 @@ fn main() {
     let mut cases_dir = PathBuf::from("rust-packages/laterite-ags4-xcheck/cases");
     let mut repo_root = PathBuf::from(".");
     let mut require_all = false;
+    let mut require_engines = false;
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
@@ -141,6 +147,9 @@ fn main() {
             "--repo-root" => repo_root = args.next().map(PathBuf::from).expect("--repo-root <dir>"),
             "--require-legs" => {
                 require_all = args.next().as_deref() == Some("all");
+            }
+            "--require-engines" => {
+                require_engines = args.next().as_deref() == Some("all");
             }
             other => {
                 eprintln!("unknown arg: {other}");
@@ -232,6 +241,28 @@ fn main() {
             silent_legs.len(),
             silent_legs.join(", ")
         );
+        // ...and in CI, naming it is not enough. `--require-engines all` is the
+        // same anti-rot switch as `--require-legs all`, one level down: locally a
+        // leg that cannot answer is a fact about your working tree, but on a runner
+        // it means a surface stopped reporting and every case it "agreed" on was
+        // never actually held to the authority's build. Silence there is the exact
+        // shape of a gate disarming itself, which is what the warning above is for
+        // and what this makes fatal.
+        if require_engines {
+            for name in &silent_legs {
+                failures.push(Failure {
+                    case: "(engine)".into(),
+                    kind: "engine-unreported",
+                    detail: format!(
+                        "leg {name:?} reported no engine fingerprint — its cases were \
+                         compared but never identity-checked, so this run cannot say \
+                         they were compared against the same build. Give the leg a door \
+                         to report through; do NOT allowlist this, an allowlist entry \
+                         would record agreement that was never tested"
+                    ),
+                });
+            }
+        }
     }
     // Each case's reference observation, kept for the cross-path equivalence pass
     // (`equivalent_to`): two DIFFERENT ops that should produce the same bytes

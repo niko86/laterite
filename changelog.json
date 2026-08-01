@@ -71,6 +71,12 @@
         "prs": [
           205
         ]
+      },
+      {
+        "text": "**A surface that stops reporting its engine now fails CI instead of printing a warning above a green run.** The cross-surface gate gained a second anti-rot switch, `--require-engines all`, alongside the `--require-legs all` it has always had — and for the same reason: the same silence means different things locally and on a runner. On your machine a leg that cannot name its engine is a fact about your working tree; in CI it means a surface dropped out of the identity check while the gate still said OK, which is the exact shape of a gate disarming itself. The nightly job now passes both. Neither `engine-mismatch` nor `engine-unreported` can be allowlisted — there is no finding to triage, because the comparison an entry would excuse did not happen between the things it claims — and adding an entry does not merely fail to help: the run then fails **twice**, because the entry also trips the allowlist's own staleness check.",
+        "prs": [
+          206
+        ]
       }
     ],
     "changed": [
