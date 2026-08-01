@@ -34,9 +34,34 @@ published before something it needs) is exactly the one this exists to prevent.
 Nothing happens without `--execute`. The default run performs every check and
 prints exactly what it would do.
 
+## Two things crates.io will do to you
+
+Both were hit during the 0.9.0 publish. Neither is a defect and neither leaves
+partial state, but neither is discoverable except by publishing:
+
+1. **A verified email address is required.** crates.io populates the address
+   from GitHub but leaves it UNVERIFIED, and nothing says so until an upload is
+   rejected `400 A verified email address is required to publish`. Every other
+   step — login, token scopes, packaging, the verification build — succeeds
+   first. Verify at <https://crates.io/settings/profile> before starting.
+2. **New crates are rate-limited.** There is a burst allowance and then roughly
+   one new crate per interval; a first publish of eight trips it near the end.
+   The 429 names the time to retry. This is why the script is idempotent: the
+   fix is to wait and re-run, and re-running must not try to upload the seven
+   that already went out.
+
+## Publishing part of the plan
+
+`--through-wave N` stops after wave N. Publishing one wave, looking at the live
+pages, and only then committing the rest is worth the pause on a FIRST publish:
+crate metadata is frozen per version, so a README that reads badly or a category
+you would not have chosen can still be corrected on the crates that have not
+gone out yet.
+
 Usage:
-    python tools/publish_crates.py              # dry run — check everything, publish nothing
-    python tools/publish_crates.py --execute    # actually publish
+    python tools/publish_crates.py                      # dry run — check everything, publish nothing
+    python tools/publish_crates.py --execute            # publish every wave
+    python tools/publish_crates.py --execute --through-wave 1   # publish wave 1, then stop
 """
 
 from __future__ import annotations
@@ -171,18 +196,33 @@ def main() -> int:
     ap.add_argument(
         "--execute", action="store_true", help="actually publish (default: dry run)"
     )
+    ap.add_argument(
+        "--through-wave",
+        type=int,
+        metavar="N",
+        help="stop after wave N (default: all waves)",
+    )
     args = ap.parse_args()
 
     version = workspace_version()
     round_one = set(PUBLISH_SET) - DEFERRED
     plan = waves(round_one)
 
+    if args.through_wave is not None and not 1 <= args.through_wave <= len(plan):
+        die(f"--through-wave {args.through_wave}: there are {len(plan)} waves")
+    last = args.through_wave or len(plan)
+
     print(
         f"round one: {len(round_one)} crates at {version} "
         f"({len(DEFERRED)} held for 0.2: {', '.join(sorted(DEFERRED))})\n"
     )
     for i, layer in enumerate(plan, 1):
-        print(f"  wave {i}: {', '.join(layer)}")
+        # Name what is being left out. A partial run that printed the same thing
+        # as a full one would be indistinguishable from having published
+        # everything, which is the wrong belief to hold about a registry you
+        # cannot take anything back from.
+        held = "" if i <= last else "   (NOT this run — --through-wave)"
+        print(f"  wave {i}: {', '.join(layer)}{held}")
     print()
 
     preflight(round_one, version)
@@ -191,7 +231,7 @@ def main() -> int:
         print("\nDRY RUN — nothing published. Re-run with --execute.")
         return 0
 
-    for i, layer in enumerate(plan, 1):
+    for i, layer in enumerate(plan[:last], 1):
         print(f"\n=== wave {i}: {', '.join(layer)} ===")
         fresh = []
         for crate in layer:
@@ -229,7 +269,15 @@ def main() -> int:
             )
         print(f"  wave {i} resolvable")
 
-    print(f"\npublished {len(round_one)} crates at {version}")
+    done = sum(len(layer) for layer in plan[:last])
+    print(f"\npublished/verified {done} of {len(round_one)} crates at {version}")
+    if last < len(plan):
+        remaining = [c for layer in plan[last:] for c in layer]
+        print(
+            f"STOPPED after wave {last} as asked — {len(remaining)} crate(s) NOT published: "
+            f"{', '.join(remaining)}\nRe-run without --through-wave to continue; the waves "
+            "already done will be skipped."
+        )
     return 0
 
 
