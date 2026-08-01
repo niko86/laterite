@@ -59,12 +59,20 @@ members = [
     "laterite-ags4-compliance",
 ]
 
-# Single-sourced crate version: every member inherits this via
-# `version.workspace = true`, so the whole engine + the `lat` binary
-# move in one line. Two-tier scheme: this is the
-# internal/engine tier (also stamped by bump-my-version alongside the
-# Python wheels — see root pyproject [tool.bumpversion]); the published
-# npm `laterite` versions on its own `node-v*` track.
+# The ENGINE version. Every member inherits it via `version.workspace = true`,
+# so the crates.io tier moves as one set — which is right, because it ships as
+# one set.
+#
+# Stamped by `tools/release/engine-version.toml`, NOT by the root pyproject's
+# `[tool.bumpversion]`. Until 2026-08-01 it was the latter, and one number drove
+# the engine and every product together. That is how a browser-only patch came to
+# bump the wheel: `laterite-ags4-wasm` inherits this line, so shipping it meant
+# moving the number every surface shared. Twice — 0.8.1 and 0.8.2 — and PyPI saw
+# neither. See `ags-wiki/design/dec-rust-api-crates-io.md`.
+#
+# Two crates deliberately do NOT inherit it: `laterite` (its own 0.1.x until it
+# reaches parity) and `laterite-cli` (the product version, so `lat --version`
+# agrees with the wheel's `lat`).
 [workspace.package]
 version = "0.9.0"
 # crates.io bakes metadata into the PUBLISHED VERSION, not into the crate. Adding
@@ -89,7 +97,7 @@ repository = "https://github.com/niko86/laterite"
 # resolved graph changes; the version is inert until a publish.
 #
 # They live in this file rather than inline at the 21 call sites for one reason:
-# `[tool.bumpversion]` stamps `version = "{current_version}"` in
+# `tools/release/engine-version.toml` stamps `version = "{current_version}"` in
 # `rust-packages/Cargo.toml`, and it rewrites EVERY occurrence in the file, not just
 # the first (verified against a dry run — the log reports only the first match, which
 # reads misleadingly). So these bump in lockstep with `workspace.package.version`

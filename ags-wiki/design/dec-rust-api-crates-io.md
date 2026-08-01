@@ -411,6 +411,103 @@ on. Until then `lat` is distributed as it is today: per-target binaries from the
 release workflow. `cargo install laterite-cli` is a convenience, not an API
 promise, and it is the one part of this plan with a good reason to wait.
 
+## Two version numbers — the engine/product split (#153), 2026-08-01
+
+**Decided:** the engine versions on its own; every product shares a second
+number. Two numbers, one rule each, and nothing else.
+
+| | Covers | Resolved by |
+|---|---|---|
+| **engine** | the Rust workspace and the eight crates.io crates | `cargo add laterite-ags4-validator` |
+| **product** | wheel, npm, browser package, `lat`, the DuckDB extension — and `laterite` at parity | `pip install laterite` · `npm i laterite` |
+
+### The evidence, which is better than the argument
+
+#153 was filed against a hypothetical cost. The cost is real and it is in the
+history. `laterite-ags4-wasm` is `version.workspace = true`, so shipping a
+browser-only patch meant bumping the number every surface shared:
+
+| Tag pushed | Wheel version stamped | Reached PyPI |
+|---|---|---|
+| `v0.8.0` | 0.8.0 | 0.8.0 |
+| `wasm-v0.8.1` | **0.8.1** | *nothing* |
+| `wasm-v0.8.2` | **0.8.2** | *nothing* |
+| `v0.9.0` | 0.9.0 | 0.9.0 |
+
+There are no `v0.8.1` or `v0.8.2` tags. PyPI went straight from 0.8.0 to 0.9.0,
+so **wheel versions 0.8.1 and 0.8.2 exist in git history and on no registry**.
+Two browser fixes each burned a number off every other product's line.
+
+And it was not a mistake anyone made — it was the documented workflow.
+`bump-version.sh` closed with *"cut a tag per surface that ACTUALLY CHANGED …
+republishing an unchanged surface is noise (0.8.1 shipped the browser package
+alone)"*. The advice and the phantom versions are the same decision.
+
+### The rule that replaces it
+
+**A bump and a release are the same act.** Stamp a product version and every
+product ships at it, including the ones whose bytes did not change. That is what
+the shared number costs, and it is what makes `pip install laterite==X` and
+`npm i laterite@X` the same release rather than a coincidence.
+
+Since the first publish there is a second, harder reason. `[workspace.dependencies]`
+carries the version a published crate declares on its siblings. Bumping the
+engine number for a product's sake would declare dependencies on engine versions
+that were never published, and the next `cargo publish` of any one crate would
+demand the whole set at the new number.
+
+### Why not per-product versions
+
+Considered and rejected, on one ground: the facade is meant to be **brought in
+line** with the other products once it reaches parity. Under per-product
+versioning there is no line to join — "in line" is not a state that exists — so
+`laterite` would keep its own number forever, which is the opposite of the
+intent. Its 0.1.x today is an exemption because it is *incomplete*, not a
+precedent for independence.
+
+The cost of choosing the shared number is real and worth writing down: a
+one-line browser fix re-ships the wheel, npm and `lat` unchanged.
+
+### Mechanics
+
+- `tools/release/engine-version.toml` — the engine's bump config. One file, eight
+  substitutions: `[workspace.package].version` plus the seven
+  `[workspace.dependencies]` pins.
+- `[tool.bumpversion]` in the umbrella `pyproject.toml` — the product's. It no
+  longer stamps `rust-packages/Cargo.toml`.
+- `bump-version.sh <product|engine>` — the target is **required**. A default here
+  would be a way to bump the wrong tier by omission, which is the failure the
+  split exists to prevent.
+- `test_version_faithful.py` asserts each tier is internally consistent, that the
+  two stamping paths are **disjoint** (an entry in the wrong config would
+  silently restore the lockstep, and would look fine today because the numbers
+  are equal), and that the facade's exemption is deliberate.
+
+`laterite-cli` moved onto the **product** number, off `version.workspace = true`.
+`lat` exists twice — that binary and the wheel's `lat` console script — and clap
+renders `--version` from `CARGO_PKG_VERSION`, so leaving it on the engine line
+would have made the two report different numbers for the same command the first
+time the tiers diverged.
+
+### Not done yet
+
+Every product should embed the engine it was built from, and the gate should
+assert that whatever ships together carries the same one. `ENGINE_FINGERPRINT`
+exists in the validator and is the right value — content-derived, so it cannot
+claim "same engine" when the engine differs — but it is not plumbed through
+`laterite-py`, `laterite-node` or the wasm surface. Until it is, "same engine
+everywhere" holds because every product is built from one tree: true, and
+unasserted.
+
+Deliberately not built: nightly or prerelease channels (nobody consumes builds
+between releases, and PyPI, npm and cargo disagree on the syntax — `0.9.0-nightly`
+is valid semver and invalid PEP 440); per-crate engine versions (eight numbers
+for something that ships as one set); and propagation as a version mechanism.
+The dependency-closure walk stays a **report** used at release time to answer
+"engine change or product change?" — a `laterite-ags4-parse` fix reaches 21 of 24
+crates, a `laterite-excel` fix reaches 4 — rather than a ledger that drives
+version numbers on its own.
+
 ## Related
 
 [[api-surface-1.0]] · [[dec-rust-drives-python]] · [[dec-laterite-ags4-types-leaf]] ·

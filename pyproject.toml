@@ -327,14 +327,22 @@ replace = "laterite {new_version} — compat:"
 # entries were removed here after the hand-maintained CHANGELOG.md was retired in
 # favour of the generated one — leaving them made a bump abort on a missing file.)
 
-# Rust crate suite: single-sourced via [workspace.package] version (every
-# member inherits it with version.workspace = true). Stamped here so a
-# `bump-my-version bump` moves the engine crates + the `lat` binary in
-# lockstep with the Python wheels — preventing the kind of Python/Rust version
-# drift this single-sourcing fixed. The only `version = "X"` literal in
-# that file is the [workspace.package] line.
+# The Rust workspace is NO LONGER stamped here. It moved to its own config,
+# `tools/release/engine-version.toml`, on 2026-08-01: the engine crates answer to
+# `cargo add`, the products answer to `pip install` / `npm i`, and they move for
+# different reasons. Driving both from this one number is what made a browser-only
+# patch bump every surface — twice, producing wheel versions 0.8.1 and 0.8.2 that
+# exist in git history and on no registry. `tools/release/bump-version.sh` now
+# takes an explicit target; see `ags-wiki/design/dec-rust-api-crates-io.md`.
+#
+# `laterite-cli` IS stamped here, and it is the one Rust crate that is. `lat`
+# exists twice — that binary and the wheel's `lat` console script — and clap
+# reads `CARGO_PKG_VERSION`, so leaving it on the workspace number would make the
+# two report different versions for the same command as soon as the tiers
+# diverge. A CLI is installed by people, so it carries the number people install
+# by. It is `publish = false`, so nothing on crates.io reads this.
 [[tool.bumpversion.files]]
-filename = "rust-packages/Cargo.toml"
+filename = "rust-packages/laterite-cli/Cargo.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
