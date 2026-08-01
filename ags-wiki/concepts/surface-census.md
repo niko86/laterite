@@ -16,8 +16,8 @@ sources: []
 # surface census
 
 > **Generated** by `tools/gen_census.py` — do not hand-edit.
-> Gated by `tests/test_census_faithful.py` (native + uvx) and
-> `rust-packages/laterite-node/test/census.test.ts` (npx).
+> Gated by the `surface census --check` step in ci.yml's python job
+> (native + uvx) and `rust-packages/laterite-node/test/census.test.ts` (npx).
 
 ## Definition
 
