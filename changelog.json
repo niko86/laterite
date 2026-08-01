@@ -29,6 +29,12 @@
         "prs": [
           195
         ]
+      },
+      {
+        "text": "**The eight round-one engine crates are armed for crates.io, and there is a tool that publishes them safely.** Every crate carried `publish = false` — a blanket safety catch, so `cargo publish` refused outright. It is now `true` on the eight; `laterite-ags4-diff` and `laterite-ags4-merge` stay `false`, held for 0.2, with the reason recorded at the flag rather than somewhere a reader has to go looking. `tools/publish_crates.py` does the release: it derives the dependency waves from the manifests each run rather than restating them, waits for each wave to become RESOLVABLE from the registry (not merely uploaded — crates.io indexes on a delay, and a plain loop dies on wave 2 with wave 1 already permanently published), and is idempotent, so a re-run after a failure resumes instead of restarting. It refuses a dirty tree, any branch but `main`, a HEAD that is not `origin/main`, and any crate still marked `publish = false`. Nothing happens without `--execute`.",
+        "prs": [
+          196
+        ]
       }
     ],
     "changed": [

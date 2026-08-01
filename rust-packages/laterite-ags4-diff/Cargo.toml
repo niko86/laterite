@@ -32,6 +32,9 @@ license = "MIT"
 repository.workspace = true
 keywords = ["ags", "ags4", "geotechnical", "diff", "revision"]
 categories = ["science::geo", "data-structures"]
+# Held for 0.2, NOT round one: keeping two crates off crates.io keeps the
+# frozen public surface smaller for a first publish. Arming this is a
+# deliberate act, not a tidy-up — see ags-wiki/design/dec-rust-api-crates-io.md.
 publish = false
 
 # What `cargo package` may put in the tarball. Explicit because the default is
