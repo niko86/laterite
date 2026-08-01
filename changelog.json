@@ -41,6 +41,10 @@
         "prs": [
           197
         ]
+      },
+      {
+        "text": "**`laterite` — a Rust API, not just a facade.** The user-facing crate now exists and is functional at 0.1.0: read an AGS4 file from a path or bytes, walk its groups/headings/rows, edit cells and append rows, validate against the full numbered rule set, and write valid AGS4 back out. It carries its own version, deliberately — the engine crates are lockstep 0.9.x and reshape as the format work demands; this one is a different promise to a different audience. The design's central rule is now **mechanically enforced** rather than reviewed for: no third-party type may appear anywhere in its public API, checked against the rendered surface, so a `serde_json::Value` return or an `encoding_rs::Encoding` argument fails the build instead of silently binding our semver to a dependency's. `encoding_rs` is not even a dependency — encodings are WHATWG label strings. Held for 0.2, additively: diff, merge, typed cell access, indexed scan.",
+        "prs": []
       }
     ],
     "changed": [

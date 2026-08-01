@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Publish the engine crates to crates.io, in dependency waves, idempotently.
+"""Publish the crates to crates.io, in dependency waves, idempotently.
 
-A first publish is not one command repeated eight times. The crates depend on
+A first publish is not one command repeated per crate. The crates depend on
 each other, and a dependent cannot be published until the crate it depends on is
 **resolvable from the registry** — not merely uploaded. crates.io accepts an
 upload and then takes a short while to make it appear in the index, so a script
@@ -45,9 +45,9 @@ partial state, but neither is discoverable except by publishing:
    step — login, token scopes, packaging, the verification build — succeeds
    first. Verify at <https://crates.io/settings/profile> before starting.
 2. **New crates are rate-limited.** There is a burst allowance and then roughly
-   one new crate per interval; a first publish of eight trips it near the end.
+   one new crate per interval; a first publish of several trips it near the end.
    The 429 names the time to retry. This is why the script is idempotent: the
-   fix is to wait and re-run, and re-running must not try to upload the seven
+   fix is to wait and re-run, and re-running must not try to upload the ones
    that already went out.
 
 ## Publishing part of the plan
@@ -83,8 +83,8 @@ WORKSPACE = CRATES / "Cargo.toml"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_package_contents import PUBLISH_SET  # noqa: E402
 
-#: Held for 0.2 — see the design page. Gated by the packaging tools (all ten) but
-#: NOT published in round one, which is eight.
+#: Held for 0.2 — see the design page. Gated by the packaging tools like every
+#: other publishable crate, but deliberately not published yet.
 DEFERRED = {"laterite-ags4-diff", "laterite-ags4-merge"}
 
 #: How long to wait for an uploaded crate to become resolvable from the index.
@@ -113,10 +113,26 @@ def manifest(crate: str) -> dict:
     return tomllib.loads((CRATES / crate / "Cargo.toml").read_text(encoding="utf-8"))
 
 
-def workspace_version() -> str:
-    return tomllib.loads(WORKSPACE.read_text(encoding="utf-8"))["workspace"]["package"][
-        "version"
-    ]
+def crate_version(crate: str) -> str:
+    """`crate`'s published version, resolving workspace inheritance.
+
+    Per-crate, NOT one number for the whole run. The engine crates inherit the
+    workspace version in lockstep, but `laterite` — the user-facing facade —
+    carries its own 0.1.x, deliberately: it is a different promise to a
+    different audience. A single `workspace_version()` here would have asked
+    crates.io whether `laterite 0.9.0` was published, got "no" for a version
+    that does not exist, and tried to publish it.
+    """
+    pkg = manifest(crate)["package"]
+    version = pkg.get("version")
+    if isinstance(version, str):
+        return version
+    if isinstance(version, dict) and version.get("workspace") is True:
+        return tomllib.loads(WORKSPACE.read_text(encoding="utf-8"))["workspace"][
+            "package"
+        ]["version"]
+    die(f"{crate}: cannot determine its version from the manifest")
+    raise AssertionError("unreachable")  # die() exits
 
 
 def waves(crates: set[str]) -> list[list[str]]:
@@ -165,7 +181,7 @@ def on_registry(crate: str, version: str) -> bool:
     return body.get("version", {}).get("yanked") is False
 
 
-def preflight(round_one: set[str], version: str) -> None:
+def preflight(round_one: set[str]) -> None:
     branch = sh("git", "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
     if branch != "main":
         die(f"on branch `{branch}` — publish from `main`, which is what CI tested")
@@ -188,7 +204,7 @@ def preflight(round_one: set[str], version: str) -> None:
             "these crates say `publish = false`, which is the safety catch, not an "
             f"obstacle to route around: {blocked}"
         )
-    print(f"preflight OK — main @ {local[:8]}, version {version}, tree clean")
+    print(f"preflight OK — main @ {local[:8]}, tree clean")
 
 
 def main() -> int:
@@ -204,16 +220,16 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    version = workspace_version()
     round_one = set(PUBLISH_SET) - DEFERRED
     plan = waves(round_one)
+    versions = {c: crate_version(c) for c in round_one}
 
     if args.through_wave is not None and not 1 <= args.through_wave <= len(plan):
         die(f"--through-wave {args.through_wave}: there are {len(plan)} waves")
     last = args.through_wave or len(plan)
 
     print(
-        f"round one: {len(round_one)} crates at {version} "
+        f"{len(round_one)} publishable crate(s) "
         f"({len(DEFERRED)} held for 0.2: {', '.join(sorted(DEFERRED))})\n"
     )
     for i, layer in enumerate(plan, 1):
@@ -221,11 +237,12 @@ def main() -> int:
         # as a full one would be indistinguishable from having published
         # everything, which is the wrong belief to hold about a registry you
         # cannot take anything back from.
-        held = "" if i <= last else "   (NOT this run — --through-wave)"
-        print(f"  wave {i}: {', '.join(layer)}{held}")
+        held = "   (NOT this run — --through-wave)" if i > last else ""
+        named = ", ".join(f"{c} {versions[c]}" for c in layer)
+        print(f"  wave {i}: {named}{held}")
     print()
 
-    preflight(round_one, version)
+    preflight(round_one)
 
     if not args.execute:
         print("\nDRY RUN — nothing published. Re-run with --execute.")
@@ -235,6 +252,7 @@ def main() -> int:
         print(f"\n=== wave {i}: {', '.join(layer)} ===")
         fresh = []
         for crate in layer:
+            version = versions[crate]
             if on_registry(crate, version):
                 print(f"  skip    {crate} {version} (already on crates.io)")
                 continue
@@ -259,7 +277,7 @@ def main() -> int:
         deadline = time.monotonic() + INDEX_TIMEOUT_S
         pending = list(fresh)
         while pending and time.monotonic() < deadline:
-            pending = [c for c in pending if not on_registry(c, version)]
+            pending = [c for c in pending if not on_registry(c, versions[c])]
             if pending:
                 time.sleep(INDEX_POLL_S)
         if pending:
@@ -270,7 +288,7 @@ def main() -> int:
         print(f"  wave {i} resolvable")
 
     done = sum(len(layer) for layer in plan[:last])
-    print(f"\npublished/verified {done} of {len(round_one)} crates at {version}")
+    print(f"\npublished/verified {done} of {len(round_one)} crate(s)")
     if last < len(plan):
         remaining = [c for layer in plan[last:] for c in layer]
         print(

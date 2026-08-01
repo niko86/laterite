@@ -67,6 +67,12 @@ flowchart TD
     laterite_cliutil[laterite-cliutil]
     laterite_transport[laterite-transport]
   end
+  laterite[laterite ?]
+  laterite --> laterite_ags4_core
+  laterite --> laterite_ags4_emit
+  laterite --> laterite_ags4_parse
+  laterite --> laterite_ags4_reference
+  laterite --> laterite_ags4_validator
   laterite_ags4_censor --> laterite_ags4_parse
   laterite_ags4_censor --> laterite_ags4_reference
   laterite_ags4_censor --> laterite_ags4_types
@@ -160,14 +166,14 @@ flowchart TD
 
 | crate | layer | ship-deps (out) | dependents (in) | transitive |
 |---|---|--:|--:|--:|
-| `laterite-ags4-parse` | L0 | 0 | 14 | 0 |
+| `laterite-ags4-parse` | L0 | 0 | 15 | 0 |
 | `laterite-ags4-types` | L0 | 0 | 12 | 0 |
-| `laterite-ags4-reference` | L0 | 2 | 6 | 2 |
+| `laterite-ags4-reference` | L0 | 2 | 7 | 2 |
 | `laterite-cliutil` | L0 | 0 | 3 | 0 |
 | `laterite-transport` | L0 | 0 | 2 | 0 |
-| `laterite-ags4-core` | L1 | 4 | 8 | 4 |
-| `laterite-ags4-validator` | L2 | 3 | 12 | 3 |
-| `laterite-ags4-emit` | L2 | 2 | 6 | 4 |
+| `laterite-ags4-core` | L1 | 4 | 9 | 4 |
+| `laterite-ags4-validator` | L2 | 3 | 13 | 3 |
+| `laterite-ags4-emit` | L2 | 2 | 7 | 4 |
 | `laterite-ags4-diff` | L2 | 3 | 4 | 3 |
 | `laterite-ags4-merge` | L2 | 4 | 4 | 5 |
 | `laterite-excel` | L2 | 2 | 4 | 7 |
@@ -184,18 +190,21 @@ flowchart TD
 | `laterite-ags4-wasm` | L4 | 10 | 0 | 12 |
 | `laterite-node` | L4 | 10 | 0 | 11 |
 | `laterite-py` | L4 | 10 | 0 | 11 |
+| `laterite` | L? | 5 | 0 | 7 |
 
 ## Structural findings (computed from the manifests)
 
 - **Layering inversions (ship edge to a higher layer):** none — the graph respects its layering.
 - **Dev-only cycles (latent — would cycle if promoted to a ship dep):** none.
 - **Hubs (in-degree ≥ 6):**
-  - `laterite-ags4-parse` (in-degree 14)
+  - `laterite-ags4-parse` (in-degree 15)
+  - `laterite-ags4-validator` (in-degree 13)
   - `laterite-ags4-types` (in-degree 12)
-  - `laterite-ags4-validator` (in-degree 12)
-  - `laterite-ags4-core` (in-degree 8)
-  - `laterite-ags4-emit` (in-degree 6)
-  - `laterite-ags4-reference` (in-degree 6)
+  - `laterite-ags4-core` (in-degree 9)
+  - `laterite-ags4-emit` (in-degree 7)
+  - `laterite-ags4-reference` (in-degree 7)
+- **Crates with no layer assignment (add one to `gen_crate_graph.py`):**
+  - `laterite`
 
 ## Structural notes (reviewed)
 

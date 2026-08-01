@@ -1,0 +1,48 @@
+# The user-facing Rust API. Everything else in this workspace is an engine
+# crate; this is the one a stranger is expected to depend on.
+#
+# It carries its OWN version (0.1.x), deliberately NOT `version.workspace = true`.
+# The engine tier is at 0.9.0 and moves whenever the engine does; publishing this
+# crate at 0.9.0 would advertise nine minors of API history that never existed,
+# and would then drag the user-facing semver commitment along with every internal
+# reshape. Two clocks is the point of the two tiers.
+[package]
+name = "laterite"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Read, validate and write AGS4 — the geotechnical data transfer format"
+license = "MIT"
+repository.workspace = true
+keywords = ["ags", "ags4", "geotechnical", "validator", "borehole"]
+categories = ["science::geo", "parser-implementations", "encoding"]
+publish = true
+
+# See laterite#159. `cargo package` ships everything not excluded, and crates.io
+# is append-only.
+include = [
+    "/src/**",
+    "/README.md",
+]
+
+[dependencies]
+laterite-ags4-core = { workspace = true, features = ["transport"] }
+laterite-ags4-emit = { workspace = true }
+laterite-ags4-parse = { workspace = true }
+laterite-ags4-reference = { workspace = true }
+laterite-ags4-validator = { workspace = true }
+# serde_json is an IMPLEMENTATION detail: the emit engine takes cell values as
+# `serde_json::Value`. It must never reach a public signature — see the
+# `no_third_party_types_in_public_signatures` note in src/lib.rs.
+serde_json = "1"
+
+[features]
+default = []
+# The only escape hatch to the engine crates, and deliberately a FEATURE rather
+# than `#[doc(hidden)]`: a feature appears in the consumer's own Cargo.toml, so
+# reaching past the facade is a thing they wrote down and can be asked about.
+# `#[doc(hidden)]` hides an item from rustdoc and from nobody else.
+unstable-engine = []
+
+[lints]
+workspace = true
