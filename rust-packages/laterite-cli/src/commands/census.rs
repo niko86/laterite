@@ -25,11 +25,15 @@ use crate::cli::Cli;
 ///
 /// 1: `verbs`. 2: + `editions` / `fallback_edition`. 3: + `encodings`.
 /// 4: per-verb `args` are now DIFFED (npx grew a per-verb flag table to report).
+/// 6: + `engine` — not a table, but bumped for the same reason one is: a launcher
+///    built before the field existed answers with it MISSING, and a missing engine
+///    is indistinguishable from a launcher that has nothing to hide. Without the
+///    bump a stale launcher would quietly opt itself out of the identity check.
 ///
 /// `tools/gen_census.py` pins a minimum and refuses anything older, so a launcher
 /// built before a table existed fails loudly instead of reporting that table empty.
 /// All three launchers declare this; they must agree.
-pub const CENSUS_VERSION: u32 = 5;
+pub const CENSUS_VERSION: u32 = 6;
 
 /// The encoding labels the census resolves on every surface.
 ///
@@ -146,6 +150,21 @@ pub fn census_json() -> Value {
         "census_version": CENSUS_VERSION,
         "surface": "cli-native",
         "authority": true,
+        // The identity of the ENGINE this launcher carries, not a table — the
+        // validator's build-time digest over every rule source, the dictionary and
+        // the rules catalogue. It rides in the census because the census is already
+        // the one machine door all three launchers implement; a second door would be
+        // a second thing to keep in step, which is the failure this file exists to
+        // catch.
+        //
+        // Deliberately NOT part of the snapshot (`shape()` in `tools/gen_census.py`
+        // picks its tables by name and does not pick this one). A fingerprint moves
+        // whenever a rule is edited, so recording it in `surface-census.json` would
+        // churn a checked-in file on every rule change while saying nothing about
+        // the surfaces — the census answers "what can this launcher do", and this
+        // answers "which rules is it running". The comparison that needs it is
+        // `laterite-ags4-xcheck`, which asks the built launchers at run time.
+        "engine": laterite_ags4_validator::ENGINE_FINGERPRINT,
         "verbs": verbs,
         "global_args": global,
         // The USER-FACING list — what README-cli.md documents and what the other two
@@ -181,6 +200,46 @@ pub fn run() -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The authority's census names the engine it is LINKED against.
+    ///
+    /// This is the reference the two other launchers are held to by
+    /// `laterite-ags4-xcheck`, so a hard-coded digest here would not merely be
+    /// wrong — it would be the value everything else is measured with. Comparing
+    /// against the constant (rather than a literal, or a shape check) is what makes
+    /// that impossible to fake by editing this file alone.
+    #[test]
+    fn census_reports_the_linked_engine() {
+        let c = census_json();
+        assert_eq!(
+            c["engine"].as_str(),
+            Some(laterite_ags4_validator::ENGINE_FINGERPRINT),
+            "the authority must report the engine it is compiled against"
+        );
+    }
+
+    /// The schema version has to move when `engine` is added, even though `engine`
+    /// is not a table. A launcher built before it answers with the field MISSING,
+    /// and a missing engine is indistinguishable from one that simply has nothing
+    /// to report — so without the bump a stale launcher opts itself out of the
+    /// identity check in silence, which is the failure mode the whole census
+    /// version exists to prevent.
+    #[test]
+    fn engine_arrived_with_a_schema_bump() {
+        let c = census_json();
+        let declared = c["census_version"]
+            .as_u64()
+            .expect("the dump declares a numeric schema version");
+        assert!(
+            declared >= 6,
+            "census schema {declared} predates the `engine` field"
+        );
+        assert!(
+            c["engine"].as_str().is_some_and(|s| !s.is_empty()),
+            "a schema >= 6 dump that carries no engine is the exact shape a stale \
+             launcher produces, and it must not come from a current build"
+        );
+    }
 
     /// The census must see every verb the tool actually dispatches. This is the
     /// assertion that makes the census an AUTHORITY rather than a third hand-list:
