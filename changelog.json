@@ -59,6 +59,12 @@
         "prs": [
           203
         ]
+      },
+      {
+        "text": "**The cross-surface gate now checks it was comparing the same engine.** `xcheck` holds eight surfaces to the in-process Rust authority's bytes, and half of those legs run against BUILT ARTEFACTS — a `wasm-pack` output, a tsup dist, an installed wheel — any of which can be stale while every case still matches, because a stale engine and a current one usually agree. The run then reports N-way identity across a surface compiled two weeks ago. Each leg now reports the engine fingerprint it is ACTUALLY running, asked of the artefact rather than assumed from the tree, and a mismatch against the authority's is a hard failure that the allowlist cannot excuse — an allowlisted engine split would be the gate agreeing to compare two different engines, which is the one thing it exists to refuse. A version number could not have done this job; the digest moves when a rule is edited even if nobody bumps anything. The three `cli-*` launcher legs have no door to ask through yet, so they are NAMED on stderr as unchecked rather than passed over, and the run reads as five identity-checked surfaces plus a known gap instead of a clean bill of health.",
+        "prs": [
+          204
+        ]
       }
     ],
     "changed": [

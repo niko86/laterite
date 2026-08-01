@@ -60,7 +60,7 @@ async function runNode(cases, repoRoot) {
     }
     return null;
   };
-  return collect("node", cases, observe);
+  return collect("node", mod.engineFingerprint(), cases, observe);
 }
 
 /** The two knobs the build legs share, in each surface's own spelling.
@@ -97,17 +97,23 @@ async function runWasm(cases, repoRoot) {
     }
     return null;
   };
-  return collect("wasm-engine", cases, observe);
+  return collect("wasm-engine", glue.engine_fingerprint(), cases, observe);
 }
 
-function collect(leg, cases, observe) {
+// `engine` is the digest of the rules this leg is ACTUALLY running, asked of the
+// artifact rather than assumed from the tree. Both JS legs read a built artifact —
+// `node` the napi addon, `wasm-engine` a wasm-pack output — either of which can be
+// stale while every case still matches, because a stale engine and a current one
+// usually agree. Without this the run would report N-way identity across a surface
+// compiled some time ago; the comparator holds it to the authority's.
+function collect(leg, engine, cases, observe) {
   const observations = {};
   for (const aCase of cases) {
     if (!aCase.legs.includes(leg)) continue;
     const obs = observe(aCase);
     if (obs != null) observations[aCase.id] = obs;
   }
-  return { schema: 1, leg, cases: observations };
+  return { schema: 1, leg, engine, cases: observations };
 }
 
 function parseArgs(argv) {

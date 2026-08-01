@@ -175,6 +175,64 @@ fn main() {
 
     let mut failures: Vec<Failure> = Vec::new();
     let mut used_entries: BTreeSet<usize> = BTreeSet::new();
+
+    // --- were these legs even comparable? --------------------------------
+    //
+    // Runs BEFORE any case comparison, because it changes what a pass means. A
+    // leg running a different engine can agree on every case and still be
+    // reporting about software nobody shipped — half these legs read a built
+    // artefact (`wasm-engine` a wasm-pack output, `cli-npx` a tsup dist, `python`
+    // an installed wheel), and a stale one usually agrees. The identity is what
+    // separates "the surfaces agree" from "the surfaces were rebuilt".
+    //
+    // A MISMATCH is a hard failure and is never allowlistable: there is no
+    // finding to triage, because the comparison it would appear in did not
+    // happen between the things it claims.
+    let reference_engine = legs.get(AUTHORITY).and_then(|o| o.engine.clone());
+    let mut silent_legs: Vec<&str> = Vec::new();
+    match &reference_engine {
+        None => {
+            // The authority not reporting is a wiring failure, not a gap: it reads
+            // the constant out of the crate it links.
+            if legs.contains_key(AUTHORITY) {
+                failures.push(Failure {
+                    case: "(engine)".into(),
+                    kind: "engine-unknown",
+                    detail: format!(
+                        "the {AUTHORITY} leg reported no engine fingerprint — every other \
+                         leg is compared against it, so there is nothing to compare to"
+                    ),
+                });
+            }
+        }
+        Some(reference) => {
+            for (name, obs) in &legs {
+                match &obs.engine {
+                    Some(got) if got == reference => {}
+                    Some(got) => failures.push(Failure {
+                        case: "(engine)".into(),
+                        kind: "engine-mismatch",
+                        detail: format!(
+                            "leg {name:?} is running engine {got} but {AUTHORITY} is running \
+                             {reference} — every case this leg agreed on was compared against \
+                             a different build. Rebuild the leg's artefact; do NOT allowlist \
+                             this, an allowlist entry would record agreement that was never tested"
+                        ),
+                    }),
+                    None => silent_legs.push(name.as_str()),
+                }
+            }
+        }
+    }
+    if !silent_legs.is_empty() {
+        // Named, not swallowed. A gate that quietly checked five of eight legs
+        // looks exactly like one that checked all eight.
+        eprintln!(
+            "xcheck: {} leg(s) reported no engine fingerprint and were NOT identity-checked: {}",
+            silent_legs.len(),
+            silent_legs.join(", ")
+        );
+    }
     // Each case's reference observation, kept for the cross-path equivalence pass
     // (`equivalent_to`): two DIFFERENT ops that should produce the same bytes
     // (e.g. `build_ags4` vs an Excel round-trip).

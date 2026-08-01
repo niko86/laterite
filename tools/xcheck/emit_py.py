@@ -191,8 +191,21 @@ def main() -> None:
             if obs is not None:
                 observations[case["id"]] = obs
         path = out_dir / f"{leg}.json"
+        # Both Python legs are the SAME installed wheel — `laterite` and
+        # `laterite.compat` ship together — so they report one engine, read from
+        # the module rather than passed in. That is the point: an editable install
+        # nobody rebuilt would report a stale digest here and be caught, instead of
+        # agreeing on every case and being counted as identity.
         path.write_text(
-            json.dumps({"schema": 1, "leg": leg, "cases": observations}, indent=2)
+            json.dumps(
+                {
+                    "schema": 1,
+                    "leg": leg,
+                    "engine": laterite.engine_fingerprint(),
+                    "cases": observations,
+                },
+                indent=2,
+            )
         )
         print(f"{leg}: {len(observations)} cases -> {path}", flush=True)
 
