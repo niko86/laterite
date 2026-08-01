@@ -17,6 +17,10 @@ for finding in report.findings() {
     println!("{}: {}", finding.rule(), finding.description());
 }
 
+// Or validate bytes, with no filesystem in the picture at all.
+let upload: Vec<u8> = receive_upload();
+let report = ags4::validate_bytes(upload).run()?;
+
 doc.set_cell("PROJ", 0, "PROJ_NAME", "Renamed site")?;
 ags4::write(&doc).to_path("out.ags")?;
 ```
@@ -30,7 +34,12 @@ ags4::write(&doc).to_path("out.ags")?;
   normalises it is not doing you a favour.
 - **Validate.** The full numbered rule set (Rules 1–20), against five bundled
   standard dictionaries with per-file edition auto-selection from `TRAN_AGS`.
-  Findings carry a rule label, a group, a line and a severity.
+  Findings carry a rule label, a group, a line and a severity. From a path or
+  **from bytes** — a service that validates an upload need not give it a disk to
+  sit on. The one difference is Rule 20's on-disk half, which asks whether the
+  sibling `FILE/` tree really holds the attachments the file references: bytes
+  have no sibling anything, so requesting it there is an error rather than a
+  clean result.
 - **Write.** Emit valid AGS4, deriving the `UNIT` and `TYPE` catalogue groups
   from the data. Choose whether to auto-fix, report, or refuse outright.
 

@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ReadOptions, read_ags4_bytes_with};
 use laterite_ags4_emit::{EmitMode, EmitOpts, GroupInput, TranStamp, emit_ags4};
 use laterite_ags4_reference::dict::DictVersion;
-use laterite_ags4_validator::{CheckOptions, check_file};
+use laterite_ags4_validator::parse::parse_bytes;
+use laterite_ags4_validator::{CheckOptions, WorldScope, check_file, check_parsed_with_dict};
 
 pub use document::{Document, Group, Row, Rows};
 pub use report::{Finding, Report, Severity};
@@ -176,7 +177,7 @@ impl Read {
 
 /// A pending validation. Configure it, then [`Validate::run`].
 pub struct Validate {
-    path: PathBuf,
+    source: Source,
     warnings: bool,
     fyi: bool,
     edition: Option<String>,
@@ -184,14 +185,39 @@ pub struct Validate {
     check_files: bool,
 }
 
-/// Validate an AGS4 file against the numbered rules.
+/// Validate an AGS4 file on disk against the numbered rules.
 ///
-/// Takes a path rather than bytes because one rule — Rule 20 — is about files
-/// on disk beside the `.ags`, and a bytes API could only ever answer half of it.
-/// A bytes form will be added when it can say honestly which half it ran.
+/// This is the only form that can answer Rule 20's on-disk half — see
+/// [`Validate::check_files`]. For AGS4 that never touches a filesystem, use
+/// [`validate_bytes`].
 pub fn validate(path: impl AsRef<Path>) -> Validate {
     Validate {
-        path: path.as_ref().to_path_buf(),
+        source: Source::Path(path.as_ref().to_path_buf()),
+        warnings: false,
+        fyi: false,
+        edition: None,
+        encoding: None,
+        check_files: false,
+    }
+}
+
+/// Validate AGS4 already in memory — an upload, a queue message, a database
+/// blob, a document you just wrote with [`write`].
+///
+/// **Every rule runs except Rule 20's on-disk half**, which asks whether the
+/// sibling `FILE/` tree really holds the attachments the file references. Bytes
+/// have no sibling anything, so that half is not run — and asking for it anyway
+/// via [`Validate::check_files`] is an error rather than a clean result. A
+/// service that validates uploads without exposing a filesystem is the case this
+/// exists for; it is also what the browser build has always done.
+///
+/// Everything else is identical to [`validate`], deliberately: both go through
+/// the engine's single door, so the edition resolved from `TRAN_AGS` — and the
+/// 4.0.3→4.0.4 content guard that goes with it — cannot come out differently for
+/// the same file read two ways.
+pub fn validate_bytes(bytes: impl Into<Vec<u8>>) -> Validate {
+    Validate {
+        source: Source::Bytes(bytes.into()),
         warnings: false,
         fyi: false,
         edition: None,
@@ -235,6 +261,11 @@ impl Validate {
     ///
     /// Off by default, because it makes the answer depend on the directory
     /// rather than on the bytes — two runs over the same file can then disagree.
+    ///
+    /// Requires [`validate`]. Setting it on [`validate_bytes`] fails the run with
+    /// [`ErrorKind::InvalidArgument`] instead of reporting Rule 20 clean, because
+    /// "I looked and found nothing" and "I could not look" are different answers
+    /// and only one of them is true.
     #[must_use]
     pub fn check_files(mut self, yes: bool) -> Validate {
         self.check_files = yes;
@@ -253,7 +284,23 @@ impl Validate {
             encoding: laterite_ags4_parse::resolve_encoding(self.encoding.as_deref())
                 .ok_or_else(|| bad_encoding(self.encoding.as_deref().unwrap_or_default()))?,
         };
-        let findings = check_file(&self.path, &opts).map_err(|e| {
+        // Both arms end at `check_parsed_with_dict` — `check_file` reaches it too.
+        // That is not incidental: resolving `TRAN_AGS` and applying the 4.0.3→4.0.4
+        // content guard is four steps, and the engine records that every surface
+        // which hand-assembled them got the guard wrong, judging one file against
+        // two dictionaries depending on whether it arrived as a path or as bytes.
+        // Whatever this does, it must not become a fifth place that gets it wrong.
+        let result = match &self.source {
+            Source::Path(p) => check_file(p, &opts),
+            Source::Bytes(b) => parse_bytes(b, opts.encoding).and_then(|parsed| {
+                // `WorldScope::None` is the honest scope for bytes, and it is what
+                // turns `check_files` into an error inside the engine rather than a
+                // silent pass here.
+                check_parsed_with_dict(&parsed, &opts, &WorldScope::None).map(|(f, _, _)| f)
+            }),
+        };
+
+        let findings = result.map_err(|e| {
             // Map from the engine's own kind token, not from its variants. Its
             // `kind()` is documented as the single producer of that domain
             // precisely so surfaces stop re-deriving it and drifting; a variant
@@ -265,7 +312,11 @@ impl Validate {
                 "world_check_requires_source" => ErrorKind::InvalidArgument,
                 _ => ErrorKind::Other,
             };
-            Error::with_source(kind, format!("cannot validate {}", self.path.display()), e)
+            let what = match &self.source {
+                Source::Path(p) => format!("cannot validate {}", p.display()),
+                Source::Bytes(b) => format!("cannot validate {} bytes", b.len()),
+            };
+            Error::with_source(kind, what, e)
         })?;
         Ok(Report {
             findings: convert(findings),
@@ -489,7 +540,13 @@ impl std::fmt::Debug for Read {
 impl std::fmt::Debug for Validate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Validate")
-            .field("path", &self.path.display().to_string())
+            .field(
+                "source",
+                &match &self.source {
+                    Source::Path(p) => format!("path {}", p.display()),
+                    Source::Bytes(b) => format!("{} bytes", b.len()),
+                },
+            )
             .field("warnings", &self.warnings)
             .field("fyi", &self.fyi)
             .field("edition", &self.edition)

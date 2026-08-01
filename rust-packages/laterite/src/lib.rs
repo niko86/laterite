@@ -9,11 +9,16 @@
 //!     println!("{} — {} rows", group.code(), group.len());
 //! }
 //!
-//! // Validate
+//! // Validate — from a path...
 //! let report = ags4::validate("delivery.ags").warnings(true).run()?;
 //! for finding in report.findings() {
 //!     println!("{}: {}", finding.rule(), finding.description());
 //! }
+//!
+//! // ...or from bytes that never touch a filesystem, for a service that
+//! // validates an upload without giving it a disk to sit on.
+//! let upload: &[u8] = b"\"GROUP\",\"PROJ\"\r\n";
+//! let report = ags4::validate_bytes(upload).run()?;
 //!
 //! // Modify and write
 //! doc.set_cell("PROJ", 0, "PROJ_NAME", "Renamed site")?;
