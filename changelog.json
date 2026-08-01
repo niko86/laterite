@@ -83,6 +83,12 @@
         "prs": [
           208
         ]
+      },
+      {
+        "text": "**The browser bundle's least-tested module was the one standing between DuckDB values and the DOM.** `duckTypes.ts` calls itself \"the single audited place\" where an Int64 column's `bigint` and a TIMESTAMP's micros-since-epoch are normalised — rendering a bigint in JSX throws, and a micros value read as millis renders a plausible date in 1970 rather than an error — and it sat at 15% of lines. It now has a suite, as does `loadSensitive()` (whose fetch-once cache and non-OK-response guard decide whether the Anonymiser pre-ticks anything at all: a proxy's JSON error page would otherwise yield a document with no headings, and an anonymiser that redacts nothing while looking like it worked). The parent-chain walkers in `relationships.ts` gained tests for their cycle guards, which existed to stop a malformed dictionary freezing the tab and had never been exercised. The web lane also gained a BRANCH floor, which it never had — that absence is why the badge read ~85% while the lines gate sat green above 95, since a half-taken branch counts as a hit to lcov and a partial to Codecov. Generated wasm-pack glue is now excluded from the denominator so a local run and the CI run measure the same thing.",
+        "prs": [
+          209
+        ]
       }
     ],
     "changed": [
