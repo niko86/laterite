@@ -499,7 +499,21 @@ _WASM_VERB_CAP = {
 # where `ags4-compliance`'s wasm runner had HARD-CODED `version: "0.5.1"` because
 # wasm exported nothing to ask — the report then claimed the wasm leg tested a
 # two-minor-old build while the gate called it 4-laterite identity.
-_WASM_META_ALLOW = {"list_rules", "dictionary", "version"}
+#
+# `engine_version` / `engine_fingerprint` are the same shape one level down, and
+# they exist because `version` stopped being able to answer the question. Since
+# the tiers split (#202) this package carries the PRODUCT number while the rules
+# carry their own, so a matching `version` across surfaces now shows only that
+# they shipped together. The fingerprint is a digest of the engine's actual
+# inputs, so surfaces reporting the same one are running the same rules — which
+# is what #556's report thought it was asserting.
+_WASM_META_ALLOW = {
+    "list_rules",
+    "dictionary",
+    "version",
+    "engine_version",
+    "engine_fingerprint",
+}
 
 _WEB_VERB_CAP = {"lock": "transport-lock", "unlock": "transport-lock"}
 _WEB_ALLOW = {"ready"}  # worker readiness handshake, not a capability verb

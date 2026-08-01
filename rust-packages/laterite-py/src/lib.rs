@@ -1566,8 +1566,29 @@ fn render_read_csv(headings: Vec<String>, rows: Vec<Vec<String>>) -> String {
     laterite_ags4_core::read_render::render_rows_csv(&headings, &rows)
 }
 
+/// The validation engine's hand-bumped semver — see `engine_fingerprint`.
+#[pyfunction]
+fn engine_version() -> &'static str {
+    laterite_ags4_validator::VERSION
+}
+
+/// The identity of the engine that produces verdicts — a build-time digest over
+/// every rule source, the dictionary, and the rules catalogue.
+///
+/// Exposed because the wheel's own version cannot answer "which rules ran". The
+/// two numbers are independent since the tiers split (#202): a wheel version says
+/// which release you installed, this says what is inside it. Two surfaces
+/// reporting the same fingerprint ARE running the same engine; two reporting the
+/// same release number merely shipped together.
+#[pyfunction]
+fn engine_fingerprint() -> &'static str {
+    laterite_ags4_validator::ENGINE_FINGERPRINT
+}
+
 #[pymodule]
 fn _laterite_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(engine_version, m)?)?;
+    m.add_function(wrap_pyfunction!(engine_fingerprint, m)?)?;
     m.add_function(wrap_pyfunction!(run_check, m)?)?;
     m.add_function(wrap_pyfunction!(fix_file, m)?)?;
     m.add_function(wrap_pyfunction!(list_rules, m)?)?;

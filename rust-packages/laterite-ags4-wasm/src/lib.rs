@@ -2882,6 +2882,28 @@ pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// The version of the validation engine underneath — a hand-bumped semver.
+///
+/// Distinct from [`version`] since the tiers split (#202): this package carries
+/// the product number, the engine carries its own. Useful for humans, useless as
+/// an identity — edit a rule without bumping the crate and this is unchanged.
+#[wasm_bindgen]
+pub fn engine_version() -> String {
+    laterite_ags4_validator::VERSION.to_string()
+}
+
+/// The identity of the engine that produces verdicts — a build-time digest over
+/// every rule source, the dictionary, and the rules catalogue.
+///
+/// The same hazard this module's [`version`] was written for, one level down. A
+/// report that prints matching version numbers across surfaces has shown they
+/// shipped together, not that they agree on the rules; only this can show that.
+/// Two surfaces reporting the same fingerprint ARE running the same engine.
+#[wasm_bindgen]
+pub fn engine_fingerprint() -> String {
+    laterite_ags4_validator::ENGINE_FINGERPRINT.to_string()
+}
+
 // The `dictionary` result — `laterite-ags4-reference`'s `DictionaryDto`, which
 // PyO3 and Node also render, from the one shared builder. Bound to that struct
 // by `ts_interfaces_match_the_serde_structs`.

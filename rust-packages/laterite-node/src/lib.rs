@@ -68,11 +68,41 @@ fn thrown(e: &ValidatorError) -> Error {
     Error::from_reason(format!("{kind}{SEP}{code}{SEP}{e}"))
 }
 
-/// The crate version.
+/// The version of THIS package — the npm `laterite` you installed.
+///
+/// Not the engine's. Since the tiers split (#202) those are two numbers, and this
+/// crate is stamped with the product one precisely so this export keeps answering
+/// the question a caller is actually asking. For the engine, see
+/// [`engine_version`] and [`engine_fingerprint`].
 #[napi]
 #[must_use]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+/// The version of the validation engine underneath — a hand-bumped semver.
+///
+/// Useful for humans, and useless as an identity: edit a rule without bumping the
+/// crate and this is unchanged. [`engine_fingerprint`] is the value that cannot
+/// lie about what produced a verdict.
+#[napi]
+#[must_use]
+pub fn engine_version() -> String {
+    laterite_ags4_validator::VERSION.to_string()
+}
+
+/// The identity of the engine that produces verdicts — a build-time digest over
+/// every rule source, the dictionary, and the rules catalogue.
+///
+/// This is what makes "the same engine everywhere" a checkable claim rather than
+/// an assumption. Two surfaces reporting the same value ARE running the same
+/// rules; two reporting the same `version()` merely shipped together. It is also
+/// what an `.ags.idx` certificate stamps, so a verdict can be traced to the
+/// engine that produced it.
+#[napi]
+#[must_use]
+pub fn engine_fingerprint() -> String {
+    laterite_ags4_validator::ENGINE_FINGERPRINT.to_string()
 }
 
 // --- parse → typed Arrow ------------------------------------------------

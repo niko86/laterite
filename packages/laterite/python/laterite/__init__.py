@@ -78,6 +78,8 @@ __all__ = [
     "build_ags4",
     "dict_for",
     "diff",
+    "engine_fingerprint",
+    "engine_version",
     "fix",
     "fixable_rules",
     "from_excel",
@@ -1779,6 +1781,32 @@ def fixable_rules() -> list[dict]:
     from the same gated rule metadata as ``list_rules`` (which the engine gates
     against the fix engine's own ``FIXABLE_RULE_LABELS``)."""
     return [r for r in list_rules() if r.get("fixable")]
+
+
+def engine_version() -> str:
+    """The validation engine's own version — a hand-bumped semver, distinct from
+    the wheel's since the two tiers split. Useful for humans and **useless as an
+    identity**: edit a rule without bumping the crate and this does not move. Reach
+    for [`engine_fingerprint`][laterite.engine_fingerprint] when you need to know
+    what actually ran."""
+    return _native.engine_version()
+
+
+def engine_fingerprint() -> str:
+    """The identity of the engine that produced a verdict — a build-time digest
+    over every rule source, the dictionary and the rules catalogue.
+
+    ``importlib.metadata.version("laterite")`` says which release you installed;
+    this says what is inside it. The two are independent numbers, so the release
+    version cannot answer "which rules ran" — only this can. Two surfaces (the
+    wheel, the npm package, the browser build) reporting the same fingerprint
+    **are** running the same rules; two reporting the same release number merely
+    shipped together.
+
+    It is also what an ``.ags.idx`` certificate stamps, which is what lets a later
+    run tell "this verdict is still current" from "this verdict was made by a
+    different engine" — so it is the right thing to quote in a bug report."""
+    return _native.engine_fingerprint()
 
 
 def _validate_fixable(

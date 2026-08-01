@@ -18,7 +18,14 @@
 
 [package]
 name = "laterite-py"
-version.workspace = true
+# The PRODUCT version, not the engine's — this crate IS the PyPI `laterite` wheel's native module,
+# so it carries the number people install by. Stamped by
+# `[tool.bumpversion]` in the umbrella pyproject.toml.
+#
+# maturin takes the wheel version from `packages/laterite/pyproject.toml`, so a
+# divergence here would put a different number in the cdylib than on the wheel
+# that contains it.
+version = "0.9.0"
 edition = "2024"
 rust-version = "1.85"
 description = "PyO3 bindings exposing the clean-room laterite-ags4-validator engine to Python (laterite)"

@@ -13,7 +13,13 @@
 
 [package]
 name = "laterite-node"
-version.workspace = true
+# The PRODUCT version, not the engine's — this crate IS the npm `laterite` package,
+# so it carries the number people install by. Stamped by
+# `[tool.bumpversion]` in the umbrella pyproject.toml.
+#
+# `version()` is exported to JS from `CARGO_PKG_VERSION`, so on the engine line it
+# would report a number that is not the package the caller installed.
+version = "0.9.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Node-API (napi-rs) bindings exposing the laterite AGS4 engine to Node.js"
