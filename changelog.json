@@ -89,6 +89,12 @@
         "prs": [
           209
         ]
+      },
+      {
+        "text": "**The browser engine has a coverage figure for the first time — it was 69%, and nobody could see it.** `laterite-ags4-wasm` was the one shipped surface with no coverage gate of any kind. The nightly Rust job excludes it, correctly, because folding a binding cdylib into the ENGINE's denominator would move the engine's floor for reasons unrelated to the engine — but the exclusion read as \"cannot be measured\", and so nothing ever measured it. It was never unmeasurable: its 44 tests are plain `#[test]`s that `cargo test` runs on every PR. It now has its own nightly step, its own denominator and its own floor, deliberately separate so the engine's floor stays comparable run-to-run. Four exports whose signatures are plain Rust — `version`, `engine_version`, `engine_fingerprint`, `list_rules` — gained native tests; the two identity doors especially, since `engine_fingerprint` exists because a hard-coded constant once stood in for a real answer here, and a constant is exactly what these would silently become again. The ceiling is now stated rather than discovered: 103 of 218 functions are unreachable from a native test because they take or return JS types, so raising this means moving logic out of the fat `#[wasm_bindgen]` exports into plain functions, not writing more tests against the boundary.",
+        "prs": [
+          210
+        ]
       }
     ],
     "changed": [
