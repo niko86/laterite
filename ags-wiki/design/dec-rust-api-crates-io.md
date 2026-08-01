@@ -269,6 +269,42 @@ whose stated posture is that AGS5 is a dormant concept.
 `laterite-ags4-core`, so it cannot be dropped without a breaking default-feature
 change.
 
+## The first publish happened — 0.9.0, 2026-08-01
+
+All eight went out: `laterite-ags4-parse`, `-types`, `laterite-transport`,
+`-reference`, `-core`, `-validator`, `-emit`, `-trust`. `laterite-ags4-diff` and
+`-merge` are **not** on crates.io, which is the `publish = false` guard doing
+exactly its job rather than a decision anyone had to remember at the keyboard.
+
+`tools/publish_crates.py` runs it: waves derived from the manifests, a wait for
+each wave to become *resolvable* (not merely uploaded) before the next starts,
+and idempotent so a failure is resumed rather than restarted.
+
+### Two things crates.io does that only a publish reveals
+
+Both were hit, neither is a defect, and neither left partial state — but both cost
+a stop, and the 0.2 publish of diff/merge should not rediscover them.
+
+- **A verified email address is required, and nothing says so until the upload.**
+  crates.io fills the address in from GitHub and leaves it UNVERIFIED. Account
+  creation, token scopes, `cargo login`, packaging and the full verification
+  build all succeed; the rejection arrives at the upload itself, as
+  `400 A verified email address is required to publish`. Verify at
+  <https://crates.io/settings/profile> *first*.
+- **New crates are rate-limited.** A burst allowance, then roughly one new crate
+  per interval. Publishing eight tripped it on the eighth, with a `429` naming
+  the retry time. This is the reason idempotency is not a nicety: the fix is to
+  wait and re-run, and a re-run must not attempt to re-upload the seven that
+  already went out.
+
+### What the publish proved that no local gate could
+
+`laterite-ags4-trust`'s verification build **downloaded `laterite-ags4-core 0.9.0`
+from the registry** and compiled against it. Every earlier check ran against path
+dependencies; this is the first evidence that the published artefacts resolve and
+build as a stranger receives them — which is precisely the thing
+[[dec-rust-api-crates-io|#158]] was about.
+
 ## Related
 
 [[api-surface-1.0]] · [[dec-rust-drives-python]] · [[dec-laterite-ags4-types-leaf]] ·

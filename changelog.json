@@ -35,6 +35,10 @@
         "prs": [
           196
         ]
+      },
+      {
+        "text": "**The engine crates are on crates.io.** Eight of them at 0.9.0 — `laterite-ags4-parse`, `-types`, `-reference`, `-core`, `-validator`, `-emit`, `-trust` and `laterite-transport` — so a Rust consumer no longer needs a git dependency or a vendored path. `laterite-ags4-diff` and `laterite-ags4-merge` are deliberately NOT published; they ship in 0.2, and the `publish = false` guard is what keeps that a decision rather than something to remember. `tools/publish_crates.py` gained `--through-wave N`, so a release can publish one wave, let the live pages be inspected, and only then commit the rest — worth the pause while metadata is still correctable on the crates that have not gone out.",
+        "prs": []
       }
     ],
     "changed": [
