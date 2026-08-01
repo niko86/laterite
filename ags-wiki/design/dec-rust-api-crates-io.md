@@ -302,6 +302,41 @@ filed under whichever kind looked closest. And `publish_crates.py` now reads
 **per-crate** versions: one `workspace_version()` would have asked crates.io
 about `laterite 0.9.0`, been told no, and tried to publish it.
 
+### 0.1.1 — `validate_bytes`, and a justification that did not hold
+
+0.1.0 shipped `validate` taking a **path only**. The reason written at the
+function was that Rule 20 concerns files on disk beside the `.ags`, so a bytes
+API "could only ever answer half of it" and would be added "when it can say
+honestly which half it ran".
+
+That reason was already satisfied when it was written. Rule 20 has lived in two
+modules since the `cert-trust-v2` arc (2026-07-14): the data-level half in
+`rules/references.rs`, a pure function of the bytes, and the on-disk half in
+`world.rs`. [[cert-trust-v2|`WorldScope`]] exists precisely to say which one ran,
+and its own doc rejects the `(bool, Option<&Path>)` shape because that pair has a
+fourth state — *asked for the check, had nothing to check against* — which the
+engine used to answer by quietly reporting Rule 20 clean. Ask for the world check
+with no source and you get `WorldCheckRequiresSource`.
+
+Every other surface was already using it: Python sniffs bytes, Node builds all
+three arms explicitly, wasm is `WorldScope::None` always, and the emitter
+re-validates its own output in memory. The facade was the only one that could
+not, and its error mapping already handled the `world_check_requires_source`
+token it never produced. The omission was mine, and the comment made it read as
+principled.
+
+So 0.1.1 adds `ags4::validate_bytes`. Both arms end at `check_parsed_with_dict`
+— deliberately, because that door does four things (resolve `TRAN_AGS`, apply the
+4.0.3→4.0.4 guard, run the rules, emit the transparency FYI) and the engine
+records that **every** surface which hand-assembled them skipped the guard,
+judging one file against two dictionaries depending on how it arrived. A test
+asserts a path and its own bytes produce identical findings, which is that bug
+stated as an assertion.
+
+The motivating case is a service that validates uploads without exposing a
+filesystem — the same shape as "merging a disk file with bytes off a network",
+already on record as laterite#162.
+
 ## The first publish happened — 0.9.0, 2026-08-01
 
 All eight went out: `laterite-ags4-parse`, `-types`, `laterite-transport`,

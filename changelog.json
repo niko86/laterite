@@ -47,6 +47,12 @@
         "prs": [
           198
         ]
+      },
+      {
+        "text": "**`laterite` can validate bytes — `ags4::validate_bytes`, in 0.1.1.** 0.1.0 shipped `validate` taking a path only, which meant a service validating an upload had to give it a disk to sit on first. The reason written at the function — that Rule 20 is about files beside the `.ags`, so bytes could only answer half of it — did not hold: Rule 20 has been two modules since 2026-07-14, and `WorldScope` exists precisely to say which half ran, refusing the request with `WorldCheckRequiresSource` rather than reporting a clean Rule 20 nobody checked. Python, Node, wasm and the emitter were all already using it; the facade was the only surface that could not, and its error mapping already handled the token it never produced. Both arms now end at the engine's single door, so the edition resolved from `TRAN_AGS` and the 4.0.3→4.0.4 content guard cannot come out differently for one file read two ways — a test asserts exactly that, since it is the bug every hand-assembled surface has had. Asking for the on-disk check on bytes is an error, not a pass.",
+        "prs": [
+          200
+        ]
       }
     ],
     "changed": [

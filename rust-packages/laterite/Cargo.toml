@@ -8,7 +8,7 @@
 # reshape. Two clocks is the point of the two tiers.
 [package]
 name = "laterite"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 rust-version = "1.85"
 description = "Read, validate and write AGS4 — the geotechnical data transfer format"

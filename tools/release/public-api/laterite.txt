@@ -222,6 +222,7 @@ pub fn laterite::ags4::editions() -> alloc::vec::Vec<&'static str>
 pub fn laterite::ags4::read(impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Read
 pub fn laterite::ags4::read_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Read
 pub fn laterite::ags4::validate(impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Validate
+pub fn laterite::ags4::validate_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Validate
 pub fn laterite::ags4::write(&laterite::ags4::Document) -> laterite::ags4::Write<'_>
 #[non_exhaustive] pub enum laterite::ErrorKind
 pub laterite::ErrorKind::BadDictionary
