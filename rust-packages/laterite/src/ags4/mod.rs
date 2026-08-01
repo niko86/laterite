@@ -312,11 +312,33 @@ impl Validate {
                 "world_check_requires_source" => ErrorKind::InvalidArgument,
                 _ => ErrorKind::Other,
             };
-            let what = match &self.source {
+            let subject = match &self.source {
                 Source::Path(p) => format!("cannot validate {}", p.display()),
                 Source::Bytes(b) => format!("cannot validate {} bytes", b.len()),
             };
-            Error::with_source(kind, what, e)
+            // One token gets its own sentence, because it is the one a caller
+            // causes rather than receives: `check_files` on bytes. "cannot
+            // validate 210 bytes" describes the size of the input and nothing
+            // about the mistake, and it is the first thing a service validating
+            // uploads runs into.
+            //
+            // No source attached in that arm, deliberately. The engine's own
+            // wording says the same thing, so keeping it made `{:#}` — and every
+            // `anyhow` chain — print the explanation twice in a row. A cause is
+            // worth carrying when it adds what the message lacks; here it does
+            // not. Every other arm keeps the terse subject and its real cause.
+            if e.kind() == "world_check_requires_source" {
+                Error::new(
+                    kind,
+                    format!(
+                        "{subject}: the on-disk file check (Rule 20) needs a path to look \
+                         beside, so `check_files` works with `validate` and not with \
+                         `validate_bytes` — drop it, or validate the file from disk"
+                    ),
+                )
+            } else {
+                Error::with_source(kind, subject, e)
+            }
         })?;
         Ok(Report {
             findings: convert(findings),

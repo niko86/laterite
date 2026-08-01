@@ -102,6 +102,12 @@
         "prs": [
           193
         ]
+      },
+      {
+        "text": "**`laterite` 0.1.2 — the error a bytes caller actually hits now says what to do about it.** Asking for the on-disk file check on bytes reported `cannot validate 210 bytes`: true, and useless. It names the size of the input and nothing about the mistake, and it is the first thing a service validating uploads runs into. It now explains that Rule 20's on-disk half needs a path to look beside, so `check_files` belongs with `validate` rather than `validate_bytes`. `Error`'s `Display` also gained an alternate form: `{}` stays terse because `anyhow` and `eyre` walk `source()` themselves and would otherwise print the cause twice, while `{:#}` appends it for callers using neither — which the field's own documentation had claimed since the crate was written. No public signature changed.",
+        "prs": [
+          201
+        ]
       }
     ],
     "security": []
