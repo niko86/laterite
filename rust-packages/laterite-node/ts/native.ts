@@ -7,6 +7,8 @@
 // the compiled dist resolves `#native` the same way the source does.
 export {
   version,
+  engineVersion,
+  engineFingerprint,
   parseArrow,
   runCheck,
   fixFile,

@@ -195,6 +195,27 @@ export interface EmitResult {
 }
 
 /**
+ * The identity of the engine that produces verdicts — a build-time digest over
+ * every rule source, the dictionary, and the rules catalogue.
+ *
+ * This is what makes "the same engine everywhere" a checkable claim rather than
+ * an assumption. Two surfaces reporting the same value ARE running the same
+ * rules; two reporting the same `version()` merely shipped together. It is also
+ * what an `.ags.idx` certificate stamps, so a verdict can be traced to the
+ * engine that produced it.
+ */
+export declare function engineFingerprint(): string
+
+/**
+ * The version of the validation engine underneath — a hand-bumped semver.
+ *
+ * Useful for humans, and useless as an identity: edit a rule without bumping the
+ * crate and this is unchanged. [`engine_fingerprint`] is the value that cannot
+ * lie about what produced a verdict.
+ */
+export declare function engineVersion(): string
+
+/**
  * An in-memory Excel conversion result: the produced `bytes` (an `.xlsx`
  * workbook or an `.ags` document) plus the same conversion stats. The bytes
  * twin of the path functions, so an uploaded workbook / a fixed handle needn't
@@ -546,7 +567,14 @@ export interface ValidationReport {
   ndjson: string
 }
 
-/** The crate version. */
+/**
+ * The version of THIS package — the npm `laterite` you installed.
+ *
+ * Not the engine's. Since the tiers split (#202) those are two numbers, and this
+ * crate is stamped with the product one precisely so this export keeps answering
+ * the question a caller is actually asking. For the engine, see
+ * [`engine_version`] and [`engine_fingerprint`].
+ */
 export declare function version(): string
 
 /**

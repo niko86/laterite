@@ -42,11 +42,13 @@ Deliberately NOT gated (documented so their absence isn't mistaken for a hole):
   by `scripts/release.sh <version>` (version is a required arg) + that repo's CI
   asserting its `Cargo.toml` == `description.yml`, per RELEASING.md.
 
-Not yet gated, and it is the one real hole: that every product embeds the SAME
-engine. `ENGINE_FINGERPRINT` exists in the validator and is the right value to
-assert on, but it is not plumbed through `laterite-py`, `laterite-node` or the
-wasm surface yet. Until it is, "same engine everywhere" holds because every
-product is built from one tree, which is true and unasserted.
+Every product now REPORTS the engine it carries — `engine_fingerprint()` on the
+wheel, the npm package and the browser build, from the validator's build-time
+digest. What is still missing is a gate that compares those values *across* built
+surfaces: within this repo they are trivially equal, because everything compiles
+the same crate from one tree. The comparison that would mean something runs
+against built artefacts, which is `laterite-ags4-xcheck`'s job, and it lands
+there rather than here.
 """
 
 import json
@@ -138,20 +140,45 @@ def test_compat_version_prefix_matches_product() -> None:
     )
 
 
-def test_cli_crate_matches_product_not_engine() -> None:
-    """`lat` is a product, so the binary carries the number people install by.
+#: Crates that SHIP AS A PRODUCT and therefore carry the product number, not the
+#: engine's. Each is a product wearing a crate; none is on crates.io. The value is
+#: what breaks if it is wrong, because "it should match" is not a reason anyone
+#: can act on at 2am.
+PRODUCT_CRATES = {
+    "laterite-cli": (
+        "`lat --version` (clap reads CARGO_PKG_VERSION) would disagree with the "
+        "wheel's `lat` console script, which is the same command"
+    ),
+    "laterite-py": (
+        "maturin takes the wheel version from packages/laterite/pyproject.toml, so "
+        "the cdylib would carry a different number than the wheel containing it"
+    ),
+    "laterite-node": (
+        "its `version()` export is CARGO_PKG_VERSION, so npm callers would be told "
+        "a version that is not the package they installed"
+    ),
+    "laterite-ags4-wasm": (
+        "wasm-pack writes the published manifest FROM this line and release.yml "
+        "asserts the `wasm-v<tag>` matches it — the release fails its own tag check"
+    ),
+}
 
-    `lat` exists twice — `rust-packages/laterite-cli` and the wheel's `lat`
-    console script (`laterite._cli:main`), which is byte-faithful to it. clap
-    renders `--version` from `CARGO_PKG_VERSION`, so leaving the crate on
-    `version.workspace = true` would make the two report different numbers for
-    the same command the first time the tiers diverge.
+
+def test_product_crates_are_on_the_product_number() -> None:
+    """A crate that ships as a product carries the number people install by.
+
+    All four were left on `version.workspace = true` when the tiers split (#202),
+    which was harmless for exactly as long as the two numbers stayed equal — and
+    would have broken at the first product-only release, starting with the wasm
+    tag check.
     """
-    cli = _toml("rust-packages/laterite-cli/Cargo.toml")["package"]
-    assert cli.get("version") == PRODUCT, (
-        f"laterite-cli is {cli.get('version')!r}, not the product {PRODUCT!r} — "
-        "`lat --version` would disagree with the wheel's `lat`"
-    )
+    for crate, consequence in PRODUCT_CRATES.items():
+        got = _toml(f"rust-packages/{crate}/Cargo.toml")["package"].get("version")
+        assert got == PRODUCT, (
+            f"{crate} is {got!r}, not the product {PRODUCT!r}"
+            + (" (it inherits the ENGINE version)" if got is None else "")
+            + f" — {consequence}"
+        )
 
 
 # --- ENGINE --------------------------------------------------------------
@@ -215,6 +242,11 @@ def test_the_two_tiers_are_stamped_from_different_configs() -> None:
     product_files = {
         f["filename"] for f in _toml("pyproject.toml")["tool"]["bumpversion"]["files"]
     }
+    for crate in PRODUCT_CRATES:
+        assert f"rust-packages/{crate}/Cargo.toml" in product_files, (
+            f"{crate} is asserted to carry the product version but nothing stamps "
+            "it — a bump would leave it behind at the old number"
+        )
     engine_files = {
         f["filename"]
         for f in _toml("tools/release/engine-version.toml")["tool"]["bumpversion"][

@@ -335,14 +335,44 @@ replace = "laterite {new_version} — compat:"
 # exist in git history and on no registry. `tools/release/bump-version.sh` now
 # takes an explicit target; see `ags-wiki/design/dec-rust-api-crates-io.md`.
 #
-# `laterite-cli` IS stamped here, and it is the one Rust crate that is. `lat`
-# exists twice — that binary and the wheel's `lat` console script — and clap
-# reads `CARGO_PKG_VERSION`, so leaving it on the workspace number would make the
-# two report different versions for the same command as soon as the tiers
-# diverge. A CLI is installed by people, so it carries the number people install
-# by. It is `publish = false`, so nothing on crates.io reads this.
+# FOUR Rust crates are stamped here, and the rule is one line: a crate that
+# SHIPS AS A PRODUCT carries the number people install by, not the engine's.
+# Each of these is a product wearing a crate; none is on crates.io.
+#
+#   laterite-cli         `lat`. It exists twice — this binary and the wheel's
+#                        `lat` console script — and clap reads
+#                        `CARGO_PKG_VERSION`, so on the engine line the two would
+#                        report different numbers for the same command.
+#   laterite-py          the wheel's native module. maturin takes the wheel
+#                        version from packages/laterite/pyproject.toml, so this
+#                        must not drift from it.
+#   laterite-node        the npm `laterite` package. Its `version()` export is
+#                        `CARGO_PKG_VERSION` — on the engine line it would report
+#                        a number that is not the package you installed.
+#   laterite-ags4-wasm   the npm `@laterite/ags4-wasm` package. wasm-pack writes
+#                        the published manifest FROM this line and release.yml
+#                        asserts `wasm-v<tag>` matches it, so on the engine line
+#                        the first product-only release fails its own tag check.
+#
+# All four were left on `version.workspace = true` when the tiers split (#202),
+# which was harmless only while the two numbers were equal.
 [[tool.bumpversion.files]]
 filename = "rust-packages/laterite-cli/Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "rust-packages/laterite-py/Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "rust-packages/laterite-node/Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "rust-packages/laterite-ags4-wasm/Cargo.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 

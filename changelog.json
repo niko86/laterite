@@ -53,6 +53,12 @@
         "prs": [
           200
         ]
+      },
+      {
+        "text": "**Every surface can say which ENGINE it carries, not just which release it is.** `engine_fingerprint()` and `engine_version()` now exist on the wheel (`laterite.engine_fingerprint()`), the npm package (`engineFingerprint()`) and the browser build. The fingerprint is a build-time digest over every rule source, the dictionary and the rules catalogue, so it is the only value that can be believed: edit a rule and forget to bump anything and the semver is unchanged while the digest moves. Two surfaces reporting the same fingerprint ARE running the same rules; two reporting the same release number merely shipped together — a distinction this repo has already been burned by, when a compliance report hard-coded a version literal and kept printing it two minors after the workspace moved past it. It is also what an `.ags.idx` certificate stamps, so it is the right thing to quote in a bug report.",
+        "prs": [
+          203
+        ]
       }
     ],
     "changed": [
@@ -113,6 +119,12 @@
         "text": "**`laterite` 0.1.2 — the error a bytes caller actually hits now says what to do about it.** Asking for the on-disk file check on bytes reported `cannot validate 210 bytes`: true, and useless. It names the size of the input and nothing about the mistake, and it is the first thing a service validating uploads runs into. It now explains that Rule 20's on-disk half needs a path to look beside, so `check_files` belongs with `validate` rather than `validate_bytes`. `Error`'s `Display` also gained an alternate form: `{}` stays terse because `anyhow` and `eyre` walk `source()` themselves and would otherwise print the cause twice, while `{:#}` appends it for callers using neither — which the field's own documentation had claimed since the crate was written. No public signature changed.",
         "prs": [
           201
+        ]
+      },
+      {
+        "text": "**Four crates that ship as products were left on the engine version.** `laterite-py`, `laterite-node` and `laterite-ags4-wasm` still said `version.workspace = true` after the tiers split, which was harmless for exactly as long as the two numbers stayed equal and would have broken at the first product-only release. The sharpest case: `wasm-pack` writes the published npm manifest FROM the crate version and the release workflow then asserts the `wasm-v<tag>` matches it, so a `wasm-v0.9.1` tag against a crate still on engine 0.9.0 fails its own tag check. Node's `version()` export would likewise have told callers a number that was not the package they installed. All four now carry the product number, and the gate names the consequence for each rather than asserting they merely ought to match.",
+        "prs": [
+          203
         ]
       }
     ],

@@ -947,7 +947,7 @@ export {
   WorldCheckRequiresSourceError,
 } from "./errors";
 export { Report, type RuleFinding } from "./report";
-export { version } from "./native";
+export { engineFingerprint, engineVersion, version } from "./native";
 export type { ExcelStats, Finding, GroupMeta, Sidecar } from "./native";
 // AGS type-system helpers, as a namespace (mirrors Python's `laterite.ags_types`).
 export * as agsTypes from "./ags-types";

@@ -489,15 +489,46 @@ renders `--version` from `CARGO_PKG_VERSION`, so leaving it on the engine line
 would have made the two report different numbers for the same command the first
 time the tiers diverged.
 
-### Not done yet
+### Every product reports its engine
 
-Every product should embed the engine it was built from, and the gate should
-assert that whatever ships together carries the same one. `ENGINE_FINGERPRINT`
-exists in the validator and is the right value — content-derived, so it cannot
-claim "same engine" when the engine differs — but it is not plumbed through
-`laterite-py`, `laterite-node` or the wasm surface. Until it is, "same engine
-everywhere" holds because every product is built from one tree: true, and
-unasserted.
+Done next, and it began by finding a defect in the split above.
+
+**Four crates were left on the engine line that ship as products.**
+`laterite-py`, `laterite-node` and `laterite-ags4-wasm` all said
+`version.workspace = true` — harmless for exactly as long as the two numbers
+stayed equal, and broken at the first product-only release. The sharpest case:
+`wasm-pack` writes the published npm manifest *from* the crate version and
+`release.yml` then asserts the `wasm-v<tag>` matches it, so a `wasm-v0.9.1` tag
+against a crate still on engine 0.9.0 fails its own tag check. All four now carry
+the product number, and the rule is one line: **a crate that ships as a product
+carries the number people install by.**
+
+With that fixed, `version()` means the package again, and the engine needed its
+own door:
+
+- `engine_version()` — the engine's hand-bumped semver.
+- `engine_fingerprint()` — the build-time digest over every rule source, the
+  dictionary and the rules catalogue.
+
+on the wheel (`laterite.engine_fingerprint()`), the npm package
+(`engineFingerprint()`) and the browser build.
+
+The fingerprint rather than the version, because only the fingerprint can be
+believed: edit a rule and forget to bump anything and the semver is unchanged
+while the digest moves. Two surfaces reporting the same fingerprint **are**
+running the same rules; two reporting the same release number merely shipped
+together. This repo has already been burned by the weaker claim — [[modality-register|#556]]
+added wasm's `version()` because a compliance report hard-coded `"0.5.1"` and
+kept printing it while the workspace moved to 0.7.0. The build was current; only
+the report lied.
+
+**Still open:** comparing those values *across* built surfaces. Inside this repo
+they are trivially equal — everything compiles the same crate from one tree — so
+a test here would assert nothing. The comparison that means something runs
+against built artefacts, which is `laterite-ags4-xcheck`'s existing job: it
+already holds every surface to an authority leg through a shared observation
+envelope, and the fingerprint belongs in that envelope so a comparison can state
+that the legs were comparable rather than assume it.
 
 Deliberately not built: nightly or prerelease channels (nobody consumes builds
 between releases, and PyPI, npm and cargo disagree on the syntax — `0.9.0-nightly`
