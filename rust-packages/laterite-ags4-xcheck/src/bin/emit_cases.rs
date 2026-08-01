@@ -202,6 +202,10 @@ fn main() {
     let payload = LegObservations {
         schema: 1,
         leg: AUTHORITY.into(),
+        // The authority's engine is the reference every other leg is held to —
+        // read from the linked crate, not passed in, so this leg cannot report an
+        // engine it is not running.
+        engine: Some(laterite_ags4_validator::ENGINE_FINGERPRINT.to_string()),
         cases: observations,
     };
     let path = out_dir.join(format!("{AUTHORITY}.json"));

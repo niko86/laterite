@@ -145,6 +145,31 @@ pub fn load_manifests(cases_dir: &Path) -> Result<Vec<Case>, String> {
 pub struct LegObservations {
     pub schema: u32,
     pub leg: String,
+    /// The identity of the engine THIS leg is actually running — the validator's
+    /// build-time digest over every rule source, the dictionary and the rules
+    /// catalogue (`laterite_ags4_validator::ENGINE_FINGERPRINT`).
+    ///
+    /// Without it this gate can only report that the legs agreed, not that they
+    /// were comparable. That distinction is not academic: half these legs run
+    /// against BUILT ARTEFACTS — `wasm-engine` against a `wasm-pack` output,
+    /// `cli-npx` against a tsup dist, `python` against an installed wheel — any
+    /// of which can be stale while every case still matches, because a stale
+    /// engine and a current one usually agree. The run then reports N-way
+    /// identity across a surface that was compiled two weeks ago.
+    ///
+    /// That is exactly the failure this repo has already paid for once, at a
+    /// different level: `ags4-compliance` hard-coded a version literal and went on
+    /// printing it for two minors, so its report claimed an identity it had not
+    /// checked. A version number could not have caught it; this can, because it
+    /// moves when a rule is edited even if nobody bumps anything.
+    ///
+    /// `Option` because the three `cli-*` launcher legs have no door to ask
+    /// through yet — they drive a subprocess, and none of the three launchers
+    /// prints its engine. The comparator NAMES the legs that did not report
+    /// rather than passing over them, so this reads as a known gap instead of a
+    /// clean bill of health.
+    #[serde(default)]
+    pub engine: Option<String>,
     pub cases: BTreeMap<String, Observation>,
 }
 
@@ -224,6 +249,41 @@ mod tests {
             serde_json::to_value(&absent).unwrap(),
             serde_json::json!({"absent": "no filesystem in the wasm engine"})
         );
+    }
+
+    /// An envelope written before the `engine` field existed must still parse.
+    ///
+    /// The three `cli-*` legs emit exactly this shape today, so this is not a
+    /// compatibility nicety — it is the live case. If it stopped parsing, every
+    /// launcher leg would drop out of the run and the gate would report a
+    /// comfortable pass over three fewer surfaces.
+    #[test]
+    fn an_envelope_without_an_engine_still_parses_as_unknown() {
+        let old = serde_json::json!({
+            "schema": 1,
+            "leg": "cli-native",
+            "cases": {"x": {"ok": "\"GROUP\",\"PROJ\"\r\n"}}
+        });
+        let parsed: LegObservations = serde_json::from_value(old).expect("parses");
+        assert_eq!(
+            parsed.engine, None,
+            "a missing engine is unknown, not empty"
+        );
+        assert_eq!(parsed.cases.len(), 1, "the cases must survive intact");
+    }
+
+    /// An absent engine and an empty one are different facts, and only one of
+    /// them can be compared. `Some("")` would match another `Some("")` and read
+    /// as identity — so a leg that reports a blank digest must not be silently
+    /// treated as having reported nothing, nor as agreeing.
+    #[test]
+    fn an_empty_engine_is_not_the_same_as_no_engine() {
+        let blank: LegObservations = serde_json::from_value(
+            serde_json::json!({"schema": 1, "leg": "l", "engine": "", "cases": {}}),
+        )
+        .expect("parses");
+        assert_eq!(blank.engine.as_deref(), Some(""));
+        assert_ne!(blank.engine, None);
     }
 
     #[test]

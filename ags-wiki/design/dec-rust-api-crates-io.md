@@ -522,13 +522,39 @@ added wasm's `version()` because a compliance report hard-coded `"0.5.1"` and
 kept printing it while the workspace moved to 0.7.0. The build was current; only
 the report lied.
 
-**Still open:** comparing those values *across* built surfaces. Inside this repo
-they are trivially equal — everything compiles the same crate from one tree — so
-a test here would assert nothing. The comparison that means something runs
-against built artefacts, which is `laterite-ags4-xcheck`'s existing job: it
-already holds every surface to an authority leg through a shared observation
-envelope, and the fingerprint belongs in that envelope so a comparison can state
-that the legs were comparable rather than assume it.
+### The cross-surface gate checks it was comparing the same engine
+
+`laterite-ags4-xcheck`'s observation envelope carries an `engine` field, and the
+comparator holds every leg that reports one to the authority's before any case is
+compared. A mismatch is a hard failure and is **not allowlistable**: there is no
+finding to triage, because the comparison it would appear in did not happen
+between the things it claims.
+
+The reason this is not tautological — every leg compiles from one tree, so why
+would they differ? — is that **half the legs run against built artefacts**:
+`wasm-engine` against a `wasm-pack` output, `node` and `cli-npx` against a tsup
+dist and a napi addon, `python` against an installed wheel. Any of those can be
+stale while every case still matches, because a stale engine and a current one
+usually agree. The run then reports N-way identity across a surface compiled some
+time ago. That is [[modality-register|#556]] again, one level up: a report
+claiming an identity it had not checked.
+
+Verified by falsification rather than by reasoning — doctoring `wasm-engine`'s
+digest fails the run with `engine-mismatch` and exit 1, and rebuilding the leg
+clears it.
+
+**Five of eight legs report.** `cli-native`, `cli-uvx` and `cli-npx` drive a
+subprocess and none of the three launchers prints its engine, so the comparator
+**names them** on every run:
+
+```
+xcheck: 3 leg(s) reported no engine fingerprint and were NOT identity-checked: cli-native, cli-npx, cli-uvx
+```
+
+rather than passing over them. A gate that quietly checked five of eight looks
+exactly like one that checked all eight. Closing it means giving the three
+launchers a shared door to report through — they are byte-faithful to each other
+by design, so it is one contract, not three.
 
 Deliberately not built: nightly or prerelease channels (nobody consumes builds
 between releases, and PyPI, npm and cargo disagree on the syntax — `0.9.0-nightly`
