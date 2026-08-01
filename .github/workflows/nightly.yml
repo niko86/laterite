@@ -276,7 +276,12 @@ jobs:
   # VALUES N-way, with the in-process Rust leaf (emit-cases) as the AUTHORITY
   # column. `--require-legs all` is the anti-rot switch: locally a leg self-skips
   # when its artifact is missing, but IN CI a skipped leg is a FAILURE — that is
-  # how this gate avoids being "built, never wired". Lives in laterite-ags4-xcheck
+  # how this gate avoids being "built, never wired". `--require-engines all` is the
+  # same switch one level down: every leg must also say WHICH ENGINE it is running,
+  # so the run can state the legs were comparable rather than assume it. Half these
+  # legs drive built artefacts that can be stale while every case still matches, and
+  # a leg that stops reporting would otherwise degrade to a warning above a green
+  # run. Lives in laterite-ags4-xcheck
   # (split out of the dev ags4-compliance crate — its findings half needs the
   # private ags4-parity oracle; #553 reversal, the public-is-dev-home flip).
   # GitHub-hosted: it builds all four surfaces (~50 min cold), so it runs off the
@@ -335,7 +340,7 @@ jobs:
           node                    tools/xcheck/emit_js.mjs --out "$O"
           uv run --no-sync python tools/xcheck/emit_cli.py --out "$O"
           cargo run -q --manifest-path "$M" -p laterite-ags4-xcheck --bin xcheck -- \
-            --check "$O" --allow xcheck-allow.json --require-legs all
+            --check "$O" --allow xcheck-allow.json --require-legs all --require-engines all
       - name: upload observations on failure
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
