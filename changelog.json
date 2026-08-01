@@ -79,6 +79,12 @@
         "prs": [
           199
         ]
+      },
+      {
+        "text": "**There are two version numbers now: the engine and the products.** One number used to stamp the wheel, the npm package, the compat prefix and the Rust workspace together, and that coupling has a cost recorded in this repo's own history: `laterite-ags4-wasm` inherits the workspace version, so shipping a browser-only patch meant bumping the number every surface shared. It happened at 0.8.1 and again at 0.8.2, and because the release advice was \"tag only what changed\", PyPI saw neither — wheel versions 0.8.1 and 0.8.2 exist in git history and on no registry. Since the first crates.io publish there is a second cost: `[workspace.dependencies]` carries the version a published crate declares on its siblings, so bumping the engine for a product's sake would declare dependencies on engine versions nobody published. The engine (the Rust workspace and the eight crates.io crates) now moves on `bump-version.sh engine`; every product still shares one number and moves on `bump-version.sh product`. The target is required — a default would be a way to bump the wrong tier by omission. `laterite-cli` moved onto the product number, because `lat` exists twice and clap renders `--version` from `CARGO_PKG_VERSION`, so the binary and the wheel's `lat` would otherwise disagree the first time the tiers diverged. The gate asserts each tier is internally consistent and that the two stamping paths are disjoint, since an entry in the wrong config would silently restore the lockstep and look correct today, while the numbers are still equal.",
+        "prs": [
+          202
+        ]
       }
     ],
     "deprecated": [],

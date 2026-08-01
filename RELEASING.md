@@ -19,17 +19,41 @@ for when we deliberately want to signal "stable — I'll keep compatibility."
 
 ## Cutting a release
 
-**Every published surface shares one version** (#372): the Python wheel, the
-Rust workspace (so the `lat` binary), the npm `laterite` package with its
-three `@laterite/native-*` addons, and the `laterite_ags4` DuckDB extension all
-move on one number. `tools/release/bump-version.sh` drives the in-repo bump
-(wrapping [`bump-my-version`](https://callowayproject.github.io/bump-my-version/),
-config in the root `pyproject.toml` `[tool.bumpversion]`, plus lockfile
-regeneration); the DuckDB extension lives in its own repo and takes the same
-number when you cut it (below). The **docs site** carries the version too — it's
-derived at build and republishes on merge. **Never hand-edit a version string**
-— `test_version_faithful.py`, the compat guard, and the `release.yml` tag-check
-all catch drift.
+**There are two version numbers** (#153, split 2026-08-01):
+
+| | Covers | Resolved by | Bumped with |
+|---|---|---|---|
+| **product** | the Python wheel, the npm `laterite` package + its `@laterite/native-*` addons, the browser package, the `lat` binary, the DuckDB extension | `pip install laterite` · `npm i laterite` | `bump-version.sh product` |
+| **engine** | the Rust workspace and the eight crates.io crates | `cargo add laterite-ags4-validator` | `bump-version.sh engine` |
+
+Every **product** still shares one number, so `pip install laterite==X` and
+`npm i laterite@X` are the same release. The engine moves on its own, because it
+answers to a different audience and a different registry.
+
+> [!IMPORTANT] **A bump and a release are the same act.** If you stamp a product
+> version, cut *every* product tag — not just the surfaces that changed. They
+> share one number, so a product left un-cut leaves a version that exists in this
+> tree and on no registry. That is not hypothetical: 0.8.1 and 0.8.2 were stamped
+> for a browser-only fix and tagged `wasm-v*` alone, so PyPI went 0.8.0 → 0.9.0
+> and wheel 0.8.1/0.8.2 were never published at all. Re-shipping an unchanged
+> product is the cost of the shared number.
+
+`tools/release/bump-version.sh <product|engine>` drives the in-repo bump
+(wrapping [`bump-my-version`](https://callowayproject.github.io/bump-my-version/)
+— product config in the root `pyproject.toml` `[tool.bumpversion]`, engine config
+in `tools/release/engine-version.toml` — plus lockfile regeneration). The target
+is required; there is no default, because bumping the wrong tier by omission is
+exactly the failure the split exists to prevent. The DuckDB extension lives in
+its own repo and takes the **product** number when you cut it (below). The **docs
+site** carries the version too — it's derived at build and republishes on merge.
+
+Two crates sit outside both tiers on purpose: `laterite` (its own `0.1.x` until
+it reaches feature parity with the Python and Node surfaces, then it joins the
+product line) and `laterite-cli` (the product number, so `lat --version` agrees
+with the wheel's `lat`).
+
+**Never hand-edit a version string** — `test_version_faithful.py`, the compat
+guard, and the `release.yml` tag-check all catch drift.
 
 > [!IMPORTANT] **Releases publish from this repo.** The PyPI/npm trusted
 > publishers are configured for `niko86/laterite`, so its `release.yml` builds,
@@ -41,20 +65,21 @@ it into the dated release). Then:
 
 ```bash
 # 1. On a release branch (the script refuses to run on main or a dirty tree),
-#    bump every surface + regenerate uv.lock / Cargo.lock / package-lock.json,
+#    bump every PRODUCT + regenerate uv.lock / Cargo.lock / package-lock.json,
 #    verify the drift-gate, and make one "release: X" commit (no tag, no push):
 git switch -c release/0.6.0
-tools/release/bump-version.sh minor          # or: patch  ·  --new-version 0.6.0rc1
-#    (DRY_RUN=1 tools/release/bump-version.sh minor  stamps + regenerates without committing)
+tools/release/bump-version.sh product minor  # or: patch  ·  --new-version 0.6.0rc1
+#    (DRY_RUN=1 tools/release/bump-version.sh product minor  stamps + regenerates without committing)
 
 # 2. main is PROTECTED → land the bump via a release PR (merge-commit, NOT squash):
 git push -u origin release/0.6.0
 gh pr create -B main -t "release: 0.6.0" -b "version bump"   # merge once CI is green
 
-# 3. On the merged main, cut BOTH tags — release.yml builds + publishes from them:
+# 3. On the merged main, cut EVERY product tag — release.yml builds + publishes from them:
 git switch main && git pull
 gh release create v0.6.0      --title v0.6.0      --generate-notes   # wheels + sdist → PyPI, CLI → GH release
 gh release create node-v0.6.0 --title node-v0.6.0 --generate-notes   # npm addon + @laterite/native-*
+git tag --no-sign wasm-v0.6.0 && git push origin wasm-v0.6.0          # npm @laterite/ags4-wasm (browser)
 # 4. Approve the `pypi` / `npm` environments in the resulting Actions runs (the OIDC gates).
 
 # 5. Cut the DuckDB extension at the SAME version (its own repo — see below):
@@ -62,10 +87,16 @@ cd <the niko86/laterite-duckdb checkout> && bash scripts/release.sh 0.6.0
 # 6. Confirm the docs republished: /laterite/docs/ Reference → Changelog shows 0.6.0.
 ```
 
-The two tags stay separate because `release.yml` has independent `v*` (Python +
-CLI) and `node-v*` (npm) build/publish paths — but the **number** is now one, so
-you cut `v0.6.0` and `node-v0.6.0` from the same release. A Python-only patch can
-still skip the `node-v*` tag; the version simply doesn't move on npm until you do.
+The tags stay separate because `release.yml` has independent `v*` (Python + CLI),
+`node-v*` (npm) and `wasm-v*` (browser) build/publish paths — but the **number**
+is one, so you cut all three from the same release.
+
+**Do not skip a tag because that surface didn't change.** The number is shared,
+so a surface left un-cut leaves a version stamped in this tree that exists on no
+registry — which is precisely how wheel 0.8.1 and 0.8.2 came to be published
+nowhere. If skipping feels right, the thing you actually want is per-product
+versions, which is a different scheme; see
+`ags-wiki/design/dec-rust-api-crates-io.md` rather than skipping a tag here.
 
 > Cutting a release on a **new** tag fires **two** workflow runs — a `push` (tag) run
 > and a `release` run — because GitHub raises both events. That's expected: the `push`
@@ -74,12 +105,12 @@ still skip the `node-v*` tag; the version simply doesn't move on npm until you d
 > laterite#264). If you ever see the build run *cancelled* at ~3s, that regression is
 > back — re-run the `push` run.
 
-`bump-version.sh` stamps, atomically in one commit: the `laterite` wheel
+`bump-version.sh product` stamps, atomically in one commit: the `laterite` wheel
 `pyproject.toml` + the root umbrella, `compat.py`'s `__version__` base + Checker
-banner (preserving the `+compat.python-ags4.<pin>` pin), the Rust workspace
-version, the npm `package.json` version + its three `@laterite/native-*`
-optionalDeps, and rolls `CHANGELOG.md`'s `[Unreleased]` into the new dated
-section — then regenerates `uv.lock`, `Cargo.lock`, the npm `package-lock.json`
+banner (preserving the `+compat.python-ags4.<pin>` pin), `laterite-cli`'s crate
+version, the npm `package.json` version, and rolls `CHANGELOG.md`'s
+`[Unreleased]` into the new dated section — then regenerates `uv.lock`,
+`Cargo.lock`, the npm `package-lock.json`
 (the last one avoids the `EUSAGE` failure `npm ci` throws at publish against a
 stale lock), and the generated napi loader `index.js` (the node CI job runs
 `napi build` + `git diff --exit-code`, so the committed loader's version literals
@@ -87,14 +118,45 @@ must match a fresh build — a stale one reds that guard). `web/src/wasm/package
 is gitignored and wasm-pack regenerates it from the crate version; the docs
 Changelog page derives its version at build. Neither needs stamping.
 
+### Cutting an engine release (crates.io)
+
+Separate from the product flow above, and usually *before* it: the engine is the
+substrate every product is rebuilt from.
+
+```bash
+git switch -c release/engine-0.10.0
+tools/release/bump-version.sh engine minor   # stamps rust-packages/Cargo.toml only
+gh pr create -B main -t "release: engine 0.10.0" -b "engine version bump"
+
+# once merged, from main:
+uv run --no-sync python tools/publish_crates.py             # dry run — prints the waves
+uv run --no-sync python tools/publish_crates.py --execute
+```
+
+`publish_crates.py` derives the dependency waves from the manifests, waits for
+each wave to become *resolvable* from the registry before starting the next, and
+is idempotent — a re-run after a failure resumes rather than restarting. It
+refuses a dirty tree, any branch but `main`, and any crate marked
+`publish = false`.
+
+**An engine release reaches nobody on its own.** Every product is built from
+these crates and keeps shipping the previous engine until it is rebuilt, so
+follow with a product bump. Engine changelog entries stay under `[Unreleased]`
+until that product release rolls them — which is the release a reader can
+actually install.
+
+The facade crate `laterite` is published by the same tool but carries its **own**
+`0.1.x`, bumped by hand in `rust-packages/laterite/Cargo.toml`. It is neither
+tier until it reaches parity with the Python and Node surfaces.
+
 ### Pre-releases (RC / dev)
 
 The API may still change pre-1.0, so cut a release candidate first when in doubt.
 Use the **explicit** form (PEP 440 canonical — no hyphen):
 
 ```bash
-tools/release/bump-version.sh --new-version 0.6.0rc1     # then rc2, rc3, ...
-tools/release/bump-version.sh --new-version 0.6.0         # promote to final
+tools/release/bump-version.sh product --new-version 0.6.0rc1     # then rc2, rc3, ...
+tools/release/bump-version.sh product --new-version 0.6.0         # promote to final
 ```
 
 ## The DuckDB extension (`laterite_ags4`)

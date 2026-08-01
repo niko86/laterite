@@ -1,0 +1,66 @@
+# The ENGINE version — the Rust workspace and the crates.io tier.
+#
+# Separate from the PRODUCT version (`[tool.bumpversion]` in the umbrella
+# `pyproject.toml`, which stamps the wheel, npm and compat) because the two
+# answer to different audiences and move for different reasons:
+#
+#   engine   what `cargo add laterite-ags4-validator` resolves. Moves when the
+#            engine changes and is published to crates.io.
+#   product  what `pip install laterite` and `npm i laterite` resolve. Moves
+#            when a product release is cut.
+#
+# They were one number until 2026-08-01. That coupling had a cost with a name:
+# `laterite-ags4-wasm` is `version.workspace = true`, so shipping a browser-only
+# patch meant bumping the number every surface shared. It happened twice, and
+# PyPI never saw either — wheel versions 0.8.1 and 0.8.2 exist in git history and
+# on no registry. See `ags-wiki/design/dec-rust-api-crates-io.md`.
+#
+# Since the first crates.io publish there is a second, harder cost: the seven
+# `[workspace.dependencies]` entries below carry the version a published crate
+# declares on its siblings. Bumping this number for a product's sake would
+# declare dependencies on engine versions that were never published, and the
+# next `cargo publish` of any one crate would demand the whole set at the new
+# number.
+#
+# Usage — never invoked directly; `tools/release/bump-version.sh engine` drives it:
+#     bump-my-version bump --config-file tools/release/engine-version.toml minor
+[tool.bumpversion]
+current_version = "0.9.0"
+
+# Same grammar as the product config, deliberately. The two numbers are
+# independent but they are both plain semver, and a release engineer should not
+# have to hold two spellings in their head. PEP 440 canonical pre-releases (no
+# hyphen) round-trip through `--new-version`.
+parse = '(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?:(?P<pre_l>rc|dev)(?P<pre_n>\d+))?'
+serialize = [
+    "{major}.{minor}.{patch}{pre_l}{pre_n}",
+    "{major}.{minor}.{patch}",
+]
+
+# No commit and no tag: `bump-version.sh` owns both. It folds the stamp and the
+# lockfile regeneration into one reviewed commit, and the publish tags are cut
+# after the release PR merges.
+#
+# `allow_dirty = false` matches the product config rather than differing from it.
+# bump-version.sh already refuses a dirty tree, so this never fires during a
+# normal run — it fires when someone reaches for bump-my-version directly, mid-
+# edit, which is exactly when a stamp should not be applied.
+commit = false
+tag = false
+allow_dirty = false
+
+# One file, eight substitutions. `[workspace.package].version` is inherited by
+# every member crate (`version.workspace = true`), and the seven
+# `[workspace.dependencies]` entries each carry the same literal — bump-my-version
+# rewrites every occurrence, not just the first, which is what keeps the tier in
+# lockstep with itself. `test_engine_dependency_versions_match` asserts that
+# rather than trusting it.
+#
+# NOT matched, and this is load-bearing: `rust-packages/laterite/Cargo.toml`
+# carries its own `0.1.x` and is a different file entirely. The facade is
+# deliberately outside both numbers until it reaches feature parity with the
+# Python and Node surfaces, at which point it joins the PRODUCT line.
+[[tool.bumpversion.files]]
+filename = "rust-packages/Cargo.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'

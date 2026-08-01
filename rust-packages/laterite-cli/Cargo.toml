@@ -9,7 +9,16 @@
 
 [package]
 name = "laterite-cli"
-version.workspace = true
+# The PRODUCT version, not the engine's — stamped by `[tool.bumpversion]` in the
+# umbrella pyproject.toml alongside the wheel and the npm package.
+#
+# `lat` exists twice: this binary, and the wheel's `lat` console script
+# (`laterite._cli:main`), which is byte-faithful to it. clap's `version` reads
+# `CARGO_PKG_VERSION`, so inheriting the workspace number would make the two
+# report different versions the first time the engine and the products diverge —
+# for the same command, doing the same thing. A CLI is something a person
+# installs, so it belongs on the number people install by.
+version = "0.9.0"
 edition = "2024"
 rust-version = "1.85"
 description = "CLI validator for the AGS4 geotechnical transfer format"
