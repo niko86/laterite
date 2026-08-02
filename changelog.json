@@ -77,6 +77,12 @@
         "prs": [
           206
         ]
+      },
+      {
+        "text": "**The npm package's error-mapping table is tested, and its coverage floors moved 93/84 → 97/89.** `errors.ts` is the module that turns an engine failure into the class callers branch on (`instanceof FileNotFoundError`, not a message match) — and nothing tested it; it was covered only incidentally by suites that happened to trip some of its arms. The new suite reads the error kinds OUT OF THE RUST SOURCE rather than restating them, because a third hand-list is the failure this repo keeps paying for: `ValidatorError::kind()` calls itself the single producer of that value domain and a new variant does force its Rust match, but nothing forced `makeError` to keep up — an unmapped kind falls through to a base `Ags4Error` with the right message and the right exit code, so every `instanceof` a caller wrote silently becomes false. Also covered: the four source shapes a handle can re-read (a path is re-read from DISK, not snapshotted, so certifying after an edit measures the current file), `certify`'s refusal to overwrite a file that is not a certificate, and the guards on `diff`/`fix`/`buildAgs4` that turn a mistake into a typed error instead of a raw `ENOENT` or a lookup on `undefined`.",
+        "prs": [
+          208
+        ]
       }
     ],
     "changed": [
