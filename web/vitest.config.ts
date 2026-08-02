@@ -28,11 +28,24 @@ export default defineConfig({
       // text → CI log; lcov → web/coverage/lcov.info for the Codecov upload
       // (web flag). Only uploaded from the public repo (see e2e.yml guard).
       reporter: ["text", "lcov"],
-      // Floor gate, not a target. Introduced at 65 (68.76% baseline);
-      // RATCHETED to 95 after agsline + analytics got full unit suites
-      // (now 97.97% lines). A new untested pure module — or deleting a tested
-      // one — drops this and fails the `unit` job, which is the point.
-      thresholds: { lines: 95 },
+      // The wasm-pack output is GENERATED glue, not code this repo writes or
+      // tests. It is gitignored and absent when CI's `unit` job runs (that job
+      // builds no wasm), so leaving it un-excluded made the number depend on
+      // whether the developer happened to have built wasm: with it present the
+      // run reports ~47% and FAILS the 95 floor, for no reason anyone changed.
+      // Excluded so a local run and the CI run measure the same denominator.
+      exclude: ["src/wasm/**", "src/wasm-tokenizer/**"],
+      // Floor gate, not a target. Introduced at 65 (68.76% baseline); ratcheted to
+      // 95, and now to 99 after duckTypes / loadSensitive / the relationship
+      // walkers got suites. A new untested pure module — or deleting a tested one
+      // — drops this and fails the `unit` job, which is the point.
+      //
+      // BRANCHES had no floor at all until now, and that is why the Codecov badge
+      // read ~85% while this gate sat green at 95+: a line whose branch is only
+      // half-taken counts as HIT by lcov and as a PARTIAL by Codecov. Lines alone
+      // cannot see that, so branch coverage drifted to 81% unnoticed. Codecov's is
+      // the stricter measure and this is the floor that tracks it.
+      thresholds: { lines: 99, branches: 89 },
     },
   },
 });
