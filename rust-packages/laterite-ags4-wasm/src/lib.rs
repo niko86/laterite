@@ -5304,19 +5304,23 @@ mod run_and_overlay_tests {
     }
 
     #[test]
-    fn widening_against_an_x_column_is_silent_today() {
-        // RECORDED, not endorsed. `type_widened` is pushed only when at least
-        // TWO of the clashing codes are non-X, so `{2DP, X}` widens the column
-        // to X — discarding `2DP` — and reports nothing.
+    fn a_typed_vs_x_clash_widens_silently_by_design() {
+        // NOT a wart — the documented lattice behaviour, verified through the
+        // browser door. `TypeClashMode::Widen`'s own doc states it: "Typed-vs-`X`
+        // resolves silently (`X` trivially absorbs a typed value); two *different*
+        // non-`X` types warn", and laterite-ags4-merge's acceptance suite pins
+        // both halves (`typed_vs_x_widen_is_silent`, `non_x_vs_non_x_warns_under_
+        // lenient`).
         //
-        // The asymmetry is visible from here: the SAME pair under the default
-        // `error` mode is a hard refusal (asserted in
-        // `a_type_clash_is_fatal_by_default_and_widen_settles_it`), so the mode
-        // decides between "refuse this merge" and "accept it silently" with no
-        // middle record. That is laterite-ags4-merge's call to make, not this
-        // crate's — pinned here so the behaviour is deliberate rather than
-        // discovered, and so changing it fails a test instead of surprising a
-        // browser user.
+        // The reasoning is that merge made no CHOICE here: once one file declares
+        // `X`, the merged column can only be `X` — promote cannot reach it either
+        // — so there is no resolution to report. A warning would fire on every
+        // typed-vs-freetext column in a real delivery and drown the ones that
+        // record an actual decision.
+        //
+        // Asserted here because a surface can drop a warning its engine emitted:
+        // this proves the browser reports exactly what merge reports, silence
+        // included.
         let clash: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
 \"HEADING\",\"PROJ_ID\"\r\n\
 \"UNIT\",\"\"\r\n\
@@ -5340,11 +5344,12 @@ mod run_and_overlay_tests {
         let text = String::from_utf8(res.bytes()).expect("utf-8");
         assert!(
             text.contains("\"ID\",\"X\""),
-            "the column was widened to X:\n{text}"
+            "the column widens to X:\n{text}"
         );
         assert!(
             !warning_kinds(&res).iter().any(|k| k == "type_widened"),
-            "if this now warns, the asymmetry has been fixed — delete this test"
+            "typed-vs-X is the trivial widen and must stay silent — if merge's \
+             lattice changed, change it here and in TypeClashMode's doc together"
         );
     }
 

@@ -175,18 +175,28 @@ of defensive `TypeError`/parse-invariant guards.
   > agree here because the extraction moved real logic, but they would not have
   > if the same points had been bought with tests alone.
 
-  Two things fell out of writing the tests rather than the tests confirming
-  them, which is the useful signal:
-  - `laterite-ags4-merge` warns `type_widened` only when **≥2** of the clashing
-    codes are non-`X`. So `{2DP, X}` widens the column to `X` — discarding
-    `2DP` — and records nothing, while the *same pair* under the default
-    `error` mode is a hard refusal. Pinned by
-    `widening_against_an_x_column_is_silent_today`; merge's call to make.
-  - `build_ags4`/`build_ags4_ipc` serialise through serde-wasm-bindgen's
-    **default** serializer (`None` → `undefined`) while every other door uses
-    `json_compatible` (`None` → `null`), yet `BuildReport`'s published TS
-    declares `line: number | null`. Preserved as-is (released API) and
-    documented on `to_js_bare`.
+  One real defect fell out of writing the tests: `build_ags4`/`build_ags4_ipc`
+  serialised through serde-wasm-bindgen's **default** serializer (`None` →
+  `undefined`) while every other door used `json_compatible` (`None` → `null`),
+  yet `BuildReport`'s published TS declares `line: number | null` — so
+  `f.line === null` type-checked clean and never matched. Fixed in #212; there
+  is now one serializer and a source-level test refusing a second.
+
+  > [!caution] **A second "finding" was not one, and the lesson generalises.**
+  > The same pass flagged `laterite-ags4-merge` widening `{2DP, X}` to `X`
+  > without a `type_widened` warning. It is **documented, deliberate behaviour**
+  > — stated in `TypeClashMode::Widen`'s own doc comment ("Typed-vs-`X` resolves
+  > silently; two *different* non-`X` types warn") and pinned by a named
+  > acceptance test, `typed_vs_x_widen_is_silent`. Merge made no *choice* there:
+  > once one file declares `X` the column can only be `X`, so there is no
+  > resolution to report.
+  >
+  > **Coverage work walks into untested code and is therefore primed to read
+  > deliberate design as oversight.** Before reporting a gap as a defect, look
+  > for the decision: the enum doc, an acceptance test, a wiki page. Absence of
+  > a *test* is not absence of a *decision* — and here the test existed too, one
+  > crate away. Present the finding and ask; do not reverse a recorded decision
+  > because the axis you happened to measure did not see the reason for it.
 
 ## The stopping rule
 
