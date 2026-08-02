@@ -58,6 +58,9 @@ test-results/
 coverage.xml
 htmlcov/
 lcov.info
+# cargo-llvm-cov writes rust.lcov / wasm.lcov next to the workspace root for the
+# Codecov upload steps in nightly.yml — build artefacts, never committed.
+*.lcov
 web/coverage/
 rust-packages/**/*.profraw
 

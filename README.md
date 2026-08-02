@@ -24,6 +24,7 @@ Files come back born-typed — a `2DP` heading is a float, a `DT` a datetime, an
 [![python cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=python&label=python%20cov)](https://codecov.io/gh/niko86/laterite)
 [![node cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=node&label=node%20cov)](https://codecov.io/gh/niko86/laterite)
 [![web cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=web&label=web%20cov)](https://codecov.io/gh/niko86/laterite)
+[![wasm cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=wasm&label=wasm%20cov)](https://codecov.io/gh/niko86/laterite)
 
 📖 **[Documentation](https://niko86.github.io/laterite/docs/)** · 🌐 **[Browser validator + data explorer](https://niko86.github.io/laterite/)** · 📓 **[Cookbook](https://niko86.github.io/laterite/docs/cookbook/)**
 

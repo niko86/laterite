@@ -127,6 +127,12 @@
         "prs": [
           202
         ]
+      },
+      {
+        "text": "**The browser engine's coverage went 69% → 91%, and it has a badge like every other language.** #210 stated the ceiling; this removes it. Fourteen `#[wasm_bindgen]` exports gave up their bodies to a host-testable `*_core` twin — `build_ags4`, `build_ags4_ipc`, `compute_fixes`, `apply_fixes`, `read`, `ParsedDataset.meta`/`arrow_ipc`, `diff`, `merge`, `dictionary`, `censor`, `ags4_to_xlsx`, `xlsx_to_ags4` — leaving `decode → core → marshal` at the boundary. That boundary is the floor of this measurement, not a backlog item: covering it needs `wasm-bindgen-test` on wasm32, which llvm-cov cannot instrument, so those tests would not move the number even once written; it is exercised end-to-end by the `wasm-engine` xcheck leg and the web content-hash test against the real `.wasm` instead. **No export changed behaviour** — including the two build doors' serializer, which writes `undefined` for an absent `line` where every other door writes `null`, preserved as released API and documented rather than quietly unified. 85 new tests, each falsified against a deliberate mutation of the code it guards. The floor moves 67 → 89, and `codecov.yml` stops documenting four floors that had all moved on without it.",
+        "prs": [
+          211
+        ]
       }
     ],
     "deprecated": [],
@@ -167,6 +173,12 @@
         "text": "**The surface census had a gate that could never pass, so nothing ran it.** `tools/gen_census.py --check` is what stops the three `lat` launchers drifting apart — it was written after `lat merge` shipped in the native binary and never reached the uvx or npx launchers with every gate green. But its renderer emitted a `repo_ref` to `tests/test_census_faithful.py`, a file that has never existed in this repository, and the wiki lint's dead-reference scan is hard over live content — so the rendered page had that line stripped by hand, which made `--check` report the page stale on every run, forever. An unpassable check does not get wired into CI, and it wasn't: no job invoked it, so the census could drift from the launchers in silence, which is the exact failure it was built to catch. The false reference is gone, `--check` passes with no change to the committed page or SSOT, and ci.yml's python job now runs it — a step rather than a test, because the check needs BUILT launchers and a test would have had to skip without them.",
         "prs": [
           207
+        ]
+      },
+      {
+        "text": "**`censor`'s leak-safe default is now held by a test.** Omitting `selectedCodes` applies the policy to EVERY classified heading — the wider scrub, so forgetting the option over-redacts rather than leaving coordinates in the file. The behaviour was correct and entirely unguarded: it sat inside an export no native test could call, and inverting it passed the whole suite.",
+        "prs": [
+          211
         ]
       }
     ],
