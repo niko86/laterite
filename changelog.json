@@ -95,6 +95,12 @@
         "prs": [
           210
         ]
+      },
+      {
+        "text": "**The npm surface reaches the 95% coverage bar, and its floors move 97/89 → 98/91.** Five suites, each aimed at a decision that fails *quietly*. The `0DP` → `BIGINT` arm of the AGS-type mapping had never been exercised — a count that arrives as `7.0` is a different fact from `7`, and it round-trips back out that way. `_filteredRows`' `WHERE TRUE` fallback and the `* EXCLUDE (_id, _parent_id)` choice both produce a query that *runs*, with the wrong rows or the wrong columns. And `ancestorChain`/`inheritedKeyNames` translate a native throw as `e instanceof Error ? e.message : String(e)`, where only the first arm was ever taken: napi can surface a non-`Error`, and without the second arm the `Ags4Error` reports the string `\"undefined\"` — the only diagnostic the caller had, gone. `registry.ts` goes 50 → 100% branch. Falsified by mutation rather than by assertion count: censor's default inverted, the `TRUE`/`FALSE` clause flipped, the null-fill removed and the `String(e)` arm removed are all caught.",
+        "prs": [
+          214
+        ]
       }
     ],
     "changed": [
