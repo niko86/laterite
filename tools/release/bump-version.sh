@@ -63,6 +63,14 @@ die() {
 # bump the wrong tier by omission, and the whole point of the split is that the
 # two are not interchangeable.
 target="$1"; shift
+#
+# The expansions below are the guarded `${CONFIG[@]+...}` form rather than a
+# plain quoted one. Under `set -u`, bash 3.2 -- which is what macOS still ships
+# -- treats an EMPTY array's `[@]` expansion as an unbound variable and aborts.
+# The product tier is exactly the empty case (it uses bump-my-version's default
+# config), so the plain form made `bump-version.sh product` die on macOS from the
+# moment the two-tier split introduced the array, while `engine` kept working
+# because its array is never empty.
 case "$target" in
   product) CONFIG=(); SURFACES="wheel + umbrella + compat + npm + lat" ;;
   engine)  CONFIG=(--config-file tools/release/engine-version.toml)
@@ -75,13 +83,13 @@ branch="$(git branch --show-current)"
 [ "$branch" != "main" ] || die "refuse to bump on main — cut a release/X branch first"
 [ -z "$(git status --porcelain)" ] || die "working tree is dirty — commit or stash first"
 
-old="$(uv run --no-sync bump-my-version show "${CONFIG[@]}" current_version)"
+old="$(uv run --no-sync bump-my-version show ${CONFIG[@]+"${CONFIG[@]}"} current_version)"
 
 # --- 1. stamp the tracked version strings for THIS tier.
 #         --no-commit/--no-tag: we fold the lock regen into one commit, and the
 #         publish tags come after the release PR merges.
-uv run --no-sync bump-my-version bump "${CONFIG[@]}" --no-commit --no-tag "$@"
-new="$(uv run --no-sync bump-my-version show "${CONFIG[@]}" current_version)"
+uv run --no-sync bump-my-version bump ${CONFIG[@]+"${CONFIG[@]}"} --no-commit --no-tag "$@"
+new="$(uv run --no-sync bump-my-version show ${CONFIG[@]+"${CONFIG[@]}"} current_version)"
 [ "$new" != "$old" ] || die "version did not change ($old) — nothing to do"
 echo "bump-version: $target $old -> $new  ($SURFACES)"
 

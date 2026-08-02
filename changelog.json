@@ -5,205 +5,216 @@
   "semver": true,
   "unreleased": {
     "summary": "",
-    "added": [
-      {
-        "text": "**The browser package publishes its remaining result types, and `any` is gone from its `.d.ts` entirely.** `diff`, `dictionary` and `compute_fixes` were the three still returning `any`; they now return `RevisionDelta`, `StandardDict` and `Fix[]`, joining the shapes published previously. Consumers can delete their hand-written `RevisionDelta` / `StandardDict` / `Fix` / `SpanEdit` / `CellDelta` / `RowDelta` / `GroupDelta` / `DictGroup` / `DictHeading` mirrors — the validator site deleted ~120 lines of exactly those. Each new interface is bound to the Rust struct that serialises it by the same drift test as the others, and `Fix`'s `kind`/`risk` unions are checked against the validator's own enums, so a new fix kind cannot ship a `.d.ts` that lies about what you can receive.",
-        "prs": [
-          188
-        ]
-      },
-      {
-        "text": "**The fingerprint build refuses to emit a digest that covers too little.** It previously narrowed in silence — the dependency walk simply found nothing and carried on. It now fails the build, naming what it found. The existing coverage test cannot do this job: tests do not ship in a published crate, so the one build that had the defect was also the one build with nothing checking it.",
-        "prs": [
-          190
-        ]
-      },
-      {
-        "text": "**Three gates that have to work before the first crates.io publish, not after.** A published version's public API and its declared `rust-version` are both frozen, and the only remedy for either being wrong is a version bump every consumer has to follow. The new `publish-gates` CI job (1) builds the ten engine crates on the `rust-version` their own manifests declare, (2) diffs each crate's rendered public API against a checked-in snapshot under `tools/release/public-api/`, and (3) runs `cargo semver-checks` against `main`. The snapshot is the one that changes review: it puts the whole public surface into the PR's own diff, including the `Send`/`Sync` impls that are public API nobody writes down — an `Rc` in a private field silently removes `Send` from a consumer's type, and that is now a build failure rather than something a reviewer has to notice. Opaque `-> impl Trait` returns are the one thing a snapshot cannot see, so each is asserted at compile time instead, and the gate refuses to let a new one be added without one.",
-        "prs": [
-          193
-        ]
-      },
-      {
-        "text": "**The engine crates carry the metadata a crates.io page is made of.** `repository`, `keywords` and `categories` were absent, and seven of the eight round-one crates had no README. That is not a cosmetic gap: crates.io bakes metadata into the PUBLISHED VERSION, so adding it afterwards fixes future versions only — the pages for a version already on the registry would keep no link back to the source, permanently, and seven of them would have been a one-line description and nothing else. Each README is written to stand alone on the registry rather than assume the repository around it. The packaging gate caught all seven new files, which is what it is for.",
-        "prs": [
-          195
-        ]
-      },
-      {
-        "text": "**The eight round-one engine crates are armed for crates.io, and there is a tool that publishes them safely.** Every crate carried `publish = false` — a blanket safety catch, so `cargo publish` refused outright. It is now `true` on the eight; `laterite-ags4-diff` and `laterite-ags4-merge` stay `false`, held for 0.2, with the reason recorded at the flag rather than somewhere a reader has to go looking. `tools/publish_crates.py` does the release: it derives the dependency waves from the manifests each run rather than restating them, waits for each wave to become RESOLVABLE from the registry (not merely uploaded — crates.io indexes on a delay, and a plain loop dies on wave 2 with wave 1 already permanently published), and is idempotent, so a re-run after a failure resumes instead of restarting. It refuses a dirty tree, any branch but `main`, a HEAD that is not `origin/main`, and any crate still marked `publish = false`. Nothing happens without `--execute`.",
-        "prs": [
-          196
-        ]
-      },
-      {
-        "text": "**The engine crates are on crates.io.** Eight of them at 0.9.0 — `laterite-ags4-parse`, `-types`, `-reference`, `-core`, `-validator`, `-emit`, `-trust` and `laterite-transport` — so a Rust consumer no longer needs a git dependency or a vendored path. `laterite-ags4-diff` and `laterite-ags4-merge` are deliberately NOT published; they ship in 0.2, and the `publish = false` guard is what keeps that a decision rather than something to remember. `tools/publish_crates.py` gained `--through-wave N`, so a release can publish one wave, let the live pages be inspected, and only then commit the rest — worth the pause while metadata is still correctable on the crates that have not gone out.",
-        "prs": [
-          197
-        ]
-      },
-      {
-        "text": "**`laterite` — a Rust API, not just a facade.** The user-facing crate now exists and is functional at 0.1.0: read an AGS4 file from a path or bytes, walk its groups/headings/rows, edit cells and append rows, validate against the full numbered rule set, and write valid AGS4 back out. It carries its own version, deliberately — the engine crates are lockstep 0.9.x and reshape as the format work demands; this one is a different promise to a different audience. The design's central rule is now **mechanically enforced** rather than reviewed for: no third-party type may appear anywhere in its public API, checked against the rendered surface, so a `serde_json::Value` return or an `encoding_rs::Encoding` argument fails the build instead of silently binding our semver to a dependency's. `encoding_rs` is not even a dependency — encodings are WHATWG label strings. Held for 0.2, additively: diff, merge, typed cell access, indexed scan.",
-        "prs": [
-          198
-        ]
-      },
-      {
-        "text": "**`laterite` can validate bytes — `ags4::validate_bytes`, in 0.1.1.** 0.1.0 shipped `validate` taking a path only, which meant a service validating an upload had to give it a disk to sit on first. The reason written at the function — that Rule 20 is about files beside the `.ags`, so bytes could only answer half of it — did not hold: Rule 20 has been two modules since 2026-07-14, and `WorldScope` exists precisely to say which half ran, refusing the request with `WorldCheckRequiresSource` rather than reporting a clean Rule 20 nobody checked. Python, Node, wasm and the emitter were all already using it; the facade was the only surface that could not, and its error mapping already handled the token it never produced. Both arms now end at the engine's single door, so the edition resolved from `TRAN_AGS` and the 4.0.3→4.0.4 content guard cannot come out differently for one file read two ways — a test asserts exactly that, since it is the bug every hand-assembled surface has had. Asking for the on-disk check on bytes is an error, not a pass.",
-        "prs": [
-          200
-        ]
-      },
-      {
-        "text": "**Every surface can say which ENGINE it carries, not just which release it is.** `engine_fingerprint()` and `engine_version()` now exist on the wheel (`laterite.engine_fingerprint()`), the npm package (`engineFingerprint()`) and the browser build. The fingerprint is a build-time digest over every rule source, the dictionary and the rules catalogue, so it is the only value that can be believed: edit a rule and forget to bump anything and the semver is unchanged while the digest moves. Two surfaces reporting the same fingerprint ARE running the same rules; two reporting the same release number merely shipped together — a distinction this repo has already been burned by, when a compliance report hard-coded a version literal and kept printing it two minors after the workspace moved past it. It is also what an `.ags.idx` certificate stamps, so it is the right thing to quote in a bug report.",
-        "prs": [
-          203
-        ]
-      },
-      {
-        "text": "**The cross-surface gate now checks it was comparing the same engine.** `xcheck` holds eight surfaces to the in-process Rust authority's bytes, and half of those legs run against BUILT ARTEFACTS — a `wasm-pack` output, a tsup dist, an installed wheel — any of which can be stale while every case still matches, because a stale engine and a current one usually agree. The run then reports N-way identity across a surface compiled two weeks ago. Each leg now reports the engine fingerprint it is ACTUALLY running, asked of the artefact rather than assumed from the tree, and a mismatch against the authority's is a hard failure that the allowlist cannot excuse — an allowlisted engine split would be the gate agreeing to compare two different engines, which is the one thing it exists to refuse. A version number could not have done this job; the digest moves when a rule is edited even if nobody bumps anything. The three `cli-*` launcher legs have no door to ask through yet, so they are NAMED on stderr as unchecked rather than passed over, and the run reads as five identity-checked surfaces plus a known gap instead of a clean bill of health.",
-        "prs": [
-          204
-        ]
-      },
-      {
-        "text": "**All eight cross-surface legs now prove they were running the same engine — the three `lat` launchers included.** #204 gave five of them a fingerprint to compare and left `cli-native`, `cli-uvx` and `cli-npx` naming themselves as unchecked, because a launcher is a subprocess and none of the three would say what engine it carried. They say it now, through `lat census` — the hidden machine dump all three already implement and `tools/gen_census.py` already diffs them across. A second machine door would have been a second thing to keep in step, which is the failure the census exists to catch. `engine` is deliberately NOT a census table and is absent from `surface-census.json`: a fingerprint moves whenever a rule is edited, so snapshotting it would churn a checked-in file on every rule change while saying nothing about the surfaces. The schema version still bumped, because a launcher built before the field answers with it MISSING and missing is indistinguishable from a launcher with nothing to report — it would opt itself out of the identity check in silence. That version is hand-declared in four places and nothing had ever pinned them equal; a test now does, since a bump that reaches three of four makes the fourth launcher permanently \"stale\" to the generator, which reads as a build problem rather than the typo it is.",
-        "prs": [
-          205
-        ]
-      },
-      {
-        "text": "**A surface that stops reporting its engine now fails CI instead of printing a warning above a green run.** The cross-surface gate gained a second anti-rot switch, `--require-engines all`, alongside the `--require-legs all` it has always had — and for the same reason: the same silence means different things locally and on a runner. On your machine a leg that cannot name its engine is a fact about your working tree; in CI it means a surface dropped out of the identity check while the gate still said OK, which is the exact shape of a gate disarming itself. The nightly job now passes both. Neither `engine-mismatch` nor `engine-unreported` can be allowlisted — there is no finding to triage, because the comparison an entry would excuse did not happen between the things it claims — and adding an entry does not merely fail to help: the run then fails **twice**, because the entry also trips the allowlist's own staleness check.",
-        "prs": [
-          206
-        ]
-      },
-      {
-        "text": "**The npm package's error-mapping table is tested, and its coverage floors moved 93/84 → 97/89.** `errors.ts` is the module that turns an engine failure into the class callers branch on (`instanceof FileNotFoundError`, not a message match) — and nothing tested it; it was covered only incidentally by suites that happened to trip some of its arms. The new suite reads the error kinds OUT OF THE RUST SOURCE rather than restating them, because a third hand-list is the failure this repo keeps paying for: `ValidatorError::kind()` calls itself the single producer of that value domain and a new variant does force its Rust match, but nothing forced `makeError` to keep up — an unmapped kind falls through to a base `Ags4Error` with the right message and the right exit code, so every `instanceof` a caller wrote silently becomes false. Also covered: the four source shapes a handle can re-read (a path is re-read from DISK, not snapshotted, so certifying after an edit measures the current file), `certify`'s refusal to overwrite a file that is not a certificate, and the guards on `diff`/`fix`/`buildAgs4` that turn a mistake into a typed error instead of a raw `ENOENT` or a lookup on `undefined`.",
-        "prs": [
-          208
-        ]
-      },
-      {
-        "text": "**The browser bundle's least-tested module was the one standing between DuckDB values and the DOM.** `duckTypes.ts` calls itself \"the single audited place\" where an Int64 column's `bigint` and a TIMESTAMP's micros-since-epoch are normalised — rendering a bigint in JSX throws, and a micros value read as millis renders a plausible date in 1970 rather than an error — and it sat at 15% of lines. It now has a suite, as does `loadSensitive()` (whose fetch-once cache and non-OK-response guard decide whether the Anonymiser pre-ticks anything at all: a proxy's JSON error page would otherwise yield a document with no headings, and an anonymiser that redacts nothing while looking like it worked). The parent-chain walkers in `relationships.ts` gained tests for their cycle guards, which existed to stop a malformed dictionary freezing the tab and had never been exercised. The web lane also gained a BRANCH floor, which it never had — that absence is why the badge read ~85% while the lines gate sat green above 95, since a half-taken branch counts as a hit to lcov and a partial to Codecov. Generated wasm-pack glue is now excluded from the denominator so a local run and the CI run measure the same thing.",
-        "prs": [
-          209
-        ]
-      },
-      {
-        "text": "**The browser engine has a coverage figure for the first time — it was 69%, and nobody could see it.** `laterite-ags4-wasm` was the one shipped surface with no coverage gate of any kind. The nightly Rust job excludes it, correctly, because folding a binding cdylib into the ENGINE's denominator would move the engine's floor for reasons unrelated to the engine — but the exclusion read as \"cannot be measured\", and so nothing ever measured it. It was never unmeasurable: its 44 tests are plain `#[test]`s that `cargo test` runs on every PR. It now has its own nightly step, its own denominator and its own floor, deliberately separate so the engine's floor stays comparable run-to-run. Four exports whose signatures are plain Rust — `version`, `engine_version`, `engine_fingerprint`, `list_rules` — gained native tests; the two identity doors especially, since `engine_fingerprint` exists because a hard-coded constant once stood in for a real answer here, and a constant is exactly what these would silently become again. The ceiling is now stated rather than discovered: 103 of 218 functions are unreachable from a native test because they take or return JS types, so raising this means moving logic out of the fat `#[wasm_bindgen]` exports into plain functions, not writing more tests against the boundary.",
-        "prs": [
-          210
-        ]
-      },
-      {
-        "text": "**The npm surface reaches the 95% coverage bar, and its floors move 97/89 → 98/91.** Five suites, each aimed at a decision that fails *quietly*. The `0DP` → `BIGINT` arm of the AGS-type mapping had never been exercised — a count that arrives as `7.0` is a different fact from `7`, and it round-trips back out that way. `_filteredRows`' `WHERE TRUE` fallback and the `* EXCLUDE (_id, _parent_id)` choice both produce a query that *runs*, with the wrong rows or the wrong columns. And `ancestorChain`/`inheritedKeyNames` translate a native throw as `e instanceof Error ? e.message : String(e)`, where only the first arm was ever taken: napi can surface a non-`Error`, and without the second arm the `Ags4Error` reports the string `\"undefined\"` — the only diagnostic the caller had, gone. `registry.ts` goes 50 → 100% branch. Falsified by mutation rather than by assertion count: censor's default inverted, the `TRUE`/`FALSE` clause flipped, the null-fill removed and the `String(e)` arm removed are all caught.",
-        "prs": [
-          214
-        ]
-      },
-      {
-        "text": "**The browser bundle reaches 97.5% coverage — lines and functions both at 100% — and its branch floor moves 89 → 95.** Four suites, all aimed at code whose failure is a wrong *answer* rather than an error. An unqualified column in a join is ambiguous exactly when both sides carry the same heading, which for `LOCA_ID` is the *normal* case, and DuckDB resolves it by picking one; the Explore tab's suggested queries (`joinKeys`, `depthRangeOf`, `geologyTemplate`) run perfectly well while returning the wrong rows; and the union-dictionary fetch must throw on a non-OK response, because parsing a proxy's JSON error page instead yields a dictionary with no groups — an Explore tab where nothing is a known AGS group and nothing says why. `project()`'s output guard is now pinned against the official OS test points: `1e300` is finite, walks past the input check, and comes back unplottable. Falsified by mutation: the sensitive-policy guard dropped, the `!res.ok` throw removed, chart columns never alias-qualified, the `MC` gloss deleted and the template's depth check forced true are all caught. With the npm lane, this closes the last two lanes of the coverage campaign.",
-        "prs": [
-          215
-        ]
-      }
-    ],
-    "changed": [
-      {
-        "text": "**Breaking: `diff` and `censor` take an options object too.** They were the last two `@laterite/ags4-wasm` exports with a positional tail — `diff(a, b, encoding, maxRowsPerGroup)` and `censor(data, sensitiveJson, selectedCodes, token, dropCustom, includeFreetext)`, the latter six-deep with three consecutive booleans. Both now take one named object after their inputs (`diff(a, b, { encoding, maxRowsPerGroup })`, `censor(data, sensitiveJson, { selectedCodes, token, dropCustom, includeFreetext })`), every field optional and defaulted, with the same unknown-key refusal the other exports got. The test that recorded these two as \"not yet migrated\" now has nothing left to exempt.",
-        "prs": [
-          188
-        ]
-      },
-      {
-        "text": "**Every engine crate now declares what it may publish.** `cargo package` ships whatever sits in a crate directory and is not excluded, and no crate here specified `include` — `laterite-ags4-validator` alone would have put 41 test and bench files plus 2.1 MB of reference data no code reads into its tarball. All ten engine-tier crates now carry an explicit allowlist, and a CI gate diffs `cargo package --list` against a checked-in manifest so a new file entering a tarball turns the build red. This had to land before the first publish rather than after: crates.io is append-only, and `yank` stops new resolution without removing the tarball.",
-        "prs": [
-          189
-        ]
-      },
-      {
-        "text": "**The engine crates declare the versions a publish needs.** `cargo package` rejects a dependency with no version requirement — publishing strips the `path` and the version is all that survives to identify it — so 7 of the 10 engine-tier crates could not be packaged at all. The 21 in-workspace dependency sites now inherit from `[workspace.dependencies]`, which carries both a path and a version. Nothing changes locally: the path still wins, and `Cargo.lock` is untouched. The versions sit in `rust-packages/Cargo.toml` specifically so the release bump rewrites them alongside the workspace version rather than leaving them behind, and a test asserts that lockstep instead of assuming it.",
-        "prs": [
-          191
-        ]
-      },
-      {
-        "text": "**The CLI crate is `laterite-cli`.** `laterite-ags4-check` named a checker; the crate reads, fixes, diffs, merges, certifies, packs, converts and mints certificates, and `-ags4-` marks the engine tier, which a product binary is not. The shipped binary is still `lat` — nothing a user types changes. Renamed now because crates.io has no rename: a name is free until its first publish and irreversible after, and the engine tier went out yesterday. It is deliberately NOT added to the publish set, which looks like an oversight and is not: a binary's dependencies are still dependencies, so publishing it requires `laterite-ags4-diff` and `-merge` (held for 0.2) plus `laterite-cliutil` and `laterite-excel` (never considered for the registry) — and both publish gates render a lib target that a bin-only crate does not have. The CLI ships with 0.2, alongside the diff/merge publish it already depends on.",
-        "prs": [
-          199
-        ]
-      },
-      {
-        "text": "**There are two version numbers now: the engine and the products.** One number used to stamp the wheel, the npm package, the compat prefix and the Rust workspace together, and that coupling has a cost recorded in this repo's own history: `laterite-ags4-wasm` inherits the workspace version, so shipping a browser-only patch meant bumping the number every surface shared. It happened at 0.8.1 and again at 0.8.2, and because the release advice was \"tag only what changed\", PyPI saw neither — wheel versions 0.8.1 and 0.8.2 exist in git history and on no registry. Since the first crates.io publish there is a second cost: `[workspace.dependencies]` carries the version a published crate declares on its siblings, so bumping the engine for a product's sake would declare dependencies on engine versions nobody published. The engine (the Rust workspace and the eight crates.io crates) now moves on `bump-version.sh engine`; every product still shares one number and moves on `bump-version.sh product`. The target is required — a default would be a way to bump the wrong tier by omission. `laterite-cli` moved onto the product number, because `lat` exists twice and clap renders `--version` from `CARGO_PKG_VERSION`, so the binary and the wheel's `lat` would otherwise disagree the first time the tiers diverged. The gate asserts each tier is internally consistent and that the two stamping paths are disjoint, since an entry in the wrong config would silently restore the lockstep and look correct today, while the numbers are still equal.",
-        "prs": [
-          202
-        ]
-      },
-      {
-        "text": "**The browser engine's coverage went 69% → 91%, and it has a badge like every other language.** #210 stated the ceiling; this removes it. Fourteen `#[wasm_bindgen]` exports gave up their bodies to a host-testable `*_core` twin — `build_ags4`, `build_ags4_ipc`, `compute_fixes`, `apply_fixes`, `read`, `ParsedDataset.meta`/`arrow_ipc`, `diff`, `merge`, `dictionary`, `censor`, `ags4_to_xlsx`, `xlsx_to_ags4` — leaving `decode → core → marshal` at the boundary. That boundary is the floor of this measurement, not a backlog item: covering it needs `wasm-bindgen-test` on wasm32, which llvm-cov cannot instrument, so those tests would not move the number even once written; it is exercised end-to-end by the `wasm-engine` xcheck leg and the web content-hash test against the real `.wasm` instead. **No export changed behaviour** — including the two build doors' serializer, which writes `undefined` for an absent `line` where every other door writes `null`, preserved as released API and documented rather than quietly unified. 85 new tests, each falsified against a deliberate mutation of the code it guards. The floor moves 67 → 89, and `codecov.yml` stops documenting four floors that had all moved on without it.",
-        "prs": [
-          211
-        ]
-      }
-    ],
+    "added": [],
+    "changed": [],
     "deprecated": [],
-    "removed": [
-      {
-        "text": "**`GroupDescriptor::table()` / `view()` are gone** (again). The two DuckDB `g_<code>`/`v_<code>` name builders sat on the format-neutral reference-data leaf with no callers but their own unit test, and publishing that crate would have frozen an unrelated product's schema naming into its public API. They were deleted in #175 — but #178 branched before it and squash-merged after, so its diff restored them, and the closed issue made the reverted state read as the finished one.",
-        "prs": [
-          189
-        ]
-      }
-    ],
-    "fixed": [
-      {
-        "text": "**The engine fingerprint no longer forgets its dependencies when built from a published crate.** A certificate records which engine judged a file, and the engine's identity is a hash over everything that can change a verdict — the rules, plus the crates they run through. `cargo publish` rewrites the packaged manifest and strips the `path` key from every dependency, and the hash found those crates BY that key, so a build from a crates.io tarball covered 14 files in 1 crate instead of 29 across 4, without a word. A consumer who picked up a new `laterite-ags4-parse` — the tokenizer that decides where fields end — would have kept trusting every certificate minted before it. Our own crates are now identified by `name@version` when their sources are not reachable, which is sound precisely there: a published version's content is immutable. The in-workspace fingerprint is unchanged, so no existing certificate is affected.",
-        "prs": [
-          190
-        ]
-      },
-      {
-        "text": "**The engine crates build on the Rust version they promise.** Every crate declares `rust-version = \"1.85\"`, cargo only ever enforces that field on our dependencies and never on us, and so the promise had quietly been false: `laterite-ags4-emit` used a `let` chain, stable in 1.88. A consumer pinned to an older toolchain would have resolved to us precisely because the floor said they could, then failed to compile against our source. The one line is rewritten and the MSRV gate now builds the publish set on whatever floor the manifests declare — read from the manifests rather than restated, so raising the floor cannot leave the gate testing the old one.",
-        "prs": [
-          193
-        ]
-      },
-      {
-        "text": "**`laterite` 0.1.2 — the error a bytes caller actually hits now says what to do about it.** Asking for the on-disk file check on bytes reported `cannot validate 210 bytes`: true, and useless. It names the size of the input and nothing about the mistake, and it is the first thing a service validating uploads runs into. It now explains that Rule 20's on-disk half needs a path to look beside, so `check_files` belongs with `validate` rather than `validate_bytes`. `Error`'s `Display` also gained an alternate form: `{}` stays terse because `anyhow` and `eyre` walk `source()` themselves and would otherwise print the cause twice, while `{:#}` appends it for callers using neither — which the field's own documentation had claimed since the crate was written. No public signature changed.",
-        "prs": [
-          201
-        ]
-      },
-      {
-        "text": "**Four crates that ship as products were left on the engine version.** `laterite-py`, `laterite-node` and `laterite-ags4-wasm` still said `version.workspace = true` after the tiers split, which was harmless for exactly as long as the two numbers stayed equal and would have broken at the first product-only release. The sharpest case: `wasm-pack` writes the published npm manifest FROM the crate version and the release workflow then asserts the `wasm-v<tag>` matches it, so a `wasm-v0.9.1` tag against a crate still on engine 0.9.0 fails its own tag check. Node's `version()` export would likewise have told callers a number that was not the package they installed. All four now carry the product number, and the gate names the consequence for each rather than asserting they merely ought to match.",
-        "prs": [
-          203
-        ]
-      },
-      {
-        "text": "**The surface census had a gate that could never pass, so nothing ran it.** `tools/gen_census.py --check` is what stops the three `lat` launchers drifting apart — it was written after `lat merge` shipped in the native binary and never reached the uvx or npx launchers with every gate green. But its renderer emitted a `repo_ref` to `tests/test_census_faithful.py`, a file that has never existed in this repository, and the wiki lint's dead-reference scan is hard over live content — so the rendered page had that line stripped by hand, which made `--check` report the page stale on every run, forever. An unpassable check does not get wired into CI, and it wasn't: no job invoked it, so the census could drift from the launchers in silence, which is the exact failure it was built to catch. The false reference is gone, `--check` passes with no change to the committed page or SSOT, and ci.yml's python job now runs it — a step rather than a test, because the check needs BUILT launchers and a test would have had to skip without them.",
-        "prs": [
-          207
-        ]
-      },
-      {
-        "text": "**`censor`'s leak-safe default is now held by a test.** Omitting `selectedCodes` applies the policy to EVERY classified heading — the wider scrub, so forgetting the option over-redacts rather than leaving coordinates in the file. The behaviour was correct and entirely unguarded: it sat inside an export no native test could call, and inverting it passed the whole suite.",
-        "prs": [
-          211
-        ]
-      },
-      {
-        "text": "**`build_ags4` and `build_ags4_ipc` now return `null` for an absent `line`, as their published types always said.** `BuildReport`'s `.d.ts` declares `line: number | null` on `EmitFinding` and `AppliedFix`, but these two doors serialised through serde-wasm-bindgen's *default* serializer, which writes `undefined` for an absent `Option` — so a consumer writing `f.line === null` type-checked clean and never matched. Every other export in the package already used the json-compatible serializer; there is now only one, and a test refuses to compile a second into the crate. **This is an observable change**: code testing `f.line === undefined` needs `=== null` (or `== null`, which was always correct for both). `?? ` and truthiness checks are unaffected. Verified surgical — the build payload carries no maps and no 64-bit integers, so `None` handling is the only thing the two serializers disagree on.",
-        "prs": [
-          212,
-          213
-        ]
-      }
-    ],
+    "removed": [],
+    "fixed": [],
     "security": []
   },
   "releases": [
+    {
+      "version": "0.10.0",
+      "date": "2026-08-02",
+      "summary": "The Rust engine has an audience it did not have before: eight crates are on crates.io, and `laterite` is a real Rust API rather than a reserved name. That brought a second version number with it — the engine answers to `cargo add`, the products to `pip install` and `npm i` — so every surface now reports which ENGINE it carries, and the cross-surface gate checks it was comparing one. **Breaking:** the browser package finishes what 0.9.0 started — `diff` and `censor` take an options object like every other export, and `any` is gone from the `.d.ts` entirely.",
+      "added": [
+        {
+          "text": "**The browser package publishes its remaining result types, and `any` is gone from its `.d.ts` entirely.** `diff`, `dictionary` and `compute_fixes` were the three still returning `any`; they now return `RevisionDelta`, `StandardDict` and `Fix[]`, joining the shapes published previously. Consumers can delete their hand-written `RevisionDelta` / `StandardDict` / `Fix` / `SpanEdit` / `CellDelta` / `RowDelta` / `GroupDelta` / `DictGroup` / `DictHeading` mirrors — the validator site deleted ~120 lines of exactly those. Each new interface is bound to the Rust struct that serialises it by the same drift test as the others, and `Fix`'s `kind`/`risk` unions are checked against the validator's own enums, so a new fix kind cannot ship a `.d.ts` that lies about what you can receive.",
+          "prs": [
+            188
+          ]
+        },
+        {
+          "text": "**The fingerprint build refuses to emit a digest that covers too little.** It previously narrowed in silence — the dependency walk simply found nothing and carried on. It now fails the build, naming what it found. The existing coverage test cannot do this job: tests do not ship in a published crate, so the one build that had the defect was also the one build with nothing checking it.",
+          "prs": [
+            190
+          ]
+        },
+        {
+          "text": "**Three gates that have to work before the first crates.io publish, not after.** A published version's public API and its declared `rust-version` are both frozen, and the only remedy for either being wrong is a version bump every consumer has to follow. The new `publish-gates` CI job (1) builds the ten engine crates on the `rust-version` their own manifests declare, (2) diffs each crate's rendered public API against a checked-in snapshot under `tools/release/public-api/`, and (3) runs `cargo semver-checks` against `main`. The snapshot is the one that changes review: it puts the whole public surface into the PR's own diff, including the `Send`/`Sync` impls that are public API nobody writes down — an `Rc` in a private field silently removes `Send` from a consumer's type, and that is now a build failure rather than something a reviewer has to notice. Opaque `-> impl Trait` returns are the one thing a snapshot cannot see, so each is asserted at compile time instead, and the gate refuses to let a new one be added without one.",
+          "prs": [
+            193
+          ]
+        },
+        {
+          "text": "**The engine crates carry the metadata a crates.io page is made of.** `repository`, `keywords` and `categories` were absent, and seven of the eight round-one crates had no README. That is not a cosmetic gap: crates.io bakes metadata into the PUBLISHED VERSION, so adding it afterwards fixes future versions only — the pages for a version already on the registry would keep no link back to the source, permanently, and seven of them would have been a one-line description and nothing else. Each README is written to stand alone on the registry rather than assume the repository around it. The packaging gate caught all seven new files, which is what it is for.",
+          "prs": [
+            195
+          ]
+        },
+        {
+          "text": "**The eight round-one engine crates are armed for crates.io, and there is a tool that publishes them safely.** Every crate carried `publish = false` — a blanket safety catch, so `cargo publish` refused outright. It is now `true` on the eight; `laterite-ags4-diff` and `laterite-ags4-merge` stay `false`, held for 0.2, with the reason recorded at the flag rather than somewhere a reader has to go looking. `tools/publish_crates.py` does the release: it derives the dependency waves from the manifests each run rather than restating them, waits for each wave to become RESOLVABLE from the registry (not merely uploaded — crates.io indexes on a delay, and a plain loop dies on wave 2 with wave 1 already permanently published), and is idempotent, so a re-run after a failure resumes instead of restarting. It refuses a dirty tree, any branch but `main`, a HEAD that is not `origin/main`, and any crate still marked `publish = false`. Nothing happens without `--execute`.",
+          "prs": [
+            196
+          ]
+        },
+        {
+          "text": "**The engine crates are on crates.io.** Eight of them at 0.9.0 — `laterite-ags4-parse`, `-types`, `-reference`, `-core`, `-validator`, `-emit`, `-trust` and `laterite-transport` — so a Rust consumer no longer needs a git dependency or a vendored path. `laterite-ags4-diff` and `laterite-ags4-merge` are deliberately NOT published; they ship in 0.2, and the `publish = false` guard is what keeps that a decision rather than something to remember. `tools/publish_crates.py` gained `--through-wave N`, so a release can publish one wave, let the live pages be inspected, and only then commit the rest — worth the pause while metadata is still correctable on the crates that have not gone out.",
+          "prs": [
+            197
+          ]
+        },
+        {
+          "text": "**`laterite` — a Rust API, not just a facade.** The user-facing crate now exists and is functional at 0.1.0: read an AGS4 file from a path or bytes, walk its groups/headings/rows, edit cells and append rows, validate against the full numbered rule set, and write valid AGS4 back out. It carries its own version, deliberately — the engine crates are lockstep 0.9.x and reshape as the format work demands; this one is a different promise to a different audience. The design's central rule is now **mechanically enforced** rather than reviewed for: no third-party type may appear anywhere in its public API, checked against the rendered surface, so a `serde_json::Value` return or an `encoding_rs::Encoding` argument fails the build instead of silently binding our semver to a dependency's. `encoding_rs` is not even a dependency — encodings are WHATWG label strings. Held for 0.2, additively: diff, merge, typed cell access, indexed scan.",
+          "prs": [
+            198
+          ]
+        },
+        {
+          "text": "**`laterite` can validate bytes — `ags4::validate_bytes`, in 0.1.1.** 0.1.0 shipped `validate` taking a path only, which meant a service validating an upload had to give it a disk to sit on first. The reason written at the function — that Rule 20 is about files beside the `.ags`, so bytes could only answer half of it — did not hold: Rule 20 has been two modules since 2026-07-14, and `WorldScope` exists precisely to say which half ran, refusing the request with `WorldCheckRequiresSource` rather than reporting a clean Rule 20 nobody checked. Python, Node, wasm and the emitter were all already using it; the facade was the only surface that could not, and its error mapping already handled the token it never produced. Both arms now end at the engine's single door, so the edition resolved from `TRAN_AGS` and the 4.0.3→4.0.4 content guard cannot come out differently for one file read two ways — a test asserts exactly that, since it is the bug every hand-assembled surface has had. Asking for the on-disk check on bytes is an error, not a pass.",
+          "prs": [
+            200
+          ]
+        },
+        {
+          "text": "**Every surface can say which ENGINE it carries, not just which release it is.** `engine_fingerprint()` and `engine_version()` now exist on the wheel (`laterite.engine_fingerprint()`), the npm package (`engineFingerprint()`) and the browser build. The fingerprint is a build-time digest over every rule source, the dictionary and the rules catalogue, so it is the only value that can be believed: edit a rule and forget to bump anything and the semver is unchanged while the digest moves. Two surfaces reporting the same fingerprint ARE running the same rules; two reporting the same release number merely shipped together — a distinction this repo has already been burned by, when a compliance report hard-coded a version literal and kept printing it two minors after the workspace moved past it. It is also what an `.ags.idx` certificate stamps, so it is the right thing to quote in a bug report.",
+          "prs": [
+            203
+          ]
+        },
+        {
+          "text": "**The cross-surface gate now checks it was comparing the same engine.** `xcheck` holds eight surfaces to the in-process Rust authority's bytes, and half of those legs run against BUILT ARTEFACTS — a `wasm-pack` output, a tsup dist, an installed wheel — any of which can be stale while every case still matches, because a stale engine and a current one usually agree. The run then reports N-way identity across a surface compiled two weeks ago. Each leg now reports the engine fingerprint it is ACTUALLY running, asked of the artefact rather than assumed from the tree, and a mismatch against the authority's is a hard failure that the allowlist cannot excuse — an allowlisted engine split would be the gate agreeing to compare two different engines, which is the one thing it exists to refuse. A version number could not have done this job; the digest moves when a rule is edited even if nobody bumps anything. The three `cli-*` launcher legs have no door to ask through yet, so they are NAMED on stderr as unchecked rather than passed over, and the run reads as five identity-checked surfaces plus a known gap instead of a clean bill of health.",
+          "prs": [
+            204
+          ]
+        },
+        {
+          "text": "**All eight cross-surface legs now prove they were running the same engine — the three `lat` launchers included.** #204 gave five of them a fingerprint to compare and left `cli-native`, `cli-uvx` and `cli-npx` naming themselves as unchecked, because a launcher is a subprocess and none of the three would say what engine it carried. They say it now, through `lat census` — the hidden machine dump all three already implement and `tools/gen_census.py` already diffs them across. A second machine door would have been a second thing to keep in step, which is the failure the census exists to catch. `engine` is deliberately NOT a census table and is absent from `surface-census.json`: a fingerprint moves whenever a rule is edited, so snapshotting it would churn a checked-in file on every rule change while saying nothing about the surfaces. The schema version still bumped, because a launcher built before the field answers with it MISSING and missing is indistinguishable from a launcher with nothing to report — it would opt itself out of the identity check in silence. That version is hand-declared in four places and nothing had ever pinned them equal; a test now does, since a bump that reaches three of four makes the fourth launcher permanently \"stale\" to the generator, which reads as a build problem rather than the typo it is.",
+          "prs": [
+            205
+          ]
+        },
+        {
+          "text": "**A surface that stops reporting its engine now fails CI instead of printing a warning above a green run.** The cross-surface gate gained a second anti-rot switch, `--require-engines all`, alongside the `--require-legs all` it has always had — and for the same reason: the same silence means different things locally and on a runner. On your machine a leg that cannot name its engine is a fact about your working tree; in CI it means a surface dropped out of the identity check while the gate still said OK, which is the exact shape of a gate disarming itself. The nightly job now passes both. Neither `engine-mismatch` nor `engine-unreported` can be allowlisted — there is no finding to triage, because the comparison an entry would excuse did not happen between the things it claims — and adding an entry does not merely fail to help: the run then fails **twice**, because the entry also trips the allowlist's own staleness check.",
+          "prs": [
+            206
+          ]
+        },
+        {
+          "text": "**The npm package's error-mapping table is tested, and its coverage floors moved 93/84 → 97/89.** `errors.ts` is the module that turns an engine failure into the class callers branch on (`instanceof FileNotFoundError`, not a message match) — and nothing tested it; it was covered only incidentally by suites that happened to trip some of its arms. The new suite reads the error kinds OUT OF THE RUST SOURCE rather than restating them, because a third hand-list is the failure this repo keeps paying for: `ValidatorError::kind()` calls itself the single producer of that value domain and a new variant does force its Rust match, but nothing forced `makeError` to keep up — an unmapped kind falls through to a base `Ags4Error` with the right message and the right exit code, so every `instanceof` a caller wrote silently becomes false. Also covered: the four source shapes a handle can re-read (a path is re-read from DISK, not snapshotted, so certifying after an edit measures the current file), `certify`'s refusal to overwrite a file that is not a certificate, and the guards on `diff`/`fix`/`buildAgs4` that turn a mistake into a typed error instead of a raw `ENOENT` or a lookup on `undefined`.",
+          "prs": [
+            208
+          ]
+        },
+        {
+          "text": "**The browser bundle's least-tested module was the one standing between DuckDB values and the DOM.** `duckTypes.ts` calls itself \"the single audited place\" where an Int64 column's `bigint` and a TIMESTAMP's micros-since-epoch are normalised — rendering a bigint in JSX throws, and a micros value read as millis renders a plausible date in 1970 rather than an error — and it sat at 15% of lines. It now has a suite, as does `loadSensitive()` (whose fetch-once cache and non-OK-response guard decide whether the Anonymiser pre-ticks anything at all: a proxy's JSON error page would otherwise yield a document with no headings, and an anonymiser that redacts nothing while looking like it worked). The parent-chain walkers in `relationships.ts` gained tests for their cycle guards, which existed to stop a malformed dictionary freezing the tab and had never been exercised. The web lane also gained a BRANCH floor, which it never had — that absence is why the badge read ~85% while the lines gate sat green above 95, since a half-taken branch counts as a hit to lcov and a partial to Codecov. Generated wasm-pack glue is now excluded from the denominator so a local run and the CI run measure the same thing.",
+          "prs": [
+            209
+          ]
+        },
+        {
+          "text": "**The browser engine has a coverage figure for the first time — it was 69%, and nobody could see it.** `laterite-ags4-wasm` was the one shipped surface with no coverage gate of any kind. The nightly Rust job excludes it, correctly, because folding a binding cdylib into the ENGINE's denominator would move the engine's floor for reasons unrelated to the engine — but the exclusion read as \"cannot be measured\", and so nothing ever measured it. It was never unmeasurable: its 44 tests are plain `#[test]`s that `cargo test` runs on every PR. It now has its own nightly step, its own denominator and its own floor, deliberately separate so the engine's floor stays comparable run-to-run. Four exports whose signatures are plain Rust — `version`, `engine_version`, `engine_fingerprint`, `list_rules` — gained native tests; the two identity doors especially, since `engine_fingerprint` exists because a hard-coded constant once stood in for a real answer here, and a constant is exactly what these would silently become again. The ceiling is now stated rather than discovered: 103 of 218 functions are unreachable from a native test because they take or return JS types, so raising this means moving logic out of the fat `#[wasm_bindgen]` exports into plain functions, not writing more tests against the boundary.",
+          "prs": [
+            210
+          ]
+        },
+        {
+          "text": "**The npm surface reaches the 95% coverage bar, and its floors move 97/89 → 98/91.** Five suites, each aimed at a decision that fails *quietly*. The `0DP` → `BIGINT` arm of the AGS-type mapping had never been exercised — a count that arrives as `7.0` is a different fact from `7`, and it round-trips back out that way. `_filteredRows`' `WHERE TRUE` fallback and the `* EXCLUDE (_id, _parent_id)` choice both produce a query that *runs*, with the wrong rows or the wrong columns. And `ancestorChain`/`inheritedKeyNames` translate a native throw as `e instanceof Error ? e.message : String(e)`, where only the first arm was ever taken: napi can surface a non-`Error`, and without the second arm the `Ags4Error` reports the string `\"undefined\"` — the only diagnostic the caller had, gone. `registry.ts` goes 50 → 100% branch. Falsified by mutation rather than by assertion count: censor's default inverted, the `TRUE`/`FALSE` clause flipped, the null-fill removed and the `String(e)` arm removed are all caught.",
+          "prs": [
+            214
+          ]
+        },
+        {
+          "text": "**The browser bundle reaches 97.5% coverage — lines and functions both at 100% — and its branch floor moves 89 → 95.** Four suites, all aimed at code whose failure is a wrong *answer* rather than an error. An unqualified column in a join is ambiguous exactly when both sides carry the same heading, which for `LOCA_ID` is the *normal* case, and DuckDB resolves it by picking one; the Explore tab's suggested queries (`joinKeys`, `depthRangeOf`, `geologyTemplate`) run perfectly well while returning the wrong rows; and the union-dictionary fetch must throw on a non-OK response, because parsing a proxy's JSON error page instead yields a dictionary with no groups — an Explore tab where nothing is a known AGS group and nothing says why. `project()`'s output guard is now pinned against the official OS test points: `1e300` is finite, walks past the input check, and comes back unplottable. Falsified by mutation: the sensitive-policy guard dropped, the `!res.ok` throw removed, chart columns never alias-qualified, the `MC` gloss deleted and the template's depth check forced true are all caught. With the npm lane, this closes the last two lanes of the coverage campaign.",
+          "prs": [
+            215
+          ]
+        }
+      ],
+      "changed": [
+        {
+          "text": "**Breaking: `diff` and `censor` take an options object too.** They were the last two `@laterite/ags4-wasm` exports with a positional tail — `diff(a, b, encoding, maxRowsPerGroup)` and `censor(data, sensitiveJson, selectedCodes, token, dropCustom, includeFreetext)`, the latter six-deep with three consecutive booleans. Both now take one named object after their inputs (`diff(a, b, { encoding, maxRowsPerGroup })`, `censor(data, sensitiveJson, { selectedCodes, token, dropCustom, includeFreetext })`), every field optional and defaulted, with the same unknown-key refusal the other exports got. The test that recorded these two as \"not yet migrated\" now has nothing left to exempt.",
+          "prs": [
+            188
+          ]
+        },
+        {
+          "text": "**Every engine crate now declares what it may publish.** `cargo package` ships whatever sits in a crate directory and is not excluded, and no crate here specified `include` — `laterite-ags4-validator` alone would have put 41 test and bench files plus 2.1 MB of reference data no code reads into its tarball. All ten engine-tier crates now carry an explicit allowlist, and a CI gate diffs `cargo package --list` against a checked-in manifest so a new file entering a tarball turns the build red. This had to land before the first publish rather than after: crates.io is append-only, and `yank` stops new resolution without removing the tarball.",
+          "prs": [
+            189
+          ]
+        },
+        {
+          "text": "**The engine crates declare the versions a publish needs.** `cargo package` rejects a dependency with no version requirement — publishing strips the `path` and the version is all that survives to identify it — so 7 of the 10 engine-tier crates could not be packaged at all. The 21 in-workspace dependency sites now inherit from `[workspace.dependencies]`, which carries both a path and a version. Nothing changes locally: the path still wins, and `Cargo.lock` is untouched. The versions sit in `rust-packages/Cargo.toml` specifically so the release bump rewrites them alongside the workspace version rather than leaving them behind, and a test asserts that lockstep instead of assuming it.",
+          "prs": [
+            191
+          ]
+        },
+        {
+          "text": "**The CLI crate is `laterite-cli`.** `laterite-ags4-check` named a checker; the crate reads, fixes, diffs, merges, certifies, packs, converts and mints certificates, and `-ags4-` marks the engine tier, which a product binary is not. The shipped binary is still `lat` — nothing a user types changes. Renamed now because crates.io has no rename: a name is free until its first publish and irreversible after, and the engine tier went out yesterday. It is deliberately NOT added to the publish set, which looks like an oversight and is not: a binary's dependencies are still dependencies, so publishing it requires `laterite-ags4-diff` and `-merge` (held for 0.2) plus `laterite-cliutil` and `laterite-excel` (never considered for the registry) — and both publish gates render a lib target that a bin-only crate does not have. The CLI ships with 0.2, alongside the diff/merge publish it already depends on.",
+          "prs": [
+            199
+          ]
+        },
+        {
+          "text": "**There are two version numbers now: the engine and the products.** One number used to stamp the wheel, the npm package, the compat prefix and the Rust workspace together, and that coupling has a cost recorded in this repo's own history: `laterite-ags4-wasm` inherits the workspace version, so shipping a browser-only patch meant bumping the number every surface shared. It happened at 0.8.1 and again at 0.8.2, and because the release advice was \"tag only what changed\", PyPI saw neither — wheel versions 0.8.1 and 0.8.2 exist in git history and on no registry. Since the first crates.io publish there is a second cost: `[workspace.dependencies]` carries the version a published crate declares on its siblings, so bumping the engine for a product's sake would declare dependencies on engine versions nobody published. The engine (the Rust workspace and the eight crates.io crates) now moves on `bump-version.sh engine`; every product still shares one number and moves on `bump-version.sh product`. The target is required — a default would be a way to bump the wrong tier by omission. `laterite-cli` moved onto the product number, because `lat` exists twice and clap renders `--version` from `CARGO_PKG_VERSION`, so the binary and the wheel's `lat` would otherwise disagree the first time the tiers diverged. The gate asserts each tier is internally consistent and that the two stamping paths are disjoint, since an entry in the wrong config would silently restore the lockstep and look correct today, while the numbers are still equal.",
+          "prs": [
+            202
+          ]
+        },
+        {
+          "text": "**The browser engine's coverage went 69% → 91%, and it has a badge like every other language.** #210 stated the ceiling; this removes it. Fourteen `#[wasm_bindgen]` exports gave up their bodies to a host-testable `*_core` twin — `build_ags4`, `build_ags4_ipc`, `compute_fixes`, `apply_fixes`, `read`, `ParsedDataset.meta`/`arrow_ipc`, `diff`, `merge`, `dictionary`, `censor`, `ags4_to_xlsx`, `xlsx_to_ags4` — leaving `decode → core → marshal` at the boundary. That boundary is the floor of this measurement, not a backlog item: covering it needs `wasm-bindgen-test` on wasm32, which llvm-cov cannot instrument, so those tests would not move the number even once written; it is exercised end-to-end by the `wasm-engine` xcheck leg and the web content-hash test against the real `.wasm` instead. **No export changed behaviour** — including the two build doors' serializer, which writes `undefined` for an absent `line` where every other door writes `null`, preserved as released API and documented rather than quietly unified. 85 new tests, each falsified against a deliberate mutation of the code it guards. The floor moves 67 → 89, and `codecov.yml` stops documenting four floors that had all moved on without it.",
+          "prs": [
+            211
+          ]
+        }
+      ],
+      "deprecated": [],
+      "removed": [
+        {
+          "text": "**`GroupDescriptor::table()` / `view()` are gone** (again). The two DuckDB `g_<code>`/`v_<code>` name builders sat on the format-neutral reference-data leaf with no callers but their own unit test, and publishing that crate would have frozen an unrelated product's schema naming into its public API. They were deleted in #175 — but #178 branched before it and squash-merged after, so its diff restored them, and the closed issue made the reverted state read as the finished one.",
+          "prs": [
+            189
+          ]
+        }
+      ],
+      "fixed": [
+        {
+          "text": "**The engine fingerprint no longer forgets its dependencies when built from a published crate.** A certificate records which engine judged a file, and the engine's identity is a hash over everything that can change a verdict — the rules, plus the crates they run through. `cargo publish` rewrites the packaged manifest and strips the `path` key from every dependency, and the hash found those crates BY that key, so a build from a crates.io tarball covered 14 files in 1 crate instead of 29 across 4, without a word. A consumer who picked up a new `laterite-ags4-parse` — the tokenizer that decides where fields end — would have kept trusting every certificate minted before it. Our own crates are now identified by `name@version` when their sources are not reachable, which is sound precisely there: a published version's content is immutable. The in-workspace fingerprint is unchanged, so no existing certificate is affected.",
+          "prs": [
+            190
+          ]
+        },
+        {
+          "text": "**The engine crates build on the Rust version they promise.** Every crate declares `rust-version = \"1.85\"`, cargo only ever enforces that field on our dependencies and never on us, and so the promise had quietly been false: `laterite-ags4-emit` used a `let` chain, stable in 1.88. A consumer pinned to an older toolchain would have resolved to us precisely because the floor said they could, then failed to compile against our source. The one line is rewritten and the MSRV gate now builds the publish set on whatever floor the manifests declare — read from the manifests rather than restated, so raising the floor cannot leave the gate testing the old one.",
+          "prs": [
+            193
+          ]
+        },
+        {
+          "text": "**`laterite` 0.1.2 — the error a bytes caller actually hits now says what to do about it.** Asking for the on-disk file check on bytes reported `cannot validate 210 bytes`: true, and useless. It names the size of the input and nothing about the mistake, and it is the first thing a service validating uploads runs into. It now explains that Rule 20's on-disk half needs a path to look beside, so `check_files` belongs with `validate` rather than `validate_bytes`. `Error`'s `Display` also gained an alternate form: `{}` stays terse because `anyhow` and `eyre` walk `source()` themselves and would otherwise print the cause twice, while `{:#}` appends it for callers using neither — which the field's own documentation had claimed since the crate was written. No public signature changed.",
+          "prs": [
+            201
+          ]
+        },
+        {
+          "text": "**Four crates that ship as products were left on the engine version.** `laterite-py`, `laterite-node` and `laterite-ags4-wasm` still said `version.workspace = true` after the tiers split, which was harmless for exactly as long as the two numbers stayed equal and would have broken at the first product-only release. The sharpest case: `wasm-pack` writes the published npm manifest FROM the crate version and the release workflow then asserts the `wasm-v<tag>` matches it, so a `wasm-v0.9.1` tag against a crate still on engine 0.9.0 fails its own tag check. Node's `version()` export would likewise have told callers a number that was not the package they installed. All four now carry the product number, and the gate names the consequence for each rather than asserting they merely ought to match.",
+          "prs": [
+            203
+          ]
+        },
+        {
+          "text": "**The surface census had a gate that could never pass, so nothing ran it.** `tools/gen_census.py --check` is what stops the three `lat` launchers drifting apart — it was written after `lat merge` shipped in the native binary and never reached the uvx or npx launchers with every gate green. But its renderer emitted a `repo_ref` to `tests/test_census_faithful.py`, a file that has never existed in this repository, and the wiki lint's dead-reference scan is hard over live content — so the rendered page had that line stripped by hand, which made `--check` report the page stale on every run, forever. An unpassable check does not get wired into CI, and it wasn't: no job invoked it, so the census could drift from the launchers in silence, which is the exact failure it was built to catch. The false reference is gone, `--check` passes with no change to the committed page or SSOT, and ci.yml's python job now runs it — a step rather than a test, because the check needs BUILT launchers and a test would have had to skip without them.",
+          "prs": [
+            207
+          ]
+        },
+        {
+          "text": "**`censor`'s leak-safe default is now held by a test.** Omitting `selectedCodes` applies the policy to EVERY classified heading — the wider scrub, so forgetting the option over-redacts rather than leaving coordinates in the file. The behaviour was correct and entirely unguarded: it sat inside an export no native test could call, and inverting it passed the whole suite.",
+          "prs": [
+            211
+          ]
+        },
+        {
+          "text": "**`build_ags4` and `build_ags4_ipc` now return `null` for an absent `line`, as their published types always said.** `BuildReport`'s `.d.ts` declares `line: number | null` on `EmitFinding` and `AppliedFix`, but these two doors serialised through serde-wasm-bindgen's *default* serializer, which writes `undefined` for an absent `Option` — so a consumer writing `f.line === null` type-checked clean and never matched. Every other export in the package already used the json-compatible serializer; there is now only one, and a test refuses to compile a second into the crate. **This is an observable change**: code testing `f.line === undefined` needs `=== null` (or `== null`, which was always correct for both). `?? ` and truthiness checks are unaffected. Verified surgical — the build payload carries no maps and no 64-bit integers, so `None` handling is the only thing the two serializers disagree on.",
+          "prs": [
+            212,
+            213
+          ]
+        }
+      ],
+      "security": []
+    },
     {
       "version": "0.9.0",
       "date": "2026-07-30",

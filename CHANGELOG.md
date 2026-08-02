@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-08-02
+
+The Rust engine has an audience it did not have before: eight crates are on crates.io, and `laterite` is a real Rust API rather than a reserved name. That brought a second version number with it — the engine answers to `cargo add`, the products to `pip install` and `npm i` — so every surface now reports which ENGINE it carries, and the cross-surface gate checks it was comparing one. **Breaking:** the browser package finishes what 0.9.0 started — `diff` and `censor` take an options object like every other export, and `any` is gone from the `.d.ts` entirely.
+
 ### Added
 
 - **The browser package publishes its remaining result types, and `any` is gone from its `.d.ts` entirely.** `diff`, `dictionary` and `compute_fixes` were the three still returning `any`; they now return `RevisionDelta`, `StandardDict` and `Fix[]`, joining the shapes published previously. Consumers can delete their hand-written `RevisionDelta` / `StandardDict` / `Fix` / `SpanEdit` / `CellDelta` / `RowDelta` / `GroupDelta` / `DictGroup` / `DictHeading` mirrors — the validator site deleted ~120 lines of exactly those. Each new interface is bound to the Rust struct that serialises it by the same drift test as the others, and `Fix`'s `kind`/`risk` unions are checked against the validator's own enums, so a new fix kind cannot ship a `.d.ts` that lies about what you can receive. ([#188](https://github.com/niko86/laterite/pull/188))
@@ -197,7 +201,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/niko86/laterite/releases/tag/v0.10.0
 [0.9.0]: https://github.com/niko86/laterite/releases/tag/v0.9.0
 [0.8.2]: https://github.com/niko86/laterite/releases/tag/v0.8.2
 [0.8.1]: https://github.com/niko86/laterite/releases/tag/v0.8.1
