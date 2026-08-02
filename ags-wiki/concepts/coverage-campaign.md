@@ -94,8 +94,8 @@ Measured live from the Codecov API, 2026-08-02:
 |---|---|---|---|---|---|
 | **Python** | **99.15%** ✓ | — | 95 | `ci.yml` `pytest --cov=laterite` | **met** (floor ratcheted 80→95) |
 | **Rust** (shipped engine) | **95.02%** ✓ | — | 88 | `nightly.yml` `cargo llvm-cov` | **met** (floor lags reality) |
-| **Node** | 89.93 → **93.86%** | 98.16 lines / 90.48 br | 97 / 89 | `laterite-node/vitest.config.ts` | +1 pt |
-| **Web** | 84.91 → **92.00%** | 99.5 lines / 90.86 br | 99 / 89 | `web/vitest.config.ts` | +3 pt |
+| **Node** | 89.93 → **95.42%** ✓ | 98.56 lines / 92.21 br | 98 / 91 | `laterite-node/vitest.config.ts` | **met** |
+| **Web** | 84.91 → **97.50%** ✓ | 100 lines / 96.34 br | 99 / 95 | `web/vitest.config.ts` | **met** |
 | **wasm** | no flag → **own flag + badge** | 69.03 → **90.86%** lines | 89 | `nightly.yml`, own step | +4 pt (ceiling — see below) |
 
 Web had a lines floor and **no branch floor**, which is precisely why its badge
@@ -131,72 +131,128 @@ of defensive `TypeError`/parse-invariant guards.
 | P4 ✓ | `_frames.py` | 77→**100** | 26 | pyarrow-vs-duckdb materialization backends | **ran both backends** (rule 5 — pyarrow present + simulated-absent), not a skip |
 | P5 ✓ | `dynamic.py` | 83→**100** | 10 | dynamic group registration edges | behavioural |
 
-### Rust, Node — measure next
+### Rust — measure next
 
 - **Rust** (~89.24 → 95): re-run `cargo llvm-cov` for the per-crate/per-file
   breakdown before ranking (heavy, instrumented build — do it once, deliberately).
   The gap is small; expect a handful of under-tested modules in the shipped engine.
-- **Node** (floor 93/84): `npm run test:coverage` for the actual number + the
-  uncovered TS in the `laterite-node` wrapper.
-- **wasm (69.03 → 90.86%) — DONE ✓**, floor 67 → **89**, and it now has a
-  Codecov flag and a README badge like every other language.
 
-  The previous entry called the ceiling structural and named the fix: move the
-  logic **out** of the fat `#[wasm_bindgen]` exports into plain functions the
-  native tests can call. That is what was done. Fourteen exports gave up their
-  bodies to a `*_core` twin — `build_ags4_core`, `build_ipc_core`,
-  `compute_fixes_core`, `apply_fixes_core`, `read_core`, `meta_core`,
-  `arrow_ipc_core`, `diff_core`, `merge_core`, `dictionary_core`, `censor_core`,
-  `ags4_to_xlsx_core`, `xlsx_to_ags4_core` (plus `build_parts`, the shared TRAN
-  fold) — and what is left inside each export is `decode → core → marshal`.
+### Node (89.93 → 95.42%) — **DONE** ✓
 
-  **First: check whether the dark code should exist at all.** It should — every
-  one of those exports is a registered cross-surface capability in
-  `modality.json`, and `build_ags4_ipc` / `list_rules` / `engine_fingerprint`
-  are unused by *our* web app but are published `@laterite/ags4-wasm` API with
-  consumers elsewhere (`engine_fingerprint` backs the xcheck engine-identity
-  gate). Nothing here was deletable; the problem was the *shape*, not the
-  existence.
+Floor 97/89 → **98/91**. Five suites, all aimed at decisions that fail *quietly*
+rather than loudly:
 
-  **What the residue is, exactly.** ~127 of the ~141 uncovered production lines
-  are `JsValue`/`JsError` marshalling. `cargo test` cannot call them, and — the
-  part worth knowing before anyone tries — covering them would need
-  `wasm-bindgen-test` on **wasm32, a target llvm-cov cannot instrument**, so
-  those tests would not move this number even once written. They are exercised
-  end-to-end instead: the `wasm-engine` xcheck leg drives `build_ags4` and
-  `web/src/lib/content-hash.test.ts` drives `read` + `arrow_ipc`, both against
-  the real `.wasm` binary through Node. **The boundary is the floor of this
-  measurement, not a backlog item.**
+- **`duckdb-typing`** — the AGS TYPE → DuckDB column matrix. The `0DP` → `BIGINT`
+  arm had never been exercised: a count arriving as `7.0` is a different fact
+  from `7`, and it round-trips back out that way. Also pins the micros-vs-millis
+  scaling in `toMicros`, the same class of bug the web side once had (read
+  microseconds as milliseconds and every timestamp lands in 1970, silently).
+- **`frame-query-builder`** — `_filteredRows`' `WHERE TRUE` fallback and the
+  `* EXCLUDE (_id, _parent_id)` vs plain `*` choice. Both produce a query that
+  *runs*, with the wrong columns or the wrong rows.
+- **`ragged-and-bytes-doors`** — `rowsToTable`'s null-fill on a short row, and
+  `fromExcel`'s path-vs-bytes doors.
+- **`registry-error-translation`** — `ancestorChain` / `inheritedKeyNames` catch
+  a native throw as `e instanceof Error ? e.message : String(e)`, and only the
+  first arm was ever taken. Without the second, a non-`Error` from napi reports
+  an `Ags4Error` whose message is the string `"undefined"` — the only diagnostic
+  the caller had, gone. Took `registry.ts` from 50 → **100%** branch.
+- **`cli-exit-codes`** — exit code 3 for a missing file, and the `--tran-*` fold.
 
-  > **Beware the denominator here.** `lib.rs` is ~45% `#[cfg(test)]` code and
-  > llvm-cov counts it, as hits — so the headline rises whenever tests are
-  > added, whatever they assert. Measured separately, PRODUCTION lines went
-  > **61.42% → 90.90%**; the whole-file figure the gate reads is 90.86%. They
-  > agree here because the extraction moved real logic, but they would not have
-  > if the same points had been bought with tests alone.
+Falsified by mutation: censor's default inverted, the `TRUE`/`FALSE` clause
+flipped, the null-fill removed, the `String(e)` arm removed — all four caught.
 
-  One real defect fell out of writing the tests: `build_ags4`/`build_ags4_ipc`
-  serialised through serde-wasm-bindgen's **default** serializer (`None` →
-  `undefined`) while every other door used `json_compatible` (`None` → `null`),
-  yet `BuildReport`'s published TS declares `line: number | null` — so
-  `f.line === null` type-checked clean and never matched. Fixed in #212; there
-  is now one serializer and a source-level test refusing a second.
+### Web (84.91 → 97.50%) — **DONE** ✓
 
-  > [!caution] **A second "finding" was not one, and the lesson generalises.**
-  > The same pass flagged `laterite-ags4-merge` widening `{2DP, X}` to `X`
-  > without a `type_widened` warning. It is **documented, deliberate behaviour**
-  > — stated in `TypeClashMode::Widen`'s own doc comment ("Typed-vs-`X` resolves
-  > silently; two *different* non-`X` types warn") and pinned by a named
-  > acceptance test, `typed_vs_x_widen_is_silent`. Merge made no *choice* there:
-  > once one file declares `X` the column can only be `X`, so there is no
-  > resolution to report.
-  >
-  > **Coverage work walks into untested code and is therefore primed to read
-  > deliberate design as oversight.** Before reporting a gap as a defect, look
-  > for the decision: the enum doc, an acceptance test, a wiki page. Absence of
-  > a *test* is not absence of a *decision* — and here the test existed too, one
-  > crate away. Present the finding and ask; do not reverse a recorded decision
-  > because the axis you happened to measure did not see the reason for it.
+Floor 99/89 → **99/95**; lines and functions are both at 100%. Four suites:
+
+- **`sqlgen-joins`** — join-mode `SELECT` plus the join-mode chart refs. The
+  failure mode throughout is a query that runs and answers wrongly: an
+  unqualified column in a join is ambiguous exactly when both sides share the
+  heading, which for `LOCA_ID` is the *normal* case, and DuckDB resolves it by
+  picking one. Also pins the half-open depth band (`<` not `<=`, or a boundary
+  sample lands in two strata).
+- **`relationships-templates`** — `joinKeys` / `depthRangeOf` / `geologyTemplate`
+  / `relExamples`: the SQL the Explore tab *offers*. A wrong answer here is not a
+  crash, it is a suggestion that runs and returns the wrong rows.
+- **`dict-load`** — the union-dictionary fetch doors. A non-OK response must
+  throw: parsing a proxy's JSON error page instead yields a union with no groups,
+  i.e. an Explore tab where nothing is a known AGS group and nothing says why.
+- **`coords-project`** — `project()`'s two non-finite guards, against the official
+  OS test points. The *output* guard is the one the input guard cannot stand in
+  for: `1e300` is finite, walks past the first check, and comes back unplottable.
+
+Falsified by mutation: the sensitive-policy guard dropped, the union fetch's
+`!res.ok` throw removed, chart columns never alias-qualified, the `MC` gloss
+deleted, the template's depth-column check forced true — all five caught.
+
+The ~10 branches still short of 100 are `?.` / `??` guards TypeScript's narrowing
+needs but no input can reach (a `present.get()` on a key taken from the same map,
+a `dict.get()` after a `dict.get()?.parent` test). Converting those would move
+the number without testing anything, so the floor keeps a margin rather than
+pinning today's value.
+
+### wasm (69.03 → 90.86%) — **DONE** ✓
+
+Floor 67 → **89**, and it now has a Codecov flag and a README badge like every
+other language.
+
+The previous entry called the ceiling structural and named the fix: move the
+logic **out** of the fat `#[wasm_bindgen]` exports into plain functions the
+native tests can call. That is what was done. Fourteen exports gave up their
+bodies to a `*_core` twin — `build_ags4_core`, `build_ipc_core`,
+`compute_fixes_core`, `apply_fixes_core`, `read_core`, `meta_core`,
+`arrow_ipc_core`, `diff_core`, `merge_core`, `dictionary_core`, `censor_core`,
+`ags4_to_xlsx_core`, `xlsx_to_ags4_core` (plus `build_parts`, the shared TRAN
+fold) — and what is left inside each export is `decode → core → marshal`.
+
+**First: check whether the dark code should exist at all.** It should — every
+one of those exports is a registered cross-surface capability in
+`modality.json`, and `build_ags4_ipc` / `list_rules` / `engine_fingerprint`
+are unused by *our* web app but are published `@laterite/ags4-wasm` API with
+consumers elsewhere (`engine_fingerprint` backs the xcheck engine-identity
+gate). Nothing here was deletable; the problem was the *shape*, not the
+existence.
+
+**What the residue is, exactly.** ~127 of the ~141 uncovered production lines
+are `JsValue`/`JsError` marshalling. `cargo test` cannot call them, and — the
+part worth knowing before anyone tries — covering them would need
+`wasm-bindgen-test` on **wasm32, a target llvm-cov cannot instrument**, so
+those tests would not move this number even once written. They are exercised
+end-to-end instead: the `wasm-engine` xcheck leg drives `build_ags4` and
+`web/src/lib/content-hash.test.ts` drives `read` + `arrow_ipc`, both against
+the real `.wasm` binary through Node. **The boundary is the floor of this
+measurement, not a backlog item.**
+
+> **Beware the denominator here.** `lib.rs` is ~45% `#[cfg(test)]` code and
+> llvm-cov counts it, as hits — so the headline rises whenever tests are
+> added, whatever they assert. Measured separately, PRODUCTION lines went
+> **61.42% → 90.90%**; the whole-file figure the gate reads is 90.86%. They
+> agree here because the extraction moved real logic, but they would not have
+> if the same points had been bought with tests alone.
+
+One real defect fell out of writing the tests: `build_ags4`/`build_ags4_ipc`
+serialised through serde-wasm-bindgen's **default** serializer (`None` →
+`undefined`) while every other door used `json_compatible` (`None` → `null`),
+yet `BuildReport`'s published TS declares `line: number | null` — so
+`f.line === null` type-checked clean and never matched. Fixed in #212; there
+is now one serializer and a source-level test refusing a second.
+
+> [!caution] **A second "finding" was not one, and the lesson generalises.**
+> The same pass flagged `laterite-ags4-merge` widening `{2DP, X}` to `X`
+> without a `type_widened` warning. It is **documented, deliberate behaviour**
+> — stated in `TypeClashMode::Widen`'s own doc comment ("Typed-vs-`X` resolves
+> silently; two *different* non-`X` types warn") and pinned by a named
+> acceptance test, `typed_vs_x_widen_is_silent`. Merge made no *choice* there:
+> once one file declares `X` the column can only be `X`, so there is no
+> resolution to report.
+>
+> **Coverage work walks into untested code and is therefore primed to read
+> deliberate design as oversight.** Before reporting a gap as a defect, look
+> for the decision: the enum doc, an acceptance test, a wiki page. Absence of
+> a *test* is not absence of a *decision* — and here the test existed too, one
+> crate away. Present the finding and ask; do not reverse a recorded decision
+> because the axis you happened to measure did not see the reason for it.
 
 ## The stopping rule
 
