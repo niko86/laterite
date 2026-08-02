@@ -23,7 +23,7 @@ name = "laterite-ags4-wasm"
 # `wasm-pack` writes the published manifest FROM this line, and release.yml then
 # asserts the `wasm-v<tag>` matches it — so on the engine line the first
 # product-only release fails its own tag check.
-version = "0.9.0"
+version = "0.10.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Browser wasm wrapper around the clean-room AGS4 validator"
