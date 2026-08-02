@@ -3602,3 +3602,95 @@ mod tests {
         );
     }
 }
+
+/// The four exports whose signatures are plain Rust — no `JsValue`, no
+/// `JsError` — and which are therefore reachable from a NATIVE `cargo test`.
+///
+/// Every other `#[wasm_bindgen]` export in this file takes or returns a JS type,
+/// so it can only be driven from the browser (or the `wasm-engine` xcheck leg).
+/// These four cannot: they are pure metadata doors, and until now nothing called
+/// them from anywhere except JavaScript. That mattered most for the two identity
+/// doors — `engine_fingerprint` exists precisely because a *constant* once stood
+/// in for a real answer here (#556), and a constant is exactly what these would
+/// silently become if someone replaced the crate lookup with a literal.
+#[cfg(test)]
+mod metadata_door_tests {
+    use super::*;
+
+    #[test]
+    fn version_is_the_crate_version_not_a_literal() {
+        // The bug this whole family of doors was written for: a hand-written
+        // version string that kept printing while the workspace moved past it.
+        // Asserting against `CARGO_PKG_VERSION` is what makes a pasted literal
+        // fail rather than merely look plausible.
+        assert_eq!(version(), env!("CARGO_PKG_VERSION"));
+        assert!(
+            version().split('.').count() >= 3,
+            "not a semver: {}",
+            version()
+        );
+    }
+
+    #[test]
+    fn engine_version_comes_from_the_validator_not_this_crate() {
+        // The tiers split in #202: this package carries the PRODUCT number and the
+        // engine carries its own. They are equal today, so a test that only
+        // compared them would pass while reading the wrong one — assert the source
+        // instead.
+        assert_eq!(engine_version(), laterite_ags4_validator::VERSION);
+    }
+
+    #[test]
+    fn engine_fingerprint_is_the_validator_digest() {
+        assert_eq!(
+            engine_fingerprint(),
+            laterite_ags4_validator::ENGINE_FINGERPRINT
+        );
+    }
+
+    #[test]
+    fn engine_fingerprint_is_a_well_formed_digest() {
+        // 16 hex chars — `build.rs` truncates the SHA-256. A placeholder or an
+        // empty string would compare EQUAL across two surfaces and mean nothing,
+        // which is the one failure this value exists to prevent.
+        let fp = engine_fingerprint();
+        assert_eq!(fp.len(), 16, "fingerprint {fp:?} is not 16 chars");
+        assert!(
+            fp.chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()),
+            "fingerprint {fp:?} is not lowercase hex"
+        );
+    }
+
+    #[test]
+    fn the_version_and_the_fingerprint_are_different_answers() {
+        // They answer different questions — "which release" vs "which rules" — so
+        // a surface that wired one door to the other would still look sensible.
+        assert_ne!(version(), engine_fingerprint());
+    }
+
+    #[test]
+    fn list_rules_is_the_validator_catalogue_verbatim() {
+        // The browser parses this into typed rule entries, so it must be the
+        // catalogue itself and not a re-serialisation that could reorder or
+        // re-shape it.
+        assert_eq!(list_rules(), laterite_ags4_validator::rule_metadata_json());
+    }
+
+    #[test]
+    fn list_rules_is_parseable_json_describing_real_rules() {
+        // A door the browser JSON.parses. If it ever returned a Rust Debug string
+        // or an error message, every consumer would fail at parse time with no
+        // clue which surface produced it.
+        let parsed: serde_json::Value =
+            serde_json::from_str(&list_rules()).expect("rule catalogue is JSON");
+        assert!(
+            parsed.is_object() || parsed.is_array(),
+            "expected a JSON object/array, got {parsed}"
+        );
+        assert!(
+            list_rules().contains("Rule") || list_rules().contains("rule"),
+            "the catalogue mentions no rules at all"
+        );
+    }
+}

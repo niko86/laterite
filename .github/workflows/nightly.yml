@@ -78,8 +78,16 @@ jobs:
       # that true. Two categories come out, for two different reasons:
       #
       #   1. Binding cdylibs (wasm, tokenizer-wasm, laterite-py, laterite-node) —
-      #      exercised by the Python / Node / browser suites, never by `cargo test`.
-      #      Measuring them here would report ~0% for code that IS tested.
+      #      exercised by the Python / Node / browser suites. Measuring them in this
+      #      denominator would report near-0% for code that IS tested, and would
+      #      move the engine's own floor for reasons that have nothing to do with
+      #      the engine.
+      #
+      #      NB this is a denominator argument, NOT "they have no Rust tests".
+      #      `laterite-ags4-wasm` has 44 native `#[test]`s that `cargo test` runs on
+      #      every PR, and they cover 69% of it — a number nobody could see until
+      #      the separate wasm step below existed, because the exclusion here was
+      #      read as "unmeasurable" rather than "measured elsewhere".
       #   2. Dev-only QA tooling (xcheck, parity, forge, corpus-qa, perf,
       #      compliance) — harnesses and CLIs that are never shipped to a user.
       #
@@ -141,6 +149,35 @@ jobs:
           flags: rust
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+
+      # NB placed AFTER the Codecov upload on purpose. `cargo llvm-cov` clears prior
+      # profile data at the start of a run, so measuring the wasm crate before the
+      # upload would delete the engine collection this job just made and ship an
+      # empty (or wasm-only) lcov under the `rust` flag.
+      # The wasm crate, measured on its OWN — a second denominator, deliberately
+      # not folded into the engine number above.
+      #
+      # It had no coverage gate of any kind. The exclusion above is a statement
+      # about the engine's denominator, but it read as "cannot be measured", and so
+      # for months the browser surface was the one shipped surface with no coverage
+      # figure at all. It is not unmeasurable: its tests are plain `#[test]`s that
+      # run on the host, and they cover 69% of the crate.
+      #
+      # The ceiling is real and worth stating: every export whose signature takes or
+      # returns a JS type (`JsValue`, `JsError`, the `*Js` aliases) can only be
+      # driven from the browser or the `wasm-engine` xcheck leg, so those ~100
+      # functions cannot be reached from here at all. This gate measures the LOGIC
+      # under the boundary, not the boundary. Raising it means moving logic out of
+      # the fat exports into plain functions, not writing more of these tests.
+      #
+      # Separate step, separate floor: the engine floor above is only comparable
+      # run-to-run while ITS denominator is fixed, which is the lesson of the
+      # 2026-07-24 failure recorded there.
+      - name: cargo llvm-cov (wasm crate, separate floor)
+        working-directory: rust-packages
+        run: |
+          cargo llvm-cov -p laterite-ags4-wasm --summary-only \
+            --fail-under-lines 67
 
       - name: sccache stats
         if: always()

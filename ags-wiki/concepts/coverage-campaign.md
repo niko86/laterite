@@ -79,13 +79,27 @@ and the exclude set **together**.
 
 ## Measured baseline (2026-07-26)
 
-| language | measured | floor (the gate) | gate lives in | gap to 95 |
-|---|---|---|---|---|
-| **Python** | **~99%** ✓ | **95** | `ci.yml` `pytest --cov=laterite` | **met** (floor ratcheted 80→95) |
-| **Rust** (shipped engine) | ~89.24% | 88 | `nightly.yml` `cargo llvm-cov` | +6 pt |
-| **Node** | not re-measured | 93 lines / 84 branches | `laterite-node/vitest.config.ts` | +2 pt |
-| **Web** | ~98% | 95 | `web/vitest.config.ts` | **met** |
-| **wasm** | none | none | — | needs a gate designed |
+> [!warning] **Two different numbers, and the badge is the strict one.**
+> lcov's "line %" counts a line whose branch is only half-taken as **hit**;
+> Codecov counts it as a **partial**, i.e. not covered. So a lane can read 98% in
+> its own gate and ~90% on its badge with neither being wrong. Verified by
+> computing `hits/(hits+partials+misses)` against the very lcov the flag uploads
+> (node: lcov 95.82 vs Codecov 89.93, computed 90.59). **Codecov's is the measure
+> the 95% goal means**, so BRANCH coverage is what moves it — and a lane with only
+> a lines floor cannot see the gap at all.
+
+Measured live from the Codecov API, 2026-08-02:
+
+| language | Codecov (strict) | own gate | floor | gate lives in | gap to 95 |
+|---|---|---|---|---|---|
+| **Python** | **99.15%** ✓ | — | 95 | `ci.yml` `pytest --cov=laterite` | **met** (floor ratcheted 80→95) |
+| **Rust** (shipped engine) | **95.02%** ✓ | — | 88 | `nightly.yml` `cargo llvm-cov` | **met** (floor lags reality) |
+| **Node** | 89.93 → **93.86%** | 98.16 lines / 90.48 br | 97 / 89 | `laterite-node/vitest.config.ts` | +1 pt |
+| **Web** | 84.91 → **92.00%** | 99.5 lines / 90.86 br | 99 / 89 | `web/vitest.config.ts` | +3 pt |
+| **wasm** | no flag | **69.03%** lines | 67 | `nightly.yml`, own step | +26 pt (ceiling — see below) |
+
+Web had a lines floor and **no branch floor**, which is precisely why its badge
+drifted to 85 while its gate sat green above 95. Both lanes now have one.
 
 Rust's denominator is the shipped engine: the `cargo llvm-cov` run excludes the
 binding cdylibs (wasm, tokenizer-wasm, py, node — tested by the Python/Node/browser
@@ -124,9 +138,21 @@ of defensive `TypeError`/parse-invariant guards.
   The gap is small; expect a handful of under-tested modules in the shipped engine.
 - **Node** (floor 93/84): `npm run test:coverage` for the actual number + the
   uncovered TS in the `laterite-node` wrapper.
-- **wasm**: no gate exists. Design one — the browser engine wasm is exercised by
-  Playwright e2e ([[tech-stack-wasm]]); decide whether coverage is collected there
-  or a unit layer is added, then set a floor.
+- **wasm** — *gate now exists* (`nightly.yml`, its own step and its own floor).
+  It was never unmeasurable: the crate's tests are plain `#[test]`s that
+  `cargo test` already runs on every PR, and they cover **69.03%** of it. What
+  hid that was the engine job's `--exclude laterite-ags4-wasm`, a *denominator*
+  decision that read as "cannot be measured".
+
+  **The ceiling is structural, and more tests of this kind will not raise it.**
+  103 of the crate's 218 functions are never executed, and they are almost
+  exactly the `#[wasm_bindgen]` exports — `merge`, `build_ags4_ipc`,
+  `compute_fixes`, `censor`, `diff`, `validate`, `read`, `certify`, `dictionary`.
+  Every one takes or returns a JS type (`JsValue`, `JsError`, a `*Js` alias), so
+  it can only be driven from the browser or the `wasm-engine` xcheck leg. Raising
+  this number means **moving logic out of the fat exports into plain functions**
+  the native tests can call — the export becoming a thin marshalling shell — not
+  writing more tests against the boundary.
 
 ## The stopping rule
 
