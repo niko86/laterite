@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The Rust engine has an audience it did not have before: eight crates are on crates.io, and `laterite` is a real Rust API rather than a reserved name. That brought a second version number with it — the engine answers to `cargo add`, the products to `pip install` and `npm i` — so every surface now reports which ENGINE it carries, and the cross-surface gate checks it was comparing one. **Breaking:** the browser package finishes what 0.9.0 started — `diff` and `censor` take an options object like every other export, and `any` is gone from the `.d.ts` entirely.
+
 ### Added
 
 - **The browser package publishes its remaining result types, and `any` is gone from its `.d.ts` entirely.** `diff`, `dictionary` and `compute_fixes` were the three still returning `any`; they now return `RevisionDelta`, `StandardDict` and `Fix[]`, joining the shapes published previously. Consumers can delete their hand-written `RevisionDelta` / `StandardDict` / `Fix` / `SpanEdit` / `CellDelta` / `RowDelta` / `GroupDelta` / `DictGroup` / `DictHeading` mirrors — the validator site deleted ~120 lines of exactly those. Each new interface is bound to the Rust struct that serialises it by the same drift test as the others, and `Fix`'s `kind`/`risk` unions are checked against the validator's own enums, so a new fix kind cannot ship a `.d.ts` that lies about what you can receive. ([#188](https://github.com/niko86/laterite/pull/188))
