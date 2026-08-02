@@ -813,7 +813,7 @@ pub fn build_ags4(
     console_error_panic_hook::set_once();
     let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
     let report = build_ags4_core(groups_json, o).map_err(|e| JsError::new(&e))?;
-    to_js_bare(&report)
+    to_js(&report)
 }
 
 /// Build valid AGS4 from **columnar Arrow IPC** input — the same as
@@ -855,7 +855,7 @@ pub fn build_ags4_ipc(
         inputs.push(group_from_ipc(code, &ipc).map_err(|e| JsError::new(&e))?);
     }
     let report = build_ipc_core(inputs, o).map_err(|e| JsError::new(&e))?;
-    to_js_bare(&report)
+    to_js(&report)
 }
 
 #[cfg(test)]
@@ -1175,32 +1175,23 @@ fn decode_opts<T: WasmOptions>(opts: Option<JsValue>) -> Result<T, String> {
 /// JS side sees objects and `null` rather than `Map`/`undefined`, the same shape
 /// the CLI's `--json` emits.
 ///
-/// One helper instead of the same three lines at the end of six exports. The
+/// One helper instead of the same three lines at the end of every export. The
 /// tail names `JsValue`, so every copy of it was a line `cargo test` could never
 /// reach: collapsing them shrinks the untestable boundary to one place rather
 /// than spreading it across every door.
+///
+/// **Every** door goes through this, the two build doors included. They used
+/// serde-wasm-bindgen's *default* serializer until #212, which writes
+/// `undefined` for an absent `Option` where this one writes `null` — so
+/// `BuildReport`'s published TS declared `line: number | null` while the runtime
+/// handed back `undefined`, and a consumer writing `f.line === null` type-checked
+/// clean and missed every time. Having one serializer is now the only thing
+/// standing between the next result struct and the same bug; `serializer_
+/// consistency_tests` asserts there is still only one.
 fn to_js<T: Serialize, J: JsCast>(value: &T) -> Result<J, JsError> {
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();
     value
         .serialize(&serializer)
-        .map(JsCast::unchecked_into)
-        .map_err(|e| JsError::new(&e.to_string()))
-}
-
-/// As [`to_js`], but through serde-wasm-bindgen's **default** serializer.
-///
-/// The difference is `Option::None`: the default writes `undefined`, the
-/// json-compatible one writes `null`. The two build doors have always used the
-/// default and every other door the json-compatible one, so the split is
-/// preserved here rather than quietly unified — `build_ags4`'s result shape is
-/// released API, and a coverage refactor is the wrong place to change what a
-/// published call returns.
-///
-/// Worth knowing that the split is not harmless: `BuildReport`'s TS declares
-/// `line: number | null` on `EmitFinding` and `AppliedFix`, and through this
-/// serializer an absent line arrives as `undefined`. Recorded, not fixed here.
-fn to_js_bare<T: Serialize, J: JsCast>(value: &T) -> Result<J, JsError> {
-    serde_wasm_bindgen::to_value(value)
         .map(JsCast::unchecked_into)
         .map_err(|e| JsError::new(&e.to_string()))
 }
@@ -5549,6 +5540,73 @@ mod dictionary_and_target_tests {
         assert!(
             msg.contains("error-severity"),
             "the refusal must name what blocked it, got: {msg}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod serializer_consistency_tests {
+    //! One serializer for the whole crate, asserted against the source.
+    //!
+    //! serde-wasm-bindgen ships two that differ in what an absent `Option`
+    //! becomes: the default writes `undefined`, `json_compatible()` writes
+    //! `null`. Both are reachable, neither is wrong, and choosing the wrong one
+    //! is invisible from Rust — it surfaces only as a `=== null` check that never
+    //! fires in a browser, against a published `.d.ts` that promised `null`.
+    //! That is precisely what `build_ags4` and `build_ags4_ipc` did.
+    //!
+    //! `cargo test` cannot inspect the JS value — that is the boundary — so the
+    //! invariant is enforced where it IS visible: the source may not name a
+    //! second serializer.
+
+    const SRC: &str = include_str!("lib.rs");
+
+    #[test]
+    fn every_serialisation_goes_through_the_json_compatible_serializer() {
+        // The default serializer, reached either by constructing it directly or
+        // via the free function that wraps it. Neither may appear outside this
+        // test's own mentions of them.
+        let this_module = SRC
+            .find("mod serializer_consistency_tests")
+            .expect("this module is in the source it reads");
+        for banned in ["serde_wasm_bindgen::to_value(", "Serializer::new()"] {
+            let total = SRC.match_indices(banned).count();
+            let here = SRC[this_module..].match_indices(banned).count();
+            assert_eq!(
+                total, here,
+                "{banned:?} bypasses `to_js`: it writes `undefined` for an absent \
+                 Option where this crate's published .d.ts promises `null`. \
+                 Serialise through `to_js` instead."
+            );
+        }
+    }
+
+    #[test]
+    fn the_build_doors_serialise_through_to_js() {
+        // Belt to the above's braces, and the more direct statement: these two
+        // are the doors that regressed, so name them.
+        for door in ["pub fn build_ags4(", "pub fn build_ags4_ipc("] {
+            let at = SRC.find(door).unwrap_or_else(|| panic!("{door} exists"));
+            let body_end = SRC[at..].find("\n}\n").expect("the function ends");
+            assert!(
+                SRC[at..at + body_end].contains("to_js(&report)"),
+                "{door} no longer serialises through to_js"
+            );
+        }
+    }
+
+    #[test]
+    fn the_published_ts_still_declares_the_nullable_field_that_caught_this() {
+        // `line` is `Option<u32>` on both EmitFinding and AppliedFix and is
+        // declared `number | null`. If that declaration ever changes, the
+        // serializer choice has to be revisited in the same breath — so fail
+        // loudly rather than let the two drift apart again.
+        assert_eq!(
+            super::TS_BUILD_RESULT
+                .matches("line: number | null")
+                .count(),
+            2,
+            "EmitFinding and AppliedFix should each declare a nullable line"
         );
     }
 }
