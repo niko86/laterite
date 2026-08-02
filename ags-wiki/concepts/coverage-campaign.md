@@ -4,7 +4,7 @@ title: "coverage campaign: the strategy, the stopping rule and the ledger"
 status: drafted
 tags: [concept, testing, process, register]
 volatile: [coverage, status]
-volatile_asof: 2026-07-26
+volatile_asof: 2026-08-02
 ags_editions: []
 repo_refs:
   python_gate: "repo:.github/workflows/ci.yml"
@@ -96,7 +96,7 @@ Measured live from the Codecov API, 2026-08-02:
 | **Rust** (shipped engine) | **95.02%** ✓ | — | 88 | `nightly.yml` `cargo llvm-cov` | **met** (floor lags reality) |
 | **Node** | 89.93 → **93.86%** | 98.16 lines / 90.48 br | 97 / 89 | `laterite-node/vitest.config.ts` | +1 pt |
 | **Web** | 84.91 → **92.00%** | 99.5 lines / 90.86 br | 99 / 89 | `web/vitest.config.ts` | +3 pt |
-| **wasm** | no flag | **69.03%** lines | 67 | `nightly.yml`, own step | +26 pt (ceiling — see below) |
+| **wasm** | no flag → **own flag + badge** | 69.03 → **90.86%** lines | 89 | `nightly.yml`, own step | +4 pt (ceiling — see below) |
 
 Web had a lines floor and **no branch floor**, which is precisely why its badge
 drifted to 85 while its gate sat green above 95. Both lanes now have one.
@@ -131,28 +131,62 @@ of defensive `TypeError`/parse-invariant guards.
 | P4 ✓ | `_frames.py` | 77→**100** | 26 | pyarrow-vs-duckdb materialization backends | **ran both backends** (rule 5 — pyarrow present + simulated-absent), not a skip |
 | P5 ✓ | `dynamic.py` | 83→**100** | 10 | dynamic group registration edges | behavioural |
 
-### Rust, Node, wasm — measure next
+### Rust, Node — measure next
 
 - **Rust** (~89.24 → 95): re-run `cargo llvm-cov` for the per-crate/per-file
   breakdown before ranking (heavy, instrumented build — do it once, deliberately).
   The gap is small; expect a handful of under-tested modules in the shipped engine.
 - **Node** (floor 93/84): `npm run test:coverage` for the actual number + the
   uncovered TS in the `laterite-node` wrapper.
-- **wasm** — *gate now exists* (`nightly.yml`, its own step and its own floor).
-  It was never unmeasurable: the crate's tests are plain `#[test]`s that
-  `cargo test` already runs on every PR, and they cover **69.03%** of it. What
-  hid that was the engine job's `--exclude laterite-ags4-wasm`, a *denominator*
-  decision that read as "cannot be measured".
+- **wasm (69.03 → 90.86%) — DONE ✓**, floor 67 → **89**, and it now has a
+  Codecov flag and a README badge like every other language.
 
-  **The ceiling is structural, and more tests of this kind will not raise it.**
-  103 of the crate's 218 functions are never executed, and they are almost
-  exactly the `#[wasm_bindgen]` exports — `merge`, `build_ags4_ipc`,
-  `compute_fixes`, `censor`, `diff`, `validate`, `read`, `certify`, `dictionary`.
-  Every one takes or returns a JS type (`JsValue`, `JsError`, a `*Js` alias), so
-  it can only be driven from the browser or the `wasm-engine` xcheck leg. Raising
-  this number means **moving logic out of the fat exports into plain functions**
-  the native tests can call — the export becoming a thin marshalling shell — not
-  writing more tests against the boundary.
+  The previous entry called the ceiling structural and named the fix: move the
+  logic **out** of the fat `#[wasm_bindgen]` exports into plain functions the
+  native tests can call. That is what was done. Fourteen exports gave up their
+  bodies to a `*_core` twin — `build_ags4_core`, `build_ipc_core`,
+  `compute_fixes_core`, `apply_fixes_core`, `read_core`, `meta_core`,
+  `arrow_ipc_core`, `diff_core`, `merge_core`, `dictionary_core`, `censor_core`,
+  `ags4_to_xlsx_core`, `xlsx_to_ags4_core` (plus `build_parts`, the shared TRAN
+  fold) — and what is left inside each export is `decode → core → marshal`.
+
+  **First: check whether the dark code should exist at all.** It should — every
+  one of those exports is a registered cross-surface capability in
+  `modality.json`, and `build_ags4_ipc` / `list_rules` / `engine_fingerprint`
+  are unused by *our* web app but are published `@laterite/ags4-wasm` API with
+  consumers elsewhere (`engine_fingerprint` backs the xcheck engine-identity
+  gate). Nothing here was deletable; the problem was the *shape*, not the
+  existence.
+
+  **What the residue is, exactly.** ~127 of the ~141 uncovered production lines
+  are `JsValue`/`JsError` marshalling. `cargo test` cannot call them, and — the
+  part worth knowing before anyone tries — covering them would need
+  `wasm-bindgen-test` on **wasm32, a target llvm-cov cannot instrument**, so
+  those tests would not move this number even once written. They are exercised
+  end-to-end instead: the `wasm-engine` xcheck leg drives `build_ags4` and
+  `web/src/lib/content-hash.test.ts` drives `read` + `arrow_ipc`, both against
+  the real `.wasm` binary through Node. **The boundary is the floor of this
+  measurement, not a backlog item.**
+
+  > **Beware the denominator here.** `lib.rs` is ~45% `#[cfg(test)]` code and
+  > llvm-cov counts it, as hits — so the headline rises whenever tests are
+  > added, whatever they assert. Measured separately, PRODUCTION lines went
+  > **61.42% → 90.90%**; the whole-file figure the gate reads is 90.86%. They
+  > agree here because the extraction moved real logic, but they would not have
+  > if the same points had been bought with tests alone.
+
+  Two things fell out of writing the tests rather than the tests confirming
+  them, which is the useful signal:
+  - `laterite-ags4-merge` warns `type_widened` only when **≥2** of the clashing
+    codes are non-`X`. So `{2DP, X}` widens the column to `X` — discarding
+    `2DP` — and records nothing, while the *same pair* under the default
+    `error` mode is a hard refusal. Pinned by
+    `widening_against_an_x_column_is_silent_today`; merge's call to make.
+  - `build_ags4`/`build_ags4_ipc` serialise through serde-wasm-bindgen's
+    **default** serializer (`None` → `undefined`) while every other door uses
+    `json_compatible` (`None` → `null`), yet `BuildReport`'s published TS
+    declares `line: number | null`. Preserved as-is (released API) and
+    documented on `to_js_bare`.
 
 ## The stopping rule
 

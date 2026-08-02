@@ -161,14 +161,20 @@ jobs:
       # about the engine's denominator, but it read as "cannot be measured", and so
       # for months the browser surface was the one shipped surface with no coverage
       # figure at all. It is not unmeasurable: its tests are plain `#[test]`s that
-      # run on the host, and they cover 69% of the crate.
+      # run on the host.
       #
-      # The ceiling is real and worth stating: every export whose signature takes or
-      # returns a JS type (`JsValue`, `JsError`, the `*Js` aliases) can only be
-      # driven from the browser or the `wasm-engine` xcheck leg, so those ~100
-      # functions cannot be reached from here at all. This gate measures the LOGIC
-      # under the boundary, not the boundary. Raising it means moving logic out of
-      # the fat exports into plain functions, not writing more of these tests.
+      # The remaining gap is the wasm-bindgen boundary and it is a HARD ceiling
+      # here, not a backlog: ~127 of the residual lines are `JsValue`/`JsError`
+      # marshalling, which `cargo test` cannot call at all. Covering them needs
+      # `wasm-bindgen-test` on wasm32 — a target llvm-cov cannot instrument — so
+      # those tests would not move this number even once written. They are
+      # exercised end-to-end instead, by the `wasm-engine` xcheck leg (build_ags4)
+      # and web/src/lib/content-hash.test.ts (read + arrow_ipc), both of which
+      # drive the real .wasm binary through Node.
+      #
+      # So this gate measures the LOGIC under the boundary. It moved 69% -> 91%
+      # by relocating that logic OUT of the fat exports into plain `*_core`
+      # functions; what is left inside them is decode -> core -> marshal.
       #
       # Separate step, separate floor: the engine floor above is only comparable
       # run-to-run while ITS denominator is fixed, which is the lesson of the
@@ -177,7 +183,24 @@ jobs:
         working-directory: rust-packages
         run: |
           cargo llvm-cov -p laterite-ags4-wasm --summary-only \
-            --fail-under-lines 67
+            --fail-under-lines 89
+
+      # The `wasm` flag + badge. Emitted from the SAME run as the floor above:
+      # a second `cargo llvm-cov` invocation would clear the profile data this
+      # one just wrote (the reason the engine upload sits above the wasm step),
+      # so `report` re-renders the existing collection rather than re-measuring.
+      - name: lcov report for Codecov (wasm)
+        if: github.repository == 'niko86/laterite'
+        working-directory: rust-packages
+        run: cargo llvm-cov report -p laterite-ags4-wasm --lcov --output-path wasm.lcov
+      - name: Upload wasm coverage to Codecov
+        if: github.repository == 'niko86/laterite'
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        with:
+          files: rust-packages/wasm.lcov
+          flags: wasm
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
       - name: sccache stats
         if: always()

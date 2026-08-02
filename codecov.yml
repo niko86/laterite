@@ -1,13 +1,25 @@
 # Codecov config — consumed only on the PUBLIC repo (niko86/laterite), where CI
-# uploads per-language coverage under the rust / python / web flags. The private
-# repo never uploads (the upload steps are guarded to `github.repository ==
-# 'niko86/laterite'`), so this file is inert there.
+# uploads per-language coverage under the rust / python / node / web / wasm
+# flags. The private repo never uploads (the upload steps are guarded to
+# `github.repository == 'niko86/laterite'`), so this file is inert there.
 #
 # Coverage here is REPORTED, not gated. The real floors are enforced in CI:
-#   * Rust   — cargo-llvm-cov --fail-under-lines 62   (.github/workflows/ci.yml)
-#   * Python — pytest --cov-fail-under=80             (.github/workflows/ci.yml)
-#   * Web    — vitest thresholds.lines 95             (web/vitest.config.ts)
+#   * Rust   — cargo llvm-cov --fail-under-lines 88   (.github/workflows/nightly.yml)
+#   * wasm   — cargo llvm-cov --fail-under-lines 89   (.github/workflows/nightly.yml)
+#   * Python — pytest --cov-fail-under=95             (.github/workflows/ci.yml)
+#   * Node   — vitest thresholds {lines 97, branches 89} (laterite-node/vitest.config.ts)
+#   * Web    — vitest thresholds {lines 99, branches 89} (web/vitest.config.ts)
 # So Codecov's own statuses are INFORMATIONAL — they annotate PRs, never block.
+#
+# The floors above are DELIBERATELY below the badges, and by different margins:
+# they are ratchets sized to each lane's normal fluctuation, not targets. Read
+# the badge for where a language actually is.
+#
+# Note the two measures disagree on purpose. lcov's own "line %" counts a line
+# whose branch is half-taken as HIT; Codecov counts it as a PARTIAL, so the badge
+# is the stricter number and the one the 95% goal means. A lane gated on lines
+# alone cannot see that gap at all — which is exactly how web's badge drifted ten
+# points under its own floor before the branch thresholds were added.
 coverage:
   status:
     project:
@@ -26,7 +38,13 @@ flag_management:
   individual_flags:
     - name: rust
     - name: python
+    - name: node
     - name: web
+    # The browser engine. Its denominator is ONE crate measured on the host, and
+    # ~127 of its uncovered lines are wasm-bindgen marshalling that `cargo test`
+    # cannot call — so this flag sits below the others by construction, not by
+    # neglect. See ags-wiki/concepts/coverage-campaign.md.
+    - name: wasm
 
 comment:
   layout: "reach, diff, flags, files"

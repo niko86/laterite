@@ -724,6 +724,56 @@ fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::Grou
     ))
 }
 
+/// `(edition, mode, synthesise_metadata, tran)` — what [`emit_report`] takes,
+/// once the options object has been folded down to it.
+type BuildParts = (
+    Option<String>,
+    Option<String>,
+    bool,
+    Option<laterite_ags4_emit::TranStamp>,
+);
+
+/// The parts of a [`BuildOptions`] the emit path takes, with the completeness
+/// rule applied to `tran` and the documented default for `synthesiseMetadata`.
+///
+/// Split out because it was the only *decision* the two build exports made:
+/// both held an identical five-line fold sitting behind a `JsValue` parameter,
+/// so the "all five or none" rule and the synthesis default were enforced twice
+/// and testable in neither place.
+fn build_parts(o: BuildOptions) -> Result<BuildParts, String> {
+    let tran = o.tran.map(TranInput::fold).transpose()?.flatten();
+    Ok((
+        o.dict_version,
+        o.mode,
+        o.synthesise_metadata.unwrap_or(false),
+        tran,
+    ))
+}
+
+/// The host-testable core of [`build_ags4`] — everything but the JS decode and
+/// the JS serialise.
+fn build_ags4_core(groups_json: &str, o: BuildOptions) -> Result<BuildAgs4Report, String> {
+    let (edition, mode, synth, tran) = build_parts(o)?;
+    build_ags4_from_json(
+        groups_json,
+        edition.as_deref(),
+        mode.as_deref(),
+        synth,
+        tran,
+    )
+}
+
+/// The host-testable core of [`build_ags4_ipc`], taking the groups already
+/// decoded from the JS array (that walk is genuinely `Reflect` work and stays
+/// at the boundary).
+fn build_ipc_core(
+    inputs: Vec<laterite_ags4_emit::GroupInput>,
+    o: BuildOptions,
+) -> Result<BuildAgs4Report, String> {
+    let (edition, mode, synth, tran) = build_parts(o)?;
+    emit_report(inputs, edition.as_deref(), mode.as_deref(), synth, tran)
+}
+
 /// Build valid AGS4 from typed/string data in the browser — the data→AGS4
 /// producer (the read path reversed), with no server round-trip.
 ///
@@ -762,23 +812,8 @@ pub fn build_ags4(
 ) -> Result<BuildReportJs, JsError> {
     console_error_panic_hook::set_once();
     let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
-    let tran = o
-        .tran
-        .map(TranInput::fold)
-        .transpose()
-        .map_err(|m| JsError::new(&m))?
-        .flatten();
-    let report = build_ags4_from_json(
-        groups_json,
-        o.dict_version.as_deref(),
-        o.mode.as_deref(),
-        o.synthesise_metadata.unwrap_or(false),
-        tran,
-    )
-    .map_err(|e| JsError::new(&e))?;
-    serde_wasm_bindgen::to_value(&report)
-        .map(JsCast::unchecked_into)
-        .map_err(|e| JsError::new(&e.to_string()))
+    let report = build_ags4_core(groups_json, o).map_err(|e| JsError::new(&e))?;
+    to_js_bare(&report)
 }
 
 /// Build valid AGS4 from **columnar Arrow IPC** input — the same as
@@ -804,12 +839,6 @@ pub fn build_ags4_ipc(
     use wasm_bindgen::JsCast;
     console_error_panic_hook::set_once();
     let o: BuildOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
-    let tran = o
-        .tran
-        .map(TranInput::fold)
-        .transpose()
-        .map_err(|m| JsError::new(&m))?
-        .flatten();
     let arr = js_sys::Array::from(&groups);
     let mut inputs: Vec<laterite_ags4_emit::GroupInput> = Vec::with_capacity(arr.length() as usize);
     for item in arr.iter() {
@@ -825,17 +854,8 @@ pub fn build_ags4_ipc(
             .to_vec();
         inputs.push(group_from_ipc(code, &ipc).map_err(|e| JsError::new(&e))?);
     }
-    let report = emit_report(
-        inputs,
-        o.dict_version.as_deref(),
-        o.mode.as_deref(),
-        o.synthesise_metadata.unwrap_or(false),
-        tran,
-    )
-    .map_err(|e| JsError::new(&e))?;
-    serde_wasm_bindgen::to_value(&report)
-        .map(JsCast::unchecked_into)
-        .map_err(|e| JsError::new(&e.to_string()))
+    let report = build_ipc_core(inputs, o).map_err(|e| JsError::new(&e))?;
+    to_js_bare(&report)
 }
 
 #[cfg(test)]
@@ -1151,6 +1171,40 @@ fn decode_opts<T: WasmOptions>(opts: Option<JsValue>) -> Result<T, String> {
     serde_wasm_bindgen::from_value(v).map_err(|e| format!("{}: {e}", T::WHAT))
 }
 
+/// Serialise a plain report into its declared TS type — json-compatible, so the
+/// JS side sees objects and `null` rather than `Map`/`undefined`, the same shape
+/// the CLI's `--json` emits.
+///
+/// One helper instead of the same three lines at the end of six exports. The
+/// tail names `JsValue`, so every copy of it was a line `cargo test` could never
+/// reach: collapsing them shrinks the untestable boundary to one place rather
+/// than spreading it across every door.
+fn to_js<T: Serialize, J: JsCast>(value: &T) -> Result<J, JsError> {
+    let serializer = serde_wasm_bindgen::Serializer::json_compatible();
+    value
+        .serialize(&serializer)
+        .map(JsCast::unchecked_into)
+        .map_err(|e| JsError::new(&e.to_string()))
+}
+
+/// As [`to_js`], but through serde-wasm-bindgen's **default** serializer.
+///
+/// The difference is `Option::None`: the default writes `undefined`, the
+/// json-compatible one writes `null`. The two build doors have always used the
+/// default and every other door the json-compatible one, so the split is
+/// preserved here rather than quietly unified — `build_ags4`'s result shape is
+/// released API, and a coverage refactor is the wrong place to change what a
+/// published call returns.
+///
+/// Worth knowing that the split is not harmless: `BuildReport`'s TS declares
+/// `line: number | null` on `EmitFinding` and `AppliedFix`, and through this
+/// serializer an absent line arrives as `undefined`. Recorded, not fixed here.
+fn to_js_bare<T: Serialize, J: JsCast>(value: &T) -> Result<J, JsError> {
+    serde_wasm_bindgen::to_value(value)
+        .map(JsCast::unchecked_into)
+        .map_err(|e| JsError::new(&e.to_string()))
+}
+
 /// `validate`'s named options. Note the ABSENT `deny_unknown_fields` — see the
 /// module comment above; `decode_opts` enumerates instead.
 ///
@@ -1299,19 +1353,13 @@ pub fn validate(data: &[u8], opts: Option<ValidateOptionsJs>) -> ValidationRepor
     // instead would split one error channel in two: some argument errors the UI
     // renders through `report.error.kind`, others arriving as a rejected
     // promise. `validate` stays infallible.
-    let o: ValidateOptions = match decode_opts(opts.map(JsValue::from)) {
-        Ok(o) => o,
-        Err(message) => {
-            let report = ValidationReport::failure("bad_args", message);
-            let serializer = serde_wasm_bindgen::Serializer::json_compatible();
-            return report
-                .serialize(&serializer)
-                .expect("ValidationReport is plain data and always serialises")
-                .unchecked_into();
-        }
+    // One serialise for both outcomes: a decode failure is reported through the
+    // very same `ValidationReport` a rule failure is, so there is nothing to
+    // return early for.
+    let report = match decode_opts(opts.map(JsValue::from)) {
+        Ok(o) => run(data, &o),
+        Err(message) => ValidationReport::failure("bad_args", message),
     };
-
-    let report = run(data, &o);
     // json_compatible so the JS side sees plain objects + null (not Map
     // / undefined) — same shape the CLI emits.
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();
@@ -2211,22 +2259,39 @@ pub fn compute_fixes(
     encoding_label: Option<String>,
 ) -> FixesJs {
     console_error_panic_hook::set_once();
+    let fixes = compute_fixes_core(data, dict_version.as_deref(), encoding_label.as_deref());
     let serializer = serde_wasm_bindgen::Serializer::json_compatible();
-    let empty: Vec<laterite_ags4_validator::fixes::Fix> = Vec::new();
+    fixes
+        .serialize(&serializer)
+        .expect("Fixes is plain data and always serialises")
+        .unchecked_into()
+}
 
-    let dict_over = match resolve_dict_override(dict_version.as_deref()) {
-        Ok(v) => v,
-        Err(_) => return empty.serialize(&serializer).unwrap().unchecked_into(),
+/// The host-testable core of [`compute_fixes`].
+///
+/// Every failure yields an EMPTY fix list rather than an error, and that is the
+/// whole design: this door has no error channel, so the alternative to "no
+/// fixes" is fixes computed against the wrong decoding or the wrong dictionary —
+/// offering the user a button that silently corrupts their file. Four distinct
+/// ways in (bad edition, bad encoding, unparseable bytes, a failed check) all
+/// had to collapse to the same empty answer, and none of them could be reached
+/// from a test while they lived behind a `FixesJs` return type.
+fn compute_fixes_core(
+    data: &[u8],
+    dict_version: Option<&str>,
+    encoding_label: Option<&str>,
+) -> Vec<laterite_ags4_validator::fixes::Fix> {
+    let Ok(dict_over) = resolve_dict_override(dict_version) else {
+        return Vec::new();
     };
     // An unknown label yields no fixes rather than fixes computed against the
-    // wrong decoding — this fn has no error channel, and silently "fixing" text
-    // we mis-decoded is the worst option on the table.
-    let Ok(encoding) = resolve_encoding(encoding_label.as_deref()) else {
-        return empty.serialize(&serializer).unwrap().unchecked_into();
+    // wrong decoding — silently "fixing" text we mis-decoded is the worst
+    // option on the table.
+    let Ok(encoding) = resolve_encoding(encoding_label) else {
+        return Vec::new();
     };
-    let parsed = match parse_bytes(data, encoding) {
-        Ok(p) => p,
-        Err(_) => return empty.serialize(&serializer).unwrap().unchecked_into(),
+    let Ok(parsed) = parse_bytes(data, encoding) else {
+        return Vec::new();
     };
     let opts = CheckOptions {
         dict_version: dict_over,
@@ -2236,20 +2301,10 @@ pub fn compute_fixes(
     };
     // Through the door, so the fixes offered in the browser are computed against the
     // same dictionary `lat fix` would use on the same bytes (the O-42 guard included).
-    // No error channel here: a failure yields no fixes rather than fixes derived from
-    // the wrong dictionary.
     let Ok((found, _dv, _kind)) = check_parsed_with_dict(&parsed, &opts, &WorldScope::None) else {
-        return empty
-            .serialize(&serializer)
-            .unwrap_or(JsValue::NULL)
-            .unchecked_into();
+        return Vec::new();
     };
-
-    let fixes = laterite_ags4_validator::fixes::compute_fixes(&parsed, &found);
-    fixes
-        .serialize(&serializer)
-        .expect("Fixes is plain data and always serialises")
-        .unchecked_into()
+    laterite_ags4_validator::fixes::compute_fixes(&parsed, &found)
 }
 
 /// Apply a user-selected subset of fixes to AGS4 bytes, returning the new
@@ -2272,16 +2327,31 @@ pub fn apply_fixes(
     fixes_json: JsValue,
 ) -> Result<Vec<u8>, JsError> {
     console_error_panic_hook::set_once();
-    let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
+    // A fix list that will not deserialise becomes an EMPTY list, so the call
+    // returns the file unchanged rather than throwing. Only the decode is
+    // JS-shaped; the work is in the core below.
+    let fixes: Vec<laterite_ags4_validator::fixes::Fix> =
+        serde_wasm_bindgen::from_value(fixes_json).unwrap_or_default();
+    apply_fixes_core(data, encoding_label.as_deref(), &fixes).map_err(|m| JsError::new(&m))
+}
+
+/// The host-testable core of [`apply_fixes`]: decode with the caller's
+/// encoding, apply, re-encode as UTF-8.
+///
+/// The BOM capture is the load-bearing part — `apply_fixes` honours "keep the
+/// BOM" when `StripBom` was not among the selected fixes, so this has to read
+/// the raw bytes rather than the decoded text (`encoding_rs` eats the mark).
+fn apply_fixes_core(
+    data: &[u8],
+    encoding_label: Option<&str>,
+    fixes: &[laterite_ags4_validator::fixes::Fix],
+) -> Result<Vec<u8>, String> {
+    let encoding = resolve_encoding(encoding_label)?;
     // Decode to text + capture the BOM the same way the engine does, so
     // apply_fixes can honour "keep the BOM" when StripBom isn't selected.
     let has_bom = data.starts_with(&[0xEF, 0xBB, 0xBF]);
     let (text, _enc, _had) = encoding.decode(data);
-
-    let fixes: Vec<laterite_ags4_validator::fixes::Fix> =
-        serde_wasm_bindgen::from_value(fixes_json).unwrap_or_default();
-
-    let out = laterite_ags4_validator::fixes::apply_fixes(&text, has_bom, &fixes);
+    let out = laterite_ags4_validator::fixes::apply_fixes(&text, has_bom, fixes);
     Ok(out.into_bytes())
 }
 
@@ -2331,18 +2401,24 @@ pub fn ags4_to_xlsx(
     recover_duplicate_headings: Option<bool>,
 ) -> Result<ExcelResult, JsError> {
     console_error_panic_hook::set_once();
+    ags4_to_xlsx_core(data, recover_duplicate_headings.unwrap_or(false))
+        .map_err(|m| JsError::new(&m))
+}
+
+/// The host-testable core of [`ags4_to_xlsx`].
+fn ags4_to_xlsx_core(data: &[u8], recover_duplicate_headings: bool) -> Result<ExcelResult, String> {
     use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ReadOptions};
     // Duplicate headings are fatal by default here as on every read surface; the
     // browser caller opts into the suffixed recovery read.
     let opts = ReadOptions {
-        duplicate_headings: if recover_duplicate_headings.unwrap_or(false) {
+        duplicate_headings: if recover_duplicate_headings {
             DuplicateHeadings::Recover
         } else {
             DuplicateHeadings::Error
         },
     };
-    let (bytes, stats) = laterite_excel::ags4_bytes_to_xlsx_with(data, None, opts)
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    let (bytes, stats) =
+        laterite_excel::ags4_bytes_to_xlsx_with(data, None, opts).map_err(|e| e.to_string())?;
     Ok(ExcelResult {
         bytes,
         warnings: stats.warnings,
@@ -2359,8 +2435,13 @@ pub fn ags4_to_xlsx(
 #[wasm_bindgen]
 pub fn xlsx_to_ags4(data: &[u8], format_numeric: bool) -> Result<ExcelResult, JsError> {
     console_error_panic_hook::set_once();
-    let (bytes, stats) = laterite_excel::xlsx_bytes_to_ags4(data, format_numeric)
-        .map_err(|e| JsError::new(&e.to_string()))?;
+    xlsx_to_ags4_core(data, format_numeric).map_err(|m| JsError::new(&m))
+}
+
+/// The host-testable core of [`xlsx_to_ags4`].
+fn xlsx_to_ags4_core(data: &[u8], format_numeric: bool) -> Result<ExcelResult, String> {
+    let (bytes, stats) =
+        laterite_excel::xlsx_bytes_to_ags4(data, format_numeric).map_err(|e| e.to_string())?;
     Ok(ExcelResult {
         bytes,
         warnings: stats.warnings,
@@ -2439,26 +2520,8 @@ impl ParsedDataset {
     /// `{headings, units, types, sql_types}` for one group, or `null` if
     /// the code isn't present.
     pub fn meta(&self, code: &str) -> GroupMetaJs {
-        let Some(group) = self.parsed.groups.get(code) else {
+        let Some(meta) = self.meta_core(code) else {
             return JsValue::NULL.unchecked_into();
-        };
-        let n = group.headings.len();
-        let types: Vec<String> = (0..n)
-            .map(|i| {
-                group
-                    .types
-                    .get(i)
-                    .cloned()
-                    .unwrap_or_else(|| "X".to_string())
-            })
-            .collect();
-        let meta = GroupMeta {
-            headings: group.headings.clone(),
-            units: (0..n)
-                .map(|i| group.units.get(i).cloned().unwrap_or_default())
-                .collect(),
-            sql_types: types.iter().map(|t| sql_type(t).to_string()).collect(),
-            types,
         };
         let serializer = serde_wasm_bindgen::Serializer::json_compatible();
         meta.serialize(&serializer)
@@ -2488,11 +2551,59 @@ impl ParsedDataset {
         keys: Option<bool>,
         content_hash: Option<bool>,
     ) -> Result<Vec<u8>, JsError> {
+        self.arrow_ipc_core(code, keys.unwrap_or(false), content_hash.unwrap_or(false))
+            .map_err(|m| JsError::new(&m))
+    }
+}
+
+/// The host-testable half of [`ParsedDataset`]. Same methods, plain Rust types —
+/// the `#[wasm_bindgen]` block above is now only defaults and error marshalling.
+impl ParsedDataset {
+    /// The core of [`ParsedDataset::meta`]: `None` for a code the file does not
+    /// contain, which the caller renders as JS `null`.
+    ///
+    /// The parallel-array contract lives here — `headings[i]` / `units[i]` /
+    /// `types[i]` / `sql_types[i]` describe the same column, and a file whose
+    /// UNIT or TYPE row is SHORTER than its HEADING row (common, and legal
+    /// enough to reach the explorer) must still produce four arrays of equal
+    /// length. That padding — `""` for a missing unit, `"X"` for a missing type
+    /// — is the reason this is not a one-liner, and it was unreachable from a
+    /// test while it sat behind a `GroupMetaJs` return.
+    fn meta_core(&self, code: &str) -> Option<GroupMeta> {
+        let group = self.parsed.groups.get(code)?;
+        let n = group.headings.len();
+        let types: Vec<String> = (0..n)
+            .map(|i| {
+                group
+                    .types
+                    .get(i)
+                    .cloned()
+                    .unwrap_or_else(|| "X".to_string())
+            })
+            .collect();
+        Some(GroupMeta {
+            headings: group.headings.clone(),
+            units: (0..n)
+                .map(|i| group.units.get(i).cloned().unwrap_or_default())
+                .collect(),
+            sql_types: types.iter().map(|t| sql_type(t).to_string()).collect(),
+            types,
+        })
+    }
+
+    /// The core of [`ParsedDataset::arrow_ipc`], with the two flags already
+    /// defaulted.
+    fn arrow_ipc_core(
+        &self,
+        code: &str,
+        keys: bool,
+        content_hash: bool,
+    ) -> Result<Vec<u8>, String> {
         let group = self
             .parsed
             .groups
             .get(code)
-            .ok_or_else(|| JsError::new(&format!("group {code:?} not in dataset")))?;
+            .ok_or_else(|| format!("group {code:?} not in dataset"))?;
 
         // Typed columns + IPC framing both come from laterite-ags4-types now
         // (`ipc::build_group_ipc_synth` = the shared `arrow_cols` cast + StreamWriter,
@@ -2501,7 +2612,7 @@ impl ParsedDataset {
         // a file byte-identically by construction. Framed here only for
         // duckdb-wasm.
         let reg = laterite_ags4_core::registry::registry();
-        let ids = (keys.unwrap_or(false) && reg.get(code).is_some()).then(|| {
+        let ids = (keys && reg.get(code).is_some()).then(|| {
             laterite_ags4_core::keychain::group_row_ids(
                 reg,
                 code,
@@ -2510,7 +2621,7 @@ impl ParsedDataset {
                 |col, row| group.cell(col, row),
             )
         });
-        let hashes = if content_hash.unwrap_or(false) {
+        let hashes = if content_hash {
             Some(laterite_ags4_core::keychain::group_content_hashes(
                 code,
                 &group.headings,
@@ -2532,7 +2643,7 @@ impl ParsedDataset {
             group.rows.len(),
             |col, row| group.cell(col, row),
         )
-        .map_err(|e| JsError::new(&format!("arrow ipc for {code}: {e}")))?;
+        .map_err(|e| format!("arrow ipc for {code}: {e}"))?;
         Ok(buf)
     }
 }
@@ -2544,9 +2655,15 @@ impl ParsedDataset {
 #[wasm_bindgen]
 pub fn read(data: &[u8], encoding_label: Option<String>) -> Result<ParsedDataset, JsError> {
     console_error_panic_hook::set_once();
-    let encoding = resolve_encoding(encoding_label.as_deref()).map_err(|m| JsError::new(&m))?;
-    let parsed = parse_bytes(data, encoding)
-        .map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
+    read_core(data, encoding_label.as_deref()).map_err(|m| JsError::new(&m))
+}
+
+/// The host-testable core of [`read`]. The `ParseError` → `ValidatorError`
+/// bridge is the point: an unparseable file must report the SAME text here as
+/// it does from `validate`, and only this conversion makes that true.
+fn read_core(data: &[u8], encoding_label: Option<&str>) -> Result<ParsedDataset, String> {
+    let encoding = resolve_encoding(encoding_label)?;
+    let parsed = parse_bytes(data, encoding).map_err(|e| ValidatorError::from(e).to_string())?;
     Ok(ParsedDataset { parsed })
 }
 
@@ -2665,12 +2782,26 @@ extern "C" {
 pub fn diff(a: &[u8], b: &[u8], opts: Option<DiffOptionsJs>) -> Result<RevisionDeltaJs, JsError> {
     console_error_panic_hook::set_once();
     let o: DiffOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
-    let encoding = resolve_encoding(o.encoding.as_deref()).map_err(|m| JsError::new(&m))?;
-    let max_rows_per_group = o.max_rows_per_group;
-    let pa =
-        parse_bytes(a, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
-    let pb =
-        parse_bytes(b, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
+    let delta = diff_core(a, b, &o).map_err(|m| JsError::new(&m))?;
+    to_js(&delta)
+}
+
+/// The host-testable core of [`diff`]: decode both files, resolve the edition,
+/// and run the shared comparison.
+///
+/// Which edition is a real decision and it is made here — KEY headings come
+/// from the dictionary, and picking the wrong one silently changes what counts
+/// as "the same row". It reads `b`'s `TRAN_AGS` (the newer file) and falls back
+/// to the standard, and neither half of that could be reached from a test while
+/// it sat behind `RevisionDeltaJs`.
+fn diff_core(
+    a: &[u8],
+    b: &[u8],
+    o: &DiffOptions,
+) -> Result<laterite_ags4_diff::RevisionDelta, String> {
+    let encoding = resolve_encoding(o.encoding.as_deref())?;
+    let pa = parse_bytes(a, encoding).map_err(|e| ValidatorError::from(e).to_string())?;
+    let pb = parse_bytes(b, encoding).map_err(|e| ValidatorError::from(e).to_string())?;
 
     // KEY headings come from the dictionary; pick the edition from the
     // revision's TRAN_AGS (the "new" file), falling back to the standard.
@@ -2678,17 +2809,12 @@ pub fn diff(a: &[u8], b: &[u8], opts: Option<DiffOptionsJs>) -> Result<RevisionD
         .map(|(dv, _)| dv)
         .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
     let dict = Dictionary::bundled(dv);
-    let cap = max_rows_per_group.map(|c| c as usize);
+    let cap = o.max_rows_per_group.map(|c| c as usize);
 
     // The KEY-aware/type-aware comparison itself lives in the shared
-    // laterite-ags4-diff leaf (so PyO3 + the CLI reuse it); this wrapper only
-    // parses, resolves the dictionary, and serialises the result to JS.
-    let delta = laterite_ags4_diff::diff_parsed(&pa, &pb, &dict, cap);
-    let serializer = serde_wasm_bindgen::Serializer::json_compatible();
-    delta
-        .serialize(&serializer)
-        .map(JsCast::unchecked_into)
-        .map_err(|e| JsError::new(&e.to_string()))
+    // laterite-ags4-diff leaf (so PyO3 + the CLI reuse it); this only parses,
+    // resolves the dictionary, and hands the result back.
+    Ok(laterite_ags4_diff::diff_parsed(&pa, &pb, &dict, cap))
 }
 
 /// The result of a merge: the reconciled `bytes` (a JS `Uint8Array` — the merged
@@ -2790,36 +2916,37 @@ extern "C" {
 /// down here.
 #[wasm_bindgen]
 pub fn merge(a: &[u8], b: &[u8], opts: Option<MergeOptionsJs>) -> Result<MergeResult, JsError> {
-    use laterite_ags4_merge::{MergeOpts, TypeClashMode, merge_parsed};
-
     console_error_panic_hook::set_once();
     let o: MergeOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
-    let tran = o
-        .tran
-        .map(TranInput::fold)
-        .transpose()
-        .map_err(|m| JsError::new(&m))?
-        .flatten();
-    let encoding = resolve_encoding(o.encoding.as_deref()).map_err(|m| JsError::new(&m))?;
-    let pa =
-        parse_bytes(a, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
-    let pb =
-        parse_bytes(b, encoding).map_err(|e| JsError::new(&ValidatorError::from(e).to_string()))?;
+    merge_core(a, b, o).map_err(|m| JsError::new(&m))
+}
+
+/// The host-testable core of [`merge`].
+///
+/// Four separate decisions live in here, all of which change the output file
+/// and none of which `cargo test` could reach behind a `MergeOptionsJs`: the
+/// TRAN completeness rule, the encoding, the edition (an explicit
+/// `dictVersion` overriding `b`'s `TRAN_AGS`), and the type-clash vocabulary —
+/// which is deliberately parsed by the merge crate's own `FromStr` so the
+/// browser cannot accept a token the CLI rejects, or word the rejection
+/// differently.
+fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String> {
+    use laterite_ags4_merge::{MergeOpts, TypeClashMode, merge_parsed};
+
+    let tran = o.tran.map(TranInput::fold).transpose()?.flatten();
+    let encoding = resolve_encoding(o.encoding.as_deref())?;
+    let pa = parse_bytes(a, encoding).map_err(|e| ValidatorError::from(e).to_string())?;
+    let pb = parse_bytes(b, encoding).map_err(|e| ValidatorError::from(e).to_string())?;
 
     // Edition from the newest file (b)'s TRAN_AGS, falling back to the standard.
-    let over = resolve_dict_override(o.dict_version.as_deref()).map_err(|m| JsError::new(&m))?;
+    let over = resolve_dict_override(o.dict_version.as_deref())?;
     let dv = resolve_dict_version(over, tran_ags_of(&pb).as_deref())
         .map(|(dv, _)| dv)
         .unwrap_or(laterite_ags4_validator::dict::FALLBACK);
 
     // One vocabulary for every surface: accepted tokens + rejection message come
     // from the merge crate's FromStr, so the browser cannot drift from the CLI.
-    let clash: TypeClashMode = o
-        .on_type_clash
-        .as_deref()
-        .unwrap_or("error")
-        .parse()
-        .map_err(|m: String| JsError::new(&m))?;
+    let clash: TypeClashMode = o.on_type_clash.as_deref().unwrap_or("error").parse()?;
 
     let opts = MergeOpts {
         on_type_clash: clash,
@@ -2828,7 +2955,7 @@ pub fn merge(a: &[u8], b: &[u8], opts: Option<MergeOptionsJs>) -> Result<MergeRe
         ..Default::default()
     };
 
-    let res = merge_parsed(&[pa, pb], &opts).map_err(|e| JsError::new(&e.to_string()))?;
+    let res = merge_parsed(&[pa, pb], &opts).map_err(|e| e.to_string())?;
     let warnings: Vec<_> = res
         .warnings
         .iter()
@@ -3002,14 +3129,17 @@ extern "C" {
 #[wasm_bindgen]
 pub fn dictionary(dict_version: Option<String>) -> Result<StandardDictJs, JsError> {
     console_error_panic_hook::set_once();
-    let version = resolve_dict_override(dict_version.as_deref())
-        .map_err(|e| JsError::new(&e))?
-        .unwrap_or(FALLBACK);
-    let dto = laterite_ags4_validator::dict::dictionary_dto(version);
-    let serializer = serde_wasm_bindgen::Serializer::json_compatible();
-    dto.serialize(&serializer)
-        .map(JsCast::unchecked_into)
-        .map_err(|e| JsError::new(&e.to_string()))
+    let dto = dictionary_core(dict_version.as_deref()).map_err(|m| JsError::new(&m))?;
+    to_js(&dto)
+}
+
+/// The host-testable core of [`dictionary`]: resolve the edition (`None`/`auto`
+/// → [`FALLBACK`]) and build the shared DTO.
+fn dictionary_core(
+    dict_version: Option<&str>,
+) -> Result<laterite_ags4_validator::dict::DictionaryDto, String> {
+    let version = resolve_dict_override(dict_version)?.unwrap_or(FALLBACK);
+    Ok(laterite_ags4_validator::dict::dictionary_dto(version))
 }
 
 // ---------------------------------------------------------------------
@@ -3133,6 +3263,20 @@ pub fn censor(
 ) -> Result<CensorResultJs, JsError> {
     console_error_panic_hook::set_once();
     let o: CensorOptions = decode_opts(opts.map(JsValue::from)).map_err(|m| JsError::new(&m))?;
+    let dto = censor_core(data, sensitive_json, o).map_err(|m| JsError::new(&m))?;
+    to_js(&dto)
+}
+
+/// The host-testable core of [`censor`].
+///
+/// This is the one door where an untested default LEAKS. `selectedCodes`
+/// omitted means "every classified heading" — the WIDER scrub — so forgetting
+/// the option over-redacts rather than under-redacts, and the difference
+/// between those two behaviours is a data-protection outcome, not a
+/// preference. `PROJ_ID`'s filehash is the full 64-hex SHA-256 of the input
+/// bytes (a KEY field, so full width), computed here because the leaf takes it
+/// precomputed.
+fn censor_core(data: &[u8], sensitive_json: &str, o: CensorOptions) -> Result<CensorDto, String> {
     let include_freetext = o.include_freetext.unwrap_or(false);
     let drop_custom = o.drop_custom.unwrap_or(false);
     let token = o.token.unwrap_or_else(|| "[REDACTED]".to_string());
@@ -3144,7 +3288,7 @@ pub fn censor(
 
     let mut policy =
         laterite_ags4_censor::Policy::from_sensitive_json(sensitive_json, include_freetext)
-            .map_err(|e| JsError::new(&e.to_string()))?;
+            .map_err(|e| e.to_string())?;
     // Omitted/null → keep the full policy (every classified heading); a list
     // restricts it to the browser's column selection. Note the asymmetry is
     // deliberate: the default is the WIDER scrub, so forgetting the option
@@ -3159,15 +3303,10 @@ pub fn censor(
         drop_custom,
     };
     let (out_text, tally) = laterite_ags4_censor::censor(&text, &file_id, &policy, &opts);
-
-    let dto = CensorDto {
+    Ok(CensorDto {
         text: out_text,
         tally,
-    };
-    let serializer = serde_wasm_bindgen::Serializer::json_compatible();
-    dto.serialize(&serializer)
-        .map(JsCast::unchecked_into)
-        .map_err(|e| JsError::new(&e.to_string()))
+    })
 }
 
 #[cfg(test)]
@@ -3691,6 +3830,1725 @@ mod metadata_door_tests {
         assert!(
             list_rules().contains("Rule") || list_rules().contains("rule"),
             "the catalogue mentions no rules at all"
+        );
+    }
+}
+
+#[cfg(test)]
+mod core_door_tests {
+    //! The extracted cores of the `#[wasm_bindgen]` exports.
+    //!
+    //! Every export in this crate names a JS type — `JsValue`, `JsError`, one of
+    //! the `*Js` aliases — and this crate has no `wasm-bindgen-test` lane, so
+    //! `cargo test` cannot call a single one of them. That is a measurement
+    //! problem only if the exports are thin. They were not: option folding,
+    //! edition resolution, the encoding decision, the leak-safe censor default
+    //! and four separate "return nothing rather than the wrong thing" arms all
+    //! lived inside signatures no test could enter.
+    //!
+    //! So the logic moved out and these tests hold it. What is left at the
+    //! boundary is decode → core → marshal, which is genuinely browser-only and
+    //! is covered by the `wasm-engine` xcheck leg instead.
+    use super::*;
+
+    const CLEAN: &[u8] =
+        include_bytes!("../../laterite-ags4-validator/tests/fixtures/clean_minimal.ags");
+
+    /// The classification SSOT the browser Anonymiser fetches, read from the
+    /// same file the engine ships rather than a hand-written stub — a stub would
+    /// let this suite pass while the real policy said something else.
+    const SENSITIVE: &str = include_str!("../../laterite-ags4-core/data/sensitive_headings.json");
+
+    /// Two groups, one keyed child, one heading typed `2DP` — enough to exercise
+    /// edition resolution, KEY matching and a type clash.
+    pub(super) const LOCA_A: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
+\"HEADING\",\"PROJ_ID\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"P1\"\r\n\
+\r\n\
+\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+\"UNIT\",\"\",\"m\"\r\n\
+\"TYPE\",\"ID\",\"2DP\"\r\n\
+\"DATA\",\"BH01\",\"100.00\"\r\n\
+\"DATA\",\"BH02\",\"200.00\"\r\n";
+
+    /// `LOCA_A` with BH01 moved, BH02 gone and BH03 new — one of each verdict.
+    pub(super) const LOCA_B: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
+\"HEADING\",\"PROJ_ID\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"P1\"\r\n\
+\r\n\
+\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+\"UNIT\",\"\",\"m\"\r\n\
+\"TYPE\",\"ID\",\"2DP\"\r\n\
+\"DATA\",\"BH01\",\"999.00\"\r\n\
+\"DATA\",\"BH03\",\"300.00\"\r\n";
+
+    /// `LOCA_A` with `LOCA_NATE` typed `X` instead of `2DP` — the clash.
+    const LOCA_CLASH: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
+\"HEADING\",\"PROJ_ID\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"P1\"\r\n\
+\r\n\
+\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+\"UNIT\",\"\",\"m\"\r\n\
+\"TYPE\",\"ID\",\"X\"\r\n\
+\"DATA\",\"BH09\",\"nine\"\r\n";
+
+    fn err(r: Result<impl Sized, String>) -> String {
+        match r {
+            Ok(_) => panic!("expected an error, got Ok"),
+            Err(m) => m,
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // TranInput::fold / build_parts — the "all five or none" rule
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn a_partial_tran_names_what_is_missing() {
+        // The reason `tran` is a nested struct of Options rather than five
+        // positional slots: `deny_unknown_fields` is a NO-OP under
+        // serde-wasm-bindgen, so a misspelled `producr` cannot be caught by
+        // enumeration — it arrives as an unset `producer`, and requiredness is
+        // what turns that into a named error instead of a silently absent TRAN.
+        let partial = TranInput {
+            issue: Some("1".into()),
+            date: Some("2020-08-18".into()),
+            producer: None,
+            recipient: Some("ACME".into()),
+            status: Some("FINAL".into()),
+            ..Default::default()
+        };
+        let msg = err(partial.fold());
+        assert!(
+            msg.to_ascii_lowercase().contains("producer"),
+            "the missing field must be named, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn an_entirely_absent_tran_is_not_an_error() {
+        // "None" is a legitimate answer — no TRAN is written and Rule 14 reports
+        // the gap, which is the honest outcome. Only a PARTIAL stamp is a
+        // mistake.
+        let folded = TranInput::default().fold().expect("an empty tran is legal");
+        assert!(folded.is_none(), "an empty tran must fold to no stamp");
+    }
+
+    #[test]
+    fn all_five_fold_to_a_stamp_and_the_extras_attach() {
+        let full = TranInput {
+            issue: Some("1".into()),
+            date: Some("2020-08-18".into()),
+            producer: Some("ACME Drilling".into()),
+            recipient: Some("ACME Consulting".into()),
+            status: Some("FINAL".into()),
+            description: Some("Phase 2 boreholes".into()),
+            remarks: Some("re-issued".into()),
+        };
+        let stamp = full.fold().expect("a complete tran folds").expect("some");
+        // description/remarks are optional EXTRAS, not part of the five — they
+        // must survive the fold rather than being dropped by it.
+        let rendered = format!("{stamp:?}");
+        assert!(
+            rendered.contains("Phase 2 boreholes") && rendered.contains("re-issued"),
+            "the optional extras were dropped: {rendered}"
+        );
+    }
+
+    #[test]
+    fn synthesise_metadata_defaults_to_off() {
+        // Opt-in since 2026-07-24: no surface mints GROUPs the caller never
+        // wrote unless told to. The browser lost this once already by inheriting
+        // a default, so the default is asserted rather than assumed.
+        let (_, _, synth, _) = build_parts(BuildOptions::default()).expect("defaults fold");
+        assert!(!synth, "synthesis must be off unless asked for");
+    }
+
+    #[test]
+    fn a_partial_tran_stops_a_build_before_it_emits() {
+        // The fold runs inside build_parts, so an incomplete stamp fails the
+        // whole call rather than quietly emitting a file with no TRAN.
+        let o = BuildOptions {
+            tran: Some(TranInput {
+                issue: Some("1".into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let msg = err(build_ags4_core("[]", o));
+        assert!(
+            !msg.contains("invalid groups JSON"),
+            "the tran must be rejected before the groups are parsed, got: {msg}"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // build_ags4_core / emit_mode / emit_edition
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn malformed_groups_json_says_so() {
+        let msg = err(build_ags4_core("not json at all", BuildOptions::default()));
+        assert!(
+            msg.contains("invalid groups JSON"),
+            "expected a JSON error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn an_unknown_mode_lists_the_three_that_exist() {
+        let o = BuildOptions {
+            mode: Some("autofixx".into()),
+            ..Default::default()
+        };
+        let msg = err(build_ags4_core("[]", o));
+        assert!(
+            msg.contains("autofix") && msg.contains("report") && msg.contains("strict"),
+            "the rejection must list the accepted modes, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn every_documented_mode_is_accepted() {
+        // The TS union says "autofix" | "report" | "strict"; a mode the .d.ts
+        // promises but the Rust rejects is a lie the type checker cannot catch.
+        for mode in ["autofix", "report", "strict"] {
+            assert!(
+                emit_mode(Some(mode)).is_ok(),
+                "documented mode {mode:?} was rejected"
+            );
+        }
+        // Absent and empty both mean "the default", not "an unknown mode".
+        assert!(emit_mode(None).is_ok());
+        assert!(emit_mode(Some("")).is_ok());
+        // Case-insensitively, since the browser passes user-facing strings.
+        assert!(emit_mode(Some("AutoFix")).is_ok());
+    }
+
+    #[test]
+    fn an_unknown_edition_lists_the_editions() {
+        let o = BuildOptions {
+            dict_version: Some("4.9".into()),
+            ..Default::default()
+        };
+        let msg = err(build_ags4_core("[]", o));
+        assert!(
+            msg.contains("4.1.1") && msg.contains("unknown edition"),
+            "the rejection must list the real editions, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn auto_and_absent_mean_the_fallback_edition() {
+        assert_eq!(emit_edition(None).expect("absent"), FALLBACK);
+        assert_eq!(emit_edition(Some("auto")).expect("auto"), FALLBACK);
+        assert_eq!(emit_edition(Some("")).expect("empty"), FALLBACK);
+    }
+
+    #[test]
+    fn a_built_file_carries_the_rows_it_was_given() {
+        let groups = r#"[{"code":"PROJ","headings":["PROJ_ID","PROJ_NAME"],
+                          "rows":[["P1","Test project"]]}]"#;
+        let report = build_ags4_core(groups, BuildOptions::default()).expect("builds");
+        assert!(
+            report.text.contains("\"DATA\",\"P1\",\"Test project\""),
+            "the data row is missing from the output:\n{}",
+            report.text
+        );
+        // CRLF is Rule 2 and the browser downloads this as a file — a stray LF
+        // makes the artefact invalid on arrival.
+        assert!(report.text.contains("\r\n"), "output must be CRLF");
+    }
+
+    // ---------------------------------------------------------------
+    // group_from_ipc — the columnar door
+    // ---------------------------------------------------------------
+
+    /// One group as an Arrow IPC stream, the shape `build_ags4_ipc` receives.
+    fn ipc_of(names: &[&str], rows: &[&[&str]]) -> Vec<u8> {
+        use arrow::array::StringArray;
+        use arrow::datatypes::{DataType, Field, Schema};
+        use std::sync::Arc;
+
+        let fields: Vec<Field> = names
+            .iter()
+            .map(|n| Field::new(*n, DataType::Utf8, true))
+            .collect();
+        let schema = Arc::new(Schema::new(fields));
+        let cols: Vec<arrow::array::ArrayRef> = (0..names.len())
+            .map(|c| {
+                let vals: Vec<&str> = rows.iter().map(|r| r[c]).collect();
+                Arc::new(StringArray::from(vals)) as arrow::array::ArrayRef
+            })
+            .collect();
+        let batch = arrow::record_batch::RecordBatch::try_new(schema.clone(), cols).expect("batch");
+        let mut buf = Vec::new();
+        {
+            let mut w = arrow::ipc::writer::StreamWriter::try_new(&mut buf, &schema).expect("w");
+            w.write(&batch).expect("write");
+            w.finish().expect("finish");
+        }
+        buf
+    }
+
+    #[test]
+    fn non_ipc_bytes_are_reported_as_an_arrow_error() {
+        let msg = err(group_from_ipc("LOCA".into(), b"definitely not arrow"));
+        assert!(
+            msg.contains("arrow ipc"),
+            "the caller needs to know it was the IPC decode, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn a_synthetic_key_column_never_becomes_an_ags_heading() {
+        // The #303 round trip: `read(keys=true)` prepends `_id`/`_parent_id`, and
+        // feeding that frame straight back into build must not emit them as
+        // headings — AGS headings never start with "_", so they are dropped.
+        // Nothing exercised the projection branch that does the dropping.
+        let ipc = ipc_of(
+            &["_id", "LOCA_ID", "_parent_id", "LOCA_NATE"],
+            &[&["u-1", "BH01", "u-0", "100.00"]],
+        );
+        let group = group_from_ipc("LOCA".into(), &ipc).expect("decodes");
+        assert_eq!(
+            group.headings,
+            vec!["LOCA_ID".to_string(), "LOCA_NATE".to_string()],
+            "underscore-prefixed columns must be dropped"
+        );
+        // And the values must stay aligned with the columns that survived — a
+        // projection that dropped the schema entry but not the data would put
+        // "u-1" under LOCA_ID.
+        assert_eq!(group.rows[0][0], "BH01");
+        assert_eq!(group.rows[0][1], "100.00");
+    }
+
+    #[test]
+    fn a_frame_with_no_underscore_columns_is_passed_through_whole() {
+        // The other side of the same branch: when nothing needs dropping the
+        // projection is skipped entirely, and the columns must be unchanged.
+        let ipc = ipc_of(&["LOCA_ID", "LOCA_NATE"], &[&["BH01", "100.00"]]);
+        let group = group_from_ipc("LOCA".into(), &ipc).expect("decodes");
+        assert_eq!(
+            group.headings,
+            vec!["LOCA_ID".to_string(), "LOCA_NATE".to_string()]
+        );
+        assert_eq!(group.rows.len(), 1);
+    }
+
+    #[test]
+    fn the_columnar_and_json_doors_build_the_same_file() {
+        // Two input shapes, one emitter — the whole point of `build_ags4_ipc`
+        // existing alongside `build_ags4`. If they can diverge, the columnar
+        // door is a second implementation rather than a second door.
+        let ipc = ipc_of(&["PROJ_ID", "PROJ_NAME"], &[&["P1", "Test project"]]);
+        let from_ipc = build_ipc_core(
+            vec![group_from_ipc("PROJ".into(), &ipc).expect("decodes")],
+            BuildOptions::default(),
+        )
+        .expect("ipc builds");
+        let from_json = build_ags4_core(
+            r#"[{"code":"PROJ","headings":["PROJ_ID","PROJ_NAME"],
+                 "rows":[["P1","Test project"]]}]"#,
+            BuildOptions::default(),
+        )
+        .expect("json builds");
+        assert_eq!(
+            from_ipc.text, from_json.text,
+            "the two build doors disagree on the same data"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // compute_fixes_core — four ways to return nothing
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn a_fixable_file_yields_fixes() {
+        // LF line endings breach Rule 2 and are safely fixable, so this is the
+        // baseline the four failure paths below are contrasted against — without
+        // it, "returns empty" proves nothing.
+        let lf: Vec<u8> = CLEAN.iter().copied().filter(|&b| b != b'\r').collect();
+        let fixes = compute_fixes_core(&lf, None, None);
+        assert!(
+            !fixes.is_empty(),
+            "a file with LF endings must offer at least the CRLF fix"
+        );
+    }
+
+    #[test]
+    fn an_unknown_edition_yields_no_fixes() {
+        assert!(compute_fixes_core(CLEAN, Some("4.9"), None).is_empty());
+    }
+
+    #[test]
+    fn an_unknown_encoding_yields_no_fixes() {
+        // The important one. This door has no error channel, so the alternative
+        // to "no fixes" is fixes computed against text we mis-decoded — a button
+        // that silently corrupts the user's file.
+        let lf: Vec<u8> = CLEAN.iter().copied().filter(|&b| b != b'\r').collect();
+        assert!(
+            !compute_fixes_core(&lf, None, None).is_empty(),
+            "the fixture must be fixable, or the next assertion proves nothing"
+        );
+        assert!(compute_fixes_core(&lf, None, Some("klingon-1")).is_empty());
+    }
+
+    #[test]
+    fn unparseable_bytes_yield_no_fixes() {
+        assert!(compute_fixes_core(b"not an ags file at all", None, None).is_empty());
+    }
+
+    // ---------------------------------------------------------------
+    // apply_fixes_core
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn applying_fixes_with_an_unknown_encoding_is_refused() {
+        // This used to fall back to UTF-8 and REWRITE a file it had just
+        // mis-decoded — the one place a silent fallback does permanent damage.
+        let msg = err(apply_fixes_core(CLEAN, Some("klingon-1"), &[]));
+        assert!(
+            msg.to_ascii_lowercase().contains("encoding")
+                || msg.to_ascii_lowercase().contains("klingon"),
+            "the rejection must name the encoding, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn applying_no_fixes_returns_the_bytes_unchanged() {
+        let out = apply_fixes_core(CLEAN, None, &[]).expect("applies");
+        assert_eq!(out, CLEAN, "an empty fix list must be a no-op");
+    }
+
+    #[test]
+    fn a_bom_survives_when_stripping_it_was_not_selected() {
+        // apply_fixes honours "keep the BOM" only because the core reads the RAW
+        // bytes for it — encoding_rs eats the mark during decode, so a version
+        // that inspected the decoded text would drop it silently.
+        let mut bom = vec![0xEF, 0xBB, 0xBF];
+        bom.extend_from_slice(CLEAN);
+        let out = apply_fixes_core(&bom, None, &[]).expect("applies");
+        assert!(
+            out.starts_with(&[0xEF, 0xBB, 0xBF]),
+            "the BOM was dropped without a strip_bom fix being selected"
+        );
+    }
+
+    #[test]
+    fn a_cp1252_file_comes_back_as_utf8() {
+        // Applying to a cp1252 file also normalises its encoding, which is why
+        // the UI resets its encoding select afterwards. 0xB0 is DEGREE SIGN in
+        // cp1252 and invalid as standalone UTF-8.
+        let mut cp = Vec::from(&b"\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n"[..]);
+        cp.extend_from_slice(b"\"UNIT\",\"\"\r\n\"TYPE\",\"X\"\r\n\"DATA\",\"90");
+        cp.push(0xB0);
+        cp.extend_from_slice(b"\"\r\n");
+        let out = apply_fixes_core(&cp, Some("windows-1252"), &[]).expect("applies");
+        let text = String::from_utf8(out).expect("output must be valid UTF-8");
+        assert!(
+            text.contains('\u{00B0}'),
+            "the degree sign did not survive the re-encode: {text}"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // read_core + ParsedDataset
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn reading_with_an_unknown_encoding_is_refused() {
+        let msg = err(read_core(CLEAN, Some("klingon-1")));
+        assert!(!msg.is_empty(), "an unknown encoding must be reported");
+    }
+
+    #[test]
+    fn an_unreadable_file_reports_the_validator_error_text() {
+        // The ParseError -> ValidatorError bridge. It exists so an unparseable
+        // file says the same thing here as it does from `validate`; without the
+        // conversion the browser would show two different messages for one
+        // problem depending on which door the user came through.
+        let msg = err(read_core(b"nothing resembling ags4", None));
+        let via_validate = ValidatorError::from(
+            parse_bytes(b"nothing resembling ags4", encoding_rs::UTF_8)
+                .expect_err("must not parse"),
+        )
+        .to_string();
+        assert_eq!(
+            msg, via_validate,
+            "read and validate must agree on the text"
+        );
+    }
+
+    #[test]
+    fn group_codes_come_back_in_file_order() {
+        // The explorer loads tables in this order, and PROJ must land before its
+        // children — an alphabetical sort would put LOCA first and break the
+        // foreign keys on insert.
+        let ds = read_core(LOCA_A, None).expect("reads");
+        assert_eq!(
+            ds.group_codes(),
+            vec!["PROJ".to_string(), "LOCA".to_string()]
+        );
+    }
+
+    #[test]
+    fn meta_is_none_for_a_group_the_file_lacks() {
+        let ds = read_core(LOCA_A, None).expect("reads");
+        assert!(ds.meta_core("SAMP").is_none());
+    }
+
+    #[test]
+    fn meta_returns_four_arrays_of_equal_length() {
+        let ds = read_core(LOCA_A, None).expect("reads");
+        let m = ds.meta_core("LOCA").expect("LOCA is present");
+        let n = m.headings.len();
+        assert_eq!(n, 2);
+        assert_eq!(m.units.len(), n);
+        assert_eq!(m.types.len(), n);
+        assert_eq!(m.sql_types.len(), n);
+    }
+
+    #[test]
+    fn a_short_unit_or_type_row_is_padded_not_truncated() {
+        // The parallel-array contract is what the UI indexes by, so a file whose
+        // UNIT/TYPE rows are shorter than its HEADING row must still yield four
+        // equal-length arrays. Truncating instead would silently mislabel every
+        // column after the short one.
+        let ragged: &[u8] = b"\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\",\"LOCA_REM\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"BH01\",\"1.00\",\"note\"\r\n";
+        let ds = read_core(ragged, None).expect("reads");
+        let m = ds.meta_core("LOCA").expect("LOCA is present");
+        assert_eq!(m.headings.len(), 3);
+        assert_eq!(m.units.len(), 3, "units must pad to the heading count");
+        assert_eq!(m.types.len(), 3, "types must pad to the heading count");
+        // A missing TYPE becomes "X" (free text), which is the safe assumption —
+        // it casts to VARCHAR rather than guessing a numeric column.
+        assert_eq!(m.types[2], "X");
+        assert_eq!(m.units[2], "");
+        assert_eq!(m.sql_types[2], sql_type("X"));
+    }
+
+    #[test]
+    fn sql_types_are_derived_from_the_files_own_type_row() {
+        // Parity by construction: the explorer must report the column types the
+        // native DuckDB conversion would produce, and both read them off the
+        // file's TYPE row through the same `sql_type`.
+        let ds = read_core(LOCA_A, None).expect("reads");
+        let m = ds.meta_core("LOCA").expect("LOCA is present");
+        assert_eq!(m.types, vec!["ID".to_string(), "2DP".to_string()]);
+        assert_eq!(
+            m.sql_types,
+            vec![sql_type("ID").to_string(), sql_type("2DP").to_string()]
+        );
+    }
+
+    #[test]
+    fn arrow_ipc_names_the_group_it_could_not_find() {
+        let ds = read_core(LOCA_A, None).expect("reads");
+        let msg = err(ds.arrow_ipc_core("ZZZZ", false, false));
+        assert!(
+            msg.contains("ZZZZ"),
+            "the missing code must appear in the error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn keys_and_content_hash_are_off_by_default_and_add_columns_when_asked() {
+        let ds = read_core(LOCA_A, None).expect("reads");
+        let plain = ds.arrow_ipc_core("LOCA", false, false).expect("plain");
+        let keyed = ds.arrow_ipc_core("LOCA", true, false).expect("keyed");
+        let hashed = ds.arrow_ipc_core("LOCA", false, true).expect("hashed");
+
+        // Asserted through the IPC bytes rather than a length comparison: the
+        // column NAMES are the contract duckdb-wasm joins on.
+        let names = |ipc: &[u8]| -> Vec<String> {
+            let r = arrow::ipc::reader::StreamReader::try_new(std::io::Cursor::new(ipc), None)
+                .expect("ipc reads");
+            r.schema()
+                .fields()
+                .iter()
+                .map(|f| f.name().clone())
+                .collect()
+        };
+        let plain_names = names(&plain);
+        assert!(
+            !plain_names.iter().any(|n| n.starts_with('_')),
+            "the default frame must carry no synthetic columns, got {plain_names:?}"
+        );
+        assert!(names(&keyed).contains(&"_id".to_string()));
+        assert!(names(&hashed).contains(&"_content_hash".to_string()));
+    }
+
+    // ---------------------------------------------------------------
+    // diff_core
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn diffing_with_an_unknown_encoding_is_refused() {
+        let o = DiffOptions {
+            encoding: Some("klingon-1".into()),
+            ..Default::default()
+        };
+        assert!(diff_core(LOCA_A, LOCA_B, &o).is_err());
+    }
+
+    #[test]
+    fn an_unparseable_side_is_reported() {
+        let o = DiffOptions::default();
+        assert!(diff_core(b"junk", LOCA_B, &o).is_err());
+        assert!(diff_core(LOCA_A, b"junk", &o).is_err());
+    }
+
+    #[test]
+    fn a_file_diffed_against_itself_reports_nothing() {
+        let d = diff_core(LOCA_A, LOCA_A, &DiffOptions::default()).expect("diffs");
+        assert_eq!((d.total_added, d.total_removed, d.total_changed), (0, 0, 0));
+        assert!(
+            d.groups.is_empty(),
+            "no group should be reported as changed"
+        );
+    }
+
+    #[test]
+    fn rows_are_matched_by_key_not_position() {
+        // BH01 changed value, BH02 is gone, BH03 is new. Matching by position
+        // instead would report two changes and no add/remove.
+        let d = diff_core(LOCA_A, LOCA_B, &DiffOptions::default()).expect("diffs");
+        assert_eq!(d.total_changed, 1, "BH01's coordinate changed");
+        assert_eq!(d.total_removed, 1, "BH02 is gone");
+        assert_eq!(d.total_added, 1, "BH03 is new");
+        let loca = d.groups.iter().find(|g| g.code == "LOCA").expect("LOCA");
+        assert!(loca.keyed, "LOCA has dictionary KEY headings");
+        assert!(loca.key_headings.contains(&"LOCA_ID".to_string()));
+    }
+
+    #[test]
+    fn a_row_cap_bounds_the_payload_without_lying_about_the_totals() {
+        // The documented contract: `maxRowsPerGroup` caps what each group
+        // SERIALISES, and the added/removed/changed counts stay true totals. A
+        // cap that also truncated the counts would tell the user a three-row
+        // change was a one-row change.
+        let capped = DiffOptions {
+            max_rows_per_group: Some(1),
+            ..Default::default()
+        };
+        let d = diff_core(LOCA_A, LOCA_B, &capped).expect("diffs");
+        let loca = d.groups.iter().find(|g| g.code == "LOCA").expect("LOCA");
+        assert_eq!(loca.rows.len(), 1, "the cap must bound the serialised rows");
+        assert_eq!(
+            loca.added + loca.removed + loca.changed,
+            3,
+            "the totals must survive the cap"
+        );
+        assert_eq!(d.total_added + d.total_removed + d.total_changed, 3);
+    }
+
+    // ---------------------------------------------------------------
+    // merge_core
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn an_unknown_type_clash_token_is_refused_in_the_merge_crates_own_words() {
+        // The vocabulary is parsed by laterite-ags4-merge's FromStr precisely so
+        // the browser cannot accept a token the CLI rejects, or word the
+        // rejection differently. Asserted against that crate's own list, not a
+        // literal here — a copy would drift the moment a fourth mode appears.
+        let o = MergeOptions {
+            on_type_clash: Some("widenn".into()),
+            ..Default::default()
+        };
+        let msg = err(merge_core(LOCA_A, LOCA_B, o));
+        for mode in laterite_ags4_merge::TypeClashMode::ALL {
+            assert!(
+                msg.contains(mode.as_str()),
+                "the rejection must list {:?}, got: {msg}",
+                mode.as_str()
+            );
+        }
+    }
+
+    #[test]
+    fn every_documented_clash_mode_is_accepted() {
+        for mode in laterite_ags4_merge::TypeClashMode::ALL {
+            let o = MergeOptions {
+                on_type_clash: Some(mode.as_str().to_string()),
+                ..Default::default()
+            };
+            // `error` legitimately fails on the clashing pair, so merge two files
+            // that do NOT clash — this asserts the TOKEN is accepted.
+            assert!(
+                merge_core(LOCA_A, LOCA_B, o).is_ok(),
+                "documented mode {:?} was rejected",
+                mode.as_str()
+            );
+        }
+    }
+
+    #[test]
+    fn a_type_clash_is_fatal_by_default_and_widen_settles_it() {
+        let strict = merge_core(LOCA_A, LOCA_CLASH, MergeOptions::default());
+        assert!(
+            strict.is_err(),
+            "two files typing LOCA_NATE differently must not merge silently"
+        );
+        let widened = merge_core(
+            LOCA_A,
+            LOCA_CLASH,
+            MergeOptions {
+                on_type_clash: Some("widen".into()),
+                ..Default::default()
+            },
+        )
+        .expect("widen settles the clash");
+        let text = String::from_utf8(widened.bytes()).expect("utf-8");
+        assert!(
+            text.contains("BH01") && text.contains("BH09"),
+            "both deliveries' rows must survive the widen:\n{text}"
+        );
+    }
+
+    #[test]
+    fn merge_refuses_an_unknown_edition_and_an_unknown_encoding() {
+        let bad_dict = MergeOptions {
+            dict_version: Some("4.9".into()),
+            ..Default::default()
+        };
+        assert!(merge_core(LOCA_A, LOCA_B, bad_dict).is_err());
+        let bad_enc = MergeOptions {
+            encoding: Some("klingon-1".into()),
+            ..Default::default()
+        };
+        assert!(merge_core(LOCA_A, LOCA_B, bad_enc).is_err());
+    }
+
+    #[test]
+    fn a_partial_tran_stops_a_merge() {
+        let o = MergeOptions {
+            tran: Some(TranInput {
+                issue: Some("1".into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let msg = err(merge_core(LOCA_A, LOCA_B, o));
+        assert!(
+            !msg.is_empty(),
+            "an incomplete merge-TRAN must be reported, not silently dropped"
+        );
+    }
+
+    #[test]
+    fn the_merge_result_getters_return_what_the_core_built() {
+        // These three getters are the entire JS-visible surface of a merge, and
+        // the web worker reads them before calling `.free()`. Empty JSON here
+        // would look exactly like "nothing to report".
+        let res = merge_core(LOCA_A, LOCA_B, MergeOptions::default()).expect("merges");
+        assert!(!res.bytes().is_empty(), "the merged file must have bytes");
+        // Valid JSON arrays, not the "[]" fallback that a serialisation failure
+        // would produce indistinguishably from a genuinely empty audit.
+        let w: serde_json::Value =
+            serde_json::from_str(&res.warnings_json()).expect("warnings are JSON");
+        let r: serde_json::Value =
+            serde_json::from_str(&res.revisions_json()).expect("revisions are JSON");
+        assert!(w.is_array() && r.is_array());
+        assert!(
+            r.as_array().is_some_and(|a| !a.is_empty()),
+            "BH01 differs between the two deliveries, so a revision must be recorded"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // dictionary_core
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn dictionary_defaults_to_the_fallback_edition() {
+        let dto = dictionary_core(None).expect("default");
+        assert_eq!(
+            dto.ags_edition,
+            dictionary_core(Some("auto")).unwrap().ags_edition
+        );
+        assert!(!dto.groups.is_empty(), "the dictionary must have groups");
+    }
+
+    #[test]
+    fn dictionary_refuses_an_unknown_edition() {
+        let msg = err(dictionary_core(Some("4.9")));
+        assert!(msg.contains("4.9") || msg.contains("unknown"), "got: {msg}");
+    }
+
+    #[test]
+    fn each_edition_returns_its_own_dictionary() {
+        // A resolver that ignored its argument would return the fallback for
+        // every edition and pass any single-edition assertion.
+        let a = dictionary_core(Some("4.0.3")).expect("4.0.3");
+        let b = dictionary_core(Some("4.2")).expect("4.2");
+        assert_ne!(a.ags_edition, b.ags_edition);
+        assert!(
+            a.groups.len() != b.groups.len()
+                || a.groups.iter().map(|g| g.headings.len()).sum::<usize>()
+                    != b.groups.iter().map(|g| g.headings.len()).sum::<usize>(),
+            "4.0.3 and 4.2 returned identical dictionaries"
+        );
+    }
+
+    #[test]
+    fn a_dictionary_group_carries_the_descriptions_the_reference_ui_needs() {
+        // The reason this door exists: the Tools reference used to fetch a
+        // scaffolded dictionary where ~91% of headings had EMPTY descriptions.
+        let dto = dictionary_core(Some("4.1.1")).expect("4.1.1");
+        let loca = dto.groups.iter().find(|g| g.code == "LOCA").expect("LOCA");
+        assert!(!loca.contents.is_empty(), "the group needs its description");
+        assert!(
+            loca.headings
+                .iter()
+                .filter(|h| !h.description.is_empty())
+                .count()
+                > loca.headings.len() / 2,
+            "most headings should carry a description"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // censor_core
+    // ---------------------------------------------------------------
+
+    /// A file carrying one heading from each of the categories the tests below
+    /// assert on: a location id (pseudonym), a coordinate (blank) and a project
+    /// id (filehash).
+    const SENSITIVE_FILE: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
+\"HEADING\",\"PROJ_ID\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"SECRET-PROJECT\"\r\n\
+\r\n\
+\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+\"UNIT\",\"\",\"m\"\r\n\
+\"TYPE\",\"ID\",\"2DP\"\r\n\
+\"DATA\",\"BH01\",\"523145.67\"\r\n";
+
+    #[test]
+    fn omitting_selected_codes_scrubs_every_classified_heading() {
+        // The leak-safety default, and the one that must never regress: an
+        // omitted `selectedCodes` means the WIDER scrub, so forgetting the
+        // option over-redacts rather than leaving coordinates in the file.
+        let out =
+            censor_core(SENSITIVE_FILE, SENSITIVE, CensorOptions::default()).expect("censors");
+        assert!(
+            !out.text.contains("523145.67"),
+            "the coordinate survived the default policy:\n{}",
+            out.text
+        );
+        assert!(
+            !out.text.contains("SECRET-PROJECT"),
+            "the project id survived the default policy:\n{}",
+            out.text
+        );
+    }
+
+    #[test]
+    fn selected_codes_restricts_the_policy_to_those_columns() {
+        let out = censor_core(
+            SENSITIVE_FILE,
+            SENSITIVE,
+            CensorOptions {
+                selected_codes: Some(vec!["LOCA_NATE".to_string()]),
+                ..Default::default()
+            },
+        )
+        .expect("censors");
+        assert!(
+            !out.text.contains("523145.67"),
+            "the selected coordinate must still be scrubbed"
+        );
+        assert!(
+            out.text.contains("SECRET-PROJECT"),
+            "an unselected heading must be left alone:\n{}",
+            out.text
+        );
+    }
+
+    #[test]
+    fn proj_id_becomes_the_full_sha256_of_the_input_bytes() {
+        // Full 64 hex, not a prefix: PROJ_ID is a KEY field, so the width is what
+        // makes a collision cryptographically nil rather than merely unlikely.
+        let out =
+            censor_core(SENSITIVE_FILE, SENSITIVE, CensorOptions::default()).expect("censors");
+        let expected = hex::encode(<sha2::Sha256 as sha2::Digest>::digest(SENSITIVE_FILE));
+        assert_eq!(expected.len(), 64);
+        assert!(
+            out.text.contains(&expected),
+            "PROJ_ID should be the file's own SHA-256:\n{}",
+            out.text
+        );
+    }
+
+    #[test]
+    fn the_replacement_token_defaults_and_can_be_overridden() {
+        let custom = censor_core(
+            SENSITIVE_FILE,
+            SENSITIVE,
+            CensorOptions {
+                token: Some("***".to_string()),
+                ..Default::default()
+            },
+        )
+        .expect("censors");
+        assert!(
+            !custom.text.contains("[REDACTED]"),
+            "a custom token must replace the default entirely"
+        );
+    }
+
+    #[test]
+    fn a_malformed_classification_document_is_refused() {
+        // Without a policy nothing would be scrubbed — the one outcome a caller
+        // must never get by accident, so it has to be an error rather than an
+        // empty policy.
+        let msg = err(censor_core(
+            SENSITIVE_FILE,
+            "{ not valid json",
+            CensorOptions::default(),
+        ));
+        assert!(!msg.is_empty(), "a bad policy document must be reported");
+    }
+
+    #[test]
+    fn the_tally_counts_what_was_actually_changed() {
+        // A tally of zeroes alongside a scrubbed file would tell the Anonymiser's
+        // UI that nothing happened.
+        let out =
+            censor_core(SENSITIVE_FILE, SENSITIVE, CensorOptions::default()).expect("censors");
+        let total = out.tally.pseudonym + out.tally.blank + out.tally.token;
+        assert!(
+            total > 0,
+            "the tally reported no changes on a scrubbed file"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // the Excel pair
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn an_ags_file_becomes_a_workbook_with_a_sheet_per_group() {
+        let res = ags4_to_xlsx_core(CLEAN, false).expect("converts");
+        assert!(res.sheets() > 0, "no sheets were written");
+        assert!(res.rows() > 0, "no rows were written");
+        // The xlsx magic — a zip container. Anything else is not a workbook,
+        // however plausible the byte count.
+        assert_eq!(&res.bytes()[..2], b"PK", "output must be a zip/xlsx");
+        assert!(res.warnings().len() < 100, "warnings should be bounded");
+    }
+
+    #[test]
+    fn duplicate_headings_are_fatal_unless_recovery_is_asked_for() {
+        // Fatal by default on every read surface; the browser opts into the
+        // suffixed recovery read. Both halves matter — a default that recovered
+        // would silently invent column names.
+        let dup: &[u8] = b"\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_ID\"\r\n\
+\"UNIT\",\"\",\"\"\r\n\
+\"TYPE\",\"ID\",\"ID\"\r\n\
+\"DATA\",\"BH01\",\"BH01\"\r\n";
+        assert!(
+            ags4_to_xlsx_core(dup, false).is_err(),
+            "duplicate headings must be fatal by default"
+        );
+        assert!(
+            ags4_to_xlsx_core(dup, true).is_ok(),
+            "recovery must be reachable from the browser"
+        );
+    }
+
+    #[test]
+    fn non_workbook_bytes_are_refused() {
+        assert!(xlsx_to_ags4_core(b"not a workbook", false).is_err());
+    }
+
+    #[test]
+    fn a_workbook_round_trips_back_to_the_same_groups() {
+        // The pair is only useful if it is a pair: converting out and back must
+        // preserve the groups, not merely produce *some* AGS4.
+        let book = ags4_to_xlsx_core(CLEAN, false).expect("to xlsx");
+        let back = xlsx_to_ags4_core(&book.bytes(), false).expect("from xlsx");
+        let text = String::from_utf8(back.bytes()).expect("utf-8");
+        for group in ["PROJ", "TRAN", "UNIT", "TYPE"] {
+            assert!(
+                text.contains(&format!("\"GROUP\",\"{group}\"")),
+                "{group} did not survive the round trip:\n{text}"
+            );
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // certify_core's error arms
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn certify_requires_the_caller_to_supply_the_clock() {
+        // wasm has no clock, so `checkedAt` is the one option with no default.
+        // The message has to say why, or a caller reads "required" and guesses.
+        let msg = err(certify_core(CLEAN, &CertifyOptions::default()));
+        assert!(
+            msg.contains("checkedAt"),
+            "the missing option must be named, got: {msg}"
+        );
+        assert!(
+            msg.contains("clock") || msg.contains("toISOString"),
+            "the message should explain why the caller supplies it, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn certify_refuses_an_unknown_edition_and_an_unknown_encoding() {
+        let bad_dict = CertifyOptions {
+            checked_at: Some("2020-01-01T00:00:00Z".into()),
+            dict_version: Some("4.9".into()),
+            ..Default::default()
+        };
+        assert!(certify_core(CLEAN, &bad_dict).is_err());
+        let bad_enc = CertifyOptions {
+            checked_at: Some("2020-01-01T00:00:00Z".into()),
+            encoding: Some("klingon-1".into()),
+            ..Default::default()
+        };
+        assert!(certify_core(CLEAN, &bad_enc).is_err());
+    }
+
+    #[test]
+    fn certify_refuses_a_file_with_errors() {
+        // Warnings and FYI findings are measured and recorded; ERRORS are fatal.
+        // A certificate over a broken file is exactly the claim the trust model
+        // exists to prevent.
+        assert!(
+            certify_core(b"not an ags file", &CertifyOptions::default()).is_err(),
+            "an unparseable file must not certify"
+        );
+    }
+}
+
+#[cfg(test)]
+mod run_and_overlay_tests {
+    //! `run()` and `build_custom_dict()` — plain functions all along, and the
+    //! only two places in this crate where a caller mistake has to come back as
+    //! DATA rather than an exception.
+    //!
+    //! `validate` is infallible by contract: a bad edition, a bad encoding, an
+    //! unparseable dictionary and a file that is not AGS4 all arrive as
+    //! `report.error = {kind, message}`, because the UI already renders that
+    //! channel and a thrown exception would have to be caught somewhere else.
+    //! Which `kind` each one produces is the part a consumer switches on, and
+    //! none of the four arms was exercised.
+    use super::core_door_tests::{LOCA_A, LOCA_B};
+    use super::*;
+
+    const DELIVERY: &[u8] = include_bytes!(
+        "../../laterite-ags4-validator/tests/fixtures/custom_dict/delivery_with_xtra.ags"
+    );
+    const DICT_JSON: &[u8] =
+        include_bytes!("../../laterite-ags4-validator/tests/fixtures/custom_dict/xtra.dict.json");
+
+    fn kind_of(r: &ValidationReport) -> String {
+        r.error.as_ref().map(|e| e.kind.clone()).unwrap_or_default()
+    }
+
+    #[test]
+    fn a_bad_edition_is_reported_not_thrown() {
+        let r = run(
+            LOCA_A,
+            &ValidateOptions {
+                dict_version: Some("4.9".into()),
+                ..Default::default()
+            },
+        );
+        assert!(!r.ok);
+        assert_eq!(kind_of(&r), "bad_args");
+        assert!(
+            r.error.as_ref().is_some_and(|e| e.message.contains("4.9")),
+            "the rejected edition must appear in the message"
+        );
+    }
+
+    #[test]
+    fn a_bad_encoding_is_reported_rather_than_falling_back_to_utf8() {
+        // The caller SEES the bad label instead of receiving findings that are
+        // artefacts of a silent UTF-8 fallback — findings which would look
+        // exactly like real ones.
+        let r = run(
+            LOCA_A,
+            &ValidateOptions {
+                encoding: Some("klingon-1".into()),
+                ..Default::default()
+            },
+        );
+        assert_eq!(kind_of(&r), "bad_args");
+        assert_eq!(
+            r.finding_count, 0,
+            "no findings may be invented on a failure"
+        );
+    }
+
+    #[test]
+    fn an_unparseable_dictionary_is_the_dictionarys_problem() {
+        // A distinct kind from `bad_args` on purpose: the delivery is fine and
+        // the DICTIONARY is broken, and the UI points at a different input.
+        let r = run(
+            DELIVERY,
+            &ValidateOptions {
+                dictionary: Some(b"{ not a dictionary".to_vec()),
+                ..Default::default()
+            },
+        );
+        assert_eq!(kind_of(&r), "bad_dict");
+    }
+
+    #[test]
+    fn a_file_that_is_not_ags4_is_classified_as_such() {
+        let r = run(
+            b"nothing resembling ags4 at all",
+            &ValidateOptions::default(),
+        );
+        assert_eq!(kind_of(&r), "not_ags4");
+        assert!(r.dict_version.is_empty(), "no edition was judged");
+    }
+
+    #[test]
+    fn a_failure_report_carries_the_full_shape_a_consumer_reads() {
+        // Every surface returns the same report shape; a failure that omitted
+        // fields would make the browser the one door a consumer had to special-case.
+        let r = run(b"junk", &ValidateOptions::default());
+        assert!(!r.ok);
+        assert_eq!(r.finding_count, 0);
+        assert_eq!(r.shown_count, 0);
+        assert!(r.findings.is_empty());
+        assert!(
+            r.revalidate_reason.is_none(),
+            "this surface has no cert-consume door, so it is structurally null"
+        );
+    }
+
+    #[test]
+    fn warnings_are_on_and_fyi_off_by_default() {
+        // Python and Node both promise warnings ON. A plain `Option<bool>`
+        // unwrapping to false here would have made the browser the one surface
+        // that quietly disagreed, and no test would have noticed.
+        let defaults = run(DELIVERY, &ValidateOptions::default());
+        let explicit_off = run(
+            DELIVERY,
+            &ValidateOptions {
+                warnings: Some(false),
+                ..Default::default()
+            },
+        );
+        let with_fyi = run(
+            DELIVERY,
+            &ValidateOptions {
+                fyi: Some(true),
+                ..Default::default()
+            },
+        );
+        assert!(
+            defaults.finding_count >= explicit_off.finding_count,
+            "warnings must be included by default"
+        );
+        assert!(
+            with_fyi.finding_count >= defaults.finding_count,
+            "fyi must be excluded by default"
+        );
+    }
+
+    #[test]
+    fn max_per_rule_caps_what_crosses_the_boundary_not_what_was_found() {
+        // `finding_count` is the true total and `shown_count` is what was
+        // serialised, so the UI can say "showing N of M". A cap that also
+        // reduced the total would under-report the state of the file.
+        let uncapped = run(
+            DELIVERY,
+            &ValidateOptions {
+                warnings: Some(true),
+                fyi: Some(true),
+                ..Default::default()
+            },
+        );
+        let capped = run(
+            DELIVERY,
+            &ValidateOptions {
+                warnings: Some(true),
+                fyi: Some(true),
+                max_per_rule: Some(1),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            capped.finding_count, uncapped.finding_count,
+            "the true total must survive the cap"
+        );
+        assert!(
+            capped.shown_count <= uncapped.shown_count,
+            "the cap must reduce what is serialised"
+        );
+        assert_eq!(
+            capped.shown_count,
+            capped.findings.iter().map(|g| g.items.len()).sum::<usize>(),
+            "shown_count must equal what is actually in the payload"
+        );
+        for g in &capped.findings {
+            assert!(g.items.len() <= 1, "rule {:?} exceeded the cap", g.rule);
+            assert!(
+                g.total >= g.items.len(),
+                "the per-rule total must be the true count"
+            );
+        }
+    }
+
+    #[test]
+    fn a_cell_targeted_finding_serialises_its_target() {
+        // `target` drives the browser's cell highlight, and it is omitted for
+        // the whole-line default — so a mis-mapped variant is invisible until a
+        // user clicks a finding and lands on the wrong thing.
+        let bad_type: &[u8] = b"\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+\"UNIT\",\"\",\"m\"\r\n\
+\"TYPE\",\"ID\",\"2DP\"\r\n\
+\"DATA\",\"BH01\",\"not a number\"\r\n";
+        let r = run(
+            bad_type,
+            &ValidateOptions {
+                warnings: Some(true),
+                fyi: Some(true),
+                ..Default::default()
+            },
+        );
+        let targets: Vec<&str> = r
+            .findings
+            .iter()
+            .flat_map(|g| &g.items)
+            .filter_map(|f| f.target.as_deref())
+            .collect();
+        assert!(
+            targets.contains(&"cell"),
+            "a value that does not match its TYPE is a CELL finding, got {targets:?}"
+        );
+    }
+
+    /// A SELF-CONTAINED dictionary — every group roots itself. A replacement has
+    /// no bundled edition behind it, so anything it references it must define.
+    const STANDALONE_DICT: &[u8] = br#"{
+      "groups": {
+        "PROJ": {
+          "parent": null,
+          "description": "Project",
+          "headings": [
+            {"name": "PROJ_ID", "type": "ID", "status": "KEY"}
+          ]
+        },
+        "LOCA": {
+          "parent": null,
+          "description": "Location",
+          "headings": [
+            {"name": "LOCA_ID",   "type": "ID",  "status": "KEY"},
+            {"name": "LOCA_NATE", "type": "2DP", "status": "OTHER", "unit": "m"}
+          ]
+        }
+      }
+    }"#;
+
+    #[test]
+    fn a_custom_dictionary_can_replace_the_bundled_one_outright() {
+        // `dictReplace` is a different question from `dictVersion`: replace says
+        // "this file IS the dictionary", force says "judge against edition X".
+        // The replace branch had never been taken by any test.
+        let r = run(
+            LOCA_A,
+            &ValidateOptions {
+                dictionary: Some(STANDALONE_DICT.to_vec()),
+                dict_replace: Some(true),
+                ..Default::default()
+            },
+        );
+        assert_ne!(
+            kind_of(&r),
+            "bad_dict",
+            "a self-contained dictionary must be accepted as a replacement: {:?}",
+            r.error.as_ref().map(|e| e.message.clone())
+        );
+    }
+
+    #[test]
+    fn a_delta_dictionary_cannot_stand_in_as_a_whole_replacement() {
+        // The realistic mistake: `xtra.dict.json` hangs a bespoke group off the
+        // standard `SAMP`, which is exactly right as an OVERLAY and incoherent
+        // as a REPLACEMENT — under replace there is no bundled edition, so
+        // `SAMP` is undefined. Refusing it by name beats validating a delivery
+        // against a dictionary with a dangling parent.
+        let r = run(
+            DELIVERY,
+            &ValidateOptions {
+                dictionary: Some(DICT_JSON.to_vec()),
+                dict_replace: Some(true),
+                ..Default::default()
+            },
+        );
+        assert_eq!(kind_of(&r), "bad_dict");
+        let msg = r
+            .error
+            .as_ref()
+            .map(|e| e.message.clone())
+            .unwrap_or_default();
+        assert!(
+            msg.contains("XTRA") && msg.contains("SAMP"),
+            "the message must name both the group and the parent it cannot find, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn replacing_and_forcing_the_dictionary_at_once_is_a_contradiction() {
+        // A forced base and a full replacement cannot both be honoured, so the
+        // combination is refused by name rather than one silently winning.
+        let r = run(
+            DELIVERY,
+            &ValidateOptions {
+                dictionary: Some(DICT_JSON.to_vec()),
+                dict_replace: Some(true),
+                dict_version: Some("4.1.1".into()),
+                ..Default::default()
+            },
+        );
+        assert_eq!(kind_of(&r), "bad_dict");
+        let msg = r
+            .error
+            .as_ref()
+            .map(|e| e.message.clone())
+            .unwrap_or_default();
+        assert!(
+            msg.contains("dict_replace") && msg.contains("dict_version"),
+            "both halves of the contradiction must be named, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn build_custom_dict_is_a_no_op_without_bytes() {
+        let none = build_custom_dict(None, false, None, encoding_rs::UTF_8).expect("no dict");
+        assert!(
+            none.is_none(),
+            "no bytes means no overlay, not an empty one"
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // The remaining gaps in the emit + merge tails
+    // ---------------------------------------------------------------
+
+    #[test]
+    fn a_complete_tran_without_the_optional_extras_still_folds() {
+        // The `None => s` arms: description and remarks are genuinely optional,
+        // so the five-field stamp has to survive their absence. Both arms were
+        // dark because every existing test supplied them.
+        let five_only = TranInput {
+            issue: Some("1".into()),
+            date: Some("2020-08-18".into()),
+            producer: Some("ACME Drilling".into()),
+            recipient: Some("ACME Consulting".into()),
+            status: Some("FINAL".into()),
+            description: None,
+            remarks: None,
+        };
+        let stamp = five_only.fold().expect("folds").expect("some");
+        let rendered = format!("{stamp:?}");
+        assert!(
+            rendered.contains("ACME Drilling"),
+            "the five required fields must survive: {rendered}"
+        );
+    }
+
+    #[test]
+    fn a_tran_stamp_reaches_the_emitted_file() {
+        // The fold is only worth anything if the stamp lands in the output —
+        // otherwise "all five or none" guards a value that is then dropped.
+        let o = BuildOptions {
+            synthesise_metadata: Some(true),
+            tran: Some(TranInput {
+                issue: Some("7".into()),
+                date: Some("2020-08-18".into()),
+                producer: Some("ACME Drilling".into()),
+                recipient: Some("ACME Consulting".into()),
+                status: Some("FINAL".into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let report = build_ags4_core(
+            r#"[{"code":"PROJ","headings":["PROJ_ID"],"rows":[["P1"]]}]"#,
+            o,
+        )
+        .expect("builds");
+        assert!(
+            report.text.contains("ACME Drilling") && report.text.contains("\"GROUP\",\"TRAN\""),
+            "the supplied transmission must be written:\n{}",
+            report.text
+        );
+    }
+
+    #[test]
+    fn emit_findings_are_all_errors_which_is_why_the_severity_field_is_absent() {
+        // `EmitFinding.severity` is `skip_serializing_if = is_none` and its TS
+        // documents "absent means error". The emit path produces ONLY error-
+        // severity findings today, so the non-error arm of that mapping is
+        // unreachable rather than untested — asserted here so that the day emit
+        // grows a warning, this fails and someone revisits the mapping instead
+        // of discovering it in a browser.
+        let report = build_ags4_core(
+            r#"[{"code":"PROJ","headings":["PROJ_ID","PROJ_NAME"],"rows":[["P1","x"]]}]"#,
+            BuildOptions {
+                mode: Some("report".into()),
+                ..Default::default()
+            },
+        )
+        .expect("builds");
+        assert!(
+            !report.findings.is_empty(),
+            "a data-only build must report the missing mandatory groups"
+        );
+        assert!(
+            report.findings.iter().all(|f| f.severity.is_none()),
+            "emit produced a non-error severity — the mapping arm is now live"
+        );
+    }
+
+    /// `LOCA_A` typed `2DP`; this types the same heading `3DP` — a clash
+    /// entirely inside the nDP family, which is what `promote` can join.
+    const LOCA_3DP: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
+\"HEADING\",\"PROJ_ID\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"P1\"\r\n\
+\r\n\
+\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+\"UNIT\",\"\",\"m\"\r\n\
+\"TYPE\",\"ID\",\"3DP\"\r\n\
+\"DATA\",\"BH09\",\"9.123\"\r\n";
+
+    fn warning_kinds(res: &MergeResult) -> Vec<String> {
+        let v: serde_json::Value =
+            serde_json::from_str(&res.warnings_json()).expect("warnings are JSON");
+        v.as_array()
+            .expect("array")
+            .iter()
+            .filter_map(|w| w.get("kind").and_then(|k| k.as_str()).map(str::to_string))
+            .collect()
+    }
+
+    #[test]
+    fn a_widened_type_clash_is_recorded_in_the_merge_warnings() {
+        // Widening keeps both deliveries' rows but DISCARDS the column's type,
+        // which is a loss the audit trail has to carry — a silent widen is
+        // indistinguishable from the files having agreed.
+        let res = merge_core(
+            LOCA_A,
+            LOCA_3DP,
+            MergeOptions {
+                on_type_clash: Some("widen".into()),
+                ..Default::default()
+            },
+        )
+        .expect("widen settles the clash");
+        let kinds = warning_kinds(&res);
+        assert!(
+            kinds.iter().any(|k| k == "type_widened"),
+            "a discarded type must be warned about, got {kinds:?}"
+        );
+        // The warning has to say WHICH column lost its type, or it is unactionable.
+        let v: serde_json::Value = serde_json::from_str(&res.warnings_json()).expect("JSON");
+        let widened = v
+            .as_array()
+            .expect("array")
+            .iter()
+            .find(|w| w.get("kind").and_then(|k| k.as_str()) == Some("type_widened"))
+            .expect("the widen warning");
+        assert_eq!(
+            widened.get("heading").and_then(|h| h.as_str()),
+            Some("LOCA_NATE")
+        );
+    }
+
+    #[test]
+    fn promote_keeps_the_column_numeric_and_says_so() {
+        // The other resolution: `{2DP, 3DP}` joins inside the nDP family, so the
+        // column stays numeric at the greater precision rather than falling back
+        // to raw text.
+        let res = merge_core(
+            LOCA_A,
+            LOCA_3DP,
+            MergeOptions {
+                on_type_clash: Some("promote".into()),
+                ..Default::default()
+            },
+        )
+        .expect("promote settles the clash");
+        assert!(
+            warning_kinds(&res).iter().any(|k| k == "type_promoted"),
+            "a promotion changes what the file asserts and must be recorded"
+        );
+        let text = String::from_utf8(res.bytes()).expect("utf-8");
+        assert!(
+            text.contains("\"3DP\""),
+            "the column should keep the greatest precision, not widen to X:\n{text}"
+        );
+    }
+
+    #[test]
+    fn widening_against_an_x_column_is_silent_today() {
+        // RECORDED, not endorsed. `type_widened` is pushed only when at least
+        // TWO of the clashing codes are non-X, so `{2DP, X}` widens the column
+        // to X — discarding `2DP` — and reports nothing.
+        //
+        // The asymmetry is visible from here: the SAME pair under the default
+        // `error` mode is a hard refusal (asserted in
+        // `a_type_clash_is_fatal_by_default_and_widen_settles_it`), so the mode
+        // decides between "refuse this merge" and "accept it silently" with no
+        // middle record. That is laterite-ags4-merge's call to make, not this
+        // crate's — pinned here so the behaviour is deliberate rather than
+        // discovered, and so changing it fails a test instead of surprising a
+        // browser user.
+        let clash: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
+\"HEADING\",\"PROJ_ID\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"P1\"\r\n\
+\r\n\
+\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\"\r\n\
+\"UNIT\",\"\",\"m\"\r\n\
+\"TYPE\",\"ID\",\"X\"\r\n\
+\"DATA\",\"BH09\",\"nine\"\r\n";
+        let res = merge_core(
+            LOCA_A,
+            clash,
+            MergeOptions {
+                on_type_clash: Some("widen".into()),
+                ..Default::default()
+            },
+        )
+        .expect("widen accepts the pair");
+        let text = String::from_utf8(res.bytes()).expect("utf-8");
+        assert!(
+            text.contains("\"ID\",\"X\""),
+            "the column was widened to X:\n{text}"
+        );
+        assert!(
+            !warning_kinds(&res).iter().any(|k| k == "type_widened"),
+            "if this now warns, the asymmetry has been fixed — delete this test"
+        );
+    }
+
+    #[test]
+    fn merging_two_identical_files_changes_nothing() {
+        // The degenerate case, and a useful control on the revision audit: if a
+        // file merged with itself reports revisions, "changed" means nothing.
+        let res = merge_core(LOCA_A, LOCA_A, MergeOptions::default()).expect("merges");
+        let revisions: serde_json::Value =
+            serde_json::from_str(&res.revisions_json()).expect("JSON");
+        let changed = revisions
+            .as_array()
+            .expect("array")
+            .iter()
+            .filter(|r| r.get("changed").and_then(serde_json::Value::as_bool) == Some(true))
+            .count();
+        assert_eq!(changed, 0, "a file merged with itself has no revisions");
+    }
+
+    #[test]
+    fn an_explicit_edition_overrides_the_files_own_tran_ags() {
+        // The parity gap this option was added to close: Python's `merge` and
+        // `lat merge` both take it, and this surface used to hard-code None — so
+        // a browser user merging files with a wrong or absent TRAN_AGS had no
+        // way to say so. Proven by forcing an edition the inputs do not name.
+        let forced = merge_core(
+            LOCA_A,
+            LOCA_B,
+            MergeOptions {
+                dict_version: Some("4.0.3".into()),
+                ..Default::default()
+            },
+        )
+        .expect("merges against the forced edition");
+        assert!(!forced.bytes().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod dictionary_and_target_tests {
+    //! The last three plain-Rust arms: forcing an edition UNDER a custom
+    //! dictionary, the group-targeted finding, and `certify`'s dictionary half.
+    use super::core_door_tests::LOCA_A;
+    use super::*;
+
+    const DELIVERY: &[u8] = include_bytes!(
+        "../../laterite-ags4-validator/tests/fixtures/custom_dict/delivery_with_xtra.ags"
+    );
+    const DICT_JSON: &[u8] =
+        include_bytes!("../../laterite-ags4-validator/tests/fixtures/custom_dict/xtra.dict.json");
+    const CLEAN: &[u8] =
+        include_bytes!("../../laterite-ags4-validator/tests/fixtures/clean_minimal.ags");
+
+    #[test]
+    fn a_custom_dictionary_can_be_overlaid_on_a_forced_edition() {
+        // The third `BaseSpec` arm. `dictReplace` is refused alongside
+        // `dictVersion` (they contradict), but an OVERLAY on a forced base is
+        // coherent and is the combination a consultancy actually uses: our
+        // bespoke groups, judged against the edition the client mandated.
+        let r = run(
+            DELIVERY,
+            &ValidateOptions {
+                dictionary: Some(DICT_JSON.to_vec()),
+                dict_version: Some("4.1.1".into()),
+                ..Default::default()
+            },
+        );
+        assert_ne!(
+            r.error.as_ref().map(|e| e.kind.clone()).unwrap_or_default(),
+            "bad_dict",
+            "an overlay on a forced base must be accepted: {:?}",
+            r.error.as_ref().map(|e| e.message.clone())
+        );
+        assert_eq!(
+            r.dict_version, "4.1.1",
+            "the forced edition must be the one reported"
+        );
+        assert_eq!(
+            r.resolution, "forced",
+            "and it must be reported as forced, not guessed"
+        );
+    }
+
+    #[test]
+    fn a_group_targeted_finding_serialises_its_target() {
+        // Rule 19: a GROUP name must be exactly four uppercase letters. The
+        // finding targets the GROUP rather than a line or a cell, and that
+        // variant of the mapping had never been produced.
+        let bad_group: &[u8] = b"\"GROUP\",\"loca\"\r\n\
+\"HEADING\",\"LOCA_ID\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"BH01\"\r\n";
+        let r = run(
+            bad_group,
+            &ValidateOptions {
+                warnings: Some(true),
+                fyi: Some(true),
+                ..Default::default()
+            },
+        );
+        let targets: Vec<&str> = r
+            .findings
+            .iter()
+            .flat_map(|g| &g.items)
+            .filter_map(|f| f.target.as_deref())
+            .collect();
+        assert!(
+            targets.contains(&"group"),
+            "a bad GROUP name is a GROUP finding, got {targets:?}"
+        );
+    }
+
+    #[test]
+    fn certify_reports_a_broken_dictionary_rather_than_certifying_without_it() {
+        // Certifying against a dictionary that would not load must FAIL, not
+        // quietly fall back to the bundled one — the certificate records which
+        // dictionary was used, so a silent fallback would mint a true-looking
+        // statement about a validation that never happened.
+        let o = CertifyOptions {
+            checked_at: Some("2020-01-01T00:00:00Z".into()),
+            dictionary: Some(b"{ not a dictionary".to_vec()),
+            ..Default::default()
+        };
+        let msg = match certify_core(CLEAN, &o) {
+            Ok(_) => panic!("a broken dictionary must not certify"),
+            Err(m) => m,
+        };
+        assert!(
+            msg.contains("bad dict"),
+            "the dictionary must be named as the problem, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn a_certificate_records_the_custom_dictionary_it_was_minted_against() {
+        // O-48, record-not-contract: the stamp carries the dict's identity so a
+        // later `validate --index` on ANY surface re-validates rather than
+        // silently vouching when the effective dictionary differs. A cert that
+        // forgot which dictionary it used would be trusted against the wrong one.
+        //
+        // `CLEAN` and not a fixture with findings — a certificate asserts an
+        // error-clean validation, so an erroring file cannot mint one at all and
+        // both sides of this comparison would be `Err` (which is how the first
+        // draft of this test managed to assert nothing at all).
+        let plain = certify_core(
+            CLEAN,
+            &CertifyOptions {
+                checked_at: Some("2020-01-01T00:00:00Z".into()),
+                ..Default::default()
+            },
+        )
+        .expect("the clean fixture certifies");
+        let with_dict = certify_core(
+            CLEAN,
+            &CertifyOptions {
+                checked_at: Some("2020-01-01T00:00:00Z".into()),
+                dictionary: Some(DICT_JSON.to_vec()),
+                ..Default::default()
+            },
+        )
+        .expect("the clean fixture certifies against an overlay too");
+
+        assert_ne!(
+            plain, with_dict,
+            "the custom dictionary left no trace in the certificate"
+        );
+        assert!(
+            with_dict.contains("custom-dict"),
+            "the advisory dictionary name must be recorded: {with_dict}"
+        );
+        assert!(
+            !plain.contains("custom-dict"),
+            "a cert minted without a dictionary must not claim one: {plain}"
+        );
+    }
+
+    #[test]
+    fn certify_refuses_a_parseable_file_that_has_errors() {
+        // The trust model's whole point: warnings and FYI findings are measured
+        // and recorded, ERRORS are fatal. The message has to say how many, or a
+        // user cannot tell "your file is broken" from "certify is broken".
+        let msg = match certify_core(
+            LOCA_A,
+            &CertifyOptions {
+                checked_at: Some("2020-01-01T00:00:00Z".into()),
+                ..Default::default()
+            },
+        ) {
+            Ok(_) => panic!("a file with error findings must not certify"),
+            Err(m) => m,
+        };
+        assert!(
+            msg.contains("error-severity"),
+            "the refusal must name what blocked it, got: {msg}"
         );
     }
 }
