@@ -180,6 +180,13 @@
         "prs": [
           211
         ]
+      },
+      {
+        "text": "**`build_ags4` and `build_ags4_ipc` now return `null` for an absent `line`, as their published types always said.** `BuildReport`'s `.d.ts` declares `line: number | null` on `EmitFinding` and `AppliedFix`, but these two doors serialised through serde-wasm-bindgen's *default* serializer, which writes `undefined` for an absent `Option` — so a consumer writing `f.line === null` type-checked clean and never matched. Every other export in the package already used the json-compatible serializer; there is now only one, and a test refuses to compile a second into the crate. **This is an observable change**: code testing `f.line === undefined` needs `=== null` (or `== null`, which was always correct for both). `?? ` and truthiness checks are unaffected. Verified surgical — the build payload carries no maps and no 64-bit integers, so `None` handling is the only thing the two serializers disagree on.",
+        "prs": [
+          212,
+          213
+        ]
       }
     ],
     "security": []
