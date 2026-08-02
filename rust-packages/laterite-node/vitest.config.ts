@@ -36,7 +36,7 @@ export default defineConfig({
       // branch is half-taken counts as HIT here and as a PARTIAL there, which is
       // why this file can read ~98% while the `node` flag reads ~90%. Codecov's is
       // the stricter measure, so branch coverage is what actually moves it.
-      thresholds: { lines: 97, branches: 89 },
+      thresholds: { lines: 98, branches: 91 },
     },
   },
 });
