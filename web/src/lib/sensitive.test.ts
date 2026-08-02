@@ -58,6 +58,26 @@ describe("sensitive", () => {
     expect(a.get("LLPL_LAB")).toBe("token");
   });
 
+  it("omits a heading whose category has no policy, rather than a blank action", () => {
+    // The two halves of the SSOT can disagree: a heading classified into a
+    // category that `scrub_policy` does not name. Mapping it to `undefined`
+    // would put a heading in the action map with no action — the Anonymiser
+    // would tick it and then redact it with nothing. Absent means "unhandled",
+    // which is the honest state.
+    const drifted: SensitiveDoc = {
+      ...doc,
+      headings: { ...doc.headings, ZZZZ_NEW: { category: "unclassified" } },
+    };
+    const a = actionOf(drifted);
+    expect(a.has("ZZZZ_NEW")).toBe(false);
+    // The rest of the map is unaffected — one unknown category is not a reason
+    // to stop redacting the categories that ARE policed.
+    expect(a.get("LOCA_NATE")).toBe("blank");
+    expect(a.size).toBe(5);
+    // …but the category lookup still knows it, so the UI can show the hint.
+    expect(categoryOf(drifted).get("ZZZZ_NEW")).toBe("unclassified");
+  });
+
   it("scopes preset pre-ticks by category", () => {
     expect([...codesForPreset(doc, "coords")]).toEqual(["LOCA_NATE"]);
     // 'all' is every classified heading.

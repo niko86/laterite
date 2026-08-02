@@ -45,7 +45,14 @@ export default defineConfig({
       // half-taken counts as HIT by lcov and as a PARTIAL by Codecov. Lines alone
       // cannot see that, so branch coverage drifted to 81% unnoticed. Codecov's is
       // the stricter measure and this is the floor that tracks it.
-      thresholds: { lines: 99, branches: 89 },
+      //
+      // Branches ratcheted 89 → 95 once the fetch doors, the join-mode chart
+      // refs and the template's search loop got suites (actual 96.34, lines 100,
+      // Codecov-strict 97.5%). The ~10 branches still short are `?.`/`??` guards
+      // TypeScript's narrowing needs but no input can reach — chasing those would
+      // move the number without testing anything, so the floor keeps a margin
+      // rather than pinning the current value.
+      thresholds: { lines: 99, branches: 95 },
     },
   },
 });

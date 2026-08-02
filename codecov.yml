@@ -7,8 +7,8 @@
 #   * Rust   — cargo llvm-cov --fail-under-lines 88   (.github/workflows/nightly.yml)
 #   * wasm   — cargo llvm-cov --fail-under-lines 89   (.github/workflows/nightly.yml)
 #   * Python — pytest --cov-fail-under=95             (.github/workflows/ci.yml)
-#   * Node   — vitest thresholds {lines 97, branches 89} (laterite-node/vitest.config.ts)
-#   * Web    — vitest thresholds {lines 99, branches 89} (web/vitest.config.ts)
+#   * Node   — vitest thresholds {lines 98, branches 91} (laterite-node/vitest.config.ts)
+#   * Web    — vitest thresholds {lines 99, branches 95} (web/vitest.config.ts)
 # So Codecov's own statuses are INFORMATIONAL — they annotate PRs, never block.
 #
 # The floors above are DELIBERATELY below the badges, and by different margins:

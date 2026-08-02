@@ -45,4 +45,25 @@ describe("typeDescription — covers the dictionary's TYPE vocabulary", () => {
     expect(typeDescription("X")).toBe("text"); // the legitimate free-text type
     expect(typeDescription("ZZ")).toBe("text"); // unknown → fallback
   });
+
+  it("glosses a code the engine knows but no standard heading uses", () => {
+    // MC is in laterite-ags4-types' string-type vocabulary, yet no heading in
+    // the union declares it — so the drift test above can never reach it. A
+    // user-defined group is free to declare TYPE "MC", and when one does the
+    // Analyse view must name it rather than shrug "text" at a type the engine
+    // recognises perfectly well.
+    expect(typeDescription("MC")).toBe("moisture-condition value");
+    expect(dictTypes).not.toContain("MC");
+  });
+
+  it("treats a missing TYPE row as unknown rather than throwing", () => {
+    // A group with no TYPE line reaches here as "" — common in hand-edited
+    // files, and the Analyse view renders it alongside everything else. It must
+    // fall through to the text fallback, not blow up the whole column table.
+    expect(typeDescription("")).toBe("text");
+    // The normalisation either side of it: surrounding space and lower case are
+    // both ordinary, and neither should cost a code its description.
+    expect(typeDescription("  2dp  ")).toBe("decimal, 2 places");
+    expect(typeDescription("yn")).toBe("yes / no (boolean)");
+  });
 });
