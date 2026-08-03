@@ -11,9 +11,10 @@ public API (`check_file` / `check_file_with_dict` / `is_valid` /
 `CheckOptions`), the `lat` CLI, and the full numbered-rule set
 (Rules 1–20) are implemented, regression-tested, and dogfooded
 against real-world deliveries + cross-checked vs `python-ags4`.
-Deliberate divergences from python are logged in `OBSERVATIONS.md`.
-For end-user CLI usage see [`README-cli.md`](README-cli.md) (or
-`lat --readme`).
+Deliberate divergences from python are logged in
+[`OBSERVATIONS.md`](https://github.com/niko86/laterite/blob/main/OBSERVATIONS.md).
+For end-user CLI usage run `lat --readme`, or see
+[`README-cli.md`](https://github.com/niko86/laterite/blob/main/rust-packages/laterite-cli/README-cli.md).
 
 ## Licence & clean-room boundary (important)
 
@@ -35,13 +36,17 @@ For the interim Python-based workflow, see
 
 Discrepancies, ambiguities, and apparent defects found in python-ags4
 or the AGS4 spec while porting are recorded in
-[`OBSERVATIONS.md`](OBSERVATIONS.md) — both to justify our deliberate
+[`OBSERVATIONS.md`](https://github.com/niko86/laterite/blob/main/OBSERVATIONS.md) — both to justify our deliberate
 deviations and to feed upstream issue reports to the AGS Data Format
 Working Group. Every phase appends to it.
 
-## Roadmap
+## The rule set
 
-Port the 19 rules + the cross-file Rule 20 listed below. Each rule maps to a planned Rust function in [`src/lib.rs`](src/lib.rs). The AGS4.1 spec source is `reports/AGS 4_1.pdf`, sections 4.1.1 (Rules 1–18) + 4.1.4 (Rule 20).
+All 19 numbered rules plus the cross-file Rule 20 are implemented and shipped;
+the table is a reference to what each one covers, not a plan. They live in
+`src/rules/` (line_format, structure, naming, dictionary, typed_values,
+relational, groups, references), dispatched from `src/lib.rs`. The rule text is
+AGS4.1 §4.1.1 (Rules 1–18) and §4.1.4 (Rule 20).
 
 | Rule | Family | Notes |
 |---|---|---|
@@ -68,15 +73,14 @@ Port the 19 rules + the cross-file Rule 20 listed below. Each rule maps to a pla
 | 19 / 19a / 19b | Multi-group consistency | Dictionary alignment across groups in one file. |
 | 20 | Cross-file | Same headings/types/units across multiple deliveries. |
 
-## Trigger to start work
-
-When one of these is true:
-
-- A consumer wants spec validation without Python on the machine (shipping a single-file binary).
-- The Python validator is too slow on a hot path (current pandas-based impl is ~30 s on a 23 MB / 100k-row file).
-- A pure-Rust crate is needed for embedding in other Rust tooling.
-
-
 ## Test corpus
 
-When implementation begins, the python-ags4 test fixtures at <https://gitlab.com/ags-data-format-wg/ags-python-library/-/tree/main/tests/test_files> are the canonical regression suite. Each `4.1-rule<N>-<variant>.ags` fixture has a matching `.check` JSON file capturing the expected `check_file` output. Aim for byte-for-byte parity with those golden outputs (modulo the `"Rule N"` ↔ `"AGS Format Rule N"` key prefix difference noted in the skill).
+The python-ags4 fixtures at
+<https://gitlab.com/ags-data-format-wg/ags-python-library/-/tree/main/tests/test_files>
+are the regression suite: each `4.1-rule<N>-<variant>.ags` has a matching
+`.check` JSON capturing the expected `check_file` output. Parity against them is
+not an aspiration but a **required merge check** — [`check_parity.py`](https://github.com/niko86/laterite/blob/main/tools/check_parity.py)
+enforces the failing set by identity against
+[`parity-known-failures.json`](https://github.com/niko86/laterite/blob/main/parity-known-failures.json), so a regression
+and an intentional divergence are told apart rather than counted. The `"Rule N"`
+vs `"AGS Format Rule N"` key-prefix difference is a deliberate, recorded variance.

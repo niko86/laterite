@@ -84,7 +84,7 @@ git tag --no-sign wasm-v0.6.0 && git push origin wasm-v0.6.0          # npm @lat
 
 # 5. Cut the DuckDB extension at the SAME version (its own repo — see below):
 cd <the niko86/laterite-duckdb checkout> && bash scripts/release.sh 0.6.0
-# 6. Confirm the docs republished: /laterite/docs/ Reference → Changelog shows 0.6.0.
+# 6. Confirm the docs republished (the site rebuilds on every main push).
 ```
 
 The tags stay separate because `release.yml` has independent `v*` (Python + CLI),
@@ -179,11 +179,10 @@ at whatever laterite version is then current.
 
 The docs (`web/docs-site/`) deploy to `/laterite/docs/` on **every main push**
 (`deploy-validator.yml`) — deliberately *not* gated on the release tag, so a doc
-fix ships immediately. The **Changelog page** (`reference/changelog.md`, generated
-by `scripts/gen_changelog.py`) renders the root `CHANGELOG.md` and stamps the
-shipped version, both **derived at build**. So merging the release PR to main
-republishes the docs with the new version + notes automatically — step 6 is just
-a confirmation, nothing to run.
+fix ships immediately. The **Changelog page** (`web/docs-site/docs/reference/changelog.md`)
+is a short hand-written stub that points readers at the GitHub Releases feed. It
+does NOT render `CHANGELOG.md` and carries no version number — so there is
+nothing about it to confirm after a release, and step 6 above says so.
 
 ## What keeps it honest
 

@@ -339,7 +339,7 @@ Largest divergence area. Multiple sub-cases:
 - **laterite** (Stage 7e): same behaviour. We codegen the standard
   ABBR data into the Rust binary (`build.rs` emits a
   `DICT_<edition>_ABBRS` phf map per edition), then `rule_16_fyi`
-  in `rules/groups.rs` performs the same comparison. Wording
+  in `rust-packages/laterite-ags4-validator/src/rules/groups.rs` performs the same comparison. Wording
   matches python-ags4 verbatim. Native + compat both benefit.
 
 ### Rule 19b — heading prefix validation

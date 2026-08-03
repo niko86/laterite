@@ -134,6 +134,14 @@ jobs:
               - 'observations.json'
               - 'OBSERVATIONS.md'
               - 'tools/gen_observations.py'
+              # The prose docs check_doc_refs reads. `COMPAT.md` is already above
+              # (a test reads it); these are the rest. Without them a
+              # RELEASING/CONTRIBUTING-only edit would not fire the gate that
+              # exists to check exactly those files.
+              - 'RELEASING.md'
+              - 'CONTRIBUTING.md'
+              - 'README.md'
+              - 'tools/check_doc_refs.py'
             node:
               # The napi addon links sibling crates — laterite-ags4-validator,
               # laterite-ags4-types, laterite-ags4-emit (see laterite-node/Cargo.toml) —
@@ -908,6 +916,18 @@ jobs:
         # reclassified (BUG->SPEC) while the external-facing table keeps the old
         # text. Regenerate with `python tools/gen_observations.py`.
         run: uv run --no-project python tools/gen_observations.py --check
+
+      - name: doc references resolve (incl. crates.io-strict for published READMEs)
+        # Cheap stdlib check that no doc points at a file that isn't there. It
+        # exists because the equivalent manual audit found four dead references
+        # in seconds, TWO OF THEM on published crates.io pages — where a
+        # version's README is frozen and cannot be corrected retroactively.
+        #
+        # The published-crate half is the part worth having: a README link
+        # resolves against the PACKAGE on crates.io, not the repo, so
+        # `[x](OBSERVATIONS.md)` reads fine in a checkout and 404s for the person
+        # deciding whether to `cargo add`. Those must be absolute github.com URLs.
+        run: uv run --no-project python tools/check_doc_refs.py --check
 
       - name: ty check (type-faithfulness gate)
         # Astral `ty` over the SHIPPED `laterite` package (scope + the abi3-py312
