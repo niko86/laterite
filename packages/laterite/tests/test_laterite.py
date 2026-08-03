@@ -14,6 +14,7 @@ import contextlib
 import io
 import json
 import logging
+import re
 import subprocess
 import sys
 import textwrap
@@ -33,6 +34,8 @@ _FIX = (
 _RUST_BIN = Path(__file__).parents[3] / "rust-packages" / "target" / "release" / "lat"
 _FIXTURES = sorted(_FIX.glob("*.ags"))
 _CLEAN = _FIX / "clean_minimal.ags"
+#: A file with findings — the populated-grid half of the human-table parity check.
+_DIRTY = _FIX / "multi_finding.ags"
 
 logging.disable(logging.CRITICAL)
 
@@ -692,18 +695,99 @@ def test_cli_list_rules_rust_binary_json_matches_python():
     assert r.stdout == py  # byte-identical, not merely structurally equal
 
 
+def test_box_table_colour_is_off_when_redirected(monkeypatch):
+    """`_colour_enabled` is the Rust `colour_enabled` conjunction, and all three
+    terms must hold — an explicit opt-out, `NO_COLOR`, and a real terminal.
+
+    Only the last one is exercised by every other test here (a captured
+    subprocess has no TTY), so the other two are pinned directly. If any term
+    stopped being read, redirected output would gain escape codes and every
+    byte-parity assertion above would start failing for a reason none of them
+    names.
+    """
+    from laterite import _cli
+
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setattr(_cli.sys.stdout, "isatty", lambda: True)
+    assert _cli._colour_enabled() is True
+    assert _cli._colour_enabled(no_colour=True) is False, "the explicit opt-out"
+    monkeypatch.setenv("NO_COLOR", "1")
+    assert _cli._colour_enabled() is False, "the NO_COLOR convention"
+    monkeypatch.delenv("NO_COLOR")
+    monkeypatch.setattr(_cli.sys.stdout, "isatty", lambda: False)
+    assert _cli._colour_enabled() is False, "not a terminal"
+
+
+def test_box_table_styling_does_not_skew_columns():
+    """Escapes are applied AFTER padding, so they never count as display width.
+
+    Getting this backwards is the classic ANSI table bug: the cell is padded to
+    include the invisible bytes, every column after it shifts, and the grid only
+    breaks for users on a terminal — the one place no test looks.
+    """
+    from laterite import _cli
+
+    plain = _cli._box_table(["h"], [["a"], ["b"]], colour=False)
+    styled = _cli._box_table(["h"], [["a"], ["b"]], colour=True)
+    assert "\x1b[" not in plain
+    assert "\x1b[1;36m" in styled and "\x1b[2m" in styled, (
+        "header bold-cyan, alt rows dim"
+    )
+    # Strip the escapes back out and the two must be the same table.
+    assert re.sub(r"\x1b\[[0-9;]*m", "", styled) == plain
+
+
+@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat not built")
+@pytest.mark.parametrize(
+    ("argv", "what"),
+    [
+        (["rules"], "the rule catalogue"),
+        ([str(_CLEAN)], "a clean verdict"),
+        ([str(_DIRTY)], "a findings table"),
+    ],
+    ids=["rules", "clean", "findings"],
+)
+def test_cli_human_table_rust_binary_byte_parity(argv, what):
+    """The HUMAN tables agree byte-for-byte, not just the machine-readable ones.
+
+    `lat rules` and the findings table had no cross-surface coverage at all —
+    `--json`/`--ndjson`/`--csv` and exit codes were pinned, and the grids people
+    actually read were pinned nowhere. That is how the two CLIs came to print
+    visibly different output for the same command without any gate noticing.
+
+    Covers a wide table (28 rules), an empty one (a clean file prints no grid at
+    all) and a populated one, so a change to the glyphs, the padding or the
+    between-row rule reddens here.
+    """
+    r = subprocess.run([str(_RUST_BIN), *argv], capture_output=True, text=True)
+    py, _ = _run_py_cli(argv)
+    assert r.stdout == py, f"{what} diverged between the Rust binary and the Python CLI"
+
+
 @pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat not built")
 def test_cli_read_rust_binary_byte_parity():
     """`lat read` is byte-coherent across the Rust binary and the Python CLI for
-    the group listing and --json / --csv (raw file cells, #430 PR 2). The human
-    --table is each surface's own presentation and is not compared."""
+    the group listing, --json / --csv (raw file cells, #430 PR 2) — and now the
+    human --table as well.
+
+    The table used to be excluded on the grounds that presentation was each
+    surface's own. It was not a principle so much as an accident: the Python CLI
+    printed a plain `ljust` grid because nobody had written comfy-table's glyphs
+    down. They are written down now (`_cli._box_table`), so the exclusion is gone
+    and the two programs called `lat` render the same bytes.
+
+    The one place they still part is an interactive TTY, where comfy-table's
+    `ContentArrangement::Dynamic` wraps to the terminal width and this does not.
+    A captured subprocess has no TTY, so it is not this test's case — and it is
+    not any gate's or document's case either, which is why matching the wrapping
+    algorithm was not worth it."""
     f = str(_CLEAN)
     # the group listing
     r = subprocess.run([str(_RUST_BIN), "read", f], capture_output=True, text=True)
     py, _ = _run_py_cli(["read", f])
     assert r.returncode == 0 and r.stdout == py, "read (list codes) diverged"
-    # a group dumped as --json and --csv (PROJ is present in the clean fixture)
-    for extra in (["--json"], ["--csv"]):
+    # a group dumped as --json, --csv and the human table
+    for extra in (["--json"], ["--csv"], []):
         r = subprocess.run(
             [str(_RUST_BIN), "read", f, "PROJ", *extra], capture_output=True, text=True
         )

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The `lat` console script the wheel installs now renders the same tables as the shipped `lat` binary.** Two programs answer to `lat` — the Rust binary and this Python console script — and until now they printed visibly different output for the same command: comfy-table's UTF-8 box grid from one, a plain `ljust` grid from the other. The machine-readable surfaces (`--json`, `--ndjson`, `--csv`, the group listing, exit codes) had always been held byte-identical by test; the grids people actually read were pinned nowhere, which is how the divergence survived. The glyphs are now matched exactly, colour included (bold-cyan header, dim alternate rows, honouring `NO_COLOR` and a real terminal the same way the binary does), and the human table has joined the byte-parity tests instead of being excluded from them. **No new dependency:** the CLI remains stdlib-only. The two still part under an interactive TTY, where comfy-table wraps to the terminal width and this does not — a case no gate or document captures.
+
 ## [0.10.0] — 2026-08-02
 
 The Rust engine has an audience it did not have before: eight crates are on crates.io, and `laterite` is a real Rust API rather than a reserved name. That brought a second version number with it — the engine answers to `cargo add`, the products to `pip install` and `npm i` — so every surface now reports which ENGINE it carries, and the cross-surface gate checks it was comparing one. **Breaking:** the browser package finishes what 0.9.0 started — `diff` and `censor` take an options object like every other export, and `any` is gone from the `.d.ts` entirely.
