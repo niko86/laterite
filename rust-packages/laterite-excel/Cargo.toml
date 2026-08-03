@@ -34,7 +34,7 @@ laterite-ags4-core = { path = "../laterite-ags4-core", default-features = false 
 # wasm-safe emit leaf rather than through laterite-ags4-core's ags4_writer shim.
 laterite-ags4-emit = { path = "../laterite-ags4-emit" }
 # Pure-Rust XLSX I/O (no Python deps): rust_xlsxwriter writes, calamine reads.
-rust_xlsxwriter = "0.96"
+rust_xlsxwriter = "0.97"
 calamine = "0.36"
 
 [features]
