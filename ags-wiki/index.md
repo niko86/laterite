@@ -451,7 +451,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 28, concept
 | page | status | targets |
 |---|---|---|
 | [[strategies/_README\|Test Strategies register]] | register | — |
-| [[strat-ags-dfwg-upstream-list]] | confirmed | [rule-19-group-name-format, rule-06-comma-no-embedded-crlf, rule-07-heading-order, rule-01-ascii] |
+| [[strat-ags-dfwg-upstream-list]] | confirmed | [rule-19-group-name-format, rule-06-comma-no-embedded-crlf, rule-07-heading-order, rule-01-ascii, rule-08-typed-values] |
 | [[strat-cp1252-rule1]] | confirmed | [rule-01-ascii] |
 | [[strat-elrg-recognition]] | confirmed | [rule-09-unknown-headings, rule-15-unit-group] |
 | [[strat-forge-divergence-mining-campaign]] | proposed | [rule-10a-key-uniqueness, rule-10c-parent-child, rule-08-typed-values, rule-05-quoting, rule-16-abbr-defined] |

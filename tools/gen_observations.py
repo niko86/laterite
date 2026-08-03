@@ -83,6 +83,13 @@ WIKI_DIR = ROOT / "ags-wiki" / "observations"
 COVERAGE_MAP = ROOT / "ags-wiki" / "insights" / "observations-coverage-map.md"
 COVERAGE_MARKER = "observations-coverage"
 
+#: The register the `upstream` flag exists to feed: the AGS-DFWG proposal list.
+#: Its tiering and wording are editorial, so it is NOT generated — but its
+#: MEMBERSHIP is not, and six flagged observations had gone missing from it,
+#: including the two strongest (a DoS and a false-positive on real delivery
+#: files). --check-wiki holds the membership; the prose stays hand-written.
+DFWG_REGISTER = ROOT / "ags-wiki" / "strategies" / "strat-ags-dfwg-upstream-list.md"
+
 #: The house style CLAUDE.md documents. Used by --lint as a REPORT, never as a
 #: schema — see the module docstring for why the catalogue is not normalised to it.
 HOUSE_STYLE = ["Observed", "Spec", "Assessment", "Upstream-reportable", "Our decision"]
@@ -286,6 +293,9 @@ def check_wiki(data: dict) -> list[str]:
     record's kind, or its `upstream_reportable` contradicts the record's flag —
     the last being the one that actually drifted, on 12 pages.
 
+    Plus a fifth, one level up: an observation can be correctly flagged everywhere
+    and still be absent from the register the flag EXISTS to feed. Six were.
+
     Zero-padding is the wiki's filename convention (`O-01.md`) and the catalogue's
     ids are unpadded (`O-1`), so the two are mapped by integer, never by string.
     """
@@ -323,6 +333,21 @@ def check_wiki(data: dict) -> list[str]:
             for key, got, want in checks
             if got != want
         )
+
+    # Membership only, in one direction. An O-N may be CITED in the register
+    # without being flagged — O-9 is, as context beside the flagged attribution
+    # items — so the reverse is deliberately not an error. What must never happen
+    # is a flagged observation the register never mentions: that is the flag
+    # producing nothing, which is the whole point of setting it.
+    cited = set(
+        re.findall(r"\[\[(O-\d+)\]\]", DFWG_REGISTER.read_text(encoding="utf-8"))
+    )
+    problems.extend(
+        f"O-{n}: upstream in {JSON_PATH.name} but absent from "
+        f"{DFWG_REGISTER.relative_to(ROOT)} — the flag feeds that register"
+        for n in sorted(n for n, r in recs.items() if r.get("upstream"))
+        if f"O-{n:02d}" not in cited
+    )
     return problems
 
 
