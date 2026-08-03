@@ -493,6 +493,14 @@ jobs:
         run: uv run --no-project python tools/gen_reference_groups.py --check
       - name: gen_crate_graph --check (graph == Cargo manifests)
         run: uv run --no-project python tools/gen_crate_graph.py --check
+      # gen_wiki_tables was in the per-PR lane but not here, so the ENFORCING half
+      # of the wiki controls was one gate short of the advisory half.
+      - name: gen_wiki_tables --check (ledger tables == their JSON)
+        run: uv run --no-project python tools/gen_wiki_tables.py --check
+      - name: gen_observations --check (OBSERVATIONS.md + coverage map == the SSOT)
+        run: uv run --no-project python tools/gen_observations.py --check
+      - name: gen_observations --check-wiki (O-N pages agree with the SSOT)
+        run: uv run --no-project python tools/gen_observations.py --check-wiki
 
   # Open or update ONE tracking issue when the nightly fails, so a bad night is
   # actionable without watching the Actions tab. GitHub also emails the owner on a

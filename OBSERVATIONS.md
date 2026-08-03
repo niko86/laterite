@@ -640,7 +640,23 @@ O-N below is an internal decision or behavioural note, not for external circulat
 
 ## How to add an entry
 
-Append under the current phase heading. Use the next `O-N`. Keep the
-five fields (observed / spec / assessment / upstream-reportable /
-our decision). When an item is reported upstream, add a
+Edit `observations.json` — **never `OBSERVATIONS.md`**, which is generated from it
+and gated in CI (`tools/gen_observations.py --check`). Regenerate with
+`uv run --no-sync python tools/gen_observations.py`.
+
+Append under the current phase heading and use the next free `O-N`. Aim for the
+house style — **observed / spec / assessment / upstream-reportable / our
+decision** — but write what the case needs rather than padding to five: `Spec` is
+meaningless for a laterite-internal fork, and `python-ags4` is the usual concrete
+form of `Observed`. `--lint` reports departures without rewriting them, so the
+convention guides new entries instead of being enforced retroactively over a
+catalogue that predates it.
+
+Set `upstream: true` for anything worth sending to the AGS Data Format Working
+Group; the `## Upstream-reportable` table is rendered from that flag, so there is
+no second list to keep in step. When an item is actually filed, add a
 `- **Reported**: <url or ref> (<date>)` line so we don't double-file.
+
+Each O-N also has a wiki page (`ags-wiki/observations/O-NN.md`) that links and
+cross-references but never copies the fields. `--check-wiki` holds the two in
+agreement.
