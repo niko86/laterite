@@ -36,7 +36,9 @@ engine or a whole codec. It is wasm-safe and has no I/O.
 ## Reference data provenance
 
 The bundled standard dictionaries are ©AGS reference data, redistributed as a
-documented decision — see `data/PROVENANCE.md` in the crate.
+documented decision — see
+[`PROVENANCE.md`](https://github.com/niko86/laterite/blob/main/rust-packages/laterite-ags4-validator/data/PROVENANCE.md),
+which lives beside the source `.ags` dictionaries in `laterite-ags4-validator`.
 
 Part of the [laterite](https://github.com/niko86/laterite) AGS4 toolchain.
 
