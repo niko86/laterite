@@ -5,7 +5,7 @@
 # CLI-only deps that can't cross-compile to wasm32 (comfy-table /
 # indicatif → console threads+TTY, the optional ratatui/crossterm TUI)
 # live here, behind the product binary, not on the library every
-# embedder (laterite-ags5-db, laterite-py, laterite-ags4-wasm) inherits.
+# embedder (laterite-py, laterite-node, laterite-ags4-wasm) inherits.
 
 [package]
 name = "laterite-cli"
@@ -82,10 +82,12 @@ chrono = "0.4"
 # Same encoding_rs as the validator so `&'static Encoding` types match
 # across the `CheckOptions::encoding` boundary.
 encoding_rs = "0.8"
-# CLI presentation parity with laterite-ags5-db/src/output.rs: the
-# animated spinner, the aligned UTF8 finding table, rich-style coloured
-# JSON — via the shared `laterite-cliutil` crate (single source of truth,
-# also used by `ags4-corpus-qa`). It pulls comfy-table/indicatif/
+# CLI presentation primitives: the animated spinner, the aligned UTF8
+# finding table, rich-style coloured JSON — all via the shared
+# `laterite-cliutil` crate, which is the single source of truth for them
+# (also used by laterite-ags4-{corpus-qa,forge,parity}, so the QA tools and
+# the product binary render findings the same way). It pulls
+# comfy-table/indicatif/
 # serde_json + (transitively) crossterm for terminal capability
 # detection; none of that touches the validator library now.
 laterite-cliutil = { path = "../laterite-cliutil", features = ["clap"] }
