@@ -43,6 +43,8 @@ O-N below is an internal decision or behavioural note, not for external circulat
 | O-30 | VARIANCE | TRAN_AGS-driven edition selection — deliberate divergences from python |
 | O-31 | VARIANCE | Rule 8 — empty `DT` UNIT now flagged (python parity; closes the O-12 degenerate gap) |
 | O-32 | VARIANCE | Non-UTF-8 input is decoded lossily, not refused (mirrors python's `errors="replace"`; closes the `NotUtf8` black hole) |
+| O-33 | VARIANCE | Rule 8 — DT/datetime bounded to pandas' Timestamp range (closes the value-range gap O-12 missed) |
+| O-34 | VARIANCE | `NotAgs4` ↔ python "missing mandatory groups" is a KNOWN_DIVERGENCE |
 | O-38 | SPEC | Rule 8 DT validation: python-ags4 forbids non-ISO UNITs |
 | O-39 | SPEC | Rule 10c — empty parent KEYs are "no entry", not a missing link |
 | O-42 | VARIANCE | TRAN_AGS="4.0" resolves to 4.0.4 (superset-safe), with a content guard; python's static "4.0"→4.0.3 over-reports Rule 10c |
