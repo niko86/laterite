@@ -304,18 +304,27 @@ def AGS4_to_dict(
     return data, headings
 
 
-def _compat_arrow(filepath_or_buffer: Any, encoding: str) -> dict:
+def _compat_arrow(
+    filepath_or_buffer: Any, encoding: str, only_groups: list[str] | None = None
+) -> dict:
     """Native compat parse → per-group all-``Utf8`` Arrow, built Rust-side with
     no per-cell ``PyObject`` boxing (the fast path behind ``AGS4_to_dataframe``).
     Returns ``group_order`` + per-group ``{headings, table, ragged, …}`` +
-    ``group_records`` (the dup/ragged data the strict raises consume)."""
+    ``group_records`` (the dup/ragged data the strict raises consume).
+
+    ``only_groups`` narrows which groups get a ``table``; every group still
+    carries its headings, line anchors and ``ragged`` list, because the strict
+    raises apply to the whole file. Groups outside the narrowing have no
+    ``table`` key at all — reach for one only on a group you asked for."""
     if hasattr(filepath_or_buffer, "read"):
         text = filepath_or_buffer.read()
         if isinstance(text, bytes):
             text = text.decode(encoding, errors="replace")
-        return raise_for(_native.parse_compat_arrow(text=text))
+        return raise_for(_native.parse_compat_arrow(text=text, only_groups=only_groups))
     return raise_for(
-        _native.parse_compat_arrow(path=str(filepath_or_buffer), encoding=encoding)
+        _native.parse_compat_arrow(
+            path=str(filepath_or_buffer), encoding=encoding, only_groups=only_groups
+        )
     )
 
 
@@ -352,7 +361,11 @@ def AGS4_to_dataframe(
         )
 
     sd = resolve_string_dtype(string_dtype)
-    p = _compat_arrow(filepath_or_buffer, encoding)
+    # Push the narrowing down to the native parse so the Arrow tables for groups
+    # you are about to discard are never built or crossed at all. On a 123-group
+    # file that is ~11 ms and ~25 MB of peak RSS (#99); `only_groups=None` builds
+    # every group exactly as before.
+    p = _compat_arrow(filepath_or_buffer, encoding, only_groups)
     # python-ags4's hard raises from the native parse — no second file scan.
     _strict_check_native(p)
     groups = p["groups"]
