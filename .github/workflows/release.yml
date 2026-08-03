@@ -540,7 +540,7 @@ jobs:
           echo "After re-tag:"
           ls -la
 
-      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           packages-dir: pypi/
 
@@ -606,7 +606,7 @@ jobs:
           echo "After re-tag:"
           ls -la
 
-      - uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           packages-dir: pypi/
 
@@ -888,7 +888,7 @@ jobs:
       - name: Prepare the publishable package
         run: tools/release/prepare-wasm-package.sh "$GITHUB_WORKSPACE/wasm-pkg"
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: wasm-pkg
           path: wasm-pkg/
