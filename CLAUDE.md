@@ -24,12 +24,20 @@ repo authority it cites (`observations.json`, `ags_dictionary.json`, the validat
 rule modules) before relying on it — code can move under a page.
 
 **The OBSERVATIONS canon is a code SSOT.** The O-N divergence catalogue's source
-of truth is `observations.json` (repo root); `OBSERVATIONS.md` is its rendered
-prose view. To add or change an O-N: edit `observations.json` (5-field house style
-— observed / spec / assessment / upstream-reportable / our decision — next free
-O-N, clean-room, accurate), then **regenerate** with
-`uv run --no-sync python tools/gen_observations.py` (never hand-edit the rendered
-Markdown). Reflect the change in the wiki's divergence catalogue in the same work.
+of truth is `observations.json` (repo root); `OBSERVATIONS.md` and the wiki's
+coverage-map lists are its rendered views. To add or change an O-N: edit
+`observations.json` (aim for the house style — observed / spec / assessment /
+upstream-reportable / our decision — next free O-N, clean-room, accurate), then
+**regenerate** with `uv run --no-sync python tools/gen_observations.py` (never
+hand-edit a rendered file). Set `upstream: true` for anything worth taking to the
+AGS-DFWG — the `## Upstream-reportable` table is rendered from that flag.
+
+Every O-N also needs a wiki page — one zero-padded `O-NN.md` per record under
+`ags-wiki/observations/`, copied from
+`ags-wiki/templates/_template-observation.md` — that **links and cross-references
+but never copies the fields**, with `obs_tag` and `upstream_reportable` matching
+the record. `tools/gen_observations.py --check-wiki` holds the two in agreement
+and is a CI gate; `--lint` reports house-style departures without rewriting them.
 
 > Private, dev-only notes (CI/runner operations, the dormant AGS5 strand, the QA
 > tool design pages, session-workflow recipes) are **not** in this public repo —

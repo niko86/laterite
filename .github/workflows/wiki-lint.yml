@@ -126,3 +126,25 @@ jobs:
       # from a fresh render (a hand-edit inside the markers, or a stale checkout).
       - name: gen_wiki_tables --check (ledger tables == their JSON)
         run: uv run --no-project python tools/gen_wiki_tables.py --check
+
+      # The O-N catalogue's two wiki-side gates.
+      #
+      # `--check-wiki` compares every `ags-wiki/observations/O-NN.md` against
+      # observations.json: kind, upstream-reportability, self-declared id, anchor,
+      # and that the page set and the record set are the same set. Nothing had ever
+      # compared them, and they had drifted — 12 pages read
+      # `upstream_reportable: false` for observations the catalogue lists as
+      # upstream-reportable (their own prose said "[SPEC] — …"), and O-46/O-47 had
+      # no page at all.
+      #
+      # `--check` is ALSO run here, not only in ci.yml's python job, because the
+      # generator now renders the coverage map's by-tag + upstream lists into a
+      # marker region. That target lives under ags-wiki/**, which is not in the
+      # python job's path filter — so a hand-edit of the region alone would sail
+      # past exactly the way #207's census gate did. This lane has no path filter,
+      # so both halves of the SSOT→page relationship always fire.
+      - name: gen_observations --check (OBSERVATIONS.md + coverage map == the SSOT)
+        run: uv run --no-project python tools/gen_observations.py --check
+
+      - name: gen_observations --check-wiki (O-N pages agree with the SSOT)
+        run: uv run --no-project python tools/gen_observations.py --check-wiki

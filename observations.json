@@ -437,6 +437,6 @@
   ],
   "footer": {
     "heading": "How to add an entry",
-    "body": "\nAppend under the current phase heading. Use the next `O-N`. Keep the\nfive fields (observed / spec / assessment / upstream-reportable /\nour decision). When an item is reported upstream, add a\n`- **Reported**: <url or ref> (<date>)` line so we don't double-file.\n"
+    "body": "\nEdit `observations.json` — **never `OBSERVATIONS.md`**, which is generated from it\nand gated in CI (`tools/gen_observations.py --check`). Regenerate with\n`uv run --no-sync python tools/gen_observations.py`.\n\nAppend under the current phase heading and use the next free `O-N`. Aim for the\nhouse style — **observed / spec / assessment / upstream-reportable / our\ndecision** — but write what the case needs rather than padding to five: `Spec` is\nmeaningless for a laterite-internal fork, and `python-ags4` is the usual concrete\nform of `Observed`. `--lint` reports departures without rewriting them, so the\nconvention guides new entries instead of being enforced retroactively over a\ncatalogue that predates it.\n\nSet `upstream: true` for anything worth sending to the AGS Data Format Working\nGroup; the `## Upstream-reportable` table is rendered from that flag, so there is\nno second list to keep in step. When an item is actually filed, add a\n`- **Reported**: <url or ref> (<date>)` line so we don't double-file.\n\nEach O-N also has a wiki page (`ags-wiki/observations/O-NN.md`) that links and\ncross-references but never copies the fields. `--check-wiki` holds the two in\nagreement.\n"
   }
 }

@@ -35,13 +35,26 @@ by hand. The structured part is what the rendering actually needs — `id`, `kin
 the house style WITHOUT rewriting them, so the convention is enforced going
 forward instead of retrofitted destructively.
 
+THE WIKI'S SECOND COPY. Each O-N also has a page under `ags-wiki/observations/`
+carrying the same classification in its frontmatter — `obs_tag` (the kind) and
+`upstream_reportable`. Nothing had ever compared the two, and by the time this was
+measured they had drifted: 12 pages read `upstream_reportable: false` while the
+catalogue listed them as upstream-reportable, and O-46/O-47 had no page at all.
+The prose on all 12 already said "[SPEC] — …"/"[BUG] — …", so only the machine-
+readable flag was wrong — exactly the silent-disagreement failure a rendered table
+prevents on the repo side, reappearing one directory over. `--check-wiki` closes
+it: the SSOT is the catalogue, and a page may not disagree with it.
+
 Modes:
-  gen_observations.py            regenerate OBSERVATIONS.md from observations.json
-  gen_observations.py --check    exit 1 if OBSERVATIONS.md is stale (CI drift gate)
-  gen_observations.py --lint     report records that depart from the house style
-  gen_observations.py --ingest   one-off: parse a hand-written OBSERVATIONS.md
-                                 into observations.json. Refuses to overwrite an
-                                 existing SSOT.
+  gen_observations.py              regenerate OBSERVATIONS.md from observations.json
+  gen_observations.py --check      exit 1 if OBSERVATIONS.md is stale (CI drift gate)
+  gen_observations.py --check-wiki exit 1 if an ags-wiki O-N page disagrees with
+                                   the SSOT (missing/extra page, wrong obs_tag,
+                                   wrong upstream_reportable, wrong anchor)
+  gen_observations.py --lint       report records that depart from the house style
+  gen_observations.py --ingest     one-off: parse a hand-written OBSERVATIONS.md
+                                   into observations.json. Refuses to overwrite an
+                                   existing SSOT.
 
 Run: `uv run --no-sync python tools/gen_observations.py` (stdlib only).
 """
@@ -61,6 +74,14 @@ if TYPE_CHECKING:
 ROOT = Path(__file__).resolve().parent.parent
 JSON_PATH = ROOT / "observations.json"
 MD_PATH = ROOT / "OBSERVATIONS.md"
+WIKI_DIR = ROOT / "ags-wiki" / "observations"
+
+#: The vault's by-tag / upstream-reportable synthesis. Its two lists are pure
+#: derivations of the catalogue, so they are rendered into a marker-delimited
+#: region (`gen_wiki_tables.py`'s convention) rather than hand-maintained — they
+#: had frozen at "all 39 O-N entries" while the catalogue reached 50.
+COVERAGE_MAP = ROOT / "ags-wiki" / "insights" / "observations-coverage-map.md"
+COVERAGE_MARKER = "observations-coverage"
 
 #: The house style CLAUDE.md documents. Used by --lint as a REPORT, never as a
 #: schema — see the module docstring for why the catalogue is not normalised to it.
@@ -81,6 +102,15 @@ SYNONYMS = {
 
 RECORD_RE = re.compile(r"^### (O-\d+) \[([A-Z]+)\] (.*)$", re.M)
 SECTION_RE = re.compile(r"^## (.*)$", re.M)
+
+#: A record body's own verdict line, e.g. `- **Upstream-reportable**: **[SPEC]** — …`.
+#: The bracket tag is the catalogue's own convention and tracks the boolean almost
+#: perfectly: SPEC/BUG/VARIANCE (and a bare "Yes") are in the upstream table,
+#: NO/NOTE/qualified prose are not. --lint reports where the two disagree.
+UPSTREAM_LINE_RE = re.compile(
+    r"^- \*\*Upstream[- ]reportable\*\*:?\s*\**\[?([A-Za-z]+)\]?", re.M | re.I
+)
+UPSTREAM_TAGS = {"SPEC", "BUG", "VARIANCE", "YES"}
 
 
 # --------------------------------------------------------------------------- render
@@ -179,6 +209,123 @@ def ingest(md: str) -> dict:
     }
 
 
+# ------------------------------------------------------------------- coverage map
+
+
+def render_coverage(data: dict) -> str:
+    """The coverage map's generated region: every O-N by tag, then the upstream set.
+
+    Wikilinks use the vault's ZERO-PADDED page names (`[[O-01]]`), which is why
+    this cannot simply echo the catalogue's ids.
+    """
+    by_tag: dict[str, list[str]] = {}
+    upstream: list[str] = []
+    for rec in _all_records(data):
+        link = f"[[O-{int(rec['id'][2:]):02d}]]"
+        by_tag.setdefault(rec["kind"], []).append(link)
+        if rec.get("upstream"):
+            upstream.append(link)
+
+    # VARIANCE/SPEC/BUG first — the AGS-DFWG-relevant tags — then NOTE, then any
+    # tag a later record introduces, so a new kind can't vanish from the page.
+    order = ["VARIANCE", "SPEC", "BUG", "NOTE"]
+    out = ["", "## By tag"]
+    out.extend(
+        f"- **{tag}** ({len(by_tag[tag])}): " + ", ".join(by_tag[tag])
+        for tag in order + sorted(set(by_tag) - set(order))
+        if tag in by_tag
+    )
+    out += [
+        "",
+        f"## Upstream-reportable ({len(upstream)})",
+        ", ".join(upstream),
+        "",
+    ]
+    return "\n".join(out)
+
+
+def _splice(md: str, marker: str, block: str) -> str:
+    """Replace the lines between the `<marker>` BEGIN/END comments."""
+    begin, end = f"<!-- BEGIN GENERATED: {marker}", f"<!-- END GENERATED: {marker}"
+    lines = md.split("\n")
+    bi = next((i for i, ln in enumerate(lines) if ln.startswith(begin)), None)
+    ei = next((i for i, ln in enumerate(lines) if ln.startswith(end)), None)
+    if bi is None or ei is None:
+        sys.exit(f"gen_observations: {marker!r} markers not found in {COVERAGE_MAP}")
+    return "\n".join(lines[: bi + 1] + block.split("\n") + lines[ei:])
+
+
+# ----------------------------------------------------------------------- check-wiki
+
+
+def _frontmatter(txt: str) -> dict[str, str]:
+    """The page's `---` block as flat `key: value` strings.
+
+    Deliberately not a YAML parser (stdlib-only, same constraint as the wiki's own
+    `lint.py`). The four keys this gate reads are all scalars written one per line,
+    and `repo_refs.anchor` is picked up by its own indented `anchor:` key.
+    """
+    if not txt.startswith("---"):
+        return {}
+    end = txt.find("\n---", 3)
+    block = txt[3:end] if end != -1 else txt[3:]
+    out: dict[str, str] = {}
+    for line in block.splitlines():
+        m = re.match(r"^\s*([A-Za-z_]+):\s*(.*)$", line)
+        if m:
+            out[m.group(1)] = m.group(2).strip().strip('"')
+    return out
+
+
+def check_wiki(data: dict) -> list[str]:
+    """Cross-check `ags-wiki/observations/O-NN.md` against the catalogue.
+
+    The catalogue is the SSOT; a page may not disagree with it. Four ways it can:
+    the page is missing (or names an O-N the catalogue doesn't have), its
+    `observation_id` contradicts its own filename, its `obs_tag` contradicts the
+    record's kind, or its `upstream_reportable` contradicts the record's flag —
+    the last being the one that actually drifted, on 12 pages.
+
+    Zero-padding is the wiki's filename convention (`O-01.md`) and the catalogue's
+    ids are unpadded (`O-1`), so the two are mapped by integer, never by string.
+    """
+    problems: list[str] = []
+    recs = {int(r["id"][2:]): r for r in _all_records(data)}
+    pages = {
+        int(p.stem[2:]): p for p in WIKI_DIR.glob("O-*.md") if p.stem[2:].isdigit()
+    }
+
+    problems.extend(
+        f"O-{n}: in {JSON_PATH.name} but has no wiki page "
+        f"({WIKI_DIR.relative_to(ROOT)}/O-{n:02d}.md) — copy templates/_template-observation.md"
+        for n in sorted(set(recs) - set(pages))
+    )
+    problems.extend(
+        f"{pages[n].name}: no O-{n} record in {JSON_PATH.name} — the page outlives its observation"
+        for n in sorted(set(pages) - set(recs))
+    )
+
+    for n in sorted(set(recs) & set(pages)):
+        rec, page = recs[n], pages[n]
+        fm = _frontmatter(page.read_text(encoding="utf-8"))
+        checks = [
+            ("observation_id", fm.get("observation_id"), f"O-{n:02d}"),
+            ("obs_tag", fm.get("obs_tag"), rec["kind"]),
+            (
+                "upstream_reportable",
+                fm.get("upstream_reportable"),
+                str(bool(rec["upstream"])).lower(),
+            ),
+            ("repo_refs.anchor", fm.get("anchor"), f"repo:OBSERVATIONS.md#o-{n}"),
+        ]
+        problems.extend(
+            f"{page.name}: {key} is {got!r}, {JSON_PATH.name} says {want!r}"
+            for key, got, want in checks
+            if got != want
+        )
+    return problems
+
+
 # --------------------------------------------------------------------------- lint
 
 
@@ -201,6 +348,17 @@ def lint(data: dict) -> list[str]:
         if missing:
             problems.append(f"{rec['id']}: missing house-style field(s): {missing}")
 
+        # The body's own bracket tag vs the boolean that renders the table. A
+        # report and not a gate: the tag is a convention, and only the maintainer
+        # can say whether a [VARIANCE] belongs in the actionable register.
+        m = UPSTREAM_LINE_RE.search(rec["body"])
+        tag = m.group(1).upper() if m else None
+        if tag and (tag in UPSTREAM_TAGS) != bool(rec["upstream"]):
+            problems.append(
+                f"{rec['id']}: body says Upstream-reportable [{tag}] "
+                f"but upstream={rec['upstream']} (the table follows the boolean)"
+            )
+
     nums = sorted(int(r["id"][2:]) for r in _all_records(data))
     gaps = [n for n in range(1, nums[-1] + 1) if n not in nums]
     if gaps:
@@ -215,6 +373,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--check", action="store_true", help="fail if OBSERVATIONS.md is stale"
+    )
+    ap.add_argument(
+        "--check-wiki",
+        action="store_true",
+        help="fail if an ags-wiki O-N page disagrees with the SSOT",
     )
     ap.add_argument("--lint", action="store_true", help="report house-style departures")
     ap.add_argument(
@@ -244,6 +407,19 @@ def main() -> None:
 
     data = json.loads(JSON_PATH.read_text())
 
+    if args.check_wiki:
+        problems = check_wiki(data)
+        for p in problems:
+            print(f"  {p}")
+        if problems:
+            sys.exit(
+                f"gen_observations: {len(problems)} wiki page(s) disagree with "
+                f"{JSON_PATH.name}, which is the source of truth for the O-N catalogue."
+            )
+        n = sum(len(s["observations"]) for s in data["sections"])
+        print(f"gen_observations: {n} wiki O-N page(s) agree with {JSON_PATH.name}")
+        return
+
     if args.lint:
         problems = lint(data)
         for p in problems:
@@ -254,17 +430,29 @@ def main() -> None:
         return
 
     out = render(data)
+    cov = _splice(
+        COVERAGE_MAP.read_text(encoding="utf-8"),
+        COVERAGE_MARKER,
+        render_coverage(data),
+    )
     if args.check:
-        if MD_PATH.read_text() != out:
+        stale = [
+            p.relative_to(ROOT)
+            for p, want in ((MD_PATH, out), (COVERAGE_MAP, cov))
+            if p.read_text(encoding="utf-8") != want
+        ]
+        if stale:
             sys.exit(
-                "gen_observations: OBSERVATIONS.md is STALE — it is generated from "
-                "observations.json.\nRun: uv run --no-sync python tools/gen_observations.py"
+                f"gen_observations: STALE — {', '.join(map(str, stale))} "
+                "generated from observations.json.\n"
+                "Run: uv run --no-sync python tools/gen_observations.py"
             )
-        print("gen_observations: OBSERVATIONS.md is up to date")
+        print("gen_observations: OBSERVATIONS.md + the coverage map are up to date")
         return
 
     MD_PATH.write_text(out)
-    print(f"gen_observations: wrote {MD_PATH.name}")
+    COVERAGE_MAP.write_text(cov, encoding="utf-8")
+    print(f"gen_observations: wrote {MD_PATH.name} + {COVERAGE_MAP.name}")
 
 
 if __name__ == "__main__":

@@ -915,6 +915,12 @@ jobs:
         # RENDERED from the records it summarises, so an O-N cannot be retitled or
         # reclassified (BUG->SPEC) while the external-facing table keeps the old
         # text. Regenerate with `python tools/gen_observations.py`.
+        #
+        # It now also renders the vault's coverage-map lists. That second target is
+        # under ags-wiki/**, which this job's path filter does NOT watch — so the
+        # SAME command also runs unfiltered in wiki-lint.yml, which is what makes
+        # the coverage-map half reachable. Do not add ags-wiki/** here instead:
+        # that would build the PyO3 wheel on every wiki-only edit.
         run: uv run --no-project python tools/gen_observations.py --check
 
       - name: doc references resolve (incl. crates.io-strict for published READMEs)
