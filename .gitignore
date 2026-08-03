@@ -84,3 +84,21 @@ mutants.out.old/
 # company names and other sensitive tokens that must never appear in the public
 # CHANGELOG.md but also must not be committed here. Owner-maintained, local-only.
 .changelog-denylist
+
+# Scratch output from the docs CLI examples (web/docs-site/examples/cli/*.sh).
+# Those scripts copy a fixture into place and run `lat` on it, so every
+# gen_doc_outputs.py run — including the CI gate — drops these in the working
+# tree. #225 swept them into the repo root with `git add -A`; they are build
+# output, not sources. The examples' own inputs (examples/sample_site.ags) stay
+# tracked; only what a run PRODUCES is ignored.
+/delivery.ags
+/repaired.ags
+/restored.ags
+/round-tripped.ags
+/site.ags
+/site.ags.idx
+/site.ags.zst
+/site.xlsx
+/examples/merged.ags
+/examples/phase2.ags
+/examples/rev.ags

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from importlib import resources
 from pathlib import Path
@@ -72,24 +73,99 @@ def _print_readme() -> int:
     return 0
 
 
+# --- the human table ---------------------------------------------------
+#
+# The Rust `lat` draws comfy-table's `UTF8_FULL` grid (laterite-cliutil's
+# `styled_table`). This CLI used to print a plain `ljust`/`-+-` table, so the two
+# programs called `lat` — the shipped binary and this console script the wheel
+# installs — rendered visibly different output for the same command. The
+# machine-readable surfaces (`--json`, `--ndjson`, `--csv`, the group listing,
+# exit codes) have always been held byte-identical by test; only the human view
+# diverged, and it diverged for no reason other than nobody having written the
+# glyphs down.
+#
+# So they are written down here. Matching them costs no dependency: `rich` would
+# pull `pygments` (5.6 MB, a syntax highlighter, entirely unused for tables) and
+# would still not match, because rich's default box is `HEAVY_HEAD` rather than
+# `UTF8_FULL` — the custom glyph table needed to converge is the one below.
+#
+# WHERE THEY STILL PART. comfy-table uses `ContentArrangement::Dynamic`, which
+# wraps cells to the terminal width. With no terminal it does not wrap at all
+# (measured: a 120-char cell renders a 402-byte line), so pipes, files, CI and
+# every gate see identical bytes from both programs. Under an interactive TTY the
+# Rust side wraps and this one does not. Replicating comfy-table's width-
+# distribution algorithm byte-for-byte is not worth it for a case no test or
+# document ever captures.
+_GLYPHS = {
+    #        left  fill  join  right
+    "top": ("\u250c", "\u2500", "\u252c", "\u2510"),
+    "head": ("\u255e", "\u2550", "\u256a", "\u2561"),
+    "row": ("\u251c", "\u254c", "\u253c", "\u2524"),
+    "bottom": ("\u2514", "\u2500", "\u2534", "\u2518"),
+}
+_OUTER, _INNER = "\u2502", "\u2506"
+
+
+def _colour_enabled(no_colour: bool = False) -> bool:
+    """The Rust `laterite_cliutil::colour_enabled` conjunction, exactly.
+
+    All three terms matter: an explicit opt-out, the `NO_COLOR` convention, and a
+    real terminal — so redirected output is never salted with escape codes, which
+    is also what keeps the two CLIs byte-identical everywhere it is checked.
+    """
+    return not no_colour and os.environ.get("NO_COLOR") is None and sys.stdout.isatty()
+
+
+def _rule(kind: str, widths: list[int]) -> str:
+    left, fill, join, right = _GLYPHS[kind]
+    return left + join.join(fill * (w + 2) for w in widths) + right
+
+
+def _box_table(headings: list[str], rows: list[list[str]], *, colour: bool) -> str:
+    """comfy-table's `UTF8_FULL` grid: a full border, a `=`-ruled header, and a
+    dotted rule between every pair of data rows.
+
+    Styling mirrors `styled_table`'s house look — bold-cyan header, dim alternate
+    rows — and is applied AFTER padding, so an escape sequence can never be
+    counted as display width and skew a column.
+    """
+    w = [len(h) for h in headings]
+    for row in rows:
+        for i, cell in enumerate(row):
+            w[i] = max(w[i], len(cell))
+
+    def line(cells: list[str], style: str = "") -> str:
+        padded = (f"{c:<{w[i]}}" for i, c in enumerate(cells))
+        if style:
+            padded = (f"{style}{c}\x1b[0m" for c in padded)
+        return _OUTER + " " + f" {_INNER} ".join(padded) + " " + _OUTER
+
+    out = [_rule("top", w), line(headings, "\x1b[1;36m" if colour else "")]
+    out.append(_rule("head", w))
+    for i, row in enumerate(rows):
+        if i:
+            out.append(_rule("row", w))
+        out.append(line(row, "\x1b[2m" if colour and i % 2 else ""))
+    out.append(_rule("bottom", w))
+    return "\n".join(out) + "\n"
+
+
 def _plain(file: str, findings: list[dict], n: int) -> str:
     if n == 0:
         return f"{file}: clean (0 findings)\n"
-    w = [4, 4, 5, 11]
-    rows = []
-    for f in findings:
-        short = f["rule"].removeprefix("AGS Format Rule ")
-        line = "-" if f["line"] is None else str(f["line"])
-        cells = [short, line, f["group"], f["desc"]]
-        for i, c in enumerate(cells):
-            w[i] = max(w[i], len(c))
-        rows.append(cells)
-    head = ["Rule", "Line", "Group", "Description"]
-    out = [f"{file}: {n} finding(s)"]
-    out.append(" | ".join(h.ljust(w[i]) for i, h in enumerate(head)))
-    out.append("-+-".join("-" * w[i] for i in range(4)))
-    out.extend(" | ".join(r[i].ljust(w[i]) for i in range(4)) for r in rows)
-    return "\n".join(out) + "\n"
+    rows = [
+        [
+            f["rule"].removeprefix("AGS Format Rule "),
+            "-" if f["line"] is None else str(f["line"]),
+            f["group"],
+            f["desc"],
+        ]
+        for f in findings
+    ]
+    table = _box_table(
+        ["Rule", "Line", "Group", "Description"], rows, colour=_colour_enabled()
+    )
+    return f"{file}: {n} finding(s)\n{table}"
 
 
 def _engine(args: argparse.Namespace) -> dict:
@@ -294,23 +370,21 @@ def _list_rules(as_json: bool) -> int:
     import json
 
     rules = json.loads(raw)["rules"]
-    w = [4, 5, 8, 4]
-    rows = []
-    for r in rules:
-        cells = [
+    rows = [
+        [
             r["rule"],
             r.get("title", ""),
             r.get("severity", ""),
             "yes" if r.get("fixable") else "",
         ]
-        for i, c in enumerate(cells):
-            w[i] = max(w[i], len(c))
-        rows.append(cells)
-    head = ["Rule", "Title", "Severity", "Fix?"]
-    out = [" | ".join(h.ljust(w[i]) for i, h in enumerate(head)).rstrip()]
-    out.append("-+-".join("-" * w[i] for i in range(4)))
-    out.extend(" | ".join(r[i].ljust(w[i]) for i in range(4)).rstrip() for r in rows)
-    print("\n".join(out))
+        for r in rules
+    ]
+    print(
+        _box_table(
+            ["Rule", "Title", "Severity", "Fix?"], rows, colour=_colour_enabled()
+        ),
+        end="",
+    )
     return 0
 
 
@@ -523,26 +597,16 @@ no gate on `read` output (#530). """
 
 
 def _read_table(headings: list[str], rows: list[list[str]]) -> str:
-    """A plain aligned table for `lat read <group>` — the human view (the Rust
-    binary renders its own comfy-table box grid; only --json/--csv are byte-coherent)."""
-    w = [len(h) for h in headings]
-    for row in rows:
-        for i, c in enumerate(row):
-            w[i] = max(w[i], len(c))
-    lines = [" | ".join(h.ljust(w[i]) for i, h in enumerate(headings)).rstrip()]
-    lines.append("-+-".join("-" * w[i] for i in range(len(headings))))
-    lines.extend(
-        " | ".join(row[i].ljust(w[i]) for i in range(len(headings))).rstrip()
-        for row in rows
-    )
-    return "\n".join(lines) + "\n"
+    """The human view for `lat read <group>` — the same grid the Rust binary draws."""
+    return _box_table(headings, rows, colour=_colour_enabled())
 
 
 def _run_read(args: argparse.Namespace) -> int:
     """`lat read <file> [group]` — list the file's group codes, or dump a group
     as a table / CSV / JSON. Raw file cells via the native read codec, so the
     Rust binary and this CLI agree byte-for-byte on the group listing and on
-    `read --json` / `--csv` (the human --table is each surface's own — #430 PR 2)."""
+    `read --json` / `--csv` — and, since the box grid was matched glyph-for-glyph,
+    on the human --table too (everywhere there is no TTY to wrap it)."""
     import json as _json
     from pathlib import Path
 

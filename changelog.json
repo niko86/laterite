@@ -6,7 +6,11 @@
   "unreleased": {
     "summary": "",
     "added": [],
-    "changed": [],
+    "changed": [
+      {
+        "text": "**The `lat` console script the wheel installs now renders the same tables as the shipped `lat` binary.** Two programs answer to `lat` — the Rust binary and this Python console script — and until now they printed visibly different output for the same command: comfy-table's UTF-8 box grid from one, a plain `ljust` grid from the other. The machine-readable surfaces (`--json`, `--ndjson`, `--csv`, the group listing, exit codes) had always been held byte-identical by test; the grids people actually read were pinned nowhere, which is how the divergence survived. The glyphs are now matched exactly, colour included (bold-cyan header, dim alternate rows, honouring `NO_COLOR` and a real terminal the same way the binary does), and the human table has joined the byte-parity tests instead of being excluded from them. **No new dependency:** the CLI remains stdlib-only. The two still part under an interactive TTY, where comfy-table wraps to the terminal width and this does not — a case no gate or document captures."
+      }
+    ],
     "deprecated": [],
     "removed": [],
     "fixed": [],
