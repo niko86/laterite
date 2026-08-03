@@ -124,6 +124,16 @@ jobs:
               - 'COMPAT.md'              # referenced by test_laterite (packages/laterite/tests)
               - 'tools/gen_census.py'    # referenced by test_merge (packages/laterite/tests)
               - 'tools/wheel_smoke.py'   # the wheel-smoke job's post-install smoke (#554)
+              # The O-N catalogue SSOT + its render + the generator. These belong
+              # in `code` for the same reason as the entries above and NOT for the
+              # reason the block warns against: the drift gate genuinely runs in
+              # THIS repo now (the `observations drift gate` step in the python
+              # job). Without these paths the gate exists and nothing fires it —
+              # an edit to the SSOT alone would sail past, which is precisely how
+              # the census gate came to be unpassable-by-construction (#207).
+              - 'observations.json'
+              - 'OBSERVATIONS.md'
+              - 'tools/gen_observations.py'
               # The prose docs check_doc_refs reads. `COMPAT.md` is already above
               # (a test reads it); these are the rest. Without them a
               # RELEASING/CONTRIBUTING-only edit would not fire the gate that
@@ -893,6 +903,19 @@ jobs:
         # the derived Markdown is never hand-edited and nothing sensitive reaches
         # the public file. Regenerate with `python tools/gen_changelog.py`.
         run: uv run --no-project python tools/gen_changelog.py --check
+
+      - name: observations drift gate (OBSERVATIONS.md == observations.json render)
+        # The other half of the pair the comment above names. OBSERVATIONS.md is
+        # the O-N divergence catalogue's rendered view; observations.json is the
+        # SSOT. This gate existed in CLAUDE.md's instructions and in three
+        # generators' doc comments long before it existed in fact — the catalogue
+        # was hand-maintained and ungated the whole time.
+        #
+        # What it actually protects: the `## Upstream-reportable` table is
+        # RENDERED from the records it summarises, so an O-N cannot be retitled or
+        # reclassified (BUG->SPEC) while the external-facing table keeps the old
+        # text. Regenerate with `python tools/gen_observations.py`.
+        run: uv run --no-project python tools/gen_observations.py --check
 
       - name: doc references resolve (incl. crates.io-strict for published READMEs)
         # Cheap stdlib check that no doc points at a file that isn't there. It

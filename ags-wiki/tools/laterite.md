@@ -8,7 +8,7 @@ language: python
 artifact: laterite
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 volatile: [sizes]
-volatile_asof: 2026-05-30
+volatile_asof: 2026-08-03
 repo_refs:
   root: "repo:packages/laterite"
   pyproject: "repo:packages/laterite/pyproject.toml"
@@ -57,7 +57,11 @@ pyarrow); `set_backend("polars")` / `LATERITE_COMPAT_BACKEND=polars` drops
 the pandas requirement from the compat path entirely
 (`repo:packages/laterite/pyproject.toml`).
 
-> [!note] The base wheel is light (~10 MB, no bundled DuckDB). The DuckDB-bundling
+> [!note] The base wheel is light — **6.0 MB** (macOS arm64) to **6.9 MB**
+> (Windows), no bundled DuckDB; the sdist is 0.6 MB. Measured from the published
+> 0.10.0 artifacts on PyPI, not from a local build, so it is what a user actually
+> downloads. The previous figure here said ~10 MB, which overstated it by ~50%.
+> The DuckDB-bundling
 > `.ags5db` companion was decoupled (dec-ags5-decouple) and is no longer
 > published; `[ags5]` is gone.
 

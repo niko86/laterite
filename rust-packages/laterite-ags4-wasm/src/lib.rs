@@ -3306,10 +3306,12 @@ mod tests {
     //!
     //! `build_column` is the whole casting surface (the wasm-bindgen
     //! wrappers above only marshal it), and it casts through the SAME
-    //! `laterite_ags4_types` fns — off the file's TYPE row — that the native
-    //! DuckDB conversion uses (`laterite-ags5-db/src/convert.rs`). So asserting the
-    //! Arrow `DataType` + cell values here proves the explorer casts a
-    //! file identically to that native conversion, with no DuckDB/Node/wasm runtime.
+    //! `laterite_ags4_types` fns — off the file's TYPE row — that every other
+    //! DuckDB bridge uses: `laterite-node/ts/duckdb.ts` on the Node surface, and
+    //! the `laterite_ags4` DuckDB extension in its own repo. (There is no DuckDB
+    //! crate in THIS workspace; core is deliberately DuckDB-free.) So asserting
+    //! the Arrow `DataType` + cell values here proves the explorer casts a file
+    //! identically to those bridges, with no DuckDB/Node/wasm runtime.
     //! The datetime oracle is computed independently via `chrono`.
     use super::*;
     // `Array` provides `is_null`/`len`; ArrayRef/DataType/TimeUnit assert the
