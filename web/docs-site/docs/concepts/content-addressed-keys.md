@@ -73,10 +73,10 @@ AGS data, so a `keys=True` frame round-tripped back to AGS4 drops the synthetic
 columns — they live only in the read model.
 
 !!! note "Why it matters"
-Content-addressing turns the AGS parent/child tree into a stable graph that
-survives independent reads, partial files, and re-emission. Same content, same
-key — so merging two deliveries, or spotting a row that appears twice, is a set
-operation rather than a join you have to hand-author per group pair.
+    Content-addressing turns the AGS parent/child tree into a stable graph that
+    survives independent reads, partial files, and re-emission. Same content, same
+    key — so merging two deliveries, or spotting a row that appears twice, is a set
+    operation rather than a join you have to hand-author per group pair.
 
 See also: [SQL across groups](../cookbook/sql-across-groups.md) ·
 [Born-typed reads](./born-typed.md)

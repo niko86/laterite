@@ -1,6 +1,6 @@
 # Certify a clean file & skip re-validation
 
-**Available in:** Python · Node · CLI · Browser
+**Available in:** Python · Node · CLI · [Browser](../surfaces/browser.md)
 
 Mint an `.ags.idx` certificate from a clean validation, then reopen with it to
 skip the rule engine.
@@ -67,13 +67,6 @@ skip the rule engine.
     `note: certificate written to site.ags.idx` line reports where; point it
     elsewhere with `--out`). A dirty file gets no cert — the findings
     table and exit `1` come back instead.
-
-=== "Browser"
-
-    Validate a clean file in the [web app](../surfaces/browser.md) and it
-    offers the `.ags.idx` certificate as a download — minted by the same wasm
-    engine, byte-compatible with every other surface, so a file certified in
-    the browser opens on the fast path in Python, Node, or DuckDB.
 
 The cert is **content-bound**: if the file changes by a single byte, the hash
 no longer matches and laterite silently falls back to a full validation — a

@@ -1,6 +1,6 @@
 # Pull one borehole record set
 
-**Available in:** Python · Node · DuckDB · Browser
+**Available in:** Python · Node · DuckDB · [Browser](../surfaces/browser.md)
 
 Fan out from a `LOCA` location to everything that hangs off it — samples, tests,
 the lot — as typed frames keyed by group code. Reach for this when you want a
@@ -68,14 +68,6 @@ single borehole's whole story, not one group at a time.
     related group at once, add a `read_ags(...)` and `JOIN` per code, or reach
     for `load_ags(path)` to emit the DDL that materialises them all as
     `ags_<code>` tables first.
-
-=== "Browser"
-
-    Open the [web app](../surfaces/browser.md) and load your file into the
-    **Explore** pane. Pick a `LOCA` location and the related groups surface
-    alongside it — the same parent-graph fan-out, point-and-click — so you can
-    read one borehole's samples and tests together without writing a query. The
-    file never leaves your machine.
 
 When to use it: building a per-location report, exporting one hole's data, or
 feeding a downstream model that wants the whole record set at once. Gotcha:

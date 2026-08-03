@@ -68,6 +68,6 @@ if (!file.report.ok) file.fix().save("clean.ags");
 ```
 
 !!! note "Python-only"
-The `python-ags4` compat shim is the one Python-only surface — see the
-[capability matrix](../surfaces/index.md#what-each-door-can-do). Excel I/O
-(`toExcel` / `fromExcel`) landed on Node in #358.
+    The `python-ags4` compat shim is the one Python-only surface — see the
+    [capability matrix](../surfaces/index.md#what-each-door-can-do). Excel I/O
+    (`toExcel` / `fromExcel`) landed on Node in #358.

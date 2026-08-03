@@ -65,5 +65,5 @@ lat unlock delivery.ags.age out.ags --password-file pw.txt
 ```
 
 !!! tip "The full reference"
-Every verb, flag, and exit code — the shipped `lat --readme` guide — is the
-[CLI command reference](../reference/cli.md).
+    Every verb, flag, and exit code — the shipped `lat --readme` guide — is the
+    [CLI command reference](../reference/cli.md).

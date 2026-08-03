@@ -78,6 +78,13 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "web" / "docs-site" / "docs"
 EXAMPLES = ROOT / "web" / "docs-site" / "examples"
 
+#: Where the built wasm package lands, and where Node must see it to resolve the
+#: published name. wasm-pack names the package after the CRATE
+#: (`laterite-ags4-wasm`); the publish step renames it. Node resolves a symlink by
+#: PATH, not by the manifest's `name`, so this works against either.
+WASM_PKG = ROOT / "web" / "src" / "wasm"
+WASM_LINK = EXAMPLES / "wasm" / "node_modules" / "@laterite" / "ags4-wasm"
+
 #: A `--8<--` include fence followed by the `text` fence documenting its output.
 #: Both fences carry the tab-block indent (`=== "Python"`), which is captured so
 #: the rewrite puts it back — Material's tabbed content is indentation-sensitive.
@@ -143,6 +150,12 @@ SURFACES = {
         # bash, not sh: the examples use bash-isms, and `lat` is put on PATH via
         # env rather than hard-coded so the committed .out stays machine-neutral.
         Surface("cli", "*.sh", lambda f: ["bash", str(f)]),
+        # The browser package, run headless. The examples import it by its
+        # PUBLISHED name (`@laterite/ags4-wasm`) so they read exactly as a
+        # consumer writes them; `_link_wasm` puts a symlink where Node's resolver
+        # will find it. Off by default: it needs `wasm-pack build`, which the e2e
+        # job does and a plain `uv run` does not.
+        Surface("wasm", "ex*.mjs", lambda f: ["node", str(f)], default=False),
         Surface(
             "duckdb",
             "ex*.sql",
@@ -158,6 +171,25 @@ SURFACES = {
         ),
     )
 }
+
+
+def _link_wasm() -> None:
+    """Put the built wasm package where Node resolves `@laterite/ags4-wasm`.
+
+    The examples import the published name rather than a relative path, because a
+    reader copying one should get working code, not a path into this repo. The
+    same trick `docs-examples.test.ts` uses for the node examples — idempotent,
+    gitignored, and pointing at whatever `wasm-pack build` last produced.
+    """
+    if not (WASM_PKG / "ags4_wasm.js").exists():
+        sys.exit(
+            f"gen_doc_outputs: surface wasm needs a built package at "
+            f"{WASM_PKG.relative_to(ROOT)} — run `npm run build:wasm` in web/ first"
+        )
+    WASM_LINK.parent.mkdir(parents=True, exist_ok=True)
+    if WASM_LINK.is_symlink() or WASM_LINK.exists():
+        WASM_LINK.unlink()
+    WASM_LINK.symlink_to(WASM_PKG, target_is_directory=True)
 
 
 def run_example(surface: Surface, path: Path) -> str:
@@ -233,14 +265,26 @@ def main() -> None:
     )
     args = ap.parse_args()
 
+    # `default` marks a surface whose examples need extra tooling to RUN. That is
+    # irrelevant to --check-pages, which runs nothing — so the structural half
+    # covers EVERY surface unless one is named. Scoping it to the runnable ones
+    # would leave the wasm blocks unchecked in the only lane that can always fire.
     chosen = (
         [SURFACES[n] for n in args.surface]
         if args.surface
+        else list(SURFACES.values())
+        if args.check_pages
         else [s for s in SURFACES.values() if s.default]
     )
+    # A surface's tooling is only needed to RUN its examples; --check-pages reads
+    # Markdown and needs none of it.
     for s in chosen:
+        if args.check_pages:
+            continue
         if s.requires and not shutil.which(s.requires):
             sys.exit(f"gen_doc_outputs: surface {s.name} needs `{s.requires}` on PATH")
+        if s.name == "wasm":
+            _link_wasm()
 
     # example include-path -> its .out include-path, for every surface in play
     wanted: dict[str, str] = {}

@@ -1,6 +1,6 @@
 # Pack / encrypt for transport
 
-**Available in:** Python · Node · CLI · Browser
+**Available in:** Python · Node · CLI · [Browser](../surfaces/browser.md)
 
 Compress an AGS4 file for storage or transfer, then restore it byte-for-byte —
 no schema, no re-emit, just zstd (with optional age encryption on top).
@@ -94,15 +94,6 @@ no schema, no re-emit, just zstd (with optional age encryption on top).
     `$LAT_TRANSPORT_PASSWORD` → an interactive prompt. `--level` tunes the zstd
     ratio and `--log-n` the scrypt tier (default 18). A file sealed here opens
     with `transport.unlock` in Python/Node — or stock `age` — anywhere.
-
-=== "Browser"
-
-    The [web app](../surfaces/browser.md)'s **Tools** pane has the same
-    lock/unlock round-trip running client-side: drop a file, enter a
-    passphrase, download the sealed `.zst.age` (or unseal one you received).
-    The output is byte-compatible with the Python/Node `lock` — a file sealed
-    in the browser opens with `transport.unlock` anywhere, and vice versa —
-    and nothing ever leaves your machine.
 
 The sealed format is standard **zstd inside a standard age envelope** — not a
 laterite-only container — so recipients without laterite can still recover the

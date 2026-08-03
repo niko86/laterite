@@ -716,6 +716,21 @@ jobs:
           npm run lint
           npm run format:check
 
+      # The wasm half of #164's doc-output gate. The examples on
+      # reference/wasm-api.md import `@laterite/ags4-wasm` by its PUBLISHED name
+      # and run headless here, and their committed `.out` is compared to what
+      # they actually print — so the page documenting the browser package cannot
+      # drift from the package.
+      #
+      # HERE because this is the only job that builds the wasm bindings (the step
+      # above), and it is gated on BOTH `web/**` and `rust-packages/**` — so a
+      # change to the wasm crate re-runs it, not just a change to the examples.
+      # The python/node/cli surfaces run in their own jobs; the structural half
+      # (`--check-pages`, no build needed) runs unfiltered in wiki-lint.yml.
+      - name: gen_doc_outputs --check (docs example output == real stdout, wasm)
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/gen_doc_outputs.py --check --surface wasm
+
       - name: sccache stats
         if: always()
         shell: bash

@@ -67,13 +67,13 @@ Same dial as the CLI: `validate(warnings=False)` mirrors `--no-warnings`, and
 [`.report`](../learn/validate.md) reflects whichever tiers you asked for.
 
 !!! warning "Tiers and the certificate fast-path"
-An `.ags.idx` [certificate](./certificate-lifecycle.md) vouches that a file
-is **error-clean** — that and only that. So a plain `validate()` (or
-`validate(warnings=False)`) can take the cert short-circuit and skip the rule
-engine. The moment you ask for a tier the cert never promised —
-`validate(warnings=True, fyi=True)` wanting the soft findings back — there's
-nothing cached to trust, so the call runs the full engine regardless of the
-cert. Warnings and fyi are computed fresh; the error verdict is the only thing
-a cert can shortcut.
+    An `.ags.idx` [certificate](./certificate-lifecycle.md) vouches that a file
+    is **error-clean** — that and only that. So a plain `validate()` (or
+    `validate(warnings=False)`) can take the cert short-circuit and skip the rule
+    engine. The moment you ask for a tier the cert never promised —
+    `validate(warnings=True, fyi=True)` wanting the soft findings back — there's
+    nothing cached to trust, so the call runs the full engine regardless of the
+    cert. Warnings and fyi are computed fresh; the error verdict is the only thing
+    a cert can shortcut.
 
 See also: [Validate](../learn/validate.md) · [Certificate lifecycle](./certificate-lifecycle.md)

@@ -46,5 +46,5 @@ them so they never read as a regression.
 | **O-45** | An unrecognised `TRAN_AGS` edition → a laterite WARNING (Related to Rule 14), shown by default.                          |
 
 !!! tip "Reading the tiers"
-Whether a divergence surfaces as an **error**, **warning**, or **FYI** follows
-laterite's [severity tiers](../concepts/severity-tiers.md).
+    Whether a divergence surfaces as an **error**, **warning**, or **FYI** follows
+    laterite's [severity tiers](../concepts/severity-tiers.md).

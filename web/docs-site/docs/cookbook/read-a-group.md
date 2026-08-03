@@ -1,6 +1,6 @@
 # Read a group at the shell
 
-**Available in:** Python · Node · DuckDB · CLI · Browser
+**Available in:** Python · Node · DuckDB · CLI · [Browser](../surfaces/browser.md)
 
 Dump one group's rows straight from a file — no engine run, no import. At the
 shell, `lat read` gives you the raw cells as a table, CSV, or JSON; omit the

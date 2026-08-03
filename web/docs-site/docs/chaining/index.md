@@ -129,13 +129,13 @@ rule engine — `resolution` reads `certified`, not `exact`.
 ```
 
 !!! warning "Single-result and fan-out don't mix on one `AgsQuery`"
-The single-result terminals (`.filter` / `.select` → `.frame()` /
-`.to_polars()` / `.to_pandas()` / `.relation()`) and the fan-out terminals
-(`.frames()` / `.groups`) belong to different `AgsQuery` shapes — a
-`.query(sql)` builder versus an `.at(...)` fan-out — and are mutually
-exclusive on a given handle. And because every builder call returns a **new**
-immutable `AgsQuery`, reassign (`q = q.filter(...)`) rather than expecting
-in-place mutation.
+    The single-result terminals (`.filter` / `.select` → `.frame()` /
+    `.to_polars()` / `.to_pandas()` / `.relation()`) and the fan-out terminals
+    (`.frames()` / `.groups`) belong to different `AgsQuery` shapes — a
+    `.query(sql)` builder versus an `.at(...)` fan-out — and are mutually
+    exclusive on a given handle. And because every builder call returns a **new**
+    immutable `AgsQuery`, reassign (`q = q.filter(...)`) rather than expecting
+    in-place mutation.
 
 ## Where next
 

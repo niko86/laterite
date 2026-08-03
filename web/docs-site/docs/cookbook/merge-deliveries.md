@@ -1,6 +1,6 @@
 # Merge two deliveries
 
-**Available in:** Python · Node · CLI · Browser
+**Available in:** Python · Node · CLI · [Browser](../surfaces/browser.md)
 
 **When:** two deliveries of _one_ project need to become one file — a phased
 site investigation, or a resubmission that revises some boreholes and adds
@@ -83,14 +83,6 @@ _revisions_ a later file made, plus any warnings.
     delivery only exists in memory. A type clash throws `MergeConflictError`;
     `{ onTypeClash: "promote" }` or `"widen"` settles it (see
     [below](#when-the-two-files-disagree-on-a-type)).
-
-=== "Browser"
-
-    Open the [web app](../surfaces/browser.md)'s **Tools → Merge** tool, keep the
-    file you already loaded as the base, and drop in the incoming delivery. The same
-    reconciliation runs compiled to WebAssembly, entirely client-side: you get the
-    per-row revision audit, choose how to settle a type clash, and download the
-    merged `.ags` — neither file leaves your machine.
 
 ## When the two files disagree on a type
 

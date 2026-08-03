@@ -83,6 +83,6 @@ out.save("out.ags"); // or out.text / out.bytes
 ```
 
 !!! note "Same engine, proven"
-Node's findings are asserted **byte-identical** to Python, wasm, and DuckDB
-by the cross-surface compliance harness — see [One engine, every
-stack](../surfaces/index.md).
+    Node's findings are asserted **byte-identical** to Python, wasm, and DuckDB
+    by the cross-surface compliance harness — see [One engine, every
+    stack](../surfaces/index.md).

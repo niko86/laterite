@@ -39,6 +39,6 @@ on the page is the _exact_ file the CI gate executes, so the output is real. New
 - [**Drop-in for python-ags4**](compat.md) — `from laterite import compat as AGS4`.
 
 !!! tip
-Want to see the whole fluent API assembled from these parts? The [Chaining showcase](../chaining/index.md)
-climbs a power ladder from a one-line `read().validate()` to raw SQL, your own functions, and the
-certify fast-path.
+    Want to see the whole fluent API assembled from these parts? The [Chaining showcase](../chaining/index.md)
+    climbs a power ladder from a one-line `read().validate()` to raw SQL, your own functions, and the
+    certify fast-path.

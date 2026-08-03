@@ -102,3 +102,9 @@ mutants.out.old/
 /examples/merged.ags
 /examples/phase2.ags
 /examples/rev.ags
+
+# The docs wasm examples import the PUBLISHED package name
+# (`@laterite/ags4-wasm`) so a reader can copy one and have it work. A symlink
+# here is what lets Node's resolver find the locally-built package —
+# gen_doc_outputs.py drops it in, same trick as the node examples' symlink above.
+web/docs-site/examples/wasm/node_modules/

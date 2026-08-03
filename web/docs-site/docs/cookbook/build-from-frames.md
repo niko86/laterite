@@ -1,6 +1,6 @@
 # Build AGS4 from frames
 
-**Available in:** Python · Node · Browser
+**Available in:** Python · Node · [Browser](../surfaces/browser.md)
 
 **What / when:** you have your data as per-group tables (one per group, columns named
 for the AGS headings) and want an AGS4 file back — optionally with the
@@ -68,14 +68,6 @@ transmission details.
     codes) and `tran: { issue, date, producer, recipient, status }` to stamp a
     `TRAN`; without them those gaps are reported as Rules 14/15/17. No DuckDB
     peer needed — emit is pure.
-
-=== "Browser"
-
-    Open the [web app](../surfaces/browser.md)'s **Export** pane: assemble or
-    paste your per-group data and export an AGS4 file. The same emitter runs
-    compiled to WebAssembly, and nothing is uploaded to build it. Direct wasm
-    callers take `synthesise_metadata` on `build_ags4` / `build_ags4_ipc` — the
-    browser twin of the Python and Node flags.
 
 Every door runs the same emitter over the same dictionary, and metadata synthesis
 is opt-in on all of them — `synthesise_metadata=` in Python, `{ synthesiseMetadata }`

@@ -14,10 +14,10 @@
 tell you _which_ AGS edition the rules came from.
 
 !!! note "The edition selects itself"
-You never pass an edition. `dict_version` is read straight from the file's
-`TRAN_AGS` field; `resolution='exact'` means that edition was matched
-on the nose (otherwise laterite falls back to the nearest dictionary it
-ships). Here the file declared 4.1, so the 4.1.1 rules ran.
+    You never pass an edition. `dict_version` is read straight from the file's
+    `TRAN_AGS` field; `resolution='exact'` means that edition was matched
+    on the nose (otherwise laterite falls back to the nearest dictionary it
+    ships). Here the file declared 4.1, so the 4.1.1 rules ran.
 
 Because `.validate()` returns the file, you keep going on the same handle —
 query it, slice a group, or emit it — without re-reading from disk.

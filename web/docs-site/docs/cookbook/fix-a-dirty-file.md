@@ -1,6 +1,6 @@
 # Fix a dirty file
 
-**Available in:** Python · Node · CLI · Browser
+**Available in:** Python · Node · CLI · [Browser](../surfaces/browser.md)
 
 Mechanically repair a non-conforming AGS4 file — non-destructively — into a
 fresh handle.
@@ -66,14 +66,6 @@ fresh handle.
     and counts what remains for a human — here the padded row was fixed, while
     the missing `TRAN`/`UNIT`/`TYPE` groups can't be invented, so the exit code
     stays `1`. Add `--risky` for the intent-guessing tier.
-
-=== "Browser"
-
-    Open the [web app](../surfaces/browser.md) and drop your file on the
-    **Fix** pane. It computes the available repairs, shows a before/after diff
-    so you can review each one, and hands back the repaired file as a download
-    — the same safe-fix engine as every other surface, running entirely in
-    your browser.
 
 These are _safe_ repairs — width/whitespace/structural defects that have one
 unambiguous correction. Anything judgemental (a wrong value, a missing KEY) is

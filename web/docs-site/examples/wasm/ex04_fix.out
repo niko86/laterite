@@ -1,0 +1,3 @@
+pad_short_row(safe)
+before: AGS Format Rule 13 AGS Format Rule 14 AGS Format Rule 15 AGS Format Rule 16 AGS Format Rule 17 AGS Format Rule 4
+after:  AGS Format Rule 13 AGS Format Rule 14 AGS Format Rule 15 AGS Format Rule 16 AGS Format Rule 17

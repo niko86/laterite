@@ -34,10 +34,10 @@ laterite.read("delivery.ags").validate(dict_version="4.1.1")
 ```
 
 !!! note "One dictionary, many editions"
-All editions are projected from a single union dictionary at build time, so
-every bundled edition is available in-process — no download, no per-edition
-install. See [Born-typed reads](born-typed.md) for how the same dictionary
-drives column typing.
+    All editions are projected from a single union dictionary at build time, so
+    every bundled edition is available in-process — no download, no per-edition
+    install. See [Born-typed reads](born-typed.md) for how the same dictionary
+    drives column typing.
 
 See also: [List the validator's rules](../cookbook/list-rules.md) ·
 [Validate](../learn/validate.md)
