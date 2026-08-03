@@ -161,8 +161,10 @@ print(
 '''
 
 
-def run(cmd: list[str], **kw: object) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, check=True, text=True, capture_output=True, **kw)  # type: ignore[arg-type]
+def run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    """check=True: every call here is a build or an install whose failure must stop
+    the run rather than silently produce a wheel-less output dir."""
+    return subprocess.run(cmd, cwd=cwd, check=True, text=True, capture_output=True)
 
 
 def set_features(features: list[str]) -> None:
