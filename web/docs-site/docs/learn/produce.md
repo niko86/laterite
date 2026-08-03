@@ -5,8 +5,7 @@
 ```
 
 ```text
-groups: ['PROJ', 'LOCA']
-findings: 3
+--8<-- "python/ex09a_build_from_frames.out"
 ```
 
 `build_ags4` takes a `{code: frame}` mapping — the columns are your AGS
@@ -54,8 +53,7 @@ build) so nothing appears in your file that you didn't ask for.
 ```
 
 ```text
-groups: ['PROJ', 'LOCA']
-findings: 3
+--8<-- "python/ex09b_build_from_typed_graph.out"
 ```
 
 The other door takes a typed graph: a `PROJ` with `LOCA` children attached via

@@ -1,0 +1,16 @@
+[
+  { LOCA_ID: 'BH01', n: 4n },
+  { LOCA_ID: 'BH02', n: 2n },
+  { LOCA_ID: 'BH03', n: 3n },
+  { LOCA_ID: 'BH04', n: 4n },
+  { LOCA_ID: 'BH05', n: 2n },
+  { LOCA_ID: 'BH06', n: 2n },
+  { LOCA_ID: 'BH07', n: 3n },
+  { LOCA_ID: 'BH08', n: 2n },
+  { LOCA_ID: 'BH09', n: 2n },
+  { LOCA_ID: 'BH10', n: 3n },
+  { LOCA_ID: 'BH11', n: 3n },
+  { LOCA_ID: 'BH12', n: 3n },
+  { LOCA_ID: 'BH13', n: 4n },
+  { LOCA_ID: 'BH14', n: 4n }
+]

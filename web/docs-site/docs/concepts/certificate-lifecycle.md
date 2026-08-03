@@ -11,7 +11,7 @@ single rule.
 ```
 
 ```text
-certified
+--8<-- "python/ex08_certify.out"
 ```
 
 `certify()` needs a prior clean `validate()` on the same handle — it writes

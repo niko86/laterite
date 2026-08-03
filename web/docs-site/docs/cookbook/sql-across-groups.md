@@ -12,24 +12,7 @@ aggregates — that a single-group query can't express. Drop to SQL.
     ```
 
     ```text
-    shape: (14, 2)
-    ┌─────────┬─────┐
-    │ LOCA_ID ┆ n   │
-    │ ---     ┆ --- │
-    │ str     ┆ i64 │
-    ╞═════════╪═════╡
-    │ BH01    ┆ 4   │
-    │ BH02    ┆ 2   │
-    │ BH03    ┆ 3   │
-    │ BH04    ┆ 4   │
-    │ BH05    ┆ 2   │
-    │ …       ┆ …   │
-    │ BH10    ┆ 3   │
-    │ BH11    ┆ 3   │
-    │ BH12    ┆ 3   │
-    │ BH13    ┆ 4   │
-    │ BH14    ┆ 4   │
-    └─────────┴─────┘
+    --8<-- "python/ex06_sql_join.out"
     ```
 
     `.sql(...)` exposes every group in the file as a DuckDB table named by its
@@ -62,22 +45,7 @@ aggregates — that a single-group query can't express. Drop to SQL.
     ```
 
     ```text
-    [
-      { LOCA_ID: 'BH01', n: 4n },
-      { LOCA_ID: 'BH02', n: 2n },
-      { LOCA_ID: 'BH03', n: 3n },
-      { LOCA_ID: 'BH04', n: 4n },
-      { LOCA_ID: 'BH05', n: 2n },
-      { LOCA_ID: 'BH06', n: 2n },
-      { LOCA_ID: 'BH07', n: 3n },
-      { LOCA_ID: 'BH08', n: 2n },
-      { LOCA_ID: 'BH09', n: 2n },
-      { LOCA_ID: 'BH10', n: 3n },
-      { LOCA_ID: 'BH11', n: 3n },
-      { LOCA_ID: 'BH12', n: 3n },
-      { LOCA_ID: 'BH13', n: 4n },
-      { LOCA_ID: 'BH14', n: 4n }
-    ]
+    --8<-- "node/ex06_sql_join.out"
     ```
 
     Identical SQL, identical table names. `sql()` is `async` and returns plain

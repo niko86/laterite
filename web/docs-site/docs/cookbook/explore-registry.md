@@ -13,10 +13,7 @@ schema before you have data.
 ```
 
 ```text
-LOCA children: 50
-first few: ['BKFL', 'CDIA', 'CHIS']
-SAMP inherits: {'LOCA_ID'}
-LLPL_PL dtype: Float64
+--8<-- "python/ex13_registry_xn.out"
 ```
 
 `child_groups("LOCA")` returns the `GroupDescriptor` objects that name `LOCA` as

@@ -12,9 +12,7 @@ no schema, no re-emit, just zstd (with optional age encryption on top).
     ```
 
     ```text
-    original:   7007 bytes
-    compressed: 1743 bytes
-    round-trip byte-identical: True
+    --8<-- "python/ex12_transport.out"
     ```
 
     `transport.pack` zstd-compresses the file as-is and writes a `.zst`
@@ -39,8 +37,7 @@ no schema, no re-emit, just zstd (with optional age encryption on top).
     ```
 
     ```text
-    sealed: site.ags.zst.age
-    round-trip byte-identical: True
+    --8<-- "python/ex17_lock.out"
     ```
 
     The KDF is scrypt at age's standard `log_N` 18 tier — deliberately
@@ -55,9 +52,7 @@ no schema, no re-emit, just zstd (with optional age encryption on top).
     ```
 
     ```text
-    original:   7007 bytes
-    compressed: 1743 bytes
-    round-trip byte-identical: true
+    --8<-- "node/ex12_transport.out"
     ```
 
     The `transport` namespace mirrors Python call-for-call —
@@ -72,7 +67,7 @@ no schema, no re-emit, just zstd (with optional age encryption on top).
     ```
 
     ```text
-    round-trip byte-identical: true
+    --8<-- "node/ex17_lock.out"
     ```
 
     `transport.lock(src, dest, password)` seals the same **standard** zstd+age

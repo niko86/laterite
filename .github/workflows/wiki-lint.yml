@@ -148,3 +148,13 @@ jobs:
 
       - name: gen_observations --check-wiki (O-N pages agree with the SSOT)
         run: uv run --no-project python tools/gen_observations.py --check-wiki
+
+      # The structural half of #164's doc-output gate: every example-output block on
+      # a docs page must still INCLUDE its `.out`, or opt out with a stated reason.
+      # It runs no example, so it needs no wheel, no dist and no `lat` — which is
+      # why it can live in this unfiltered lane. That matters: the ci.yml jobs
+      # holding the built surfaces are path-filtered on code, and a docs PAGE can be
+      # edited without touching any of those paths, so a block hand-written back in
+      # would never fire them. Cheap check, placed where it can always run.
+      - name: gen_doc_outputs --check-pages (every output block is wired to its example)
+        run: uv run --no-project python tools/gen_doc_outputs.py --check-pages

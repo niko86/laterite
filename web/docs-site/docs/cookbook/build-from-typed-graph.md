@@ -13,8 +13,7 @@ graph to the emitter — use this when your data is already a graph in memory
     ```
 
     ```text
-    groups: ['PROJ', 'LOCA']
-    findings: 3
+    --8<-- "python/ex09b_build_from_typed_graph.out"
     ```
 
     `build_ags4(PROJ(...))` walks the graph depth-first (#214) and emits exactly
@@ -42,8 +41,7 @@ graph to the emitter — use this when your data is already a graph in memory
     ```
 
     ```text
-    groups: [ 'PROJ', 'LOCA' ]
-    findings: 3
+    --8<-- "node/ex09b_build_from_typed_graph.out"
     ```
 
     The same typed classes are named exports — `import { PROJ, LOCA } from

@@ -11,8 +11,7 @@ handle as `fn`'s first argument and returns whatever `fn` returns.
 ```
 
 ```text
-first 3 group codes: ['PROJ', 'TRAN', 'UNIT']
-LOCA row count via pipe: 14
+--8<-- "python/ex07_pipe.out"
 ```
 
 `.pipe(fn, *args)` calls `fn(handle, *args)` and returns the result verbatim — so

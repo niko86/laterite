@@ -607,6 +607,20 @@ jobs:
       - name: vitest (+ coverage)
         run: npm run test:coverage
 
+      # The Node half of #164's doc-output gate. docs-examples.test.ts already RUNS
+      # every .mjs example — but it only checks that the asserts hold, never what the
+      # example printed, so an example could assert correctly and be documented
+      # incorrectly. That is exactly what happened. This compares stdout to the
+      # committed `.out` the pages include. Here because this job is where `dist/`
+      # exists; the python + cli surfaces run in the python job.
+      #
+      # Plain `python3`, not uv: this job installs no Python at all, and the
+      # generator is stdlib-only — pulling in setup-uv to run one stdlib script
+      # would be the more fragile choice, not the safer one.
+      - name: gen_doc_outputs --check (docs example output == real stdout, node)
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/gen_doc_outputs.py --check --surface node
+
       # Codecov `node` flag — public repo only (where the badge lives + the token
       # is set). Measures the TS wrapper; the Rust engine's number is the nightly
       # cargo-llvm-cov `rust` flag. codecov-action is a `uses:` step so it runs at
@@ -867,6 +881,26 @@ jobs:
         # the target/release path (matching how the binary ships).
         working-directory: rust-packages
         run: cargo build --release -p laterite-cli
+
+      - name: gen_doc_outputs --check (docs example output == real stdout, python + cli)
+        # #164: a docs page single-sources its CODE by reference and then hand-wrote
+        # what that code PRINTS. The example could not drift; the output block could,
+        # and did — a behaviour change updated the examples and left six blocks across
+        # three pages asserting a result the code no longer produced.
+        #
+        # The output now lives in a `.out` beside the example and the page includes
+        # it, so there is no copy in the Markdown at all (the CLI examples in this
+        # tree already worked that way). This step re-runs the examples and fails if
+        # any committed `.out` is stale.
+        #
+        # HERE because this job is the one with both launchers: the wheel from the
+        # maturin step and the `lat` release binary built above — the same reason the
+        # surface census is pinned here. Node's surface runs in the node job, and the
+        # structural half (a block must stay wired to its example) runs unfiltered in
+        # wiki-lint.yml, since a doc PAGE edit touches no path that fires this job.
+        env:
+          LAT_BIN: ${{ github.workspace }}/rust-packages/target/release/lat
+        run: uv run --no-sync python tools/gen_doc_outputs.py --check --surface python --surface cli
 
       - name: surface census --check (launchers == surface-census.json)
         # This job has both launchers the census names here — the `lat` release

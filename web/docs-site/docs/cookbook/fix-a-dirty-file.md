@@ -12,7 +12,7 @@ fresh handle.
     ```
 
     ```text
-    pad_short_row
+    --8<-- "python/ex15_fix.out"
     ```
 
     `.fix()` runs the safe-repair pass over a file you've already
@@ -38,7 +38,7 @@ fresh handle.
     ```
 
     ```text
-    pad_short_row
+    --8<-- "node/ex15_fix.out"
     ```
 
     Same behaviour, camelCase: `.fix()` returns a **new**

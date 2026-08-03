@@ -1,0 +1,4 @@
+LOCA children: 50
+first few: ['BKFL', 'CDIA', 'CHIS']
+SAMP inherits: {'LOCA_ID'}
+LLPL_PL dtype: Float64

@@ -12,8 +12,7 @@ headings)` 2-tuple, same pandas frames.
 ```
 
 ```text
-<class 'tuple'> ['PROJ', 'TRAN', 'UNIT', 'TYPE', 'ABBR']
-(16, 7)
+--8<-- "python/ex11_compat.out"
 ```
 
 `from laterite import compat as AGS4` aliases the shim to the name python-ags4

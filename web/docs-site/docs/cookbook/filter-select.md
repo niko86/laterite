@@ -13,20 +13,7 @@ dtype _is_ the AGS type, a numeric filter compares numbers, not strings.
     ```
 
     ```text
-    shape: (7, 3)
-    ┌─────────┬───────────┬─────────┐
-    │ LOCA_ID ┆ LOCA_TYPE ┆ LOCA_GL │
-    │ ---     ┆ ---       ┆ ---     │
-    │ str     ┆ str       ┆ f64     │
-    ╞═════════╪═══════════╪═════════╡
-    │ BH02    ┆ RC        ┆ 32.49   │
-    │ BH03    ┆ RC        ┆ 28.54   │
-    │ BH04    ┆ RC        ┆ 29.04   │
-    │ BH05    ┆ RC        ┆ 31.62   │
-    │ BH07    ┆ RC        ┆ 31.33   │
-    │ BH08    ┆ CP        ┆ 28.67   │
-    │ BH09    ┆ CP        ┆ 30.98   │
-    └─────────┴───────────┴─────────┘
+    --8<-- "python/ex05_query_builder.out"
     ```
 
     `.query(sql)` returns a lazy `AgsQuery`. Chain `.filter(...)` to drop rows and
@@ -57,15 +44,7 @@ dtype _is_ the AGS type, a numeric filter compares numbers, not strings.
     ```
 
     ```text
-    [
-      { LOCA_ID: 'BH02', LOCA_TYPE: 'RC', LOCA_GL: 32.49 },
-      { LOCA_ID: 'BH03', LOCA_TYPE: 'RC', LOCA_GL: 28.54 },
-      { LOCA_ID: 'BH04', LOCA_TYPE: 'RC', LOCA_GL: 29.04 },
-      { LOCA_ID: 'BH05', LOCA_TYPE: 'RC', LOCA_GL: 31.62 },
-      { LOCA_ID: 'BH07', LOCA_TYPE: 'RC', LOCA_GL: 31.33 },
-      { LOCA_ID: 'BH08', LOCA_TYPE: 'CP', LOCA_GL: 28.67 },
-      { LOCA_ID: 'BH09', LOCA_TYPE: 'CP', LOCA_GL: 30.98 }
-    ]
+    --8<-- "node/ex05_query.out"
     ```
 
     Node has one query door — `sql()` — not a lazy `.query()`/`.filter()`/`.select()`

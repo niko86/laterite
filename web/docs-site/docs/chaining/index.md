@@ -41,7 +41,7 @@ your own functions, and the certify fast-path.
 ```
 
 ```text
-is_valid=True count=0 dict_version='4.1.1' resolution='exact'
+--8<-- "python/ex02_validate.out"
 ```
 
 ### 2 · Fan-out a branch
@@ -54,7 +54,7 @@ back an `AgsQuery`. Ask it `.groups` to see what came along for the ride.
 ```
 
 ```text
-['LOCA', 'SAMP', 'LLPL']
+--8<-- "python/ex03_at_fanout_groups.out"
 ```
 
 ### 3 · Terminate the fan-out
@@ -67,8 +67,7 @@ keyed by group code.
 ```
 
 ```text
-['LLPL', 'LOCA', 'SAMP']
-4
+--8<-- "python/ex04_at_frames.out"
 ```
 
 ### 4 · The lazy builder and its four terminals
@@ -81,20 +80,7 @@ nothing runs — then pick a terminal to materialise the plan.
 ```
 
 ```text
-shape: (7, 3)
-┌─────────┬───────────┬─────────┐
-│ LOCA_ID ┆ LOCA_TYPE ┆ LOCA_GL │
-│ ---     ┆ ---       ┆ ---     │
-│ str     ┆ str       ┆ f64     │
-╞═════════╪═══════════╪═════════╡
-│ BH02    ┆ RC        ┆ 32.49   │
-│ BH03    ┆ RC        ┆ 28.54   │
-│ BH04    ┆ RC        ┆ 29.04   │
-│ BH05    ┆ RC        ┆ 31.62   │
-│ BH07    ┆ RC        ┆ 31.33   │
-│ BH08    ┆ CP        ┆ 28.67   │
-│ BH09    ┆ CP        ┆ 30.98   │
-└─────────┴───────────┴─────────┘
+--8<-- "python/ex05_query_builder.out"
 ```
 
 `.frame()` follows the handle's backend, `.to_polars()` / `.to_pandas()` force
@@ -111,24 +97,7 @@ groups. It returns a `DuckDBPyRelation` — a terminal you materialise with `.pl
 ```
 
 ```text
-shape: (14, 2)
-┌─────────┬─────┐
-│ LOCA_ID ┆ n   │
-│ ---     ┆ --- │
-│ str     ┆ i64 │
-╞═════════╪═════╡
-│ BH01    ┆ 4   │
-│ BH02    ┆ 2   │
-│ BH03    ┆ 3   │
-│ BH04    ┆ 4   │
-│ BH05    ┆ 2   │
-│ …       ┆ …   │
-│ BH10    ┆ 3   │
-│ BH11    ┆ 3   │
-│ BH12    ┆ 3   │
-│ BH13    ┆ 4   │
-│ BH14    ┆ 4   │
-└─────────┴─────┘
+--8<-- "python/ex06_sql_join.out"
 ```
 
 ### 6 · Splice in your own step with `.pipe`
@@ -142,8 +111,7 @@ both `Ags4File` and `AgsQuery`.
 ```
 
 ```text
-first 3 group codes: ['PROJ', 'TRAN', 'UNIT']
-LOCA row count via pipe: 14
+--8<-- "python/ex07_pipe.out"
 ```
 
 ### 7 · The certify fast-path
@@ -157,7 +125,7 @@ rule engine — `resolution` reads `certified`, not `exact`.
 ```
 
 ```text
-certified
+--8<-- "python/ex08_certify.out"
 ```
 
 !!! warning "Single-result and fan-out don't mix on one `AgsQuery`"

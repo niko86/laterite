@@ -1,0 +1,94 @@
+{
+  "version": 2,
+  "file": {
+    "size": 7007,
+    "sha256": "316befb6416d081ca3944cc7366a6127f65b01ed631e1bebda218f1dad748d80",
+    "etag": null,
+    "last_modified": null
+  },
+  "validation": {
+    "validator": "laterite_ags4",
+    "engine": "4472ecdc3ad95f03",
+    "compat": null,
+    "checked_at": "2026-08-03T12:03:20.802101+00:00",
+    "edition": {
+      "mode": "auto",
+      "resolved": "4.1.1",
+      "resolution": "exact"
+    },
+    "encoding": "UTF-8",
+    "custom_dict": null,
+    "errors": {
+      "state": "measured",
+      "count": 0
+    },
+    "warnings": {
+      "state": "measured",
+      "count": 0
+    },
+    "fyi": {
+      "state": "measured",
+      "count": 2
+    }
+  },
+  "groups": {
+    "ABBR": [
+      [
+        937,
+        1245
+      ]
+    ],
+    "PROJ": [
+      [
+        0,
+        155
+      ]
+    ],
+    "SAMP": [
+      [
+        2254,
+        4007
+      ]
+    ],
+    "TYPE": [
+      [
+        593,
+        937
+      ]
+    ],
+    "LLPL": [
+      [
+        4007,
+        7007
+      ]
+    ],
+    "LOCA": [
+      [
+        1245,
+        2254
+      ]
+    ],
+    "TRAN": [
+      [
+        155,
+        439
+      ]
+    ],
+    "UNIT": [
+      [
+        439,
+        593
+      ]
+    ]
+  },
+  "order": [
+    "PROJ",
+    "TRAN",
+    "UNIT",
+    "TYPE",
+    "ABBR",
+    "LOCA",
+    "SAMP",
+    "LLPL"
+  ]
+}

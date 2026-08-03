@@ -16,7 +16,7 @@ single borehole's whole story, not one group at a time.
     ```
 
     ```text
-    ['LOCA', 'SAMP', 'LLPL']
+    --8<-- "python/ex03_at_fanout_groups.out"
     ```
 
     `.at("LOCA", ["BH01", "BH02"])` walks the dictionary's parent graph down from
@@ -31,8 +31,7 @@ single borehole's whole story, not one group at a time.
     ```
 
     ```text
-    ['LLPL', 'LOCA', 'SAMP']
-    4
+    --8<-- "python/ex04_at_frames.out"
     ```
 
     `frames` is a plain dict of **born-typed** polars frames — pull one out by its
@@ -47,9 +46,7 @@ single borehole's whole story, not one group at a time.
     ```
 
     ```text
-    [ 'LLPL', 'LOCA', 'SAMP' ]
-    [ 'LLPL', 'LOCA', 'SAMP' ]
-    4
+    --8<-- "node/ex04_at_frames.out"
     ```
 
     Same fan-out, same manifest: `at("LOCA", ids)` returns a subset whose

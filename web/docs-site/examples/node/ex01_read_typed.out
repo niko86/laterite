@@ -1,0 +1,2 @@
+LOCA_ID[0]=BH01 LOCA_GL[0]=23.68
+{ LOCA_ID: 'Utf8', LOCA_NATE: 'Float64', LOCA_GL: 'Float64' }
