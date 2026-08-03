@@ -8,7 +8,7 @@ language: rust
 artifact: laterite-ags4-wasm
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 volatile: [sizes]
-volatile_asof: 2026-05-30
+volatile_asof: 2026-08-03
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-wasm"
   lib: "repo:rust-packages/laterite-ags4-wasm/src/lib.rs"
@@ -54,7 +54,9 @@ sources: []
 > validator worker's new `censor` RPC op — reusing this crate's existing wasm
 > bundle rather than a second tiny cdylib (censor has no per-keystroke
 > latency constraint, unlike the tokenizer/quoter pair above); the bundle
-> grew ~6.6→6.64 MB, still under the 8 MiB PWA precache cap. See
+> grew ~6.6→6.64 MB at the time. Re-measured 2026-08-03: the engine wasm is
+> **6.76 MiB raw / 1.88 MiB gzipped**, so the 8 MiB PWA precache cap still has
+> ~1.2 MiB of headroom on the raw figure. See
 > [[dec-ags4-censor-leaf]].
 
 ## What it is
