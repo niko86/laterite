@@ -4,7 +4,7 @@ title: "perf campaign: the strategy, the stopping rule and the ledger"
 status: drafted
 tags: [concept, performance, process, register]
 volatile: [timings, status]
-volatile_asof: 2026-07-26
+volatile_asof: 2026-08-03
 ags_editions: []
 repo_refs:
   benches: "repo:rust-packages/laterite-ags4-validator/benches/validate.rs"
@@ -218,9 +218,20 @@ with the condition for revisiting).
 
 ### Priced, declined
 
+**This table is the home of record.** Each row below had a GitHub issue holding
+its decision; the issues were closed on 2026-08-03 so the board stops carrying
+work nobody intends to do, and the reasoning moved here where the thresholds it
+was judged against also live. A row leaves this table only by its own revisit
+condition being met and a fresh measurement, never by someone re-filing it.
+
 | candidate | prize | why not | revisit when |
 |---|---|---|---|
 | positional row model (`Vec<Vec<String>>` + heading index) | ~25 ms, 13% of the typed read | breaks `r["LOCA_ID"]` at every call site — `lat read`, `laterite-excel`, node, `read_groups_raw` | a caller reads these rows in a hot loop, **or** `AgsGroup` is being reshaped anyway. Not on the 13% alone. |
+| `raw_lines` pushes one owned `String` per line under `validating()` (`parse/lib.rs:35` `pub text: String`, allocated at `:721`) — queue #4, was issue #112 | ~9.9 ms = **6.9% of `parse_bytes`**, 1.9% of `check_file` — and that is the ceiling (a span rewrite keeps the `Vec` push) | **invasive**: needs `ParsedFile<'a>` or whole-file-decode + span, changing the public `RawLine.text` type across `line_format`/`structure`/`fixes`/PyO3. Fails the 20% gate by ~3× | a change is *already* rewriting `RawLine` to borrow (making this contained rather than invasive), **or** `parse_bytes` becomes a materially larger share of a user-facing operation. Re-verified 2026-08-03: mechanism unchanged, no such rewrite in flight |
+| `EmitGroup` owns `Vec<Vec<String>>`, so `emit.rs:354` deep-clones an already-owned matrix to hand the writer a *view* — queue #9, was issue #113 | **measured 2026-08-03, paired**: `emit_ags4/report` 18.155 → 16.525 ms with the clone removed = **−1.63 ms, −9.0%** (autofix −8.8%, +synth −7.6%) | **invasive**, and more so than when first declined: `laterite-ags4-emit` now **publishes to crates.io** (0.9.0), so changing `EmitGroup.rows`'s type is a breaking change to a published API — an engine MINOR under the pre-1.0 convention. 9% against a 20% gate | the original condition was "node gets a bench harness **and** node's emit dominates there". Half of it is now met — `node/bench/read.bench.ts` + `npm run bench` exist — but it benches **read only**. At 9% on the Rust side a node emit bench would have to find something dramatically different to change the answer, so: only if a node emit bench is written for its own reasons and shows that |
+| keychain S3 — memoise the parent `_id` across a group's rows — was issue #111 | ~5–15% of *id-minting*, which post-S1/S2 is no longer the dominant stage of the keyed read | end-to-end ceiling falls **below the tranche floor**. Contained, but there is nothing left to win here | id-minting becomes the dominant stage of the keyed read again |
+| keychain S4 — fuse UUID→string into the Arrow builder, skipping the per-row 36-char `String` (`keychain.rs:181`) — was issue #111 | **measured 2026-08-03**: with both `to_string()` calls removed outright, `group_row_ids/SAMP-10k` 1.327 → 1.045 ms = **−21.6% of that stage**. That is an over-stated bound (it drops the hyphen formatting too, which S4 keeps); scaled to the keyed read it lands in the estimated **4–8%** band | straddles the 5% candidate floor **from below** once the over-statement is discounted, and it touches the `_id`/`_parent_id` byte-identity contract guarded by the cross-surface golden. Delicate work for a sub-floor prize | the keyed path is being revisited for another reason and this can ride along under the existing golden-pin |
+| keychain S5 — emit `_id`/`_parent_id` as a 16-byte DuckDB `UUID` instead of 36-char Utf8 — was issue #111 | not a perf candidate at all | it is a **contract change**: the column *type* moves, touching the golden, `test_content_keys.py`, `p3-content-keys.test.ts`, `arrow_cols`, every surface reader and the extension's `read_ags`. It sat inside a perf issue where the stopping rule cannot judge it | a DuckDB-heavy consumer asks for it. Then it gets its own design page and a deliberate decision, not a slip-in — the contract it would change is described in [[laterite-ags4-reference]] |
 
 ### The queue — ranked, big-cheap first
 
@@ -237,9 +248,9 @@ as such, because they are counts, not timings.
 | ~~4~~ | ~~`raw_lines` pushes one owned `String` per line under `validating()` (`parse/lib.rs:721`)~~ | parse leaf | per-line | **DECLINED T4 — measured ~9.9 ms** (validating 144.2 vs lean 134.3 @ 25 MB): only ~6.9% of `parse_bytes`, ~1.9% of `check_file`, and that is the *ceiling* (a span rewrite keeps the `Vec` push) | **invasive** (ledger said contained — WRONG: removing the alloc needs `ParsedFile<'a>` / whole-file-decode + span, changing the `pub RawLine.text` API across `line_format`/`structure`/`fixes`/PyO3) | yes | fails the 20% invasive gate at ~5% realized |
 | ~~5~~ | ~~`Sidecar::assemble` walks the file a second time inside `mint` to rebuild the byte index~~ | core + trust | per-file | **LANDED T4 — mint −13.3% (324→280 ms @ 25 MB)**: reuse the validating parse's source-true offsets instead of re-walking (`assemble_from_parsed`) | contained | yes (new `trust/mint` bench) | non-UTF-8 mint pinned (core fallback + trust end-to-end) |
 | ~~6~~ | ~~node's `table_ipc` has no `with_keys=false` escape, so the keychain pass runs on the default `table(code)` call and the keys are then stripped~~ | surfaces (node) | per-row | **LANDED T6 — default `read + table(all)` 692 → 152 ms (−78%)**: the keychain is ~96% of the native build (isolated: keyed `tableIpc(all)` 509 ms vs keyless 18 ms), so `withKeys=false` skips it on the keys-less default; only the explicit keyed variant still pays it | contained | yes (`node/bench/read.bench.ts`) | `.sql()`/`.at()` after a prior plain `table()` pinned (`p3-content-keys.test.ts`) |
-| ~~7~~ | ~~`parse_compat_arrow` builds a `RecordBatch` for every group even when `only_groups` narrows~~ | surfaces (compat) | per-group | **MEASURED → DEFERRED (issue #99): ~14 ms ≈ 9% of a 1-group narrowed read, 0 on a full read** — parse (143.7 ms) dominates and is shared; the build+cross of all 123 compat tables is only 14.1 ms. Clears the 5% floor but is the smallest candidate + narrowed-reads-only | contained | probe (`compat_narrow_probe` / `parse_equiv_probe`) | strict-check metadata + dup-heading / ragged / dup-GROUP raises must stay for *all* groups |
+| ~~7~~ | ~~`parse_compat_arrow` builds a `RecordBatch` for every group even when `only_groups` narrows~~ | surfaces (compat) | per-group | **LANDED (#99) — narrowed `AGS4_to_dataframe` 144.4 → 131.2 ms (−9.1%)**; the native `parse_compat_arrow` drops 121.7 → 111.0 ms when one group of 123 is asked for. `only_groups=None` builds every group exactly as before, and ~25 MB of peak RSS goes with the tables that are no longer materialised | contained (~20 lines: an `only_groups` parameter on the pyfunction, threaded from `AGS4_to_dataframe`) | yes (paired native + end-to-end) | `test_compat_only_groups.py` — the strict raises (dup GROUP / ragged / dup heading) still fire on groups the caller filtered out |
 | ~~8~~ | ~~the GIL is never released anywhere in `laterite-py` (zero `allow_threads`/`detach`)~~ | surfaces (wheel) | not hot — concurrency only | **LANDED T6 — concurrent throughput: validate 0.99 → 5.08×, read 0.96 → 3.53× @ 10 cores** (`Python::detach` around the pure-Rust compute in `run_check`/`parse_arrow`/`parse_compat_arrow`); single-call latency unchanged | contained | yes (`tools/bench-gil-throughput.py`, T6) | `test_gil_released.py` proves a concurrent thread advances *during* the native call |
-| 9 | `EmitGroup` owns `Vec<Vec<String>>`, so two callers deep-clone an already-owned matrix (`emit.rs:188`, node `lib.rs:243`) | emit + node | per-cell | **small** — `emit_ags4/report` is 22.4 ms and the writer is 2.9 ms of it | **invasive** — changes a public field type | partial | node and excel have no bench crate |
+| ~~9~~ | ~~`EmitGroup` owns `Vec<Vec<String>>`, so a caller deep-clones an already-owned matrix~~ | emit + node | per-cell | **DECLINED 2026-08-03 — measured −1.63 ms, −9.0% of `emit_ags4/report`** against a 20% invasive gate. See *Priced, declined* above for the paired numbers and the revisit condition | **invasive** — changes a public field type on a crate that now publishes to crates.io | yes (`benches/emit.rs`; node has `bench/read.bench.ts` but benches read only) | — |
 | ~~10~~ | ~~the process uses the system allocator; `parse_bytes` is allocation-bound (~5M blocks / 25 MB, dhat-confirmed)~~ | parse leaf → all surfaces | per-cell alloc | **LANDED — mimalloc `#[global_allocator]` on all 3 native artifacts: wheel end-to-end read −22%, validate −14%; lat/node the same read win** for +163 KB (.so) / +116 KB (lat) | contained (dep + 3 lines/artifact; C `libmimalloc-sys` on the abi3 matrix, the accepted dep-shape cost) | yes (dhat + wheel e2e) | wheel 681 + node 289 green; Arrow release-callback handoff proven safe |
 | ~~11~~ | ~~the *keyed* keychain (`group_row_ids`) rebuilds a per-row all-columns `HashMap<String,String>` and re-hashes with a fresh `Sha256` per row — paid on every `.sql()`/`.at()`/`keys=True`/`to_duckdb` read (#6 skipped it on the keys-less default but left the keyed path untouched)~~ | reference leaf (keychain) → surfaces | per-row | **LANDED (Steps 1+2, #106/#108).** S1 `perf/keychain-positional-keys` — kill the per-row map, read KEY cells positionally: end-to-end node 25 MB **keyed** read **521 → 277 ms (−47%)**, keychain overhead ~386 → ~144 ms (−63%); isolated 1002 → 201 ns/row. S2 `perf/keychain-streaming-hash` — borrow + stream KEY cells into one reused `Sha256` (`finalize_reset`) behind a `ByteSink` trait: isolated `group_row_ids` **353 → 132 ns/row (2.68×)**. S2 end-to-end is flat — post-S1, id-minting sits one stage *behind* the Arrow key-column build + IPC, which now dominate the keyed read | contained (byte-identical; public signatures unchanged) | yes (`benches/keychain.rs` criterion + node `read.bench.ts`) | `content_id_pins_the_cross_surface_golden` + injectivity + node `p3-content-keys.test.ts` pin byte-identity |
 
@@ -654,8 +665,30 @@ candidate floor, but it is the smallest win on the board and narrowed-reads-only
 A prototype (`parse_equiv_probe`) also proved the compat and native `read()`
 parses are byte-identical, so the "reimplement compat on the lazy handle" refactor
 is viable — but it lands the *same* 14 ms and touches the python-ags4 parity
-oracle, so its only payoff is one internal read path. Both options are captured in
-#99 for later; the small `only_groups` pushdown is the recommended form.
+oracle, so its only payoff is one internal read path.
+
+**#7 — LANDED (2026-08-03).** The small pushdown, as recommended. `only_groups`
+became a parameter on `parse_compat_arrow` itself, so the Arrow tables for groups
+the caller is about to discard are never built or crossed. Re-measured on the same
+25 MB rung the day it landed: narrowed `AGS4_to_dataframe` **144.4 → 131.2 ms
+(−9.1%)**, and the native call **121.7 → 111.0 ms** when one group of 123 is asked
+for; `only_groups=None` builds every group exactly as before. Note the *ratio* in
+the paragraph above had already moved on its own — a narrowed read was 93% of a
+full one when first measured and 69% by August, drift in the Python-side
+materialisation rather than in the prize, which stayed ~11 ms where it was.
+
+The refactor half (reimplement compat on the lazy handle) was **not** taken and is
+not queued: same win, more risk, and its only payoff is architectural. It belongs
+to whoever retires `parse_compat_arrow`, not to this campaign.
+
+What the pushdown must never narrow is the *raises*. python-ags4 rejects a
+duplicate GROUP, a ragged DATA row and a duplicate heading under
+`rename_duplicate_headers=False` by reading the whole file, and narrowing those
+alongside the tables would turn a rejected file into an accepted one — silent data
+loss dressed as a speed-up. Every group therefore still crosses its headings, line
+anchors and `ragged` list; only the table is conditional.
+`test_compat_only_groups.py` pins each raise firing on an offence in a group the
+caller filtered out, which is the property a timing can never show.
 
 **#8 — LANDED (2026-07-25).** The single-threaded benches are blind to this by
 construction — the win is *concurrency*, not latency. A new throughput harness

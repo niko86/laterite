@@ -15,6 +15,7 @@
 //! with a comment (#530); the python-ags4 `check_file` dict (with
 //! `Metadata`/`Summary`) is assembled in `laterite/compat.py`.
 
+use std::collections::HashSet;
 use std::path::Path;
 
 // The read/validate hot-path is allocation-bound in the parse leaf (~5M small
@@ -903,7 +904,7 @@ fn parse_primitives(
 /// heading count — for the ragged-row raise), so the compat reader needs no
 /// second file scan. This is the fast path behind `compat.AGS4_to_dataframe`.
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, data=None, encoding=None))]
+#[pyo3(signature = (path=None, text=None, data=None, encoding=None, only_groups=None))]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
 fn parse_compat_arrow(
@@ -912,6 +913,7 @@ fn parse_compat_arrow(
     text: Option<String>,
     data: Option<Vec<u8>>,
     encoding: Option<String>,
+    only_groups: Option<Vec<String>>,
 ) -> PyResult<Bound<'_, PyDict>> {
     let Some(enc) = laterite_ags4_parse::resolve_encoding(encoding.as_deref()) else {
         let label = encoding.as_deref().unwrap_or("");
@@ -957,6 +959,20 @@ fn parse_compat_arrow(
             .collect::<Vec<_>>(),
     )?;
 
+    // `only_groups` narrows which groups get an Arrow `table` built and crossed —
+    // and NOTHING else. Every group still contributes its headings, line anchors,
+    // `ragged` list and `group_records` entry, because python-ags4's hard raises
+    // (duplicate GROUP, ragged row, duplicate heading under `rename=False`) fire
+    // on the whole file regardless of narrowing. Narrowing the raises instead
+    // would be a behaviour change wearing a performance change's clothes.
+    //
+    // An EMPTY list means "all", matching the caller: `AGS4_to_dataframe` reads
+    // `only_groups if only_groups else <every group>`, so `[]` is falsy there.
+    let wanted: Option<HashSet<&str>> = only_groups
+        .as_ref()
+        .filter(|v| !v.is_empty())
+        .map(|v| v.iter().map(String::as_str).collect());
+
     let groups = PyDict::new(py);
     for code in &pf.group_order {
         let Some(g) = pf.groups.get(code) else {
@@ -983,16 +999,20 @@ fn parse_compat_arrow(
             .collect();
         gd.set_item("ragged", ragged)?;
 
-        let batch = laterite_ags4_types::arrow_cols::build_record_batch_compat(
-            &g.headings,
-            &g.units,
-            &g.types,
-            g.rows.len(),
-            |col, row| g.cell(col, row),
-        )
-        .map_err(|e| PyRuntimeError::new_err(format!("compat arrow for {code}: {e}")))?;
-        let schema = batch.schema();
-        gd.set_item("table", PyTable::try_new(vec![batch], schema)?)?;
+        // The one narrowed step. A skipped group simply has no `table` key; the
+        // caller only reaches for one on a group it asked for.
+        if wanted.as_ref().is_none_or(|w| w.contains(code.as_str())) {
+            let batch = laterite_ags4_types::arrow_cols::build_record_batch_compat(
+                &g.headings,
+                &g.units,
+                &g.types,
+                g.rows.len(),
+                |col, row| g.cell(col, row),
+            )
+            .map_err(|e| PyRuntimeError::new_err(format!("compat arrow for {code}: {e}")))?;
+            let schema = batch.schema();
+            gd.set_item("table", PyTable::try_new(vec![batch], schema)?)?;
+        }
 
         groups.set_item(code, gd)?;
     }
