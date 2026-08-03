@@ -133,7 +133,20 @@ jobs:
         # selected packages only, and the four crates that request `arrow` are all
         # excluded here. The honest number came in 0.36 points below the old one
         # (89.6% → 89.24%), so the floor did not have to move.
-        run: cargo llvm-cov report --summary-only --fail-under-lines 88
+        #
+        # 88 -> 93 (2026-08-03). Actual has been 94.44-95.91 across the last four
+        # nightlies (94.88 on 2026-08-02), so the old floor sat ~7 points under
+        # reality and would not have caught a whole crate going dark. 93 keeps
+        # ~1.4 points under the LOWEST of those runs, which is the margin the
+        # denominator churn needs: it moved 15,522 -> 16,659 lines in that window
+        # when the `laterite` facade crate landed, and a floor tighter than the
+        # denominator's own drift fails on arithmetic rather than on coverage.
+        #
+        # NB this lane has no strict-vs-lenient gap. llvm-cov's lcov carries no
+        # branch records (Branches reads 0/0), so Codecov sees no partials and its
+        # badge is ~= this number -- unlike node/web, where the two diverged by ten
+        # points. Do not import the branch-floor reasoning from those lanes here.
+        run: cargo llvm-cov report --summary-only --fail-under-lines 93
 
       # Codecov `rust` flag — public repo only (where the badge lives + the token
       # is set). NB: the cargo-only number (PyO3 glue is Python-tested, excluded).
