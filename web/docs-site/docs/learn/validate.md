@@ -5,7 +5,7 @@
 ```
 
 ```text
-is_valid=True count=0 dict_version='4.1.1' resolution='exact'
+--8<-- "python/ex02_validate.out"
 ```
 
 `read(path).validate()` runs the numbered-rules engine and hands back the

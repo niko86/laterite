@@ -12,10 +12,7 @@ Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
     ```
 
     ```text
-    totals: 0 0 1
-    PROJ key headings: ['PROJ_ID']
-    changed row key: ['LAT-DEMO']
-    changed cell: {'heading': 'PROJ_NAME', 'type': 'X', 'a': 'laterite demo site (synthetic starter - replace me)', 'b': 'laterite demo site (Rev B)'}
+    --8<-- "python/ex16_diff.out"
     ```
 
     `laterite.diff(a, b)` compares two AGS4 texts and returns a `RevisionDelta` — a
@@ -56,15 +53,7 @@ Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
     ```
 
     ```text
-    totals: 0 0 1
-    PROJ key headings: [ 'PROJ_ID' ]
-    changed row key: [ 'LAT-DEMO' ]
-    changed cell: {
-      heading: 'PROJ_NAME',
-      type: 'X',
-      a: 'laterite demo site (synthetic starter - replace me)',
-      b: 'laterite demo site (Rev B)'
-    }
+    --8<-- "node/ex16_diff.out"
     ```
 
     `diff(a, b)` runs the same `laterite-ags4-diff` engine and returns the

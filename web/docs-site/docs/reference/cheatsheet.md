@@ -8,20 +8,7 @@ file, then chain — every method below hangs off what `read()` gives you.
 ```
 
 ```text
-shape: (7, 3)
-┌─────────┬───────────┬─────────┐
-│ LOCA_ID ┆ LOCA_TYPE ┆ LOCA_GL │
-│ ---     ┆ ---       ┆ ---     │
-│ str     ┆ str       ┆ f64     │
-╞═════════╪═══════════╪═════════╡
-│ BH02    ┆ RC        ┆ 32.49   │
-│ BH03    ┆ RC        ┆ 28.54   │
-│ BH04    ┆ RC        ┆ 29.04   │
-│ BH05    ┆ RC        ┆ 31.62   │
-│ BH07    ┆ RC        ┆ 31.33   │
-│ BH08    ┆ CP        ┆ 28.67   │
-│ BH09    ┆ CP        ┆ 30.98   │
-└─────────┴───────────┴─────────┘
+--8<-- "python/ex05_query_builder.out"
 ```
 
 A lazy `AgsQuery` (above), built up and then materialised. The tables that

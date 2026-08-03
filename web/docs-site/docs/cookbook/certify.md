@@ -12,7 +12,7 @@ skip the rule engine.
     ```
 
     ```text
-    certified
+    --8<-- "python/ex08_certify.out"
     ```
 
     `.certify()` needs a prior **clean** [`.validate()`](../learn/validate.md)
@@ -35,7 +35,7 @@ skip the rule engine.
     ```
 
     ```text
-    certified
+    --8<-- "node/ex08_certify.out"
     ```
 
     The same lifecycle, the same file format: `certify()` after a clean

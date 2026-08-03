@@ -1,0 +1,2 @@
+sealed: site.ags.zst.age
+round-trip byte-identical: True

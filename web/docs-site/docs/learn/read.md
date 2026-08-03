@@ -5,16 +5,7 @@
 ```
 
 ```text
-shape: (2, 3)
-┌─────────┬───────────┬─────────┐
-│ LOCA_ID ┆ LOCA_NATE ┆ LOCA_GL │
-│ ---     ┆ ---       ┆ ---     │
-│ str     ┆ f64       ┆ f64     │
-╞═════════╪═══════════╪═════════╡
-│ BH01    ┆ 451105.75 ┆ 23.68   │
-│ BH02    ┆ 451235.21 ┆ 32.49   │
-└─────────┴───────────┴─────────┘
-{'LOCA_ID': 'String', 'LOCA_NATE': 'Float64', 'LOCA_GL': 'Float64'}
+--8<-- "python/ex01_read_typed.out"
 ```
 
 `laterite.read` hands back a group as a **born-typed** polars frame. Index it

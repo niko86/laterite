@@ -501,6 +501,11 @@ jobs:
         run: uv run --no-project python tools/gen_observations.py --check
       - name: gen_observations --check-wiki (O-N pages agree with the SSOT)
         run: uv run --no-project python tools/gen_observations.py --check-wiki
+      # The structural half of the doc-output gate (#164). The half that RUNS the
+      # examples needs the built surfaces and lives in ci.yml's python + node jobs;
+      # this one only reads Markdown, so the enforcing lane can carry it too.
+      - name: gen_doc_outputs --check-pages (every output block is wired to its example)
+        run: uv run --no-project python tools/gen_doc_outputs.py --check-pages
 
   # Open or update ONE tracking issue when the nightly fails, so a bad night is
   # actionable without watching the Actions tab. GitHub also emails the owner on a

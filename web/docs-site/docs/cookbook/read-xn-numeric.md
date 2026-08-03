@@ -11,10 +11,7 @@ AGS `XN` headings are _numeric-or-text_ on disk — laterite reads them as
 ```
 
 ```text
-LOCA children: 50
-first few: ['BKFL', 'CDIA', 'CHIS']
-SAMP inherits: {'LOCA_ID'}
-LLPL_PL dtype: Float64
+--8<-- "python/ex13_registry_xn.out"
 ```
 
 `XN` is the AGS type for a column that _usually_ holds a number but is allowed to

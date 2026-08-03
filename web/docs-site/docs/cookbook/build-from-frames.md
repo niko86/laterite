@@ -14,8 +14,7 @@ transmission details.
     ```
 
     ```text
-    groups: ['PROJ', 'LOCA']
-    findings: 3
+    --8<-- "python/ex09a_build_from_frames.out"
     ```
 
     `build_ags4` takes a `{code: frame}` mapping — each frame's columns *are* the AGS
@@ -57,8 +56,7 @@ transmission details.
     ```
 
     ```text
-    groups: [ 'PROJ', 'LOCA' ]
-    findings: 3
+    --8<-- "node/ex09a_build_from_frames.out"
     ```
 
     `buildAgs4` takes a `Map` (or array) of `[code, rows]` entries — each row a

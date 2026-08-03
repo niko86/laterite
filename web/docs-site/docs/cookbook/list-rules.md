@@ -13,9 +13,7 @@ numbers.
     ```
 
     ```text
-    27
-    ['checks', 'fixable', 'observations', 'rule', 'severity', 'title']
-    ('4.1.1', 'exact')
+    --8<-- "python/ex14_rules_dict.out"
     ```
 
     `laterite.list_rules()` returns one rich dict per numbered AGS4 rule — 27 of
@@ -53,9 +51,7 @@ numbers.
     ```
 
     ```text
-    27
-    [ 'checks', 'fixable', 'observations', 'rule', 'severity', 'title' ]
-    fixable: 1, 2a, 4, 6, 7, 8, 11a, 11b
+    --8<-- "node/ex14_rules.out"
     ```
 
     `listRules()` returns the same 27-entry catalogue as an array of `RuleMeta`

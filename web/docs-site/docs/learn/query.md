@@ -11,7 +11,7 @@ from a one-line fan-out to raw SQL.
 ```
 
 ```text
-['LOCA', 'SAMP', 'LLPL']
+--8<-- "python/ex03_at_fanout_groups.out"
 ```
 
 `ags.at("LOCA", ["BH01", "BH02"])` follows the dictionary's parent/child links
@@ -26,8 +26,7 @@ plasticity tests that hang off them.
 ```
 
 ```text
-['LLPL', 'LOCA', 'SAMP']
-4
+--8<-- "python/ex04_at_frames.out"
 ```
 
 `.frames()` turns that scoped query into a plain `dict` of born-typed polars
@@ -42,20 +41,7 @@ with — already typed, no casting.
 ```
 
 ```text
-shape: (7, 3)
-┌─────────┬───────────┬─────────┐
-│ LOCA_ID ┆ LOCA_TYPE ┆ LOCA_GL │
-│ ---     ┆ ---       ┆ ---     │
-│ str     ┆ str       ┆ f64     │
-╞═════════╪═══════════╪═════════╡
-│ BH02    ┆ RC        ┆ 32.49   │
-│ BH03    ┆ RC        ┆ 28.54   │
-│ BH04    ┆ RC        ┆ 29.04   │
-│ BH05    ┆ RC        ┆ 31.62   │
-│ BH07    ┆ RC        ┆ 31.33   │
-│ BH08    ┆ CP        ┆ 28.67   │
-│ BH09    ┆ CP        ┆ 30.98   │
-└─────────┴───────────┴─────────┘
+--8<-- "python/ex05_query_builder.out"
 ```
 
 `.query(sql)` returns a lazy `AgsQuery`. Chain `.filter(...)` and `.select(...)`
@@ -72,24 +58,7 @@ not strings.
 ```
 
 ```text
-shape: (14, 2)
-┌─────────┬─────┐
-│ LOCA_ID ┆ n   │
-│ ---     ┆ --- │
-│ str     ┆ i64 │
-╞═════════╪═════╡
-│ BH01    ┆ 4   │
-│ BH02    ┆ 2   │
-│ BH03    ┆ 3   │
-│ BH04    ┆ 4   │
-│ BH05    ┆ 2   │
-│ …       ┆ …   │
-│ BH10    ┆ 3   │
-│ BH11    ┆ 3   │
-│ BH12    ┆ 3   │
-│ BH13    ┆ 4   │
-│ BH14    ┆ 4   │
-└─────────┴─────┘
+--8<-- "python/ex06_sql_join.out"
 ```
 
 When you need a real join, `.sql(...)` exposes every group as a DuckDB table by

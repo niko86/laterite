@@ -1,0 +1,9 @@
+totals: 0 0 1
+PROJ key headings: [ 'PROJ_ID' ]
+changed row key: [ 'LAT-DEMO' ]
+changed cell: {
+  heading: 'PROJ_NAME',
+  type: 'X',
+  a: 'laterite demo site (synthetic starter - replace me)',
+  b: 'laterite demo site (Rev B)'
+}

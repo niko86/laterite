@@ -13,7 +13,7 @@ in-process from Python or Node, in SQL from DuckDB, at the shell with
     ```
 
     ```text
-    is_valid=True count=0 dict_version='4.1.1' resolution='exact'
+    --8<-- "python/ex02_validate.out"
     ```
 
     `read(path).validate()` runs the rule engine and returns the
@@ -34,7 +34,7 @@ in-process from Python or Node, in SQL from DuckDB, at the shell with
     ```
 
     ```text
-    isValid=true count=0 dictVersion=4.1.1 resolution=exact
+    --8<-- "node/ex02_validate.out"
     ```
 
     Same engine, camelCase verbs: the free `validate()` returns a `Report`

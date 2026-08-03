@@ -10,9 +10,7 @@ dictionary (4.0.3 … 4.2). `dict_for(path)` reports the decision as a
 ```
 
 ```text
-27
-['checks', 'fixable', 'observations', 'rule', 'severity', 'title']
-('4.1.1', 'exact')
+--8<-- "python/ex14_rules_dict.out"
 ```
 
 The last line is the part to read here: `dict_for("examples/sample_site.ags")`
