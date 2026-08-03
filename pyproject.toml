@@ -26,7 +26,7 @@ laterite = { workspace = true }
 # (the notebook's PEP 723 header brings polars/duckdb/altair/pyarrow/laterite,
 # so the shipped wheel never gains marimo). pandas<3 stays — python-ags4 needs it.
 dev = [
-    "marimo>=0.23.15",
+    "marimo>=0.23.16",
     "pandas<3",
     "pytest>=9.1.1",
     "pytest-benchmark>=5.2.3",
@@ -34,7 +34,7 @@ dev = [
     # Ags4File text round-trip with generated input the example-based
     # tests don't reach (the laterite-base tests in
     # packages/laterite/tests/test_ags_types.py + test_ags4file.py).
-    "hypothesis>=6.161.8",
+    "hypothesis>=6.164.0",
     # Parallel test execution. The laterite suite is file/DuckDB-heavy
     # (per-test tmp_path isolation), so tests fan out cleanly across
     # workers. CI runs `-n 4` to roughly halve the suite while leaving
@@ -45,13 +45,13 @@ dev = [
     # [tool.coverage] config below scopes it to the package. Plays
     # with xdist (combines per-worker data automatically).
     "pytest-cov>=5",
-    "ruff>=0.16.0",
+    "ruff>=0.16.1",
     # Astral's type checker (preview) — the type-faithfulness gate (#303 Phase 1):
     # proves the shipped `laterite` package's type hints don't lie. Same toolchain
     # as ruff/uv (Rust-fast). Run in the project venv (`uv run ty check`, NOT
     # `uvx`) so it resolves polars/duckdb + the generated `_laterite_native.pyi`;
     # config + scope in [tool.ty] below. CI step sits beside `ruff check`.
-    "ty>=0.0.64",
+    "ty>=0.0.65",
     # Dead-code finder for the Python surface (Rust's `dead_code` lint is
     # built-in; Python has no equivalent). NOT a gate — it's a reliquary
     # *scout*: `uv run vulture` surfaces candidate unused funcs/classes for a
