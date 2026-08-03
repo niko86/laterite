@@ -73,6 +73,6 @@ SELECT stmt FROM load_ags('delivery.ags') ORDER BY seq;
 ```
 
 !!! note "Read-only query surface"
-DuckDB is a **read** door — it reads and inspects, but doesn't validate,
-certify, `fix`, `diff`, or emit AGS4 (those are the library and CLI
-surfaces). See the [capability matrix](../surfaces/index.md#what-each-door-can-do).
+    DuckDB is a **read** door — it reads and inspects, but doesn't validate,
+    certify, `fix`, `diff`, or emit AGS4 (those are the library and CLI
+    surfaces). See the [capability matrix](../surfaces/index.md#what-each-door-can-do).

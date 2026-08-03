@@ -1,6 +1,6 @@
 # List the validation rules
 
-**Available in:** Python · Node · CLI · Browser
+**Available in:** Python · Node · CLI · [Browser](../surfaces/browser.md)
 
 Enumerate the validator's numbered rules — the same catalogue every surface runs
 — to drive a UI legend, a docs page, or a coverage check without hard-coding rule
@@ -76,14 +76,6 @@ numbers.
     The **Severity** and **Fix?** columns are exactly the `severity` / `fixable`
     fields the library surfaces expose — `mixed` marks a rule that also emits
     information-only findings, and `yes` marks one `fix` can repair mechanically.
-
-=== "Browser"
-
-    Open the [web app](../surfaces/browser.md) and find the rule catalogue under
-    **Tools** — the same 27 numbered rules with their titles, severities, and
-    fixable flags, rendered from the wasm build. When a validation run flags a
-    finding, it links back to this explainer so you can read what the rule checks
-    without leaving the page.
 
 Every surface reads the same rule catalogue from the one engine, so the numbers,
 titles, severities, and fixable flags never drift between a Python legend, a Node

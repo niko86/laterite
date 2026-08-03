@@ -9,9 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The browser package has an API reference.** `@laterite/ags4-wasm` ships to npm with fully typed results, and until now the docs site did not mention it once — the crate README was its only documentation. `reference/wasm-api.md` documents it through the practices the web app actually uses, with worked examples whose printed output is generated from running them: init once and await that promise (and pass `module_or_path` explicitly, or a non-root `base` breaks the fetch fallback), read severity through one resolver because an absent `severity` means *error*, take the types from the package rather than mirroring them, hold a `ParsedDataset` across its Arrow pulls and free it before the next parse, propose fixes before applying them, and keep the synchronous engine off the main thread.
+
 ### Changed
 
 - **The `lat` console script the wheel installs now renders the same tables as the shipped `lat` binary.** Two programs answer to `lat` — the Rust binary and this Python console script — and until now they printed visibly different output for the same command: comfy-table's UTF-8 box grid from one, a plain `ljust` grid from the other. The machine-readable surfaces (`--json`, `--ndjson`, `--csv`, the group listing, exit codes) had always been held byte-identical by test; the grids people actually read were pinned nowhere, which is how the divergence survived. The glyphs are now matched exactly, colour included (bold-cyan header, dim alternate rows, honouring `NO_COLOR` and a real terminal the same way the binary does), and the human table has joined the byte-parity tests instead of being excluded from them. **No new dependency:** the CLI remains stdlib-only. The two still part under an interactive TTY, where comfy-table wraps to the terminal width and this does not — a case no gate or document captures.
+- **The browser story is one page instead of thirteen near-identical tabs.** Each cookbook page carried a *Browser* tab saying the same three sentences — same engine, in your browser, nothing uploaded — about whichever pane of the web app was relevant. Those are consolidated into the web app's own page (`surfaces/browser.md`), which now describes what each pane gives you; the cookbook's *Available in* line links there instead. The app is a showcase for the wasm package, not a product, so it gets one page describing it and the package gets the API reference every other surface already had.
+
+### Fixed
+
+- **28 of the docs site's 30 admonitions rendered as an empty box.** Prettier de-indents the body of a `!!! note` / `??? tip`, and MkDocs needs that indentation to associate the body with the box — so the text escaped into a plain paragraph underneath while the titled box rendered empty. Because `prettier --check` is a CI gate, writing an admonition *correctly* meant failing the gate, which is why only two survived. The docs' Markdown is now outside prettier's scope (it is MkDocs-flavoured — admonitions, content tabs and `--8<--` includes are not prettier's dialect) and every body is re-indented; the built site now has zero empty admonition boxes.
 
 ## [0.10.0] — 2026-08-02
 

@@ -66,10 +66,10 @@ All three return the same object, so the rest of your code never asks where the
 data came from.
 
 !!! note "Why it matters"
-Identical behaviour across surfaces is a guarantee, not a coincidence:
-validate in CI with `lat`, then read the same file in Python and get
-the same verdict. And because the input doors converge, a web upload
-(`data=`), a pasted snippet (`text=`), and a file (path) all flow through
-one code path — no special-casing.
+    Identical behaviour across surfaces is a guarantee, not a coincidence:
+    validate in CI with `lat`, then read the same file in Python and get
+    the same verdict. And because the input doors converge, a web upload
+    (`data=`), a pasted snippet (`text=`), and a file (path) all flow through
+    one code path — no special-casing.
 
 ← Back to [Read](../learn/read.md)

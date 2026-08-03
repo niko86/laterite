@@ -1,6 +1,6 @@
 # Filter & select one group
 
-**Available in:** Python · Node · DuckDB · Browser
+**Available in:** Python · Node · DuckDB · [Browser](../surfaces/browser.md)
 
 Narrow one group to the rows and columns you want. In Python it's a lazy query
 builder; on every other surface it's the same idea said in SQL — and because the
@@ -67,14 +67,6 @@ dtype _is_ the AGS type, a numeric filter compares numbers, not strings.
     compares numbers exactly as the other surfaces do. To narrow across groups,
     add more `read_ags(...)` calls and join — see
     [SQL across groups](./sql-across-groups.md).
-
-=== "Browser"
-
-    Open the [web app](../surfaces/browser.md) and load your file into the
-    **Explore** pane. Pick a group, then filter its rows and choose columns
-    interactively — the grid is fed by the same born-typed columns, so a numeric
-    filter sorts and compares as numbers. The file never leaves your machine,
-    which keeps confidential ground-investigation data local.
 
 Every door narrows the same born-typed group: Python's builder stays lazy and
 composable, Node and DuckDB say it in SQL, the browser does it by point-and-click.

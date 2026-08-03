@@ -1,6 +1,6 @@
 # Get one group as a typed frame
 
-**Available in:** Python · Node · DuckDB · Browser
+**Available in:** Python · Node · DuckDB · [Browser](../surfaces/browser.md)
 
 Pull a single AGS group straight into a dataframe whose dtypes already match
 the group's `TYPE` row — no casting at the call site.
@@ -61,12 +61,5 @@ the group's `TYPE` row — no casting at the call site.
     numeric predicates (`WHERE loca_gl < 0`) mean what they say with no
     `CAST`. Feed it straight into `CREATE TABLE … AS` to materialise, or join
     it against other groups (see [SQL across groups](./sql-across-groups.md)).
-
-=== "Browser"
-
-    In the [web app](../surfaces/browser.md), the **Explore** pane shows every
-    group as the same born-typed table — sortable columns, the KEY chain to
-    parent/child groups, and charts over the numeric columns — powered by the
-    same Arrow columns via wasm, entirely client-side.
 
 See also: [Read](../learn/read.md) · [Born-typed reads](../concepts/born-typed.md)

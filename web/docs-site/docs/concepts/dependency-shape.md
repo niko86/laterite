@@ -39,12 +39,12 @@ AGS4.set_string_dtype("string")            # process-wide (or LATERITE_COMPAT_ST
 ```
 
 !!! note "Which extra do I want?"
-Most callers want none. Reach for **`[compat]`** to use the `laterite.compat`
-python-ags4 shim (pandas-backed by default); it adds `pandas<3` and nothing
-else. Add **`[compat,pyarrow]`** for the faster pandas hop and the
-Arrow-backed `string` dtype. Reach for **`[pyarrow]`** when you explicitly want
-the Arrow backend — e.g. handing native `pyarrow.Table` objects to another
-Arrow-native library.
+    Most callers want none. Reach for **`[compat]`** to use the `laterite.compat`
+    python-ags4 shim (pandas-backed by default); it adds `pandas<3` and nothing
+    else. Add **`[compat,pyarrow]`** for the faster pandas hop and the
+    Arrow-backed `string` dtype. Reach for **`[pyarrow]`** when you explicitly want
+    the Arrow backend — e.g. handing native `pyarrow.Table` objects to another
+    Arrow-native library.
 
 So a base user gets polars + duckdb and an Arrow-capable bridge without dragging
 in two heavyweight dataframe stacks. Importing `laterite.compat` without the

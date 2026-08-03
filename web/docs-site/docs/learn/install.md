@@ -63,9 +63,9 @@ lat validate examples/sample_site.ags --json
 ```
 
 !!! note "The exit-code contract"
-`lat` exits **`0`** when the file is clean and **`1`** when there are
-findings — nothing else. That makes it a drop-in gate for CI or a pre-commit
-hook: `lat validate delivery.ags` fails the step the moment a rule fires, no
-output parsing required.
+    `lat` exits **`0`** when the file is clean and **`1`** when there are
+    findings — nothing else. That makes it a drop-in gate for CI or a pre-commit
+    hook: `lat validate delivery.ags` fails the step the moment a rule fires, no
+    output parsing required.
 
 Next → [Read & explore a file](./read.md)

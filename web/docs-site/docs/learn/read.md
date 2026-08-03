@@ -29,8 +29,8 @@ All three return the same object, so the rest of your code doesn't care where
 the file came from.
 
 !!! tip
-Typing happens at read time straight from the dictionary, so a group that
-isn't in your file simply isn't a key. Iterate `ags` to see what's present.
+    Typing happens at read time straight from the dictionary, so a group that
+    isn't in your file simply isn't a key. Iterate `ags` to see what's present.
 
 Curious _how_ the dtype gets fixed from the AGS TYPE row? See
 [how this works → born-typed](../concepts/born-typed.md).

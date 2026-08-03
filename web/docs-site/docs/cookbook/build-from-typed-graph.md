@@ -1,6 +1,6 @@
 # Build AGS4 from a typed graph
 
-**Available in:** Python · Node · Browser
+**Available in:** Python · Node · [Browser](../surfaces/browser.md)
 
 Construct a `PROJ` typed-class tree, attach its children, and hand the whole
 graph to the emitter — use this when your data is already a graph in memory
@@ -53,19 +53,11 @@ graph to the emitter — use this when your data is already a graph in memory
     (Node's `locas` is a plain array — the append-only guard is a Python-only
     nicety.)
 
-=== "Browser"
-
-    Open the [web app](../surfaces/browser.md)'s **Export** pane: whether you
-    assemble data as a graph or as per-group tables, the same WebAssembly emitter
-    builds the file client-side — nothing uploaded. Direct wasm callers take
-    `synthesise_metadata` on `build_ags4` / `build_ags4_ipc` to derive the
-    `UNIT`/`TYPE` catalogs, plus the five `tran_*` arguments to stamp a `TRAN`.
-
 !!! tip
-`build_ags4` / `buildAgs4` returns a `BuildResult` whichever door you use.
-Inspect `res.text` / `res.bytes` in memory, check `res.findings` for any
-caveats autofix couldn't resolve, or `res.save("out.ags")` to persist a
-byte-faithful AGS4 file.
+    `build_ags4` / `buildAgs4` returns a `BuildResult` whichever door you use.
+    Inspect `res.text` / `res.bytes` in memory, check `res.findings` for any
+    caveats autofix couldn't resolve, or `res.save("out.ags")` to persist a
+    byte-faithful AGS4 file.
 
 See also: [Build from frames](./build-from-frames.md) ·
 [Produce AGS4](../learn/produce.md).

@@ -1,6 +1,6 @@
 # Excel ↔ AGS4
 
-**Available in:** Python · Node · CLI · Browser
+**Available in:** Python · Node · CLI · [Browser](../surfaces/browser.md)
 
 Round-trip an AGS4 delivery through a spreadsheet — one sheet per group, with the
 headings / units / types as header rows — for hand-editing or sharing with

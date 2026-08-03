@@ -31,12 +31,12 @@ with `.frame()` / `.to_polars()` / `.to_pandas()` / `.relation()`; an `.at(...)`
 fan-out exposes `.groups` and `.frames()`.
 
 !!! warning "Single-result and fan-out are mutually exclusive"
-The single-result methods (`.filter` / `.select` / `.frame()`) and the
-fan-out methods (`.groups` / `.frames()`) live on **different `AgsQuery`
-shapes** and don't mix on one handle. And every builder call returns a
-**new, immutable** `AgsQuery` — reassign (`q = q.filter(...)`) rather than
-expecting in-place mutation, which also lets you fork a chain without one
-branch disturbing another.
+    The single-result methods (`.filter` / `.select` / `.frame()`) and the
+    fan-out methods (`.groups` / `.frames()`) live on **different `AgsQuery`
+    shapes** and don't mix on one handle. And every builder call returns a
+    **new, immutable** `AgsQuery` — reassign (`q = q.filter(...)`) rather than
+    expecting in-place mutation, which also lets you fork a chain without one
+    branch disturbing another.
 
 ## Why it composes
 

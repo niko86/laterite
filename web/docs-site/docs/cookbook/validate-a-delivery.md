@@ -1,6 +1,6 @@
 # Validate a delivery
 
-**Available in:** Python · Node · CLI · Browser
+**Available in:** Python · Node · CLI · [Browser](../surfaces/browser.md)
 
 Run the numbered AGS Format Rules over a transfer file and get a verdict —
 in-process from Python or Node, in SQL from DuckDB, at the shell with
@@ -89,15 +89,6 @@ in-process from Python or Node, in SQL from DuckDB, at the shell with
     ```text
     --8<-- "cli/validate_json.out"
     ```
-
-=== "Browser"
-
-    Open the [web app](../surfaces/browser.md) and drag your file into the
-    **Validate** pane. The same numbered-rules engine runs compiled to
-    WebAssembly, entirely client-side — your file never leaves your machine,
-    which makes it safe for confidential ground-investigation data. Findings
-    arrive grouped by rule with the resolved edition and severity tiers, and
-    you can carry the same file straight into the **Fix** or **Explore** panes.
 
 Every validating door runs the same rule engine and picks the dictionary
 edition from the file's `TRAN_AGS` — the Python/Node `report` and the CLI's

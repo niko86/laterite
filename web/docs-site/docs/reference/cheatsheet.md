@@ -39,9 +39,9 @@ materialised value.
 | `.save(path)`                                     | writes the file              | no — terminal                                               | [ex08](../learn/produce.md)  |
 
 !!! tip "Born typed"
-`["CODE"]` and the query terminals hand back polars frames where the column
-**dtype is the AGS data type** — `LOCA_GL` arrives as `f64`, not a string to
-re-parse. See [Born typed](../concepts/born-typed.md).
+    `["CODE"]` and the query terminals hand back polars frames where the column
+    **dtype is the AGS data type** — `LOCA_GL` arrives as `f64`, not a string to
+    re-parse. See [Born typed](../concepts/born-typed.md).
 
 ## `AgsQuery` — the lazy query handle
 
@@ -60,13 +60,13 @@ returns a **new** `AgsQuery`, so the plan only runs when you call a terminal.
 | `.groups`        | `list[str]`            | fan-out — group codes in the result        |
 
 !!! warning "Single-result and fan-out are mutually exclusive"
-An `AgsQuery` is _either_ a single-result query (use `.frame` / `.to_polars`
-/ `.to_pandas` / `.relation`) _or_ a fan-out (use `.frames` / `.groups`) —
-`.at(code, [ids])` produces the fan-out shape, `.query(sql)` the
-single-result shape. Calling the wrong family raises. And every builder call
-(`.filter`, `.select`) returns a **new immutable** `AgsQuery`; the original
-is unchanged, so you can branch a plan safely. See
-[ex04](../learn/query.md) and [ex05](../learn/query.md).
+    An `AgsQuery` is _either_ a single-result query (use `.frame` / `.to_polars`
+    / `.to_pandas` / `.relation`) _or_ a fan-out (use `.frames` / `.groups`) —
+    `.at(code, [ids])` produces the fan-out shape, `.query(sql)` the
+    single-result shape. Calling the wrong family raises. And every builder call
+    (`.filter`, `.select`) returns a **new immutable** `AgsQuery`; the original
+    is unchanged, so you can branch a plan safely. See
+    [ex04](../learn/query.md) and [ex05](../learn/query.md).
 
 ## `Report` — the validation verdict
 

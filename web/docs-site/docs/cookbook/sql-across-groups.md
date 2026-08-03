@@ -1,6 +1,6 @@
 # SQL across groups
 
-**Available in:** Python · Node · DuckDB · Browser
+**Available in:** Python · Node · DuckDB · [Browser](../surfaces/browser.md)
 
 **When:** you need a real join across two or more groups — counts, lookups,
 aggregates — that a single-group query can't express. Drop to SQL.
@@ -65,13 +65,6 @@ aggregates — that a single-group query can't express. Drop to SQL.
     table function and the join is plain SQL. The same born-typed columns
     apply, and `load_ags(path)` emits the DDL to materialise every group as an
     `ags_<code>` table when you'd rather query a warehouse than a file.
-
-=== "Browser"
-
-    The [web app](../surfaces/browser.md)'s **Explore** pane has a SQL box
-    over the same engine (DuckDB-wasm fed by the wasm reader's Arrow output) —
-    the identical `SAMP s JOIN LOCA l USING (LOCA_ID)` runs client-side over
-    the file you dropped in.
 
 ### Join without knowing the keys
 

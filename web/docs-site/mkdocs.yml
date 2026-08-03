@@ -10,7 +10,16 @@
 # laterite-node/test/docs-examples.test.ts (node), tests/test_docs_cli_examples.py
 # (cli, vs committed .out files), tests/test_docs_duckdb_examples.py (duckdb,
 # monthly via compliance-report.yml) — so a page and its test are the same bytes.
-# Browser tabs are prose (the web app has no user-facing code API).
+# Every example's OUTPUT is generated too (tools/gen_doc_outputs.py): the `.out`
+# beside each example is what it really printed, and the page includes it, so a
+# block cannot drift from the code it documents (#164).
+#
+# The wasm surface documents `@laterite/ags4-wasm` on reference/wasm-api.md —
+# NOT as a Browser tab per cookbook page. The web app is a showcase for that
+# package rather than a product, so it gets one page describing it
+# (surfaces/browser.md) and the package gets the API reference every other
+# surface has. Thirteen near-identical Browser tabs said 'the same engine, in
+# your browser, nothing uploaded' thirteen times and are gone.
 
 site_name: laterite
 site_description: >-
@@ -170,6 +179,7 @@ nav:
       - CLI (lat): reference/cli.md
       - Python API: reference/api.md
       - Node API: reference/node-api.md
+      - Browser API (wasm): reference/wasm-api.md
       - DuckDB functions: reference/duckdb-functions.md
       - AGS data types: reference/types.md
       - Group catalogue: reference/groups/

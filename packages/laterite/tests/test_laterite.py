@@ -755,7 +755,7 @@ def test_cli_human_table_rust_binary_byte_parity(argv, what):
     actually read were pinned nowhere. That is how the two CLIs came to print
     visibly different output for the same command without any gate noticing.
 
-    Covers a wide table (28 rules), an empty one (a clean file prints no grid at
+    Covers a wide table (27 rules, 28 rows with the header), an empty one (a clean file prints no grid at
     all) and a populated one, so a change to the glyphs, the padding or the
     between-row rule reddens here.
     """

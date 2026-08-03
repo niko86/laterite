@@ -1,6 +1,6 @@
 # Diff two revisions
 
-**Available in:** Python · Node · CLI · Browser
+**Available in:** Python · Node · CLI · [Browser](../surfaces/browser.md)
 
 **When:** a resubmission lands and you need to know _what actually changed_ between
 Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
@@ -81,14 +81,6 @@ Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
     — off the same KEY-aware, type-aware engine, so the counts agree with every
     other surface. When you need the cell-level `a`/`b` detail shown in the
     Python/Node tabs, reach for `diff()` in a script.
-
-=== "Browser"
-
-    Open the [web app](../surfaces/browser.md)'s revision-diff tool and drop in
-    Rev A and Rev B. The same KEY-aware, type-aware engine runs compiled to
-    WebAssembly, entirely client-side — you get the per-group added/removed/changed
-    breakdown with each changed cell's `a`/`b` values, and neither file leaves your
-    machine.
 
 Every door runs the same diff leaf and reports the same delta, so a `1.50` vs
 `1.5` non-change stays a non-change everywhere. Reach for `lat diff` in a

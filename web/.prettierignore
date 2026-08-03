@@ -8,3 +8,12 @@ src/wasm-tokenizer/
 package-lock.json
 # Synced from the repo SSOT (sync-*.mjs) — formatting drifts it from source.
 public/
+# MkDocs-flavoured Markdown, which prettier does not speak. It DE-INDENTS
+# admonition bodies (`!!! note` / `??? tip`), and MkDocs needs that indentation
+# to associate the body with the box — so a correctly-written admonition came
+# out rendering as an empty titled box with its text escaped into a paragraph
+# below. 28 of the site's 30 admonitions were broken this way, because
+# `format:check` is a CI gate: writing one correctly meant failing the gate.
+# The content tabs (`=== "Python"`) and snippet includes (`--8<--`) survive only
+# by luck. Formatting here is a human's job, not the formatter's.
+docs-site/docs/

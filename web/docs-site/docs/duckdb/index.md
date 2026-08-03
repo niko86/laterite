@@ -161,8 +161,8 @@ GROUP BY l.loca_id;
 ```
 
 !!! note "One engine, every stack"
-`read_ags` is the identical born-typing engine behind
-[Python](../surfaces/python.md), [Node](../node/index.md), and the
-[browser app](../surfaces/browser.md) — the cross-surface compliance matrix
-proves every read surface agrees, so a column's type is the same wherever
-you read it.
+    `read_ags` is the identical born-typing engine behind
+    [Python](../surfaces/python.md), [Node](../node/index.md), and the
+    [browser app](../surfaces/browser.md) — the cross-surface compliance matrix
+    proves every read surface agrees, so a column's type is the same wherever
+    you read it.
