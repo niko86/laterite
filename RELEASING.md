@@ -60,8 +60,29 @@ guard, and the `release.yml` tag-check all catch drift.
 > tests, *and* publishes. Cut the `v*` / `node-v*` tags here, on `main`, once the
 > release PR has merged (step 3) — there is no separate publish origin.
 
-Before bumping, finish the `CHANGELOG.md` `[Unreleased]` section (the bump rolls
-it into the dated release). Then:
+Before bumping, finish the `[Unreleased]` section — in **`changelog.json`**, the
+SSOT; `CHANGELOG.md` is generated from it and never hand-edited. Then ask which
+bump the queued entries justify:
+
+```bash
+uv run --no-sync python tools/gen_changelog.py --advise
+```
+
+**A breaking entry must say so twice.** Compatibility is the axis the table above
+turns on, so it is *declared* on the entry rather than inferred from its prose:
+
+```json
+{ "text": "**Breaking:** callers must pass the new flag.", "breaking": true }
+```
+
+The `breaking` flag drives `--advise`; the `**Breaking:**` marker tells the
+reader. `gen_changelog.py` fails if one is present without the other, so neither
+can be added or removed alone. (It used to be a `\bbreaking\b` search over the
+entry text, which counted "a non-breaking change" and "this is not a breaking
+change" as breaks — the flag exists because a wrong answer here becomes a wrong
+version on an append-only registry.)
+
+Then: 
 
 ```bash
 # 1. On a release branch (the script refuses to run on main or a dirty tree),

@@ -26,6 +26,9 @@
     "fixed": [
       {
         "text": "**28 of the docs site's 30 admonitions rendered as an empty box.** Prettier de-indents the body of a `!!! note` / `??? tip`, and MkDocs needs that indentation to associate the body with the box — so the text escaped into a plain paragraph underneath while the titled box rendered empty. Because `prettier --check` is a CI gate, writing an admonition *correctly* meant failing the gate, which is why only two survived. The docs' Markdown is now outside prettier's scope (it is MkDocs-flavoured — admonitions, content tabs and `--8<--` includes are not prettier's dialect) and every body is re-indented; the built site now has zero empty admonition boxes."
+      },
+      {
+        "text": "**The release advisor recommended the wrong bump, in two different ways.** `gen_changelog.py --advise` is what `RELEASING.md` sends you to before stamping a version, and it disagreed with the policy paragraph in that same document. First, the pre-1.0 rule was applied in one place and not the other: `_bump()` correctly refused MAJOR at `0.x`, but the other branch escalated any non-empty `added` to MINOR regardless of version — so a documentation page would have cut a minor, which pre-1.0 *means* \"something broke\". Second, and worse, whether a change was breaking was decided by searching the entry prose for `\\bbreaking\\b`, which cannot tell a marker from a sentence denying one: \"a non-breaking change\" matched (the hyphen is a word boundary), as did \"this is not a breaking change\" and \"avoids breaking downstream consumers\". Every historical hit was a true positive only because the house style happened to be disciplined. Compatibility is now **declared** — `\"breaking\": true` on the entry — and the prose marker is kept as a cross-check the generator enforces in every mode: flag without marker, or marker without flag, fails. The six historical breaking entries are backfilled. The stakes are why: the engine tier publishes to crates.io, where a version can never be re-cut."
       }
     ],
     "security": []
@@ -144,7 +147,8 @@
           "text": "**Breaking: `diff` and `censor` take an options object too.** They were the last two `@laterite/ags4-wasm` exports with a positional tail — `diff(a, b, encoding, maxRowsPerGroup)` and `censor(data, sensitiveJson, selectedCodes, token, dropCustom, includeFreetext)`, the latter six-deep with three consecutive booleans. Both now take one named object after their inputs (`diff(a, b, { encoding, maxRowsPerGroup })`, `censor(data, sensitiveJson, { selectedCodes, token, dropCustom, includeFreetext })`), every field optional and defaulted, with the same unknown-key refusal the other exports got. The test that recorded these two as \"not yet migrated\" now has nothing left to exempt.",
           "prs": [
             188
-          ]
+          ],
+          "breaking": true
         },
         {
           "text": "**Every engine crate now declares what it may publish.** `cargo package` ships whatever sits in a crate directory and is not excluded, and no crate here specified `include` — `laterite-ags4-validator` alone would have put 41 test and bench files plus 2.1 MB of reference data no code reads into its tarball. All ten engine-tier crates now carry an explicit allowlist, and a CI gate diffs `cargo package --list` against a checked-in manifest so a new file entering a tarball turns the build red. This had to land before the first publish rather than after: crates.io is append-only, and `yank` stops new resolution without removing the tarball.",
@@ -264,13 +268,15 @@
             179,
             180,
             181
-          ]
+          ],
+          "breaking": true
         },
         {
           "text": "**Breaking: a synthesised `TRAN` is stamped by the caller, never invented.** With metadata synthesis on, the emitter used to write `\"TBC\"` into `TRAN_PROD`/`TRAN_RECV`/`TRAN_STAT` and a fixed `1900-01-01` date — a combination that **satisfies Rule 14**. The file asserted a transmission that never happened, passed validation, and gave a recipient no way to tell it from a real transmission record. The five REQUIRED values are now supplied together or not at all: **Python and Node take a `TranStamp` object in place of the five `tran_*` arguments**, and the CLI's `--tran-*` flags are all-or-none (a partial set exits 2, naming what is missing). With no stamp, no `TRAN` is minted and Rule 14 reports the gap honestly. Note that **a clean file now genuinely needs all five values** — the placeholder had also been silencing Rule 10b on three REQUIRED headings, which is why dropping it surfaces findings that were always true.",
           "prs": [
             178
-          ]
+          ],
+          "breaking": true
         }
       ],
       "deprecated": [],
@@ -369,7 +375,8 @@
           "text": "**Metadata synthesis is now opt-in.** `build_ags4` and the emit path no longer synthesise the mandatory `TRAN` / `UNIT` / `TYPE` catalog groups a data-only build is missing — a data-only build now *reports* Rule 14/15/17 rather than silently filling them. **Breaking:** pass `synthesise_metadata=True` (Python) / `synthesiseMetadata: true` (Node) to restore the previous behaviour. Minting whole groups the caller never wrote is the kind of magic a caller should ask for.",
           "prs": [
             85
-          ]
+          ],
+          "breaking": true
         },
         {
           "text": "**The read path is substantially faster.** The typed read is built by a single bulk Arrow cast rather than per-row conversion (~75.9 ms → ~19.9 ms on the 25 MB baseline); the content-addressed keychain streams each key straight into a reused hasher and reads KEY cells positionally (dropping a per-row all-columns map); the Python read/validate compute releases the GIL; and a keys-less default read on Node skips the keychain entirely.",
@@ -451,7 +458,8 @@
           "text": "**The CLI binary and Python console-script are renamed `lat-check` → `lat`.** The tool grew well beyond \"check\" (read / transport / excel / diff / certify). **Breaking:** scripts invoking `lat-check` must switch to `lat`.",
           "prs": [
             430
-          ]
+          ],
+          "breaking": true
         },
         {
           "text": "**`fix()` canonicalises unambiguous dates by default.** Date normalisation is assessed per value — an unambiguous date is a safe fix, where before it needed `risky=True`.",
@@ -677,7 +685,8 @@
           "text": "**The 174 typed-graph classes moved to the `laterite.groups` submodule.** `from laterite import PROJ, LOCA, …` is now `from laterite.groups import PROJ, LOCA, …`. This keeps the four-letter AGS codes out of the top-level namespace (which drops from ~200 to 26 public names). A clean break with no deprecation shim — **breaking**, but pre-1.0 with no external users.",
           "prs": [
             302
-          ]
+          ],
+          "breaking": true
         }
       ],
       "fixed": [

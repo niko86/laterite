@@ -134,6 +134,17 @@ jobs:
               - 'observations.json'
               - 'OBSERVATIONS.md'
               - 'tools/gen_observations.py'
+              # The changelog trio, for the identical reason — its drift gate
+              # ("changelog drift gate" in the python job) also runs in THIS
+              # repo, and the leak gate + the `breaking` marker cross-check ride
+              # in the same `--check`. Missed when the observations trio above
+              # was added. Listing it does not currently CHANGE which PRs run
+              # python (see #230 — the two `!` rules above make `code` true for
+              # essentially everything), and that is the point: a gate must fire
+              # by declaration, not by an accident that a filter fix would undo.
+              - 'changelog.json'
+              - 'CHANGELOG.md'
+              - 'tools/gen_changelog.py'
               # The prose docs check_doc_refs reads. `COMPAT.md` is already above
               # (a test reads it); these are the rest. Without them a
               # RELEASING/CONTRIBUTING-only edit would not fire the gate that
@@ -951,6 +962,12 @@ jobs:
         # names, plus any private `.changelog-denylist` (company names, etc.). So
         # the derived Markdown is never hand-edited and nothing sensitive reaches
         # the public file. Regenerate with `python tools/gen_changelog.py`.
+        #
+        # It also fails (exit 4) when an entry's `"breaking": true` flag and its
+        # `**Breaking:**` prose marker disagree. The flag is what `--advise`
+        # reads to pick the next bump, so the two drifting apart is how a break
+        # gets cut as a patch — onto crates.io, where a version can never be
+        # re-cut. See tests/test_changelog_advisor.py.
         run: uv run --no-project python tools/gen_changelog.py --check
 
       - name: observations drift gate (OBSERVATIONS.md == observations.json render)

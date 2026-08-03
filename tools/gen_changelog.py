@@ -18,6 +18,14 @@ for the switch:
     text-substitution on the Markdown (which is why the file could silently drift
     or, as happened, be deleted by a mirror sync with no gate noticing).
 
+An entry is `{"text": …, "prs": [...], "breaking": true}` — `breaking` optional,
+defaulting to false. It is what `--advise` reads, and it must agree with the
+`**Breaking:**` marker in the text (exit 4 if not); RELEASING.md documents the
+convention for authors.
+
+Exit codes: 1 stale render · 2 leak gate · 3 empty release · 4 breaking-marker
+disagreement.
+
 Modes:
   gen_changelog.py                 regenerate CHANGELOG.md from changelog.json
   gen_changelog.py --check         exit 1 if CHANGELOG.md is stale (CI drift gate)
@@ -38,6 +46,10 @@ import re
 import sys
 from datetime import date as date_cls
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 ROOT = Path(__file__).resolve().parent.parent
 JSON_PATH = ROOT / "changelog.json"
@@ -178,6 +190,16 @@ def do_release(version: str, when: str | None) -> None:
             file=sys.stderr,
         )
         sys.exit(3)
+    # Advice, not a veto — the owner can have a reason the categories don't
+    # carry. But a silent disagreement is how a version gets mis-cut onto a
+    # registry that cannot re-cut it, so say it out loud at the moment it counts.
+    part, advised, why = advise(data)
+    if version != advised:
+        print(
+            f"gen_changelog: NOTE — the advisor says {part.upper()} → {advised}, "
+            f"not {version}.\n  Why: {why}",
+            file=sys.stderr,
+        )
     when = when or date_cls.today().isoformat()
     rolled = {"version": version, "date": when}
     rolled["summary"] = unreleased.get("summary", "")
@@ -206,26 +228,66 @@ def _write(data: dict) -> None:
     print(f"gen_changelog: wrote {MD_PATH.relative_to(ROOT)}")
 
 
-# Categories whose only presence still means "bug-fix release" — a patch, per
-# SemVer. Anything in `added` (a feature) or a **Breaking:** marker escalates it.
-_PATCH_ONLY = {"fixed", "security"}
-_BREAKING = re.compile(r"\bbreaking\b", re.IGNORECASE)
+# Compatibility is a property of the change, so it is DECLARED (`"breaking":
+# true` on the entry) rather than inferred from the prose. It used to be a
+# `\bbreaking\b` search over the entry text, which cannot tell a marker from a
+# sentence denying one: "a non-breaking change" matched (the hyphen is a word
+# boundary), as did "this is not a breaking change" and "avoids breaking
+# downstream consumers". Six years of entries happened to be true positives only
+# because the house style was disciplined — and the cost of the first false one
+# is a wrong version on an append-only registry, which can never be re-cut.
+#
+# The prose marker survives as a CROSS-CHECK, not as the signal (see
+# `_breaking_check`): the flag and the rendered `**Breaking:` marker must agree,
+# so neither can be updated without the other. Same shape as the wiki/observation
+# gate — two representations held in agreement, not one guessed from the other.
+_MARKER = re.compile(r"\*\*[Bb]reaking\b[^*]*\*\*")
+
+
+def _entries(block: dict) -> Iterator[tuple[str, int, dict]]:
+    """Yield `(category, index, entry)` over every entry in a block."""
+    for cat in CATEGORIES:
+        for i, e in enumerate(block.get(cat) or []):
+            yield cat, i, e
 
 
 def _breaking_count(block: dict) -> int:
-    """How many entries carry a **Breaking:** marker (KaC house style)."""
-    n = 0
-    for cat in CATEGORIES:
-        for e in block.get(cat) or []:
-            if _BREAKING.search(e.get("text", "")):
-                n += 1
-    return n
+    """How many entries DECLARE themselves breaking."""
+    return sum(1 for _, _, e in _entries(block) if e.get("breaking") is True)
+
+
+def _breaking_check(data: dict) -> list[str]:
+    """Return `flag != marker` disagreements; empty means the two agree.
+
+    Both directions are violations. A flag with no marker ships a breaking
+    change whose entry never says so to the reader; a marker with no flag tells
+    the reader while leaving the advisor to recommend a patch.
+    """
+    hits: list[str] = []
+
+    def scan(where: str, block: dict) -> None:
+        for cat, i, e in _entries(block):
+            flag = e.get("breaking") is True
+            marker = bool(_MARKER.search(e.get("text", "")))
+            if flag and not marker:
+                hits.append(
+                    f'{where} {cat}[{i}]: "breaking": true but the text carries no '
+                    "**Breaking:** marker"
+                )
+            elif marker and not flag:
+                hits.append(
+                    f"{where} {cat}[{i}]: text carries a **Breaking:** marker but "
+                    '"breaking": true is missing'
+                )
+
+    scan("unreleased", data.get("unreleased", {}))
+    for rel in data.get("releases", []):
+        scan(f"[{rel.get('version', '?')}]", rel)
+    return hits
 
 
 def _bump(base: str, part: str) -> str:
-    """Increment a clean `X.Y.Z`. Pre-1.0, a breaking change is a MINOR (this
-    project's practice — the 0.6.0 typed-graph move was a minor), so `major` is
-    only reachable once the project is >= 1.0.0."""
+    """Increment a clean `X.Y.Z`."""
     major, minor, patch = (int(x) for x in base.split("."))
     if part == "major":
         return f"{major + 1}.0.0"
@@ -234,13 +296,51 @@ def _bump(base: str, part: str) -> str:
     return f"{major}.{minor}.{patch + 1}"
 
 
+def advise(data: dict) -> tuple[str, str, str]:
+    """Recommend the next bump from [Unreleased]. Returns `(part, version, why)`.
+
+    The axis is COMPATIBILITY, not change size (RELEASING.md), and which bump a
+    break lands on depends on where the project is:
+
+        pre-1.0 (0.x)  features and fixes are a PATCH; a BREAKING change takes
+                       the MINOR. `1.0.0` is saved for a deliberate "stable"
+                       signal, so MAJOR is unreachable here.
+        1.0 and after  standard SemVer: additive is a MINOR, breaking a MAJOR.
+
+    Splitting this out of the printing makes it testable, and lets `--release`
+    warn when the version being cut disagrees with it.
+    """
+    unreleased = data.get("unreleased", {})
+    counts = {c: len(unreleased.get(c) or []) for c in CATEGORIES}
+    breaking = _breaking_count(unreleased)
+    current = data["releases"][0]["version"] if data.get("releases") else "0.0.0"
+    pre_1_0 = current.startswith("0.")
+
+    if breaking:
+        part = "minor" if pre_1_0 else "major"
+        era = "pre-1.0 (0.x) — a breaking change takes the MINOR"
+        why = f"{breaking} breaking change(s) queued; {era}."
+    elif pre_1_0:
+        part = "patch"
+        why = (
+            "pre-1.0 (0.x) — features and fixes are a PATCH; only a breaking "
+            "change takes the MINOR. Nothing queued declares itself breaking."
+        )
+    elif counts["added"]:
+        part = "minor"
+        why = "new features (added) with nothing breaking — a MINOR, post-1.0 SemVer."
+    else:
+        part = "patch"
+        why = "only fixes and non-breaking changes are queued."
+    return part, _bump(current, part), why
+
+
 def do_advise(data: dict) -> None:
     """Read `unreleased` and recommend the next bump. The fix backlog is exactly
     `unreleased.fixed` — no second register to drift — so this is where an
     accumulation of fixes surfaces as 'time for a patch'."""
     unreleased = data.get("unreleased", {})
     counts = {c: len(unreleased.get(c) or []) for c in CATEGORIES}
-    breaking = _breaking_count(unreleased)
     current = data["releases"][0]["version"] if data.get("releases") else "0.0.0"
 
     print(f"gen_changelog: release advisor (current shipped: {current})")
@@ -250,35 +350,23 @@ def do_advise(data: dict) -> None:
         return
     print("  [Unreleased] holds:")
     for c, n in populated:
-        tag = (
-            f"  ({breaking} breaking)"
-            if c in ("changed", "removed") and breaking
-            else ""
+        n_break = sum(
+            1
+            for cat, _, e in _entries(unreleased)
+            if cat == c and e.get("breaking") is True
         )
-        print(f"    {c:<10} {n}{tag}")
+        print(f"    {c:<10} {n}{f'  ({n_break} breaking)' if n_break else ''}")
 
-    has_feature = counts["added"] > 0
-    if has_feature or breaking:
-        part = "major" if breaking and not current.startswith("0.") else "minor"
-        why = []
-        if has_feature:
-            why.append("new features (added)")
-        if breaking:
-            why.append("a breaking change")
-        reason = " and ".join(why)
-        print(f"\n  Recommended bump: {part.upper()} → {_bump(current, part)}")
-        print(f"    Why: [Unreleased] carries {reason} — a {part}, not a patch.")
-        if counts["fixed"] or counts["security"]:
-            ship = counts["fixed"] + counts["security"]
-            print(f"    The {ship} queued fix(es)/security item(s) ship with it.")
-    else:
-        fixes = counts["fixed"] + counts["security"]
-        print(f"\n  Recommended bump: PATCH → {_bump(current, 'patch')}")
-        print("    Why: only bug fixes / non-breaking changes are queued.")
-        if fixes:
-            print(
-                f"    → {fixes} fix(es)/security item(s) are ready — cut a patch to ship them."
-            )
+    part, version, why = advise(data)
+    print(f"\n  Recommended bump: {part.upper()} → {version}")
+    print(f"    Why: {why}")
+    ship = counts["fixed"] + counts["security"]
+    if ship and part != "patch":
+        print(f"    The {ship} queued fix(es)/security item(s) ship with it.")
+    elif ship:
+        print(
+            f"    → {ship} fix(es)/security item(s) are ready — cut a patch to ship them."
+        )
 
 
 def main() -> None:
@@ -313,6 +401,20 @@ def main() -> None:
         for h in hits:
             print(f"  {h}", file=sys.stderr)
         sys.exit(2)
+
+    # Every mode enforces this, not just `--check`: an entry whose flag and prose
+    # disagree is already wrong in the JSON, so the render, the roll and the
+    # advice are all downstream of the same bad input.
+    disagreements = _breaking_check(data)
+    if disagreements:
+        print(
+            "gen_changelog: BREAKING-MARKER — the `breaking` flag and the "
+            "**Breaking:** marker disagree:",
+            file=sys.stderr,
+        )
+        for h in disagreements:
+            print(f"  {h}", file=sys.stderr)
+        sys.exit(4)
 
     if args.advise:
         do_advise(data)
