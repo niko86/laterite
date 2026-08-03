@@ -5,7 +5,7 @@ status: drafted
 tags: [concept, architecture, wasm]
 ags_editions: []
 volatile: [sizes]
-volatile_asof: 2026-05-31
+volatile_asof: 2026-08-03
 repo_refs:
   wasm: "repo:rust-packages/laterite-ags4-wasm/src/lib.rs"
   deploy: "repo:.github/workflows/deploy-validator.yml"
@@ -18,7 +18,8 @@ sources: []
 # tech stack: the browser wasm path
 
 > [!note] Two browser wasm modules, not one
-> This page describes the **engine** wasm (`laterite-ags4-wasm`, ~6.9 MB) —
+> This page describes the **engine** wasm (`laterite-ags4-wasm`, ~6.9 MB raw /
+> ~1.9 MB gzipped — re-measured 2026-08-03) —
 > `validate`/`parse`/`diff`/`merge`/`to_ags4`, run in a Web Worker. Since
 > #533 (part of the #527 convergence arc) the browser also loads a SEPARATE,
 > deliberately tiny sibling — `laterite-ags4-tokenizer-wasm` (~30 KB / ~13 KB

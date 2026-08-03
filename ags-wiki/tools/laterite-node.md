@@ -8,7 +8,7 @@ language: rust
 artifact: "laterite-node (.node addon + TS laterite package)"
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 volatile: [phase]
-volatile_asof: 2026-06-15
+volatile_asof: 2026-08-03
 repo_refs:
   root: "repo:rust-packages/laterite-node"
   lib: "repo:rust-packages/laterite-node/src/lib.rs"
@@ -232,7 +232,14 @@ owner npm setup + release flow are in `RELEASING-node.md`.
 
 ## Status
 
-**Complete (P1–P4).** P1+P2 merged (PR #120); P3 merged (PR #121: DuckDB
+**Complete (P1–P4), and long past first publish.** The npm package is on
+**0.10.0** as of 2026-08-03 — it tracks the shared PRODUCT number, so
+`npm i laterite@X` and `pip install laterite==X` are the same release (see
+[[dec-rust-api-crates-io]] for the engine/product split). Its own coverage floors
+are 98 lines / 91 branches, at 95.4% on the strict measure.
+
+The phase history below is kept because the first-publish gotchas it records are
+still the ones that bite. P1+P2 merged (PR #120); P3 merged (PR #121: DuckDB
 `sql`/`at` Appender + row output, `agsTypes`, the 174 typed-graph classes +
 `registry` + the typed-tree→`emitAgs4` bridge, `transport`, opt-in arrow-js
 output via the `arrow` community extension's `to_arrow_ipc`); **P4** = the npm
