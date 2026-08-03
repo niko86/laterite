@@ -18,8 +18,13 @@ const wasm = fileURLToPath(
 try {
   initSync({ module: readFileSync(wasm) });
 } catch (e) {
+  // `cause` matters here specifically: the two failures this catch covers look
+  // identical in the message but are nothing alike — a missing file (nobody ran
+  // the build) versus a wasm that will not instantiate (a stale or corrupt
+  // artifact). Interpolating `.message` and dropping the original threw away the
+  // stack that tells them apart, in the one situation where you need it.
   throw new Error(
-    "tokenizer wasm not built or failed to init — run 'npm run build:wasm-tokenizer' first " +
-      `(${(e as Error).message})`,
+    "tokenizer wasm not built or failed to init — run 'npm run build:wasm-tokenizer' first",
+    { cause: e },
   );
 }

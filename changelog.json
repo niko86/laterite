@@ -16,6 +16,9 @@
       },
       {
         "text": "**The browser story is one page instead of thirteen near-identical tabs.** Each cookbook page carried a *Browser* tab saying the same three sentences — same engine, in your browser, nothing uploaded — about whichever pane of the web app was relevant. Those are consolidated into the web app's own page (`surfaces/browser.md`), which now describes what each pane gives you; the cookbook's *Available in* line links there instead. The app is a showcase for the wasm package, not a product, so it gets one page describing it and the package gets the API reference every other surface already had."
+      },
+      {
+        "text": "**The web app lints on ESLint 10.** It was the last surface still on 9 — `laterite-node` had already moved — and the bump was blocked by `eslint-plugin-solid`, whose peer range stops at `^9.0.0` and whose last release was December 2024. That peer is now relaxed by an `overrides` entry, which is only defensible because the thing an override can hide was checked: the plugin's rules still **fire** under 10 (a deliberate `solid/reactivity` violation is still caught), not merely load. Two of 10's new rules earned the upgrade. `preserve-caught-error` found a real defect in the wasm-tokenizer test setup, which interpolated the caught error's `.message` into a new one and dropped the original — throwing away the stack that distinguishes *nobody ran the build* from *the wasm will not instantiate*, the one moment you need to tell them apart; it now attaches `cause`. `no-unassigned-vars` flagged four Solid ref bindings, where the JSX compiler does the write the rule cannot see (and the definite-assignment `!` does not satisfy it — three of the four already carried one); it is off for `.tsx` only, so a never-assigned `let` in a plain `.ts` module stays a hard failure."
       }
     ],
     "deprecated": [],

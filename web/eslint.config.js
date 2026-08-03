@@ -1,4 +1,12 @@
-// ESLint 9 flat config — type-aware linting for the web (SolidJS + Vite) app.
+// ESLint 10 flat config — type-aware linting for the web (SolidJS + Vite) app.
+//
+// eslint-plugin-solid stopped at eslint 9 in its peer range (last release
+// 2024-12), so package.json carries an `overrides` entry relaxing that peer to
+// whatever eslint the root resolves. That is a deliberate, verified override,
+// not a shrug: the plugin's rules were confirmed to still FIRE under eslint 10
+// (a solid/reactivity violation is still caught), which is the failure mode an
+// override could otherwise hide. Drop the override the day upstream ships a
+// release that declares ^10.
 //
 // The point of this config is the *type-aware* typescript-eslint ruleset
 // (no-floating-promises, no-misused-promises, no-unnecessary-condition, …):
@@ -119,6 +127,27 @@ export default tseslint.config(
     rules: {
       "solid/reactivity": "error",
       "solid/components-return-once": "error",
+    },
+  },
+  {
+    // eslint 10 added `no-unassigned-vars`, which flags a `let` that is declared
+    // and never written. All four hits here are Solid **ref bindings**:
+    //
+    //     let el!: HTMLDivElement;
+    //     <div ref={el}>            // the JSX compiler does the assignment
+    //
+    // The rule cannot see that write, and the definite-assignment `!` does not
+    // satisfy it either — three of the four already carry one and were still
+    // flagged. So it is off rather than papered over with four copies of this
+    // explanation (and a fifth the next time someone adds a ref).
+    //
+    // Scoped to `.tsx` deliberately: a ref binding is a JSX construct, so in a
+    // plain `.ts` module a never-assigned `let` really is the bug the rule is
+    // for, and stays a hard failure there.
+    name: "solid/ref-bindings-are-not-unassigned",
+    files: ["**/*.tsx"],
+    rules: {
+      "no-unassigned-vars": "off",
     },
   },
 );
