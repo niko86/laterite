@@ -27,6 +27,16 @@ each means, in both directions:
 `quote_field` / `write_quoted_field` implement AGS4's quoting rules for the
 writer side.
 
+<!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+## Install it
+
+```bash
+cargo add laterite-ags4-types
+```
+
+Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+<!-- END GENERATED: availability -->
+
 ## Scope
 
 A wasm-safe leaf with no I/O and no dictionary. The optional `arrow` feature

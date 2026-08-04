@@ -17,8 +17,24 @@ tied into the wiki's rigid structure rather than floating beside it:
     (a readable flowchart that omits edges for clarity); THIS page is the complete
     machine-derived view. They cross-link.
 
+It also owns two SPLICED regions elsewhere, both rendered from the same
+manifests this file already parses:
+
+  * **`crate-card`** in each `ags-wiki/tools/<crate>.md` — distribution, version
+    (own line vs workspace-inherited) and consumers. Fifteen of those pages once
+    opened "Internal implementation detail — not a public API" while nine of the
+    crates were `publish = true`.
+  * **`availability`** in each publishable crate's `README.md` — the `cargo add`
+    line. Eleven of them shipped to crates.io saying nothing about installation.
+
+Both come from `distribution()`: computed once, rendered twice, so the wiki and
+the shipped README cannot state different things about the same crate. A README
+is frozen at publish time, which is why the check has to fail before an upload
+rather than after one.
+
 Run: `uv run --no-project python tools/gen_crate_graph.py` (stdlib only — tomllib).
-`--check` exits non-zero if the committed page is stale (the CI gate).
+`--check` exits non-zero if the page, any card or any availability block is
+stale (the CI gate).
 """
 
 from __future__ import annotations
@@ -459,11 +475,31 @@ def _version_of(d: dict) -> tuple[str, bool]:
     return ws["workspace"]["package"]["version"], True
 
 
-def _card_lines(name: str, man: dict[str, dict], consumers: list[str]) -> list[str]:
+def distribution(name: str, man: dict[str, dict]) -> dict:
+    """Where `name` is installable from, and at what version.
+
+    Computed ONCE and rendered TWICE — into the crate's wiki card and into its
+    shipped README. Half the audited defects lived outside `ags-wiki/`, and a
+    README that ships to a registry is frozen at publish time: a wrong install
+    line on crates.io cannot be corrected retroactively, only superseded by
+    another release. Two renderings of one computation is what stops the wiki
+    and the README disagreeing about the same crate.
+    """
     d = man[name]
     version, inherited = _version_of(d)
+    return {
+        "name": name,
+        "version": version,
+        "inherited": inherited,
+        "crates_io": d.get("package", {}).get("publish") is not False,
+    }
+
+
+def _card_lines(name: str, man: dict[str, dict], consumers: list[str]) -> list[str]:
+    dist = distribution(name, man)
+    version, inherited = dist["version"], dist["inherited"]
     tier = "inherited from the workspace" if inherited else "its own line"
-    if d.get("package", {}).get("publish") is False:
+    if not dist["crates_io"]:
         head = (
             f"> [!note] **Not published** — `{name}` is a workspace crate, "
             f"internal to this repo, at v{version} ({tier})."
@@ -509,6 +545,61 @@ def _name_of(crate_dir: str) -> str | None:
     return tomllib.loads(ct.read_text()).get("package", {}).get("name")
 
 
+AVAIL = "availability"
+
+
+def _availability_lines(dist: dict) -> list[str]:
+    """The install block for a crate's shipped README.
+
+    Only crates.io is rendered here. The npm and PyPI surfaces are deliberately
+    left hand-written: `packages/laterite/README.md` documents three extras with
+    their dependency trade-offs, and `laterite-node/README.md` its own CLI — both
+    richer than anything derivable from a manifest, and neither has ever been
+    wrong. Generating over them would destroy information to prevent a defect
+    that has not occurred.
+    """
+    return [
+        "## Install it",
+        "",
+        "```bash",
+        f"cargo add {dist['name']}",
+        "```",
+        "",
+        f"Currently v{dist['version']}"
+        + (
+            " — the engine crates move in lockstep on the workspace version."
+            if dist["inherited"]
+            else " — this crate versions independently of the engine."
+        ),
+    ]
+
+
+def readmes() -> dict[Path, str]:
+    """shipped README -> its text with the availability region refreshed.
+
+    Keyed on the manifest's `publish`, so a crate armed for the registry without
+    its README being regenerated fails the same `--check` as a stale card.
+    """
+    man = _manifests()
+    out: dict[Path, str] = {}
+    for crate_dir in sorted(set(_members())):
+        name = _name_of(crate_dir)
+        if name is None or name not in man:
+            continue
+        dist = distribution(name, man)
+        if not dist["crates_io"]:
+            continue
+        readme = RUST / crate_dir / "README.md"
+        if not readme.exists():
+            continue
+        spliced = _splice(
+            readme.read_text(encoding="utf-8"), AVAIL, _availability_lines(dist)
+        )
+        if spliced is not None:
+            out[readme] = spliced
+    return out
+
+
 def cards() -> dict[Path, str]:
     """page -> its full text with the crate-card region refreshed.
 
@@ -534,7 +625,15 @@ def cards() -> dict[Path, str]:
 
 def main(argv: list[str]) -> int:
     out = render()
-    card_pages = cards()
+    targets = {**cards(), **readmes()}
+    kinds = {
+        p: (
+            "crate-card"
+            if p.suffix == ".md" and "ags-wiki" in p.parts
+            else "availability"
+        )
+        for p in targets
+    }
     if "--check" in argv:
         rc = 0
         cur = PAGE.read_text() if PAGE.exists() else ""
@@ -546,13 +645,13 @@ def main(argv: list[str]) -> int:
             )
             rc = 1
         stale = [
-            p for p, txt in card_pages.items() if p.read_text(encoding="utf-8") != txt
+            p for p, txt in targets.items() if p.read_text(encoding="utf-8") != txt
         ]
         if stale:
             for p in sorted(stale):
                 print(
-                    f"{p.relative_to(REPO)}: crate-card region is STALE — its "
-                    "manifest says something the page does not",
+                    f"{p.relative_to(REPO)}: {kinds[p]} region is STALE — its "
+                    "manifest says something the file does not",
                     file=sys.stderr,
                 )
             print(
@@ -561,17 +660,19 @@ def main(argv: list[str]) -> int:
             )
             rc = 1
         if rc == 0:
+            n_cards = sum(1 for k in kinds.values() if k == "crate-card")
             print(
                 f"crate dependency graph OK: page matches render(); "
-                f"{len(card_pages)} crate card(s) current"
+                f"{n_cards} crate card(s) and {len(targets) - n_cards} README "
+                f"availability block(s) current"
             )
         return rc
     PAGE.write_text(out)
     print(f"wrote {PAGE.relative_to(REPO)}")
-    for p, txt in sorted(card_pages.items()):
+    for p, txt in sorted(targets.items()):
         if p.read_text(encoding="utf-8") != txt:
             p.write_text(txt, encoding="utf-8")
-            print(f"wrote {p.relative_to(REPO)} (crate-card)")
+            print(f"wrote {p.relative_to(REPO)} ({kinds[p]})")
     return 0
 
 

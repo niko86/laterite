@@ -13,6 +13,16 @@ laterite_transport::unlock(&src, &dest, pw)?;    // decrypt + decompress
 Byte-oriented variants (`pack_bytes`, `lock_bytes`, …) are available for callers
 that never touch the filesystem.
 
+<!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+## Install it
+
+```bash
+cargo add laterite-transport
+```
+
+Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+<!-- END GENERATED: availability -->
+
 ## Content-agnostic on purpose
 
 Nothing here knows what an AGS file is. The operations run over raw bytes, so
