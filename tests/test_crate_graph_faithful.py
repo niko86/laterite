@@ -90,23 +90,27 @@ def test_every_workspace_crate_page_carries_a_card() -> None:
     assert not missing, f"tool pages rooted at a crate but carrying no card: {missing}"
 
 
-def test_the_facade_crate_still_has_no_page() -> None:
-    """Records a known gap so it cannot be forgotten or silently "fixed" wrong.
+def test_the_facade_crate_has_its_own_page() -> None:
+    """The gap this file used to record, now closed.
 
     Three different things here are called `laterite`: the PyPI wheel
     (`packages/laterite`), the crates.io facade (`rust-packages/laterite`), and
     the Python import root. `ags-wiki/tools/laterite.md` roots at the WHEEL, so
-    the published facade crate — `publish = true`, on its own 0.1.x line — has no
-    page at all, and a reader looking up "laterite" lands confidently on the
-    wrong artifact.
+    for a while the published facade crate had no page at all and a reader
+    looking up "laterite" landed confidently on the wrong artifact.
 
-    Creating that page needs a distinct stem and cross-links to all three, which
-    is a documentation decision rather than a generated one. When it lands, this
-    test flips to asserting the page exists.
+    The stem is `laterite-crate` because `laterite` was taken. That stem is NOT a
+    package name — asserted here so nobody later "fixes" it into one, which would
+    put `cargo add laterite-crate` into the vault pointing at nothing.
     """
-    assert "laterite" not in gcg._page_for_crate(), (
-        "rust-packages/laterite now has a page — good. Replace this test with "
-        "the positive assertion and add the crate to the parametrised list below."
+    page = gcg._page_for_crate().get("laterite")
+    assert page is not None, "rust-packages/laterite has no tool page rooted at it"
+    assert page.stem == "laterite-crate", (
+        f"expected the facade page at laterite-crate.md, found {page.name}"
+    )
+    text = page.read_text(encoding="utf-8")
+    assert "cargo add laterite-crate` resolves to nothing" in text, (
+        "the facade page must say its own stem is not a package name"
     )
 
 

@@ -15,7 +15,7 @@ sources: []
 ## Definition
 
 The Rust side of the **shipped AGS4 toolkit** is **one Cargo workspace of
-twenty-four crates** (`repo:rust-packages/Cargo.toml` members) feeding **one
+twenty-five crates** (`repo:rust-packages/Cargo.toml` members) feeding **one
 published Python wheel** — the base [[laterite]] — plus a **loadable DuckDB
 extension** that ships outside the wheel entirely (the
 [[dec-duckdb-extension|laterite-duckdb]], via DuckDB Community Extensions).
@@ -48,7 +48,7 @@ CLI, a PyO3 cdylib, and a wasm bundle alike — see
 ## Why it matters
 
 Five questions a cold session re-derives from source unless this map
-exists: **why twenty-four crates** (the engine/CLI/QA/bindings/leaf split);
+exists: **why twenty-five crates** (the engine/CLI/QA/bindings/leaf split);
 **why AGS5 is decoupled** (the shipped product is AGS4-only; `.ags5db`/`.agsx`
 sit dormant in `ags5/` — dec-ags5-decouple); **the wasm path**
 ([[tech-stack-wasm]]); **the PyO3 boundary** ([[pyo3-boundary]]); and **why the

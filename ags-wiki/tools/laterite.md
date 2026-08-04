@@ -19,6 +19,11 @@ sources: []
 ---
 # laterite
 
+> [!warning] **This is the PyPI wheel.** The Rust crate published to crates.io is
+> also called `laterite` and is a different artifact on a different version line
+> — see [[laterite-crate]]. `pip install laterite` gets this; `cargo add laterite`
+> gets that.
+
 ## What it is
 
 The **published, public-facing AGS4 wheel** — `pip install laterite`. Per
