@@ -1181,6 +1181,87 @@ if CRATE_MAP.exists() and WORKSPACE_CRATES:
         if c not in _cgraph
     ]
 
+# C6: every workspace crate has exactly ONE tool page rooted at its directory.
+#
+# Strictly stronger than C5 above, which asks only that the crate-map GRAPH names
+# every crate. C5 stayed green when the 25th member landed, because a node
+# labelled `laterite` was already in the graph — meaning the PyPI wheel. A graph
+# label is prose; a `repo_refs.root` is a path, and a path cannot be satisfied by
+# a coincidence of naming.
+#
+# It catches two failures a label check cannot:
+#   * a crate with no page at all (what `rust-packages/laterite` was — published,
+#     on its own version line, and undocumented, while a reader looking up
+#     "laterite" landed confidently on the wheel's page instead)
+#   * two pages claiming the same crate, which makes "the page for X" ambiguous
+#     and lets the two drift apart unnoticed
+_ROOTED = re.compile(r'^\s+root:\s*"repo:rust-packages/([A-Za-z0-9_-]+)/?"\s*$', re.M)
+crate_page_problems: list[str] = []
+if WORKSPACE_CRATES:
+    _claims: dict[str, list[str]] = {}
+    for _p in sorted((WIKI / "tools").glob("*.md")):
+        _parts = _p.read_text(encoding="utf-8").split("---", 2)
+        if len(_parts) < 3:
+            continue
+        for _m in _ROOTED.finditer(_parts[1]):
+            _claims.setdefault(_m.group(1), []).append(_p.stem)
+    # WORKSPACE_CRATES is the `members` list, i.e. DIRECTORY names — the same
+    # thing `repo_refs.root` points at, so they compare directly.
+    for _dir in sorted(WORKSPACE_CRATES):
+        _pages = _claims.get(_dir, [])
+        if not _pages:
+            crate_page_problems.append(
+                f"workspace crate '{_dir}' has no tool page rooted at "
+                f"repo:rust-packages/{_dir}"
+            )
+        elif len(_pages) > 1:
+            crate_page_problems.append(
+                f"workspace crate '{_dir}' is claimed by {len(_pages)} pages: "
+                f"{', '.join(sorted(_pages))}"
+            )
+
+# C6b: crate-map.md's spelled-out crate count matches the manifest.
+#
+# It said "twenty-four crates" against 25 members, in two places, while citing
+# the very file that lists them. The count is not generated — a numeral spliced
+# into hand-written prose reads worse than the prose does, and this page is the
+# hand-curated keystone. Checking it costs nothing and keeps the voice.
+#
+# Only NUMBER words are considered, so "the QA crates" or "these crates" cannot
+# trip it. A page that states no count at all is fine; the check is agreement,
+# not obligation.
+_NUMWORD = {
+    "twenty": 20,
+    "twenty-one": 21,
+    "twenty-two": 22,
+    "twenty-three": 23,
+    "twenty-four": 24,
+    "twenty-five": 25,
+    "twenty-six": 26,
+    "twenty-seven": 27,
+    "twenty-eight": 28,
+    "twenty-nine": 29,
+    "thirty": 30,
+    "thirty-one": 31,
+    "thirty-two": 32,
+    "thirty-three": 33,
+    "thirty-four": 34,
+    "thirty-five": 35,
+}
+bad_crate_count: list[str] = []
+if CRATE_MAP.exists() and WORKSPACE_CRATES:
+    _true = len(WORKSPACE_CRATES)
+    _txt = CRATE_MAP.read_text(encoding="utf-8")
+    for _m in re.finditer(r"\b([a-z]+(?:-[a-z]+)?|\d+) crates\b", _txt):
+        _tok = _m.group(1)
+        _n = int(_tok) if _tok.isdigit() else _NUMWORD.get(_tok)
+        if _n is not None and _n != _true:
+            _line = _txt[: _m.start()].count("\n") + 1
+            bad_crate_count.append(
+                f"crate-map.md:{_line}: says '{_tok} crates' but "
+                f"repo:rust-packages/Cargo.toml lists {_true} members"
+            )
+
 # C5 long-term (#10): every crate-map edge connects two really-coupled crates.
 CRATE_DEPS = _crate_deps()
 bad_crate_edges: list[str] = []
@@ -1205,6 +1286,12 @@ section(
     "orphan pages (0 inbound wikilinks; index.md/log.md excluded)", orphans_real
 )  # hard (D1)
 section("crate-map graph missing a workspace crate", missing_crates)  # hard (C5)
+section(
+    "workspace crate with no tool page, or claimed by two", crate_page_problems
+)  # hard (C6)
+section(
+    "crate-map states a crate count the manifest contradicts", bad_crate_count
+)  # hard (C6b)
 section(
     "crate-map edge names a non-dependency (phantom edge)", bad_crate_edges
 )  # hard (C5 long-term)
