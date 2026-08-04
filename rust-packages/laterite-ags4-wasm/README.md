@@ -58,7 +58,7 @@ you're calling.
 import init, { validate, read, version } from "./pkg/ags4_wasm.js";
 
 await init();                       // required, once, before anything else
-version();                          // "0.8.2"
+version();                          // "0.10.1"
 
 const bytes = new Uint8Array(await file.arrayBuffer());
 
