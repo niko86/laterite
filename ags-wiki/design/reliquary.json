@@ -225,9 +225,9 @@
       "symbol": "`_ordered()` (modality helper)",
       "verify": "`tools/gen_modality.py::def _ordered`",
       "axis": "code",
-      "status": "spotted",
-      "removed_in": "—",
-      "evidence": "vulture-surfaced 2026-07-20, verified dead: 0 references repo-wide (module *or* test), superseded by `_columns()`/`_grid()`. Trivial standalone leftover — safe to drop in any pass that touches `gen_modality.py`"
+      "status": "removed",
+      "removed_in": "the modality drift-gate PR",
+      "evidence": "vulture-surfaced 2026-07-20, verified dead: 0 references repo-wide (module *or* test), superseded by `_columns()`/`_grid()`. Trivial standalone leftover — safe to drop in any pass that touches `gen_modality.py` — dropped 2026-08-04, in the pass its own note nominated"
     },
     {
       "symbol": "`include_warnings: true` (diff)",
