@@ -37,9 +37,16 @@ Two wasm modules are built from this repo: this one (the full engine) and
 `laterite-ags4-tokenizer-wasm`, a much smaller leaf that only tokenises lines —
 enough for syntax highlighting in an editor without paying for the engine.
 
-## Build it
+## Install it
 
-There is no npm package yet — build from the repo:
+```bash
+npm i @laterite/ags4-wasm
+```
+
+An ES module built with `--target web`: `ags4_wasm.js` with a generated
+`ags4_wasm.d.ts` beside it.
+
+### …or build it from source
 
 ```bash
 cargo install wasm-pack
@@ -55,7 +62,7 @@ you're calling.
 ## Use it
 
 ```ts
-import init, { validate, read, version } from "./pkg/ags4_wasm.js";
+import init, { validate, read, version } from "@laterite/ags4-wasm";
 
 await init();                       // required, once, before anything else
 version();                          // "0.10.1"
@@ -140,7 +147,7 @@ await conn.query(`
 ### Building AGS4
 
 ```ts
-import { build_ags4, build_ags4_ipc } from "./pkg/ags4_wasm.js";
+import { build_ags4, build_ags4_ipc } from "@laterite/ags4-wasm";
 
 // an ARRAY of groups, columnar — `units` / `types` are optional per-heading
 // overrides, and the dictionary fills in whatever you leave out
