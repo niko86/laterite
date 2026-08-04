@@ -86,23 +86,29 @@ jobs:
           # python job), and the docs EXAMPLES + their shared fixture
           # (tests/test_docs_examples.py runs them in the python job). The docs
           # *pages* deliberately DON'T trip `code` — they're link-gated by the
-          # cheap `docs` job below; tools/assets/release-tooling don't either.
+          # cheap `docs` job below. `tools/**` DOES trip it, because `ruff check .`
+          # runs in the python job and lints every one of those files; assets and
+          # the wiki (bar its three linted scripts) still don't.
           # `node` = the laterite-node crate + TS package (drives the `node` job).
           # `docs` = the MkDocs site (drives the `docs` strict-build link gate).
           filters: |
             code:
               - 'rust-packages/**'
-              # ...EXCEPT laterite-node's non-Rust surface. laterite-node is a
-              # leaf consumer — nothing in the wheel/crate test set depends on it —
-              # so its TS + package config cannot change a Rust or Python outcome,
-              # yet a bench/config-only edit there was firing the ~12-min `python`
-              # job (and `rust`/`test`) via the broad glob above. Exclude only
-              # `.ts`/`.json`: the crate's `.rs`/`Cargo.toml` STAY in `code` so a
-              # real Rust change still runs clippy/fmt (dropping that would be a
-              # silent skip). The `node` filter below keeps watching all of
-              # rust-packages/**, so the node job still runs on these files.
-              - '!rust-packages/laterite-node/**/*.ts'
-              - '!rust-packages/laterite-node/**/*.json'
+              # There were two `!` rules here — `!rust-packages/laterite-node/**/*.ts`
+              # and the `.json` twin — meant to keep a bench/config-only edit in
+              # laterite-node from firing the ~12-min `python` job. They did the
+              # exact opposite (#230). dorny/paths-filter treats each entry as an
+              # independent pattern and OR's the results, and picomatch's `!x`
+              # matches EVERYTHING THAT IS NOT x — so `!…/*.ts` matched CHANGELOG.md,
+              # codecov.yml, every wiki page. Measured before removal: `code` was
+              # true for 1385 of 1385 tracked files. The filter had not narrowed
+              # anything since the day those lines were added.
+              #
+              # There is no way to spell the intended exclusion in an OR'd list, so
+              # it is gone rather than rewritten: a `.ts`-only edit in laterite-node
+              # now fires `code`. That over-triggers on a rare change, which is the
+              # side to err on — the alternative is a gate that stops firing.
+              # `tests/test_paths_filter.py` bans the pattern class outright.
               - 'packages/**'
               - 'tests/**'              # the root suite = AGS4 dictionary-faithfulness tests (run below)
               - 'pyproject.toml'
@@ -153,6 +159,25 @@ jobs:
               - 'CONTRIBUTING.md'
               - 'README.md'
               - 'tools/check_doc_refs.py'
+              # `ruff check .` and `ruff format --check .` are steps in the python
+              # job and lint the WHOLE repo, not the subset listed above. While the
+              # `!` rules made `code` universally true that cost nothing; the moment
+              # they went, 26 linted files — 20 in tools/, 2 in tools/xcheck/, 3 in
+              # ags-wiki/.bootstrap/, 1 in examples/ — would have stopped firing the
+              # only job that lints them. Declared here so the gate fires by
+              # DECLARATION rather than by the accident this commit removes (#207 is
+              # what that failure looks like). `tools/**` rather than `tools/**/*.py`
+              # so a new helper is covered on the day it lands, whatever its
+              # extension; test_paths_filter derives the set from ruff itself and
+              # fails if any linted file falls outside.
+              - 'tools/**'
+              - 'ags-wiki/.bootstrap/**/*.py'
+              - 'examples/**/*.py'
+              # The surface census: `gen_census.py --check` runs as its own step in
+              # the python job and compares the SSOT against the live launchers, so
+              # both the SSOT and its render are inputs to a gate that already exists.
+              - 'surface-census.json'
+              - 'ags-wiki/concepts/surface-census.md'
             node:
               # The napi addon links sibling crates — laterite-ags4-validator,
               # laterite-ags4-types, laterite-ags4-emit (see laterite-node/Cargo.toml) —
