@@ -29,14 +29,15 @@ sources: []
 The **published, public-facing AGS4 wheel** — `pip install laterite`. Per
 `repo:packages/laterite/pyproject.toml`: *"Rust-backed AGS4
 reader/writer/validator — a fast, drop-in replacement for python-ags4 with
-a narwhals-native API"*. It is the primary external-developer surface of
-this toolkit and the wheel most callers want; the `.ags5db`/AGS5 work was
-decoupled to a dormant holding folder (laterite-ags5, dec-ags5-decouple).
+born-typed polars/pandas reads and a lean polars+duckdb base install"*. It is
+the primary external-developer surface of this toolkit and the wheel most
+callers want; the `.ags5db`/AGS5 work was decoupled to a dormant holding
+folder (laterite-ags5, dec-ags5-decouple).
 
 It exists to **replace [[python-ags4]]**: a faster validator/parser with a
-clean-room engine (so it ships MIT, not LGPL) and a narwhals-native return
-type instead of an unconditional pandas dependency. The Rust↔python-ags4
-behavioural-equivalence story is tracked in [[parity-model]].
+clean-room engine (so it ships MIT, not LGPL), returning born-typed polars
+frames instead of carrying an unconditional pandas dependency. The
+Rust↔python-ags4 behavioural-equivalence story is tracked in [[parity-model]].
 
 > [!note] Stability
 > `Development Status :: 3 - Alpha` in the pyproject classifiers
@@ -46,21 +47,25 @@ behavioural-equivalence story is tracked in [[parity-model]].
 ## Install & dependency shape
 
 The deliberate design choice is a **light mandatory footprint** — only
-`polars` + `narwhals`, *no pandas* (cite
-`repo:packages/laterite/pyproject.toml dependencies`). narwhals is the
-public tabular return type, so a caller targets polars / pandas / pyarrow
-without laterite picking for them. pandas is pulled only by an extra.
+`polars` + `duckdb`, *no pandas and no pyarrow* (cite
+`repo:packages/laterite/pyproject.toml dependencies`). The base returns
+polars frames; a caller who wants pandas asks for it by extra rather than
+paying for it unconditionally.
+
+**DuckDB is load-bearing in the base**, not an optional nicety: it is the
+pyarrow-free dataframe bridge. Dropping it would reintroduce pyarrow on the
+pandas path, which is the dependency this shape exists to avoid.
 
 | Install | Adds | For |
 |---|---|---|
-| `pip install laterite` | polars + narwhals only | base AGS4 work |
-| `pip install "laterite[compat]"` | `pandas<3` + `pyarrow` | the [[python-ags4]] drop-in surface (returns pandas frames) |
-| `pip install "laterite[all]"` | `pandas<3` + `pyarrow` | the compat + Arrow extras together |
+| `pip install laterite` | nothing beyond `polars` + `duckdb` | base AGS4 work |
+| `pip install "laterite[compat]"` | `pandas<3` only — **pyarrow-free** | the [[python-ags4]] drop-in surface (returns pandas frames) |
+| `pip install "laterite[pyarrow]"` | `pyarrow` | the optional accelerator, auto-detected at runtime |
+| `pip install "laterite[all]"` | `pandas<3` + `pyarrow` | compat and the accelerator together |
 
-`[pandas]` is retained as a back-compat alias of `[compat]` (minus
-pyarrow); `set_backend("polars")` / `LATERITE_COMPAT_BACKEND=polars` drops
-the pandas requirement from the compat path entirely
-(`repo:packages/laterite/pyproject.toml`).
+`set_backend("polars")` / `LATERITE_COMPAT_BACKEND=polars`
+(`repo:packages/laterite/python/laterite/compat.py:99`) drops the pandas
+requirement from the compat path entirely.
 
 > [!note] The base wheel is light — **6.0 MB** (macOS arm64) to **6.9 MB**
 > (Windows), no bundled DuckDB; the sdist is 0.6 MB. Measured from the published
