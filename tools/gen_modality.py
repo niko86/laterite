@@ -87,11 +87,6 @@ sources: []
 """
 
 
-def _ordered(forms: list[str], present: dict[str, str]) -> list[str]:
-    """Forms that appear in a cell, in the declared header order."""
-    return [f for f in forms if f in present]
-
-
 def _columns(cells: list[dict], direction: str, header: list[str]) -> list[str]:
     """The union of forms used across a capability's cells for one direction,
     in declared order — the column set for that direction's grid."""
@@ -289,8 +284,9 @@ def render(doc: dict) -> str:
         "",
         "Grid: ✓ present · — absent · ≈ divergent (present but shape differs from siblings). "
         "Findings: 🔴 P1 · 🟠 P2 · 🟡 P3 · ⚪ by-design. Generated from [[crate-map|the crate map]]'s "
-        "surfaces via `repo:tools/gen_modality.py`; the SSOT is `repo:modality.json` and the standing "
-        "gate is `repo:packages/laterite/tests/test_modality_parity.py`.",
+        "surfaces via `repo:tools/gen_modality.py`; the SSOT is `repo:modality.json`. Two standing "
+        "gates: `repo:packages/laterite/tests/test_modality_parity.py` holds the SSOT against the "
+        "live surfaces, and `gen_modality.py --check` holds this page against the SSOT.",
         "",
     ]
     return "\n".join(parts).rstrip() + "\n"
