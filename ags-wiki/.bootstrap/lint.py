@@ -63,6 +63,11 @@ from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+# The `repo:` citation grammar lives in refs.py so tools other than the linter
+# can resolve a citation — importing lint.py to get at it is not an option, and
+# re-deriving it locally is the drift this vault's checks exist to catch.
+from refs import REPO_REF, TRAILING_PUNCT, resolve_ref
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -840,75 +845,6 @@ HISTORICAL_SPECIFIC = re.compile(r"<!--\s*retired:\s*([A-Za-z0-9_-]+)\s*-->")
 # form (AGS-WIKI.md §1). That blind spot is the whole reason this check
 # exists, so it can't inherit strip_code()'s behaviour.
 # ---------------------------------------------------------------------------
-REPO_REF = re.compile(r"(?<![A-Za-z0-9_-])repo:([^\s`()|]+)")
-_TRAILING_PUNCT = ".,;:!?'\")"
-
-
-def strip_ref_suffix(raw: str) -> str:
-    """path/glob portion of a repo: ref — strips #anchor, ::symbol, :line."""
-    val = raw
-    if "#" in val:
-        val = val.split("#", 1)[0]
-    if "::" in val:
-        val = val.split("::", 1)[0]
-    # trailing :NNN or :NNN-NNN (single line or a line range)
-    m = re.match(r"^(.*):(\d+)(-\d+)?$", val)
-    if m:
-        val = m.group(1)
-    return val
-
-
-def _expand_braces(pattern: str) -> list[str]:
-    # non-nested {a,b,c} alternation only — the only shape seen in-vault
-    # (e.g. `{python,node,cli,duckdb}`); good enough for a report-only pass.
-    m = re.search(r"\{([^{}]+)\}", pattern)
-    if not m:
-        return [pattern]
-    prefix, suffix = pattern[: m.start()], pattern[m.end() :]
-    out = []
-    for alt in m.group(1).split(","):
-        out.extend(_expand_braces(prefix + alt + suffix))
-    return out
-
-
-def _is_glob(s: str) -> bool:
-    return any(c in s for c in "*?[")
-
-
-def path_exists(path_str: str) -> bool:
-    if not path_str:
-        return False
-    for expanded in _expand_braces(path_str):
-        if _is_glob(expanded):
-            try:
-                if any(REPO_ROOT.glob(expanded)):
-                    return True
-            except (NotImplementedError, ValueError):
-                continue
-        elif (REPO_ROOT / expanded).exists():
-            return True
-    return False
-
-
-def resolve_ref(raw: str) -> tuple[bool, str]:
-    """(exists, path_used) — tries the ref as-written, then progressively
-    strips trailing punctuation. Needed because ~17% of refs in this vault
-    are bare (non-backtick) mentions inside `repo_refs: {...: "repo:..."}`
-    frontmatter, so the raw regex capture drags in a trailing `"` — a real
-    ref, not a dead one, once the quote is off."""
-    candidate = strip_ref_suffix(raw)
-    seen = set()
-    while candidate and candidate not in seen:
-        seen.add(candidate)
-        if path_exists(candidate):
-            return True, candidate
-        if candidate[-1] in _TRAILING_PUNCT:
-            candidate = candidate[:-1]
-        else:
-            break
-    return False, candidate
-
-
 def anchor_problem(raw: str, resolved: str) -> str | None:
     """Tier-3 symbol/line-anchor validation (report-only) — for a `repo:` ref
     whose FILE exists, check its `:NN`/`:NN-MM` line suffix is in range and its
@@ -920,7 +856,7 @@ def anchor_problem(raw: str, resolved: str) -> str | None:
     if not fp.is_file():
         return None
     r = raw
-    while r and r[-1] in _TRAILING_PUNCT:
+    while r and r[-1] in TRAILING_PUNCT:
         r = r[:-1]
     m = re.search(r"::([A-Za-z_][A-Za-z0-9_]*)$", r)
     if m:
@@ -1129,7 +1065,7 @@ for p in md:
         if is_placeholder(raw):
             continue
         clean = raw
-        while clean and clean[-1] in _TRAILING_PUNCT:
+        while clean and clean[-1] in TRAILING_PUNCT:
             clean = clean[:-1]
         repo_id, _ext_path = parse_ext_ref(clean)
         ln = line_at(txt, m.start())
