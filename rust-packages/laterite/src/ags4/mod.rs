@@ -83,6 +83,14 @@ fn convert(findings: laterite_ags4_validator::Findings) -> Vec<Finding> {
 enum Source {
     Path(PathBuf),
     Bytes(Vec<u8>),
+    /// AGS4 the caller has already decoded.
+    ///
+    /// A distinct variant rather than `Bytes(s.into_bytes())` so that
+    /// [`Read::encoding`] cannot reach it. Text is decoded by definition, and
+    /// transcoding it again would corrupt exactly the non-ASCII cells — the `°`
+    /// and `±` in description fields — that made someone reach for `encoding`
+    /// in the first place. Structural, not a doc note.
+    Text(String),
 }
 
 /// A pending read. Configure it, then [`Read::run`].
@@ -105,6 +113,25 @@ pub fn read(path: impl AsRef<Path>) -> Read {
 pub fn read_bytes(bytes: impl Into<Vec<u8>>) -> Read {
     Read {
         source: Source::Bytes(bytes.into()),
+        encoding: None,
+        recover_duplicate_headings: false,
+    }
+}
+
+/// Read AGS4 from text already decoded — a string literal, a template, a column
+/// out of a database driver that hands back `String`.
+///
+/// `read_bytes(s.as_bytes())` reaches the same place, and that is the point: it
+/// is the workaround, not the door. Python and Node both offer this form, and a
+/// caller who has a `String` should not have to know that the engine wants
+/// bytes.
+///
+/// [`Read::encoding`] does not apply here and cannot — the text is decoded
+/// already. That matches the Python surface, whose `encoding` is documented as
+/// governing bytes and path input only.
+pub fn read_str(text: impl Into<String>) -> Read {
+    Read {
+        source: Source::Text(text.into()),
         encoding: None,
         recover_duplicate_headings: false,
     }
@@ -146,14 +173,23 @@ impl Read {
                 Error::with_source(ErrorKind::Io, format!("cannot read {}", p.display()), e)
             })?,
             Source::Bytes(b) => b.clone(),
+            // Already decoded — hand the engine its UTF-8 and skip the transcode
+            // below entirely. `encoding` is unreachable on this variant.
+            Source::Text(s) => s.clone().into_bytes(),
         };
 
         // Decode here rather than pushing an encoding down the engine: the core
         // reader's entry point takes bytes it assumes are UTF-8, so transcoding
         // first is both correct and keeps `encoding_rs` out of our API.
-        let bytes = match &self.encoding {
-            None => raw,
-            Some(label) => {
+        //
+        // Matched on the SOURCE as well as the label. Text is decoded already,
+        // so transcoding it is not a no-op — it re-reads UTF-8 as cp1252 and
+        // turns `°` into `Â°`, corrupting precisely the cells the option exists
+        // to rescue. Keying only on `encoding` looked right and did exactly
+        // that; `encoding_cannot_corrupt_text` is the test that says so.
+        let bytes = match (&self.source, &self.encoding) {
+            (Source::Text(_), _) | (_, None) => raw,
+            (_, Some(label)) => {
                 let enc = laterite_ags4_parse::resolve_encoding(Some(label))
                     .ok_or_else(|| bad_encoding(label))?;
                 enc.decode(&raw).0.into_owned().into_bytes()
@@ -226,6 +262,25 @@ pub fn validate_bytes(bytes: impl Into<Vec<u8>>) -> Validate {
     }
 }
 
+/// Validate AGS4 from text already decoded.
+///
+/// Identical to [`validate_bytes`] in every respect that reaches a finding —
+/// same engine door, same edition resolution, same Rule 20 restriction — and
+/// offered for the same reason as [`read_str`]: a caller holding a `String`
+/// should not have to convert it to satisfy a signature.
+///
+/// [`Validate::encoding`] does not apply, as with [`read_str`].
+pub fn validate_str(text: impl Into<String>) -> Validate {
+    Validate {
+        source: Source::Text(text.into()),
+        warnings: false,
+        fyi: false,
+        edition: None,
+        encoding: None,
+        check_files: false,
+    }
+}
+
 impl Validate {
     /// Include WARNING-severity findings.
     #[must_use]
@@ -284,6 +339,12 @@ impl Validate {
             encoding: laterite_ags4_parse::resolve_encoding(self.encoding.as_deref())
                 .ok_or_else(|| bad_encoding(self.encoding.as_deref().unwrap_or_default()))?,
         };
+        // Text is decoded already, so its bytes must be read back as UTF-8
+        // whatever `encoding` says. `resolve_encoding(None)` is UTF-8 — the same
+        // fact the comment above relies on.
+        let utf8 =
+            laterite_ags4_parse::resolve_encoding(None).ok_or_else(|| bad_encoding("utf-8"))?;
+
         // Both arms end at `check_parsed_with_dict` — `check_file` reaches it too.
         // That is not incidental: resolving `TRAN_AGS` and applying the 4.0.3→4.0.4
         // content guard is four steps, and the engine records that every surface
@@ -296,6 +357,11 @@ impl Validate {
                 // `WorldScope::None` is the honest scope for bytes, and it is what
                 // turns `check_files` into an error inside the engine rather than a
                 // silent pass here.
+                check_parsed_with_dict(&parsed, &opts, &WorldScope::None).map(|(f, _, _)| f)
+            }),
+            // UTF-8 explicitly, not `opts.encoding`: the text is decoded, so the
+            // only faithful reading of its bytes is the one that round-trips them.
+            Source::Text(s) => parse_bytes(s.as_bytes(), utf8).and_then(|parsed| {
                 check_parsed_with_dict(&parsed, &opts, &WorldScope::None).map(|(f, _, _)| f)
             }),
         };
@@ -315,6 +381,7 @@ impl Validate {
             let subject = match &self.source {
                 Source::Path(p) => format!("cannot validate {}", p.display()),
                 Source::Bytes(b) => format!("cannot validate {} bytes", b.len()),
+                Source::Text(s) => format!("cannot validate {} characters", s.chars().count()),
             };
             // One token gets its own sentence, because it is the one a caller
             // causes rather than receives: `check_files` on bytes. "cannot
@@ -479,7 +546,17 @@ impl<'a> Write<'a> {
         Ok(Written {
             fixes_applied: result.fixes_applied,
             findings: convert(result.findings),
-            bytes: result.bytes,
+            // Cannot fail — see the note on `Written::text`. Surfaced as an
+            // error rather than unwrapped anyway: if the emitter ever did
+            // produce non-UTF-8 that is an engine bug, and a panic in a library
+            // is a poor way to report one.
+            text: String::from_utf8(result.bytes).map_err(|e| {
+                Error::with_source(
+                    ErrorKind::Emit,
+                    "the emitter produced bytes that are not UTF-8",
+                    e,
+                )
+            })?,
         })
     }
 
@@ -492,7 +569,7 @@ impl<'a> Write<'a> {
     pub fn to_path(self, path: impl AsRef<Path>) -> Result<Written, Error> {
         let path = path.as_ref();
         let written = self.emit()?;
-        std::fs::write(path, &written.bytes).map_err(|e| {
+        std::fs::write(path, written.bytes()).map_err(|e| {
             Error::with_source(ErrorKind::Io, format!("cannot write {}", path.display()), e)
         })?;
         Ok(written)
@@ -501,7 +578,15 @@ impl<'a> Write<'a> {
 
 /// What a write produced.
 pub struct Written {
-    bytes: Vec<u8>,
+    /// Held as `String`, with bytes derived — the same way round as the Python
+    /// surface, whose `Ags4File.text` is primary and whose `.bytes` is
+    /// `text.encode("utf-8")`.
+    ///
+    /// Sound because this is OUR emitter's own output, not an arbitrary file:
+    /// every cell reaches the writer as a Rust `String`, so the result is UTF-8
+    /// by construction. The "AGS4 is not guaranteed UTF-8" caution is real, and
+    /// it is about READING files other people wrote — it does not reach here.
+    text: String,
     findings: Vec<Finding>,
     fixes_applied: usize,
 }
@@ -510,13 +595,29 @@ impl Written {
     /// The AGS4 bytes.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
-        &self.bytes
+        self.text.as_bytes()
     }
 
     /// Take ownership of the bytes.
     #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
-        self.bytes
+        self.text.into_bytes()
+    }
+
+    /// The AGS4 as text.
+    ///
+    /// Python and Node both return the produced AGS4 as a string as well as
+    /// bytes; this closes the gap. Free — no copy, no re-decode — because the
+    /// text is what is stored.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Take ownership of the text.
+    #[must_use]
+    pub fn into_text(self) -> String {
+        self.text
     }
 
     /// Anything still wrong with the output after the chosen [`WriteMode`] ran.
@@ -548,6 +649,7 @@ impl std::fmt::Debug for Read {
                 &match &self.source {
                     Source::Path(p) => format!("path {}", p.display()),
                     Source::Bytes(b) => format!("{} bytes", b.len()),
+                    Source::Text(s) => format!("{} characters", s.chars().count()),
                 },
             )
             .field("encoding", &self.encoding)
@@ -567,6 +669,7 @@ impl std::fmt::Debug for Validate {
                 &match &self.source {
                     Source::Path(p) => format!("path {}", p.display()),
                     Source::Bytes(b) => format!("{} bytes", b.len()),
+                    Source::Text(s) => format!("{} characters", s.chars().count()),
                 },
             )
             .field("warnings", &self.warnings)
@@ -591,10 +694,14 @@ impl std::fmt::Debug for Write<'_> {
 
 impl std::fmt::Debug for Written {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // `finish_non_exhaustive` because omitting the produced AGS4 is the
+        // point, not an oversight — same rule as the other Debug impls here.
+        // Reported as a byte length (not a char count) so it stays comparable
+        // with what `bytes()` hands back and with what lands on disk.
         f.debug_struct("Written")
-            .field("bytes", &self.bytes.len())
+            .field("bytes", &self.text.len())
             .field("findings", &self.findings.len())
             .field("fixes_applied", &self.fixes_applied)
-            .finish()
+            .finish_non_exhaustive()
     }
 }

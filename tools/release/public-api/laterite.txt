@@ -209,6 +209,8 @@ pub fn laterite::ags4::Written::bytes(&self) -> &[u8]
 pub fn laterite::ags4::Written::findings(&self) -> &[laterite::ags4::Finding]
 pub fn laterite::ags4::Written::fixes_applied(&self) -> usize
 pub fn laterite::ags4::Written::into_bytes(self) -> alloc::vec::Vec<u8>
+pub fn laterite::ags4::Written::into_text(self) -> alloc::string::String
+pub fn laterite::ags4::Written::text(&self) -> &str
 impl core::fmt::Debug for laterite::ags4::Written
 pub fn laterite::ags4::Written::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite::ags4::Written
@@ -221,8 +223,10 @@ impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Written
 pub fn laterite::ags4::editions() -> alloc::vec::Vec<&'static str>
 pub fn laterite::ags4::read(impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Read
 pub fn laterite::ags4::read_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Read
+pub fn laterite::ags4::read_str(impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Read
 pub fn laterite::ags4::validate(impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Validate
 pub fn laterite::ags4::validate_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Validate
+pub fn laterite::ags4::validate_str(impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Validate
 pub fn laterite::ags4::write(&laterite::ags4::Document) -> laterite::ags4::Write<'_>
 #[non_exhaustive] pub enum laterite::ErrorKind
 pub laterite::ErrorKind::BadDictionary
