@@ -1,7 +1,7 @@
 ---
 type: index
-generated: 2026-08-03
-counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 28, concepts: 29, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 22}
+generated: 2026-08-04
+counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 28, concepts: 29, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 23}
 ---
 # AGS Wiki — Content Catalog
 
@@ -22,11 +22,11 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 28, concept
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
-| Design | 22 |
-| **Total (live)** | **399** |
+| Design | 23 |
+| **Total (live)** | **400** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 21 · `confirmed` 18 · `drafted` 330 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 5 · `stub` 13
+**Status distribution:** `accepted` 22 · `confirmed` 18 · `drafted` 330 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 5 · `stub` 13
 
 ## Rules
 
@@ -482,6 +482,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 28, concept
 | [[dec-duckdb-per-host-engine]] | accepted | — |
 | [[dec-duckdb-perf-architecture]] | accepted | — |
 | [[dec-edition-selection]] | accepted | — |
+| [[dec-facade-parity]] | accepted | — |
 | [[dec-laterite-ags4-types-leaf]] | accepted | — |
 | [[dec-monorepo-structure]] | accepted | — |
 | [[dec-python-imports-rust-library]] | accepted | — |

@@ -126,6 +126,8 @@ jobs:
               # run (a README badge bump rebuilding the whole wheel is the visible
               # symptom). Keep ONLY the paths a test or job IN THIS REPO actually
               # reads; the rest return alongside the private faithfulness suite.
+              # ...and by the modality drift gate. The generator half needs no
+              # entry: `tools/**` below already covers it.
               - 'modality.json'          # read by test_modality_parity (packages/laterite/tests)
               - 'COMPAT.md'              # referenced by test_laterite (packages/laterite/tests)
               - 'tools/gen_census.py'    # referenced by test_merge (packages/laterite/tests)
@@ -1013,6 +1015,21 @@ jobs:
         # the coverage-map half reachable. Do not add ags-wiki/** here instead:
         # that would build the PyO3 wheel on every wiki-only edit.
         run: uv run --no-project python tools/gen_observations.py --check
+
+      - name: modality drift gate (modality-register.md == modality.json render)
+        # Added 2026-08-04. The register shipped deliberately ungated, on the
+        # argument that a 100%-derived page with no migrated prose cannot lose
+        # anything to a regen — true, and about a different failure. It does not
+        # say the COMMITTED page still matches, which is what goes wrong when a
+        # `modality.json` edit lands without one. Nothing fails when it does, and
+        # the page misinforms every reader, the facade-floor census included.
+        #
+        # Same split as the observations gate above: `modality.json` is in this
+        # job's path filter, so an SSOT edit fires this step — but the rendered
+        # page is under ags-wiki/**, which this filter deliberately does not
+        # watch. The SAME command therefore runs unfiltered in wiki-lint.yml, so
+        # a hand-edit of the page alone cannot sail past (#207's failure mode).
+        run: uv run --no-project python tools/gen_modality.py --check
 
       - name: doc references resolve (incl. crates.io-strict for published READMEs)
         # Cheap stdlib check that no doc points at a file that isn't there. It

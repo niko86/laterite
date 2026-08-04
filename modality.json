@@ -1452,8 +1452,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Decided 2026-08-04: DO NOT ADD. It costs +laterite-excel (calamine + rust_xlsxwriter, 6 third-party deps) — precisely the deps the crate map extracted that crate to keep OUT of every consumer. A Rust caller can `cargo add laterite-excel` directly, which is a door a python or node user has no equivalent of, so the floor's premise (the facade is the only way in) does not hold here.",
-          "facade_verdict": "by-design"
+          "note": "Reversed 2026-08-04 (dec-facade-parity): TO ADD, behind an optional `excel` feature. The earlier DO-NOT-ADD rested on a Rust caller being able to `cargo add laterite-excel` directly — a door that was never open, since the crate is publish = false and has never been on crates.io. The dependency cost survives the reversal because an optional dep is not compiled, downloaded or locked by anyone who leaves the feature off, so the calamine + rust_xlsxwriter weight the crate map extracted stays off every consumer that does not ask for it.",
+          "facade_verdict": "planned"
         }
       ]
     },
@@ -1551,8 +1551,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Decided 2026-08-04: DO NOT ADD, with to_excel — same dependency cost, same direct-dependency escape hatch.",
-          "facade_verdict": "by-design"
+          "note": "Reversed 2026-08-04 with to_excel (dec-facade-parity): TO ADD, behind the same optional `excel` feature — same false premise, same reasoning.",
+          "facade_verdict": "planned"
         }
       ]
     },

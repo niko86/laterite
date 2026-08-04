@@ -149,6 +149,13 @@ jobs:
       - name: gen_observations --check-wiki (O-N pages agree with the SSOT)
         run: uv run --no-project python tools/gen_observations.py --check-wiki
 
+      # The modality register is the same shape of relationship, and needs both
+      # lanes for the same reason: ci.yml's python job fires on `modality.json`
+      # but does not watch ags-wiki/**, so the SSOT half is covered there and the
+      # rendered-page half is covered here, where nothing is filtered.
+      - name: gen_modality --check (modality-register.md == the SSOT)
+        run: uv run --no-project python tools/gen_modality.py --check
+
       # The structural half of #164's doc-output gate: every example-output block on
       # a docs page must still INCLUDE its `.out`, or opt out with a stated reason.
       # It runs no example, so it needs no wheel, no dist and no `lat` — which is
