@@ -26,8 +26,8 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 ## Findings backlog (find-only — fixes are follow-ups)
 
 - **🔴 P1** (0): —
-- **🟠 P2** (4): read/cli (in.stdin); validate/cli (in.stdin); build/browser (in.text); emit/browser (out.bytes)
-- **🟡 P3** (2): read_typed/node (out.handle); read-output-view/python (out.table)
+- **🟠 P2** (5): read/rust (in.cert); read/cli (in.stdin); validate/cli (in.stdin); build/browser (in.text); emit/browser (out.bytes)
+- **🟡 P3** (7): read/rust (in.text); read/rust (in.file-like); validate/rust (in.text); validate/rust (in.file-like); emit/rust (out.text); read_typed/node (out.handle); read-output-view/python (out.table)
 - **⚪ by-design** (12): intentional absences, rationale in each cell below.
 
 ## Excluded axes
@@ -43,12 +43,15 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 
 *Offered anywhere — in: bytes, cert, file-like, path, text · out: handle, stdout, table, value*
 
+*Below the facade floor — the Rust crate does not yet offer in: cert, text, which python and node both do. A minimum to clear, not a gate*
+
 **Input**
 
 | surface (spelling) | path | text | bytes | file-like | stdin | cert |
 |---|---|---|---|---|---|---|
 | python (free) | ✓ | ✓ | ✓ | ✓ |   | ✓ |
 | node (free) | ✓ | ✓ | ✓ | — |   | ✓ |
+| rust (chained) | ✓ | — | ✓ | — |   | — |
 | cli (free) | ✓ |   |   |   | — |   |
 | browser (free) | — |   | ✓ |   |   | — |
 | duckdb (free) | ✓ | ✓ |   |   |   | ✓ |
@@ -59,18 +62,27 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 |---|---|---|---|---|
 | python (free) | ✓ |   |   |   |
 | node (free) | ✓ |   |   |   |
+| rust (chained) | ✓ |   |   |   |
 | cli (free) |   | ✓ |   | ✓ |
 | browser (free) | ✓ |   |   |   |
 | duckdb (free) |   |   | ✓ |   |
 
 _Findings:_
 - ⚪ by-design · **node** in.file-like — Node has no io.BytesIO-style universal file-like; a caller reads the stream to a Buffer and passes bytes.
+- 🟡 P3 · **rust** in.text — Owed by the facade floor — python and node both offer it. Also trivial: it is `read_bytes(s.as_bytes())` behind a name, so there is no design question to settle first.
+- 🟡 P3 · **rust** in.file-like — Above the facade floor — node does not offer it either — so the floor does not owe it. Recorded anyway because node's by-design reason ('no universal Node file-like') cannot be borrowed here: Rust has one, `impl std::io::Read`. Cheap to add; the floor is a minimum, not a cap on what gets built.
+- 🟠 P2 · **rust** in.cert — the `.ags.idx` cert door is unexposed; certify itself is absent on this surface, so this gap closes with that one.
 - 🟠 P2 · **cli** in.stdin `cli-stdin` — no '-'/stdin door — a piped .ags must be spooled to a temp file first. The shell surface's bytes form IS stdin.
 - ⚪ by-design · **browser** in.path — no filesystem in the browser — a File/upload is read to a Uint8Array, so bytes is the only sensible input door.
+
+_Notes:_
+- _rust_: Partial. `cert` lands with cert-input (decided 2026-08-04); `text` is `read_bytes(s.as_bytes())` behind a name.
 
 ### validate — Run the numbered AGS4 rules and return a verdict.
 
 *Offered anywhere — in: bytes, file-like, path, text · out: stdout, value*
+
+*Below the facade floor — the Rust crate does not yet offer in: text, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -78,6 +90,7 @@ _Findings:_
 |---|---|---|---|---|---|
 | python (free) | ✓ | ✓ | ✓ | ✓ |   |
 | node (free) | ✓ | ✓ | ✓ | — |   |
+| rust (chained) | ✓ | — | ✓ | — |   |
 | cli (free) | ✓ |   |   |   | — |
 | browser (free) | — |   | ✓ |   |   |
 
@@ -87,20 +100,26 @@ _Findings:_
 |---|---|---|
 | python (free) | ✓ |   |
 | node (free) | ✓ |   |
+| rust (chained) | ✓ |   |
 | cli (free) |   | ✓ |
 | browser (free) | ✓ |   |
 
 _Findings:_
 - ⚪ by-design · **node** in.file-like — same as read — no universal Node file-like; pass bytes.
+- 🟡 P3 · **rust** in.text — Owed by the facade floor — python and node both offer it. Also trivial: it is `read_bytes(s.as_bytes())` behind a name, so there is no design question to settle first.
+- 🟡 P3 · **rust** in.file-like — Above the facade floor — node does not offer it either — so the floor does not owe it. Recorded anyway because node's by-design reason ('no universal Node file-like') cannot be borrowed here: Rust has one, `impl std::io::Read`. Cheap to add; the floor is a minimum, not a cap on what gets built.
 - 🟠 P2 · **cli** in.stdin `cli-stdin` — no '-'/stdin door; a piped file must be spooled to disk first.
 - ⚪ by-design · **browser** in.path — no filesystem in the browser.
 
 _Notes:_
 - _python_: validate exposes only the positional source sniff + text= keyword — no explicit path=/data= keyword doors like read/fix. All input FORMS are still reachable via the sniff (_resolve_source accepts path/bytes/file-like), so this is a keyword-ergonomics inconsistency, NOT a lost modality — recorded here, deliberately not a gap.
+- _rust_: Partial. `text` is the same trivial door as read's.
 
 ### fix — Mechanically repair AGS4.
 
 *Offered anywhere — in: bytes, file-like, path, text · out: bytes, file, value*
+
+*Below the facade floor — the Rust crate does not yet offer in: bytes, path, text · out: file, value, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -109,6 +128,7 @@ _Notes:_
 | python (free) | ✓ | ✓ | ✓ | ✓ |
 | node (free) | ✓ | ✓ | ✓ |   |
 | browser (free) |   |   | ✓ |   |
+| rust (absent) |   |   |   |   |
 
 **Output**
 
@@ -117,14 +137,18 @@ _Notes:_
 | python (free) | ✓ |   | ✓ |
 | node (free) | ✓ |   | ✓ |
 | browser (free) |   | ✓ | ✓ |
+| rust (absent) |   |   |   |
 
 _Notes:_
 - _node_: #394 added inPlace/out write-back (the out.file form) + only/exclude rule selection — the latter shrank the test_cross_surface_parity _MATRIX allowlist to empty. Rule labels are typed as FixableRule, drift-gated to Python/the engine (test_typed_choices).
 - _browser_: the browser deliberately SPLITS fix into compute_fixes (returns the Fix[] proposal for the UI to preview — a value form) and apply_fixes (returns the repaired bytes). The library surfaces one-shot fix() and offer no dry-run Fix[] preview form; whether to add one is P3 verb-decomposition (fix-dry-run-split), tracked in the backlog, not a browser defect.
+- _rust_: Decided 2026-08-04: ADD. No new dependency — `compute_fixes`/`apply_fixes` are in laterite-ags4-validator, already a facade dep.
 
 ### build — Construct valid AGS4 from caller-supplied data (build_ags4).
 
 *Offered anywhere — in: bytes, handle, text, value · out: bytes, value*
+
+*Below the facade floor — the Rust crate does not yet offer in: handle, value · out: value, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -133,6 +157,7 @@ _Notes:_
 | python (free) |   |   | ✓ | ✓ |
 | node (free) |   |   | ✓ | ✓ |
 | browser (free) | ≈ | ✓ |   |   |
+| rust (absent) |   |   |   |   |
 
 **Output**
 
@@ -141,13 +166,19 @@ _Notes:_
 | python (free) |   | ✓ |
 | node (free) |   | ✓ |
 | browser (free) | ✓ |   |
+| rust (absent) |   |   |
 
 _Findings:_
 - 🟠 P2 · **browser** in.text `wasm-build-text-outlier` — build_ags4 takes a JSON-TEXT groups payload — the lone text-in build door across all surfaces (Python/Node take a typed-graph root or (code, frame) rows). Bytes-in already exists as build_ags4_ipc, so the reconciliation is the JSON-text outlier, NOT adding a bytes door.
 
+_Notes:_
+- _rust_: Decided 2026-08-04: ADD. No new dependency — laterite-ags4-emit is already a facade dep, and `Document` already has `push_row`/`set_cell`; what is missing is the one-call door.
+
 ### diff — Compare two AGS4 revisions.
 
 *Offered anywhere — in: bytes, file-like, handle, path, text · out: value*
+
+*Below the facade floor — the Rust crate does not yet offer in: bytes, handle, path · out: value, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -156,6 +187,7 @@ _Findings:_
 | python (free) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | node (free) | ✓ |   | ✓ | — | ✓ |
 | browser (free) |   |   | ✓ |   |   |
+| rust (absent) |   |   |   |   |   |
 
 **Output**
 
@@ -164,13 +196,19 @@ _Findings:_
 | python (free) | ✓ |
 | node (free) | ✓ |
 | browser (free) | ✓ |
+| rust (absent) |   |
 
 _Findings:_
 - ⚪ by-design · **node** in.file-like — no universal Node file-like; DiffSource is string|Uint8Array|Ags4File.
 
+_Notes:_
+- _rust_: Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it.
+
 ### merge — Reconcile N AGS4 deliveries of one project into one file.
 
 *Offered anywhere — in: bytes, file-like, handle, path, text · out: file, stdout, value*
+
+*Below the facade floor — the Rust crate does not yet offer in: bytes, handle, path · out: value, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -178,6 +216,7 @@ _Findings:_
 |---|---|---|---|---|---|
 | python (free) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | node (free) | ✓ |   | ✓ | — | ✓ |
+| rust (absent) |   |   |   |   |   |
 | cli (free) | ✓ |   |   |   |   |
 | browser (free) |   |   | ✓ |   |   |
 
@@ -187,12 +226,16 @@ _Findings:_
 |---|---|---|---|
 | python (free) | ✓ | ✓ |   |
 | node (free) | — | ✓ |   |
+| rust (absent) |   |   |   |
 | cli (free) | ✓ |   | ✓ |
 | browser (free) | ✓ | ✓ |   |
 
 _Findings:_
 - ⚪ by-design · **node** in.file-like — no universal Node file-like; MergeSource is string|Uint8Array|Ags4File.
 - ⚪ by-design · **node** out.file — Node merge returns a MergeResult carrying the merged bytes; the caller writes with fs (return-only, matching diff).
+
+_Notes:_
+- _rust_: Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it.
 
 ### censor — Anonymise an AGS4 file — scrub the classified sensitive cells (pseudonymise IDs, hash PROJ_ID, blank coordinates, tokenise names, strip free-text [units]) before sharing. Browser-only among shipped surfaces: the SAME laterite-ags4-censor engine backs the private laterite-ags4-corpus-qa `censor` dev tool, which is not a shipped py/node/cli API, so its cross-surface EXISTENCE is a surface-census matter, not a modality one.
 
@@ -203,16 +246,23 @@ _Findings:_
 | surface (spelling) | bytes |
 |---|---|
 | browser (free) | ✓ |
+| rust (absent) |   |
 
 **Output**
 
 | surface (spelling) | file | value |
 |---|---|---|
 | browser (free) | ✓ | ✓ |
+| rust (absent) |   |   |
+
+_Notes:_
+- _rust_: Absent. Browser-only among shipped surfaces, so the floor is empty here — there is no python/node pair to be the least of.
 
 ### certify — Mint an .ags.idx validity certificate (cert as OUTPUT).
 
 *Offered anywhere — in: bytes, handle, path · out: bytes, file, text*
+
+*Below the facade floor — the Rust crate does not yet offer in: handle · out: bytes, file, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -220,6 +270,7 @@ _Findings:_
 |---|---|---|---|
 | python (chained) |   |   | ✓ |
 | node (chained) |   |   | ✓ |
+| rust (absent) |   |   |   |
 | cli (free) | ✓ |   |   |
 | browser (free) |   | ✓ |   |
 
@@ -229,6 +280,7 @@ _Findings:_
 |---|---|---|---|
 | python (chained) | ✓ | ✓ |   |
 | node (chained) | ✓ | ✓ |   |
+| rust (absent) |   |   |   |
 | cli (free) | ✓ |   |   |
 | browser (free) | — |   | ✓ |
 
@@ -238,10 +290,13 @@ _Findings:_
 _Notes:_
 - _python_: certify_bytes() (#390) returns the .ags.idx bytes in memory — the certify analog of transport.lock_bytes; same cert as certify() (bar the mint timestamp), so it interops with read(index=)/--index/the browser.
 - _node_: certifyBytes() (#390) mirrors laterite-py's certify_bytes — same in-memory cert form.
+- _rust_: Decided 2026-08-04: ADD. Costs +laterite-ags4-trust (2 third-party deps). Genuine floor debt — python and node both offer it.
 
 ### cert-input — Consume an .ags.idx certificate to skip revalidation (cert as INPUT).
 
 *Offered anywhere — in: cert · out: handle, stdout, table*
+
+*Below the facade floor — the Rust crate does not yet offer in: cert · out: handle, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -250,6 +305,7 @@ _Notes:_
 | python (free) | ✓ |
 | node (free) | ✓ |
 | duckdb (free) | ✓ |
+| rust (absent) |   |
 | cli (free) | ✓ |
 | browser (free) | — |
 
@@ -260,6 +316,7 @@ _Notes:_
 | python (free) | ✓ |   |   |
 | node (free) | ✓ |   |   |
 | duckdb (free) |   | ✓ |   |
+| rust (absent) |   |   |   |
 | cli (free) |   |   | ✓ |
 | browser (free) |   |   |   |
 
@@ -270,11 +327,14 @@ _Notes:_
 - _python_: explicit opt-in — autodiscovery is deliberately refused so naming index= asserts the cert is for THIS file.
 - _node_: explicit opt-in, mirrors Python.
 - _duckdb_: implicit — a sibling <path>.idx is auto-consumed (the divergent FORM of the same cert-input capability: autodiscovery vs explicit).
+- _rust_: Decided 2026-08-04: ADD, with certify. This is also what closes `read`'s `cert` floor gap, so the two land together.
 - _cli_: --index (#393) consumes a fresh, same-engine, profile-covering .ags.idx to SKIP the rule engine (mirrors the library read(index=) short-circuit); a stale/foreign/insufficient cert is re-validated. Explicit opt-in like Python/Node, not autodiscovery like DuckDB.
 
 ### emit — Get spec-correct AGS4 back OUT of a read handle.
 
 *Offered anywhere — in: handle · out: bytes, file, table, text*
+
+*Below the facade floor — the Rust crate does not yet offer out: text, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -283,6 +343,7 @@ _Notes:_
 | python (chained) | ✓ |
 | node (chained) | ✓ |
 | browser (chained) | ✓ |
+| rust (chained) | ✓ |
 
 **Output**
 
@@ -291,13 +352,20 @@ _Notes:_
 | python (chained) | ✓ | ✓ | ✓ |   |
 | node (chained) | ✓ | ✓ | ✓ |   |
 | browser (chained) |   | — | — | ✓ |
+| rust (chained) | ✓ | ✓ | — |   |
 
 _Findings:_
 - 🟠 P2 · **browser** out.bytes `wasm-read-emit` — the wasm read handle (ParsedDataset) exposes only group_codes/meta/arrow_ipc (typed table-out) — no .text/.bytes AGS4 re-emit, so there is no round-trip AGS4 out of a browser read (Python/Node Ags4File have .text/.bytes/.save). Compute the fix instead via the separate build/apply verbs.
+- 🟡 P3 · **rust** out.text — Owed by the facade floor — python and node both return the AGS4 as text as well as bytes. No decode question to settle: the emitter's own output is UTF-8 by construction, which is why python makes `.text` primary and derives `.bytes` from it.
+
+_Notes:_
+- _rust_: Partial. `Written` exposes bytes only. The earlier note here claimed a String door needed a lossy/strict decision first — that was wrong: the concern applies to READING arbitrary files, not to our own emitter's output, which is UTF-8 by construction. Python already treats it that way, with `Ags4File.text` primary and `.bytes` its UTF-8 encoding.
 
 ### to_excel — Convert AGS4 to an .xlsx workbook.
 
 *Offered anywhere — in: bytes, file-like, path, text · out: bytes, file*
+
+*Below the facade floor — the Rust crate does not yet offer in: bytes, path · out: bytes, file, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -306,6 +374,7 @@ _Findings:_
 | python (free) | ✓ | ✓ | ✓ | ✓ |
 | node (free) | ✓ |   | ✓ |   |
 | browser (free) |   |   | ✓ |   |
+| rust (absent) |   |   |   |   |
 
 **Output**
 
@@ -314,14 +383,18 @@ _Findings:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | browser (free) |   | ✓ |
+| rust (absent) |   |   |
 
 _Notes:_
 - _python_: to_excel(output=None) (#391) returns the .xlsx bytes in memory — the FS-free door the browser's ags4_to_xlsx already offered.
 - _node_: #391 added bytes-in/bytes-out (omit xlsxPath → Buffer) + the Ags4File.toExcel() handle method — mirrors Python's to_excel.
+- _rust_: Decided 2026-08-04: DO NOT ADD. It costs +laterite-excel (calamine + rust_xlsxwriter, 6 third-party deps) — precisely the deps the crate map extracted that crate to keep OUT of every consumer. A Rust caller can `cargo add laterite-excel` directly, which is a door a python or node user has no equivalent of, so the floor's premise (the facade is the only way in) does not hold here.
 
 ### from_excel — Convert an AGS4-shaped .xlsx back to AGS4.
 
 *Offered anywhere — in: bytes, path · out: bytes, file, handle*
+
+*Below the facade floor — the Rust crate does not yet offer in: bytes, path · out: file, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -330,6 +403,7 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | browser (free) |   | ✓ |
+| rust (absent) |   |   |
 
 **Output**
 
@@ -338,16 +412,20 @@ _Notes:_
 | python (free) | ✓ |   | ✓ |
 | node (free) | ✓ | ✓ | — |
 | browser (free) |   | ✓ |   |
+| rust (absent) |   |   |   |
 
 _Findings:_
 - ⚪ by-design · **node** out.handle — Node fromExcel(bytes) returns the AGS4 Buffer, not an Ags4File; the handle is one read() away (read(fromExcel(bytes))) — the Node idiom, where read IS the handle constructor. Python returns the handle directly as a convenience.
 
 _Notes:_
 - _python_: from_excel(source) (#391) accepts raw .xlsx bytes — an uploaded workbook needn't hit disk first.
+- _rust_: Decided 2026-08-04: DO NOT ADD, with to_excel — same dependency cost, same direct-dependency escape hatch.
 
 ### transport-pack — zstd-only compress/decompress (pack/unpack).
 
 *Offered anywhere — in: bytes, path · out: bytes, file*
+
+*Below the facade floor — the Rust crate does not yet offer in: bytes, path · out: bytes, file, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -355,6 +433,7 @@ _Notes:_
 |---|---|---|
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
+| rust (absent) |   |   |
 
 **Output**
 
@@ -362,13 +441,17 @@ _Notes:_
 |---|---|---|
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
+| rust (absent) |   |   |
 
 _Notes:_
 - _node_: the *Bytes forms (#389) mirror laterite-py's pack_bytes/unpack_bytes — same shared-leaf envelope, so a Node-sealed blob interops with the file API and pyrage/the browser.
+- _rust_: Decided 2026-08-04: ADD. laterite-transport is ALREADY linked into the published crate (laterite-ags4-core's `transport` feature is default-ON and the facade enables it), so callers already carry age + zstd and cannot reach a single function. Exposing it costs nothing and removes that anomaly.
 
 ### transport-lock — zstd + age passphrase encrypt/decrypt (lock/unlock) — the motivating capability.
 
 *Offered anywhere — in: bytes, path · out: bytes, file*
+
+*Below the facade floor — the Rust crate does not yet offer in: bytes, path · out: bytes, file, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -377,6 +460,7 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | browser (free) | — | ✓ |
+| rust (absent) |   |   |
 | cli (free) | ✓ | — |
 
 **Output**
@@ -386,6 +470,7 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | browser (free) | — | ✓ |
+| rust (absent) |   |   |
 | cli (free) | ✓ |   |
 
 _Findings:_
@@ -395,6 +480,7 @@ _Findings:_
 _Notes:_
 - _python_: the *_bytes forms were added in 0.6.2-dev to close the exact path-only-vs-browser-bytes-only gap this whole audit is named after.
 - _node_: the *Bytes forms (#389) close the remaining leg of the motivating gap — lockBytes never writes plaintext to disk; same shared-leaf envelope as the Python/browser forms.
+- _rust_: Decided 2026-08-04: ADD. Same already-linked-but-unreachable position as transport-pack.
 
 ### read_typed — Read AGS4 into the typed-graph object model.
 
@@ -406,6 +492,7 @@ _Notes:_
 |---|---|---|---|---|
 | python (free) | ✓ | ✓ | ✓ | ✓ |
 | node (free) |   |   |   |   |
+| rust (absent) |   |   |   |   |
 
 **Output**
 
@@ -413,9 +500,13 @@ _Notes:_
 |---|---|
 | python (free) | ✓ |
 | node (free) | — |
+| rust (absent) |   |
 
 _Findings:_
 - 🟡 P3 · **node** out.handle `node-read-typed` — Node has the 174 typed-graph classes (for buildAgs4) but no read_typed to populate them FROM a file — the biggest port lift, a real typed-graph reader. Last in the backlog.
+
+_Notes:_
+- _rust_: Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it.
 
 ### read-output-view — Output-shaping of a read (xn numeric coercion).
 
@@ -426,15 +517,20 @@ _Findings:_
 | surface (spelling) | path |
 |---|---|
 | python (free) | ✓ |
+| rust (absent) |   |
 
 **Output**
 
 | surface (spelling) | table |
 |---|---|
 | python (free) | ≈ |
+| rust (absent) |   |
 
 _Findings:_
 - 🟡 P3 · **python** out.table `xn-numeric-view` — read(xn=) casts XN columns to Float64 — a Python-only output-shaping view with no sibling and (unlike keys/backend) no knob-parity gate. An open port-or-document decision, so it is a P3 gap/divergence, not a settled by-design.
+
+_Notes:_
+- _rust_: Absent. python-only (a dataframe-backend view), so the floor is empty. A Rust caller works with the engine's own types.
 
 ## Legend
 
