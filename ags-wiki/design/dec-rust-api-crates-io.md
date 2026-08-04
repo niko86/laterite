@@ -6,7 +6,7 @@ tags: [design, decision, api, rust, crates-io, versioning]
 decided: 2026-07-29
 supersedes: []
 from_gap: []
-related: [api-surface-1.0, dec-rust-drives-python, dec-laterite-ags4-types-leaf, crate-map, crate-dependency-graph, dec-monorepo-structure, dec-duckdb-extension, pyo3-boundary, reliquary]
+related: [dec-facade-parity, api-surface-1.0, dec-rust-drives-python, dec-laterite-ags4-types-leaf, crate-map, crate-dependency-graph, dec-monorepo-structure, dec-duckdb-extension, pyo3-boundary, reliquary]
 sources:
   - "https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html"
   - "https://doc.rust-lang.org/cargo/reference/publishing.html"
@@ -256,6 +256,12 @@ Each turned out to be a slightly different shape than the one-line plan implied:
 
 The job is a **new required-status-check context** (`publish-gates`) and gates
 nothing until branch protection is told about it.
+
+> [!important] Revised 2026-08-04 — see [[dec-facade-parity]].
+> There is **no facade 0.2**. Diff and merge publish at engine 0.9.0, and the
+> facade jumps 0.1.x straight onto the product line once it reaches parity, per
+> the rule the version gate already records. The deferral below did its job —
+> it kept the frozen surface small through the first publish — and is now spent.
 
 **Deliberately deferred**: diff and merge ship in 0.2, not 0.1 — keeping two crates off
 crates.io and the frozen surface smaller. `laterite-duckdb` migrates off its submodule

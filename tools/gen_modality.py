@@ -7,11 +7,21 @@ each absence/divergence verdicted gap|by-design with a reason + priority. This
 script renders it to a human-readable per-capability matrix in
 `ags-wiki/concepts/modality-register.md`.
 
-There is deliberately NO faithfulness gate (unlike OBSERVATIONS.md): the page is
-100%-derived tabular data with no migrated prose, so a `render == committed .md`
-check would guard nothing that could meaningfully drift. The register's REALITY
-is instead guarded by the standing gate `test_modality_parity.py`, which reflects
-the live Python/Node/browser surfaces and fails when they diverge from the JSON.
+Three distinct risks, three answers. The middle one went unguarded until
+2026-08-04, because the first one's argument was read as covering it:
+
+1. A regen CLOBBERING hand-written text. Not possible here — the page is
+   100%-derived tabular data with no migrated prose, unlike OBSERVATIONS.md,
+   which was ingested from Markdown and can lose text to a bad render. This is
+   why the page shipped without a faithfulness gate, and the reasoning holds.
+2. The page going STALE — a `modality.json` edit landing without a regen. (1)
+   does not cover this: "a regen destroys nothing" is not "the committed page
+   still matches". Nothing failed, and a stale page misinforms every human who
+   reads it, including the facade-floor census. `--check` is that gate.
+3. `modality.json` diverging from the surfaces it describes. Guarded by the
+   standing `test_modality_parity.py`, which reflects the live
+   Python/Node/browser/Rust surfaces and fails when they disagree with the JSON.
+
 The page is a generated artifact — regenerate it, don't hand-edit it.
 
 The **sibling baseline** (which forms a capability is offered in *somewhere*) is
@@ -23,10 +33,12 @@ same way and for the same reason — see `_floor`. It is a minimum, not a gate.
 Usage:
     python tools/gen_modality.py            # render the wiki page
     python tools/gen_modality.py --summary  # P1/P2/P3 census + the facade floor
+    python tools/gen_modality.py --check    # fail if the rendered page is stale
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -341,11 +353,32 @@ def summary(doc: dict) -> str:
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--summary", action="store_true", help="P1/P2/P3 census + the facade floor"
+    )
+    ap.add_argument(
+        "--check", action="store_true", help=f"fail if {PAGE.name} is stale"
+    )
+    args = ap.parse_args()
+
     doc = json.loads(JSON.read_text(encoding="utf-8"))
-    if "--summary" in sys.argv:
+    if args.summary:
         print(summary(doc))
         return
-    PAGE.write_text(render(doc), encoding="utf-8")
+
+    out = render(doc)
+    if args.check:
+        if PAGE.read_text(encoding="utf-8") != out:
+            sys.exit(
+                f"gen_modality: {PAGE.relative_to(REPO)} is stale — {JSON.name} is "
+                f"the source of truth. Regenerate with "
+                f"`uv run --no-sync python tools/gen_modality.py`."
+            )
+        print(f"gen_modality: {PAGE.relative_to(REPO)} matches {JSON.name}")
+        return
+
+    PAGE.write_text(out, encoding="utf-8")
     n_gaps = sum(
         len(c.get("gaps", [])) for cap in doc["capabilities"] for c in cap["cells"]
     )

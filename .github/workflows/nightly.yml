@@ -501,6 +501,8 @@ jobs:
         run: uv run --no-project python tools/gen_observations.py --check
       - name: gen_observations --check-wiki (O-N pages agree with the SSOT)
         run: uv run --no-project python tools/gen_observations.py --check-wiki
+      - name: gen_modality --check (modality-register.md == the SSOT)
+        run: uv run --no-project python tools/gen_modality.py --check
       # The structural half of the doc-output gate (#164). The half that RUNS the
       # examples needs the built surfaces and lives in ci.yml's python + node jobs;
       # this one only reads Markdown, so the enforcing lane can carry it too.
