@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-08-04
+
 ### Added
 
 - **The browser package has an API reference.** `@laterite/ags4-wasm` ships to npm with fully typed results, and until now the docs site did not mention it once — the crate README was its only documentation. `reference/wasm-api.md` documents it through the practices the web app actually uses, with worked examples whose printed output is generated from running them: init once and await that promise (and pass `module_or_path` explicitly, or a non-root `base` breaks the fetch fallback), read severity through one resolver because an absent `severity` means *error*, take the types from the package rather than mirroring them, hold a `ParsedDataset` across its Arrow pulls and free it before the next parse, propose fixes before applying them, and keep the synchronous engine off the main thread.
@@ -218,7 +220,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/niko86/laterite/releases/tag/v0.10.1
 [0.10.0]: https://github.com/niko86/laterite/releases/tag/v0.10.0
 [0.9.0]: https://github.com/niko86/laterite/releases/tag/v0.9.0
 [0.8.2]: https://github.com/niko86/laterite/releases/tag/v0.8.2
