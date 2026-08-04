@@ -7,6 +7,16 @@ skip re-validating it?"*
 let outcome = laterite_ags4_trust::check(request)?;
 ```
 
+<!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+## Install it
+
+```bash
+cargo add laterite-ags4-trust
+```
+
+Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+<!-- END GENERATED: availability -->
+
 ## Why this is a crate
 
 The question was previously answered in five places — a CLI, the Rust and

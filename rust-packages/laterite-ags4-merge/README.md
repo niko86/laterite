@@ -6,6 +6,16 @@ Reconcile **N deliveries** of one project into a single AGS4 file.
 let merged = laterite_ags4_merge::merge_parsed(&files, &MergeOpts::default())?;
 ```
 
+<!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+## Install it
+
+```bash
+cargo add laterite-ags4-merge
+```
+
+Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+<!-- END GENERATED: availability -->
+
 ## Why this is a crate
 
 Real geotechnical delivery is incremental: each file carries only what was

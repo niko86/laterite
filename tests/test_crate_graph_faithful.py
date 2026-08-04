@@ -110,6 +110,75 @@ def test_the_facade_crate_still_has_no_page() -> None:
     )
 
 
+def test_every_shipped_readme_matches_its_manifest() -> None:
+    """The README half of the gate.
+
+    A crate README is frozen at publish time — a wrong install line on crates.io
+    cannot be corrected retroactively, only superseded by another release. So a
+    manifest change that leaves a README stale has to fail before the upload, not
+    after.
+    """
+    stale = [
+        p.relative_to(REPO).as_posix()
+        for p, rendered in gcg.readmes().items()
+        if p.read_text(encoding="utf-8") != rendered
+    ]
+    assert not stale, (
+        "README availability blocks are stale — run "
+        "`uv run --no-project python tools/gen_crate_graph.py`:\n  "
+        + "\n  ".join(stale)
+    )
+
+
+def test_every_publishable_crate_readme_says_how_to_install_it() -> None:
+    """Eleven crates.io READMEs carried no install line at all before this gate.
+
+    A visitor landing on crates.io saw a description and no way to add the crate.
+    Asserted on the committed text rather than the render, so deleting the region
+    from a README fails here instead of silently dropping it from the gate.
+    """
+    man = gcg._manifests()
+    missing = []
+    for crate_dir in gcg._members():
+        name = gcg._name_of(crate_dir)
+        if (
+            name is None
+            or name not in man
+            or not gcg.distribution(name, man)["crates_io"]
+        ):
+            continue
+        readme = gcg.RUST / crate_dir / "README.md"
+        if readme.exists() and f"cargo add {name}" not in readme.read_text(
+            encoding="utf-8"
+        ):
+            missing.append(readme.relative_to(REPO).as_posix())
+    assert not missing, (
+        f"publishable crates whose README never says `cargo add`: {missing}"
+    )
+
+
+def test_the_card_and_the_readme_cannot_disagree() -> None:
+    """One computation, two renderings — the point of factoring `distribution()`.
+
+    Half the audited defects lived outside `ags-wiki/`. If the wiki card and the
+    shipped README derived their facts separately they could state different
+    versions for the same crate, which is the drift this whole change exists to
+    remove.
+    """
+    man = gcg._manifests()
+    for name in man:
+        dist = gcg.distribution(name, man)
+        if not dist["crates_io"]:
+            continue
+        page = gcg._page_for_crate().get(name)
+        if page is None:
+            continue
+        card = page.read_text(encoding="utf-8")
+        assert f"v{dist['version']}" in card, (
+            f"{page.name}'s card does not state v{dist['version']} for {name}"
+        )
+
+
 @pytest.mark.parametrize("crate", ["laterite-ags4-parse", "laterite-ags4-diff"])
 def test_published_crates_are_not_called_internal(crate: str) -> None:
     """The defect class this PR exists to retire, asserted directly.

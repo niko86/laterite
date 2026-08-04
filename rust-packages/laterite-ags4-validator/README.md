@@ -16,6 +16,16 @@ Deliberate divergences from python are logged in
 For end-user CLI usage run `lat --readme`, or see
 [`README-cli.md`](https://github.com/niko86/laterite/blob/main/rust-packages/laterite-cli/README-cli.md).
 
+<!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+## Install it
+
+```bash
+cargo add laterite-ags4-validator
+```
+
+Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+<!-- END GENERATED: availability -->
+
 ## Licence & clean-room boundary (important)
 
 This crate is **MIT** and is **not** derived from python-ags4 (LGPL-3.0).
