@@ -51,6 +51,12 @@
       "reflection": "ts-parse"
     },
     {
+      "id": "rust",
+      "label": "Rust (laterite facade crate)",
+      "source": "rust-packages/laterite/src/{lib.rs,ags4/*.rs}",
+      "reflection": "public-api-snapshot"
+    },
+    {
       "id": "cli",
       "label": "lat CLI",
       "source": "rust-packages/laterite-cli/src/main.rs",
@@ -156,6 +162,55 @@
               "verdict": "by-design",
               "reason": "Node has no io.BytesIO-style universal file-like; a caller reads the stream to a Buffer and passes bytes.",
               "priority": "by-design"
+            }
+          ]
+        },
+        {
+          "surface": "rust",
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "read/read_bytes",
+              "in_forms": [
+                "path",
+                "bytes"
+              ],
+              "out_forms": [
+                "handle"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present",
+            "text": "absent",
+            "file-like": "absent",
+            "cert": "absent"
+          },
+          "output": {
+            "handle": "present"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "text",
+              "verdict": "gap",
+              "reason": "Owed by the facade floor — python and node both offer it. Also trivial: it is `read_bytes(s.as_bytes())` behind a name, so there is no design question to settle first.",
+              "priority": "P3"
+            },
+            {
+              "direction": "in",
+              "form": "file-like",
+              "verdict": "gap",
+              "reason": "Above the facade floor — node does not offer it either — so the floor does not owe it. Recorded anyway because node's by-design reason ('no universal Node file-like') cannot be borrowed here: Rust has one, `impl std::io::Read`. Cheap to add; the floor is a minimum, not a cap on what gets built.",
+              "priority": "P3"
+            },
+            {
+              "direction": "in",
+              "form": "cert",
+              "verdict": "gap",
+              "reason": "the `.ags.idx` cert door is unexposed; certify itself is absent on this surface, so this gap closes with that one.",
+              "priority": "P2"
             }
           ]
         },
@@ -330,6 +385,47 @@
           ]
         },
         {
+          "surface": "rust",
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "validate/validate_bytes",
+              "in_forms": [
+                "path",
+                "bytes"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present",
+            "text": "absent",
+            "file-like": "absent"
+          },
+          "output": {
+            "value": "present"
+          },
+          "gaps": [
+            {
+              "direction": "in",
+              "form": "text",
+              "verdict": "gap",
+              "reason": "Owed by the facade floor — python and node both offer it. Also trivial: it is `read_bytes(s.as_bytes())` behind a name, so there is no design question to settle first.",
+              "priority": "P3"
+            },
+            {
+              "direction": "in",
+              "form": "file-like",
+              "verdict": "gap",
+              "reason": "Above the facade floor — node does not offer it either — so the floor does not owe it. Recorded anyway because node's by-design reason ('no universal Node file-like') cannot be borrowed here: Rust has one, `impl std::io::Read`. Cheap to add; the floor is a minimum, not a cap on what gets built.",
+              "priority": "P3"
+            }
+          ]
+        },
+        {
           "surface": "cli",
           "spelling": "free",
           "verbs": [
@@ -489,6 +585,14 @@
           },
           "gaps": [],
           "note": "the browser deliberately SPLITS fix into compute_fixes (returns the Fix[] proposal for the UI to preview — a value form) and apply_fixes (returns the repaired bytes). The library surfaces one-shot fix() and offer no dry-run Fix[] preview form; whether to add one is P3 verb-decomposition (fix-dry-run-split), tracked in the backlog, not a browser defect."
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
         }
       ]
     },
@@ -585,6 +689,14 @@
               "shape_note": "present-but-anomalous: JSON text where every sibling takes native value objects or Arrow-IPC bytes."
             }
           ]
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
         }
       ]
     },
@@ -678,6 +790,14 @@
             "value": "present"
           },
           "gaps": []
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it."
         }
       ]
     },
@@ -761,6 +881,14 @@
           ]
         },
         {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it."
+        },
+        {
           "surface": "cli",
           "spelling": "free",
           "verbs": [
@@ -837,6 +965,14 @@
             "file": "present"
           },
           "gaps": []
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent. Browser-only among shipped surfaces, so the floor is empty here — there is no python/node pair to be the least of."
         }
       ]
     },
@@ -909,6 +1045,14 @@
           },
           "gaps": [],
           "note": "certifyBytes() (#390) mirrors laterite-py's certify_bytes — same in-memory cert form."
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
         },
         {
           "surface": "cli",
@@ -1038,6 +1182,14 @@
           },
           "gaps": [],
           "note": "implicit — a sibling <path>.idx is auto-consumed (the divergent FORM of the same cert-input capability: autodiscovery vs explicit)."
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
         },
         {
           "surface": "cli",
@@ -1170,6 +1322,39 @@
               "related": "wasm-read-emit"
             }
           ]
+        },
+        {
+          "surface": "rust",
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "write",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "file",
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present",
+            "text": "absent"
+          },
+          "gaps": [
+            {
+              "direction": "out",
+              "form": "text",
+              "verdict": "gap",
+              "reason": "Owed by the facade floor — python and node both offer it. Also trivial: it is `read_bytes(s.as_bytes())` behind a name, so there is no design question to settle first.",
+              "priority": "P3"
+            }
+          ]
         }
       ]
     },
@@ -1266,6 +1451,14 @@
             "bytes": "present"
           },
           "gaps": []
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
         }
       ]
     },
@@ -1356,6 +1549,14 @@
             "bytes": "present"
           },
           "gaps": []
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
         }
       ]
     },
@@ -1429,6 +1630,14 @@
           },
           "gaps": [],
           "note": "the *Bytes forms (#389) mirror laterite-py's pack_bytes/unpack_bytes — same shared-leaf envelope, so a Node-sealed blob interops with the file API and pyrage/the browser."
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
         }
       ]
     },
@@ -1537,6 +1746,14 @@
           ]
         },
         {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
+        },
+        {
           "surface": "cli",
           "spelling": "free",
           "verbs": [
@@ -1619,6 +1836,14 @@
               "related": "node-read-typed"
             }
           ]
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it."
         }
       ]
     },
@@ -1657,6 +1882,14 @@
               "shape_note": "present-but-Python-only: no other surface offers an xn numeric coercion of the table output."
             }
           ]
+        },
+        {
+          "surface": "rust",
+          "spelling": "absent",
+          "verbs": [],
+          "input": {},
+          "output": {},
+          "note": "Absent. python-only (a dataframe-backend view), so the floor is empty. A Rust caller works with the engine's own types."
         }
       ]
     }
