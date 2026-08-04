@@ -14,6 +14,11 @@ sources: []
 ---
 # laterite-ags4-xcheck
 
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Not published** — `laterite-ags4-xcheck` is a workspace crate, internal to this repo, at v0.9.0 (inherited from the workspace).
+> **Used by** — nothing else in this workspace.
+<!-- END GENERATED: crate-card -->
+
 ## What it is
 > [!quote] **Implemented** (`repo:rust-packages/laterite-ags4-xcheck`). The
 > cross-surface **output-value** gate: it holds every surface's *emitted

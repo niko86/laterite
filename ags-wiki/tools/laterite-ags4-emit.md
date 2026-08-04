@@ -17,9 +17,13 @@ sources: []
 ---
 # laterite-ags4-emit
 
-> [!note] **Internal implementation detail** — a workspace crate, not a public
-> API. The published faces are the wheel's `build_ags4` ([[laterite]]), the Node
-> binding's emit verb ([[laterite-node]]) and the browser's writer
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Cleared for crates.io** — `laterite-ags4-emit` v0.9.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> **Used by** — [[laterite]], [[laterite-ags4-merge]], [[laterite-ags4-wasm]], [[laterite-ags4-xcheck]], [[laterite-excel]], [[laterite-node]], [[laterite-py]].
+<!-- END GENERATED: crate-card -->
+
+> [!note] The published faces are the wheel's `build_ags4` ([[laterite]]),
+> the Node binding's emit verb ([[laterite-node]]) and the browser's writer
 > ([[laterite-ags4-wasm]]) — all three over this one crate.
 
 ## What it is

@@ -1031,6 +1031,25 @@ jobs:
         # a hand-edit of the page alone cannot sail past (#207's failure mode).
         run: uv run --no-project python tools/gen_modality.py --check
 
+      - name: crate cards match the manifests
+        # The audit found fifteen tool pages opening "Internal implementation
+        # detail — a workspace crate, not a public API"; NINE of those crates
+        # were `publish = true`. Nobody edited those pages. The manifests moved
+        # underneath them — which is exactly why this step belongs HERE, in a
+        # required job whose `code` filter watches `rust-packages/**`, and not in
+        # a wiki-triggered lane. A check that fires on wiki diffs would have
+        # caught none of it.
+        #
+        # Concretely: replaying #253 (arming diff + merge for the registry,
+        # touching no wiki page) merged green on 2026-08-04. After this step it
+        # cannot — the manifest change alone turns the card stale and fails here.
+        #
+        # Same split as the two gates above. The rendered pages live under
+        # ags-wiki/**, which this filter deliberately does not watch, so the same
+        # command runs unfiltered in wiki-lint.yml and the nightly to catch a
+        # hand-edit of a card region.
+        run: uv run --no-project python tools/gen_crate_graph.py --check
+
       - name: doc references resolve (incl. crates.io-strict for published READMEs)
         # Cheap stdlib check that no doc points at a file that isn't there. It
         # exists because the equivalent manual audit found four dead references

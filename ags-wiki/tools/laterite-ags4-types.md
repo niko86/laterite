@@ -15,9 +15,13 @@ sources: []
 ---
 # laterite-ags4-types
 
-> [!note] **Internal implementation detail** — a workspace leaf crate, not a
-> public API. The published surface is the [[laterite]] wheel's
-> `laterite.ags_types` re-export, not this crate directly.
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Cleared for crates.io** — `laterite-ags4-types` v0.9.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> **Used by** — [[laterite-ags4-censor]], [[laterite-ags4-core]], [[laterite-ags4-diff]], [[laterite-ags4-emit]], [[laterite-ags4-merge]], [[laterite-ags4-perf]], [[laterite-ags4-reference]], [[laterite-ags4-tokenizer-wasm]], [[laterite-ags4-validator]], [[laterite-ags4-wasm]], [[laterite-node]], [[laterite-py]].
+<!-- END GENERATED: crate-card -->
+
+> [!note] Python reaches it through the [[laterite]] wheel's
+> `laterite.ags_types` re-export; Rust can depend on the crate itself.
 
 ## What it is
 

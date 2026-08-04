@@ -15,10 +15,15 @@ sources: []
 ---
 # laterite-transport
 
-> [!note] **Internal implementation detail** — a workspace crate, not a public
-> API. Its operations reach users through `lat pack`/`unpack`/`lock`/`unlock`
-> ([[laterite-cli]]) and the wheel's `transport` surface ([[laterite]]),
-> never as a crate a consumer names directly.
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Cleared for crates.io** — `laterite-transport` v0.9.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> **Used by** — [[laterite-ags4-core]], [[laterite-node]].
+<!-- END GENERATED: crate-card -->
+
+> [!note] Its operations reach users through `lat
+> pack`/`unpack`/`lock`/`unlock` ([[laterite-cli]]) and the wheel's
+> `transport` surface ([[laterite]]), never as a crate a consumer names
+> directly.
 
 ## What it is
 

@@ -17,9 +17,13 @@ sources: []
 ---
 # laterite-ags4-wasm
 
-> [!note] **Internal implementation detail** — a browser cdylib, not a
-> public Rust API. It is the wasm engine behind the validator site /
-> data explorer ([[validator-site]]).
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Not published** — `laterite-ags4-wasm` is a workspace crate, internal to this repo, at v0.10.1 (its own line).
+> **Used by** — nothing else in this workspace.
+<!-- END GENERATED: crate-card -->
+
+> [!note] It is the wasm engine behind the validator site / data explorer
+> ([[validator-site]]).
 
 > [!important] No longer in-tree only — **published to npm as of 0.8.1 (2026-07-29)**
 > This page said the crate was "consumed only by that front-end's JavaScript"

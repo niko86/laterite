@@ -16,6 +16,11 @@ sources: []
 ---
 # laterite-ags4-perf
 
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Not published** — `laterite-ags4-perf` is a workspace crate, internal to this repo, at v0.9.0 (inherited from the workspace).
+> **Used by** — nothing else in this workspace.
+<!-- END GENERATED: crate-card -->
+
 ## What it is
 > [!quote] **Implemented** (`repo:rust-packages/laterite-ags4-perf`). The rust
 > leg of the cross-surface performance matrix — a **dev/QA bin, never

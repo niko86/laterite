@@ -15,9 +15,13 @@ sources: []
 ---
 # laterite-ags4-core
 
-> [!note] **Internal implementation detail** — a workspace library crate,
-> not a public API. Its modules are surfaced through the [[laterite]]
-> wheels and the laterite-ags5-db binary, never imported by external Rust.
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Cleared for crates.io** — `laterite-ags4-core` v0.9.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> **Used by** — [[laterite]], [[laterite-ags4-compliance]], [[laterite-ags4-trust]], [[laterite-ags4-wasm]], [[laterite-ags4-xcheck]], [[laterite-cli]], [[laterite-excel]], [[laterite-node]], [[laterite-py]].
+<!-- END GENERATED: crate-card -->
+
+> [!note] Its modules are surfaced through the [[laterite]] wheel; Rust
+> consumers can also depend on the crate directly, per the card above.
 
 ## What it is
 

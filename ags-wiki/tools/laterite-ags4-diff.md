@@ -15,8 +15,12 @@ sources: []
 ---
 # laterite-ags4-diff
 
-> [!note] **Internal implementation detail** — a workspace crate, not a public
-> API. It ships as the `lat diff` verb ([[laterite-cli]]) and the diff
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Cleared for crates.io** — `laterite-ags4-diff` v0.9.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> **Used by** — [[laterite-ags4-wasm]], [[laterite-cli]], [[laterite-node]], [[laterite-py]].
+<!-- END GENERATED: crate-card -->
+
+> [!note] It ships as the `lat diff` verb ([[laterite-cli]]) and the diff
 > surface on every binding ([[laterite-py]], [[laterite-node]],
 > [[laterite-ags4-wasm]]).
 

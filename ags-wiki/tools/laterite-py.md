@@ -15,9 +15,13 @@ sources: []
 ---
 # laterite-py
 
-> [!note] **Internal implementation detail** — the native cdylib, not a
-> public API. External developers use the [[laterite]] wheel; this crate
-> is the compiled `_laterite_native` module behind it.
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Not published** — `laterite-py` is a workspace crate, internal to this repo, at v0.10.1 (its own line).
+> **Used by** — nothing else in this workspace.
+<!-- END GENERATED: crate-card -->
+
+> [!note] External developers use the [[laterite]] wheel; this crate is the
+> compiled `_laterite_native` module behind it.
 
 ## What it is
 

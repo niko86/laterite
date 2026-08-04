@@ -15,9 +15,13 @@ sources: []
 ---
 # laterite-excel
 
-> [!note] **Internal implementation detail** — a workspace leaf crate, not a
-> public API. Its only consumer is [[laterite-py]], exposing it as
-> `laterite.compat.AGS4_to_excel` / `excel_to_AGS4`.
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Not published** — `laterite-excel` is a workspace crate, internal to this repo, at v0.9.0 (inherited from the workspace).
+> **Used by** — [[laterite-ags4-wasm]], [[laterite-cli]], [[laterite-node]], [[laterite-py]].
+<!-- END GENERATED: crate-card -->
+
+> [!note] [[laterite-py]] exposes it as `laterite.compat.AGS4_to_excel` /
+> `excel_to_AGS4`; the card above lists every consumer.
 
 ## What it is
 

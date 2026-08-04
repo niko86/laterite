@@ -23,6 +23,7 @@ Run: `uv run --no-project python tools/gen_crate_graph.py` (stdlib only — toml
 
 from __future__ import annotations
 
+import re
 import sys
 import tomllib
 from pathlib import Path
@@ -395,9 +396,147 @@ def render() -> str:
     return "\n".join(fm) + "\n" + "\n".join(body)
 
 
+# ---------------------------------------------------------------------------
+# Crate cards — the facts a crate's page states ABOUT ITSELF, printed from its
+# manifest instead of typed.
+#
+# The 2026-08-04 audit found fifteen tool pages opening "Internal implementation
+# detail — a workspace crate, not a public API". Nine of them were `publish =
+# true`. Nobody edited those pages; the manifests moved underneath them, which is
+# why a wiki-diff-triggered check would have caught none of it and why this rides
+# `rust-packages/**` in ci.yml's `code` filter instead.
+#
+# ## Why the card says "cleared for crates.io", not "published"
+#
+# Whether a version is actually ON the registry is not knowable offline, and a
+# gate that needs the network is a gate that fails on a flaky DNS. Worse, the two
+# states genuinely differ right now: `laterite-ags4-diff` and `-merge` are armed
+# `publish = true` but their first upload has not happened. Asserting "published"
+# for them would replace one false claim with another — the decided-but-not-yet-
+# executed trap. So the card states what the manifest says, because the manifest
+# is the thing this repo controls and the thing this gate can verify.
+#
+# ## Why module lists are NOT here
+#
+# Several pages annotate their module lists with prose that is the page's actual
+# value. Generating a bare list beside that annotated prose would leave the wrong
+# text in place with a green gate — strictly worse than today. Round-tripping the
+# annotations is a separate change with its own idempotence proof.
+# ---------------------------------------------------------------------------
+CARD = "crate-card"
+TOOLS = REPO / "ags-wiki" / "tools"
+
+#: `repo_refs.root` pointing at a workspace member, inside a page's frontmatter.
+_ROOT_REF = re.compile(
+    r'^\s+root:\s*"repo:rust-packages/([A-Za-z0-9_-]+)/?"\s*$', re.MULTILINE
+)
+
+
+def _page_for_crate() -> dict[str, Path]:
+    """crate directory -> the tool page rooted at it.
+
+    Keyed on `repo_refs.root`, not on the filename: three different things in
+    this repo are called `laterite` (the wheel, the facade crate, the import
+    root), so a stem lookup silently lands on the wrong artifact.
+    """
+    out: dict[str, Path] = {}
+    for page in sorted(TOOLS.glob("*.md")):
+        head = page.read_text(encoding="utf-8").split("---", 2)
+        if len(head) < 3:
+            continue
+        m = _ROOT_REF.search(head[1])
+        if m:
+            out.setdefault(m.group(1), page)
+    return out
+
+
+def _version_of(d: dict) -> tuple[str, bool]:
+    """(version, inherited) — resolving `version.workspace = true`."""
+    v = d.get("package", {}).get("version")
+    if isinstance(v, str):
+        return v, False
+    ws = tomllib.loads((RUST / "Cargo.toml").read_text())
+    return ws["workspace"]["package"]["version"], True
+
+
+def _card_lines(name: str, man: dict[str, dict], consumers: list[str]) -> list[str]:
+    d = man[name]
+    version, inherited = _version_of(d)
+    tier = "inherited from the workspace" if inherited else "its own line"
+    if d.get("package", {}).get("publish") is False:
+        head = (
+            f"> [!note] **Not published** — `{name}` is a workspace crate, "
+            f"internal to this repo, at v{version} ({tier})."
+        )
+    else:
+        head = (
+            f"> [!note] **Cleared for crates.io** — `{name}` v{version} "
+            f"({tier}) declares `publish = true`, so it is a public API under "
+            f"semver, not an internal detail."
+        )
+    used = (
+        ", ".join(f"[[{c}]]" for c in consumers)
+        if consumers
+        else "nothing else in this workspace"
+    )
+    return [head, f"> **Used by** — {used}."]
+
+
+def _splice(md: str, marker: str, body: list[str]) -> str | None:
+    """`md` with the region between the markers replaced, or None if it has none.
+
+    None rather than raising: a page opts INTO a card by carrying the markers, so
+    a page without them is a normal state to skip, not an error to stop on.
+    """
+    begin, end = f"<!-- BEGIN GENERATED: {marker}", f"<!-- END GENERATED: {marker}"
+    lines = md.split("\n")
+    bi = next((i for i, ln in enumerate(lines) if ln.startswith(begin)), None)
+    ei = next((i for i, ln in enumerate(lines) if ln.startswith(end)), None)
+    if bi is None or ei is None:
+        return None
+    return "\n".join(lines[: bi + 1] + body + lines[ei:])
+
+
+def _name_of(crate_dir: str) -> str | None:
+    """Package name declared by `rust-packages/<crate_dir>/Cargo.toml`.
+
+    The directory and the package name usually match but are not the same thing,
+    and the manifest is the authority for which crate a page is actually about.
+    """
+    ct = RUST / crate_dir / "Cargo.toml"
+    if not ct.exists():
+        return None
+    return tomllib.loads(ct.read_text()).get("package", {}).get("name")
+
+
+def cards() -> dict[Path, str]:
+    """page -> its full text with the crate-card region refreshed.
+
+    Pages with no card region are skipped rather than rewritten: a page opts in
+    by carrying the markers, so adding one is a deliberate edit, not something
+    this tool does to every file it can reach.
+    """
+    man = _manifests()
+    ship = graph()[1]
+    out: dict[Path, str] = {}
+    for crate_dir, page in _page_for_crate().items():
+        name = _name_of(crate_dir)
+        if name is None or name not in man:
+            continue
+        consumers = sorted(c for c, deps in ship.items() if name in deps)
+        spliced = _splice(
+            page.read_text(encoding="utf-8"), CARD, _card_lines(name, man, consumers)
+        )
+        if spliced is not None:
+            out[page] = spliced
+    return out
+
+
 def main(argv: list[str]) -> int:
     out = render()
+    card_pages = cards()
     if "--check" in argv:
+        rc = 0
         cur = PAGE.read_text() if PAGE.exists() else ""
         if cur != out:
             print(
@@ -405,11 +544,34 @@ def main(argv: list[str]) -> int:
                 "`uv run --no-project python tools/gen_crate_graph.py`",
                 file=sys.stderr,
             )
-            return 1
-        print("crate dependency graph OK: page matches render()")
-        return 0
+            rc = 1
+        stale = [
+            p for p, txt in card_pages.items() if p.read_text(encoding="utf-8") != txt
+        ]
+        if stale:
+            for p in sorted(stale):
+                print(
+                    f"{p.relative_to(REPO)}: crate-card region is STALE — its "
+                    "manifest says something the page does not",
+                    file=sys.stderr,
+                )
+            print(
+                "run `uv run --no-project python tools/gen_crate_graph.py`",
+                file=sys.stderr,
+            )
+            rc = 1
+        if rc == 0:
+            print(
+                f"crate dependency graph OK: page matches render(); "
+                f"{len(card_pages)} crate card(s) current"
+            )
+        return rc
     PAGE.write_text(out)
     print(f"wrote {PAGE.relative_to(REPO)}")
+    for p, txt in sorted(card_pages.items()):
+        if p.read_text(encoding="utf-8") != txt:
+            p.write_text(txt, encoding="utf-8")
+            print(f"wrote {p.relative_to(REPO)} (crate-card)")
     return 0
 
 

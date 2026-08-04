@@ -18,9 +18,14 @@ sources: []
 ---
 # laterite-node
 
-> [!note] **Internal implementation detail** — the napi-rs
-> cdylib + co-located TS package: the **Node.js** host binding, the direct
-> analog of [[laterite-py]] for the JS/TS half of the toolchain.
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Not published** — `laterite-node` is a workspace crate, internal to this repo, at v0.10.1 (its own line).
+> **Used by** — nothing else in this workspace.
+<!-- END GENERATED: crate-card -->
+
+> [!note] the napi-rs cdylib + co-located TS package: the **Node.js** host
+> binding, the direct analog of [[laterite-py]] for the JS/TS half of the
+> toolchain.
 
 > [!important] **Published.** `laterite` shipped to npm at **0.1.0 (2026-06-15)**
 > This page claimed "not yet published to npm (that is P4)" for six weeks after it
