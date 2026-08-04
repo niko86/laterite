@@ -225,6 +225,66 @@ def test_doc_example_outputs_carry_no_superseded_product_version() -> None:
     )
 
 
+#: READMEs that ride out with a published artifact: the crates.io tarballs
+#: (`include` carries `/README.md`), the npm package wasm-pack assembles, and
+#: the PyPI wheel. Scoped to these deliberately rather than to every tracked
+#: `.md`, which was the first design and is wrong — Markdown in this repo is
+#: FULL of legitimately superseded versions. `CHANGELOG.md` is nothing else;
+#: `ags-wiki/design/` records what shipped when; `RELEASING*.md` uses past
+#: releases as worked examples. Measured before choosing the scope: across every
+#: tracked `.md`, 21 files carry a superseded version and 20 of them are correct
+#: history. Only the shipped READMEs are a claim about NOW, made to someone who
+#: cannot see this repo, on a page that cannot be corrected once they have read it.
+def _shipped_readmes() -> list[Path]:
+    return sorted(
+        [
+            *(_REPO / "rust-packages").glob("*/README.md"),
+            *(_REPO / "packages").glob("*/README.md"),
+        ]
+    )
+
+
+def test_shipped_readmes_carry_no_superseded_version() -> None:
+    """A README that ships to a registry must not name a version that has moved.
+
+    `laterite-ags4-wasm/README.md` showed `version(); // "0.8.2"` at product
+    0.10.1 — three releases stale, in a code block presented as what the API
+    returns, on a page wasm-pack copies into the published npm package. Nothing
+    caught it: `bump-version.sh product` restamps manifests, `compat.py` and the
+    docs-site `.out` files, and the sibling gate above scans only `**/*.out`.
+
+    Asserted by SUPERSEDED version, matching that sibling: any README that starts
+    naming a version is covered the day it lands, with no list to maintain.
+
+    A live tier's number is never "superseded", even when it collides with a past
+    product release. ENGINE is 0.9.0 today and `0.9.0` is also a past product
+    version — an engine README citing its own current version is correct, and a
+    gate that flagged it would be wrong in the direction that gets gates deleted.
+    """
+    facade = _toml("rust-packages/laterite/Cargo.toml")["package"]["version"]
+    live = {PRODUCT, ENGINE, facade}
+    superseded = {
+        r["version"]
+        for r in json.loads((_REPO / "changelog.json").read_text())["releases"]
+        if r["version"] not in live
+    }
+    stale: list[str] = []
+    for readme in _shipped_readmes():
+        text = readme.read_text(encoding="utf-8")
+        stale.extend(
+            f"{readme.relative_to(_REPO)} still says {old}"
+            for old in sorted(superseded)
+            # Bounded so `0.1.0` cannot match inside `0.1.01` or `v0.1.0-rc`.
+            if re.search(rf"(?<![\w.]){re.escape(old)}(?![\w.])", text)
+        )
+    assert not stale, (
+        "a README that ships to a registry names a superseded version:\n  "
+        + "\n  ".join(stale)
+        + f"\n\nLive tiers: product {PRODUCT}, engine {ENGINE}, facade {facade}. "
+        "These pages are permanent once published — fix before the next release."
+    )
+
+
 # --- ENGINE --------------------------------------------------------------
 
 
