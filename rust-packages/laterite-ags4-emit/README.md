@@ -12,6 +12,16 @@ One host-agnostic orchestrator sits under thin native and browser frontends, so
 the Python binding, the Node binding and the wasm build all emit identical
 bytes rather than each having its own writer that drifts.
 
+<!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+## Install it
+
+```bash
+cargo add laterite-ags4-emit
+```
+
+Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+<!-- END GENERATED: availability -->
+
 ## What it takes care of
 
 - **Quoting and formatting** to the spec's rules, including the

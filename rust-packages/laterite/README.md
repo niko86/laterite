@@ -25,6 +25,16 @@ doc.set_cell("PROJ", 0, "PROJ_NAME", "Renamed site")?;
 ags4::write(&doc).to_path("out.ags")?;
 ```
 
+<!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+## Install it
+
+```bash
+cargo add laterite
+```
+
+Currently v0.1.2 — this crate versions independently of the engine.
+<!-- END GENERATED: availability -->
+
 ## What it does
 
 - **Read.** From a path or from bytes, with encoding handling — legacy delivery

@@ -8,6 +8,16 @@ certificate and byte-offset index.
 let parsed = laterite_ags4_core::ags4_codec::read_ags4_bytes(&bytes, opts)?;
 ```
 
+<!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+## Install it
+
+```bash
+cargo add laterite-ags4-core
+```
+
+Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+<!-- END GENERATED: availability -->
+
 ## What is in here
 
 - **`ags4_codec`** — the AGS4 reader, producing groups of pure strings. No type

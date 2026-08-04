@@ -7,6 +7,16 @@ structurally cannot be, because it understands the data model.
 let delta = laterite_ags4_diff::diff_parsed(&baseline, &revision, &dict, None);
 ```
 
+<!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+## Install it
+
+```bash
+cargo add laterite-ags4-diff
+```
+
+Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+<!-- END GENERATED: availability -->
+
 ## Why a line diff is the wrong tool
 
 AGS4 is a tabular transfer format, and the two things that make text diffs noisy

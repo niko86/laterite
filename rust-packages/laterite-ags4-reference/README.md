@@ -10,6 +10,16 @@ let dict = Dictionary::bundled(FALLBACK);
 let group = dict.group("LOCA").expect("a standard group");
 ```
 
+<!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+## Install it
+
+```bash
+cargo add laterite-ags4-reference
+```
+
+Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+<!-- END GENERATED: availability -->
+
 ## One source of truth
 
 `ags_dictionary.json` holds **174 AGS groups** — the union across editions

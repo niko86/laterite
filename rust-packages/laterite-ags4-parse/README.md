@@ -17,6 +17,16 @@ The tolerant part matters — real deliveries arrive with ragged rows, stray
 whitespace, mixed line endings and non-UTF-8 encodings, and a parser that
 rejects them is a parser nobody can use to find out *why* they are wrong.
 
+<!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+## Install it
+
+```bash
+cargo add laterite-ags4-parse
+```
+
+Currently v0.9.0 — the engine crates move in lockstep on the workspace version.
+<!-- END GENERATED: availability -->
+
 ## What is source-true about it
 
 A single pass records, for every record: its absolute **byte** offset in the
