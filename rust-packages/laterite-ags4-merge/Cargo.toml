@@ -24,16 +24,21 @@ license = "MIT"
 repository.workspace = true
 keywords = ["ags", "ags4", "geotechnical", "merge", "combine"]
 categories = ["science::geo", "data-structures"]
-# Held for 0.2, NOT round one: keeping two crates off crates.io keeps the
-# frozen public surface smaller for a first publish. Arming this is a
-# deliberate act, not a tidy-up — see ags-wiki/design/dec-rust-api-crates-io.md.
-publish = false
+# Armed 2026-08-04, with laterite-ags4-diff. Same reasoning, plus one specific to
+# this crate: what publishes is `merge_parsed`, whose `&[ParsedFile]` shape is
+# exactly the one laterite#162 endorses. The TYPED merge surface #162 warns about
+# — no provenance typestate, because it forces every document in one merge to
+# share a provenance and rules out merging a disk file with bytes off a network —
+# is NOT published here and stays free to design.
+# See ags-wiki/design/dec-facade-parity.md and dec-ags4-merge-semantics.md.
+publish = true
 
 # What `cargo package` may put in the tarball. Explicit because the default is
 # "everything not excluded", and crates.io is append-only — a file that rides one
 # publish cannot be taken back. See laterite#159.
 include = [
     "/src/**",
+    "/README.md",
 ]
 
 [lib]

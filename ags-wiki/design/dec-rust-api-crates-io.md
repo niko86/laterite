@@ -18,9 +18,19 @@ repo_refs:
 
 # laterite — the public Rust API surface, and publishing the engine to crates.io
 
-> **DECIDED 2026-07-29.** The API design is settled; nothing is published yet.
-> Sibling to [[api-surface-1.0]], which is the *Python* surface — this page is the
-> Rust one. Prerequisite work is tracked as laterite#158–#162.
+> **DECIDED 2026-07-29.** The API design is settled. Sibling to
+> [[api-surface-1.0]], which is the *Python* surface — this page is the Rust one.
+> Prerequisite work is tracked as laterite#158–#162.
+>
+> **Published since:** eight engine crates at 0.9.0 and the `laterite` facade on
+> its own 0.1.x line, both 2026-08-01.
+>
+> **Revised 2026-08-04 by [[dec-facade-parity]]** — four points, marked inline
+> below. There is **no 0.2**: the facade completes to parity and jumps straight
+> onto the product line. `diff` and `merge` publish at engine 0.9.0. Excel is
+> published too, renamed `laterite-ags4-excel` and gated behind an optional
+> facade feature. `laterite-cli` is **not** published — decided against, not
+> deferred. Everything else on this page stands.
 
 ## Context
 
@@ -147,7 +157,10 @@ publish only what is already frozen by a contract we cannot break anyway.
 - **Grafted from B**: caret version requirements; a `Row<'a>` handle with an amortised
   per-`Group` column index (without it, cell lookup is O(headings) per cell);
   `Cell::Verbatim`, so `format(parse(x))` stays an identity. `scan()`/`Indexed` are
-  reserved as the flagship 0.2 addition.
+  reserved as the flagship post-0.1 addition. **Revised**: [[dec-facade-parity]]
+  retires the 0.2 milestone without giving these a new home — an open question,
+  not a decision. They are Rust-native ergonomics with no Python or Node sibling,
+  so the facade floor never owes them and parity does not wait on them.
 - **Grafted from A**: option setter names match the Python kwarg names (`warnings`,
   `fyi`, `risky`, `synthesise_metadata`, `on_type_clash`) — already frozen by two
   ecosystems, so adopting them costs nothing and makes the Python docs readable as
@@ -278,9 +291,16 @@ change.
 ## `laterite` 0.1.0 — the facade exists
 
 Built 2026-08-01, after the engine tier was already published. Scope is **read,
-validate, write**; diff, merge, typed cells and the indexed `scan()` path stay
-0.2 as planned, and all four are additive so nothing here has to move to admit
+validate, write**; diff, merge, typed cells and the indexed `scan()` path were
+all held for 0.2, and all four are additive so nothing here has to move to admit
 them.
+
+> [!important] Revised 2026-08-04 — see [[dec-facade-parity]].
+> The facade completes to **parity** with the Python and Node surfaces and then
+> jumps 0.1.x straight onto the product line, so diff and merge arrive on the
+> 0.1.x line rather than in a 0.2 that no longer exists. Typed cells and `scan()`
+> are unaffected by that rule — the facade floor never owes them, because neither
+> has a Python or Node sibling to be measured against.
 
 The Option-C rules held in practice, and the rendered API is the evidence:
 
@@ -357,7 +377,8 @@ and idempotent so a failure is resumed rather than restarted.
 ### Two things crates.io does that only a publish reveals
 
 Both were hit, neither is a defect, and neither left partial state — but both cost
-a stop, and the 0.2 publish of diff/merge should not rediscover them.
+a stop, and the diff/merge publish should not rediscover them. (That publish is
+now at engine 0.9.0 rather than a facade 0.2 — [[dec-facade-parity]].)
 
 - **A verified email address is required, and nothing says so until the upload.**
   crates.io fills the address in from GitHub and leaves it UNVERIFIED. Account
@@ -396,9 +417,9 @@ because it looks like an oversight:
 
 - **A binary's dependencies are still dependencies.** Publishing strips `path`,
   so every in-workspace dep must itself be on the registry. `laterite-cli` needs
-  `laterite-ags4-diff` and `laterite-ags4-merge` — both deliberately held for 0.2
-  — plus `laterite-cliutil` and `laterite-excel`, which carry `publish = false`
-  and have never been considered for the registry at all. Publishing the CLI
+  `laterite-ags4-diff` and `laterite-ags4-merge` — both deliberately held at the
+  time — plus `laterite-cliutil` and `laterite-excel`, which carry
+  `publish = false` and had never been considered for the registry. Publishing the CLI
   means publishing four more crates, two of them against a decision recorded
   above. That is the trade the crate split bought us, seen from the other side:
   the CLI is separate *precisely* so its `clap`/`ratatui`/`calamine` weight stays
@@ -416,6 +437,22 @@ So the CLI ships with 0.2, alongside the diff/merge publish it already depends
 on. Until then `lat` is distributed as it is today: per-target binaries from the
 release workflow. `cargo install laterite-cli` is a convenience, not an API
 promise, and it is the one part of this plan with a good reason to wait.
+
+> [!important] Revised 2026-08-04 — see [[dec-facade-parity]].
+> **The CLI is not published at all** — decided against, not deferred, because
+> not-publishing is the reversible direction and "deferred" kept dragging the CLI
+> tier into every scope conversation. The capability already exists without it:
+> `publish = false` blocks `cargo publish`, not
+> `cargo install --git https://github.com/niko86/laterite laterite-cli`. And what
+> a publish would add is the mode we would least recommend — `cargo install`
+> compiles 25 direct dependencies locally, where the wheel and the npm package
+> both ship prebuilt.
+>
+> Two of the blockers above have since moved, and the argument is narrower for
+> it: diff and merge publish at 0.9.0, and `laterite-excel` is published as
+> `laterite-ags4-excel`. What still stands against it is `laterite-cliutil`, the
+> bin-only gates problem, and the dependency weight the crate split exists to
+> keep off library consumers.
 
 ## Two version numbers — the engine/product split (#153), 2026-08-01
 
