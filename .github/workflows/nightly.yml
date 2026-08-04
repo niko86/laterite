@@ -507,13 +507,25 @@ jobs:
       - name: gen_doc_outputs --check-pages (every output block is wired to its example)
         run: uv run --no-project python tools/gen_doc_outputs.py --check-pages
 
-  # Open or update ONE tracking issue when the nightly fails, so a bad night is
+  # Drive ONE tracking issue from the night's results, so a bad night is
   # actionable without watching the Actions tab. GitHub also emails the owner on a
   # scheduled-workflow failure, so this is the durable, dedup'd record — and it
   # no-ops gracefully if the runner has no `gh` (the email still fires).
+  #
+  # Runs on EVERY night, not just bad ones, because closing is half the job: the
+  # old step fired only on failure, so nothing ever closed the tracker. #245 sat
+  # open after its cause was fixed, and — because the step comments when a tracker
+  # already exists — the next failure would have been a quiet comment on a stale
+  # issue instead of a new one anyone would notice.
+  #
+  # The job list is `toJSON(needs)` rather than a third hand-written copy. It used
+  # to appear in `needs:`, in this `if:`, and in `env:`; adding a nightly job and
+  # missing one copy silently dropped it from the tracker — a reporter that covers
+  # less than it appears to, which is #207's shape. One list now, and it is the
+  # dependency list itself.
   notify:
     needs: [coverage, deny, links, wheel-smoke, ruleset-drift, output-values, wiki-lint]
-    if: ${{ always() && (needs.coverage.result == 'failure' || needs.deny.result == 'failure' || needs.links.result == 'failure' || needs.wheel-smoke.result == 'failure' || needs.ruleset-drift.result == 'failure' || needs.output-values.result == 'failure' || needs.wiki-lint.result == 'failure') }}
+    if: always()
     # GitHub-hosted so `gh` is guaranteed present (the pool image may lack it) —
     # the whole point of this job is to reliably open the tracking issue.
     runs-on: ubuntu-latest
@@ -521,30 +533,19 @@ jobs:
       contents: read
       issues: write
     steps:
-      - name: open or update the nightly-failure tracking issue
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: drive the nightly tracking issue
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          COV: ${{ needs.coverage.result }}
-          DENY: ${{ needs.deny.result }}
-          LINKS: ${{ needs.links.result }}
-          WHEEL: ${{ needs.wheel-smoke.result }}
-          RULESET: ${{ needs.ruleset-drift.result }}
-          XCHECK: ${{ needs.output-values.result }}
-          WIKI: ${{ needs.wiki-lint.result }}
+          NEEDS: ${{ toJSON(needs) }}
         run: |
           set -euo pipefail
           command -v gh >/dev/null 2>&1 || {
             echo "gh CLI not on runner — relying on the default scheduled-failure email"
             exit 0
           }
-          title="Nightly CI failing"
-          num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --search "in:title \"$title\"" --json number,title \
-            --jq "[.[] | select(.title==\"$title\")][0].number // empty")
-          body="The nightly run failed: $RUN_URL (coverage=$COV, deny=$DENY, links=$LINKS, wheel=$WHEEL, ruleset=$RULESET, xcheck=$XCHECK, wiki=$WIKI)."
-          if [ -n "$num" ]; then
-            gh issue comment "$num" --repo "$GITHUB_REPOSITORY" --body "$body"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
-          fi
+          # Stdlib-only by design, so this job needs no Python/uv setup step —
+          # see the module docstring. Every decision lives in `plan()`, which
+          # tests/test_nightly_tracker.py exercises branch by branch.
+          python3 tools/nightly_tracker.py
