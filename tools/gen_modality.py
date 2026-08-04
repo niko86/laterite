@@ -301,25 +301,42 @@ def summary(doc: dict) -> str:
     # holds the Rust crate outside both version tiers "until it reaches feature
     # parity with the Python and Node surfaces" — this is that trigger made
     # checkable instead of aspirational.
-    owed: list[str] = []
-    met = 0
+    # Split the shortfall by what was DECIDED about it. The floor itself stays
+    # purely mechanical (python n node) — a human override never moves it, or it
+    # stops measuring anything. What the verdict does is separate "still to do"
+    # from "deliberately not doing", so the number can actually reach zero.
+    buckets: dict[str, list[str]] = {"planned": [], "by-design": [], "undecided": []}
+    clear = 0
     for cap in doc["capabilities"]:
         d_in, d_out = _facade_debt(cap["cells"])
-        if d_in or d_out:
-            bits = []
-            if d_in:
-                bits.append("in: " + ", ".join(sorted(d_in)))
-            if d_out:
-                bits.append("out: " + ", ".join(sorted(d_out)))
-            owed.append(f"  - {cap['capability']}: {' · '.join(bits)}")
-        elif _floor(cap["cells"], "input") or _floor(cap["cells"], "output"):
-            met += 1
+        if not (d_in or d_out):
+            if _floor(cap["cells"], "input") or _floor(cap["cells"], "output"):
+                clear += 1
+            continue
+        bits = []
+        if d_in:
+            bits.append("in: " + ", ".join(sorted(d_in)))
+        if d_out:
+            bits.append("out: " + ", ".join(sorted(d_out)))
+        cell = next((c for c in cap["cells"] if c["surface"] == _FACADE), None)
+        verdict = (cell or {}).get("facade_verdict", "undecided")
+        buckets.setdefault(verdict, []).append(
+            f"  - {cap['capability']}: {' · '.join(bits)}"
+        )
+    short = sum(len(v) for v in buckets.values())
     lines += [
         "",
         f"Facade floor (rust >= python n node, owner-set 2026-08-04; a minimum, "
-        f"not a gate) — {met} clear, {len(owed)} below:",
-        *owed,
+        f"not a gate) — {clear} clear, {short} below:",
     ]
+    for label, key in (
+        ("to add", "planned"),
+        ("deliberately not adding", "by-design"),
+        ("UNDECIDED", "undecided"),
+    ):
+        rows = buckets.get(key) or []
+        lines.append(f"\n  {label} ({len(rows)}):")
+        lines += rows
     return "\n".join(lines)
 
 

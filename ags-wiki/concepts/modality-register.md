@@ -75,6 +75,9 @@ _Findings:_
 - 🟠 P2 · **cli** in.stdin `cli-stdin` — no '-'/stdin door — a piped .ags must be spooled to a temp file first. The shell surface's bytes form IS stdin.
 - ⚪ by-design · **browser** in.path — no filesystem in the browser — a File/upload is read to a Uint8Array, so bytes is the only sensible input door.
 
+_Notes:_
+- _rust_: Partial. `cert` lands with cert-input (decided 2026-08-04); `text` is `read_bytes(s.as_bytes())` behind a name.
+
 ### validate — Run the numbered AGS4 rules and return a verdict.
 
 *Offered anywhere — in: bytes, file-like, path, text · out: stdout, value*
@@ -110,6 +113,7 @@ _Findings:_
 
 _Notes:_
 - _python_: validate exposes only the positional source sniff + text= keyword — no explicit path=/data= keyword doors like read/fix. All input FORMS are still reachable via the sniff (_resolve_source accepts path/bytes/file-like), so this is a keyword-ergonomics inconsistency, NOT a lost modality — recorded here, deliberately not a gap.
+- _rust_: Partial. `text` is the same trivial door as read's.
 
 ### fix — Mechanically repair AGS4.
 
@@ -138,7 +142,7 @@ _Notes:_
 _Notes:_
 - _node_: #394 added inPlace/out write-back (the out.file form) + only/exclude rule selection — the latter shrank the test_cross_surface_parity _MATRIX allowlist to empty. Rule labels are typed as FixableRule, drift-gated to Python/the engine (test_typed_choices).
 - _browser_: the browser deliberately SPLITS fix into compute_fixes (returns the Fix[] proposal for the UI to preview — a value form) and apply_fixes (returns the repaired bytes). The library surfaces one-shot fix() and offer no dry-run Fix[] preview form; whether to add one is P3 verb-decomposition (fix-dry-run-split), tracked in the backlog, not a browser defect.
-- _rust_: Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence.
+- _rust_: Decided 2026-08-04: ADD. No new dependency — `compute_fixes`/`apply_fixes` are in laterite-ags4-validator, already a facade dep.
 
 ### build — Construct valid AGS4 from caller-supplied data (build_ags4).
 
@@ -168,7 +172,7 @@ _Findings:_
 - 🟠 P2 · **browser** in.text `wasm-build-text-outlier` — build_ags4 takes a JSON-TEXT groups payload — the lone text-in build door across all surfaces (Python/Node take a typed-graph root or (code, frame) rows). Bytes-in already exists as build_ags4_ipc, so the reconciliation is the JSON-text outlier, NOT adding a bytes door.
 
 _Notes:_
-- _rust_: Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence.
+- _rust_: Decided 2026-08-04: ADD. No new dependency — laterite-ags4-emit is already a facade dep, and `Document` already has `push_row`/`set_cell`; what is missing is the one-call door.
 
 ### diff — Compare two AGS4 revisions.
 
@@ -286,7 +290,7 @@ _Findings:_
 _Notes:_
 - _python_: certify_bytes() (#390) returns the .ags.idx bytes in memory — the certify analog of transport.lock_bytes; same cert as certify() (bar the mint timestamp), so it interops with read(index=)/--index/the browser.
 - _node_: certifyBytes() (#390) mirrors laterite-py's certify_bytes — same in-memory cert form.
-- _rust_: Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence.
+- _rust_: Decided 2026-08-04: ADD. Costs +laterite-ags4-trust (2 third-party deps). Genuine floor debt — python and node both offer it.
 
 ### cert-input — Consume an .ags.idx certificate to skip revalidation (cert as INPUT).
 
@@ -323,7 +327,7 @@ _Notes:_
 - _python_: explicit opt-in — autodiscovery is deliberately refused so naming index= asserts the cert is for THIS file.
 - _node_: explicit opt-in, mirrors Python.
 - _duckdb_: implicit — a sibling <path>.idx is auto-consumed (the divergent FORM of the same cert-input capability: autodiscovery vs explicit).
-- _rust_: Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence.
+- _rust_: Decided 2026-08-04: ADD, with certify. This is also what closes `read`'s `cert` floor gap, so the two land together.
 - _cli_: --index (#393) consumes a fresh, same-engine, profile-covering .ags.idx to SKIP the rule engine (mirrors the library read(index=) short-circuit); a stale/foreign/insufficient cert is re-validated. Explicit opt-in like Python/Node, not autodiscovery like DuckDB.
 
 ### emit — Get spec-correct AGS4 back OUT of a read handle.
@@ -352,7 +356,10 @@ _Notes:_
 
 _Findings:_
 - 🟠 P2 · **browser** out.bytes `wasm-read-emit` — the wasm read handle (ParsedDataset) exposes only group_codes/meta/arrow_ipc (typed table-out) — no .text/.bytes AGS4 re-emit, so there is no round-trip AGS4 out of a browser read (Python/Node Ags4File have .text/.bytes/.save). Compute the fix instead via the separate build/apply verbs.
-- 🟡 P3 · **rust** out.text — Owed by the facade floor — python and node both offer it. Also trivial: it is `read_bytes(s.as_bytes())` behind a name, so there is no design question to settle first.
+- 🟡 P3 · **rust** out.text — Owed by the facade floor — python and node both return the AGS4 as text as well as bytes. No decode question to settle: the emitter's own output is UTF-8 by construction, which is why python makes `.text` primary and derives `.bytes` from it.
+
+_Notes:_
+- _rust_: Partial. `Written` exposes bytes only. The earlier note here claimed a String door needed a lossy/strict decision first — that was wrong: the concern applies to READING arbitrary files, not to our own emitter's output, which is UTF-8 by construction. Python already treats it that way, with `Ags4File.text` primary and `.bytes` its UTF-8 encoding.
 
 ### to_excel — Convert AGS4 to an .xlsx workbook.
 
@@ -381,7 +388,7 @@ _Findings:_
 _Notes:_
 - _python_: to_excel(output=None) (#391) returns the .xlsx bytes in memory — the FS-free door the browser's ags4_to_xlsx already offered.
 - _node_: #391 added bytes-in/bytes-out (omit xlsxPath → Buffer) + the Ags4File.toExcel() handle method — mirrors Python's to_excel.
-- _rust_: Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence.
+- _rust_: Decided 2026-08-04: DO NOT ADD. It costs +laterite-excel (calamine + rust_xlsxwriter, 6 third-party deps) — precisely the deps the crate map extracted that crate to keep OUT of every consumer. A Rust caller can `cargo add laterite-excel` directly, which is a door a python or node user has no equivalent of, so the floor's premise (the facade is the only way in) does not hold here.
 
 ### from_excel — Convert an AGS4-shaped .xlsx back to AGS4.
 
@@ -412,7 +419,7 @@ _Findings:_
 
 _Notes:_
 - _python_: from_excel(source) (#391) accepts raw .xlsx bytes — an uploaded workbook needn't hit disk first.
-- _rust_: Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence.
+- _rust_: Decided 2026-08-04: DO NOT ADD, with to_excel — same dependency cost, same direct-dependency escape hatch.
 
 ### transport-pack — zstd-only compress/decompress (pack/unpack).
 
@@ -438,7 +445,7 @@ _Notes:_
 
 _Notes:_
 - _node_: the *Bytes forms (#389) mirror laterite-py's pack_bytes/unpack_bytes — same shared-leaf envelope, so a Node-sealed blob interops with the file API and pyrage/the browser.
-- _rust_: Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence.
+- _rust_: Decided 2026-08-04: ADD. laterite-transport is ALREADY linked into the published crate (laterite-ags4-core's `transport` feature is default-ON and the facade enables it), so callers already carry age + zstd and cannot reach a single function. Exposing it costs nothing and removes that anomaly.
 
 ### transport-lock — zstd + age passphrase encrypt/decrypt (lock/unlock) — the motivating capability.
 
@@ -473,7 +480,7 @@ _Findings:_
 _Notes:_
 - _python_: the *_bytes forms were added in 0.6.2-dev to close the exact path-only-vs-browser-bytes-only gap this whole audit is named after.
 - _node_: the *Bytes forms (#389) close the remaining leg of the motivating gap — lockBytes never writes plaintext to disk; same shared-leaf envelope as the Python/browser forms.
-- _rust_: Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence.
+- _rust_: Decided 2026-08-04: ADD. Same already-linked-but-unreachable position as transport-pack.
 
 ### read_typed — Read AGS4 into the typed-graph object model.
 

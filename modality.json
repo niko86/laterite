@@ -212,7 +212,9 @@
               "reason": "the `.ags.idx` cert door is unexposed; certify itself is absent on this surface, so this gap closes with that one.",
               "priority": "P2"
             }
-          ]
+          ],
+          "facade_verdict": "planned",
+          "note": "Partial. `cert` lands with cert-input (decided 2026-08-04); `text` is `read_bytes(s.as_bytes())` behind a name."
         },
         {
           "surface": "cli",
@@ -423,7 +425,9 @@
               "reason": "Above the facade floor — node does not offer it either — so the floor does not owe it. Recorded anyway because node's by-design reason ('no universal Node file-like') cannot be borrowed here: Rust has one, `impl std::io::Read`. Cheap to add; the floor is a minimum, not a cap on what gets built.",
               "priority": "P3"
             }
-          ]
+          ],
+          "facade_verdict": "planned",
+          "note": "Partial. `text` is the same trivial door as read's."
         },
         {
           "surface": "cli",
@@ -592,7 +596,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
+          "note": "Decided 2026-08-04: ADD. No new dependency — `compute_fixes`/`apply_fixes` are in laterite-ags4-validator, already a facade dep.",
+          "facade_verdict": "planned"
         }
       ]
     },
@@ -696,7 +701,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
+          "note": "Decided 2026-08-04: ADD. No new dependency — laterite-ags4-emit is already a facade dep, and `Document` already has `push_row`/`set_cell`; what is missing is the one-call door.",
+          "facade_verdict": "planned"
         }
       ]
     },
@@ -797,7 +803,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it."
+          "note": "Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it.",
+          "facade_verdict": "planned"
         }
       ]
     },
@@ -886,7 +893,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it."
+          "note": "Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it.",
+          "facade_verdict": "planned"
         },
         {
           "surface": "cli",
@@ -972,7 +980,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent. Browser-only among shipped surfaces, so the floor is empty here — there is no python/node pair to be the least of."
+          "note": "Absent. Browser-only among shipped surfaces, so the floor is empty here — there is no python/node pair to be the least of.",
+          "facade_verdict": "no-floor"
         }
       ]
     },
@@ -1052,7 +1061,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
+          "note": "Decided 2026-08-04: ADD. Costs +laterite-ags4-trust (2 third-party deps). Genuine floor debt — python and node both offer it.",
+          "facade_verdict": "planned"
         },
         {
           "surface": "cli",
@@ -1189,7 +1199,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
+          "note": "Decided 2026-08-04: ADD, with certify. This is also what closes `read`'s `cert` floor gap, so the two land together.",
+          "facade_verdict": "planned"
         },
         {
           "surface": "cli",
@@ -1351,10 +1362,12 @@
               "direction": "out",
               "form": "text",
               "verdict": "gap",
-              "reason": "Owed by the facade floor — python and node both offer it. Also trivial: it is `read_bytes(s.as_bytes())` behind a name, so there is no design question to settle first.",
+              "reason": "Owed by the facade floor — python and node both return the AGS4 as text as well as bytes. No decode question to settle: the emitter's own output is UTF-8 by construction, which is why python makes `.text` primary and derives `.bytes` from it.",
               "priority": "P3"
             }
-          ]
+          ],
+          "facade_verdict": "planned",
+          "note": "Partial. `Written` exposes bytes only. The earlier note here claimed a String door needed a lossy/strict decision first — that was wrong: the concern applies to READING arbitrary files, not to our own emitter's output, which is UTF-8 by construction. Python already treats it that way, with `Ags4File.text` primary and `.bytes` its UTF-8 encoding."
         }
       ]
     },
@@ -1458,7 +1471,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
+          "note": "Decided 2026-08-04: DO NOT ADD. It costs +laterite-excel (calamine + rust_xlsxwriter, 6 third-party deps) — precisely the deps the crate map extracted that crate to keep OUT of every consumer. A Rust caller can `cargo add laterite-excel` directly, which is a door a python or node user has no equivalent of, so the floor's premise (the facade is the only way in) does not hold here.",
+          "facade_verdict": "by-design"
         }
       ]
     },
@@ -1556,7 +1570,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
+          "note": "Decided 2026-08-04: DO NOT ADD, with to_excel — same dependency cost, same direct-dependency escape hatch.",
+          "facade_verdict": "by-design"
         }
       ]
     },
@@ -1637,7 +1652,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
+          "note": "Decided 2026-08-04: ADD. laterite-transport is ALREADY linked into the published crate (laterite-ags4-core's `transport` feature is default-ON and the facade enables it), so callers already carry age + zstd and cannot reach a single function. Exposing it costs nothing and removes that anomaly.",
+          "facade_verdict": "planned"
         }
       ]
     },
@@ -1751,7 +1767,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent, and not in the 0.2 plan — below the facade floor (offered by both python and node) with no recorded decision either way. Wants an explicit in-or-out, not silence."
+          "note": "Decided 2026-08-04: ADD. Same already-linked-but-unreachable position as transport-pack.",
+          "facade_verdict": "planned"
         },
         {
           "surface": "cli",
@@ -1843,7 +1860,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it."
+          "note": "Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it.",
+          "facade_verdict": "planned"
         }
       ]
     },
@@ -1889,7 +1907,8 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Absent. python-only (a dataframe-backend view), so the floor is empty. A Rust caller works with the engine's own types."
+          "note": "Absent. python-only (a dataframe-backend view), so the floor is empty. A Rust caller works with the engine's own types.",
+          "facade_verdict": "no-floor"
         }
       ]
     }
