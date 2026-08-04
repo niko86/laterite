@@ -32,16 +32,22 @@ license = "MIT"
 repository.workspace = true
 keywords = ["ags", "ags4", "geotechnical", "diff", "revision"]
 categories = ["science::geo", "data-structures"]
-# Held for 0.2, NOT round one: keeping two crates off crates.io keeps the
-# frozen public surface smaller for a first publish. Arming this is a
-# deliberate act, not a tidy-up — see ags-wiki/design/dec-rust-api-crates-io.md.
-publish = false
+# Armed 2026-08-04. Held back through the first publish so the surface we had to
+# stand behind on day one was as small as it could be — that deferral did its job
+# and is spent. Published at the engine's existing 0.9.0: a new crate at the
+# current number, so no tier moves to admit it. What this costs is not a frozen
+# API (crates.io freezes a VERSION, not a surface) but our own gates starting to
+# police it — cargo semver-checks and the public-API snapshot turn edits here
+# from free in-tree changes into versioned, reviewed acts.
+# See ags-wiki/design/dec-facade-parity.md.
+publish = true
 
 # What `cargo package` may put in the tarball. Explicit because the default is
 # "everything not excluded", and crates.io is append-only — a file that rides one
 # publish cannot be taken back. See laterite#159.
 include = [
     "/src/**",
+    "/README.md",
 ]
 
 [dependencies]

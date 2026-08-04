@@ -83,9 +83,16 @@ WORKSPACE = CRATES / "Cargo.toml"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_package_contents import PUBLISH_SET  # noqa: E402
 
-#: Held for 0.2 — see the design page. Gated by the packaging tools like every
-#: other publishable crate, but deliberately not published yet.
-DEFERRED = {"laterite-ags4-diff", "laterite-ags4-merge"}
+#: Crates prepared for the registry but deliberately not published yet — gated by
+#: the packaging tools like every other publishable crate, and skipped here.
+#:
+#: Emptied 2026-08-04: `laterite-ags4-diff` and `laterite-ags4-merge` were the
+#: only two entries, held back through the first publish so day one's surface was
+#: as small as possible. That is spent, and they publish at 0.9.0. The mechanism
+#: stays because it will be wanted again — the next crate to prepare ahead of its
+#: publish is `laterite-ags4-excel` (see ags-wiki/design/dec-facade-parity.md),
+#: which also has to be renamed before it can go out.
+DEFERRED: set[str] = set()
 
 #: How long to wait for an uploaded crate to become resolvable from the index.
 #: Generous: the cost of waiting too long is a slow release, and the cost of not
