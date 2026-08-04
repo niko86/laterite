@@ -718,6 +718,12 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 22
+      # The SAME npm the publish job installs, pinned identically. A rehearsal on
+      # a different npm than the publisher is not a rehearsal: `node-v0.10.1`
+      # failed inside `napi pre-publish` on npm-12-only behaviour that this job,
+      # running node 22's bundled npm 10, could not have reproduced.
+      - name: Upgrade npm (match the publish job)
+        run: npm install -g 'npm@^11'
       - name: npm ci
         run: npm ci
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -738,6 +744,20 @@ jobs:
           ls -1 npm/ | sed 's/^/  staged notice for @laterite\/native-/'
       - name: Verify every package would carry the notice
         run: "$GITHUB_WORKSPACE/tools/release/verify-npm-notice.sh"
+
+      # Rehearse the publish job's FIRST step, which is the one that had never
+      # run anywhere but a live tag. `--dry-run` takes the same validation path
+      # (validateReleasePackage -> validateReleasePackageContents) and touches no
+      # files, so it exercises `@napi-rs/cli`'s per-package checks against this
+      # runner's npm without staging anything. That is the whole gap `node-v0.10.1`
+      # fell through: every packaging fault it could hit was already covered here,
+      # and the one that fired was in the tool doing the publishing.
+      #
+      # Deliberately AFTER the notice check: that one names the missing file, this
+      # one reports whatever napi is unhappy about, and the specific error is the
+      # more useful failure when both would trip.
+      - name: Rehearse napi pre-publish (no writes, no registry)
+        run: npx napi pre-publish -t npm --dry-run
 
   npm-publish:
     # Gated EXACTLY like `pypi-publish`:
@@ -774,8 +794,22 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       # npm trusted publishing (OIDC) needs npm >= 11.5.1; node 22 ships npm 10.
+      #
+      # Pinned to 11.x, NOT `@latest`. `@latest` is an unpinned input to a job
+      # that only ever runs on a `node-v*` tag, so it can change the release's
+      # behaviour with no commit behind it and nothing before the tag can catch
+      # it. That is not hypothetical: `node-v0.10.1` failed because `@latest`
+      # had rolled to npm 12, which changed `npm pack --json` from an array to
+      # an object keyed by package name — and `@napi-rs/cli` 3.8.x (new since
+      # #232) validates every platform package by parsing exactly that. It
+      # reported `Ensure npm is available and the package can be packed`, which
+      # names neither npm's version nor the shape change.
+      #
+      # `tools/release/verify-npm-notice.sh` carries the same scar in its header
+      # for the same reason: `npm pack --json` has no stable output schema.
+      # Nothing here needs npm 12; the floor is the OIDC one.
       - name: Upgrade npm (OIDC trusted-publishing support)
-        run: npm install -g npm@latest
+        run: npm install -g 'npm@^11'
 
       - name: npm ci
         run: npm ci
@@ -949,8 +983,10 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
       # npm trusted publishing (OIDC) needs npm >= 11.5.1; node 22 ships npm 10.
+      # Pinned to 11.x for the reason spelled out on the node job's copy: a
+      # floating `@latest` changes a tag-only job with no commit behind it.
       - name: Upgrade npm (OIDC trusted-publishing support)
-        run: npm install -g npm@latest
+        run: npm install -g 'npm@^11'
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
