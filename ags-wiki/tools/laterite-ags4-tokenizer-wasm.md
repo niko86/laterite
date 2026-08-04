@@ -15,9 +15,13 @@ sources: []
 ---
 # laterite-ags4-tokenizer-wasm
 
-> [!note] **Internal implementation detail** — a workspace crate, not a public
-> API. It is the browser's line-editing primitive; the user sees its effect in the
-> web app's live AGS4 editor, not the crate.
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Not published** — `laterite-ags4-tokenizer-wasm` is a workspace crate, internal to this repo, at v0.9.0 (inherited from the workspace).
+> **Used by** — nothing else in this workspace.
+<!-- END GENERATED: crate-card -->
+
+> [!note] It is the browser's line-editing primitive; the user sees its
+> effect in the web app's live AGS4 editor, not the crate.
 
 ## What it is
 

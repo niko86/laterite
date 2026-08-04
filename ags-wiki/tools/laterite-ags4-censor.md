@@ -15,10 +15,14 @@ sources: []
 ---
 # laterite-ags4-censor
 
-> [!note] **Internal implementation detail** — a workspace crate, not a public
-> API. The user-facing face is the browser **Anonymiser** ([[laterite-ags4-wasm]])
-> and the corpus-QA scrub ([[laterite-ags4-corpus-qa]]); both drive this one
-> engine.
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Not published** — `laterite-ags4-censor` is a workspace crate, internal to this repo, at v0.9.0 (inherited from the workspace).
+> **Used by** — [[laterite-ags4-corpus-qa]], [[laterite-ags4-wasm]].
+<!-- END GENERATED: crate-card -->
+
+> [!note] The user-facing face is the browser **Anonymiser**
+> ([[laterite-ags4-wasm]]) and the corpus-QA scrub
+> ([[laterite-ags4-corpus-qa]]); both drive this one engine.
 
 ## What it is
 

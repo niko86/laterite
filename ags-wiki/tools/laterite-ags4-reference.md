@@ -22,8 +22,12 @@ sources: []
 ---
 # laterite-ags4-reference
 
-> [!note] **Internal implementation detail** — a workspace leaf crate, not a
-> public API. Its contents reach the outside world only through
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Cleared for crates.io** — `laterite-ags4-reference` v0.9.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> **Used by** — [[laterite]], [[laterite-ags4-censor]], [[laterite-ags4-core]], [[laterite-ags4-diff]], [[laterite-ags4-merge]], [[laterite-ags4-validator]], [[laterite-py]].
+<!-- END GENERATED: crate-card -->
+
+> [!note] Its contents reach the outside world only through
 > [[laterite-ags4-validator]]'s and [[laterite-ags4-core]]'s re-exports.
 
 ## What it is

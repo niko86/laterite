@@ -14,6 +14,11 @@ sources: []
 ---
 # laterite-cli
 
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Not published** — `laterite-cli` is a workspace crate, internal to this repo, at v0.10.1 (its own line).
+> **Used by** — nothing else in this workspace.
+<!-- END GENERATED: crate-card -->
+
 ## What it is
 > [!quote] The clean-room Rust AGS4 validator CLI crate; ships the `lat` binary (lib `laterite_ags4_validator` + bin). Implements Rules 1–20 from the spec PDF (clean-room: python-ags4 LGPL read only for behavioural parity, never copied). Edition auto-resolved from TRAN_AGS (lib.rs::resolve_dict_version).
 

@@ -15,10 +15,15 @@ sources: []
 ---
 # laterite-ags4-trust
 
-> [!note] **Internal implementation detail** — a workspace crate, not a public
-> API. It is the single implementation behind `lat validate`/`certify`
+<!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> [!note] **Cleared for crates.io** — `laterite-ags4-trust` v0.9.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
+> **Used by** — [[laterite-ags4-wasm]], [[laterite-cli]], [[laterite-node]], [[laterite-py]].
+<!-- END GENERATED: crate-card -->
+
+> [!note] It is the single implementation behind `lat validate`/`certify`
 > ([[laterite-cli]]) and every binding's validate+certify surface. The
-> format is [[dec-ags-idx-certificate]]; the trust model is [[cert-trust-v2]].
+> format is [[dec-ags-idx-certificate]]; the trust model is
+> [[cert-trust-v2]].
 
 ## What it is
 
