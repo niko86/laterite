@@ -170,10 +170,11 @@
           "spelling": "chained",
           "verbs": [
             {
-              "name": "read/read_bytes",
+              "name": "read/read_bytes/read_str",
               "in_forms": [
                 "path",
-                "bytes"
+                "bytes",
+                "text"
               ],
               "out_forms": [
                 "handle"
@@ -183,7 +184,7 @@
           "input": {
             "path": "present",
             "bytes": "present",
-            "text": "absent",
+            "text": "present",
             "file-like": "absent",
             "cert": "absent"
           },
@@ -191,13 +192,6 @@
             "handle": "present"
           },
           "gaps": [
-            {
-              "direction": "in",
-              "form": "text",
-              "verdict": "gap",
-              "reason": "Owed by the facade floor — python and node both offer it. Also trivial: it is `read_bytes(s.as_bytes())` behind a name, so there is no design question to settle first.",
-              "priority": "P3"
-            },
             {
               "direction": "in",
               "form": "file-like",
@@ -391,10 +385,11 @@
           "spelling": "chained",
           "verbs": [
             {
-              "name": "validate/validate_bytes",
+              "name": "validate/validate_bytes/validate_str",
               "in_forms": [
                 "path",
-                "bytes"
+                "bytes",
+                "text"
               ],
               "out_forms": [
                 "value"
@@ -404,20 +399,13 @@
           "input": {
             "path": "present",
             "bytes": "present",
-            "text": "absent",
+            "text": "present",
             "file-like": "absent"
           },
           "output": {
             "value": "present"
           },
           "gaps": [
-            {
-              "direction": "in",
-              "form": "text",
-              "verdict": "gap",
-              "reason": "Owed by the facade floor — python and node both offer it. Also trivial: it is `read_bytes(s.as_bytes())` behind a name, so there is no design question to settle first.",
-              "priority": "P3"
-            },
             {
               "direction": "in",
               "form": "file-like",
@@ -1345,7 +1333,8 @@
               ],
               "out_forms": [
                 "file",
-                "bytes"
+                "bytes",
+                "text"
               ]
             }
           ],
@@ -1355,17 +1344,9 @@
           "output": {
             "file": "present",
             "bytes": "present",
-            "text": "absent"
+            "text": "present"
           },
-          "gaps": [
-            {
-              "direction": "out",
-              "form": "text",
-              "verdict": "gap",
-              "reason": "Owed by the facade floor — python and node both return the AGS4 as text as well as bytes. No decode question to settle: the emitter's own output is UTF-8 by construction, which is why python makes `.text` primary and derives `.bytes` from it.",
-              "priority": "P3"
-            }
-          ],
+          "gaps": [],
           "facade_verdict": "planned",
           "note": "Partial. `Written` exposes bytes only. The earlier note here claimed a String door needed a lossy/strict decision first — that was wrong: the concern applies to READING arbitrary files, not to our own emitter's output, which is UTF-8 by construction. Python already treats it that way, with `Ags4File.text` primary and `.bytes` its UTF-8 encoding."
         }

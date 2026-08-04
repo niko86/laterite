@@ -27,7 +27,7 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 
 - **🔴 P1** (0): —
 - **🟠 P2** (5): read/rust (in.cert); read/cli (in.stdin); validate/cli (in.stdin); build/browser (in.text); emit/browser (out.bytes)
-- **🟡 P3** (7): read/rust (in.text); read/rust (in.file-like); validate/rust (in.text); validate/rust (in.file-like); emit/rust (out.text); read_typed/node (out.handle); read-output-view/python (out.table)
+- **🟡 P3** (4): read/rust (in.file-like); validate/rust (in.file-like); read_typed/node (out.handle); read-output-view/python (out.table)
 - **⚪ by-design** (12): intentional absences, rationale in each cell below.
 
 ## Excluded axes
@@ -43,7 +43,7 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 
 *Offered anywhere — in: bytes, cert, file-like, path, text · out: handle, stdout, table, value*
 
-*Below the facade floor — the Rust crate does not yet offer in: cert, text, which python and node both do. A minimum to clear, not a gate*
+*Below the facade floor — the Rust crate does not yet offer in: cert, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -51,7 +51,7 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 |---|---|---|---|---|---|---|
 | python (free) | ✓ | ✓ | ✓ | ✓ |   | ✓ |
 | node (free) | ✓ | ✓ | ✓ | — |   | ✓ |
-| rust (chained) | ✓ | — | ✓ | — |   | — |
+| rust (chained) | ✓ | ✓ | ✓ | — |   | — |
 | cli (free) | ✓ |   |   |   | — |   |
 | browser (free) | — |   | ✓ |   |   | — |
 | duckdb (free) | ✓ | ✓ |   |   |   | ✓ |
@@ -69,7 +69,6 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 
 _Findings:_
 - ⚪ by-design · **node** in.file-like — Node has no io.BytesIO-style universal file-like; a caller reads the stream to a Buffer and passes bytes.
-- 🟡 P3 · **rust** in.text — Owed by the facade floor — python and node both offer it. Also trivial: it is `read_bytes(s.as_bytes())` behind a name, so there is no design question to settle first.
 - 🟡 P3 · **rust** in.file-like — Above the facade floor — node does not offer it either — so the floor does not owe it. Recorded anyway because node's by-design reason ('no universal Node file-like') cannot be borrowed here: Rust has one, `impl std::io::Read`. Cheap to add; the floor is a minimum, not a cap on what gets built.
 - 🟠 P2 · **rust** in.cert — the `.ags.idx` cert door is unexposed; certify itself is absent on this surface, so this gap closes with that one.
 - 🟠 P2 · **cli** in.stdin `cli-stdin` — no '-'/stdin door — a piped .ags must be spooled to a temp file first. The shell surface's bytes form IS stdin.
@@ -82,15 +81,13 @@ _Notes:_
 
 *Offered anywhere — in: bytes, file-like, path, text · out: stdout, value*
 
-*Below the facade floor — the Rust crate does not yet offer in: text, which python and node both do. A minimum to clear, not a gate*
-
 **Input**
 
 | surface (spelling) | path | text | bytes | file-like | stdin |
 |---|---|---|---|---|---|
 | python (free) | ✓ | ✓ | ✓ | ✓ |   |
 | node (free) | ✓ | ✓ | ✓ | — |   |
-| rust (chained) | ✓ | — | ✓ | — |   |
+| rust (chained) | ✓ | ✓ | ✓ | — |   |
 | cli (free) | ✓ |   |   |   | — |
 | browser (free) | — |   | ✓ |   |   |
 
@@ -106,7 +103,6 @@ _Notes:_
 
 _Findings:_
 - ⚪ by-design · **node** in.file-like — same as read — no universal Node file-like; pass bytes.
-- 🟡 P3 · **rust** in.text — Owed by the facade floor — python and node both offer it. Also trivial: it is `read_bytes(s.as_bytes())` behind a name, so there is no design question to settle first.
 - 🟡 P3 · **rust** in.file-like — Above the facade floor — node does not offer it either — so the floor does not owe it. Recorded anyway because node's by-design reason ('no universal Node file-like') cannot be borrowed here: Rust has one, `impl std::io::Read`. Cheap to add; the floor is a minimum, not a cap on what gets built.
 - 🟠 P2 · **cli** in.stdin `cli-stdin` — no '-'/stdin door; a piped file must be spooled to disk first.
 - ⚪ by-design · **browser** in.path — no filesystem in the browser.
@@ -334,8 +330,6 @@ _Notes:_
 
 *Offered anywhere — in: handle · out: bytes, file, table, text*
 
-*Below the facade floor — the Rust crate does not yet offer out: text, which python and node both do. A minimum to clear, not a gate*
-
 **Input**
 
 | surface (spelling) | handle |
@@ -352,11 +346,10 @@ _Notes:_
 | python (chained) | ✓ | ✓ | ✓ |   |
 | node (chained) | ✓ | ✓ | ✓ |   |
 | browser (chained) |   | — | — | ✓ |
-| rust (chained) | ✓ | ✓ | — |   |
+| rust (chained) | ✓ | ✓ | ✓ |   |
 
 _Findings:_
 - 🟠 P2 · **browser** out.bytes `wasm-read-emit` — the wasm read handle (ParsedDataset) exposes only group_codes/meta/arrow_ipc (typed table-out) — no .text/.bytes AGS4 re-emit, so there is no round-trip AGS4 out of a browser read (Python/Node Ags4File have .text/.bytes/.save). Compute the fix instead via the separate build/apply verbs.
-- 🟡 P3 · **rust** out.text — Owed by the facade floor — python and node both return the AGS4 as text as well as bytes. No decode question to settle: the emitter's own output is UTF-8 by construction, which is why python makes `.text` primary and derives `.bytes` from it.
 
 _Notes:_
 - _rust_: Partial. `Written` exposes bytes only. The earlier note here claimed a String door needed a lossy/strict decision first — that was wrong: the concern applies to READING arbitrary files, not to our own emitter's output, which is UTF-8 by construction. Python already treats it that way, with `Ags4File.text` primary and `.bytes` its UTF-8 encoding.

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`laterite` takes and returns AGS4 as text — `ags4::read_str`, `ags4::validate_str`, `Written::text`.** The facade could only be handed bytes, so a caller holding a `String` — a template, a database column, a literal — had to write `read_bytes(s.as_bytes())`. That worked, which is why it lasted: it is the workaround, not the door, and Python and Node both offer the door. The modality register (added in #241) is what made the absence legible rather than merely true. Text is a distinct source internally, not bytes wearing a hat, so `encoding` cannot reach it: applying a codepage to already-decoded text re-reads UTF-8 as cp1252 and turns `°` into `Â°`, corrupting exactly the cells the option exists to rescue. That is enforced structurally and asserted both ways — the text form is exempt, the bytes form still transcodes. `Written` now holds a `String` with bytes derived, the same way round as Python's `Ags4File`, so `text()` costs nothing; `bytes()` and `into_bytes()` are unchanged. Every case is asserted as EQUAL to the bytes path rather than merely working, because a convenience form that is a second implementation is a second set of bugs.
+
 ## [0.10.1] — 2026-08-04
 
 ### Added
