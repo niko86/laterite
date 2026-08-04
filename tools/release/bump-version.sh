@@ -101,7 +101,36 @@ if [ "$target" = "product" ]; then
   sed -i.bak "s/${old_re}/${new}/g" rust-packages/laterite-node/index.js
   rm -f rust-packages/laterite-node/index.js.bak
 
-  # --- 1c. roll the CHANGELOG. It is generated from changelog.json (the SSOT):
+  # --- 1c. stamp any docs example output that PRINTS the version.
+  #         `examples/wasm/ex01_init.mjs` ends in `console.log(version())`, so
+  #         its committed `.out` is a version stamp in all but name. This step
+  #         did not exist and 0.10.1 paid for it: `gen_doc_outputs --check` runs
+  #         in the `ts-lint` job, so the release PR went red on a TypeScript
+  #         check for a reason unrelated to TypeScript or to the release (#243).
+  #         Only visible then because that gate landed after 0.10.0 was cut.
+  #
+  #         Same trade as the loader above: sed rather than regenerate, because
+  #         regenerating the wasm output needs a ~40s wasm-pack build and a Rust
+  #         toolchain, which this script exists to avoid. `gen_doc_outputs
+  #         --check` in CI is the backstop if an output ever grows past a bare
+  #         version string.
+  #
+  #         DISCOVERED, not listed: one file matches today, and the moment an
+  #         example on another surface prints the version it is covered without
+  #         anyone remembering to add it here.
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    sed -i.bak "s/${old_re}/${new}/g" "$f"
+    rm -f "$f.bak"
+    echo "bump-version:   restamped $f"
+  #         `find -exec grep -l` rather than `grep -r --include`: --include is
+  #         not honoured identically by every grep on PATH (a ugrep shim warns
+  #         and searches everything), and silently widening the file set here
+  #         would sed the example SOURCES too.
+  done <<<"$(find web/docs-site/examples -type f -name '*.out' \
+               -exec grep -lF -- "$old" {} + || true)"
+
+  # --- 1d. roll the CHANGELOG. It is generated from changelog.json (the SSOT):
   #         `--release` moves [Unreleased] into a dated `[$new]` section in the
   #         JSON and regenerates CHANGELOG.md. Refuses if [Unreleased] is empty
   #         (nothing to release) and runs the leak-gate over every entry.

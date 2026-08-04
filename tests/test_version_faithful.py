@@ -181,6 +181,50 @@ def test_product_crates_are_on_the_product_number() -> None:
         )
 
 
+def test_doc_example_outputs_carry_no_superseded_product_version() -> None:
+    """A docs example that PRINTS the version pins it in its committed `.out`.
+
+    `web/docs-site/examples/wasm/ex01_init.mjs` ends in `console.log(version())`,
+    so its `.out` is a version stamp in all but name — and `bump-version.sh` did
+    not touch it. The `gen_doc_outputs --check` gate caught it, but that gate
+    lives in the `ts-lint` job, so 0.10.1 (#242) went red on a TypeScript check
+    for a reason that had nothing to do with TypeScript or with the release's
+    content. It surfaced then and not earlier only because the gate landed in
+    #225/#228, after 0.10.0 — 0.10.1 was the first bump to meet it (#243).
+
+    Asserted by SUPERSEDED version rather than by naming the file: any example on
+    any surface that starts printing the version is covered the day it lands, and
+    nobody has to remember a list. Past releases come from changelog.json, which
+    `bump-version.sh` rolls BEFORE it runs this test, so the version just stamped
+    is already current and only genuinely stale outputs match.
+
+    Deliberately not "every X.Y.Z equals PRODUCT": the AGS edition `4.1.1` is an
+    X.Y.Z and appears in five of these outputs. This asks whether a LATERITE
+    version is stale, which is the actual question.
+    """
+    superseded = {
+        r["version"]
+        for r in json.loads((_REPO / "changelog.json").read_text())["releases"]
+        if r["version"] != PRODUCT
+    }
+    stale: list[str] = []
+    for out in sorted((_REPO / "web" / "docs-site" / "examples").rglob("*.out")):
+        text = out.read_text(encoding="utf-8")
+        stale.extend(
+            f"{out.relative_to(_REPO)} still says {old}"
+            for old in sorted(superseded)
+            # Bounded so `0.1.0` cannot match inside `0.1.01` or `v0.1.0-rc`.
+            if re.search(rf"(?<![\w.]){re.escape(old)}(?![\w.])", text)
+        )
+    assert not stale, (
+        "docs example output pins a superseded product version:\n  "
+        + "\n  ".join(stale)
+        + f"\n\nThe current product version is {PRODUCT}. `bump-version.sh product` "
+        "restamps these; if you bumped by hand, re-run it or regenerate with\n"
+        "    uv run --no-project python tools/gen_doc_outputs.py --surface <surface>"
+    )
+
+
 # --- ENGINE --------------------------------------------------------------
 
 
