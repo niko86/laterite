@@ -27,9 +27,10 @@ published before something it needs) is exactly the one this exists to prevent.
   crates.io is immutable; it must be a commit that exists and passed CI.
 - Publish a crate whose manifest says `publish = false`. That flag is the safety
   catch; this reports it rather than working around it.
-- Publish `laterite-ags4-diff` / `laterite-ags4-merge`. They are held for 0.2 by
-  the decision recorded in `ags-wiki/design/dec-rust-api-crates-io.md`, and a
-  tool that quietly included them would be how a deferred crate goes out.
+- Publish anything in `DEFERRED` — crates prepared for the registry but held back
+  deliberately. A tool that quietly included one is how a held crate goes out.
+  The set is empty as of 2026-08-04 (`laterite-ags4-diff` and `laterite-ags4-merge`
+  were its only members and are now armed); the mechanism stays for the next one.
 
 Nothing happens without `--execute`. The default run performs every check and
 prints exactly what it would do.
@@ -146,8 +147,8 @@ def waves(crates: set[str]) -> list[list[str]]:
     """`crates` grouped so every crate follows everything inside `crates` it needs.
 
     Derived from the manifests, so it cannot disagree with them. Dependencies
-    OUTSIDE the set are ignored: a crate held back for 0.2 is not a reason to
-    hold back something that does not depend on it.
+    OUTSIDE the set are ignored: a crate held back is not a reason to hold back
+    something that does not depend on it.
     """
     deps: dict[str, set[str]] = {}
     for c in crates:
@@ -235,10 +236,12 @@ def main() -> int:
         die(f"--through-wave {args.through_wave}: there are {len(plan)} waves")
     last = args.through_wave or len(plan)
 
-    print(
-        f"{len(round_one)} publishable crate(s) "
-        f"({len(DEFERRED)} held for 0.2: {', '.join(sorted(DEFERRED))})\n"
+    held = (
+        f", {len(DEFERRED)} held back: {', '.join(sorted(DEFERRED))}"
+        if DEFERRED
+        else ""
     )
+    print(f"{len(round_one)} publishable crate(s){held}\n")
     for i, layer in enumerate(plan, 1):
         # Name what is being left out. A partial run that printed the same thing
         # as a full one would be indistinguishable from having published
