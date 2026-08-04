@@ -52,6 +52,7 @@ import argparse
 import json
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,6 +80,63 @@ SHIPPED_FILES = (
 EXEMPT_PARTS = ("/tests/", "/test/", "/benches/", "/bench/", "/examples/")
 EXEMPT_SUFFIXES = (".test.ts", ".test.tsx", ".bench.ts", ".md")
 
+# --- manifests: which TABLE moved, not which file -----------------------------
+#
+# A path-only rule fires on a dev-tooling bump that changes nothing a consumer
+# receives. `globals` 14->17 in laterite-node (#233) is an eslint devDependency;
+# `ruff`/`ty`/`marimo`/`hypothesis` in the root pyproject (#236) are all in
+# `[dependency-groups]`. Both failed this gate and both were waved through with
+# `no-changelog` — and that label only works while applying it stays a deliberate
+# act. Make it the routine answer to a weekly bot PR and the one bump that DOES
+# change shipped behaviour gets waved through with the rest. #232 was that bump,
+# in the same batch: a `@napi-rs/cli` bump whose regenerated loader gained error
+# chaining and a new env var, both observable from the published package.
+#
+# So for these three manifest kinds the gate parses both sides and asks which
+# section moved. The allowlists below are DEV-ONLY sections; everything else,
+# including anything unrecognised, counts as shipped. That polarity is the point
+# — an unknown table must not buy silence, and the module docstring's rule that a
+# gate guessing LENIENTLY is worse than one that asks applies here too.
+_DEV_ONLY_SECTIONS: dict[str, frozenset[str]] = {
+    # `[project]` is the shipped contract (deps, optional-deps, requires-python,
+    # scripts); `[tool.maturin]` decides how the wheel is built. Neither is here.
+    "pyproject.toml": frozenset(
+        {
+            "dependency-groups",
+            "tool.uv",
+            "tool.ruff",
+            "tool.pytest",
+            "tool.coverage",
+            "tool.ty",
+            "tool.vulture",
+            "tool.mypy",
+            "tool.hypothesis",
+        }
+    ),
+    # `[workspace.dependencies]` lives under `workspace`, so a real dep bump in
+    # the workspace manifest stays shipped — only a crate's own dev-dependencies
+    # are exempt.
+    "Cargo.toml": frozenset({"dev-dependencies"}),
+    # NOT `overrides` or `optionalDependencies`: both change the tree a consumer
+    # installs. Only the dev tree is exempt.
+    "package.json": frozenset({"devDependencies"}),
+}
+
+# Lockfiles split, and NOT the way "a lock just records the manifests" suggests.
+# #237 is the counter-example that settled it: it changed `rust-packages/Cargo.lock`
+# and NOTHING else — the manifest range already admitted the new versions, so
+# dependabot moved only the lock — while bumping napi 3.11 -> 3.12, which is
+# compiled into the published addon. Treating every lock as a follower would have
+# let a real dependency change through with no entry and no label.
+#
+# The asymmetry is about who resolves. `Cargo.lock` decides exactly what gets
+# COMPILED into the wheel, the node addon, `lat` and the wasm — this repo ships
+# built artefacts, so the lock is part of the shipped contract even when no
+# manifest moved. npm and uv consumers resolve their own tree from the published
+# RANGES; those locks govern our installs, not theirs.
+_SHIPPED_LOCKFILES = ("Cargo.lock",)
+_FOLLOWING_LOCKFILES = ("package-lock.json", "uv.lock", "pnpm-lock.yaml")
+
 
 def _git(*args: str) -> str:
     out = subprocess.run(
@@ -94,13 +152,92 @@ def die(msg: str) -> None:
     sys.exit(2)
 
 
+def _blob(ref: str, path: str) -> str | None:
+    """One file's text at a ref, or None if it does not exist there.
+
+    Deliberately NOT `_git`: a manifest absent on one side is a legitimate answer
+    (the file was added or deleted), and `dev_only_change` turns that None into
+    "shipped". Routing it through `_git` would abort the whole run instead.
+    """
+    out = subprocess.run(
+        ["git", "show", f"{ref}:{path}"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return out.stdout if out.returncode == 0 else None
+
+
 def shipped(path: str) -> bool:
-    """Does a change to `path` alter something a consumer receives?"""
+    """Does a change to `path` alter something a consumer receives?
+
+    Path-level only. For manifests this is the FIRST of two questions — see
+    `dev_only_change`, which then asks which table actually moved.
+    """
     if any(f"/{path}".find(p) != -1 for p in EXEMPT_PARTS):
         return False
     if path.endswith(EXEMPT_SUFFIXES):
         return False
     return path.startswith(SHIPPED_PREFIXES) or path in SHIPPED_FILES
+
+
+def lock_follows_manifest(path: str) -> bool:
+    """A lock that declares nothing on its own — held back and only counted if
+    something else in the same PR shipped. `Cargo.lock` is NOT one of these; see
+    the constants above for why."""
+    return path.rsplit("/", 1)[-1] in _FOLLOWING_LOCKFILES
+
+
+def is_shipped_lockfile(path: str) -> bool:
+    return path.rsplit("/", 1)[-1] in _SHIPPED_LOCKFILES
+
+
+def manifest_kind(path: str) -> str | None:
+    """Which allowlist applies, if any. Keyed on the file NAME, so every crate's
+    Cargo.toml and every package.json in the tree is covered without listing them."""
+    name = path.rsplit("/", 1)[-1]
+    return name if name in _DEV_ONLY_SECTIONS else None
+
+
+def sections(data: dict) -> dict[str, object]:
+    """Flatten a manifest to comparable sections.
+
+    One level, except `tool`, which flattens to `tool.<name>` — `[tool.ruff]` and
+    `[tool.maturin]` are both under `tool` and must not share a verdict.
+    """
+    out: dict[str, object] = {}
+    for key, value in data.items():
+        if key == "tool" and isinstance(value, dict):
+            out.update({f"tool.{sub}": v for sub, v in value.items()})
+        else:
+            out[key] = value
+    return out
+
+
+def changed_sections(before: dict, after: dict) -> set[str]:
+    a, b = sections(before), sections(after)
+    return {k for k in a.keys() | b.keys() if a.get(k) != b.get(k)}
+
+
+def dev_only_change(kind: str, before: str | None, after: str | None) -> bool:
+    """Did this manifest change touch ONLY dev-tooling sections?
+
+    Fails closed everywhere it cannot be sure: a side that is missing (the file
+    was added or deleted), text that will not parse, or a section outside the
+    allowlist all return False, i.e. shipped. A manifest the gate cannot read is
+    a manifest it has not checked.
+    """
+    if before is None or after is None:
+        return False
+    try:
+        parse = (
+            tomllib.loads if kind.endswith(".toml") else lambda s: json.loads(s or "{}")
+        )
+        moved = changed_sections(parse(before), parse(after))
+    except (tomllib.TOMLDecodeError, json.JSONDecodeError, TypeError, ValueError):
+        return False
+    return bool(moved) and moved <= _DEV_ONLY_SECTIONS[kind]
 
 
 def entries(block: dict) -> list[str]:
@@ -163,11 +300,40 @@ def main() -> None:
             "  (In CI this usually means a shallow clone: give actions/checkout fetch-depth: 0.)"
         )
 
-    touched = sorted(p for p in changed if shipped(p))
+    candidates = sorted(p for p in changed if shipped(p))
+
+    # Second pass over the manifests: a dev-tooling bump changes a shipped FILE
+    # without changing a shipped SURFACE. Locks are held back and decided last —
+    # they follow their manifests rather than declaring anything themselves.
+    touched, dev_only, locks = [], [], []
+    for path in candidates:
+        if lock_follows_manifest(path):
+            locks.append(path)
+            continue
+        kind = manifest_kind(path)
+        if kind and dev_only_change(kind, _blob(merge_base, path), _blob("HEAD", path)):
+            dev_only.append(path)
+            continue
+        touched.append(path)
+    if touched:
+        touched += locks
+    else:
+        dev_only += locks
+
+    # Say what was set aside, always. A gate that narrows silently is how you get
+    # a gate nobody knows has stopped covering something.
+    if dev_only:
+        print(
+            f"check_changelog: {len(dev_only)} file(s) changed only dev-tooling "
+            "sections (or are lockfiles with no shipped manifest change):"
+        )
+        for p in dev_only:
+            print(f"    {p}")
+
     if not touched:
         print(
             f"check_changelog: OK — {len(changed)} file(s) changed, none of them a "
-            "shipped surface (tests / CI / docs / tooling)."
+            "shipped surface (tests / CI / docs / tooling / dev deps)."
         )
         return
 
