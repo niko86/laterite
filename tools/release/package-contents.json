@@ -5,6 +5,7 @@
     "Cargo.toml",
     "Cargo.toml.orig",
     "README.md",
+    "src/ags4/cert.rs",
     "src/ags4/document.rs",
     "src/ags4/mod.rs",
     "src/ags4/report.rs",

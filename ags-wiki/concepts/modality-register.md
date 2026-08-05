@@ -26,7 +26,7 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 ## Findings backlog (find-only — fixes are follow-ups)
 
 - **🔴 P1** (0): —
-- **🟠 P2** (5): read/rust (in.cert); read/cli (in.stdin); validate/cli (in.stdin); build/browser (in.text); emit/browser (out.bytes)
+- **🟠 P2** (4): read/cli (in.stdin); validate/cli (in.stdin); build/browser (in.text); emit/browser (out.bytes)
 - **🟡 P3** (4): read/rust (in.file-like); validate/rust (in.file-like); read_typed/node (out.handle); read-output-view/python (out.table)
 - **⚪ by-design** (12): intentional absences, rationale in each cell below.
 
@@ -43,15 +43,13 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 
 *Offered anywhere — in: bytes, cert, file-like, path, text · out: handle, stdout, table, value*
 
-*Below the facade floor — the Rust crate does not yet offer in: cert, which python and node both do. A minimum to clear, not a gate*
-
 **Input**
 
 | surface (spelling) | path | text | bytes | file-like | stdin | cert |
 |---|---|---|---|---|---|---|
 | python (free) | ✓ | ✓ | ✓ | ✓ |   | ✓ |
 | node (free) | ✓ | ✓ | ✓ | — |   | ✓ |
-| rust (chained) | ✓ | ✓ | ✓ | — |   | — |
+| rust (chained) | ✓ | ✓ | ✓ | — |   | ✓ |
 | cli (free) | ✓ |   |   |   | — |   |
 | browser (free) | — |   | ✓ |   |   | — |
 | duckdb (free) | ✓ | ✓ |   |   |   | ✓ |
@@ -70,12 +68,11 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 _Findings:_
 - ⚪ by-design · **node** in.file-like — Node has no io.BytesIO-style universal file-like; a caller reads the stream to a Buffer and passes bytes.
 - 🟡 P3 · **rust** in.file-like — Above the facade floor — node does not offer it either — so the floor does not owe it. Recorded anyway because node's by-design reason ('no universal Node file-like') cannot be borrowed here: Rust has one, `impl std::io::Read`. Cheap to add; the floor is a minimum, not a cap on what gets built.
-- 🟠 P2 · **rust** in.cert — the `.ags.idx` cert door is unexposed; certify itself is absent on this surface, so this gap closes with that one.
 - 🟠 P2 · **cli** in.stdin `cli-stdin` — no '-'/stdin door — a piped .ags must be spooled to a temp file first. The shell surface's bytes form IS stdin.
 - ⚪ by-design · **browser** in.path — no filesystem in the browser — a File/upload is read to a Uint8Array, so bytes is the only sensible input door.
 
 _Notes:_
-- _rust_: Partial. `cert` lands with cert-input (decided 2026-08-04); `text` is `read_bytes(s.as_bytes())` behind a name.
+- _rust_: Partial. `text` is `read_bytes(s.as_bytes())` behind a name. The `cert` door (2026-08-05, phase 4b) is not the python/node one: there a cert parked on the handle lets a later `.validate()` skip the engine, which this facade has no `Document::validate()` to do. Here it carries the BYTE INDEX, so `read(f).index(c).only(["LOCA"])` parses that group out of its byte range and never looks at the rest of the file — `Document::sliced()` says whether it did. It declines rather than risks: a stale cert, a group the index places in two sections, or a transcode that moved the offsets all fall back to the whole-file parse.
 
 ### validate — Run the numbered AGS4 rules and return a verdict.
 
@@ -258,15 +255,13 @@ _Notes:_
 
 *Offered anywhere — in: bytes, handle, path · out: bytes, file, text*
 
-*Below the facade floor — the Rust crate does not yet offer in: handle · out: bytes, file, which python and node both do. A minimum to clear, not a gate*
-
 **Input**
 
 | surface (spelling) | path | bytes | handle |
 |---|---|---|---|
 | python (chained) |   |   | ✓ |
 | node (chained) |   |   | ✓ |
-| rust (absent) |   |   |   |
+| rust (chained) |   |   | ✓ |
 | cli (free) | ✓ |   |   |
 | browser (free) |   | ✓ |   |
 
@@ -276,7 +271,7 @@ _Notes:_
 |---|---|---|---|
 | python (chained) | ✓ | ✓ |   |
 | node (chained) | ✓ | ✓ |   |
-| rust (absent) |   |   |   |
+| rust (chained) | ✓ | ✓ |   |
 | cli (free) | ✓ |   |   |
 | browser (free) | — |   | ✓ |
 
@@ -286,13 +281,11 @@ _Findings:_
 _Notes:_
 - _python_: certify_bytes() (#390) returns the .ags.idx bytes in memory — the certify analog of transport.lock_bytes; same cert as certify() (bar the mint timestamp), so it interops with read(index=)/--index/the browser.
 - _node_: certifyBytes() (#390) mirrors laterite-py's certify_bytes — same in-memory cert form.
-- _rust_: Decided 2026-08-04: ADD. Costs +laterite-ags4-trust (2 third-party deps). Genuine floor debt — python and node both offer it.
+- _rust_: Added 2026-08-05 (phase 4b). Mints over the ORIGINAL source bytes, before any transcode, with the encoding recorded alongside — the same rule laterite-py follows. Note the engine limit this exposes: bytes that are not UTF-8 validate but cannot be certified at all, because a certificate carries byte offsets the engine will not record into bytes it cannot address. That holds on every surface.
 
 ### cert-input — Consume an .ags.idx certificate to skip revalidation (cert as INPUT).
 
 *Offered anywhere — in: cert · out: handle, stdout, table*
-
-*Below the facade floor — the Rust crate does not yet offer in: cert · out: handle, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -301,7 +294,7 @@ _Notes:_
 | python (free) | ✓ |
 | node (free) | ✓ |
 | duckdb (free) | ✓ |
-| rust (absent) |   |
+| rust (chained) | ✓ |
 | cli (free) | ✓ |
 | browser (free) | — |
 
@@ -312,7 +305,7 @@ _Notes:_
 | python (free) | ✓ |   |   |
 | node (free) | ✓ |   |   |
 | duckdb (free) |   | ✓ |   |
-| rust (absent) |   |   |   |
+| rust (chained) | ✓ |   |   |
 | cli (free) |   |   | ✓ |
 | browser (free) |   |   |   |
 
@@ -323,7 +316,7 @@ _Notes:_
 - _python_: explicit opt-in — autodiscovery is deliberately refused so naming index= asserts the cert is for THIS file.
 - _node_: explicit opt-in, mirrors Python.
 - _duckdb_: implicit — a sibling <path>.idx is auto-consumed (the divergent FORM of the same cert-input capability: autodiscovery vs explicit).
-- _rust_: Decided 2026-08-04: ADD, with certify. This is also what closes `read`'s `cert` floor gap, so the two land together.
+- _rust_: Added 2026-08-05 (phase 4b). Spelled on VALIDATE rather than on read, because this facade's validate is a free function and has no `Document::validate()` for a cert attached at read time to reach. Same modality as python/node's `read(index=)` — cert as an input form — and the same refusal to auto-discover. NOTE the asymmetry this reveals in the siblings: a vouched cert with no world check lets the engine skip PARSING entirely, which python/node cannot reach because building a handle parses by definition.
 - _cli_: --index (#393) consumes a fresh, same-engine, profile-covering .ags.idx to SKIP the rule engine (mirrors the library read(index=) short-circuit); a stale/foreign/insufficient cert is re-validated. Explicit opt-in like Python/Node, not autodiscovery like DuckDB.
 
 ### emit — Get spec-correct AGS4 back OUT of a read handle.

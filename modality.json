@@ -179,6 +179,15 @@
               "out_forms": [
                 "handle"
               ]
+            },
+            {
+              "name": "read().index()/.index_bytes() + .only()",
+              "in_forms": [
+                "cert"
+              ],
+              "out_forms": [
+                "handle"
+              ]
             }
           ],
           "input": {
@@ -186,7 +195,7 @@
             "bytes": "present",
             "text": "present",
             "file-like": "absent",
-            "cert": "absent"
+            "cert": "present"
           },
           "output": {
             "handle": "present"
@@ -198,17 +207,10 @@
               "verdict": "gap",
               "reason": "Above the facade floor — node does not offer it either — so the floor does not owe it. Recorded anyway because node's by-design reason ('no universal Node file-like') cannot be borrowed here: Rust has one, `impl std::io::Read`. Cheap to add; the floor is a minimum, not a cap on what gets built.",
               "priority": "P3"
-            },
-            {
-              "direction": "in",
-              "form": "cert",
-              "verdict": "gap",
-              "reason": "the `.ags.idx` cert door is unexposed; certify itself is absent on this surface, so this gap closes with that one.",
-              "priority": "P2"
             }
           ],
           "facade_verdict": "planned",
-          "note": "Partial. `cert` lands with cert-input (decided 2026-08-04); `text` is `read_bytes(s.as_bytes())` behind a name."
+          "note": "Partial. `text` is `read_bytes(s.as_bytes())` behind a name. The `cert` door (2026-08-05, phase 4b) is not the python/node one: there a cert parked on the handle lets a later `.validate()` skip the engine, which this facade has no `Document::validate()` to do. Here it carries the BYTE INDEX, so `read(f).index(c).only([\"LOCA\"])` parses that group out of its byte range and never looks at the rest of the file — `Document::sliced()` says whether it did. It declines rather than risks: a stale cert, a group the index places in two sections, or a transcode that moved the offsets all fall back to the whole-file parse."
         },
         {
           "surface": "cli",
@@ -1045,12 +1047,36 @@
         },
         {
           "surface": "rust",
-          "spelling": "absent",
-          "verbs": [],
-          "input": {},
-          "output": {},
-          "note": "Decided 2026-08-04: ADD. Costs +laterite-ags4-trust (2 third-party deps). Genuine floor debt — python and node both offer it.",
-          "facade_verdict": "planned"
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "Document::certify().to_path",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            },
+            {
+              "name": "Document::certify().to_bytes",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "note": "Added 2026-08-05 (phase 4b). Mints over the ORIGINAL source bytes, before any transcode, with the encoding recorded alongside — the same rule laterite-py follows. Note the engine limit this exposes: bytes that are not UTF-8 validate but cannot be certified at all, because a certificate carries byte offsets the engine will not record into bytes it cannot address. That holds on every surface.",
+          "gaps": []
         },
         {
           "surface": "cli",
@@ -1183,12 +1209,26 @@
         },
         {
           "surface": "rust",
-          "spelling": "absent",
-          "verbs": [],
-          "input": {},
-          "output": {},
-          "note": "Decided 2026-08-04: ADD, with certify. This is also what closes `read`'s `cert` floor gap, so the two land together.",
-          "facade_verdict": "planned"
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "validate().index()/.index_bytes()",
+              "in_forms": [
+                "cert"
+              ],
+              "out_forms": [
+                "handle"
+              ]
+            }
+          ],
+          "input": {
+            "cert": "present"
+          },
+          "output": {
+            "handle": "present"
+          },
+          "note": "Added 2026-08-05 (phase 4b). Spelled on VALIDATE rather than on read, because this facade's validate is a free function and has no `Document::validate()` for a cert attached at read time to reach. Same modality as python/node's `read(index=)` — cert as an input form — and the same refusal to auto-discover. NOTE the asymmetry this reveals in the siblings: a vouched cert with no world check lets the engine skip PARSING entirely, which python/node cannot reach because building a handle parses by definition.",
+          "gaps": []
         },
         {
           "surface": "cli",

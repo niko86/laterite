@@ -3,6 +3,7 @@
 //! Everything format-specific lives under this module and not at the crate
 //! root, so a future format is a sibling rather than a rename.
 
+mod cert;
 mod document;
 mod report;
 
@@ -14,6 +15,7 @@ use laterite_ags4_reference::dict::DictVersion;
 use laterite_ags4_validator::parse::parse_bytes;
 use laterite_ags4_validator::{CheckOptions, WorldScope, check_file, check_parsed_with_dict};
 
+pub use cert::Certify;
 pub use document::{Document, Group, Row, Rows};
 pub use report::{Finding, Report, Severity};
 
@@ -98,6 +100,8 @@ pub struct Read {
     source: Source,
     encoding: Option<String>,
     recover_duplicate_headings: bool,
+    cert: Option<CertInput>,
+    only: Vec<String>,
 }
 
 /// Read an AGS4 file from disk.
@@ -106,6 +110,8 @@ pub fn read(path: impl AsRef<Path>) -> Read {
         source: Source::Path(path.as_ref().to_path_buf()),
         encoding: None,
         recover_duplicate_headings: false,
+        cert: None,
+        only: Vec::new(),
     }
 }
 
@@ -115,6 +121,8 @@ pub fn read_bytes(bytes: impl Into<Vec<u8>>) -> Read {
         source: Source::Bytes(bytes.into()),
         encoding: None,
         recover_duplicate_headings: false,
+        cert: None,
+        only: Vec::new(),
     }
 }
 
@@ -134,6 +142,8 @@ pub fn read_str(text: impl Into<String>) -> Read {
         source: Source::Text(text.into()),
         encoding: None,
         recover_duplicate_headings: false,
+        cert: None,
+        only: Vec::new(),
     }
 }
 
@@ -166,6 +176,46 @@ impl Read {
         self
     }
 
+    /// Read only these groups.
+    ///
+    /// On its own this is a filter — the file is parsed and the rest discarded.
+    /// Combined with [`Read::index`] it becomes a *slice*: the named sections are
+    /// parsed straight out of their byte ranges and the rest of the file is never
+    /// looked at. [`Document::sliced`] reports which of the two happened.
+    #[must_use]
+    pub fn only<I, S>(mut self, codes: I) -> Read
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.only = codes.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Offer a certificate, so [`Read::only`] can slice instead of parsing.
+    ///
+    /// A certificate carries a byte index — group code to byte range — which is
+    /// what turns "read one group out of a large delivery" into a read of that
+    /// group's bytes rather than of the file.
+    ///
+    /// Purely an optimisation, and it declines itself whenever it cannot be sure:
+    /// a certificate that does not match these bytes, a group the index places in
+    /// more than one section, or an `encoding` override (which means the bytes
+    /// being parsed are not the bytes the index was built over) all fall back to
+    /// the whole-file parse. The document is the same either way.
+    #[must_use]
+    pub fn index(mut self, path: impl AsRef<Path>) -> Read {
+        self.cert = Some(CertInput::Path(path.as_ref().to_path_buf()));
+        self
+    }
+
+    /// Offer certificate bytes already in memory — see [`Read::index`].
+    #[must_use]
+    pub fn index_bytes(mut self, bytes: impl Into<Vec<u8>>) -> Read {
+        self.cert = Some(CertInput::Bytes(bytes.into()));
+        self
+    }
+
     /// Do it.
     pub fn run(self) -> Result<Document, Error> {
         let raw = match &self.source {
@@ -187,6 +237,7 @@ impl Read {
         // turns `°` into `Â°`, corrupting precisely the cells the option exists
         // to rescue. Keying only on `encoding` looked right and did exactly
         // that; `encoding_cannot_corrupt_text` is the test that says so.
+        let raw_for_cert = raw.clone();
         let bytes = match (&self.source, &self.encoding) {
             (Source::Text(_), _) | (_, None) => raw,
             (_, Some(label)) => {
@@ -203,16 +254,99 @@ impl Read {
                 DuplicateHeadings::Error
             },
         };
+        // The sliced path, when a certificate can vouch for the byte index AND
+        // the caller asked for specific groups. Every guard below is a reason to
+        // fall back rather than to fail: the whole-file parse is always correct,
+        // so an index that cannot be trusted costs time, never accuracy.
+        //
+        // Nested rather than a `let ... && ...` chain: let chains are stable in
+        // 1.88 and every crate here declares `rust-version = "1.85"`. That is a
+        // promise to a stranger's toolchain, and the publish gate builds on 1.85
+        // to keep it honest.
+        //
+        // The index's offsets are into the ORIGINAL bytes. If an `encoding`
+        // override transcoded them, the bytes being parsed are not the bytes the
+        // index describes, and slicing would read from the wrong offsets — hence
+        // the `raw_for_cert == bytes` guard.
+        let can_slice = self.cert.is_some() && !self.only.is_empty() && raw_for_cert == bytes;
+        if can_slice {
+            let input = self
+                .cert
+                .as_ref()
+                .expect("can_slice is false when there is no certificate");
+            let cert_bytes = match input {
+                CertInput::Path(p) => std::fs::read(p).map_err(|e| {
+                    Error::with_source(ErrorKind::Io, format!("cannot read {}", p.display()), e)
+                })?,
+                CertInput::Bytes(b) => b.clone(),
+            };
+            let sidecar = cert::parse_cert(&cert_bytes)?;
+            let index = sidecar.index();
+
+            // `range` is None for a group the index places in more than one
+            // section. That is the truncation guard: slicing the first section of
+            // a redeclared group returns a strict SUBSET of its rows, silently.
+            let ranges: Option<Vec<_>> = self
+                .only
+                .iter()
+                .map(|code| index.range(code).map(|r| (code.clone(), r)))
+                .collect();
+
+            // Against the ORIGINAL bytes, which is what the certificate hashed.
+            // Checking the transcoded buffer instead happens to work while the
+            // guard above holds them equal — and hides the fact that the guard
+            // is what makes slicing safe. Mutation testing found exactly that.
+            if let (true, Some(ranges)) = (sidecar.is_fresh_for(&raw_for_cert), ranges) {
+                let mut groups = std::collections::HashMap::with_capacity(ranges.len());
+                let mut order = Vec::with_capacity(ranges.len());
+                for (code, range) in ranges {
+                    let group = laterite_ags4_core::index::parse_group_slice(&bytes, range, &code)
+                        .map_err(|e| {
+                            Error::with_source(
+                                ErrorKind::NotAgs4,
+                                format!("cannot read group `{code}` from its byte range"),
+                                e,
+                            )
+                        })?;
+                    order.push(code.clone());
+                    groups.insert(code, group);
+                }
+                let parsed = laterite_ags4_core::ags4_codec::ParsedAgs4 { groups, order };
+                let mut doc = Document::new(parsed, raw_for_cert, self.encoding.clone());
+                doc.sliced = true;
+                return Ok(doc);
+            }
+        }
+
         read_ags4_bytes_with(&bytes, opts)
-            .map(Document::new)
+            // `raw`, not `bytes`: a certificate minted from this handle must hash
+            // what the file actually holds, not what we decoded it into. See
+            // `Document::source_bytes`.
+            .map(|parsed| Document::new(parsed, raw_for_cert, self.encoding.clone()))
+            .map(|mut doc| {
+                // `only` without a usable index is still a filter — the caller
+                // asked for these groups and gets these groups, just not cheaply.
+                if !self.only.is_empty() {
+                    doc.retain_only(&self.only);
+                }
+                doc
+            })
             .map_err(|e| Error::with_source(ErrorKind::NotAgs4, "cannot read as AGS4", e))
     }
 }
 
 // --- validate -----------------------------------------------------------
 
+/// Where an offered certificate comes from. Held unparsed so the engine's
+/// `Sidecar` stays behind the boundary until [`Validate::run`] needs it.
+enum CertInput {
+    Path(PathBuf),
+    Bytes(Vec<u8>),
+}
+
 /// A pending validation. Configure it, then [`Validate::run`].
 pub struct Validate {
+    cert: Option<CertInput>,
     source: Source,
     warnings: bool,
     fyi: bool,
@@ -228,6 +362,7 @@ pub struct Validate {
 /// [`validate_bytes`].
 pub fn validate(path: impl AsRef<Path>) -> Validate {
     Validate {
+        cert: None,
         source: Source::Path(path.as_ref().to_path_buf()),
         warnings: false,
         fyi: false,
@@ -253,6 +388,7 @@ pub fn validate(path: impl AsRef<Path>) -> Validate {
 /// the same file read two ways.
 pub fn validate_bytes(bytes: impl Into<Vec<u8>>) -> Validate {
     Validate {
+        cert: None,
         source: Source::Bytes(bytes.into()),
         warnings: false,
         fyi: false,
@@ -272,6 +408,7 @@ pub fn validate_bytes(bytes: impl Into<Vec<u8>>) -> Validate {
 /// [`Validate::encoding`] does not apply, as with [`read_str`].
 pub fn validate_str(text: impl Into<String>) -> Validate {
     Validate {
+        cert: None,
         source: Source::Text(text.into()),
         warnings: false,
         fyi: false,
@@ -311,6 +448,29 @@ impl Validate {
         self
     }
 
+    /// Offer a certificate, so a matching one skips the rule engine.
+    ///
+    /// Never auto-discovered: an `.ags.idx` sitting beside a file is not consent
+    /// to trust it, so naming one here is how you assert that this certificate
+    /// is for these bytes.
+    ///
+    /// A certificate that does not match cannot produce a wrong verdict — the
+    /// engine simply runs, and [`Report::revalidate_reason`] says why it had to.
+    /// The file is read by [`Validate::run`], so a missing one fails there.
+    #[must_use]
+    pub fn index(mut self, path: impl AsRef<Path>) -> Validate {
+        self.cert = Some(CertInput::Path(path.as_ref().to_path_buf()));
+        self
+    }
+
+    /// Offer certificate bytes already in memory — one minted by
+    /// [`Certify::to_bytes`], or fetched from a store rather than a disk.
+    #[must_use]
+    pub fn index_bytes(mut self, bytes: impl Into<Vec<u8>>) -> Validate {
+        self.cert = Some(CertInput::Bytes(bytes.into()));
+        self
+    }
+
     /// Also run Rule 20's on-disk half: the `FILE/` tree beside the `.ags` must
     /// actually contain what the file references.
     ///
@@ -344,6 +504,58 @@ impl Validate {
         // fact the comment above relies on.
         let utf8 =
             laterite_ags4_parse::resolve_encoding(None).ok_or_else(|| bad_encoding("utf-8"))?;
+
+        // A certificate routes through the trust engine instead. That is not a
+        // second implementation of the check: `trust::check` ends at the same
+        // `check_parsed_with_dict` when the cert cannot answer, so the edition
+        // guard below is resolved in one place either way.
+        if let Some(input) = &self.cert {
+            let raw = match input {
+                CertInput::Path(p) => &std::fs::read(p).map_err(|e| {
+                    Error::with_source(ErrorKind::Io, format!("cannot read {}", p.display()), e)
+                })?,
+                CertInput::Bytes(b) => b,
+            };
+            let sidecar = cert::parse_cert(raw)?;
+
+            // The bytes the certificate is judged against, and the world it may
+            // look at. Only a real path has a world — the same rule the engine
+            // applies, restated here because the source is ours to classify.
+            let (bytes, world) = match &self.source {
+                Source::Path(p) => (
+                    std::fs::read(p).map_err(|e| {
+                        Error::with_source(ErrorKind::Io, format!("cannot read {}", p.display()), e)
+                    })?,
+                    WorldScope::OnDisk(p.clone()),
+                ),
+                Source::Bytes(b) => (b.clone(), WorldScope::None),
+                Source::Text(s) => (s.clone().into_bytes(), WorldScope::None),
+            };
+
+            let outcome = laterite_ags4_trust::check(laterite_ags4_trust::Request {
+                bytes: &bytes,
+                opts: &opts,
+                cert: Some(&sidecar),
+                world,
+                compat: None,
+            })
+            .map_err(|e| {
+                let kind = match e.kind() {
+                    "io" | "not_found" => ErrorKind::Io,
+                    "not_ags4" => ErrorKind::NotAgs4,
+                    "bad_dict" | "unsupported_edition" => ErrorKind::BadDictionary,
+                    "world_check_requires_source" => ErrorKind::InvalidArgument,
+                    _ => ErrorKind::Other,
+                };
+                Error::with_source(kind, "cannot validate", e)
+            })?;
+
+            return Ok(Report {
+                findings: convert(outcome.findings),
+                certified: outcome.certified,
+                revalidate_reason: outcome.revalidate_reason.map(|r| r.as_str().to_string()),
+            });
+        }
 
         // Both arms end at `check_parsed_with_dict` — `check_file` reaches it too.
         // That is not incidental: resolving `TRAN_AGS` and applying the 4.0.3→4.0.4
@@ -409,7 +621,29 @@ impl Validate {
         })?;
         Ok(Report {
             findings: convert(findings),
+            certified: false,
+            revalidate_reason: None,
         })
+    }
+}
+
+impl Document {
+    /// Mint this file's `.ags.idx` validity certificate.
+    ///
+    /// The certificate is over the bytes this document was READ from, before any
+    /// transcode — see [`Certify`] for what one is and why it is never
+    /// auto-discovered.
+    ///
+    /// Minting validates; it is not told a verdict. There is deliberately no
+    /// parameter through which a caller can assert one, because that is exactly
+    /// what earlier versions of this library got wrong — every certificate it
+    /// produced recorded zero warnings because zero was the default argument.
+    #[must_use]
+    pub fn certify(&self) -> Certify<'_> {
+        Certify {
+            doc: self,
+            edition: None,
+        }
     }
 }
 
@@ -657,6 +891,15 @@ impl std::fmt::Debug for Read {
                 "recover_duplicate_headings",
                 &self.recover_duplicate_headings,
             )
+            .field("only", &self.only)
+            .field(
+                "index",
+                &match &self.cert {
+                    None => "none".to_string(),
+                    Some(CertInput::Path(p)) => format!("path {}", p.display()),
+                    Some(CertInput::Bytes(b)) => format!("{} bytes", b.len()),
+                },
+            )
             .finish()
     }
 }
@@ -676,6 +919,14 @@ impl std::fmt::Debug for Validate {
             .field("fyi", &self.fyi)
             .field("edition", &self.edition)
             .field("encoding", &self.encoding)
+            .field(
+                "index",
+                &match &self.cert {
+                    None => "none".to_string(),
+                    Some(CertInput::Path(p)) => format!("path {}", p.display()),
+                    Some(CertInput::Bytes(b)) => format!("{} bytes", b.len()),
+                },
+            )
             .field("check_files", &self.check_files)
             .finish()
     }

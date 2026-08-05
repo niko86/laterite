@@ -30,7 +30,12 @@ laterite-ags4-core = { workspace = true, features = ["transport"] }
 laterite-ags4-emit = { workspace = true }
 laterite-ags4-parse = { workspace = true }
 laterite-ags4-reference = { workspace = true }
+laterite-ags4-trust = { workspace = true }
 laterite-ags4-validator = { workspace = true }
+# Only to stamp a certificate's `checked_at`. Already in this crate's tree via
+# laterite-ags4-validator, so it is not new weight for anyone; `clock` is the
+# one feature needed and the type never reaches a public signature.
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # serde_json is an IMPLEMENTATION detail: the emit engine takes cell values as
 # `serde_json::Value`. It must never reach a public signature — see the
 # `no_third_party_types_in_public_signatures` note in src/lib.rs.
@@ -43,6 +48,12 @@ default = []
 # reaching past the facade is a thing they wrote down and can be asked about.
 # `#[doc(hidden)]` hides an item from rustdoc and from nobody else.
 unstable-engine = []
+
+[dev-dependencies]
+# Test-only: the byte-index ambiguity guard is reached by handing `index_bytes`
+# a certificate whose index places a group in two sections, which means editing
+# certificate JSON. Dev-only, so it never reaches a consumer's dependency graph.
+serde_json = "1"
 
 [lints]
 workspace = true

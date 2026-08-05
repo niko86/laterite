@@ -15,11 +15,54 @@ use crate::{Error, ErrorKind};
 /// that reorders them is not a round-trip.
 pub struct Document {
     pub(crate) parsed: ParsedAgs4,
+    /// The bytes exactly as they arrived — **before** any transcode.
+    ///
+    /// Kept for [`Document::certify`], whose SHA-256 must be over the bytes a
+    /// later reader will hash. Storing the decoded UTF-8 instead would look
+    /// right and mint a certificate that is never fresh for the file on disk:
+    /// a cp1252 delivery read with `encoding` differs from its own decoded
+    /// form in exactly the `°` and `±` cells that made someone pass the option.
+    /// The Python surface mints over the original bytes for the same reason and
+    /// records the encoding alongside, which is what this pair reproduces.
+    pub(crate) source_bytes: Vec<u8>,
+    /// The encoding label the source was read with, recorded into the
+    /// certificate so a verifier decodes the way the minter did.
+    pub(crate) encoding: Option<String>,
+    /// Was this built by slicing named groups out of the source using a
+    /// certificate's byte index, rather than by parsing the whole file?
+    pub(crate) sliced: bool,
 }
 
 impl Document {
-    pub(crate) fn new(parsed: ParsedAgs4) -> Document {
-        Document { parsed }
+    pub(crate) fn new(
+        parsed: ParsedAgs4,
+        source_bytes: Vec<u8>,
+        encoding: Option<String>,
+    ) -> Document {
+        Document {
+            parsed,
+            source_bytes,
+            encoding,
+            sliced: false,
+        }
+    }
+
+    /// Did a certificate's byte index let this read skip the rest of the file?
+    ///
+    /// `false` whenever the whole file was parsed — including when a certificate
+    /// was offered and declined, which is the case worth being able to see. An
+    /// index that quietly stops applying is otherwise indistinguishable from one
+    /// that is working, since the document is identical either way.
+    #[must_use]
+    pub fn sliced(&self) -> bool {
+        self.sliced
+    }
+
+    /// Keep only these groups, dropping the rest. The filter half of
+    /// [`crate::ags4::Read::only`].
+    pub(crate) fn retain_only(&mut self, codes: &[String]) {
+        self.parsed.groups.retain(|code, _| codes.contains(code));
+        self.parsed.order.retain(|code| codes.contains(code));
     }
 
     /// The group codes, in file order.
@@ -281,6 +324,11 @@ impl std::fmt::Debug for Document {
         f.debug_struct("Document")
             .field("groups", &self.parsed.order.len())
             .field("codes", &self.codes())
+            // Length, never contents: this is the whole source file, and a
+            // `dbg!` of a document should not print a delivery.
+            .field("source_bytes", &self.source_bytes.len())
+            .field("encoding", &self.encoding)
+            .field("sliced", &self.sliced)
             .finish()
     }
 }
