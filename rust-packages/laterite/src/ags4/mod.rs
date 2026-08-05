@@ -258,13 +258,22 @@ impl Read {
         // the caller asked for specific groups. Every guard below is a reason to
         // fall back rather than to fail: the whole-file parse is always correct,
         // so an index that cannot be trusted costs time, never accuracy.
-        if let Some(input) = &self.cert
-            && !self.only.is_empty()
-            // The index's offsets are into the ORIGINAL bytes. If an `encoding`
-            // override transcoded them, the bytes being parsed are not the bytes
-            // the index describes, and slicing would read from the wrong offsets.
-            && raw_for_cert == bytes
-        {
+        //
+        // Nested rather than a `let ... && ...` chain: let chains are stable in
+        // 1.88 and every crate here declares `rust-version = "1.85"`. That is a
+        // promise to a stranger's toolchain, and the publish gate builds on 1.85
+        // to keep it honest.
+        //
+        // The index's offsets are into the ORIGINAL bytes. If an `encoding`
+        // override transcoded them, the bytes being parsed are not the bytes the
+        // index describes, and slicing would read from the wrong offsets — hence
+        // the `raw_for_cert == bytes` guard.
+        let can_slice = self.cert.is_some() && !self.only.is_empty() && raw_for_cert == bytes;
+        if can_slice {
+            let input = self
+                .cert
+                .as_ref()
+                .expect("can_slice is false when there is no certificate");
             let cert_bytes = match input {
                 CertInput::Path(p) => std::fs::read(p).map_err(|e| {
                     Error::with_source(ErrorKind::Io, format!("cannot read {}", p.display()), e)
@@ -287,9 +296,7 @@ impl Read {
             // Checking the transcoded buffer instead happens to work while the
             // guard above holds them equal — and hides the fact that the guard
             // is what makes slicing safe. Mutation testing found exactly that.
-            if sidecar.is_fresh_for(&raw_for_cert)
-                && let Some(ranges) = ranges
-            {
+            if let (true, Some(ranges)) = (sidecar.is_fresh_for(&raw_for_cert), ranges) {
                 let mut groups = std::collections::HashMap::with_capacity(ranges.len());
                 let mut order = Vec::with_capacity(ranges.len());
                 for (code, range) in ranges {
