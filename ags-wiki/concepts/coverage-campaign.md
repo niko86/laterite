@@ -71,8 +71,12 @@ and the exclude set **together**.
    gap honestly; a contrived test does not.
 5. **Dep-gated code needs the dep, not a skip.** A branch only reachable with
    `pyarrow` installed is covered by *running that arm with pyarrow*, not by a
-   `skipif` that hides it from the denominator. (84 of the current Python tests
-   skip — some gaps sit behind those skips.)
+   `skipif` that hides it from the denominator. This rule has since been
+   satisfied: running CI's own command under CI's provisioning collects 1200
+   tests and skips **zero** — every `skipif` in the suite (oracle presence, the
+   built `lat` binary) evaluates False. The line here read "84 of the current
+   Python tests skip" from before `_frames.py` was fixed to run both backends,
+   which the same page records below as done.
 6. **Ratchet only on real coverage.** Raise a floor to 95 only once the coverage
    is genuinely there; move the floor and its denominator together, never the
    floor alone.

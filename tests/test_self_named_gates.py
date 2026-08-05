@@ -64,8 +64,21 @@ DISCLAIMERS = ("dev satellite", "not in this repo")
 
 #: How far past the token a disclaimer may sit. Prose wraps, so this is measured
 #: on the whitespace-collapsed text rather than per line; one short clause of
-#: slack, not enough for the next sentence's disclaimer to cover this one.
+#: slack. It is a ceiling, not the whole rule — see `_window`.
 REACH = 120
+
+
+def _window(flat: str, end: int) -> str:
+    """The text a disclaimer at `end` would be attached to.
+
+    `REACH` characters, but **stopped at the next test filename**. Without that
+    stop, one claim borrows its neighbour's disclaimer: `mkdocs.yml` names three
+    gates in one comment, and 120 characters from the first reaches the third's
+    `(dev satellite)`. That is not a corner case — it fired the first time the
+    inverse check ran, on prose that is entirely correct.
+    """
+    nxt = TOKEN.search(flat, end)
+    return flat[end : min(end + REACH, nxt.start() if nxt else len(flat))]
 
 
 def _real_tests() -> set[str]:
@@ -102,7 +115,7 @@ def test_every_named_gate_exists_or_disclaims_itself() -> None:
             name = m.group(1)
             if name in real:
                 continue
-            window = flat[m.end() : m.end() + REACH]
+            window = _window(flat, m.end())
             if any(d in window for d in DISCLAIMERS):
                 continue
             bad.append(f"{rel}: {name}")
@@ -112,6 +125,38 @@ def test_every_named_gate_exists_or_disclaims_itself() -> None:
         + "\n  ".join(sorted(set(bad)))
         + "\n\nEither name the gate that actually runs, or append one of "
         + f"{list(DISCLAIMERS)} to the claim."
+    )
+
+
+def test_a_gate_that_runs_here_is_not_disclaimed_as_absent() -> None:
+    """The inverse defect, which the rule above cannot see.
+
+    `test_every_named_gate_exists_or_disclaims_itself` passes any name that
+    resolves — so a gate that DOES run here, wrongly marked `(dev satellite)`,
+    sails through it. That is not hypothetical: `ags-wiki/concepts/docs-site.md`
+    disclaimed `tests/test_docs_examples.py` as satellite-only while the file sat
+    in this repo, wired into the required `python` job. It understates the repo's
+    own safety, which is the same class of harm as overstating it — a reader
+    deciding whether a change is covered gets the wrong answer either way.
+
+    Falsify by writing `(dev satellite)` beside any test in `tests/`.
+    """
+    real = _real_tests()
+    wrong: list[str] = []
+    for path in _scope_files():
+        flat = " ".join(path.read_text(encoding="utf-8").split())
+        rel = path.relative_to(REPO).as_posix()
+        for m in TOKEN.finditer(flat):
+            name = m.group(1)
+            if name not in real:
+                continue
+            if "dev satellite" in _window(flat, m.end()):
+                wrong.append(f"{rel}: {name}")
+
+    assert not wrong, (
+        "these call a gate `dev satellite` when it runs in THIS repo:\n  "
+        + "\n  ".join(sorted(set(wrong)))
+        + "\n\nDrop the disclaimer — the test is here."
     )
 
 
@@ -138,7 +183,7 @@ def test_the_disclaimer_is_not_a_way_to_keep_a_dead_name() -> None:
             name = m.group(1)
             if name in real or name in there:
                 continue
-            if "dev satellite" in flat[m.end() : m.end() + REACH]:
+            if "dev satellite" in _window(flat, m.end()):
                 phantom.append(f"{rel}: {name}")
 
     assert not phantom, (

@@ -15,23 +15,26 @@ sources: []
 
 ## Definition
 
-PyO3 appears in exactly **two** workspace crates — the only crates that
-link `pyo3` — each producing an `extension-module` cdylib loaded by
-CPython:
+PyO3 appears in exactly **one** workspace crate — the only crate that links
+`pyo3` — producing an `extension-module` cdylib loaded by CPython:
 
-- **AGS4 base lane**: `laterite-ags4-validator` engine → `laterite-py`
+- **AGS4 lane**: `laterite-ags4-validator` engine → `laterite-py`
   (`crate-type = ["cdylib"]`, lib name `_laterite_native`) → the public
-  [[laterite]] wheel (narwhals-native API).
+  [[laterite]] wheel, returning **polars** frames from a `polars` + `duckdb`
+  base install.
   `repo:rust-packages/laterite-py/Cargo.toml`
-- **AGS5 lane (parallel)**: `laterite-ags4-core` + `ags5db` → `laterite-py-ags5`
-  (lib name `_laterite_ags5_native`, bundles DuckDB) →
-  laterite-ags5, pulled by the `[ags5]` extra.
-  `ags5/rust-packages/laterite-py-ags5/Cargo.toml`
 
-> [!stale-risk] sizes · as-of 2026-05-30
-> The AGS5 cdylib links DuckDB (~50 MB at time of writing) — which is why
-> it ships as a separate `[ags5]` extra rather than in the base wheel.
-> Verify against the built artefact before citing the figure downstream.
+`laterite-py`'s own manifest states the invariant on its first line — "This is
+the ONLY crate in the workspace that links pyo3" — which is what makes the
+boundary a single place rather than a policy.
+
+> [!note] There was a second lane here
+> This page described an AGS5 lane (`laterite-py-ags5`, bundling DuckDB, pulled
+> by an `[ags5]` extra) as a live parallel pipeline, with a diagram. None of it
+> is in this tree: no such crate, no such extra, and no tracked file matching
+> `ags5`. AGS5 is a **dormant concept** held in the private satellite, never a
+> shipped feature — see `CLAUDE.md`. The lane is described here in the past
+> tense so the diagrams below read against one boundary, not two.
 
 The boundary's **read path carries typed Apache Arrow** (the 0.3 DuckDB-engine
 redesign): the Rust parser builds one `RecordBatch` per group via
@@ -83,15 +86,16 @@ pandas only ships via `[compat]` anyway. compat's all-Rust write
 (`emit_ags4_compat`) already took the polars-capsule shape (no engine).
 
 Because the read boundary uses that **stable Arrow C Data Interface**, not
-pyo3-polars' per-CPython ABI coupling, both cdylibs build **abi3**
+pyo3-polars' per-CPython ABI coupling, the cdylib builds **abi3**
 (`abi3-py312` on the `pyo3` dep; `pyo3-arrow` 0.19 compiles clean under it):
 ONE `cp312-abi3` wheel per platform
 serves **Python 3.12+** (proven green on 3.12 / 3.13 / 3.14). The floor is
 **3.12**, not lower, because the 174 generated `#[pyclass(dict)]` typed-graph
-classes (the shipped AGS4 union; 92 is the dormant AGS5-only count) need
-the 3.12 limited API (`dict` isn't exposed below it). The dev
-*workspace* still requires 3.14 — the unshipped `laterite-ags5x` uses
-`compression.zstd` (PEP 784) — but that's the build env, not what users install.
+classes (the AGS4 union) need the 3.12 limited API (`dict` isn't exposed below
+it). The dev workspace declares the same floor — `requires-python = ">=3.12"` in
+the root `pyproject.toml` — so the build env and the shipped wheel agree. This
+paragraph previously claimed the workspace required 3.14, justified by an
+unshipped `laterite-ags5x` crate that is not in this tree.
 A stale comment once claimed the wheels *couldn't* be abi3 "because pyo3-polars
 couples the wheel"; that was wrong on both counts (no pyo3-polars; abi3 works).
 abi3's runtime cost here is ~5 ns per object construction and **nil on real
@@ -100,44 +104,37 @@ operations** (and a higher floor like `abi3-py314` buys nothing) — measured in
 
 ## Why it matters
 
-These cdylibs are `extension-module` builds (no libpython at link time),
-so they **must** be built by maturin (`uv sync`, or each package's
+This cdylib is an `extension-module` build (no libpython at link time),
+so it **must** be built by maturin (`uv sync`, or the package's
 `[tool.maturin]`), which supplies the `-undefined dynamic_lookup` link
-args. A bare `cargo build --workspace` deliberately **excludes** them and
-will fail to link them on macOS — by design, not a regression. This is
-why the build recipe runs `cargo build --workspace --exclude laterite-py
---exclude laterite-py-ags5` then `uv sync`.
+args. A bare `cargo build --workspace` deliberately **excludes** it and
+will fail to link it on macOS — by design, not a regression. This is
+why the workspace Rust build excludes it — `--exclude laterite-py`, as
+`.github/workflows/ci.yml` does — and `uv sync` builds it through maturin
+instead.
 
 The boundary is also **directional**: *Rust drives Python, never the
-reverse* — the shipped artefact is the Rust binary, and these wheels are
+reverse* — the shipped artefact is the Rust binary, and this wheel is
 the scoped exception where a Python library imports the Rust engine, not
 where Python becomes a runtime prerequisite of the tool. See
 [[dec-rust-drives-python]] and the scoped exception
 [[dec-python-imports-rust-library]].
-
-> [!note] Two cdylibs, not shared Rust types
-> `laterite-py-ags5` looks up the typed-graph classes (`PROJ`, `LOCA`, …)
-> at runtime via `py.import("laterite._laterite_native")` rather than
-> sharing Rust types across the two cdylibs.
 
 ## Diagram
 
 ```mermaid
 flowchart LR
   validator["laterite-ags4-validator<br/>(engine)"] --> latpy["laterite-py<br/>_laterite_native cdylib"]
-  core["laterite-ags4-core"] --> latpy5["laterite-py-ags5<br/>_laterite_ags5_native cdylib"]
-  db["ags5db (+ DuckDB)"] --> latpy5
   latpy -. "maturin only<br/>(-undefined dynamic_lookup)" .-> wheel["laterite wheel"]
-  latpy5 -. "maturin only<br/>(-undefined dynamic_lookup)" .-> wheel5["laterite-ags5 wheel<br/>([ags5] extra)"]
 ```
 
 ## Where it shows up
 
-This is the Python edge of the [[crate-map]]: the two PyO3 cdylibs are
-the "internal implementation" crates behind the two public wheels. The
+This is the Python edge of the [[crate-map]]: the PyO3 cdylib is the
+"internal implementation" crate behind the public wheel. The
 direction principle is [[dec-rust-drives-python]]; the library-imports-
 engine exception is [[dec-python-imports-rust-library]].
 
 ## Related
 
-[[crate-map]] · [[laterite-py]] · laterite-py-ags5 · [[laterite]] · laterite-ags5 · [[dec-rust-drives-python]] · [[dec-python-imports-rust-library]] · [[dec-monorepo-structure]] · [[abi3-perf]]
+[[crate-map]] · [[laterite-py]] · [[laterite]] · [[dec-rust-drives-python]] · [[dec-python-imports-rust-library]] · [[dec-monorepo-structure]] · [[abi3-perf]]

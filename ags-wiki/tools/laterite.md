@@ -75,7 +75,7 @@ requirement from the compat path entirely.
 > `.ags5db` companion was decoupled (dec-ags5-decouple) and is no longer
 > published; `[ags5]` is gone.
 
-Requires Python ≥ 3.14 (`requires-python`).
+Requires Python ≥ 3.12 (`requires-python` in `repo:packages/laterite/pyproject.toml`) — one abi3-py312 wheel per platform, green on 3.12/3.13/3.14.
 
 ## Public import surface
 

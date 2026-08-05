@@ -9,9 +9,17 @@ page also advertised a `[pandas]` extra that does not exist and described
 Nobody edited that page wrongly. The packaging moved and the prose stayed, which
 is the same mechanism behind every finding in the 2026-08-04 audit.
 
-Two checks, both cheap and both zero-false-positive by construction: a quoted
-description must match, and an advertised extra must exist. Neither obliges a doc
-to mention either thing — the gate is agreement, not coverage.
+Four checks, each cheap and zero-false-positive by construction: a quoted
+description must match, an advertised extra must exist, the base-install line
+must name exactly the real dependencies, and a pyproject field the page cites by
+name must carry the manifest's value.
+
+None of them obliges a doc to mention anything — **the gate is agreement, not
+coverage**. That is deliberate and it is also the limit: the fourth check exists
+because "Requires Python ≥ 3.14" sat four lines below the block the first three
+were written to guard, and none of them looked at `requires-python`. A gate is
+only as wide as the fields someone enumerated, so `_CITED_FIELDS` names its list
+out loud rather than implying it covers the manifest.
 """
 
 from __future__ import annotations
@@ -116,4 +124,56 @@ def test_the_base_install_is_described_as_what_it_is() -> None:
         f"laterite.md must name the base install as {expected} — built from "
         f"pyproject's `dependencies`. If the dependencies changed, the prose has "
         f"to change with them."
+    )
+
+
+#: pyproject fields a doc might cite by name -> the exact PHRASE the page must
+#: carry, built from the manifest. Add a row when a page starts quoting a field.
+#:
+#: A phrase, never a bare value. The first version required only that the number
+#: appear somewhere on the page, and bumping the manifest to `>=3.13` passed —
+#: the page says "green on 3.12/3.13/3.14" further down, so the substring was
+#: there while the claim was false. That is the same weak-assertion shape
+#: `test_the_base_install_is_described_as_what_it_is` above already records
+#: falling for, which is why the fix is the same: build the phrase, demand the
+#: phrase.
+_CITED_FIELDS = {
+    "requires-python": lambda v: f"≥ {v.lstrip('>=').strip()}",
+}
+
+
+def test_a_field_the_page_names_carries_the_value_the_manifest_has() -> None:
+    """`laterite.md` said "Requires Python ≥ 3.14 (`requires-python`)". It is 3.12.
+
+    The wheel is abi3-py312 — one wheel per platform for ≥3.12 — so the page was
+    telling a 3.12 or 3.13 user the wheel would not install for them. 3.14 is the
+    dev interpreter, not the floor.
+
+    That claim sat four lines below the block this file's other tests were written
+    to guard, and survived them: they check the quoted description, the advertised
+    extras and the base-install line, and `requires-python` was not among the
+    fields anyone had enumerated. **A gate is only as wide as its list**, which is
+    the honest lesson and the reason this one names its list out loud rather than
+    implying it covers "the manifest".
+
+    Only fires when the page cites the field BY NAME. A page is never obliged to
+    mention `requires-python`; if it does, the number beside it has to be real.
+    """
+    project = _project()
+    page = _flat(
+        (REPO / "ags-wiki" / "tools" / "laterite.md").read_text(encoding="utf-8")
+    )
+    wrong: list[str] = []
+    for field, render in _CITED_FIELDS.items():
+        if f"`{field}`" not in page:
+            continue
+        want = render(str(project[field]))
+        if want not in page:
+            wrong.append(
+                f"`{field}` is {project[field]!r}, so the page must read "
+                f"{want!r} — it does not"
+            )
+    assert not wrong, (
+        "laterite.md names a pyproject field and gets its value wrong:\n  "
+        + "\n  ".join(wrong)
     )

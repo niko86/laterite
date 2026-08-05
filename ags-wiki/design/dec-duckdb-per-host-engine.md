@@ -102,7 +102,7 @@ and the host DuckDB writes the file (a plain queryable `.duckdb`, *not* `.ags5db
   per-surface re-implementation** — the heavy logic (Arrow + keychain) is shared
   Rust; the host DuckDB I/O is thin, already-present glue, reused both directions.
   In Python, `ags[code]` *already* funnels through the host engine
-  (`repo:packages/laterite/python/laterite/__init__.py:357-387` — `con.register` the
+  (`repo:packages/laterite/python/laterite/__init__.py:591-677` — `con.register` the
   Rust Arrow → CTAS → `.pl()`/`.df()`); write is the same call, opposite direction.
 - **DuckDB multiplexes the output backend** (`.pl()`/`.df()`/`.arrow()`), so polars is
   a convenient *materialisation of DuckDB's result*, not the engine — and pandas

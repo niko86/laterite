@@ -57,8 +57,10 @@ error-JSON shapes are preserved byte-faithfully — the Rust-CLI shape
 
 `repo:rust-packages/laterite-py` — the **only** crate in the workspace
 that links pyo3. Depends on [[laterite-ags4-validator]] (never the reverse) and
-[[laterite-ags4-core]] (registry / ags_types / transport / excel / ddl / codec —
-no DuckDB), plus the wasm-safe leaves `laterite-ags4-diff` / `laterite-ags4-emit`
+[[laterite-ags4-core]] (`ags4_codec` / `ags_types` / `error` / `index` /
+`keychain` / `read_render` / `registry` / `transport` — no DuckDB; the list here
+used to name `excel` and `ddl`, neither of which is a module of that crate —
+Excel is the sibling `laterite-excel` named below), plus the wasm-safe leaves `laterite-ags4-diff` / `laterite-ags4-emit`
 / `laterite-ags4-merge` (the Python `diff()` / `build_ags4()` / `merge()`
 surfaces — `merge_files` in `src/lib.rs` is the new 2026-07-12 addition, see
 [[dec-ags4-merge-semantics]]) and [[laterite-ags4-reference]] directly (its
