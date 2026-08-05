@@ -167,8 +167,6 @@ _Notes:_
 
 *Offered anywhere — in: bytes, file-like, handle, path, text · out: value*
 
-*Below the facade floor — the Rust crate does not yet offer in: bytes, handle, path · out: value, which python and node both do. A minimum to clear, not a gate*
-
 **Input**
 
 | surface (spelling) | path | text | bytes | file-like | handle |
@@ -176,7 +174,7 @@ _Notes:_
 | python (free) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | node (free) | ✓ |   | ✓ | — | ✓ |
 | browser (free) |   |   | ✓ |   |   |
-| rust (absent) |   |   |   |   |   |
+| rust (chained) | ✓ |   | ✓ |   | ✓ |
 
 **Output**
 
@@ -185,19 +183,17 @@ _Notes:_
 | python (free) | ✓ |
 | node (free) | ✓ |
 | browser (free) | ✓ |
-| rust (absent) |   |
+| rust (chained) | ✓ |
 
 _Findings:_
 - ⚪ by-design · **node** in.file-like — no universal Node file-like; DiffSource is string|Uint8Array|Ags4File.
 
 _Notes:_
-- _rust_: Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it.
+- _rust_: Added 2026-08-06 (phase 4d of dec-facade-parity). The value form is a typed `Delta` of first-party handles, not the engine's `Serialize` structs — the same rule that made `Cell` its own enum. NOTE the handle door compares each document AS IT STANDS, edits included, by re-emitting it: python's handle form resolves to `Ags4File.bytes` (the re-emit) for the same reason, and diffing the file on disk instead would silently ignore an edit. One asymmetry worth knowing about the shared engine: a group present on only one side is reported whole via `groups_added`/`groups_removed` and its rows do NOT reach the totals, so summing them is the wrong way to ask whether anything changed.
 
 ### merge — Reconcile N AGS4 deliveries of one project into one file.
 
 *Offered anywhere — in: bytes, file-like, handle, path, text · out: file, stdout, value*
-
-*Below the facade floor — the Rust crate does not yet offer in: bytes, handle, path · out: value, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -205,7 +201,7 @@ _Notes:_
 |---|---|---|---|---|---|
 | python (free) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | node (free) | ✓ |   | ✓ | — | ✓ |
-| rust (absent) |   |   |   |   |   |
+| rust (chained) | ✓ |   | ✓ |   | ✓ |
 | cli (free) | ✓ |   |   |   |   |
 | browser (free) |   |   | ✓ |   |   |
 
@@ -215,7 +211,7 @@ _Notes:_
 |---|---|---|---|
 | python (free) | ✓ | ✓ |   |
 | node (free) | — | ✓ |   |
-| rust (absent) |   |   |   |
+| rust (chained) |   | ✓ |   |
 | cli (free) | ✓ |   | ✓ |
 | browser (free) | ✓ | ✓ |   |
 
@@ -224,7 +220,7 @@ _Findings:_
 - ⚪ by-design · **node** out.file — Node merge returns a MergeResult carrying the merged bytes; the caller writes with fs (return-only, matching diff).
 
 _Notes:_
-- _rust_: Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it.
+- _rust_: Added 2026-08-06 (phase 4d). Wraps `merge_parsed`'s `&[ParsedFile]` door — the shape dec-ags4-merge-semantics and laterite#162 endorse — so no provenance typestate reaches the facade. `Merged::save` writes, but the door's own out-form is the value: node offers no file form, so the floor does not ask for one. Two new `ErrorKind` variants (`TypeConflict`, `UnitConflict`) carry the siblings' exact wire tokens rather than collapsing onto `Other`, because the engine draws that distinction deliberately — widen/promote settles the first and nothing settles the second.
 
 ### censor — Anonymise an AGS4 file — scrub the classified sensitive cells (pseudonymise IDs, hash PROJ_ID, blank coordinates, tokenise names, strip free-text [units]) before sharing. Browser-only among shipped surfaces: the SAME laterite-ags4-censor engine backs the private laterite-ags4-corpus-qa `censor` dev tool, which is not a shipped py/node/cli API, so its cross-surface EXISTENCE is a surface-census matter, not a modality one.
 
@@ -484,7 +480,7 @@ _Findings:_
 - 🟡 P3 · **node** out.handle `node-read-typed` — Node has the 174 typed-graph classes (for buildAgs4) but no read_typed to populate them FROM a file — the biggest port lift, a real typed-graph reader. Last in the backlog.
 
 _Notes:_
-- _rust_: Absent. Held for 0.2 by the published plan (dec-rust-api-crates-io): 0.1.x scope is read/validate/write and this is additive, so nothing has to move to admit it.
+- _rust_: Absent. The 0.2 milestone this cell used to cite was RETIRED by dec-facade-parity on 2026-08-04 — the facade goes to parity once and then joins the product line, so there is no waypoint release left to hold this for. It is also outside the floor: `read_typed` has no Node sibling to take the intersection with, so parity never owes it. A Rust-native typed-graph reader stays an open question rather than a scheduled one.
 
 ### read-output-view — Output-shaping of a read (xn numeric coercion).
 
