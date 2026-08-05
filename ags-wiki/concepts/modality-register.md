@@ -112,8 +112,6 @@ _Notes:_
 
 *Offered anywhere — in: bytes, file-like, path, text · out: bytes, file, value*
 
-*Below the facade floor — the Rust crate does not yet offer in: bytes, path, text · out: file, value, which python and node both do. A minimum to clear, not a gate*
-
 **Input**
 
 | surface (spelling) | path | text | bytes | file-like |
@@ -121,7 +119,7 @@ _Notes:_
 | python (free) | ✓ | ✓ | ✓ | ✓ |
 | node (free) | ✓ | ✓ | ✓ |   |
 | browser (free) |   |   | ✓ |   |
-| rust (absent) |   |   |   |   |
+| rust (chained) | ✓ | ✓ | ✓ |   |
 
 **Output**
 
@@ -130,18 +128,16 @@ _Notes:_
 | python (free) | ✓ |   | ✓ |
 | node (free) | ✓ |   | ✓ |
 | browser (free) |   | ✓ | ✓ |
-| rust (absent) |   |   |   |
+| rust (chained) | ✓ |   | ✓ |
 
 _Notes:_
 - _node_: #394 added inPlace/out write-back (the out.file form) + only/exclude rule selection — the latter shrank the test_cross_surface_parity _MATRIX allowlist to empty. Rule labels are typed as FixableRule, drift-gated to Python/the engine (test_typed_choices).
 - _browser_: the browser deliberately SPLITS fix into compute_fixes (returns the Fix[] proposal for the UI to preview — a value form) and apply_fixes (returns the repaired bytes). The library surfaces one-shot fix() and offer no dry-run Fix[] preview form; whether to add one is P3 verb-decomposition (fix-dry-run-split), tracked in the backlog, not a browser defect.
-- _rust_: Decided 2026-08-04: ADD. No new dependency — `compute_fixes`/`apply_fixes` are in laterite-ags4-validator, already a facade dep.
+- _rust_: Added 2026-08-05 (phase 4c of dec-facade-parity). One builder over the three source doors, ending at `Fixed` — the value form. The file form is `to_path`, and in-place is the source path named as the destination rather than a separate flag: there is nothing a flag would express that the path does not. Rule selection (`only`/`exclude`) speaks the same short labels as python and node, read from the engine via `fixable_rules()` so a new fix cannot leave the list behind.
 
 ### build — Construct valid AGS4 from caller-supplied data (build_ags4).
 
 *Offered anywhere — in: bytes, handle, text, value · out: bytes, value*
-
-*Below the facade floor — the Rust crate does not yet offer in: handle, value · out: value, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -150,7 +146,7 @@ _Notes:_
 | python (free) |   |   | ✓ | ✓ |
 | node (free) |   |   | ✓ | ✓ |
 | browser (free) | ≈ | ✓ |   |   |
-| rust (absent) |   |   |   |   |
+| rust (chained) |   |   | ✓ | ✓ |
 
 **Output**
 
@@ -159,13 +155,13 @@ _Notes:_
 | python (free) |   | ✓ |
 | node (free) |   | ✓ |
 | browser (free) | ✓ |   |
-| rust (absent) |   |   |
+| rust (chained) |   | ✓ |
 
 _Findings:_
 - 🟠 P2 · **browser** in.text `wasm-build-text-outlier` — build_ags4 takes a JSON-TEXT groups payload — the lone text-in build door across all surfaces (Python/Node take a typed-graph root or (code, frame) rows). Bytes-in already exists as build_ags4_ipc, so the reconciliation is the JSON-text outlier, NOT adding a bytes door.
 
 _Notes:_
-- _rust_: Decided 2026-08-04: ADD. No new dependency — laterite-ags4-emit is already a facade dep, and `Document` already has `push_row`/`set_cell`; what is missing is the one-call door.
+- _rust_: Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it.
 
 ### diff — Compare two AGS4 revisions.
 
