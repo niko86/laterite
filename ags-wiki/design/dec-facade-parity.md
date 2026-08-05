@@ -294,7 +294,7 @@ Excel, which needs a rename and full prep first.
 | **1** | `publish = true` on `diff` + `merge`, empty `DEFERRED` | — | — | 2026-08-04 |
 | **2** | **publish `diff` + `merge`** at 0.9.0 — owner | — | 1 | 2026-08-05 |
 | **3** | rename `laterite-excel` → `laterite-ags4-excel`, repo-wide | — | — | 2026-08-05 |
-| **4a** | facade `transport`: `pack` / `lock` | 2 | — | — |
+| **4a** | facade `transport`: `pack` / `lock` | 2 | — | 2026-08-05 |
 | **4b** | facade cert trio: `certify`, cert-input, read-from-cert | 3 | — | — |
 | **4c** | facade `fix` + `build` | 2 | — | — |
 | **4d** | facade `diff` + `merge` | 2 | 2 | — |

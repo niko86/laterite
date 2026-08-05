@@ -36,7 +36,9 @@
 //!
 //! - **Everything AGS4-specific lives under [`ags4`].** The crate root stays
 //!   format-neutral. AGS4 is not the last version of the format, and a root-level
-//!   `laterite::read` would have to mean one of them forever.
+//!   `laterite::read` would have to mean one of them forever. [`transport`] is at
+//!   the root because it genuinely is format-neutral — zstd and age over any
+//!   bytes.
 //! - **Handles are opaque.** [`ags4::Document`], [`ags4::Report`] and the rest
 //!   have private fields. You reach data through methods, so the engine's own
 //!   structs can change shape without editing your code.
@@ -52,15 +54,25 @@
 //! `Cargo.toml` — reaching past a stability boundary should be something you
 //! wrote down.
 //!
-//! # Scope of 0.1
+//! # Scope
 //!
-//! Read, validate, write. Diff, merge, typed cell access and the indexed
-//! `scan()` path are the engine's already and will surface here in 0.2 —
-//! additively, so nothing here has to change to accommodate them.
+//! Read, validate, write, and [`transport`] (compress / encrypt any file).
+//!
+//! The crate is completing to **parity** with the Python and Node surfaces —
+//! offering, per capability, at least what the weaker of those two offers — and
+//! joins the product version line when it gets there. Still to arrive: diff,
+//! merge, fix, build, the certificate trio and Excel. Each is additive, so
+//! nothing here has to change to admit them.
+//!
+//! There is no 0.2. This paragraph used to promise one; the milestone was
+//! retired in favour of going to parity once, because a 0.2 would have been a
+//! waypoint that existed for as long as the remaining work took, on a crate
+//! whose whole purpose is to be a stable surface.
 
 #![forbid(unsafe_code)]
 
 pub mod ags4;
 mod error;
+pub mod transport;
 
 pub use error::{Error, ErrorKind};

@@ -90,10 +90,20 @@ The `unstable-engine` feature is the only way past the facade, and it is a
 feature rather than a hidden module so that reaching past a stability boundary
 is something you wrote down in your own `Cargo.toml`.
 
-## Scope of 0.1
+## Scope
 
-Read, validate, write. Diff, merge, typed cell access and an indexed scan path
-all exist in the engine already and will surface here in 0.2 — additively.
+Read, validate, write, and `transport` — compress (`pack`) or compress-and-encrypt
+(`lock`) any file, from a path or from bytes in memory.
+
+The crate is completing to **parity** with the Python and Node surfaces: per
+capability, at least what the weaker of those two offers. Still to arrive: diff,
+merge, fix, build, the certificate trio and Excel. Each is additive, so nothing
+here has to change to admit them. When it reaches parity it joins the product
+version line.
+
+There is no 0.2 — that milestone was retired in favour of going to parity once,
+rather than stopping at a waypoint on a crate whose whole purpose is to be
+stable.
 
 ## Other surfaces
 

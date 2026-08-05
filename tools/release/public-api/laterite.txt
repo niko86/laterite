@@ -228,6 +228,98 @@ pub fn laterite::ags4::validate(impl core::convert::AsRef<std::path::Path>) -> l
 pub fn laterite::ags4::validate_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Validate
 pub fn laterite::ags4::validate_str(impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Validate
 pub fn laterite::ags4::write(&laterite::ags4::Document) -> laterite::ags4::Write<'_>
+pub mod laterite::transport
+pub struct laterite::transport::Lock
+impl laterite::transport::Lock
+pub fn laterite::transport::Lock::level(self, i32) -> laterite::transport::Lock
+pub fn laterite::transport::Lock::run(self) -> core::result::Result<laterite::transport::Packed, laterite::Error>
+pub fn laterite::transport::Lock::work_factor(self, u8) -> laterite::transport::Lock
+impl core::fmt::Debug for laterite::transport::Lock
+pub fn laterite::transport::Lock::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::Lock
+impl core::marker::Send for laterite::transport::Lock
+impl core::marker::Sync for laterite::transport::Lock
+impl core::marker::Unpin for laterite::transport::Lock
+impl core::marker::UnsafeUnpin for laterite::transport::Lock
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::Lock
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::Lock
+pub struct laterite::transport::LockBytes
+impl laterite::transport::LockBytes
+pub fn laterite::transport::LockBytes::level(self, i32) -> laterite::transport::LockBytes
+pub fn laterite::transport::LockBytes::run(self) -> core::result::Result<alloc::vec::Vec<u8>, laterite::Error>
+pub fn laterite::transport::LockBytes::work_factor(self, u8) -> laterite::transport::LockBytes
+impl core::fmt::Debug for laterite::transport::LockBytes
+pub fn laterite::transport::LockBytes::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::LockBytes
+impl core::marker::Send for laterite::transport::LockBytes
+impl core::marker::Sync for laterite::transport::LockBytes
+impl core::marker::Unpin for laterite::transport::LockBytes
+impl core::marker::UnsafeUnpin for laterite::transport::LockBytes
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::LockBytes
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::LockBytes
+pub struct laterite::transport::Pack
+impl laterite::transport::Pack
+pub fn laterite::transport::Pack::level(self, i32) -> laterite::transport::Pack
+pub fn laterite::transport::Pack::run(self) -> core::result::Result<laterite::transport::Packed, laterite::Error>
+impl core::fmt::Debug for laterite::transport::Pack
+pub fn laterite::transport::Pack::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::Pack
+impl core::marker::Send for laterite::transport::Pack
+impl core::marker::Sync for laterite::transport::Pack
+impl core::marker::Unpin for laterite::transport::Pack
+impl core::marker::UnsafeUnpin for laterite::transport::Pack
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::Pack
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::Pack
+pub struct laterite::transport::PackBytes
+impl laterite::transport::PackBytes
+pub fn laterite::transport::PackBytes::level(self, i32) -> laterite::transport::PackBytes
+pub fn laterite::transport::PackBytes::run(self) -> core::result::Result<alloc::vec::Vec<u8>, laterite::Error>
+impl core::fmt::Debug for laterite::transport::PackBytes
+pub fn laterite::transport::PackBytes::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::PackBytes
+impl core::marker::Send for laterite::transport::PackBytes
+impl core::marker::Sync for laterite::transport::PackBytes
+impl core::marker::Unpin for laterite::transport::PackBytes
+impl core::marker::UnsafeUnpin for laterite::transport::PackBytes
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::PackBytes
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::PackBytes
+pub struct laterite::transport::Packed
+impl laterite::transport::Packed
+pub fn laterite::transport::Packed::bytes(&self) -> u64
+pub fn laterite::transport::Packed::elapsed_secs(&self) -> f64
+pub fn laterite::transport::Packed::ratio(&self) -> f64
+impl core::fmt::Debug for laterite::transport::Packed
+pub fn laterite::transport::Packed::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::Packed
+impl core::marker::Send for laterite::transport::Packed
+impl core::marker::Sync for laterite::transport::Packed
+impl core::marker::Unpin for laterite::transport::Packed
+impl core::marker::UnsafeUnpin for laterite::transport::Packed
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::Packed
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::Packed
+pub struct laterite::transport::Unpacked
+impl laterite::transport::Unpacked
+pub fn laterite::transport::Unpacked::bytes(&self) -> u64
+pub fn laterite::transport::Unpacked::elapsed_secs(&self) -> f64
+impl core::fmt::Debug for laterite::transport::Unpacked
+pub fn laterite::transport::Unpacked::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for laterite::transport::Unpacked
+impl core::marker::Send for laterite::transport::Unpacked
+impl core::marker::Sync for laterite::transport::Unpacked
+impl core::marker::Unpin for laterite::transport::Unpacked
+impl core::marker::UnsafeUnpin for laterite::transport::Unpacked
+impl core::panic::unwind_safe::RefUnwindSafe for laterite::transport::Unpacked
+impl core::panic::unwind_safe::UnwindSafe for laterite::transport::Unpacked
+pub const laterite::transport::DEFAULT_LEVEL: i32
+pub const laterite::transport::DEFAULT_WORK_FACTOR: u8
+pub fn laterite::transport::lock(impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<std::path::Path>, impl core::convert::Into<alloc::string::String>) -> laterite::transport::Lock
+pub fn laterite::transport::lock_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>, impl core::convert::Into<alloc::string::String>) -> laterite::transport::LockBytes
+pub fn laterite::transport::pack(impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<std::path::Path>) -> laterite::transport::Pack
+pub fn laterite::transport::pack_bytes(impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::transport::PackBytes
+pub fn laterite::transport::unlock(impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<str>) -> core::result::Result<laterite::transport::Unpacked, laterite::Error>
+pub fn laterite::transport::unlock_bytes(impl core::convert::AsRef<[u8]>, impl core::convert::AsRef<str>) -> core::result::Result<alloc::vec::Vec<u8>, laterite::Error>
+pub fn laterite::transport::unpack(impl core::convert::AsRef<std::path::Path>, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<laterite::transport::Unpacked, laterite::Error>
+pub fn laterite::transport::unpack_bytes(impl core::convert::AsRef<[u8]>) -> core::result::Result<alloc::vec::Vec<u8>, laterite::Error>
 #[non_exhaustive] pub enum laterite::ErrorKind
 pub laterite::ErrorKind::BadDictionary
 pub laterite::ErrorKind::Emit

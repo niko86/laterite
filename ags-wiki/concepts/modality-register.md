@@ -418,15 +418,13 @@ _Notes:_
 
 *Offered anywhere — in: bytes, path · out: bytes, file*
 
-*Below the facade floor — the Rust crate does not yet offer in: bytes, path · out: bytes, file, which python and node both do. A minimum to clear, not a gate*
-
 **Input**
 
 | surface (spelling) | path | bytes |
 |---|---|---|
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
-| rust (absent) |   |   |
+| rust (chained) | ✓ | ✓ |
 
 **Output**
 
@@ -434,17 +432,15 @@ _Notes:_
 |---|---|---|
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
-| rust (absent) |   |   |
+| rust (chained) | ✓ | ✓ |
 
 _Notes:_
 - _node_: the *Bytes forms (#389) mirror laterite-py's pack_bytes/unpack_bytes — same shared-leaf envelope, so a Node-sealed blob interops with the file API and pyrage/the browser.
-- _rust_: Decided 2026-08-04: ADD. laterite-transport is ALREADY linked into the published crate (laterite-ags4-core's `transport` feature is default-ON and the facade enables it), so callers already carry age + zstd and cannot reach a single function. Exposing it costs nothing and removes that anomaly.
+- _rust_: Added 2026-08-05 (phase 4a of dec-facade-parity) as `laterite::transport`, at the crate ROOT rather than under `ags4` — the envelope is zstd over arbitrary bytes and understands no format. Level and (for lock) work factor are builder knobs; unpack/unlock are plain functions because they have nothing to configure.
 
 ### transport-lock — zstd + age passphrase encrypt/decrypt (lock/unlock) — the motivating capability.
 
 *Offered anywhere — in: bytes, path · out: bytes, file*
-
-*Below the facade floor — the Rust crate does not yet offer in: bytes, path · out: bytes, file, which python and node both do. A minimum to clear, not a gate*
 
 **Input**
 
@@ -453,7 +449,7 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | browser (free) | — | ✓ |
-| rust (absent) |   |   |
+| rust (chained) | ✓ | ✓ |
 | cli (free) | ✓ | — |
 
 **Output**
@@ -463,7 +459,7 @@ _Notes:_
 | python (free) | ✓ | ✓ |
 | node (free) | ✓ | ✓ |
 | browser (free) | — | ✓ |
-| rust (absent) |   |   |
+| rust (chained) | ✓ | ✓ |
 | cli (free) | ✓ |   |
 
 _Findings:_
@@ -473,7 +469,7 @@ _Findings:_
 _Notes:_
 - _python_: the *_bytes forms were added in 0.6.2-dev to close the exact path-only-vs-browser-bytes-only gap this whole audit is named after.
 - _node_: the *Bytes forms (#389) close the remaining leg of the motivating gap — lockBytes never writes plaintext to disk; same shared-leaf envelope as the Python/browser forms.
-- _rust_: Decided 2026-08-04: ADD. Same already-linked-but-unreachable position as transport-pack.
+- _rust_: Added 2026-08-05 (phase 4a). Same shared-leaf envelope as every other surface, so a Rust-sealed blob opens with `lat unlock`, Python, Node, the browser and stock age. The password-carrying builders redact in `Debug` — a derived one would put the passphrase in any log line that renders the builder.
 
 ### read_typed — Read AGS4 into the typed-graph object model.
 
