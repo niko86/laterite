@@ -84,7 +84,7 @@ def _scope_files() -> list[Path]:
 def test_every_named_gate_exists_or_disclaims_itself() -> None:
     """Falsify by deleting any test named in a doc, or by naming a new one.
 
-    Both halves matter. Deleting `tests/test_nightly_tracker.py` must fail here
+    Both halves matter. Deleting `tests/test_issue_tracker.py` must fail here
     (nightly.yml names it); so must writing "gated by tests/test_nope.py" into
     any page in scope.
     """

@@ -548,6 +548,7 @@ jobs:
             exit 0
           }
           # Stdlib-only by design, so this job needs no Python/uv setup step —
-          # see the module docstring. Every decision lives in `plan()`, which
-          # tests/test_nightly_tracker.py exercises branch by branch.
-          python3 tools/nightly_tracker.py
+          # see the module docstring. Every decision lives in `plan_items()`,
+          # which tests/test_issue_tracker.py exercises branch by branch. The
+          # same module drives wiki-ext-drift.yml's issue, hence the name.
+          python3 tools/issue_tracker.py

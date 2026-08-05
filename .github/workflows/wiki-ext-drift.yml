@@ -12,6 +12,13 @@
 # thing that counts as drift; a timeout/rate-limit/auth hiccup is reported
 # as `unknown` and does NOT open an issue (network flakiness must not be
 # mistaken for a citation actually going stale).
+#
+# The issue is driven by `tools/issue_tracker.py`, the same state machine the
+# nightly uses. It used to be inline shell here that create-or-commented, which
+# had all three defects that tool was written to fix: the issue could never
+# close (nothing ran when drift cleared), the body was never rewritten so it
+# never said what was missing NOW, and a comment landed on every single run
+# whether or not anything had changed.
 name: wiki-ext-drift
 
 on:
@@ -44,26 +51,27 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           uv run --no-project python ags-wiki/.bootstrap/check_ext_drift.py | tee drift.log
-          count=$(grep -Eo '^DRIFT_COUNT=[0-9]+' drift.log | cut -d= -f2)
-          echo "count=${count:-0}" >> "$GITHUB_OUTPUT"
+          # The SET, not a count — the tracker reports what changed, and an
+          # empty set is what closes the issue. Multiline, so it goes to
+          # $GITHUB_ENV via a heredoc rather than an output.
+          {
+            echo "ITEMS<<DRIFT_EOF"
+            grep -E '^DRIFT_REF=' drift.log | cut -d= -f2- || true
+            echo "DRIFT_EOF"
+          } >> "$GITHUB_ENV"
 
-      - name: Open/update tracking issue on confirmed drift
-        # continue-on-error, not just `|| true` on the run line — an issue
-        # API hiccup here must never turn a *report-only* check red.
-        # Looked up by TITLE, not a label — doesn't assume any repo-side
-        # label setup exists (this workflow is meant to be self-contained).
-        if: steps.drift.outputs.count != '0'
+      - name: Drive the tracking issue
+        # Runs on EVERY run, not just drifting ones: closing is half the job, and
+        # gating this step on "drift found" is exactly what left the old issue
+        # unable to close.
+        #
+        # continue-on-error, not `|| true` on the run line — an issue API hiccup
+        # must never turn a *report-only* check red. Looked up by exact title,
+        # not a label: labels are effectively unused in this repo (1 application
+        # across 31 issues), so a label-keyed lookup would assume setup that
+        # isn't there.
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set +e
-          title="wiki: ext: citation drift detected"
-          existing=$(gh issue list --search "in:title \"$title\"" --state open \
-            --json number --jq '.[0].number' 2>/dev/null)
-          body="Weekly \`ext:\` drift check found ${{ steps.drift.outputs.count }} confirmed-missing citation(s) — see the run log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          if [ -n "$existing" ] && [ "$existing" != "null" ]; then
-            gh issue comment "$existing" --body "$body"
-          else
-            gh issue create --title "$title" --body "$body"
-          fi
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 tools/issue_tracker.py --tracker ext-drift
