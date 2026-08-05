@@ -146,9 +146,18 @@ def main() -> int:
     for u in unknown:
         print(f"  - {u}")
 
-    # Machine-readable line the workflow step greps for. Report-only: this
+    # Machine-readable lines the workflow step greps for. Report-only: this
     # script's own exit code is always 0 regardless of what it found.
-    print(f"\nDRIFT_COUNT={len(missing)}")
+    #
+    # One `DRIFT_REF=` per missing citation, not just the count: the tracking
+    # issue is driven by the SET, so it can say what newly broke and what came
+    # back rather than restating a number. A count alone can only ever produce
+    # the "N confirmed-missing citation(s)" sentence the old inline shell
+    # commented every single week.
+    print()
+    for m in missing:
+        print(f"DRIFT_REF={m}")
+    print(f"DRIFT_COUNT={len(missing)}")
     return 0
 
 
