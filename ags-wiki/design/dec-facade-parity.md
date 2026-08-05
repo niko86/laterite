@@ -147,7 +147,10 @@ in that build gets it. For an application graph that is a non-issue.
 
 The real cost lands on **us**, not on consumers: `laterite-ags4-excel` joins
 `PUBLISH_SET`, and with it the semver gate, the public-API snapshot and the
-packaging-contents gate, permanently, on a tenth crate.
+packaging-contents gate, permanently, on an eleventh engine crate. (Written as
+"a tenth crate"; the engine tier was already ten crates when this was decided —
+`CHANGELOG.md` 0.10.0 says so — with diff and merge in `PUBLISH_SET` but held
+from the registry. Excel is the eleventh either way you count.)
 
 Three findings make that cost affordable:
 
@@ -285,20 +288,20 @@ publish, and a publish is the owner's act, not a PR. Two independent publish
 tracks fall out of that — diff/merge, which need only a flag flip, and
 Excel, which needs a rename and full prep first.
 
-| phase | what | caps | blocked by |
-|---|---|---|---|
-| **0** | this page · register cells · modality drift gate | — | #250 |
-| **1** | `publish = true` on `diff` + `merge`, empty `DEFERRED` | — | — |
-| **2** | **publish `diff` + `merge`** at 0.9.0 — owner | — | 1 |
-| **3** | rename `laterite-excel` → `laterite-ags4-excel`, repo-wide | — | — |
-| **4a** | facade `transport`: `pack` / `lock` | 2 | — |
-| **4b** | facade cert trio: `certify`, cert-input, read-from-cert | 3 | — |
-| **4c** | facade `fix` + `build` | 2 | — |
-| **4d** | facade `diff` + `merge` | 2 | 2 |
-| **5** | Excel publish prep · second facade snapshot | — | 3 |
-| **6** | **publish `laterite-ags4-excel`** at 0.9.0 — owner | — | 5 |
-| **7** | facade `excel` feature: `to_excel` + `from_excel` | 2 | 6 |
-| **8** | **the jump** — facade onto the product line | — | 0–7 |
+| phase | what | caps | blocked by | done |
+|---|---|---|---|---|
+| **0** | this page · register cells · modality drift gate | — | #250 | 2026-08-04 |
+| **1** | `publish = true` on `diff` + `merge`, empty `DEFERRED` | — | — | 2026-08-04 |
+| **2** | **publish `diff` + `merge`** at 0.9.0 — owner | — | 1 | 2026-08-05 |
+| **3** | rename `laterite-excel` → `laterite-ags4-excel`, repo-wide | — | — | — |
+| **4a** | facade `transport`: `pack` / `lock` | 2 | — | — |
+| **4b** | facade cert trio: `certify`, cert-input, read-from-cert | 3 | — | — |
+| **4c** | facade `fix` + `build` | 2 | — | — |
+| **4d** | facade `diff` + `merge` | 2 | 2 | — |
+| **5** | Excel publish prep · second facade snapshot | — | 3 | — |
+| **6** | **publish `laterite-ags4-excel`** at 0.9.0 — owner | — | 5 | — |
+| **7** | facade `excel` feature: `to_excel` + `from_excel` | 2 | 6 | — |
+| **8** | **the jump** — facade onto the product line | — | 0–7 | — |
 
 Phases 1 and 3 are independent of each other and of everything in 4; 4a–4c are
 independent of both publish tracks.
@@ -363,9 +366,10 @@ landing.
 tier both stay where they are. Publishing diff, merge and excel adds crates at
 0.9.0; it does not bump anything.
 
-**The engine tier grows to ten published crates**, and the gates that ride on
+**The engine tier grows to eleven published crates**, and the gates that ride on
 `PUBLISH_SET` — semver, public-API snapshot, packaging contents — grow with it.
-That is the standing cost decision 4 accepts.
+That is the standing cost decision 4 accepts. As of 2026-08-05 it is **ten**:
+phase 2 published diff and merge, and excel is the one still to come.
 
 **The version gate changes shape at the jump.** `test_version_faithful` currently
 asserts the facade starts with `0.1.` and explains why. At parity that assertion
