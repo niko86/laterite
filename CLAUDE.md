@@ -15,9 +15,25 @@ The **why** — design decisions, format concepts, the crate map, the O-1..O-N
 divergence catalogue, editions, and per-crate tool pages — lives in **`ags-wiki/`**
 in this repo. **Reach for it before** answering an AGS4 question, changing
 validator/parity behaviour, or touching the architecture (crate layout, the
-wheel/dep/build split, the PyO3 or wasm boundary). Start at
-`ags-wiki/start-here.md`; `ags-wiki/concepts/crate-map.md` is the keystone crate
-map.
+wheel/dep/build split, the PyO3 or wasm boundary).
+
+**To find what covers the files you are about to change**, ask — don't guess from
+filenames, and don't assume nothing covers them:
+
+```bash
+uv run --no-project python ags-wiki/.bootstrap/librarian.py --paths <files…>
+```
+
+Under a second, no build. It inverts the `repo:` citations already on the pages
+and prints them ranked, with their titles, marking a hit that comes only from a
+page citing a parent *directory* as `(directory only — may not describe this
+file)`. A stem lookup cannot answer this: the page covering
+`rust-packages/laterite-ags4-reference/src/dict.rs` is called
+`edition-resolution`. It is a lookup, not a gate — nothing checks that you ran
+it.
+
+For orientation rather than lookup: `ags-wiki/start-here.md`, and
+`ags-wiki/concepts/crate-map.md` is the keystone crate map.
 
 Treat a page as a pointer, not gospel: verify a load-bearing claim against the
 repo authority it cites (`observations.json`, `ags_dictionary.json`, the validator

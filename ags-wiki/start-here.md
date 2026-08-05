@@ -114,16 +114,21 @@ graph TD
 - **[[parent-child-graph]]** — full group hierarchy · **[[rule-families]]** · **[[traceability-chain]]** · **[[parity-model]]** · **[[edition-resolution]]**
 - **[[evolutionary-dogfooding]]** — manufacture & prove divergences · **[[parity-confidence-model]]** — adaptive oracle gating · **[[agent-first-cli-contract]]** — the CLI lineage/contract · **[[testing-strategy]]** — invariant-first hardening doctrine
 - **[[validator-site]]** — the browser AGS4 validator + data-explorer roadmap (wasm) · **[[dec-laterite-ags4-types-leaf]]** — shared wasm-safe typing crate · **cli-cloud-workflow** — handing off work between CLI & cloud sessions
-- **[[crate-map]]** — the 20-crate / 1-wheel workspace map · **[[tech-stack-wasm]]** — the browser wasm + typed-Arrow path · **[[pyo3-boundary]]** — where Rust drives Python
-- **Rules** — `rules/` (28 pages, Rules 1–20 + sub-rules)
-- **Groups** — `groups/` (92 pages — a bootstrap-era subset; the shipped
-  AGS4 union dictionary has grown to 174 groups, see [[ags-dictionary-json]])
-- **Types** — `types/` (17 AGS data types)
-- **Observations** — `observations/` (36 O-N divergence entries)
-- **Tools** — `tools/` (13 CLIs/crates/packages/scripts)
+- **[[crate-map]]** — the workspace crate map · **[[tech-stack-wasm]]** — the browser wasm + typed-Arrow path · **[[pyo3-boundary]]** — where Rust drives Python
+- **Rules** — `rules/` (Rules 1–20 + sub-rules)
+- **Groups** — `groups/` (one page per group in the AGS4 union dictionary, generated — see [[ags-dictionary-json]])
+- **Types** — `types/` (the AGS data types)
+- **Observations** — `observations/` (the O-N divergence entries)
+- **Tools** — `tools/` (CLIs/crates/packages/scripts)
 - **Editions** — `editions/` (4.0.3 → 4.2) · **Sources** — `sources/` · **Comparisons** — `comparisons/`
 - **Campaign registers** — [[insights/_README|Insights & Gaps]] · [[strategies/_README|Test Strategies]] · [[design/_README|AGS5 Design]] (see `.bootstrap/INGEST-PLAN.md`)
 - Full catalog: [[index]] · Activity: [[log]]
+
+> [!note] **Page counts live in [[index]]'s Coverage table**, which `reindex.py`
+> generates and `--check` gates. They were hand-typed in the list above and had
+> rotted to Groups 92 (177), Observations 36 (50), Tools 13 (29) and a "20-crate"
+> workspace (25). Deleted rather than corrected — a number typed in two places
+> drifts in one of them.
 
 ## Example Dataview rollups (need the Dataview plugin; degrade gracefully)
 
