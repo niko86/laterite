@@ -63,6 +63,14 @@ Currently v0.1.2 — this crate versions independently of the engine.
 - **Certify.** Mint an `.ags.idx` certificate over a file's bytes, and offer one
   back so a validate can skip the rule engine or a read can slice a group
   straight out of its byte range.
+- **Diff.** Compare two revisions in *AGS terms*: rows matched by their
+  dictionary `KEY` headings rather than by line order, cells compared through
+  their declared TYPE. A re-sorted file is not a change, and `1.0` → `1.00` is
+  not a change. A line diff gets both wrong.
+- **Merge.** Reconcile several deliveries of one project into one file, in
+  order — a later file wins. A column two producers typed differently is
+  refused unless you say how to settle it; a column they gave different *units*
+  is refused outright, because nothing can settle that honestly.
 
 The validator is **clean-room** — written from the AGS4.1 specification, not
 derived from any existing implementation — and is cross-checked against the
@@ -103,13 +111,14 @@ is something you wrote down in your own `Cargo.toml`.
 
 ## Scope
 
-Read, validate, fix, build, write, certify, and `transport` — compress (`pack`)
-or compress-and-encrypt (`lock`) any file, from a path or from bytes in memory.
+Read, validate, fix, build, write, certify, diff, merge, and `transport` —
+compress (`pack`) or compress-and-encrypt (`lock`) any file, from a path or from
+bytes in memory.
 
 The crate is completing to **parity** with the Python and Node surfaces: per
-capability, at least what the weaker of those two offers. Still to arrive: diff,
-merge and Excel. Each is additive, so nothing here has to change to admit them.
-When it reaches parity it joins the product version line.
+capability, at least what the weaker of those two offers. Only Excel is still to
+arrive, behind an optional feature; it is additive, so nothing here has to change
+to admit it. When it reaches parity it joins the product version line.
 
 There is no 0.2 — that milestone was retired in favour of going to parity once,
 rather than stopping at a waypoint on a crate whose whole purpose is to be
