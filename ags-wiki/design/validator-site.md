@@ -137,9 +137,12 @@ Commit `6b3bb17` on branch the validator-site branch.
 
 > [!todo] Owed (carried into Phase 3 or a follow-up)
 > End-to-end value parity against a *live* native `.ags5db` was **not**
-> run. The read CLI laterite-ags5-db has no `convert` subcommand — AGS4 →
-> `.ags5db` is the Python path (`laterite.ags5db.convert`). A proper E2E
-> check would convert a fixture both ways and diff the typed cell values.
+> run, and is no longer owed: the `.ags5db` surface was decoupled in #177 and
+> no longer ships. `laterite.ags5db` is gone —
+> `repo:packages/laterite/tests/test_base_surface_no_extras.py` asserts that
+> importing it raises `ModuleNotFoundError` — so there is nothing left in this
+> tree to check parity against. AGS5 is a dormant concept in the private
+> satellite; see `CLAUDE.md`.
 > The host unit test proves the casting *logic*; the "identical to
 > `.ags5db`" claim currently rests on both sides calling the one shared
 > crate ([[dec-laterite-ags4-types-leaf]]).
@@ -196,7 +199,9 @@ Deferred (offered as follow-ups, not dropped):
   `lat fix` now normalise the unambiguous majority by default. chrono
   validates so an impossible date is never "fixed". Ships to the Fix tab via the
   wasm `compute_fixes`. Row-count padding also shipped (below).
-- The end-to-end `.ags5db` parity check remains owed (carried from Phase 2).
+- ~~The end-to-end `.ags5db` parity check remains owed (carried from Phase 2).~~
+  Dropped, not owed: the `.ags5db` surface was decoupled in #177 and no longer
+  ships (see the Phase 2 note above).
 
 ## Phase 3 follow-ups (post-#38 hardening)
 

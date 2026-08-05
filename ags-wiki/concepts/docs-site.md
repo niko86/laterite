@@ -33,12 +33,12 @@ Key facts:
 
 - **Example-led / single-sourced.** Every code snippet on a page is
   `--8<--`-included (pymdownx.snippets, `base_path: [examples]`) from
-  `repo:web/docs-site/examples/{python,node,cli,duckdb}/` — and each tree has a
-  **runtime gate** so page and test are the same bytes (#373 built the three
-  non-Python trees; a changed return shape / dtype / printed format / method
+  `repo:web/docs-site/examples/{python,node,cli,duckdb,wasm}/` — and each tree
+  has a **runtime gate** so page and test are the same bytes (#373 built the
+  three non-Python trees, #228 added the wasm one; a changed return shape / dtype / printed format / method
   name turns a doc snippet **red in CI** — the example-first analogue of the
   OBSERVATIONS / `.pyi` drift gates):
-  - *python* — `tests/test_docs_examples.py` (dev satellite) runs each `ex*.py` as a
+  - *python* — `repo:tests/test_docs_examples.py` runs each `ex*.py` as a
     subprocess against the installed wheel + the committed
     `repo:examples/sample_site.ags` fixture (`cwd` = repo root, so the literal
     `"examples/sample_site.ags"` path resolves); in-file `assert`s pin outputs.
@@ -101,18 +101,22 @@ Key facts:
   CDN-free.
 - **Two CI gates, both via `ci.yml`'s `changes`-job filter** (see
   ci-and-runners):
-  - *Build half* — the `docs` job `uv sync --group docs` (builds the local wheel
-    + mkdocs-material + mkdocstrings; Rust toolchain + sccache make it a warm-
-    cache hit) then `mkdocs build --strict`, so `--strict` fails on a broken
+  - *Build half* — the `docs` job `uv sync --group docs` (mkdocs-material +
+    mkdocstrings) then `mkdocs build --strict`, so `--strict` fails on a broken
     internal link, missing nav page, unresolved snippet file, **or a broken
-    autodoc cross-reference**. The `docs` filter includes
+    autodoc cross-reference**. It is a **pure Python job**: it downloads the
+    cdylib `build-ext` already produced rather than compiling one, so there is no
+    Rust toolchain and no sccache in it — `repo:.github/workflows/ci.yml` says so
+    at the step ("No Rust toolchain / build-accel here any more"). The `docs` filter includes
     `packages/laterite/python/**` so a docstring rename re-runs it.
   - *Runtime half* — `web/docs-site/examples/**` + `examples/sample_site.ags` sit
     in the `code` filter, so editing an example or the shared fixture re-runs
     the python + CLI example gates in the `python` job (which has the compiled
     wheel + `lat`); `web/docs-site/examples/node/**` + the fixture also
     sit in the `node` filter so Node-snippet edits re-run the vitest gate. The
-    duckdb gate's per-PR leg is include-check only (runtime is monthly, above).
+    wasm tree has its own per-PR leg in the `web` job — `gen_doc_outputs.py
+    --check --surface wasm` — on `web/**` + `rust-packages/**`. The duckdb
+    gate's per-PR leg is include-check only (runtime is monthly, above).
 - **Deploy.** The mkdocs build in
   `repo:.github/workflows/deploy-validator.yml` deploys the docs to the public
   Pages site (`/laterite/docs/`). The build is deliberately **non-strict** — a

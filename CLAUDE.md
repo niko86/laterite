@@ -86,9 +86,11 @@ The python-ags4 parity runner shims `python_ags4` to `laterite.compat`. The
 identity** (`parity-known-failures.json`, `tools/check_parity.py`) — a required
 merge check.
 
-The dev workspace floor is Python ≥ 3.12, matching the shipped wheel; the dev
-interpreter is pinned to 3.14 (`.python-version`). The **shipped** `laterite`
-wheel is **abi3-py312** → installable on **≥ 3.12** (green on 3.12/3.13/3.14).
+The dev workspace floor is Python ≥ 3.12 (`requires-python` in the root
+`pyproject.toml`), matching the shipped wheel. There is **no `.python-version`**
+— this line used to claim the dev interpreter was pinned to 3.14 by one, and no
+such file has ever been tracked. The **shipped** `laterite` wheel is
+**abi3-py312** → installable on **≥ 3.12** (green on 3.12/3.13/3.14).
 
 **Dep-shape split:** `pip install laterite` installs **polars + duckdb** only —
 no pandas, no pyarrow. The python-ags4 drop-in surface (`laterite.compat`) lives

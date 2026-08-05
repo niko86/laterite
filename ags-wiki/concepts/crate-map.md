@@ -330,9 +330,14 @@ as stable):
 - [[laterite-node]] — the napi-rs cdylib + co-located TS `laterite` package: the
   **Node.js** host binding (the Node analog of `laterite-py`), re-expressing the
   DuckDB-free engine through `#[napi]` as per-group Arrow IPC `Buffer`s (the same
-  marshalling `laterite-ags4-wasm` frames for the browser). Deps: `laterite-ags4-validator` +
-  `laterite-ags4-types` + `laterite-ags4-emit` (both `arrow`). In progress (P1+P2 of 4:
-  read/validate/emit Arrow-direct; DuckDB/typed-graph/npm = P3–P4).
+  marshalling `laterite-ags4-wasm` frames for the browser). Deps — ten, per
+  `repo:rust-packages/laterite-node/Cargo.toml`, and the diagram below is the
+  authority for the edges: `laterite-ags4-validator`, `-parse`, `-diff`,
+  `-merge`, `-types` (`arrow`), `-emit` (`arrow`), `-core`, `-trust`,
+  `laterite-excel`, `laterite-transport`. Shipping: P3–P4 landed (DuckDB,
+  typed-graph, npm) — `test/p3-*.test.ts` exercise them and `git tag -l
+  "node-v*"` runs to `node-v0.10.1`. This paragraph listed three deps and called
+  P3–P4 pending long after both stopped being true.
 - `laterite_ags4` — the **DuckDB loadable extension** (crate `laterite-duckdb`):
   reads AGS4 files as typed, UUID-keyed tables straight from SQL (`read_ags(path,
   group)` + `ags_groups`/`ags_headings`/`ags_dictionary`/`ags_relationships`) —
