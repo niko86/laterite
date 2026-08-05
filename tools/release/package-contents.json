@@ -9,7 +9,8 @@
     "src/ags4/mod.rs",
     "src/ags4/report.rs",
     "src/error.rs",
-    "src/lib.rs"
+    "src/lib.rs",
+    "src/transport.rs"
   ],
   "laterite-ags4-core": [
     ".cargo_vcs_info.json",

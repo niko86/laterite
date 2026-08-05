@@ -1629,12 +1629,37 @@
         },
         {
           "surface": "rust",
-          "spelling": "absent",
-          "verbs": [],
-          "input": {},
-          "output": {},
-          "note": "Decided 2026-08-04: ADD. laterite-transport is ALREADY linked into the published crate (laterite-ags4-core's `transport` feature is default-ON and the facade enables it), so callers already carry age + zstd and cannot reach a single function. Exposing it costs nothing and removes that anomaly.",
-          "facade_verdict": "planned"
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "pack/unpack",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            },
+            {
+              "name": "pack_bytes/unpack_bytes",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "note": "Added 2026-08-05 (phase 4a of dec-facade-parity) as `laterite::transport`, at the crate ROOT rather than under `ags4` — the envelope is zstd over arbitrary bytes and understands no format. Level and (for lock) work factor are builder knobs; unpack/unlock are plain functions because they have nothing to configure.",
+          "gaps": []
         }
       ]
     },
@@ -1744,12 +1769,37 @@
         },
         {
           "surface": "rust",
-          "spelling": "absent",
-          "verbs": [],
-          "input": {},
-          "output": {},
-          "note": "Decided 2026-08-04: ADD. Same already-linked-but-unreachable position as transport-pack.",
-          "facade_verdict": "planned"
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "lock/unlock",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            },
+            {
+              "name": "lock_bytes/unlock_bytes",
+              "in_forms": [
+                "bytes"
+              ],
+              "out_forms": [
+                "bytes"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "file": "present",
+            "bytes": "present"
+          },
+          "note": "Added 2026-08-05 (phase 4a). Same shared-leaf envelope as every other surface, so a Rust-sealed blob opens with `lat unlock`, Python, Node, the browser and stock age. The password-carrying builders redact in `Debug` — a derived one would put the passphrase in any log line that renders the builder.",
+          "gaps": []
         },
         {
           "surface": "cli",
