@@ -717,7 +717,21 @@ _RUST_READ_DOORS = {
     # `impl std::io::Read` — Rust HAS a universal file-like, so node's
     # by-design reason for omitting it cannot be borrowed here.
     "file-like": "read_reader",
-    "cert": "read_cert",
+    # A builder method, not a free `read_cert`: the certificate is not a SOURCE,
+    # it is an accelerator for a path/bytes read — it carries the byte index that
+    # lets `.only([…])` slice a group instead of parsing the file.
+    "cert": "Read::index",
+}
+#: certify's OUTPUT forms — the certificate itself, written or returned.
+_RUST_CERTIFY_DOORS = {
+    "file": "Certify::to_path",
+    "bytes": "Certify::to_bytes",
+}
+#: cert-input's INPUT form. On this surface the door is on validate, not on
+#: read: the facade's validate is a free function with no `Document::validate()`
+#: for a read-time certificate to reach.
+_RUST_CERT_INPUT_DOORS = {
+    "cert": "Validate::index",
 }
 _RUST_VALIDATE_DOORS = {
     "path": "validate",
@@ -764,6 +778,8 @@ def test_rust_facade_reflects_the_register():
         ("read", _RUST_READ_DOORS, "in"),
         ("validate", _RUST_VALIDATE_DOORS, "in"),
         ("emit", _RUST_EMIT_DOORS, "out"),
+        ("certify", _RUST_CERTIFY_DOORS, "out"),
+        ("cert-input", _RUST_CERT_INPUT_DOORS, "in"),
     ):
         present, absent = _reflect_rust(doors, api)
         _assert_reflection(_cell(doc, capability, "rust"), direction, present, absent)
