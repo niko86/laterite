@@ -69,12 +69,27 @@ fn a_number_is_formatted_to_its_type_and_a_string_is_not() {
 /// `AutoFix` reaches the same place by a different route — the numeric
 /// reformatter pads the string afterwards. Pinned so the test above cannot be
 /// read as "strings are never normalised": they are, just not by the emitter.
+///
+/// The count is asserted on BOTH modes. `> 0` alone is satisfied by a
+/// `fixes_applied` hard-wired to 1, and `Report` is the mode that makes zero
+/// the right answer — mutation testing found that gap.
 #[test]
 fn autofix_pads_the_string_the_emitter_left_alone() {
-    let stringly = GroupData::new("LOCA", ["LOCA_ID", "LOCA_GL"]).row(["BH01", "12.5"]);
-    let built = ags4::build(vec![proj(), stringly]).run().unwrap();
+    let stringly = || GroupData::new("LOCA", ["LOCA_ID", "LOCA_GL"]).row(["BH01", "12.5"]);
+
+    let built = ags4::build(vec![proj(), stringly()]).run().unwrap();
     assert!(text_of(&built).contains("\"12.50\""), "{}", text_of(&built));
     assert!(built.fixes_applied() > 0);
+
+    let reported = ags4::build(vec![proj(), stringly()])
+        .mode(WriteMode::Report)
+        .run()
+        .unwrap();
+    assert_eq!(
+        reported.fixes_applied(),
+        0,
+        "Report emits unchanged — nothing was fixed"
+    );
 }
 
 #[test]
