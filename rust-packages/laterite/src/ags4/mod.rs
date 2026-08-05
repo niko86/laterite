@@ -1,12 +1,14 @@
-//! The AGS4 surface: read, validate, fix, build, write.
+//! The AGS4 surface: read, validate, fix, build, write, diff, merge.
 //!
 //! Everything format-specific lives under this module and not at the crate
 //! root, so a future format is a sibling rather than a rename.
 
 mod build;
 mod cert;
+mod diff;
 mod document;
 mod fix;
+mod merge;
 mod report;
 
 use std::path::{Path, PathBuf};
@@ -19,8 +21,12 @@ use laterite_ags4_validator::{CheckOptions, WorldScope, check_file, check_parsed
 
 pub use build::{Build, Cell, GroupData, build, build_document};
 pub use cert::Certify;
+pub use diff::{
+    CellChange, Change, Delta, Diff, GroupChange, RowChange, diff, diff_bytes, diff_documents,
+};
 pub use document::{Document, Group, Row, Rows};
 pub use fix::{Fix, Fixed, Repair, fix, fix_bytes, fix_str, fixable_rules};
+pub use merge::{Merge, Merged, Note, Revision, TypeClash, merge, merge_bytes, merge_documents};
 pub use report::{Finding, Report, Severity};
 
 use crate::{Error, ErrorKind};
