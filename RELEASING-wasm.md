@@ -109,11 +109,25 @@ publish log reads *"Signed provenance statement with source and build informatio
 from GitHub Actions"* (Sigstore log index 2285019141). OIDC authenticated with **no
 credential in the job**.
 
-One expectation that proved wrong, worth recording: **the `npm` environment did not
-pause for approval.** It carries deployment tag policies but no required reviewer, so
-a `wasm-v*` or `node-v*` tag push publishes with no human checkpoint after the tag.
-If you want one, add a required reviewer to the environment — the tag itself is
-currently the only gate.
+One expectation that proved wrong at the time, worth recording: **on that run the
+`npm` environment did not pause for approval.** It carried deployment tag policies
+and no required reviewer, so the tag push published with no human checkpoint after
+the tag.
+
+**That has since been fixed, and the fix is the operative state:** the `npm`
+environment now carries `required_reviewers` alongside its `branch_policy`, so a
+`wasm-v*` or `node-v*` tag push **waits for an approval** before anything reaches
+the registry. Confirm with
+
+```bash
+gh api repos/niko86/laterite/environments/npm --jq '.protection_rules[].type'
+# branch_policy
+# required_reviewers
+```
+
+This paragraph is the one claim in this file nothing in the repo can gate — the
+environment's protection rules live in GitHub's settings and leave no in-tree
+trace. Re-run the command above rather than trusting the sentence.
 
 ## What a `wasm-v*` tag triggers
 

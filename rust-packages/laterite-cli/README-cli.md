@@ -119,7 +119,6 @@ report (certify / pack / unpack / lock / unlock / excel) reject them.
 
 ## certify <file>
 
-    --check-files        record Rule 20's on-disk check in the cert profile
     --out <path>         write the certificate to <path> (default <file>.ags.idx)
                          (also honours --dict-version / --dict / --encoding)
 
