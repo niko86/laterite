@@ -47,8 +47,8 @@ compat; DuckDB + CLI stay by-design; web transport is a by-design browser blank)
 
 ## Plug-list (the `○` cells — docs ship now, plugs on their own cadence)
 
-1. ~~**Node Excel I/O** — bind `laterite-excel`~~ — **shipped (#358 / PR #361):** `toExcel` / `fromExcel`.
-2. **Browser Excel I/O** — wasm-bind `laterite-excel` (or a JS xlsx lib). #359, relates to #295.
+1. ~~**Node Excel I/O** — bind `laterite-ags4-excel`~~ — **shipped (#358 / PR #361):** `toExcel` / `fromExcel`.
+2. **Browser Excel I/O** — wasm-bind `laterite-ags4-excel` (or a JS xlsx lib). #359, relates to #295.
 3. **Browser certify** — mint `.ags.idx` client-side + download; wasm has the `index` code. #360, relates to #295.
 
 Deferred/by-design: web transport (`age`→`getrandom` isn't wasm-clean; encryption

@@ -1,4 +1,4 @@
-// #358 — Node Excel I/O. Binds the SAME `laterite-excel` converter Python's
+// #358 — Node Excel I/O. Binds the SAME `laterite-ags4-excel` converter Python's
 // to_excel / from_excel use, so AGS4 ↔ XLSX round-trips through Node.
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

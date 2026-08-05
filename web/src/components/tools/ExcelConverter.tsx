@@ -9,7 +9,7 @@ const XLSX_MIME =
 const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
 // Tools → Excel: AGS4 ↔ `.xlsx` conversion, fully client-side (the wasm
-// laterite-excel cores; #359). Export turns the loaded AGS4 into a workbook
+// laterite-ags4-excel cores; #359). Export turns the loaded AGS4 into a workbook
 // (one sheet per group, python-ags4's layout); import turns an uploaded `.xlsx`
 // back into AGS4. Nothing is uploaded to a server.
 export const ExcelConverter: Component = () => {

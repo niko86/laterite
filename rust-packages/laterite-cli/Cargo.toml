@@ -44,9 +44,9 @@ default = ["transport", "excel"]
 # `--no-default-features` gives a lean validate/read/fix/diff/certify/rules build
 # with NO age/zstd, exactly as before these verbs existed.
 transport = ["laterite-ags4-core/transport", "dep:rpassword"]
-# The `excel` verb — AGS4 ↔ XLSX via laterite-excel (calamine + rust_xlsxwriter).
+# The `excel` verb — AGS4 ↔ XLSX via laterite-ags4-excel (calamine + rust_xlsxwriter).
 # On by default; those are heavy deps, so `--no-default-features` drops them.
-excel = ["dep:laterite-excel"]
+excel = ["dep:laterite-ags4-excel"]
 tui = ["dep:ratatui", "dep:crossterm"]
 
 [dependencies]
@@ -101,7 +101,7 @@ clap = { version = "4.5", features = ["derive", "wrap_help", "env"] }
 rpassword = { version = "7", optional = true }
 # The `excel` verb — AGS4 ↔ XLSX. Kept behind the `excel` feature so the
 # calamine / rust_xlsxwriter deps don't ride into a lean build.
-laterite-excel = { path = "../laterite-excel", optional = true }
+laterite-ags4-excel = { path = "../laterite-ags4-excel", optional = true }
 # Optional, behind the `tui` feature — the interactive findings browser
 # (`lat --tui`). crossterm arrives via ratatui::crossterm so the
 # backend/event types are version-matched to the linked ratatui.

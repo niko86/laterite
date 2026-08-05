@@ -420,7 +420,7 @@ because it looks like an oversight:
 - **A binary's dependencies are still dependencies.** Publishing strips `path`,
   so every in-workspace dep must itself be on the registry. `laterite-cli` needs
   `laterite-ags4-diff` and `laterite-ags4-merge` — both deliberately held at the
-  time — plus `laterite-cliutil` and `laterite-excel`, which carry
+  time — plus `laterite-cliutil` and `laterite-ags4-excel`, which carry
   `publish = false` and had never been considered for the registry. Publishing the CLI
   means publishing four more crates, two of them against a decision recorded
   above. That is the trade the crate split bought us, seen from the other side:
@@ -625,7 +625,7 @@ is valid semver and invalid PEP 440); per-crate engine versions (eight numbers
 for something that ships as one set); and propagation as a version mechanism.
 The dependency-closure walk stays a **report** used at release time to answer
 "engine change or product change?" — a `laterite-ags4-parse` fix reaches 21 of 24
-crates, a `laterite-excel` fix reaches 4 — rather than a ledger that drives
+crates, a `laterite-ags4-excel` fix reaches 4 — rather than a ledger that drives
 version numbers on its own.
 
 ## Related

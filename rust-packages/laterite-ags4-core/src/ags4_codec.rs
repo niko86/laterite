@@ -69,7 +69,7 @@ impl ParsedAgs4 {
 /// What the reader does when a group declares the same heading name twice.
 ///
 /// AGS4 forbids it (Rule 7), and the validator raises it at error severity —
-/// but the *read* surfaces (`lat read`, `laterite-excel`, node,
+/// but the *read* surfaces (`lat read`, `laterite-ags4-excel`, node,
 /// `read_groups_raw`) never run the rule engine. Left unhandled the collision is
 /// not merely lossy, it is **wrong**: rows are keyed by heading name, so the
 /// second occurrence overwrites the first, and consumers that walk `headings`
@@ -432,7 +432,7 @@ mod tests {
     /// The regression this exists to prevent. Rows are keyed by heading name, so
     /// before the guard the second `LOCA_ID` overwrote the first and a
     /// positional read — `headings[i]` → `row[&headings[i]]`, the shape
-    /// `laterite-excel`, node and `read_groups_raw` all use — returned
+    /// `laterite-ags4-excel`, node and `read_groups_raw` all use — returned
     /// `["SECOND", "1.00", "SECOND"]`. `FIRST` was gone AND `SECOND` was
     /// duplicated into its column, so the column looked populated and was wrong.
     /// Recovery must keep both, in their own positions.

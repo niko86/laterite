@@ -66,7 +66,7 @@ describe("fromExcel's two source doors", () => {
     // The `typeof source === "string" ? readFileSync(source) : source` arm. A
     // caller holding an uploaded buffer must not have to write it to disk first,
     // and the two doors must not diverge.
-    const dir = mkdtempSync(join(tmpdir(), "laterite-excel-"));
+    const dir = mkdtempSync(join(tmpdir(), "laterite-ags4-excel-"));
     const xlsxPath = join(dir, "book.xlsx");
     const agsPath = join(dir, "in.ags");
     writeFileSync(agsPath, AGS);
@@ -83,7 +83,7 @@ describe("fromExcel's two source doors", () => {
 
   it("returns bytes when given no output path, and stats when given one", () => {
     // The two overloads share one body and differ on `agsPath === undefined`.
-    const dir = mkdtempSync(join(tmpdir(), "laterite-excel-"));
+    const dir = mkdtempSync(join(tmpdir(), "laterite-ags4-excel-"));
     const xlsxPath = join(dir, "book.xlsx");
     const agsPath = join(dir, "in.ags");
     const outPath = join(dir, "out.ags");

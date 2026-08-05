@@ -1024,7 +1024,7 @@ class Ags4File:
         ``path=None`` returns the ``.xlsx`` **bytes** in memory (no filesystem) — so
         an uploaded/in-memory AGS4 needn't hit disk.
 
-        Rust-backed via ``laterite_excel`` (``rust_xlsxwriter``); openpyxl and
+        Rust-backed via ``laterite_ags4_excel`` (``rust_xlsxwriter``); openpyxl and
         pyarrow never enter the dep graph. Sheets carry the AGS HEADING / UNIT /
         TYPE / DATA layout. ``groups`` optionally fixes the sheet order (a subset or
         re-ordering of [`groups`][laterite.Ags4File.groups]); default is source order. The workbook is
@@ -1658,7 +1658,7 @@ def to_excel(
     returns the ``.xlsx`` **bytes** in memory (no filesystem) — so an in-memory
     AGS4 workbook needn't hit disk on the way to an upload.
 
-    Rust-backed via ``laterite_excel`` (``rust_xlsxwriter``); openpyxl and pyarrow
+    Rust-backed via ``laterite_ags4_excel`` (``rust_xlsxwriter``); openpyxl and pyarrow
     never enter the dep graph. ``source`` is anything [`read`][laterite.read] accepts (a path /
     file-like / bytes / AGS4 text) or an already-[`read`][laterite.read] [`Ags4File`][laterite.Ags4File];
     ``groups`` optionally fixes the sheet order (a subset or re-ordering of the
@@ -1719,7 +1719,7 @@ def from_excel(
 ) -> dict | Ags4File:
     """Convert an AGS4-shaped XLSX workbook to AGS4.
 
-    Rust-backed via ``laterite_excel`` (``calamine``). Each worksheet with a
+    Rust-backed via ``laterite_ags4_excel`` (``calamine``). Each worksheet with a
     ``HEADING`` column becomes one group; columns not matching Rule 19's heading
     pattern are dropped. ``source`` is the ``.xlsx`` as a path **or raw workbook
     bytes** — so an uploaded ``.xlsx`` needn't hit disk. With ``output`` given,

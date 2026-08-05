@@ -28,7 +28,7 @@ backwards.
 The edge existed for **one** reason: `core::error::CliError` carried
 `impl From<laterite_ags4_emit::EmitError>` (`repo:rust-packages/laterite-ags4-core/src/error.rs`),
 so callers of `write_ags4` got `?`-ergonomics. Nothing else in `core` ever touched
-`emit`, and `write_ags4`'s only caller was `laterite-excel`.
+`emit`, and `write_ags4`'s only caller was `laterite-ags4-excel`.
 
 ## Why the "extract the dictionary" fix is a dead end
 
@@ -54,11 +54,11 @@ So the dict-extraction was abandoned. The inversion is the real underlying item.
 The cut was simpler than the options first framed. #473 had already emptied `CliError`
 of its CLI/ags5 baggage — it is now just `FileNotFound` + `Schema`, a near-native data
 error — so relocating it (the old **Option B**, a new `laterite-cli-error` crate)
-became unnecessary. Since `write_ags4`'s sole caller is `laterite-excel`, the whole
+became unnecessary. Since `write_ags4`'s sole caller is `laterite-ags4-excel`, the whole
 edge collapses to **moving one conversion to its one consumer**:
 
 1. Deleted `impl From<EmitError> for CliError` from `core/error.rs`.
-2. Moved that mapping verbatim into `laterite-excel` as a private `emit_err(e)` helper
+2. Moved that mapping verbatim into `laterite-ags4-excel` as a private `emit_err(e)` helper
    (excel already deps `emit` directly), and changed its one `write_ags4(…)?`
    call-site to `.map_err(emit_err)?`.
 3. Dropped `laterite-ags4-emit` from `core`'s `Cargo.toml`.

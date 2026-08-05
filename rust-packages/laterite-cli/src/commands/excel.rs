@@ -1,4 +1,4 @@
-//! `lat excel <in> <out>` — AGS4 ↔ XLSX (laterite-excel). Direction is inferred
+//! `lat excel <in> <out>` — AGS4 ↔ XLSX (laterite-ags4-excel). Direction is inferred
 //! from the output extension (`.xlsx` ⇒ export, `.ags` ⇒ import); `--export` /
 //! `--import` force it when the extension is ambiguous.
 
@@ -39,9 +39,9 @@ pub fn run(args: &ExcelArgs) -> ! {
     };
 
     let result = if export {
-        laterite_excel::ags4_to_excel(&args.input, &args.output, None)
+        laterite_ags4_excel::ags4_to_excel(&args.input, &args.output, None)
     } else {
-        laterite_excel::excel_to_ags4(&args.input, &args.output, !args.no_format_numeric)
+        laterite_ags4_excel::excel_to_ags4(&args.input, &args.output, !args.no_format_numeric)
     };
 
     match result {

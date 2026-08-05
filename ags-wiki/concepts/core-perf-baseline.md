@@ -11,7 +11,7 @@ repo_refs:
   fixtures: "repo:tools/gen-bench-fixtures.sh"
   relational: "repo:rust-packages/laterite-ags4-validator/src/rules/relational.rs"
   line_format: "repo:rust-packages/laterite-ags4-validator/src/rules/line_format.rs"
-related: [crate-map, testing-strategy, abi3-perf, laterite-ags4-validator, laterite-ags4-emit, laterite-ags4-types, laterite-ags4-core, laterite-ags4-parse, laterite-excel, perf-campaign]
+related: [crate-map, testing-strategy, abi3-perf, laterite-ags4-validator, laterite-ags4-emit, laterite-ags4-types, laterite-ags4-core, laterite-ags4-parse, laterite-ags4-excel, perf-campaign]
 sources: []
 ---
 # core perf baseline: where the time actually goes
@@ -336,7 +336,7 @@ What remains is the **per-row `HashMap` allocation** itself: ~418k of them on th
 converts *away from* into a more expensive one.
 
 **Priced and deliberately not taken (2026-07-24.)** It would change `r["LOCA_ID"]`
-to an index lookup at every call site — `lat read`, [[laterite-excel]], the node
+to an index lookup at every call site — `lat read`, [[laterite-ags4-excel]], the node
 binding, `read_groups_raw` — and 13% did not justify that churn. The bigger
 number that motivated it (97 ms) had already been claimed by the cheap fix.
 
@@ -389,4 +389,4 @@ nothing, which is exactly how the previous one sat silently dead.
 
 ## Related
 
-[[perf-campaign]] · [[crate-map]] · [[testing-strategy]] · [[abi3-perf]] · [[laterite-ags4-validator]] · [[laterite-ags4-emit]] · [[laterite-ags4-types]] · [[laterite-ags4-core]] · [[laterite-ags4-parse]] · [[laterite-excel]] · [[ags4-output]]
+[[perf-campaign]] · [[crate-map]] · [[testing-strategy]] · [[abi3-perf]] · [[laterite-ags4-validator]] · [[laterite-ags4-emit]] · [[laterite-ags4-types]] · [[laterite-ags4-core]] · [[laterite-ags4-parse]] · [[laterite-ags4-excel]] · [[ags4-output]]

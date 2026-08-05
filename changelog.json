@@ -13,7 +13,11 @@
         "text": "**`laterite-ags4-diff` and `laterite-ags4-merge` publish to crates.io at 0.9.0.** Both were prepared in full for the first publish and then held back by a single flag, so day one's frozen surface stayed as small as possible. That deferral is spent. They are new crates at the engine's existing number, so nothing moves to admit them: diff lands in publish wave 3, merge in wave 5, and the nine crates already on the registry are skipped rather than republished. What changes is not that the API is frozen — crates.io makes a *version* immutable, not a surface — but that `cargo semver-checks` and the public-API snapshot now police edits to these two. For merge that is the point worth stating: what publishes is `merge_parsed`, whose `&[ParsedFile]` shape is the one laterite#162 endorses, while the typed merge surface #162 warns about is not published and stays free to design. Both crates gained a README, because a published crate without one has a bare crates.io page and that is not recoverable for anyone who already looked."
       }
     ],
-    "changed": [],
+    "changed": [
+      {
+        "text": "**The Excel crate is `laterite-ags4-excel`.** It was `laterite-excel` — a name chosen for the general-purpose Excel library it was meant to become and never did. `-ags4-` marks the engine tier and bare `laterite-*` is for the format-agnostic crates, of which `laterite-transport` is the only genuine one; this crate holds contents its own header calls AGS4-specific. Renamed **now** because a crates.io name is free until its first publish and irreversible after, and this crate is scheduled to publish — the same reasoning that renamed `laterite-ags4-check` to `laterite-cli` before the engine tier went out. Nothing a user types changes: the Python, Node, browser and `lat excel` surfaces are untouched, and the crate has never been on a registry for anyone to depend on. Internally the lib name moves with it, so `laterite_excel::` becomes `laterite_ags4_excel::` at every call site. Past release entries here carry the new name too, deliberately: one grep gives one answer rather than an exception list to carry forward."
+      }
+    ],
     "deprecated": [],
     "removed": [],
     "fixed": [],
@@ -187,7 +191,7 @@
           ]
         },
         {
-          "text": "**The CLI crate is `laterite-cli`.** `laterite-ags4-check` named a checker; the crate reads, fixes, diffs, merges, certifies, packs, converts and mints certificates, and `-ags4-` marks the engine tier, which a product binary is not. The shipped binary is still `lat` — nothing a user types changes. Renamed now because crates.io has no rename: a name is free until its first publish and irreversible after, and the engine tier went out yesterday. It is deliberately NOT added to the publish set, which looks like an oversight and is not: a binary's dependencies are still dependencies, so publishing it requires `laterite-ags4-diff` and `-merge` (held for 0.2) plus `laterite-cliutil` and `laterite-excel` (never considered for the registry) — and both publish gates render a lib target that a bin-only crate does not have. The CLI ships with 0.2, alongside the diff/merge publish it already depends on.",
+          "text": "**The CLI crate is `laterite-cli`.** `laterite-ags4-check` named a checker; the crate reads, fixes, diffs, merges, certifies, packs, converts and mints certificates, and `-ags4-` marks the engine tier, which a product binary is not. The shipped binary is still `lat` — nothing a user types changes. Renamed now because crates.io has no rename: a name is free until its first publish and irreversible after, and the engine tier went out yesterday. It is deliberately NOT added to the publish set, which looks like an oversight and is not: a binary's dependencies are still dependencies, so publishing it requires `laterite-ags4-diff` and `-merge` (held for 0.2) plus `laterite-cliutil` and `laterite-ags4-excel` (never considered for the registry) — and both publish gates render a lib target that a bin-only crate does not have. The CLI ships with 0.2, alongside the diff/merge publish it already depends on.",
           "prs": [
             199
           ]
@@ -587,13 +591,13 @@
       "summary": "0.6.0 completes the cross-surface story. The browser and Node now reach every capability except the `python-ags4` compat shim: Node and browser Excel I/O, in-browser certificate minting, and browser transport (zstd + age) all land here, alongside finer fix-control across Python, Node and the CLI. One breaking change — the typed-graph classes moved to `laterite.groups` — is what bumps the minor pre-1.0. The npm package unifies onto this single version (the separate `node-v*` number is retired), and a new cross-surface drift-gate (`tests/test_version_faithful.py`) keeps every surface's version in lockstep.",
       "added": [
         {
-          "text": "**Node Excel I/O — `toExcel()` / `fromExcel()`.** The Node addon binds the shared `laterite-excel` engine, so AGS4 ↔ `.xlsx` round-trips from Node the same way Python and the browser do — one sheet per group, born-typed columns, an `ExcelStats` summary.",
+          "text": "**Node Excel I/O — `toExcel()` / `fromExcel()`.** The Node addon binds the shared `laterite-ags4-excel` engine, so AGS4 ↔ `.xlsx` round-trips from Node the same way Python and the browser do — one sheet per group, born-typed columns, an `ExcelStats` summary.",
           "prs": [
             361
           ]
         },
         {
-          "text": "**Browser Excel — AGS4 ↔ `.xlsx`, client-side.** A two-way Excel converter running entirely in the browser (wasm) — no upload. Backed by a new FS-free bytes API in `laterite-excel`, so one engine drives Python, Node and the browser.",
+          "text": "**Browser Excel — AGS4 ↔ `.xlsx`, client-side.** A two-way Excel converter running entirely in the browser (wasm) — no upload. Backed by a new FS-free bytes API in `laterite-ags4-excel`, so one engine drives Python, Node and the browser.",
           "prs": [
             367,
             368

@@ -1461,12 +1461,12 @@ fn resolve_mode(s: Option<&str>) -> Result<laterite_ags4_emit::EmitMode> {
     }
 }
 
-// --- Excel ↔ AGS4 (laterite-excel) --------------------------------------
+// --- Excel ↔ AGS4 (laterite-ags4-excel) --------------------------------------
 // Binds the same AGS4↔XLSX converter Python exposes as to_excel/from_excel
 // (#358 — closes the node-Excel capability gap). Path-based, like the Python
 // binding: Node has a filesystem, so no in-memory round-trip is needed.
 
-/// The outcome of an Excel conversion (mirrors `laterite_excel::ExcelStats`).
+/// The outcome of an Excel conversion (mirrors `laterite_ags4_excel::ExcelStats`).
 #[napi(object)]
 pub struct ExcelStats {
     /// Worksheets written (AGS4→XLSX) or read (XLSX→AGS4).
@@ -1477,13 +1477,13 @@ pub struct ExcelStats {
     pub warnings: Vec<String>,
 }
 
-impl From<laterite_excel::ExcelStats> for ExcelStats {
+impl From<laterite_ags4_excel::ExcelStats> for ExcelStats {
     // `sheets_written` is bounded by the AGS4 dictionary's group count (174
     // max); `rows_written` needs billions of in-memory rows to overflow —
     // physically unreachable (RAM exhausts long before this cast could
     // truncate).
     #[allow(clippy::cast_possible_truncation)]
-    fn from(s: laterite_excel::ExcelStats) -> Self {
+    fn from(s: laterite_ags4_excel::ExcelStats) -> Self {
         ExcelStats {
             sheets_written: s.sheets_written as u32,
             rows_written: s.rows_written as u32,
@@ -1501,7 +1501,7 @@ pub fn ags4_to_excel(
     xlsx_path: String,
     ordered_keys: Option<Vec<String>>,
 ) -> Result<ExcelStats> {
-    laterite_excel::ags4_to_excel(Path::new(&ags_path), Path::new(&xlsx_path), ordered_keys)
+    laterite_ags4_excel::ags4_to_excel(Path::new(&ags_path), Path::new(&xlsx_path), ordered_keys)
         .map(ExcelStats::from)
         .map_err(|e| Error::from_reason(e.to_string()))
 }
@@ -1515,7 +1515,7 @@ pub fn excel_to_ags4(
     ags_path: String,
     format_numeric_columns: Option<bool>,
 ) -> Result<ExcelStats> {
-    laterite_excel::excel_to_ags4(
+    laterite_ags4_excel::excel_to_ags4(
         Path::new(&xlsx_path),
         Path::new(&ags_path),
         format_numeric_columns.unwrap_or(true),
@@ -1547,7 +1547,7 @@ pub fn ags4_bytes_to_xlsx(
     recover_duplicate_headings: Option<bool>,
 ) -> Result<ExcelBytesResult> {
     let opts = read_opts_from(recover_duplicate_headings);
-    let (xlsx, stats) = laterite_excel::ags4_bytes_to_xlsx_with(&data, ordered_keys, opts)
+    let (xlsx, stats) = laterite_ags4_excel::ags4_bytes_to_xlsx_with(&data, ordered_keys, opts)
         .map_err(|e| Error::from_reason(e.to_string()))?;
     // Bounded the same way as `ExcelStats::from` above (group count /
     // physical RAM limits).
@@ -1571,7 +1571,7 @@ pub fn xlsx_bytes_to_ags4(
     format_numeric_columns: Option<bool>,
 ) -> Result<ExcelBytesResult> {
     let (ags, stats) =
-        laterite_excel::xlsx_bytes_to_ags4(&data, format_numeric_columns.unwrap_or(true))
+        laterite_ags4_excel::xlsx_bytes_to_ags4(&data, format_numeric_columns.unwrap_or(true))
             .map_err(|e| Error::from_reason(e.to_string()))?;
     // Bounded the same way as `ExcelStats::from` above (group count /
     // physical RAM limits).

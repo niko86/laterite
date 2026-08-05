@@ -228,7 +228,7 @@ export interface ExcelBytesResult {
   warnings: Array<string>
 }
 
-/** The outcome of an Excel conversion (mirrors `laterite_excel::ExcelStats`). */
+/** The outcome of an Excel conversion (mirrors `laterite_ags4_excel::ExcelStats`). */
 export interface ExcelStats {
   /** Worksheets written (AGS4→XLSX) or read (XLSX→AGS4). */
   sheetsWritten: number

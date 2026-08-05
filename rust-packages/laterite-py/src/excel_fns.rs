@@ -8,7 +8,7 @@
 
 use std::path::PathBuf;
 
-use laterite_excel::ExcelStats;
+use laterite_ags4_excel::ExcelStats;
 use pyo3::Bound;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyList, PyModule};
@@ -36,7 +36,7 @@ fn ags4_to_excel<'py>(
     output_file: &str,
     ordered_keys: Option<Vec<String>>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let stats = laterite_excel::ags4_to_excel(
+    let stats = laterite_ags4_excel::ags4_to_excel(
         &PathBuf::from(input_file),
         &PathBuf::from(output_file),
         ordered_keys,
@@ -53,7 +53,7 @@ fn excel_to_ags4<'py>(
     output_file: &str,
     format_numeric_columns: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
-    let stats = laterite_excel::excel_to_ags4(
+    let stats = laterite_ags4_excel::excel_to_ags4(
         &PathBuf::from(input_file),
         &PathBuf::from(output_file),
         format_numeric_columns,
@@ -74,7 +74,7 @@ fn ags4_bytes_to_xlsx<'py>(
     ordered_keys: Option<Vec<String>>,
     recover_duplicate_headings: bool,
 ) -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyDict>)> {
-    let (xlsx, stats) = laterite_excel::ags4_bytes_to_xlsx_with(
+    let (xlsx, stats) = laterite_ags4_excel::ags4_bytes_to_xlsx_with(
         data,
         ordered_keys,
         read_opts(recover_duplicate_headings),
@@ -92,7 +92,7 @@ fn xlsx_bytes_to_ags4<'py>(
     data: &[u8],
     format_numeric_columns: bool,
 ) -> PyResult<(Bound<'py, PyBytes>, Bound<'py, PyDict>)> {
-    let (ags, stats) = laterite_excel::xlsx_bytes_to_ags4(data, format_numeric_columns)
+    let (ags, stats) = laterite_ags4_excel::xlsx_bytes_to_ags4(data, format_numeric_columns)
         .map_err(|e| map_cli_err(&e))?;
     Ok((PyBytes::new(py, &ags), stats_to_pydict(py, stats)?))
 }

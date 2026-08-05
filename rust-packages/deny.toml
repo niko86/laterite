@@ -16,7 +16,7 @@ ignore = [
     # transitive (age → i18n-embed-fl), no safe upgrade, low risk.
     "RUSTSEC-2026-0173", # proc-macro-error2 (via age's i18n-embed-fl)
     # quick-xml DoS advisories — fixed in quick-xml >= 0.41, but transitive via
-    # calamine (Excel READING, laterite-excel → laterite.compat) and even the
+    # calamine (Excel READING, laterite-ags4-excel → laterite.compat) and even the
     # latest calamine (0.35) still pins quick-xml < 0.41, so there is NO upgrade
     # path yet. Low practical risk: we parse trusted local .xlsx the caller
     # supplies, not attacker-controlled network XML. Drop both once calamine

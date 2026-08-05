@@ -1,6 +1,6 @@
 ---
 type: index
-generated: 2026-08-04
+generated: 2026-08-05
 counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 29, concepts: 29, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 23}
 ---
 # AGS Wiki — Content Catalog
@@ -331,6 +331,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 29, concept
 | [[laterite-ags4-corpus-qa]] | drafted | cli |
 | [[laterite-ags4-diff]] | drafted | crate |
 | [[laterite-ags4-emit]] | drafted | crate |
+| [[laterite-ags4-excel]] | drafted | crate |
 | [[laterite-ags4-forge]] | drafted | cli |
 | [[laterite-ags4-merge]] | drafted | crate |
 | [[laterite-ags4-parity]] | drafted | crate |
@@ -346,7 +347,6 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 29, concept
 | [[laterite-cli]] | reviewed | cli |
 | [[laterite-cliutil]] | drafted | crate |
 | [[laterite-crate]] | drafted | crate |
-| [[laterite-excel]] | drafted | crate |
 | [[laterite-node]] | drafted | crate |
 | [[laterite-py]] | drafted | crate |
 | [[laterite-transport]] | drafted | crate |

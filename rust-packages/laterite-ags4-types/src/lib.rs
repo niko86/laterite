@@ -272,7 +272,7 @@ pub fn quote_field(value: &str) -> String {
 // validator used to carry a hand-port of all three, kept honest only by a
 // "ported from ags_types::ags4_str" comment — it agreed, but nothing checked
 // it, so a validator could have judged a value by a different formatter than
-// the one that WRITES it (#528). laterite-excel keeps its own, deliberately
+// the one that WRITES it (#528). laterite-ags4-excel keeps its own, deliberately
 // divergent formatter (uppercase `E`, bare `"0"` for SF-of-zero) — that
 // divergence is by design and pinned in xcheck-allow.json.
 
@@ -328,7 +328,7 @@ pub fn format_nsf(f: f64, n: usize) -> String {
 /// nSCI expected form — scientific notation, one digit before the point and
 /// `n` after. Rust's `{:e}` already emits a single leading mantissa digit and
 /// a sign-less-or-minus exponent with no leading zero (`1.5e2`, `3.1e-5`) —
-/// exactly the AGS form, and LOWERCASE `e` (laterite-excel's uppercase `E` is
+/// exactly the AGS form, and LOWERCASE `e` (laterite-ags4-excel's uppercase `E` is
 /// the registered by-design divergence).
 #[must_use]
 pub fn format_nsci(f: f64, n: usize) -> String {

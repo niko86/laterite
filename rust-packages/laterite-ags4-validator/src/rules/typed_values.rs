@@ -595,7 +595,7 @@ fn dt_semantic_ok(value: &str, unit: &str) -> bool {
 // `format_nsci` mirrors `is_nsci` (`-?\d\.\d{n}[eE][+-]?\d+`), and `format_nsf`
 // is the never-scientific fixed-point form python-ags4 expects (`0.002` @3SF →
 // "0.00200"). The format↔validate inverse proptests below now guard the LEAF's
-// formatters against this crate's grammar. (laterite-excel keeps a
+// formatters against this crate's grammar. (laterite-ags4-excel keeps a
 // deliberately divergent formatter — by-design, pinned in xcheck-allow.json.)
 pub(crate) use laterite_ags4_types::{format_ndp, format_nsci, format_nsf};
 

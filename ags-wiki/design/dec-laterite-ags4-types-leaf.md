@@ -74,7 +74,7 @@ that stays deliberate. The validator gained a direct `laterite-ags4-types` edge 
 this at zero build cost — it was already transitive via
 [[laterite-ags4-reference]], and the generated [[crate-dependency-graph]]
 records its transitive count unmoved (3) while direct deps went 2→3.
-`laterite-excel` keeps a deliberately divergent copy (uppercase `E`, bare
+`laterite-ags4-excel` keeps a deliberately divergent copy (uppercase `E`, bare
 `"0"` for SF-of-zero), pinned by-design and bounded by its own
 formatter-authority matrix — see ags4-output-value-gate.
 

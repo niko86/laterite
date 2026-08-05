@@ -30,7 +30,7 @@ members = [
     "laterite-ags4-reference",
     "laterite-transport",
     "laterite-ags4-core",
-    "laterite-excel",
+    "laterite-ags4-excel",
     "laterite-ags4-emit",
     "laterite-ags4-diff",
     "laterite-ags4-merge",

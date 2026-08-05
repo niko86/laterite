@@ -19,7 +19,7 @@ sources: []
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
 > [!note] **Cleared for crates.io** — `laterite-ags4-emit` v0.9.0 (inherited from the workspace) declares `publish = true`, so it is a public API under semver, not an internal detail.
-> **Used by** — [[laterite]], [[laterite-ags4-merge]], [[laterite-ags4-wasm]], [[laterite-ags4-xcheck]], [[laterite-excel]], [[laterite-node]], [[laterite-py]].
+> **Used by** — [[laterite]], [[laterite-ags4-excel]], [[laterite-ags4-merge]], [[laterite-ags4-wasm]], [[laterite-ags4-xcheck]], [[laterite-node]], [[laterite-py]].
 <!-- END GENERATED: crate-card -->
 
 > [!note] The published faces are the wheel's `build_ags4` ([[laterite]]),
@@ -82,7 +82,7 @@ re-exports the validator's `DictVersion` so a caller can choose an edition
 without taking a validator dependency of its own.
 
 Consumers: [[laterite-py]], [[laterite-node]], [[laterite-ags4-wasm]],
-`laterite-excel`, `laterite-ags4-merge`, and [[laterite-ags4-xcheck]] — which
+`laterite-ags4-excel`, `laterite-ags4-merge`, and [[laterite-ags4-xcheck]] — which
 matters, because xcheck's authority leg drives *this* crate directly rather than
 through a binding, making it the reference column every surface's emitted values
 are held to.
@@ -98,7 +98,7 @@ flowchart LR
   emit --> latpy[laterite-py]
   emit --> latnode[laterite-node]
   emit --> wasm[laterite-ags4-wasm]
-  emit --> excel[laterite-excel]
+  emit --> excel[laterite-ags4-excel]
   emit --> merge[laterite-ags4-merge]
   emit --> xcheck[laterite-ags4-xcheck]
 ```
