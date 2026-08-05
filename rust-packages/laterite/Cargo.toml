@@ -49,5 +49,11 @@ default = []
 # `#[doc(hidden)]` hides an item from rustdoc and from nobody else.
 unstable-engine = []
 
+[dev-dependencies]
+# Test-only: the byte-index ambiguity guard is reached by handing `index_bytes`
+# a certificate whose index places a group in two sections, which means editing
+# certificate JSON. Dev-only, so it never reaches a consumer's dependency graph.
+serde_json = "1"
+
 [lints]
 workspace = true

@@ -179,6 +179,15 @@
               "out_forms": [
                 "handle"
               ]
+            },
+            {
+              "name": "read().index()/.index_bytes() + .only()",
+              "in_forms": [
+                "cert"
+              ],
+              "out_forms": [
+                "handle"
+              ]
             }
           ],
           "input": {
@@ -186,7 +195,7 @@
             "bytes": "present",
             "text": "present",
             "file-like": "absent",
-            "cert": "absent"
+            "cert": "present"
           },
           "output": {
             "handle": "present"
@@ -201,7 +210,7 @@
             }
           ],
           "facade_verdict": "planned",
-          "note": "Partial. `text` is `read_bytes(s.as_bytes())` behind a name. The `cert` door is spelled on validate() rather than read() — see cert-input — so read itself still does not take one; that is a spelling choice, not a missing capability."
+          "note": "Partial. `text` is `read_bytes(s.as_bytes())` behind a name. The `cert` door (2026-08-05, phase 4b) is not the python/node one: there a cert parked on the handle lets a later `.validate()` skip the engine, which this facade has no `Document::validate()` to do. Here it carries the BYTE INDEX, so `read(f).index(c).only([\"LOCA\"])` parses that group out of its byte range and never looks at the rest of the file — `Document::sliced()` says whether it did. It declines rather than risks: a stale cert, a group the index places in two sections, or a transcode that moved the offsets all fall back to the whole-file parse."
         },
         {
           "surface": "cli",

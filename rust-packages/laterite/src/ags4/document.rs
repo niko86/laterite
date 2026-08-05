@@ -28,6 +28,9 @@ pub struct Document {
     /// The encoding label the source was read with, recorded into the
     /// certificate so a verifier decodes the way the minter did.
     pub(crate) encoding: Option<String>,
+    /// Was this built by slicing named groups out of the source using a
+    /// certificate's byte index, rather than by parsing the whole file?
+    pub(crate) sliced: bool,
 }
 
 impl Document {
@@ -40,7 +43,26 @@ impl Document {
             parsed,
             source_bytes,
             encoding,
+            sliced: false,
         }
+    }
+
+    /// Did a certificate's byte index let this read skip the rest of the file?
+    ///
+    /// `false` whenever the whole file was parsed — including when a certificate
+    /// was offered and declined, which is the case worth being able to see. An
+    /// index that quietly stops applying is otherwise indistinguishable from one
+    /// that is working, since the document is identical either way.
+    #[must_use]
+    pub fn sliced(&self) -> bool {
+        self.sliced
+    }
+
+    /// Keep only these groups, dropping the rest. The filter half of
+    /// [`crate::ags4::Read::only`].
+    pub(crate) fn retain_only(&mut self, codes: &[String]) {
+        self.parsed.groups.retain(|code, _| codes.contains(code));
+        self.parsed.order.retain(|code| codes.contains(code));
     }
 
     /// The group codes, in file order.
@@ -306,6 +328,7 @@ impl std::fmt::Debug for Document {
             // `dbg!` of a document should not print a delivery.
             .field("source_bytes", &self.source_bytes.len())
             .field("encoding", &self.encoding)
+            .field("sliced", &self.sliced)
             .finish()
     }
 }

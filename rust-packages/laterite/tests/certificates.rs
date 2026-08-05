@@ -291,3 +291,183 @@ fn a_report_without_a_certificate_says_so() {
     assert!(!report.certified());
     assert_eq!(report.revalidate_reason(), None);
 }
+
+// --- the byte index: reading groups without parsing the file ----------------
+
+#[test]
+fn a_certificate_lets_read_slice_named_groups() {
+    let dir = scratch("slice");
+    let ags = dir.join("d.ags");
+    let idx = dir.join("d.ags.idx");
+    fs::write(&ags, CLEAN).unwrap();
+    ags4::read(&ags)
+        .run()
+        .unwrap()
+        .certify()
+        .to_path(&idx)
+        .unwrap();
+
+    let doc = ags4::read(&ags).index(&idx).only(["PROJ"]).run().unwrap();
+    assert!(doc.sliced(), "the byte index was not used");
+    assert_eq!(doc.codes(), ["PROJ"]);
+    assert_eq!(doc.group("PROJ").unwrap().len(), 1);
+}
+
+#[test]
+fn slicing_and_parsing_produce_the_same_group() {
+    // The optimisation must be invisible in the result. If these ever disagree,
+    // the fast path is not reading what the slow path reads.
+    let dir = scratch("sameresult");
+    let ags = dir.join("d.ags");
+    let idx = dir.join("d.ags.idx");
+    fs::write(&ags, CLEAN).unwrap();
+    ags4::read(&ags)
+        .run()
+        .unwrap()
+        .certify()
+        .to_path(&idx)
+        .unwrap();
+
+    let sliced = ags4::read(&ags).index(&idx).only(["TRAN"]).run().unwrap();
+    let parsed = ags4::read(&ags).only(["TRAN"]).run().unwrap();
+    assert!(sliced.sliced() && !parsed.sliced());
+
+    let a = sliced.group("TRAN").unwrap();
+    let b = parsed.group("TRAN").unwrap();
+    assert_eq!(a.headings(), b.headings());
+    assert_eq!(a.units(), b.units());
+    assert_eq!(a.types(), b.types());
+    assert_eq!(a.len(), b.len());
+}
+
+#[test]
+fn only_without_a_certificate_still_filters() {
+    let doc = ags4::read_str(CLEAN).only(["PROJ", "TRAN"]).run().unwrap();
+    assert!(!doc.sliced(), "there was no index to slice with");
+    let mut codes = doc.codes();
+    codes.sort_unstable();
+    assert_eq!(codes, ["PROJ", "TRAN"]);
+}
+
+#[test]
+fn a_stale_certificate_falls_back_instead_of_slicing_wrong_bytes() {
+    // The offsets in a stale certificate point into a file that no longer
+    // exists. Reading them would return whatever now sits at those bytes — the
+    // one failure mode of a byte index, and the reason freshness is checked
+    // before the ranges are touched rather than after.
+    let dir = scratch("staleslice");
+    let ags = dir.join("d.ags");
+    let idx = dir.join("d.ags.idx");
+    fs::write(&ags, CLEAN).unwrap();
+    ags4::read(&ags)
+        .run()
+        .unwrap()
+        .certify()
+        .to_path(&idx)
+        .unwrap();
+
+    fs::write(&ags, CLEAN_EDITED).unwrap();
+    let doc = ags4::read(&ags).index(&idx).only(["PROJ"]).run().unwrap();
+
+    assert!(!doc.sliced(), "a stale index was used to slice");
+    assert_eq!(doc.codes(), ["PROJ"]);
+    // And the content is the CURRENT file's, not the certified one's.
+    assert_eq!(
+        doc.group("PROJ").unwrap().row(0).unwrap().cell("PROJ_NAME"),
+        Some("Certificate test edited")
+    );
+}
+
+#[test]
+fn an_encoding_override_that_changes_the_bytes_declines_the_index() {
+    // The index's offsets are into the ORIGINAL bytes. If a transcode moved
+    // them, slicing would read from the wrong places — so the guard is byte
+    // equality, not "was an encoding named". A UTF-8 `°` read as cp1252 becomes
+    // "Â°", which is a different length, so every offset after it shifts.
+    let dir = scratch("encslice");
+    let ags = dir.join("d.ags");
+    let idx = dir.join("d.ags.idx");
+    fs::write(&ags, CLEAN.replace("Certificate test", "Dip 45\u{b0}")).unwrap();
+    ags4::read(&ags)
+        .run()
+        .unwrap()
+        .certify()
+        .to_path(&idx)
+        .unwrap();
+
+    let doc = ags4::read(&ags)
+        .encoding("windows-1252")
+        .index(&idx)
+        .only(["PROJ"])
+        .run()
+        .unwrap();
+    assert!(!doc.sliced(), "sliced using offsets into different bytes");
+    assert_eq!(doc.codes(), ["PROJ"]);
+}
+
+#[test]
+fn an_encoding_that_changes_nothing_still_slices() {
+    // The other half of the guard being byte equality rather than a flag: this
+    // file is ASCII, so decoding it as cp1252 is a genuine no-op and the offsets
+    // still describe the bytes being parsed. Declining here would be a needless
+    // slow path.
+    let dir = scratch("encnoop");
+    let ags = dir.join("d.ags");
+    let idx = dir.join("d.ags.idx");
+    fs::write(&ags, CLEAN).unwrap();
+    ags4::read(&ags)
+        .run()
+        .unwrap()
+        .certify()
+        .to_path(&idx)
+        .unwrap();
+
+    let doc = ags4::read(&ags)
+        .encoding("windows-1252")
+        .index(&idx)
+        .only(["PROJ"])
+        .run()
+        .unwrap();
+    assert!(
+        doc.sliced(),
+        "an identity transcode should not decline the index"
+    );
+}
+
+#[test]
+fn an_index_placing_a_group_in_two_sections_declines_to_slice() {
+    // The silent-truncation guard, and it IS reachable from out here: a caller
+    // can hand `index_bytes` any certificate, so one whose index puts a group in
+    // two sections is a supported input. Slicing the first of them would return
+    // a strict SUBSET of that group's rows with no error and no warning — the
+    // worst failure a byte index can have, because the result looks complete.
+    //
+    // The certificate stays FRESH (the hash is over the file, which is
+    // untouched), so freshness cannot be what rejects it. Only the ambiguity can.
+    let dir = scratch("tworanges");
+    let ags = dir.join("d.ags");
+    fs::write(&ags, CLEAN).unwrap();
+    let cert = ags4::read(&ags)
+        .run()
+        .unwrap()
+        .certify()
+        .to_bytes()
+        .unwrap();
+
+    let mut json: serde_json::Value = serde_json::from_slice(&cert).unwrap();
+    let spans = json["groups"]["PROJ"].as_array().unwrap().clone();
+    assert_eq!(spans.len(), 1, "PROJ should occupy exactly one section");
+    json["groups"]["PROJ"] = serde_json::Value::Array(vec![spans[0].clone(), spans[0].clone()]);
+    let doctored = serde_json::to_vec(&json).unwrap();
+
+    let doc = ags4::read(&ags)
+        .index_bytes(doctored)
+        .only(["PROJ"])
+        .run()
+        .unwrap();
+
+    assert!(!doc.sliced(), "sliced a group the index could not place");
+    // And the fallback still answers the question that was asked.
+    assert_eq!(doc.codes(), ["PROJ"]);
+    assert_eq!(doc.group("PROJ").unwrap().len(), 1);
+}

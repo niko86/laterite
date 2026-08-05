@@ -100,6 +100,8 @@ pub struct Read {
     source: Source,
     encoding: Option<String>,
     recover_duplicate_headings: bool,
+    cert: Option<CertInput>,
+    only: Vec<String>,
 }
 
 /// Read an AGS4 file from disk.
@@ -108,6 +110,8 @@ pub fn read(path: impl AsRef<Path>) -> Read {
         source: Source::Path(path.as_ref().to_path_buf()),
         encoding: None,
         recover_duplicate_headings: false,
+        cert: None,
+        only: Vec::new(),
     }
 }
 
@@ -117,6 +121,8 @@ pub fn read_bytes(bytes: impl Into<Vec<u8>>) -> Read {
         source: Source::Bytes(bytes.into()),
         encoding: None,
         recover_duplicate_headings: false,
+        cert: None,
+        only: Vec::new(),
     }
 }
 
@@ -136,6 +142,8 @@ pub fn read_str(text: impl Into<String>) -> Read {
         source: Source::Text(text.into()),
         encoding: None,
         recover_duplicate_headings: false,
+        cert: None,
+        only: Vec::new(),
     }
 }
 
@@ -165,6 +173,46 @@ impl Read {
     #[must_use]
     pub fn recover_duplicate_headings(mut self, yes: bool) -> Read {
         self.recover_duplicate_headings = yes;
+        self
+    }
+
+    /// Read only these groups.
+    ///
+    /// On its own this is a filter — the file is parsed and the rest discarded.
+    /// Combined with [`Read::index`] it becomes a *slice*: the named sections are
+    /// parsed straight out of their byte ranges and the rest of the file is never
+    /// looked at. [`Document::sliced`] reports which of the two happened.
+    #[must_use]
+    pub fn only<I, S>(mut self, codes: I) -> Read
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        self.only = codes.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// Offer a certificate, so [`Read::only`] can slice instead of parsing.
+    ///
+    /// A certificate carries a byte index — group code to byte range — which is
+    /// what turns "read one group out of a large delivery" into a read of that
+    /// group's bytes rather than of the file.
+    ///
+    /// Purely an optimisation, and it declines itself whenever it cannot be sure:
+    /// a certificate that does not match these bytes, a group the index places in
+    /// more than one section, or an `encoding` override (which means the bytes
+    /// being parsed are not the bytes the index was built over) all fall back to
+    /// the whole-file parse. The document is the same either way.
+    #[must_use]
+    pub fn index(mut self, path: impl AsRef<Path>) -> Read {
+        self.cert = Some(CertInput::Path(path.as_ref().to_path_buf()));
+        self
+    }
+
+    /// Offer certificate bytes already in memory — see [`Read::index`].
+    #[must_use]
+    pub fn index_bytes(mut self, bytes: impl Into<Vec<u8>>) -> Read {
+        self.cert = Some(CertInput::Bytes(bytes.into()));
         self
     }
 
@@ -206,11 +254,76 @@ impl Read {
                 DuplicateHeadings::Error
             },
         };
+        // The sliced path, when a certificate can vouch for the byte index AND
+        // the caller asked for specific groups. Every guard below is a reason to
+        // fall back rather than to fail: the whole-file parse is always correct,
+        // so an index that cannot be trusted costs time, never accuracy.
+        if let Some(input) = &self.cert
+            && !self.only.is_empty()
+            // The index's offsets are into the ORIGINAL bytes. If an `encoding`
+            // override transcoded them, the bytes being parsed are not the bytes
+            // the index describes, and slicing would read from the wrong offsets.
+            && raw_for_cert == bytes
+        {
+            let cert_bytes = match input {
+                CertInput::Path(p) => std::fs::read(p).map_err(|e| {
+                    Error::with_source(ErrorKind::Io, format!("cannot read {}", p.display()), e)
+                })?,
+                CertInput::Bytes(b) => b.clone(),
+            };
+            let sidecar = cert::parse_cert(&cert_bytes)?;
+            let index = sidecar.index();
+
+            // `range` is None for a group the index places in more than one
+            // section. That is the truncation guard: slicing the first section of
+            // a redeclared group returns a strict SUBSET of its rows, silently.
+            let ranges: Option<Vec<_>> = self
+                .only
+                .iter()
+                .map(|code| index.range(code).map(|r| (code.clone(), r)))
+                .collect();
+
+            // Against the ORIGINAL bytes, which is what the certificate hashed.
+            // Checking the transcoded buffer instead happens to work while the
+            // guard above holds them equal — and hides the fact that the guard
+            // is what makes slicing safe. Mutation testing found exactly that.
+            if sidecar.is_fresh_for(&raw_for_cert)
+                && let Some(ranges) = ranges
+            {
+                let mut groups = std::collections::HashMap::with_capacity(ranges.len());
+                let mut order = Vec::with_capacity(ranges.len());
+                for (code, range) in ranges {
+                    let group = laterite_ags4_core::index::parse_group_slice(&bytes, range, &code)
+                        .map_err(|e| {
+                            Error::with_source(
+                                ErrorKind::NotAgs4,
+                                format!("cannot read group `{code}` from its byte range"),
+                                e,
+                            )
+                        })?;
+                    order.push(code.clone());
+                    groups.insert(code, group);
+                }
+                let parsed = laterite_ags4_core::ags4_codec::ParsedAgs4 { groups, order };
+                let mut doc = Document::new(parsed, raw_for_cert, self.encoding.clone());
+                doc.sliced = true;
+                return Ok(doc);
+            }
+        }
+
         read_ags4_bytes_with(&bytes, opts)
             // `raw`, not `bytes`: a certificate minted from this handle must hash
             // what the file actually holds, not what we decoded it into. See
             // `Document::source_bytes`.
             .map(|parsed| Document::new(parsed, raw_for_cert, self.encoding.clone()))
+            .map(|mut doc| {
+                // `only` without a usable index is still a filter — the caller
+                // asked for these groups and gets these groups, just not cheaply.
+                if !self.only.is_empty() {
+                    doc.retain_only(&self.only);
+                }
+                doc
+            })
             .map_err(|e| Error::with_source(ErrorKind::NotAgs4, "cannot read as AGS4", e))
     }
 }
@@ -770,6 +883,15 @@ impl std::fmt::Debug for Read {
             .field(
                 "recover_duplicate_headings",
                 &self.recover_duplicate_headings,
+            )
+            .field("only", &self.only)
+            .field(
+                "index",
+                &match &self.cert {
+                    None => "none".to_string(),
+                    Some(CertInput::Path(p)) => format!("path {}", p.display()),
+                    Some(CertInput::Bytes(b)) => format!("{} bytes", b.len()),
+                },
             )
             .finish()
     }

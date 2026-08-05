@@ -43,15 +43,13 @@ This register is the **I/O-form** axis of cross-surface parity — does a capabi
 
 *Offered anywhere — in: bytes, cert, file-like, path, text · out: handle, stdout, table, value*
 
-*Below the facade floor — the Rust crate does not yet offer in: cert, which python and node both do. A minimum to clear, not a gate*
-
 **Input**
 
 | surface (spelling) | path | text | bytes | file-like | stdin | cert |
 |---|---|---|---|---|---|---|
 | python (free) | ✓ | ✓ | ✓ | ✓ |   | ✓ |
 | node (free) | ✓ | ✓ | ✓ | — |   | ✓ |
-| rust (chained) | ✓ | ✓ | ✓ | — |   | — |
+| rust (chained) | ✓ | ✓ | ✓ | — |   | ✓ |
 | cli (free) | ✓ |   |   |   | — |   |
 | browser (free) | — |   | ✓ |   |   | — |
 | duckdb (free) | ✓ | ✓ |   |   |   | ✓ |
@@ -74,7 +72,7 @@ _Findings:_
 - ⚪ by-design · **browser** in.path — no filesystem in the browser — a File/upload is read to a Uint8Array, so bytes is the only sensible input door.
 
 _Notes:_
-- _rust_: Partial. `text` is `read_bytes(s.as_bytes())` behind a name. The `cert` door is spelled on validate() rather than read() — see cert-input — so read itself still does not take one; that is a spelling choice, not a missing capability.
+- _rust_: Partial. `text` is `read_bytes(s.as_bytes())` behind a name. The `cert` door (2026-08-05, phase 4b) is not the python/node one: there a cert parked on the handle lets a later `.validate()` skip the engine, which this facade has no `Document::validate()` to do. Here it carries the BYTE INDEX, so `read(f).index(c).only(["LOCA"])` parses that group out of its byte range and never looks at the rest of the file — `Document::sliced()` says whether it did. It declines rather than risks: a stale cert, a group the index places in two sections, or a transcode that moved the offsets all fall back to the whole-file parse.
 
 ### validate — Run the numbered AGS4 rules and return a verdict.
 
