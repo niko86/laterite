@@ -15,12 +15,12 @@ vocabulary](../surfaces/index.md#the-shared-vocabulary) — `read`, `validate`,
 import { validate } from "laterite";
 
 const report = validate("delivery.ags", { warnings: true });
-console.log(report.ok, report.count, report.dictVersion, report.resolution);
+console.log(report.isValid, report.count, report.dictVersion, report.resolution);
 // true 0 "4.1.1" "exact"
 ```
 
-`validate(path)` runs the numbered-rules engine and returns a `Report`. `ok` is
-the headline verdict (zero findings), `count` the number of findings, and
+`validate(path)` runs the numbered-rules engine and returns a `Report`. `isValid`
+is the headline verdict (zero findings), `count` the number of findings, and
 `dictVersion` / `resolution` tell you which AGS edition the rules came from —
 selected automatically from the file's `TRAN_AGS`, never passed in. Group them by
 rule (the same shape as Python's `by_rule()`):
@@ -52,7 +52,7 @@ The read handle is fluent, so a whole workflow stays on one object:
 ```js
 const file = read("delivery.ags").validate({ warnings: true }); // returns the file; verdict on .report
 
-if (!file.report.ok) {
+if (!file.report.isValid) {
   const repaired = file.fix(); // returns a NEW repaired Ags4File
   const delta = file.diff(repaired); // what changed, group by group
   repaired.save("clean.ags");
