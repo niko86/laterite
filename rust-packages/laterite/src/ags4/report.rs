@@ -71,6 +71,8 @@ impl Finding {
 /// The result of validating a file.
 pub struct Report {
     pub(crate) findings: Vec<Finding>,
+    pub(crate) certified: bool,
+    pub(crate) revalidate_reason: Option<String>,
 }
 
 impl Report {
@@ -89,6 +91,28 @@ impl Report {
     #[must_use]
     pub fn findings(&self) -> &[Finding] {
         &self.findings
+    }
+
+    /// Did an offered certificate stand in for the rule engine?
+    ///
+    /// Always `false` when no certificate was offered. It never means "nothing
+    /// was checked": if `check_files` was on, the on-disk half ran regardless —
+    /// a certificate is a statement about bytes, and a directory is not part of
+    /// them.
+    #[must_use]
+    pub fn certified(&self) -> bool {
+        self.certified
+    }
+
+    /// Why an offered certificate was NOT used, if one was offered and rejected.
+    ///
+    /// `None` when none was offered, or when it was accepted. Worth surfacing
+    /// rather than swallowing: without it, a stale certificate looks exactly
+    /// like a working one from the outside — same verdict, quietly paying for a
+    /// full validation every time.
+    #[must_use]
+    pub fn revalidate_reason(&self) -> Option<&str> {
+        self.revalidate_reason.as_deref()
     }
 
     /// How many findings at this severity.

@@ -50,7 +50,23 @@ impl core::marker::Unpin for laterite::ags4::WriteMode
 impl core::marker::UnsafeUnpin for laterite::ags4::WriteMode
 impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::WriteMode
 impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::WriteMode
+pub struct laterite::ags4::Certify<'a>
+impl laterite::ags4::Certify<'_>
+pub fn laterite::ags4::Certify<'_>::edition(self, impl core::convert::Into<alloc::string::String>) -> Self
+pub fn laterite::ags4::Certify<'_>::to_bytes(self) -> core::result::Result<alloc::vec::Vec<u8>, laterite::Error>
+pub fn laterite::ags4::Certify<'_>::to_path(self, impl core::convert::AsRef<std::path::Path>) -> core::result::Result<(), laterite::Error>
+impl core::fmt::Debug for laterite::ags4::Certify<'_>
+pub fn laterite::ags4::Certify<'_>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Freeze for laterite::ags4::Certify<'a>
+impl<'a> core::marker::Send for laterite::ags4::Certify<'a>
+impl<'a> core::marker::Sync for laterite::ags4::Certify<'a>
+impl<'a> core::marker::Unpin for laterite::ags4::Certify<'a>
+impl<'a> core::marker::UnsafeUnpin for laterite::ags4::Certify<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Certify<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for laterite::ags4::Certify<'a>
 pub struct laterite::ags4::Document
+impl laterite::ags4::Document
+pub fn laterite::ags4::Document::certify(&self) -> laterite::ags4::Certify<'_>
 impl laterite::ags4::Document
 pub fn laterite::ags4::Document::codes(&self) -> alloc::vec::Vec<&str>
 pub fn laterite::ags4::Document::contains(&self, &str) -> bool
@@ -124,10 +140,12 @@ impl core::panic::unwind_safe::RefUnwindSafe for laterite::ags4::Read
 impl core::panic::unwind_safe::UnwindSafe for laterite::ags4::Read
 pub struct laterite::ags4::Report
 impl laterite::ags4::Report
+pub fn laterite::ags4::Report::certified(&self) -> bool
 pub fn laterite::ags4::Report::count(&self, laterite::ags4::Severity) -> usize
 pub fn laterite::ags4::Report::findings(&self) -> &[laterite::ags4::Finding]
 pub fn laterite::ags4::Report::is_empty(&self) -> bool
 pub fn laterite::ags4::Report::is_valid(&self) -> bool
+pub fn laterite::ags4::Report::revalidate_reason(&self) -> core::option::Option<&str>
 impl core::fmt::Debug for laterite::ags4::Report
 pub fn laterite::ags4::Report::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::Freeze for laterite::ags4::Report
@@ -175,6 +193,8 @@ pub fn laterite::ags4::Validate::check_files(self, bool) -> laterite::ags4::Vali
 pub fn laterite::ags4::Validate::edition(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Validate
 pub fn laterite::ags4::Validate::encoding(self, impl core::convert::Into<alloc::string::String>) -> laterite::ags4::Validate
 pub fn laterite::ags4::Validate::fyi(self, bool) -> laterite::ags4::Validate
+pub fn laterite::ags4::Validate::index(self, impl core::convert::AsRef<std::path::Path>) -> laterite::ags4::Validate
+pub fn laterite::ags4::Validate::index_bytes(self, impl core::convert::Into<alloc::vec::Vec<u8>>) -> laterite::ags4::Validate
 pub fn laterite::ags4::Validate::run(self) -> core::result::Result<laterite::ags4::Report, laterite::Error>
 pub fn laterite::ags4::Validate::warnings(self, bool) -> laterite::ags4::Validate
 impl core::fmt::Debug for laterite::ags4::Validate

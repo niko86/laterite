@@ -15,11 +15,32 @@ use crate::{Error, ErrorKind};
 /// that reorders them is not a round-trip.
 pub struct Document {
     pub(crate) parsed: ParsedAgs4,
+    /// The bytes exactly as they arrived — **before** any transcode.
+    ///
+    /// Kept for [`Document::certify`], whose SHA-256 must be over the bytes a
+    /// later reader will hash. Storing the decoded UTF-8 instead would look
+    /// right and mint a certificate that is never fresh for the file on disk:
+    /// a cp1252 delivery read with `encoding` differs from its own decoded
+    /// form in exactly the `°` and `±` cells that made someone pass the option.
+    /// The Python surface mints over the original bytes for the same reason and
+    /// records the encoding alongside, which is what this pair reproduces.
+    pub(crate) source_bytes: Vec<u8>,
+    /// The encoding label the source was read with, recorded into the
+    /// certificate so a verifier decodes the way the minter did.
+    pub(crate) encoding: Option<String>,
 }
 
 impl Document {
-    pub(crate) fn new(parsed: ParsedAgs4) -> Document {
-        Document { parsed }
+    pub(crate) fn new(
+        parsed: ParsedAgs4,
+        source_bytes: Vec<u8>,
+        encoding: Option<String>,
+    ) -> Document {
+        Document {
+            parsed,
+            source_bytes,
+            encoding,
+        }
     }
 
     /// The group codes, in file order.
@@ -281,6 +302,10 @@ impl std::fmt::Debug for Document {
         f.debug_struct("Document")
             .field("groups", &self.parsed.order.len())
             .field("codes", &self.codes())
+            // Length, never contents: this is the whole source file, and a
+            // `dbg!` of a document should not print a delivery.
+            .field("source_bytes", &self.source_bytes.len())
+            .field("encoding", &self.encoding)
             .finish()
     }
 }

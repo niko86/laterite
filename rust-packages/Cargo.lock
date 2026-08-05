@@ -2082,10 +2082,12 @@ checksum = "bf36173d4167ed999940f804952e6b08197cae5ad5d572eb4db150ce8ad5d58f"
 name = "laterite"
 version = "0.1.2"
 dependencies = [
+ "chrono",
  "laterite-ags4-core",
  "laterite-ags4-emit",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
+ "laterite-ags4-trust",
  "laterite-ags4-validator",
  "serde_json",
 ]
