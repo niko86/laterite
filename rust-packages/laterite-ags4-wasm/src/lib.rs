@@ -2408,8 +2408,8 @@ fn ags4_to_xlsx_core(data: &[u8], recover_duplicate_headings: bool) -> Result<Ex
             DuplicateHeadings::Error
         },
     };
-    let (bytes, stats) =
-        laterite_ags4_excel::ags4_bytes_to_xlsx_with(data, None, opts).map_err(|e| e.to_string())?;
+    let (bytes, stats) = laterite_ags4_excel::ags4_bytes_to_xlsx_with(data, None, opts)
+        .map_err(|e| e.to_string())?;
     Ok(ExcelResult {
         bytes,
         warnings: stats.warnings,
