@@ -60,7 +60,7 @@ LAYER = {
     "laterite-ags4-core": 1,
     "laterite-ags4-emit": 2,
     "laterite-ags4-validator": 2,
-    "laterite-excel": 2,
+    "laterite-ags4-excel": 2,
     "laterite-ags4-diff": 2,
     "laterite-ags4-merge": 2,
     "laterite-ags4-censor": 2,
@@ -110,7 +110,7 @@ NOTES = [
         "#441 (`core → emit`) — CUT 2026-07-11",
         "resolved",
         "The edge is gone: `core` depended on `emit` solely for `impl From<EmitError> "
-        "for CliError`, whose one consumer (`laterite-excel`) now owns the mapping. "
+        "for CliError`, whose one consumer (`laterite-ags4-excel`) now owns the mapping. "
         "Cutting that shim fully severed the edge (an earlier worry that it was "
         "'heavier than the shim framing' was misplaced — the shim was core's only use "
         "of `emit`) and, as a bonus, broke the former "

@@ -199,7 +199,7 @@
     },
     {
       "module": "(whole crate)",
-      "crate": "laterite-excel",
+      "crate": "laterite-ags4-excel",
       "swept": "2026-07-30",
       "mutants": "89",
       "result": "74 killed / 1 residual (14 unviable)",

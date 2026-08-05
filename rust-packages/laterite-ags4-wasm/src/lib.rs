@@ -2347,7 +2347,7 @@ fn apply_fixes_core(
 }
 
 // ---------------------------------------------------------------------
-// AGS4 ↔ XLSX (#359). The FS-free laterite-excel cores (`ags4_bytes_to_xlsx` /
+// AGS4 ↔ XLSX (#359). The FS-free laterite-ags4-excel cores (`ags4_bytes_to_xlsx` /
 // `xlsx_bytes_to_ags4`) drive the browser Excel surface: the Tools pane hands
 // us bytes and gets bytes + warnings back, no filesystem. calamine reads and
 // rust_xlsxwriter writes — both pure-Rust and wasm-clean.
@@ -2408,8 +2408,8 @@ fn ags4_to_xlsx_core(data: &[u8], recover_duplicate_headings: bool) -> Result<Ex
             DuplicateHeadings::Error
         },
     };
-    let (bytes, stats) =
-        laterite_excel::ags4_bytes_to_xlsx_with(data, None, opts).map_err(|e| e.to_string())?;
+    let (bytes, stats) = laterite_ags4_excel::ags4_bytes_to_xlsx_with(data, None, opts)
+        .map_err(|e| e.to_string())?;
     Ok(ExcelResult {
         bytes,
         warnings: stats.warnings,
@@ -2432,7 +2432,7 @@ pub fn xlsx_to_ags4(data: &[u8], format_numeric: bool) -> Result<ExcelResult, Js
 /// The host-testable core of [`xlsx_to_ags4`].
 fn xlsx_to_ags4_core(data: &[u8], format_numeric: bool) -> Result<ExcelResult, String> {
     let (bytes, stats) =
-        laterite_excel::xlsx_bytes_to_ags4(data, format_numeric).map_err(|e| e.to_string())?;
+        laterite_ags4_excel::xlsx_bytes_to_ags4(data, format_numeric).map_err(|e| e.to_string())?;
     Ok(ExcelResult {
         bytes,
         warnings: stats.warnings,

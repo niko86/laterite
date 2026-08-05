@@ -42,7 +42,7 @@ Probed 2026-07-20 (`ags-wiki/.bootstrap/probes/probe_sf_count_dos.py` →
   did `(n as i32)`, which **wraps** `9999999999` to a *positive*
   `1_410_065_407` → a ~1.4 GB requested width → OOM; `format_ndp`/`format_nsci`
   fed a bare `n: usize` straight into `{:.n$}` with the same unbounded read.
-  `repo:rust-packages/laterite-excel/src/lib.rs`'s `NumericFormat::format`
+  `repo:rust-packages/laterite-ags4-excel/src/lib.rs`'s `NumericFormat::format`
   (`Dp`/`Sci` arms) and `format_sf` shared the identical shape.
 - Post-#610: `L.validate(<crafted 9999999999SF file>)` returns in **1 ms**,
   bounded, 9 findings — no OOM, no hang.
@@ -73,11 +73,11 @@ by this page's clamp.
 ## OBSERVATIONS entry — **ratified as [[O-49]]**
 > [!note] Written into `repo:OBSERVATIONS.md#o-49` (5-field house style).
 > **Our decision** (#610): clamp the count to `MAX_NUMERIC_COUNT = 30` at all
-> six sites (`laterite-ags4-types` nDP/nSF/nSCI + `laterite-excel` Dp/Sci/
+> six sites (`laterite-ags4-types` nDP/nSF/nSCI + `laterite-ags4-excel` Dp/Sci/
 > `format_sf`) before it reaches a format width. Regression tests
 > `repo:rust-packages/laterite-ags4-types/src/lib.rs::nsf_count_is_clamped_so_a_crafted_type_cannot_dos`
 > and
-> `repo:rust-packages/laterite-excel/src/lib.rs::format_sf_count_is_clamped_so_a_crafted_type_cannot_dos`
+> `repo:rust-packages/laterite-ags4-excel/src/lib.rs::format_sf_count_is_clamped_so_a_crafted_type_cannot_dos`
 > assert a crafted/`usize::MAX` count stays bounded *and* that legitimate
 > counts render unchanged. **Upstream-reportable: [YES]** — python-ags4's
 > `_format_SF`/`_format_DP`/`_format_SCI` OOM on a crafted numeric-TYPE count;

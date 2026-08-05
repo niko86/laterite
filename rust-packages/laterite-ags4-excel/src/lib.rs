@@ -1,4 +1,4 @@
-//! `laterite-excel` — AGS4 ↔ XLSX conversion (Rust-backed Excel I/O for
+//! `laterite-ags4-excel` — AGS4 ↔ XLSX conversion (Rust-backed Excel I/O for
 //! `laterite.compat.AGS4_to_excel` / `excel_to_AGS4`).
 //!
 //! ⚠️ ROUGH EXTRACTION (2026-06-18): lifted verbatim out of
@@ -6,8 +6,14 @@
 //! `rust_xlsxwriter` — ~1.5 MB that every core consumer which never touches
 //! Excel was carrying (the DuckDB extension, `ags4-perf`).
 //! The logic is unchanged. **FLAGGED FOR REWRITE**: today this is
-//! AGS4-specific (one sheet per group, AGS4 UNIT/TYPE pseudo-rows); the
-//! intent is to rewrite it into a proper, general-purpose Excel library.
+//! AGS4-specific (one sheet per group, AGS4 UNIT/TYPE pseudo-rows).
+//!
+//! It was called `laterite-excel` until 2026-08-05 — a name chosen for a
+//! general-purpose Excel library it never became. `-ags4-` marks the engine
+//! tier, which is what this is, and a crates.io name is free until its first
+//! publish and irreversible after, so the correction had to land before the
+//! crate went out. If the general-purpose rewrite ever happens it wants its own
+//! name rather than this one back.
 //!
 //! Mirrors python-ags4's openpyxl-based implementation but uses two
 //! pure-Rust crates: `rust_xlsxwriter` for writing and `calamine` for

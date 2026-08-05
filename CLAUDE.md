@@ -156,7 +156,7 @@ load-bearing chain:
 Surfaces: `laterite-py` (PyO3 → the `laterite` wheel), `laterite-node` (napi-rs),
 `laterite-ags4-wasm` (browser). CLI: **`lat`** (`laterite-cli`). Supporting
 crates include the `laterite-ags4-{parity,forge,corpus-qa,perf}` QA tools,
-`laterite-ags4-xcheck` (cross-surface output-value gate), and `laterite-excel`
+`laterite-ags4-xcheck` (cross-surface output-value gate), and `laterite-ags4-excel`
 (AGS4↔XLSX, extracted so its `calamine`/`rust_xlsxwriter` deps don't ride into
 every consumer).
 

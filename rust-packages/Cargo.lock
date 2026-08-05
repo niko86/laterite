@@ -2177,6 +2177,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "laterite-ags4-excel"
+version = "0.9.0"
+dependencies = [
+ "calamine",
+ "laterite-ags4-core",
+ "laterite-ags4-emit",
+ "laterite-ags4-types",
+ "rust_xlsxwriter",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "laterite-ags4-forge"
 version = "0.9.0"
 dependencies = [
@@ -2321,12 +2334,12 @@ dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-diff",
  "laterite-ags4-emit",
+ "laterite-ags4-excel",
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-trust",
  "laterite-ags4-types",
  "laterite-ags4-validator",
- "laterite-excel",
  "serde",
  "serde-wasm-bindgen",
  "serde_bytes",
@@ -2357,12 +2370,12 @@ dependencies = [
  "encoding_rs",
  "laterite-ags4-core",
  "laterite-ags4-diff",
+ "laterite-ags4-excel",
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-trust",
  "laterite-ags4-validator",
  "laterite-cliutil",
- "laterite-excel",
  "mimalloc",
  "ratatui",
  "rpassword",
@@ -2382,19 +2395,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "laterite-excel"
-version = "0.9.0"
-dependencies = [
- "calamine",
- "laterite-ags4-core",
- "laterite-ags4-emit",
- "laterite-ags4-types",
- "rust_xlsxwriter",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
 name = "laterite-node"
 version = "0.10.1"
 dependencies = [
@@ -2403,12 +2403,12 @@ dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-diff",
  "laterite-ags4-emit",
+ "laterite-ags4-excel",
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-trust",
  "laterite-ags4-types",
  "laterite-ags4-validator",
- "laterite-excel",
  "laterite-transport",
  "mimalloc",
  "napi",
@@ -2427,13 +2427,13 @@ dependencies = [
  "laterite-ags4-core",
  "laterite-ags4-diff",
  "laterite-ags4-emit",
+ "laterite-ags4-excel",
  "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
  "laterite-ags4-trust",
  "laterite-ags4-types",
  "laterite-ags4-validator",
- "laterite-excel",
  "mimalloc",
  "pyo3",
  "pyo3-arrow",

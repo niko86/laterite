@@ -98,13 +98,13 @@ laterite-ags4-merge = { path = "../laterite-ags4-merge" }
 laterite-ags4-censor = { path = "../laterite-ags4-censor" }
 # AGS4 ↔ XLSX conversion (#359). Its FS-free `ags4_bytes_to_xlsx` /
 # `xlsx_bytes_to_ags4` cores back the browser Excel surface. calamine +
-# rust_xlsxwriter (+ zip / flate2 / zopfli) are wasm-clean; laterite-excel takes
+# rust_xlsxwriter (+ zip / flate2 / zopfli) are wasm-clean; laterite-ags4-excel takes
 # core with `default-features = false`, so `age` / getrandom never enters this
 # binary (the same guard this crate applies to its own core dep above). The
 # `wasm` feature swaps rust_xlsxwriter's clock to `js_sys::Date::now()` — its
 # default `SystemTime::now()` traps on wasm32 when stamping the workbook's
 # creation time.
-laterite-excel = { path = "../laterite-excel", features = ["wasm"] }
+laterite-ags4-excel = { path = "../laterite-ags4-excel", features = ["wasm"] }
 # The AGS type system — SAME canonical_type / parse_value / parse_datetime
 # the native DuckDB conversion uses, so the explorer casts identically
 # (parity by construction). The `arrow` feature pulls in arrow_cols, the

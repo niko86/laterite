@@ -1,22 +1,22 @@
 ---
 type: tool
-title: laterite-excel
+title: laterite-ags4-excel
 status: drafted
 tags: [tool, internal, compat]
 tool_kind: crate
 language: rust
-artifact: laterite-excel
+artifact: laterite-ags4-excel
 ags_editions: []
 repo_refs:
-  root: "repo:rust-packages/laterite-excel"
-  lib: "repo:rust-packages/laterite-excel/src/lib.rs"
+  root: "repo:rust-packages/laterite-ags4-excel"
+  lib: "repo:rust-packages/laterite-ags4-excel/src/lib.rs"
 related: [crate-map, laterite-ags4-core, laterite-py, python-ags4, reliquary, core-perf-baseline]
 sources: []
 ---
-# laterite-excel
+# laterite-ags4-excel
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
-> [!note] **Not published** — `laterite-excel` is a workspace crate, internal to this repo, at v0.9.0 (inherited from the workspace).
+> [!note] **Not published** — `laterite-ags4-excel` is a workspace crate, internal to this repo, at v0.9.0 (inherited from the workspace).
 > **Used by** — [[laterite-ags4-wasm]], [[laterite-cli]], [[laterite-node]], [[laterite-py]].
 <!-- END GENERATED: crate-card -->
 
@@ -86,7 +86,7 @@ Tracked in the relic register: [[reliquary]].
 
 ## Where it lives
 
-`repo:rust-packages/laterite-excel` — a single `src/lib.rs`.
+`repo:rust-packages/laterite-ags4-excel` — a single `src/lib.rs`.
 
 ## Related
 

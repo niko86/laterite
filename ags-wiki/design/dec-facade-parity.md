@@ -17,7 +17,7 @@ repo_refs:
   version_gate: "repo:tests/test_version_faithful.py"
   publish_tool: "repo:tools/publish_crates.py"
   cli: "repo:rust-packages/laterite-cli/Cargo.toml"
-  excel: "repo:rust-packages/laterite-excel/Cargo.toml"
+  excel: "repo:rust-packages/laterite-ags4-excel/Cargo.toml"
 ---
 
 # The Rust facade reaches parity and joins the product line — Excel joins it, the CLI does not
@@ -62,7 +62,7 @@ Both hold only if the work stops halfway.
 
 **Third: the two by-design exclusions were justified by a door that is shut.**
 The register's note on the rust `to_excel` cell tells a Rust caller to
-`cargo add laterite-excel` — a crate that is `publish = false` and has never been
+`cargo add laterite-ags4-excel` — a crate that is `publish = false` and has never been
 on crates.io. An exclusion resting on a false premise is not an exclusion, and
 re-examining it is what produced decision 4.
 
@@ -119,11 +119,11 @@ warns about is not being published and stays free to design.
 Superseding the register's own `by-design` verdict on `to_excel`/`from_excel`.
 That verdict rested on a premise that is **not true**:
 
-> "A Rust caller can `cargo add laterite-excel` directly, which is a door a
+> "A Rust caller can `cargo add laterite-ags4-excel` directly, which is a door a
 > python or node user has no equivalent of, so the floor's premise (the facade
 > is the only way in) does not hold here."
 
-`laterite-excel` is `publish = false` and has never been on crates.io. The escape
+`laterite-ags4-excel` is `publish = false` and has never been on crates.io. The escape
 hatch the exclusion was justified by does not exist, so the note had to change
 whichever way this went — either the crate gets published and the sentence
 becomes true, or the sentence goes.
@@ -212,7 +212,7 @@ Two mechanics this constrains:
   `mutation-sweep.md` are generated. The rename edits the three JSON files and
   regenerates; a blanket substitution across rendered files is reverted by the
   next generator run and fails its `--check`.
-- **`CHANGELOG.md:64` needs more than a rename.** It records `laterite-excel` as
+- **`CHANGELOG.md:64` needs more than a rename.** It records `laterite-ags4-excel` as
   *"never considered for the registry"*, which phase 6 falsifies whatever the
   crate is called. The repair is a new entry at the phase-6 release, not a
   rewrite of the old one.
@@ -293,7 +293,7 @@ Excel, which needs a rename and full prep first.
 | **0** | this page · register cells · modality drift gate | — | #250 | 2026-08-04 |
 | **1** | `publish = true` on `diff` + `merge`, empty `DEFERRED` | — | — | 2026-08-04 |
 | **2** | **publish `diff` + `merge`** at 0.9.0 — owner | — | 1 | 2026-08-05 |
-| **3** | rename `laterite-excel` → `laterite-ags4-excel`, repo-wide | — | — | — |
+| **3** | rename `laterite-excel` → `laterite-ags4-excel`, repo-wide | — | — | 2026-08-05 |
 | **4a** | facade `transport`: `pack` / `lock` | 2 | — | — |
 | **4b** | facade cert trio: `certify`, cert-input, read-from-cert | 3 | — | — |
 | **4c** | facade `fix` + `build` | 2 | — | — |
@@ -347,7 +347,7 @@ constraint: the door wraps `merge_parsed`'s `&[ParsedFile]` shape, and no
 provenance typestate reaches the facade.
 
 **Phase 6 needs a changelog entry that corrects a claim**, not just announces a
-publish. `CHANGELOG.md` records `laterite-excel` as *"never considered for the
+publish. `CHANGELOG.md` records `laterite-ags4-excel` as *"never considered for the
 registry"*; that becomes false here and the correction belongs in this release's
 notes.
 
@@ -391,7 +391,7 @@ sitting there unexercised without a decision either way.
 any reading of "0.2" as a facade milestone. If the CLI is ever wanted on
 crates.io, this page is what has to be revisited — along with preparing two
 crates and finding an honest answer to the bin-only gates problem. Note that
-decision 4 removes one of the reasons given against it: `laterite-excel` was
+decision 4 removes one of the reasons given against it: `laterite-ags4-excel` was
 named as an unprepared blocker, and after phase 3 it is prepared. What remains
 against the CLI is `laterite-cliutil`, the bin-only gates problem, and the
 dependency weight — the argument is narrower now, and honesty requires saying so.

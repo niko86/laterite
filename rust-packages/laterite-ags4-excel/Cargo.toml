@@ -1,15 +1,17 @@
-# laterite-excel — AGS4 ↔ XLSX conversion, extracted out of laterite-ags4-core
+# laterite-ags4-excel — AGS4 ↔ XLSX conversion, extracted out of laterite-ags4-core
 # (2026-06-18) so the "core" crate stops dragging calamine + rust_xlsxwriter
 # (~1.5 MB) into every consumer that never touches Excel (the DuckDB
-# extension, ags4-perf). Sole consumer today: laterite-py
-# (the `laterite.compat` AGS4_to_excel / excel_to_AGS4 surface).
+# extension, ags4-perf).
 #
-# FLAGGED FOR REWRITE: the current contents are AGS4-specific; the intent is
-# to grow this into a proper general-purpose Excel library. Name chosen for
-# that destination — see src/lib.rs.
+# FLAGGED FOR REWRITE: the current contents are AGS4-specific. Renamed from
+# `laterite-excel` on 2026-08-05 (ags-wiki/design/dec-facade-parity.md decision
+# 5) because the old name was chosen for a general-purpose library this never
+# became, and `-ags4-` marks the engine tier this belongs to. A crates.io name
+# cannot be changed after the first publish, so it had to be right before
+# phase 6 — see src/lib.rs.
 
 [package]
-name = "laterite-excel"
+name = "laterite-ags4-excel"
 version.workspace = true
 edition = "2024"
 rust-version = "1.85"
@@ -18,7 +20,7 @@ license = "MIT"
 publish = false
 
 [lib]
-name = "laterite_excel"
+name = "laterite_ags4_excel"
 path = "src/lib.rs"
 
 [dependencies]

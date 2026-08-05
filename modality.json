@@ -1452,7 +1452,7 @@
           "verbs": [],
           "input": {},
           "output": {},
-          "note": "Reversed 2026-08-04 (dec-facade-parity): TO ADD, behind an optional `excel` feature. The earlier DO-NOT-ADD rested on a Rust caller being able to `cargo add laterite-excel` directly — a door that was never open, since the crate is publish = false and has never been on crates.io. The dependency cost survives the reversal because an optional dep is not compiled, downloaded or locked by anyone who leaves the feature off, so the calamine + rust_xlsxwriter weight the crate map extracted stays off every consumer that does not ask for it.",
+          "note": "Reversed 2026-08-04 (dec-facade-parity): TO ADD, behind an optional `excel` feature. The earlier DO-NOT-ADD rested on a Rust caller being able to `cargo add laterite-ags4-excel` directly — a door that was never open, since the crate is publish = false and has never been on crates.io. The dependency cost survives the reversal because an optional dep is not compiled, downloaded or locked by anyone who leaves the feature off, so the calamine + rust_xlsxwriter weight the crate map extracted stays off every consumer that does not ask for it.",
           "facade_verdict": "planned"
         }
       ]

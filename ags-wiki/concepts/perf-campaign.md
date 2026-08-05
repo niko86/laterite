@@ -226,7 +226,7 @@ condition being met and a fresh measurement, never by someone re-filing it.
 
 | candidate | prize | why not | revisit when |
 |---|---|---|---|
-| positional row model (`Vec<Vec<String>>` + heading index) | ~25 ms, 13% of the typed read | breaks `r["LOCA_ID"]` at every call site — `lat read`, `laterite-excel`, node, `read_groups_raw` | a caller reads these rows in a hot loop, **or** `AgsGroup` is being reshaped anyway. Not on the 13% alone. |
+| positional row model (`Vec<Vec<String>>` + heading index) | ~25 ms, 13% of the typed read | breaks `r["LOCA_ID"]` at every call site — `lat read`, `laterite-ags4-excel`, node, `read_groups_raw` | a caller reads these rows in a hot loop, **or** `AgsGroup` is being reshaped anyway. Not on the 13% alone. |
 | `raw_lines` pushes one owned `String` per line under `validating()` (`parse/lib.rs:35` `pub text: String`, allocated at `:721`) — queue #4, was issue #112 | ~9.9 ms = **6.9% of `parse_bytes`**, 1.9% of `check_file` — and that is the ceiling (a span rewrite keeps the `Vec` push) | **invasive**: needs `ParsedFile<'a>` or whole-file-decode + span, changing the public `RawLine.text` type across `line_format`/`structure`/`fixes`/PyO3. Fails the 20% gate by ~3× | a change is *already* rewriting `RawLine` to borrow (making this contained rather than invasive), **or** `parse_bytes` becomes a materially larger share of a user-facing operation. Re-verified 2026-08-03: mechanism unchanged, no such rewrite in flight |
 | `EmitGroup` owns `Vec<Vec<String>>`, so `emit.rs:354` deep-clones an already-owned matrix to hand the writer a *view* — queue #9, was issue #113 | **measured 2026-08-03, paired**: `emit_ags4/report` 18.155 → 16.525 ms with the clone removed = **−1.63 ms, −9.0%** (autofix −8.8%, +synth −7.6%) | **invasive**, and more so than when first declined: `laterite-ags4-emit` now **publishes to crates.io** (0.9.0), so changing `EmitGroup.rows`'s type is a breaking change to a published API — an engine MINOR under the pre-1.0 convention. 9% against a 20% gate | the original condition was "node gets a bench harness **and** node's emit dominates there". Half of it is now met — `node/bench/read.bench.ts` + `npm run bench` exist — but it benches **read only**. At 9% on the Rust side a node emit bench would have to find something dramatically different to change the answer, so: only if a node emit bench is written for its own reasons and shows that |
 | keychain S3 — memoise the parent `_id` across a group's rows — was issue #111 | ~5–15% of *id-minting*, which post-S1/S2 is no longer the dominant stage of the keyed read | end-to-end ceiling falls **below the tranche floor**. Contained, but there is nothing left to win here | id-minting becomes the dominant stage of the keyed read again |
@@ -297,7 +297,7 @@ Below the floor, measured out — recorded so they are not rediscovered:
 **C1, as measured rather than as queued.** The row above originally read
 "silently collapses duplicate headings". That understated it. Rows are keyed by
 heading name, and every consumer walks `headings` *positionally* then indexes the
-row *by name* (`laterite-excel:144`, node `lib.rs:117`, wasm `lib.rs:1198`,
+row *by name* (`laterite-ags4-excel:144`, node `lib.rs:117`, wasm `lib.rs:1198`,
 `read_groups_raw`) — so the survivor was returned for **both** positions. Built
 against the pre-fix commit, a `LOCA` with headings `LOCA_ID, LOCA_GL, LOCA_ID`
 and values `FIRST, 1.00, SECOND` read back as:
@@ -736,7 +736,7 @@ out to dominate there.
 - **`laterite-py`'s two emit sites as `EmitGroup` double-copies.** Miscited —
   neither touches `EmitGroup`; both hand a matrix to `write_ags4_matrix`, which
   already takes it **by reference**. The wheel's emit surfaces never had this bug.
-- **`laterite-excel` as "copies every cell twice".** One clone, not two, and
+- **`laterite-ags4-excel` as "copies every cell twice".** One clone, not two, and
   untouched by the #9 fix; removing it needs a different row representation.
 - **`encoding_rs`' decode as the source of the per-line allocation.**
   `decode_without_bom_handling` returns `Cow::Borrowed` with zero allocation for
@@ -788,7 +788,7 @@ engine.
 - **Opt in** to disambiguate rather than collide: the second and subsequent
   occurrences are suffixed `__2`, `__3`, … in **both** `headings` and the row
   key, which restores correct positional reads and loses nothing.
-- **On every read surface** — `lat read`, `laterite-excel`, node,
+- **On every read surface** — `lat read`, `laterite-ags4-excel`, node,
   `read_groups_raw` and the Python read. Not because each needs it equally, but
   because a read option present on some surfaces and absent on others is exactly
   the drift `laterite-ags4-xcheck` and the drop-in surface gate exist to catch;

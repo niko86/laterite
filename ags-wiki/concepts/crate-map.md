@@ -206,7 +206,7 @@ as stable):
   `transport` module is now a thin `CliError`-returning face over the shared `laterite-transport`
   leaf (#327) — the zstd+age logic moved out — still behind a default-on `transport` feature so the
   wasm consumer takes `default-features = false` (the leaf's `age`→getrandom won't build on wasm32).
-- [[laterite-excel]] — AGS4 ↔ XLSX (`calamine` reader + `rust_xlsxwriter` writer), extracted out of
+- [[laterite-ags4-excel]] — AGS4 ↔ XLSX (`calamine` reader + `rust_xlsxwriter` writer), extracted out of
   `laterite-ags4-core` (2026-06-18) so those Excel deps stop riding into every core consumer that never
   touches XLSX (the duckdb extension, `laterite-ags5-db`, `laterite-ags4-perf`). Path fns (`ags4_to_excel` /
   `excel_to_ags4`) + **FS-free byte cores** (`ags4_bytes_to_xlsx` / `xlsx_bytes_to_ags4`, #359) the
@@ -228,7 +228,7 @@ as stable):
   cell through `laterite_ags4_types::write_quoted_field` (#533), the same quoter the browser now reaches via
   `laterite-ags4-tokenizer-wasm` (below). The old
   `core → emit` layering inversion (`core` depended on `emit` solely for `From<EmitError> for CliError`) was
-  **cut** in #441: that conversion moved to its sole consumer `laterite-excel`, so `core` no longer depends on
+  **cut** in #441: that conversion moved to its sole consumer `laterite-ags4-excel`, so `core` no longer depends on
   `emit` — see [[core-emit-layering-inversion]].
 - `laterite-ags4-diff` — the wasm-safe **revision-diff leaf** (#204): the KEY-aware, type-aware
   comparison of two parsed AGS4 files (`diff_parsed(a, b, dict, cap) -> RevisionDelta`; rows matched
@@ -334,7 +334,7 @@ as stable):
   `repo:rust-packages/laterite-node/Cargo.toml`, and the diagram below is the
   authority for the edges: `laterite-ags4-validator`, `-parse`, `-diff`,
   `-merge`, `-types` (`arrow`), `-emit` (`arrow`), `-core`, `-trust`,
-  `laterite-excel`, `laterite-transport`. Shipping: P3–P4 landed (DuckDB,
+  `laterite-ags4-excel`, `laterite-transport`. Shipping: P3–P4 landed (DuckDB,
   typed-graph, npm) — `test/p3-*.test.ts` exercise them and `git tag -l
   "node-v*"` runs to `node-v0.10.1`. This paragraph listed three deps and called
   P3–P4 pending long after both stopped being true.
@@ -392,7 +392,7 @@ flowchart LR
   parse --> tokenizerwasm
   types --> emit[laterite-ags4-emit]
   validator[laterite-ags4-validator] --> emit
-  core --> excel[laterite-excel]
+  core --> excel[laterite-ags4-excel]
   emit --> excel
   excel --> latpy[laterite-py]
   excel --> latnode

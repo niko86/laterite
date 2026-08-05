@@ -62,11 +62,11 @@ laterite-ags4-types = { path = "../laterite-ags4-types", features = ["arrow"] }
 laterite-ags4-emit = { path = "../laterite-ags4-emit", features = ["arrow"] }
 # AGS4 ↔ XLSX converter (#358) — the same crate laterite-py binds for
 # to_excel/from_excel. Pure Rust (calamine + rust_xlsxwriter), DuckDB-free.
-laterite-excel = { path = "../laterite-excel" }
+laterite-ags4-excel = { path = "../laterite-ags4-excel" }
 # The content-addressed keychain (#303): `registry()` + `keychain::group_row_ids`
 # so `table_ipc` prepends the `_id`/`_parent_id` columns from the ONE shared id
 # maths every surface uses (byte-identical to the DuckDB extension). Pure +
-# DuckDB-free; Excel/csv moved out to laterite-excel (2026-06-18), so this is a
+# DuckDB-free; Excel/csv moved out to laterite-ags4-excel (2026-06-18), so this is a
 # light dep now — sha2 + uuid + the dictionary. `default-features = false` drops
 # core's `transport` feature (we bind the leaf directly below), so core pulls
 # neither age nor zstd for us.

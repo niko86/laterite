@@ -956,7 +956,7 @@ def AGS4_to_excel(
 ) -> None:
     """Convert an AGS4 file to an XLSX spreadsheet, one sheet per group.
 
-    Rust-backed via `laterite_excel::ags4_to_excel` (uses
+    Rust-backed via `laterite_ags4_excel::ags4_to_excel` (uses
     `rust_xlsxwriter`); openpyxl never enters the dep graph. Output
     matches python-ags4's column layout: HEADING column first, AGS
     heading names as headers, UNIT / TYPE / DATA pseudo-rows
@@ -1011,7 +1011,7 @@ def excel_to_AGS4(
 ) -> None:
     """Convert an XLSX (AGS4-shaped) back to an AGS4 file.
 
-    Rust-backed via `laterite_excel::excel_to_ags4` (uses `calamine`).
+    Rust-backed via `laterite_ags4_excel::excel_to_ags4` (uses `calamine`).
     Each worksheet with a ``HEADING`` column becomes one AGS4 group.
     Columns not matching Rule 19's ``[A-Z0-9]{4}_[A-Z0-9]{1,4}`` regex
     are dropped (with a warning); rows whose HEADING isn't UNIT /
@@ -1024,7 +1024,7 @@ def excel_to_AGS4(
             re-formatted to their column's TYPE precision (``<N>DP``,
             ``<N>SCI``, ``<N>SF``) so floats from XLSX don't lose
             trailing zeros. Done in Rust via
-            ``laterite_excel::apply_type_formatting``.
+            ``laterite_ags4_excel::apply_type_formatting``.
         dictionary: Optional bundled-edition version string or AGS4
             dict-file path. When provided, the XLSX is first converted
             to AGS4 via Rust, then the dictionary's UNIT/TYPE rows
