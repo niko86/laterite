@@ -50,8 +50,19 @@ Currently v0.1.2 — this crate versions independently of the engine.
   sibling `FILE/` tree really holds the attachments the file references: bytes
   have no sibling anything, so requesting it there is an error rather than a
   clean result.
+- **Fix.** Mechanically repair a delivery — CRLF, BOM, embedded carriage
+  returns, short rows, numeric formatting, the `TRAN` delimiter rows. The output
+  is re-validated, so what comes back with it is what could *not* be fixed. The
+  repairs that guess intent are withheld until you ask for them, and the result
+  says how many it held back.
+- **Build.** Construct AGS4 from data you hold — a query result, a spreadsheet,
+  your own structs. Typed cells are formatted to their heading's declared AGS
+  TYPE; strings are written as given.
 - **Write.** Emit valid AGS4, deriving the `UNIT` and `TYPE` catalogue groups
   from the data. Choose whether to auto-fix, report, or refuse outright.
+- **Certify.** Mint an `.ags.idx` certificate over a file's bytes, and offer one
+  back so a validate can skip the rule engine or a read can slice a group
+  straight out of its byte range.
 
 The validator is **clean-room** — written from the AGS4.1 specification, not
 derived from any existing implementation — and is cross-checked against the
@@ -92,14 +103,13 @@ is something you wrote down in your own `Cargo.toml`.
 
 ## Scope
 
-Read, validate, write, and `transport` — compress (`pack`) or compress-and-encrypt
-(`lock`) any file, from a path or from bytes in memory.
+Read, validate, fix, build, write, certify, and `transport` — compress (`pack`)
+or compress-and-encrypt (`lock`) any file, from a path or from bytes in memory.
 
 The crate is completing to **parity** with the Python and Node surfaces: per
 capability, at least what the weaker of those two offers. Still to arrive: diff,
-merge, fix, build, the certificate trio and Excel. Each is additive, so nothing
-here has to change to admit them. When it reaches parity it joins the product
-version line.
+merge and Excel. Each is additive, so nothing here has to change to admit them.
+When it reaches parity it joins the product version line.
 
 There is no 0.2 — that milestone was retired in favour of going to parity once,
 rather than stopping at a waypoint on a crate whose whole purpose is to be
