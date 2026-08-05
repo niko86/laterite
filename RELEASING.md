@@ -24,7 +24,7 @@ for when we deliberately want to signal "stable — I'll keep compatibility."
 | | Covers | Resolved by | Bumped with |
 |---|---|---|---|
 | **product** | the Python wheel, the npm `laterite` package + its `@laterite/native-*` addons, the browser package, the `lat` binary, the DuckDB extension | `pip install laterite` · `npm i laterite` | `bump-version.sh product` |
-| **engine** | the Rust workspace and the eight crates.io crates | `cargo add laterite-ags4-validator` | `bump-version.sh engine` |
+| **engine** | the Rust workspace and the ten crates.io engine crates | `cargo add laterite-ags4-validator` | `bump-version.sh engine` |
 
 Every **product** still shares one number, so `pip install laterite==X` and
 `npm i laterite@X` are the same release. The engine moves on its own, because it

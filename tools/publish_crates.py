@@ -30,7 +30,8 @@ published before something it needs) is exactly the one this exists to prevent.
 - Publish anything in `DEFERRED` — crates prepared for the registry but held back
   deliberately. A tool that quietly included one is how a held crate goes out.
   The set is empty as of 2026-08-04 (`laterite-ags4-diff` and `laterite-ags4-merge`
-  were its only members and are now armed); the mechanism stays for the next one.
+  were its only members and went out on 2026-08-05); the mechanism stays for the
+  next one.
 
 Nothing happens without `--execute`. The default run performs every check and
 prints exactly what it would do.
@@ -89,7 +90,8 @@ from check_package_contents import PUBLISH_SET  # noqa: E402
 #:
 #: Emptied 2026-08-04: `laterite-ags4-diff` and `laterite-ags4-merge` were the
 #: only two entries, held back through the first publish so day one's surface was
-#: as small as possible. That is spent, and they publish at 0.9.0. The mechanism
+#: as small as possible. That is spent — both went out at 0.9.0 on 2026-08-05,
+#: taking the engine tier to ten published crates. The mechanism
 #: stays because it will be wanted again — the next crate to prepare ahead of its
 #: publish is `laterite-ags4-excel` (see ags-wiki/design/dec-facade-parity.md),
 #: which also has to be renamed before it can go out.

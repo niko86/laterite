@@ -23,7 +23,9 @@ repo_refs:
 > Prerequisite work is tracked as laterite#158–#162.
 >
 > **Published since:** eight engine crates at 0.9.0 and the `laterite` facade on
-> its own 0.1.x line, both 2026-08-01.
+> its own 0.1.x line, both 2026-08-01; `laterite-ags4-diff` and
+> `laterite-ags4-merge` joined them at 0.9.0 on 2026-08-05, taking the engine
+> tier to **ten** published crates (phase 2 of [[dec-facade-parity]]).
 >
 > **Revised 2026-08-04 by [[dec-facade-parity]]** — four points, marked inline
 > below. There is **no 0.2**: the facade completes to parity and jumps straight
@@ -461,7 +463,7 @@ number. Two numbers, one rule each, and nothing else.
 
 | | Covers | Resolved by |
 |---|---|---|
-| **engine** | the Rust workspace and the eight crates.io crates | `cargo add laterite-ags4-validator` |
+| **engine** | the Rust workspace and the ten crates.io engine crates | `cargo add laterite-ags4-validator` |
 | **product** | wheel, npm, browser package, `lat`, the DuckDB extension — and `laterite` at parity | `pip install laterite` · `npm i laterite` |
 
 ### The evidence, which is better than the argument
