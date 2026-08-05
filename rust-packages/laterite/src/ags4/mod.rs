@@ -1,10 +1,12 @@
-//! The AGS4 surface: read, validate, write.
+//! The AGS4 surface: read, validate, fix, build, write.
 //!
 //! Everything format-specific lives under this module and not at the crate
 //! root, so a future format is a sibling rather than a rename.
 
+mod build;
 mod cert;
 mod document;
+mod fix;
 mod report;
 
 use std::path::{Path, PathBuf};
@@ -15,8 +17,10 @@ use laterite_ags4_reference::dict::DictVersion;
 use laterite_ags4_validator::parse::parse_bytes;
 use laterite_ags4_validator::{CheckOptions, WorldScope, check_file, check_parsed_with_dict};
 
+pub use build::{Build, Cell, GroupData, build, build_document};
 pub use cert::Certify;
 pub use document::{Document, Group, Row, Rows};
+pub use fix::{Fix, Fixed, Repair, fix, fix_bytes, fix_str, fixable_rules};
 pub use report::{Finding, Report, Severity};
 
 use crate::{Error, ErrorKind};
@@ -51,6 +55,23 @@ fn bad_encoding(label: &str) -> Error {
         ErrorKind::InvalidArgument,
         format!("unknown encoding label `{label}` (WHATWG names, e.g. `windows-1252`)"),
     )
+}
+
+/// Map an engine error onto one of ours, from the engine's own kind token.
+///
+/// The token, not the variants. `ValidatorError::kind()` is documented as the
+/// single producer of that domain precisely so surfaces stop re-deriving it and
+/// drifting; a variant match here would be a second, competing table. One
+/// function rather than one match per call site for the same reason — four
+/// copies is four chances for a new token to be handled three ways.
+fn validator_kind(token: &str) -> ErrorKind {
+    match token {
+        "io" | "not_found" => ErrorKind::Io,
+        "not_ags4" => ErrorKind::NotAgs4,
+        "bad_dict" | "unsupported_edition" => ErrorKind::BadDictionary,
+        "world_check_requires_source" => ErrorKind::InvalidArgument,
+        _ => ErrorKind::Other,
+    }
 }
 
 /// Findings from the engine, flattened into our own shape.
@@ -93,6 +114,19 @@ enum Source {
     /// and `±` in description fields — that made someone reach for `encoding`
     /// in the first place. Structural, not a doc note.
     Text(String),
+}
+
+impl Source {
+    /// How a source is named in a `Debug` rendering — its shape and size, never
+    /// its contents. Factored out because three builders render it identically
+    /// and a fourth spelling would be the one that drifts.
+    fn describe(&self) -> String {
+        match self {
+            Source::Path(p) => format!("path {}", p.display()),
+            Source::Bytes(b) => format!("{} bytes", b.len()),
+            Source::Text(s) => format!("{} characters", s.chars().count()),
+        }
+    }
 }
 
 /// A pending read. Configure it, then [`Read::run`].
@@ -539,16 +573,7 @@ impl Validate {
                 world,
                 compat: None,
             })
-            .map_err(|e| {
-                let kind = match e.kind() {
-                    "io" | "not_found" => ErrorKind::Io,
-                    "not_ags4" => ErrorKind::NotAgs4,
-                    "bad_dict" | "unsupported_edition" => ErrorKind::BadDictionary,
-                    "world_check_requires_source" => ErrorKind::InvalidArgument,
-                    _ => ErrorKind::Other,
-                };
-                Error::with_source(kind, "cannot validate", e)
-            })?;
+            .map_err(|e| Error::with_source(validator_kind(e.kind()), "cannot validate", e))?;
 
             return Ok(Report {
                 findings: convert(outcome.findings),
@@ -579,17 +604,7 @@ impl Validate {
         };
 
         let findings = result.map_err(|e| {
-            // Map from the engine's own kind token, not from its variants. Its
-            // `kind()` is documented as the single producer of that domain
-            // precisely so surfaces stop re-deriving it and drifting; a variant
-            // match here would be a second, competing table.
-            let kind = match e.kind() {
-                "io" | "not_found" => ErrorKind::Io,
-                "not_ags4" => ErrorKind::NotAgs4,
-                "bad_dict" | "unsupported_edition" => ErrorKind::BadDictionary,
-                "world_check_requires_source" => ErrorKind::InvalidArgument,
-                _ => ErrorKind::Other,
-            };
+            let kind = validator_kind(e.kind());
             let subject = match &self.source {
                 Source::Path(p) => format!("cannot validate {}", p.display()),
                 Source::Bytes(b) => format!("cannot validate {} bytes", b.len()),
@@ -761,37 +776,13 @@ impl<'a> Write<'a> {
             })
             .collect();
 
-        let edition = match &self.edition {
-            Some(label) => resolve_edition(label)?,
-            None => laterite_ags4_reference::dict::FALLBACK,
-        };
-        let opts = EmitOpts {
-            mode: match self.mode {
-                WriteMode::AutoFix => EmitMode::AutoFix,
-                WriteMode::Report => EmitMode::Report,
-                WriteMode::Strict => EmitMode::Strict,
-            },
-            edition,
-            tran: self.tran,
-            synthesise_metadata: self.synthesise_metadata,
-        };
-        let result = emit_ags4(&groups, &opts)
-            .map_err(|e| Error::with_source(ErrorKind::Emit, "cannot write as AGS4", e))?;
-        Ok(Written {
-            fixes_applied: result.fixes_applied,
-            findings: convert(result.findings),
-            // Cannot fail — see the note on `Written::text`. Surfaced as an
-            // error rather than unwrapped anyway: if the emitter ever did
-            // produce non-UTF-8 that is an engine bug, and a panic in a library
-            // is a poor way to report one.
-            text: String::from_utf8(result.bytes).map_err(|e| {
-                Error::with_source(
-                    ErrorKind::Emit,
-                    "the emitter produced bytes that are not UTF-8",
-                    e,
-                )
-            })?,
-        })
+        emit_groups(
+            &groups,
+            self.mode,
+            self.edition.as_deref(),
+            self.synthesise_metadata,
+            self.tran,
+        )
     }
 
     /// Produce the AGS4 bytes.
@@ -808,6 +799,53 @@ impl<'a> Write<'a> {
         })?;
         Ok(written)
     }
+}
+
+/// The one call into the emit engine, shared by [`write`] and
+/// [`build`](build::build).
+///
+/// Both doors differ only in where their `GroupInput` came from — a document,
+/// or the caller's own data. Everything after that (edition resolution, the
+/// mode mapping, the UTF-8 contract on the way out) is the same work, and a
+/// second copy of it is how two doors come to disagree about the same file.
+fn emit_groups(
+    groups: &[GroupInput],
+    mode: WriteMode,
+    edition: Option<&str>,
+    synthesise_metadata: bool,
+    tran: Option<TranStamp>,
+) -> Result<Written, Error> {
+    let edition = match edition {
+        Some(label) => resolve_edition(label)?,
+        None => laterite_ags4_reference::dict::FALLBACK,
+    };
+    let opts = EmitOpts {
+        mode: match mode {
+            WriteMode::AutoFix => EmitMode::AutoFix,
+            WriteMode::Report => EmitMode::Report,
+            WriteMode::Strict => EmitMode::Strict,
+        },
+        edition,
+        tran,
+        synthesise_metadata,
+    };
+    let result = emit_ags4(groups, &opts)
+        .map_err(|e| Error::with_source(ErrorKind::Emit, "cannot write as AGS4", e))?;
+    Ok(Written {
+        fixes_applied: result.fixes_applied,
+        findings: convert(result.findings),
+        // Cannot fail — see the note on `Written::text`. Surfaced as an error
+        // rather than unwrapped anyway: if the emitter ever did produce
+        // non-UTF-8 that is an engine bug, and a panic in a library is a poor
+        // way to report one.
+        text: String::from_utf8(result.bytes).map_err(|e| {
+            Error::with_source(
+                ErrorKind::Emit,
+                "the emitter produced bytes that are not UTF-8",
+                e,
+            )
+        })?,
+    })
 }
 
 /// What a write produced.
@@ -878,14 +916,7 @@ impl Written {
 impl std::fmt::Debug for Read {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Read")
-            .field(
-                "source",
-                &match &self.source {
-                    Source::Path(p) => format!("path {}", p.display()),
-                    Source::Bytes(b) => format!("{} bytes", b.len()),
-                    Source::Text(s) => format!("{} characters", s.chars().count()),
-                },
-            )
+            .field("source", &self.source.describe())
             .field("encoding", &self.encoding)
             .field(
                 "recover_duplicate_headings",
@@ -907,14 +938,7 @@ impl std::fmt::Debug for Read {
 impl std::fmt::Debug for Validate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Validate")
-            .field(
-                "source",
-                &match &self.source {
-                    Source::Path(p) => format!("path {}", p.display()),
-                    Source::Bytes(b) => format!("{} bytes", b.len()),
-                    Source::Text(s) => format!("{} characters", s.chars().count()),
-                },
-            )
+            .field("source", &self.source.describe())
             .field("warnings", &self.warnings)
             .field("fyi", &self.fyi)
             .field("edition", &self.edition)
