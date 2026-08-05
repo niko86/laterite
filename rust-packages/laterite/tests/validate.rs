@@ -134,6 +134,39 @@ fn requesting_the_on_disk_check_on_bytes_is_refused() {
     );
 }
 
+/// Every engine error token this crate maps has to be REACHED by a test, not
+/// merely listed in the mapping.
+///
+/// `validator_kind` translates the engine's own kind tokens into our
+/// `ErrorKind`, and two of its arms are only ever produced by the engine — a
+/// caller cannot cause them directly the way a bad encoding label or a bad
+/// edition string goes through this crate's own checks first. Deleting either
+/// arm survived the suite until this test existed, because the tests that look
+/// like they cover them (a missing file, a bad edition) reach `ErrorKind::Io`
+/// and `ErrorKind::BadDictionary` by a different route entirely.
+#[test]
+fn engine_error_tokens_reach_the_kinds_they_map_to() {
+    // `not_found` — the engine's, from `check_file` on a path that is not there.
+    // (`fix`'s missing-file error comes from this crate's own `fs::read`.)
+    let err = ags4::validate("no-such-file-anywhere.ags")
+        .run()
+        .expect_err("missing file");
+    assert_eq!(err.kind(), laterite::ErrorKind::Io);
+
+    // `unsupported_edition` — AGS **3**, which the engine refuses outright
+    // rather than validating against a 4.x dictionary.
+    let ags3 = concat!(
+        "\"**PROJ\"\r\n",
+        "\"*PROJ_ID\",\"*PROJ_NAME\"\r\n",
+        "\"<UNITS>\",\"\"\r\n",
+        "\"P1\",\"An AGS3 file\"\r\n",
+    );
+    let err = ags4::validate_str(ags3)
+        .run()
+        .expect_err("AGS3 is not validated against an AGS4 dictionary");
+    assert_eq!(err.kind(), laterite::ErrorKind::BadDictionary);
+}
+
 /// `{}` stays terse so wrappers do not print the cause twice; `{:#}` shows it.
 #[test]
 fn the_alternate_format_appends_the_cause() {

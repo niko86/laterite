@@ -1,4 +1,5 @@
-//! Read, validate and write **AGS4** — the geotechnical data transfer format.
+//! Read, validate, repair and write **AGS4** — the geotechnical data transfer
+//! format.
 //!
 //! ```no_run
 //! use laterite::ags4;
@@ -23,6 +24,16 @@
 //! // Modify and write
 //! doc.set_cell("PROJ", 0, "PROJ_NAME", "Renamed site")?;
 //! ags4::write(&doc).to_path("out.ags")?;
+//!
+//! // Repair a delivery mechanically — the result carries what could NOT be
+//! // fixed, and the source file is untouched until you name a destination.
+//! let fixed = ags4::fix("delivery.ags").run()?;
+//! println!("{} repaired, {} left", fixed.fixes_applied(), fixed.findings().len());
+//!
+//! // Or construct AGS4 from data you hold rather than a file you read.
+//! use laterite::ags4::GroupData;
+//! let proj = GroupData::new("PROJ", ["PROJ_ID", "PROJ_NAME"]).row(["P1", "A site"]);
+//! let built = ags4::build(vec![proj]).run()?;
 //! # Ok::<(), laterite::Error>(())
 //! ```
 //!
@@ -56,13 +67,14 @@
 //!
 //! # Scope
 //!
-//! Read, validate, write, and [`transport`] (compress / encrypt any file).
+//! Read, validate, fix, build, write, certify, and [`transport`] (compress /
+//! encrypt any file).
 //!
 //! The crate is completing to **parity** with the Python and Node surfaces —
 //! offering, per capability, at least what the weaker of those two offers — and
 //! joins the product version line when it gets there. Still to arrive: diff,
-//! merge, fix, build, the certificate trio and Excel. Each is additive, so
-//! nothing here has to change to admit them.
+//! merge and Excel. Each is additive, so nothing here has to change to admit
+//! them.
 //!
 //! There is no 0.2. This paragraph used to promise one; the milestone was
 //! retired in favour of going to parity once, because a 0.2 would have been a

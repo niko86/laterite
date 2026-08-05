@@ -582,12 +582,40 @@
         },
         {
           "surface": "rust",
-          "spelling": "absent",
-          "verbs": [],
-          "input": {},
-          "output": {},
-          "note": "Decided 2026-08-04: ADD. No new dependency — `compute_fixes`/`apply_fixes` are in laterite-ags4-validator, already a facade dep.",
-          "facade_verdict": "planned"
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "fix/fix_bytes/fix_str",
+              "in_forms": [
+                "path",
+                "bytes",
+                "text"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            },
+            {
+              "name": "fix().to_path / Fixed::save",
+              "in_forms": [
+                "path"
+              ],
+              "out_forms": [
+                "file"
+              ]
+            }
+          ],
+          "input": {
+            "path": "present",
+            "text": "present",
+            "bytes": "present"
+          },
+          "output": {
+            "file": "present",
+            "value": "present"
+          },
+          "note": "Added 2026-08-05 (phase 4c of dec-facade-parity). One builder over the three source doors, ending at `Fixed` — the value form. The file form is `to_path`, and in-place is the source path named as the destination rather than a separate flag: there is nothing a flag would express that the path does not. Rule selection (`only`/`exclude`) speaks the same short labels as python and node, read from the engine via `fixable_rules()` so a new fix cannot leave the list behind.",
+          "gaps": []
         }
       ]
     },
@@ -687,12 +715,36 @@
         },
         {
           "surface": "rust",
-          "spelling": "absent",
-          "verbs": [],
-          "input": {},
-          "output": {},
-          "note": "Decided 2026-08-04: ADD. No new dependency — laterite-ags4-emit is already a facade dep, and `Document` already has `push_row`/`set_cell`; what is missing is the one-call door.",
-          "facade_verdict": "planned"
+          "spelling": "chained",
+          "verbs": [
+            {
+              "name": "build",
+              "in_forms": [
+                "value"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            },
+            {
+              "name": "build_document",
+              "in_forms": [
+                "handle"
+              ],
+              "out_forms": [
+                "value"
+              ]
+            }
+          ],
+          "input": {
+            "handle": "present",
+            "value": "present"
+          },
+          "output": {
+            "value": "present"
+          },
+          "note": "Added 2026-08-05 (phase 4c). The value door takes `GroupData` rows of a first-party `Cell` enum, NOT the engine's `serde_json::Value` — the facade's no-third-party-type rule is load-bearing here, and the enum is what preserves the typed formatting python and node get from an Arrow frame (a number goes through its heading's declared TYPE, a string is written verbatim). The handle door is `build_document`, which reuses the same emit pipeline as `write` through one shared call rather than a second copy of it.",
+          "gaps": []
         }
       ]
     },

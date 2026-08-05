@@ -745,6 +745,28 @@ _RUST_EMIT_DOORS = {
     "bytes": "Written::bytes",
     "text": "Written::text",
 }
+#: fix's INPUT forms — the three source doors, same names as read/validate.
+_RUST_FIX_IN_DOORS = {
+    "path": "fix",
+    "bytes": "fix_bytes",
+    "text": "fix_str",
+}
+#: fix's OUTPUT forms. In place is the source path named as the destination
+#: rather than a separate flag, so `to_path` is the whole file form.
+_RUST_FIX_OUT_DOORS = {
+    "value": "Fix::run",
+    "file": "Fix::to_path",
+}
+#: build's INPUT forms. `value` is the caller's own data (`GroupData` rows of
+#: `Cell`); `handle` is a `Document`, which is this surface's answer to python
+#: and node's typed-graph root.
+_RUST_BUILD_IN_DOORS = {
+    "value": "build",
+    "handle": "build_document",
+}
+_RUST_BUILD_OUT_DOORS = {
+    "value": "Build::run",
+}
 
 
 def _rust_api() -> set[str]:
@@ -780,13 +802,18 @@ def test_rust_facade_reflects_the_register():
         ("emit", _RUST_EMIT_DOORS, "out"),
         ("certify", _RUST_CERTIFY_DOORS, "out"),
         ("cert-input", _RUST_CERT_INPUT_DOORS, "in"),
+        ("fix", _RUST_FIX_IN_DOORS, "in"),
+        ("fix", _RUST_FIX_OUT_DOORS, "out"),
+        ("build", _RUST_BUILD_IN_DOORS, "in"),
+        ("build", _RUST_BUILD_OUT_DOORS, "out"),
     ):
         present, absent = _reflect_rust(doors, api)
         _assert_reflection(_cell(doc, capability, "rust"), direction, present, absent)
 
 
-def test_rust_read_and_validate_doors_are_all_mapped():
-    """A new `read_*` / `validate_*` entry point must be given a form here.
+def test_rust_source_doors_are_all_mapped():
+    """A new `read_*` / `validate_*` / `fix_*` / `build_*` entry point must be
+    given a form here.
 
     The completeness half — without it the reflector only ever sees doors someone
     remembered to add to the table, which is the hand-list it exists to replace.
@@ -796,12 +823,17 @@ def test_rust_read_and_validate_doors_are_all_mapped():
     discovered = {
         item
         for item in api
-        if re.fullmatch(r"(read|validate)(_\w+)?", item) and "::" not in item
+        if re.fullmatch(r"(read|validate|fix|build)(_\w+)?", item) and "::" not in item
     }
-    mapped = set(_RUST_READ_DOORS.values()) | set(_RUST_VALIDATE_DOORS.values())
+    mapped = (
+        set(_RUST_READ_DOORS.values())
+        | set(_RUST_VALIDATE_DOORS.values())
+        | set(_RUST_FIX_IN_DOORS.values())
+        | set(_RUST_BUILD_IN_DOORS.values())
+    )
     unmapped = discovered - mapped
     assert not unmapped, (
         f"the facade offers {sorted(unmapped)} but no form is mapped to it — add "
-        "it to _RUST_READ_DOORS / _RUST_VALIDATE_DOORS and credit the form in "
-        "modality.json, or the register will under-report the surface"
+        "it to the _RUST_*_DOORS tables and credit the form in modality.json, or "
+        "the register will under-report the surface"
     )

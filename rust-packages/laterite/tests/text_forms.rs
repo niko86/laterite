@@ -170,16 +170,35 @@ fn into_text_and_into_bytes_agree() {
     assert_eq!(a.into_bytes(), b);
 }
 
+/// The `Debug` impls report shape, never contents — `finish_non_exhaustive` is
+/// what keeps the produced AGS4 out of a log line.
+///
+/// Every case asserts what the rendering DOES say as well as what it does not.
+/// A "leaked nothing" check alone is satisfied by a `Debug` that prints nothing
+/// at all, which is not a passing grade — mutation testing found exactly that:
+/// stubbing these four impls out entirely survived the suite.
 #[test]
-fn debug_never_prints_the_document() {
-    // The Debug impls report shape, never contents — `finish_non_exhaustive`
-    // is what keeps the produced AGS4 out of a log line.
+fn debug_reports_shape_and_never_the_document() {
     let doc = ags4::read_str(SAMPLE).run().expect("read");
+
     let out = ags4::write(&doc).to_bytes().expect("write");
     let rendered = format!("{out:?}");
     assert!(!rendered.contains("Slope 35°"), "Debug leaked contents");
+    assert!(rendered.contains("Written"), "{rendered}");
     assert!(rendered.contains("bytes"), "Debug should still report size");
 
-    let pending = format!("{:?}", ags4::read_str(SAMPLE));
-    assert!(!pending.contains("PROJ"), "Debug leaked the source text");
+    let rendered = format!("{:?}", ags4::read_str(SAMPLE));
+    assert!(!rendered.contains("PROJ"), "Debug leaked the source text");
+    assert!(rendered.contains("Read"), "{rendered}");
+    assert!(rendered.contains("characters"), "{rendered}");
+
+    let rendered = format!("{:?}", ags4::validate_str(SAMPLE).warnings(true));
+    assert!(!rendered.contains("PROJ"), "Debug leaked the source text");
+    assert!(rendered.contains("Validate"), "{rendered}");
+    assert!(rendered.contains("warnings: true"), "{rendered}");
+
+    let rendered = format!("{:?}", ags4::write(&doc).edition("4.1.1"));
+    assert!(!rendered.contains("Slope 35°"), "Debug leaked contents");
+    assert!(rendered.contains("Write"), "{rendered}");
+    assert!(rendered.contains("4.1.1"), "{rendered}");
 }
