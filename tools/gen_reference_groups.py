@@ -8,7 +8,11 @@ position erDiagram) with a thin, fully-templatable veneer (Purpose, Variations
 and had drifted from the SSOT (every page's `ags_editions` was a uniform `[4.1]`
 placeholder; root descriptions were `(scaffolded) CODE` stubs). This makes the
 dictionary the single source: one group page per dict group, regenerated here,
-gated by tests/test_reference_groups_faithful.py (committed == render()).
+gated by `--check` (committed == render()) in the `wiki-lint` job — advisory
+per-PR, hard in `nightly.yml`. That is the whole gate. This line named a paired
+pytest (2026-07-23 → 2026-08-05) that was never written, so a reader weighing
+whether the 174 group pages could drift was counting a second guard that did not
+exist.
 
 Scope = every group in ags_dictionary.json (the AGS4 union, 174). "Current in
 4.2" is expressed by the Variations banner (present / deprecated / removed), not

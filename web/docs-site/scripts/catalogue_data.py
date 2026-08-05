@@ -1,8 +1,9 @@
 """Shared, side-effect-free data layer for the AGS4 group catalogue (#201).
 
 Both the build-time generators (`gen_groups.py`, `gen_types.py`, run by
-mkdocs-gen-files) and the content-drift gate (`tests/test_groups_catalogue_faithful.py`)
-import this module, so the catalogue can never quietly diverge from the
+mkdocs-gen-files) and the content-drift gate
+(`tests/test_groups_catalogue_faithful.py`, which is in the dev satellite, not
+this repo) import this module, so the catalogue can never quietly diverge from the
 dictionary or the glossary from the type codes it documents.
 
 Pure stdlib (json only) — deliberately does NOT import `laterite`, so the gate

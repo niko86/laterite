@@ -17,8 +17,16 @@ faithfulness gate rides the cheap stdlib-only `wiki-lint` job (`--check`).
 
 `--readme` is hand-maintained (include_str!, not derived from the clap tree), so
 a verb could in principle be added to `Commands` without reaching the README.
-The paired test (`tests/test_wiki_cli_faithful.py`) closes that by cross-checking
-the parsed verbs against `cli.rs`'s `SUBCOMMANDS` const — the runtime verb list.
+`verb_drift()` closes that here, in this script, by cross-checking the parsed
+verbs against `cli.rs`'s `SUBCOMMANDS` const — the runtime verb list, which
+`census.rs` already pins to clap's visible subcommands. This docstring used to
+credit a paired pytest instead; that file has never existed, so the chain
+clap → SUBCOMMANDS → README had its last link missing while the prose said
+otherwise, with `parse_subcommands()` sitting here unreferenced.
+
+It runs in BOTH modes, not just `--check`: a README missing a verb would
+otherwise be rendered into the wiki table as if complete, which is the drift
+rather than a warning about it.
 """
 
 from __future__ import annotations
@@ -101,8 +109,37 @@ def extract_block(page: str) -> str:
     return m.group(0)
 
 
+def verb_drift(readme: str, cli_rs: str) -> str | None:
+    """Why the README and the runtime verb list disagree, or None if they don't.
+
+    Order matters to a reader chasing a failure, so each direction names its own
+    consequence rather than printing one symmetric diff.
+    """
+    documented = [v for v, _, _ in parse_commands(readme)]
+    runtime = parse_subcommands(cli_rs)
+    missing = [v for v in runtime if v not in documented]
+    phantom = [v for v in documented if v not in runtime]
+    if missing:
+        return (
+            f"README-cli.md documents no `{'`, `'.join(missing)}` — the verb ships "
+            "in the binary and `lat --readme` will not mention it"
+        )
+    if phantom:
+        return (
+            f"README-cli.md documents `{'`, `'.join(phantom)}`, which cli.rs's "
+            "SUBCOMMANDS does not list — the wiki table would advertise a verb "
+            "`lat` does not dispatch"
+        )
+    return None
+
+
 def main(argv: list[str]) -> int:
-    block = render_block(_README.read_text())
+    readme = _README.read_text()
+    drift = verb_drift(readme, _CLI_RS.read_text())
+    if drift:
+        print(f"DRIFT: {drift}", file=sys.stderr)
+        return 1
+    block = render_block(readme)
     page = _PAGE.read_text()
     if "--check" in argv:
         if extract_block(page) != block:

@@ -119,13 +119,15 @@ jobs:
               - 'web/docs-site/examples/**'  # docs example sources — test_docs_examples.py executes these
               - 'examples/sample_site.ags'   # the fixture that gate reads (subprocess cwd = repo root)
               - 'web/docs-site/scripts/**'   # catalogue_data/gen_* — its drift gate (test_groups_catalogue_faithful) runs in the python job
-              # SSOT paths whose faithfulness gate lives in the root `tests/`
-              # suite — which is private-only (blocklisted from this public
-              # mirror). On this repo those gates aren't present, so an SSOT / doc
-              # edit here would fire the ~12-min `python` job for a gate that can't
-              # run (a README badge bump rebuilding the whole wheel is the visible
-              # symptom). Keep ONLY the paths a test or job IN THIS REPO actually
-              # reads; the rest return alongside the private faithfulness suite.
+              # SSOT paths a gate IN THIS REPO actually reads. That is the rule
+              # every block below invokes: an entry earns its place by naming a
+              # path some test or step here opens. List a path for a gate that
+              # doesn't run and an SSOT / doc edit fires the ~12-min `python` job
+              # for nothing (a README badge bump rebuilding the whole wheel is the
+              # visible symptom); leave a live gate's inputs unlisted and it never
+              # fires at all (#207). This block used to open by saying the root
+              # `tests/` suite was private-only and absent from this mirror — it
+              # is present, and its gates are part of why entries below exist.
               # ...and by the modality drift gate. The generator half needs no
               # entry: `tools/**` below already covers it.
               - 'modality.json'          # read by test_modality_parity (packages/laterite/tests)
@@ -1095,15 +1097,18 @@ jobs:
         # surface to ~99% (see ags-wiki/concepts/coverage-campaign.md), so the
         # floor is RATCHETED to 95 — the campaign's target, with real headroom.
         run: |
-          # The root `tests/` (the AGS4 dictionary-faithfulness suite) is
-          # private-only — it's blocklisted from the public mirror
-          # (niko86/laterite) — so include it only when present. Handed a
-          # missing path, pytest aborts collection entirely (0 tests →
-          # coverage-floor fail), which broke the public repo's python job. The
-          # conditional is a no-op on the private repo (the dir exists, so
-          # behaviour + coverage are unchanged). A broken import in `tests/`
-          # surfaces as a collection error here (non-zero exit) — no separate
-          # sentinel step needed.
+          # The root `tests/` suite runs beside the wheel's own. It IS present
+          # here and holds the repo-truth gates — dictionary + vendored-authority
+          # faithfulness, the crate cards, the self-named-gate rule. This comment
+          # used to say the suite was private-only and blocklisted from the public
+          # mirror, which stopped being true as those gates landed here; the line
+          # below never changed, so the config outlived its own explanation.
+          # The `[ -d tests ]` guard stays: handed a missing path pytest aborts
+          # collection entirely (0 tests → coverage-floor fail), so a checkout
+          # without the directory would take the whole python job down rather
+          # than skip a suite. A broken import in `tests/` surfaces as a
+          # collection error here (non-zero exit) — no separate sentinel step
+          # needed.
           uv run pytest \
             packages/laterite/tests \
             $([ -d tests ] && echo tests) \
