@@ -398,10 +398,11 @@ def render(ssot: dict) -> str:
         # No `gate_python:` ref. The python-side gate is a STEP in ci.yml's python
         # job, not a file, so there is nothing here to cite — and the wiki lint's
         # dead-`repo:`-ref scan is hard over live content, so naming a file that does
-        # not exist would fail it. This line used to name `tests/test_census_faithful.py`,
-        # which has never been in this repo; the rendered page had it stripped by hand
-        # to keep the lint green, and that hand-edit is what made `--check` report
-        # stale forever — the one thing it could never be made to pass.
+        # not exist would fail it. This line used to name `tests/test_census_faithful.py`
+        # (not in this repo — it is the dev satellite's, copied across); the rendered
+        # page had it stripped by hand to keep the lint green, and that hand-edit is
+        # what made `--check` report stale forever — the one thing it could never be
+        # made to pass.
         '  gate_node: "repo:rust-packages/laterite-node/test/census.test.ts"',
         '  authority: "repo:rust-packages/laterite-cli/src/commands/census.rs"',
         "related: [modality-register, crate-map, agent-first-cli-contract, parity-model, start-here, laterite-ags4-xcheck]",

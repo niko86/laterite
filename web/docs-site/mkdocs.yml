@@ -8,8 +8,9 @@
 # examples/{python,node,cli,duckdb}/ via pymdownx.snippets (`--8<--`), and each
 # tree has a runtime gate — tests/test_docs_examples.py (python),
 # laterite-node/test/docs-examples.test.ts (node), tests/test_docs_cli_examples.py
-# (cli, vs committed .out files), tests/test_docs_duckdb_examples.py (duckdb,
-# monthly via compliance-report.yml) — so a page and its test are the same bytes.
+# (dev satellite; cli, vs committed .out files), tests/test_docs_duckdb_examples.py
+# (dev satellite; duckdb, monthly via compliance-report.yml) — so a page and its
+# test are the same bytes.
 # Every example's OUTPUT is generated too (tools/gen_doc_outputs.py): the `.out`
 # beside each example is what it really printed, and the page includes it, so a
 # block cannot drift from the code it documents (#164).

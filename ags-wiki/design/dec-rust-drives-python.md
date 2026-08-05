@@ -97,8 +97,8 @@ Rust binary as its execution engine.
 >    F2c-6, and the standalone-install probe this bullet named
 >    (`test_ags5_db_standalone_install_runs_lazy_imports`) was retired
 >    with them — its docstring now records that explicitly. The test
->    file moved to `ags5/tests/test_packaging.py` with the rest of the
->    dormant AGS5 strand (#177, 2026-06-21) and
+>    file moved to `ags5/tests/test_packaging.py` (dev satellite) with the
+>    rest of the dormant AGS5 strand (#177, 2026-06-21) and
 >    today asserts only `test_workspace_packages_declare_their_sibling_imports`
 >    — a package-agnostic static check that every `ags5/packages/*`
 >    sibling import is declared as a dep, unrelated to any shipped-binary

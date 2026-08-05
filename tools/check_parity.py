@@ -45,7 +45,9 @@ from pathlib import Path
 _REPO = Path(__file__).resolve().parents[1]
 _FIXTURE = _REPO / "parity-known-failures.json"
 
-# pytest's short summary: `FAILED tests/test_check.py::test_rule_2 - AssertionError: ...`
+# pytest's short summary: `FAILED tests/test_check.py::test_rule_2 - AssertionError:
+# ...` — the paths in that output are python-ags4's own suite (not in this repo);
+# this parses their run, not ours.
 _FAILED = re.compile(r"^FAILED (\S+::\S+)", re.M)
 # `10 failed, 121 passed, 3 warnings in 2.49s`. Scanned INDEPENDENTLY and
 # tail-most, mirroring the shell this replaces (`grep -Eo '[0-9]+ passed' | tail

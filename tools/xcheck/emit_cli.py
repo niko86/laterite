@@ -50,12 +50,12 @@ def load_cases(cases_dir: Path) -> list[dict]:
 
 
 #: Which `lat <verb>` each CLI op exercises. The authority for xcheck VERB
-#: coverage (`tests/test_xcheck_verb_coverage.py`): a SUBCOMMAND is covered iff some
-#: case uses an op listed here. Kept beside the op functions — each already hard-codes
-#: its verb in the argv it builds — so the map cannot drift from what actually runs
-#: (a test asserts every op in `observe()` appears here). Ops NOT in this map are
-#: library-level (emit/build/reemit/excel-roundtrip), not a `lat <verb>` invocation,
-#: so they contribute no verb coverage.
+#: coverage — `tests/test_xcheck_verb_coverage.py` (dev satellite) — a SUBCOMMAND is
+#: covered iff some case uses an op listed here. Kept beside the op functions — each
+#: already hard-codes its verb in the argv it builds — so the map cannot drift from
+#: what actually runs (a test asserts every op in `observe()` appears here). Ops
+#: NOT in this map are library-level (emit/build/reemit/excel-roundtrip), not a
+#: `lat <verb>` invocation, so they contribute no verb coverage.
 OP_VERBS: dict[str, str] = {
     "fix_dest": "fix",
     "fix_json": "fix",

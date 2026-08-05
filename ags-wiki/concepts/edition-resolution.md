@@ -88,7 +88,7 @@ binary one commit old did exactly that).
 > resolves (and before wasm loads) — the list has to be available
 > synchronously. All four sites now import from it (`validator.ts`
 > re-exports `DictVersionOpt`, so its ~9 importers are unchanged).
-> `tests/test_web_editions_match_generator.py` re-runs the generator and
+> `tests/test_web_editions_match_generator.py` (dev satellite) re-runs it and
 > asserts byte-equality with the committed file, *plus* an independent
 > check that the committed file lists exactly the union's editions — so a
 > generator bug that drops or reorders an edition can't hide behind

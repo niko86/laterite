@@ -21,7 +21,7 @@ earlier are out of scope*) and this repo's AGS toolchain.
 
 Scale is bounded: **174 groups** — the `groups/` reference tier is
 generated from `ags_dictionary.json` (`tools/gen_reference_groups.py`,
-gated by `tests/test_reference_groups_faithful.py`; the AGS4 union, D6)
+gated by its own `--check` in the `wiki-lint` job; the AGS4 union, D6)
 plus 3 hand-authored AGS-L draft pages — alongside ~28 rules+subrules,
 ~18 types, ~45 observations, ~21 tools (see `index.md` for exact live
 counts). The `index.md` catalog is sufficient navigation — **no

@@ -21,7 +21,7 @@ sources: []
 > shapes → spend the python oracle ONLY on the novel *divergence-prone*
 > signatures. This page is the matrix that drives it **over time** and
 > the harvest loop that feeds the per-PR divergence-lock gate
-> (`packages/laterite/tests/test_parity_divergences.py`, #190).
+> (`packages/laterite/tests/test_parity_divergences.py` (dev satellite), #190).
 
 ## Sequencing
 **Runs AFTER the forge injector improvements** (#169 laterite-ags4-compliance crate;
