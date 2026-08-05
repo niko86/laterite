@@ -1,10 +1,16 @@
-"""`repo:` citation parsing and resolution — the one copy.
+"""`repo:` citation parsing and resolution, plus where a page's frontmatter ends
+— the one copy of each.
 
 Extracted from `lint.py` so a second tool can resolve a citation without
 importing the linter. `check_ext_drift.py` already documents why that was not
 an option ("importing it would execute its whole top-level"), and its answer was
 to re-derive the parsing locally — which is the multi-source-of-truth rot the
 wiki machinery exists to catch, sitting inside the machinery. One copy, here.
+
+`frontmatter_block` came along for the same reason rather than being re-typed in
+`librarian.py`: two tools disagreeing about where a page's frontmatter ends would
+have them reading different text out of the same file — the citation grammar's
+problem one level up.
 
 This module is import-safe by construction: no top-level I/O, no argument
 parsing, nothing but constants and pure functions over `REPO_ROOT`.
@@ -16,6 +22,7 @@ optional suffix — `:NN` / `:NN-MM` for lines, `::symbol` for a symbol,
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from pathlib import Path
 
@@ -30,6 +37,25 @@ REPO_REF = re.compile(r"(?<![A-Za-z0-9_-])repo:([^\s`()|]+)")
 #: Punctuation a ref may pick up from the prose around it. Public because the
 #: wikilink and CLAUDE.md scans strip the same set from their own captures.
 TRAILING_PUNCT = ".,;:!?'\")"
+
+
+def frontmatter_block(txt: str) -> str | None:
+    """The YAML between the opening and closing `---`, or None if there is none."""
+    if not txt.startswith("---"):
+        return None
+    end = txt.find("\n---", 3)
+    if end == -1:
+        return None
+    return txt[3:end]
+
+
+def body_after_frontmatter(txt: str) -> str:
+    """Everything after the closing `---` of the YAML frontmatter (the prose
+    body), or the whole text if there's no frontmatter block."""
+    if not txt.startswith("---"):
+        return txt
+    end = txt.find("\n---", 3)
+    return txt[end + 4 :] if end != -1 else txt
 
 
 def strip_ref_suffix(raw: str) -> str:
@@ -76,6 +102,32 @@ def path_exists(path_str: str) -> bool:
         elif (REPO_ROOT / expanded).exists():
             return True
     return False
+
+
+def ref_covers(ref_path: str, target: str) -> str | None:
+    """How a citation's path covers `target`: "exact", "glob", "ancestor" or None.
+
+    The distinction is the point, not a detail. Only ~1 in 5 tracked non-wiki
+    files is cited exactly; most of what looks like coverage comes from a page
+    citing a *directory* — `repo:web/` alone sweeps 323 files from two pages that
+    describe none of them. A caller that collapses the three into "covered" would
+    report a page as describing a file it has never mentioned.
+
+    Globbing is `fnmatch`, so `*` crosses `/`. That over-matches slightly against
+    a shell glob; for a report-only lookup a wide net beats a missed page.
+    """
+    for expanded in _expand_braces(ref_path):
+        expanded = expanded.rstrip("/")
+        if not expanded:
+            continue
+        if _is_glob(expanded):
+            if fnmatch.fnmatch(target, expanded):
+                return "glob"
+        elif expanded == target:
+            return "exact"
+        elif target.startswith(expanded + "/"):
+            return "ancestor"
+    return None
 
 
 def resolve_ref(raw: str) -> tuple[bool, str]:

@@ -66,7 +66,13 @@ from typing import TYPE_CHECKING
 # The `repo:` citation grammar lives in refs.py so tools other than the linter
 # can resolve a citation — importing lint.py to get at it is not an option, and
 # re-deriving it locally is the drift this vault's checks exist to catch.
-from refs import REPO_REF, TRAILING_PUNCT, resolve_ref
+from refs import (
+    REPO_REF,
+    TRAILING_PUNCT,
+    body_after_frontmatter,
+    frontmatter_block,
+    resolve_ref,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -392,15 +398,6 @@ def strip_code(t: str) -> str:
 # schema existed before Phase B) — see the AGS-WIKI.md §12 writeup for the
 # judgment calls this makes.
 # ---------------------------------------------------------------------------
-def frontmatter_block(txt: str) -> str | None:
-    if not txt.startswith("---"):
-        return None
-    end = txt.find("\n---", 3)
-    if end == -1:
-        return None
-    return txt[3:end]
-
-
 def top_level_keys(fm: str) -> set[str]:
     # column-0 `key:` lines only — nested keys (e.g. `repo_refs:\n  root:`)
     # are indented and correctly excluded from the top-level required set.
@@ -409,15 +406,6 @@ def top_level_keys(fm: str) -> set[str]:
 
 def line_at(text: str, pos: int) -> int:
     return text.count("\n", 0, pos) + 1
-
-
-def body_after_frontmatter(txt: str) -> str:
-    """Everything after the closing `---` of the YAML frontmatter (the prose
-    body), or the whole text if there's no frontmatter block."""
-    if not txt.startswith("---"):
-        return txt
-    end = txt.find("\n---", 3)
-    return txt[end + 4 :] if end != -1 else txt
 
 
 def fm_list(fm: str, key: str) -> list[str]:
