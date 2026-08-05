@@ -2084,7 +2084,9 @@ version = "0.1.2"
 dependencies = [
  "chrono",
  "laterite-ags4-core",
+ "laterite-ags4-diff",
  "laterite-ags4-emit",
+ "laterite-ags4-merge",
  "laterite-ags4-parse",
  "laterite-ags4-reference",
  "laterite-ags4-trust",

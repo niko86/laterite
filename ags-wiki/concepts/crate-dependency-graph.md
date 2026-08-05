@@ -69,7 +69,9 @@ flowchart TD
   end
   laterite[laterite ?]
   laterite --> laterite_ags4_core
+  laterite --> laterite_ags4_diff
   laterite --> laterite_ags4_emit
+  laterite --> laterite_ags4_merge
   laterite --> laterite_ags4_parse
   laterite --> laterite_ags4_reference
   laterite --> laterite_ags4_trust
@@ -175,9 +177,9 @@ flowchart TD
 | `laterite-ags4-core` | L1 | 4 | 9 | 4 |
 | `laterite-ags4-validator` | L2 | 3 | 13 | 3 |
 | `laterite-ags4-emit` | L2 | 2 | 7 | 4 |
-| `laterite-ags4-diff` | L2 | 3 | 4 | 3 |
+| `laterite-ags4-diff` | L2 | 3 | 5 | 3 |
+| `laterite-ags4-merge` | L2 | 4 | 5 | 5 |
 | `laterite-ags4-excel` | L2 | 2 | 4 | 7 |
-| `laterite-ags4-merge` | L2 | 4 | 4 | 5 |
 | `laterite-ags4-censor` | L2 | 3 | 2 | 3 |
 | `laterite-ags4-trust` | L3 | 3 | 5 | 6 |
 | `laterite-ags4-parity` | L3 | 1 | 3 | 4 |
@@ -191,7 +193,7 @@ flowchart TD
 | `laterite-cli` | L4 | 8 | 0 | 12 |
 | `laterite-node` | L4 | 10 | 0 | 11 |
 | `laterite-py` | L4 | 10 | 0 | 11 |
-| `laterite` | L? | 6 | 0 | 8 |
+| `laterite` | L? | 8 | 0 | 10 |
 
 ## Structural findings (computed from the manifests)
 
