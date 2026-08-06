@@ -26,6 +26,23 @@ pub enum ErrorKind {
     /// A caller argument was wrong — an unknown group code, a row index out of
     /// range, an encoding label nothing recognises.
     InvalidArgument,
+    /// Something the engine reported that this crate does not classify.
+    ///
+    /// Not dead weight: the engine names its error kinds as strings and is the
+    /// single producer of that domain, so it can add one without this crate
+    /// changing. Mapping such a token onto whichever existing kind looked
+    /// closest would be a confident wrong answer; this is the honest one. It
+    /// carries the engine's own message.
+    Other,
+    // --- Appended, and that is not a style choice ------------------------
+    //
+    // New variants go at the END of this enum, never in the middle, however
+    // much better they would read grouped with their neighbours. A variant's
+    // discriminant is its position, so inserting one renumbers every variant
+    // after it and breaks any downstream `kind as isize` — `cargo semver-checks`
+    // calls that a MAJOR change and is right to. `#[non_exhaustive]` makes
+    // APPENDING a variant non-breaking; it does nothing for inserting one.
+    // Learned by inserting these two above `Other` and moving it from 5 to 7.
     /// Two files being merged declare different AGS TYPEs for one heading, and
     /// no resolution was chosen.
     ///
@@ -42,14 +59,6 @@ pub enum ErrorKind {
     /// disagreement, since picking one would silently mislabel the other file's
     /// values. Reconcile the `UNIT` row in the sources.
     UnitConflict,
-    /// Something the engine reported that this crate does not classify.
-    ///
-    /// Not dead weight: the engine names its error kinds as strings and is the
-    /// single producer of that domain, so it can add one without this crate
-    /// changing. Mapping such a token onto whichever existing kind looked
-    /// closest would be a confident wrong answer; this is the honest one. It
-    /// carries the engine's own message.
-    Other,
 }
 
 impl ErrorKind {
