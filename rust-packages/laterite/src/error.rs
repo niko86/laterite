@@ -34,6 +34,31 @@ pub enum ErrorKind {
     /// closest would be a confident wrong answer; this is the honest one. It
     /// carries the engine's own message.
     Other,
+    // --- Appended, and that is not a style choice ------------------------
+    //
+    // New variants go at the END of this enum, never in the middle, however
+    // much better they would read grouped with their neighbours. A variant's
+    // discriminant is its position, so inserting one renumbers every variant
+    // after it and breaks any downstream `kind as isize` — `cargo semver-checks`
+    // calls that a MAJOR change and is right to. `#[non_exhaustive]` makes
+    // APPENDING a variant non-breaking; it does nothing for inserting one.
+    // Learned by inserting these two above `Other` and moving it from 5 to 7.
+    /// Two files being merged declare different AGS TYPEs for one heading, and
+    /// no resolution was chosen.
+    ///
+    /// Its own kind rather than [`ErrorKind::InvalidArgument`] because the
+    /// caller CAN settle it — [`ags4::Merge::on_type_clash`](crate::ags4::Merge::on_type_clash)
+    /// widens the column to `X` or promotes it to the greatest `nDP` precision.
+    /// The Python, Node and `lat` surfaces draw the same distinction under the
+    /// same `type_conflict` token.
+    TypeConflict,
+    /// Two files being merged declare different UNITs for one heading.
+    ///
+    /// Separate from [`ErrorKind::TypeConflict`] because it is fatal in every
+    /// mode and the two need different fixes: no resolution absorbs a unit
+    /// disagreement, since picking one would silently mislabel the other file's
+    /// values. Reconcile the `UNIT` row in the sources.
+    UnitConflict,
 }
 
 impl ErrorKind {
@@ -51,6 +76,8 @@ impl ErrorKind {
             ErrorKind::BadDictionary => "bad_dict",
             ErrorKind::Emit => "emit",
             ErrorKind::InvalidArgument => "invalid_argument",
+            ErrorKind::TypeConflict => "type_conflict",
+            ErrorKind::UnitConflict => "unit_conflict",
             ErrorKind::Other => "error",
         }
     }
@@ -63,6 +90,10 @@ impl ErrorKind {
             ErrorKind::Io => 2,
             ErrorKind::NotAgs4 | ErrorKind::BadDictionary | ErrorKind::InvalidArgument => 3,
             ErrorKind::Emit => 4,
+            // 6, not 4: `lat merge` reports an unresolved schema conflict with
+            // its own code, and this domain is shared verbatim with the other
+            // surfaces — a wrapper routing on it must get the same number here.
+            ErrorKind::TypeConflict | ErrorKind::UnitConflict => 6,
             ErrorKind::Other => 1,
         }
     }

@@ -27,7 +27,9 @@ include = [
 
 [dependencies]
 laterite-ags4-core = { workspace = true, features = ["transport"] }
+laterite-ags4-diff = { workspace = true }
 laterite-ags4-emit = { workspace = true }
+laterite-ags4-merge = { workspace = true }
 laterite-ags4-parse = { workspace = true }
 laterite-ags4-reference = { workspace = true }
 laterite-ags4-trust = { workspace = true }

@@ -97,8 +97,10 @@ repository = "https://github.com/niko86/laterite"
 # number after a release and published crates pinned to a version that no longer
 # matched the engine.
 #
-# Only the crates that are DEPENDED ON are listed; diff, merge and trust are leaves
-# of this graph — nothing in the publish set depends on them.
+# Only the crates that are DEPENDED ON are listed. `laterite-ags4-trust` is the
+# one remaining leaf — nothing in the publish set depends on it. Diff and merge
+# were leaves too until the facade grew those doors (phase 4d of
+# dec-facade-parity), which is what put them in this table.
 [workspace.dependencies]
 # `default-features = false` HERE rather than at the call site, because cargo
 # refuses to let a member turn a workspace entry's default features off
@@ -108,7 +110,9 @@ repository = "https://github.com/niko86/laterite"
 # pulls getrandom. A future member that wants the default build asks for it by
 # name — `{ workspace = true, features = ["transport"] }`.
 laterite-ags4-core = { path = "laterite-ags4-core", version = "0.9.0", default-features = false }
+laterite-ags4-diff = { path = "laterite-ags4-diff", version = "0.9.0" }
 laterite-ags4-emit = { path = "laterite-ags4-emit", version = "0.9.0" }
+laterite-ags4-merge = { path = "laterite-ags4-merge", version = "0.9.0" }
 laterite-ags4-parse = { path = "laterite-ags4-parse", version = "0.9.0" }
 laterite-ags4-reference = { path = "laterite-ags4-reference", version = "0.9.0" }
 laterite-ags4-trust = { path = "laterite-ags4-trust", version = "0.9.0" }

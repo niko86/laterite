@@ -767,18 +767,43 @@ _RUST_BUILD_IN_DOORS = {
 _RUST_BUILD_OUT_DOORS = {
     "value": "Build::run",
 }
+#: diff's INPUT forms. The handle door compares each document as it stands —
+#: edits included — which is why it is a distinct entry point rather than a
+#: convenience over the bytes one.
+_RUST_DIFF_IN_DOORS = {
+    "path": "diff",
+    "bytes": "diff_bytes",
+    "handle": "diff_documents",
+}
+_RUST_DIFF_OUT_DOORS = {
+    "value": "Diff::run",
+}
+_RUST_MERGE_IN_DOORS = {
+    "path": "merge",
+    "bytes": "merge_bytes",
+    "handle": "merge_documents",
+}
+_RUST_MERGE_OUT_DOORS = {
+    "value": "Merge::run",
+}
 
 
 def _rust_api() -> set[str]:
     """Every public item in the facade, as `name` or `Type::method`.
 
-    Lifetimes are stripped so `Write<'a>::to_path` and `Write<'_>::fmt` collapse
-    onto one spelling — the snapshot carries both and the distinction is noise
-    for "does this door exist".
+    Lifetimes and type parameters are stripped so `Write<'a>::to_path`,
+    `Write<'_>::fmt` and `merge<I, P>` collapse onto one spelling — the snapshot
+    carries every variant and the distinction is noise for "does this door
+    exist".
+
+    The comma in the character class is load-bearing: without it a generic
+    function with more than one parameter — `merge<I, P>(…)` — does not match at
+    all, and the reflector reports its door ABSENT while the crate exports it.
+    Found by adding exactly such a door.
     """
     items: set[str] = set()
     for line in PUBLIC_API.read_text(encoding="utf-8").splitlines():
-        m = re.match(r"pub fn laterite::ags4::([A-Za-z0-9_:<>'\s]+?)\(", line)
+        m = re.match(r"pub fn laterite::ags4::([A-Za-z0-9_:<>',\s]+?)\(", line)
         if m:
             items.add(re.sub(r"<[^>]*>", "", m.group(1)).strip())
     assert items, "public-API snapshot yielded no items — the reflector is broken"
@@ -806,14 +831,18 @@ def test_rust_facade_reflects_the_register():
         ("fix", _RUST_FIX_OUT_DOORS, "out"),
         ("build", _RUST_BUILD_IN_DOORS, "in"),
         ("build", _RUST_BUILD_OUT_DOORS, "out"),
+        ("diff", _RUST_DIFF_IN_DOORS, "in"),
+        ("diff", _RUST_DIFF_OUT_DOORS, "out"),
+        ("merge", _RUST_MERGE_IN_DOORS, "in"),
+        ("merge", _RUST_MERGE_OUT_DOORS, "out"),
     ):
         present, absent = _reflect_rust(doors, api)
         _assert_reflection(_cell(doc, capability, "rust"), direction, present, absent)
 
 
 def test_rust_source_doors_are_all_mapped():
-    """A new `read_*` / `validate_*` / `fix_*` / `build_*` entry point must be
-    given a form here.
+    """A new `read_*` / `validate_*` / `fix_*` / `build_*` / `diff_*` / `merge_*`
+    entry point must be given a form here.
 
     The completeness half — without it the reflector only ever sees doors someone
     remembered to add to the table, which is the hand-list it exists to replace.
@@ -823,13 +852,16 @@ def test_rust_source_doors_are_all_mapped():
     discovered = {
         item
         for item in api
-        if re.fullmatch(r"(read|validate|fix|build)(_\w+)?", item) and "::" not in item
+        if re.fullmatch(r"(read|validate|fix|build|diff|merge)(_\w+)?", item)
+        and "::" not in item
     }
     mapped = (
         set(_RUST_READ_DOORS.values())
         | set(_RUST_VALIDATE_DOORS.values())
         | set(_RUST_FIX_IN_DOORS.values())
         | set(_RUST_BUILD_IN_DOORS.values())
+        | set(_RUST_DIFF_IN_DOORS.values())
+        | set(_RUST_MERGE_IN_DOORS.values())
     )
     unmapped = discovered - mapped
     assert not unmapped, (
