@@ -225,6 +225,75 @@ def test_doc_example_outputs_carry_no_superseded_product_version() -> None:
     )
 
 
+#: A docs example's PEP 723 header, and the laterite pin inside it. The header is
+#: what makes an example `uv run`-able by a reader who has not cloned anything —
+#: it declares its own interpreter floor and dependencies, so the file installs
+#: what it needs and runs.
+_PEP723 = re.compile(r"^# /// script\n(?P<body>(?:^#.*\n)*?)^# ///$", re.M)
+_PINNED = re.compile(r"laterite==(?P<version>[\w.]+)")
+_REQUIRES_PY = re.compile(r'requires-python\s*=\s*"(?P<spec>[^"]+)"')
+
+
+def _example_headers() -> list[tuple[Path, str]]:
+    return [
+        (p, m.group("body"))
+        for p in sorted((_REPO / "web" / "docs-site" / "examples").rglob("*.py"))
+        if (m := _PEP723.search(p.read_text(encoding="utf-8")))
+    ]
+
+
+def test_example_pep723_pins_track_the_product() -> None:
+    """A `uv run`-able example pins the laterite it is known to run at.
+
+    The pin is the point — it says "this example was green against THIS wheel",
+    which is worth more than a floating dependency that silently starts resolving
+    something the snippet was never checked against. But a pin is also a version
+    site, and version sites in documentation are exactly what rots: `COMPAT.md`
+    sat at 0.1.0 for nine releases, and `examples/laterite_tour.py` still asks for
+    `laterite>=0.5.0` several minors after that floor stopped meaning anything.
+
+    So the pin is asserted rather than trusted, by DISCOVERY: any example that
+    grows a header is covered the day it lands, with no list to update.
+    `tools/release/bump-version.sh` restamps them, and this is what says so.
+
+    Falsify by editing any header's `laterite==` to a version that is not the
+    shipped one.
+    """
+    headers = _example_headers()
+    assert headers, "no PEP 723 headers found — the discovery pattern has gone stale"
+    wrong = [
+        f"{p.relative_to(_REPO)} pins laterite=={m.group('version')}"
+        for p, body in headers
+        if (m := _PINNED.search(body)) and m.group("version") != PRODUCT
+    ]
+    assert not wrong, (
+        "a runnable docs example pins a laterite that is not the shipped one:\n  "
+        + "\n  ".join(wrong)
+        + f"\n\nThe product version is {PRODUCT}. `bump-version.sh product` restamps "
+        "these; if you edited one by hand, put it back."
+    )
+
+
+def test_example_pep723_python_floor_matches_the_wheel() -> None:
+    """…and the interpreter floor it declares is the wheel's real floor.
+
+    The same defect `test_wheel_claims_faithful.py` was written for, one tree
+    along: a header claiming `>=3.14` would send a 3.12 reader — for whom the
+    abi3-py312 wheel installs perfectly — away with a resolver error.
+    """
+    floor = _toml("packages/laterite/pyproject.toml")["project"]["requires-python"]
+    wrong = [
+        f"{p.relative_to(_REPO)} declares requires-python {m.group('spec')!r}"
+        for p, body in _example_headers()
+        if (m := _REQUIRES_PY.search(body)) and m.group("spec") != floor
+    ]
+    assert not wrong, (
+        "a runnable docs example declares an interpreter floor the wheel does not:\n  "
+        + "\n  ".join(wrong)
+        + f"\n\nThe wheel's own requires-python is {floor!r}."
+    )
+
+
 #: READMEs that ride out with a published artifact: the crates.io tarballs
 #: (`include` carries `/README.md`), the npm package wasm-pack assembles, and
 #: the PyPI wheel. Scoped to these deliberately rather than to every tracked

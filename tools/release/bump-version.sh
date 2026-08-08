@@ -130,6 +130,27 @@ if [ "$target" = "product" ]; then
   done <<<"$(find web/docs-site/examples -type f -name '*.out' \
                -exec grep -lF -- "$old" {} + || true)"
 
+  # --- 1c-bis. stamp the PEP 723 pin in every runnable docs example.
+  #         Each `ex*.py` carries a `# /// script` header pinning the laterite it
+  #         is known to run at, so a reader can `uv run` it without cloning. That
+  #         pin is a version site, and the sibling loop above must NOT be widened
+  #         to reach it: that one rewrites EVERY occurrence of the old version in
+  #         a matched file, which is safe in a generated `.out` and reckless in a
+  #         hand-written source, where the same digits can appear in an AGS
+  #         edition, a fixture value or a comment.
+  #
+  #         So: anchored on `laterite==` and nothing else. The gate that proves it
+  #         worked is `tests/test_version_faithful.py`
+  #         (`test_example_pep723_pins_track_the_product`), which discovers the
+  #         headers the same way this does — neither carries a list to forget.
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    sed -i.bak "s/laterite==${old_re}/laterite==${new}/g" "$f"
+    rm -f "$f.bak"
+    echo "bump-version:   restamped PEP 723 pin in $f"
+  done <<<"$(find web/docs-site/examples -type f -name '*.py' \
+               -exec grep -lF -- "laterite==$old" {} + || true)"
+
   # --- 1d. roll the CHANGELOG. It is generated from changelog.json (the SSOT):
   #         `--release` moves [Unreleased] into a dated `[$new]` section in the
   #         JSON and regenerates CHANGELOG.md. Refuses if [Unreleased] is empty

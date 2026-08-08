@@ -26,6 +26,12 @@
       },
       {
         "text": "**The Rust crate compares and reconciles deliveries — `ags4::diff` and `ags4::merge`.** `diff` answers what changed between two submissions in *AGS terms*, not text terms: rows are matched by their group's dictionary KEY headings rather than by line order, so a re-sorted borehole list pairs each row with its own prior self, and cells are compared through their declared TYPE, so `1.0` → `1.00` is not a change. A line diff gets both wrong. `merge` reconciles N deliveries in order — a later file wins — with the same KEY-aware row identity, so a re-sorted delivery merges onto its prior self instead of doubling it, and every revision it makes is reported so the merge stays auditable. A column two producers typed differently is **refused by default**: resolving that is a judgement about their data, and `on_type_clash` offers the two honest answers — widen to free text (bytes untouched, type discarded) or promote to the greatest `nDP` precision (never the lowest, which would round data away). A column they gave different *units* is refused in every mode, because no resolution exists that does not silently mislabel one file's values. Those two failures now have their own `ErrorKind`s — `TypeConflict` and `UnitConflict`, carrying the same `type_conflict` / `unit_conflict` tokens the Python, Node and `lat` surfaces already use — rather than collapsing onto one, because they need different fixes. Both doors take a path, bytes, or a read handle; the handle form uses each document **as it stands, edits included**, since diffing the file it was read from would quietly ignore the edit."
+      },
+      {
+        "text": "**`tests/test_docs_snippets.py` — the docs' hand-written Python is executed now.** `test_docs_examples.py` and `gen_doc_outputs.py --check` both key off the `--8<--` include, which covers 38 of the site's 60 Python fences; the other 22 are literal fragments, and together with `README.md`, the PyPI landing page and `COMPAT.md` nothing ran them (`--check-pages` inspects only *output* blocks, so a literal code fence is not even counted). The new gate treats a page as one program in document order — replaying includes so a fragment inherits the `ags`/`fixed` its page established — executes 85% of literal statements against the installed wheel and resolves names plus call keywords for the rest, with a coverage floor so it cannot decay into name-checking. It runs from a temp dir: these snippets write."
+      },
+      {
+        "text": "**A docs Python example runs on its own — `uv run ex01_read_typed.py`, no clone.** Prototyped on one example ahead of the other 17. A PEP 723 `# /// script` header pins `requires-python` and an exact `laterite==`, and a fixture arm fetches `examples/sample_site.ags` when the repo-relative path is absent, so the code on the page stays the code you would type in a checkout instead of becoming an absolute path. Both sit above a `--8<-- [start:code]` marker and the page includes `…py:code`, so the rendered snippet is byte-identical to before — the CLI tree's `[start:cmd]` trick applied to Python. The arm is cold in CI, so no gate takes on a network dependency. The pin is a claim, so it is gated: `test_version_faithful.py` holds it and the interpreter floor to the shipped values by discovery, and `bump-version.sh` restamps it with a substitution anchored on `laterite==` — the sibling loop that stamps `.out` files rewrites every occurrence of the old version in a file, which is safe in generated output and would silently rewrite an `assert` in a source."
       }
     ],
     "changed": [
@@ -35,7 +41,14 @@
     ],
     "deprecated": [],
     "removed": [],
-    "fixed": [],
+    "fixed": [
+      {
+        "text": "**`COMPAT.md` documented a `check_file` keyword that has never existed, and a version frozen nine releases back.** Both blocks of the error-handling section passed `dictionary='not-a-dict.txt'`; the parameter is `standard_AGS4_dictionary` in laterite *and* in python-ags4, so the two snippets illustrating the divergence raised `TypeError` on both sides and showed the reader nothing — the prose was correct, only the code was uncopyable. The `laterite.compat.__version__` doctest, the `Metadata.Checker` banner a user sees in their own validation report, and the phase-1 illustration all still said `0.1.0`. `bump-my-version` stamps those two strings in `compat.py` and had no `COMPAT.md` entry, so code and page provably diverged on every release; neither superseded-version gate could catch it, because both match versions listed in `changelog.json` and its history starts at 0.6.0. The page is now stamped, and `tests/test_docs_snippets.py` asserts it against the wheel's real values."
+      },
+      {
+        "text": "**`gen_doc_outputs.py` silently under-counted a page that included an example SECTION.** The include→example map registered the literal `:cmd` spelling beside the bare filename, so the first page to use any other section name fell through the `not in wanted` branch as \"a surface this run didn't ask for\" — pointing three pages at `…py:code` dropped the matched-block count from 38 to 35 and still reported success. The key is now the include with its section suffix stripped, which covers every section name there will ever be."
+      }
+    ],
     "security": []
   },
   "releases": [

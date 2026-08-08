@@ -31,7 +31,7 @@ Pages workflow uploads) and rides alongside the validator SPA at `/laterite/`.
 
 Key facts:
 
-- **Example-led / single-sourced.** Every code snippet on a page is
+- **Example-led / single-sourced — but not universally.** *Most* code on a page is
   `--8<--`-included (pymdownx.snippets, `base_path: [examples]`) from
   `repo:web/docs-site/examples/{python,node,cli,duckdb,wasm}/` — and each tree
   has a **runtime gate** so page and test are the same bytes (#373 built the
@@ -61,6 +61,50 @@ Key facts:
     skip, broken snippet = red). `_`-prefixed files (`_install.sql`) are
     include-only boilerplate.
   Browser tabs are **prose** (the web app has no user-facing code API).
+- **A Python example is `uv run`-able on its own** (prototyped on
+  `ex01_read_typed.py`; the remaining 17 follow). Each carries a PEP 723
+  `# /// script` header pinning
+  `requires-python` and an exact `laterite==<product>`, plus a fixture arm that
+  fetches `repo:examples/sample_site.ags` from the raw GitHub URL when the
+  repo-relative path is absent — so a reader with `uv` and no checkout gets a
+  working run, and the code on the page stays the code you would type in a
+  checkout rather than an absolute path. Both live ABOVE a
+  `--8<-- [start:code]` marker and the page includes `…py:code`, so the rendered
+  snippet is byte-identical to before the header existed; the machinery is in the
+  file, not on the page. That is the CLI tree's `[start:cmd]` trick
+  (`repo:web/docs-site/examples/cli/validate_clean.sh`) applied to Python.
+  The arm is cold in CI (cwd = repo root, the fixture is there), so no gate
+  acquires a network dependency. The pin is a CLAIM — "green against this wheel" —
+  and `repo:tests/test_version_faithful.py` holds both it and the interpreter
+  floor to the shipped values by DISCOVERY, while `bump-version.sh` restamps it
+  with a substitution anchored on `laterite==`: the sibling loop that stamps
+  `.out` files rewrites every occurrence of the old version in a file, which is
+  safe in generated output and would silently rewrite an `assert` in a source.
+  Ordering forces `import laterite` to follow the fixture arm, so
+  `web/docs-site/examples/**` takes the `E402` per-file-ignore the root
+  `examples/**` already has — the alternative is publishing a snippet that omits
+  its own import to satisfy a linter.
+- **The other 22 fences — hand-written, and gated separately.** The list above is
+  the *included* half: 38 of the site's 60 Python fences. The rest are LITERAL —
+  fragments a page writes inline (`for group in delta["groups"]:`), which read
+  correctly as fragments and would be worse as standalone examples. Every gate
+  above keys off the `--8<--`, so all of them were invisible to it, as were
+  `repo:README.md`, the PyPI landing page and `repo:COMPAT.md`. What that cost was
+  measured on 2026-08-08: `COMPAT.md` documented
+  `check_file(..., dictionary=...)` in both blocks of its error-handling section,
+  and no such parameter has ever existed in either library
+  (`standard_AGS4_dictionary` is the name), so the two snippets illustrating the
+  divergence raised `TypeError` on both sides and demonstrated nothing. The prose
+  was right; only the code was uncopyable.
+  `repo:tests/test_docs_snippets.py` closes it by treating a page as ONE program
+  in document order — includes replayed so a fragment inherits the `ags` / `fixed`
+  its page established — EXECUTING what can run (85% of literal statements) and
+  resolving names + call keywords against the wheel for the rest. It runs from a
+  temp dir with the fixture copied under `examples/`, like the CLI gate and for
+  the same reason: `surfaces/python.md` and `cookbook/excel.md` WRITE files.
+  A `<!-- doc-snippet: skip — reason -->` marker (the shape of `doc-output: skip`,
+  reason likewise mandatory) exempts a fence from execution but never from
+  resolution — the `dictionary=` typo lived in a block that would carry one.
 - **Changelog page — generated, version-stamped (#372).** `reference/changelog.md`
   is built by `web/docs-site/scripts/gen_changelog.py` (a `gen-files` script)
   from the repo-root `CHANGELOG.md` plus the shipped version read from
