@@ -47,6 +47,9 @@
       },
       {
         "text": "**The Node docs' hand-typed JavaScript is executed now.** `docs-examples.test.ts` and `gen_doc_outputs --surface node` both key off the `--8<--` include, covering 18 fences; 11 more are typed straight into the Markdown and the npm landing page carries 4 — the page a reader sees before `npm install` — and none of it ran. `laterite-node/test/docs-snippets.test.ts` welds each page into one ESM program (imports unioned per module, re-declarations turned into assignment, since ESM forbids the rebind Python allows) and executes it from a temp cwd with the fixture copied in. All four pages run; a fence that genuinely cannot — the wasm type declarations, the `{ arrow: true }` call that downloads a DuckDB community extension at run time — carries a `doc-snippet: skip` marker with its reason."
+      },
+      {
+        "text": "**`laterite-node/test/peer-range.test.ts` — the published peer range must admit the version we develop against.** Offline and registry-free: if the range you tell users to install disagrees with the version your own tests run against, it cannot be right. That single assertion would have caught the ETARGET above the day it was introduced."
       }
     ],
     "changed": [
@@ -77,6 +80,9 @@
       },
       {
         "text": "**`node/index.md` documented `buildAgs4` with an input it rejects.** The page showed `buildAgs4({ PROJ: [{ PROJ_ID: \"P1\" }] })`; the signature is `AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>`, so a reader copying it got `TypeError: items is not iterable`. Confirmed against the built package before fixing, and the page now shows a `Map` with a note that a plain object is not one of the accepted shapes."
+      },
+      {
+        "text": "**`sql()` and `at()` were unreachable for anyone installing the npm package.** `peerDependencies: { \"@duckdb/node-api\": \">=1.5.0\" }` matched ZERO of that package's 56 published versions: every release carries a prerelease suffix (`1.5.5-r.3`, …), and semver excludes a prerelease from a range unless a comparator shares its major.minor.patch AND carries a prerelease itself — so `>=1.5.0` matched nothing, and neither did `>=1.5.0-0` or even `*`. All three install orders were reproduced against the published package: `npm i laterite` then `npm i @duckdb/node-api` (the exact command the library's own error text prints) fails with ETARGET; installing both in one command drops the peer silently; installing the peer first has it actively removed when laterite arrives. The range is now `>=1.5.5-0`, the devDependency is aligned to the same line, and the documented flow was verified end to end — install resolution against a packed build, and `sql()`/`at()` actually running against the published one. No existing gate could see this: `npm ci` installs from the lockfile, so the peer range is never consulted."
       }
     ],
     "security": []
