@@ -125,6 +125,22 @@ Key facts:
   A `<!-- doc-snippet: skip — reason -->` marker (the shape of `doc-output: skip`,
   reason likewise mandatory) exempts a fence from execution but never from
   resolution — the `dictionary=` typo lived in a block that would carry one.
+- **Node's literal fences, and the two-gate split.** The same hole existed one
+  surface along: 11 hand-typed fences plus the npm landing page's 4, none
+  executed. `repo:rust-packages/laterite-node/test/docs-snippets.test.ts` closes
+  it — vitest, not pytest, because executing them needs `dist/` and the
+  `node_modules/laterite` symlink that only the `node` job builds; a pytest
+  version would skip in CI, which `test_docs_node_api.py` explicitly refused to
+  accept. It welds a page into one ESM program (imports unioned per module,
+  re-declarations turned into assignment — ESM forbids the rebind Python allows)
+  and runs it from a temp cwd with the fixture copied in.
+  **The two Node gates catch different things and neither subsumes the other:
+  the executor catches CALLS, `repo:tests/test_docs_node_api.py` catches READS.**
+  A bare `report.someTypo` evaluates to `undefined` and logs rather than throwing,
+  so no amount of executing finds it; `buildAgs4({…})` with the wrong shape throws,
+  and no amount of name-resolution finds that. Falsification proved the split and
+  exposed a hole in passing — the static gate scanned `docs/node/` only, leaving
+  the npm README covered by neither — so its scope now includes that page.
 - **Orphan output blocks — down to one, and it is not output.** `--check-pages`
   counts `text` fences that no example backs and prints the number rather than
   absorbing it; that count was **8** and is now **1**. The seven closed were
