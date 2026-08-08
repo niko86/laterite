@@ -244,6 +244,12 @@ ignore = [
 # B018: a marimo cell's bare last expression IS its rendered output.
 # ANN: illustrative demo scripts, not a typed surface.
 "examples/**" = ["E402", "B018", "ANN"]
+# The docs-site examples, for the same E402 reason one level along. Each carries a
+# PEP 723 header and a fixture arm ABOVE its `--8<-- [start:code]` marker, so the
+# `import laterite` a reader must see on the page necessarily follows a statement.
+# Ordering it legally would mean hoisting the import out of the shown region —
+# publishing a snippet that omits its own import to satisfy a linter.
+"web/docs-site/examples/**" = ["E402", "ANN"]
 
 # --- Type-faithfulness gate (#303 Phase 1) --------------------------------
 # Astral `ty` (preview). Originally scoped to the SHIPPED `laterite` package

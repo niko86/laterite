@@ -61,6 +61,29 @@ Key facts:
     skip, broken snippet = red). `_`-prefixed files (`_install.sql`) are
     include-only boilerplate.
   Browser tabs are **prose** (the web app has no user-facing code API).
+- **A Python example is `uv run`-able on its own** (prototyped on
+  `ex01_read_typed.py`; the remaining 17 follow). Each carries a PEP 723
+  `# /// script` header pinning
+  `requires-python` and an exact `laterite==<product>`, plus a fixture arm that
+  fetches `repo:examples/sample_site.ags` from the raw GitHub URL when the
+  repo-relative path is absent — so a reader with `uv` and no checkout gets a
+  working run, and the code on the page stays the code you would type in a
+  checkout rather than an absolute path. Both live ABOVE a
+  `--8<-- [start:code]` marker and the page includes `…py:code`, so the rendered
+  snippet is byte-identical to before the header existed; the machinery is in the
+  file, not on the page. That is the CLI tree's `[start:cmd]` trick
+  (`repo:web/docs-site/examples/cli/validate_clean.sh`) applied to Python.
+  The arm is cold in CI (cwd = repo root, the fixture is there), so no gate
+  acquires a network dependency. The pin is a CLAIM — "green against this wheel" —
+  and `repo:tests/test_version_faithful.py` holds both it and the interpreter
+  floor to the shipped values by DISCOVERY, while `bump-version.sh` restamps it
+  with a substitution anchored on `laterite==`: the sibling loop that stamps
+  `.out` files rewrites every occurrence of the old version in a file, which is
+  safe in generated output and would silently rewrite an `assert` in a source.
+  Ordering forces `import laterite` to follow the fixture arm, so
+  `web/docs-site/examples/**` takes the `E402` per-file-ignore the root
+  `examples/**` already has — the alternative is publishing a snippet that omits
+  its own import to satisfy a linter.
 - **The other 22 fences — hand-written, and gated separately.** The list above is
   the *included* half: 38 of the site's 60 Python fences. The rest are LITERAL —
   fragments a page writes inline (`for group in delta["groups"]:`), which read
