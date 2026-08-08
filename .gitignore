@@ -102,6 +102,8 @@ mutants.out.old/
 /examples/merged.ags
 /examples/phase2.ags
 /examples/rev.ags
+/examples/sample_site_typo.ags
+/examples/sample_site_edition.ags
 
 # The docs wasm examples import the PUBLISHED package name
 # (`@laterite/ags4-wasm`) so a reader can copy one and have it work. A symlink
