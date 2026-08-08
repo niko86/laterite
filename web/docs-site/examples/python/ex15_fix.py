@@ -1,3 +1,14 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["laterite==0.10.1"]
+# ///
+"""Docs example — run it with `uv run ex15_fix.py`, from anywhere.
+
+Everything above the `[start:code]` marker is machinery the page does not
+show: the PEP 723 header that makes the file self-installing.
+"""
+
+# --8<-- [start:code]
 # what this shows: .fix() mechanically repairs a dirty AGS4 file, non-destructively, into a NEW handle.
 from laterite import read
 
@@ -20,3 +31,4 @@ print(fixed.fix_report.applied[0]["kind"])
 assert fixed is not dirty  # non-destructive: a fresh handle
 assert fixed.fix_report.applied[0]["kind"] == "pad_short_row"
 assert "pad_short_row" in kinds  # the short row was padded to width
+# --8<-- [end:code]

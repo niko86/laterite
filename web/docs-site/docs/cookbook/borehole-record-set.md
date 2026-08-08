@@ -12,7 +12,7 @@ single borehole's whole story, not one group at a time.
     `.at(code, ids)` returns a query whose `.groups` lists the related group set:
 
     ```python
-    --8<-- "python/ex03_at_fanout_groups.py"
+    --8<-- "python/ex03_at_fanout_groups.py:code"
     ```
 
     ```text
@@ -27,7 +27,7 @@ single borehole's whole story, not one group at a time.
     Then call `.frames()` to materialise the record set as `{group_code: frame}`:
 
     ```python
-    --8<-- "python/ex04_at_frames.py"
+    --8<-- "python/ex04_at_frames.py:code"
     ```
 
     ```text

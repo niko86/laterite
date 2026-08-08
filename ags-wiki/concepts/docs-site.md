@@ -61,14 +61,21 @@ Key facts:
     skip, broken snippet = red). `_`-prefixed files (`_install.sql`) are
     include-only boilerplate.
   Browser tabs are **prose** (the web app has no user-facing code API).
-- **A Python example is `uv run`-able on its own** (prototyped on
-  `ex01_read_typed.py`; the remaining 17 follow). Each carries a PEP 723
-  `# /// script` header pinning
-  `requires-python` and an exact `laterite==<product>`, plus a fixture arm that
+- **A Python example is `uv run`-able on its own** — all 18, plus the marimo tour.
+  Each carries a PEP 723 `# /// script` header pinning
+  `requires-python` and an exact `laterite==<product>`, and the 15 that read a
+  file also carry a fixture arm that
   fetches `repo:examples/sample_site.ags` from the raw GitHub URL when the
   repo-relative path is absent — so a reader with `uv` and no checkout gets a
   working run, and the code on the page stays the code you would type in a
-  checkout rather than an absolute path. Both live ABOVE a
+  checkout rather than an absolute path. Two details the rollout settled that the
+  prototype could not show, because `ex01` is polars-only and reads the fixture:
+  `ex09a`, `ex09b` and `ex15` build from frames / a typed graph / inline text and
+  get **no** fixture arm (there is nothing to fetch for), and `ex05` + `ex11`
+  import pandas — which is NOT in the base install — so they pin
+  `laterite[compat]==<product>`. A uniform bare pin makes both die under
+  `uv run` on `ModuleNotFoundError: pandas`, the exact failure the header exists
+  to prevent. Header and fixture arm live ABOVE a
   `--8<-- [start:code]` marker and the page includes `…py:code`, so the rendered
   snippet is byte-identical to before the header existed; the machinery is in the
   file, not on the page. That is the CLI tree's `[start:cmd]` trick
@@ -76,10 +83,16 @@ Key facts:
   The arm is cold in CI (cwd = repo root, the fixture is there), so no gate
   acquires a network dependency. The pin is a CLAIM — "green against this wheel" —
   and `repo:tests/test_version_faithful.py` holds both it and the interpreter
-  floor to the shipped values by DISCOVERY, while `bump-version.sh` restamps it
-  with a substitution anchored on `laterite==`: the sibling loop that stamps
-  `.out` files rewrites every occurrence of the old version in a file, which is
-  safe in generated output and would silently rewrite an `assert` in a source.
+  floor to the shipped values by DISCOVERY over **both** example trees, the
+  docs corpus and the root `examples/` where the tour lives. It asserts the whole
+  specifier (`==<product>`, extras group allowed), not the version inside a `==`:
+  the first cut matched `laterite==(version)`, which silently passes anything that
+  is not an exact pin, so the tour's own `>=0.5.0` — five untested minors, the
+  defect that motivated the gate — produced no match and therefore no finding.
+  `bump-version.sh` restamps with a substitution anchored on the pin *including*
+  its optional `[extras]`; the sibling loop that stamps `.out` files rewrites
+  every occurrence of the old version in a file, which is safe in generated
+  output and would silently rewrite an `assert` in a source.
   Ordering forces `import laterite` to follow the fixture arm, so
   `web/docs-site/examples/**` takes the `E402` per-file-ignore the root
   `examples/**` already has — the alternative is publishing a snippet that omits
@@ -105,6 +118,22 @@ Key facts:
   A `<!-- doc-snippet: skip — reason -->` marker (the shape of `doc-output: skip`,
   reason likewise mandatory) exempts a fence from execution but never from
   resolution — the `dictionary=` typo lived in a block that would carry one.
+- **One nightly leg asks the READER's question.** Every gate above runs against the
+  working-tree cdylib, so all of them answer "is the site consistent with HEAD" —
+  and the reader is not on HEAD, they are on `pip install laterite`. The
+  `docs-vs-released-wheel` job in `repo:.github/workflows/nightly.yml` installs the
+  **published** wheel (no pin — whatever PyPI resolves today) and runs the docs
+  examples plus `repo:tests/test_docs_snippets.py` against it, printing the
+  released version beside this tree's so the run states what it measured.
+  Its two steps are calibrated differently and that is the whole design: an
+  example that **fails to run** fails the job, because a reader following the live
+  site would get a traceback; a committed `.out` that no longer byte-matches is
+  reported and **not** fatal, because output drift is the ordinary consequence of
+  the tree being ahead of the release. For the same reason the job is deliberately
+  **not** in `notify`'s `needs` — the docs track HEAD by decision and the site
+  deploys from main, so documenting unreleased API is a chosen state, and a gate
+  that files a tracking issue about a choice already made is noise that gets muted.
+  GitHub-hosted and toolchain-free: a published wheel needs no Rust and no maturin.
 - **Changelog page — generated, version-stamped (#372).** `reference/changelog.md`
   is built by `web/docs-site/scripts/gen_changelog.py` (a `gen-files` script)
   from the repo-root `CHANGELOG.md` plus the shipped version read from

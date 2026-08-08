@@ -6,7 +6,7 @@ dictionary (4.0.3 … 4.2). `dict_for(path)` reports the decision as a
 `(version, reason)` tuple so you can see _why_ a file landed on a given edition.
 
 ```python
---8<-- "python/ex14_rules_dict.py"
+--8<-- "python/ex14_rules_dict.py:code"
 ```
 
 ```text

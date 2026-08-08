@@ -1,3 +1,14 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["laterite==0.10.1"]
+# ///
+"""Docs example — run it with `uv run ex09b_build_from_typed_graph.py`, from anywhere.
+
+Everything above the `[start:code]` marker is machinery the page does not
+show: the PEP 723 header that makes the file self-installing.
+"""
+
+# --8<-- [start:code]
 import laterite
 from laterite import build_ags4
 from laterite.groups import LOCA, PROJ
@@ -47,3 +58,4 @@ try:
     raise AssertionError("expected AttributeError")
 except AttributeError:
     pass
+# --8<-- [end:code]

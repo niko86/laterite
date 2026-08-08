@@ -12,7 +12,7 @@ pip install laterite
 ## In one breath
 
 ```python
---8<-- "python/ex02_validate.py"
+--8<-- "python/ex02_validate.py:code"
 ```
 
 ```text

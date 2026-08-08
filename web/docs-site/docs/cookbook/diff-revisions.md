@@ -8,7 +8,7 @@ Rev A and Rev B — not a line diff, but a KEY-aware, type-aware delta.
 === "Python"
 
     ```python
-    --8<-- "python/ex16_diff.py"
+    --8<-- "python/ex16_diff.py:code"
     ```
 
     ```text

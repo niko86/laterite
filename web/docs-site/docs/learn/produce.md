@@ -1,7 +1,7 @@
 # Produce AGS4
 
 ```python
---8<-- "python/ex09a_build_from_frames.py"
+--8<-- "python/ex09a_build_from_frames.py:code"
 ```
 
 ```text
@@ -49,7 +49,7 @@ build) so nothing appears in your file that you didn't ask for.
 ## From a typed PROJ graph
 
 ```python
---8<-- "python/ex09b_build_from_typed_graph.py"
+--8<-- "python/ex09b_build_from_typed_graph.py:code"
 ```
 
 ```text

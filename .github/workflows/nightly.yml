@@ -343,6 +343,79 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
+  # Does the LIVE docs site work against the wheel a reader can actually install?
+  #
+  # Every other docs gate runs against the working-tree cdylib, so all of them
+  # answer "is the site consistent with HEAD". Nobody was asking the reader's
+  # question, and the reader is not on HEAD: they are on `pip install laterite`.
+  # The gap is real and was measured once by hand — the answer that day was yes,
+  # every example ran and all 38 output blocks byte-matched — but a one-off
+  # measurement decays the moment it is taken.
+  #
+  # WHY THE TWO STEPS ARE CALIBRATED DIFFERENTLY, and why this job is not wired
+  # into `notify`. The docs deliberately track HEAD (see docs-site.md: the API
+  # reference is mkdocstrings against the local build, "the owner's call over a
+  # published-PyPI wheel"), and the site deploys from main. So between a docs
+  # change and the next release the site legitimately documents API the released
+  # wheel lacks. That window is short at this cadence — six releases in the four
+  # weeks to 0.10.1 — but it is a CHOSEN state, and a gate that opens a tracking
+  # issue about a choice already made is noise that gets muted.
+  #
+  # So: an example that FAILS TO RUN fails this job, because a reader following
+  # the live site then gets a traceback rather than a result. A committed `.out`
+  # that no longer byte-matches does NOT, because output drift is the ordinary,
+  # expected consequence of the tree being ahead. And the job stays out of
+  # `notify`'s `needs`, so a red run emails rather than filing an issue against
+  # a state the owner intended.
+  #
+  # GitHub-hosted and toolchain-free: this installs a published wheel from PyPI,
+  # so it needs no Rust, no maturin and none of the pool's warm caches.
+  docs-vs-released-wheel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+      # No version pin: the point is whatever `pip install laterite` resolves to
+      # today. [all] because the docs exercise the pandas + pyarrow surfaces too.
+      - name: Install the PUBLISHED wheel
+        run: |
+          set -euxo pipefail
+          uv venv --python 3.12 --clear "$GITHUB_WORKSPACE/.released"
+          uv pip install --python "$GITHUB_WORKSPACE/.released/bin/python" \
+            "laterite[all]" pytest pytest-benchmark
+      # A gate whose subject depends on the environment must say what it measured
+      # — the same reason `gen_doc_outputs.py:_lat()` prints the binary it picked.
+      - name: State what is under test
+        run: |
+          set -euo pipefail
+          py="$GITHUB_WORKSPACE/.released/bin/python"
+          released=$("$py" -c 'import importlib.metadata as m; print(m.version("laterite"))')
+          tree=$("$py" - <<'EOF'
+          import pathlib, tomllib
+          print(tomllib.loads(pathlib.Path("packages/laterite/pyproject.toml").read_text())["project"]["version"])
+          EOF
+          )
+          echo "released wheel : $released"
+          echo "this tree      : $tree"
+          [ "$released" = "$tree" ] \
+            && echo "same version — any failure below is a real defect" \
+            || echo "TREE IS AHEAD — unreleased API in the docs is expected until the next release"
+      # The actionable class: a documented example that does not RUN.
+      - name: Docs examples + snippets execute against the released wheel
+        run: |
+          "$GITHUB_WORKSPACE/.released/bin/python" -m pytest \
+            tests/test_docs_examples.py tests/test_docs_snippets.py -q --no-header
+      # The expected-drift class: reported, never fatal (see the header above).
+      - name: Committed .out still byte-matches (informational)
+        continue-on-error: true
+        run: |
+          "$GITHUB_WORKSPACE/.released/bin/python" tools/gen_doc_outputs.py \
+            --check --surface python
+
   # Cross-surface OUTPUT-VALUE gate (X1). Every OTHER gate compares knob NAMES;
   # this one pushes a committed list of (op × input) cases through all four
   # surface legs (python / node / wasm / CLI) and compares the observed output

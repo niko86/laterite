@@ -4,7 +4,7 @@ The whole Python surface is three handles plus two result objects. Read one
 file, then chain — every method below hangs off what `read()` gives you.
 
 ```python
---8<-- "python/ex05_query_builder.py"
+--8<-- "python/ex05_query_builder.py:code"
 ```
 
 ```text

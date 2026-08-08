@@ -8,7 +8,7 @@ and the existing `AGS4_to_dataframe` call works unchanged — same `(tables,
 headings)` 2-tuple, same pandas frames.
 
 ```python
---8<-- "python/ex11_compat.py"
+--8<-- "python/ex11_compat.py:code"
 ```
 
 ```text

@@ -9,7 +9,7 @@ numbers.
 === "Python"
 
     ```python
-    --8<-- "python/ex14_rules_dict.py"
+    --8<-- "python/ex14_rules_dict.py:code"
     ```
 
     ```text

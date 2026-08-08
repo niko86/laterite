@@ -9,7 +9,7 @@ dtype _is_ the AGS type, a numeric filter compares numbers, not strings.
 === "Python"
 
     ```python
-    --8<-- "python/ex05_query_builder.py"
+    --8<-- "python/ex05_query_builder.py:code"
     ```
 
     ```text
