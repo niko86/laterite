@@ -9,7 +9,7 @@ in-memory AGS group graph; reach for it to drive UI, build joins, or validate a
 schema before you have data.
 
 ```python
---8<-- "python/ex13_registry_xn.py"
+--8<-- "python/ex13_registry_xn.py:code"
 ```
 
 ```text

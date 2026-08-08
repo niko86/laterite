@@ -7,7 +7,7 @@ with a _fresh, matching_ cert and `.validate()` resolves without re-running a
 single rule.
 
 ```python
---8<-- "python/ex08_certify.py"
+--8<-- "python/ex08_certify.py:code"
 ```
 
 ```text

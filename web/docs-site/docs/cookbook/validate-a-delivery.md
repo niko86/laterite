@@ -9,7 +9,7 @@ in-process from Python or Node, in SQL from DuckDB, at the shell with
 === "Python"
 
     ```python
-    --8<-- "python/ex02_validate.py"
+    --8<-- "python/ex02_validate.py:code"
     ```
 
     ```text

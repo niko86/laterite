@@ -10,7 +10,7 @@ transmission details.
 === "Python"
 
     ```python
-    --8<-- "python/ex09a_build_from_frames.py"
+    --8<-- "python/ex09a_build_from_frames.py:code"
     ```
 
     ```text

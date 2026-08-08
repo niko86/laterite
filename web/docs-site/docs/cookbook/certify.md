@@ -8,7 +8,7 @@ skip the rule engine.
 === "Python"
 
     ```python
-    --8<-- "python/ex08_certify.py"
+    --8<-- "python/ex08_certify.py:code"
     ```
 
     ```text

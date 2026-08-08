@@ -7,7 +7,7 @@ inline a function without breaking out of the flow. `.pipe(fn, *args)` passes th
 handle as `fn`'s first argument and returns whatever `fn` returns.
 
 ```python
---8<-- "python/ex07_pipe.py"
+--8<-- "python/ex07_pipe.py:code"
 ```
 
 ```text

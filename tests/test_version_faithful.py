@@ -230,14 +230,31 @@ def test_doc_example_outputs_carry_no_superseded_product_version() -> None:
 #: it declares its own interpreter floor and dependencies, so the file installs
 #: what it needs and runs.
 _PEP723 = re.compile(r"^# /// script\n(?P<body>(?:^#.*\n)*?)^# ///$", re.M)
-_PINNED = re.compile(r"laterite==(?P<version>[\w.]+)")
+#: A laterite requirement in a PEP 723 dependency list, whatever shape it takes:
+#: the extras group and the version specifier are both captured rather than
+#: assumed, so `>=`, `~=` and a bare `"laterite"` are all VISIBLE to the gate
+#: instead of simply not matching it. Matching `laterite==(version)` was the first
+#: cut and it could not see the one file that motivated the gate.
+#:
+#: The extras group is not decoration either. `pip install laterite` is polars +
+#: duckdb; pandas lives behind `[compat]`, so an example that imports pandas or
+#: touches `laterite.compat` must ask for `laterite[compat]` or die under
+#: `uv run` with ModuleNotFoundError — the very failure the header prevents.
+_LATERITE_DEP = re.compile(r'"laterite(?P<extras>\[[\w,]+\])?(?P<spec>[^"]*)"')
 _REQUIRES_PY = re.compile(r'requires-python\s*=\s*"(?P<spec>[^"]+)"')
+
+#: Both example trees. `web/docs-site/examples` is the docs corpus; the root
+#: `examples/` holds the marimo tour, which is where this rot was first seen —
+#: it asked for `laterite>=0.5.0` at product 0.10.1, five minors of compatibility
+#: it claimed and nobody had tested.
+_EXAMPLE_TREES = ("web/docs-site/examples", "examples")
 
 
 def _example_headers() -> list[tuple[Path, str]]:
     return [
         (p, m.group("body"))
-        for p in sorted((_REPO / "web" / "docs-site" / "examples").rglob("*.py"))
+        for tree in _EXAMPLE_TREES
+        for p in sorted((_REPO / tree).rglob("*.py"))
         if (m := _PEP723.search(p.read_text(encoding="utf-8")))
     ]
 
@@ -246,25 +263,36 @@ def test_example_pep723_pins_track_the_product() -> None:
     """A `uv run`-able example pins the laterite it is known to run at.
 
     The pin is the point — it says "this example was green against THIS wheel",
-    which is worth more than a floating dependency that silently starts resolving
+    which is worth more than a floating requirement that silently starts resolving
     something the snippet was never checked against. But a pin is also a version
     site, and version sites in documentation are exactly what rots: `COMPAT.md`
-    sat at 0.1.0 for nine releases, and `examples/laterite_tour.py` still asks for
-    `laterite>=0.5.0` several minors after that floor stopped meaning anything.
+    sat at 0.1.0 for nine releases, and `examples/laterite_tour.py` asked for
+    `laterite>=0.5.0` at product 0.10.1 — five minors of compatibility it claimed
+    and nobody had ever tested.
 
-    So the pin is asserted rather than trusted, by DISCOVERY: any example that
-    grows a header is covered the day it lands, with no list to update.
-    `tools/release/bump-version.sh` restamps them, and this is what says so.
+    THE ASSERTION IS ON THE WHOLE SPECIFIER, not on the version inside a `==`.
+    The first cut of this gate matched `laterite==(version)` and compared the
+    version, which quietly passes anything that is not an exact pin at all: the
+    tour's own `>=0.5.0` produced no match and therefore no finding, so the one
+    file that motivated the gate was the one file it could not see. A bare
+    `"laterite"` escaped the same way. Now the specifier must be exactly
+    `==<PRODUCT>`, so `>=`, `~=` and no-specifier are failures rather than
+    absences.
 
-    Falsify by editing any header's `laterite==` to a version that is not the
-    shipped one.
+    Discovery, not a list: any example that grows a header is covered the day it
+    lands, across both example trees. `tools/release/bump-version.sh` restamps
+    them, and this is what says so.
+
+    Falsify by loosening any header to `laterite>=…`, by dropping the specifier,
+    or by pinning a version that is not the shipped one.
     """
     headers = _example_headers()
     assert headers, "no PEP 723 headers found — the discovery pattern has gone stale"
     wrong = [
-        f"{p.relative_to(_REPO)} pins laterite=={m.group('version')}"
+        f"{p.relative_to(_REPO)} requires laterite{m.group('extras') or ''}"
+        f"{m.group('spec') or ' (no specifier)'}"
         for p, body in headers
-        if (m := _PINNED.search(body)) and m.group("version") != PRODUCT
+        if (m := _LATERITE_DEP.search(body)) and m.group("spec") != f"=={PRODUCT}"
     ]
     assert not wrong, (
         "a runnable docs example pins a laterite that is not the shipped one:\n  "

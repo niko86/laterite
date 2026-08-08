@@ -8,7 +8,7 @@ fresh handle.
 === "Python"
 
     ```python
-    --8<-- "python/ex15_fix.py"
+    --8<-- "python/ex15_fix.py:code"
     ```
 
     ```text

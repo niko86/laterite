@@ -8,7 +8,7 @@ no schema, no re-emit, just zstd (with optional age encryption on top).
 === "Python"
 
     ```python
-    --8<-- "python/ex12_transport.py"
+    --8<-- "python/ex12_transport.py:code"
     ```
 
     ```text
@@ -33,7 +33,7 @@ no schema, no re-emit, just zstd (with optional age encryption on top).
     the zstd pack; without the passphrase the payload is opaque:
 
     ```python
-    --8<-- "python/ex17_lock.py"
+    --8<-- "python/ex17_lock.py:code"
     ```
 
     ```text

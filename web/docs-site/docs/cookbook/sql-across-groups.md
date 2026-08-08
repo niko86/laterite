@@ -8,7 +8,7 @@ aggregates — that a single-group query can't express. Drop to SQL.
 === "Python"
 
     ```python
-    --8<-- "python/ex06_sql_join.py"
+    --8<-- "python/ex06_sql_join.py:code"
     ```
 
     ```text

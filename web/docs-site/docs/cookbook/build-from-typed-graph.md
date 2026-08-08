@@ -9,7 +9,7 @@ graph to the emitter — use this when your data is already a graph in memory
 === "Python"
 
     ```python
-    --8<-- "python/ex09b_build_from_typed_graph.py"
+    --8<-- "python/ex09b_build_from_typed_graph.py:code"
     ```
 
     ```text
