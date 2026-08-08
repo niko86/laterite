@@ -168,11 +168,18 @@ def _resolve(stmt: ast.AST, env: dict) -> list[str]:
                 bad.append(f"[MISSING SYMBOL] {missing}")
         elif isinstance(node, ast.Call) and node.keywords:
             path = _chain(node.func) if isinstance(node.func, ast.Attribute) else None
-            fn, _ = _lookup(path or [], env)
-            if fn is None:
+            if not path:
+                continue
+            fn, _ = _lookup(path, env)
+            # `callable`, not `is not None`: a resolved name can be a module or a
+            # plain data attribute (`laterite.__version__` is a str), and handing
+            # one of those to `signature` is meaningless. The previous guard let
+            # them through and relied on the `except TypeError` below to absorb
+            # the mistake, which is not the same as not making it.
+            if not callable(fn):
                 continue
             try:
-                sig = inspect.signature(fn)  # type: ignore[arg-type]
+                sig = inspect.signature(fn)
             except (TypeError, ValueError):
                 continue  # a PyO3 callable with no introspectable signature
             if any(
