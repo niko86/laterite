@@ -319,6 +319,38 @@ filename = "packages/laterite/python/laterite/compat.py"
 search = "laterite {current_version} — compat:"
 replace = "laterite {new_version} — compat:"
 
+# COMPAT.md renders the two strings above as documentation — the `__version__`
+# repr and the `Metadata.Checker` banner a user sees in their validation report.
+# It was NOT stamped here, and `compat.py` was, so the page froze at 0.1.0 and
+# stayed there for nine releases while the code moved: the doctest claimed
+# '0.1.0+compat.python-ags4.1.2.0' against a wheel emitting '0.10.1+…'.
+#
+# Neither superseded-version gate in test_version_faithful.py could have caught
+# it. One scans `examples/**/*.out`, the other the registry-shipped READMEs, and
+# both work by matching versions listed in changelog.json — whose history starts
+# at 0.6.0, so `0.1.0` is not in the set they look for at all. The positive
+# assertion (doc == what the wheel emits) lives in tests/test_docs_snippets.py;
+# these entries are the other half, keeping the page stamped on release.
+#
+# Three sites, two of them sharing the local-version segment (the doctest repr
+# uses single quotes, the phase-1 illustration double) — so the search omits the
+# quote and both are rewritten. As above, only the laterite release prefix moves;
+# the +compat.python-ags4.<pin> segment is pinned independently.
+[[tool.bumpversion.files]]
+filename = "COMPAT.md"
+search = "{current_version}+compat.python-ags4."
+replace = "{new_version}+compat.python-ags4."
+
+[[tool.bumpversion.files]]
+filename = "COMPAT.md"
+search = "laterite {current_version} — compat:"
+replace = "laterite {new_version} — compat:"
+
+[[tool.bumpversion.files]]
+filename = "COMPAT.md"
+search = "`{current_version}` — the laterite release."
+replace = "`{new_version}` — the laterite release."
+
 # CHANGELOG: NOT rolled by bump-my-version any more. The changelog is generated
 # from `changelog.json` (the SSOT) by `tools/gen_changelog.py`; the release roll
 # ([Unreleased] → a dated version) happens there via `--release`, which

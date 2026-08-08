@@ -31,7 +31,7 @@ Pages workflow uploads) and rides alongside the validator SPA at `/laterite/`.
 
 Key facts:
 
-- **Example-led / single-sourced.** Every code snippet on a page is
+- **Example-led / single-sourced — but not universally.** *Most* code on a page is
   `--8<--`-included (pymdownx.snippets, `base_path: [examples]`) from
   `repo:web/docs-site/examples/{python,node,cli,duckdb,wasm}/` — and each tree
   has a **runtime gate** so page and test are the same bytes (#373 built the
@@ -61,6 +61,27 @@ Key facts:
     skip, broken snippet = red). `_`-prefixed files (`_install.sql`) are
     include-only boilerplate.
   Browser tabs are **prose** (the web app has no user-facing code API).
+- **The other 22 fences — hand-written, and gated separately.** The list above is
+  the *included* half: 38 of the site's 60 Python fences. The rest are LITERAL —
+  fragments a page writes inline (`for group in delta["groups"]:`), which read
+  correctly as fragments and would be worse as standalone examples. Every gate
+  above keys off the `--8<--`, so all of them were invisible to it, as were
+  `repo:README.md`, the PyPI landing page and `repo:COMPAT.md`. What that cost was
+  measured on 2026-08-08: `COMPAT.md` documented
+  `check_file(..., dictionary=...)` in both blocks of its error-handling section,
+  and no such parameter has ever existed in either library
+  (`standard_AGS4_dictionary` is the name), so the two snippets illustrating the
+  divergence raised `TypeError` on both sides and demonstrated nothing. The prose
+  was right; only the code was uncopyable.
+  `repo:tests/test_docs_snippets.py` closes it by treating a page as ONE program
+  in document order — includes replayed so a fragment inherits the `ags` / `fixed`
+  its page established — EXECUTING what can run (85% of literal statements) and
+  resolving names + call keywords against the wheel for the rest. It runs from a
+  temp dir with the fixture copied under `examples/`, like the CLI gate and for
+  the same reason: `surfaces/python.md` and `cookbook/excel.md` WRITE files.
+  A `<!-- doc-snippet: skip — reason -->` marker (the shape of `doc-output: skip`,
+  reason likewise mandatory) exempts a fence from execution but never from
+  resolution — the `dictionary=` typo lived in a block that would carry one.
 - **Changelog page — generated, version-stamped (#372).** `reference/changelog.md`
   is built by `web/docs-site/scripts/gen_changelog.py` (a `gen-files` script)
   from the repo-root `CHANGELOG.md` plus the shipped version read from
