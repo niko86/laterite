@@ -5,9 +5,20 @@ tolerant tokenizer, and one source-true walk that carries every coordinate
 system a caller might need.
 
 ```rust
-let parsed = laterite_ags4_parse::parse_str(text)?;
-for group in &parsed.groups {
-    println!("{} — {} rows", group.code, group.rows.len());
+const AGS4: &str = concat!(
+    "\"GROUP\",\"PROJ\"\r\n",
+    "\"HEADING\",\"PROJ_ID\"\r\n",
+    "\"UNIT\",\"\"\r\n",
+    "\"TYPE\",\"ID\"\r\n",
+    "\"DATA\",\"P1\"\r\n",
+);
+
+fn main() -> Result<(), laterite_ags4_parse::ParseError> {
+    let parsed = laterite_ags4_parse::parse_str(AGS4)?;
+    for (code, group) in &parsed.groups {
+        println!("{} — {} rows", code, group.rows.len());
+    }
+    Ok(())
 }
 ```
 

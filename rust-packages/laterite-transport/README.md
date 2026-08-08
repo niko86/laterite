@@ -3,11 +3,19 @@
 A small, content-agnostic file envelope: **zstd** compression and **age**
 passphrase encryption, as four operations.
 
-```rust
-laterite_transport::pack(&src, &dest, 19)?;      // compress
-laterite_transport::unpack(&src, &dest)?;        // decompress
-laterite_transport::lock(&src, &dest, pw, 19)?;  // compress + encrypt
-laterite_transport::unlock(&src, &dest, pw)?;    // decrypt + decompress
+```rust,no_run
+use std::path::Path;
+
+fn main() -> Result<(), laterite_transport::TransportError> {
+    let (src, dest) = (Path::new("site.ags"), Path::new("site.ags.zst"));
+    let pw = "correct horse battery staple";
+
+    laterite_transport::pack(src, dest, 19)?;        // compress
+    laterite_transport::unpack(dest, src)?;          // decompress
+    laterite_transport::lock(src, dest, pw, 19, 18)?;  // compress + encrypt (scrypt log_n)
+    laterite_transport::unlock(dest, src, pw)?;      // decrypt + decompress
+    Ok(())
+}
 ```
 
 Byte-oriented variants (`pack_bytes`, `lock_bytes`, …) are available for callers

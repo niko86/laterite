@@ -41,6 +41,9 @@
       },
       {
         "text": "**Seven ungated output blocks are now generated, not hand-written.** `--check-pages` counts `text` fences no example backs; that count was 8 and is now 1. Four new CLI examples (clean-file `--json`, a one-value typo, and the warning/errors-only tier pair, the last three minting their input from the fixture with `sed` so CRLF survives) and two new Python examples close `learn/install.md`, `concepts/severity-tiers.md` and `concepts/one-engine-many-doors.md`. The remaining orphan is `chaining/index.md`'s ASCII flow diagram — a drawing, not the output of anything, so it stays unwired by design: the target is zero GATEABLE orphans, not zero orphans."
+      },
+      {
+        "text": "**Every crate README example is now a doctest.** Three lines per crate — `#[cfg(doctest)] #[doc = include_str!(\"../README.md\")] mod readme_doctests {}` — point rustdoc at the README, so `cargo test --workspace` compiles all ten (eight execute; two touch the filesystem and are `no_run`). No new CI, no duplication: the README stays the single copy, and `cfg(doctest)` keeps the module out of both a normal build and the docs.rs page, so the crates' own `//!` docs are untouched — verified by grepping the generated HTML. Each fence is written out in full because a README is also read as Markdown on crates.io, where rustdoc's `# ` hidden lines would render as headings. `tests/test_crate_readme_doctests.py` asserts the wiring by discovery, rejects an `ignore` fence, and fails a fence in a crate excluded from the CI doctest run — where it would look gated and be checked by nothing."
       }
     ],
     "changed": [
@@ -62,6 +65,9 @@
       },
       {
         "text": "**`learn/install.md` printed its findings table in the wrong renderer.** The first page a new user reads showed plain ASCII pipes (`Rule | Line | Group`) — what the wheel's Python `lat` console script renders — on a page documenting the Rust binary, which draws comfy-table box-drawing. The row's content was correct, so somebody ran it once and nothing re-ran it: exactly the drift the CLI example gate was built for, in the blocks that gate never covered because no example backed them."
+      },
+      {
+        "text": "**Three crates.io READMEs documented Rust that does not compile.** `laterite-ags4-parse` iterated `parsed.groups` — a `BTreeMap` — as though it were a sequence, so `group.code` was a field access on a `(&String, &ParsedGroup)` tuple; `laterite-ags4-core` called `read_ags4_bytes(&bytes, opts)`, which takes one argument (the two-argument form is `read_ags4_bytes_with`); and `laterite-transport` called `lock(src, dest, pw, level)`, which takes five — the scrypt `log_n` was missing. A published version's README is frozen on crates.io, and `check_doc_refs.py` already treated those pages as a strict special case for their links; their code was checked by nothing."
       }
     ],
     "security": []
