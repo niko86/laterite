@@ -44,11 +44,17 @@
       },
       {
         "text": "**Every crate README example is now a doctest.** Three lines per crate — `#[cfg(doctest)] #[doc = include_str!(\"../README.md\")] mod readme_doctests {}` — point rustdoc at the README, so `cargo test --workspace` compiles all ten (eight execute; two touch the filesystem and are `no_run`). No new CI, no duplication: the README stays the single copy, and `cfg(doctest)` keeps the module out of both a normal build and the docs.rs page, so the crates' own `//!` docs are untouched — verified by grepping the generated HTML. Each fence is written out in full because a README is also read as Markdown on crates.io, where rustdoc's `# ` hidden lines would render as headings. `tests/test_crate_readme_doctests.py` asserts the wiring by discovery, rejects an `ignore` fence, and fails a fence in a crate excluded from the CI doctest run — where it would look gated and be checked by nothing."
+      },
+      {
+        "text": "**The Node docs' hand-typed JavaScript is executed now.** `docs-examples.test.ts` and `gen_doc_outputs --surface node` both key off the `--8<--` include, covering 18 fences; 11 more are typed straight into the Markdown and the npm landing page carries 4 — the page a reader sees before `npm install` — and none of it ran. `laterite-node/test/docs-snippets.test.ts` welds each page into one ESM program (imports unioned per module, re-declarations turned into assignment, since ESM forbids the rebind Python allows) and executes it from a temp cwd with the fixture copied in. All four pages run; a fence that genuinely cannot — the wasm type declarations, the `{ arrow: true }` call that downloads a DuckDB community extension at run time — carries a `doc-snippet: skip` marker with its reason."
       }
     ],
     "changed": [
       {
         "text": "**The Excel crate is `laterite-ags4-excel`.** It was `laterite-excel` — a name chosen for the general-purpose Excel library it was meant to become and never did. `-ags4-` marks the engine tier and bare `laterite-*` is for the format-agnostic crates, of which `laterite-transport` is the only genuine one; this crate holds contents its own header calls AGS4-specific. Renamed **now** because a crates.io name is free until its first publish and irreversible after, and this crate is scheduled to publish — the same reasoning that renamed `laterite-ags4-check` to `laterite-cli` before the engine tier went out. Nothing a user types changes: the Python, Node, browser and `lat excel` surfaces are untouched, and the crate has never been on a registry for anyone to depend on. Internally the lib name moves with it, so `laterite_excel::` becomes `laterite_ags4_excel::` at every call site. Past release entries here carry the new name too, deliberately: one grep gives one answer rather than an exception list to carry forward."
+      },
+      {
+        "text": "**`tests/test_docs_node_api.py` now also scans the npm landing page.** Falsification of the new executor found the gap: a bare `report.someTypo` evaluates to `undefined` and logs rather than throwing, so executing cannot catch it, and the static gate scanned `docs/node/` only — leaving `laterite-node/README.md` covered by neither. The executor catches calls, the resolver catches reads; neither subsumes the other."
       }
     ],
     "deprecated": [],
@@ -68,6 +74,9 @@
       },
       {
         "text": "**Three crates.io READMEs documented Rust that does not compile.** `laterite-ags4-parse` iterated `parsed.groups` — a `BTreeMap` — as though it were a sequence, so `group.code` was a field access on a `(&String, &ParsedGroup)` tuple; `laterite-ags4-core` called `read_ags4_bytes(&bytes, opts)`, which takes one argument (the two-argument form is `read_ags4_bytes_with`); and `laterite-transport` called `lock(src, dest, pw, level)`, which takes five — the scrypt `log_n` was missing. A published version's README is frozen on crates.io, and `check_doc_refs.py` already treated those pages as a strict special case for their links; their code was checked by nothing."
+      },
+      {
+        "text": "**`node/index.md` documented `buildAgs4` with an input it rejects.** The page showed `buildAgs4({ PROJ: [{ PROJ_ID: \"P1\" }] })`; the signature is `AgsGroup | Map<string, GroupData> | Array<[string, GroupData]>`, so a reader copying it got `TypeError: items is not iterable`. Confirmed against the built package before fixing, and the page now shows a `Map` with a note that a plain object is not one of the accepted shapes."
       }
     ],
     "security": []

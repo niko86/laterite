@@ -78,7 +78,8 @@ const rows = await file.sql("SELECT loca_id FROM LOCA WHERE loca_gl < 0");
 ```js
 import { buildAgs4 } from "laterite";
 
-const out = buildAgs4({ PROJ: [{ PROJ_ID: "P1" }] /* … */ });
+// A Map — or an array of [code, rows] pairs. Not a plain object.
+const out = buildAgs4(new Map([["PROJ", [{ PROJ_ID: "P1" }]] /* … */]));
 out.save("out.ags"); // or out.text / out.bytes
 ```
 
