@@ -53,7 +53,14 @@ Key facts:
     the `# expect-exit: N` code and **byte-equality of stdout vs a committed
     sibling `.out`** — pages include the `[start:cmd]` section + the `.out`
     verbatim, so even the *output* blocks can't lie (the old hand-typed CLI
-    table had already drifted from the binary's real box-drawing output).
+    table had already drifted from the binary's real box-drawing output). It
+    drifted the same way a SECOND time, in the blocks this gate never covered
+    because no example backed them: `learn/install.md` — the first page a new
+    user reads — printed its findings table as plain ASCII pipes, which is what
+    the WHEEL's Python `lat` renders, on a page documenting the Rust binary. The
+    row's content was right, so somebody ran it once; nothing re-ran it. Wiring
+    a block to an example is therefore not bookkeeping, and an *unwired* output
+    block is the actual risk surface — see the orphan-block note below.
   - *duckdb* — `tests/test_docs_duckdb_examples.py` (dev satellite), env-gated on
     `LATERITE_DUCKDB_EXT`; per-PR the `.sql` files are include-checked only
     (`--strict` + `check_paths`), the **monthly `compliance-report.yml`** runs
@@ -118,6 +125,15 @@ Key facts:
   A `<!-- doc-snippet: skip — reason -->` marker (the shape of `doc-output: skip`,
   reason likewise mandatory) exempts a fence from execution but never from
   resolution — the `dictionary=` typo lived in a block that would carry one.
+- **Orphan output blocks — down to one, and it is not output.** `--check-pages`
+  counts `text` fences that no example backs and prints the number rather than
+  absorbing it; that count was **8** and is now **1**. The seven closed were
+  hand-written stdout on `learn/install.md`, `concepts/severity-tiers.md` and
+  `concepts/one-engine-many-doors.md`, and one of them had drifted into the wrong
+  renderer entirely (above). The survivor is `chaining/index.md`'s ASCII flow
+  diagram — a `text` fence that is a *drawing*, not the output of anything, so it
+  is correctly and permanently unwired. Worth stating so nobody "fixes" it: the
+  right target is **zero gateable orphans**, not zero orphans.
 - **One nightly leg asks the READER's question.** Every gate above runs against the
   working-tree cdylib, so all of them answer "is the site consistent with HEAD" —
   and the reader is not on HEAD, they are on `pip install laterite`. The

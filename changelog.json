@@ -38,6 +38,9 @@
       },
       {
         "text": "**A nightly leg asks the reader's question: does the live docs site work against the wheel you can actually install?** Every existing docs gate runs against the working-tree cdylib, so all of them answer \"is the site consistent with HEAD\" — and the reader is not on HEAD, they are on `pip install laterite`. `docs-vs-released-wheel` installs the published wheel (unpinned, whatever PyPI resolves that day) and runs the examples plus `tests/test_docs_snippets.py` against it, printing the released version beside the tree's. The two steps are calibrated differently on purpose: an example that fails to RUN fails the job, because a reader following the site would get a traceback; a committed `.out` that no longer byte-matches is reported and not fatal, because output drift is the ordinary consequence of the tree being ahead. It stays out of `notify`'s `needs` for the same reason — the docs track HEAD by decision, so documenting unreleased API is a chosen state, and filing an issue about a chosen state is noise that gets muted."
+      },
+      {
+        "text": "**Seven ungated output blocks are now generated, not hand-written.** `--check-pages` counts `text` fences no example backs; that count was 8 and is now 1. Four new CLI examples (clean-file `--json`, a one-value typo, and the warning/errors-only tier pair, the last three minting their input from the fixture with `sed` so CRLF survives) and two new Python examples close `learn/install.md`, `concepts/severity-tiers.md` and `concepts/one-engine-many-doors.md`. The remaining orphan is `chaining/index.md`'s ASCII flow diagram — a drawing, not the output of anything, so it stays unwired by design: the target is zero GATEABLE orphans, not zero orphans."
       }
     ],
     "changed": [
@@ -56,6 +59,9 @@
       },
       {
         "text": "**The PEP 723 pin gate could not see the file that motivated it.** It matched `laterite==(version)` and compared the version, which passes anything that is not an exact pin at all — so `examples/laterite_tour.py` asking for `laterite>=0.5.0` at product 0.10.1 (five minors of compatibility it claimed and nobody had tested) produced no match and therefore no finding, and a bare `\"laterite\"` escaped identically. The gate now asserts the whole specifier, discovers across both example trees rather than the docs corpus alone, and admits the `[extras]` group that the pandas examples need — `bump-version.sh` was equally blind to `laterite[compat]==`, which would have frozen those two pins at the old version while every sibling moved."
+      },
+      {
+        "text": "**`learn/install.md` printed its findings table in the wrong renderer.** The first page a new user reads showed plain ASCII pipes (`Rule | Line | Group`) — what the wheel's Python `lat` console script renders — on a page documenting the Rust binary, which draws comfy-table box-drawing. The row's content was correct, so somebody ran it once and nothing re-ran it: exactly the drift the CLI example gate was built for, in the blocks that gate never covered because no example backed them."
       }
     ],
     "security": []
