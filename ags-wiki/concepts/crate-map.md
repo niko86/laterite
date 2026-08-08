@@ -458,6 +458,44 @@ flowchart LR
   end
 ```
 
+## A crate README's example is a doctest
+
+Ten of these crates publish to crates.io, and a published version's README is
+**frozen** — `repo:tools/check_doc_refs.py` already treats those pages as a
+strict special case for their *links*, with no repo-root fallback, because the
+person deciding whether to `cargo add` cannot see this repo. Their *code* was
+checked by nothing, and three of the ten did not compile: `laterite-ags4-parse`
+iterated a `BTreeMap` as a sequence, `laterite-ags4-core` called
+`read_ags4_bytes` with two arguments (it takes one; the two-argument form is
+`read_ags4_bytes_with`), and `laterite-transport` called `lock` with four (it
+takes five — the scrypt `log_n` was missing).
+
+The convention, three lines in each crate's `src/lib.rs`:
+
+```rust
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+mod readme_doctests {}
+```
+
+`cfg(doctest)` is what makes it side-effect-free: the module exists only while
+rustdoc collects doctests, so it is absent from a normal build **and** from the
+rendered docs.rs page. The crate's own `//!` docs — 82 lines on the facade —
+are untouched, and the README stays the single copy of its example. No new CI:
+`cargo test --workspace` carries no `--lib` restriction, so it already runs them.
+
+Two constraints worth knowing before editing one:
+
+- **No rustdoc `# ` hidden lines.** A README is also read as plain Markdown on
+  crates.io, where `# let x = …` renders as an `<h1>`. Every line of setup is
+  visible, which is why each fence carries a `fn main() -> Result<…>` and a
+  `const AGS4` literal.
+- **`no_run` is fine, `ignore` is not.** Two fences touch the filesystem and are
+  compiled but not executed; compiling is what catches the drift above. `ignore`
+  compiles nothing, so `repo:tests/test_crate_readme_doctests.py` rejects it —
+  along with a fence whose crate lacks the module, or sits outside
+  `cargo test --workspace`'s selection where nothing would compile it.
+
 ## Where it shows up
 
 Every crate's own tool page links back here for the whole-workspace

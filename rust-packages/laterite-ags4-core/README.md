@@ -5,7 +5,21 @@ The DuckDB-free core of the [laterite](https://github.com/niko86/laterite)
 certificate and byte-offset index.
 
 ```rust
-let parsed = laterite_ags4_core::ags4_codec::read_ags4_bytes(&bytes, opts)?;
+use laterite_ags4_core::ags4_codec::{read_ags4_bytes_with, ReadOptions};
+
+const AGS4: &str = concat!(
+    "\"GROUP\",\"PROJ\"\r\n",
+    "\"HEADING\",\"PROJ_ID\"\r\n",
+    "\"UNIT\",\"\"\r\n",
+    "\"TYPE\",\"ID\"\r\n",
+    "\"DATA\",\"P1\"\r\n",
+);
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let parsed = read_ags4_bytes_with(AGS4.as_bytes(), ReadOptions::default())?;
+    println!("{} group(s)", parsed.groups.len());
+    Ok(())
+}
 ```
 
 <!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->

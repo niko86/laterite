@@ -3,7 +3,25 @@
 Reconcile **N deliveries** of one project into a single AGS4 file.
 
 ```rust
-let merged = laterite_ags4_merge::merge_parsed(&files, &MergeOpts::default())?;
+use laterite_ags4_merge::{merge_parsed, MergeOpts};
+use laterite_ags4_parse::parse_str;
+
+const AGS4: &str = concat!(
+    "\"GROUP\",\"PROJ\"\r\n",
+    "\"HEADING\",\"PROJ_ID\"\r\n",
+    "\"UNIT\",\"\"\r\n",
+    "\"TYPE\",\"ID\"\r\n",
+    "\"DATA\",\"P1\"\r\n",
+);
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let a = parse_str(AGS4).expect("valid AGS4");
+    let b = parse_str(AGS4).expect("valid AGS4");
+
+    let merged = merge_parsed(&[a, b], &MergeOpts::default())?;
+    println!("{} revision(s)", merged.revisions.len());
+    Ok(())
+}
 ```
 
 <!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
