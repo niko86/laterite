@@ -50,6 +50,9 @@
       },
       {
         "text": "**`laterite-node/test/peer-range.test.ts` — the published peer range must admit the version we develop against.** Offline and registry-free: if the range you tell users to install disagrees with the version your own tests run against, it cannot be right. That single assertion would have caught the ETARGET above the day it was introduced."
+      },
+      {
+        "text": "**`docs-vs-released-npm` — the Node twin of the released-wheel nightly.** Installs `laterite` from npm unpinned, then the optional peer exactly as the docs and the runtime error tell a reader to, then runs the docs examples against it. Same calibration as the wheel leg: an example that fails to RUN fails the job, an `.out` byte-mismatch is reported and not fatal, and it stays out of `notify`'s `needs`. Building this job is what surfaced the unsatisfiable `peerDependencies` range, so it had earned its keep before running once — and it will be red until that fix ships, which is the correct signal rather than a defect in the job."
       }
     ],
     "changed": [

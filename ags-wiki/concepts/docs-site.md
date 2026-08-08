@@ -166,6 +166,17 @@ Key facts:
   deploys from main, so documenting unreleased API is a chosen state, and a gate
   that files a tracking issue about a choice already made is noise that gets muted.
   GitHub-hosted and toolchain-free: a published wheel needs no Rust and no maturin.
+- **…and its Node twin, `docs-vs-released-npm`.** Same question, same calibration:
+  `npm install laterite` unpinned, then the optional peer **exactly as the docs and
+  the runtime error tell a reader to install it**, then the examples. Building it
+  is what surfaced that the published `peerDependencies` range matched no
+  published version at all (see `repo:ags-wiki/tools/laterite-node.md`), so it was
+  earning its keep before it had run once. **Expect it red until that fix ships** —
+  the manifest on npm still carries the old range, the peer install fails with
+  ETARGET and the three `sql()`/`at()` examples fail with it. That is the correct
+  signal rather than a bug in the job: the published package IS broken for readers,
+  and the remedy is a release. Like the wheel leg it stays out of `notify`'s
+  `needs`, so it emails rather than filing an issue about a state already known.
 - **Changelog page — generated, version-stamped (#372).** `reference/changelog.md`
   is built by `web/docs-site/scripts/gen_changelog.py` (a `gen-files` script)
   from the repo-root `CHANGELOG.md` plus the shipped version read from
