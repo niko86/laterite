@@ -118,6 +118,22 @@ Key facts:
   A `<!-- doc-snippet: skip — reason -->` marker (the shape of `doc-output: skip`,
   reason likewise mandatory) exempts a fence from execution but never from
   resolution — the `dictionary=` typo lived in a block that would carry one.
+- **One nightly leg asks the READER's question.** Every gate above runs against the
+  working-tree cdylib, so all of them answer "is the site consistent with HEAD" —
+  and the reader is not on HEAD, they are on `pip install laterite`. The
+  `docs-vs-released-wheel` job in `repo:.github/workflows/nightly.yml` installs the
+  **published** wheel (no pin — whatever PyPI resolves today) and runs the docs
+  examples plus `repo:tests/test_docs_snippets.py` against it, printing the
+  released version beside this tree's so the run states what it measured.
+  Its two steps are calibrated differently and that is the whole design: an
+  example that **fails to run** fails the job, because a reader following the live
+  site would get a traceback; a committed `.out` that no longer byte-matches is
+  reported and **not** fatal, because output drift is the ordinary consequence of
+  the tree being ahead of the release. For the same reason the job is deliberately
+  **not** in `notify`'s `needs` — the docs track HEAD by decision and the site
+  deploys from main, so documenting unreleased API is a chosen state, and a gate
+  that files a tracking issue about a choice already made is noise that gets muted.
+  GitHub-hosted and toolchain-free: a published wheel needs no Rust and no maturin.
 - **Changelog page — generated, version-stamped (#372).** `reference/changelog.md`
   is built by `web/docs-site/scripts/gen_changelog.py` (a `gen-files` script)
   from the repo-root `CHANGELOG.md` plus the shipped version read from
