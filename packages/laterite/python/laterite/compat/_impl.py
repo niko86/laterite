@@ -1,20 +1,29 @@
-"""``from laterite import compat as AGS4`` — a drop-in for
-``from python_ags4 import AGS4``, backed by the clean-room Rust engine.
+"""The python-ags4 compatibility engine — private; import from
+:mod:`laterite.compat` (or its ``AGS4`` / ``check`` / ``utils`` / ``data``
+submodules), never from here.
 
-Backend-configurable. The default is **pandas** (a literal
-python-ags4 swap-in returns pandas frames), switchable so ``compat``
-can return polars / pyarrow with no pandas installed at all:
+This is the whole body as one module by intent. Upstream splits the same surface
+across ``AGS4.py`` / ``check.py`` / ``utils.py``, and those two files import each
+other (``python_ags4/check.py:35`` imports back from ``.AGS4``); reproducing that
+circularity would buy nothing when the engine underneath is one Rust call. So the
+public module boundaries are re-export shims over this file, and the split that
+matters — which name lives in which module — is asserted by
+``tests/test_compat_import_shapes.py`` rather than enforced by the file layout.
+
+Backend-configurable. The default is **pandas** (a literal python-ags4 swap-in
+returns pandas frames), switchable so ``compat`` can return polars / pyarrow with
+no pandas installed at all:
 
     laterite.compat.set_backend("polars")          # process-wide
     AGS4.AGS4_to_dataframe("f.ags", backend="polars")   # per call
     # or env LATERITE_COMPAT_BACKEND=polars
 
 ``check_file`` returns the **python-ags4-shaped dict** (rule keys plus
-``Metadata`` / ``Summary of data`` / ``General``) so its
-``json.dumps`` matches python-ags4's. Validator semantics — and the
-deliberate divergences (AGS3 refusal O-30, ``errors='replace'`` →
-Rule 1 O-32, ``rename_duplicate_headers`` default O-8) — defer to the
-upstream docs: https://gitlab.com/ags-data-format-wg/ags-python-library
+``Metadata`` / ``Summary of data`` / ``General``) so its ``json.dumps`` matches
+python-ags4's. Validator semantics — and the deliberate divergences (AGS3 refusal
+O-30, ``errors='replace'`` → Rule 1 O-32, ``rename_duplicate_headers`` default
+O-8) — defer to the upstream docs:
+https://gitlab.com/ags-data-format-wg/ags-python-library
 """
 
 from __future__ import annotations
@@ -24,15 +33,15 @@ import datetime
 import hashlib
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import polars as pl
 
-from . import _compat_desc
-from . import _laterite_native as _native
-from ._errors import Ags4Error, BadDictError, raise_for
-from ._frames import (
+from .. import _compat_desc
+from .. import _laterite_native as _native
+from .._errors import Ags4Error, BadDictError, raise_for
+from .._frames import (
     compat_materializer,
     get_default_backend,
     get_default_string_dtype,
@@ -426,17 +435,6 @@ def _ags4_to_dataframe_via_dict(
         )
         tables[k] = materialize(df, be)
     return tables, headings, line_numbers
-
-
-def AGS4_to_dataframe_AGS3(*_a: object, **_k: object) -> NoReturn:
-    """The clean-room engine deliberately refuses AGS3 rather than
-    silently validating it against an AGS4 schema (O-30)."""
-    from ._errors import UnsupportedEditionError
-
-    raise UnsupportedEditionError(
-        "AGS3 is not supported (clean-room refuses it rather than silently "
-        "validating against an AGS4 schema — see O-30)"
-    )
 
 
 # --- writer ---------------------------------------------------------
@@ -1653,7 +1651,7 @@ def sort_groups(tables: dict, sorting_strategy: str = "dictionary") -> dict:
         appended at the end in alphabetical order (a warning is
         emitted, matching python-ags4).
     """
-    from .registry import GROUPS as _LATERITE_GROUPS
+    from ..registry import GROUPS as _LATERITE_GROUPS
 
     if sorting_strategy == "alphabetical":
         group_list: list[str] = sorted(tables.keys())
@@ -1786,7 +1784,6 @@ __all__ = [
     "PYTHON_AGS4_COMPAT",
     "AGS4Error",
     "AGS4_to_dataframe",
-    "AGS4_to_dataframe_AGS3",
     "AGS4_to_dict",
     "AGS4_to_excel",
     "__version__",

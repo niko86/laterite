@@ -132,7 +132,7 @@ def test_node_package_and_native_deps_match_product() -> None:
 def test_compat_version_prefix_matches_product() -> None:
     # compat.py's __version__ is an f-string literal `"{ver}+compat.python-ags4.…"`
     # — the release prefix is a hardcoded literal a bump must keep current.
-    src = (_REPO / "packages/laterite/python/laterite/compat.py").read_text()
+    src = (_REPO / "packages/laterite/python/laterite/compat/_impl.py").read_text()
     m = re.search(r'__version__ = f"(\d+\.\d+\.\d+[^"+]*)\+compat\.python-ags4\.', src)
     assert m, "could not find compat.__version__ f-string literal"
     assert m.group(1) == PRODUCT, (

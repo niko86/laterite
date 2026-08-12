@@ -127,8 +127,9 @@ versions, which is a different scheme; see
 > back — re-run the `push` run.
 
 `bump-version.sh product` stamps, atomically in one commit: the `laterite` wheel
-`pyproject.toml` + the root umbrella, `compat.py`'s `__version__` base + Checker
-banner (preserving the `+compat.python-ags4.<pin>` pin), `laterite-cli`'s crate
+`pyproject.toml` + the root umbrella, the compat `__version__` base + Checker
+banner in `packages/laterite/python/laterite/compat/_impl.py` (preserving the
+`+compat.python-ags4.<pin>` pin), `laterite-cli`'s crate
 version, the npm `package.json` version, and rolls `CHANGELOG.md`'s
 `[Unreleased]` into the new dated section — then regenerates `uv.lock`,
 `Cargo.lock`, the npm `package-lock.json`
@@ -209,8 +210,10 @@ nothing about it to confirm after a release, and step 6 above says so.
 
 - **Drift-gate** `test_version_faithful.py`: reads the source files (no build)
   and fails CI if the shipped wheel version, the Rust workspace version, the npm
-  `package.json` version, its three `@laterite/native-*` pins, or the `compat.py`
-  prefix ever disagree — the net for a bump that missed a surface.
+  `package.json` version, its three `@laterite/native-*` pins, or the compat
+  `__version__` prefix in
+  `packages/laterite/python/laterite/compat/_impl.py` ever disagree — the net
+  for a bump that missed a surface.
 - **Guard test** `test_compat_python_ags4_pin_stays_in_sync`: fails CI if the
   shipped version carries a PEP 440 `+local` segment (PyPI rejects those), if
   `compat.__version__`'s prefix drifts from the shipped version, or if the

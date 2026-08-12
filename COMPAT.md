@@ -387,9 +387,9 @@ malformed structure (duplicate GROUP declarations, ragged DATA
 rows, duplicate headings) is *reported* by the validator, not
 *raised* by the parser. python-ags4 raises hard.
 
-**laterite.compat** layers strictness back on via
-`_strict_pre_check` (in `compat.py`) which scans the file with
-`csv.reader` and raises `Ags4Error` for:
+**laterite.compat** layers strictness back on via `_strict_pre_check`
+(`packages/laterite/python/laterite/compat/_impl.py`), which scans the file
+with `csv.reader` and raises `Ags4Error` for:
 
 - Duplicate GROUP declarations
 - DATA rows with field count ≠ HEADING row
@@ -451,6 +451,45 @@ upstream wrapped report.
 
 ## API surface
 
+### Module shapes
+
+`laterite.compat` mirrors python-ags4's **module layout**, not just its
+function names, so every import shape a real python-ags4 user writes ports by
+changing one token — `python_ags4` → `laterite.compat`:
+
+| python-ags4 | laterite.compat |
+|---|---|
+| `from python_ags4 import AGS4` | `from laterite.compat import AGS4` |
+| `from python_ags4.AGS4 import AGS4Error` | `from laterite.compat.AGS4 import AGS4Error` |
+| `from python_ags4.check import get_TRAN_AGS` | `from laterite.compat.check import get_TRAN_AGS` |
+| `from python_ags4.utils import get_DICT_table_from_json_file` | `from laterite.compat.utils import get_DICT_table_from_json_file` |
+| `from python_ags4.data import load_test_data` | `from laterite.compat.data import load_test_data` |
+
+The submodule form matters because third-party code really does write
+`from python_ags4.AGS4 import …`, which a single flat module cannot serve. The
+flat namespace (`from laterite import compat as AGS4`, and every name in the
+table below) is unchanged and remains the primary surface — the submodules
+re-export from it. `packages/laterite/tests/test_compat_import_shapes.py` holds
+this true: it asserts placement, not mere presence, so a name drifting between
+submodules fails even though the flat namespace would still resolve it.
+
+Two deliberate non-mirrors:
+
+- **`ags4_cli`** — laterite ships `lat` instead (see below).
+- **A top-level `python_ags4` import name.** There is none in this wheel, and
+  that is a **permanent non-goal**, not an omission or a gap awaiting closure.
+  Two installed distributions cannot both own `site-packages/python_ags4/`: pip
+  does not arbitrate it, whichever installs last silently wins, and the loser is
+  a half-overwritten tree. It would also break this repo's own parity oracle,
+  which installs the real `python-ags4` alongside laterite. "Change one token"
+  is the promise; zero-token is not on the roadmap.
+
+`compat.data` ships a sample file under upstream's filename, but the contents
+are **ours** — clean-room generated, because upstream's `test_data.ags` is
+LGPL-3.0. Code asserting on specific upstream values will not match, by design.
+
+### Functions
+
 `laterite.compat` mirrors python-ags4's public API. Functions that
 exist verbatim:
 
@@ -458,7 +497,6 @@ exist verbatim:
 |---|---|---|
 | `AGS4.AGS4_to_dict` | `compat.AGS4_to_dict` | python-ags4-shaped output |
 | `AGS4.AGS4_to_dataframe` | `compat.AGS4_to_dataframe` | backend-configurable (default pandas) |
-| `AGS4.AGS4_to_dataframe_AGS3` | `compat.AGS4_to_dataframe_AGS3` | raises `UnsupportedEditionError` per O-30 |
 | `AGS4.AGS4_to_excel` | `compat.AGS4_to_excel` | Rust-backed (calamine + rust_xlsxwriter) |
 | `AGS4.excel_to_AGS4` | `compat.excel_to_AGS4` | Rust-backed; `dictionary=` works post-Stage 6d |
 | `AGS4.dataframe_to_AGS4` | `compat.dataframe_to_AGS4` | byte-faithful spec emit |

@@ -102,7 +102,7 @@ def test_a_group_outside_the_narrowing_has_no_table_built(tmp_path):
     """The mechanism, asserted at the native boundary rather than inferred from
     a timing. A skipped group still carries its headings and line anchors (the
     raises need them); what it must not carry is the Arrow table."""
-    from laterite.compat import _compat_arrow
+    from laterite.compat._impl import _compat_arrow
 
     path = _write(tmp_path, _THREE_GROUPS)
     p = _compat_arrow(path, "utf-8", ["LOCA"])
@@ -119,7 +119,7 @@ def test_a_group_outside_the_narrowing_has_no_table_built(tmp_path):
 def test_unnarrowed_read_still_builds_every_table(tmp_path):
     """`only_groups=None` is the default path every existing caller takes; it
     must be exactly what it was before the pushdown."""
-    from laterite.compat import _compat_arrow
+    from laterite.compat._impl import _compat_arrow
 
     p = _compat_arrow(_write(tmp_path, _THREE_GROUPS), "utf-8", None)
     assert all("table" in g for g in p["groups"].values())
