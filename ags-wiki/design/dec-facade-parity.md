@@ -6,7 +6,7 @@ tags: [design, decision, api, rust, crates-io, versioning]
 decided: 2026-08-04
 supersedes: []
 from_gap: []
-related: [dec-rust-api-crates-io, modality-register, api-surface-1.0, crate-map, dec-ags4-merge-semantics, surface-census]
+related: [dec-rust-api-crates-io, modality-register, api-surface-1.0, crate-map, dec-ags4-merge-semantics, surface-census, dec-beta-claim]
 sources:
   - "https://doc.rust-lang.org/cargo/commands/cargo-install.html"
   - "https://doc.rust-lang.org/cargo/reference/publishing.html"
@@ -398,7 +398,11 @@ dependency weight — the argument is narrower now, and honesty requires saying 
 
 ## Related
 
+[[dec-beta-claim]] is the other side of this page: until these phases land, the
+facade is the one surface carved out of the beta claim — on the completeness axis
+named here, not a quality one. It joins when this reaches parity.
+
 [[dec-rust-api-crates-io]] · [[modality-register]] · [[api-surface-1.0]] ·
 [[crate-map]] · [[dec-ags4-merge-semantics]] · [[surface-census]] ·
-`repo:tools/gen_modality.py` · `repo:tests/test_version_faithful.py` ·
-laterite#241 · laterite#162
+[[dec-beta-claim]] · `repo:tools/gen_modality.py` ·
+`repo:tests/test_version_faithful.py` · laterite#241 · laterite#162
