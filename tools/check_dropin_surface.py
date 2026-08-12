@@ -27,11 +27,17 @@ Deliberately AST-based, both sides: no import, so no built wheel, no pandas, no
 `_laterite_native`. That is what lets this run in a cheap scheduled job next to
 `upstream-pin` instead of behind a maturin build.
 
-NOTE ON WHAT THIS DOES NOT CHECK: name coverage is not drop-in-ness. laterite
-ships ONE flat module where upstream ships a package (`AGS4.py` / `check.py` /
-`utils.py` / `ags4_cli.py` / `data/`), and there is no `python_ags4` import path
-in the wheel at all. That is a permanent, documented structural difference (see
-COMPAT.md and the README), not drift, so it is stated here and not gated.
+NOTE ON WHAT THIS DOES NOT CHECK: name coverage is not placement. This answers
+"is any upstream name missing from laterite's compat surface?" by taking the
+UNION across the package, so it cannot see a name sitting in the wrong module.
+`packages/laterite/tests/test_compat_import_shapes.py` owns that half — it can
+import, so it asserts per-module placement and module identity.
+
+laterite now mirrors upstream's module layout (`AGS4` / `check` / `utils` /
+`data`); `ags4_cli` is excluded wholesale (below). There remains no top-level
+`python_ags4` import path in the wheel, which is a permanent NON-GOAL rather
+than a gap — two distributions cannot both own `site-packages/python_ags4/`.
+See COMPAT.md's "Module shapes" section.
 
 Run:
     uv run --no-sync python tools/check_dropin_surface.py
@@ -48,7 +54,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-COMPAT = REPO / "packages" / "laterite" / "python" / "laterite" / "compat.py"
+COMPAT_PKG = REPO / "packages" / "laterite" / "python" / "laterite" / "compat"
 FIXTURE = REPO / "compat-surface-gaps.json"
 
 # The upstream submodules whose public callables a drop-in is expected to cover.
@@ -89,11 +95,16 @@ def _seed_reason(module: str, name: str) -> str:
 
 
 def public_api(path: Path) -> set[str]:
-    """Public top-level callables (functions + classes) declared in a module.
+    """Public top-level names (callables, classes AND constants) in a module.
 
     AST, not import: importing upstream drags pandas, and importing
     `laterite.compat` needs the compiled `_laterite_native`. Neither is worth a
     build for a name-level comparison.
+
+    Constants count. They were missed until 2026-08-12, which hid a real gap:
+    `check.STANDARD_DICT_FILES` and `check.LATEST_DICT_VERSION` are module-level
+    assignments upstream, so a callables-only scan reported full coverage of
+    `check` while both were absent from laterite.
     """
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     names = {
@@ -101,6 +112,22 @@ def public_api(path: Path) -> set[str]:
         for node in tree.body
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
         and not node.name.startswith("_")
+    }
+    # Only LITERAL assignments. `STANDARD_DICT_FILES = {...}` is a constant a
+    # port has to carry; `logger = logging.getLogger(__name__)` is machinery that
+    # happens to be assigned at module level, and listing it as a "gap" would
+    # mean either mirroring someone's logger or writing a fake fixture entry to
+    # excuse it. The RHS node type is the discriminator, since this stays
+    # AST-only and cannot ask an object what it is.
+    names |= {
+        t.id
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and isinstance(
+            node.value, ast.Constant | ast.Dict | ast.List | ast.Tuple | ast.Set
+        )
+        for t in node.targets
+        if isinstance(t, ast.Name) and not t.id.startswith("_") and t.id != "__all__"
     }
     # An explicit `__all__` is a stronger statement of intent than what happens
     # to be declared here, so honour it additively (re-exports count as covered).
@@ -146,7 +173,13 @@ def main() -> int:
     args = ap.parse_args()
 
     up_dir = find_upstream(args.upstream)
-    ours = public_api(COMPAT)
+    # laterite's compat surface is a package: the flat namespace on `__init__.py`
+    # plus the per-module re-export shims. Union them — this check answers "is
+    # any name missing?", and WHICH module a name lands in is asserted by
+    # packages/laterite/tests/test_compat_import_shapes.py, which can import.
+    ours: set[str] = set()
+    for f in sorted(COMPAT_PKG.rglob("*.py")):
+        ours |= public_api(f)
 
     upstream: dict[str, set[str]] = {}
     for mod in UPSTREAM_MODULES:

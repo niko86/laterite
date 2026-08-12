@@ -133,7 +133,7 @@ def test_compat_python_ags4_pin_stays_in_sync():
     import pathlib
     import re
 
-    from laterite.compat import _CHECKER_STRING
+    from laterite.compat._impl import _CHECKER_STRING
 
     pin = AGS4.PYTHON_AGS4_COMPAT
     shipped = importlib.metadata.version("laterite")
@@ -459,9 +459,29 @@ def test_compat_string_dtype_knob_pyarrow():
         AGS4.set_string_dtype("nonsense")
 
 
-def test_compat_ags3_is_refused():
+# Minimal AGS3-shaped text: `**PROJ` group + `<UNITS>` marker (same fixture
+# shape as test_review_regressions._AGS3_TEXT).
+_COMPAT_AGS3_TEXT = (
+    '"**PROJ"\r\n'
+    '"*PROJ_ID","*PROJ_NAME","*PROJ_AGS"\r\n'
+    '"<UNITS>","",""\r\n'
+    '"P001","Demo","3.1"\r\n'
+)
+
+
+@pytest.mark.parametrize("fn", ["AGS4_to_dataframe", "AGS4_to_dict"])
+def test_compat_ags3_is_refused(fn):
+    """O-30 through the drop-in surface: real AGS3 input raises rather than
+    being silently validated against an AGS4 schema.
+
+    This used to call a `compat.AGS4_to_dataframe_AGS3` stub, which was an
+    invention — python-ags4 has never had such a function, so the assertion
+    proved nothing about the drop-in. The refusal it was reaching for happens
+    on the ordinary entry points, which is what upstream does too
+    (`python_ags4/AGS4.py:782` aborts on a Rule 3 AGS3 detection).
+    """
     with pytest.raises(laterite.UnsupportedEditionError):
-        AGS4.AGS4_to_dataframe_AGS3("x")
+        getattr(AGS4, fn)(io.StringIO(_COMPAT_AGS3_TEXT))
 
 
 def test_compat_convert_to_numeric_default_pandas_backend():

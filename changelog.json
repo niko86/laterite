@@ -53,6 +53,9 @@
       },
       {
         "text": "**`docs-vs-released-npm` — the Node twin of the released-wheel nightly.** Installs `laterite` from npm unpinned, then the optional peer exactly as the docs and the runtime error tell a reader to, then runs the docs examples against it. Same calibration as the wheel leg: an example that fails to RUN fails the job, an `.out` byte-mismatch is reported and not fatal, and it stays out of `notify`'s `needs`. Building this job is what surfaced the unsatisfiable `peerDependencies` range, so it had earned its keep before running once — and it will be red until that fix ships, which is the correct signal rather than a defect in the job."
+      },
+      {
+        "text": "**`laterite.compat` mirrors python-ags4's module layout — `compat.AGS4`, `compat.check`, `compat.utils`, `compat.data`.** The drop-in was one flat module where upstream is a package, so `from python_ags4.AGS4 import AGS4Error` — third-party production code, not a hypothetical — had no laterite equivalent at all. The parity oracle could never have caught this: its shim aliases four distinct upstream modules to one object, so 121/131 green was a statement about flattened function behaviour and structurally blind to module boundaries. Every import shape a real python-ags4 user writes now ports by changing one token, `python_ags4` -> `laterite.compat`, and `tests/test_compat_import_shapes.py` holds that true by asserting placement rather than mere presence — a name drifting between submodules fails even though the flat namespace would still resolve it. The flat namespace is unchanged and remains the primary surface; the submodules re-export from it. `compat.check` also gains `STANDARD_DICT_FILES` and `LATEST_DICT_VERSION`, mirrored verbatim — the fallback is 4.1.1 rather than the newest key, because upstream ships a 4.2 dictionary and still defaults to 4.1.1 when TRAN_AGS is absent — and `compat.data` ships a sample file whose contents are clean-room (upstream's is LGPL-3.0). There is still no top-level `python_ags4` import name in the wheel, now stated as a permanent non-goal rather than an unrecorded gap: two distributions cannot both own `site-packages/python_ags4/`. Undocumented private helpers (`compat._try_dict_version` and friends) moved to `compat._impl` with the body."
       }
     ],
     "changed": [
@@ -64,7 +67,11 @@
       }
     ],
     "deprecated": [],
-    "removed": [],
+    "removed": [
+      {
+        "text": "**`compat.AGS4_to_dataframe_AGS3`, which mirrored nothing.** `git log -S` over python-ags4's entire history shows no such function has ever existed, in any version — so the stub was a laterite invention, and COMPAT.md's API table listed it as mirroring an upstream function in order to claim a divergence against it. AGS3 is out of scope for this project. The real O-30 refusal is unaffected: it happens on the ordinary entry points, exactly as upstream aborts on its own AGS3 detection, and is now tested there with real AGS3-shaped input instead of through a function nobody could have called."
+      }
+    ],
     "fixed": [
       {
         "text": "**`COMPAT.md` documented a `check_file` keyword that has never existed, and a version frozen nine releases back.** Both blocks of the error-handling section passed `dictionary='not-a-dict.txt'`; the parameter is `standard_AGS4_dictionary` in laterite *and* in python-ags4, so the two snippets illustrating the divergence raised `TypeError` on both sides and showed the reader nothing — the prose was correct, only the code was uncopyable. The `laterite.compat.__version__` doctest, the `Metadata.Checker` banner a user sees in their own validation report, and the phase-1 illustration all still said `0.1.0`. `bump-my-version` stamps those two strings in `compat.py` and had no `COMPAT.md` entry, so code and page provably diverged on every release; neither superseded-version gate could catch it, because both match versions listed in `changelog.json` and its history starts at 0.6.0. The page is now stamped, and `tests/test_docs_snippets.py` asserts it against the wheel's real values."

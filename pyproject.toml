@@ -312,16 +312,22 @@ filename = "packages/laterite/pyproject.toml"
 search = 'version = "{current_version}"'
 replace = 'version = "{new_version}"'
 
-# compat.py: bump ONLY the laterite release prefix. The +compat.python-ags4.<pin>
-# local segment + the banner's "python-ags4 1.2.0" are pinned independently
-# (PYTHON_AGS4_COMPAT) and must NOT move on a version bump.
+# compat/_impl.py: bump ONLY the laterite release prefix. The
+# +compat.python-ags4.<pin> local segment + the banner's "python-ags4 1.2.0" are
+# pinned independently (PYTHON_AGS4_COMPAT) and must NOT move on a version bump.
+#
+# These target the file BY PATH, so the 2026-08-12 reshape of `compat.py` into
+# the `compat/` package had to move them in the same commit: bump-my-version
+# hard-errors on a missing filename, which would have aborted the release stamp
+# at the worst possible moment. `test_version_faithful.py` covers the values,
+# not the paths — the paths are only exercised by an actual bump.
 [[tool.bumpversion.files]]
-filename = "packages/laterite/python/laterite/compat.py"
+filename = "packages/laterite/python/laterite/compat/_impl.py"
 search = '__version__ = f"{current_version}+compat.python-ags4.'
 replace = '__version__ = f"{new_version}+compat.python-ags4.'
 
 [[tool.bumpversion.files]]
-filename = "packages/laterite/python/laterite/compat.py"
+filename = "packages/laterite/python/laterite/compat/_impl.py"
 search = "laterite {current_version} — compat:"
 replace = "laterite {new_version} — compat:"
 

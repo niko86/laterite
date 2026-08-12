@@ -27,6 +27,10 @@ import pandas.testing as pt
 import pytest
 from laterite import compat as AGS4
 
+# White-box access: the engine lives in `compat._impl`, and these tests reach
+# for helpers that are deliberately NOT on the public `laterite.compat` surface.
+from laterite.compat import _impl as compat_impl
+
 try:
     from python_ags4 import AGS4 as up_AGS4
     from python_ags4 import utils as up_utils
@@ -381,7 +385,9 @@ def test_format_numeric_column_does_not_mutate_input() -> None:
     ],
 )
 def test_format_sf_matches_oracle(value: float, type_spec: str) -> None:
-    assert AGS4._format_sf(value, type_spec) == up_AGS4._format_SF(value, type_spec)
+    assert compat_impl._format_sf(value, type_spec) == up_AGS4._format_SF(
+        value, type_spec
+    )
 
 
 @oracle

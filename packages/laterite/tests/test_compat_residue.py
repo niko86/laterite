@@ -24,6 +24,10 @@ import polars as pl
 import pytest
 from laterite import compat as AGS4
 
+# White-box access: the engine lives in `compat._impl`, and these tests reach
+# for helpers that are deliberately NOT on the public `laterite.compat` surface.
+from laterite.compat import _impl as compat_impl
+
 try:
     from python_ags4 import AGS4 as up_AGS4
 
@@ -248,7 +252,7 @@ def test_convert_to_text_overwrites_existing_unit_type_rows() -> None:
 
 
 def test_convert_to_text_unknown_dictionary_raises_bad_dict() -> None:
-    with pytest.raises(AGS4.BadDictError):
+    with pytest.raises(compat_impl.BadDictError):
         AGS4.convert_to_text(
             _numeric_group_frame("LOCA_GL", ["1.0"]),
             dictionary="not-a-version-nor-a-file",
@@ -277,14 +281,14 @@ def test_check_file_bundled_dict_basename() -> None:
 
 
 def test_check_file_unknown_external_dict_raises() -> None:
-    with pytest.raises(AGS4.BadDictError):
+    with pytest.raises(compat_impl.BadDictError):
         AGS4.check_file(str(_CLEAN), standard_AGS4_dictionary="/no/such/dict_v9.ags")
 
 
 def test_try_dict_version_none_is_none() -> None:
     # The non-raising variant returns None for a missing dictionary (the arm the
     # convert_to_text guard never reaches, since it gates on `is not None`).
-    assert AGS4._try_dict_version(None) is None
+    assert compat_impl._try_dict_version(None) is None
 
 
 # --- _columns_of cross-backend enumeration ----------------------------------
@@ -304,10 +308,10 @@ class _PydictOnly:
 
 
 def test_columns_of_backend_variants() -> None:
-    assert AGS4._columns_of(_NamesOnly()) == ["HEADING", "LOCA_ID"]
-    assert AGS4._columns_of(_PydictOnly()) == ["HEADING", "LOCA_ID"]
+    assert compat_impl._columns_of(_NamesOnly()) == ["HEADING", "LOCA_ID"]
+    assert compat_impl._columns_of(_PydictOnly()) == ["HEADING", "LOCA_ID"]
     with pytest.raises(TypeError, match="cannot enumerate columns"):
-        AGS4._columns_of(12345)
+        compat_impl._columns_of(12345)
 
 
 # --- get_TRAN_AGS across backends -------------------------------------------

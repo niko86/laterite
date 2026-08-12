@@ -11,7 +11,21 @@ script are otherwise never exercised. Invoked by ci.yml's `wheel-smoke` job on
 real 3.12 / 3.13 / 3.14 interpreters and by release.yml's pre-publish gate.
 """
 
+from importlib import resources
+
 import laterite
+
+# `compat.data` ships a sample `.ags` as PACKAGE DATA, and package data is the
+# one kind of wheel content the source tree cannot vouch for: a maturin
+# include/exclude slip leaves every dev-tree test green and ships a wheel whose
+# `load_test_data()` raises FileNotFoundError. Checked as a resource rather than
+# by importing `laterite.compat.data`, so this stays valid in the BASE install
+# (no pandas) that this smoke deliberately runs in.
+_fixture = resources.files("laterite").joinpath("compat/data/test_data.ags")
+assert _fixture.is_file(), (
+    "laterite/compat/data/test_data.ags is missing from the installed wheel — "
+    "compat.data.load_test_data() would raise FileNotFoundError for every user."
+)
 
 # A minimal, self-contained AGS4 document (CRLF, as the format requires).
 _AGS = '"GROUP","LOCA"\r\n"HEADING","LOCA_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n"DATA","BH01"\r\n'
