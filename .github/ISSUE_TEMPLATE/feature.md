@@ -5,6 +5,14 @@ title: "[feature] "
 labels: enhancement
 ---
 
+## Which surface
+
+<!-- Delete the ones that don't apply, or say "all" if it belongs in the
+engine and should reach every door. -->
+
+- [ ] Python (`laterite` / `laterite.compat`) · [ ] Node · [ ] Browser (wasm)
+- [ ] DuckDB extension · [ ] CLI (`lat`) · [ ] Rust engine crate · [ ] All
+
 ## What you want to be able to do
 
 <!-- The use case in your own words. Concrete examples beat abstract
@@ -17,8 +25,8 @@ missing from the public surface. -->
 
 ## Optional: proposed API
 
-```python
-# what would the call look like?
+```
+# what would the call look like, in the language of your surface?
 ```
 
 ## Additional context
