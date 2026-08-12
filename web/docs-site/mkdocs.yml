@@ -195,3 +195,4 @@ nav:
       - DuckDB (SQL): duckdb/index.md
       - CLI (lat): surfaces/cli.md
       - Browser (web app): surfaces/browser.md
+  - Feedback: feedback.md

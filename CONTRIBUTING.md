@@ -97,12 +97,33 @@ tests. Do not read python-ags4's source for the answer.
 
 ## Reporting bugs
 
-Open an issue with the version you are on:
+If you are not sure whether the behaviour is a bug in laterite or something in the
+file itself, [start a discussion][discussions] rather than an issue — AGS4 has real
+ambiguity in it, and that question is a good one. If it turns out to be a bug, we
+will open the issue.
+
+Otherwise [open an issue][issues]. The template asks first which surface you are on
+— the Python wheel, `laterite.compat`, Node, wasm, the DuckDB extension, `lat`, or
+an engine crate — because one engine sits behind all of them and the door matters
+for reproducing the problem. Include that surface's version; for Python:
 
 ```bash
 python -c "import laterite; print(laterite.__version__)"
 ```
 
-Attach a minimal AGS file or snippet, and say what you expected against what you
-got. For a parity regression against python-ags4, include the python-ags4 version
-you compared with — the suite pins 1.2.0.
+Say what you expected against what you got. For a parity regression against
+python-ags4, include the python-ags4 version you compared with — the suite pins
+1.2.0 — and check [`docs/parity-coverage-map.md`](docs/parity-coverage-map.md)
+first, in case the difference is a deliberate divergence.
+
+**You do not need to send us a file.** Real AGS4 deliveries are commercially
+sensitive and we would rather you never attached one. Describe the shape — the
+group, the heading, the AGS data type, what the offending value looks like in form
+rather than content, and the rule code if there was one — and we will build a
+synthetic fixture from it. That fixture becomes the regression test.
+
+We aim to read everything weekly. That is a goal rather than a promise, and it is a
+promise of a reply rather than of a fix.
+
+[discussions]: https://github.com/niko86/laterite/discussions
+[issues]: https://github.com/niko86/laterite/issues

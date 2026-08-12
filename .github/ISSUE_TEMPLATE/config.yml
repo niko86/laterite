@@ -2,6 +2,17 @@
 # non-bug questions at the right place before they become issues here.
 blank_issues_enabled: true
 contact_links:
+  - name: Not sure it's a bug? Start a discussion
+    url: https://github.com/niko86/laterite/discussions
+    about: >-
+      "Is this laterite, or is it my file?" is a good question — AGS4 has real
+      ambiguity in it. Ask in Discussions and we'll work it out; if it turns
+      out to be a bug, we'll open the issue.
+  - name: Trying laterite in beta — what we'd like to hear
+    url: https://niko86.github.io/laterite/feedback/
+    about: >-
+      What's worth reporting, and why you never need to send us a real
+      delivery to file a useful report.
   - name: AGS4 data format (the standard itself)
     url: https://www.ags.org.uk/data-format/
     about: >-
