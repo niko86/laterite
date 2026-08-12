@@ -387,9 +387,9 @@ malformed structure (duplicate GROUP declarations, ragged DATA
 rows, duplicate headings) is *reported* by the validator, not
 *raised* by the parser. python-ags4 raises hard.
 
-**laterite.compat** layers strictness back on via
-`_strict_pre_check` (in `compat/_impl.py`) which scans the file with
-`csv.reader` and raises `Ags4Error` for:
+**laterite.compat** layers strictness back on via `_strict_pre_check`
+(`packages/laterite/python/laterite/compat/_impl.py`), which scans the file
+with `csv.reader` and raises `Ags4Error` for:
 
 - Duplicate GROUP declarations
 - DATA rows with field count ≠ HEADING row
