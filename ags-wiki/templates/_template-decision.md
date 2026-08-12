@@ -1,6 +1,6 @@
 ---
 type: decision
-title: "AGS5: <decision one-liner>"
+title: "<decision one-liner>"
 status: proposed              # proposed | accepted | superseded | rejected
 tags: [design, decision]
 decided: ""                   # YYYY-MM-DD or ""
@@ -10,10 +10,10 @@ related: []
 sources: []
 ---
 
-# AGS5: <decision one-liner>
+# <decision one-liner>
 
 ## Context
-> [!todo] The AGS4 limitation / requirement this addresses (link [[insights/…]]).
+> [!todo] The limitation / requirement this addresses (link [[insights/…]]).
 
 ## Options considered
 1. …
@@ -26,7 +26,7 @@ sources: []
 <!-- rationale; trade-offs accepted -->
 
 ## Consequences
-<!-- what this commits AGS5 to; what it rules out -->
+<!-- what this commits us to; what it rules out -->
 
 ## Related
-<!-- [[insights/…]] · [[design/…]] · repo: ags5-* package -->
+<!-- [[insights/…]] · [[design/…]] · repo: <path the librarian should index> -->
