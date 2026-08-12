@@ -908,3 +908,16 @@ fn synthesise_tran(files: &[ParsedFile], stamp: &TranStamp, edition: DictVersion
         rows: vec![row],
     }
 }
+
+// The README's example is a doctest, not a second copy of one. `cfg(doctest)`
+// means this module exists only while rustdoc collects doctests: it is absent
+// from a normal build and from the rendered docs.rs page, so the crate's own
+// `//!` docs are untouched and nothing is duplicated. The README is the single
+// source, and `cargo test --workspace` already compiles it.
+//
+// The example is written out in full — no rustdoc `# ` hidden lines. A README is
+// also read as plain Markdown on crates.io, where `# let x = …` renders as an
+// <h1>. Visible boilerplate is the price of a page that is checked AND readable.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+mod readme_doctests {}

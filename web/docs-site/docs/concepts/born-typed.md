@@ -6,7 +6,7 @@ dtype, so the frame is typed at the door. No `.cast()`, no `pd.to_numeric`, no
 guessing.
 
 ```python
---8<-- "python/ex01_read_typed.py"
+--8<-- "python/ex01_read_typed.py:code"
 ```
 
 ```text

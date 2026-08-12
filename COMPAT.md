@@ -69,10 +69,10 @@ syntax](https://peps.python.org/pep-0440/#local-version-identifiers):
 ```python
 >>> import laterite.compat
 >>> laterite.compat.__version__
-'0.1.0+compat.python-ags4.1.2.0'
+'0.10.1+compat.python-ags4.1.2.0'
 ```
 
-- `0.1.0` — the laterite release.
+- `0.10.1` — the laterite release.
 - `+compat.python-ags4.1.2.0` — the python-ags4 version we hold
   parity against. The pin is exact (python-ags4 minors can change
   behaviour silently — see the dev-dep comment).
@@ -86,7 +86,7 @@ e.g. `0.2.0+compat.python-ags4.1.3.0`.
 `Metadata.Checker` in validation reports reads:
 
 ```
-laterite 0.1.0 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine
+laterite 0.10.1 — compat: python-ags4 1.2.0 — clean-room laterite_ags4_validator engine
 ```
 
 This is the source of 5 parity-test failures (which expect us to
@@ -124,7 +124,7 @@ coupling; you never need to add it back):
 the constant exist:
 
 ```python
-__version__ = "0.1.0+compat.python-ags4.1.2.0"
+__version__ = "0.10.1+compat.python-ags4.1.2.0"
 PYTHON_AGS4_COMPAT = "1.2.0"
 ```
 
@@ -177,6 +177,7 @@ releases):
 | laterite | tracks python-ags4 | notes |
 |---|---|---|
 | 0.1.x | 1.2.0 | initial release |
+| 0.10.x | 1.2.0 | pin unchanged; compat surface stable |
 
 This table grows by one row each time we re-target python-ags4 or
 ship a notable laterite-internal release.
@@ -407,8 +408,10 @@ This is the most significant **Python-idiom** difference.
 returns them as dict entries under a `"Validator Process Error"`
 key:
 
+<!-- doc-snippet: skip — `AGS4` here is python_ags4, not laterite.compat; the block documents upstream's behaviour, so running it against ours would assert the opposite of what it says -->
+
 ```python
-el = AGS4.check_file('bad-input.ags', dictionary='not-a-dict.txt')
+el = AGS4.check_file('bad-input.ags', standard_AGS4_dictionary='not-a-dict.txt')
 # Doesn't raise. Returns:
 # {"Validator Process Error": [{...}], "Metadata": {...}}
 ```
@@ -417,8 +420,10 @@ el = AGS4.check_file('bad-input.ags', dictionary='not-a-dict.txt')
 Pythonic / EAFP pattern):
 
 ```python
+from laterite.compat import BadDictError
+
 try:
-    el = AGS4.check_file('bad-input.ags', dictionary='not-a-dict.txt')
+    el = AGS4.check_file('bad-input.ags', standard_AGS4_dictionary='not-a-dict.txt')
 except BadDictError as e:
     print(f"can't validate: {e}")
 ```

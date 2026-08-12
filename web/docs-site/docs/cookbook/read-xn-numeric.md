@@ -7,7 +7,7 @@ AGS `XN` headings are _numeric-or-text_ on disk — laterite reads them as
 `String` by default. Pass `xn="numeric"` to coerce them to `Float64` at the door.
 
 ```python
---8<-- "python/ex13_registry_xn.py"
+--8<-- "python/ex13_registry_xn.py:code"
 ```
 
 ```text

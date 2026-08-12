@@ -1,7 +1,7 @@
 # Read & explore
 
 ```python
---8<-- "python/ex01_read_typed.py"
+--8<-- "python/ex01_read_typed.py:code"
 ```
 
 ```text

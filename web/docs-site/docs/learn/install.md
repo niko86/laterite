@@ -23,25 +23,22 @@ via DuckDB). pyarrow is an optional accelerator — see
 Point `lat` at an AGS4 file. A clean file says so and exits `0`:
 
 ```bash
-lat validate examples/sample_site.ags
+--8<-- "cli/validate_clean.sh:cmd"
 ```
 
 ```text
-examples/sample_site.ags: clean (0 findings)
+--8<-- "cli/validate_clean.out"
 ```
 
 Break one value — say a `2DP` easting that isn't a number — and the same
 command prints a findings table and exits `1`:
 
 ```bash
-lat validate sample_site_typo.ags
+--8<-- "cli/validate_typo.sh:cmd"
 ```
 
 ```text
-sample_site_typo.ags: 1 finding(s)
-Rule | Line | Group | Description
------+------+-------+--------------------------------------------------------------------------
-8    | 51   | LOCA  | Value "not-a-number" in LOCA_NATE does not match its declared TYPE "2DP".
+--8<-- "cli/validate_typo.out"
 ```
 
 Each row is one numbered-rule violation: the **Rule** that fired, the **Line**
@@ -52,14 +49,11 @@ Need machine-readable output? Add `--json` — `findings` is an empty object whe
 the file is clean:
 
 ```bash
-lat validate examples/sample_site.ags --json
+--8<-- "cli/validate_clean_json.sh:cmd"
 ```
 
 ```text
-{
-  "file": "examples/sample_site.ags",
-  "findings": {}
-}
+--8<-- "cli/validate_clean_json.out"
 ```
 
 !!! note "The exit-code contract"

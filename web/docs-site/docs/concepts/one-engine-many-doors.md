@@ -24,34 +24,11 @@ Inside Python, `read` itself has three doors — and they all feed the same
 engine, so it doesn't matter which one your data arrives through:
 
 ```python
-import laterite
-
-# A minimal AGS4 string — GROUP / HEADING / UNIT / TYPE rows, then DATA.
-ags4_text = '''"GROUP","LOCA"
-"HEADING","LOCA_ID","LOCA_GL"
-"UNIT","","m"
-"TYPE","ID","2DP"
-"DATA","BH01","23.68"
-"DATA","BH02","32.49"
-'''
-
-ags = laterite.read(text=ags4_text)   # the text= door
-loca = ags["LOCA"]
-print(loca)
-print({h: str(loca[h].dtype) for h in ("LOCA_ID", "LOCA_GL")})
+--8<-- "python/ex19_read_text_door.py:code"
 ```
 
 ```text
-shape: (2, 2)
-┌─────────┬─────────┐
-│ LOCA_ID ┆ LOCA_GL │
-│ ---     ┆ ---     │
-│ str     ┆ f64     │
-╞═════════╪═════════╡
-│ BH01    ┆ 23.68   │
-│ BH02    ┆ 32.49   │
-└─────────┴─────────┘
-{'LOCA_ID': 'String', 'LOCA_GL': 'Float64'}
+--8<-- "python/ex19_read_text_door.out"
 ```
 
 The same `2DP` → `Float64` typing you get from a file on disk falls out of an

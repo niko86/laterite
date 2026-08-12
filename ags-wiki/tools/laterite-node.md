@@ -173,6 +173,22 @@ path is faster + lighter, and Python's reason to route reads through DuckDB
 (`@duckdb/node-api`) is an **optional peer** gated behind `sql()`/`at()`
 only. See [[dec-rust-drives-python]] for the host-binding direction.
 
+**The peer range must carry a prerelease component, and there is a gate.**
+`@duckdb/node-api` publishes ONLY prereleases — all 56 versions are `X.Y.Z-r.N`
+— and semver excludes a prerelease from a range unless some comparator shares
+its major.minor.patch *and* carries a prerelease itself. So `>=1.5.0` matched
+**nothing**; neither did `>=1.5.0-0`, nor `*`. That range shipped in
+`laterite@0.10.1`, which made `sql()` and `at()` unreachable for anyone
+installing from npm: `npm i laterite` then `npm i @duckdb/node-api` — the exact
+command `ts/duckdb.ts`'s own error prints — fails with **ETARGET**; installing
+both at once drops the peer silently; installing the peer first has it
+*removed* when laterite arrives. No gate saw it because `npm ci` installs from
+the lockfile, so the range is never consulted. It is now `>=1.5.5-0`, pinned to
+the line the devDependency tracks, and `repo:rust-packages/laterite-node/test/peer-range.test.ts`
+asserts the published range admits the version we actually build against —
+offline, no registry. A duckdb minor bump means updating both together; that is
+inherent to a dependency that never ships a final release.
+
 **DuckDB-in-Node reality (P3):** the modern `@duckdb/node-api` ("Neo")
 client has **no *built-in* Arrow bridge** — no `register`; results come
 back as JS rows/cols, not Arrow. (The legacy `duckdb` package has a

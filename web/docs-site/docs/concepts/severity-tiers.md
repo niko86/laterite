@@ -17,25 +17,22 @@ A file whose only blemish is an out-of-range `TRAN_AGS` edition (`4.9.9`) carrie
 a single **warning** — nothing in the error tier:
 
 ```bash
-lat validate site.ags
+--8<-- "cli/validate_warning_tier.sh:cmd"
 ```
 
 ```text
-site.ags: 1 finding(s)
-Rule                         | Line | Group | Description
------------------------------+------+-------+-----------------------------------------------------------------------------------------------------------------
-Warning (Related to Rule 14) | -    | TRAN  | TRAN_AGS is not a recognized AGS4 version: "4.9.9". The standard editions are 4.0.3 / 4.0.4 / 4.1 / 4.1.1 / 4.2.
+--8<-- "cli/validate_warning_tier.out"
 ```
 
 Drop the warning tier and the _same file_ reads clean — and the exit code flips
 from `1` to `0`:
 
 ```bash
-lat validate --no-warnings site.ags
+--8<-- "cli/validate_no_warnings.sh:cmd"
 ```
 
 ```text
-site.ags: clean (0 findings)
+--8<-- "cli/validate_no_warnings.out"
 ```
 
 `--no-warnings` is errors-only; the default keeps warnings; `--show-fyi` adds the
@@ -48,18 +45,11 @@ full flag list.
 `fyi=` (default `False`):
 
 ```python
-import laterite
-
-# Default: errors + warnings. The unrecognised-edition warning shows.
-print(laterite.read("site.ags").validate().report.count)          # -> 1
-
-# Errors only — the warning is gone, the verdict is clean.
-print(laterite.read("site.ags").validate(warnings=False).report.count)  # -> 0
+--8<-- "python/ex18_severity_tiers.py:code"
 ```
 
 ```text
-1
-0
+--8<-- "python/ex18_severity_tiers.out"
 ```
 
 Same dial as the CLI: `validate(warnings=False)` mirrors `--no-warnings`, and

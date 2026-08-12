@@ -66,7 +66,7 @@ jobs:
 
       - name: Install cargo-llvm-cov
         # Prebuilt binary (no compile). SHA-pinned; Dependabot bumps it.
-        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        uses: taiki-e/install-action@6c6fd71fe4fb72c3697d269963d0e15df8adedad # v2.85.10
         with:
           tool: cargo-llvm-cov
 
@@ -231,7 +231,7 @@ jobs:
       - name: rust toolchain (cargo-deny shells out to `cargo metadata`)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - name: install cargo-deny
-        uses: taiki-e/install-action@6a1bd70eaac3c8bdf093356838d7ee09fda951cf # v2.85.5
+        uses: taiki-e/install-action@6c6fd71fe4fb72c3697d269963d0e15df8adedad # v2.85.10
         with:
           tool: cargo-deny
       - name: cargo deny check
@@ -342,6 +342,159 @@ jobs:
         if: always()
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
+
+  # Does the LIVE docs site work against the wheel a reader can actually install?
+  #
+  # Every other docs gate runs against the working-tree cdylib, so all of them
+  # answer "is the site consistent with HEAD". Nobody was asking the reader's
+  # question, and the reader is not on HEAD: they are on `pip install laterite`.
+  # The gap is real and was measured once by hand — the answer that day was yes,
+  # every example ran and all 38 output blocks byte-matched — but a one-off
+  # measurement decays the moment it is taken.
+  #
+  # WHY THE TWO STEPS ARE CALIBRATED DIFFERENTLY, and why this job is not wired
+  # into `notify`. The docs deliberately track HEAD (see docs-site.md: the API
+  # reference is mkdocstrings against the local build, "the owner's call over a
+  # published-PyPI wheel"), and the site deploys from main. So between a docs
+  # change and the next release the site legitimately documents API the released
+  # wheel lacks. That window is short at this cadence — six releases in the four
+  # weeks to 0.10.1 — but it is a CHOSEN state, and a gate that opens a tracking
+  # issue about a choice already made is noise that gets muted.
+  #
+  # So: an example that FAILS TO RUN fails this job, because a reader following
+  # the live site then gets a traceback rather than a result. A committed `.out`
+  # that no longer byte-matches does NOT, because output drift is the ordinary,
+  # expected consequence of the tree being ahead. And the job stays out of
+  # `notify`'s `needs`, so a red run emails rather than filing an issue against
+  # a state the owner intended.
+  #
+  # GitHub-hosted and toolchain-free: this installs a published wheel from PyPI,
+  # so it needs no Rust, no maturin and none of the pool's warm caches.
+  docs-vs-released-wheel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+      # No version pin: the point is whatever `pip install laterite` resolves to
+      # today. [all] because the docs exercise the pandas + pyarrow surfaces too.
+      - name: Install the PUBLISHED wheel
+        run: |
+          set -euxo pipefail
+          uv venv --python 3.12 --clear "$GITHUB_WORKSPACE/.released"
+          uv pip install --python "$GITHUB_WORKSPACE/.released/bin/python" \
+            "laterite[all]" pytest pytest-benchmark
+      # A gate whose subject depends on the environment must say what it measured
+      # — the same reason `gen_doc_outputs.py:_lat()` prints the binary it picked.
+      - name: State what is under test
+        run: |
+          set -euo pipefail
+          py="$GITHUB_WORKSPACE/.released/bin/python"
+          released=$("$py" -c 'import importlib.metadata as m; print(m.version("laterite"))')
+          tree=$("$py" - <<'EOF'
+          import pathlib, tomllib
+          print(tomllib.loads(pathlib.Path("packages/laterite/pyproject.toml").read_text())["project"]["version"])
+          EOF
+          )
+          echo "released wheel : $released"
+          echo "this tree      : $tree"
+          [ "$released" = "$tree" ] \
+            && echo "same version — any failure below is a real defect" \
+            || echo "TREE IS AHEAD — unreleased API in the docs is expected until the next release"
+      # The actionable class: a documented example that does not RUN.
+      - name: Docs examples + snippets execute against the released wheel
+        run: |
+          "$GITHUB_WORKSPACE/.released/bin/python" -m pytest \
+            tests/test_docs_examples.py tests/test_docs_snippets.py -q --no-header
+      # The expected-drift class: reported, never fatal (see the header above).
+      - name: Committed .out still byte-matches (informational)
+        continue-on-error: true
+        run: |
+          "$GITHUB_WORKSPACE/.released/bin/python" tools/gen_doc_outputs.py \
+            --check --surface python
+
+  # The Node twin of docs-vs-released-wheel: does the live docs site work against
+  # the package `npm install laterite` actually gives you?
+  #
+  # This one has already earned its keep before running. Building it is what
+  # surfaced that `peerDependencies: {"@duckdb/node-api": ">=1.5.0"}` matched ZERO
+  # published versions — every release of that package is a prerelease, which a
+  # range without a prerelease component cannot match — so `sql()` and `at()` were
+  # unreachable for anyone installing from npm, and the install command the
+  # library's own error prints failed with ETARGET. No per-PR gate could see it:
+  # `npm ci` installs from the lockfile, so the peer range is never consulted.
+  # Fixed in the manifest; `peer-range.test.ts` keeps it fixed.
+  #
+  # EXPECT THIS RED UNTIL THAT FIX SHIPS. The manifest on npm still carries the
+  # old range, so the peer step below fails and the three `sql()`/`at()` examples
+  # fail with it. That is the correct signal, not a bug in the job: the published
+  # package IS broken for readers right now, and the remedy is a release. It goes
+  # green on its own the day one is cut.
+  #
+  # Calibrated exactly like the wheel leg, and NOT wired into `notify` for the
+  # same reason — an example that FAILS TO RUN fails the job, because a reader
+  # following the live site gets a traceback; a committed `.out` that no longer
+  # byte-matches does not, because output drift is the ordinary consequence of the
+  # tree being ahead of the release.
+  docs-vs-released-npm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 22
+      # No version pin: the point is whatever `npm install laterite` resolves to
+      # today. The peer is attempted EXACTLY as the docs and the runtime error
+      # tell a reader to install it — non-fatal here only so the failure is
+      # attributed by the step below rather than aborting before it can speak.
+      - name: Install the PUBLISHED package, as a reader would
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP:-/tmp}/released-npm"
+          mkdir -p "$work"
+          cd "$work"
+          npm init -y >/dev/null
+          npm install laterite
+          npm install @duckdb/node-api || echo "PEER INSTALL FAILED — see the job header"
+      - name: State what is under test
+        run: |
+          set -euo pipefail
+          work="${RUNNER_TEMP:-/tmp}/released-npm"
+          released=$(node -p "require('$work/node_modules/laterite/package.json').version")
+          tree=$(node -p "require('$GITHUB_WORKSPACE/rust-packages/laterite-node/package.json').version")
+          peer=$(node -p "require('fs').existsSync('$work/node_modules/@duckdb/node-api') \
+            ? require('$work/node_modules/@duckdb/node-api/package.json').version : 'ABSENT'")
+          echo "released npm : $released"
+          echo "this tree    : $tree"
+          echo "optional peer: $peer"
+          [ "$released" = "$tree" ] \
+            && echo "same version — any failure below is a real defect" \
+            || echo "TREE IS AHEAD — unreleased API in the docs is expected until the next release"
+          [ "$peer" != "ABSENT" ] \
+            || echo "PEER ABSENT — sql()/at() examples will fail; if the published peerDependencies range is still >=1.5.0 this is the known ETARGET, and the remedy is a release"
+      # The actionable class: a documented example that does not RUN. The examples
+      # resolve `import … from "laterite"` through a symlink, so pointing it at the
+      # installed package is the whole of the swap.
+      - name: Docs examples run against the released package
+        run: |
+          set -euo pipefail
+          ex="$GITHUB_WORKSPACE/web/docs-site/examples/node"
+          mkdir -p "$ex/node_modules"
+          rm -rf "$ex/node_modules/laterite"
+          ln -s "${RUNNER_TEMP:-/tmp}/released-npm/node_modules/laterite" "$ex/node_modules/laterite"
+          cd "$GITHUB_WORKSPACE"
+          for f in "$ex"/ex*.mjs; do
+            echo "--- $(basename "$f")"
+            node "$f" >/dev/null
+          done
+      # The expected-drift class: reported, never fatal (see the header).
+      - name: Committed .out still byte-matches (informational)
+        continue-on-error: true
+        run: python3 tools/gen_doc_outputs.py --check --surface node
 
   # Cross-surface OUTPUT-VALUE gate (X1). Every OTHER gate compares knob NAMES;
   # this one pushes a committed list of (op × input) cases through all four

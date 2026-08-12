@@ -4,7 +4,25 @@ A **KEY-aware, type-aware** comparison of two AGS4 files — the diff a line dif
 structurally cannot be, because it understands the data model.
 
 ```rust
-let delta = laterite_ags4_diff::diff_parsed(&baseline, &revision, &dict, None);
+use laterite_ags4_parse::parse_str;
+use laterite_ags4_reference::dict::{Dictionary, FALLBACK};
+
+const AGS4: &str = concat!(
+    "\"GROUP\",\"PROJ\"\r\n",
+    "\"HEADING\",\"PROJ_ID\"\r\n",
+    "\"UNIT\",\"\"\r\n",
+    "\"TYPE\",\"ID\"\r\n",
+    "\"DATA\",\"P1\"\r\n",
+);
+
+fn main() -> Result<(), laterite_ags4_parse::ParseError> {
+    let (baseline, revision) = (parse_str(AGS4)?, parse_str(AGS4)?);
+    let dict = Dictionary::bundled(FALLBACK);
+
+    let delta = laterite_ags4_diff::diff_parsed(&baseline, &revision, &dict, None);
+    println!("{} group(s) changed", delta.groups.len());
+    Ok(())
+}
 ```
 
 <!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->

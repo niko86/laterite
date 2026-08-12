@@ -8,7 +8,7 @@ the group's `TYPE` row — no casting at the call site.
 === "Python"
 
     ```python
-    --8<-- "python/ex01_read_typed.py"
+    --8<-- "python/ex01_read_typed.py:code"
     ```
 
     ```text

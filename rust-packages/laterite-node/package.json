@@ -83,7 +83,7 @@
     "apache-arrow": "^21.1.0"
   },
   "peerDependencies": {
-    "@duckdb/node-api": ">=1.5.0"
+    "@duckdb/node-api": ">=1.5.5-0"
   },
   "peerDependenciesMeta": {
     "@duckdb/node-api": {
@@ -91,10 +91,11 @@
     }
   },
   "devDependencies": {
-    "@duckdb/node-api": "^1.5.3-r.3",
+    "@duckdb/node-api": "^1.5.5-r.3",
     "@eslint/js": "^10.0.1",
     "@napi-rs/cli": "^3.7.2",
     "@types/node": "^26.0.1",
+    "@types/semver": "^7.8.0",
     "@vitest/coverage-v8": "^4.1.10",
     "@vitest/eslint-plugin": "^1.6.23",
     "eslint": "^10.7.0",
@@ -102,6 +103,7 @@
     "globals": "^17.8.0",
     "knip": "^6.27.0",
     "prettier": "^3.9.5",
+    "semver": "^7.8.5",
     "tsup": "^8.5.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.64.0",

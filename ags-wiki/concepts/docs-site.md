@@ -31,7 +31,7 @@ Pages workflow uploads) and rides alongside the validator SPA at `/laterite/`.
 
 Key facts:
 
-- **Example-led / single-sourced.** Every code snippet on a page is
+- **Example-led / single-sourced — but not universally.** *Most* code on a page is
   `--8<--`-included (pymdownx.snippets, `base_path: [examples]`) from
   `repo:web/docs-site/examples/{python,node,cli,duckdb,wasm}/` — and each tree
   has a **runtime gate** so page and test are the same bytes (#373 built the
@@ -53,7 +53,14 @@ Key facts:
     the `# expect-exit: N` code and **byte-equality of stdout vs a committed
     sibling `.out`** — pages include the `[start:cmd]` section + the `.out`
     verbatim, so even the *output* blocks can't lie (the old hand-typed CLI
-    table had already drifted from the binary's real box-drawing output).
+    table had already drifted from the binary's real box-drawing output). It
+    drifted the same way a SECOND time, in the blocks this gate never covered
+    because no example backed them: `learn/install.md` — the first page a new
+    user reads — printed its findings table as plain ASCII pipes, which is what
+    the WHEEL's Python `lat` renders, on a page documenting the Rust binary. The
+    row's content was right, so somebody ran it once; nothing re-ran it. Wiring
+    a block to an example is therefore not bookkeeping, and an *unwired* output
+    block is the actual risk surface — see the orphan-block note below.
   - *duckdb* — `tests/test_docs_duckdb_examples.py` (dev satellite), env-gated on
     `LATERITE_DUCKDB_EXT`; per-PR the `.sql` files are include-checked only
     (`--strict` + `check_paths`), the **monthly `compliance-report.yml`** runs
@@ -61,6 +68,115 @@ Key facts:
     skip, broken snippet = red). `_`-prefixed files (`_install.sql`) are
     include-only boilerplate.
   Browser tabs are **prose** (the web app has no user-facing code API).
+- **A Python example is `uv run`-able on its own** — all 18, plus the marimo tour.
+  Each carries a PEP 723 `# /// script` header pinning
+  `requires-python` and an exact `laterite==<product>`, and the 15 that read a
+  file also carry a fixture arm that
+  fetches `repo:examples/sample_site.ags` from the raw GitHub URL when the
+  repo-relative path is absent — so a reader with `uv` and no checkout gets a
+  working run, and the code on the page stays the code you would type in a
+  checkout rather than an absolute path. Two details the rollout settled that the
+  prototype could not show, because `ex01` is polars-only and reads the fixture:
+  `ex09a`, `ex09b` and `ex15` build from frames / a typed graph / inline text and
+  get **no** fixture arm (there is nothing to fetch for), and `ex05` + `ex11`
+  import pandas — which is NOT in the base install — so they pin
+  `laterite[compat]==<product>`. A uniform bare pin makes both die under
+  `uv run` on `ModuleNotFoundError: pandas`, the exact failure the header exists
+  to prevent. Header and fixture arm live ABOVE a
+  `--8<-- [start:code]` marker and the page includes `…py:code`, so the rendered
+  snippet is byte-identical to before the header existed; the machinery is in the
+  file, not on the page. That is the CLI tree's `[start:cmd]` trick
+  (`repo:web/docs-site/examples/cli/validate_clean.sh`) applied to Python.
+  The arm is cold in CI (cwd = repo root, the fixture is there), so no gate
+  acquires a network dependency. The pin is a CLAIM — "green against this wheel" —
+  and `repo:tests/test_version_faithful.py` holds both it and the interpreter
+  floor to the shipped values by DISCOVERY over **both** example trees, the
+  docs corpus and the root `examples/` where the tour lives. It asserts the whole
+  specifier (`==<product>`, extras group allowed), not the version inside a `==`:
+  the first cut matched `laterite==(version)`, which silently passes anything that
+  is not an exact pin, so the tour's own `>=0.5.0` — five untested minors, the
+  defect that motivated the gate — produced no match and therefore no finding.
+  `bump-version.sh` restamps with a substitution anchored on the pin *including*
+  its optional `[extras]`; the sibling loop that stamps `.out` files rewrites
+  every occurrence of the old version in a file, which is safe in generated
+  output and would silently rewrite an `assert` in a source.
+  Ordering forces `import laterite` to follow the fixture arm, so
+  `web/docs-site/examples/**` takes the `E402` per-file-ignore the root
+  `examples/**` already has — the alternative is publishing a snippet that omits
+  its own import to satisfy a linter.
+- **The other 22 fences — hand-written, and gated separately.** The list above is
+  the *included* half: 38 of the site's 60 Python fences. The rest are LITERAL —
+  fragments a page writes inline (`for group in delta["groups"]:`), which read
+  correctly as fragments and would be worse as standalone examples. Every gate
+  above keys off the `--8<--`, so all of them were invisible to it, as were
+  `repo:README.md`, the PyPI landing page and `repo:COMPAT.md`. What that cost was
+  measured on 2026-08-08: `COMPAT.md` documented
+  `check_file(..., dictionary=...)` in both blocks of its error-handling section,
+  and no such parameter has ever existed in either library
+  (`standard_AGS4_dictionary` is the name), so the two snippets illustrating the
+  divergence raised `TypeError` on both sides and demonstrated nothing. The prose
+  was right; only the code was uncopyable.
+  `repo:tests/test_docs_snippets.py` closes it by treating a page as ONE program
+  in document order — includes replayed so a fragment inherits the `ags` / `fixed`
+  its page established — EXECUTING what can run (85% of literal statements) and
+  resolving names + call keywords against the wheel for the rest. It runs from a
+  temp dir with the fixture copied under `examples/`, like the CLI gate and for
+  the same reason: `surfaces/python.md` and `cookbook/excel.md` WRITE files.
+  A `<!-- doc-snippet: skip — reason -->` marker (the shape of `doc-output: skip`,
+  reason likewise mandatory) exempts a fence from execution but never from
+  resolution — the `dictionary=` typo lived in a block that would carry one.
+- **Node's literal fences, and the two-gate split.** The same hole existed one
+  surface along: 11 hand-typed fences plus the npm landing page's 4, none
+  executed. `repo:rust-packages/laterite-node/test/docs-snippets.test.ts` closes
+  it — vitest, not pytest, because executing them needs `dist/` and the
+  `node_modules/laterite` symlink that only the `node` job builds; a pytest
+  version would skip in CI, which `test_docs_node_api.py` explicitly refused to
+  accept. It welds a page into one ESM program (imports unioned per module,
+  re-declarations turned into assignment — ESM forbids the rebind Python allows)
+  and runs it from a temp cwd with the fixture copied in.
+  **The two Node gates catch different things and neither subsumes the other:
+  the executor catches CALLS, `repo:tests/test_docs_node_api.py` catches READS.**
+  A bare `report.someTypo` evaluates to `undefined` and logs rather than throwing,
+  so no amount of executing finds it; `buildAgs4({…})` with the wrong shape throws,
+  and no amount of name-resolution finds that. Falsification proved the split and
+  exposed a hole in passing — the static gate scanned `docs/node/` only, leaving
+  the npm README covered by neither — so its scope now includes that page.
+- **Orphan output blocks — down to one, and it is not output.** `--check-pages`
+  counts `text` fences that no example backs and prints the number rather than
+  absorbing it; that count was **8** and is now **1**. The seven closed were
+  hand-written stdout on `learn/install.md`, `concepts/severity-tiers.md` and
+  `concepts/one-engine-many-doors.md`, and one of them had drifted into the wrong
+  renderer entirely (above). The survivor is `chaining/index.md`'s ASCII flow
+  diagram — a `text` fence that is a *drawing*, not the output of anything, so it
+  is correctly and permanently unwired. Worth stating so nobody "fixes" it: the
+  right target is **zero gateable orphans**, not zero orphans.
+- **One nightly leg asks the READER's question.** Every gate above runs against the
+  working-tree cdylib, so all of them answer "is the site consistent with HEAD" —
+  and the reader is not on HEAD, they are on `pip install laterite`. The
+  `docs-vs-released-wheel` job in `repo:.github/workflows/nightly.yml` installs the
+  **published** wheel (no pin — whatever PyPI resolves today) and runs the docs
+  examples plus `repo:tests/test_docs_snippets.py` against it, printing the
+  released version beside this tree's so the run states what it measured.
+  Its two steps are calibrated differently and that is the whole design: an
+  example that **fails to run** fails the job, because a reader following the live
+  site would get a traceback; a committed `.out` that no longer byte-matches is
+  reported and **not** fatal, because output drift is the ordinary consequence of
+  the tree being ahead of the release. For the same reason the job is deliberately
+  **not** in `notify`'s `needs` — the docs track HEAD by decision and the site
+  deploys from main, so documenting unreleased API is a chosen state, and a gate
+  that files a tracking issue about a choice already made is noise that gets muted.
+  GitHub-hosted and toolchain-free: a published wheel needs no Rust and no maturin.
+- **…and its Node twin, `docs-vs-released-npm`.** Same question, same calibration:
+  `npm install laterite` unpinned, then the optional peer **exactly as the docs and
+  the runtime error tell a reader to install it**, then the examples. Building it
+  is what surfaced that the published `peerDependencies` range matched no
+  published version at all (see `repo:ags-wiki/tools/laterite-node.md`), so it was
+  earning its keep before it had run once. **Expect it red until that fix ships** —
+  the manifest on npm still carries the old range, the peer install fails with
+  ETARGET and the three `sql()`/`at()` examples fail with it. That is the correct
+  signal rather than a bug in the job: the published package IS broken for readers,
+  and the remedy is a release. Like the wheel leg it stays out of `notify`'s
+  `needs`, so it emails rather than filing an issue about a state already known.
 - **Changelog page — generated, version-stamped (#372).** `reference/changelog.md`
   is built by `web/docs-site/scripts/gen_changelog.py` (a `gen-files` script)
   from the repo-root `CHANGELOG.md` plus the shipped version read from

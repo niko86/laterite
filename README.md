@@ -77,6 +77,8 @@ Cross-group SQL (`ags.sql(...)` / `ags.at(...)`) needs the optional peer `@duckd
 <summary><b>CLI — <code>lat</code></b></summary>
 
 ```bash
+uvx --from laterite lat validate delivery.ags   # try it with no install at all
+
 lat delivery.ags                       # shorthand for `lat validate`
 lat validate delivery.ags --json       # machine-readable findings
 lat validate delivery.ags --no-warnings   # errors only

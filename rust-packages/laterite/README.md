@@ -4,25 +4,29 @@ Read, validate and write **AGS4** — the data transfer format the UK
 geotechnical and geoenvironmental industry uses to exchange ground
 investigation data.
 
-```rust
+```rust,no_run
 use laterite::ags4;
 
-let mut doc = ags4::read("delivery.ags").run()?;
-for group in doc.groups() {
-    println!("{} — {} rows", group.code(), group.len());
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut doc = ags4::read("delivery.ags").run()?;
+    for group in doc.groups() {
+        println!("{} — {} rows", group.code(), group.len());
+    }
+
+    let report = ags4::validate("delivery.ags").warnings(true).run()?;
+    for finding in report.findings() {
+        println!("{}: {}", finding.rule(), finding.description());
+    }
+
+    // Or validate bytes, with no filesystem in the picture at all.
+    let upload: Vec<u8> = std::fs::read("delivery.ags")?;
+    let report = ags4::validate_bytes(upload).run()?;
+    println!("{} finding(s)", report.findings().len());
+
+    doc.set_cell("PROJ", 0, "PROJ_NAME", "Renamed site")?;
+    ags4::write(&doc).to_path("out.ags")?;
+    Ok(())
 }
-
-let report = ags4::validate("delivery.ags").warnings(true).run()?;
-for finding in report.findings() {
-    println!("{}: {}", finding.rule(), finding.description());
-}
-
-// Or validate bytes, with no filesystem in the picture at all.
-let upload: Vec<u8> = receive_upload();
-let report = ags4::validate_bytes(upload).run()?;
-
-doc.set_cell("PROJ", 0, "PROJ_NAME", "Renamed site")?;
-ags4::write(&doc).to_path("out.ags")?;
 ```
 
 <!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->

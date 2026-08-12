@@ -4,7 +4,32 @@ One door for the question *"can I trust this AGS4 file's certificate enough to
 skip re-validating it?"*
 
 ```rust
-let outcome = laterite_ags4_trust::check(request)?;
+use laterite_ags4_trust::{check, Request};
+use laterite_ags4_validator::{CheckOptions, WorldScope};
+
+const AGS4: &str = concat!(
+    "\"GROUP\",\"PROJ\"\r\n",
+    "\"HEADING\",\"PROJ_ID\"\r\n",
+    "\"UNIT\",\"\"\r\n",
+    "\"TYPE\",\"ID\"\r\n",
+    "\"DATA\",\"P1\"\r\n",
+);
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let request = Request {
+        bytes: AGS4.as_bytes(),
+        opts: &CheckOptions::default(),
+        // No certificate offered. An `.ags.idx` beside the file is not consent.
+        cert: None,
+        // Content-only: the bytes are the whole of the evidence.
+        world: WorldScope::None,
+        compat: None,
+    };
+
+    let outcome = check(request)?;
+    println!("judged against {:?}", outcome.dict_version);
+    Ok(())
+}
 ```
 
 <!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->

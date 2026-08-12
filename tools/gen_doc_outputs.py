@@ -229,6 +229,22 @@ def include_ref(example: Path) -> str:
     return f"{example.parent.name}/{out_path(example).name}"
 
 
+def example_key(include: str) -> str:
+    """An include target reduced to the example it names, section suffix dropped.
+
+    A page may include a SECTION of an example (`file.sh:cmd`, `file.py:code`)
+    rather than the whole file, so the machinery lives in the file and only the
+    lesson reaches the page. This was previously handled by registering the `:cmd`
+    spelling literally alongside the bare one — which silently stopped working the
+    moment a second section name existed: an unrecognised spelling falls through
+    the `not in wanted` branch below as "a surface this run didn't ask for", so
+    adding `:code` to three pages dropped the matched-block count from 38 to 35
+    and reported success. Splitting on `:` covers every section name there will
+    ever be, and cannot quietly under-count.
+    """
+    return include.split(":", 1)[0]
+
+
 def scan(md: str) -> list[re.Match[str]]:
     return list(BLOCK_RE.finditer(md))
 
@@ -237,7 +253,7 @@ def rewrite_page(md: str, wanted: dict[str, str]) -> str:
     """Point every example-output block at its `.out`, leaving opt-outs alone."""
 
     def sub(m: re.Match[str]) -> str:
-        ref = wanted.get(m.group("include"))
+        ref = wanted.get(example_key(m.group("include")))
         if ref is None or SKIP_RE.search(m.group("skip")):
             return m.group(0)
         i = m.group("indent")
@@ -298,10 +314,9 @@ def main() -> None:
             )
         for f in found:
             examples.append((s, f))
-            # A CLI page includes a SECTION of the .sh (`file.sh:cmd`), so the map
-            # is keyed on both spellings; only the output side is rewritten.
+            # Keyed on the bare example; `example_key` strips any section
+            # suffix a page used. Only the output side is ever rewritten.
             wanted[f"{s.name}/{f.name}"] = include_ref(f)
-            wanted[f"{s.name}/{f.name}:cmd"] = include_ref(f)
 
     # --check-pages asserts only what the Markdown can say for itself: that every
     # block still points at its .out, or opts out with a reason. It runs no example,
@@ -335,7 +350,7 @@ def main() -> None:
         blocks = scan(md)
         orphan += len(TEXT_FENCE_RE.findall(md)) - len(blocks)
         for m in blocks:
-            if m.group("include") not in wanted:
+            if example_key(m.group("include")) not in wanted:
                 continue  # a surface this run didn't ask for
             covered += 1
             skip = SKIP_RE.search(m.group("skip"))

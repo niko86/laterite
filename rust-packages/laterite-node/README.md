@@ -68,6 +68,8 @@ buildAgs4(proj); // walks the tree → valid AGS4
 npm install @duckdb/node-api
 ```
 
+<!-- doc-snippet: skip — `{ arrow: true }` downloads DuckDB's `arrow` community extension at call time; gating on a network fetch would make this red whenever the registry is unreachable, the same reason the duckdb example tree runs monthly rather than per-PR -->
+
 ```ts
 const ags = read("delivery.ags");
 

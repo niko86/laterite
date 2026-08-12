@@ -37,7 +37,7 @@ your own functions, and the certify fast-path.
 `Report` rides along on `.report`.
 
 ```python
---8<-- "python/ex02_validate.py"
+--8<-- "python/ex02_validate.py:code"
 ```
 
 ```text
@@ -50,7 +50,7 @@ your own functions, and the certify fast-path.
 back an `AgsQuery`. Ask it `.groups` to see what came along for the ride.
 
 ```python
---8<-- "python/ex03_at_fanout_groups.py"
+--8<-- "python/ex03_at_fanout_groups.py:code"
 ```
 
 ```text
@@ -63,7 +63,7 @@ back an `AgsQuery`. Ask it `.groups` to see what came along for the ride.
 keyed by group code.
 
 ```python
---8<-- "python/ex04_at_frames.py"
+--8<-- "python/ex04_at_frames.py:code"
 ```
 
 ```text
@@ -76,7 +76,7 @@ keyed by group code.
 nothing runs — then pick a terminal to materialise the plan.
 
 ```python
---8<-- "python/ex05_query_builder.py"
+--8<-- "python/ex05_query_builder.py:code"
 ```
 
 ```text
@@ -93,7 +93,7 @@ groups. It returns a `DuckDBPyRelation` — a terminal you materialise with `.pl
 `.df()`, or `.arrow()`.
 
 ```python
---8<-- "python/ex06_sql_join.py"
+--8<-- "python/ex06_sql_join.py:code"
 ```
 
 ```text
@@ -107,7 +107,7 @@ whatever `fn` returns — so an escape hatch never breaks the chain. It works on
 both `Ags4File` and `AgsQuery`.
 
 ```python
---8<-- "python/ex07_pipe.py"
+--8<-- "python/ex07_pipe.py:code"
 ```
 
 ```text
@@ -121,7 +121,7 @@ Re-read with that fresh cert and `.validate()` resolves without ever running the
 rule engine — `resolution` reads `certified`, not `exact`.
 
 ```python
---8<-- "python/ex08_certify.py"
+--8<-- "python/ex08_certify.py:code"
 ```
 
 ```text

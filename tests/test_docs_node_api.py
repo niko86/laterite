@@ -32,6 +32,18 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 TS = REPO / "rust-packages" / "laterite-node" / "ts"
 DOCS = REPO / "web" / "docs-site" / "docs" / "node"
+#: The npm LANDING PAGE, added after falsification found it covered by neither
+#: gate. Its member reads are the same claim the pages make, on the page a reader
+#: sees *before* `npm install` — and the runtime gate beside it
+#: (`laterite-node/test/docs-snippets.test.ts`) cannot see them: a bare
+#: `report.someTypo` evaluates to `undefined` and logs, it does not throw. The
+#: executor catches CALLS, this catches READS. That split is why both exist.
+NPM_README = REPO / "rust-packages" / "laterite-node" / "README.md"
+
+
+def _pages() -> list[Path]:
+    return [*sorted(DOCS.glob("*.md")), NPM_README]
+
 
 #: variable name in the docs -> (source file, exported class it is documented as)
 HANDLES = {
@@ -83,7 +95,7 @@ def test_every_documented_member_exists() -> None:
     )
 
     bad: list[str] = []
-    for page in sorted(DOCS.glob("*.md")):
+    for page in _pages():
         text = page.read_text(encoding="utf-8")
         rel = page.relative_to(REPO).as_posix()
         # Code blocks, plus inline `report.x` spans — the prose gets it wrong
