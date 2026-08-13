@@ -11,6 +11,9 @@ here.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+import textwrap
 from pathlib import Path
 
 import laterite as L
@@ -121,8 +124,10 @@ def test_register_user_frame() -> None:
 # polars anyway (the DuckDB fallback at build_ags4's 2136-2142 is pandas<2.2
 # only, hence unreachable on the CI/dev pandas — a documented gap, not a test
 # target). Building from pandas here ALSO tripped a native crash when a later
-# native write ran in the same process — an arrow-rs use-after-free consuming
-# pandas' pyarrow-backed stream, now guarded (niko86/laterite#122, apache/arrow-rs#10439).
+# native write ran in the same process. That was long attributed to an arrow-rs
+# use-after-free consuming pandas' pyarrow-backed stream (niko86/laterite#122,
+# apache/arrow-rs#10439); #294 showed the Arrow FFI is not involved at all — see
+# the co-resident-allocator note below.
 
 
 def test_build_result_repr() -> None:
@@ -144,11 +149,16 @@ def test_build_drops_synth_key_columns_polars() -> None:
 
 
 def test_pandas_build_then_native_write_is_safe() -> None:
-    """Regression for niko86/laterite#122 (arrow-rs UAF, apache/arrow-rs#10439):
-    a pandas frame's pyarrow-backed capsule handed to the native emit corrupted a
-    later in-process native write. The guard normalises pandas ->2.2 to a polars
-    capsule first. Assert the pandas build equals the polars build (proof the
-    normalisation ran) AND that a native write after it stays intact."""
+    """Pins that a pandas build agrees byte-for-byte with the polars build and
+    that a native write after it still produces a zip — i.e. the guard's happy
+    path, end to end.
+
+    Deliberately NOT the regression test for the crash it was written for. It
+    was filed as a #122 regression (arrow-rs UAF), but neither assertion can
+    observe that fault: the texts match with or without the guard, and one native
+    write cannot detect a corrupted heap. It passed on every build that crashed,
+    which is why #294 went unexplained for so long. The real fault, and a test
+    that actually goes red on it, are below."""
     import gc
 
     pandas_text = L.build_ags4(
@@ -163,6 +173,60 @@ def test_pandas_build_then_native_write_is_safe() -> None:
 
     gc.collect()
     assert L.to_excel(L.read(_CLEAN))[:2] == b"PK"  # native write uncorrupted
+
+
+# --- #294: co-resident allocators --------------------------------------------
+#
+# The fault #122/#294 chased is NOT an arrow-rs use-after-free and has nothing to
+# do with the Arrow FFI: pyarrow bundles its own mimalloc as its default memory
+# pool, and our cdylib used to bring a second, statically-linked mimalloc v3.
+# Two co-resident mimallocs hand out overlapping memory (microsoft/mimalloc#1327;
+# apache/arrow GH-50428 is the same fault from Arrow's side), so `import pyarrow`
+# followed by `import laterite` was enough to corrupt pyarrow's buffers with no
+# laterite call at all. Fixed by pinning mimalloc v2 in
+# rust-packages/laterite-py/Cargo.toml.
+#
+# pyarrow 25.0.1 also fixes it from their side, so this test only goes red on
+# pyarrow 24.0.0-25.0.0. It is kept because we do not control which pyarrow a
+# user installs — a green run on a fixed pyarrow proves nothing about the pin.
+#
+# This runs in a SUBPROCESS on purpose. The fault depends on which allocator
+# initialises first, so it is a property of process startup — by the time this
+# module is imported laterite is already loaded, and an in-process assertion
+# cannot express the condition (which is exactly why the #122 regression above
+# passed throughout: nothing it asserts can observe the corruption).
+#
+# The shape of the payload is load-bearing, measured on the faulty build: the
+# overlap only shows on a string buffer over 64 bytes with 2+ rows, and only in
+# the first pyarrow allocations after our module loads. Shrink the values, or
+# put work between the two imports and the table, and this silently stops
+# testing anything.
+
+
+def _run_isolated(body: str) -> subprocess.CompletedProcess[str]:
+    """Run `body` in a fresh interpreter with pyarrow imported FIRST."""
+    return subprocess.run(
+        [sys.executable, "-c", textwrap.dedent(body)],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+
+def test_pyarrow_buffers_survive_a_coresident_native_module() -> None:
+    """#294: importing laterite must not corrupt pyarrow's heap. Fails with a
+    UnicodeDecodeError (the string buffer is overwritten) on a mimalloc-v3 build."""
+    pytest.importorskip("pyarrow")
+    r = _run_isolated("""
+        import pyarrow as pa      # pyarrow's bundled mimalloc initialises first
+        import laterite           # our cdylib brings the second allocator
+
+        vals = ["A" * 32, "B" * 32, "C" * 32, "D" * 32]
+        table = pa.table({"c": vals})
+        got = table.column(0).chunk(0).to_pylist()
+        assert got == vals, f"pyarrow buffer corrupted: {got!r}"
+    """)
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
 
 
 # --- merge: MergeResult repr ------------------------------------------------

@@ -22,9 +22,9 @@ extension** that ships outside the wheel entirely (the
 
 The experimental AGS5 (`.ags5db` / `.agsx`) crates and wheels —
 `laterite-ags5-db` (the `lat-db` CLI), `laterite-py-ags5`, and the
-`laterite-ags5` / `laterite-ags5x` Python packages — were **decoupled to the
-dormant `ags5/` holding folder** (dec-ags5-decouple, 2026-06-21): preserved
-intact but out of the Cargo workspace and the shipped product, for a future
+`laterite-ags5` / `laterite-ags5x` Python packages — were **decoupled and are no
+longer in this repo** (dec-ags5-decouple, 2026-06-21): preserved intact
+elsewhere, out of the Cargo workspace and the shipped product, for a future
 AGS5 strand to re-link against the shared libs (`laterite-ags4-types` /
 `laterite-ags4-core` / `laterite-ags4-validator`). A clean side-effect: the
 kept workspace now links **no bundled DuckDB** (that left with the AGS5 crates).
@@ -50,7 +50,7 @@ CLI, a PyO3 cdylib, and a wasm bundle alike — see
 Five questions a cold session re-derives from source unless this map
 exists: **why twenty-five crates** (the engine/CLI/QA/bindings/leaf split);
 **why AGS5 is decoupled** (the shipped product is AGS4-only; `.ags5db`/`.agsx`
-sit dormant in `ags5/` — dec-ags5-decouple); **the wasm path**
+sit dormant outside this repo — dec-ags5-decouple); **the wasm path**
 ([[tech-stack-wasm]]); **the PyO3 boundary** ([[pyo3-boundary]]); and **why the
 `laterite_ags4` DuckDB extension lives in its own repo, not this workspace** (the
 loadable-vs-bundled DuckDB clash + the Path-B carve-out — [[dec-duckdb-extension]]).
@@ -66,7 +66,7 @@ as stable):
 **Shipped product — the Rust binary:**
 - [[laterite-ags4-validator]] (lib) + `lat` (its CLI front-end) — the
   validator engine. `lat` is the shipped CLI; the `.ags5db` `lat-db` binary
-  moved to `ags5/` (see *Decoupled AGS5* below).
+  was decoupled out of this repo (see *Decoupled AGS5* below).
 
 **Internal implementation — crates with no external audience** (free to churn):
 - [[laterite-ags4-types]] — the wasm-safe typing leaf ([[dec-laterite-ags4-types-leaf]]); an optional
@@ -368,8 +368,9 @@ as stable):
 **Dev / QA — never shipped:**
 - `laterite-cliutil` (shared CLI presentation), [[laterite-ags4-parity]] (verdict model + PyOracle), [[laterite-ags4-corpus-qa]] (dogfood crawler + crawler/manifest wrapper around the `laterite-ags4-censor` leaf's `censor` subcommand, above), [[laterite-ags4-forge]] (evolutionary fuzzer), [[laterite-ags4-perf]] (the rust leg of the cross-surface perf matrix — times validate + parse-to-typed over the forge size ladder via the shipped validator-parse path, emitting the matrix's uniform JSON; `tools/perf-matrix.py` aggregates all surfaces), [[laterite-ags4-compliance]] (the cross-surface findings-agreement harness — runs the numbered-rule verdict across every surface and fails on a regression; deps `laterite-ags4-{parity,validator,core}` only), and [[laterite-ags4-xcheck]] (the separate lean **output-value** gate — `xcheck`/`emit-cases` + the case manifest, kept its own crate so the gate builds without the harness's deps).
 
-**Decoupled AGS5 — dormant in `ags5/`** (preserved, out of the workspace; not
-built or shipped; a future AGS5 strand re-links them — dec-ags5-decouple):
+**Decoupled AGS5 — dormant, and not in this repo** (preserved elsewhere, out of
+the workspace; not built or shipped; a future AGS5 strand re-links them —
+dec-ags5-decouple). Named here only so the crate roster is complete:
 - laterite-ags5-db — the `.ags5db`/`.agsx`/AGS4 engine + the `lat-db` CLI
   (the bundled-DuckDB crate; its `high_volume` is the only reader of the retained
   `ags5_dictionary.json` AGS5 record, co-located in the crate's `data/`).
@@ -452,7 +453,7 @@ flowchart LR
   cliutil --> forge
   latpy -.native module.-> wlat([laterite wheel])
   duckdb -.community extension.-> cext([laterite_ags4 DuckDB ext])
-  subgraph dormant["ags5/ — decoupled, dormant"]
+  subgraph dormant["AGS5 — decoupled, dormant, not in this repo"]
     cli[laterite-ags5-db<br/>+ lat-db]
     latpy5[laterite-py-ags5]
   end

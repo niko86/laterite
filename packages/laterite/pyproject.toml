@@ -19,7 +19,11 @@ keywords = [
     "duckdb",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    # The only machine-readable status field the project owns — npm, crates.io
+    # and GitHub Releases have no equivalent, so everywhere else the claim is a
+    # README line. Beta is a declaration about real-world use, not a test-coverage
+    # bar; it retires at the product line's 1.0.0. See docs `reference/support.md`.
+    "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",

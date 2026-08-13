@@ -206,3 +206,28 @@ scaffolders — not production code.
 - **Branch hygiene.** Reconcile in one read-only pass at session start and after
   PR merges: `git fetch --all --prune`, fast-forward `main`, delete merged local
   branches; surface stale remote branches for the owner rather than deleting.
+
+## Agent skills
+
+Configuration the installed engineering skills read. These files answer *where*
+things live; they do not restate the rules above.
+
+### Issue tracker
+
+GitHub issues on `niko86/laterite`, via the `gh` CLI. External PRs are **not** a
+request surface. See `docs/agents/issue-tracker.md`, which also carries the PR
+rules a skill would otherwise get wrong (every change goes through a PR, the
+maintainer merges, a stacked PR runs zero CI).
+
+### Triage labels
+
+The five canonical roles, each label string equal to its name. Only `wontfix`
+exists on the repo today; the other four have to be created. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context, but **not** the usual `CONTEXT.md` + `docs/adr/` layout — this
+repo's domain layer is the wiki, so `ags-wiki/start-here.md` stands in for
+`CONTEXT.md` and `ags-wiki/design/dec-*.md` for the ADRs. See
+`docs/agents/domain.md`.

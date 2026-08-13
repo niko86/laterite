@@ -9,6 +9,9 @@ python-ags4, rebuilt on a Rust core for speed.
 pip install laterite
 ```
 
+laterite is **[in beta](reference/support.md)** — the engine is tested, what it hasn't
+had is your files. [Tell us how it goes](feedback.md).
+
 ## In one breath
 
 ```python

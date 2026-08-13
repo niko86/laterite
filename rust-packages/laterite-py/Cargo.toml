@@ -47,7 +47,21 @@ crate-type = ["cdylib"]
 # small allocations for a 25 MB file; see perf-campaign T4-followup). Paired
 # with the `#[global_allocator]` in the crate root — only a final artifact
 # (binary / cdylib) can set one, so it is declared per-surface, not in a leaf.
-mimalloc = "0.1"
+#
+# PINNED to mimalloc v2 (#294). libmimalloc-sys defaults to v3 from 0.1.47, and
+# v3 co-resident with ANOTHER mimalloc in the same process hands out overlapping
+# memory: pyarrow bundles its own mimalloc as its default pool, so
+# `import pyarrow; import laterite` was enough to corrupt pyarrow's buffers —
+# no laterite call required. microsoft/mimalloc#1327 is the co-residency report;
+# apache/arrow GH-50428 is the same fault seen from Arrow's side (a pyarrow
+# 24.0.0 regression, fixed in pyarrow 25.0.1) and names switching the
+# extension's copy to v2 as the fix. Measured here: pyarrow 24.0.0/25.0.0
+# corrupt 44 of 50 shapes under v3, 0 of 50 under v2.
+#
+# Do NOT unpin just because pyarrow >=25.0.1 is fixed — we do not control the
+# pyarrow a user installs, and CPython 3.14 vendors its own mimalloc v3 as a
+# second co-residency partner regardless of pyarrow.
+mimalloc = { version = "0.1", features = ["v2"] }
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 # The shared parse leaf (#168 Phase 3): the binding parses text/bytes through
 # the leaf directly (the validator is no longer on the parse hot-path); its

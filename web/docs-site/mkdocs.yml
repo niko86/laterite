@@ -187,6 +187,7 @@ nav:
       - Known divergences (O-N): reference/divergences.md
       - Support modules: reference/modules.md
       - Python cheatsheet: reference/cheatsheet.md
+      - Support &amp; beta: reference/support.md
       - Changelog: reference/changelog.md
   - Surfaces:
       - One engine, every stack: surfaces/index.md
