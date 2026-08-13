@@ -71,8 +71,12 @@ jobs:
           # Evaluated here rather than inline in `run:` so a label containing
           # shell metacharacters can't reach the command line.
           SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+          # Read from the EVENT, never from the branch — a contributor cannot
+          # forge it into looking like Dependabot. The script only ever compares
+          # it against `_BOT_ACTORS`.
+          ACTOR: ${{ github.event.pull_request.user.login }}
         run: |
-          args=(--base "origin/${{ github.base_ref }}")
+          args=(--base "origin/${{ github.base_ref }}" --actor "$ACTOR")
           if [ "$SKIP" = "true" ]; then
             args+=(--allow-empty)
           fi
