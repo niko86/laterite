@@ -57,12 +57,13 @@ the question that page does not: **when `laterite-py` installs mimalloc as
 
 Versions this page is scoped to (`repo:rust-packages/Cargo.lock`,
 `repo:packages/laterite/pyproject.toml`, dev env at 2026-08-13):
-`arrow` **59.1.0**, `pyo3` **0.29.0**, `pyo3-arrow` **0.19.0**,
+`arrow` **59.2.0**, `pyo3` **0.29.2**, `pyo3-arrow` **0.19.0**,
 `mimalloc` **0.1.52** / `libmimalloc-sys` **0.1.49** (v3.3.2 on default features;
-`laterite-py` pins `v2` = 2.3.2 as of PR #301 — **`laterite-node` and
-`laterite-cli` still take the v3 default**),
+**all three surfaces that install a global allocator — `laterite-py`,
+`laterite-node` and `laterite-cli` — now pin `v2` = 2.3.2**, py in PR #301 and
+the other two alongside it),
 pyarrow **25.0.0** (**inside the 24.0.0–25.0.0 fault window**; 25.0.1 fixes it
-upstream), pandas **2.3.3**, polars **1.43.1**.
+upstream), pandas **2.3.3**, polars **1.43.2**.
 
 ## 1. Ownership across the Arrow C Data Interface
 
@@ -104,7 +105,11 @@ contract is expressed entirely in terms of *callbacks*, never in terms of
 
 **Yes — and in arrow-rs the global allocator is not merely avoided, it is
 structurally unreachable for foreign buffers.** This is the crux, so here is the
-whole chain, verified at tag `59.1.0`.
+whole chain, verified by reading `arrow-array` at tag `59.1.0`. The workspace has
+since moved to **59.2.0**, and the chain is untouched by that bump:
+`arrow-array/src/ffi.rs` is byte-identical between the two tags
+(`sha256 df4d434b…`, 1968 lines both), so every quotation below still describes
+the code we ship.
 
 **Step 1 — a foreign pointer becomes a `Buffer` with the FFI struct as its
 owner** (`arrow-array/src/ffi.rs`,
