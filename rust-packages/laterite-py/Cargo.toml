@@ -47,7 +47,15 @@ crate-type = ["cdylib"]
 # small allocations for a 25 MB file; see perf-campaign T4-followup). Paired
 # with the `#[global_allocator]` in the crate root — only a final artifact
 # (binary / cdylib) can set one, so it is declared per-surface, not in a leaf.
-mimalloc = "0.1"
+#
+# PINNED to mimalloc v2 (#294). libmimalloc-sys 0.1.49 defaults to v3, and v3
+# co-resident with ANOTHER mimalloc in the same process hands out overlapping
+# memory: pyarrow bundles its own mimalloc as its default pool, so
+# `import pyarrow; import laterite` was enough to corrupt pyarrow's buffers —
+# no laterite call required. Upstream microsoft/mimalloc#1287 is fixed only on
+# `dev3`, not in any stable release; apache/datafusion-python#1607 is the same
+# fault and took the same pin. Revisit when a fixed v3 ships.
+mimalloc = { version = "0.1", features = ["v2"] }
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 # The shared parse leaf (#168 Phase 3): the binding parses text/bytes through
 # the leaf directly (the validator is no longer on the parse hot-path); its
