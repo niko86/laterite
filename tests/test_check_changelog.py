@@ -295,3 +295,125 @@ def test_shipped_paths(path: str) -> None:
 )
 def test_unshipped_paths(path: str) -> None:
     assert cc.shipped(path) is False
+
+
+# --- the bot waiver: a version move on something already declared -------------
+#
+# Dependabot can neither write an entry nor apply `no-changelog`, so before this
+# every weekly PR touching `[project] dependencies` sat red waiting for a human.
+# The tests below are weighted the same way as the ones above: toward the
+# directions that must NOT relax, because a waiver that over-fires is a gate that
+# quietly stopped covering the thing it was built for.
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "name"),
+    [
+        ("polars>=1.43.1", "polars>=1.43.2", "polars"),
+        ("pandas<3", "pandas<4", "pandas"),
+        ("laterite[compat]", "laterite[compat,pyarrow]", "laterite"),
+        # Cargo and npm put the name in the KEY, so the value names nothing.
+        ("1.0", "1.1", ""),
+        ("^9.39.5", "^10.0.1", ""),
+        (">=1.43.1", ">=1.43.2", ""),
+    ],
+)
+def test_requirement_name(before: str, after: str, name: str) -> None:
+    assert cc.requirement_name(before) == name
+    assert cc.requirement_name(after) == name
+
+
+def test_a_floor_bump_is_bumps_only() -> None:
+    after = _PY_BASE.replace('"polars>=1"', '"polars>=2"')
+    assert cc.bumps_only("pyproject.toml", _PY_BASE, after) == [
+        "project.dependencies.0: polars>=1 -> polars>=2"
+    ]
+
+
+def test_a_dev_group_bump_is_bumps_only_too() -> None:
+    """The waiver does not care which table moved — `dev_only_change` already
+    settles that question, and a PR mixing both (which #296 was) must not be
+    disqualified just because one of its bumps was a dev one."""
+    after = _PY_BASE.replace("ruff==0.1.0", "ruff==0.2.0")
+    assert cc.bumps_only("pyproject.toml", _PY_BASE, after) == [
+        "dependency-groups.dev.0: ruff==0.1.0 -> ruff==0.2.0"
+    ]
+
+
+def test_a_new_dependency_is_not_a_bump() -> None:
+    """Adding a dependency changes what `pip install laterite` pulls. The key
+    set moves, so it fails closed."""
+    after = _PY_BASE.replace(
+        'dependencies = ["polars>=1", "duckdb>=1"]',
+        'dependencies = ["polars>=1", "duckdb>=1", "pyarrow>=25"]',
+    )
+    assert cc.bumps_only("pyproject.toml", _PY_BASE, after) is None
+
+
+def test_a_dropped_dependency_is_not_a_bump() -> None:
+    after = _PY_BASE.replace(
+        'dependencies = ["polars>=1", "duckdb>=1"]', 'dependencies = ["polars>=1"]'
+    )
+    assert cc.bumps_only("pyproject.toml", _PY_BASE, after) is None
+
+
+def test_a_swapped_requirement_is_not_a_bump() -> None:
+    """Same key, same shape, different package — the name comparison is what
+    stops a same-index substitution reading as a version move."""
+    after = _PY_BASE.replace('"polars>=1"', '"pandas>=1"')
+    assert cc.bumps_only("pyproject.toml", _PY_BASE, after) is None
+
+
+def test_a_reordered_list_is_not_a_bump() -> None:
+    """Indices are the keys, deliberately: a reorder we cannot explain should
+    ask rather than shrug."""
+    after = _PY_BASE.replace(
+        'dependencies = ["polars>=1", "duckdb>=1"]',
+        'dependencies = ["duckdb>=1", "polars>=1"]',
+    )
+    assert cc.bumps_only("pyproject.toml", _PY_BASE, after) is None
+
+
+def test_a_non_string_move_is_not_a_bump() -> None:
+    """`requires-python`, a `line-length`, a bool toggle — none of these is a
+    dependency, and none should be waived on a bot's say-so."""
+    after = _PY_BASE.replace("line-length = 88", "line-length = 100")
+    assert cc.bumps_only("pyproject.toml", _PY_BASE, after) is None
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [(None, _PY_BASE), (_PY_BASE, None), (_PY_BASE, "not : valid = toml [[")],
+)
+def test_bumps_only_fails_closed(before: str | None, after: str | None) -> None:
+    """Same principle as `dev_only_change`: a manifest the gate cannot read is a
+    manifest it has not checked."""
+    assert cc.bumps_only("pyproject.toml", before, after) is None
+
+
+def test_cargo_lock_is_not_classifiable_so_it_can_never_be_waived() -> None:
+    """The load-bearing exclusion, asserted at the layer that enforces it.
+
+    `Cargo.lock` decides what is COMPILED into the wheel, the addon, `lat` and
+    the wasm — #237 bumped napi 3.11 -> 3.12 in the lock alone. It is neither a
+    following lockfile nor a known manifest kind, which is exactly what makes
+    the waiver skip it: there is no `bumps_only` verdict to be had.
+    """
+    assert cc.lock_follows_manifest("rust-packages/Cargo.lock") is False
+    assert cc.manifest_kind("rust-packages/Cargo.lock") is None
+    assert cc.is_shipped_lockfile("rust-packages/Cargo.lock") is True
+
+
+def test_a_source_file_is_not_classifiable_either() -> None:
+    """#232: a `@napi-rs/cli` bump whose regenerated loader gained error chaining
+    and a new env var. The manifest was dev-only; the loader was not."""
+    assert cc.manifest_kind("rust-packages/laterite-node/index.js") is None
+    assert cc.manifest_kind("packages/laterite/python/laterite/__init__.py") is None
+
+
+def test_only_the_two_bot_actors_qualify() -> None:
+    """The actor comes from the event payload, not the branch, so it cannot be
+    forged — but the set is still worth pinning, since widening it is how a
+    waiver like this stops being narrow."""
+    assert set(cc._BOT_ACTORS) == {"dependabot[bot]", "app/dependabot"}
+    assert "niko86" not in cc._BOT_ACTORS
