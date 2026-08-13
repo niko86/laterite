@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "laterite",
     "duckdb>=1.5.5",
-    "polars>=1.43.1",
+    "polars>=1.43.2",
     "pyarrow>=25.0.0",
 ]
 
@@ -34,7 +34,7 @@ dev = [
     # Ags4File text round-trip with generated input the example-based
     # tests don't reach (the laterite-base tests in
     # packages/laterite/tests/test_ags_types.py + test_ags4file.py).
-    "hypothesis>=6.164.0",
+    "hypothesis>=6.165.2",
     # Parallel test execution. The laterite suite is file/DuckDB-heavy
     # (per-test tmp_path isolation), so tests fan out cleanly across
     # workers. CI runs `-n 4` to roughly halve the suite while leaving
@@ -45,13 +45,13 @@ dev = [
     # [tool.coverage] config below scopes it to the package. Plays
     # with xdist (combines per-worker data automatically).
     "pytest-cov>=5",
-    "ruff>=0.16.1",
+    "ruff>=0.16.2",
     # Astral's type checker (preview) — the type-faithfulness gate (#303 Phase 1):
     # proves the shipped `laterite` package's type hints don't lie. Same toolchain
     # as ruff/uv (Rust-fast). Run in the project venv (`uv run ty check`, NOT
     # `uvx`) so it resolves polars/duckdb + the generated `_laterite_native.pyi`;
     # config + scope in [tool.ty] below. CI step sits beside `ruff check`.
-    "ty>=0.0.65",
+    "ty>=0.0.69",
     # Dead-code finder for the Python surface (Rust's `dead_code` lint is
     # built-in; Python has no equivalent). NOT a gate — it's a reliquary
     # *scout*: `uv run vulture` surfaces candidate unused funcs/classes for a
@@ -86,7 +86,7 @@ dev = [
     # Declarative version bumping (the maintained bumpversion successor):
     # stamps the release version across every site + rolls the CHANGELOG in
     # one command. Config in [tool.bumpversion] below; policy in RELEASING.md.
-    "bump-my-version>=1.5.0",
+    "bump-my-version>=1.5.1",
     # Independent `age` implementation (Rust `age` crate via PyO3), used only
     # by test_transport_interop.py as an INTEROP ORACLE: it decrypts what our
     # laterite.transport.lock() produced and encrypts what our unlock() reads.
