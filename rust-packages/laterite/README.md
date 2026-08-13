@@ -4,6 +4,12 @@ Read, validate and write **AGS4** — the data transfer format the UK
 geotechnical and geoenvironmental industry uses to exchange ground
 investigation data.
 
+> **This crate is not yet at parity with laterite's other surfaces.** The Python,
+> Node, browser, DuckDB and CLI surfaces are in beta; this one is still being
+> built out, and its API will change. The engine underneath is the same one they
+> all run. Use it if that suits you — just don't expect the surface to hold still
+> yet. [What beta means here](https://niko86.github.io/laterite/docs/reference/support/).
+
 ```rust,no_run
 use laterite::ags4;
 

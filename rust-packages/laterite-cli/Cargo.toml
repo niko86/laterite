@@ -54,7 +54,12 @@ tui = ["dep:ratatui", "dep:crossterm"]
 # small allocations for a 25 MB file; see perf-campaign T4-followup). Paired
 # with the `#[global_allocator]` in the crate root — only a final artifact
 # (binary / cdylib) can set one, so it is declared per-surface, not in a leaf.
-mimalloc = "0.1"
+#
+# PINNED to v2 in step with the wheel and the addon (#294). `lat` owns its whole
+# process and loads no second allocator, so the co-residency fault that bit the
+# wheel cannot reach it — this is version hygiene, not a fix: one workspace,
+# one mimalloc major, so a future surface cannot inherit v3 by default.
+mimalloc = { version = "0.1", features = ["v2"] }
 # The engine. Depended on via its public library API only — the split
 # has zero code-consumer breakage (every call site uses the re-exported
 # surface: CheckOptions / DictVersion / Findings / ValidatorError /

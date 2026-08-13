@@ -20,8 +20,16 @@
 - [ ] New behaviour covered by a test
 - [ ] `./tools/run_python_ags4_tests.sh` parity count unchanged (or improved)
 - [ ] Validator behaviour change → `COMPAT.md` + `docs/parity-coverage-map.md` updated
-- [ ] User-visible API change → `CHANGELOG.md` updated
-- [ ] Validator behaviour change → `OBSERVATIONS.md` updated
+- [ ] User-visible API change → entry added to `changelog.json`, then
+      `uv run --no-sync python tools/gen_changelog.py`
+- [ ] Validator behaviour change → O-N added to `observations.json`, then
+      `uv run --no-sync python tools/gen_observations.py` (plus its
+      `ags-wiki/observations/O-NN.md` page)
+
+<!-- CHANGELOG.md and OBSERVATIONS.md are GENERATED views of the two JSON files
+     above, and `--check` gates in ci.yml/nightly.yml fail on a hand-edit. Edit
+     the JSON and regenerate; never the Markdown. -->
+
 - [ ] Wiki updated — ags-wiki reflects any behaviour/architecture/build change (`lint.py --since` passes)
 
 ## Clean-room confirmation
