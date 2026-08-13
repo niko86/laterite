@@ -15,7 +15,7 @@ several front doors:
 
 - **Python** — `import laterite` (this site).
 - **`lat` CLI** — `lat validate delivery.ags --json` (see the [CLI reference](../reference/cli.md)).
-- **Node** — `@laterite/*` on npm.
+- **Node** — `laterite` on npm.
 - **DuckDB** — the `laterite_ags4` loadable extension.
 
 ## Many input doors
