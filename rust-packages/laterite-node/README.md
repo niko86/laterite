@@ -8,6 +8,11 @@ Born-typed: a `2DP` heading comes back as a JavaScript number, an `ID` as a stri
 npm install laterite
 ```
 
+> **laterite is in beta** — a statement about how much real-world use it has had, not
+> how much testing. The API can still change; what it runs on is the steadier promise.
+> [What that means](https://niko86.github.io/laterite/docs/reference/support/) ·
+> [tell us how it goes](https://niko86.github.io/laterite/docs/feedback/).
+
 Prebuilt native binaries ship for linux-x64-gnu, darwin-arm64, and win32-x64-msvc (auto-selected via `optionalDependencies`). No build step, no Python, no toolchain.
 
 ## Read & validate

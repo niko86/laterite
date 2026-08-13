@@ -7,6 +7,11 @@ the DuckDB extension — same numbered rules, same findings, same emitted bytes.
 Everything runs in the caller's process. Nothing is uploaded, and there is no
 server to run.
 
+> **laterite is in beta** — a statement about how much real-world use it has had, not
+> how much testing. The API can still change; what it runs on is the steadier promise.
+> [What that means](https://niko86.github.io/laterite/docs/reference/support/) ·
+> [tell us how it goes](https://niko86.github.io/laterite/docs/feedback/).
+
 ## Read this first — what's different from the native surfaces
 
 WebAssembly is not just "the library, compiled". Four things change:

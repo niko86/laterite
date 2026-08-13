@@ -16,11 +16,11 @@ doors, and the door matters for reproducing this. -->
 
 - [ ] Python — the `laterite` wheel
 - [ ] Python — `laterite.compat` (the python-ags4 drop-in)
-- [ ] Node — `@laterite/*`
-- [ ] Browser — the wasm package
-- [ ] DuckDB — the `laterite` extension
+- [ ] Node — `laterite`
+- [ ] Browser — `@laterite/ags4-wasm`
+- [ ] DuckDB — the `laterite_ags4` extension
 - [ ] CLI — `lat`
-- [ ] Rust — an engine crate from crates.io
+- [ ] Rust — the `laterite` crate, or an engine crate from crates.io
 
 ## What happened
 
