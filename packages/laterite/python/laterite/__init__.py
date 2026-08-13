@@ -2246,16 +2246,21 @@ def build_ags4(
     con = None
     for i, (code, frame) in enumerate(items):
         frame = _drop_synth_keys(frame)  # never emit a read(keys=True) _id/_parent_id
-        # A pandas >=2.2 frame exposes a *pyarrow-backed* Arrow C-stream capsule;
-        # handing it straight to the native emit corrupts the process heap and
-        # hard-crashes a later in-process native call — a use-after-free in the
-        # pyo3-arrow/arrow-rs consumer of a pyarrow-produced stream (polars' native
-        # stream is unaffected; reproduces from `build_ags4({g: pandas_frame})`).
+        # A pandas >=2.2 frame exposes a *pyarrow-backed* Arrow C-stream capsule.
         # Normalise those to a native polars capsule first — the guard compat's
         # writer (`_to_polars`) also applies. A pandas <2.2 frame has no capsule and
         # falls through to the DuckDB bridge below (its existing pyarrow-free path),
-        # so that branch stays reachable. A pure Rust fix would need a workspace
-        # arrow/pyo3-arrow major bump across every binding; tracked separately.
+        # so that branch stays reachable.
+        #
+        # This was added for what was diagnosed as an arrow-rs use-after-free
+        # consuming a pyarrow-produced stream (#122, apache/arrow-rs#10439). #294
+        # established that diagnosis was wrong: the Arrow FFI is not involved, and
+        # the crash needed no laterite call at all — it was mimalloc v3 in our
+        # cdylib colliding with the mimalloc pyarrow bundles, now pinned to v2 in
+        # rust-packages/laterite-py/Cargo.toml. So this guard is NOT what makes the
+        # pandas path safe, and removing it would not reintroduce that crash. It is
+        # kept because it is also what keeps the pandas branch pyarrow-free; retire
+        # it deliberately, with measurements, not as a side effect of #294.
         if type(frame).__module__.partition(".")[0] == "pandas" and hasattr(
             frame, "__arrow_c_stream__"
         ):
