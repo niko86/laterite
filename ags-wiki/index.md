@@ -1,7 +1,7 @@
 ---
 type: index
 generated: 2026-08-13
-counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 29, concepts: 29, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 24}
+counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 29, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 24}
 ---
 # AGS Wiki — Content Catalog
 
@@ -16,17 +16,17 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 29, concept
 | Types | 17 |
 | Observations | 50 |
 | Tools | 29 |
-| Concepts | 29 |
+| Concepts | 30 |
 | Editions | 5 |
 | Comparisons | 1 |
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
 | Design | 24 |
-| **Total (live)** | **402** |
+| **Total (live)** | **403** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 23 · `confirmed` 18 · `drafted` 331 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 5 · `stub` 13
+**Status distribution:** `accepted` 23 · `confirmed` 18 · `drafted` 332 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 5 · `stub` 13
 
 ## Rules
 
@@ -360,6 +360,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 29, concept
 |---|---|
 | [[abi3-perf]] | drafted |
 | [[agent-first-cli-contract]] | drafted |
+| [[arrow-c-ffi-allocator-ownership]] | drafted |
 | [[bs5930-soil-descriptions]] | drafted |
 | [[core-perf-baseline]] | drafted |
 | [[coverage-campaign]] | drafted |

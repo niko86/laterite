@@ -8,7 +8,7 @@ volatile_asof: 2026-05-30
 ags_editions: []
 repo_refs:
   latpy: "repo:rust-packages/laterite-py/Cargo.toml"
-related: [crate-map, laterite-py, laterite, dec-rust-drives-python, dec-python-imports-rust-library, dec-monorepo-structure, abi3-perf, ags4-output]
+related: [crate-map, laterite-py, laterite, dec-rust-drives-python, dec-python-imports-rust-library, dec-monorepo-structure, abi3-perf, ags4-output, arrow-c-ffi-allocator-ownership]
 sources: []
 ---
 # the PyO3 boundary: where Rust stops and Python starts
@@ -85,6 +85,17 @@ directly; only an *old* pandas (pre-2.2, no capsule) falls back to DuckDB, and
 pandas only ships via `[compat]` anyway. compat's all-Rust write
 (`emit_ags4_compat`) already took the polars-capsule shape (no engine).
 
+A **pandas** frame's capsule is additionally normalised through `pl.from_pandas`
+before the native call. That guard is **not** a memory-safety measure — it copies
+nothing on the pyarrow path, and the heap corruption it was once credited with
+preventing was a mimalloc bug, fixed by pinning v2 (#301). It earns its place on
+**dep shape**: pandas' `__arrow_c_stream__` calls
+`import_optional_dependency("pyarrow")`, so without it a pyarrow-free `[compat]`
+install raises `ImportError` — the same "pyarrow is an accelerator, never a
+`[compat]` dependency" invariant this section turns on. Who owns and frees the
+buffers crossing here, and why a foreign `#[global_allocator]` cannot endanger
+them, is [[arrow-c-ffi-allocator-ownership]].
+
 Because the read boundary uses that **stable Arrow C Data Interface**, not
 pyo3-polars' per-CPython ABI coupling, the cdylib builds **abi3**
 (`abi3-py312` on the `pyo3` dep; `pyo3-arrow` 0.19 compiles clean under it):
@@ -137,4 +148,4 @@ engine exception is [[dec-python-imports-rust-library]].
 
 ## Related
 
-[[crate-map]] · [[laterite-py]] · [[laterite]] · [[dec-rust-drives-python]] · [[dec-python-imports-rust-library]] · [[dec-monorepo-structure]] · [[abi3-perf]]
+[[crate-map]] · [[laterite-py]] · [[laterite]] · [[dec-rust-drives-python]] · [[dec-python-imports-rust-library]] · [[dec-monorepo-structure]] · [[abi3-perf]] · [[arrow-c-ffi-allocator-ownership]]
