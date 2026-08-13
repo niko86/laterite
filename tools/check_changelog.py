@@ -16,7 +16,7 @@ The rule: **if you changed something a consumer can observe, say so.** Not a
 count, not a heuristic on the commit subject — the presence of a new entry,
 compared against the base branch.
 
-Four ways to pass, and the third and fourth are the interesting ones:
+Five ways to pass, and the third, fourth and fifth are the interesting ones:
 
   no shipped surface touched   -> pass. Tests, CI, docs, tooling and the wiki
                                   change nothing a consumer installs.
@@ -34,6 +34,12 @@ Four ways to pass, and the third and fourth are the interesting ones:
                                   the PR, rather than a silence nobody noticed —
                                   which is the whole difference between this and
                                   what happened to #178-#182.
+  a BOT moved declared versions-> pass, LOUDLY, printing every bump. Dependabot
+                                  can do none of the four above: it cannot write
+                                  an entry and it cannot apply a label, so every
+                                  weekly PR sat red until a human intervened.
+                                  See `_BOT_ACTORS` for how narrow this is and
+                                  what deliberately still asks.
 
 **An empty comparison must never read as a pass.** If the base ref is unreachable
 or the diff comes back empty, that is an error, not a green run — the same trap
@@ -50,6 +56,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import tomllib
@@ -240,6 +247,108 @@ def dev_only_change(kind: str, before: str | None, after: str | None) -> bool:
     return bool(moved) and moved <= _DEV_ONLY_SECTIONS[kind]
 
 
+# --- the fifth way to pass: a bot moving a version it already declared --------
+#
+# Dependabot can do none of the other four. It cannot write a changelog entry
+# and it cannot apply `no-changelog`, so every weekly PR that moves a floor in
+# `[project] dependencies` sat red until a human intervened. That is precisely
+# the failure `check_upstream_pin.py` refuses to create: a check that fails for
+# reasons its author cannot act on is one people learn to click past — and this
+# gate's entire value is that a red run still means something.
+#
+# The waiver is narrow, and what it does NOT cover is the point:
+#
+#   * `Cargo.lock` is never waivable. It decides what gets COMPILED into the
+#     wheel, the addon, `lat` and the wasm, so #237 (napi 3.11 -> 3.12, lock
+#     only, no manifest) must keep asking. This falls out for free rather than
+#     being special-cased: it is not a following lockfile and has no manifest
+#     kind, so it disqualifies the PR by not being classifiable.
+#   * A source file anywhere in the same PR disqualifies it, same mechanism.
+#     #232 is the shape — a `@napi-rs/cli` bump whose regenerated loader gained
+#     error chaining and a new env var, both observable from the published
+#     package.
+#   * Anything but a version move on a requirement BOTH sides declare — a new
+#     dependency, a dropped one, a `requires-python` change, a renamed extra, a
+#     reordered list — disqualifies it.
+#
+# What it cannot see, and no amount of manifest parsing could: whether the new
+# version of a dependency changes behaviour a consumer notices. For a range in
+# `pyproject.toml` or `package.json` the consumer resolves their own tree, so
+# the floor move IS the declaration and the semantics inside it are upstream's.
+# That is the argument for where this line sits, and it is also why the line
+# stops at anything we compile.
+_BOT_ACTORS = frozenset({"dependabot[bot]", "app/dependabot"})
+
+# A name only counts as a name when a constraint (or an extras bracket) follows
+# it. Cargo's `serde = "1.0"` and npm's `"eslint": "^9.39.5"` put the name in the
+# KEY and the bare constraint in the value; PEP 508 carries both in one string.
+_REQUIREMENT = re.compile(
+    r"^\s*(?P<name>[A-Za-z][A-Za-z0-9._-]*)\s*(?P<rest>.*)$", re.S
+)
+
+
+def requirement_name(spec: str) -> str:
+    """The requirement a specifier names, or `""` when the name lives in the key.
+
+    `polars>=1.43.2` -> `polars`; `pandas<3` -> `pandas`; `laterite` -> `laterite`
+    (a bare name still identifies itself, so swapping it is not a bump).
+    `1.0`, `^9.39.5` and `>=1.43.2` -> `""`, because there is nothing to compare
+    and the key path above them already established which package it is.
+    """
+    m = _REQUIREMENT.match(spec)
+    return m.group("name") if m else ""
+
+
+def leaves(
+    node: object, path: tuple[str, ...] = ()
+) -> list[tuple[tuple[str, ...], object]]:
+    """Every scalar in a parsed manifest, keyed by its full path.
+
+    List items are keyed by INDEX, so a reordered dependency list reads as a
+    change rather than a match. That is the conservative direction: a reorder we
+    cannot explain should ask, not shrug.
+    """
+    if isinstance(node, dict):
+        return [x for k, v in node.items() for x in leaves(v, (*path, str(k)))]
+    if isinstance(node, list):
+        return [x for i, v in enumerate(node) for x in leaves(v, (*path, str(i)))]
+    return [(path, node)]
+
+
+def bumps_only(kind: str, before: str | None, after: str | None) -> list[str] | None:
+    """The version moves in this manifest, or None if anything else moved.
+
+    Fails closed exactly the way `dev_only_change` does — a missing side, text
+    that will not parse, a key that appears or disappears, or a value that is not
+    a string on both sides all return None. "I could not tell" must never read as
+    "nothing shipped".
+    """
+    if before is None or after is None:
+        return None
+    try:
+        parse = (
+            tomllib.loads if kind.endswith(".toml") else lambda s: json.loads(s or "{}")
+        )
+        a = dict(leaves(parse(before)))
+        b = dict(leaves(parse(after)))
+    except (tomllib.TOMLDecodeError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+    if a.keys() != b.keys():
+        return None
+
+    moved = []
+    for key, old in a.items():
+        new = b[key]
+        if old == new:
+            continue
+        if not isinstance(old, str) or not isinstance(new, str):
+            return None
+        if requirement_name(old) != requirement_name(new):
+            return None
+        moved.append(f"{'.'.join(key)}: {old} -> {new}")
+    return moved
+
+
 def entries(block: dict) -> list[str]:
     """Every entry's text, flattened. Identity, not count: an entry swapped for
     another of the same length must not read as 'unchanged'."""
@@ -280,6 +389,15 @@ def main() -> None:
         "--allow-empty",
         action="store_true",
         help="the `no-changelog` label: pass with no entry, and say what was skipped",
+    )
+    ap.add_argument(
+        "--actor",
+        default="",
+        help=(
+            "the PR author (github.event.pull_request.user.login). Only ever read "
+            "to enable the bot waiver — a contributor cannot set it, because it "
+            "comes from the event payload rather than from the branch."
+        ),
     )
     args = ap.parse_args()
 
@@ -359,6 +477,37 @@ def main() -> None:
             cat, _, text = e.partition(":")
             print(f"    {cat:<10} {text[:90]}{'…' if len(text) > 90 else ''}")
         return
+
+    if args.actor in _BOT_ACTORS:
+        waived: dict[str, list[str]] | None = {}
+        for path in touched:
+            if lock_follows_manifest(path):
+                continue  # already settled above: it declares nothing on its own
+            kind = manifest_kind(path)
+            bumps = (
+                bumps_only(kind, _blob(merge_base, path), _blob("HEAD", path))
+                if kind
+                else None
+            )
+            if bumps is None:
+                waived = None
+                break
+            waived[path] = bumps
+        if waived is not None:
+            print(
+                f"check_changelog: OK — {args.actor} moved declared versions only, "
+                f"across {len(waived)} manifest(s):"
+            )
+            for path, bumps in waived.items():
+                for line in bumps:
+                    print(f"    {path}  {line}")
+            print(
+                "\n  No entry required: for a manifest RANGE the floor move is itself the\n"
+                "  declaration, and the consumer's own resolver decides the rest. A source\n"
+                "  file or a Cargo.lock in the same PR would have disqualified this — see\n"
+                "  `_BOT_ACTORS` for why the line sits there."
+            )
+            return
 
     if args.allow_empty:
         print(
