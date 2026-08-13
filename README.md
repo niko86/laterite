@@ -39,7 +39,16 @@ scriptable output is byte-identical across them.
 | **Node.js** | `npm install laterite` | apache-arrow tables, server-side validation | [guide](https://niko86.github.io/laterite/docs/node/) |
 | **CLI — `lat`** | [Releases](https://github.com/niko86/laterite/releases), or `pip install laterite` / `npx laterite` | pipelines, CI gates, one-off checks | [guide](https://niko86.github.io/laterite/docs/surfaces/cli/) |
 | **DuckDB** | `INSTALL laterite_ags4 FROM community;` | SQL straight over `.ags` files, no conversion step | [guide](https://niko86.github.io/laterite/docs/duckdb/) |
-| **Browser** | [open the app](https://niko86.github.io/laterite/) | validate + explore without uploading a file anywhere | [guide](https://niko86.github.io/laterite/docs/surfaces/browser/) |
+| **Browser** | `npm i @laterite/ags4-wasm` | validate + explore in the page, nothing uploaded anywhere | [guide](https://niko86.github.io/laterite/docs/reference/wasm-api/) |
+
+All five are **[in beta](https://niko86.github.io/laterite/docs/reference/support/)** —
+the engine is tested; what it hasn't had is your files. The Rust crate
+(`cargo add laterite`) is the one surface that isn't: same engine, but not yet at
+parity with these five.
+
+The **[web app](https://niko86.github.io/laterite/)** is built on the browser package
+and nothing else — a worked example of that surface rather than a sixth one. Go and
+use it; there's nothing to install.
 
 ## Quickstart
 
@@ -126,7 +135,7 @@ deliberately not mirrored — see [Parity](#parity-with-python-ags4).
 </details>
 
 The [cookbook](https://niko86.github.io/laterite/docs/cookbook/) shows each task
-side by side across all five surfaces.
+side by side across Python, Node, DuckDB and the CLI, with synced tabs.
 
 ## What it does
 

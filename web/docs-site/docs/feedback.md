@@ -1,8 +1,8 @@
 # Feedback
 
-laterite is in beta. That is a statement about how much real-world use it has had,
-not about how much testing it has had — and the only way to change the first one is
-for people to run it against files we have never seen.
+laterite is [in beta](reference/support.md) — a statement about how much real-world
+use it has had, not about how much testing it has had. The only way to change the
+first one is for people to run it against files we have never seen.
 
 **So: give it a try.** Point it at a delivery you already have and see what happens.
 

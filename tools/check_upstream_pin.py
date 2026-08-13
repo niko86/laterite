@@ -3,12 +3,12 @@
 
 `parity.yml`'s header states why the cron exists:
 
-    # Manual `workflow_dispatch` + scheduled monthly so an upstream
-    # silent behavioural drift surfaces before it bites a user.
+    # Manual `workflow_dispatch` + scheduled weekly so an upstream
+    # silent drift surfaces before it bites a user.
 
 Thirty lines below, `PYTHON_AGS4_VERSION: "1.2.0"`. The pin makes the stated
 purpose structurally impossible: the cron re-runs the same frozen oracle forever
-and can never see upstream move. It has been running monthly, going green, and
+and can never see upstream move. It ran on that schedule, going green, and
 proving something other than what its header claims — the single sentence and the
 single constant were 30 lines apart, and three separate audit lenses read that
 workflow's shape without noticing.
@@ -21,7 +21,7 @@ whether to follow.
 This is deliberately NOT a PR gate. A PR must not go red because upstream released
 something while it was open — that is not the PR's fault, and a check that fails
 for reasons the author cannot act on is a check people learn to ignore. It runs on
-the monthly cron, where a red run is the notification.
+the weekly cron, where a red run is the notification.
 
 It compares PyPI's latest against the version *actually installed*, not against a
 constant scraped from a file. The installed distribution is the fact; the

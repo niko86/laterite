@@ -79,7 +79,7 @@ fails loud instead.
 
 `data/PROVENANCE.md` documents the refresh path (`tools/sync-standard-dicts.sh`
 / `.ps1`) but nothing ever ran it proactively. `parity.yml`'s header claims
-the monthly cron exists "so an upstream silent behavioural drift surfaces
+the scheduled cron exists "so an upstream silent drift surfaces
 before it bites a user" — thirty lines above `PYTHON_AGS4_VERSION: "1.2.0"`,
 which pins the cron to one frozen oracle forever and makes that sentence
 structurally false. Unpinning is the wrong fix (the pin is what makes
@@ -126,7 +126,7 @@ locally-required, never on a PR).
 
 ```mermaid
 flowchart LR
-  pypi[PyPI python-ags4] -.monthly cron.-> pin[check_upstream_pin.py]
+  pypi[PyPI python-ags4] -.weekly cron.-> pin[check_upstream_pin.py]
   venv["installed python-ags4<br/>(dev dependency, the oracle)"] --> pin
   venv --> gate[test_vendored_authority_faithful.py]
   vendored["Standard_dictionary_v4_*.ags<br/>(vendored copies)"] --> gate
