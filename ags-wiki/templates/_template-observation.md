@@ -19,7 +19,8 @@ sources: []
 
 # O-<NN> — <title>
 
-> Source-of-truth is `repo:OBSERVATIONS.md#o-<NN>`.
+> Source-of-truth is `repo:observations.json` (record O-<NN>), rendered to
+> `repo:OBSERVATIONS.md#o-<NN>` — never hand-edit the Markdown.
 > This page links + cross-references only — it never copies the 5 fields.
 
 ## Summary

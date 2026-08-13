@@ -57,13 +57,13 @@ Same dial as the CLI: `validate(warnings=False)` mirrors `--no-warnings`, and
 [`.report`](../learn/validate.md) reflects whichever tiers you asked for.
 
 !!! warning "Tiers and the certificate fast-path"
-    An `.ags.idx` [certificate](./certificate-lifecycle.md) vouches that a file
-    is **error-clean** — that and only that. So a plain `validate()` (or
-    `validate(warnings=False)`) can take the cert short-circuit and skip the rule
-    engine. The moment you ask for a tier the cert never promised —
-    `validate(warnings=True, fyi=True)` wanting the soft findings back — there's
-    nothing cached to trust, so the call runs the full engine regardless of the
-    cert. Warnings and fyi are computed fresh; the error verdict is the only thing
-    a cert can shortcut.
+    `certify()` measures **every** tier, and the certificate records what each
+    one returned. A cert can therefore shortcut any tier it both *measured* and
+    found *clean* — not just errors. So a plain `validate()` takes the cert
+    short-circuit, and so does `validate(warnings=True, fyi=True)` when the cert
+    recorded those tiers clean. What forces a full re-run is asking a question
+    the cert cannot fully answer: a tier it never measured, or one it measured
+    and found **dirty** — the findings themselves are not stored, only the
+    verdict, so the engine has to run to hand them back.
 
 See also: [Validate](../learn/validate.md) · [Certificate lifecycle](./certificate-lifecycle.md)
