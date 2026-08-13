@@ -180,11 +180,15 @@ def test_pandas_build_then_native_write_is_safe() -> None:
 # The fault #122/#294 chased is NOT an arrow-rs use-after-free and has nothing to
 # do with the Arrow FFI: pyarrow bundles its own mimalloc as its default memory
 # pool, and our cdylib used to bring a second, statically-linked mimalloc v3.
-# Two co-resident mimallocs hand out overlapping memory (microsoft/mimalloc#1287,
-# fixed only on `dev3`; apache/datafusion-python#1607 is the same fault), so
-# `import pyarrow` followed by `import laterite` was enough to corrupt pyarrow's
-# buffers with no laterite call at all. Fixed by pinning mimalloc v2 in
+# Two co-resident mimallocs hand out overlapping memory (microsoft/mimalloc#1327;
+# apache/arrow GH-50428 is the same fault from Arrow's side), so `import pyarrow`
+# followed by `import laterite` was enough to corrupt pyarrow's buffers with no
+# laterite call at all. Fixed by pinning mimalloc v2 in
 # rust-packages/laterite-py/Cargo.toml.
+#
+# pyarrow 25.0.1 also fixes it from their side, so this test only goes red on
+# pyarrow 24.0.0-25.0.0. It is kept because we do not control which pyarrow a
+# user installs — a green run on a fixed pyarrow proves nothing about the pin.
 #
 # This runs in a SUBPROCESS on purpose. The fault depends on which allocator
 # initialises first, so it is a property of process startup — by the time this

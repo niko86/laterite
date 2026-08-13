@@ -35,10 +35,11 @@ crate-type = ["cdylib"]
 # with the `#[global_allocator]` in the crate root — only a final artifact
 # (binary / cdylib) can set one, so it is declared per-surface, not in a leaf.
 #
-# PINNED to v2 for the same reason as the wheel (#294): libmimalloc-sys 0.1.49
-# defaults to mimalloc v3, and v3 co-resident with another mimalloc in the same
-# process hands out overlapping memory (microsoft/mimalloc#1287, fixed only on
-# `dev3`). Unproven for this addon — no pyarrow here — but a Node addon is
+# PINNED to v2 for the same reason as the wheel (#294): libmimalloc-sys defaults
+# to mimalloc v3 from 0.1.47, and v3 co-resident with another mimalloc in the
+# same process hands out overlapping memory (microsoft/mimalloc#1327, and
+# apache/arrow GH-50428 from Arrow's side). Unproven for this addon — no pyarrow
+# here — but a Node addon is
 # dlopen'd into a process whose other addons we do not control, which is exactly
 # the shape that bit the wheel. Kept in step deliberately, not swept.
 mimalloc = { version = "0.1", features = ["v2"] }

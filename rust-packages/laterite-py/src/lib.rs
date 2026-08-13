@@ -28,8 +28,9 @@ use std::path::Path;
 //
 // Handoff was never the hazard — CO-RESIDENCY was (#294). We load into processes
 // that already contain another mimalloc (pyarrow bundles one as its default
-// pool), and mimalloc v3 in that situation hands out memory the other instance
-// is already using. The version pin that avoids it is on the dep in Cargo.toml;
+// pool; CPython 3.14 vendors one too), and mimalloc v3 in that situation hands
+// out memory the other instance is already using. The version pin that avoids
+// it is on the dep in Cargo.toml;
 // keep it there, and do not assume this comment's "Rust frees what Rust
 // allocated" makes a second allocator in the process safe.
 #[global_allocator]
