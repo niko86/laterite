@@ -15,18 +15,18 @@ skip the rule engine.
     --8<-- "python/ex08_certify.out"
     ```
 
-    `.certify()` needs a prior **clean** [`.validate()`](../learn/validate.md)
-    on the same handle — a passing verdict is the precondition for issuing a
-    cert. It writes `<path>.ags.idx` next to the file: a validity certificate
-    (the verdict plus a hash of the bytes it vouches for) and a byte-offset
-    index of every group.
+    `.certify()` **runs the validation itself**, with every severity tier on,
+    and records what the rules actually returned — no prior
+    [`.validate()`](../learn/validate.md) is needed. It writes
+    `<path>.ags.idx` next to the file: a validity certificate (the verdict plus
+    a hash of the bytes it vouches for) and a byte-offset index of every group.
 
     Reopen with `read(path, index=...)` and the next `.validate()` resolves
-    from the cert instead of running the numbered rules. You can see it took
-    the fast path on `.report.resolution`: `"certified"` means the cert matched
-    the file's current bytes, so the rule engine was skipped entirely. (A
-    normal validate reports `"exact"` or a fallback edition — see
-    [Validate](../learn/validate.md).)
+    from the cert instead of running the numbered rules. Two separate fields
+    tell you what happened: `.report.certified` is `True` when the cert matched
+    the file's current bytes and the rule engine was skipped, and
+    `.report.resolution` reports how the dictionary edition was resolved
+    (`"exact"` or a fallback — see [Validate](../learn/validate.md)).
 
 === "Node"
 
@@ -38,9 +38,9 @@ skip the rule engine.
     --8<-- "node/ex08_certify.out"
     ```
 
-    The same lifecycle, the same file format: `certify()` after a clean
-    `validate()` mints `<path>.ags.idx`, and `read(path, { index })` +
-    `validate()` resolves from it with `report.resolution === "certified"`.
+    The same lifecycle, the same file format: `certify()` validates and mints
+    `<path>.ags.idx` in one step, and `read(path, { index })` + `validate()`
+    resolves from it with `report.certified === true`.
     The cert wraps the one core `Sidecar`, so a Node-minted `.ags.idx` is
     byte-compatible with the ones Python, DuckDB and `lat` mint — any
     surface can consume any surface's cert.
@@ -64,9 +64,10 @@ skip the rule engine.
     ```
 
     `certify` mints the certificate after the check comes back clean (a
-    `note: certificate written to site.ags.idx` line reports where; point it
-    elsewhere with `--out`). A dirty file gets no cert — the findings
-    table and exit `1` come back instead.
+    `certificate written to site.ags.idx` line reports where; point it
+    elsewhere with `--out`). A file with error-severity findings gets no cert:
+    a single `error:` line explains why and points you at
+    `lat validate <file>` for the findings table, and the exit code is `1`.
 
 The cert is **content-bound**: if the file changes by a single byte, the hash
 no longer matches and laterite silently falls back to a full validation — a

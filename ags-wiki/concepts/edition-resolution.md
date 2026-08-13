@@ -77,7 +77,9 @@ binary one commit old did exactly that).
 > had already drifted: all four had grown a stray `"4.2"` beyond the
 > audit's stated `"4.1.1"`, and `ExportPane.tsx`'s list was a different
 > length (5 vs 6) from the other three. A new generator,
-> `tools/gen_web_editions.py`, reads the union `ags_dictionary.json`'s own
+> `tools/gen_web_editions.py` (dev satellite — the emitted
+> `web/src/lib/editions.ts` is committed here, the generator is not), reads
+> the union `ags_dictionary.json`'s own
 > `editions` array (this same `DictVersion::from_edition` authority) and
 > emits a committed `web/src/lib/editions.ts` — **the first generated
 > source under `web/src`** — exporting `EDITIONS` (the editions),

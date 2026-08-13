@@ -15,7 +15,7 @@ sources: [spec-4.2]
 # AGS 4.2
 
 ## Overview
-AGS **Edition 4.2 (current, Dec 2025)** — released 2025-12-31, status **current**. Spec PDF: `spec:AGS4-4.2-*.pdf` (vault root). Current. Foreword: 'The AGS 4 Rules remain unchanged.' All deltas are Data Dictionary changes (below).
+AGS **Edition 4.2 (current, Dec 2025)** — released 2025-12-31, status **current**. Spec PDF: `spec:AGS4-4.2-*.pdf` (not vendored here — see the `sources/spec-*` page). Current. Foreword: 'The AGS 4 Rules remain unchanged.' All deltas are Data Dictionary changes (below).
 
 ## Support in this repo
 The validator resolves the dictionary edition from `TRAN_AGS` — see [[edition-resolution]] and [[O-30]] (bare `"4"`→4.0.4, AGS3 refusal). **Rule prose is identical to every other in-scope edition** ([[ags4-rules-frozen-dictionary-evolves]]); only the data model differs.
