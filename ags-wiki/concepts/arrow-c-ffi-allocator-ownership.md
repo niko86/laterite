@@ -38,9 +38,11 @@ the question that page does not: **when `laterite-py` installs mimalloc as
    ships jemalloc/mimalloc in its Python extension and consumes pyarrow daily;
    datafusion-python ships mimalloc unconditionally (§6).
 3. **The cause is two co-resident *instances of the same allocator*** — ours and
-   the one inside pyarrow's default memory pool — with ours built as **v3.3.2**,
-   inside the range microsoft/mimalloc#1287 flags as faulty (§3b). **Fixed by
-   pinning `features = ["v2"]`**, shipped in PR #301.
+   the one inside pyarrow's default memory pool — with ours built as **v3.3.2**
+   (§3b). The upstream co-residency reports are **microsoft/mimalloc#1327** and
+   **apache/arrow GH-50428**. **Fixed our side by pinning `features = ["v2"]`**
+   (PR #301); **fixed upstream in pyarrow 25.0.1**, so the exposure window is
+   pyarrow **24.0.0–25.0.0**.
 4. **The `pl.from_pandas` guard stays — but for a different reason than its
    comment claimed.** It never made the pandas path memory-safe, and on the
    pyarrow path it copies nothing at all. It is load-bearing for **dep shape**:
@@ -59,7 +61,8 @@ Versions this page is scoped to (`repo:rust-packages/Cargo.lock`,
 `mimalloc` **0.1.52** / `libmimalloc-sys` **0.1.49** (v3.3.2 on default features;
 `laterite-py` pins `v2` = 2.3.2 as of PR #301 — **`laterite-node` and
 `laterite-cli` still take the v3 default**),
-pyarrow **25.0.0**, pandas **2.3.3**, polars **1.43.1**.
+pyarrow **25.0.0** (**inside the 24.0.0–25.0.0 fault window**; 25.0.1 fixes it
+upstream), pandas **2.3.3**, polars **1.43.1**.
 
 ## 1. Ownership across the Arrow C Data Interface
 
@@ -251,19 +254,45 @@ matters, and it is documented in the wild:
   Rust crate's, and the one inside `libarrow`. Each has its own global and
   thread-local state.
 - **apache/datafusion-python#1607** — *"Segfault with PyArrow 24 on macOS when
-  using mimalloc v3"*, **open** — is exactly this, and is the closest real-world
-  precedent to laterite's symptom.
-  <https://github.com/apache/datafusion-python/issues/1607> Crash is inside
-  `arrow::MimallocAllocator::ReallocateAligned`. Root-caused there to
-  **microsoft/mimalloc#1287** — *"mimalloc >= 3.3.0 causes segmentation faults
-  when used from multiple threads"*, **closed**, fixed on the `dev3` branch but
-  **not in a stable release** as of that thread.
-  <https://github.com/microsoft/mimalloc/issues/1287> Its reproducer is
-  `dlopen`-shaped: load a shared library using mimalloc from a non-main thread,
-  exit that thread, allocate from another — i.e. **exactly the shape of a CPython
-  extension module**. datafusion-python's mitigation is to pin the Rust side to
-  mimalloc **v2** via the crate's `v2` feature: *"no performance loss, no PyArrow
-  pin."*
+  using mimalloc v3"*, **open** — is the closest real-world precedent, crashing
+  inside `arrow::MimallocAllocator::ReallocateAligned`.
+  <https://github.com/apache/datafusion-python/issues/1607> Its mitigation is
+  ours: pin the Rust side to mimalloc **v2** via the crate's `v2` feature — *"no
+  performance loss, no PyArrow pin."*
+- **microsoft/mimalloc#1327** is the **co-residency** report, and the right
+  upstream anchor: *"Two independently-linked mimalloc v3 instances (CPython 3.14
+  vendored + static in a Python extension) SIGSEGV in `_mi_theap_collect_retired`
+  at process exit when Arrow's v2 copy is also loaded (macOS arm64)"*, **closed**.
+  <https://github.com/microsoft/mimalloc/issues/1327> Its shape matches ours
+  closely — macOS arm64, a PyO3/abi3 cdylib linking mimalloc through
+  `libmimalloc-sys` as `#[global_allocator]`, and a discriminating matrix over
+  extension-version × pyarrow-version. It also records a **third** instance we had
+  only inferred: **CPython 3.14 vendors its own mimalloc v3.3.2**.
+- **apache/arrow GH-50428** is the same fault seen from Arrow's side —
+  *"pyarrow 24.0.0 regression: co-loading a native extension bundling mimalloc v3
+  SIGSEGVs in bundled mimalloc at interpreter teardown"* — **closed**, milestone
+  **25.0.1**, fixed by **apache/arrow#50549** *"[C++] Better mimalloc
+  configuration on macOS"* (**merged** 2026-07-21).
+  <https://github.com/apache/arrow/issues/50428> Arrow independently names
+  switching the extension's mimalloc to **v2** as the workaround — arm A, reached
+  from the other direction.
+
+> [!caution] Cite these as the same *family*, not the same *symptom*
+> #1327 and GH-50428 both crash at **interpreter teardown** (#1327's repro exits
+> 139, and `os._exit(0)` avoids it entirely). Laterite's fault is **mid-run**:
+> deterministic zeroing of the first 64 bytes during `to_pylist`, with no teardown
+> involved. #1327 also has pyarrow on the **v2** line, whereas we measured
+> pyarrow's pool as mimalloc. Shared root cause — multiple co-resident mimalloc
+> instances on macOS — **different manifestation**.
+>
+> An **earlier revision of this page cited microsoft/mimalloc#1287** as the
+> version-range authority. That is a *threading* bug (*"mimalloc >= 3.3.0 causes
+> segmentation faults when used from multiple threads"*,
+> <https://github.com/microsoft/mimalloc/issues/1287>). It is a real issue and
+> datafusion-python#1607 genuinely does root-cause to it, so it is kept here — but
+> using a threading bug as the authority for a non-threading fault was an error,
+> and it propagated into source comments and a public upstream issue before being
+> caught. **#1327 is the co-residency citation; #1287 is not.**
 
 > [!success] Measured — this is the cause, and the cross-matrix is unambiguous
 > Varying **our `.so`'s allocator** against **pyarrow's memory pool**
@@ -295,10 +324,12 @@ block` on import, fixed by `features = ["disable_initial_exec_tls"]`.
 mechanics, not buffer ownership**. polars uses that exact flag today.
 
 **Not stated by any source found:** that allocator *mismatch* across the Arrow C
-Data Interface causes heap corruption. arrow-rs#10439 (**open, 0 comments**,
-filed from this repo) is the only issue advancing that theory, and it is
-untriaged. Searches of apache/arrow-rs for `mimalloc`/allocator/segfault surfaced
-no other issue making that claim.
+Data Interface causes heap corruption. **arrow-rs#10439**, filed from this repo,
+was the only issue advancing that theory — and it has since been **closed** (2
+comments) with the evidence and a correction, because §2 and the §3b matrix show
+the FFI is not on the path.
+<https://github.com/apache/arrow-rs/issues/10439> Searches of apache/arrow-rs for
+`mimalloc`/allocator/segfault surfaced no other issue making that claim.
 
 ## 4. pyo3-arrow
 
@@ -474,9 +505,9 @@ let version = if env::var("CARGO_FEATURE_V2").is_ok() { "v2" } else { "v3" };
 
 The vendored headers give `v2` = **2.3.2** and `v3` = **3.3.2**. Nothing in the
 workspace opts into `v2` (grep: no `"v2"` in any `Cargo.toml`). **laterite
-therefore builds mimalloc v3.3.2** — inside the range microsoft/mimalloc#1287
-identifies as faulty (*">= 3.3.0"*), co-resident with pyarrow's own bundled
-mimalloc, in a `dlopen`'d extension module, on macOS. That is
+therefore builds mimalloc v3.3.2** — co-resident with pyarrow's own bundled
+mimalloc, in a `dlopen`'d extension module, on macOS. That is the configuration
+microsoft/mimalloc#1327 and apache/arrow GH-50428 both report, and
 datafusion-python#1607's situation feature-for-feature.
 
 When first written this was **inference**. It has since been **confirmed by
@@ -490,6 +521,21 @@ under the same allocation churn, so base `pip install laterite` — which is
 polars + duckdb and no pyarrow — **was never exposed**. Only the
 `[pyarrow]` / `[compat,pyarrow]` / `[all]` extras and dev/CI environments could
 hit it.
+
+**And it is fixed upstream too, which bounds the exposure.** Measured against an
+**unchanged v3 consumer**: pyarrow **25.0.0** corrupts **44 of 50** array shapes;
+pyarrow **25.0.1** corrupts **0 of 50**. A `v2` consumer is clean on both. So the
+fault window is pyarrow **24.0.0 – 25.0.0**, closed by
+apache/arrow#50549 (milestone 25.0.1). The v2 pin and a pyarrow floor are
+independent fixes; #301 takes the pin because it protects users who have not
+upgraded pyarrow.
+
+> [!note] `backend_name` does not disclose the major
+> `pa.default_memory_pool().backend_name` reports `'mimalloc'` on **both** 25.0.0
+> and 25.0.1, so it confirms *which allocator* pyarrow's pool uses and says
+> nothing about *which version*. It therefore neither corroborates nor
+> contradicts GH-50428's note that `libarrow.2400` carries a **v2-line** copy.
+> Don't over-read it in either direction.
 
 **Corruption signature** (useful if this is ever taken upstream): it needs a
 string buffer **larger than 64 bytes across 2+ rows**, landing in the **first
@@ -519,12 +565,12 @@ only **~6% read** versus v3. Dropping mimalloc entirely would have cost read
 
 4. **`laterite-node` and `laterite-cli` still declare bare `mimalloc = "0.1"`**,
    so both still build **v3.3.2**. Neither loads pyarrow today, so neither is
-   known-exposed — but they carry the same faulty allocator version, and the node
-   addon is the same `dlopen`'d-extension shape that microsoft/mimalloc#1287
-   describes. **Owner's call**, deliberately not swept into #301.
-5. **arrow-rs#10439 is mis-filed.** It blames the Arrow FFI for what is a mimalloc
-   bug, and §2 plus the §3b matrix show the FFI is not involved. It should be
-   **withdrawn or re-pointed at mimalloc**. Outward-facing, so owner's call.
+   known-exposed — but they carry the same allocator version, and the node addon
+   is the same `dlopen`'d-extension shape that microsoft/mimalloc#1327 describes.
+   **Owner's call**, deliberately not swept into #301.
+5. ~~**arrow-rs#10439 is mis-filed.**~~ **Done** — closed with the evidence and a
+   correction. It blamed the Arrow FFI for what is a mimalloc bug, and §2 plus the
+   §3b matrix show the FFI is not on the path.
 6. **Consider `local_dynamic_tls`** (§3c) — cheap, and the ecosystem standard for
    allocators inside `dlopen`'d extension modules. Not required by any observed
    failure here.
@@ -532,7 +578,7 @@ only **~6% read** versus v3. Dropping mimalloc entirely would have cost read
 ### The experiment that settled it
 
 The matrix below was run, changing **one** variable at a time. Predictions were
-made from mimalloc#1287 before the arms were executed:
+made from the co-residency hypothesis before the arms were executed:
 
 | Arm | Change | Predicted | **Measured** |
 |---|---|---|---|
@@ -546,7 +592,7 @@ made from mimalloc#1287 before the arms were executed:
 allocator-mismatch**, since A changes only *our* allocator and B changes only
 *pyarrow's* — yet either alone is sufficient.
 
-### The reproduction — and why iteration count never found it
+### The reproduction — and what actually gates it
 
 The minimal reproduction contains **no laterite call at all**. Two imports and a
 pyarrow table:
@@ -563,16 +609,26 @@ That importing the module is sufficient — with the Arrow FFI never exercised �
 is what makes this **stronger than "the FFI is probably not at fault"**: the FFI
 is not on the path.
 
-> [!warning] This bug cannot be reproduced by iteration count
-> It needs the pyarrow allocation to land in the window **right after our module
-> loads** (§7 signature). Hammering an already-warm process misses it no matter
-> how many iterations you run — an early attempt here of 3 pandas shapes × 400
-> iterations, plus a 300-iteration emit→`laterite.read()` canary, **survived
-> everything** and was worthless as evidence. This is also **why the existing
-> #122 regression test never caught it**, and it is the trap to avoid when
-> writing any replacement: a test that cannot go red proves nothing. A credible
-> regression test must A/B the faulty artifact and run in a **subprocess**, since
-> the fault is startup-order-dependent.
+> [!warning] The variable is **pyarrow's version**, not iteration count — and not pandas
+> An earlier revision of this page claimed the bug "cannot be reproduced by
+> iteration count", citing an attempt here of 3 pandas shapes × 400 iterations
+> plus a 300-iteration emit→`laterite.read()` canary that **survived everything**.
+> That non-reproduction has since been explained, and **it was not about iteration
+> count**: the environment had resolved to a pyarrow outside the 24.0.0–25.0.0
+> fault window. At the reported versions it reproduces **deterministically, first
+> try**.
+>
+> A second wrong turn is worth recording because it is the easy one to take:
+> pandas was initially blamed, after a resolver pulled pandas 3.0.5. **The pandas
+> major is not the variable** — it SIGSEGVs on both majors at pyarrow 25.0.0 and
+> survives on both at 25.0.1. Pin pyarrow when bisecting this, not pandas.
+>
+> What does still hold is the **shape** of the fault: the corruption lands in the
+> first pyarrow allocations after our module loads (the §7 signature), so it is
+> startup-order-dependent. Any regression test must therefore run in a
+> **subprocess** and **A/B the faulty artifact** — and must pin a pyarrow inside
+> the fault window, or it can never go red. That last point is why the existing
+> #122 regression test did not catch this.
 
 ## Diagram
 
