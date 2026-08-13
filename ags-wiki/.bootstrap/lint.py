@@ -10,10 +10,15 @@ terms tripwire) + A9 (ext: allowlist) + A11 (historical/retired
 exemption markers). A9/A11 are report-only diagnostics; A1/A2 started
 report-only and GRADUATED to hard whole-vault checks (#75, 2026-07-26,
 once the grandfathered backlog reached 0 — live content only, log.md/
-index.md exempt, A11-marked mentions filtered). The hard checks that
+index.md exempt, A11-marked mentions filtered). A12 (2026-08-13, the
+week-33 shelf-read) resolves the frontmatter `location:` field on
+`type: source` pages — a declared path A1's citation grammar cannot
+see — and is HARD from the start (see its block for why it needed no
+grandfathering). The hard checks that
 drive the exit code are broken wikilinks / unbalanced mermaid / orphans /
 crate-map completeness / crate-map edge-correctness / erDiagram group codes /
-related-dangling / superseded-tombstone / owns-uniqueness; the orphan check counts
+related-dangling / superseded-tombstone / owns-uniqueness / `location:`
+resolution (A12); the orphan check counts
 inbound links with index.md/log.md excluded (plan item D1, graduated to
 hard-fail once the backlog reached 0 in #451). Two are the C5
 mermaid-content checks (2026-07-10): the crate-map graph must name every
@@ -71,6 +76,7 @@ from refs import (
     TRAILING_PUNCT,
     body_after_frontmatter,
     frontmatter_block,
+    path_exists,
     resolve_ref,
 )
 
@@ -982,7 +988,42 @@ def categorize_dead_ref(path_str: str) -> tuple[str, str]:
     return ("genuinely gone", "")
 
 
+# ---------------------------------------------------------------------------
+# A12 — `location:` frontmatter resolution. A `type: source` page's `location:`
+# is a declared path to the artifact that page is the authority for, and until
+# now NOTHING in .bootstrap/ read the field at all. So five source pages sat
+# pointing at `ags-wiki/AGS4-*.pdf` files the public-repo flip had removed, and
+# A1 — which resolves every `repo:` citation in this vault against disk, and is
+# hard — saw none of them, because a `location:` is not a citation: A1's grammar
+# keys on the `repo:` prefix (refs.py REPO_REF) and a bare declared path has no
+# prefix to key on. The field makes a path claim either way, so it gets its own
+# resolution pass (week-33 shelf-read).
+#
+# Three value forms, per templates/_template-source.md:
+#   repo:<path>              A1 already resolves it — same raw text, same
+#                            grammar — so it is skipped here and a dead one is
+#                            reported once rather than twice.
+#   <repo-relative path>     must exist on disk (file or directory).
+#   <name> — not vendored; …  an explicit "this artifact is NOT in this repo"
+#                            declaration (the AGS-published spec PDFs, #304).
+#                            Resolution would be wrong for it, but the
+#                            declaration is itself checkable — and checking it
+#                            is what stops the marker being a way to silence a
+#                            dead path: the named file must genuinely be absent
+#                            from the tree.
+#
+# No file-level exemptions: unlike A1/A2 there is nothing to exempt, since the
+# machine-maintained log.md/index.md carry no frontmatter `location:` (and no
+# generated page has any reason to). An empty `location:` makes no claim and is
+# not a finding here — whether the key must be present at all is B1's business.
+# ---------------------------------------------------------------------------
+LOCATION_FIELD = re.compile(r"^location:\s*(.*?)\s*$", re.M)
+NOT_VENDORED = "not vendored"
+
 dead_refs: list[dict] = []
+bad_locations: list[dict] = []  # A12
+location_claims = 0
+location_repo_claims = 0
 ref_occurrences = 0
 retired_hits: list[dict] = []
 retired_counts: Counter = Counter()
@@ -1022,6 +1063,39 @@ for p in md:
                 "detail": detail,
             }
         )
+
+    # A12 — the frontmatter `location:` claim (see the block above). Offsets
+    # into the frontmatter map back to the page by +3: frontmatter_block()
+    # returns txt[3:…], the text after the opening `---`.
+    _fm = frontmatter_block(txt)
+    _lm = LOCATION_FIELD.search(_fm) if _fm else None
+    if _lm and (loc := _lm.group(1).strip().strip("\"'")):
+        location_claims += 1
+        ln = line_at(txt, 3 + _lm.start())
+        if loc.startswith("repo:"):
+            location_repo_claims += 1  # A1 resolved it in the scan above
+        elif NOT_VENDORED in loc:
+            # the claim is absence, so absence is what gets checked
+            named = loc.split()[0]
+            if named in _BASENAME_INDEX:
+                bad_locations.append(
+                    {
+                        "file": rel,
+                        "line": ln,
+                        "msg": f"location: {loc!r} says '{NOT_VENDORED}', but "
+                        f"{_BASENAME_INDEX[named][0]} is tracked in this repo",
+                    }
+                )
+        elif not path_exists(loc):
+            cat, detail = categorize_dead_ref(loc)
+            bad_locations.append(
+                {
+                    "file": rel,
+                    "line": ln,
+                    "msg": f"location: {loc!r} — no such path  [{cat}]"
+                    + (f" ({detail})" if detail else ""),
+                }
+            )
 
     # verified_against / staleness (Tier-3): a `> [!stale-risk] … as-of DATE`
     # callout promises "these numbers were true as of DATE". If a repo: file
@@ -1347,6 +1421,12 @@ if dead_refs:
         info_section(f"  [{cat}] findings", cat_findings, limit=A_LIMIT)
 
 print(
+    f"\n`location:` claims scanned (A12): {location_claims} "
+    f"({location_repo_claims} of them `repo:` — resolved by A1 above), "
+    f"{len(bad_locations)} unresolved"
+)
+
+print(
     f"\nretired-term hits: {len(retired_hits)} (seed list: {', '.join(RETIRED_TERMS)})"
 )
 if retired_hits:
@@ -1458,6 +1538,15 @@ if SINCE_REF:
         ],
         limit=A_LIMIT,
     )
+    section(
+        "  NEW unresolvable `location:` fields (introduced by this diff)",
+        [
+            f"{d['file']}:{d['line']} -> {d['msg']}"
+            for d in bad_locations
+            if in_added_range(d["file"], d["line"])
+        ],
+        limit=A_LIMIT,
+    )
     # Tier-3 (#23) net-citation-removal — report-only (never touches `ok`):
     # citations this diff deleted without re-adding, a de-grounding signal.
     info_section(
@@ -1494,6 +1583,15 @@ else:
             for h in retired_hits
             if h["file"] not in RATCHET_EXEMPT_FILES
         ],
+        limit=A_LIMIT,
+    )
+    # A12 is HARD from the day it lands, not report-only-then-graduated like
+    # A1/A2 — same rule, met differently: the backlog it had to clear was one
+    # page (sources/repo-authorities/ags-library-xlsx.md, a pre-flip `reports/`
+    # path), repointed in the change that added this check, so it starts at 0.
+    section(
+        "A12 `location:` fields that don't resolve (HARD)",
+        [f"{d['file']}:{d['line']} -> {d['msg']}" for d in bad_locations],
         limit=A_LIMIT,
     )
 
