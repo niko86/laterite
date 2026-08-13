@@ -244,25 +244,39 @@ rule-weakness):
    `discovered_phase`, ≥1 `spec:`/`repo:` citation.
 2. **Grounding rigor**: a Rust↔python or spec↔Rust gap is
    `status: hypothesis` until **empirically probed** — a crafted
-   fixture under `.bootstrap/probes/` (NEVER
-   `laterite-ags4-validator/tests/fixtures/`) run through *both*
-   `lat` and `tools/py_ags4_check_json.py`, output recorded as
-   `evidence` → then `confirmed`. Spec-only gaps are graded by
-   citation strength, `> [!spec-ambiguity]`.
+   fixture (NEVER `laterite-ags4-validator/tests/fixtures/`, which is
+   the validator's own contract) run through *both* `lat` and the
+   python-ags4 oracle, output recorded as `evidence` → then
+   `confirmed`. Spec-only gaps are graded by citation strength,
+   `> [!spec-ambiguity]`. **The probe harness is not in this repo**:
+   `.bootstrap/probes/` and `tools/py_ags4_check_json.py` are dev-satellite
+   material, so without it, reach the oracle the way this repo can —
+   `./tools/run_python_ags4_tests.sh` (python-ags4's own suite against
+   `laterite.compat`) or `laterite.compat` directly — and say in the
+   `evidence` which route produced the output.
 3. If it warrants an OBSERVATIONS entry, set
    `proposes_observation: true` and fill the drafted `### O-NN …`
-   block. The agent then **writes it into
-   `OBSERVATIONS.md`** directly —
-   that file is the canonical authority, so edit it *deliberately*:
-   match the 5-field house style (observed/where · spec · assessment
-   · upstream-reportable · our decision), use the next free `O-N`,
-   keep it clean-room (cite, never paste). Flip the insight to
+   block. The agent then **writes it into `observations.json`** (repo
+   root) — that file is the canonical authority — and **regenerates**
+   with `uv run --no-sync python tools/gen_observations.py`. Edit it
+   *deliberately*: match the 5-field house style (observed/where ·
+   spec · assessment · upstream-reportable · our decision), use the
+   next free `O-N`, keep it clean-room (cite, never paste). Add the
+   matching `ags-wiki/observations/O-NN.md` page from
+   `templates/_template-observation.md` — it links and cross-references
+   the record but never copies its fields. Flip the insight to
    `status: ratified` and surface the new/changed O-N in the response
-   so the maintainer sees the authority change. (Earlier campaign
-   text said "the agent never writes `OBSERVATIONS.md`; the user
-   ratifies" — that was a self-imposed guardrail wrongly attributed to
-   the user, not a maintainer instruction. Corrected: deliberate,
-   visible edits are fine; gratuitous churn of the authority is not.)
+   so the maintainer sees the authority change.
+
+   > [!warning] **Never hand-edit `OBSERVATIONS.md`.**
+   > It is a *generated view* of `observations.json`, as is the wiki's
+   > coverage-map list. `gen_observations.py --check` gates both on
+   > `ci.yml` and `nightly.yml`, and `--check-wiki` holds the JSON and
+   > the `O-NN.md` pages in agreement — so a hand-edit is a red PR, not
+   > a shortcut. (Earlier campaign text said "the agent never writes
+   > `OBSERVATIONS.md`; the user ratifies" — that was a self-imposed
+   > guardrail wrongly attributed to the user. Deliberate, visible
+   > authority edits are fine; they just go through the JSON.)
 4. Wire `feeds_strategy` / `feeds_ags5_req` so the gap flows into the
    test strategy and the AGS5 requirement register.
 
