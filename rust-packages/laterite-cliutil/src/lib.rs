@@ -83,7 +83,7 @@ pub fn colour_enabled(no_color: bool) -> bool {
 #[must_use]
 pub fn styled_table(headers: &[&str], rows: Vec<Vec<String>>, use_color: bool) -> Table {
     let mut t = Table::new();
-    t.load_preset(UTF8_FULL)
+    t.load_style(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic);
     t.set_header(
         headers
@@ -438,16 +438,34 @@ mod tests {
         ));
     }
 
+    /// The grid `lat` prints, pinned glyph-for-glyph.
+    ///
+    /// The old assertion here only checked that the CELL TEXT appeared, which
+    /// every border style in comfy-table satisfies — so it could not tell
+    /// `UTF8_FULL` from `ASCII_MARKDOWN`, and the comfy-table 8 migration
+    /// (`load_preset` -> `load_style`, the preset becoming a `TableStyle`
+    /// rather than a glyph string) would have gone green whatever it did to the
+    /// output. This is the whole visible surface of `lat`'s table mode; a
+    /// silent restyle is a real regression even though nothing fails to compile.
     #[test]
-    fn styled_table_renders_header_and_rows() {
+    fn styled_table_is_the_utf8_full_grid() {
         let t = styled_table(
-            &["A", "B"],
-            vec![vec!["1".into(), "2".into()], vec!["3".into(), "4".into()]],
+            &["A", "Bee"],
+            vec![vec!["1".into(), "22".into()], vec!["3".into(), "4".into()]],
             false,
         );
-        let s = t.to_string();
-        assert!(s.contains('A') && s.contains('B'));
-        assert!(s.contains('1') && s.contains('4'));
+        assert_eq!(
+            t.to_string(),
+            concat!(
+                "┌───┬─────┐\n",
+                "│ A ┆ Bee │\n",
+                "╞═══╪═════╡\n",
+                "│ 1 ┆ 22  │\n",
+                "├╌╌╌┼╌╌╌╌╌┤\n",
+                "│ 3 ┆ 4   │\n",
+                "└───┴─────┘",
+            )
+        );
     }
 
     #[test]
