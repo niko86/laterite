@@ -13,13 +13,21 @@ validator.
 | **[Node](../node/index.md)** &nbsp;(`laterite`, npm)     | `npm install laterite`                 | JS/TS tooling, servers, born-typed Arrow                  |
 | **[DuckDB](../duckdb/index.md)** &nbsp;(`laterite_ags4`) | `INSTALL laterite_ags4 FROM community` | SQL-native analytics, querying files in place             |
 | **[CLI](cli.md)** &nbsp;(`lat`)                          | the shipped binary                     | CI gates, shell one-liners, `fix` in place                |
-| **[Browser](browser.md)** &nbsp;(the web app)            | open the app                           | drag-and-drop validate / fix / explore — nothing uploaded |
+| **[Browser](../reference/wasm-api.md)** &nbsp;(`@laterite/ags4-wasm`, npm) | `npm i @laterite/ags4-wasm`            | validate / read / fix inside the page — nothing uploaded  |
+
+Every one of these is **[in beta](../reference/support.md)**. The Rust crate
+(`cargo add laterite`) is the one surface that isn't — it runs the same engine, but
+it is not yet at parity with these five.
+
+The **[web app](browser.md)** is built on the browser package and nothing else, so
+it is a worked example of that door rather than a sixth one — go and use it, but you
+don't install it.
 
 ## What each door can do
 
 The surfaces aren't equal — they're **different shapes**. Python is the fullest
 library; Node mirrors it; DuckDB is a SQL idiom; the CLI is a CI tool; the
-browser is a product. This grid is the honest map:
+browser package runs the engine in the page. This grid is the honest map:
 
 | Capability                  | Python | Node | DuckDB | CLI | Browser |
 | --------------------------- | :----: | :--: | :----: | :-: | :-----: |
@@ -58,8 +66,9 @@ Every surface that _can_ do a task uses the same verb, so knowledge transfers:
 | `save` · `.text` · `.bytes` | write it out                                                                     |
 
 See **[Validate a delivery](../cookbook/validate-a-delivery.md)** for the same
-operation side-by-side across Python, Node, DuckDB, the CLI, and the browser, with
-synced tabs.
+operation side-by-side across Python, Node, DuckDB and the CLI, with synced tabs.
+The browser package does it too — its worked examples live in the
+[browser API reference](../reference/wasm-api.md).
 
 ## Not re-implementations — one core, proven
 
