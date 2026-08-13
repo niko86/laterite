@@ -31,7 +31,7 @@ laterite.read("delivery.ags").validate().save("checked.ags")
 | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
 | **python-ags4 compat** | `from laterite import compat as AGS4` — a drop-in for the `python_ags4` API, so existing scripts run unchanged |
 | **Excel I/O**          | `to_excel()` / `from_excel()` — round-trip AGS4 ↔ XLSX                                                         |
-| **`AgsQuery`**         | a lazy, chainable query view (`.query()` / `.filter()` / `.sql()`) over the groups                             |
+| **`AgsQuery`**         | a lazy, chainable query view (`.query()` / `.filter()` / `.select()`) over the groups                          |
 | **`registry`**         | the typed group graph — `GROUPS`, `child_groups`, the KEY chain — as importable Python                         |
 | **transport**          | `pack` / `lock` — zstd + age-passphrase file envelopes (also on Node)                                          |
 

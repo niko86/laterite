@@ -59,7 +59,8 @@ a `> [!spec-ambiguity]`/`> [!divergence]` callout), never silently
 - repo symbol — `` `repo:.../rules/mod.rs::run_all` ``
 - OBSERVATIONS entry — `` `repo:OBSERVATIONS.md#o-33` ``
 - dictionary entry — `` `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json groups[code=SAMP]` ``
-- spec PDF — `` `spec:AGS4-4.2-2025.pdf §4.1.1 Rule 8` `` (PDF lives at this vault root)
+- spec PDF — `` `spec:AGS4-4.2-2025.pdf §4.1.1 Rule 8` `` (the PDF itself is not
+  vendored — the citation names the file, not a path; see `sources/spec-*`)
 - AGS library xlsx — `` `reports/AGSL4_2_TRI.xlsx` ``
 
 Paths are repo-root-relative, forward-slash, no backslashes.
@@ -293,7 +294,8 @@ page/source); the next Ingest clears them.
 - AGS3/earlier **out of scope** (only 4.0.3–4.2). O-30 keeps its page
   (it documents the validator *refusing* AGS3 — an AGS4-tooling
   insight) but there is no AGS3 *edition* page.
-- Spec PDFs are *moved* to this vault root (not duplicated);
+- Spec PDFs are held once, never duplicated — and **not redistributed in this
+  public repo** (AGS's own copyright); `sources/spec-*` says where to get them.
   `reports/AGS 4_1.pdf` & `reports/AGS 4_2.pdf` were deleted; the
   `AGSL4_2_*.xlsx` stay in `reports/` and are cited there.
 - Sub-rules get their own pages; `nDP/nSF/nSCI` are one parametric
