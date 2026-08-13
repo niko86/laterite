@@ -121,6 +121,7 @@ controlled vocabularies are documented in each template. Vocab:
 - `experiment.outcome` ∈ `worked | partial | failed`; `decision.status` ∈ `proposed | accepted | superseded | rejected`
 - `tool.status` also allows `superseded` — a retired-package page kept as a redirect-stub tombstone (the same terminal word `decision` uses)
 - `superseded_by` — **required on any `status: superseded` page** (D4): the successor page stem(s) (`[a, b]` or a bare `a`), each of which must resolve; the page must *also* carry a read-time tombstone callout (`> [!…]` naming the supersession). A superseded page missing either is invalid; these pages get a dedicated **Retired / Superseded** index section.
+- `location` (`type: source`, A12) — where the artifact is, and Lint resolves it: a `repo:` citation (resolved by A1 under the §1 grammar), a repo-relative path that must exist on disk, or `"<filename> — not vendored; see the body"` for an artifact this repo doesn't hold (and then the named file must genuinely be absent — the marker is a checked claim, not a way to silence a dead path).
 - `owns` (optional, D7) — a list of topic slugs this page is the single authority for (e.g. the DuckDB decision cluster: `duckdb-sql-extension` / `duckdb-host-engine` / `duckdb-read-path-perf`). A slug must not be claimed by more than one page — one owner per topic.
 
 Dataview is **opt-in**: frontmatter is authored regardless so live
