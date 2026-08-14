@@ -368,8 +368,8 @@ wrong* the moment this phase makes it two. It is a deletion list, not a rewrite:
 - the caveat block at the top of `repo:rust-packages/laterite/README.md`;
 - the second clause in `repo:rust-packages/laterite/src/lib.rs` — the "nothing
   absorbs this crate" paragraph beneath the four API rules;
-- the facade folds into `repo:changelog.json`, which is also where the deferred
-  facade `CHANGELOG.md` issue lands rather than becoming a second file.
+- the facade folds into `repo:changelog.json`, which is also where laterite#319
+  (a facade `CHANGELOG.md`) lands rather than becoming a second file.
 
 Left in place: the qualifier on the *first* clause ("a promise about the engine"),
 which stays true after the jump — what changes is the crate's clock, not what a

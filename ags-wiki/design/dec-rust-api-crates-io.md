@@ -224,7 +224,7 @@ Three consequences worth recording here rather than only in the prose:
   its drift gate live — not GitHub Releases. `repo:tools/gen_changelog.py` renders a
   **Breaking changes** index from the declared flag (#317), so the clause resolves to
   a short list rather than ~40KB of prose. No changelog covers the facade or the
-  engine tier at all today; a facade `CHANGELOG.md` is deferred to a GitHub issue,
+  engine tier at all today; a facade `CHANGELOG.md` is deferred to laterite#319,
   paired with folding it into `repo:changelog.json` at [[dec-facade-parity]] phase 8.
 - **The engine tier's anti-promise is generated, not written.** `repo:tools/gen_crate_graph.py`
   stamps one line into each published non-facade README through the `availability`
