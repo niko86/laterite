@@ -10,9 +10,10 @@ validate, read as typed data, query, build, fix, diff, certify, and convert ↔
 Excel — with a modern, born-typed **polars** API.
 
 Coming from [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library)?
-`laterite.compat` is a faithful, faster stand-in for its `AGS4` and `AGS4.utils`
-modules — swap `from python_ags4 import AGS4` for
-`from laterite import compat as AGS4` and keep your code.
+`laterite.compat` is a faithful, faster stand-in for its `AGS4`, `check`, `utils`
+and `data` modules — **one token changes**: `python_ags4` → `laterite.compat`.
+`from python_ags4 import AGS4` becomes `from laterite.compat import AGS4`, and
+your code keeps working.
 
 [![ci](https://github.com/niko86/laterite/actions/workflows/ci.yml/badge.svg)](https://github.com/niko86/laterite/actions/workflows/ci.yml)
 [![python cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=python&label=python%20cov)](https://codecov.io/gh/niko86/laterite)
@@ -143,11 +144,28 @@ documented rule by rule. A weekly job compares the two public surfaces, so a
 function added upstream can't quietly go missing here.
 <!-- cadence: parity -->
 
-**Two caveats worth knowing before you swap the import.** `compat` mirrors the
-*library* API — python-ags4's `ags4_cli` command is not mirrored, because
-laterite ships `lat` instead with its own JSON shapes; and `compat` is one flat
-module rather than a package, so `from laterite.compat import AGS4` (a submodule
-import) is not the shape — use `from laterite import compat as AGS4`.
+`compat` is a **package** mirroring upstream's own layout, so upstream's import
+shapes work with one token changed:
+
+```python
+from python_ags4 import AGS4          # becomes:
+from laterite.compat import AGS4
+
+from python_ags4.AGS4 import AGS4_to_dataframe   # becomes:
+from laterite.compat.AGS4 import AGS4_to_dataframe
+```
+
+`AGS4`, `check`, `utils` and `data` are real, distinct submodules — so code that
+depends on module identity (monkeypatching `check.X` and expecting `AGS4` not to
+see it) behaves as it does upstream. `from laterite import compat as AGS4` also
+still works: the flat namespace is unchanged.
+
+**Two caveats before you swap.** No top-level `python_ags4` package ships, and
+that is deliberate and permanent — inside this wheel it would collide with the
+real distribution in `site-packages`. So the import token changes; the rest of
+the line does not. And `compat` mirrors the *library* API only: python-ags4's
+`ags4_cli` command is not mirrored, because laterite ships `lat` instead with
+its own JSON shapes.
 
 The validator is **clean-room** from the published AGS4 specification, not
 adapted from another library's source — python-ags4 is LGPL-3.0, and that
