@@ -63,8 +63,8 @@ Key facts:
     block is the actual risk surface — see the orphan-block note below.
   - *duckdb* — `tests/test_docs_duckdb_examples.py` (dev satellite), env-gated on
     `LATERITE_DUCKDB_EXT`; per-PR the `.sql` files are include-checked only
-    (`--strict` + `check_paths`), the **monthly `compliance-report.yml`** runs
-    them live against the from-source extension (fail-soft: ABI drift = visible
+    (`--strict` + `check_paths`), that tree's **monthly `compliance-report.yml`**
+    runs them live against the from-source extension (fail-soft: ABI drift = visible
     skip, broken snippet = red). `_`-prefixed files (`_install.sql`) are
     include-only boilerplate.
   Browser tabs are **prose** (the web app has no user-facing code API).

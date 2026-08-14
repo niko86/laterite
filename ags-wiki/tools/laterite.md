@@ -63,9 +63,12 @@ pandas path, which is the dependency this shape exists to avoid.
 | `pip install "laterite[pyarrow]"` | `pyarrow` | the optional accelerator, auto-detected at runtime |
 | `pip install "laterite[all]"` | `pandas<3` + `pyarrow` | compat and the accelerator together |
 
-`set_backend("polars")` / `LATERITE_COMPAT_BACKEND=polars`
-(`repo:packages/laterite/python/laterite/compat.py:99`) drops the pandas
-requirement from the compat path entirely.
+`set_backend("polars")`
+(`repo:packages/laterite/python/laterite/compat/_impl.py::set_backend`) and
+`LATERITE_COMPAT_BACKEND=polars`
+(`repo:packages/laterite/python/laterite/_frames.py::_DEFAULT_BACKEND`, where
+the env var is actually read) drop the pandas requirement from the compat path
+entirely.
 
 > [!note] The base wheel is light — **6.0 MB** (macOS arm64) to **6.9 MB**
 > (Windows), no bundled DuckDB; the sdist is 0.6 MB. Measured from the published

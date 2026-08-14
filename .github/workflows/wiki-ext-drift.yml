@@ -24,8 +24,9 @@ name: wiki-ext-drift
 on:
   workflow_dispatch:
   schedule:
-    # Monday 04:00 UTC — low-traffic slot, clear of the parity job's
-    # monthly 1st-of-month 03:00 run.
+    # Monday 04:00 UTC — low-traffic slot, clear of parity.yml's Sunday 03:00
+    # run (weekly since the `dropin-surface` job joined; this comment used to
+    # describe its old monthly 1st-of-month slot).
     - cron: "0 4 * * 1"
 
 permissions:
