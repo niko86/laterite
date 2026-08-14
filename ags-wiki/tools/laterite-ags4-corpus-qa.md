@@ -33,8 +33,9 @@ gather→check→cross-check), plus two added 2026-06-21:
   The finding-drift gate for the [[reliquary|parser convergence]] — now
   also **wired per-PR**: a committed baseline over the vendored corpus
   (`repo:rust-packages/laterite-ags4-corpus-qa/baselines/pyags4-vendor.json`, regen
-  note beside it) is `--check`ed in laterite-ags4-compliance's `compliance.yml`
-  gate, pinning the engine's absolute finding VALUES where the sibling
+  note beside it) is `--check`ed in the dev satellite's `compliance.yml`
+  gate — that tree runs the compliance harness, not this one — pinning the
+  engine's absolute finding VALUES where the sibling
   floor-identity check only proves the surfaces agree with each other.
 - **`censor`** — anonymise harvested files for sharing (gather →
   **clean** → check): per the generated `sensitive_headings.json` SSOT it
