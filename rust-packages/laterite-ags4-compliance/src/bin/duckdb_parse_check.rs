@@ -23,9 +23,12 @@
 //! well-formed fixtures and — unlike the leaf's lossy/lenient profile — matches
 //! duckdb's reject/empty behaviour on the 4 malformed ones.)
 //!
-//! Reads `<results>/duckdb-parse.json` (emitted by `tools/compliance/emit_duckdb.py`).
+//! Reads `<results>/duckdb-parse.json`, emitted by the dev satellite's
+//! `tools/compliance/emit_duckdb.py` — the whole compliance harness (emitters,
+//! comparator, workflows) lives there, not in this repo.
 //! Self-skips (exit 0) if that file is absent — the extension isn't built, so
-//! there is nothing to check (the monthly `compliance-report.yml` builds it).
+//! there is nothing to check (that tree's monthly `compliance-report.yml`
+//! builds it).
 //! Exit 1 on any disagreement (a missing/extra registry group, an `_id`-set
 //! split, or a read-error disagreement) EXCEPT a documented inherent divergence
 //! (see [`known_divergence`]).
