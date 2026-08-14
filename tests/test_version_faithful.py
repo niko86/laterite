@@ -56,6 +56,8 @@ import re
 import tomllib
 from pathlib import Path
 
+import yaml
+
 _REPO = Path(__file__).resolve().parents[1]
 
 
@@ -116,16 +118,26 @@ def test_node_package_and_native_deps_match_product() -> None:
     # What DOES need guarding is the input napi derives those pins from: every
     # platform the release builds must be a declared napi target, or that
     # platform ships with no addon to resolve.
-    targets = set(pkg["napi"]["targets"])
+    # READ the matrix; do not restate it. This used to compare against a literal
+    # set written here, while its own message claimed it compared against
+    # release.yml — a third hand-maintained copy of the list, checked against
+    # nothing. Adding aarch64-linux for the beta is what exposed it: the target
+    # went into package.json AND release.yml, and this still failed, because the
+    # only list it actually knew about was its own.
+    workflow = yaml.safe_load(
+        (_REPO / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+    )
     expected = {
-        "x86_64-unknown-linux-gnu",
-        "aarch64-apple-darwin",
-        "x86_64-pc-windows-msvc",
+        entry["target"]
+        for entry in workflow["jobs"]["build-node"]["strategy"]["matrix"]["include"]
     }
+    assert expected, "no targets parsed from release.yml's build-node matrix"
+
+    targets = set(pkg["napi"]["targets"])
     assert targets == expected, (
-        f"napi.targets {sorted(targets)} != the release build matrix "
-        f"{sorted(expected)} — release.yml's build-node matrix and this list "
-        "must agree, or a platform publishes without its native addon"
+        f"napi.targets {sorted(targets)} != release.yml's build-node matrix "
+        f"{sorted(expected)} — they must agree, or a platform publishes without "
+        "its native addon (or napi declares an optional dep nobody publishes)"
     )
 
 
