@@ -41,7 +41,10 @@
 //!
 //! It is a **facade**. The work happens in a tier of `laterite-ags4-*` engine
 //! crates, which move on their own version and reshape as the format work
-//! demands. This crate exists so that reshaping does not reach you.
+//! demands. This crate exists so that *their* reshaping does not reach you —
+//! a promise about the engine, and not the same thing as a promise that this
+//! crate's own surface holds still. Both clauses below; neither is worth much
+//! printed alone.
 //!
 //! Concretely, and these are the rules the API is built to:
 //!
@@ -59,6 +62,16 @@
 //!   rule here: no dependency's major version can ever force one of ours.
 //! - **One [`Error`]** with a coarse, `#[non_exhaustive]` [`ErrorKind`] and a
 //!   stable [`Error::kind_str`] shared with the Python, Node and `lat` surfaces.
+//!
+//! **Those four rules absorb the engine. Nothing absorbs this crate.** It is
+//! pre-1.0, on its own version line, and still being completed to parity with
+//! the Python and Node surfaces — its API will change, and a minor release may
+//! break you. Cargo will not carry you across a `0.x` minor on a caret
+//! requirement, which is what `cargo add` writes, so the upgrade is yours to
+//! take rather than something that happens to you. Don't force it.
+//!
+//! What that means for every surface is stated once, at
+//! <https://niko86.github.io/laterite/docs/reference/support/>.
 //!
 //! The `unstable-engine` feature is the only way past the facade. It is a
 //! feature rather than a hidden module because it shows up in *your*
@@ -79,7 +92,7 @@
 //! There is no 0.2. This paragraph used to promise one; the milestone was
 //! retired in favour of going to parity once, because a 0.2 would have been a
 //! waypoint that existed for as long as the remaining work took, on a crate
-//! whose whole purpose is to be a stable surface.
+//! whose purpose is to be a stable surface *over a moving engine*.
 
 #![forbid(unsafe_code)]
 
