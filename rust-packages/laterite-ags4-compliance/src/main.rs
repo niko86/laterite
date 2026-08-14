@@ -40,7 +40,7 @@ use serde::Deserialize;
 /// `duckdb` was dropped here in #458: the extension became a read-only reader
 /// (#446 removed `validate_ags`), so it emits no findings — its cross-surface
 /// agreement is checked by the `duckdb-parse-check` bin (read/parse-agreement)
-/// instead. See `tools/compliance/README.md`.
+/// instead. See the dev satellite's `tools/compliance/README.md`.
 const LATERITE: &[&str] = &["rust", "python-laterite", "node", "wasm"];
 /// Surfaces that can emit FYI — the same set (duckdb, the only non-FYI surface,
 /// no longer participates in findings-agreement at all; #194/#458).

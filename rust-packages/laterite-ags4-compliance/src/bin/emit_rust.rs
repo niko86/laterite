@@ -4,7 +4,8 @@
 //! Runs the in-workspace validator engine
 //! ([`laterite_ags4_validator::check_file`]) over a fixtures dir and writes
 //! `rust.json` in the exact shape the `laterite-ags4-compliance` comparator reads — the
-//! same schema `tools/compliance/_worker.py` emits for the Python surfaces.
+//! same schema the dev satellite's `tools/compliance/_worker.py` emits for the
+//! Python surfaces.
 //! This is the *reference* engine every laterite surface (python-laterite /
 //! node / wasm / duckdb) wraps, so its rule FLOOR is the identity the
 //! 4-laterite check holds the bindings to (duckdb left findings in #458).

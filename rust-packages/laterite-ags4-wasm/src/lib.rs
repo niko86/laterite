@@ -2989,12 +2989,12 @@ fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String
 /// `CARGO_PKG_VERSION`.
 ///
 /// It exists because `ags4-compliance`'s wasm runner HARD-CODED `version: "0.5.1"`
-/// (tools/compliance/emit_js.mjs) — a literal true when it was written, that the
-/// workspace moved past to 0.7.0 while nothing compared it back. The harness then
-/// printed "wasm v0.5.1" next to three 0.7.0 surfaces and called the comparison
-/// 4-laterite identity. The build was current; only the report lied. Node had this
-/// all along and asked the module; wasm had nothing to ask, which is why someone
-/// wrote a constant instead. (#556)
+/// (the dev satellite's tools/compliance/emit_js.mjs) — a literal true when it
+/// was written, that the workspace moved past to 0.7.0 while nothing compared it
+/// back. The harness then printed "wasm v0.5.1" next to three 0.7.0 surfaces and
+/// called the comparison 4-laterite identity. The build was current; only the
+/// report lied. Node had this all along and asked the module; wasm had nothing to
+/// ask, which is why someone wrote a constant instead. (#556)
 #[wasm_bindgen]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
