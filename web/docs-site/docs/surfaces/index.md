@@ -73,8 +73,8 @@ The browser package does it too — its worked examples live in the
 ## Not re-implementations — one core, proven
 
 The surfaces don't each re-implement AGS4; they wrap the same Rust core. A
-cross-surface **compliance harness** runs every read surface — Python, Node,
-wasm, DuckDB, the `lat` CLI, and the python-ags4 incumbent — over a real
+cross-surface **compliance harness** runs every read surface — the Rust core,
+Python, Node, wasm, DuckDB, and the python-ags4 incumbent — over a real
 corpus and asserts they report **byte-identical findings**, as a per-PR gate plus
 a monthly full-matrix report. So "the same verdict everywhere" is a tested
 guarantee, not a claim — see [Cross-surface parity](../concepts/cross-surface-parity.md).
