@@ -26,6 +26,8 @@ manifests this file already parses:
     crates were `publish = true`.
   * **`availability`** in each publishable crate's `README.md` — the `cargo add`
     line. Eleven of them shipped to crates.io saying nothing about installation.
+    For the ten that are not the facade it also carries the engine tier's
+    **anti-promise** (`_engine_banner`): machinery, not a door.
 
 Both come from `distribution()`: computed once, rendered twice, so the wiki and
 the shipped README cannot state different things about the same crate. A README
@@ -547,6 +549,38 @@ def _name_of(crate_dir: str) -> str | None:
 
 AVAIL = "availability"
 
+#: The one crate on crates.io that is a DOOR. Everything else this workspace
+#: publishes is the engine underneath it — named here rather than inferred from
+#: `inherited`, because "is this the door" is a fact about the architecture and
+#: not about which version line a crate happens to sit on today (the facade folds
+#: onto the product line at `dec-facade-parity` phase 8 and is still the door).
+FACADE = "laterite"
+
+
+def _engine_banner(name: str) -> list[str]:
+    """The engine tier's anti-promise, for a crate that is not the facade.
+
+    The facade's stated purpose is to absorb engine reshaping — which says
+    nothing about the engine crates themselves holding still, and they don't. A
+    reader who found one on crates.io had nothing telling them that, and ten
+    hand-written sentences would have been ten things to drift.
+
+    It rides the availability region rather than a marker of its own so that the
+    reader about to run `cargo add` meets it ABOVE the command, and so that a
+    crate cannot acquire an install line without it.
+
+    `laterite` is skipped: it is the door, and what it has to say — its own
+    clock, its own churn — is a different claim in kind, hand-written in its
+    README rather than stamped in one shape across eleven crates.
+    """
+    return [
+        f"> **Engine crate, not a door.** `{name}` is machinery inside the laterite",
+        "> toolchain, reshaped whenever the toolchain needs it. The Rust door is",
+        "> [`laterite`](https://crates.io/crates/laterite); depend on this one directly",
+        "> only if that suits you, and expect it to move.",
+        "",
+    ]
+
 
 def _availability_lines(dist: dict) -> list[str]:
     """The install block for a crate's shipped README.
@@ -558,7 +592,9 @@ def _availability_lines(dist: dict) -> list[str]:
     wrong. Generating over them would destroy information to prevent a defect
     that has not occurred.
     """
+    banner = [] if dist["name"] == FACADE else _engine_banner(dist["name"])
     return [
+        *banner,
         "## Install it",
         "",
         "```bash",

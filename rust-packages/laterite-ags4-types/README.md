@@ -28,6 +28,11 @@ each means, in both directions:
 writer side.
 
 <!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> **Engine crate, not a door.** `laterite-ags4-types` is machinery inside the laterite
+> toolchain, reshaped whenever the toolchain needs it. The Rust door is
+> [`laterite`](https://crates.io/crates/laterite); depend on this one directly
+> only if that suits you, and expect it to move.
+
 ## Install it
 
 ```bash

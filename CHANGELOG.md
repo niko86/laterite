@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <!-- GENERATED FROM changelog.json BY tools/gen_changelog.py — DO NOT EDIT BY HAND -->
 
+## Breaking changes
+
+Every change listed here declares itself breaking — at `0.x` a breaking change takes the **MINOR**, so these are the only version steps that can break you. Rendered from the same flag the release advisor reads, so a declared break cannot be missing from it.
+
+| version | change |
+|---|---|
+| [Unreleased](#unreleased) | the Node package requires Node >= 22. |
+| [0.10.0](#0100--2026-08-02) | `diff` and `censor` take an options object too. |
+| [0.9.0](#090--2026-07-30) | every `@laterite/ags4-wasm` export takes an options object. |
+| [0.9.0](#090--2026-07-30) | a synthesised `TRAN` is stamped by the caller, never invented. |
+| [0.8.0](#080--2026-07-28) | Metadata synthesis is now opt-in. |
+| [0.7.0](#070--2026-07-08) | The CLI binary and Python console-script are renamed `lat-check` → `lat`. |
+| [0.6.0](#060--2026-07-04) | The 174 typed-graph classes moved to the `laterite.groups` submodule. |
+
 ## [Unreleased]
 
 ### Added
