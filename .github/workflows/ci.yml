@@ -275,10 +275,21 @@ jobs:
       # `--no-project --with pytest`: the test is stdlib + pytest and reads the
       # tree with `git ls-files`. A `uv sync` here would build the PyO3 wheel to
       # run a one-second file walk.
+      #
+      # `-o addopts=""` is load-bearing. The root pyproject sets
+      # `addopts = "--benchmark-disable"`, which pytest reads from the inifile
+      # even under `--no-project` — and pytest-benchmark is NOT in this
+      # ephemeral env, so pytest exits 4 on an unrecognised argument before it
+      # collects anything. This job wants the file and nothing else from the
+      # project's pytest config.
+      #
+      # It passed locally and failed here, because a local `--with pytest` env
+      # can inherit a cached pytest-benchmark that a clean runner never has.
+      # Reproduce the runner's view with `-p no:benchmark`.
       - name: Stated cadences match their workflows' crons
         run: >-
           uv run --no-project --with pytest
-          pytest tests/test_stated_cadences_faithful.py -q
+          pytest -o addopts="" tests/test_stated_cadences_faithful.py -q
 
   # Supply-chain gate: RustSec advisories + the permissive-license policy +
   # crates.io-only sources + duplicate-version warnings. Config + the documented
