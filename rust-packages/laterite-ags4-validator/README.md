@@ -17,6 +17,11 @@ For end-user CLI usage run `lat --readme`, or see
 [`README-cli.md`](https://github.com/niko86/laterite/blob/main/rust-packages/laterite-cli/README-cli.md).
 
 <!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> **Engine crate, not a door.** `laterite-ags4-validator` is machinery inside the laterite
+> toolchain, reshaped whenever the toolchain needs it. The Rust door is
+> [`laterite`](https://crates.io/crates/laterite); depend on this one directly
+> only if that suits you, and expect it to move.
+
 ## Install it
 
 ```bash

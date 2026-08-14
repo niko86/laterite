@@ -21,7 +21,9 @@ for the switch:
 An entry is `{"text": …, "prs": [...], "breaking": true}` — `breaking` optional,
 defaulting to false. It is what `--advise` reads, and it must agree with the
 `**Breaking:**` marker in the text (exit 4 if not); RELEASING.md documents the
-convention for authors.
+convention for authors. It is also what the **Breaking changes** index at the top
+of the rendered file is built from — see `_breaking_index`, gated by
+`tests/test_changelog_breaking_index.py`.
 
 Exit codes: 1 stale render · 2 leak gate · 3 empty release · 4 breaking-marker
 disagreement.
@@ -136,6 +138,37 @@ def _render_block(block: dict, repo: str) -> list[str]:
     return out
 
 
+def _heading(rel: dict | None) -> str:
+    """A section's heading text — what follows `## `. `None` is [Unreleased].
+
+    One function because the breaking index links INTO these sections: the
+    anchor is derived from the same string the heading is printed from, so the
+    two cannot be changed apart.
+    """
+    if rel is None:
+        return "[Unreleased]"
+    return f"[{rel['version']}] — {rel['date']}"
+
+
+#: Everything GitHub's heading slugger drops — anything that is not a word
+#: character, an ASCII hyphen or a space.
+_NOT_IN_SLUG = re.compile(r"[^\w\- ]", re.UNICODE)
+
+
+def _anchor(heading: str) -> str:
+    """GitHub's fragment for a heading: lowercased, punctuation dropped, spaces
+    hyphenated.
+
+    Each space becomes its own hyphen — GitHub does not collapse runs — so
+    `[0.10.0] — 2026-08-02` anchors at `#0100--2026-08-02`, a DOUBLE hyphen
+    where the em dash was. That reads like a typo and is not: python-markdown's
+    slugify *would* collapse it, which is why this is written out here rather
+    than borrowed from whichever slugifier happens to be importable. `CHANGELOG.md`
+    is read on GitHub — the docs site does not render it (RELEASING.md).
+    """
+    return _NOT_IN_SLUG.sub("", heading.strip().lower()).replace(" ", "-")
+
+
 def render(data: dict) -> str:
     repo = data["repo"]
     kac = data.get("keepachangelog", "1.1.0")
@@ -148,14 +181,14 @@ def render(data: dict) -> str:
         "and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).",
         "",
         "<!-- GENERATED FROM changelog.json BY tools/gen_changelog.py — DO NOT EDIT BY HAND -->",
-        "",
-        "## [Unreleased]",
     ]
+    lines += _breaking_index(data)
+    lines += ["", f"## {_heading(None)}"]
     lines += _render_block(data.get("unreleased", {}), repo)
 
     releases = data.get("releases", [])
     for rel in releases:
-        lines += ["", f"## [{rel['version']}] — {rel['date']}"]
+        lines += ["", f"## {_heading(rel)}"]
         lines += _render_block(rel, repo)
 
     # Link references (compare for Unreleased, tag for each release).
@@ -284,6 +317,93 @@ def _breaking_check(data: dict) -> list[str]:
     for rel in data.get("releases", []):
         scan(f"[{rel.get('version', '?')}]", rel)
     return hits
+
+
+# --- the breaking-changes index ---------------------------------------------
+#
+# "Pre-1.0 a minor may break you — read the changelog before upgrading" is a
+# promise that only pays out if the changelog can be READ. This file is ~40KB of
+# prose, and the question a consumer arrives with is not "what changed" but "does
+# the step I am about to take break me" — a six-line answer buried in it.
+#
+# So the answer is rendered at the top, from the same declared flag `advise()`
+# bumps on. Not a second hand-maintained list: an entry cannot be flagged
+# breaking and left out of the index, because the index IS the flag, and the
+# `--check` drift gate fails the moment the two could disagree.
+
+#: The bold sentence the house style opens every entry with.
+_HEADLINE = re.compile(r"\A\*\*(?P<head>.+?)\*\*", re.DOTALL)
+
+#: A leading `Breaking:` on that sentence. Redundant under a heading that already
+#: says so, and dropping it makes the column read as one list of changes rather
+#: than four rows announcing themselves and three not.
+_LEADING_BREAKING = re.compile(r"\A\*{0,2}[Bb]reaking\b:?\*{0,2}\s*")
+
+
+def _first_sentence(text: str, limit: int = 120) -> str:
+    """The first sentence of `text`, hard-truncated if it has none."""
+    text = text.strip()
+    m = re.search(r"(?<=[.!?])\s", text)
+    s = (text[: m.start()] if m else text).strip()
+    return s if len(s) <= limit else s[: limit - 1].rstrip() + "…"
+
+
+def _headline(text: str) -> str:
+    """An entry's one-line form, for the index.
+
+    The house style opens each entry with a bold summary sentence — the wording
+    its author already chose. Quoting that beats paraphrasing: a summary written
+    twice is a summary that can end up disagreeing with the entry it points at.
+
+    Two entries (0.7.0, 0.8.0) put their summary first and the bare
+    `**Breaking:**` marker mid-paragraph, so stripping the prefix can empty the
+    headline; those fall back to the first sentence after the marker.
+    """
+    text = " ".join(text.split())
+    m = _HEADLINE.match(text)
+    head = _LEADING_BREAKING.sub("", m.group("head") if m else text).strip()
+    if not head:
+        head = _first_sentence(text[m.end() :] if m else text)
+    # A raw pipe would end the table cell it sits in.
+    return head.replace("|", r"\|")
+
+
+def _breaking_index(data: dict) -> list[str]:
+    """The rendered index — one row per entry declaring itself breaking."""
+    releases = data.get("releases", [])
+    blocks: list[tuple[str, dict | None, dict]] = [
+        ("Unreleased", None, data.get("unreleased", {})),
+        *((r["version"], r, r) for r in releases),
+    ]
+    rows = [
+        f"| [{label}](#{_anchor(_heading(rel))}) | {_headline(e['text'])} |"
+        for label, rel, block in blocks
+        for _, _, e in _entries(block)
+        if e.get("breaking") is True
+    ]
+
+    # Which bump a break lands on is the era's business, not a constant — the
+    # same fact `advise()` computes. Asserting "the MINOR" here would go false at
+    # 1.0 while the advisor kept getting it right, on the one page the promise
+    # sends people to.
+    current = releases[0]["version"] if releases else "0.0.0"
+    era = (
+        "at `0.x` a breaking change takes the **MINOR**"
+        if current.startswith("0.")
+        else "past `1.0` a breaking change takes the **MAJOR**"
+    )
+    out = [
+        "",
+        "## Breaking changes",
+        "",
+        f"Every change listed here declares itself breaking — {era}, so these are "
+        "the only version steps that can break you. Rendered from the same flag "
+        "the release advisor reads, so a declared break cannot be missing from it.",
+        "",
+    ]
+    if not rows:
+        return [*out, "None — no release has declared a breaking change."]
+    return [*out, "| version | change |", "|---|---|", *rows]
 
 
 def _bump(base: str, part: str) -> str:

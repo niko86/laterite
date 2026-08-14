@@ -161,6 +161,70 @@ def test_every_publishable_crate_readme_says_how_to_install_it() -> None:
     )
 
 
+def _published(non_facade: bool = True) -> list[tuple[str, Path]]:
+    """(crate name, its README) for every crate the manifests publish."""
+    man = gcg._manifests()
+    out = []
+    for crate_dir in gcg._members():
+        name = gcg._name_of(crate_dir)
+        if name is None or name not in man:
+            continue
+        if not gcg.distribution(name, man)["crates_io"]:
+            continue
+        if non_facade and name == gcg.FACADE:
+            continue
+        readme = gcg.RUST / crate_dir / "README.md"
+        if readme.exists():
+            out.append((name, readme))
+    return out
+
+
+def test_every_engine_readme_carries_the_anti_promise() -> None:
+    """The engine tier says what it is, on the page a `cargo add` decision is made.
+
+    The facade's whole stated purpose is to absorb engine reshaping — which says
+    nothing about the engine crates holding still, and a reader who found one on
+    crates.io had nothing telling them otherwise. Asserted on the committed text
+    rather than the render, so deleting the line from a README fails here instead
+    of quietly leaving that crate out of the gate's reach.
+    """
+    missing = [
+        readme.relative_to(REPO).as_posix()
+        for _, readme in _published()
+        if "**Engine crate, not a door.**" not in readme.read_text(encoding="utf-8")
+    ]
+    assert not missing, (
+        "published engine crates whose README does not say it is one — run "
+        "`uv run --no-project python tools/gen_crate_graph.py`:\n  "
+        + "\n  ".join(missing)
+    )
+
+
+def test_the_anti_promise_names_the_door() -> None:
+    """A crate told "not a door" and not told where the door is has been sent
+    nowhere. The link is to crates.io rather than to a repo path because the
+    reader this is for is on crates.io."""
+    name, readme = _published()[0]
+    text = readme.read_text(encoding="utf-8")
+    assert f"`{name}` is machinery inside the laterite" in text
+    assert "https://crates.io/crates/laterite" in text
+
+
+def test_the_facade_makes_its_own_promise_by_hand() -> None:
+    """`laterite` is the door, so it must NOT be stamped with the anti-promise.
+
+    Its README's caveat is hand-written and says something different in kind —
+    the facade has its own clock and its own churn statement, which one generated
+    line cannot carry in the same shape as the ten engine crates.
+    """
+    facade = gcg.RUST / gcg.FACADE / "README.md"
+    text = facade.read_text(encoding="utf-8")
+    assert "**Engine crate, not a door.**" not in text
+    assert "not yet at parity" in text, (
+        "the facade README has lost the hand-written caveat this gate assumes"
+    )
+
+
 def test_the_card_and_the_readme_cannot_disagree() -> None:
     """One computation, two renderings — the point of factoring `distribution()`.
 

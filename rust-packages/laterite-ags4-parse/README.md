@@ -29,6 +29,11 @@ whitespace, mixed line endings and non-UTF-8 encodings, and a parser that
 rejects them is a parser nobody can use to find out *why* they are wrong.
 
 <!-- BEGIN GENERATED: availability — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
+> **Engine crate, not a door.** `laterite-ags4-parse` is machinery inside the laterite
+> toolchain, reshaped whenever the toolchain needs it. The Rust door is
+> [`laterite`](https://crates.io/crates/laterite); depend on this one directly
+> only if that suits you, and expect it to move.
+
 ## Install it
 
 ```bash
