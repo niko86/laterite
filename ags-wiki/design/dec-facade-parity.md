@@ -358,6 +358,23 @@ gains the facade as a stamped surface, and the floor gate starts asserting
 `0 below`. None of that should ride in on the back of the last capability
 landing.
 
+**Phase 8 also retires four documents**, added 2026-08-14 with the versioning
+revision on [[dec-rust-api-crates-io]]. That revision says the facade has its own
+clock and is outside the beta claim — true while three clocks run, and *actively
+wrong* the moment this phase makes it two. It is a deletion list, not a rewrite:
+
+- the facade paragraph in `repo:web/docs-site/docs/reference/support.md`
+  ("How versions move") goes, and the crate's row joins the beta table above it;
+- the caveat block at the top of `repo:rust-packages/laterite/README.md`;
+- the second clause in `repo:rust-packages/laterite/src/lib.rs` — the "nothing
+  absorbs this crate" paragraph beneath the four API rules;
+- the facade folds into `repo:changelog.json`, which is also where the deferred
+  facade `CHANGELOG.md` issue lands rather than becoming a second file.
+
+Left in place: the qualifier on the *first* clause ("a promise about the engine"),
+which stays true after the jump — what changes is the crate's clock, not what a
+facade is for.
+
 ## Consequences
 
 **What moves:** the facade's version, once, from 0.1.2 to the product number.

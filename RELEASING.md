@@ -202,9 +202,10 @@ at whatever laterite version is then current.
 The docs (`web/docs-site/`) deploy to `/laterite/docs/` on **every main push**
 (`deploy-validator.yml`) — deliberately *not* gated on the release tag, so a doc
 fix ships immediately. The **Changelog page** (`web/docs-site/docs/reference/changelog.md`)
-is a short hand-written stub that points readers at the GitHub Releases feed. It
-does NOT render `CHANGELOG.md` and carries no version number — so there is
-nothing about it to confirm after a release, and step 6 above says so.
+is a short hand-written stub that points readers at root `CHANGELOG.md` and its
+breaking-changes index, with the GitHub Releases feed second. It does NOT render
+`CHANGELOG.md` and carries no version number — so there is nothing about it to
+confirm after a release, and step 6 above says so.
 
 ## What keeps it honest
 

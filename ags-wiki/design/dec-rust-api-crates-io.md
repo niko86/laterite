@@ -33,6 +33,13 @@ repo_refs:
 > published too, renamed `laterite-ags4-excel` and gated behind an optional
 > facade feature. `laterite-cli` is **not** published — decided against, not
 > deferred. Everything else on this page stands.
+>
+> **Revised 2026-08-14 — [Versioning](#versioning), marked inline.** The rules in
+> that section are how the facade absorbs *engine* reshaping; they are not a promise
+> that the facade's own surface holds still, and both clauses were being printed
+> alone. Three promises for the three clocks, "read the changelog" scoped to the
+> product line, and the engine tier's anti-promise generated rather than written.
+> Expires at [[dec-facade-parity]] phase 8.
 
 ## Context
 
@@ -182,6 +189,52 @@ plus minor-for-breaking gives the same protection without the diamond.
 
 This is a step toward [[reliquary|per-crate versioning]] (laterite#153) without
 deciding that question now.
+
+**Revised 2026-08-14 — what the rules above are a promise *about*.** Everything in
+this section is the mechanism by which the facade absorbs **engine** reshaping. It
+was being read as a promise the facade makes about **itself**, because both halves
+were printed alone: `repo:rust-packages/laterite/src/lib.rs` said "this crate exists
+so that reshaping does not reach you" and "a crate whose whole purpose is to be a
+stable surface" four lines from a README saying its API will change. The fix is a
+qualifier, not a new rule — the two clauses are never printed apart now.
+
+Stated as **three promises, matching the three clocks this page already establishes**
+(not one blanket sentence, which under-promises on Python and over-promises on the
+facade, and not the tiered *quality* claim [[dec-beta-claim]] rejected — this is
+tiered *versioning*, which that page's own "the Rust crate keeps its own clock"
+already implies):
+
+| tier | promise |
+|---|---|
+| product line | one version, one changelog, pre-1.0 minor-for-breaking, in beta |
+| `laterite` facade | not at parity, changes faster, outside the beta claim, own clock |
+| engine crates | an anti-promise — machinery, not a door; reshapes freely |
+
+Three consequences worth recording here rather than only in the prose:
+
+- **"Read the changelog before upgrading" is a product-line clause only.** Decided on
+  an asymmetry this section's own rule creates: Cargo will not resolve a caret
+  requirement across a `0.x` minor, so a Rust consumer is protected by the resolver
+  whether or not they read anything, while `pip install laterite` unpinned is not.
+  Saying it about the facade would add a maintenance obligation supporting a promise
+  the facade is excluded from. The facade gets the honest form instead — *the API
+  will change; Cargo will not move you across a minor; do not force it.* (npm's `^`
+  behaves as Cargo's does on `0.x`; pip is the one with no equivalent.)
+- **The named artifact is root `CHANGELOG.md`**, where the `breaking` machinery and
+  its drift gate live — not GitHub Releases. `repo:tools/gen_changelog.py` renders a
+  **Breaking changes** index from the declared flag (#317), so the clause resolves to
+  a short list rather than ~40KB of prose. No changelog covers the facade or the
+  engine tier at all today; a facade `CHANGELOG.md` is deferred to a GitHub issue,
+  paired with folding it into `repo:changelog.json` at [[dec-facade-parity]] phase 8.
+- **The engine tier's anti-promise is generated, not written.** `repo:tools/gen_crate_graph.py`
+  stamps one line into each published non-facade README through the `availability`
+  region (#317) — ten hand-written sentences would be ten things to drift.
+
+Canonical home for all of it is `repo:web/docs-site/docs/reference/support.md`
+("How versions move"); `lib.rs` and `repo:rust-packages/laterite/README.md` carry
+short forms linking back. **This revision expires at [[dec-facade-parity]] phase 8**,
+where three clocks become two and the facade's separate statement becomes actively
+wrong — the four doc deletions are on that page's phase-8 checklist.
 
 ## Consequences
 
