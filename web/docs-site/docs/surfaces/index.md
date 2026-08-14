@@ -80,4 +80,3 @@ a monthly full-matrix report. So "the same verdict everywhere" is a tested
 guarantee, not a claim — see [Cross-surface parity](../concepts/cross-surface-parity.md).
 <!-- cadence: compliance -->
 <!-- cadence: compliance-report -->
-

@@ -188,7 +188,6 @@ documented rule by rule in [COMPAT.md](COMPAT.md) and the
 public surfaces, so a function added upstream can't quietly go missing here.
 <!-- cadence: parity -->
 
-
 **The CLI is deliberately not mirrored.** laterite ships `lat` instead, with its
 own JSON / NDJSON shapes — so a *script* that shells out to `ags4_cli` needs
 porting rather than an import swap. Your Python code is unaffected.

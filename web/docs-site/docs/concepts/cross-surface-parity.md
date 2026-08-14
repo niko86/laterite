@@ -29,7 +29,6 @@ including the DuckDB extension built from source).
 <!-- cadence: compliance -->
 <!-- cadence: compliance-report -->
 
-
 ## Why it matters to you
 
 It means you can **choose a surface for its ergonomics, not its correctness**.

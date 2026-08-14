@@ -82,14 +82,25 @@ finds all of them and Markdown renders none of them.
 %% cadence: compliance-report            inside a mermaid fence
 ```
 
-Exemptions reuse the wiki lint's A11 (`repo:ags-wiki/.bootstrap/lint.py`) word
-and both its forms, and are
-**line-scoped**: `cadence: historical` exempts every cadence word on its line,
-`cadence: historical=monthly` only the one named. The specific form is the one
-that does the work — the two real exemptions in this tree each put the live word
-and the dead one in a single sentence ("Weekly rather than monthly since the
-`dropin-surface` job joined"), so a block-scoped exemption would silence the live
-claim along with the narration.
+Exemptions borrow the wiki lint's A11 (`repo:ags-wiki/.bootstrap/lint.py`) word,
+its line-scoping, and its generic/specific shape — but **not** its spelling:
+A11's specific form is `<!-- retired: TERM -->` naming a retired term, and it has
+no form that names a word to exempt. Here:
+
+- `cadence: historical` — every cadence word on that line;
+- `cadence: historical=monthly` — only the one named, which must be a real
+  cadence word.
+
+The specific form is the one that does the work. All **three** exemptions in this
+tree put the live word and the dead one in a single sentence ("Weekly rather than
+monthly since the `dropin-surface` job joined"), so the generic form would
+silence the live claim along with the narration every time.
+
+An exemption is the grammar's only off-switch, so it carries a lock: **naming a
+word that is the workflow's CURRENT cadence is itself a finding.** Without it,
+`cadence: historical=weekly` on a block claiming `parity.yml` runs weekly is
+green — the word is stripped before either check sees it. `historical` marks a
+schedule that no longer holds, not one you would rather not annotate.
 
 ## The missing half: a mirror nobody checks
 

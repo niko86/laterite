@@ -100,7 +100,7 @@ _IN_REPO: dict[str, _InRepoSpec] = {
         # ("parity-cross-check vs python-ags4"), neither of which says anything
         # about a schedule. An alias that matches the subject matter rather than
         # the workflow trains people to exempt, which is how a tripwire dies.
-        aliases=("parity.yml", "parity oracle", "parity job"),
+        aliases=("parity.yml", "parity oracle", "parity job", "oracle run"),
         self_identifies=True,
     ),
     # One workflow, two cadences: the cron above AND a `pull_request` trigger. Its
@@ -183,16 +183,21 @@ _WORD_RES = {
 #: pages), `#` in Python/YAML, `//!` in Rust, `%%` inside a mermaid fence.
 _MARKER = re.compile(r"cadence:\s*([A-Za-z0-9_.-]+)")
 
-#: Line-scoped exemption, reusing A11's word AND its two forms. Line- rather than
-#: block-scoped because the real cases make a live claim and narrate a superseded
-#: one in the same breath.
+#: Line-scoped exemption. It borrows A11's WORD and its line-scoping, and its
+#: generic/specific SHAPE — but the specific spelling is new: A11's is
+#: `<!-- retired: TERM -->` naming a retired term, and there is no A11 form that
+#: names a word to exempt. Do not read this as "the same two forms".
 #:
-#: Both forms are needed, which building this proved rather than predicted: the
-#: only two exemptions this tree wants put the live word and the dead one on ONE
-#: line — `parity.yml`'s "Weekly rather than monthly since the dropin-surface job
-#: joined", `oracle-drift-pin.md`'s "monthly when this was written, weekly since
-#: 2026-07-24". The generic form would silence the live claim along with the dead
-#: one in both, so it is the specific form that does the work here.
+#: Line- rather than block-scoped because the real cases make a live claim and
+#: narrate a superseded one in the same breath.
+#:
+#: The specific form is what does the work, which building this proved rather
+#: than predicted. All THREE exemptions this tree wants put the live word and the
+#: dead one on ONE line — `parity.yml`'s "Weekly rather than monthly since the
+#: dropin-surface job joined", `wiki-ext-drift.yml`'s note about parity's old
+#: slot, and `oracle-drift-pin.md`'s "weekly since 2026-07-24, monthly when this
+#: was written". The generic form would silence the live claim along with the
+#: dead one in every case, so it is never the right one here.
 #:
 #:   cadence: historical           every cadence word on this line
 #:   cadence: historical=monthly   only `monthly`, and it must be a real cadence
@@ -359,10 +364,18 @@ def _blocks(text: str, *, markdown: bool) -> list[tuple[int, list[str]]]:
     return out
 
 
-def _words_in(lines: list[str]) -> tuple[set[str], list[str]]:
-    """(cadence words claimed in this block, malformed exemptions on its lines)."""
+def _words_in(lines: list[str]) -> tuple[set[str], list[str], set[str]]:
+    """(cadence words claimed, malformed exemptions, words an exemption hid).
+
+    The third return value exists because an exemption is the one construct here
+    that carries a cadence word and REMOVES it from the check — i.e. the only
+    off-switch in the grammar. `_findings` compares what it hid against what the
+    block's workflows currently run, so `historical` cannot be used to silence a
+    live claim.
+    """
     found: set[str] = set()
     malformed: list[str] = []
+    hidden: set[str] = set()
     for line in lines:
         exempt: set[str] = set()
         for m in _EXEMPT.finditer(line):
@@ -374,19 +387,19 @@ def _words_in(lines: list[str]) -> tuple[set[str], list[str]]:
                 malformed.append(named)
                 continue
             exempt.update(w for w in _CADENCE_WORDS if w.lower() == named.lower())
-        found.update(
-            w for w, rx in _WORD_RES.items() if w not in exempt and rx.search(line)
-        )
-    return found, malformed
+        on_line = {w for w, rx in _WORD_RES.items() if rx.search(line)}
+        hidden |= on_line & exempt
+        found |= on_line - exempt
+    return found, malformed, hidden
 
 
-def _markers_in(lines: list[str]) -> list[str]:
-    return [
+def _markers_in(lines: list[str]) -> set[str]:
+    return {
         m.group(1)
         for line in lines
         for m in _MARKER.finditer(line)
         if m.group(1) != _HISTORICAL
-    ]
+    }
 
 
 def _identities_in(
@@ -416,12 +429,28 @@ def _findings() -> tuple[list[str], list[str]]:
             continue
         for start, lines in _blocks(text, markdown=path.suffix == ".md"):
             markers = _markers_in(lines)
-            stated, malformed = _words_in(lines)
+            stated, malformed, hidden = _words_in(lines)
+            ids = _identities_in(lines, rel, authorities)
             where = f"{rel}:{start}"
 
             if malformed:
                 disagreements.append(
                     f"{where}: exemption names no cadence word: {', '.join(malformed)}"
+                )
+
+            # An exemption is the grammar's only off-switch, so it needs a lock.
+            # Without this, `cadence: historical=weekly` on a block claiming
+            # `parity.yml` runs weekly is GREEN — the word is stripped before
+            # either check sees it, and a marker that silences the live claim it
+            # annotates is worse than no marker at all. `historical` means a
+            # schedule that no longer holds; if the word it hides is what that
+            # workflow runs on TODAY, it is being used as a mute button.
+            live = {authorities[w].cadence for w in markers | ids if w in authorities}
+            if bogus := hidden & live:
+                disagreements.append(
+                    f"{where}: `historical` hides {sorted(bogus)}, which is the "
+                    f"CURRENT cadence of {sorted(markers | ids)} — exempt a dead "
+                    f"schedule, not a live one"
                 )
 
             if markers:

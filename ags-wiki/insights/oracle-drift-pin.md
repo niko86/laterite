@@ -69,13 +69,12 @@ versioned conformance corpus + pinned reference oracle).
 > `upstream-pin` job on `parity.yml`'s scheduled cron — weekly since 2026-07-24,
 > monthly when this was written <!-- cadence: historical=monthly --> — never
 > a PR) adds the <!-- cadence: parity -->
-> (that "weekly since" is itself now gated — see
-> [[stated-cadences-faithful]])
 > direction nothing checked before: noticing when PyPI moves *past* the
 > pin. See [[vendored-authority-faithful]] for the full account — including
 > the mutation-test proof of the gap and the honest limit that this still
 > cannot show python-ags4 itself matches the AGS spec, only that we match
-> python-ags4.
+> python-ags4. The "weekly since 2026-07-24" above is itself gated now — see
+> [[stated-cadences-faithful]].
 
 ## Related
 [[parity-model]] · [[observations-coverage-map]] · [[rust-vs-python-ags4-parity]] · req-reproducible-conformance-corpus · [[vendored-authority-faithful]]

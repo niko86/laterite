@@ -143,7 +143,6 @@ documented rule by rule. A weekly job compares the two public surfaces, so a
 function added upstream can't quietly go missing here.
 <!-- cadence: parity -->
 
-
 **Two caveats worth knowing before you swap the import.** `compat` mirrors the
 *library* API — python-ags4's `ags4_cli` command is not mirrored, because
 laterite ships `lat` instead with its own JSON shapes; and `compat` is one flat

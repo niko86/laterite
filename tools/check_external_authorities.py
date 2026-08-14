@@ -35,6 +35,16 @@ A MISSING record, path, or mirror is a FAILURE, never a skip. `ruleset-drift.yml
 already wrote the argument: a gate that cannot read its own subject is
 decorative, and a silent permanent skip is how it stays that way.
 
+This DELIBERATELY overrides the "unreachable exits 0 — no opinion" posture
+`check_upstream_pin.py` and `check_ext_drift.py` both take, and which was the
+stated intent for this check too. Their escape hatch exists because their subject
+is a NETWORK — PyPI, the GitHub API — where a timeout is not evidence of
+anything. Pushing the check into the satellite removed the network: the subject
+here is a file in a checkout, so every way of failing to read it is a real fault
+(a bad path, a lost record, a mirror that was deleted), and "no opinion" would
+just be the permanent skip the paragraph above warns about. If a future version
+reaches over a network again, that clause comes back with it.
+
 Exit 0 all reconciled · 1 drift, or anything unreadable.
 """
 
