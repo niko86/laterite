@@ -23,8 +23,13 @@ without this test noticing.
 
 `_matches` reimplements the picomatch subset these filters use. It was verified
 against the real `picomatch` (via `web/node_modules`) over every tracked file
-in the repo — 1385 paths x every pattern in all four filters, exact agreement,
-including the negation semantics that produced #230.
+in the repo — exact agreement, including the negation semantics that produced
+#230. Re-run whenever a filter is added, and say what it covered, because the
+number is the only thing that shows the claim is not stale:
+
+  #230 (four filters)   1385 paths x every pattern, exact agreement
+  #313 (five filters)   1453 paths x 40 patterns = 58120 pairs, exact agreement
+                        — `prose` joined for the cadence gate
 """
 
 from __future__ import annotations

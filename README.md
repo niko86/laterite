@@ -186,6 +186,7 @@ skips dates — `laterite.read` is born-typed, dates included.
 documented rule by rule in [COMPAT.md](COMPAT.md) and the
 [parity coverage map](docs/parity-coverage-map.md). A weekly job compares the two
 public surfaces, so a function added upstream can't quietly go missing here.
+<!-- cadence: parity -->
 
 **The CLI is deliberately not mirrored.** laterite ships `lat` instead, with its
 own JSON / NDJSON shapes — so a *script* that shells out to `ags4_cli` needs

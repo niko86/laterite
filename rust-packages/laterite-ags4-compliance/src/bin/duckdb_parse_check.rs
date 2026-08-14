@@ -28,7 +28,7 @@
 //! comparator, workflows) lives there, not in this repo.
 //! Self-skips (exit 0) if that file is absent — the extension isn't built, so
 //! there is nothing to check (that tree's monthly `compliance-report.yml`
-//! builds it).
+//! builds it).  cadence: compliance-report
 //! Exit 1 on any disagreement (a missing/extra registry group, an `_id`-set
 //! split, or a read-error disagreement) EXCEPT a documented inherent divergence
 //! (see [`known_divergence`]).

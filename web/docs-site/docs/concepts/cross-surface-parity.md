@@ -26,6 +26,8 @@ currency — the set of `"AGS Format Rule N"` labels that fired — then asserts
 This runs two ways: a **per-PR gate** (the four in-repo surfaces, on every change
 that could move a finding) and a **monthly full-matrix report** (all six,
 including the DuckDB extension built from source).
+<!-- cadence: compliance -->
+<!-- cadence: compliance-report -->
 
 ## Why it matters to you
 

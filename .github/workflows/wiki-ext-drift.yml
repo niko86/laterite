@@ -25,8 +25,9 @@ on:
   workflow_dispatch:
   schedule:
     # Monday 04:00 UTC — low-traffic slot, clear of parity.yml's Sunday 03:00
-    # run (weekly since the `dropin-surface` job joined; this comment used to
-    # describe its old monthly 1st-of-month slot).
+    # run (weekly since the `dropin-surface` job joined).  cadence: parity
+    # It used to describe parity's old monthly slot — cadence: historical=monthly
+    # — which is exactly the drift the cadence gate now exists to catch.
     - cron: "0 4 * * 1"
 
 permissions:

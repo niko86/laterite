@@ -1,0 +1,57 @@
+{
+  "_comment": [
+    "Authorities this repo's CI CANNOT SEE, and the value last reconciled against",
+    "them. Read by tests/test_stated_cadences_faithful.py (which checks our prose",
+    "against it) and by tools/check_external_authorities.py (which runs in the",
+    "OTHER repo and checks it against the real file).",
+    "",
+    "Every entry here is a CLAIM, not a fact. The fact is the `cron:`/`on:` line in",
+    "the file named below; this is a mirror of it, and a mirror nothing compares",
+    "back to its subject is #549's Shape 1 — the gate enforcing a proxy for the",
+    "promise. The far-side job is what stops that, so a record whose `repo` has no",
+    "reconciling job is worse than no record at all: it looks checked.",
+    "",
+    "ONLY invisible authorities belong here. `.github/workflows/parity.yml` is in",
+    "this tree and resolves straight against its own file (see the test's",
+    "_IN_REPO) — mirroring it would manufacture a proxy where the promise was",
+    "already readable.",
+    "",
+    "Adding a record: add it here, then add the reconciling step in that repo, in",
+    "that order (the far side hard-fails on a record it cannot resolve, so the",
+    "reverse order is red for as long as it takes you to notice).",
+    "",
+    "`aliases` is what the unannotated-claim tripwire keys on: the prose that",
+    "drifted in #311 never named a workflow file, so filename-matching alone would",
+    "have missed the two pages the whole gate exists for."
+  ],
+  "authorities": [
+    {
+      "id": "compliance-report",
+      "kind": "cadence",
+      "repo": "niko86/laterite-dev",
+      "path": ".github/workflows/compliance-report.yml",
+      "form": "cron",
+      "value": "0 4 1 * *",
+      "aliases": [
+        "compliance-report.yml",
+        "compliance harness",
+        "full-matrix report",
+        "full matrix report",
+        "matrix report"
+      ],
+      "note": "The 6-surface findings-agreement report (4 laterite surfaces + python-ags4 + the from-source DuckDB extension). Called 'weekly' on two published pages until #311; that was parity.yml's cadence, conflated with this."
+    },
+    {
+      "id": "compliance",
+      "kind": "cadence",
+      "repo": "niko86/laterite-dev",
+      "path": ".github/workflows/compliance.yml",
+      "form": "trigger",
+      "value": "pull_request",
+      "aliases": [
+        "compliance.yml"
+      ],
+      "note": "The per-PR half of the same harness — the binding invariant over the four in-repo surfaces. Mirrored because our prose asserts its cadence too ('a per-PR gate plus a monthly full-matrix report'), and a sentence making two claims needs both resolvable or the completeness check cannot tell a dropped claim from an unmade one."
+    }
+  ]
+}

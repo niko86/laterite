@@ -66,7 +66,9 @@ Key facts:
     (`--strict` + `check_paths`), that tree's **monthly `compliance-report.yml`**
     runs them live against the from-source extension (fail-soft: ABI drift = visible
     skip, broken snippet = red). `_`-prefixed files (`_install.sql`) are
-    include-only boilerplate.
+    include-only boilerplate. That "monthly" is a claim about another repo's
+    cron, and [[stated-cadences-faithful]] is what holds it to it.
+    <!-- cadence: ci --><!-- cadence: compliance-report -->
   Browser tabs are **prose** (the web app has no user-facing code API).
 - **A Python example is `uv run`-able on its own** — all 18, plus the marimo tour.
   Each carries a PEP 723 `# /// script` header pinning
