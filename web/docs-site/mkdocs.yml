@@ -29,7 +29,12 @@ site_description: >-
 site_url: https://niko86.github.io/laterite/docs/
 repo_url: https://github.com/niko86/laterite
 repo_name: niko86/laterite
+# Overwritten at build time by hooks/version_stamp.py, which appends the product
+# version + a changelog link. Kept here as the fallback text and so the footer is
+# still legible if the hook is ever removed.
 copyright: laterite — MIT-licensed AGS4 tooling
+hooks:
+  - hooks/version_stamp.py
 
 docs_dir: docs
 site_dir: ../dist/docs

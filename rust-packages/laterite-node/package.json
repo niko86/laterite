@@ -55,13 +55,14 @@
     "packageName": "@laterite/native",
     "targets": [
       "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
       "aarch64-apple-darwin",
       "x86_64-pc-windows-msvc"
     ],
     "enableDefaultTargets": false
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "scripts": {
     "build": "napi build --platform --release && npm run build:ts",

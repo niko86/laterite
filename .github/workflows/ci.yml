@@ -120,6 +120,7 @@ jobs:
               - 'web/docs-site/examples/**'  # docs example sources — test_docs_examples.py executes these
               - 'examples/sample_site.ags'   # the fixture that gate reads (subprocess cwd = repo root)
               - 'web/docs-site/scripts/**'   # catalogue_data/gen_* — its drift gate (test_groups_catalogue_faithful) runs in the python job
+              - 'web/docs-site/hooks/**'    # mkdocs build hooks — ruff lints them in the python job, so they must fire `code`
               # SSOT paths a gate IN THIS REPO actually reads. That is the rule
               # every block below invokes: an entry earns its place by naming a
               # path some test or step here opens. List a path for a gate that
@@ -710,6 +711,22 @@ jobs:
       # writes coverage/lcov.info for the Codecov `node` flag below.
       - name: vitest (+ coverage)
         run: npm run test:coverage
+
+      # Node 24 on the SAME native build, so the declared floor (`engines.node`
+      # >=22) and the tested ceiling are both real. Deliberately a second step
+      # rather than a matrix over the job: `node` is a REQUIRED check context in
+      # the ruleset, and a matrix renames it to `node (22)` / `node (24)` — the
+      # requirement would then reference a context nothing ever reports and
+      # every PR would pend forever.
+      #
+      # One napi build serves both because the addon is Node-API (ABI-stable
+      # across major versions) — that portability is the property being tested
+      # here, so a rebuild would test the wrong thing.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+      - name: vitest on Node 24 (no coverage — the 22 run owns the report)
+        run: npm test
 
       # The Node half of #164's doc-output gate. docs-examples.test.ts already RUNS
       # every .mjs example — but it only checks that the asserts hold, never what the

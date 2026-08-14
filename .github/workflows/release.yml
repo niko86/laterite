@@ -121,16 +121,25 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-          # aarch64-linux dropped from the wheel matrix at the
-          # self-hosted cutover: no local ARM-Linux runner (Mac runs
-          # ARM macOS via Tart, Proxmox is x86_64), and the previously
-          # used GitHub-hosted ubuntu-24.04-arm became a billing
-          # dependency we wanted to remove. v0.1.0 still has an ARM
-          # Linux wheel on PyPI; future ARM Linux users on newer
-          # versions install from source (`pip install laterite` falls
-          # back to the sdist). Revisit if PyPI download stats show
-          # meaningful ARM Linux usage — at that point a Docker runner
-          # on the Mac (native ARM) is the cleanest provisioning path.
+          # aarch64-linux RESTORED for the beta. It was dropped citing
+          # two reasons, and re-checked when the support windows were
+          # settled: the first never applied and the second expired.
+          #
+          #   "no local ARM-Linux runner" — true of the self-hosted
+          #   pool, irrelevant here: this matrix has never used it
+          #   (`runs-on: ${{ matrix.os }}`, all GitHub-hosted).
+          #   "a billing dependency we wanted to remove" — the binding
+          #   one at the time, on a repo that was then PRIVATE. This
+          #   repo is public, where arm64 Linux hosted runners are free.
+          #
+          # It has an identifiable user in a way the other absent
+          # targets do not: Apple Silicon devs in linux/arm64
+          # containers, Graviton/Ampere, ARM CI. Adding a target later
+          # is cheap and welcome; removing one is a breaking change for
+          # whoever is on it — so it goes in BEFORE the announcement,
+          # not after.
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
           - os: macos-latest
             target: aarch64-apple-darwin
           - os: windows-2022
@@ -533,9 +542,15 @@ jobs:
         run: |
           pip install --quiet wheel
           cd pypi/
-          for whl in laterite-*-linux_x86_64.whl; do
-            [ -e "$whl" ] || continue
-            python -m wheel tags --platform-tag manylinux2014_x86_64 --remove "$whl"
+          # BOTH Linux arches. aarch64 rejoined the matrix for the beta, and a
+          # `linux_aarch64` wheel is refused by PyPI exactly as `linux_x86_64`
+          # is — so a loop over x86_64 alone would build the ARM wheel, upload
+          # it, and fail the release at the last step.
+          for arch in x86_64 aarch64; do
+            for whl in laterite-*-linux_${arch}.whl; do
+              [ -e "$whl" ] || continue
+              python -m wheel tags --platform-tag "manylinux2014_${arch}" --remove "$whl"
+            done
           done
           echo "After re-tag:"
           ls -la
@@ -597,12 +612,13 @@ jobs:
         run: |
           pip install --quiet wheel
           cd pypi/
-          for whl in laterite-*-linux_x86_64.whl; do
-            [ -e "$whl" ] || continue
-            python -m wheel tags --platform-tag manylinux2014_x86_64 --remove "$whl"
+          # Both Linux arches — see the publish job's copy of this loop.
+          for arch in x86_64 aarch64; do
+            for whl in laterite-*-linux_${arch}.whl; do
+              [ -e "$whl" ] || continue
+              python -m wheel tags --platform-tag "manylinux2014_${arch}" --remove "$whl"
+            done
           done
-          # aarch64-linux dropped from the wheel matrix at the
-          # self-hosted cutover — no retag loop for it.
           echo "After re-tag:"
           ls -la
 
@@ -643,6 +659,15 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+          # Must stay in lockstep with `napi.targets` in package.json: napi
+          # generates an `optionalDependencies` entry per declared target, so a
+          # target listed there but not built here publishes a `laterite` that
+          # resolves `@laterite/native-linux-arm64-gnu` to a package nobody
+          # published. `tests/test_version_faithful.py` now PARSES this matrix
+          # and asserts it equals `napi.targets` — it used to compare against a
+          # literal list written in the test, which is what let this drift.
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
           - os: macos-latest
             target: aarch64-apple-darwin
           - os: windows-2022
