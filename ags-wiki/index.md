@@ -1,7 +1,7 @@
 ---
 type: index
-generated: 2026-08-13
-counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 29, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 24}
+generated: 2026-08-14
+counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 30, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 24}
 ---
 # AGS Wiki — Content Catalog
 
@@ -15,7 +15,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 29, concept
 | Groups | 177 |
 | Types | 17 |
 | Observations | 50 |
-| Tools | 29 |
+| Tools | 30 |
 | Concepts | 30 |
 | Editions | 5 |
 | Comparisons | 1 |
@@ -23,10 +23,10 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 29, concept
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
 | Design | 24 |
-| **Total (live)** | **403** |
+| **Total (live)** | **404** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 23 · `confirmed` 18 · `drafted` 332 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 5 · `stub` 13
+**Status distribution:** `accepted` 23 · `confirmed` 18 · `drafted` 332 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -352,6 +352,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 29, concept
 | [[laterite-transport]] | drafted | crate |
 | [[laterite]] | drafted | python-package |
 | [[python-ags4]] | drafted | reference-impl |
+| [[stated-cadences-faithful]] | reviewed | script |
 | [[vendored-authority-faithful]] | reviewed | script |
 
 ## Concepts

@@ -3,7 +3,8 @@
 A committed baseline here freezes the **exact findings** the clean-room Rust
 validator produces over a fixed corpus — the structural tuple
 `(rule, line, group, field_index, severity)` per file, keyed by content
-`sha256`. It is the per-PR *value* gate: `compliance.yml`'s floor-identity step
+`sha256`. It is the per-PR *value* gate <!-- cadence: compliance -->:
+`compliance.yml`'s floor-identity step
 proves the surfaces **agree with each other**, this proves the engine still
 produces the **same findings it did when the baseline was frozen**. A
 shared-engine change that skews findings *consistently* across every surface

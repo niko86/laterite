@@ -66,8 +66,11 @@ versioned conformance corpus + pinned reference oracle).
 > now checks them byte-for-byte against the installed oracle (plus the file
 > set, the `fallback_edition` behaviour, and all four hand-written `1.2.0`
 > claims across the tree), and `repo:tools/check_upstream_pin.py` (a new
-> `upstream-pin` job on `parity.yml`'s scheduled cron — monthly when this was
-> written, weekly since 2026-07-24 — never a PR) adds the
+> `upstream-pin` job on `parity.yml`'s scheduled cron — weekly since 2026-07-24,
+> monthly when this was written <!-- cadence: historical=monthly --> — never
+> a PR) adds the <!-- cadence: parity -->
+> (that "weekly since" is itself now gated — see
+> [[stated-cadences-faithful]])
 > direction nothing checked before: noticing when PyPI moves *past* the
 > pin. See [[vendored-authority-faithful]] for the full account — including
 > the mutation-test proof of the gap and the honest limit that this still

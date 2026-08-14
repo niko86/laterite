@@ -2,7 +2,7 @@
 # laterite.compat. The failing SET is the parity contract.
 #
 # Manual `workflow_dispatch` + scheduled weekly so an upstream
-# silent drift surfaces before it bites a user.
+# silent drift surfaces before it bites a user.  cadence: parity
 #
 # That sentence was false for as long as it existed (#558): PYTHON_AGS4_VERSION
 # below pins the oracle, so the cron re-ran one frozen version forever and could
@@ -25,12 +25,14 @@ name: parity
 on:
   workflow_dispatch:
   schedule:
-    # Sundays, 03:00 UTC. Weekly rather than monthly since the `dropin-surface`
-    # job joined: a month is a long time to be unaware that upstream grew a
-    # public function our drop-in doesn't have. Both scheduled jobs are cheap
-    # (no wheel build, no Rust), so the extra cadence costs close to nothing.
+    # Sundays, 03:00 UTC. Weekly rather than monthly (cadence: historical=monthly)
+    # since the `dropin-surface` job joined: a month is a long time to be unaware
+    # that upstream grew a public function our drop-in doesn't have. Both
+    # scheduled jobs are cheap (no wheel build, no Rust), so the extra cadence
+    # costs close to nothing.  cadence: parity
     - cron: "0 3 * * 0"
-  # Per-PR regression gate (#190). NO trigger-level `paths:` — that is what made
+  # Per-PR regression gate (#190).  cadence: parity-pr
+  # NO trigger-level `paths:` — that is what made
   # this un-requireable (#556): a required check behind a trigger filter never
   # fires on an out-of-scope PR, so no check run is created and the requirement
   # pends FOREVER, exiting only via the admin bypass button. We already ate that
@@ -126,7 +128,8 @@ jobs:
   #
   # Also PR-exempt, for the same reason as upstream-pin: upstream releasing while
   # a PR is open is not that PR's fault. On the weekly cron, a red run IS the
-  # notice. Separate job so "they added something" and "we regressed" can't
+  # notice.  cadence: parity
+  # Separate job so "they added something" and "we regressed" can't
   # collapse into one ambiguous red X.
   #
   # No wheel, no Rust, no maturin: the check is AST-based on both sides, so the

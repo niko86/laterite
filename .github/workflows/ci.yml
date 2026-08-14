@@ -75,6 +75,7 @@ jobs:
       node: ${{ steps.filter.outputs.node }}
       docs: ${{ steps.filter.outputs.docs }}
       web: ${{ steps.filter.outputs.web }}
+      prose: ${{ steps.filter.outputs.prose }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
@@ -226,6 +227,58 @@ jobs:
               - 'web/**'
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
+            prose:
+              # `prose` = the cadence gate's inputs, and they really are this
+              # broad: tests/test_stated_cadences_faithful.py walks every tracked
+              # file of these suffixes, because a sentence stating a workflow's
+              # cadence can be written in any of them. Both drifts it exists for
+              # landed outside ags-wiki/ — one in a docs-site page, one in a Rust
+              # doc comment — so a filter naming just those two trees would be a
+              # narrowing the gate does not actually make.
+              #
+              # Wide, but not costly: the job is stdlib + pytest, no wheel, no
+              # Rust, ~1s of work. It is deliberately NOT folded into `code` —
+              # that would make a README typo rebuild the wheel in the ~12-min
+              # python job, which is how a cheap gate acquires an expensive
+              # reputation and then a paths filter that quietly kills it.
+              - '**/*.md'
+              - '**/*.rs'
+              - '**/*.py'
+              - '**/*.yml'
+              - '**/*.yaml'
+              # The mirror itself: it supplies the derived cadence every claim in
+              # the tree is checked against, so editing it re-checks all of them.
+              - 'external-authorities.json'
+
+  # Stated cadences vs the crons they claim to describe. Its own job rather than
+  # a step in `python` because its inputs are every .md/.rs/.py/.yml in the tree:
+  # riding in there would mean a docs typo pays for a wheel build, and the filter
+  # someone would then add to stop that is what stops the gate firing at all
+  # (#207). Standing alone it costs a checkout and ~1s.
+  #
+  # Half a gate on its own — it proves prose agrees with
+  # external-authorities.json, and only the dev satellite can prove that mirror
+  # agrees with the crons it mirrors (tools/check_external_authorities.py, run
+  # there). See ags-wiki/tools/stated-cadences-faithful.md.
+  cadence:
+    needs: [changes]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request'
+        || needs.changes.result != 'success'
+        || needs.changes.outputs.prose == 'true') }}
+    runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) || github.event_name == 'schedule') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
+      # `--no-project --with pytest`: the test is stdlib + pytest and reads the
+      # tree with `git ls-files`. A `uv sync` here would build the PyO3 wheel to
+      # run a one-second file walk.
+      - name: Stated cadences match their workflows' crons
+        run: >-
+          uv run --no-project --with pytest
+          pytest tests/test_stated_cadences_faithful.py -q
 
   # Supply-chain gate: RustSec advisories + the permissive-license policy +
   # crates.io-only sources + duplicate-version warnings. Config + the documented
