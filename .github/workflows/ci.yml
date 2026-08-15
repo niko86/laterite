@@ -1054,6 +1054,19 @@ jobs:
         # unpassable, therefore never run, therefore the census could drift in silence.
         run: uv run --no-sync python tools/gen_census.py --check
 
+      - name: support matrix gate (declared floors == tested floors)
+        # `engines.node` said ">=18" for fifteen months while every Node job ran
+        # 22 — a floor nothing had ever built or tested, and nothing in the repo
+        # could see it. check_msrv.py has prevented exactly this for Rust since
+        # it landed; Python and Node had no equivalent, and their floors are the
+        # ones a consumer plans against.
+        #
+        # Bidirectional, like the changelog's breaking flag: a version claimed
+        # and never tested is a false promise, and a version tested and never
+        # claimed is a half-finished "add 3.15" — the matrix row without the
+        # classifier.
+        run: uv run --no-sync python tools/check_support_matrix.py
+
       - name: ruff check
         run: uv run ruff check .
 
