@@ -1,10 +1,15 @@
-# Build the client-side AGS4 validator site (Rust wasm + SolidJS/Vite)
-# and deploy it to GitHub Pages.
+# Build the client-side AGS4 validator site (Rust wasm + SolidJS/Vite) and the
+# docs, and publish them to FOUR places in one run — because they are one build
+# whose outputs land in different stores:
+#
+#   app.laterite.dev   Worker (web/wrangler.jsonc)            the browser app
+#   docs.laterite.dev  Worker (web/docs-site/wrangler.jsonc)  the mkdocs site
+#   cdn.laterite.dev   R2 bucket laterite-cdn                 the DuckDB engine
+#   niko86.github.io   GitHub Pages                           redirect shim only
 #
 # AUTO on push to main when the site's sources change (see the `paths`
 # filter), plus manual workflow_dispatch. Runs GitHub-hosted (ubuntu-latest):
-# public repos get free Actions minutes, and Pages deploy via OIDC is the
-# well-trodden GitHub-hosted path, so there's no reason to tie up the warm
+# public repos get free Actions minutes, so there's no reason to tie up the warm
 # pool for a deploy. The runner needs the wasm32 target installable, Node, and
 # network reach to GitHub releases for wasm-pack's wasm-bindgen/binaryen.
 #
@@ -140,11 +145,6 @@ jobs:
           (cd packages/laterite && uv run --no-sync maturin develop --uv)
           cd web/docs-site && uv run --no-sync mkdocs build
 
-      # Two Workers, one per host. Each config carries its own `custom_domain`
-      # route, so Cloudflare creates the DNS record and issues the certificate
-      # on deploy — nothing pre-creates app./docs. records, and pre-creating one
-      # would actively BREAK the deploy (Cloudflare refuses a custom domain on a
-      # hostname that already has a CNAME).
       # The DuckDB bundles, to R2. Their filenames are content-hashed by Vite,
       # so an unchanged engine keeps the same key and re-uploading is a no-op
       # in effect — but 73 MiB per deploy is worth skipping, hence the `get`
@@ -172,6 +172,11 @@ jobs:
               --file "$f" --content-type application/wasm --remote
           done
 
+      # Two Workers, one per host. Each config carries its own `custom_domain`
+      # route, so Cloudflare creates the DNS record and issues the certificate
+      # on deploy — nothing pre-creates the app./docs. records, and pre-creating
+      # one would actively BREAK the deploy (Cloudflare refuses a custom domain
+      # on a hostname that already has a CNAME).
       - name: Deploy the app Worker (app.laterite.dev)
         uses: cloudflare/wrangler-action@v3
         with:
