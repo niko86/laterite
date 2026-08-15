@@ -3,6 +3,9 @@ __pycache__/
 *.py[oc]
 build/
 dist/
+# mkdocs' site_dir since the docs moved to their own host. NOT covered by
+# `dist/` above — that matches a path component named exactly "dist".
+web/docs-dist/
 wheels/
 *.egg-info
 

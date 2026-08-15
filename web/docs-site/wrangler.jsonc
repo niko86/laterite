@@ -1,0 +1,23 @@
+// The documentation site, served as static assets by a Worker with no code.
+//
+// Paths are relative to THIS file, so `../docs-dist` is `web/docs-dist` — the
+// site_dir mkdocs.yml now writes to. It used to build into `../dist/docs`,
+// inside the app's own output, which was right when one GitHub Pages artifact
+// carried both. On separate hosts that would ship a second copy of the whole
+// documentation inside the app Worker.
+//
+// `404-page` rather than the app's `single-page-application`: mkdocs emits a
+// real 404.html and every page is a real file, so an unknown path should be an
+// honest 404 rather than a 200 serving the front page. The two settings are the
+// only meaningful difference between these configs, and they are opposite for
+// good reason.
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "laterite-docs",
+  "compatibility_date": "2026-08-14",
+  "assets": {
+    "directory": "../docs-dist",
+    "not_found_handling": "404-page",
+  },
+  "routes": [{ "pattern": "docs.laterite.dev", "custom_domain": true }],
+}

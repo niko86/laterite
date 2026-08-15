@@ -112,24 +112,18 @@ jobs:
           npm ci
           npm run build
 
-      # The docs build runs on BOTH deploy targets: the private `laterite`
-      # Pages (https://laterite.dev/docs/) is the DEV PREVIEW —
-      # "the purpose for dev to try things out" — and the public mirror
-      # (https://laterite.dev/docs/) is production. (This relaxes the
-      # earlier mirror-only gate now that the docs are mature and dev is the
-      # preview env; production exposure is still owner-gated by the manual mirror
-      # sync, so merging here only previews on dev.) mkdocs builds into
-      # web/dist/docs (its site_dir), riding the SAME Pages artifact as the app;
-      # run AFTER the Vite build so it doesn't clobber web/dist.
+      # mkdocs builds into web/docs-dist (its site_dir) — its OWN directory,
+      # not inside web/dist. It used to build into web/dist/docs because one
+      # Pages artifact carried the app and the docs together; on separate hosts
+      # that would ship a second copy of the whole documentation inside the app
+      # Worker.
       #
       # `uv sync --group docs` builds the local working-tree `laterite` wheel +
       # installs mkdocs-material + mkdocstrings (the API reference introspects the
       # installed wheel) + gen-files/literate-nav (the group catalogue). The Rust
       # toolchain is already present (wasm-pack installed it above; the host
       # target builds the PyO3 wheel). Non-strict on purpose: a docs link nit must
-      # never block the app deploy — the PR-time `docs` job (ci.yml) is the strict
-      # gate. (mkdocs `site_url` is the production path; nav/asset links are
-      # relative under `use_directory_urls`, so the dev-preview path resolves too.)
+      # never block the deploy — the PR-time `docs` job (ci.yml) is the strict gate.
       - name: Set up uv (docs build)
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
       - name: Build docs
@@ -141,10 +135,43 @@ jobs:
           (cd packages/laterite && uv run --no-sync maturin develop --uv)
           cd web/docs-site && uv run --no-sync mkdocs build
 
-      - name: Upload Pages artifact
+      # Two Workers, one per host. Each config carries its own `custom_domain`
+      # route, so Cloudflare creates the DNS record and issues the certificate
+      # on deploy — nothing pre-creates app./docs. records, and pre-creating one
+      # would actively BREAK the deploy (Cloudflare refuses a custom domain on a
+      # hostname that already has a CNAME).
+      - name: Deploy the app Worker (app.laterite.dev)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: web
+          command: deploy
+
+      - name: Deploy the docs Worker (docs.laterite.dev)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: web/docs-site
+          command: deploy
+
+      # GitHub Pages outlives the move as a REDIRECT SHIM, and nothing else.
+      #
+      # laterite 0.8.x and 0.9.0 shipped READMEs to PyPI, npm and crates.io
+      # pointing at niko86.github.io/laterite/... A published README cannot be
+      # edited, so those links must keep resolving forever. The alternative —
+      # keeping a full copy of the site here — would mean building the app twice
+      # (Pages needs base=/laterite/, the Worker needs base=/) to serve bytes
+      # nobody looks at.
+      #
+      # Pages serves 404.html for any path it does not recognise, and this
+      # artifact contains almost nothing, so one file catches every legacy URL
+      # and routes it to the right new host.
+      - name: Upload Pages artifact (redirect shim)
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
-          path: web/dist
+          path: web/legacy-pages
 
       - name: Deploy to GitHub Pages
         id: deploy

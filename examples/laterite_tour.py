@@ -750,7 +750,7 @@ def _(mo):
 
         [GitHub](https://github.com/niko86/laterite) ·
         [PyPI](https://pypi.org/project/laterite/) ·
-        [browser validator](https://laterite.dev/) ·
+        [browser validator](https://app.laterite.dev/) ·
         built with [marimo](https://marimo.io) + molab 🦀
         """
     )
