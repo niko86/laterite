@@ -146,6 +146,12 @@ jobs:
               - 'observations.json'
               - 'OBSERVATIONS.md'
               - 'tools/gen_observations.py'
+              # divergences.md joined that render in #320. It is under
+              # web/docs-site/**, which the `code` filter does not otherwise
+              # watch, so without this line the one edit the gate exists to
+              # catch — someone hand-editing the page back — is the one edit
+              # that would not fire it.
+              - 'web/docs-site/docs/reference/divergences.md'
               # The changelog trio, for the identical reason — its drift gate
               # ("changelog drift gate" in the python job) also runs in THIS
               # repo, and the leak gate + the `breaking` marker cross-check ride
@@ -1110,6 +1116,11 @@ jobs:
         # SAME command also runs unfiltered in wiki-lint.yml, which is what makes
         # the coverage-map half reachable. Do not add ags-wiki/** here instead:
         # that would build the PyO3 wheel on every wiki-only edit.
+        #
+        # Third target since #320: the docs site's `reference/divergences.md`.
+        # That one IS watched here — it is listed in the `code` filter — because
+        # unlike the coverage map it is a published page a reader acts on, and
+        # the edit worth catching is someone restoring it by hand.
         run: uv run --no-project python tools/gen_observations.py --check
 
       - name: modality drift gate (modality-register.md == modality.json render)

@@ -40,8 +40,12 @@ repo authority it cites (`observations.json`, `ags_dictionary.json`, the validat
 rule modules) before relying on it — code can move under a page.
 
 **The OBSERVATIONS canon is a code SSOT.** The O-N divergence catalogue's source
-of truth is `observations.json` (repo root); `OBSERVATIONS.md` and the wiki's
-coverage-map lists are its rendered views. To add or change an O-N: edit
+of truth is `observations.json` (repo root); `OBSERVATIONS.md`, the wiki's
+coverage-map lists, and `web/docs-site/docs/reference/divergences.md` are its
+rendered views. A record reaches that last one by carrying a `user_facing`
+block (`axis` + `summary`) — membership is a decision recorded on the record,
+never derived from `kind` — and a record marked `status` (with `resolved_by`)
+may not also be `user_facing`. To add or change an O-N: edit
 `observations.json` (aim for the house style — observed / spec / assessment /
 upstream-reportable / our decision — next free O-N, clean-room, accurate), then
 **regenerate** with `uv run --no-sync python tools/gen_observations.py` (never

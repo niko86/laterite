@@ -45,6 +45,21 @@ readable flag was wrong — exactly the silent-disagreement failure a rendered t
 prevents on the repo side, reappearing one directory over. `--check-wiki` closes
 it: the SSOT is the catalogue, and a page may not disagree with it.
 
+THE DOCS SITE'S THIRD COPY (#320). `web/docs-site/docs/reference/divergences.md`
+is the user-facing view — the one an evaluating reader actually meets — and it was
+hand-written against this gated SSOT, with no generator and no gate. It drifted
+the way that shape always does: it told readers the external `--dict` override was
+"deferred" a release after #568 shipped it, and it never gained O-49 or O-50.
+
+Membership is a FIELD (`user_facing`), not a derivation from `kind`, because the
+two are different sets: O-2 and O-8 are BUG yet plainly user-visible, and O-25 is
+VARIANCE yet its own body calls it "internal structure". The old page's 19 rows
+and the catalogue's 19 VARIANCE records having the same count was a coincidence —
+one that would have made a derived rule look right while quietly listing the wrong
+records. A `status` (+ `resolved_by`) marks a record that a later one settled;
+carrying both `status` and `user_facing` is a hard error, since that pairing IS
+the defect the page shipped.
+
 Modes:
   gen_observations.py              regenerate OBSERVATIONS.md from observations.json
   gen_observations.py --check      exit 1 if OBSERVATIONS.md is stale (CI drift gate)
@@ -82,6 +97,31 @@ WIKI_DIR = ROOT / "ags-wiki" / "observations"
 #: had frozen at "all 39 O-N entries" while the catalogue reached 50.
 COVERAGE_MAP = ROOT / "ags-wiki" / "insights" / "observations-coverage-map.md"
 COVERAGE_MARKER = "observations-coverage"
+
+#: The docs site's user-facing view of the catalogue. It was hand-written, with
+#: no generator and no gate, and it had drifted exactly the way that shape always
+#: does: it told readers the `--dict` override was "deferred" a release after
+#: #568 shipped it, and it never gained O-49 or O-50.
+#:
+#: Membership is a field (`user_facing`), not a derivation from `kind` — the two
+#: are genuinely different sets. O-2 and O-8 are BUG yet plainly user-visible,
+#: O-25 is VARIANCE yet its own body calls it "internal structure". That the old
+#: page's 19 records and the 19 VARIANCE records had the same count was a
+#: coincidence, and one that would have made a derived rule look correct.
+DIVERGENCES = ROOT / "web" / "docs-site" / "docs" / "reference" / "divergences.md"
+
+#: The axes a user-facing record can sit on, in render order. The old page filed
+#: everything under "Known divergences from python-ags4", which was wrong for
+#: four of its own rows: O-1 and O-32 are cases where laterite MATCHES
+#: python-ags4 and both depart from the spec, and O-31/O-33 are laterite's own
+#: false negatives, found by the comparison and closed. Calling those
+#: "divergences from python-ags4" inverts what happened.
+AXES = {
+    "vs-python": "Where laterite differs from python-ags4",
+    "vs-spec": "Where both depart from the written spec",
+    "converged": "Where laterite changed to match python-ags4",
+    "laterite-adds": "Checks laterite adds",
+}
 
 #: The register the `upstream` flag exists to feed: the AGS-DFWG proposal list.
 #: Its tiering and wording are editorial, so it is NOT generated — but its
@@ -154,6 +194,87 @@ def render(data: dict) -> str:
 def _all_records(data: dict) -> Iterator[dict]:
     for sec in data["sections"]:
         yield from sec["observations"]
+
+
+def render_divergences(data: dict) -> str:
+    """observations.json -> the exact bytes of the docs site's divergences page.
+
+    A record is on this page iff it carries `user_facing`, and it renders under
+    the axis that field names. A record with a `status` is by definition not
+    live and cannot carry `user_facing` — that pairing is what the old page got
+    wrong, telling readers `--dict` was deferred a release after it shipped.
+    """
+    live = [r for r in _all_records(data) if r.get("user_facing")]
+
+    # Both of these are hard failures rather than --lint reports. A resolved
+    # record that keeps its `user_facing` block is the exact defect this page
+    # shipped for a release, and an axis nobody renders would drop a record off
+    # the page silently — a generated page that quietly omits a record is worse
+    # than the hand-written one it replaced, because it looks authoritative.
+    if bad := [r["id"] for r in live if r.get("status")]:
+        raise SystemExit(
+            f"gen_observations: {', '.join(bad)} carries both `user_facing` and a "
+            "`status` — a resolved record cannot be a live divergence. Drop the "
+            "`user_facing` block, or the status if it is in fact still live."
+        )
+    if unknown := sorted(
+        {r["user_facing"]["axis"] for r in live} - set(AXES),
+    ):
+        raise SystemExit(
+            f"gen_observations: unknown user_facing axis {unknown} — add it to "
+            f"AXES (with a heading) or use one of {sorted(AXES)}."
+        )
+
+    by_axis: dict[str, list[dict]] = {axis: [] for axis in AXES}
+    for rec in live:
+        by_axis[rec["user_facing"]["axis"]].append(rec)
+
+    total = len(live)
+    out = [
+        "# Where laterite and python-ags4 differ\n",
+        "\n",
+        "laterite is a **clean-room** re-implementation of the AGS4 rules, "
+        "calibrated against the incumbent\n"
+        "[`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library) "
+        "on its own test corpus\n"
+        "(see [Cross-surface parity](../concepts/cross-surface-parity.md)). "
+        "Two independent implementations of\n"
+        "one specification will disagree, so every disagreement is written down "
+        "rather than smoothed over.\n",
+        "\n",
+        f"**{total} of them change what you see.** They are not all the same "
+        "kind of thing, which is why this\n"
+        "page is grouped by what actually happened rather than filed under one "
+        "heading: some are deliberate\n"
+        "differences from python-ags4, some are places the two agree and the "
+        "*spec* is the outlier, and some are\n"
+        "laterite's own false negatives that the comparison caught and closed.\n",
+        "\n",
+        "This is the user-facing list. The full catalogue — including the "
+        "internal NOTE/SPEC entries and the\n"
+        "records since resolved — lives in `OBSERVATIONS.md` in the repo, and "
+        "this page is generated from the\n"
+        "same source, so a record cannot be resolved there and stay live here.\n",
+        "\n",
+    ]
+
+    for axis, heading in AXES.items():
+        recs = by_axis[axis]
+        if not recs:
+            continue
+        out.append(f"## {heading}\n")
+        out.append("\n")
+        out.append("| # | What you see |\n|---|---|\n")
+        out.extend(f"| **{r['id']}** | {r['user_facing']['summary']} |\n" for r in recs)
+        out.append("\n")
+
+    out.append('!!! tip "Reading the tiers"\n')
+    out.append(
+        "    Whether a difference surfaces as an **error**, **warning** or "
+        "**FYI** follows\n"
+        "    laterite's [severity tiers](../concepts/severity-tiers.md).\n"
+    )
+    return "".join(out)
 
 
 # --------------------------------------------------------------------------- ingest
@@ -460,10 +581,13 @@ def main() -> None:
         COVERAGE_MARKER,
         render_coverage(data),
     )
+    div = render_divergences(data)
+    targets = ((MD_PATH, out), (COVERAGE_MAP, cov), (DIVERGENCES, div))
+
     if args.check:
         stale = [
             p.relative_to(ROOT)
-            for p, want in ((MD_PATH, out), (COVERAGE_MAP, cov))
+            for p, want in targets
             if p.read_text(encoding="utf-8") != want
         ]
         if stale:
@@ -472,12 +596,19 @@ def main() -> None:
                 "generated from observations.json.\n"
                 "Run: uv run --no-sync python tools/gen_observations.py"
             )
-        print("gen_observations: OBSERVATIONS.md + the coverage map are up to date")
+        print(
+            "gen_observations: OBSERVATIONS.md, the coverage map and "
+            "divergences.md are up to date"
+        )
         return
 
     MD_PATH.write_text(out)
     COVERAGE_MAP.write_text(cov, encoding="utf-8")
-    print(f"gen_observations: wrote {MD_PATH.name} + {COVERAGE_MAP.name}")
+    DIVERGENCES.write_text(div, encoding="utf-8")
+    print(
+        f"gen_observations: wrote {MD_PATH.name}, {COVERAGE_MAP.name} "
+        f"and {DIVERGENCES.name}"
+    )
 
 
 if __name__ == "__main__":
