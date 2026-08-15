@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Moved to laterite.dev</title>
+    <link rel="canonical" href="https://laterite.dev/" />
+    <!--
+      This whole directory exists to keep ALREADY-PUBLISHED links working.
+
+      laterite 0.8.x and 0.9.0 shipped READMEs to PyPI, npm and crates.io that
+      point at https://niko86.github.io/laterite/... — and a published README
+      can never be edited. So this Pages site outlives the move: it serves
+      nothing but redirects.
+
+      GitHub Pages has no server-side rewrites, but it serves 404.html for any
+      path it does not recognise. Since this artifact contains almost no real
+      files, essentially every legacy URL lands here, which turns one file into
+      a catch-all router. That is the only reason this is client-side rather
+      than a 301.
+    -->
+    <script>
+      (function () {
+        // Path shape is /laterite/... on the project-Pages URL; strip that
+        // prefix, then split the docs off from the app.
+        var p = location.pathname.replace(/^\/laterite\/?/, "/");
+        var target = /^\/docs(\/|$)/.test(p)
+          ? "https://docs.laterite.dev" + p.replace(/^\/docs/, "")
+          : "https://app.laterite.dev" + p;
+        location.replace(target + location.search + location.hash);
+      })();
+    </script>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #0d1117;
+        color: #e6edf3;
+        font:
+          16px/1.6 ui-sans-serif,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        padding: 24px;
+        text-align: center;
+      }
+      a {
+        color: #ff8c5a;
+      }
+      p {
+        max-width: 46ch;
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>
+      <p>
+        laterite has moved to <a href="https://laterite.dev/">laterite.dev</a> —
+        the documentation is at
+        <a href="https://docs.laterite.dev/">docs.laterite.dev</a> and the
+        browser validator at
+        <a href="https://app.laterite.dev/">app.laterite.dev</a>.
+      </p>
+    </noscript>
+    <p>Redirecting to <a href="https://laterite.dev/">laterite.dev</a>…</p>
+  </body>
+</html>

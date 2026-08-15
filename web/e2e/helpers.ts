@@ -5,7 +5,12 @@ import path from "node:path";
 // Shared e2e helpers. Kept separate from app.spec.ts so multiple spec files
 // reuse them without duplicating the wasm-ready gate / fixture path logic.
 
-export const APP = "/laterite/";
+// The deploy base, read from the SAME env var vite.config.ts reads. Five spec
+// files used to hardcode "/laterite/" each; when the site moved to its own
+// domain and the base became "/", that was five edits with nothing to catch a
+// missed one — the PWA test failed on exactly that. Derive it once instead, so
+// a base change is one edit in vite.config.ts and the suite follows.
+export const APP = process.env.VITE_BASE ?? "/";
 
 export const fixture = (name: string) =>
   path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", name);

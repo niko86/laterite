@@ -3,7 +3,7 @@
 // DuckDB-wasm is multi-MB, so the engine JS is dynamically imported (and its
 // wasm + worker assets fetched) only on first use — never on the validate
 // path. The asset URLs come from Vite's `?url`, so they're fingerprinted and
-// rewritten under the deploy base (/laterite/) — the same base-path-safe
+// rewritten under the deploy base, whatever it is — the same base-path-safe
 // trick the validator worker already uses for ags4_wasm_bg.wasm (an
 // import.meta.url fetch would 404 under a non-root base). We ship the MVP +
 // EH bundles only — NOT coi, which needs the COOP/COEP cross-origin-isolation

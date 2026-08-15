@@ -10,8 +10,8 @@ npm install laterite
 
 > **laterite is in beta** — a statement about how much real-world use it has had, not
 > how much testing. The API can still change; what it runs on is the steadier promise.
-> [What that means](https://niko86.github.io/laterite/docs/reference/support/) ·
-> [tell us how it goes](https://niko86.github.io/laterite/docs/feedback/).
+> [What that means](https://docs.laterite.dev/reference/support/) ·
+> [tell us how it goes](https://docs.laterite.dev/feedback/).
 
 Prebuilt native binaries ship for linux-x64-gnu, darwin-arm64, and win32-x64-msvc (auto-selected via `optionalDependencies`). No build step, no Python, no toolchain.
 
@@ -147,14 +147,14 @@ One clean-room Rust AGS4 engine, surfaced for every stack. Scriptable output is 
 | **Python**  | [`laterite`](https://pypi.org/project/laterite/) — PyPI                                                        | `pip install laterite`                  |
 | **CLI**     | [`lat`](https://github.com/niko86/laterite/releases)                                                           | bundled here, or GitHub Releases        |
 | **DuckDB**  | [`laterite_ags4`](https://community-extensions.duckdb.org/extensions/laterite_ags4.html) — community extension | `INSTALL laterite_ags4 FROM community;` |
-| **Browser** | [validator + data explorer](https://niko86.github.io/laterite/) — WASM                                         | open in a browser                       |
+| **Browser** | [validator + data explorer](https://app.laterite.dev/) — WASM                                                  | open in a browser                       |
 
 **Running in a browser?** This package is Node-only — it loads a native addon via
 `optionalDependencies` and touches the filesystem. Use the
 [wasm build](https://github.com/niko86/laterite/tree/main/rust-packages/laterite-ags4-wasm)
 instead: same engine, same rules, no `fs`.
 
-📖 [Documentation](https://niko86.github.io/laterite/docs/) · [Node guide](https://niko86.github.io/laterite/docs/node/) · [Cookbook](https://niko86.github.io/laterite/docs/cookbook/)
+📖 [Documentation](https://docs.laterite.dev/) · [Node guide](https://docs.laterite.dev/node/) · [Cookbook](https://docs.laterite.dev/cookbook/)
 
 ## License
 

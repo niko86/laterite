@@ -9,7 +9,7 @@ contact_links:
       ambiguity in it. Ask in Discussions and we'll work it out; if it turns
       out to be a bug, we'll open the issue.
   - name: Trying laterite in beta — what we'd like to hear
-    url: https://niko86.github.io/laterite/feedback/
+    url: https://docs.laterite.dev/feedback/
     about: >-
       What's worth reporting, and why you never need to send us a real
       delivery to file a useful report.

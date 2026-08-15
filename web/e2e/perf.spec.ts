@@ -1,4 +1,5 @@
 import { test, expect, type Page, type CDPSession } from "@playwright/test";
+import { APP } from "./helpers";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -22,7 +23,6 @@ import path from "node:path";
 //     should drop to ~instant once ingested).
 
 const RUN = !!process.env.PERF;
-const APP = "/laterite/";
 const RATES = (process.env.PERF_RATES ?? "1,4,6")
   .split(",")
   .map((n) => parseInt(n.trim(), 10))

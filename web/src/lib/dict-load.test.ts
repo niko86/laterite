@@ -69,7 +69,7 @@ describe("fetchUnion", () => {
     // The same settled promise, so both callers see the same object.
     expect(a).toBe(b);
     // BASE_URL-relative, so the app still finds it when served from a subpath
-    // (this site deploys under /laterite/).
+    // rather than only at the root the site deploys to today.
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
       "ags_dictionary.json",
     );

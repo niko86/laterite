@@ -1,0 +1,28 @@
+// The browser validator + data explorer, served as static assets by a Worker
+// with no code of its own.
+//
+// Cloudflare Workers rather than Pages: Cloudflare's own docs now say Pages
+// stays supported but all investment goes to Workers, and to start new projects
+// there — which is why the dashboard offers "Create application" with no Pages
+// tab. A Worker with `assets` and no `main` serves files and never runs.
+//
+// `not_found_handling` is the one setting that matters here. The app is
+// client-routed, so a cold visit to any path other than `/` must still boot the
+// shell; "single-page-application" returns 200 + index.html for anything that
+// is not a file. This replaces the 404.html copy the GitHub Pages build makes
+// for the same reason — that trick is Pages-specific and does nothing here.
+//
+// The custom domain creates its own DNS record and certificate on deploy, so
+// nothing pre-creates `app.laterite.dev`. Cloudflare REFUSES to attach a custom
+// domain to a hostname that already has a CNAME, so adding one by hand first is
+// actively harmful.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "laterite-app",
+  "compatibility_date": "2026-08-14",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+  },
+  "routes": [{ "pattern": "app.laterite.dev", "custom_domain": true }],
+}

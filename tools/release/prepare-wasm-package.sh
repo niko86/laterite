@@ -69,7 +69,7 @@ const m = JSON.parse(fs.readFileSync(p, "utf8"));
 m.name = process.env.PUBLISHED_NAME;
 m.publishConfig = { ...(m.publishConfig || {}), access: "public" };
 m.repository = m.repository || { type: "git", url: "git+https://github.com/niko86/laterite.git" };
-m.homepage = m.homepage || "https://niko86.github.io/laterite/";
+m.homepage = m.homepage || "https://docs.laterite.dev/";
 m.bugs = m.bugs || { url: "https://github.com/niko86/laterite/issues" };
 
 fs.writeFileSync(p, JSON.stringify(m, null, 2) + "\n");

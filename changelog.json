@@ -83,6 +83,9 @@
         "prs": [
           318
         ]
+      },
+      {
+        "text": "**The site has its own home: `laterite.dev`.** The browser validator answers at `app.laterite.dev` and the documentation at `docs.laterite.dev` — two hosts, where before they rode one artifact with the docs in a subdirectory of the app. Every published link moves with them. The old `niko86.github.io/laterite/` URLs keep working: that site stays up serving nothing but redirects, which is what makes the move safe after 0.8.x and 0.9.0 froze the old host into READMEs on PyPI, npm and crates.io that can never be edited. **If you allowlist hosts, add `cdn.laterite.dev`** — the DuckDB engine behind the Explore tab is a 34-39 MiB wasm and the static-asset host caps a single file at 25 MiB, so that one file is served from object storage on the same domain. Validate, Fix and the rest are unaffected, and nothing about the privacy claim changes: no file you open has ever left the browser and none does now. Two links were already dead and are fixed on the way past: the bug template pointed reporters at the known-divergences page and the issue chooser at the feedback page, both omitting the `/docs/` segment, so the first two links anybody filing a bug follows were 404s. Nothing checks a URL that lives in an issue template. ([#332](https://github.com/niko86/laterite/pull/332))"
       }
     ],
     "deprecated": [],

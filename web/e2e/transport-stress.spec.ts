@@ -1,4 +1,5 @@
 import { test, type CDPSession, type Page } from "@playwright/test";
+import { APP } from "./helpers"; // localhost = secure context → crypto.subtle available
 
 // OPT-IN transport stress probe (STRESS=1). Measures the compress + encrypt
 // pipeline a browser "pack/lock" would run, across file sizes and CPU throttle
@@ -21,7 +22,6 @@ const RATES = (process.env.STRESS_RATES ?? "1,4,6").split(",").map(Number);
 const SIZES_MB = (process.env.STRESS_SIZES ?? "25,50,100,200")
   .split(",")
   .map(Number);
-const APP = "/laterite/"; // localhost = secure context → crypto.subtle available
 
 const LOW_END_INIT = `try {
   Object.defineProperty(navigator, 'deviceMemory', { configurable: true, get: () => 2 });

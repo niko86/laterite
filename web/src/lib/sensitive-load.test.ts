@@ -49,7 +49,7 @@ describe("loadSensitive", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     // The URL is BASE_URL-relative, so the app still finds it when served from a
-    // subpath (this site deploys under /laterite/).
+    // subpath rather than only at the root the site deploys to today.
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
       "sensitive_headings.json",
     );

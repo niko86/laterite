@@ -3,6 +3,11 @@ __pycache__/
 *.py[oc]
 build/
 dist/
+# mkdocs' site_dir since the docs moved to their own host. NOT covered by
+# `dist/` above — that matches a path component named exactly "dist".
+web/docs-dist/
+# Oversized DuckDB bundles staged for R2 by vite.config.ts (build output).
+web/r2-upload/
 wheels/
 *.egg-info
 

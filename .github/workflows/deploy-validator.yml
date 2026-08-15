@@ -1,15 +1,23 @@
-# Build the client-side AGS4 validator site (Rust wasm + SolidJS/Vite)
-# and deploy it to GitHub Pages.
+# Build the client-side AGS4 validator site (Rust wasm + SolidJS/Vite) and the
+# docs, and publish them to FOUR places in one run — because they are one build
+# whose outputs land in different stores:
+#
+#   app.laterite.dev   Worker (web/wrangler.jsonc)            the browser app
+#   docs.laterite.dev  Worker (web/docs-site/wrangler.jsonc)  the mkdocs site
+#   cdn.laterite.dev   R2 bucket laterite-cdn                 the DuckDB engine
+#   niko86.github.io   GitHub Pages                           redirect shim only
 #
 # AUTO on push to main when the site's sources change (see the `paths`
 # filter), plus manual workflow_dispatch. Runs GitHub-hosted (ubuntu-latest):
-# public repos get free Actions minutes, and Pages deploy via OIDC is the
-# well-trodden GitHub-hosted path, so there's no reason to tie up the warm
+# public repos get free Actions minutes, so there's no reason to tie up the warm
 # pool for a deploy. The runner needs the wasm32 target installable, Node, and
 # network reach to GitHub releases for wasm-pack's wasm-bindgen/binaryen.
 #
-# The one dispatch input, `base`, is Vite's deploy path; it defaults to
-# /laterite/ (what Pages serves here) — the same default a push uses.
+# The one dispatch input, `base`, is Vite's deploy path; it defaults to `/`
+# (what the custom domain serves) — the same default a push uses. It exists
+# so a base change can be bridged in ONE build: the domain setting and this
+# default cannot change atomically, so dispatch with the other value across
+# the gap rather than leaving every asset 404ing until a PR merges.
 
 name: Deploy AGS4 validator site
 
@@ -36,9 +44,9 @@ on:
   workflow_dispatch:
     inputs:
       base:
-        description: "Vite base path (must match the Pages URL path)"
+        description: "Vite base path (must match the site URL path; / on the custom domain)"
         type: string
-        default: /laterite/
+        default: /
 
 # Pages deploy needs an OIDC id-token + pages:write; contents:read to
 # checkout. Least privilege otherwise.
@@ -104,29 +112,28 @@ jobs:
         env:
           # On a push, inputs.base is empty — fall back to the same default
           # the dispatch input uses so the Pages base path is always set.
-          VITE_BASE: ${{ inputs.base || '/laterite/' }}
+          VITE_BASE: ${{ inputs.base || '/' }}
+          # Where the two oversized DuckDB bundles are served from. Setting this
+          # both rewrites their URLs and MOVES them out of dist/ into
+          # web/r2-upload/ (see vite.config.ts) — without it the app is 73 MiB
+          # over Cloudflare's 25 MiB-per-asset cap and the deploy is rejected.
+          VITE_DUCKDB_CDN: https://cdn.laterite.dev
         run: |
           npm ci
           npm run build
 
-      # The docs build runs on BOTH deploy targets: the private `laterite`
-      # Pages (https://niko86.github.io/laterite/docs/) is the DEV PREVIEW —
-      # "the purpose for dev to try things out" — and the public mirror
-      # (https://niko86.github.io/laterite/docs/) is production. (This relaxes the
-      # earlier mirror-only gate now that the docs are mature and dev is the
-      # preview env; production exposure is still owner-gated by the manual mirror
-      # sync, so merging here only previews on dev.) mkdocs builds into
-      # web/dist/docs (its site_dir), riding the SAME Pages artifact as the app;
-      # run AFTER the Vite build so it doesn't clobber web/dist.
+      # mkdocs builds into web/docs-dist (its site_dir) — its OWN directory,
+      # not inside web/dist. It used to build into web/dist/docs because one
+      # Pages artifact carried the app and the docs together; on separate hosts
+      # that would ship a second copy of the whole documentation inside the app
+      # Worker.
       #
       # `uv sync --group docs` builds the local working-tree `laterite` wheel +
       # installs mkdocs-material + mkdocstrings (the API reference introspects the
       # installed wheel) + gen-files/literate-nav (the group catalogue). The Rust
       # toolchain is already present (wasm-pack installed it above; the host
       # target builds the PyO3 wheel). Non-strict on purpose: a docs link nit must
-      # never block the app deploy — the PR-time `docs` job (ci.yml) is the strict
-      # gate. (mkdocs `site_url` is the production path; nav/asset links are
-      # relative under `use_directory_urls`, so the dev-preview path resolves too.)
+      # never block the deploy — the PR-time `docs` job (ci.yml) is the strict gate.
       - name: Set up uv (docs build)
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
       - name: Build docs
@@ -138,10 +145,70 @@ jobs:
           (cd packages/laterite && uv run --no-sync maturin develop --uv)
           cd web/docs-site && uv run --no-sync mkdocs build
 
-      - name: Upload Pages artifact
+      # The DuckDB bundles, to R2. Their filenames are content-hashed by Vite,
+      # so an unchanged engine keeps the same key and re-uploading is a no-op
+      # in effect — but 73 MiB per deploy is worth skipping, hence the `get`
+      # probe. There is no bulk `r2 sync`, so this is a loop over two files.
+      #
+      # Ordering matters: upload BEFORE the Worker deploy. The app's JS already
+      # points at these URLs, so shipping the app first leaves a window where
+      # the first Explore click 404s.
+      - name: Upload the DuckDB engine to R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: web
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for f in r2-upload/assets/*.wasm; do
+            key="assets/$(basename "$f")"
+            if npx wrangler r2 object get "laterite-cdn/$key" --remote >/dev/null 2>&1; then
+              echo "== $key already in R2, skipping $(du -h "$f" | cut -f1)"
+              continue
+            fi
+            echo "-> uploading $key ($(du -h "$f" | cut -f1))"
+            npx wrangler r2 object put "laterite-cdn/$key" \
+              --file "$f" --content-type application/wasm --remote
+          done
+
+      # Two Workers, one per host. Each config carries its own `custom_domain`
+      # route, so Cloudflare creates the DNS record and issues the certificate
+      # on deploy — nothing pre-creates the app./docs. records, and pre-creating
+      # one would actively BREAK the deploy (Cloudflare refuses a custom domain
+      # on a hostname that already has a CNAME).
+      - name: Deploy the app Worker (app.laterite.dev)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: web
+          command: deploy
+
+      - name: Deploy the docs Worker (docs.laterite.dev)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: web/docs-site
+          command: deploy
+
+      # GitHub Pages outlives the move as a REDIRECT SHIM, and nothing else.
+      #
+      # laterite 0.8.x and 0.9.0 shipped READMEs to PyPI, npm and crates.io
+      # pointing at niko86.github.io/laterite/... A published README cannot be
+      # edited, so those links must keep resolving forever. The alternative —
+      # keeping a full copy of the site here — would mean building the app twice
+      # (Pages needs base=/laterite/, the Worker needs base=/) to serve bytes
+      # nobody looks at.
+      #
+      # Pages serves 404.html for any path it does not recognise, and this
+      # artifact contains almost nothing, so one file catches every legacy URL
+      # and routes it to the right new host.
+      - name: Upload Pages artifact (redirect shim)
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
-          path: web/dist
+          path: web/legacy-pages
 
       - name: Deploy to GitHub Pages
         id: deploy

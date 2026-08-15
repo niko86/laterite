@@ -2,9 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { enterExplore } from "./helpers";
+import { APP, enterExplore } from "./helpers";
 
-const APP = "/laterite/";
 const fixture = (name: string) =>
   path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", name);
 
@@ -388,11 +387,13 @@ test("PWA: installable — manifest, icons and theme-color are wired", async ({
   page,
 }) => {
   await ready(page);
-  // The injected manifest link is base-prefixed so it resolves under the
-  // /laterite/ deploy base (a bare href would 404 on Pages).
+  // The injected manifest link, start_url and scope must all sit under the
+  // deploy base — under a non-root base a bare href 404s, and a start_url that
+  // doesn't match scope makes the app uninstallable. At base "/" the prefix
+  // half of that is trivially true; the fetch below is what still has teeth.
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
     "href",
-    "/laterite/manifest.webmanifest",
+    `${APP}manifest.webmanifest`,
   );
   // The manifest parses and declares the installability essentials (a 512px
   // icon, standalone display, base-scoped start_url/scope).
@@ -402,8 +403,8 @@ test("PWA: installable — manifest, icons and theme-color are wired", async ({
       ?.getAttribute("href");
     return href ? await (await fetch(href)).json() : null;
   });
-  expect(manifest?.start_url).toBe("/laterite/");
-  expect(manifest?.scope).toBe("/laterite/");
+  expect(manifest?.start_url).toBe(APP);
+  expect(manifest?.scope).toBe(APP);
   expect(manifest?.display).toBe("standalone");
   expect(
     (manifest?.icons ?? []).some(

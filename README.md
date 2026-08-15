@@ -26,7 +26,7 @@ Files come back born-typed — a `2DP` heading is a float, a `DT` a datetime, an
 [![web cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=web&label=web%20cov)](https://codecov.io/gh/niko86/laterite)
 [![wasm cov](https://img.shields.io/codecov/c/github/niko86/laterite?flag=wasm&label=wasm%20cov)](https://codecov.io/gh/niko86/laterite)
 
-📖 **[Documentation](https://niko86.github.io/laterite/docs/)** · 🌐 **[Browser validator + data explorer](https://niko86.github.io/laterite/)** · 📓 **[Cookbook](https://niko86.github.io/laterite/docs/cookbook/)**
+📖 **[Documentation](https://docs.laterite.dev/)** · 🌐 **[Browser validator + data explorer](https://app.laterite.dev/)** · 📓 **[Cookbook](https://docs.laterite.dev/cookbook/)**
 
 ## Pick your surface
 
@@ -35,18 +35,18 @@ scriptable output is byte-identical across them.
 
 | Surface | Get it | Use it for | Docs |
 |---|---|---|---|
-| **Python** | `pip install laterite` | polars frames, the typed graph, the `python-ags4` drop-in | [guide](https://niko86.github.io/laterite/docs/surfaces/python/) |
-| **Node.js** | `npm install laterite` | apache-arrow tables, server-side validation | [guide](https://niko86.github.io/laterite/docs/node/) |
-| **CLI — `lat`** | [Releases](https://github.com/niko86/laterite/releases), or `pip install laterite` / `npx laterite` | pipelines, CI gates, one-off checks | [guide](https://niko86.github.io/laterite/docs/surfaces/cli/) |
-| **DuckDB** | `INSTALL laterite_ags4 FROM community;` | SQL straight over `.ags` files, no conversion step | [guide](https://niko86.github.io/laterite/docs/duckdb/) |
-| **Browser** | `npm i @laterite/ags4-wasm` | validate + explore in the page, nothing uploaded anywhere | [guide](https://niko86.github.io/laterite/docs/reference/wasm-api/) |
+| **Python** | `pip install laterite` | polars frames, the typed graph, the `python-ags4` drop-in | [guide](https://docs.laterite.dev/surfaces/python/) |
+| **Node.js** | `npm install laterite` | apache-arrow tables, server-side validation | [guide](https://docs.laterite.dev/node/) |
+| **CLI — `lat`** | [Releases](https://github.com/niko86/laterite/releases), or `pip install laterite` / `npx laterite` | pipelines, CI gates, one-off checks | [guide](https://docs.laterite.dev/surfaces/cli/) |
+| **DuckDB** | `INSTALL laterite_ags4 FROM community;` | SQL straight over `.ags` files, no conversion step | [guide](https://docs.laterite.dev/duckdb/) |
+| **Browser** | `npm i @laterite/ags4-wasm` | validate + explore in the page, nothing uploaded anywhere | [guide](https://docs.laterite.dev/reference/wasm-api/) |
 
-All five are **[in beta](https://niko86.github.io/laterite/docs/reference/support/)** —
+All five are **[in beta](https://docs.laterite.dev/reference/support/)** —
 the engine is tested; what it hasn't had is your files. The Rust crate
 (`cargo add laterite`) is the one surface that isn't: same engine, but not yet at
 parity with these five.
 
-The **[web app](https://niko86.github.io/laterite/)** is built on the browser package
+The **[web app](https://app.laterite.dev/)** is built on the browser package
 and nothing else — a worked example of that surface rather than a sixth one. Go and
 use it; there's nothing to install.
 
@@ -134,7 +134,7 @@ The drop-in mirrors python-ags4's **library** API name for name. Its CLI is
 deliberately not mirrored — see [Parity](#parity-with-python-ags4).
 </details>
 
-The [cookbook](https://niko86.github.io/laterite/docs/cookbook/) shows each task
+The [cookbook](https://docs.laterite.dev/cookbook/) shows each task
 side by side across Python, Node, DuckDB and the CLI, with synced tabs.
 
 ## What it does

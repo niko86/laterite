@@ -2,8 +2,14 @@ import { defineConfig, type Plugin } from "vite";
 import solid from "vite-plugin-solid";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
-import { copyFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import {
+  copyFileSync,
+  existsSync,
+  globSync,
+  mkdirSync,
+  renameSync,
+} from "node:fs";
+import { dirname, resolve } from "node:path";
 
 // The DuckDB-wasm worker bundles carry a `//# sourceMappingURL=…worker.js.map`
 // comment, but we copy the worker via `?url` (fingerprinted) and never emit
@@ -29,18 +35,20 @@ function stripDuckdbWorkerSourcemaps(): Plugin {
   };
 }
 
-// GitHub Pages serves 404.html for any path it doesn't recognise. Copy the
-// built index.html to 404.html so a COLD visit (no service worker yet) to a
-// mistyped or unknown in-scope URL still boots the app instead of a hard 404.
-// Routing is hash-only (every shared link is /laterite/#…), so this only
-// matters for stray paths — but it's the conventional Pages SPA hardening and
-// costs one file. Runs in closeBundle, after index.html is finalised (manifest
-// link injected) and after the SW precache manifest is computed, so 404.html
-// is intentionally NOT itself precached (it's only for the pre-SW cold case).
-function githubPagesSpaFallback(): Plugin {
+// A cold visit (no service worker yet) to an unknown in-scope path must still
+// boot the app rather than hard-404. On Cloudflare that is `not_found_handling:
+// "single-page-application"` in wrangler.jsonc, which needs no file — this 404
+// copy is the equivalent trick for a host that has no such setting and serves
+// 404.html instead, which is what still fronts the legacy niko86.github.io URLs.
+// Routing is hash-only (every shared link is <base>#…), so it only ever matters
+// for stray paths; it costs one file, so it stays until that host does not.
+// Runs in closeBundle, after index.html is finalised (manifest link injected)
+// and after the SW precache manifest is computed, so 404.html is intentionally
+// NOT itself precached (it's only for the pre-SW cold case).
+function spa404Fallback(): Plugin {
   let outDir = "dist";
   return {
-    name: "gh-pages-404-fallback",
+    name: "spa-404-fallback",
     apply: "build",
     configResolved(cfg) {
       outDir = cfg.build.outDir;
@@ -52,16 +60,76 @@ function githubPagesSpaFallback(): Plugin {
   };
 }
 
-// `base` is the single deploy-location knob. Private test repo now
-// (GitHub Pages serves it at /laterite/); the future public home
-// niko86/laterite is a one-line flip via VITE_BASE=/laterite/. A wrong
-// base 404s every asset, so it lives here and nowhere else.
+// The DuckDB engine wasm cannot live with the rest of the app.
+//
+// Cloudflare caps a SINGLE static asset at 25 MiB — on Workers and on Pages
+// alike, so this is not a choice between the two hosts. The two DuckDB bundles
+// are 34 MiB (EH) and 39 MiB (MVP), and `wrangler deploy` refuses the whole
+// upload over either. Cloudflare's own answer for anything larger is R2.
+//
+// So when VITE_DUCKDB_CDN is set, those two files are served from there and
+// MOVED OUT of the build output. Both halves are required: rewriting the URL
+// without moving the file still ships 73 MiB the deploy rejects, and moving it
+// without rewriting gives a 404 on first Explore click.
+//
+// Unset (dev, and any build that isn't deploying to Cloudflare) changes
+// nothing — the files stay put and load from the same origin, exactly as
+// before. The DuckDB wasm is already `globIgnore`d from the PWA precache, so
+// removing it cannot disturb the service worker manifest.
+const DUCKDB_CDN = process.env.VITE_DUCKDB_CDN?.replace(/\/*$/, "/");
+const DUCKDB_WASM = /(^|\/)duckdb-(eh|mvp)-[\w-]+\.wasm$/;
+
+function offloadDuckdbWasm(): Plugin {
+  let outDir = "dist";
+  return {
+    name: "offload-duckdb-wasm-to-r2",
+    apply: "build",
+    configResolved(cfg) {
+      outDir = cfg.build.outDir;
+    },
+    // closeBundle, so it runs after the PWA plugin has computed its precache
+    // manifest — the files are excluded from it either way, but moving them
+    // earlier would make that dependency load-bearing and invisible.
+    closeBundle() {
+      if (!DUCKDB_CDN) return;
+      const staging = resolve(outDir, "..", "r2-upload");
+      for (const rel of globSync("assets/*.wasm", { cwd: outDir })) {
+        if (!DUCKDB_WASM.test(rel)) continue;
+        const to = resolve(staging, rel);
+        mkdirSync(dirname(to), { recursive: true });
+        renameSync(resolve(outDir, rel), to);
+        console.log(`[duckdb-r2] ${rel} -> r2-upload/${rel}`);
+      }
+    },
+  };
+}
+
+// `base` is the single deploy-location knob, and it lives here and nowhere
+// else because a wrong base 404s every asset on the site.
+//
+// It is `/` because the site now answers on its own domain (laterite.dev),
+// where GitHub serves the repo at the root. It was `/laterite/` for the
+// project-Pages path, and `deploy-validator.yml` still exposes `base` as a
+// workflow_dispatch input — which is what makes the cutover a single build
+// rather than a broken window: the domain and this default cannot both change
+// atomically, so dispatch with the other value to bridge.
 export default defineConfig({
-  base: process.env.VITE_BASE ?? "/laterite/",
+  base: process.env.VITE_BASE ?? "/",
+  experimental: {
+    // Rewrite ONLY the two oversized DuckDB bundles to the R2 origin. Every
+    // other asset keeps the default base-relative URL; returning undefined
+    // is how this hook says "leave it alone".
+    renderBuiltUrl(filename) {
+      if (DUCKDB_CDN && DUCKDB_WASM.test(filename))
+        return DUCKDB_CDN + filename;
+      return undefined;
+    },
+  },
   plugins: [
     solid(),
     tailwindcss(),
     stripDuckdbWorkerSourcemaps(),
+    offloadDuckdbWasm(),
     // PWA: installable + offline. The caching split is the whole point here.
     // PRECACHE (downloaded at install, ~5.85 MiB, then served offline) = the
     // full app shell: EVERY JS/CSS chunk — including the Explore/Charts/
@@ -102,7 +170,8 @@ export default defineConfig({
         orientation: "any",
         categories: ["productivity", "utilities"],
         // scope + start_url intentionally omitted → the plugin defaults them
-        // to Vite's `base` (/laterite/), so they track the deploy knob.
+        // to Vite's `base`, so they track the deploy knob rather than pinning
+        // a second copy of it here.
         icons: [
           { src: "icons/icon-128.png", sizes: "128x128", type: "image/png" },
           { src: "icons/icon-256.png", sizes: "256x256", type: "image/png" },
@@ -139,17 +208,20 @@ export default defineConfig({
         // right after the first visit is already served from cache.
         clientsClaim: true,
         // SPA offline reload → serve the app shell. The plugin base-prefixes
-        // this to /laterite/index.html. Only fires for navigation requests
-        // (Workbox guards on request.mode === 'navigate'), so asset/JSON
-        // fetches are untouched.
+        // this under Vite's `base`. Only fires for navigation requests (Workbox
+        // guards on request.mode === 'navigate'), so asset/JSON fetches are
+        // untouched.
         navigateFallback: "index.html",
-        // Never answer a top-level navigation with the app shell when it should
-        // resolve elsewhere: (1) file-like URLs (a final path segment with a
-        // dot-extension) — let real assets / the runtime-cached .wasm/.gsb serve
-        // themselves; (2) `/docs/` — the MkDocs site (published alongside the app
-        // at /laterite/docs/) is its own static site, so the app's service worker
-        // must not intercept a navigation into it.
-        navigateFallbackDenylist: [/\/[^/?]+\.[^/?]+$/, /\/docs\//],
+        // Never answer a top-level navigation with the app shell when a real
+        // file should serve itself: a final path segment with a dot-extension,
+        // which is how the runtime-cached .wasm/.gsb reach their own handlers.
+        //
+        // A second entry for `/docs/` used to sit here because MkDocs published
+        // into the app's own output, one origin, where this worker's scope
+        // covered it. The docs now answer on their own host, outside the scope
+        // — so the guard cannot fire, and keeping it would only make a future
+        // reader work out that it can't.
+        navigateFallbackDenylist: [/\/[^/?]+\.[^/?]+$/],
         runtimeCaching: [
           {
             // DuckDB engine wasm — 36 MB (EH) + 41 MB (MVP). Fingerprinted +
@@ -190,7 +262,7 @@ export default defineConfig({
       },
     }),
     // After VitePWA, so it copies the FINAL index.html (manifest link injected).
-    githubPagesSpaFallback(),
+    spa404Fallback(),
   ],
   build: {
     // The wasm + (Phase 2) DuckDB/ECharts chunks are large; raise the
