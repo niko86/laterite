@@ -15,7 +15,7 @@ DuckDB is the pyarrow-free dataframe bridge. The `compat` drop-in's
 `AGS4_to_dataframe` reads a **Rust-built all-Utf8 Arrow table** (no per-cell
 Python boxing) and hands pandas an **object-dtype** frame through DuckDB's NumPy
 `.df()` materialiser — the same trick the core uses — so pandas works _without_
-pyarrow, and already runs **~2× faster than python-ags4**. The polars path
+pyarrow, and already runs **~3× faster than python-ags4**. The polars path
 ingests the same Arrow via the C-stream capsule, also pyarrow-free.
 
 ## pyarrow is an optional accelerator

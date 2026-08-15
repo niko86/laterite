@@ -96,8 +96,11 @@ feeds it as IPC.
   `repo:rust-packages/laterite-ags4-types/src/arrow_cols.rs`,
   `repo:rust-packages/laterite-py/src/lib.rs`) and hands pandas an object-dtype frame
   via DuckDB's NumPy `rel.df()` (the same trick as the core) — already **~2× faster
-  than python-ags4** (was ~2–7× slower before the Arrow move; reproducible via
-  `tools/bench_compat_dataframe.py`).
+  than python-ags4** on that bench's 3-group fixture (was ~2–7× slower before the
+  Arrow move; reproducible via `tools/bench_compat_dataframe.py`). The **published**
+  figure is **~3×** — the same call, measured across five file sizes on forge's
+  123-group `wide` scaffold (`repo:packages/laterite/README.md`). Two fixtures, not
+  two claims; quote the published one outside the wiki.
 - **pyarrow is an OPTIONAL accelerator, never a hard dependency.** `[compat,pyarrow]`
   (or `[all]` / the bare `[pyarrow]` extra) adds it; `_frames.py::compat_materializer`
   auto-detects it at runtime and swaps the pandas hop to pyarrow's `to_pandas` (a
