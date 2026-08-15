@@ -30,7 +30,7 @@ doors, and the door matters for reproducing this. -->
 
 <!-- If you're porting from python-ags4 and laterite gave a different answer,
 say which one you expected. The known divergences are catalogued at
-https://niko86.github.io/laterite/reference/divergences/ — worth a look first,
+https://laterite.dev/docs/reference/divergences/ — worth a look first,
 in case this one is deliberate. -->
 
 ## How to reproduce

@@ -10,7 +10,7 @@ investigation data.
 > all run. Use it if that suits you — just don't expect the surface to hold still
 > yet. Cargo will not carry you across a `0.x` minor on the caret requirement
 > `cargo add` writes, so the upgrade is yours to take; don't force one.
-> [What beta means here](https://niko86.github.io/laterite/docs/reference/support/).
+> [What beta means here](https://laterite.dev/docs/reference/support/).
 
 ```rust,no_run
 use laterite::ags4;

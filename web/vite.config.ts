@@ -52,12 +52,17 @@ function githubPagesSpaFallback(): Plugin {
   };
 }
 
-// `base` is the single deploy-location knob. Private test repo now
-// (GitHub Pages serves it at /laterite/); the future public home
-// niko86/laterite is a one-line flip via VITE_BASE=/laterite/. A wrong
-// base 404s every asset, so it lives here and nowhere else.
+// `base` is the single deploy-location knob, and it lives here and nowhere
+// else because a wrong base 404s every asset on the site.
+//
+// It is `/` because the site now answers on its own domain (laterite.dev),
+// where GitHub serves the repo at the root. It was `/laterite/` for the
+// project-Pages path, and `deploy-validator.yml` still exposes `base` as a
+// workflow_dispatch input — which is what makes the cutover a single build
+// rather than a broken window: the domain and this default cannot both change
+// atomically, so dispatch with the other value to bridge.
 export default defineConfig({
-  base: process.env.VITE_BASE ?? "/laterite/",
+  base: process.env.VITE_BASE ?? "/",
   plugins: [
     solid(),
     tailwindcss(),

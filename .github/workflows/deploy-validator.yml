@@ -8,8 +8,11 @@
 # pool for a deploy. The runner needs the wasm32 target installable, Node, and
 # network reach to GitHub releases for wasm-pack's wasm-bindgen/binaryen.
 #
-# The one dispatch input, `base`, is Vite's deploy path; it defaults to
-# /laterite/ (what Pages serves here) — the same default a push uses.
+# The one dispatch input, `base`, is Vite's deploy path; it defaults to `/`
+# (what the custom domain serves) — the same default a push uses. It exists
+# so a base change can be bridged in ONE build: the domain setting and this
+# default cannot change atomically, so dispatch with the other value across
+# the gap rather than leaving every asset 404ing until a PR merges.
 
 name: Deploy AGS4 validator site
 
@@ -36,9 +39,9 @@ on:
   workflow_dispatch:
     inputs:
       base:
-        description: "Vite base path (must match the Pages URL path)"
+        description: "Vite base path (must match the site URL path; / on the custom domain)"
         type: string
-        default: /laterite/
+        default: /
 
 # Pages deploy needs an OIDC id-token + pages:write; contents:read to
 # checkout. Least privilege otherwise.
@@ -104,15 +107,15 @@ jobs:
         env:
           # On a push, inputs.base is empty — fall back to the same default
           # the dispatch input uses so the Pages base path is always set.
-          VITE_BASE: ${{ inputs.base || '/laterite/' }}
+          VITE_BASE: ${{ inputs.base || '/' }}
         run: |
           npm ci
           npm run build
 
       # The docs build runs on BOTH deploy targets: the private `laterite`
-      # Pages (https://niko86.github.io/laterite/docs/) is the DEV PREVIEW —
+      # Pages (https://laterite.dev/docs/) is the DEV PREVIEW —
       # "the purpose for dev to try things out" — and the public mirror
-      # (https://niko86.github.io/laterite/docs/) is production. (This relaxes the
+      # (https://laterite.dev/docs/) is production. (This relaxes the
       # earlier mirror-only gate now that the docs are mature and dev is the
       # preview env; production exposure is still owner-gated by the manual mirror
       # sync, so merging here only previews on dev.) mkdocs builds into

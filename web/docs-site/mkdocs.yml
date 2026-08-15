@@ -26,7 +26,7 @@ site_name: laterite
 site_description: >-
   Read, validate, query and produce AGS4 geotechnical data — born-typed, fluent,
   one engine across Python, the CLI, Node and DuckDB.
-site_url: https://niko86.github.io/laterite/docs/
+site_url: https://laterite.dev/docs/
 repo_url: https://github.com/niko86/laterite
 repo_name: niko86/laterite
 # Overwritten at build time by hooks/version_stamp.py, which appends the product

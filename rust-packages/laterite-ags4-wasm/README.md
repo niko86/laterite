@@ -9,8 +9,8 @@ server to run.
 
 > **laterite is in beta** — a statement about how much real-world use it has had, not
 > how much testing. The API can still change; what it runs on is the steadier promise.
-> [What that means](https://niko86.github.io/laterite/docs/reference/support/) ·
-> [tell us how it goes](https://niko86.github.io/laterite/docs/feedback/).
+> [What that means](https://laterite.dev/docs/reference/support/) ·
+> [tell us how it goes](https://laterite.dev/docs/feedback/).
 
 ## Read this first — what's different from the native surfaces
 
@@ -239,12 +239,12 @@ the next export either.
 
 ## See it running
 
-<https://niko86.github.io/laterite/> is this module — a full AGS4 validator and
+<https://laterite.dev/> is this module — a full AGS4 validator and
 data explorer, entirely client-side. Its source is in
 [`web/`](https://github.com/niko86/laterite/tree/main/web) and is the reference
 integration: lazy module load, duckdb-wasm wiring, and one group at a time.
 
-📖 [Documentation](https://niko86.github.io/laterite/docs/) · [Browser guide](https://niko86.github.io/laterite/docs/surfaces/browser/)
+📖 [Documentation](https://laterite.dev/docs/) · [Browser guide](https://laterite.dev/docs/surfaces/browser/)
 
 ## License
 

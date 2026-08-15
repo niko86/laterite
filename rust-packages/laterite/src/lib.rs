@@ -71,7 +71,7 @@
 //! take rather than something that happens to you. Don't force it.
 //!
 //! What that means for every surface is stated once, at
-//! <https://niko86.github.io/laterite/docs/reference/support/>.
+//! <https://laterite.dev/docs/reference/support/>.
 //!
 //! The `unstable-engine` feature is the only way past the facade. It is a
 //! feature rather than a hidden module because it shows up in *your*
