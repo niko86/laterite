@@ -4,6 +4,8 @@ dist/
 # mkdocs' output since the docs moved to their own host. `dist/` above
 # matches a component named exactly "dist", so this needs its own line.
 docs-dist/
+# Build output staged for R2 upload.
+r2-upload/
 coverage/
 src/wasm/
 src/wasm-tokenizer/

@@ -2,8 +2,14 @@ import { defineConfig, type Plugin } from "vite";
 import solid from "vite-plugin-solid";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
-import { copyFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import {
+  copyFileSync,
+  existsSync,
+  globSync,
+  mkdirSync,
+  renameSync,
+} from "node:fs";
+import { dirname, resolve } from "node:path";
 
 // The DuckDB-wasm worker bundles carry a `//# sourceMappingURL=…worker.js.map`
 // comment, but we copy the worker via `?url` (fingerprinted) and never emit
@@ -52,6 +58,50 @@ function githubPagesSpaFallback(): Plugin {
   };
 }
 
+// The DuckDB engine wasm cannot live with the rest of the app.
+//
+// Cloudflare caps a SINGLE static asset at 25 MiB — on Workers and on Pages
+// alike, so this is not a choice between the two hosts. The two DuckDB bundles
+// are 34 MiB (EH) and 39 MiB (MVP), and `wrangler deploy` refuses the whole
+// upload over either. Cloudflare's own answer for anything larger is R2.
+//
+// So when VITE_DUCKDB_CDN is set, those two files are served from there and
+// MOVED OUT of the build output. Both halves are required: rewriting the URL
+// without moving the file still ships 73 MiB the deploy rejects, and moving it
+// without rewriting gives a 404 on first Explore click.
+//
+// Unset (dev, and any build that isn't deploying to Cloudflare) changes
+// nothing — the files stay put and load from the same origin, exactly as
+// before. The DuckDB wasm is already `globIgnore`d from the PWA precache, so
+// removing it cannot disturb the service worker manifest.
+const DUCKDB_CDN = process.env.VITE_DUCKDB_CDN?.replace(/\/*$/, "/");
+const DUCKDB_WASM = /(^|\/)duckdb-(eh|mvp)-[\w-]+\.wasm$/;
+
+function offloadDuckdbWasm(): Plugin {
+  let outDir = "dist";
+  return {
+    name: "offload-duckdb-wasm-to-r2",
+    apply: "build",
+    configResolved(cfg) {
+      outDir = cfg.build.outDir;
+    },
+    // closeBundle, so it runs after the PWA plugin has computed its precache
+    // manifest — the files are excluded from it either way, but moving them
+    // earlier would make that dependency load-bearing and invisible.
+    closeBundle() {
+      if (!DUCKDB_CDN) return;
+      const staging = resolve(outDir, "..", "r2-upload");
+      for (const rel of globSync("assets/*.wasm", { cwd: outDir })) {
+        if (!DUCKDB_WASM.test(rel)) continue;
+        const to = resolve(staging, rel);
+        mkdirSync(dirname(to), { recursive: true });
+        renameSync(resolve(outDir, rel), to);
+        console.log(`[duckdb-r2] ${rel} -> r2-upload/${rel}`);
+      }
+    },
+  };
+}
+
 // `base` is the single deploy-location knob, and it lives here and nowhere
 // else because a wrong base 404s every asset on the site.
 //
@@ -63,10 +113,21 @@ function githubPagesSpaFallback(): Plugin {
 // atomically, so dispatch with the other value to bridge.
 export default defineConfig({
   base: process.env.VITE_BASE ?? "/",
+  experimental: {
+    // Rewrite ONLY the two oversized DuckDB bundles to the R2 origin. Every
+    // other asset keeps the default base-relative URL; returning undefined
+    // is how this hook says "leave it alone".
+    renderBuiltUrl(filename) {
+      if (DUCKDB_CDN && DUCKDB_WASM.test(filename))
+        return DUCKDB_CDN + filename;
+      return undefined;
+    },
+  },
   plugins: [
     solid(),
     tailwindcss(),
     stripDuckdbWorkerSourcemaps(),
+    offloadDuckdbWasm(),
     // PWA: installable + offline. The caching split is the whole point here.
     // PRECACHE (downloaded at install, ~5.85 MiB, then served offline) = the
     // full app shell: EVERY JS/CSS chunk — including the Explore/Charts/
