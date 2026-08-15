@@ -1,0 +1,26 @@
+// The apex, laterite.dev — a placeholder, served as static assets by a Worker
+// with no code. Third of three: `laterite-app` (app.), `laterite-docs` (docs.),
+// this one (bare).
+//
+// It exists now because the apex was ANSWERING NOTHING while being advertised:
+// the GitHub Pages redirect shim names laterite.dev in its canonical tag and
+// its noscript fallback, so every crawler and every JS-less visitor following
+// that shim was sent to a hostname with no record. A redirect rule would have
+// closed that too, but a Worker is the thing the real landing page will be —
+// so this is the same object, thinner, rather than scaffolding to tear down.
+//
+// `assets.directory` is ./public, NOT ./ — a bare directory would upload this
+// config file alongside the page.
+//
+// No `not_found_handling`: the default is an honest 404. The app's
+// single-page-application setting would answer every mistyped path with the
+// landing page, which is wrong for a site that is one real file.
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "laterite-site",
+  "compatibility_date": "2026-08-14",
+  "assets": {
+    "directory": "./public",
+  },
+  "routes": [{ "pattern": "laterite.dev", "custom_domain": true }],
+}

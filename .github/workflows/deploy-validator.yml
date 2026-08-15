@@ -2,6 +2,7 @@
 # docs, and publish them to FOUR places in one run — because they are one build
 # whose outputs land in different stores:
 #
+#   laterite.dev       Worker (web/landing/wrangler.jsonc)    apex placeholder
 #   app.laterite.dev   Worker (web/wrangler.jsonc)            the browser app
 #   docs.laterite.dev  Worker (web/docs-site/wrangler.jsonc)  the mkdocs site
 #   cdn.laterite.dev   R2 bucket laterite-cdn                 the DuckDB engine
@@ -191,6 +192,17 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: web/docs-site
+          command: deploy
+
+      # The apex placeholder. Nothing builds it — it is one hand-written file —
+      # so it rides this workflow rather than getting its own, and redeploying
+      # it costs a few KB.
+      - name: Deploy the apex Worker (laterite.dev)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: web/landing
           command: deploy
 
       # GitHub Pages outlives the move as a REDIRECT SHIM, and nothing else.

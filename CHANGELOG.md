@@ -76,6 +76,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 ### Added
 
 - **The browser package has an API reference.** `@laterite/ags4-wasm` ships to npm with fully typed results, and until now the docs site did not mention it once — the crate README was its only documentation. `reference/wasm-api.md` documents it through the practices the web app actually uses, with worked examples whose printed output is generated from running them: init once and await that promise (and pass `module_or_path` explicitly, or a non-root `base` breaks the fetch fallback), read severity through one resolver because an absent `severity` means *error*, take the types from the package rather than mirroring them, hold a `ParsedDataset` across its Arrow pulls and free it before the next parse, propose fixes before applying them, and keep the synchronous engine off the main thread.
+- **`laterite.dev` answers.** A deliberately thin placeholder — what the project is, and the three links that matter (the browser app, the docs, the source). It exists now because the apex was being *advertised* while serving nothing: the redirect shim left on the old GitHub Pages host names `laterite.dev` in its canonical tag and its no-JavaScript fallback, so every crawler following it, and every visitor without JavaScript, was pointed at a hostname with no record. A redirect rule would have closed that too; a Worker was chosen because the real landing page will be one, so this is the same object thinner rather than scaffolding to remove later.
 
 ### Changed
 
