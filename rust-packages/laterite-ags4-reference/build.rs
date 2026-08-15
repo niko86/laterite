@@ -16,7 +16,7 @@
 //! read ONE artifact and cannot drift. (Previously this parsed the five `.ags`
 //! files directly; that made build.rs a second, independent reader of the spec.)
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fmt::Write as _;
 use std::fs;
@@ -24,6 +24,94 @@ use std::io::Write as _;
 use std::path::Path;
 
 use serde_json::Value;
+
+/// `(parent, desc)` — one group's metadata as projected.
+type GroupVal = (String, String);
+/// `(ags_type, unit, status, desc)` — one heading's definition as projected.
+type HeadingVal = (String, String, String, String);
+/// The same table, projected once per edition, tagged with the edition label.
+/// This is `fold`'s input shape.
+type PerEdition<V> = Vec<(String, HashMap<String, V>)>;
+
+/// One edition's projection of the union — the four tables plus `TRAN_AGS`.
+/// Built per edition exactly as before, then folded into the shared tables.
+struct Projection {
+    /// group code -> (parent, desc)
+    groups: HashMap<String, GroupVal>,
+    /// `"GROUP\u{1f}HEADING"` -> (`ags_type`, unit, status, desc)
+    headings: HashMap<String, HeadingVal>,
+    /// group code -> heading names in dictionary order (Rule 7)
+    order: HashMap<String, Vec<String>>,
+    /// `"ABBR_HDNG\u{1f}ABBR_CODE"` -> `ABBR_DESC`
+    abbrs: HashMap<String, String>,
+    tran_ags: String,
+}
+
+/// Fold five per-edition maps into one keyed by the union of their keys, each
+/// value a list of `(edition mask, value)` variants.
+///
+/// This is the whole repack. The five editions overlap almost entirely — 89% of
+/// heading keys carry an identical value in every edition they appear in — so
+/// emitting five complete tables stored the same tuple up to five times. Here a
+/// key appears once and its value once per DISTINCT value.
+///
+/// Masks for a given key are disjoint by construction: each edition contributes
+/// at most one value, so an edition's bit lands in exactly one variant. That is
+/// what lets the lookup stop at the first match.
+///
+/// `BTreeMap` for a deterministic, diff-stable emit — `phf` iteration order is a
+/// property of the hash, not of insertion, but the *generated source* should not
+/// churn between builds.
+fn fold<V: Clone + PartialEq>(
+    per_ed: &[(String, HashMap<String, V>)],
+) -> BTreeMap<String, Vec<(u32, V)>> {
+    let mut out: BTreeMap<String, Vec<(u32, V)>> = BTreeMap::new();
+    for (i, (_ed, table)) in per_ed.iter().enumerate() {
+        let bit = 1u32 << i;
+        let mut keys: Vec<&String> = table.keys().collect();
+        keys.sort();
+        for k in keys {
+            let v = &table[k];
+            let variants = out.entry(k.clone()).or_default();
+            match variants.iter_mut().find(|(_, existing)| existing == v) {
+                Some((mask, _)) => *mask |= bit,
+                None => variants.push((bit, v.clone())),
+            }
+        }
+    }
+    out
+}
+
+/// Emit one folded table as `phf::Map<&str, &[(u8, V)]>`, with `fmt` rendering
+/// one value as a Rust expression.
+fn emit_table<V>(
+    out: &mut String,
+    name: &str,
+    ty: &str,
+    folded: &BTreeMap<String, Vec<(u32, V)>>,
+    fmt: impl Fn(&V) -> String,
+) {
+    let entries: Vec<(&str, String)> = folded
+        .iter()
+        .map(|(k, variants)| {
+            let items: Vec<String> = variants
+                .iter()
+                .map(|(mask, v)| format!("({mask}, {})", fmt(v)))
+                .collect();
+            (k.as_str(), format!("&[{}]", items.join(", ")))
+        })
+        .collect();
+    let mut map = phf_codegen::Map::new();
+    for (k, v) in &entries {
+        map.entry(*k, v);
+    }
+    writeln!(
+        out,
+        "pub(super) static {name}: phf::Map<&'static str, &'static [(EdMask, {ty})]> = {};",
+        map.build()
+    )
+    .unwrap();
+}
 
 fn main() {
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR set by cargo");
@@ -53,14 +141,109 @@ fn main() {
         .as_str()
         .expect("fallback_edition string");
 
+    // One `EdMask` bit per edition. Five today; the width is chosen rather than
+    // assumed so adding editions is a data change, not a silent truncation.
+    let mask_ty = match editions.len() {
+        0..=8 => "u8",
+        9..=16 => "u16",
+        17..=32 => "u32",
+        n => panic!("{n} editions exceeds the 32-bit edition mask"),
+    };
+
     let mut body = String::new();
+    writeln!(
+        body,
+        "/// One bit per bundled edition, in `DictVersion::ALL` order. GENERATED.\n\
+         pub(super) type EdMask = {mask_ty};\n"
+    )
+    .unwrap();
+
     // The `DictVersion` enum + edition list + FALLBACK are generated from the
     // union too, so the validator / wasm / web never hand-copy the edition set.
     emit_dict_version(&mut body, &editions, default_edition, fallback_edition);
-    for ed in &editions {
-        let ident = ed.replace('.', "_"); // "4.0.3" -> "4_0_3"
-        emit_version(&mut body, &ident, ed, &doc);
+
+    // Project every edition exactly as before, then fold. The projection logic
+    // is untouched — only the STORAGE changes — which is what lets
+    // `tests/dict_projection_pin.rs` reproduce its digests byte for byte.
+    let projections: Vec<(String, Projection)> = editions
+        .iter()
+        .map(|ed| (ed.clone(), project(ed, &doc)))
+        .collect();
+
+    for (ed, p) in &projections {
+        assert!(
+            p.headings.len() > 1000,
+            "dict {ed}: only {} headings projected — codegen likely broken",
+            p.headings.len()
+        );
+        assert!(!p.tran_ags.is_empty(), "dict {ed}: TRAN_AGS not found");
     }
+
+    let by =
+        |f: fn(&Projection) -> &HashMap<String, String>| -> Vec<(String, HashMap<String, String>)> {
+            projections
+                .iter()
+                .map(|(e, p)| (e.clone(), f(p).clone()))
+                .collect()
+        };
+
+    let groups: PerEdition<GroupVal> = projections
+        .iter()
+        .map(|(e, p)| (e.clone(), p.groups.clone()))
+        .collect();
+    let headings: PerEdition<HeadingVal> = projections
+        .iter()
+        .map(|(e, p)| (e.clone(), p.headings.clone()))
+        .collect();
+    let order: PerEdition<Vec<String>> = projections
+        .iter()
+        .map(|(e, p)| (e.clone(), p.order.clone()))
+        .collect();
+    let abbrs = by(|p| &p.abbrs);
+
+    emit_table(
+        &mut body,
+        "HEADINGS",
+        "DictEntry",
+        &fold(&headings),
+        |(t, u, s, d)| {
+            format!("DictEntry {{ ags_type: {t:?}, unit: {u:?}, status: {s:?}, desc: {d:?} }}")
+        },
+    );
+    emit_table(
+        &mut body,
+        "GROUPS",
+        "GroupMeta",
+        &fold(&groups),
+        |(p, d)| format!("GroupMeta {{ parent: {p:?}, desc: {d:?} }}"),
+    );
+    emit_table(
+        &mut body,
+        "GROUP_HEADINGS",
+        "&'static [&'static str]",
+        &fold(&order),
+        |list| {
+            let items: Vec<String> = list.iter().map(|h| format!("{h:?}")).collect();
+            format!("&[{}]", items.join(", "))
+        },
+    );
+    emit_table(&mut body, "ABBRS", "&'static str", &fold(&abbrs), |d| {
+        format!("{d:?}")
+    });
+
+    // TRAN_AGS is one short string per edition — indexed, not masked, because
+    // there is nothing to share and an index is cheaper than a scan.
+    let trans: Vec<String> = projections
+        .iter()
+        .map(|(_, p)| format!("{:?}", p.tran_ags))
+        .collect();
+    writeln!(
+        body,
+        "\npub(super) static TRAN_AGS: [&str; {}] = [{}];",
+        trans.len(),
+        trans.join(", ")
+    )
+    .unwrap();
 
     let mut f = fs::File::create(&dest).expect("create dict_data.rs");
     f.write_all(body.as_bytes()).expect("write dict_data.rs");
@@ -108,19 +291,6 @@ fn emit_dict_version(out: &mut String, editions: &[String], default_ed: &str, fa
     }
     writeln!(out, "}}\n").unwrap();
 
-    // The five generated statics for one edition, in `Dictionary` field order.
-    writeln!(out, "type DictTables = (").unwrap();
-    writeln!(out, "    &'static phf::Map<&'static str, DictEntry>,").unwrap();
-    writeln!(out, "    &'static phf::Map<&'static str, GroupMeta>,").unwrap();
-    writeln!(
-        out,
-        "    &'static phf::Map<&'static str, &'static [&'static str]>,"
-    )
-    .unwrap();
-    writeln!(out, "    &'static phf::Map<&'static str, &'static str>,").unwrap();
-    writeln!(out, "    &'static str,").unwrap();
-    writeln!(out, ");\n").unwrap();
-
     writeln!(out, "impl DictVersion {{").unwrap();
     writeln!(out, "    pub fn as_str(self) -> &'static str {{").unwrap();
     writeln!(out, "        match self {{").unwrap();
@@ -161,27 +331,31 @@ fn emit_dict_version(out: &mut String, editions: &[String], default_ed: &str, fa
     writeln!(out, "        }}").unwrap();
     writeln!(out, "    }}").unwrap();
 
-    writeln!(
-        out,
-        "    /// The five compiled lookup tables for this edition."
-    )
-    .unwrap();
     // `pub(super)`: dict.rs (chore/clippy-pedantic) wraps this generated code
     // in a private `dict_data` submodule so `#[allow(clippy::pedantic)]` scopes
-    // correctly; `BundledDict::bundled` (the sole caller, in the parent module)
-    // still needs to reach it.
-    writeln!(out, "    pub(super) fn tables(self) -> DictTables {{").unwrap();
+    // correctly; `BundledDict` (the sole caller, in the parent module) still
+    // needs to reach these.
+    writeln!(
+        out,
+        "    /// This edition's position in `ALL` — the index into `TRAN_AGS`."
+    )
+    .unwrap();
+    writeln!(out, "    pub(super) fn index(self) -> usize {{").unwrap();
     writeln!(out, "        match self {{").unwrap();
-    for ed in editions {
-        let id = ed.replace('.', "_");
-        writeln!(
-            out,
-            "            DictVersion::{} => (&DICT_{id}_HEADINGS, &DICT_{id}_GROUPS, &DICT_{id}_GROUP_HEADINGS, &DICT_{id}_ABBRS, DICT_{id}_TRAN_AGS),",
-            variant(ed)
-        )
-        .unwrap();
+    for (i, ed) in editions.iter().enumerate() {
+        writeln!(out, "            DictVersion::{} => {i},", variant(ed)).unwrap();
     }
     writeln!(out, "        }}").unwrap();
+    writeln!(out, "    }}").unwrap();
+
+    writeln!(
+        out,
+        "    /// This edition's bit in an `EdMask`. A table entry belongs to this\n    \
+             /// edition when its variant's mask has this bit set."
+    )
+    .unwrap();
+    writeln!(out, "    pub(super) fn bit(self) -> EdMask {{").unwrap();
+    writeln!(out, "        1 << self.index()").unwrap();
     writeln!(out, "    }}").unwrap();
     writeln!(out, "}}\n").unwrap();
 
@@ -198,13 +372,19 @@ fn emit_dict_version(out: &mut String, editions: &[String], default_ed: &str, fa
     .unwrap();
 }
 
-/// Project one edition out of the union and append its five statics to `out`.
+/// Project one edition out of the union.
+///
 /// The projection mirrors `tools/gen_dictionary.py::reconstruct` exactly (flat
 /// fields are the latest-edition value; `by_ed` overlays older editions; `eds`
 /// gates membership; `order_by_ed`/`*_by_ed` override group meta + order), so the
-/// emitted tables are byte-identical to the old direct-`.ags` parse — which is
+/// projected values are byte-identical to the old direct-`.ags` parse — which is
 /// what keeps validation behaviour (and python-ags4 parity) unchanged.
-fn emit_version(out: &mut String, ident: &str, ed: &str, doc: &Value) {
+///
+/// This function is deliberately unchanged by the repack: it still answers "what
+/// does edition X believe", one edition at a time. Only what `main` does with
+/// five of these changed — they are folded into shared tables instead of emitted
+/// as five complete ones.
+fn project(ed: &str, doc: &Value) -> Projection {
     // Trim to match the old `.ags` reader (which trimmed every cell); the union
     // values are clean, so this is a no-op in practice but guarantees parity.
     let s = |v: &Value| v.as_str().unwrap_or("").trim().to_string();
@@ -306,101 +486,11 @@ fn emit_version(out: &mut String, ident: &str, ed: &str, doc: &Value) {
         .and_then(|o| o.get(ed))
         .unwrap_or(&Value::Null));
 
-    assert!(
-        headings.len() > 1000,
-        "dict {ident}: only {} headings projected — codegen likely broken",
-        headings.len()
-    );
-    assert!(!tran_ags.is_empty(), "dict {ident}: TRAN_AGS not found");
-
-    // Build the phf maps. Deterministic order (sorted) so the generated file is
-    // reproducible / diff-stable. phf_codegen::Map::entry borrows the value
-    // `&str` until `.build()`, so the formatted expression strings must outlive
-    // the builder — materialise them into owned Vecs first.
-    let mut hkeys: Vec<&String> = headings.keys().collect();
-    hkeys.sort();
-    let h_entries: Vec<(&str, String)> = hkeys
-        .iter()
-        .map(|k| {
-            let (t, u, s, d) = &headings[*k];
-            (
-                k.as_str(),
-                format!("DictEntry {{ ags_type: {t:?}, unit: {u:?}, status: {s:?}, desc: {d:?} }}"),
-            )
-        })
-        .collect();
-    let mut hmap = phf_codegen::Map::new();
-    for (k, v) in &h_entries {
-        hmap.entry(*k, v);
+    Projection {
+        groups,
+        headings,
+        order: group_hdng_order,
+        abbrs,
+        tran_ags,
     }
-
-    let mut gkeys: Vec<&String> = groups.keys().collect();
-    gkeys.sort();
-    let g_entries: Vec<(&str, String)> = gkeys
-        .iter()
-        .map(|k| {
-            let (p, d) = &groups[*k];
-            (
-                k.as_str(),
-                format!("GroupMeta {{ parent: {p:?}, desc: {d:?} }}"),
-            )
-        })
-        .collect();
-    let mut gmap = phf_codegen::Map::new();
-    for (k, v) in &g_entries {
-        gmap.entry(*k, v);
-    }
-
-    let mut okeys: Vec<&String> = group_hdng_order.keys().collect();
-    okeys.sort();
-    let o_entries: Vec<(&str, String)> = okeys
-        .iter()
-        .map(|k| {
-            let list = &group_hdng_order[*k];
-            let items: Vec<String> = list.iter().map(|h| format!("{h:?}")).collect();
-            (k.as_str(), format!("&[{}]", items.join(", ")))
-        })
-        .collect();
-    let mut omap = phf_codegen::Map::new();
-    for (k, v) in &o_entries {
-        omap.entry(*k, v);
-    }
-
-    let mut akeys: Vec<&String> = abbrs.keys().collect();
-    akeys.sort();
-    let a_entries: Vec<(&str, String)> = akeys
-        .iter()
-        .map(|k| (k.as_str(), format!("{:?}", abbrs[*k])))
-        .collect();
-    let mut amap = phf_codegen::Map::new();
-    for (k, v) in &a_entries {
-        amap.entry(*k, v);
-    }
-
-    writeln!(
-        out,
-        "static DICT_{ident}_HEADINGS: phf::Map<&'static str, DictEntry> = {};",
-        hmap.build()
-    )
-    .unwrap();
-    writeln!(
-        out,
-        "static DICT_{ident}_GROUPS: phf::Map<&'static str, GroupMeta> = {};",
-        gmap.build()
-    )
-    .unwrap();
-    writeln!(
-        out,
-        "static DICT_{ident}_GROUP_HEADINGS: \
-         phf::Map<&'static str, &'static [&'static str]> = {};",
-        omap.build()
-    )
-    .unwrap();
-    writeln!(
-        out,
-        "static DICT_{ident}_ABBRS: phf::Map<&'static str, &'static str> = {};",
-        amap.build()
-    )
-    .unwrap();
-    writeln!(out, "static DICT_{ident}_TRAN_AGS: &str = {tran_ags:?};\n").unwrap();
 }
