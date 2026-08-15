@@ -20,7 +20,7 @@
 //! was an estimate extrapolated from the generated SOURCE, and it was wrong by
 //! roughly seven-fold. Measured after doing it:
 //!
-//!   generated dict_data.rs   2,783,973 -> 906,008 bytes   -67%
+//!   generated `dict_data.rs`  2,783,973 -> 906,008 bytes   -67%
 //!   wasm binary, raw         7,185,964 -> 6,722,577       -6.4%
 //!   wasm binary, gzip -9     1,982,729 -> 1,898,909       -4.2%
 //!
