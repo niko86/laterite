@@ -13,8 +13,8 @@ export const SampleLoader: Component<{
     setError(null);
     try {
       // Served from public/samples/ under the deploy base. BASE_URL
-      // already ends in "/", so concatenation is correct under both
-      // "/" (dev) and "/laterite/" (Pages).
+      // already ends in "/", so concatenation is correct at the root and
+      // under any subpath base.
       const res = await fetch(`${import.meta.env.BASE_URL}samples/${file}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const buf = await res.arrayBuffer();

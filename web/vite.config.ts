@@ -35,18 +35,20 @@ function stripDuckdbWorkerSourcemaps(): Plugin {
   };
 }
 
-// GitHub Pages serves 404.html for any path it doesn't recognise. Copy the
-// built index.html to 404.html so a COLD visit (no service worker yet) to a
-// mistyped or unknown in-scope URL still boots the app instead of a hard 404.
-// Routing is hash-only (every shared link is /laterite/#…), so this only
-// matters for stray paths — but it's the conventional Pages SPA hardening and
-// costs one file. Runs in closeBundle, after index.html is finalised (manifest
-// link injected) and after the SW precache manifest is computed, so 404.html
-// is intentionally NOT itself precached (it's only for the pre-SW cold case).
-function githubPagesSpaFallback(): Plugin {
+// A cold visit (no service worker yet) to an unknown in-scope path must still
+// boot the app rather than hard-404. On Cloudflare that is `not_found_handling:
+// "single-page-application"` in wrangler.jsonc, which needs no file — this 404
+// copy is the equivalent trick for a host that has no such setting and serves
+// 404.html instead, which is what still fronts the legacy niko86.github.io URLs.
+// Routing is hash-only (every shared link is <base>#…), so it only ever matters
+// for stray paths; it costs one file, so it stays until that host does not.
+// Runs in closeBundle, after index.html is finalised (manifest link injected)
+// and after the SW precache manifest is computed, so 404.html is intentionally
+// NOT itself precached (it's only for the pre-SW cold case).
+function spa404Fallback(): Plugin {
   let outDir = "dist";
   return {
-    name: "gh-pages-404-fallback",
+    name: "spa-404-fallback",
     apply: "build",
     configResolved(cfg) {
       outDir = cfg.build.outDir;
@@ -168,7 +170,8 @@ export default defineConfig({
         orientation: "any",
         categories: ["productivity", "utilities"],
         // scope + start_url intentionally omitted → the plugin defaults them
-        // to Vite's `base` (/laterite/), so they track the deploy knob.
+        // to Vite's `base`, so they track the deploy knob rather than pinning
+        // a second copy of it here.
         icons: [
           { src: "icons/icon-128.png", sizes: "128x128", type: "image/png" },
           { src: "icons/icon-256.png", sizes: "256x256", type: "image/png" },
@@ -205,17 +208,20 @@ export default defineConfig({
         // right after the first visit is already served from cache.
         clientsClaim: true,
         // SPA offline reload → serve the app shell. The plugin base-prefixes
-        // this to /laterite/index.html. Only fires for navigation requests
-        // (Workbox guards on request.mode === 'navigate'), so asset/JSON
-        // fetches are untouched.
+        // this under Vite's `base`. Only fires for navigation requests (Workbox
+        // guards on request.mode === 'navigate'), so asset/JSON fetches are
+        // untouched.
         navigateFallback: "index.html",
-        // Never answer a top-level navigation with the app shell when it should
-        // resolve elsewhere: (1) file-like URLs (a final path segment with a
-        // dot-extension) — let real assets / the runtime-cached .wasm/.gsb serve
-        // themselves; (2) `/docs/` — the MkDocs site (published alongside the app
-        // at /laterite/docs/) is its own static site, so the app's service worker
-        // must not intercept a navigation into it.
-        navigateFallbackDenylist: [/\/[^/?]+\.[^/?]+$/, /\/docs\//],
+        // Never answer a top-level navigation with the app shell when a real
+        // file should serve itself: a final path segment with a dot-extension,
+        // which is how the runtime-cached .wasm/.gsb reach their own handlers.
+        //
+        // A second entry for `/docs/` used to sit here because MkDocs published
+        // into the app's own output, one origin, where this worker's scope
+        // covered it. The docs now answer on their own host, outside the scope
+        // — so the guard cannot fire, and keeping it would only make a future
+        // reader work out that it can't.
+        navigateFallbackDenylist: [/\/[^/?]+\.[^/?]+$/],
         runtimeCaching: [
           {
             // DuckDB engine wasm — 36 MB (EH) + 41 MB (MVP). Fingerprinted +
@@ -256,7 +262,7 @@ export default defineConfig({
       },
     }),
     // After VitePWA, so it copies the FINAL index.html (manifest link injected).
-    githubPagesSpaFallback(),
+    spa404Fallback(),
   ],
   build: {
     // The wasm + (Phase 2) DuckDB/ECharts chunks are large; raise the

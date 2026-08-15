@@ -147,7 +147,7 @@ One clean-room Rust AGS4 engine, surfaced for every stack. Scriptable output is 
 | **Python**  | [`laterite`](https://pypi.org/project/laterite/) — PyPI                                                        | `pip install laterite`                  |
 | **CLI**     | [`lat`](https://github.com/niko86/laterite/releases)                                                           | bundled here, or GitHub Releases        |
 | **DuckDB**  | [`laterite_ags4`](https://community-extensions.duckdb.org/extensions/laterite_ags4.html) — community extension | `INSTALL laterite_ags4 FROM community;` |
-| **Browser** | [validator + data explorer](https://app.laterite.dev/) — WASM                                         | open in a browser                       |
+| **Browser** | [validator + data explorer](https://app.laterite.dev/) — WASM                                                  | open in a browser                       |
 
 **Running in a browser?** This package is Node-only — it loads a native addon via
 `optionalDependencies` and touches the filesystem. Use the

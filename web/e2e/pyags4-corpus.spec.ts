@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { APP } from "./helpers";
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -68,7 +69,7 @@ test("python-ags4 .ags corpus through the wasm validator (opt-in)", async ({
 
   const rows: Record<string, unknown>[] = [];
   for (const f of files) {
-    await page.goto("/laterite/");
+    await page.goto(APP);
     await expect(
       page.getByRole("button", { name: /Clean \(minimal\)/ }),
     ).toBeVisible();

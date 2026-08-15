@@ -1,5 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
+const BASE = process.env.VITE_BASE ?? "/";
+
 // End-to-end tests drive the REAL app (wasm validator in a Web Worker +
 // DuckDB-wasm) in headless Chromium against a local `vite preview` of the
 // production build — the same artefact that deploys. This replaces the
@@ -7,8 +9,10 @@ import { defineConfig } from "@playwright/test";
 // exercises validate → fix → explore deterministically.
 //
 // Requires a prior `npm run build`: the webServer below runs `vite preview`,
-// which serves an existing `dist/` at the deploy base `/laterite/` but
-// does NOT build it (CI's e2e workflow runs build:wasm + build first).
+// which serves an existing `dist/` at the deploy base but does NOT build it
+// (CI's e2e workflow runs build:wasm + build first). The base comes from the
+// same VITE_BASE knob vite.config.ts reads, so previewing a non-root build
+// needs no second edit here.
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -43,7 +47,7 @@ export default defineConfig({
   ],
   webServer: {
     command: "npm run preview -- --port 4173 --strictPort",
-    url: "http://localhost:4173/laterite/",
+    url: `http://localhost:4173${BASE}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

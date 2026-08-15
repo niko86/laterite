@@ -128,7 +128,7 @@ const App: Component = () => {
             ·
           </span>{" "}
           <a
-            href="https://niko86.github.io/laterite/docs/reference/support/"
+            href="https://docs.laterite.dev/reference/support/"
             target="_blank"
             rel="noopener noreferrer"
             class="text-accent hover:underline"
