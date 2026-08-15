@@ -68,9 +68,11 @@ still being completed. Its API will change. Cargo will not carry you across a `0
 minor on the caret requirement `cargo add` writes, so the upgrade is yours to take —
 don't force one.
 
-**The engine crates make no version promise at all.** Said above and worth saying as a
-rule: they are reshaped whenever the toolchain needs it, so any release of one can
-move anything. Each says so on its own crates.io page.
+**The engine crates make no version promise at all, and they are on their own line.**
+Said above and worth saying as a rule: they are reshaped whenever the toolchain needs
+it, so any release of one can move anything. Each says so on its own crates.io page.
+Their version is **not** the product's either, so a number you see on crates.io will
+not match the one in a release announcement — that is two clocks, not a mistake.
 
 ### When beta ends
 
