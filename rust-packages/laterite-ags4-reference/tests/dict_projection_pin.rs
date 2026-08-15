@@ -9,12 +9,25 @@
 //! suite still green, because the suite exercises rules, not the dictionary's
 //! full surface.
 //!
-//! That gap matters the moment the representation changes. The tables are five
-//! complete `phf` projections of a union whose editions overlap almost entirely,
-//! and repacking them (one union + a presence mask, interned field indices) is
-//! worth ~45% of the wasm binary — but it is only safe if "the projection is
-//! unchanged" is something a machine asserts rather than something a reviewer
-//! believes after reading a diff of generated code.
+//! That gap mattered the moment the representation changed, which it now has:
+//! the five complete `phf` projections became ONE set of tables keyed by the
+//! union, each key carrying one variant per distinct value plus a bitmask of the
+//! editions holding it. That was only safe because "the projection is unchanged"
+//! is something a machine asserts here, rather than something a reviewer believes
+//! after reading a diff of generated code.
+//!
+//! This comment used to say the repack was "worth ~45% of the wasm binary". That
+//! was an estimate extrapolated from the generated SOURCE, and it was wrong by
+//! roughly seven-fold. Measured after doing it:
+//!
+//!   generated dict_data.rs   2,783,973 -> 906,008 bytes   -67%
+//!   wasm binary, raw         7,185,964 -> 6,722,577       -6.4%
+//!   wasm binary, gzip -9     1,982,729 -> 1,898,909       -4.2%
+//!
+//! The source shrank far more than the binary because the linker already
+//! deduplicated the repeated `&'static str` literals that made the source large.
+//! What the repack actually removes is the per-edition `phf` table structure, not
+//! the strings. Worth having, and worth not overselling.
 //!
 //! So: hash every observable the bundled arm exposes, per edition, and pin it.
 //! A repack that preserves behaviour reproduces these exactly; one that does not
