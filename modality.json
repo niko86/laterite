@@ -1438,7 +1438,7 @@
           "spelling": "chained",
           "verbs": [
             {
-              "name": "ParsedDataset.group_codes/meta/arrow_ipc",
+              "name": "ParsedDataset.group_codes/meta/rows_json (+arrow_ipc under the `arrow` feature)",
               "in_forms": [
                 "handle"
               ],
@@ -1460,7 +1460,7 @@
               "direction": "out",
               "form": "bytes",
               "verdict": "gap",
-              "reason": "the wasm read handle (ParsedDataset) exposes only group_codes/meta/arrow_ipc (typed table-out) — no .text/.bytes AGS4 re-emit, so there is no round-trip AGS4 out of a browser read (Python/Node Ags4File have .text/.bytes/.save). Compute the fix instead via the separate build/apply verbs.",
+              "reason": "the wasm read handle (ParsedDataset) exposes only group_codes/meta/rows_json — and arrow_ipc where the `arrow` feature is built (#330; the published package is the slim build, which has rows_json only). All are typed table-out: no .text/.bytes AGS4 re-emit on the handle itself, so there is no round-trip AGS4 out of a browser read the way Python/Node Ags4File have .text/.bytes/.save. Assemblable rather than absent since #330 — meta() + rows_json() together ARE build_ags4's input shape, so read -> edit -> write composes through the separate build verb (held by `rows_json_feeds_build_ags4_straight_back` in the crate's tests); the gap is that the handle does not do it for you.",
               "priority": "P2",
               "related": "wasm-read-emit"
             }

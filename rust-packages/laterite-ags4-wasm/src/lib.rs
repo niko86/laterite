@@ -9,15 +9,44 @@
 //!
 //! Phase 2 adds `read()` → typed Arrow IPC for the DuckDB-wasm data
 //! explorer; this file is Phase 1 (validator) only.
+//!
+//! # What is always here, and what is a feature (#330)
+//!
+//! Six surfaces are behind cargo features — `excel`, `arrow`, `certify`,
+//! `diff`, `merge`, `censor` — all ON by `default = full`, so a plain
+//! `wasm-pack build` is unchanged. Turning them off is what the published slim
+//! artifact does, and it is worth megabytes: our own Rust is ~7.6% of the
+//! binary, `arrow` alone ~35% of its code section.
+//!
+//! **Ungated, therefore the slim surface**: `validate`, `read` (+
+//! `group_codes` / `meta` / `rows_json`), `build_ags4`, `compute_fixes` /
+//! `apply_fixes`, `list_rules`, `dictionary`, `version` / `engine_version` /
+//! `engine_fingerprint`. Read → validate → fix → write is one chain and no
+//! shipped build breaks it in the middle.
+//!
+//! The gates take exports away; they never change what a surviving one
+//! *returns*. The one asymmetry is that `read`'s two row doors are not both
+//! always present — see [`ParsedDataset::rows_json`].
 
 // #168 Phase 3: parse types + tokenizer come straight from the leaf
 // (encoding_rs + memchr only — wasm-safe); the validator dep stays for rules.
 use laterite_ags4_parse::{ParsedFile, parse_bytes};
 use laterite_ags4_types::sql_type;
 use laterite_ags4_validator::{
-    CheckOptions, DictVersion, ValidatorError, WorldScope, check_parsed_with_dict,
-    dict::Dictionary, dict::FALLBACK, findings, fixes, overlay, resolve_dict_version, tran_ags_of,
+    CheckOptions, DictVersion, ValidatorError, WorldScope, check_parsed_with_dict, dict::FALLBACK,
+    findings, fixes, overlay,
 };
+// Only `diff` and `merge` read the edition off the file being compared (KEY
+// headings come from the dictionary, so which edition changes what counts as
+// "the same row"). Split out rather than left in the list above so a build
+// without either does not warn — and `-D warnings` is a CI gate.
+#[cfg(any(feature = "diff", feature = "merge"))]
+use laterite_ags4_validator::{resolve_dict_version, tran_ags_of};
+// Narrower still: only `diff` materialises a `Dictionary` (to read KEY
+// headings off it) — `merge` hands the resolved edition to `MergeOpts` and lets
+// the leaf load it. The bundled-dictionary tests want it whatever is gated on.
+#[cfg(any(feature = "diff", test))]
+use laterite_ags4_validator::dict::Dictionary;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -34,12 +63,19 @@ use wasm_bindgen::prelude::*;
 ///
 /// The readable copy is `#[cfg(test)]`: nothing but the tests reads it, so
 /// outside them it is dead weight in a binary whose whole point is being small.
+///
+/// The attribute list applies to **both** items, which matters now that six
+/// surfaces are feature-gated (#330): a `#[cfg(feature = "diff")]` that reached
+/// only the test const would leave the shipped `.d.ts` declaring `RevisionDelta`
+/// in a build with no `diff` export — the generated types are the published API
+/// reference, so that is a lie the compiler would never catch.
 macro_rules! ts_section {
     ($(#[$meta:meta])* $name:ident, $section:ident, $src:literal) => {
         $(#[$meta])*
         #[cfg(test)]
         const $name: &str = $src;
 
+        $(#[$meta])*
         #[wasm_bindgen(typescript_custom_section)]
         const $section: &'static str = $src;
     };
@@ -686,6 +722,7 @@ fn emit_report(
 
 /// Decode one group's Arrow IPC stream → a [`laterite_ags4_emit::GroupInput`] (the
 /// column names are the AGS headings). Uses the shared Arrow→Value transpose.
+#[cfg(feature = "arrow")]
 fn group_from_ipc(code: String, bytes: &[u8]) -> Result<laterite_ags4_emit::GroupInput, String> {
     let reader = arrow::ipc::reader::StreamReader::try_new(std::io::Cursor::new(bytes), None)
         .map_err(|e| format!("arrow ipc: {e}"))?;
@@ -766,6 +803,7 @@ fn build_ags4_core(groups_json: &str, o: BuildOptions) -> Result<BuildAgs4Report
 /// The host-testable core of [`build_ags4_ipc`], taking the groups already
 /// decoded from the JS array (that walk is genuinely `Reflect` work and stays
 /// at the boundary).
+#[cfg(feature = "arrow")]
 fn build_ipc_core(
     inputs: Vec<laterite_ags4_emit::GroupInput>,
     o: BuildOptions,
@@ -827,6 +865,10 @@ pub fn build_ags4(
 ///
 /// Returns the same `{ text, findings, applied, fixes_applied }`. The Arrow→AGS
 /// transpose is the read path's IPC reversed.
+///
+/// Behind the `arrow` feature: a build without it still writes AGS4 through
+/// [`build_ags4`], which takes the same data as JSON.
+#[cfg(feature = "arrow")]
 #[wasm_bindgen]
 pub fn build_ags4_ipc(
     // Stays a raw `JsValue` on its own hand-written `Reflect` path below. An
@@ -1017,6 +1059,7 @@ mod build_ags4_tests {
         assert!(build_ags4_from_json(json, Some("9.9"), None, false, None).is_err());
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn ipc_columnar_input_emits_valid() {
         use arrow::array::{Float64Array, StringArray};
@@ -1237,6 +1280,7 @@ impl WasmOptions for ValidateOptions {
 /// `certify`'s named options — `ValidateOptions`' dictionary half plus the
 /// clock. No `warnings`/`fyi`/`maxPerRule`: the mint measures every tier itself
 /// and reports counts, so there is nothing for a caller to include or exclude.
+#[cfg(feature = "certify")]
 #[cfg_attr(test, derive(serde::Serialize))]
 #[derive(serde::Deserialize, Default)]
 #[serde(default, rename_all = "camelCase")]
@@ -1252,6 +1296,7 @@ struct CertifyOptions {
     dict_replace: Option<bool>,
 }
 
+#[cfg(feature = "certify")]
 impl WasmOptions for CertifyOptions {
     const KEYS: &'static [&'static str] = &[
         "dictVersion",
@@ -1291,7 +1336,15 @@ export interface ValidateOptions {
    *  overlaying on it. Contradicts `dictVersion`; both is a `bad_dict` error. */
   dictReplace?: boolean;
 }
+"#;
 
+// Split from `TS_OPTIONS` above when `certify` became a feature (#330): the
+// generated `.d.ts` is the published API reference, so a build without the
+// export must not still declare its options interface. Every gated surface's TS
+// rides the same `#[cfg]` as the export it describes, for that reason.
+#[cfg(feature = "certify")]
+#[wasm_bindgen(typescript_custom_section)]
+const TS_CERTIFY_OPTIONS: &'static str = r#"
 /** Named options for `certify`. */
 export interface CertifyOptions {
   dictVersion?: "auto" | "4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2";
@@ -1307,6 +1360,11 @@ export interface CertifyOptions {
 extern "C" {
     #[wasm_bindgen(typescript_type = "ValidateOptions")]
     pub type ValidateOptionsJs;
+}
+
+#[cfg(feature = "certify")]
+#[wasm_bindgen]
+extern "C" {
     #[wasm_bindgen(typescript_type = "CertifyOptions")]
     pub type CertifyOptionsJs;
 }
@@ -1384,6 +1442,10 @@ pub fn validate(data: &[u8], opts: Option<ValidateOptionsJs>) -> ValidationRepor
 /// (#568), the same overlay `validate` accepts: the stamp records the dict's
 /// `{name, hash}` so a later `validate --index` on any surface re-validates (never
 /// silently vouches) when the effective dictionary differs (O-48, record-not-contract).
+///
+/// Behind the `certify` feature — it is the only door onto `laterite-ags4-trust`,
+/// so a build without it drops the whole certificate stack.
+#[cfg(feature = "certify")]
 #[wasm_bindgen]
 pub fn certify(data: &[u8], opts: CertifyOptionsJs) -> Result<String, JsError> {
     console_error_panic_hook::set_once();
@@ -1397,6 +1459,7 @@ pub fn certify(data: &[u8], opts: CertifyOptionsJs) -> Result<String, JsError> {
 /// The host-testable core of [`certify`], for the same reason [`run`] is one:
 /// a `JsValue` in the signature puts a function beyond `cargo test`, which is
 /// the only lane this crate has.
+#[cfg(feature = "certify")]
 fn certify_core(data: &[u8], o: &CertifyOptions) -> Result<String, String> {
     let checked_at = o.checked_at.clone().ok_or_else(|| {
         "certify options: `checkedAt` is required — wasm has no clock, so the caller supplies \
@@ -1667,10 +1730,18 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
 
 #[cfg(test)]
 mod options_tests {
-    use super::{
-        BuildOptions, CensorOptions, CertifyOptions, DiffOptions, MergeOptions, ValidateOptions,
-        WasmOptions, unknown_key,
-    };
+    use super::{BuildOptions, ValidateOptions, WasmOptions, unknown_key};
+    // The gated surfaces' options structs. Imported separately so this module
+    // still compiles under `--no-default-features` — the drift check itself is
+    // per-type, so it simply covers fewer types in a slimmer build.
+    #[cfg(feature = "censor")]
+    use super::CensorOptions;
+    #[cfg(feature = "certify")]
+    use super::CertifyOptions;
+    #[cfg(feature = "diff")]
+    use super::DiffOptions;
+    #[cfg(feature = "merge")]
+    use super::MergeOptions;
 
     /// `KEYS` must name exactly the struct's own serde fields.
     ///
@@ -1707,10 +1778,14 @@ mod options_tests {
     #[test]
     fn option_keys_match_the_structs() {
         assert_keys_match::<ValidateOptions>();
-        assert_keys_match::<CertifyOptions>();
         assert_keys_match::<BuildOptions>();
+        #[cfg(feature = "certify")]
+        assert_keys_match::<CertifyOptions>();
+        #[cfg(feature = "merge")]
         assert_keys_match::<MergeOptions>();
+        #[cfg(feature = "diff")]
         assert_keys_match::<DiffOptions>();
+        #[cfg(feature = "censor")]
         assert_keys_match::<CensorOptions>();
     }
 
@@ -1922,19 +1997,25 @@ mod ts_result_shape_tests {
                 fixes_applied: 0,
             }),
         );
-        assert_same(
-            "CensorTally",
-            declared_fields(TS_CENSOR_RESULT, "CensorTally"),
-            serde_keys(&laterite_ags4_censor::Tally::default()),
-        );
-        assert_same(
-            "CensorResult",
-            declared_fields(TS_CENSOR_RESULT, "CensorResult"),
-            serde_keys(&CensorDto {
-                text: String::new(),
-                tally: laterite_ags4_censor::Tally::default(),
-            }),
-        );
+        // The gated surfaces' shapes are checked when they are built. A slim
+        // build ships neither the export nor its TS, so there is no pair left
+        // to have drifted — but the `full` build CI tests still covers both.
+        #[cfg(feature = "censor")]
+        {
+            assert_same(
+                "CensorTally",
+                declared_fields(TS_CENSOR_RESULT, "CensorTally"),
+                serde_keys(&laterite_ags4_censor::Tally::default()),
+            );
+            assert_same(
+                "CensorResult",
+                declared_fields(TS_CENSOR_RESULT, "CensorResult"),
+                serde_keys(&CensorDto {
+                    text: String::new(),
+                    tally: laterite_ags4_censor::Tally::default(),
+                }),
+            );
+        }
         assert_same(
             "GroupMeta",
             declared_fields(TS_GROUP_META, "GroupMeta"),
@@ -1946,56 +2027,59 @@ mod ts_result_shape_tests {
             }),
         );
 
-        let cell = || laterite_ags4_diff::CellDelta {
-            heading: "LOCA_ID".into(),
-            ags_type: "ID".into(),
-            a: Some("BH01".into()),
-            b: Some("BH02".into()),
-        };
-        let row = || laterite_ags4_diff::RowDelta {
-            kind: "changed",
-            key: vec!["BH01".into()],
-            line_a: Some(1),
-            line_b: Some(1),
-            cells: vec![cell()],
-        };
-        assert_same(
-            "CellDelta",
-            declared_fields(TS_DIFF_RESULT, "CellDelta"),
-            serde_keys(&cell()),
-        );
-        assert_same(
-            "RowDelta",
-            declared_fields(TS_DIFF_RESULT, "RowDelta"),
-            serde_keys(&row()),
-        );
-        assert_same(
-            "GroupDelta",
-            declared_fields(TS_DIFF_RESULT, "GroupDelta"),
-            serde_keys(&laterite_ags4_diff::GroupDelta {
-                code: "LOCA".into(),
-                added: 0,
-                removed: 0,
-                changed: 1,
-                headings_added: Vec::new(),
-                headings_removed: Vec::new(),
-                keyed: true,
-                key_headings: vec!["LOCA_ID".into()],
-                rows: vec![row()],
-            }),
-        );
-        assert_same(
-            "RevisionDelta",
-            declared_fields(TS_DIFF_RESULT, "RevisionDelta"),
-            serde_keys(&laterite_ags4_diff::RevisionDelta {
-                groups: Vec::new(),
-                groups_added: Vec::new(),
-                groups_removed: Vec::new(),
-                total_added: 0,
-                total_removed: 0,
-                total_changed: 0,
-            }),
-        );
+        #[cfg(feature = "diff")]
+        {
+            let cell = || laterite_ags4_diff::CellDelta {
+                heading: "LOCA_ID".into(),
+                ags_type: "ID".into(),
+                a: Some("BH01".into()),
+                b: Some("BH02".into()),
+            };
+            let row = || laterite_ags4_diff::RowDelta {
+                kind: "changed",
+                key: vec!["BH01".into()],
+                line_a: Some(1),
+                line_b: Some(1),
+                cells: vec![cell()],
+            };
+            assert_same(
+                "CellDelta",
+                declared_fields(TS_DIFF_RESULT, "CellDelta"),
+                serde_keys(&cell()),
+            );
+            assert_same(
+                "RowDelta",
+                declared_fields(TS_DIFF_RESULT, "RowDelta"),
+                serde_keys(&row()),
+            );
+            assert_same(
+                "GroupDelta",
+                declared_fields(TS_DIFF_RESULT, "GroupDelta"),
+                serde_keys(&laterite_ags4_diff::GroupDelta {
+                    code: "LOCA".into(),
+                    added: 0,
+                    removed: 0,
+                    changed: 1,
+                    headings_added: Vec::new(),
+                    headings_removed: Vec::new(),
+                    keyed: true,
+                    key_headings: vec!["LOCA_ID".into()],
+                    rows: vec![row()],
+                }),
+            );
+            assert_same(
+                "RevisionDelta",
+                declared_fields(TS_DIFF_RESULT, "RevisionDelta"),
+                serde_keys(&laterite_ags4_diff::RevisionDelta {
+                    groups: Vec::new(),
+                    groups_added: Vec::new(),
+                    groups_removed: Vec::new(),
+                    total_added: 0,
+                    total_removed: 0,
+                    total_changed: 0,
+                }),
+            );
+        }
 
         // Straight off the real builder rather than a hand-made value: these
         // three carry `skip_serializing_if` fields (`unit`, `parent`), and a
@@ -2351,11 +2435,17 @@ fn apply_fixes_core(
 // `xlsx_bytes_to_ags4`) drive the browser Excel surface: the Tools pane hands
 // us bytes and gets bytes + warnings back, no filesystem. calamine reads and
 // rust_xlsxwriter writes — both pure-Rust and wasm-clean.
+//
+// Behind the `excel` feature (#330), and the heaviest gate after `arrow`:
+// calamine + zip + zopfli + zlib_rs + quick_xml + rust_xlsxwriter measured ~22%
+// of the code section between them. A page that never opens a workbook was
+// paying all of it.
 // ---------------------------------------------------------------------
 
 /// The result of an Excel conversion: the output `bytes` (a JS `Uint8Array` —
 /// the `.xlsx` or `.ags` file), plus the `warnings` and counts the UI surfaces
 /// (dropped non-Rule-19 columns, skipped sheets, …).
+#[cfg(feature = "excel")]
 #[wasm_bindgen]
 pub struct ExcelResult {
     bytes: Vec<u8>,
@@ -2364,6 +2454,7 @@ pub struct ExcelResult {
     rows: usize,
 }
 
+#[cfg(feature = "excel")]
 #[wasm_bindgen]
 impl ExcelResult {
     #[wasm_bindgen(getter)]
@@ -2386,6 +2477,7 @@ impl ExcelResult {
 
 /// AGS4 bytes → an `.xlsx` workbook (one sheet per group, python-ags4's
 /// layout). `JsError` if the input carries no valid AGS4 groups.
+#[cfg(feature = "excel")]
 #[wasm_bindgen]
 pub fn ags4_to_xlsx(
     data: &[u8],
@@ -2397,6 +2489,7 @@ pub fn ags4_to_xlsx(
 }
 
 /// The host-testable core of [`ags4_to_xlsx`].
+#[cfg(feature = "excel")]
 fn ags4_to_xlsx_core(data: &[u8], recover_duplicate_headings: bool) -> Result<ExcelResult, String> {
     use laterite_ags4_core::ags4_codec::{DuplicateHeadings, ReadOptions};
     // Duplicate headings are fatal by default here as on every read surface; the
@@ -2423,6 +2516,7 @@ fn ags4_to_xlsx_core(data: &[u8], recover_duplicate_headings: bool) -> Result<Ex
 /// dropped (surfaced in `warnings`). `format_numeric` re-pads DATA cells to
 /// their column's TYPE (mirrors python-ags4's `convert_to_text`). `JsError` if
 /// no sheet yields a valid group.
+#[cfg(feature = "excel")]
 #[wasm_bindgen]
 pub fn xlsx_to_ags4(data: &[u8], format_numeric: bool) -> Result<ExcelResult, JsError> {
     console_error_panic_hook::set_once();
@@ -2430,6 +2524,7 @@ pub fn xlsx_to_ags4(data: &[u8], format_numeric: bool) -> Result<ExcelResult, Js
 }
 
 /// The host-testable core of [`xlsx_to_ags4`].
+#[cfg(feature = "excel")]
 fn xlsx_to_ags4_core(data: &[u8], format_numeric: bool) -> Result<ExcelResult, String> {
     let (bytes, stats) =
         laterite_ags4_excel::xlsx_bytes_to_ags4(data, format_numeric).map_err(|e| e.to_string())?;
@@ -2456,9 +2551,16 @@ fn xlsx_to_ags4_core(data: &[u8], format_numeric: bool) -> Result<ExcelResult, S
 // ---------------------------------------------------------------------
 
 /// A parsed AGS4 file held in wasm memory as the lightweight string
-/// `ParsedFile`. Each group's typed `RecordBatch` is built lazily on the
-/// `arrow_ipc(code)` call and dropped after the bytes are returned, so
-/// peak residency is one batch — not every group at once.
+/// `ParsedFile`. Each group's typed rows are built lazily, one group per call,
+/// and dropped once returned — so peak residency is one group, not the whole
+/// file typed at once.
+#[cfg_attr(
+    feature = "arrow",
+    doc = "\nTwo doors onto those rows: `arrow_ipc(code)` frames one group as an Arrow\n\
+           IPC `RecordBatch` for duckdb-wasm, and `rows_json(code)` returns the\n\
+           same values as JSON. Without the `arrow` feature only the second\n\
+           exists (#330)."
+)]
 #[wasm_bindgen]
 pub struct ParsedDataset {
     parsed: ParsedFile,
@@ -2536,6 +2638,11 @@ impl ParsedDataset {
     /// keychain. Unlike `keys` this needs no registry entry, so a
     /// custom/passthrough group still gets a usable `_content_hash` even
     /// without an `_id`. (#448)
+    ///
+    /// Behind the `arrow` feature (#330). The Arrow machinery exists to feed
+    /// duckdb-wasm; a caller without it wants [`Self::rows_json`], which is
+    /// always present.
+    #[cfg(feature = "arrow")]
     pub fn arrow_ipc(
         &self,
         code: &str,
@@ -2544,6 +2651,33 @@ impl ParsedDataset {
     ) -> Result<Vec<u8>, JsError> {
         self.arrow_ipc_core(code, keys.unwrap_or(false), content_hash.unwrap_or(false))
             .map_err(|m| JsError::new(&m))
+    }
+
+    /// One group's rows as a JSON array-of-arrays.
+    #[cfg_attr(
+        feature = "arrow",
+        doc = "\nThe **non-Arrow** door onto the same data `arrow_ipc` frames. \
+               Without the `arrow` feature it is the only one (#330)."
+    )]
+    ///
+    /// Values are born typed, through the SAME
+    /// `laterite_ags4_types::parse_value` the native surfaces and the Arrow cast
+    /// use, off the file's own TYPE row: a `2DP` heading arrives as a JSON
+    /// number, a `DT` as a `"yyyy-mm-dd hh:mm:ss"` string, a blank or
+    /// unparseable cell as `null`. So this is not "the strings, unparsed" — it
+    /// is the same casting decision, serialised differently.
+    ///
+    /// A **string**, not a JS array. Two reasons, and the second is the real
+    /// one: `JSON.parse` on a single string beats building one boxed `JsValue`
+    /// per cell across the boundary — the very cost `build_ags4_ipc` exists to
+    /// avoid on the way back — and `list_rules` / `MergeResult` already return
+    /// their JSON that way, so this is the crate's established shape rather
+    /// than a new third convention.
+    ///
+    /// Rows are positional against [`Self::meta`]'s `headings`, and padded to
+    /// its length with `null` when a DATA row is short — so the two zip.
+    pub fn rows_json(&self, code: &str) -> Result<String, JsError> {
+        self.rows_json_core(code).map_err(|m| JsError::new(&m))
     }
 }
 
@@ -2582,8 +2716,43 @@ impl ParsedDataset {
         })
     }
 
+    /// The core of [`ParsedDataset::rows_json`].
+    ///
+    /// The padding is the part worth testing, and it is the same decision
+    /// [`Self::meta_core`] makes one row up: a missing TYPE reads as `"X"`
+    /// (free text — the safe assumption, since nothing in the file said the
+    /// column was numeric), and a short DATA row pads with `null` rather than
+    /// coming back narrow. Both keep this positional against `meta`'s parallel
+    /// arrays, which is the contract a consumer zips the two by.
+    fn rows_json_core(&self, code: &str) -> Result<String, String> {
+        let group = self
+            .parsed
+            .groups
+            .get(code)
+            .ok_or_else(|| format!("group {code:?} not in dataset"))?;
+        let cols = group.headings.len();
+        let rows: Vec<serde_json::Value> = (0..group.rows.len())
+            .map(|row| {
+                serde_json::Value::Array(
+                    (0..cols)
+                        .map(|col| {
+                            let ags_type = group.types.get(col).map_or("X", String::as_str);
+                            // `cell` yields None past the end of a short row,
+                            // and parse_value maps None -> Null: the padding
+                            // falls out of the shared cast rather than being a
+                            // second rule written here.
+                            laterite_ags4_types::parse_value(group.cell(col, row), ags_type)
+                        })
+                        .collect(),
+                )
+            })
+            .collect();
+        serde_json::to_string(&rows).map_err(|e| format!("rows json for {code}: {e}"))
+    }
+
     /// The core of [`ParsedDataset::arrow_ipc`], with the two flags already
     /// defaulted.
+    #[cfg(feature = "arrow")]
     fn arrow_ipc_core(
         &self,
         code: &str,
@@ -2664,6 +2833,7 @@ fn read_core(data: &[u8], encoding_label: Option<&str>) -> Result<ParsedDataset,
 // its own copy. `ts_interfaces_match_the_serde_structs` binds these to the leaf's
 // real structs, so "owned elsewhere" does not mean "unchecked here".
 ts_section! {
+    #[cfg(feature = "diff")]
     TS_DIFF_RESULT,
     TS_DIFF_RESULT_SECTION,
     r#"
@@ -2725,6 +2895,7 @@ export interface RevisionDelta {
 "#
 }
 
+#[cfg(feature = "diff")]
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(typescript_type = "RevisionDelta")]
@@ -2732,6 +2903,7 @@ extern "C" {
 }
 
 /// `diff`'s named options. `encoding`, not `encodingLabel` — see [`MergeOptions`].
+#[cfg(feature = "diff")]
 #[cfg_attr(test, derive(serde::Serialize))]
 #[derive(serde::Deserialize, Default)]
 #[serde(default, rename_all = "camelCase")]
@@ -2740,11 +2912,13 @@ struct DiffOptions {
     max_rows_per_group: Option<u32>,
 }
 
+#[cfg(feature = "diff")]
 impl WasmOptions for DiffOptions {
     const KEYS: &'static [&'static str] = &["encoding", "maxRowsPerGroup"];
     const WHAT: &'static str = "diff options";
 }
 
+#[cfg(feature = "diff")]
 #[wasm_bindgen(typescript_custom_section)]
 const TS_DIFF_OPTIONS: &'static str = r#"
 /** Named options for `diff`. */
@@ -2759,6 +2933,7 @@ export interface DiffOptions {
 }
 "#;
 
+#[cfg(feature = "diff")]
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(typescript_type = "DiffOptions")]
@@ -2769,6 +2944,9 @@ extern "C" {
 ///
 /// * `opts` — a [`DiffOptions`] object; every field optional, so `diff(a, b)`
 ///   is a complete call. An unrecognised key is refused by name.
+///
+/// Behind the `diff` feature (#330).
+#[cfg(feature = "diff")]
 #[wasm_bindgen]
 pub fn diff(a: &[u8], b: &[u8], opts: Option<DiffOptionsJs>) -> Result<RevisionDeltaJs, JsError> {
     console_error_panic_hook::set_once();
@@ -2785,6 +2963,7 @@ pub fn diff(a: &[u8], b: &[u8], opts: Option<DiffOptionsJs>) -> Result<RevisionD
 /// as "the same row". It reads `b`'s `TRAN_AGS` (the newer file) and falls back
 /// to the standard, and neither half of that could be reached from a test while
 /// it sat behind `RevisionDeltaJs`.
+#[cfg(feature = "diff")]
 fn diff_core(
     a: &[u8],
     b: &[u8],
@@ -2811,6 +2990,7 @@ fn diff_core(
 /// The result of a merge: the reconciled `bytes` (a JS `Uint8Array` — the merged
 /// `.ags` file), plus `warnings_json` and `revisions_json` (the audit arrays the
 /// Tools UI parses — the same shape PyO3 / Node return).
+#[cfg(feature = "merge")]
 #[wasm_bindgen]
 pub struct MergeResult {
     bytes: Vec<u8>,
@@ -2818,6 +2998,7 @@ pub struct MergeResult {
     revisions_json: String,
 }
 
+#[cfg(feature = "merge")]
 #[wasm_bindgen]
 impl MergeResult {
     #[wasm_bindgen(getter)]
@@ -2841,6 +3022,7 @@ impl MergeResult {
 /// suffix. See the README's note on which exports still take it positionally —
 /// the ones not yet migrated keep the old name until they are, so the split is
 /// a recorded state rather than an accident.
+#[cfg(feature = "merge")]
 #[cfg_attr(test, derive(serde::Serialize))]
 #[derive(serde::Deserialize, Default)]
 #[serde(default, rename_all = "camelCase")]
@@ -2857,11 +3039,13 @@ struct MergeOptions {
     tran: Option<TranInput>,
 }
 
+#[cfg(feature = "merge")]
 impl WasmOptions for MergeOptions {
     const KEYS: &'static [&'static str] = &["dictVersion", "encoding", "onTypeClash", "tran"];
     const WHAT: &'static str = "merge options";
 }
 
+#[cfg(feature = "merge")]
 #[wasm_bindgen(typescript_custom_section)]
 const TS_MERGE_OPTIONS: &'static str = r#"
 /** Named options for `merge`. */
@@ -2885,6 +3069,7 @@ export interface MergeOptions {
 }
 "#;
 
+#[cfg(feature = "merge")]
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(typescript_type = "MergeOptions")]
@@ -2905,6 +3090,9 @@ extern "C" {
 /// The returned [`MergeResult`] is a wasm-owned handle: read its getters and
 /// call `.free()`. The web worker leaked one per merge until this was written
 /// down here.
+///
+/// Behind the `merge` feature (#330).
+#[cfg(feature = "merge")]
 #[wasm_bindgen]
 pub fn merge(a: &[u8], b: &[u8], opts: Option<MergeOptionsJs>) -> Result<MergeResult, JsError> {
     console_error_panic_hook::set_once();
@@ -2921,6 +3109,7 @@ pub fn merge(a: &[u8], b: &[u8], opts: Option<MergeOptionsJs>) -> Result<MergeRe
 /// which is deliberately parsed by the merge crate's own `FromStr` so the
 /// browser cannot accept a token the CLI rejects, or word the rejection
 /// differently.
+#[cfg(feature = "merge")]
 fn merge_core(a: &[u8], b: &[u8], o: MergeOptions) -> Result<MergeResult, String> {
     use laterite_ags4_merge::{MergeOpts, TypeClashMode, merge_parsed};
 
@@ -3145,6 +3334,7 @@ fn dictionary_core(
 
 /// `{ text, tally }` — the anonymised file plus the per-action cell/structure
 /// counts the Anonymiser surfaces. `tally`'s fields match the leaf's snake_case.
+#[cfg(feature = "censor")]
 #[derive(Serialize)]
 struct CensorDto {
     text: String,
@@ -3152,6 +3342,7 @@ struct CensorDto {
 }
 
 ts_section! {
+    #[cfg(feature = "censor")]
     TS_CENSOR_RESULT,
     TS_CENSOR_RESULT_SECTION,
     r#"
@@ -3181,6 +3372,7 @@ export interface CensorResult {
 "#
 }
 
+#[cfg(feature = "censor")]
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(typescript_type = "CensorResult")]
@@ -3193,6 +3385,7 @@ extern "C" {
 /// them a `JsValue`/`&str`/`bool`/`bool` tail. `censor(d, j, null, "X", true,
 /// false)` is unreadable at the call site and two adjacent booleans are exactly
 /// where a silent transposition lives.
+#[cfg(feature = "censor")]
 #[cfg_attr(test, derive(serde::Serialize))]
 #[derive(serde::Deserialize, Default)]
 #[serde(default, rename_all = "camelCase")]
@@ -3203,12 +3396,14 @@ struct CensorOptions {
     include_freetext: Option<bool>,
 }
 
+#[cfg(feature = "censor")]
 impl WasmOptions for CensorOptions {
     const KEYS: &'static [&'static str] =
         &["selectedCodes", "token", "dropCustom", "includeFreetext"];
     const WHAT: &'static str = "censor options";
 }
 
+#[cfg(feature = "censor")]
 #[wasm_bindgen(typescript_custom_section)]
 const TS_CENSOR_OPTIONS: &'static str = r#"
 /** Named options for `censor`. */
@@ -3228,6 +3423,7 @@ export interface CensorOptions {
 }
 "#;
 
+#[cfg(feature = "censor")]
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(typescript_type = "CensorOptions")]
@@ -3246,6 +3442,10 @@ extern "C" {
 /// `PROJ_ID`'s filehash is the full 64-hex SHA-256 of `data` (a KEY field —
 /// full width so a collision is cryptographically nil); the leaf takes that id
 /// precomputed, so this wrapper hashes the bytes.
+///
+/// Behind the `censor` feature (#330) — with it goes the only sha2/hex use in
+/// the crate.
+#[cfg(feature = "censor")]
 #[wasm_bindgen]
 pub fn censor(
     data: &[u8],
@@ -3267,6 +3467,7 @@ pub fn censor(
 /// preference. `PROJ_ID`'s filehash is the full 64-hex SHA-256 of the input
 /// bytes (a KEY field, so full width), computed here because the leaf takes it
 /// precomputed.
+#[cfg(feature = "censor")]
 fn censor_core(data: &[u8], sensitive_json: &str, o: CensorOptions) -> Result<CensorDto, String> {
     let include_freetext = o.include_freetext.unwrap_or(false);
     let drop_custom = o.drop_custom.unwrap_or(false);
@@ -3316,17 +3517,26 @@ mod tests {
     use super::*;
     // `Array` provides `is_null`/`len`; ArrayRef/DataType/TimeUnit assert the
     // shape of what the shared laterite-ags4-types builder hands back.
+    //
+    // This module is a grab-bag — the typed-Arrow parity proof shares it with
+    // the certify, encoding and dictionary door tests — so the gates go on the
+    // individual items rather than the `mod`, which would take the other three
+    // subjects out of a slim test run along with Arrow.
+    #[cfg(feature = "arrow")]
     use arrow::array::{
         Array, ArrayRef, BooleanArray, Float64Array, Int64Array, StringArray,
         TimestampMicrosecondArray,
     };
+    #[cfg(feature = "arrow")]
     use arrow::datatypes::{DataType, TimeUnit};
+    #[cfg(feature = "arrow")]
     use chrono::NaiveDate;
 
     // Exercises every canonical category: ID/X -> Utf8, 2DP -> Float64,
     // DT -> Timestamp (full datetime, date-only -> midnight, empty ->
     // null), 0DP -> Int64, YN -> Bool. BH03's blank coords/dates check
     // the null path; SAMP is a child group with a YN column.
+    #[cfg(feature = "arrow")]
     const FIXTURE: &[u8] = b"\"GROUP\",\"LOCA\"\r\n\
 \"HEADING\",\"LOCA_ID\",\"LOCA_NATE\",\"LOCA_STAR\",\"LOCA_ENDD\",\"LOCA_REM\"\r\n\
 \"UNIT\",\"\",\"m\",\"yyyy-mm-dd\",\"yyyy-mm-dd\",\"\"\r\n\
@@ -3349,6 +3559,7 @@ mod tests {
 \"DATA\",\"BH01\",\"Y\"\r\n\
 \"DATA\",\"BH01\",\"N\"\r\n";
 
+    #[cfg(feature = "arrow")]
     fn parsed() -> ParsedFile {
         parse_bytes(FIXTURE, encoding_rs::UTF_8).expect("fixture parses")
     }
@@ -3356,6 +3567,7 @@ mod tests {
     /// Build the typed column for `group`'s heading `name`, returning the
     /// array + its `DataType`. Routes through the shared laterite-ags4-types builder
     /// (the production path), feeding it this column's cells.
+    #[cfg(feature = "arrow")]
     fn column(file: &ParsedFile, group: &str, name: &str) -> (ArrayRef, DataType) {
         let g = &file.groups[group];
         let col = g.headings.iter().position(|h| h == name).expect("heading");
@@ -3368,6 +3580,7 @@ mod tests {
         })
     }
 
+    #[cfg(feature = "arrow")]
     fn micros(y: i32, m: u32, d: u32, hh: u32, mm: u32, ss: u32) -> i64 {
         NaiveDate::from_ymd_opt(y, m, d)
             .unwrap()
@@ -3377,11 +3590,13 @@ mod tests {
             .timestamp_micros()
     }
 
+    #[cfg(feature = "certify")]
     const CLEAN_FIXTURE: &[u8] =
         include_bytes!("../../laterite-ags4-validator/tests/fixtures/clean_minimal.ags");
 
     /// Certify options carrying only the clock — the one field with no default,
     /// since wasm cannot read one.
+    #[cfg(feature = "certify")]
     fn stamped_at(when: &str) -> CertifyOptions {
         CertifyOptions {
             checked_at: Some(when.to_string()),
@@ -3393,6 +3608,7 @@ mod tests {
     /// to stamp "laterite-ags4-wasm", which siloed browser certs from every other
     /// surface. Now a cert downloaded from the web app is one every surface can read.
     /// (#430 PR 1a)
+    #[cfg(feature = "certify")]
     #[test]
     fn certify_stamps_the_unified_engine_identity() {
         let json = match certify_core(CLEAN_FIXTURE, &stamped_at("2020-01-01T00:00:00Z")) {
@@ -3408,6 +3624,7 @@ mod tests {
     /// The browser used to run an ERRORS-ONLY validation and then write `warnings: 0,
     /// fyi: 0` into the stamp — two tiers it had never measured, on a claim any other
     /// surface would have believed. Every tier a wasm cert names, it looked at.
+    #[cfg(feature = "certify")]
     #[test]
     fn a_browser_minted_certificate_measured_every_tier_it_names() {
         let json = certify_core(CLEAN_FIXTURE, &stamped_at("2020-01-01T00:00:00Z"))
@@ -3424,6 +3641,7 @@ mod tests {
 
     /// The sandbox has no filesystem, and the stamp has no field in which to pretend
     /// otherwise: nothing a browser mints can claim Rule 20's on-disk half ran.
+    #[cfg(feature = "certify")]
     #[test]
     fn a_browser_minted_certificate_cannot_claim_a_world_check() {
         let json = certify_core(CLEAN_FIXTURE, &stamped_at("2020-01-01T00:00:00Z"))
@@ -3434,6 +3652,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn id_and_x_are_utf8() {
         let file = parsed();
@@ -3448,6 +3667,7 @@ mod tests {
         assert_eq!(rem.value(2), "third");
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn two_dp_is_float64_with_nulls() {
         let file = parsed();
@@ -3459,6 +3679,7 @@ mod tests {
         assert!(a.is_null(2), "blank 2DP cell -> null");
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn dt_is_timestamp_full_dateonly_and_null() {
         let file = parsed();
@@ -3482,6 +3703,7 @@ mod tests {
         assert!(end.is_null(1), "blank DT cell -> null");
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn zero_dp_is_int64() {
         let file = parsed();
@@ -3492,6 +3714,7 @@ mod tests {
         assert_eq!(a.value(1), 2);
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn yn_is_bool() {
         let file = parsed();
@@ -3502,6 +3725,7 @@ mod tests {
         assert!(!a.value(1));
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn ragged_short_row_yields_nulls_not_panic() {
         // A data row shorter than the heading count must null the missing
@@ -3666,6 +3890,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn arrow_ipc_keys_match_the_shared_golden_and_default_strips() {
         // SAME fixture + golden UUIDv8s as the Python (test_content_keys.py) and
@@ -3850,6 +4075,7 @@ mod core_door_tests {
     /// The classification SSOT the browser Anonymiser fetches, read from the
     /// same file the engine ships rather than a hand-written stub — a stub would
     /// let this suite pass while the real policy said something else.
+    #[cfg(feature = "censor")]
     const SENSITIVE: &str = include_str!("../../laterite-ags4-core/data/sensitive_headings.json");
 
     /// Two groups, one keyed child, one heading typed `2DP` — enough to exercise
@@ -3868,6 +4094,7 @@ mod core_door_tests {
 \"DATA\",\"BH02\",\"200.00\"\r\n";
 
     /// `LOCA_A` with BH01 moved, BH02 gone and BH03 new — one of each verdict.
+    #[cfg(any(feature = "diff", feature = "merge"))]
     pub(super) const LOCA_B: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
 \"HEADING\",\"PROJ_ID\"\r\n\
 \"UNIT\",\"\"\r\n\
@@ -3882,6 +4109,7 @@ mod core_door_tests {
 \"DATA\",\"BH03\",\"300.00\"\r\n";
 
     /// `LOCA_A` with `LOCA_NATE` typed `X` instead of `2DP` — the clash.
+    #[cfg(feature = "merge")]
     const LOCA_CLASH: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
 \"HEADING\",\"PROJ_ID\"\r\n\
 \"UNIT\",\"\"\r\n\
@@ -4067,6 +4295,7 @@ mod core_door_tests {
     // ---------------------------------------------------------------
 
     /// One group as an Arrow IPC stream, the shape `build_ags4_ipc` receives.
+    #[cfg(feature = "arrow")]
     fn ipc_of(names: &[&str], rows: &[&[&str]]) -> Vec<u8> {
         use arrow::array::StringArray;
         use arrow::datatypes::{DataType, Field, Schema};
@@ -4093,6 +4322,7 @@ mod core_door_tests {
         buf
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn non_ipc_bytes_are_reported_as_an_arrow_error() {
         let msg = err(group_from_ipc("LOCA".into(), b"definitely not arrow"));
@@ -4102,6 +4332,7 @@ mod core_door_tests {
         );
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn a_synthetic_key_column_never_becomes_an_ags_heading() {
         // The #303 round trip: `read(keys=true)` prepends `_id`/`_parent_id`, and
@@ -4125,6 +4356,7 @@ mod core_door_tests {
         assert_eq!(group.rows[0][1], "100.00");
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn a_frame_with_no_underscore_columns_is_passed_through_whole() {
         // The other side of the same branch: when nothing needs dropping the
@@ -4138,6 +4370,7 @@ mod core_door_tests {
         assert_eq!(group.rows.len(), 1);
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn the_columnar_and_json_doors_build_the_same_file() {
         // Two input shapes, one emitter — the whole point of `build_ags4_ipc`
@@ -4348,6 +4581,131 @@ mod core_door_tests {
         );
     }
 
+    // --- rows_json: the non-Arrow read door (#330) ------------------------
+    //
+    // These are the tests that matter for the slim build: without `arrow` this
+    // is the ONLY way data leaves `read`, so "born typed" has to be true here
+    // and not merely inherited from the Arrow path's reputation.
+
+    #[test]
+    fn rows_json_names_the_group_it_could_not_find() {
+        // Same contract as arrow_ipc_core's: name the code, don't return empty.
+        let ds = read_core(LOCA_A, None).expect("reads");
+        let msg = err(ds.rows_json_core("ZZZZ"));
+        assert!(
+            msg.contains("ZZZZ"),
+            "the missing code must appear in the error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn rows_json_types_cells_off_the_files_own_type_row() {
+        // The claim the slim package's docs make: a `2DP` heading arrives as a
+        // JSON *number*, not the source string. If this ever regressed to
+        // strings the demo would still render and every number would be text.
+        let ds = read_core(LOCA_A, None).expect("reads");
+        let rows: serde_json::Value =
+            serde_json::from_str(&ds.rows_json_core("LOCA").expect("LOCA is present"))
+                .expect("valid JSON");
+        assert_eq!(
+            rows,
+            serde_json::json!([["BH01", 100.0], ["BH02", 200.0]]),
+            "ID stays a string, 2DP becomes a number"
+        );
+    }
+
+    #[test]
+    fn rows_json_and_parse_value_cannot_disagree() {
+        // Parity by construction, asserted rather than asserted-in-a-comment:
+        // every cell must be exactly what `laterite_ags4_types::parse_value`
+        // returns for that cell's declared type — the same function the native
+        // DuckDB conversion and the Arrow cast both go through.
+        let ds = read_core(LOCA_A, None).expect("reads");
+        let rows: Vec<Vec<serde_json::Value>> =
+            serde_json::from_str(&ds.rows_json_core("LOCA").expect("LOCA is present"))
+                .expect("valid JSON");
+        let group = ds.parsed.groups.get("LOCA").expect("LOCA is present");
+        for (r, row) in rows.iter().enumerate() {
+            for (c, cell) in row.iter().enumerate() {
+                assert_eq!(
+                    *cell,
+                    laterite_ags4_types::parse_value(group.cell(c, r), &group.types[c]),
+                    "cell ({r},{c}) drifted from parse_value"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn rows_json_pads_a_short_type_row_with_x_like_meta_does() {
+        // `meta` pads a missing TYPE to "X"; this must agree, or the UI's
+        // column header and the value under it would describe different types.
+        // A ragged UNIT/TYPE row is common enough to reach the explorer.
+        let ragged: &[u8] = b"\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\",\"LOCA_REM\"\r\n\
+\"UNIT\",\"\"\r\n\
+\"TYPE\",\"ID\"\r\n\
+\"DATA\",\"BH01\",\"1.00\",\"note\"\r\n";
+        let ds = read_core(ragged, None).expect("reads");
+        let rows: serde_json::Value =
+            serde_json::from_str(&ds.rows_json_core("LOCA").expect("LOCA is present"))
+                .expect("valid JSON");
+        // Under "X" (free text) the untyped columns stay strings — "1.00" must
+        // NOT become 1.0, because nothing in the file said it was numeric.
+        assert_eq!(rows, serde_json::json!([["BH01", "1.00", "note"]]));
+    }
+
+    #[test]
+    fn rows_json_rows_are_as_wide_as_the_heading_row() {
+        // The row arrays are positional against `meta().headings`, so a DATA
+        // row shorter than the HEADING row must be padded (with nulls), never
+        // returned short — a consumer zipping the two would otherwise shift
+        // every value after the gap into the wrong column.
+        let short: &[u8] = b"\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_NATE\",\"LOCA_REM\"\r\n\
+\"UNIT\",\"\",\"m\",\"\"\r\n\
+\"TYPE\",\"ID\",\"2DP\",\"X\"\r\n\
+\"DATA\",\"BH01\"\r\n";
+        let ds = read_core(short, None).expect("reads");
+        let rows: serde_json::Value =
+            serde_json::from_str(&ds.rows_json_core("LOCA").expect("LOCA is present"))
+                .expect("valid JSON");
+        assert_eq!(rows, serde_json::json!([["BH01", null, null]]));
+    }
+
+    #[test]
+    fn rows_json_feeds_build_ags4_straight_back() {
+        // The round trip the slim surface exists for (#334): read a file, edit
+        // the tables, write it back. `meta()` gives headings/units/types and
+        // this gives rows — together exactly `build_ags4`'s input shape. If
+        // these two doors ever stopped composing, the demo would need a
+        // hand-written adapter, which is the thing this asserts against.
+        let ds = read_core(LOCA_A, None).expect("reads");
+        let groups: Vec<serde_json::Value> = ds
+            .group_codes()
+            .iter()
+            .map(|code| {
+                let m = ds.meta_core(code).expect("a code the file listed");
+                let rows: serde_json::Value =
+                    serde_json::from_str(&ds.rows_json_core(code).expect("present"))
+                        .expect("valid JSON");
+                serde_json::json!({
+                    "code": code, "headings": m.headings,
+                    "units": m.units, "types": m.types, "rows": rows,
+                })
+            })
+            .collect();
+        let built = build_ags4_core(
+            &serde_json::to_string(&groups).expect("plain data"),
+            BuildOptions::default(),
+        )
+        .expect("builds");
+        // Round-tripped through JSON and back out as AGS4, the values survive.
+        assert!(built.text.contains("\"BH01\""), "got: {}", built.text);
+        assert!(built.text.contains("\"100.00\""), "got: {}", built.text);
+    }
+
+    #[cfg(feature = "arrow")]
     #[test]
     fn arrow_ipc_names_the_group_it_could_not_find() {
         let ds = read_core(LOCA_A, None).expect("reads");
@@ -4358,6 +4716,7 @@ mod core_door_tests {
         );
     }
 
+    #[cfg(feature = "arrow")]
     #[test]
     fn keys_and_content_hash_are_off_by_default_and_add_columns_when_asked() {
         let ds = read_core(LOCA_A, None).expect("reads");
@@ -4389,6 +4748,7 @@ mod core_door_tests {
     // diff_core
     // ---------------------------------------------------------------
 
+    #[cfg(feature = "diff")]
     #[test]
     fn diffing_with_an_unknown_encoding_is_refused() {
         let o = DiffOptions {
@@ -4398,6 +4758,7 @@ mod core_door_tests {
         assert!(diff_core(LOCA_A, LOCA_B, &o).is_err());
     }
 
+    #[cfg(feature = "diff")]
     #[test]
     fn an_unparseable_side_is_reported() {
         let o = DiffOptions::default();
@@ -4405,6 +4766,7 @@ mod core_door_tests {
         assert!(diff_core(LOCA_A, b"junk", &o).is_err());
     }
 
+    #[cfg(feature = "diff")]
     #[test]
     fn a_file_diffed_against_itself_reports_nothing() {
         let d = diff_core(LOCA_A, LOCA_A, &DiffOptions::default()).expect("diffs");
@@ -4415,6 +4777,7 @@ mod core_door_tests {
         );
     }
 
+    #[cfg(feature = "diff")]
     #[test]
     fn rows_are_matched_by_key_not_position() {
         // BH01 changed value, BH02 is gone, BH03 is new. Matching by position
@@ -4428,6 +4791,7 @@ mod core_door_tests {
         assert!(loca.key_headings.contains(&"LOCA_ID".to_string()));
     }
 
+    #[cfg(feature = "diff")]
     #[test]
     fn a_row_cap_bounds_the_payload_without_lying_about_the_totals() {
         // The documented contract: `maxRowsPerGroup` caps what each group
@@ -4453,6 +4817,7 @@ mod core_door_tests {
     // merge_core
     // ---------------------------------------------------------------
 
+    #[cfg(feature = "merge")]
     #[test]
     fn an_unknown_type_clash_token_is_refused_in_the_merge_crates_own_words() {
         // The vocabulary is parsed by laterite-ags4-merge's FromStr precisely so
@@ -4473,6 +4838,7 @@ mod core_door_tests {
         }
     }
 
+    #[cfg(feature = "merge")]
     #[test]
     fn every_documented_clash_mode_is_accepted() {
         for mode in laterite_ags4_merge::TypeClashMode::ALL {
@@ -4490,6 +4856,7 @@ mod core_door_tests {
         }
     }
 
+    #[cfg(feature = "merge")]
     #[test]
     fn a_type_clash_is_fatal_by_default_and_widen_settles_it() {
         let strict = merge_core(LOCA_A, LOCA_CLASH, MergeOptions::default());
@@ -4513,6 +4880,7 @@ mod core_door_tests {
         );
     }
 
+    #[cfg(feature = "merge")]
     #[test]
     fn merge_refuses_an_unknown_edition_and_an_unknown_encoding() {
         let bad_dict = MergeOptions {
@@ -4527,6 +4895,7 @@ mod core_door_tests {
         assert!(merge_core(LOCA_A, LOCA_B, bad_enc).is_err());
     }
 
+    #[cfg(feature = "merge")]
     #[test]
     fn a_partial_tran_stops_a_merge() {
         let o = MergeOptions {
@@ -4543,6 +4912,7 @@ mod core_door_tests {
         );
     }
 
+    #[cfg(feature = "merge")]
     #[test]
     fn the_merge_result_getters_return_what_the_core_built() {
         // These three getters are the entire JS-visible surface of a merge, and
@@ -4622,6 +4992,7 @@ mod core_door_tests {
     /// A file carrying one heading from each of the categories the tests below
     /// assert on: a location id (pseudonym), a coordinate (blank) and a project
     /// id (filehash).
+    #[cfg(feature = "censor")]
     const SENSITIVE_FILE: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
 \"HEADING\",\"PROJ_ID\"\r\n\
 \"UNIT\",\"\"\r\n\
@@ -4634,6 +5005,7 @@ mod core_door_tests {
 \"TYPE\",\"ID\",\"2DP\"\r\n\
 \"DATA\",\"BH01\",\"523145.67\"\r\n";
 
+    #[cfg(feature = "censor")]
     #[test]
     fn omitting_selected_codes_scrubs_every_classified_heading() {
         // The leak-safety default, and the one that must never regress: an
@@ -4653,6 +5025,7 @@ mod core_door_tests {
         );
     }
 
+    #[cfg(feature = "censor")]
     #[test]
     fn selected_codes_restricts_the_policy_to_those_columns() {
         let out = censor_core(
@@ -4675,6 +5048,7 @@ mod core_door_tests {
         );
     }
 
+    #[cfg(feature = "censor")]
     #[test]
     fn proj_id_becomes_the_full_sha256_of_the_input_bytes() {
         // Full 64 hex, not a prefix: PROJ_ID is a KEY field, so the width is what
@@ -4690,6 +5064,7 @@ mod core_door_tests {
         );
     }
 
+    #[cfg(feature = "censor")]
     #[test]
     fn the_replacement_token_defaults_and_can_be_overridden() {
         let custom = censor_core(
@@ -4707,6 +5082,7 @@ mod core_door_tests {
         );
     }
 
+    #[cfg(feature = "censor")]
     #[test]
     fn a_malformed_classification_document_is_refused() {
         // Without a policy nothing would be scrubbed — the one outcome a caller
@@ -4720,6 +5096,7 @@ mod core_door_tests {
         assert!(!msg.is_empty(), "a bad policy document must be reported");
     }
 
+    #[cfg(feature = "censor")]
     #[test]
     fn the_tally_counts_what_was_actually_changed() {
         // A tally of zeroes alongside a scrubbed file would tell the Anonymiser's
@@ -4737,6 +5114,7 @@ mod core_door_tests {
     // the Excel pair
     // ---------------------------------------------------------------
 
+    #[cfg(feature = "excel")]
     #[test]
     fn an_ags_file_becomes_a_workbook_with_a_sheet_per_group() {
         let res = ags4_to_xlsx_core(CLEAN, false).expect("converts");
@@ -4748,6 +5126,7 @@ mod core_door_tests {
         assert!(res.warnings().len() < 100, "warnings should be bounded");
     }
 
+    #[cfg(feature = "excel")]
     #[test]
     fn duplicate_headings_are_fatal_unless_recovery_is_asked_for() {
         // Fatal by default on every read surface; the browser opts into the
@@ -4768,11 +5147,13 @@ mod core_door_tests {
         );
     }
 
+    #[cfg(feature = "excel")]
     #[test]
     fn non_workbook_bytes_are_refused() {
         assert!(xlsx_to_ags4_core(b"not a workbook", false).is_err());
     }
 
+    #[cfg(feature = "excel")]
     #[test]
     fn a_workbook_round_trips_back_to_the_same_groups() {
         // The pair is only useful if it is a pair: converting out and back must
@@ -4792,6 +5173,7 @@ mod core_door_tests {
     // certify_core's error arms
     // ---------------------------------------------------------------
 
+    #[cfg(feature = "certify")]
     #[test]
     fn certify_requires_the_caller_to_supply_the_clock() {
         // wasm has no clock, so `checkedAt` is the one option with no default.
@@ -4807,6 +5189,7 @@ mod core_door_tests {
         );
     }
 
+    #[cfg(feature = "certify")]
     #[test]
     fn certify_refuses_an_unknown_edition_and_an_unknown_encoding() {
         let bad_dict = CertifyOptions {
@@ -4823,6 +5206,7 @@ mod core_door_tests {
         assert!(certify_core(CLEAN, &bad_enc).is_err());
     }
 
+    #[cfg(feature = "certify")]
     #[test]
     fn certify_refuses_a_file_with_errors() {
         // Warnings and FYI findings are measured and recorded; ERRORS are fatal.
@@ -4847,7 +5231,9 @@ mod run_and_overlay_tests {
     //! channel and a thrown exception would have to be caught somewhere else.
     //! Which `kind` each one produces is the part a consumer switches on, and
     //! none of the four arms was exercised.
-    use super::core_door_tests::{LOCA_A, LOCA_B};
+    use super::core_door_tests::LOCA_A;
+    #[cfg(feature = "merge")]
+    use super::core_door_tests::LOCA_B;
     use super::*;
 
     const DELIVERY: &[u8] = include_bytes!(
@@ -5225,6 +5611,7 @@ mod run_and_overlay_tests {
 
     /// `LOCA_A` typed `2DP`; this types the same heading `3DP` — a clash
     /// entirely inside the nDP family, which is what `promote` can join.
+    #[cfg(feature = "merge")]
     const LOCA_3DP: &[u8] = b"\"GROUP\",\"PROJ\"\r\n\
 \"HEADING\",\"PROJ_ID\"\r\n\
 \"UNIT\",\"\"\r\n\
@@ -5237,6 +5624,7 @@ mod run_and_overlay_tests {
 \"TYPE\",\"ID\",\"3DP\"\r\n\
 \"DATA\",\"BH09\",\"9.123\"\r\n";
 
+    #[cfg(feature = "merge")]
     fn warning_kinds(res: &MergeResult) -> Vec<String> {
         let v: serde_json::Value =
             serde_json::from_str(&res.warnings_json()).expect("warnings are JSON");
@@ -5247,6 +5635,7 @@ mod run_and_overlay_tests {
             .collect()
     }
 
+    #[cfg(feature = "merge")]
     #[test]
     fn a_widened_type_clash_is_recorded_in_the_merge_warnings() {
         // Widening keeps both deliveries' rows but DISCARDS the column's type,
@@ -5280,6 +5669,7 @@ mod run_and_overlay_tests {
         );
     }
 
+    #[cfg(feature = "merge")]
     #[test]
     fn promote_keeps_the_column_numeric_and_says_so() {
         // The other resolution: `{2DP, 3DP}` joins inside the nDP family, so the
@@ -5305,6 +5695,7 @@ mod run_and_overlay_tests {
         );
     }
 
+    #[cfg(feature = "merge")]
     #[test]
     fn a_typed_vs_x_clash_widens_silently_by_design() {
         // NOT a wart — the documented lattice behaviour, verified through the
@@ -5355,6 +5746,7 @@ mod run_and_overlay_tests {
         );
     }
 
+    #[cfg(feature = "merge")]
     #[test]
     fn merging_two_identical_files_changes_nothing() {
         // The degenerate case, and a useful control on the revision audit: if a
@@ -5371,6 +5763,7 @@ mod run_and_overlay_tests {
         assert_eq!(changed, 0, "a file merged with itself has no revisions");
     }
 
+    #[cfg(feature = "merge")]
     #[test]
     fn an_explicit_edition_overrides_the_files_own_tran_ags() {
         // The parity gap this option was added to close: Python's `merge` and
@@ -5394,6 +5787,7 @@ mod run_and_overlay_tests {
 mod dictionary_and_target_tests {
     //! The last three plain-Rust arms: forcing an edition UNDER a custom
     //! dictionary, the group-targeted finding, and `certify`'s dictionary half.
+    #[cfg(feature = "certify")]
     use super::core_door_tests::LOCA_A;
     use super::*;
 
@@ -5402,6 +5796,7 @@ mod dictionary_and_target_tests {
     );
     const DICT_JSON: &[u8] =
         include_bytes!("../../laterite-ags4-validator/tests/fixtures/custom_dict/xtra.dict.json");
+    #[cfg(feature = "certify")]
     const CLEAN: &[u8] =
         include_bytes!("../../laterite-ags4-validator/tests/fixtures/clean_minimal.ags");
 
@@ -5465,6 +5860,7 @@ mod dictionary_and_target_tests {
         );
     }
 
+    #[cfg(feature = "certify")]
     #[test]
     fn certify_reports_a_broken_dictionary_rather_than_certifying_without_it() {
         // Certifying against a dictionary that would not load must FAIL, not
@@ -5486,6 +5882,7 @@ mod dictionary_and_target_tests {
         );
     }
 
+    #[cfg(feature = "certify")]
     #[test]
     fn a_certificate_records_the_custom_dictionary_it_was_minted_against() {
         // O-48, record-not-contract: the stamp carries the dict's identity so a
@@ -5529,6 +5926,7 @@ mod dictionary_and_target_tests {
         );
     }
 
+    #[cfg(feature = "certify")]
     #[test]
     fn certify_refuses_a_parseable_file_that_has_errors() {
         // The trust model's whole point: warnings and FYI findings are measured

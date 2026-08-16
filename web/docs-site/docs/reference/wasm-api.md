@@ -9,9 +9,50 @@ run, in a page, with no server.
 npm i @laterite/ags4-wasm
 ```
 
-The [web app](../surfaces/browser.md) is built on this package and nothing else,
-which makes it a worked example rather than a demo — everything below is a
-practice taken from its source, with the reason it is done that way.
+The [web app](../surfaces/browser.md) is built on this same crate, which makes it
+a worked example rather than a demo — everything below is a practice taken from
+its source, with the reason it is done that way. (It compiles the crate itself,
+with every feature on; see [what's in the package](#whats-in-the-package).)
+
+## What's in the package
+
+A browser downloads what you ship it, so the package carries the surfaces a page
+actually needs and leaves the rest to a from-source build:
+
+| | in `@laterite/ags4-wasm` |
+|---|---|
+| `validate` · `read` · `build_ags4` | ✅ |
+| `compute_fixes` · `apply_fixes` | ✅ |
+| `list_rules` · `dictionary` · `version` · `engine_version` · `engine_fingerprint` | ✅ |
+| `arrow_ipc` (Arrow IPC for duckdb-wasm) · `build_ags4_ipc` | build from source |
+| `ags4_to_xlsx` · `xlsx_to_ags4` | build from source |
+| `certify` · `diff` · `merge` · `censor` | build from source |
+
+That is **1.9 MB raw / 757 KiB gzipped**, against 6.4 MB / 1.8 MB for everything
+— roughly 2.5× smaller on the wire. The whole read → validate → **fix** → write
+chain is present; nothing shipped breaks it in the middle.
+
+Two of the omissions have a replacement rather than simply being absent:
+`rows_json()` reads a group without Arrow (below), and `build_ags4` takes the
+same data as JSON that `build_ags4_ipc` takes as Arrow.
+
+### Building a bigger engine
+
+The crate's cargo features are `excel`, `arrow`, `certify`, `diff`, `merge` and
+`censor`, and they are **on by default** — so a source build gives you the full
+engine, and the published package is the deliberately trimmed one:
+
+```bash
+# everything
+wasm-pack build rust-packages/laterite-ags4-wasm --target web --release
+
+# the published shape, plus just the one you want back
+wasm-pack build rust-packages/laterite-ags4-wasm --target web --release \
+  -- --no-default-features --features arrow
+```
+
+Cargo flags go **after `--`**; wasm-pack forwards everything past it and exits
+zero if they land in the wrong place, so check the artifact, not the exit code.
 
 ## Init once, and await that one promise
 
@@ -85,23 +126,37 @@ crate publishes every result shape and there is no `any` left in the `.d.ts`.
 ## Read: the dataset is a handle, not a copy
 
 ```js
---8<-- "wasm/ex03_read_arrow.mjs"
+--8<-- "wasm/ex03_read.mjs"
 ```
 
 ```text
---8<-- "wasm/ex03_read_arrow.out"
+--8<-- "wasm/ex03_read.out"
 ```
 
-`read()` returns a `ParsedDataset` that lives in wasm memory. Each group's Arrow
-batch is built **lazily** by `arrow_ipc()` and dropped on return, so the dataset
-has to outlive every pull — hold it rather than chaining off the call — and
-**free it before the next parse**, or wasm memory holds two datasets at once.
-`using dataset = read(…)` does that for you where `Symbol.dispose` is supported.
+`read()` returns a `ParsedDataset` that lives in wasm memory. Each group is built
+**lazily** on the call and dropped on return, so the dataset has to outlive every
+pull — hold it rather than chaining off the call — and **free it before the next
+parse**, or wasm memory holds two datasets at once. `using dataset = read(…)`
+does that for you where `Symbol.dispose` is supported.
 
-`keys: true` prepends the content-addressed `_id` / `_parent_id` columns — the
+`meta()` and `rows_json()` are positional against each other: `headings[i]` names
+`rows[r][i]`. Values arrive **typed**, off the file's own `TYPE` row and through
+the same cast the Python wheel and the DuckDB extension apply — a `2DP` heading
+is a JSON number, a `DT` a `"yyyy-mm-dd hh:mm:ss"` string, a blank cell `null`.
+
+### Arrow IPC, and why it isn't in the package
+
+There is a second read door, `arrow_ipc()`, that frames a group as an Arrow IPC
+stream for [duckdb-wasm](https://duckdb.org/docs/api/wasm/overview) — with
+`keys: true` prepending the content-addressed `_id` / `_parent_id` columns (the
 same UUIDv8s the wheel, Node and the DuckDB extension produce, from the one
-shared keychain. That is what makes a cross-group join resolve when you feed
-these batches into duckdb-wasm; leave it off for a plain typed frame.
+shared keychain) so cross-group joins resolve.
+
+It is **not in the published package**. Arrow is roughly a third of the compiled
+engine and it exists to feed duckdb-wasm; a caller who is not doing that pays
+half a megabyte for bytes they will only parse back. If you want it, build the
+crate from source with the `arrow` feature (it is on by default — see
+[Building a bigger engine](#building-a-bigger-engine)).
 
 ## Repair: propose, then apply
 

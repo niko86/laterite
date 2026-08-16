@@ -5,10 +5,13 @@ status: drafted
 tags: [concept, architecture, wasm]
 ags_editions: []
 volatile: [sizes]
-volatile_asof: 2026-08-03
+volatile_asof: 2026-08-16
 repo_refs:
   wasm: "repo:rust-packages/laterite-ags4-wasm/src/lib.rs"
+  manifest: "repo:rust-packages/laterite-ags4-wasm/Cargo.toml"
   deploy: "repo:.github/workflows/deploy-validator.yml"
+  release: "repo:.github/workflows/release.yml"
+  slim_gate: "repo:tools/release/check-wasm-slim.mjs"
   web: "repo:web/"
   gitignore: "repo:.gitignore"
   types_leaf: "repo:rust-packages/laterite-ags4-types/src/lib.rs"
@@ -18,8 +21,9 @@ sources: []
 # tech stack: the browser wasm path
 
 > [!note] Two browser wasm modules, not one
-> This page describes the **engine** wasm (`laterite-ags4-wasm`, ~6.9 MB raw /
-> ~1.9 MB gzipped — re-measured 2026-08-03) —
+> This page describes the **engine** wasm (`laterite-ags4-wasm`, 6.4 MB raw /
+> 1.8 MB gzipped for the full build — re-measured 2026-08-16, post-#336 and
+> post-#330) —
 > `validate`/`parse`/`diff`/`merge`/`to_ags4`, run in a Web Worker. Since
 > #533 (part of the #527 convergence arc) the browser also loads a SEPARATE,
 > deliberately tiny sibling — `laterite-ags4-tokenizer-wasm` (~30 KB / ~13 KB
@@ -114,6 +118,42 @@ The crate exposes **seven** `#[wasm_bindgen]` entry points
 > encoding `<select>` only offers UTF-8/Windows-1252 (a closed union), so the UI
 > itself could never trigger the old fallback, but a direct wasm caller could.
 > See [[data-single-source-audit]] and [[surface-census]]'s `encodings` table.
+
+## Two shapes of the same crate (#330)
+
+Since #330 the crate is **feature-gated**, and the artifact the browser fetches
+depends on who built it. Six features — `excel`, `arrow`, `certify`, `diff`,
+`merge`, `censor` — sit behind `default = full`
+(`repo:rust-packages/laterite-ags4-wasm/Cargo.toml`), so a plain `wasm-pack
+build` is unchanged and `repo:.github/workflows/deploy-validator.yml` still ships
+the whole engine to the app.
+
+`repo:.github/workflows/release.yml` builds `--no-default-features` instead, so
+**npm's `@laterite/ags4-wasm` is the slim artifact**: validate, read, build, fix,
+rules, dictionary, versions. Measured 2026-08-16, same toolchain, wasm-bindgen
+pinned 0.2.125, `wasm-opt = ['-O', '-all']`:
+
+| build | raw | gzip | brotli |
+|---|---:|---:|---:|
+| full (`default`) | 6,722,493 | 1,898,871 | 1,355,295 |
+| slim (`--no-default-features`) | 1,913,729 | 767,434 | 588,044 |
+
+Two things about that split are easy to get wrong:
+
+- **It is not a subset relation.** `read()` survives, but its Arrow door
+  (`arrow_ipc`) does not — the slim build reads a group through `rows_json()`
+  instead, same `parse_value` cast, JSON framing. A consumer holding `arrow_ipc`
+  is not carried across.
+- **Raw bytes are the wrong axis for judging it.** Turning `diff` back on adds
+  1.47 MB raw but only 82 KB brotli — dictionary-shaped static data the
+  compressor eats. `repo:tools/release/check-wasm-slim.mjs` therefore gates on
+  gzip, and pairs that with an exact check of the exported surface, because a
+  flipped feature shows up in the export list long before it shows up in a
+  byte count. (Same lesson as #330's rejected `wasm-opt -Oz`: −360 KB raw,
+  +1.2 KB brotli.)
+
+`opt-level = "z"` and `"s"` were both measured on #330 and both **rejected** —
+13–95% slower in the browser for 164–400 KB. Do not re-propose them.
 
 Phase 3 (Explore + Fix + Tools) is **delivered** (PR series #27–#38) — the
 explorer (Arrow IPC → DuckDB-wasm + ECharts + an Analyse view), the Fix tab,

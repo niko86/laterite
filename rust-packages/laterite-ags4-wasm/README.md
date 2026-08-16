@@ -23,24 +23,50 @@ WebAssembly is not just "the library, compiled". Four things change:
 | Cross-group SQL | built in (`ags.sql(…)`) | **you** supply duckdb-wasm; laterite hands you Arrow IPC |
 | Transport (`pack` / `lock`) | ✅ | not available — zstd + age don't cross the wasm boundary |
 
-Validate, read-as-typed, build, fix, diff, merge, certify and Excel ↔ AGS4 are all
-present and behave identically.
+Validate, read-as-typed, build and fix are all present and behave identically.
+Five more surfaces are **not in this package** — see below.
+
+## What's in the package
+
+A browser downloads what you ship it, so this package carries the surfaces a page
+actually needs and leaves the rest to a from-source build:
+
+| | here |
+|---|---|
+| `validate` — the full numbered-rule engine | ✅ |
+| `read` → `group_codes` · `meta` · `rows_json` | ✅ |
+| `build_ags4` — data → valid AGS4 | ✅ |
+| `compute_fixes` · `apply_fixes` | ✅ |
+| `list_rules` · `dictionary` | ✅ |
+| `version` · `engine_version` · `engine_fingerprint` | ✅ |
+| `arrow_ipc` · `build_ags4_ipc` — Arrow IPC for duckdb-wasm | [build from source](#building-a-bigger-engine) |
+| `ags4_to_xlsx` · `xlsx_to_ags4` | [build from source](#building-a-bigger-engine) |
+| `certify` · `diff` · `merge` · `censor` | [build from source](#building-a-bigger-engine) |
+
+The whole read → validate → **fix** → write chain is here; nothing is missing
+from the middle of it. Two of the omissions have a replacement rather than being
+simply absent: `rows_json()` reads a group without Arrow, and `build_ags4` takes
+as JSON what `build_ags4_ipc` takes as Arrow.
+
+If you were using 0.10.x or earlier, note that `read` is where this bites: that
+build returned Arrow IPC via `arrow_ipc()`, and this one returns JSON via
+`rows_json()`. **It is not a drop-in for that call.** The values are the same —
+same cast, same types — only the framing differs.
 
 ## Size
 
-| | bytes |
-|---|---:|
-| `ags4_wasm_bg.wasm` raw | 7.1 MB |
-| gzip | 1.9 MB |
-| **brotli** | **1.35 MB** |
+| | raw | gzip | brotli |
+|---|---:|---:|---:|
+| **this package** | **1.9 MB** | **757 KiB** | **574 KiB** |
+| everything, from source | 6.4 MB | 1.8 MB | 1.3 MB |
 
-Serve it with brotli and it is a one-time 1.35 MB fetch, cached thereafter. Load
-it lazily — the module is only needed once a user actually opens a file, so keep
-it off the critical path with a dynamic `import()`.
+Roughly 2.5× smaller on the wire than the full engine. Load it lazily either
+way — the module is only needed once a user actually opens a file, so keep it
+off the critical path with a dynamic `import()`.
 
-Two wasm modules are built from this repo: this one (the full engine) and
+Two wasm modules are built from this repo: this one and
 `laterite-ags4-tokenizer-wasm`, a much smaller leaf that only tokenises lines —
-enough for syntax highlighting in an editor without paying for the engine.
+enough for syntax highlighting in an editor without paying for the engine at all.
 
 ## Install it
 
@@ -51,18 +77,32 @@ npm i @laterite/ags4-wasm
 An ES module built with `--target web`: `ags4_wasm.js` with a generated
 `ags4_wasm.d.ts` beside it.
 
-### …or build it from source
+### Building a bigger engine
+
+The five omitted surfaces are cargo features, and they are **on by default** — so
+a plain source build gives you everything, and the published package is the
+deliberately trimmed one:
 
 ```bash
 cargo install wasm-pack
+
+# everything: excel, arrow, certify, diff, merge, censor
 wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir pkg
+
+# this package's shape, plus just the one you want back
+wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir pkg \
+  -- --no-default-features --features arrow
 ```
+
+Cargo flags go **after `--`**. wasm-pack forwards everything past it and exits
+**zero** when they land in the wrong place, so check that the artifact appeared
+rather than trusting the exit code.
 
 `--target web` emits an ES module for browsers; `--target bundler` suits
 webpack/rollup/vite, `--target nodejs` a CommonJS host. wasm-pack writes a
 complete `.d.ts` next to the module — **that file is the authoritative API
 reference**, generated from the Rust signatures, so it can't drift from what
-you're calling.
+you're calling, and it lists exactly the features you built with.
 
 ## Use it
 
@@ -119,22 +159,49 @@ const ds = read(bytes, undefined);        // ParsedDataset
 ds.group_codes();                          // ["PROJ", "LOCA", "SAMP", …]
 ds.meta("LOCA");                           // { headings, units, types, sql_types }
 
-// One group as an Arrow IPC stream — columns already correctly typed
-const ipc = ds.arrow_ipc("LOCA", false, false);
+// One group's rows, values already correctly typed
+const rows = JSON.parse(ds.rows_json("LOCA"));
+// [["BH01", 451105.75], ["BH02", 451235.21], …]
+
+ds.free();                                 // before the next parse
 ```
 
-`arrow_ipc` materialises **one group at a time** and drops it on return, so peak
-memory is a single group rather than the whole file. Feed the `Uint8Array` to
-[apache-arrow](https://www.npmjs.com/package/apache-arrow) or straight into
-duckdb-wasm.
+`meta` and `rows_json` are **positional against each other** — `headings[i]`
+names `rows[r][i]` — and a short DATA row pads with `null` rather than coming
+back narrow, so the two always zip.
+
+Values are born typed, off the file's own `TYPE` row and through the same cast
+the Python wheel and the DuckDB extension apply: a `2DP` heading is a JSON
+number, a `DT` a `"yyyy-mm-dd hh:mm:ss"` string, a blank or unparseable cell
+`null`. It is a JSON *string* rather than an array because one `JSON.parse` beats
+building a boxed value per cell across the wasm boundary.
+
+`rows_json` materialises **one group at a time** and drops it on return, so peak
+memory is a single group rather than the whole file. The dataset is a handle into
+wasm memory: hold it while you pull, and `free()` it before the next parse.
+
+### Round-tripping into `build_ags4`
+
+`meta` and `rows_json` together are exactly `build_ags4`'s input shape, so
+read → edit → write needs no adapter:
+
+```ts
+const groups = ds.group_codes().map((code) => {
+  const { headings, units, types } = ds.meta(code);
+  return { code, headings, units, types, rows: JSON.parse(ds.rows_json(code)) };
+});
+const out = build_ags4(JSON.stringify(groups), { mode: "autofix" });
+```
 
 ### Cross-group SQL, via duckdb-wasm
 
 laterite doesn't embed a query engine in the browser — you bring
 [duckdb-wasm](https://duckdb.org/docs/api/wasm/overview.html) and laterite feeds
-it. Pass `keys = true` to prepend the content-addressed `_id` / `_parent_id`
-columns, which are **the same UUIDv8s** the wheel, Node and the DuckDB extension
-mint, so joins resolve across surfaces:
+it Arrow. That path needs the `arrow` feature, so
+[build from source](#building-a-bigger-engine) for it; `arrow_ipc(code, keys)`
+then prepends the content-addressed `_id` / `_parent_id` columns, which are **the
+same UUIDv8s** the wheel, Node and the DuckDB extension mint, so joins resolve
+across surfaces:
 
 ```ts
 for (const code of ds.group_codes()) {
@@ -148,6 +215,10 @@ await conn.query(`
   FROM LOCA l JOIN SAMP s ON s._parent_id = l._id
 `);
 ```
+
+It is not in this package because Arrow is roughly a third of the compiled
+engine, and a caller who is not driving duckdb-wasm would pay half a megabyte for
+bytes they only parse back.
 
 ### Building AGS4
 
@@ -209,16 +280,21 @@ build_ags4(groupsJson, {
 Omit `tran` and no `TRAN` is written; Rule 14 reports the gap.
 
 For large, already-columnar data (a duckdb-wasm result), `build_ags4_ipc` takes
-`[{ code, ipc }]` and skips the per-cell JSON round-trip entirely.
+`[{ code, ipc }]` and skips the per-cell JSON round-trip entirely — with the
+`arrow` feature, [from source](#building-a-bigger-engine).
 
 ### Also exported
 
-`certify` · `compute_fixes` / `apply_fixes` · `diff` · `merge` ·
-`ags4_to_xlsx` / `xlsx_to_ags4` · `list_rules` · `dictionary` · `censor`.
+`compute_fixes` / `apply_fixes` · `list_rules` · `dictionary` · `version` /
+`engine_version` / `engine_fingerprint`.
+
+With the matching feature, [from source](#building-a-bigger-engine): `certify` ·
+`diff` · `merge` · `censor` · `ags4_to_xlsx` / `xlsx_to_ags4`.
 
 ### Two calling conventions, and which is which
 
-The surface is **mid-migration**, so read this before guessing:
+The surface is **mid-migration**, so read this before guessing (the gated exports
+are listed too — the convention travels with the export, not with the build):
 
 | Export | Shape |
 |---|---|
@@ -239,8 +315,10 @@ the next export either.
 
 ## See it running
 
-<https://app.laterite.dev/> is this module — a full AGS4 validator and
-data explorer, entirely client-side. Its source is in
+<https://app.laterite.dev/> is this engine — a full AGS4 validator and data
+explorer, entirely client-side. It compiles the crate itself with every feature
+on, so it shows the Excel, diff, merge and duckdb-wasm paths this package leaves
+out. Its source is in
 [`web/`](https://github.com/niko86/laterite/tree/main/web) and is the reference
 integration: lazy module load, duckdb-wasm wiring, and one group at a time.
 
