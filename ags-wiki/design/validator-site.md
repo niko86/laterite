@@ -303,26 +303,32 @@ was **keep the four-tab IA, minor tweaks** — so this was polish, not a rework:
 Installable + offline, via `vite-plugin-pwa` (Workbox `generateSW`). The whole
 design is the **cache split**, dictated by the asset weights:
 
-- **Precache (install-time, ~5.85 MiB, then offline):** the *full* app shell —
-  every JS/CSS chunk (including the Explore/Charts/Coordinates UI + DuckDB
-  *worker* glue), the reference JSONs, the sample files, and the **2.2 MB
-  validator wasm**. So Validate/Fix/the dictionary work fully offline after one
-  visit; the Explore/Charts/Coordinates UIs render offline too — only their
-  heavy *engines* are deferred.
+- **Precache (install-time, 7269.27 KiB across 46 entries, measured 2026-08-17,
+  then offline):** the *full* app shell — every JS/CSS chunk (including the
+  Explore/Charts/Coordinates UI + DuckDB *worker* glue), the reference JSONs, the
+  sample files, and the **2.1 MB tier-1 engine wasm** (the engine minus `arrow`
+  and `excel`, see [[dec-engine-tiering]]). So Validate, Fix, Export and **all of
+  Tools** work fully offline after one visit; the Explore/Charts/Coordinates UIs
+  render offline too — only their heavy *engines* are deferred.
+  This line has been stale twice (`~5.85 MiB`, then a `2.2 MB` wasm that had
+  reached 6.6 MB); #345 is about gating it rather than re-editing it. The build
+  prints the true figure on every run.
 - **Never precached → runtime-cached `CacheFirst` on first fetch:** the DuckDB
-  engine wasm (36 MB EH + 41 MB MVP) and the 15 MB OSTN15 grid — **92 MB** we
+  engine wasm (36 MB EH + 41 MB MVP), the 15 MB OSTN15 grid, and since #355 the
+  **tier-2 engine** (5.2 MB, the full build, `ags-engine-tier2`) — **97 MB** we
   refuse to pull on every install. `globIgnore`d (+ a 3 MiB
   `maximumFileSizeToCacheInBytes` as belt-and-braces) and matched by per-asset
   `CacheFirst` rules (`maxEntries:2`, `purgeOnQuotaError`). This dovetails with
   the existing idle-warm (`lib/prefetch.ts` only fetches DuckDB on a fast,
   non-metered link); the SW adds **no** new proactive heavy download.
 
-> [!note] This two-way split becomes a four-tier one
+> [!note] This two-way split is now a four-tier one, and it is built
 > [[dec-engine-tiering]] (#338) refines the above: the engine itself splits, so
-> the precached artifact is 839 KiB rather than 6.7 MB, first render gates on the
-> ~30 KB tokenizer alone, and the full engine joins DuckDB as a warm-fetched
-> tier. The precache-vs-runtime reasoning on this page is unchanged — there are
-> simply four tiers on that axis now, not two.
+> the precached artifact is 839 KiB gzipped rather than 1771, first render gates
+> on the ~30 KB tokenizer alone (#353), and the full engine joins DuckDB as a
+> deferred tier fetched on first Explore/Excel open (#354 built the second
+> worker, #355 gave it its own artifact). The precache-vs-runtime reasoning on
+> this page is unchanged — there are simply four tiers on that axis now, not two.
 
 > [!warning] `CacheFirst` must never accept an opaque response
 > Both rules took `cacheableResponse: { statuses: [0, 200] }` until #339. Status

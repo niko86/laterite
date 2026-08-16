@@ -91,8 +91,26 @@ jobs:
         # doesn't); it then fetches a matching wasm-bindgen + binaryen on first build.
         run: command -v wasm-pack >/dev/null 2>&1 || cargo install wasm-pack --locked
 
-      - name: Build wasm (release)
-        run: wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir "$GITHUB_WORKSPACE/web/src/wasm"
+      # TWO engine builds since #355 — the app runs both (see
+      # ags-wiki/design/dec-engine-tiering.md). Tier 1 (minus `arrow` + `excel`)
+      # is what the always-on worker runs and the service worker precaches; the
+      # full build is what the lazily-created second worker runs for Explore and
+      # Tools → Excel, and it is `globIgnore`d out of that precache.
+      #
+      # The `--out-name` on the second is load-bearing, not cosmetic: both builds
+      # emit `ags4_wasm_bg.wasm` by default, the bundler would fingerprint them
+      # to the same STEM, and the tier-1 precache glob would then match both —
+      # shipping the full engine to every visitor with nothing failing.
+      - name: Build tier-1 wasm (release)
+        run: |
+          wasm-pack build rust-packages/laterite-ags4-wasm --target web --release \
+            --out-dir "$GITHUB_WORKSPACE/web/src/wasm" \
+            -- --no-default-features --features certify,diff,merge,censor
+
+      - name: Build tier-2 wasm (release, full engine)
+        run: |
+          wasm-pack build rust-packages/laterite-ags4-wasm --target web --release \
+            --out-dir "$GITHUB_WORKSPACE/web/src/wasm-full" --out-name ags4_wasm_full
 
       - name: Build tokenizer wasm (release)
         # The tiny AGS4 tokenizer/quoter wasm (#533) the app uses on the main

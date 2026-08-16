@@ -8,6 +8,7 @@ docs-dist/
 r2-upload/
 coverage/
 src/wasm/
+src/wasm-full/
 src/wasm-tokenizer/
 *.d.ts
 package-lock.json

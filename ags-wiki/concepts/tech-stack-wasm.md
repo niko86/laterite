@@ -128,21 +128,25 @@ build, plus seven more behind the features described below
 Since #330 the crate is **feature-gated**, and the artifact the browser fetches
 depends on who built it. Six features — `excel`, `arrow`, `certify`, `diff`,
 `merge`, `censor` — sit behind `default = full`
-(`repo:rust-packages/laterite-ags4-wasm/Cargo.toml`), so a plain `wasm-pack
-build` is unchanged and `repo:.github/workflows/deploy-validator.yml` still ships
-the whole engine to the app.
+(`repo:rust-packages/laterite-ags4-wasm/Cargo.toml`).
 
 `repo:.github/workflows/release.yml` builds `--no-default-features` instead, so
 **npm's `@laterite/ags4-wasm` is the slim artifact**: validate, read, build, fix,
 rules, dictionary, versions.
 
 A **third** shape exists since #352: **tier 1**, the engine minus `arrow` and
-`excel`, built by `npm run build:wasm-tier1` in `repo:web/package.json` — the one
-place that feature list is written down, so CI runs that script rather than
-spelling the flags out a second time. It is what [[dec-engine-tiering]] has the
-browser precache, and nothing imports it yet: it is built and weighed ahead of
-its consumer, so its size is held from the moment it exists rather than from
-whenever something comes to depend on it.
+`excel`, built by `npm run build:wasm` in `repo:web/package.json` — the one place
+that feature list is written down, so CI and the deploy run that script rather
+than spelling the flags out a second time.
+
+Since #355 the app builds **two** of these three, and that is what
+`repo:.github/workflows/deploy-validator.yml` now does: tier 1 into
+`web/src/wasm`, and the full engine into `web/src/wasm-full` under `--out-name
+ags4_wasm_full`. Tier 1 is precached and answers Validate, Fix, Export and every
+tool but Excel; the full build is fetched only when Explore or Tools → Excel is
+opened. The distinct out-name is load-bearing rather than tidy — see
+[[dec-engine-tiering]] for what two artifacts sharing a fingerprinted stem would
+do to the precache glob.
 
 Measured 2026-08-16, same toolchain, wasm-bindgen pinned 0.2.125,
 `wasm-opt = ['-O', '-all']`:
@@ -221,15 +225,19 @@ uncapped *in the worker* and gzips the JSON there (streaming
 `CompressionStream`), transferring back compressed bytes so the big string
 never reaches the main thread. See [[validator-site]] Phase 1.5.
 
-Since #354 there are **two** such workers. The one above is always on and serves
-Validate, Fix, Export and every tool but Excel; a second
-(`repo:web/src/lib/tier2.worker.ts`) is created only when Explore or Tools →
-Excel is opened, serves exactly those two, and owns the `ParsedDataset` handle —
-which is the app's only stateful wasm handle, and now sits in the worker of its
-sole consumer. Both still instantiate the **same** artifact: splitting the
-engines between them is [[dec-engine-tiering]]'s next step (#355), and holding it
-back to one change means a size regression there has one suspect rather than
-three.
+Since #354 there are **two** such workers, and since #355 they run **different
+engines**. The one above is always on, runs tier 1, and serves Validate, Fix,
+Export and every tool but Excel; a second (`repo:web/src/lib/tier2.worker.ts`) is
+created only when Explore or Tools → Excel is opened, runs the full engine, and
+owns the `ParsedDataset` handle — the app's only stateful wasm handle, now in the
+worker of its sole consumer.
+
+The split is enforced at compile time, not by convention: `EngineApi` in
+`repo:web/src/lib/engineDispatch.ts` is the full build's type with `read`,
+`ags4_to_xlsx` and `xlsx_to_ags4` marked optional, and `validator.worker.ts`
+names the nine ops tier 1 serves rather than handing over its whole module. Add
+one of the other four there and it stops typechecking, naming
+`ParsedDataset.arrow_ipc` as what tier 1 does not have.
 
 > [!note] DuckDB-wasm asset loading (resolved)
 > DuckDB-wasm + ECharts + proj4 **lazy-load on their views only** (confirmed:

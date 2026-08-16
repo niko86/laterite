@@ -8,6 +8,11 @@
 // is created only if one of those tabs is opened — so a parse can no longer
 // arrive behind a validate, in either direction.
 //
+// It runs **tier 1** (#355): the engine minus `arrow` and `excel`, 839 KiB
+// gzipped against the full build's 1771. That is the artifact the service worker
+// precaches, so it is what a first visit downloads and — for most visitors —
+// the only engine they ever download.
+//
 // Protocol: every request carries a monotonic `id`; every response echoes
 // it so the client can correlate (and discard superseded runs). The wasm
 // `validate()` is synchronous and uninterruptible once entered, so
@@ -66,7 +71,25 @@ ready.then(
   },
 );
 
-const dispatch = createEngineDispatch(engine, reply);
+// The nine ops tier 1 serves, named one by one rather than handed the whole
+// module. This build *has* `read`, but its `ParsedDataset` has no `arrow_ipc`
+// door and it has no Excel conversions at all — so listing what this worker can
+// serve is what makes the tier boundary a compile error rather than a runtime
+// surprise: name an op here that tier 1 drops and this file stops typechecking.
+const dispatch = createEngineDispatch(
+  {
+    validate: engine.validate,
+    certify: engine.certify,
+    compute_fixes: engine.compute_fixes,
+    apply_fixes: engine.apply_fixes,
+    diff: engine.diff,
+    merge: engine.merge,
+    censor: engine.censor,
+    dictionary: engine.dictionary,
+    build_ags4: engine.build_ags4,
+  },
+  reply,
+);
 
 self.onmessage = async (e: MessageEvent<WorkerReq>) => {
   const req = e.data;

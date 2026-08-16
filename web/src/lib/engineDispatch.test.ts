@@ -21,7 +21,7 @@ import {
 } from "./engineDispatch";
 import type { WorkerRes } from "./engineDispatch";
 import type { StandardDict, ValidationReport } from "./validator";
-import type { ParsedDataset } from "../wasm/ags4_wasm.js";
+import type { ParsedDataset } from "../wasm-full/ags4_wasm_full.js";
 
 /** Only the members a given test actually exercises need to be real. */
 const fakeEngine = (over: Partial<EngineApi> = {}): EngineApi =>
@@ -160,6 +160,78 @@ describe("engine injection", () => {
     await expect(
       dispatch({ id: 1, kind: "dictionary", edition: null }),
     ).rejects.toThrow(/engine exploded/);
+  });
+});
+
+// Tier 1 is a real engine that genuinely lacks `arrow` and `excel` (#355), which
+// is what makes the precache 4.5 MiB smaller. The tier boundary is enforced at
+// compile time where each worker names the ops it can serve, and by routing in
+// `validatorClient.ts` — so these ops should never arrive here. If one does, the
+// failure has to name the op and the reason: an engine build is not something a
+// reader can see from "undefined is not a function" inside a wasm shim.
+describe("an engine build without arrow or excel", () => {
+  // The nine ops tier 1 serves — the same list `validator.worker.ts` passes.
+  const tier1Engine = () => {
+    const {
+      validate,
+      certify,
+      compute_fixes,
+      apply_fixes,
+      diff,
+      merge,
+      censor,
+      dictionary,
+      build_ags4,
+    } = fakeEngine();
+    return {
+      validate,
+      certify,
+      compute_fixes,
+      apply_fixes,
+      diff,
+      merge,
+      censor,
+      dictionary,
+      build_ags4,
+    };
+  };
+
+  it("still serves every op it does have", async () => {
+    const { at, reply } = collect();
+    const dispatch = createEngineDispatch(tier1Engine(), reply);
+
+    await dispatch({ id: 1, kind: "dictionary", edition: null });
+
+    expect(at(0).msg).toMatchObject({ id: 1, ok: true, kind: "dictionary" });
+  });
+
+  it("names `read` when asked to parse", async () => {
+    const dispatch = createEngineDispatch(tier1Engine(), () => {});
+
+    await expect(
+      dispatch({
+        id: 1,
+        kind: "parse",
+        bytes: new ArrayBuffer(0),
+        encoding: "utf-8",
+      }),
+    ).rejects.toThrow(/no read\(\).*tier 1/);
+  });
+
+  it("names the Excel doors when asked to convert, in either direction", async () => {
+    const dispatch = createEngineDispatch(tier1Engine(), () => {});
+
+    await expect(
+      dispatch({ id: 1, kind: "excelExport", bytes: new ArrayBuffer(0) }),
+    ).rejects.toThrow(/no ags4_to_xlsx\(\).*tier 1/);
+    await expect(
+      dispatch({
+        id: 2,
+        kind: "excelImport",
+        bytes: new ArrayBuffer(0),
+        formatNumeric: true,
+      }),
+    ).rejects.toThrow(/no xlsx_to_ags4\(\).*tier 1/);
   });
 });
 

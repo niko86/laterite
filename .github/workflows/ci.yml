@@ -888,8 +888,8 @@ jobs:
         run: python3 tools/gen_doc_outputs.py --check --surface wasm
 
       # The SLIM wasm (#330) — the artifact npm actually gets, which the step
-      # above does NOT build: `build:wasm:all` builds the full engine, because
-      # that is what the web app runs. Built and checked here rather than only
+      # above does NOT build: `build:wasm:all` builds the app's two engines,
+      # tier 1 and the full one, and npm's is neither. Built and checked here rather than only
       # in release.yml for the reason prepare-wasm-package.sh's header records
       # about the npm notice guard: a publish-path check whose first execution
       # is a live release takes three tag moves to get right. This is the same
@@ -905,23 +905,20 @@ jobs:
             --out-dir "$RUNNER_TEMP/wasm-slim" -- --no-default-features
           node tools/release/check-wasm-slim.mjs "$RUNNER_TEMP/wasm-slim"
 
-      # The TIER-1 wasm (#352) — a THIRD shape of the same crate, and neither of
-      # the two above: the engine minus `arrow` and `excel`, which is what the
-      # browser will precache (#338, ags-wiki/design/dec-engine-tiering.md).
-      # Nothing imports it yet, so the shipped app is byte-identical; the point
-      # of building it before it has a consumer is that the size it is designed
-      # around — 839.2 KiB gzip / 2093.9 KiB raw — starts being HELD from the
-      # moment it exists rather than after something depends on it.
+      # The TIER-1 wasm (#352) — the engine minus `arrow` and `excel`, which the
+      # browser precaches since #355 (#338, ags-wiki/design/dec-engine-tiering.md).
+      # It is what `build:wasm` produces and what `src/wasm` now holds, so this
+      # measures the artifact the app actually ships rather than a second build
+      # of the same flags: the step above already built it.
       #
-      # Through the npm scripts rather than a second copy of the wasm-pack flags,
-      # because that feature list IS the definition of tier 1 and the slim step
-      # above already shows what happens when the same invocation is spelled out
-      # in two workflows. Same command a developer runs; same artifact.
-      - name: wasm — build the tier-1 artifact and hold it to its ceiling
+      # 839.2 KiB gzip / 2093.9 KiB raw against ceilings of 940 / 2350. The raw
+      # ceiling is also load-bearing downstream — `maximumFileSizeToCacheInBytes`
+      # in web/vite.config.ts sits at 3 MiB, above this gate and below the full
+      # engine, so raising this one without moving that one would quietly stop
+      # the engine being precached at all.
+      - name: wasm — hold the tier-1 artifact to its ceiling
         working-directory: web
-        run: |
-          npm run build:wasm-tier1
-          npm run check:wasm-tier1
+        run: npm run check:wasm-tier1
 
       - name: sccache stats
         if: always()

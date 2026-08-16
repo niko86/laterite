@@ -3,20 +3,28 @@
 // conversions. It is created the first time one of those tabs is opened and
 // never before, so a visitor who opens neither pays for one worker, not two.
 //
-// It is named for the engine it is FOR, not the one it runs. Both workers still
-// instantiate the SAME artifact here, deliberately: this ticket proves the
-// two-worker shape and the lazy creation on their own, so that #355 — where this
-// one takes the full engine and the other drops to tier 1 — changes one thing
-// rather than three.
+// It runs **tier 2** (#355): the full engine, 1771 KiB gzipped against tier 1's
+// 839. That artifact is deliberately NOT precached — it is `globIgnore`d in
+// `vite.config.ts` and served by its own `CacheFirst` runtime rule — so it costs
+// nothing until one of these two tabs is opened, and works offline after.
+//
+// Which makes this file the one place the whole tiering is spent: the import
+// below is what decides whether most visitors download 839 KiB or 1771.
 //
 // `ParsedDataset` lives here now, in this worker's dispatch closure. It is the
 // app's only stateful wasm handle and Explore is its only consumer, so it moved
 // with the tab it belongs to: there is no state to migrate, and an Explore parse
 // can no longer touch the worker a validate is running in.
 
-import init from "../wasm/ags4_wasm.js";
-import * as engine from "../wasm/ags4_wasm.js";
-import wasmUrl from "../wasm/ags4_wasm_bg.wasm?url";
+// `ags4_wasm_full`, not `ags4_wasm` — a distinct `--out-name` on the second
+// `wasm-pack` run, which is load-bearing rather than cosmetic. Both builds emit
+// `ags4_wasm_bg.wasm` by default; the bundler would then fingerprint them to two
+// hashes with the same STEM, the precache glob `assets/ags4_wasm_bg-*.wasm` would
+// match both, and the install would quietly carry the full engine again with
+// nothing erroring and every size gate green.
+import init from "../wasm-full/ags4_wasm_full.js";
+import * as engine from "../wasm-full/ags4_wasm_full.js";
+import wasmUrl from "../wasm-full/ags4_wasm_full_bg.wasm?url";
 import { createEngineDispatch } from "./engineDispatch";
 import type { WorkerReq, WorkerRes } from "./engineDispatch";
 

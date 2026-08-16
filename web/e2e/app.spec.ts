@@ -500,21 +500,117 @@ test("PWA: the app loads and validates fully offline after first visit", async (
   await page.context().setOffline(true);
   try {
     // Offline reload: the SW must serve the app shell (navigateFallback →
-    // precached index.html), every JS/CSS chunk, and the 2.2 MB validator
+    // precached index.html), every JS/CSS chunk, and the 2.1 MB tier-1 engine
     // wasm — all from the precache.
     await page.reload();
     await expect(
       page.getByRole("button", { name: /Clean \(minimal\)/ }),
     ).toBeVisible();
 
-    // And the engine genuinely runs offline: the precached validator wasm
-    // boots in its worker and validates a precached sample with no network.
+    // And the engine genuinely runs offline: the precached tier-1 wasm boots in
+    // its worker and validates a precached sample with no network.
     await page.getByRole("button", { name: /Clean \(minimal\)/ }).click();
     await expect(page.getByText(/Clean — 0 findings/)).toBeVisible();
+
+    // Tools works offline too, which is what tier 1 bought and what the
+    // "Validate, Fix, Export & Tools now work offline" notice now claims (#355).
+    // The dictionary is served by the same worker and the same precached
+    // artifact, so this is the claim itself rather than a proxy for it.
+    await tab(page, "Tools").click();
+    await page.getByRole("button", { name: /^Dictionary$/ }).click();
+    await expect(page.getByPlaceholder(/Search/).first()).toBeVisible();
   } finally {
     // Restore so the shared browser/context can't leak offline into reuse.
     await page.context().setOffline(false);
   }
+});
+
+// The whole four-tier design (#338) reduces to one fact about the install: the
+// precache carries tier 1 and NOT tier 2. Everything else about the split is
+// size-based and has headroom for the full engine — the raw ceiling, the gzip
+// ceiling, `maximumFileSizeToCacheInBytes` — so this negative assertion is the
+// only guard here that would actually fail.
+//
+// The trap it guards is not hypothetical: both engines come out of one crate and
+// wasm-pack names them both `ags4_wasm_bg.wasm` by default. Same stem, two
+// hashes, and `assets/ags4_wasm_bg-*.wasm` matches BOTH — the install carries the
+// full engine again, every feature still works, and every number still passes.
+//
+// Falsified before being trusted, and the run taught the ordering: widening that
+// glob to match both engines is caught FIRST by the 3 MiB
+// `maximumFileSizeToCacheInBytes` (a build warning, not a failure — tier 2 is
+// 5.31 MB), and only once the cap is also lifted does tier 2 reach the precache.
+// At that point this test fails here, naming the leaked artifact, and it is the
+// only check in the repo that does.
+test("PWA: the precache carries the tier-1 engine and not tier 2", async ({
+  page,
+}) => {
+  await ready(page);
+  await waitForServiceWorker(page);
+
+  // Scoped to the PRECACHE specifically — identified as the cache holding
+  // index.html — not to "any cache". Tier 2 is *expected* in a runtime cache
+  // once something fetches it (the next test asserts exactly that), and #356
+  // will warm-fetch it on idle; a whole-storage check would then start failing
+  // for the one behaviour the design wants.
+  const wasm = await page.evaluate(async () => {
+    for (const key of await caches.keys()) {
+      const reqs = await (await caches.open(key)).keys();
+      const names = reqs.map((r) => new URL(r.url).pathname.split("/").pop());
+      if (names.some((n) => n === "index.html"))
+        return names.filter((n) => n?.endsWith(".wasm"));
+    }
+    return null;
+  });
+
+  expect(wasm, "no precache cache holding index.html").not.toBeNull();
+  // Tier 1 (the engine minus arrow + excel) and tier 0 (the tokenizer first
+  // render waits on) — both precached, both required offline.
+  expect(wasm?.filter((n) => /^ags4_wasm_bg-.*\.wasm$/.test(n ?? ""))).toEqual([
+    expect.stringMatching(/^ags4_wasm_bg-/),
+  ]);
+  expect(
+    wasm?.filter((n) => /^ags4_tokenizer_bg-.*\.wasm$/.test(n ?? "")),
+  ).toEqual([expect.stringMatching(/^ags4_tokenizer_bg-/)]);
+  // Tier 2 — the assertion the tiering rests on.
+  expect(wasm?.filter((n) => /^ags4_wasm_full_bg-/.test(n ?? ""))).toEqual([]);
+});
+
+test("PWA: the tier-2 engine lands in its own runtime cache on first Excel use", async ({
+  page,
+}) => {
+  // The positive half of the same rule, and the half that fails SILENTLY: if the
+  // tier-2 response ever stopped being cacheable under `statuses: [200]`, nothing
+  // would error — the entry would simply never be written and every Explore or
+  // Excel open would re-download 5.2 MB, reported nowhere. Same shape as the
+  // DuckDB test below, for the same reason, on our own artifact this time.
+  await ready(page);
+  // Control BEFORE the fetch: a runtime rule only sees what the worker
+  // intercepts, and a cold first visit can open Excel while the SW is still
+  // installing — the cache would then be empty for a reason unrelated to the
+  // rule under test.
+  await waitForServiceWorker(page);
+  await tab(page, "Tools").click();
+  await page.getByRole("button", { name: /^Excel$/ }).click();
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async () => {
+          const names = await caches.keys();
+          if (!names.includes("ags-engine-tier2")) return 0;
+          const keys = await (await caches.open("ags-engine-tier2")).keys();
+          return keys.filter((k) => /ags4_wasm_full_bg-.*\.wasm$/.test(k.url))
+            .length;
+        }),
+      {
+        timeout: 30_000,
+        message:
+          "the tier-2 wasm never reached the ags-engine-tier2 runtime cache — " +
+          "CacheFirst is refetching the full engine on every open",
+      },
+    )
+    .toBeGreaterThan(0);
 });
 
 test("PWA: the DuckDB engine actually lands in its runtime cache", async ({
