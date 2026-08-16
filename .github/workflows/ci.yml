@@ -234,6 +234,12 @@ jobs:
               - 'web/**'
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
+              # The wasm artifact gates (slim, tier-1) also RUN in ts-lint, and
+              # editing one can only weaken it — raise a ceiling, widen a surface
+              # list. Without this a PR whose entire diff is "make the gate stop
+              # failing" would never run the gate. Narrow on purpose: the rest of
+              # `tools/release/**` has no business waking a 20-minute job.
+              - 'tools/release/*wasm*.mjs'
             prose:
               # `prose` = the cadence gate's inputs, and they really are this
               # broad: tests/test_stated_cadences_faithful.py walks every tracked
@@ -898,6 +904,24 @@ jobs:
           wasm-pack build rust-packages/laterite-ags4-wasm --target web --release \
             --out-dir "$RUNNER_TEMP/wasm-slim" -- --no-default-features
           node tools/release/check-wasm-slim.mjs "$RUNNER_TEMP/wasm-slim"
+
+      # The TIER-1 wasm (#352) — a THIRD shape of the same crate, and neither of
+      # the two above: the engine minus `arrow` and `excel`, which is what the
+      # browser will precache (#338, ags-wiki/design/dec-engine-tiering.md).
+      # Nothing imports it yet, so the shipped app is byte-identical; the point
+      # of building it before it has a consumer is that the size it is designed
+      # around — 839.2 KiB gzip / 2093.9 KiB raw — starts being HELD from the
+      # moment it exists rather than after something depends on it.
+      #
+      # Through the npm scripts rather than a second copy of the wasm-pack flags,
+      # because that feature list IS the definition of tier 1 and the slim step
+      # above already shows what happens when the same invocation is spelled out
+      # in two workflows. Same command a developer runs; same artifact.
+      - name: wasm — build the tier-1 artifact and hold it to its ceiling
+        working-directory: web
+        run: |
+          npm run build:wasm-tier1
+          npm run check:wasm-tier1
 
       - name: sccache stats
         if: always()

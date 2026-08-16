@@ -90,9 +90,13 @@ fires from a `createEffect` gated on engine readiness.
 
 **Two artifacts, two gates.** Two `wasm-pack` runs in
 `repo:.github/workflows/deploy-validator.yml`; tier 2 takes `--out-name
-ags4_wasm_full` and a dynamic import. Tier 1 gets its own size gate at ~940 KiB
-gzip / ~2350 KiB raw — both axes, ~12% headroom, mirroring
-`repo:tools/release/check-wasm-slim.mjs`.
+ags4_wasm_full` and a dynamic import. Tier 1's gate is
+`repo:tools/release/check-wasm-tier1.mjs` (#352) — 940 KiB gzip / 2350 KiB raw,
+both axes, ~12% headroom, over the same instrument
+`repo:tools/release/check-wasm-slim.mjs` drives
+(`repo:tools/release/wasm-artifact-gate.mjs`). It landed BEFORE the artifact had
+a consumer, so the 839.2 / 2093.9 measurement this design rests on has been held
+from the moment there was something to hold.
 
 ## Why
 
@@ -173,7 +177,8 @@ fits under all of them.
 
 **The app's engine stops being npm's.** `check-wasm-slim.mjs` guards what npm
 ships; it no longer describes what the app precaches. Tier 1 needs its own gate
-or nothing watches the artifact this whole design depends on staying small.
+or nothing watches the artifact this whole design depends on staying small — it
+has one, and it ran before the app had switched to the artifact it guards.
 
 **The offline claim gets larger.** `repo:web/src/components/PwaUpdater.tsx` says
 "Validate & Fix now work offline", which was honestly scoped when written and is
