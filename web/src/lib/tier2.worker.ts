@@ -17,11 +17,10 @@
 // can no longer touch the worker a validate is running in.
 
 // `ags4_wasm_full`, not `ags4_wasm` — a distinct `--out-name` on the second
-// `wasm-pack` run, which is load-bearing rather than cosmetic. Both builds emit
-// `ags4_wasm_bg.wasm` by default; the bundler would then fingerprint them to two
-// hashes with the same STEM, the precache glob `assets/ags4_wasm_bg-*.wasm` would
-// match both, and the install would quietly carry the full engine again with
-// nothing erroring and every size gate green.
+// `wasm-pack` run, which is load-bearing rather than cosmetic: two artifacts
+// sharing a fingerprinted stem would both match the tier-1 precache glob. The
+// full reasoning, and the three other locks, are in `vite.config.ts` next to that
+// glob and in ags-wiki/design/dec-engine-tiering.md.
 import init from "../wasm-full/ags4_wasm_full.js";
 import * as engine from "../wasm-full/ags4_wasm_full.js";
 import wasmUrl from "../wasm-full/ags4_wasm_full_bg.wasm?url";
@@ -34,11 +33,15 @@ import type { WorkerReq, WorkerRes } from "./engineDispatch";
 // instantiates, its readiness promise, and turning a thrown op into a reply
 // (#351, which put everything else in `engineDispatch.ts`).
 //
-// Not factored into a shared `createWorkerEntry()`, though it reads as
-// duplication today: in #355 this file acquires its engine by DYNAMIC import of
-// a separate artifact, so its readiness promise spans that import and the two
-// bootstraps stop being the same shape. Sharing them now would buy one ticket of
-// deduplication and then need an async variant grafted on.
+// Not factored into a shared `createWorkerEntry()`, though the two bootstraps
+// are near-identical. #354 predicted they would diverge here, when this file took
+// its own artifact, and they did not: the import above is static, like the other
+// worker's, because the worker is ALREADY created lazily and a dynamic import
+// inside it defers nothing a user waits on. So the honest reason is smaller than
+// the predicted one — what a worker entry owns is which engine it instantiates,
+// and a factory taking that as a parameter would leave each file a single call
+// with the interesting part passed in. It stays worth revisiting if a third
+// engine ever appears.
 const ctx = self as unknown as Worker;
 const reply = (msg: WorkerRes, transfer?: Transferable[]) => {
   if (transfer) ctx.postMessage(msg, transfer);

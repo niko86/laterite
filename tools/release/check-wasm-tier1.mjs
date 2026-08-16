@@ -5,16 +5,22 @@
 //
 // WHAT TIER 1 IS
 //   The engine minus `arrow` and `excel`: everything Validate, Fix, Export and
-//   ALL of Tools need, and nothing else. It is what the service worker will
-//   precache — so once #355 switches the workers over, it becomes the artifact
-//   most visitors download and the only one most visitors ever download. Tier 2
-//   (the full engine) is warm-fetched on idle and compiled only on intent; tier
-//   0 (the ~30 KB tokenizer, gated by
+//   ALL of Tools need, and nothing else. Since #355 it is what the service worker
+//   precaches — the artifact most visitors download, and the only one most
+//   visitors ever download. Tier 2 (the full engine) is fetched on first Explore
+//   or Excel open and compiled only then; tier 0 (the ~30 KB tokenizer, gated by
 //   `web/scripts/check-wasm-tokenizer-size.mjs`) is what first render waits on.
 //
-//   Nothing imports this artifact yet. That is the point of gating it now: the
-//   figure the tiering is designed around is held from the moment the artifact
-//   exists, rather than from whenever something comes to depend on it.
+//   This gate landed in #352, BEFORE anything imported the artifact — the figure
+//   the tiering is designed around was held from the moment the artifact existed
+//   rather than from whenever something came to depend on it. #355 is when
+//   something did, and the ceilings did not move to accommodate it.
+//
+//   Its raw ceiling is now load-bearing twice over: `web/vite.config.ts`'s
+//   `maximumFileSizeToCacheInBytes` sits at 3 MiB, ABOVE this gate's 2350 KiB and
+//   BELOW the full engine, so it can refuse a leaked tier 2. Raise this ceiling
+//   past that cap and the engine stops being precached at all — a build warning,
+//   not a failure, and offline validate goes with it.
 //
 //   The boundary is `arrow` + `excel` and nothing else because those two are
 //   the only heavy gates: `certify`, `diff`, `merge` and `censor` cost +82 KiB
@@ -58,7 +64,8 @@
 // USAGE
 //   node tools/release/check-wasm-tier1.mjs <pkg-dir>
 //   Exit 0 = the artifact is the tier-1 one; 1 = it is not, and why.
-//   `npm run build:wasm-tier1 && npm run check:wasm-tier1` from `web/` does both.
+//   `npm run build:wasm && npm run check:wasm-tier1` from `web/` does both — and
+//   since #355 the first of those is what the app itself runs on.
 ///////////////////////////////////////////////////////////////////////////////
 
 import { checkWasmArtifact, pkgDirArg } from "./wasm-artifact-gate.mjs";
@@ -98,7 +105,8 @@ const EXPECTED_CLASSES = {
 };
 
 // Measured 2026-08-16 by the shared gate's own `gzipSync(level: 9)`, on the
-// artifact `npm run build:wasm-tier1` produces:
+// artifact `npm run build:wasm` produces — which since #355 is the artifact the
+// app precaches, not a build made only to be weighed:
 //
 //                          gzip KiB     raw KiB
 //     slim (npm)             757.3      1868.9
@@ -122,7 +130,7 @@ checkWasmArtifact({
   maxGzipBytes: MAX_GZIP_BYTES,
   maxRawBytes: MAX_RAW_BYTES,
   rebuild:
-    "`npm run build:wasm-tier1` from `web/`, which is the one place the\n" +
+    "`npm run build:wasm` from `web/`, which is the one place the\n" +
     "  tier-1 feature list is written down (cargo flags go AFTER the `--`;\n" +
     "  wasm-pack exits 0 when they land in the wrong place).",
 });

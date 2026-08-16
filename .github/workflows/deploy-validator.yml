@@ -93,38 +93,31 @@ jobs:
         # matching wasm-bindgen + binaryen (wasm-opt) on first build.
         run: command -v wasm-pack >/dev/null 2>&1 || cargo install wasm-pack --locked
 
-      # The two engine artifacts the deployed app serves (#355, design in
-      # ags-wiki/design/dec-engine-tiering.md). TIER 1 — the engine minus `arrow`
-      # and `excel`, 2.1 MB raw — is precached and answers Validate, Fix, Export
-      # and every tool but Excel. TIER 2 is the full build, fetched only when
-      # Explore or Tools → Excel is opened, and kept OUT of the precache.
-      #
-      # `--out-name ags4_wasm_full` is what keeps them apart: both runs emit
-      # `ags4_wasm_bg.wasm` by default, and two artifacts sharing a fingerprinted
-      # stem would both match `assets/ags4_wasm_bg-*.wasm` in the precache glob —
-      # every visitor silently back on the full engine, no error anywhere.
-      - name: Build tier-1 wasm (release, optimized)
-        run: |
-          wasm-pack build rust-packages/laterite-ags4-wasm --target web --release \
-            --out-dir "$GITHUB_WORKSPACE/web/src/wasm" \
-            -- --no-default-features --features certify,diff,merge,censor
-
-      - name: Build tier-2 wasm (release, optimized, full engine)
-        run: |
-          wasm-pack build rust-packages/laterite-ags4-wasm --target web --release \
-            --out-dir "$GITHUB_WORKSPACE/web/src/wasm-full" --out-name ags4_wasm_full
-
-      - name: Build tokenizer wasm (release, optimized)
-        # The tiny AGS4 tokenizer/quoter wasm (#533) the app instantiates on the
-        # main thread — a separate ~30 KB module the production bundle needs.
-        run: wasm-pack build rust-packages/laterite-ags4-tokenizer-wasm --target web --release --out-dir "$GITHUB_WORKSPACE/web/src/wasm-tokenizer"
-
       - name: Install Node
+        # BEFORE the wasm build, which is `npm run` now: the scripts hold the
+        # tier-1 feature list, and a copy of those flags here is exactly the
+        # second definition #352 avoided. `npm run` needs node, not node_modules.
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
+
+      # The three wasm modules the deployed app loads (#355, design in
+      # ags-wiki/design/dec-engine-tiering.md). TIER 1 — the engine minus `arrow`
+      # and `excel`, 2.1 MB raw — is precached and answers Validate, Fix, Export
+      # and every tool but Excel. TIER 2 is the full build, fetched only when
+      # Explore or Tools → Excel is opened and kept OUT of the precache. Plus the
+      # ~30 KB tokenizer (#533) the main thread instantiates.
+      #
+      # `--out-name ags4_wasm_full` (in the npm script) is what keeps the two
+      # engines apart: both wasm-pack runs emit `ags4_wasm_bg.wasm` by default,
+      # and two artifacts sharing a fingerprinted stem would both match
+      # `assets/ags4_wasm_bg-*.wasm` in the precache glob — every visitor back on
+      # the full engine, no error anywhere.
+      - name: Build wasm (release, optimized) — tier 1, tier 2, tokenizer
+        working-directory: web
+        run: npm run build:wasm:all
 
       - name: Build site
         working-directory: web

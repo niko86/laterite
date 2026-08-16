@@ -50,9 +50,16 @@ export type CoreEngineApi = Pick<
   | "build_ags4"
 >;
 
-/** The ops only the FULL build serves: Explore's typed read (whose Arrow door is
- *  the `arrow` feature) and the two Excel conversions. Those two features are the
- *  entire weight difference between the tiers — 839 KiB gzipped against 1771. */
+/** The three names this dispatch can only take from the FULL build. Two of them
+ *  — the Excel conversions — simply do not exist in tier 1. `read` is subtler and
+ *  worth stating precisely: it is UNGATED in the crate, so tier 1 has it, but the
+ *  dataset it returns has no `arrow_ipc` door (that method is the `arrow`
+ *  feature) and this dispatch calls exactly that. So tier 1's `read` is not the
+ *  one meant here, which is why the two builds' `ParsedDataset` types are
+ *  incompatible and passing tier 1's module whole fails to compile.
+ *
+ *  `arrow` + `excel` are the entire weight difference between the tiers —
+ *  839 KiB gzipped against 1771. */
 export type HeavyEngineApi = Pick<
   typeof FullEngine,
   "read" | "ags4_to_xlsx" | "xlsx_to_ags4"
