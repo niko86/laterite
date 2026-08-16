@@ -50,18 +50,29 @@ const App: Component = () => {
     }
   });
 
-  // The engine is still TRACKED, just not rendered on — it sequences the warm
-  // below. A rejection is swallowed on purpose: the worker replies with the
-  // init error to every op it is asked for, so a dead engine reads as
-  // "Validator error: …" on the action that needed it, rather than blanking
-  // panes (the formatter, the coordinate tools) that never touch it.
+  // The engine is not awaited before paint — but a FAILED engine is still
+  // reported here, because a rejection is not a wait, and #353 only takes the
+  // engine out of the LOADING gate. Leaving the failure to the panes was tried
+  // and is a permanent silent state: a Solid resource THROWS when read after an
+  // error, so a pane's own "Validator error: …" fallback never renders and the
+  // tab sits on its spinner for ever (verified by aborting the wasm fetch —
+  // #339's lesson, that a failed engine fetch must never go quiet).
   const [engineUp, setEngineUp] = createSignal(false);
+  const [engineError, setEngineError] = createSignal<string | null>(null);
   void engineReady().then(
     () => setEngineUp(true),
-    () => {
-      /* surfaced per-op by the worker, not here */
-    },
+    (e: unknown) => setEngineError(String(e)),
   );
+
+  // The two ways boot can end badly, at one altitude. Both blank the panes,
+  // which is what they did before this ticket — the change is only that the
+  // engine ARRIVING no longer holds them back, not that its failure is quieter.
+  const fatal = () =>
+    bootReady.error
+      ? `The app failed to start: ${String(bootReady.error)}`
+      : engineError()
+        ? `Failed to load the validator engine: ${engineError()}`
+        : null;
 
   // Once the validator is live, warm the heavy lazy assets (DuckDB / echarts /
   // arrow / proj4 / reference JSONs) during idle time so Explore / Charts /
@@ -94,17 +105,10 @@ const App: Component = () => {
       <Tabs active={tab()} onChange={setTab} />
 
       <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
-        {/* Error first, then the value: reading an errored resource THROWS,
+        {/* Failure first, then the value: reading an errored resource THROWS,
             so a failure checked from inside the fallback never gets to
             render itself. */}
-        <Show
-          when={!bootReady.error}
-          fallback={
-            <p class="text-err">
-              The app failed to start: {String(bootReady.error)}
-            </p>
-          }
-        >
+        <Show when={!fatal()} fallback={<p class="text-err">{fatal()}</p>}>
           <Show
             when={bootReady()}
             fallback={<p class="text-fg-muted">Starting…</p>}

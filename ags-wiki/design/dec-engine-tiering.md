@@ -16,7 +16,7 @@ sources: []
 
 Before this, the browser app precached **one** engine artifact — the whole thing,
 6.7 MB raw — and gated its **first paint** on that artifact instantiating.
-`repo:web/src/App.tsx` waits on `Promise.all([validatorReady(),
+`repo:web/src/App.tsx` waited on `Promise.all([validatorReady(),
 tokenizerReady()])`, and `repo:web/src/lib/validator.worker.ts` instantiates
 eagerly at module scope, so nothing rendered until the full engine had
 downloaded and compiled. Someone who opened the app, read the page and left had
@@ -138,6 +138,22 @@ behind a loading state.
 tier 1 is up. Reachable mainly via the sample-file buttons. It surfaces as
 Validate's *existing* loading state — no new UI, because "engine still arriving"
 and "validate in progress" are the same thing to a user.
+
+> [!warning] Taking tier 1 out of the paint gate must not take its FAILURE with it
+> Building this (#353) the first attempt let a dead engine be reported by
+> whichever pane asked for it, on the reasoning that the worker replies with the
+> init error to every op. It does — and the pane still cannot show it. A Solid
+> resource **throws when read after an error** (`if (err !== undefined && !pr)
+> throw err`), so `repo:web/src/components/validate/ValidatePane.tsx`'s own
+> `Validator error: …` fallback sits behind a `<Show when={report()}>` that
+> throws before reaching it, and with no `ErrorBoundary` in the tree the tab
+> stays on its spinner for ever — the exact permanent silent state #339 is
+> about. So `repo:web/src/App.tsx` still reports a failed engine at page level
+> even though it no longer waits for a live one: a rejection is not a wait.
+> Pinned by an e2e that aborts the engine fetch, falsified by deleting the
+> branch. ValidatePane's own unreachable fallback is pre-existing and left
+> alone here — it needs a seam to force an op failure before a test of it could
+> be shown to go red, and its `createEffect` reads the resource too.
 
 **A failed tier-2 fetch is partial, and must read as partial.** The tab that
 needed it reports and offers retry; tier 1 is precached and untouched. #339's

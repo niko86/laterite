@@ -663,3 +663,27 @@ test("first paint doesn't wait on the engine, and a file loaded in that window s
     await ctx.close();
   }
 });
+
+test("an engine that never arrives is reported, not left spinning", async ({
+  browser,
+}) => {
+  // The other half of taking the engine out of the paint gate. Deferring the
+  // FAILURE too is what #339 says must never happen, and it is not theoretical:
+  // a Solid resource THROWS when read after an error, so ValidatePane's own
+  // "Validator error: …" fallback never renders — with the failure left to the
+  // panes this exact flow sat on "Validating…" for ever, the only trace an
+  // uncaught `TypeError: Failed to fetch`. So App reports a dead engine even
+  // though it no longer waits for a live one.
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  await page.route(/ags4_wasm_bg-.*\.wasm$/, (r) => r.abort());
+  try {
+    await page.goto(APP);
+    await expect(
+      page.getByText(/Failed to load the validator engine/),
+    ).toBeVisible();
+    await expect(page.getByText(/Validating…/)).toHaveCount(0);
+  } finally {
+    await ctx.close();
+  }
+});
