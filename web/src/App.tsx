@@ -5,7 +5,7 @@ import {
   Show,
   type Component,
 } from "solid-js";
-import { ready as validatorReady } from "./lib/validatorClient";
+import { ready as engineReady } from "./lib/validatorClient";
 import { tokenizerReady } from "./lib/tokenizer";
 import { pendingTab, setPendingTab } from "./lib/nav";
 import { activeTab, setActiveTab, shareUrl } from "./lib/settings";
@@ -20,14 +20,17 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { PwaUpdater } from "./components/PwaUpdater";
 
 const App: Component = () => {
-  // Gate the panes on wasm instantiation: the validator engine (in the worker)
-  // AND the tiny main-thread tokenizer wasm (#533) that the validate/fix views
-  // + tools call synchronously through `splitAgsFields`/`quoteAgsField`. A
-  // resource keeps the loading / error states declarative — no top-level await,
-  // no race where a pane calls validate() (or tokenizes a line) before its
-  // module is live.
-  const [wasmReady] = createResource(async () => {
-    await Promise.all([validatorReady(), tokenizerReady()]);
+  // Gate the panes on the tiny main-thread tokenizer wasm (#533) ALONE — the
+  // validate/fix views + tools call it synchronously through
+  // `splitAgsFields`/`quoteAgsField`, so a pane genuinely cannot paint before
+  // it. The multi-MB engine is deliberately NOT awaited (#353): its deadline is
+  // when a FILE is loaded, not when the page paints, and a human choosing a
+  // file puts seconds between the two. A request that does beat it — the
+  // sample buttons can, in milliseconds — queues inside the worker behind the
+  // worker's own init promise, so it lands in Validate's existing loading state
+  // rather than racing a live-before-ready engine.
+  const [bootReady] = createResource(async () => {
+    await tokenizerReady();
     return true;
   });
   // The active tab is persisted + shareable (lib/settings) — a reload (or a
@@ -47,11 +50,26 @@ const App: Component = () => {
     }
   });
 
+  // The engine is still TRACKED, just not rendered on — it sequences the warm
+  // below. A rejection is swallowed on purpose: the worker replies with the
+  // init error to every op it is asked for, so a dead engine reads as
+  // "Validator error: …" on the action that needed it, rather than blanking
+  // panes (the formatter, the coordinate tools) that never touch it.
+  const [engineUp, setEngineUp] = createSignal(false);
+  void engineReady().then(
+    () => setEngineUp(true),
+    () => {
+      /* surfaced per-op by the worker, not here */
+    },
+  );
+
   // Once the validator is live, warm the heavy lazy assets (DuckDB / echarts /
   // arrow / proj4 / reference JSONs) during idle time so Explore / Charts /
   // Tools open instantly later — without delaying the validate-first load.
+  // Sequenced behind the engine, not the paint: the speculative fetches must
+  // not steal bandwidth from the artifact the user is actually waiting on.
   createEffect(() => {
-    if (wasmReady()) warmLazyAssets();
+    if (engineUp()) warmLazyAssets();
   });
 
   return (
@@ -76,35 +94,36 @@ const App: Component = () => {
       <Tabs active={tab()} onChange={setTab} />
 
       <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
+        {/* Error first, then the value: reading an errored resource THROWS,
+            so a failure checked from inside the fallback never gets to
+            render itself. */}
         <Show
-          when={wasmReady()}
+          when={!bootReady.error}
           fallback={
-            <Show
-              when={!wasmReady.error}
-              fallback={
-                <p class="text-err">
-                  Failed to load the validator engine: {String(wasmReady.error)}
-                </p>
-              }
-            >
-              <p class="text-fg-muted">Loading validator engine…</p>
-            </Show>
+            <p class="text-err">
+              The app failed to start: {String(bootReady.error)}
+            </p>
           }
         >
-          <Show when={tab() === "validate"}>
-            <ValidatePane />
-          </Show>
-          <Show when={tab() === "fix"}>
-            <FixPane />
-          </Show>
-          <Show when={tab() === "explore"}>
-            <ExplorePane />
-          </Show>
-          <Show when={tab() === "tools"}>
-            <ToolsPane />
-          </Show>
-          <Show when={tab() === "export"}>
-            <ExportPane />
+          <Show
+            when={bootReady()}
+            fallback={<p class="text-fg-muted">Starting…</p>}
+          >
+            <Show when={tab() === "validate"}>
+              <ValidatePane />
+            </Show>
+            <Show when={tab() === "fix"}>
+              <FixPane />
+            </Show>
+            <Show when={tab() === "explore"}>
+              <ExplorePane />
+            </Show>
+            <Show when={tab() === "tools"}>
+              <ToolsPane />
+            </Show>
+            <Show when={tab() === "export"}>
+              <ExportPane />
+            </Show>
           </Show>
         </Show>
       </main>

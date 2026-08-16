@@ -153,8 +153,10 @@ let nextId = 1;
 const pending = new Map<number, Pending>();
 
 // Resolves when the worker has instantiated the wasm; rejects if init
-// failed. Panes gate their first render on this (mirrors the old
-// main-thread `initValidator()` await).
+// failed. NOTHING gates its first render on this any more (#353) — App only
+// uses it to sequence the idle warm, and an op that arrives first queues in
+// the worker behind the same promise. Kept because "engine is up" still has
+// one consumer, and because a caller that ignores it is not silently racing.
 const readyPromise = new Promise<void>((resolve, reject) => {
   const onInit = (e: MessageEvent<WorkerRes>) => {
     const msg = e.data;

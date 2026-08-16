@@ -7,8 +7,9 @@ import { APP, enterExplore } from "./helpers";
 const fixture = (name: string) =>
   path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", name);
 
-// Wait until the wasm validator is live (the sample buttons only render once
-// the worker reports ready — see App's wasmReady gate).
+// Wait until the app has painted. The sample buttons render on the ~30 KB
+// tokenizer alone (#353) — the engine may still be arriving — but every caller
+// goes on to validate something, which waits for it anyway.
 async function ready(page: Page) {
   await page.goto(APP);
   await expect(
@@ -605,4 +606,60 @@ test("Explore on a low-end device asks before downloading the engine, then loads
   await tab(page, "Explore").click();
   await expect(page.getByText(/Open the data explorer\?/)).toHaveCount(0);
   await expect(page.getByText(/data rows/)).toBeVisible();
+});
+
+// --- boot: first paint gates on the tokenizer, not the engine ------------
+
+test("first paint doesn't wait on the engine, and a file loaded in that window still validates", async ({
+  browser,
+}) => {
+  // #353 (see ags-wiki/design/dec-engine-tiering.md): the engine's deadline is
+  // when a FILE is loaded, not when the page paints. This holds it on the wire
+  // and releases it by hand, so nothing here races the runner's speed — a
+  // timed delay would only be as true as the machine was fast that day.
+  //
+  // Service workers are blocked for this context because page.route() cannot
+  // see a fetch the SW answers (Playwright's own guidance). With the precache
+  // live the engine would arrive from cache and the hold below would be a
+  // no-op the test could not tell from a pass.
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  let requested = false;
+  await page.route(/ags4_wasm_bg-.*\.wasm$/, async (route) => {
+    requested = true;
+    await held;
+    await route.continue();
+  });
+
+  const sample = page.getByRole("button", { name: /Clean \(minimal\)/ });
+  try {
+    await page.goto(APP);
+
+    // Tier 0 (the ~30 KB tokenizer) is the whole gate: the page paints and the
+    // sample buttons are live while the engine is still in flight.
+    await expect(sample).toBeVisible();
+    // …and the hold is REAL — without this the route could simply never have
+    // matched, and every assertion below would pass against a warm engine.
+    await expect
+      .poll(() => requested, {
+        message: "the engine wasm was never requested — the hold isn't real",
+      })
+      .toBe(true);
+
+    // The sample buttons are the path that takes someone from cold paint to
+    // needing the engine in milliseconds. It waits inside Validate's EXISTING
+    // loading state — no error, no new UI state.
+    await sample.click();
+    await expect(page.getByText(/Validating…/)).toBeVisible();
+    await expect(page.getByText(/Clean — 0 findings/)).toHaveCount(0);
+
+    // Engine lands → the queued request produces the normal result.
+    release();
+    await expect(page.getByText(/Clean — 0 findings/)).toBeVisible();
+  } finally {
+    release();
+    await ctx.close();
+  }
 });
