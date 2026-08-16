@@ -104,7 +104,11 @@ explicit, already-slow user actions — Explore, which is about to wait on 36 MB
 of DuckDB anyway, and Excel conversion.
 
 **Why a second worker rather than replacing the engine in place.** The worker is
-already the isolation boundary; the two engines serve disjoint tabs; the only
+already the isolation boundary — and since #351 the ops it serves live in
+`repo:web/src/lib/engineDispatch.ts`, parameterised by the engine module, so a
+second worker is a second `createEngineDispatch(...)` rather than a second copy
+of thirteen ops. The parsed-dataset handle lives in that closure, which is what
+gives each worker its own; the two engines serve disjoint tabs; the only
 stateful handle is Explore's own. So "both resident" is not duplication being
 tolerated — it is the process boundary matching the feature split. Opening
 Explore can never disturb a running validate. Replacement was the ticket's
