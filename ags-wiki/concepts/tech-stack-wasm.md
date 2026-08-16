@@ -23,7 +23,8 @@ sources: []
 > [!note] Two browser wasm modules, not one
 > This page describes the **engine** wasm (`laterite-ags4-wasm`, 5.1 MiB raw /
 > 1.71 MiB gzipped for the full build — re-measured 2026-08-16, post-#336,
-> post-#330 and post-#342) —
+> post-#330 and post-#342; [[dec-engine-tiering]] splits what the browser
+> actually loads into four tiers, of which this full build is the heaviest) —
 > `validate`/`parse`/`diff`/`merge`/`to_ags4`, run in a Web Worker. Since
 > #533 (part of the #527 convergence arc) the browser also loads a SEPARATE,
 > deliberately tiny sibling — `laterite-ags4-tokenizer-wasm` (~30 KB / ~13 KB
