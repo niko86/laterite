@@ -1,6 +1,10 @@
-import { createSignal, For, Show, type Component } from "solid-js";
+import { createSignal, For, onMount, Show, type Component } from "solid-js";
 import { fileStore } from "../../lib/fileStore";
-import { excelExport, excelImport } from "../../lib/validatorClient";
+import {
+  excelExport,
+  excelImport,
+  startTier2Worker,
+} from "../../lib/validatorClient";
 import { downloadBlob, baseName } from "../../lib/download";
 
 const XLSX_MIME =
@@ -13,6 +17,13 @@ const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 // (one sheet per group, python-ags4's layout); import turns an uploaded `.xlsx`
 // back into AGS4. Nothing is uploaded to a server.
 export const ExcelConverter: Component = () => {
+  // Both conversions run in the second worker (#354) — the only tool that does.
+  // Selecting this tool creates it, so the engine is instantiating while the
+  // user is still picking a file instead of after they press the button. It is
+  // also the one tier-2 consumer that never waits on DuckDB, so the head start
+  // is the whole difference on a slow device.
+  onMount(startTier2Worker);
+
   const [busy, setBusy] = createSignal<"export" | "import" | null>(null);
   const [err, setErr] = createSignal<string | null>(null);
   const [warnings, setWarnings] = createSignal<string[]>([]);

@@ -1,8 +1,15 @@
-// Main-thread handle to the validator worker. Components never touch the
-// wasm or the worker directly — they call `validate()` / `validateGzip()`
+// Main-thread handle to the engine workers. Components never touch the
+// wasm or a worker directly — they call `validate()` / `validateGzip()`
 // here and get a Promise back. Request/response are correlated by a
 // monotonic id; Solid's `createResource` already discards the result of a
 // superseded run, so this layer just needs faithful id correlation.
+//
+// There are TWO workers (#354, ags-wiki/design/dec-engine-tiering.md). The
+// always-on one is created at module load and serves Validate, Fix, Export and
+// most of Tools. The second is created the first time Explore or Tools → Excel
+// is opened, and serves those two alone — which is what keeps `ParsedDataset`,
+// and in #355 the whole tier-2 engine, off the path of everyone who opens
+// neither. Both speak the same protocol, so one channel drives either.
 
 import type {
   ValidationReport,
@@ -145,94 +152,6 @@ export interface CensorResult {
   tally: CensorTally;
 }
 
-const worker = new Worker(new URL("./validator.worker.ts", import.meta.url), {
-  type: "module",
-});
-
-let nextId = 1;
-const pending = new Map<number, Pending>();
-
-// Resolves when the worker has instantiated the wasm; rejects if init
-// failed. NOTHING gates its first render on this any more (#353) — App only
-// uses it to sequence the idle warm, and an op that arrives first queues in
-// the worker behind the same promise. Kept because "engine is up" still has
-// one consumer, and because a caller that ignores it is not silently racing.
-const readyPromise = new Promise<void>((resolve, reject) => {
-  const onInit = (e: MessageEvent<WorkerRes>) => {
-    const msg = e.data;
-    if ("type" in msg && msg.type === "ready") {
-      worker.removeEventListener("message", onInit);
-      resolve();
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker messages are a runtime boundary; keep the explicit check though the type narrows to it
-    } else if ("type" in msg && msg.type === "initError") {
-      worker.removeEventListener("message", onInit);
-      reject(new Error(msg.error));
-    }
-  };
-  worker.addEventListener("message", onInit);
-});
-
-worker.addEventListener("message", (e: MessageEvent<WorkerRes>) => {
-  const msg = e.data;
-  if ("type" in msg) return; // ready / initError handled above
-  const p = pending.get(msg.id);
-  if (!p) return; // superseded + already dropped
-  pending.delete(msg.id);
-  if (!msg.ok) {
-    p.reject(new Error(msg.error));
-  } else if (msg.kind === "report" && p.kind === "report") {
-    p.resolve(msg.report);
-  } else if (msg.kind === "cert" && p.kind === "cert") {
-    p.resolve(msg.json);
-  } else if (msg.kind === "gzip" && p.kind === "gzip") {
-    p.resolve({ bytes: msg.bytes, meta: msg.report });
-  } else if (msg.kind === "fixes" && p.kind === "fixes") {
-    p.resolve(msg.fixes);
-  } else if (msg.kind === "applied" && p.kind === "applied") {
-    p.resolve(new Uint8Array(msg.bytes));
-  } else if (msg.kind === "parsed" && p.kind === "parsed") {
-    p.resolve(msg.groups);
-  } else if (msg.kind === "arrow" && p.kind === "arrow") {
-    p.resolve(new Uint8Array(msg.bytes));
-  } else if (msg.kind === "revisionDelta" && p.kind === "revisionDelta") {
-    p.resolve(msg.delta);
-  } else if (msg.kind === "mergeResult" && p.kind === "mergeResult") {
-    p.resolve({
-      bytes: msg.bytes,
-      warnings: JSON.parse(msg.warningsJson) as MergeWarning[],
-      revisions: JSON.parse(msg.revisionsJson) as MergeRevision[],
-    });
-  } else if (msg.kind === "dictionary" && p.kind === "dictionary") {
-    p.resolve(msg.dict);
-  } else if (msg.kind === "censor" && p.kind === "censor") {
-    p.resolve({ text: msg.text, tally: msg.tally });
-  } else if (msg.kind === "toAgs4" && p.kind === "toAgs4") {
-    p.resolve(msg.result);
-  } else if (msg.kind === "excel" && p.kind === "excel") {
-    p.resolve({
-      bytes: msg.bytes,
-      warnings: msg.warnings,
-      sheets: msg.sheets,
-      rows: msg.rows,
-    });
-  } else {
-    p.reject(
-      new Error(`unexpected ${msg.kind} response for ${p.kind} request`),
-    );
-  }
-});
-
-worker.addEventListener("error", (e) => {
-  // A hard worker error rejects everything in flight rather than hanging.
-  const err = new Error(e.message || "validator worker crashed");
-  for (const [, p] of pending) p.reject(err);
-  pending.clear();
-});
-
-export function ready(): Promise<void> {
-  return readyPromise;
-}
-
 // Omit over a discriminated union must DISTRIBUTE, else only the keys
 // common to every member survive (dropping `dict`/`fixes`/`code`/… from the
 // per-kind requests). The built-in Omit doesn't distribute, so spell it out.
@@ -241,35 +160,185 @@ type DistributiveOmit<T, K extends keyof never> = T extends unknown
   : never;
 type ReqInit = DistributiveOmit<WorkerReq, "id">;
 
-// Send `bytes` to the worker as a transferable. We transfer a *copy*
-// (`slice()`) so the caller's original Uint8Array stays intact — the main
-// thread still needs it to decode the editor text + finding snippets.
-function post(req: ReqInit, bytes: Uint8Array): number {
-  const id = nextId++;
-  const copy = bytes.slice().buffer;
-  worker.postMessage({ ...req, id, bytes: copy }, [copy]);
-  return id;
+// One id space across both workers. Correlation never needs that — a reply only
+// ever meets its own worker's pending table — but two workers each answering
+// "id 3" in a console log is a debugging trap bought for nothing.
+let nextId = 1;
+
+/** One worker, plus the pending table that correlates its replies.
+ *
+ *  `spawn` runs on the first request (or `start()`) and never again, which is
+ *  what lets this module hold a channel for a worker that is never created —
+ *  the whole point of the second one (#354). */
+function createChannel(spawn: () => Worker) {
+  const pending = new Map<number, Pending>();
+  let live: { worker: Worker; ready: Promise<void> } | null = null;
+
+  const start = () => {
+    if (live) return live;
+    const worker = spawn();
+
+    // Resolves when the worker has instantiated the wasm; rejects if init
+    // failed. NOTHING gates its first render on this any more (#353) — App only
+    // uses it to sequence the idle warm, and an op that arrives first queues in
+    // the worker behind the same promise. Kept because "engine is up" still has
+    // one consumer, and because a caller that ignores it is not silently racing.
+    const ready = new Promise<void>((resolve, reject) => {
+      const onInit = (e: MessageEvent<WorkerRes>) => {
+        const msg = e.data;
+        if ("type" in msg && msg.type === "ready") {
+          worker.removeEventListener("message", onInit);
+          resolve();
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker messages are a runtime boundary; keep the explicit check though the type narrows to it
+        } else if ("type" in msg && msg.type === "initError") {
+          worker.removeEventListener("message", onInit);
+          reject(new Error(msg.error));
+        }
+      };
+      worker.addEventListener("message", onInit);
+    });
+    // Only the always-on worker's readiness has a reader (App's). An unread
+    // rejection is an unhandled-rejection log, and a dead second engine is
+    // already reported where it matters — every Explore/Excel op rejects with
+    // that same init error, and both panes display it. Marking it handled here
+    // doesn't take it from `ready()`, which still returns the real promise.
+    void ready.catch(() => undefined);
+
+    worker.addEventListener("message", (e: MessageEvent<WorkerRes>) => {
+      const msg = e.data;
+      if ("type" in msg) return; // ready / initError handled above
+      const p = pending.get(msg.id);
+      if (!p) return; // superseded + already dropped
+      pending.delete(msg.id);
+      if (!msg.ok) {
+        p.reject(new Error(msg.error));
+      } else if (msg.kind === "report" && p.kind === "report") {
+        p.resolve(msg.report);
+      } else if (msg.kind === "cert" && p.kind === "cert") {
+        p.resolve(msg.json);
+      } else if (msg.kind === "gzip" && p.kind === "gzip") {
+        p.resolve({ bytes: msg.bytes, meta: msg.report });
+      } else if (msg.kind === "fixes" && p.kind === "fixes") {
+        p.resolve(msg.fixes);
+      } else if (msg.kind === "applied" && p.kind === "applied") {
+        p.resolve(new Uint8Array(msg.bytes));
+      } else if (msg.kind === "parsed" && p.kind === "parsed") {
+        p.resolve(msg.groups);
+      } else if (msg.kind === "arrow" && p.kind === "arrow") {
+        p.resolve(new Uint8Array(msg.bytes));
+      } else if (msg.kind === "revisionDelta" && p.kind === "revisionDelta") {
+        p.resolve(msg.delta);
+      } else if (msg.kind === "mergeResult" && p.kind === "mergeResult") {
+        p.resolve({
+          bytes: msg.bytes,
+          warnings: JSON.parse(msg.warningsJson) as MergeWarning[],
+          revisions: JSON.parse(msg.revisionsJson) as MergeRevision[],
+        });
+      } else if (msg.kind === "dictionary" && p.kind === "dictionary") {
+        p.resolve(msg.dict);
+      } else if (msg.kind === "censor" && p.kind === "censor") {
+        p.resolve({ text: msg.text, tally: msg.tally });
+      } else if (msg.kind === "toAgs4" && p.kind === "toAgs4") {
+        p.resolve(msg.result);
+      } else if (msg.kind === "excel" && p.kind === "excel") {
+        p.resolve({
+          bytes: msg.bytes,
+          warnings: msg.warnings,
+          sheets: msg.sheets,
+          rows: msg.rows,
+        });
+      } else {
+        p.reject(
+          new Error(`unexpected ${msg.kind} response for ${p.kind} request`),
+        );
+      }
+    });
+
+    worker.addEventListener("error", (e) => {
+      // A hard worker error rejects everything in flight rather than hanging.
+      // Only this worker's: the other one's requests are unaffected by it
+      // crashing, which is half of why the split is a process boundary.
+      const err = new Error(e.message || "engine worker crashed");
+      for (const [, p] of pending) p.reject(err);
+      pending.clear();
+    });
+
+    live = { worker, ready };
+    return live;
+  };
+
+  return {
+    start,
+    ready: () => start().ready,
+
+    // Send `bytes` to the worker as a transferable. We transfer a *copy*
+    // (`slice()`) so the caller's original Uint8Array stays intact — the main
+    // thread still needs it to decode the editor text + finding snippets.
+    post(req: ReqInit, bytes: Uint8Array, p: Pending) {
+      const id = nextId++;
+      const copy = bytes.slice().buffer;
+      // Registered AFTER the send, as it always has been: a reply can only
+      // arrive on a later task, and a postMessage that throws then leaves no
+      // entry waiting on an id the worker never saw.
+      start().worker.postMessage({ ...req, id, bytes: copy }, [copy]);
+      pending.set(id, p);
+    },
+
+    // For requests that carry no bytes (e.g. arrowIpc, which reads the worker-
+    // held dataset). No transfer list.
+    postBare(req: ReqInit, p: Pending) {
+      const id = nextId++;
+      start().worker.postMessage({ ...req, id });
+      pending.set(id, p);
+    },
+
+    // For requests carrying TWO byte buffers (the revision diff). Transfer
+    // copies so the caller's originals stay intact (same rationale as post()).
+    postDual(req: ReqInit, a: Uint8Array, b: Uint8Array, p: Pending) {
+      const id = nextId++;
+      const aCopy = a.slice().buffer;
+      const bCopy = b.slice().buffer;
+      start().worker.postMessage({ ...req, id, aBytes: aCopy, bBytes: bCopy }, [
+        aCopy,
+        bCopy,
+      ]);
+      pending.set(id, p);
+    },
+  };
 }
 
-// For requests that carry no bytes (e.g. arrowIpc, which reads the worker-
-// held dataset). No transfer list.
-function postBare(req: ReqInit): number {
-  const id = nextId++;
-  worker.postMessage({ ...req, id });
-  return id;
+// The always-on worker, created at module load exactly as it always has been:
+// Validate is where a visitor lands, and its engine's deadline is the moment a
+// file is loaded — which the sample buttons can reach in milliseconds.
+const primary = createChannel(
+  () =>
+    new Worker(new URL("./validator.worker.ts", import.meta.url), {
+      type: "module",
+    }),
+);
+primary.start();
+
+// The second worker: Explore's parse + Arrow pulls, and Tools → Excel's two
+// conversions. Nothing here creates it — `startTier2Worker()` and the four ops
+// that need it do, so it stays uncreated for a visit that opens neither tab.
+const tier2 = createChannel(
+  () =>
+    new Worker(new URL("./tier2.worker.ts", import.meta.url), {
+      type: "module",
+    }),
+);
+
+export function ready(): Promise<void> {
+  return primary.ready();
 }
 
-// For requests carrying TWO byte buffers (the revision diff). Transfer
-// copies so the caller's originals stay intact (same rationale as post()).
-function postDual(req: ReqInit, a: Uint8Array, b: Uint8Array): number {
-  const id = nextId++;
-  const aCopy = a.slice().buffer;
-  const bCopy = b.slice().buffer;
-  worker.postMessage({ ...req, id, aBytes: aCopy, bBytes: bCopy }, [
-    aCopy,
-    bCopy,
-  ]);
-  return id;
+/** Bring the second engine worker up. Explore and Tools → Excel call this when
+ *  they mount, so its wasm is instantiating while the user is still looking at
+ *  the tab rather than starting when they finally click something. Idempotent —
+ *  and the only thing besides a request to that worker that creates it, which is
+ *  what an e2e in `web/e2e/app.spec.ts` holds us to. */
+export function startTier2Worker(): void {
+  tier2.start();
 }
 
 /** Validate, returning the (capped, per `maxPerRule`) report. */
@@ -282,7 +351,7 @@ export function validate(
   dict?: CustomDict,
 ): Promise<ValidationReport> {
   return new Promise((resolve, reject) => {
-    const id = post(
+    primary.post(
       {
         kind: "validate",
         bytes: new ArrayBuffer(0), // replaced inside post()
@@ -294,8 +363,8 @@ export function validate(
         dictReplace: dict?.replace ?? false,
       },
       bytes,
+      { kind: "report", resolve, reject },
     );
-    pending.set(id, { kind: "report", resolve, reject });
   });
 }
 
@@ -310,7 +379,7 @@ export function validateGzip(
   dict?: CustomDict,
 ): Promise<GzipResult> {
   return new Promise((resolve, reject) => {
-    const id = post(
+    primary.post(
       {
         kind: "validate",
         bytes: new ArrayBuffer(0),
@@ -323,8 +392,8 @@ export function validateGzip(
         dictReplace: dict?.replace ?? false,
       },
       bytes,
+      { kind: "gzip", resolve, reject },
     );
-    pending.set(id, { kind: "gzip", resolve, reject });
   });
 }
 
@@ -338,7 +407,7 @@ export function certify(
   dict?: CustomDict,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const id = post(
+    primary.post(
       {
         kind: "certify",
         bytes: new ArrayBuffer(0),
@@ -349,8 +418,8 @@ export function certify(
         dictReplace: dict?.replace ?? false,
       },
       bytes,
+      { kind: "cert", resolve, reject },
     );
-    pending.set(id, { kind: "cert", resolve, reject });
   });
 }
 
@@ -363,7 +432,7 @@ export function computeFixes(
   encoding: EncodingOpt,
 ): Promise<Fix[]> {
   return new Promise((resolve, reject) => {
-    const id = post(
+    primary.post(
       {
         kind: "computeFixes",
         bytes: new ArrayBuffer(0), // replaced inside post()
@@ -371,8 +440,8 @@ export function computeFixes(
         encoding,
       },
       bytes,
+      { kind: "fixes", resolve, reject },
     );
-    pending.set(id, { kind: "fixes", resolve, reject });
   });
 }
 
@@ -385,7 +454,7 @@ export function applyFixes(
   fixes: Fix[],
 ): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    const id = post(
+    primary.post(
       {
         kind: "applyFixes",
         bytes: new ArrayBuffer(0), // replaced inside post()
@@ -393,30 +462,31 @@ export function applyFixes(
         fixes,
       },
       bytes,
+      { kind: "applied", resolve, reject },
     );
-    pending.set(id, { kind: "applied", resolve, reject });
   });
 }
 
-/** Parse the file to a typed dataset held in the worker; resolves to the
+/** Parse the file to a typed dataset held in the SECOND worker; resolves to the
  *  per-group schema. Each group's typed Arrow IPC is pulled separately via
  *  arrowIpc(). Operates on the most-recently-parsed dataset, so a caller
- *  must drain all arrowIpc() pulls for one file before parsing the next. */
+ *  must drain all arrowIpc() pulls for one file before parsing the next — a
+ *  contract the move doesn't touch, since both halves of it moved together. */
 export function parseDataset(
   bytes: Uint8Array,
   encoding: EncodingOpt,
 ): Promise<GroupMeta[]> {
   return new Promise((resolve, reject) => {
-    const id = post(
-      { kind: "parse", bytes: new ArrayBuffer(0), encoding },
-      bytes,
-    );
-    pending.set(id, { kind: "parsed", resolve, reject });
+    tier2.post({ kind: "parse", bytes: new ArrayBuffer(0), encoding }, bytes, {
+      kind: "parsed",
+      resolve,
+      reject,
+    });
   });
 }
 
-/** Pull one group's typed Arrow IPC stream (Uint8Array) from the worker-
- *  held dataset set by the last parseDataset(). `keys=true` includes the
+/** Pull one group's typed Arrow IPC stream (Uint8Array) from the second
+ *  worker's dataset, set by the last parseDataset(). `keys=true` includes the
  *  content-addressed `_id`/`_parent_id` columns — pass it when ingesting into
  *  duckdb-wasm so cross-group joins resolve (#303). `contentHash=true` appends
  *  the trailing `_content_hash` value fingerprint, same opt-in shape (#448). */
@@ -426,8 +496,10 @@ export function arrowIpc(
   contentHash = false,
 ): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    const id = postBare({ kind: "arrowIpc", code, keys, contentHash });
-    pending.set(id, { kind: "arrow", resolve, reject });
+    tier2.postBare(
+      { kind: "arrowIpc", code, keys, contentHash },
+      { kind: "arrow", resolve, reject },
+    );
   });
 }
 
@@ -441,7 +513,7 @@ export function revisionDiff(
   maxRowsPerGroup: number | null,
 ): Promise<RevisionDelta> {
   return new Promise((resolve, reject) => {
-    const id = postDual(
+    primary.postDual(
       {
         kind: "revisionDiff",
         aBytes: new ArrayBuffer(0), // replaced inside postDual()
@@ -451,8 +523,8 @@ export function revisionDiff(
       },
       a,
       b,
+      { kind: "revisionDelta", resolve, reject },
     );
-    pending.set(id, { kind: "revisionDelta", resolve, reject });
   });
 }
 
@@ -486,7 +558,7 @@ export function mergeFiles(
   },
 ): Promise<MergeConversion> {
   return new Promise((resolve, reject) => {
-    const id = postDual(
+    primary.postDual(
       {
         kind: "merge",
         aBytes: new ArrayBuffer(0), // replaced inside postDual()
@@ -497,8 +569,8 @@ export function mergeFiles(
       },
       a,
       b,
+      { kind: "mergeResult", resolve, reject },
     );
-    pending.set(id, { kind: "mergeResult", resolve, reject });
   });
 }
 
@@ -520,7 +592,7 @@ export function censorFile(
   },
 ): Promise<CensorResult> {
   return new Promise((resolve, reject) => {
-    const id = post(
+    primary.post(
       {
         kind: "censor",
         bytes: new ArrayBuffer(0), // replaced inside post()
@@ -531,8 +603,8 @@ export function censorFile(
         includeFreetext: opts.includeFreetext,
       },
       bytes,
+      { kind: "censor", resolve, reject },
     );
-    pending.set(id, { kind: "censor", resolve, reject });
   });
 }
 
@@ -543,11 +615,13 @@ export function dictionary(
   edition: DictVersionOpt | null,
 ): Promise<StandardDict> {
   return new Promise((resolve, reject) => {
-    const id = postBare({
-      kind: "dictionary",
-      edition: edition && edition !== "auto" ? edition : null,
-    });
-    pending.set(id, { kind: "dictionary", resolve, reject });
+    primary.postBare(
+      {
+        kind: "dictionary",
+        edition: edition && edition !== "auto" ? edition : null,
+      },
+      { kind: "dictionary", resolve, reject },
+    );
   });
 }
 
@@ -555,8 +629,11 @@ export function dictionary(
  *  group, python-ags4's layout. Rejects if the file has no valid AGS4 groups. */
 export function excelExport(bytes: Uint8Array): Promise<ExcelConversion> {
   return new Promise((resolve, reject) => {
-    const id = post({ kind: "excelExport", bytes: new ArrayBuffer(0) }, bytes);
-    pending.set(id, { kind: "excel", resolve, reject });
+    tier2.post({ kind: "excelExport", bytes: new ArrayBuffer(0) }, bytes, {
+      kind: "excel",
+      resolve,
+      reject,
+    });
   });
 }
 
@@ -569,11 +646,11 @@ export function excelImport(
   formatNumeric: boolean,
 ): Promise<ExcelConversion> {
   return new Promise((resolve, reject) => {
-    const id = post(
+    tier2.post(
       { kind: "excelImport", bytes: new ArrayBuffer(0), formatNumeric },
       bytes,
+      { kind: "excel", resolve, reject },
     );
-    pending.set(id, { kind: "excel", resolve, reject });
   });
 }
 
@@ -586,12 +663,14 @@ export function toAgs4(
   mode: EmitMode,
 ): Promise<ExportResult> {
   return new Promise((resolve, reject) => {
-    const id = postBare({
-      kind: "toAgs4",
-      groupsJson,
-      edition: edition && edition !== "auto" ? edition : null,
-      mode,
-    });
-    pending.set(id, { kind: "toAgs4", resolve, reject });
+    primary.postBare(
+      {
+        kind: "toAgs4",
+        groupsJson,
+        edition: edition && edition !== "auto" ? edition : null,
+        mode,
+      },
+      { kind: "toAgs4", resolve, reject },
+    );
   });
 }
