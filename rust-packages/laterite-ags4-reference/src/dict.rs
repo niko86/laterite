@@ -166,6 +166,124 @@ mod dict_data {
 }
 pub use dict_data::*;
 
+/// The UNION view of the masked tables: every group and heading across every
+/// edition, each at its **latest-edition** definition.
+///
+/// **Why this lives here rather than in [`crate::union`].** The union used to be
+/// reconstructed by parsing a second copy of the dictionary — `ags_dictionary.json`
+/// embedded via `include_str!`, 1.4 MB of it, sitting in every binary next to
+/// these tables that already hold the same facts. That copy compressed ~18:1, so
+/// it was easy to miss: it cost 1.4 MB of a wasm bundle and only ~82 KB of what
+/// a browser downloaded. It is gone, and this is what replaced it. The masks are
+/// what make that possible and they do not leave this module, so the
+/// reconstruction has to be where they are.
+///
+/// **What "latest edition" means**, matching `tools/gen_dictionary.py::build`
+/// exactly, because the JSON it writes was the previous source and the parity
+/// test in `union.rs` holds the two together:
+///
+/// * a group's `parent`/`desc` come from the newest edition that HAS the group;
+/// * a heading's definition comes from the newest edition that has the HEADING,
+///   which can be older than the group's (a heading dropped in 4.2 keeps its
+///   4.1.1 definition);
+/// * heading ORDER is the newest edition's order, then any heading only older
+///   editions had, appended walking newest → oldest.
+///
+/// Edition bits are assigned in `DictVersion::ALL` order (oldest = bit 0), so
+/// "newest" is the highest set bit — see `build.rs::fold`.
+pub(crate) mod union_view {
+    use super::{
+        DictEntry, EdMask, GROUP_HEADINGS, GROUPS, GroupMeta, HEADINGS, heading_key, pick,
+    };
+
+    /// One group as the union sees it. Borrowed throughout: every string is a
+    /// `&'static str` already in `.rodata`, so building this allocates only the
+    /// heading `Vec`.
+    pub(crate) struct UnionGroup {
+        pub(crate) code: &'static str,
+        /// `""` for a root group, exactly as [`GroupMeta`] stores it.
+        pub(crate) parent: &'static str,
+        pub(crate) desc: &'static str,
+        pub(crate) headings: Vec<(&'static str, DictEntry)>,
+    }
+
+    /// Every edition bit any variant of a key carries — which editions define it.
+    fn eds_of<T>(variants: &[(EdMask, T)]) -> EdMask {
+        variants.iter().fold(0, |acc, (m, _)| acc | m)
+    }
+
+    /// The highest set bit of `eds` — the newest edition in that set.
+    ///
+    /// `eds` is never 0 for a key present in a table: `fold` only creates an
+    /// entry when some edition contributed to it.
+    fn newest(eds: EdMask) -> EdMask {
+        debug_assert!(eds != 0, "a table key with no edition bits");
+        1 << (EdMask::BITS - 1 - eds.leading_zeros())
+    }
+
+    /// Edition bits in `eds`, newest first.
+    fn eds_newest_first(eds: EdMask) -> impl Iterator<Item = EdMask> {
+        (0..EdMask::BITS)
+            .rev()
+            .map(|i| (1 as EdMask) << i)
+            .filter(move |b| eds & b != 0)
+    }
+
+    /// The whole union, group codes in `phf` order (the caller sorts).
+    pub(crate) fn groups() -> Vec<UnionGroup> {
+        GROUPS
+            .entries()
+            .map(|(code, variants)| {
+                let g_eds = eds_of(variants);
+                let g_latest = newest(g_eds);
+                let meta: &GroupMeta =
+                    pick(variants, g_latest).expect("the newest bit selects a variant");
+
+                // Newest edition's order first, then anything only older
+                // editions had — gen_dictionary.py's rule, and the reason this
+                // is not simply the newest edition's heading list.
+                let mut order: Vec<&'static str> = Vec::new();
+                for bit in eds_newest_first(g_eds) {
+                    let Some(per_ed) = GROUP_HEADINGS.get(code) else {
+                        break;
+                    };
+                    let Some(names) = pick(per_ed, bit) else {
+                        continue;
+                    };
+                    for n in *names {
+                        if !order.contains(n) {
+                            order.push(n);
+                        }
+                    }
+                }
+
+                let headings = order
+                    .into_iter()
+                    .map(|name| {
+                        // A name in GROUP_HEADINGS with no HEADINGS entry would
+                        // mean the two tables disagree — both are emitted from
+                        // one pass over one document, so that is a corrupt
+                        // build, not a data condition to tolerate.
+                        let variants = HEADINGS
+                            .get(&heading_key(code, name))
+                            .unwrap_or_else(|| panic!("{code}.{name} is ordered but undefined"));
+                        let e = pick(variants, newest(eds_of(variants)))
+                            .expect("the newest bit selects a variant");
+                        (name, *e)
+                    })
+                    .collect();
+
+                UnionGroup {
+                    code,
+                    parent: meta.parent,
+                    desc: meta.desc,
+                    headings,
+                }
+            })
+            .collect()
+    }
+}
+
 /// Composite key for a heading lookup. Group + heading joined by U+001F.
 #[must_use]
 pub fn heading_key(group: &str, heading: &str) -> String {
