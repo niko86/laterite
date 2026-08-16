@@ -5,11 +5,16 @@
 //
 // WHAT TIER 1 IS
 //   The engine minus `arrow` and `excel`: everything Validate, Fix, Export and
-//   ALL of Tools need, and nothing else. It is what the service worker
-//   precaches, so it is the artifact most visitors download and the only one
-//   most visitors ever download. Tier 2 (the full engine) is warm-fetched on
-//   idle and compiled only on intent; tier 0 (the ~30 KB tokenizer, gated by
+//   ALL of Tools need, and nothing else. It is what the service worker will
+//   precache — so once #355 switches the workers over, it becomes the artifact
+//   most visitors download and the only one most visitors ever download. Tier 2
+//   (the full engine) is warm-fetched on idle and compiled only on intent; tier
+//   0 (the ~30 KB tokenizer, gated by
 //   `web/scripts/check-wasm-tokenizer-size.mjs`) is what first render waits on.
+//
+//   Nothing imports this artifact yet. That is the point of gating it now: the
+//   figure the tiering is designed around is held from the moment the artifact
+//   exists, rather than from whenever something comes to depend on it.
 //
 //   The boundary is `arrow` + `excel` and nothing else because those two are
 //   the only heavy gates: `certify`, `diff`, `merge` and `censor` cost +82 KiB
@@ -24,11 +29,12 @@
 //   whole of #338 rests on, and it can only get heavier silently: no user-
 //   visible symptom, no test failure, just a slower first visit.
 //
-// WHY THE RAW CEILING MATTERS HERE SPECIFICALLY
-//   Raw is the decode-and-compile work on the first-render path, and it is what
-//   a service worker's precache budget counts. Gzip says what the visitor
-//   downloads; raw says what their device then has to chew through before the
-//   engine can answer anything. Tier 1 is on the critical path for both.
+// WHY THE RAW CEILING IS NOT DECORATION HERE
+//   `wasm-artifact-gate.mjs` says what the raw axis is FOR in general. What
+//   makes it load-bearing on THIS artifact: tier 1 is the precached one, so its
+//   raw size is an install cost every first visit pays whether or not the
+//   visitor validates anything — and it is then the compile the engine's first
+//   answer waits behind. Both halves of that are raw, not gzip.
 //
 // FALSIFIED BEFORE TRUSTED (#352)
 //   A gate nobody has seen go red is a claim, not a check, so each instrument
