@@ -28,8 +28,8 @@ actually needs and leaves the rest to a from-source build:
 | `ags4_to_xlsx` · `xlsx_to_ags4` | build from source |
 | `certify` · `diff` · `merge` · `censor` | build from source |
 
-That is **1.9 MB raw / 757 KiB gzipped**, against 6.4 MB / 1.8 MB for everything
-— roughly 2.5× smaller on the wire. The whole read → validate → **fix** → write
+That is **1.8 MiB raw / 749 KiB gzipped**, against 6.4 MiB / 1.81 MiB for
+everything — roughly 2.5× smaller on the wire. The whole read → validate → **fix** → write
 chain is present; nothing shipped breaks it in the middle.
 
 Two of the omissions have a replacement rather than simply being absent:

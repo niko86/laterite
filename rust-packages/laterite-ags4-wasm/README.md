@@ -57,8 +57,8 @@ same cast, same types — only the framing differs.
 
 | | raw | gzip | brotli |
 |---|---:|---:|---:|
-| **this package** | **1.9 MB** | **757 KiB** | **574 KiB** |
-| everything, from source | 6.4 MB | 1.8 MB | 1.3 MB |
+| **this package** | **1.8 MiB** | **749 KiB** | **574 KiB** |
+| everything, from source | 6.4 MiB | 1.81 MiB | 1.29 MiB |
 
 Roughly 2.5× smaller on the wire than the full engine. Load it lazily either
 way — the module is only needed once a user actually opens a file, so keep it

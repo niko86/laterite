@@ -21,8 +21,8 @@ sources: []
 # tech stack: the browser wasm path
 
 > [!note] Two browser wasm modules, not one
-> This page describes the **engine** wasm (`laterite-ags4-wasm`, 6.4 MB raw /
-> 1.8 MB gzipped for the full build — re-measured 2026-08-16, post-#336 and
+> This page describes the **engine** wasm (`laterite-ags4-wasm`, 6.4 MiB raw /
+> 1.81 MiB gzipped for the full build — re-measured 2026-08-16, post-#336 and
 > post-#330) —
 > `validate`/`parse`/`diff`/`merge`/`to_ags4`, run in a Web Worker. Since
 > #533 (part of the #527 convergence arc) the browser also loads a SEPARATE,
@@ -63,7 +63,8 @@ wasm-pack downloads rejects unless every feature is enabled.
 > `compute_fixes`/`apply_fixes` — live in the crate — were once missing from
 > an old checked-in `.d.ts` until it was regenerated).
 
-The crate exposes **seven** `#[wasm_bindgen]` entry points
+The crate exposes these `#[wasm_bindgen]` entry points — **ten** in every
+build, plus seven more behind the features described below
 (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`):
 
 - `validate(bytes, dict_version, include_fyi, encoding, max_per_rule)` → a
@@ -133,10 +134,17 @@ the whole engine to the app.
 rules, dictionary, versions. Measured 2026-08-16, same toolchain, wasm-bindgen
 pinned 0.2.125, `wasm-opt = ['-O', '-all']`:
 
-| build | raw | gzip | brotli |
+| build | raw | gzip -9 | brotli -q 11 | 
 |---|---:|---:|---:|
 | full (`default`) | 6,722,493 | 1,898,871 | 1,355,295 |
 | slim (`--no-default-features`) | 1,913,729 | 767,434 | 588,044 |
+
+**Name the instrument or the number is unreproducible.** The gzip column is the
+`gzip -9` binary; `repo:tools/release/check-wasm-slim.mjs` uses node's `zlib` at
+the same level and reads ~8 KB HIGHER on the same bytes, which is why its ceiling
+is stated in its own units rather than these. Brotli at `-q 11` is the artifact's
+floor, not what a CDN serves — Cloudflare's is ~10% under gzip, so treat the
+gzip column as the honest delivery figure and this one as a lower bound.
 
 Two things about that split are easy to get wrong:
 

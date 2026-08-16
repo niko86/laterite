@@ -459,7 +459,8 @@ export interface AppliedFix {
   risk: "safe" | "risky";
 }
 
-/** The `build_ags4` / `build_ags4_ipc` result. */
+/** What a build returns — from `build_ags4`, and from `build_ags4_ipc` where
+ *  that feature is built. */
 export interface BuildReport {
   /** The AGS4 document: UTF-8, CRLF line endings. */
   text: string;
@@ -608,7 +609,8 @@ export interface TranStamp {
   remarks?: string;
 }
 
-/** Named options for `build_ags4` and `build_ags4_ipc`. */
+/** Named options for `build_ags4` — and for `build_ags4_ipc` where that
+ *  feature is built. */
 export interface BuildOptions {
   /** The edition to write against. `"auto"` (or omitted) uses the standard. */
   dictVersion?: "auto" | "4.0.3" | "4.0.4" | "4.1" | "4.1.1" | "4.2";
@@ -2669,10 +2671,16 @@ impl ParsedDataset {
     ///
     /// A **string**, not a JS array. Two reasons, and the second is the real
     /// one: `JSON.parse` on a single string beats building one boxed `JsValue`
-    /// per cell across the boundary — the very cost `build_ags4_ipc` exists to
-    /// avoid on the way back — and `list_rules` / `MergeResult` already return
-    /// their JSON that way, so this is the crate's established shape rather
-    /// than a new third convention.
+    /// per cell across the boundary — the cost the columnar build door exists
+    /// to avoid on the way back — and `list_rules` already returns its JSON
+    /// that way, so this is the crate's established shape rather than a new
+    /// third convention.
+    //
+    // Both named precedents are ungated on purpose, and this note is `//` not
+    // `///` for the same reason: doc comments here are COPIED into the
+    // published `.d.ts`, so citing `build_ags4_ipc` or `MergeResult` above
+    // would point a reader at exports their build does not have — and a note
+    // explaining that is housekeeping a consumer should never be shown.
     ///
     /// Rows are positional against [`Self::meta`]'s `headings`, and padded to
     /// its length with `null` when a DATA row is short — so the two zip.

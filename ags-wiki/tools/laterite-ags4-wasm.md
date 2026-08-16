@@ -8,7 +8,7 @@ language: rust
 artifact: laterite-ags4-wasm
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 volatile: [sizes]
-volatile_asof: 2026-08-03
+volatile_asof: 2026-08-16
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-wasm"
   lib: "repo:rust-packages/laterite-ags4-wasm/src/lib.rs"
@@ -40,7 +40,7 @@ sources: []
 > [!note] Not the only browser wasm module
 > Since #533 (part of the #527 convergence arc) the browser also loads a
 > SEPARATE, deliberately tiny sibling cdylib, `laterite-ags4-tokenizer-wasm`
-> (~30 KB vs this crate's ~6.9 MB) — two `#[wasm_bindgen]` wrappers over
+> (~30 KB vs this crate's 6.4 MiB, full build) — two `#[wasm_bindgen]` wrappers over
 > `laterite-ags4-parse::scan::scan_line` and `laterite-ags4-types::quote_field` for
 > the inline line editor/preview, instantiated on the main thread rather than
 > in this crate's Web Worker. It shares no dependency edge with this crate.
@@ -58,10 +58,12 @@ sources: []
 > validator worker's new `censor` RPC op — reusing this crate's existing wasm
 > bundle rather than a second tiny cdylib (censor has no per-keystroke
 > latency constraint, unlike the tokenizer/quoter pair above); the bundle
-> grew ~6.6→6.64 MB at the time. Re-measured 2026-08-03: the engine wasm is
-> **6.76 MiB raw / 1.88 MiB gzipped**, so the 8 MiB PWA precache cap still has
-> ~1.2 MiB of headroom on the raw figure. See
-> [[dec-ags4-censor-leaf]].
+> grew ~6.6→6.64 MB at the time. Re-measured 2026-08-16 (post-#336's
+> dictionary repack): the FULL engine wasm is **6.4 MiB raw / 1.81 MiB
+> gzipped**, so the 8 MiB PWA precache cap has ~1.6 MiB of headroom on the raw
+> figure — and `censor` is one of the six features #330 gates, so the slim
+> artifact npm gets carries none of this. See [[dec-ags4-censor-leaf]] and
+> "Two shapes of the same crate" in [[tech-stack-wasm]].
 
 ## What it is
 
@@ -72,7 +74,12 @@ nothing uploaded. The *why* and roadmap live in [[validator-site]]; the
 wasm tech detail (Arrow-IPC → DuckDB-wasm, the build pipeline) is
 [[tech-stack-wasm]].
 
-Seven exports (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`):
+The exports (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`). Since #330
+**seven of them are feature-gated** — `certify`, `diff`, `merge`, `censor`,
+`ags4_to_xlsx`/`xlsx_to_ags4` (`excel`) and `build_ags4_ipc` (`arrow`), plus
+`ParsedDataset::arrow_ipc` — all ON under `default = full`, so the app sees
+every one; the published npm artifact is built `--no-default-features` and sees
+none. [[tech-stack-wasm]] carries the split and the measurements:
 - `validate(...)` — goes through [[laterite-ags4-validator]]'s
   `check_parsed_with_dict` with `WorldScope::None` — the same dictionary-
   resolving door a path read uses, minus the on-disk half of Rule 20 (the
@@ -98,8 +105,12 @@ Seven exports (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`):
   / ellipsis (the Rule 1 non-ASCII arm, once "unfixable") with plain ASCII,
   marked risky; the duplicate-heading rename (can surface a fresh Rule 9) is
   also risky.
-- `parse(...)` → `ParsedDataset` (`group_codes` / `meta` / `arrow_ipc`)
-  for the data **Explore** tab.
+- `read(...)` → `ParsedDataset` (`group_codes` / `meta` / `rows_json`, plus
+  `arrow_ipc` under the `arrow` feature) for the data **Explore** tab. The two
+  row doors are the one place the feature split is not a plain subtraction:
+  `arrow_ipc` frames a group as Arrow IPC for duckdb-wasm, `rows_json` returns
+  the same values as JSON, both through the same
+  `laterite_ags4_types::parse_value` cast. A slim build has only the second.
 - `diff(a, b, { encoding, maxRowsPerGroup })` → a `RevisionDelta` (the
   **Tools → Revision diff**). Parses both files, matches rows by each
   group's *dictionary* KEY headings (order-independent), and compares

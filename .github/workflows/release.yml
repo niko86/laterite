@@ -941,8 +941,8 @@ jobs:
       #
       # `--no-default-features` builds the SLIM artifact (#330): validate, read,
       # build, fix, rules, dictionary — without Excel, Arrow IPC, the
-      # certificate stack, diff, merge or censor. 1.87 MB raw / 757 KiB gzipped
-      # against the full engine's 6.4 MB / 1.81 MB. The web app keeps building
+      # certificate stack, diff, merge or censor. 1.8 MiB raw / 749 KiB gzipped
+      # against the full engine's 6.4 MiB / 1.81 MiB. The web app keeps building
       # the full engine from source (`default = full`); this is the shape npm
       # gets, and `check-wasm-slim.mjs` below is what proves it IS that shape.
       #

@@ -113,7 +113,10 @@ const functions = found(/^export function (\w+)/gm).filter(
 );
 const classes = found(/^export class (\w+)/gm);
 
-const diff = (label, actual, expected) => {
+// Not named `diff`: that is one of the gated surfaces AND a verb this engine
+// exports, so a local `diff` here reads as the AGS4 comparison rather than a
+// set difference over export names.
+const mismatch = (label, actual, expected) => {
   const extra = actual.filter((n) => !expected.includes(n)).sort();
   const missing = expected.filter((n) => !actual.includes(n)).sort();
   if (!extra.length && !missing.length) return null;
@@ -137,8 +140,8 @@ const diff = (label, actual, expected) => {
 };
 
 const surface = [
-  diff("exports", functions, EXPECTED_FUNCTIONS),
-  diff("classes", classes, EXPECTED_CLASSES),
+  mismatch("exports", functions, EXPECTED_FUNCTIONS),
+  mismatch("classes", classes, EXPECTED_CLASSES),
 ].filter(Boolean);
 if (surface.length) fail(surface.join("\n  "));
 
