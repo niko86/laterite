@@ -1,10 +1,13 @@
 //! AGS4 group registry.
 //!
-//! Loads the bundled multi-edition `ags_dictionary.json` (embedded via
-//! `include_str!`), reconstructs the UNION of all editions (latest-edition
-//! heading definitions), and caches it in a singleton at first access.
-//! Provides `GroupDescriptor` + `Heading` structs and the parent-chain walks
-//! the DDL builder and migrate command need.
+//! Reconstructs the UNION of all editions (latest-edition heading definitions)
+//! from the compiled `phf` tables in [`crate::dict`], and caches it in a
+//! singleton at first access. Provides `GroupDescriptor` + `Heading` structs and
+//! the parent-chain walks the DDL builder and migrate command need.
+//!
+//! It used to reconstruct that union by parsing an `include_str!`d copy of
+//! `ags_dictionary.json` — a second embedded dictionary sitting beside the
+//! tables projected from it. See the note below for what that cost.
 
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -12,20 +15,32 @@ use std::sync::OnceLock;
 use serde::{Deserialize, Serialize};
 
 // The consolidated multi-edition dictionary (heading-local layout), generated
-// from the official AGS standard dictionaries by `tools/gen_dictionary.py`. The
-// registry / typed graph / DDL consume the UNION of every heading across
-// editions, each at its latest-edition definition — which is exactly the flat
-// heading fields of the heading-local schema (the `by_ed`/`eds` per-edition
-// variation is ignored here; edition-aware consumers reconstruct a specific
-// edition separately). A faithfulness gate (tests/test_dictionary_faithful.py)
-// keeps this file == the official-projection generator output.
+// from the official AGS standard dictionaries by `tools/gen_dictionary.py`, is
+// the SSOT — but it is consumed at BUILD time, not shipped.
 //
-// #475 PR2: the SSOT JSON now physically lives in this leaf's own `data/` —
-// every other reader (validator's build.rs, laterite-py's build.rs, the node
+// It used to be `include_str!`d here and parsed on first `registry()` call. That
+// put 1.4 MB of JSON — descriptions, keys, indentation — into every artifact
+// that touched the registry: the wasm bundle, the wheel's `.so`, `lat`, the Node
+// addon. And the same facts were ALREADY in the binary, as the `phf` tables
+// `build.rs` projects out of that very file. The registry now reconstructs the
+// union from those tables (`dict::union_view`), so the dictionary is embedded
+// once instead of twice.
+//
+// It hid well: JSON that repetitive compresses ~18:1, so the duplicate cost
+// 1.4 MB raw and only ~82 KB of what a browser actually downloads. Raw size is
+// what found it.
+//
+// #475 PR2: the SSOT JSON physically lives in this leaf's own `data/` — every
+// other reader (this crate's build.rs, laterite-py's build.rs, the node
 // typed-graph codegen, the web sync scripts, the Python generators) reads it
-// cross-crate/cross-package from here.
-const DICTIONARY_JSON: &str = include_str!("../data/ags_dictionary.json");
+// cross-crate/cross-package from there, at build time.
 
+// `PartialEq`/`Eq` are test-only on purpose. The parity oracle below compares
+// whole reconstructed groups against the JSON document, which wants equality —
+// but this crate is published, so crates.io would freeze the impls as surface
+// this change never set out to add. If a consumer ever needs to compare
+// headings, that is a deliberate API decision, not a side effect of a test.
+#[cfg_attr(test, derive(PartialEq, Eq))]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Heading {
     pub name: String,
@@ -49,6 +64,7 @@ impl Heading {
     }
 }
 
+#[cfg_attr(test, derive(PartialEq, Eq))] // test-only; see `Heading` above
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GroupDescriptor {
     pub code: String,
@@ -132,19 +148,20 @@ impl DictionaryFile {
 
 /// Parent-depth of `code` (PROJ-rooted; root = 0). Orders groups
 /// parents-before-children — the invariant the DDL emission relies on.
-fn group_depth(groups: &HashMap<String, DictGroup>, code: &str) -> usize {
+///
+/// `parent_of` returns `None` for a root group AND for a code the dictionary
+/// does not contain, which is what stops the walk in both cases.
+fn group_depth(parent_of: &HashMap<&str, Option<&str>>, code: &str) -> usize {
     let (mut depth, mut cur, mut guard) = (0, code, 0);
-    while let Some(g) = groups.get(cur) {
-        match g.parent.as_deref() {
-            Some(p) if groups.contains_key(p) => {
-                depth += 1;
-                cur = p;
-                guard += 1;
-                if guard > 64 {
-                    break; // cycle guard — should never fire
-                }
-            }
-            _ => break,
+    while let Some(Some(p)) = parent_of.get(cur) {
+        if !parent_of.contains_key(p) {
+            break;
+        }
+        depth += 1;
+        cur = p;
+        guard += 1;
+        if guard > 64 {
+            break; // cycle guard — should never fire
         }
     }
     depth
@@ -157,34 +174,43 @@ fn group_depth(groups: &HashMap<String, DictGroup>, code: &str) -> usize {
 /// single-source one reconstruction of the heading-local dictionary.
 #[must_use]
 pub fn union_groups() -> Vec<GroupDescriptor> {
-    let file: DictionaryFile =
-        serde_json::from_str(DICTIONARY_JSON).expect("bundled ags_dictionary.json must parse");
-    let mut codes: Vec<&String> = file.groups.keys().collect();
-    codes.sort_by(|a, b| {
-        group_depth(&file.groups, a)
-            .cmp(&group_depth(&file.groups, b))
-            .then_with(|| a.cmp(b))
+    // The union comes from the compiled `phf` tables, not from a second embedded
+    // copy of the dictionary — see the note at the top of this file. `dict`
+    // owns the edition masks and answers "latest-edition definition"; the
+    // ordering and the owned `GroupDescriptor` shape are this module's job.
+    let mut groups = crate::dict::union_view::groups();
+
+    let parent_of: HashMap<&str, Option<&str>> = groups
+        .iter()
+        .map(|g| (g.code, (!g.parent.is_empty()).then_some(g.parent)))
+        .collect();
+    groups.sort_by(|a, b| {
+        group_depth(&parent_of, a.code)
+            .cmp(&group_depth(&parent_of, b.code))
+            .then_with(|| a.code.cmp(b.code))
     });
-    codes
+
+    groups
         .into_iter()
-        .map(|code| {
-            let g = &file.groups[code];
-            GroupDescriptor {
-                code: code.clone(),
-                contents: g.description.clone().unwrap_or_default(),
-                parent: g.parent.clone(),
-                headings: g
-                    .headings
-                    .iter()
-                    .map(|h| Heading {
-                        name: h.name.clone(),
-                        status: h.status.clone(),
-                        ags_type: h.ags_type.clone(),
-                        unit: h.unit.clone(),
-                        description: h.description.clone(),
-                    })
-                    .collect(),
-            }
+        .map(|g| GroupDescriptor {
+            code: g.code.to_string(),
+            contents: g.desc.to_string(),
+            // `GroupMeta` stores a root's parent as `""`; the registry's shape
+            // is `Option`, and the JSON it replaced wrote `null`.
+            parent: (!g.parent.is_empty()).then(|| g.parent.to_string()),
+            headings: g
+                .headings
+                .into_iter()
+                .map(|(name, e)| Heading {
+                    name: name.to_string(),
+                    status: e.status.to_string(),
+                    ags_type: e.ags_type.to_string(),
+                    // Same asymmetry as `parent`: the table stores "no unit" as
+                    // `""`, the registry as `None`.
+                    unit: (!e.unit.is_empty()).then(|| e.unit.to_string()),
+                    description: e.desc.to_string(),
+                })
+                .collect(),
         })
         .collect()
 }
@@ -386,16 +412,15 @@ mod tests {
     #[test]
     fn group_depth_counts_in_map_ancestors_and_guards_cycles() {
         use std::collections::HashMap;
-        let mk = |parent: Option<&str>| DictGroup {
-            parent: parent.map(str::to_string),
-            description: None,
-            headings: Vec::new(),
-        };
-        let mut groups: HashMap<String, DictGroup> = HashMap::new();
-        groups.insert("PROJ".into(), mk(None));
-        groups.insert("LOCA".into(), mk(Some("PROJ")));
-        groups.insert("SAMP".into(), mk(Some("LOCA")));
-        groups.insert("ORPH".into(), mk(Some("GHOST"))); // parent not in the map
+        // `parent_of` now carries borrowed codes rather than the parsed
+        // `DictGroup`s — the map is built from the compiled tables, not from a
+        // deserialised document. Same three cases either way.
+        let groups: HashMap<&str, Option<&str>> = HashMap::from([
+            ("PROJ", None),
+            ("LOCA", Some("PROJ")),
+            ("SAMP", Some("LOCA")),
+            ("ORPH", Some("GHOST")), // parent not in the map
+        ]);
         assert_eq!(group_depth(&groups, "PROJ"), 0);
         assert_eq!(group_depth(&groups, "LOCA"), 1);
         assert_eq!(group_depth(&groups, "SAMP"), 2);
@@ -403,9 +428,7 @@ mod tests {
         assert_eq!(group_depth(&groups, "ORPH"), 0);
 
         // a cycle must terminate at the 64-step guard, not spin forever
-        let mut cyc: HashMap<String, DictGroup> = HashMap::new();
-        cyc.insert("A".into(), mk(Some("B")));
-        cyc.insert("B".into(), mk(Some("A")));
+        let cyc: HashMap<&str, Option<&str>> = HashMap::from([("A", Some("B")), ("B", Some("A"))]);
         assert_eq!(group_depth(&cyc, "A"), 65);
     }
 
@@ -431,5 +454,139 @@ mod tests {
         let json = reg.to_groups_json();
         assert!(json.starts_with('['), "not a JSON array: {}", &json[..20]);
         assert!(json.contains("PROJ"));
+    }
+}
+
+#[cfg(test)]
+mod union_parity_tests {
+    //! The reconstruction, held against the document it replaced.
+    //!
+    //! `union_groups()` used to parse `ags_dictionary.json` at runtime; it now
+    //! rebuilds the same answer from the `phf` tables `build.rs` projects out of
+    //! that file. Those are two different readings of one source, and the only
+    //! thing that makes swapping them safe is comparing them — the JSON is
+    //! ~3,500 headings across 174 groups, and "spot-check PROJ and LOCA" would
+    //! not notice a heading whose edition set made its latest definition differ.
+    //!
+    //! So the JSON stays, as an ORACLE rather than a source: `include_str!`
+    //! inside `#[cfg(test)]` reaches the test binary and no shipped artifact —
+    //! which is the whole point of the change, and is itself asserted below.
+    use super::*;
+
+    const ORACLE_JSON: &str = include_str!("../data/ags_dictionary.json");
+
+    /// `union_groups()` exactly as it read before the swap, kept verbatim so the
+    /// comparison is against the old BEHAVIOUR and not a fresh interpretation of
+    /// what it was supposed to do.
+    fn oracle() -> Vec<GroupDescriptor> {
+        fn depth(groups: &HashMap<String, DictGroup>, code: &str) -> usize {
+            let (mut depth, mut cur, mut guard) = (0, code, 0);
+            while let Some(g) = groups.get(cur) {
+                match g.parent.as_deref() {
+                    Some(p) if groups.contains_key(p) => {
+                        depth += 1;
+                        cur = p;
+                        guard += 1;
+                        if guard > 64 {
+                            break;
+                        }
+                    }
+                    _ => break,
+                }
+            }
+            depth
+        }
+
+        let file: DictionaryFile =
+            serde_json::from_str(ORACLE_JSON).expect("bundled ags_dictionary.json must parse");
+        let mut codes: Vec<&String> = file.groups.keys().collect();
+        codes.sort_by(|a, b| {
+            depth(&file.groups, a)
+                .cmp(&depth(&file.groups, b))
+                .then_with(|| a.cmp(b))
+        });
+        codes
+            .into_iter()
+            .map(|code| {
+                let g = &file.groups[code];
+                GroupDescriptor {
+                    code: code.clone(),
+                    contents: g.description.clone().unwrap_or_default(),
+                    parent: g.parent.clone(),
+                    headings: g
+                        .headings
+                        .iter()
+                        .map(|h| Heading {
+                            name: h.name.clone(),
+                            status: h.status.clone(),
+                            ags_type: h.ags_type.clone(),
+                            unit: h.unit.clone(),
+                            description: h.description.clone(),
+                        })
+                        .collect(),
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_tables_rebuild_the_document_exactly() {
+        let from_tables = union_groups();
+        let from_json = oracle();
+
+        // Compared per group before the whole-vector assert: a mismatch deep in
+        // 174 groups renders as an unreadable wall of Debug otherwise, and the
+        // first differing group is what a reader needs.
+        assert_eq!(
+            from_tables.len(),
+            from_json.len(),
+            "group COUNT differs: tables {} vs json {}",
+            from_tables.len(),
+            from_json.len()
+        );
+        for (t, j) in from_tables.iter().zip(from_json.iter()) {
+            assert_eq!(t.code, j.code, "group ORDER differs");
+            assert_eq!(t.parent, j.parent, "{}: parent differs", t.code);
+            assert_eq!(t.contents, j.contents, "{}: contents differ", t.code);
+            let names = |g: &GroupDescriptor| -> Vec<String> {
+                g.headings.iter().map(|h| h.name.clone()).collect()
+            };
+            assert_eq!(
+                names(t),
+                names(j),
+                "{}: heading names or their ORDER differ",
+                t.code
+            );
+            for (th, jh) in t.headings.iter().zip(j.headings.iter()) {
+                assert_eq!(th, jh, "{}.{}: definition differs", t.code, th.name);
+            }
+        }
+        assert_eq!(from_tables, from_json);
+    }
+
+    #[test]
+    fn the_shipped_crate_no_longer_embeds_the_dictionary_json() {
+        // The regression this change exists to prevent: someone re-adds an
+        // `include_str!` of the dictionary to get at a field the tables do not
+        // carry, and 1.4 MB silently returns to every binary. It compresses ~18:1,
+        // so no size gate downstream would notice.
+        //
+        // Asserted against the SOURCE rather than a built artifact because this
+        // crate's tests cannot see the wasm/wheel/CLI links, and because the
+        // source is where the mistake is made.
+        const SRC: &str = include_str!("union.rs");
+        let this_module = SRC
+            .find("mod union_parity_tests")
+            .expect("this module is in the source it reads");
+        assert_eq!(
+            SRC.match_indices("include_str!(\"../data/ags_dictionary.json\")")
+                .count(),
+            SRC[this_module..]
+                .match_indices("include_str!(\"../data/ags_dictionary.json\")")
+                .count(),
+            "the dictionary JSON is embedded outside this test module — it is \
+             ~1.4 MB, it duplicates the phf tables, and it compresses ~18:1 so \
+             nothing downstream will flag it. Read the union from `dict::union_view`."
+        );
     }
 }
