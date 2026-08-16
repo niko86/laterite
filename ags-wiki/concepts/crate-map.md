@@ -310,7 +310,7 @@ as stable):
   (`repo:web/scripts/check-wasm-tokenizer-size.mjs`, 150 KiB ceiling) proves that stays true. Built via
   `wasm-pack --target web` into the gitignored `web/src/wasm-tokenizer/`, same as the engine wasm.
   This is the crate that lets the browser's inline line editor/preview (`web/src/lib/tokenizer.ts`,
-  warmed once at boot behind the app's existing readiness gate alongside `validatorReady()`) drive off
+  warmed once at boot, and since #353 the app's readiness gate in full — the engine left it) drive off
   the shared tokenizer/quoter **without** loading the engine on the main thread — the option ("B-tiny": a
   dedicated tiny wasm, not gating the TS copy behind a value-gate case, not calling the engine wasm from
   the main thread) chosen over the alternatives #533 considered. Retires the hand-written

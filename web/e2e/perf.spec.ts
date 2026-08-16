@@ -71,7 +71,9 @@ test.describe(
         const cdp: CDPSession = await ctx.newCDPSession(page);
         await cdp.send("Emulation.setCPUThrottlingRate", { rate });
 
-        // (1) Cold load → validator ready.
+        // (1) Cold load → first paint. Since #353 that is the ~30 KB tokenizer
+        // alone: the engine may still be arriving here, and the wait for it is
+        // instead inside (3)'s validate.
         const t0 = Date.now();
         await page.goto(APP);
         await expect(
@@ -193,7 +195,7 @@ test.describe(
         .map(([rate, m]) => ({
           CPU: `${rate}x`,
           "cpu probe": `${m.cpuProbeMs}ms`,
-          "cold→ready": s(m.coldMs),
+          "cold→paint": s(m.coldMs),
           "idle DuckDB pull (T1)": `${m.idleDuckdbMB} MB`,
           validate: s(m.validateMs),
           "Explore 1st": s(m.exploreMs),

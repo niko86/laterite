@@ -15,8 +15,9 @@ export const APP = process.env.VITE_BASE ?? "/";
 export const fixture = (name: string) =>
   path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", name);
 
-/** Navigate + wait until the wasm validator is live (the sample buttons only
- *  render once the worker reports ready — see App's wasmReady gate). */
+/** Navigate + wait until the app has painted. The sample buttons render on the
+ *  ~30 KB tokenizer alone (#353) — the engine may still be arriving — but every
+ *  caller here goes on to validate something, which waits for it anyway. */
 export async function ready(page: Page) {
   await page.goto(APP);
   await expect(
