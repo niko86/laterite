@@ -18,7 +18,9 @@ wheels/
 # satellite; never committed — the public CLAUDE.md is the shared one).
 CLAUDE.local.md
 
-# Generated example output
+# Generated example output, and the gitignored working space CLAUDE.md points
+# builds at — `web`'s `build:wasm-tier1` drops the tier-1 engine in
+# output/wasm-tier1, which nothing imports and nothing should track.
 output/
 
 # AGS4 corpus-QA harness working dir (harvested share files + reports).

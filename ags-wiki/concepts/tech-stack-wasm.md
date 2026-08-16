@@ -12,6 +12,8 @@ repo_refs:
   deploy: "repo:.github/workflows/deploy-validator.yml"
   release: "repo:.github/workflows/release.yml"
   slim_gate: "repo:tools/release/check-wasm-slim.mjs"
+  tier1_gate: "repo:tools/release/check-wasm-tier1.mjs"
+  artifact_gate: "repo:tools/release/wasm-artifact-gate.mjs"
   web: "repo:web/"
   gitignore: "repo:.gitignore"
   types_leaf: "repo:rust-packages/laterite-ags4-types/src/lib.rs"
@@ -121,7 +123,7 @@ build, plus seven more behind the features described below
 > itself could never trigger the old fallback, but a direct wasm caller could.
 > See [[data-single-source-audit]] and [[surface-census]]'s `encodings` table.
 
-## Two shapes of the same crate (#330)
+## Three shapes of the same crate (#330, #352)
 
 Since #330 the crate is **feature-gated**, and the artifact the browser fetches
 depends on who built it. Six features — `excel`, `arrow`, `certify`, `diff`,
@@ -132,12 +134,23 @@ the whole engine to the app.
 
 `repo:.github/workflows/release.yml` builds `--no-default-features` instead, so
 **npm's `@laterite/ags4-wasm` is the slim artifact**: validate, read, build, fix,
-rules, dictionary, versions. Measured 2026-08-16, same toolchain, wasm-bindgen
-pinned 0.2.125, `wasm-opt = ['-O', '-all']`:
+rules, dictionary, versions.
+
+A **third** shape exists since #352: **tier 1**, the engine minus `arrow` and
+`excel`, built by `npm run build:wasm-tier1` in `repo:web/package.json` — the one
+place that feature list is written down, so CI runs that script rather than
+spelling the flags out a second time. It is what [[dec-engine-tiering]] has the
+browser precache, and nothing imports it yet: it is built and weighed ahead of
+its consumer, so its size is held from the moment it exists rather than from
+whenever something comes to depend on it.
+
+Measured 2026-08-16, same toolchain, wasm-bindgen pinned 0.2.125,
+`wasm-opt = ['-O', '-all']`:
 
 | build | raw | gzip -9 | brotli -q 11 | 
 |---|---:|---:|---:|
 | full (`default`) | 5,314,319 | 1,798,129 | 1,301,063 |
+| tier 1 (`--features certify,diff,merge,censor`) | 2,144,163 | 848,292 | 645,503 |
 | slim (`--no-default-features`) | 1,913,737 | 767,370 | 587,212 |
 
 **Name the instrument or the number is unreproducible.** The gzip column is the
@@ -152,13 +165,18 @@ Two things about that split are easy to get wrong:
 - **It is not a subset relation.** `read()` survives, but its Arrow door
   (`arrow_ipc`) does not — the slim build reads a group through `rows_json()`
   instead, same `parse_value` cast, JSON framing. A consumer holding `arrow_ipc`
-  is not carried across.
-- **No single byte-count axis judges it.** `repo:tools/release/check-wasm-slim.mjs`
-  holds an exact check of the exported surface plus **two** ceilings, gzip and
-  raw, and the three catch different failures. A flipped feature shows up in the
-  export list and essentially nowhere else — `certify`, `diff`, `censor` and
-  `merge` cost +14 to +36 KiB gzipped each, which no ceiling with honest headroom
-  would fire on. Gzip catches what a client pays. Raw catches what compresses
+  is not carried across. Tier 1 sits on the same side of that line: it drops
+  `arrow` too, so it is the four cheap gates added to slim, not a smaller full.
+- **No single byte-count axis judges it.** Each shape has its own gate —
+  `repo:tools/release/check-wasm-slim.mjs` for npm's, and
+  `repo:tools/release/check-wasm-tier1.mjs` for the browser's — over one shared
+  instrument, `repo:tools/release/wasm-artifact-gate.mjs`. Each holds an exact
+  check of the exported surface, down to class MEMBERS (`arrow`'s door into the
+  build is `ParsedDataset::arrow_ipc`, which a top-level-only check cannot see),
+  plus **two** ceilings, gzip and raw, and the three catch different failures.
+  A flipped feature shows up in the export list and essentially nowhere else —
+  `certify`, `diff`, `censor` and `merge` cost +14 to +36 KiB gzipped each, which
+  no ceiling with honest headroom would fire on. Gzip catches what a client pays. Raw catches what compresses
   away: #342's duplicate dictionary was +1375 KiB raw against +98 KiB gzipped,
   and would have cleared a gzip-only ceiling by five kilobytes. (Same axis
   disagreement as #330's rejected `wasm-opt -Oz`: −360 KB raw, +1.2 KB brotli —
