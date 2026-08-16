@@ -40,7 +40,7 @@ sources: []
 > [!note] Not the only browser wasm module
 > Since #533 (part of the #527 convergence arc) the browser also loads a
 > SEPARATE, deliberately tiny sibling cdylib, `laterite-ags4-tokenizer-wasm`
-> (~30 KB vs this crate's 6.4 MiB, full build) — two `#[wasm_bindgen]` wrappers over
+> (~30 KB vs this crate's 5.1 MiB, full build) — two `#[wasm_bindgen]` wrappers over
 > `laterite-ags4-parse::scan::scan_line` and `laterite-ags4-types::quote_field` for
 > the inline line editor/preview, instantiated on the main thread rather than
 > in this crate's Web Worker. It shares no dependency edge with this crate.
@@ -59,9 +59,9 @@ sources: []
 > bundle rather than a second tiny cdylib (censor has no per-keystroke
 > latency constraint, unlike the tokenizer/quoter pair above); the bundle
 > grew ~6.6→6.64 MB at the time. Re-measured 2026-08-16 (post-#336's
-> dictionary repack): the FULL engine wasm is **6.4 MiB raw / 1.81 MiB
-> gzipped**, so the 8 MiB PWA precache cap has ~1.6 MiB of headroom on the raw
-> figure — and `censor` is one of the six features #330 gates, so the slim
+> dictionary repack and post-#342's de-duplication of it): the FULL engine wasm
+> is **5.1 MiB raw / 1.71 MiB gzipped**, so the 8 MiB PWA precache cap has
+> ~2.9 MiB of headroom on the raw figure — and `censor` is one of the six features #330 gates, so the slim
 > artifact npm gets carries none of this. See [[dec-ags4-censor-leaf]] and
 > "Two shapes of the same crate" in [[tech-stack-wasm]].
 

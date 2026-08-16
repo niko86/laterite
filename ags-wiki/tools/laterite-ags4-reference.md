@@ -117,6 +117,11 @@ reason.
 > | node addon | 9,368,144 | 7,915,040 | −15.5% |
 > | wheel `.so` | 20,661,360 | 19,191,760 | −7.1% |
 >
+> The wasm row is a like-for-like pair measured WITHOUT #330's feature gates, so
+> that the delta is the dictionary alone; [[tech-stack-wasm]]'s table is the
+> shipping figure and reads ~2 KB higher because the gated build adds
+> `rows_json()`.
+>
 > **It is a size win, not a startup win** — `union_groups()` went 2.13 ms →
 > 1.56 ms, because both paths allocate the same ~3,500 owned headings and the
 > parse was never the dominant cost. And it hid for a long time because JSON

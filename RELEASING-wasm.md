@@ -218,9 +218,9 @@ short of publishing.
 - **Size**: the `.wasm` is **1.8 MiB** (749 KiB gzipped), re-measured 2026-08-16.
   It was ~7.1 MB until #330 gated `excel`/`arrow`/`certify`/`diff`/`merge`/
   `censor` out of the published build; a source build with `default = full` is
-  still 6.4 MiB. Consumers should lazy-load it rather than putting it in a
-  critical bundle. `check-wasm-slim.mjs` holds the figure — if it ever jumps
-  back, the publish built the wrong shape.
+  still 5.1 MiB. Consumers should lazy-load it rather than putting it in a
+  critical bundle. `check-wasm-slim.mjs` holds both figures — a gzip ceiling and
+  a raw one — so if either jumps back, the publish built the wrong shape.
 - The package name is **rewritten** from wasm-pack's crate-derived
   `laterite-ags4-wasm`; `--scope` would give `@laterite/laterite-ags4-wasm`, which
   is not the published name.

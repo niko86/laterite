@@ -21,9 +21,9 @@ sources: []
 # tech stack: the browser wasm path
 
 > [!note] Two browser wasm modules, not one
-> This page describes the **engine** wasm (`laterite-ags4-wasm`, 6.4 MiB raw /
-> 1.81 MiB gzipped for the full build — re-measured 2026-08-16, post-#336 and
-> post-#330) —
+> This page describes the **engine** wasm (`laterite-ags4-wasm`, 5.1 MiB raw /
+> 1.71 MiB gzipped for the full build — re-measured 2026-08-16, post-#336,
+> post-#330 and post-#342) —
 > `validate`/`parse`/`diff`/`merge`/`to_ags4`, run in a Web Worker. Since
 > #533 (part of the #527 convergence arc) the browser also loads a SEPARATE,
 > deliberately tiny sibling — `laterite-ags4-tokenizer-wasm` (~30 KB / ~13 KB
@@ -136,8 +136,8 @@ pinned 0.2.125, `wasm-opt = ['-O', '-all']`:
 
 | build | raw | gzip -9 | brotli -q 11 | 
 |---|---:|---:|---:|
-| full (`default`) | 6,722,493 | 1,898,871 | 1,355,295 |
-| slim (`--no-default-features`) | 1,913,729 | 767,434 | 588,044 |
+| full (`default`) | 5,314,319 | 1,798,129 | 1,301,063 |
+| slim (`--no-default-features`) | 1,913,737 | 767,370 | 587,212 |
 
 **Name the instrument or the number is unreproducible.** The gzip column is the
 `gzip -9` binary; `repo:tools/release/check-wasm-slim.mjs` uses node's `zlib` at
@@ -152,13 +152,22 @@ Two things about that split are easy to get wrong:
   (`arrow_ipc`) does not — the slim build reads a group through `rows_json()`
   instead, same `parse_value` cast, JSON framing. A consumer holding `arrow_ipc`
   is not carried across.
-- **Raw bytes are the wrong axis for judging it.** Turning `diff` back on adds
-  1.47 MB raw but only 82 KB brotli — dictionary-shaped static data the
-  compressor eats. `repo:tools/release/check-wasm-slim.mjs` therefore gates on
-  gzip, and pairs that with an exact check of the exported surface, because a
-  flipped feature shows up in the export list long before it shows up in a
-  byte count. (Same lesson as #330's rejected `wasm-opt -Oz`: −360 KB raw,
-  +1.2 KB brotli.)
+- **No single byte-count axis judges it.** `repo:tools/release/check-wasm-slim.mjs`
+  holds an exact check of the exported surface plus **two** ceilings, gzip and
+  raw, and the three catch different failures. A flipped feature shows up in the
+  export list and essentially nowhere else — `certify`, `diff`, `censor` and
+  `merge` cost +14 to +36 KiB gzipped each, which no ceiling with honest headroom
+  would fire on. Gzip catches what a client pays. Raw catches what compresses
+  away: #342's duplicate dictionary was +1375 KiB raw against +98 KiB gzipped,
+  and would have cleared a gzip-only ceiling by five kilobytes. (Same axis
+  disagreement as #330's rejected `wasm-opt -Oz`: −360 KB raw, +1.2 KB brotli —
+  which is why neither axis is allowed to be the only instrument.)
+
+  This corrects an earlier reading of the same gate. Before #342, turning `diff`
+  on appeared to cost 1.47 MB raw against 82 KB brotli, and that lopsidedness was
+  taken as proof that raw was simply the wrong axis. It was not `diff`: it was the
+  duplicate dictionary `diff` dragged in. With the duplicate gone `diff` costs
+  55 KB raw against 17 KB brotli — an ordinary code ratio.
 
 `opt-level = "z"` and `"s"` were both measured on #330 and both **rejected** —
 13–95% slower in the browser for 164–400 KB. Do not re-propose them.

@@ -24,14 +24,23 @@
 //   either direction fails by name rather than by byte count. The SIZE check
 //   catches (2), where the surface is unchanged and only the weight moved.
 //
-// WHY GZIP AND NOT RAW BYTES
-//   Raw size is the wrong axis here, and measurably so. Turning on `diff` adds
-//   1.47 MB raw but only 82 KB brotli — it is dictionary-shaped static data
-//   that the compressor eats. A raw-byte ceiling would therefore fire on
-//   changes nobody downloads and stay quiet on ones they do. Gzip is what a
-//   client actually pays (a CDN's brotli lands ~10% under it, so this is a
-//   conservative read of delivery, not an inflated one), it is deterministic at
-//   a fixed level, and node's zlib gives it to us with no dependency.
+// WHY BOTH GZIP AND RAW BYTES
+//   They answer different questions and neither subsumes the other.
+//
+//   GZIP is what a client actually pays (a CDN's brotli lands ~10% under it, so
+//   this is a conservative read of delivery, not an inflated one), it is
+//   deterministic at a fixed level, and node's zlib gives it to us with no
+//   dependency. It is the axis that matters for "is this page fast".
+//
+//   RAW is the axis on which REDUNDANT data is unmistakable, and #342 is the
+//   worked example: the dictionary was embedded twice, and the duplicate was
+//   +1375 KiB raw against +98 KiB gzip — a 14:1 ratio, because JSON that
+//   repetitive compresses ~18:1. Every compressed-size check we had reported it
+//   as fine. Re-embedding it today would land the slim build at ~855 KiB
+//   gzipped, which clears the ceiling below by five, so the gzip axis would
+//   catch it on luck rather than on margin. Raw catches it by 1.4 MB. Raw is
+//   also the honest cost on the wasm path specifically — decode-and-compile
+//   work on every cold load, and what a service worker's precache budget counts.
 //
 // USAGE
 //   node tools/release/check-wasm-slim.mjs <pkg-dir>
@@ -71,23 +80,35 @@ const EXPECTED_FUNCTIONS = [
 // builds add `ExcelResult` (excel) and `MergeResult` (merge).
 const EXPECTED_CLASSES = ["ParsedDataset"];
 
-// 850 KiB gzipped. Measured 2026-08-16 (post-#336), by THIS script's own
-// `gzipSync(level: 9)` so the numbers below are the ones it compares — node's
-// zlib runs ~8 KB above the `gzip -9` binary on this artifact, which is exactly
-// the sort of gap that makes a hand-copied figure wrong:
+// Measured 2026-08-16 (post-#342), by THIS script's own `gzipSync(level: 9)` so
+// the numbers below are the ones it compares — node's zlib runs ~8 KB above the
+// `gzip -9` binary on this artifact, which is exactly the sort of gap that makes
+// a hand-copied figure wrong. Each row is that feature alone on top of slim:
 //
-//     slim      757.4 KiB      arrow    1273.0 KiB   (+515.6)
-//     certify   771.2 (+13.8)  excel    1286.1 (+528.7)
-//     diff      872.9 (+115.5)
-//     censor    886.9 (+129.5)
-//     merge     892.0 (+134.6)
+//                 gzip KiB            raw KiB
+//     slim         757.3              1868.9
+//     certify      771.2  (+13.9)     1908.5  (+  39.7)
+//     diff         775.1  (+17.9)     1922.8  (+  53.9)
+//     censor       788.5  (+31.2)     1944.7  (+  75.8)
+//     merge        793.5  (+36.2)     1962.8  (+  93.9)
+//     arrow       1174.3 (+417.0)     3643.7  (+1774.9)
+//     excel       1286.1 (+528.8)     3218.9  (+1350.0)
+//     full        1771.1              5189.8
 //
-// So the ceiling leaves ~92 KiB (12%) of headroom for honest growth while
-// sitting below every heavy gate — `diff` is the tightest at 872.9 and still
-// crosses. `certify` (+13.8) does NOT, deliberately: no honest headroom is
-// tight enough to catch a 1.8% change. The SURFACE check catches that one
-// exactly, which is the division of labour these two checks are for.
-const MAX_GZIP_BYTES = 850 * 1024;
+// Read the four cheap gates honestly: at +14 to +36 KiB gzipped, NO ceiling with
+// honest headroom catches them, and these two ceilings do not pretend to. The
+// SURFACE check catches a flipped gate exactly, by name, in either direction —
+// that is its whole job, and it does not degrade as the gated code gets lighter.
+// (Before #342 `diff`, `censor` and `merge` each crossed 850 KiB, but only
+// because they dragged in the duplicate dictionary. That was the size check
+// covering for the surface check by accident, and it is not a property to
+// preserve.)
+//
+// What the ceilings are for is the failure the surface check CANNOT see: a heavy
+// dependency landing on an UNGATED path, where the export list is unchanged and
+// only the weight moved. Both leave ~12% headroom over slim for honest growth.
+const MAX_GZIP_BYTES = 850 * 1024; // slim 757.3
+const MAX_RAW_BYTES = 2100 * 1024; // slim 1868.9
 
 function fail(msg) {
   console.error(`[wasm-slim] FAIL: ${msg}`);
@@ -154,6 +175,13 @@ try {
 
 const raw = statSync(wasm).size;
 const gzip = gzipSync(bytes, { level: 9 }).length;
+// A ceiling breach names the axis it was caught on, because the two mean
+// different things: gzip says the download got heavier, raw says the artifact
+// did — and raw firing alone is the signature of redundant data.
+const OVER_CEILING =
+  `  The surface check passed, so no feature gate flipped — a heavy dependency has\n` +
+  `  landed on an UNGATED path, where no feature can turn it off. Find it with\n` +
+  `  \`twiggy top\` on the artifact before raising this number.`;
 // Reported, never gated: brotli at max quality is what the artifact COULD
 // compress to, not what a CDN serves, so it belongs in the log rather than in
 // a threshold.
@@ -165,13 +193,23 @@ const kib = (n) => `${(n / 1024).toFixed(1)} KiB`;
 if (gzip > MAX_GZIP_BYTES) {
   fail(
     `${basename(wasm)} is ${kib(gzip)} gzipped, over the ${kib(MAX_GZIP_BYTES)} ceiling.\n` +
-      `  The surface check passed, so no feature gate flipped — a heavy dependency has\n` +
-      `  landed on an UNGATED path, where no feature can turn it off. Find it with\n` +
-      `  \`twiggy top\` on the artifact before raising this number.`,
+      OVER_CEILING,
+  );
+}
+
+if (raw > MAX_RAW_BYTES) {
+  fail(
+    `${basename(wasm)} is ${kib(raw)} raw, over the ${kib(MAX_RAW_BYTES)} ceiling ` +
+      `(gzipped it is ${kib(gzip)}, under its own ceiling).\n` +
+      `  Raw over budget while gzip is fine means REDUNDANT data — something large and\n` +
+      `  repetitive that the compressor eats, so delivery looks healthy and cold-start\n` +
+      `  decode does not. #342 is the worked example: the dictionary embedded twice.\n` +
+      OVER_CEILING,
   );
 }
 
 console.log(
   `[wasm-slim] OK: ${EXPECTED_FUNCTIONS.length} exports + ${EXPECTED_CLASSES.length} class; ` +
-    `${kib(raw)} raw, ${kib(gzip)} gzip (ceiling ${kib(MAX_GZIP_BYTES)}), ${kib(brotli)} brotli.`,
+    `${kib(raw)} raw (ceiling ${kib(MAX_RAW_BYTES)}), ` +
+    `${kib(gzip)} gzip (ceiling ${kib(MAX_GZIP_BYTES)}), ${kib(brotli)} brotli.`,
 );
