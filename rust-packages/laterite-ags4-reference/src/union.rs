@@ -35,7 +35,13 @@ use serde::{Deserialize, Serialize};
 // typed-graph codegen, the web sync scripts, the Python generators) reads it
 // cross-crate/cross-package from there, at build time.
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+// `PartialEq`/`Eq` are test-only on purpose. The parity oracle below compares
+// whole reconstructed groups against the JSON document, which wants equality —
+// but this crate is published, so crates.io would freeze the impls as surface
+// this change never set out to add. If a consumer ever needs to compare
+// headings, that is a deliberate API decision, not a side effect of a test.
+#[cfg_attr(test, derive(PartialEq, Eq))]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Heading {
     pub name: String,
     pub status: String, // "KEY" / "REQUIRED" / "OTHER"
@@ -58,7 +64,8 @@ impl Heading {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+#[cfg_attr(test, derive(PartialEq, Eq))] // test-only; see `Heading` above
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GroupDescriptor {
     pub code: String,
     pub contents: String,
