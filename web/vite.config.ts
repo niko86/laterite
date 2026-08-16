@@ -104,6 +104,70 @@ function offloadDuckdbWasm(): Plugin {
   };
 }
 
+// Exported so `src/lib/sw-cache-policy.test.ts` can assert the caching policy
+// over every rule. Inline in the VitePWA options it was unreachable from a
+// test, and the rule that made a server fault permanent per-device (#339) was
+// the kind only a test over the whole array catches.
+// Derived from VitePWA's own options rather than imported from `workbox-build`.
+// That package supplies the type, but it reaches us only as a transitive dep of
+// vite-plugin-pwa — importing it directly would be a phantom dependency that
+// `tsc` resolves today purely because npm happens to hoist it.
+type RuntimeCachingRule = NonNullable<
+  NonNullable<
+    NonNullable<Parameters<typeof VitePWA>[0]>["workbox"]
+  >["runtimeCaching"]
+>[number];
+
+export const RUNTIME_CACHING: RuntimeCachingRule[] = [
+  {
+    // DuckDB engine wasm — 36 MB (EH) + 41 MB (MVP). Fingerprinted +
+    // immutable, so CacheFirst is safe and avoids any revalidation.
+    urlPattern: ({ url }) =>
+      /\/duckdb-(eh|mvp)-[^/]*\.wasm$/.test(url.pathname),
+    handler: "CacheFirst",
+    options: {
+      cacheName: "ags-duckdb-wasm",
+      // 200 only. Status 0 is an OPAQUE response — what a cross-origin fetch
+      // degrades to when it is refused — and CacheFirst never revalidates, so
+      // accepting it writes a failure that is then served until expiry. That is
+      // not hypothetical: on 2026-08-16 this bucket had no CORS configuration,
+      // the fetch was blocked, and the failure was cached; the server fix was
+      // minutes, but each affected device needed `caches.delete()` in a console
+      // to recover. Nothing here is opaque — the CDN answers with
+      // `access-control-allow-origin` and no `no-cors` fetch exists in the app —
+      // so 0 kept nothing alive except the bug.
+      cacheableResponse: { statuses: [200] },
+      expiration: {
+        // selectBundle() picks ONE variant per browser (EH or MVP), so
+        // a device caches one ~38 MB wasm per build. Cap at 2 ⇒ at most
+        // the current build + one stale generation as an update-window
+        // fallback, never an unbounded pile of old fingerprinted wasm.
+        maxEntries: 2,
+        maxAgeSeconds: 60 * 60 * 24 * 60,
+        purgeOnQuotaError: true, // evict under storage pressure, don't error
+      },
+    },
+  },
+  {
+    // OSTN15 NTv2 grid — ~15 MB, fetched only when "Precise (OSTN15)"
+    // coordinates are ticked. Immutable.
+    urlPattern: ({ url }) => /\/grids\/.*\.gsb$/.test(url.pathname),
+    handler: "CacheFirst",
+    options: {
+      cacheName: "ags-ostn15-grid",
+      // 200 only — see the DuckDB rule above. This one is same-origin out of
+      // the app's own dist/, so it could never have been opaque in the first
+      // place; the 0 was copied, not reasoned about.
+      cacheableResponse: { statuses: [200] },
+      expiration: {
+        maxEntries: 2,
+        maxAgeSeconds: 60 * 60 * 24 * 180,
+        purgeOnQuotaError: true,
+      },
+    },
+  },
+];
+
 // `base` is the single deploy-location knob, and it lives here and nowhere
 // else because a wrong base 404s every asset on the site.
 //
@@ -232,43 +296,7 @@ export default defineConfig({
         // — so the guard cannot fire, and keeping it would only make a future
         // reader work out that it can't.
         navigateFallbackDenylist: [/\/[^/?]+\.[^/?]+$/],
-        runtimeCaching: [
-          {
-            // DuckDB engine wasm — 36 MB (EH) + 41 MB (MVP). Fingerprinted +
-            // immutable, so CacheFirst is safe and avoids any revalidation.
-            urlPattern: ({ url }) =>
-              /\/duckdb-(eh|mvp)-[^/]*\.wasm$/.test(url.pathname),
-            handler: "CacheFirst",
-            options: {
-              cacheName: "ags-duckdb-wasm",
-              cacheableResponse: { statuses: [0, 200] },
-              expiration: {
-                // selectBundle() picks ONE variant per browser (EH or MVP), so
-                // a device caches one ~38 MB wasm per build. Cap at 2 ⇒ at most
-                // the current build + one stale generation as an update-window
-                // fallback, never an unbounded pile of old fingerprinted wasm.
-                maxEntries: 2,
-                maxAgeSeconds: 60 * 60 * 24 * 60,
-                purgeOnQuotaError: true, // evict under storage pressure, don't error
-              },
-            },
-          },
-          {
-            // OSTN15 NTv2 grid — ~15 MB, fetched only when "Precise (OSTN15)"
-            // coordinates are ticked. Immutable.
-            urlPattern: ({ url }) => /\/grids\/.*\.gsb$/.test(url.pathname),
-            handler: "CacheFirst",
-            options: {
-              cacheName: "ags-ostn15-grid",
-              cacheableResponse: { statuses: [0, 200] },
-              expiration: {
-                maxEntries: 2,
-                maxAgeSeconds: 60 * 60 * 24 * 180,
-                purgeOnQuotaError: true,
-              },
-            },
-          },
-        ],
+        runtimeCaching: RUNTIME_CACHING,
       },
     }),
     // After VitePWA, so it copies the FINAL index.html (manifest link injected).

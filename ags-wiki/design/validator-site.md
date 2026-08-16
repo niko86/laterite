@@ -317,6 +317,34 @@ design is the **cache split**, dictated by the asset weights:
   the existing idle-warm (`lib/prefetch.ts` only fetches DuckDB on a fast,
   non-metered link); the SW adds **no** new proactive heavy download.
 
+> [!warning] `CacheFirst` must never accept an opaque response
+> Both rules took `cacheableResponse: { statuses: [0, 200] }` until #339. Status
+> `0` is an **opaque** response — what a cross-origin fetch degrades to when it is
+> refused — and because `CacheFirst` never revalidates, accepting it writes the
+> *failure* into the cache and keeps it. It is not a stale-body problem: the app
+> fetches in `cors` mode, and a cached opaque response cannot be handed to a cors
+> request, so every later fetch fails with `TypeError: Failed to fetch`
+> **permanently**, no matter what the server does. Verified by A/B on the built
+> `sw.js` — with `[0, 200]` the opaque entry is written and the app's normal fetch
+> then throws; with `[200]` the entry is refused and a healthy 200 still caches.
+>
+> This is what made 2026-08-16 expensive: the `laterite-cdn` bucket shipped with
+> no CORS configuration (#340 is the recurrence guard), the fetch was blocked,
+> and the server-side fix took minutes — but each affected device needed
+> `caches.delete('ags-duckdb-wasm')` typed into a console to recover.
+>
+> The rule now takes `[200]` only, guarded in two places because one instrument
+> cannot see both directions. `repo:web/src/lib/sw-cache-policy.test.ts` asserts
+> the **policy** over every runtime rule rather than the two that were wrong (and
+> treats a missing `cacheableResponse` as the same bug spelled differently).
+> `repo:web/e2e/app.spec.ts` asserts the **behaviour** — that the engine still
+> reaches its cache — because dropping `0` is only safe while nothing here is
+> opaque (the CDN answers with `access-control-allow-origin`, the grid is
+> same-origin, the app makes no `no-cors` fetch), and if that stopped being true
+> the failure would be silent in the other direction: the entry never written and
+> `CacheFirst` re-downloading 36 MB on every load, reported nowhere. See
+> [[playwright-e2e]].
+
 Update flow is `registerType:'prompt'` — never reload a user out from under a
 live validate/query. `PwaUpdater.tsx` (registers via `virtual:pwa-register/solid`)
 shows a dismissible "new version → Reload" toast and an honestly-scoped

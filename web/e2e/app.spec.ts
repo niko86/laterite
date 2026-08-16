@@ -465,6 +465,53 @@ test("PWA: the app loads and validates fully offline after first visit", async (
   }
 });
 
+test("PWA: the DuckDB engine actually lands in its runtime cache", async ({
+  page,
+}) => {
+  // #339 tightened both CacheFirst rules from `statuses: [0, 200]` to `[200]`,
+  // so a refused cross-origin fetch can no longer be cached as an opaque
+  // response and then served — or rather, thrown at — forever. The unit guard
+  // (src/lib/sw-cache-policy.test.ts) asserts that policy over the rule set.
+  //
+  // This asserts the half a config test CANNOT see, and it is the half that
+  // fails SILENTLY: if a response ever stopped being cacheable under the
+  // tightened rule, nothing would error — the entry would simply never be
+  // written and CacheFirst would re-download ~36 MB on every single page load,
+  // reported nowhere. Only a real browser against a real service worker can
+  // tell "cached" from "silently refetched every time".
+  //
+  // Rides an Explore load the suite already pays for; the engine is same-origin
+  // out of dist/ here, because VITE_DUCKDB_CDN is a deploy-only setting.
+  await ready(page);
+  // Wait for control BEFORE the engine is fetched. A runtime-caching rule only
+  // sees fetches the worker intercepts, and on a cold first visit the SW may
+  // still be installing when Explore fires — in which case DuckDB loads
+  // straight off the network and the cache stays empty for a reason that has
+  // nothing to do with the rule under test.
+  await waitForServiceWorker(page);
+  await page.getByRole("button", { name: /Rule 9.*unknown heading/ }).click();
+  await enterExplore(page);
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async () => {
+          const names = await caches.keys();
+          if (!names.includes("ags-duckdb-wasm")) return 0;
+          const keys = await (await caches.open("ags-duckdb-wasm")).keys();
+          return keys.filter((k) => /duckdb-(eh|mvp)-.*\.wasm$/.test(k.url))
+            .length;
+        }),
+      {
+        timeout: 30_000,
+        message:
+          "the DuckDB wasm never reached the ags-duckdb-wasm runtime cache — " +
+          "CacheFirst is refetching it on every load",
+      },
+    )
+    .toBeGreaterThan(0);
+});
+
 // Helper: load coords.ags into Explore and open the SQL view.
 async function exploreSql(page: Page) {
   await ready(page);
