@@ -317,6 +317,13 @@ design is the **cache split**, dictated by the asset weights:
   the existing idle-warm (`lib/prefetch.ts` only fetches DuckDB on a fast,
   non-metered link); the SW adds **no** new proactive heavy download.
 
+> [!note] This two-way split becomes a four-tier one
+> [[dec-engine-tiering]] (#338) refines the above: the engine itself splits, so
+> the precached artifact is 839 KiB rather than 6.7 MB, first render gates on the
+> ~30 KB tokenizer alone, and the full engine joins DuckDB as a warm-fetched
+> tier. The precache-vs-runtime reasoning on this page is unchanged — there are
+> simply four tiers on that axis now, not two.
+
 > [!warning] `CacheFirst` must never accept an opaque response
 > Both rules took `cacheableResponse: { statuses: [0, 200] }` until #339. Status
 > `0` is an **opaque** response — what a cross-origin fetch degrades to when it is
@@ -344,7 +351,6 @@ design is the **cache split**, dictated by the asset weights:
 > the failure would be silent in the other direction: the entry never written and
 > `CacheFirst` re-downloading 36 MB on every load, reported nowhere. See
 > [[playwright-e2e]].
-
 Update flow is `registerType:'prompt'` — never reload a user out from under a
 live validate/query. `PwaUpdater.tsx` (registers via `virtual:pwa-register/solid`)
 shows a dismissible "new version → Reload" toast and an honestly-scoped
