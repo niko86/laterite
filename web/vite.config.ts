@@ -131,13 +131,23 @@ export default defineConfig({
     stripDuckdbWorkerSourcemaps(),
     offloadDuckdbWasm(),
     // PWA: installable + offline. The caching split is the whole point here.
-    // PRECACHE (downloaded at install, ~5.85 MiB, then served offline) = the
-    // full app shell: EVERY JS/CSS chunk — including the Explore/Charts/
-    // Coordinates UI and the DuckDB *worker* glue — plus the reference JSONs,
-    // the sample files, and the ~6.6 MB *validator* wasm. So Validate/Fix/the
-    // dictionary work fully offline after one visit, and the Explore/Charts/
-    // Coordinates UIs render offline too; only their heavy *engines* are
-    // deferred. NEVER precached: the DuckDB engine wasm (36 MB EH + 41 MB MVP)
+    // PRECACHE (downloaded at install, then served offline) = the full app
+    // shell: EVERY JS/CSS chunk — including the Explore/Charts/Coordinates UI
+    // and the DuckDB *worker* glue — plus the reference JSONs, the sample
+    // files, and the ~6.9 MiB *validator* wasm. So Validate/Fix/the dictionary
+    // work fully offline after one visit, and the Explore/Charts/Coordinates
+    // UIs render offline too; only their heavy *engines* are deferred.
+    //
+    // That install costs **~11.9 MiB across 45 entries** — the figure vite-plugin-pwa
+    // prints as `precache N entries (… KiB)` on every build, which is where to
+    // re-read it rather than trusting this comment. It said ~5.85 MiB until
+    // 2026-08-16 and had been wrong by more than 2x since the Excel converter
+    // landed: the validator wasm alone grew 3.3 MB -> 4.8 MB -> 6.6 MB across
+    // three features (see maximumFileSizeToCacheInBytes below, which tracks the
+    // same growth and WAS kept current, because a stale number there fails the
+    // build and a stale number here fails nobody).
+    //
+    // NEVER precached: the DuckDB engine wasm (36 MB EH + 41 MB MVP)
     // and the 15 MB OSTN15 grid — 92 MB we refuse to pull on every install.
     // Those are `globIgnore`d here and instead runtime-cached CacheFirst the
     // FIRST time they're actually fetched (the idle-warm in lib/prefetch.ts
