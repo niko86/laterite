@@ -221,6 +221,16 @@ uncapped *in the worker* and gzips the JSON there (streaming
 `CompressionStream`), transferring back compressed bytes so the big string
 never reaches the main thread. See [[validator-site]] Phase 1.5.
 
+Since #354 there are **two** such workers. The one above is always on and serves
+Validate, Fix, Export and every tool but Excel; a second
+(`repo:web/src/lib/tier2.worker.ts`) is created only when Explore or Tools →
+Excel is opened, serves exactly those two, and owns the `ParsedDataset` handle —
+which is the app's only stateful wasm handle, and now sits in the worker of its
+sole consumer. Both still instantiate the **same** artifact: splitting the
+engines between them is [[dec-engine-tiering]]'s next step (#355), and holding it
+back to one change means a size regression there has one suspect rather than
+three.
+
 > [!note] DuckDB-wasm asset loading (resolved)
 > DuckDB-wasm + ECharts + proj4 **lazy-load on their views only** (confirmed:
 > separate chunks; the entry chunk stays ~150 kB). The EH DuckDB wasm is

@@ -4,11 +4,16 @@ import {
   createResource,
   createSignal,
   For,
+  onMount,
   Show,
   type Component,
 } from "solid-js";
 import { fileStore } from "../../lib/fileStore";
-import { parseDataset, arrowIpc } from "../../lib/validatorClient";
+import {
+  parseDataset,
+  arrowIpc,
+  startTier2Worker,
+} from "../../lib/validatorClient";
 import type { GroupMeta } from "../../lib/duckTypes";
 import { DataTable } from "./DataTable";
 import { SqlConsole } from "./SqlConsole";
@@ -38,6 +43,13 @@ interface GroupInfo {
 // dashboard (the landing view) or, for a selected group, its schema + a
 // paged data grid. Everything is client-side; nothing is uploaded.
 export const ExplorePane: Component = () => {
+  // Explore's engine lives in the second worker (#354), and opening this tab is
+  // what creates it — not the parse below. Start it here so the wasm is
+  // instantiating while the user is still deciding, rather than when they load a
+  // file. Unconditional, including the no-file fallback: the tab being open is
+  // the signal, and this pane is only mounted while it is.
+  onMount(startTier2Worker);
+
   const [selected, setSelected] = createSignal<string | null>(null);
   // Free-text filter for the (now capped + scrollable) group sidebar, so a
   // 69-group file is a quick type-to-find instead of a 2000px scroll.

@@ -1,7 +1,12 @@
 // The validator runs here, off the main thread, so a pathologically
 // dirty file (millions of findings) can churn for tens of seconds without
-// ever freezing the UI. The worker owns the single wasm instance; the
+// ever freezing the UI. The worker owns its own wasm instance; the
 // main thread talks to it only through `validatorClient.ts`.
+//
+// The always-on one of the app's two workers (#354): Validate, Fix, Export and
+// every tool but Excel. Explore and Excel are served by `tier2.worker.ts`, which
+// is created only if one of those tabs is opened — so a parse can no longer
+// arrive behind a validate, in either direction.
 //
 // Protocol: every request carries a monotonic `id`; every response echoes
 // it so the client can correlate (and discard superseded runs). The wasm
@@ -22,26 +27,16 @@ import wasmUrl from "../wasm/ags4_wasm_bg.wasm?url";
 import { createEngineDispatch } from "./engineDispatch";
 import type { WorkerReq, WorkerRes } from "./engineDispatch";
 
-// Re-exported so `validatorClient.ts` keeps importing the protocol from the
-// worker it talks to, rather than reaching past it into the shared dispatch.
+// Re-exported so `validatorClient.ts` keeps importing the protocol from a worker
+// it talks to, rather than reaching past it into the shared dispatch. These four
+// are what it imports; the other thirteen per-op request types were forwarded
+// here too until #354, read by nobody — they are live members of `WorkerReq` in
+// `engineDispatch.ts` either way, and types erase, so the bundle never knew.
 export type {
   WorkerReq,
   WorkerRes,
   ReportMeta,
   CensorTally,
-  ValidateReq,
-  CertifyReq,
-  ComputeFixesReq,
-  ApplyFixesReq,
-  ParseReq,
-  ArrowReq,
-  RevisionDiffReq,
-  MergeReq,
-  CensorReq,
-  DictionaryReq,
-  ToAgs4Req,
-  ExcelExportReq,
-  ExcelImportReq,
 } from "./engineDispatch";
 
 // Under the DOM lib (tsconfig), the dedicated-worker global's

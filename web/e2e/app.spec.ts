@@ -233,6 +233,57 @@ test("Tools → Excel round-trips AGS4 → .xlsx → AGS4, client-side", async (
   expect(agsText).toContain("LOCA");
 });
 
+// The engine runs in TWO workers (#354, ags-wiki/design/dec-engine-tiering.md):
+// the always-on one behind Validate/Fix/Export and most of Tools, and a second
+// created only when Explore or Tools → Excel is opened — the one that carries
+// the much larger tier-2 engine from #355 on.
+//
+// Nothing about that split shows in the UI, so these two tests are the whole
+// guard. A `startTier2Worker()` call that drifted to module scope, or a validate
+// re-routed to the second worker, would put every visitor back on the big engine
+// with every feature still working and every size gate still green.
+const tier2Workers = (page: Page) =>
+  page.workers().filter((w) => /tier2\.worker/.test(w.url()));
+
+test("Tools → Excel brings the second engine worker up; validating never does", async ({
+  page,
+}) => {
+  await ready(page);
+  // A full validate, end to end, in the always-on worker.
+  await page.getByRole("button", { name: /Clean \(minimal\)/ }).click();
+  await expect(page.getByText(/Clean — 0 findings/)).toBeVisible();
+  expect(tier2Workers(page)).toHaveLength(0);
+
+  // Tools itself doesn't count — Dictionary is served by the same worker.
+  await tab(page, "Tools").click();
+  await page.getByRole("button", { name: /^Dictionary$/ }).click();
+  await expect(page.getByPlaceholder(/Search/).first()).toBeVisible();
+  expect(tier2Workers(page)).toHaveLength(0);
+
+  // Opening Excel does, before any conversion is asked for.
+  await page.getByRole("button", { name: /^Excel$/ }).click();
+  await expect.poll(() => tier2Workers(page).length).toBe(1);
+});
+
+test("Explore brings the second engine worker up, and only one of it", async ({
+  page,
+}) => {
+  await ready(page);
+  expect(tier2Workers(page)).toHaveLength(0);
+
+  // No file loaded, so the pane renders its "load one first" prompt: it is
+  // opening the TAB that creates the worker, not an ingest — and no DuckDB.
+  await tab(page, "Explore").click();
+  await expect(page.getByText(/Data explorer/)).toBeVisible();
+  await expect.poll(() => tier2Workers(page).length).toBe(1);
+
+  // The other consumer reuses it rather than starting a second.
+  await tab(page, "Tools").click();
+  await page.getByRole("button", { name: /^Excel$/ }).click();
+  await expect(page.getByText(/AGS4 → Excel/)).toBeVisible();
+  expect(tier2Workers(page)).toHaveLength(1);
+});
+
 test("Tools → Transport round-trips a file through .zst.age, client-side", async ({
   page,
 }) => {
