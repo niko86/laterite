@@ -49,7 +49,15 @@ The suite is split by intent across two spec files (shared helpers in
   finding; an FYI-only file shows the amber informational banner (not red) while
   a mixed error+FYI file stays red; a fixable file offers a safe fix that clears
   on apply while the persistent download stays; Explore ingests a file into
-  DuckDB-wasm; and a Tools → Dictionary per-edition check.
+  DuckDB-wasm; and a Tools → Dictionary per-edition check. The **PWA** block
+  additionally asserts installability, a full offline reload+validate tied to
+  SW *precache provenance* rather than Chromium's HTTP cache, and — since
+  #339 — that the DuckDB engine genuinely **lands in its runtime cache**. That
+  last one is here rather than in a unit test because it is the direction that
+  fails silently: a `CacheFirst` rule that stopped accepting the response would
+  raise nothing, and simply re-download ~36 MB on every page load. It waits for
+  the service worker to take control *before* Explore, since a rule only sees
+  fetches the worker intercepts.
 - **`validate-ui.spec.ts` — UI *behaviours* of the Validate page** (the
   interactions, not just rule output): search filtering + the **clear-box-
   restores-all** regression; severity chips show/hide their findings; the
