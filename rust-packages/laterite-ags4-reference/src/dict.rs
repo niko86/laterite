@@ -401,7 +401,14 @@ impl<'a> Dictionary<'a> {
     /// The `TRAN_AGS` value this dictionary edition expects (Rule 14). v1: the
     /// base's — custom `TRAN_AGS` is a v2 cut (#568 §6).
     #[must_use]
-    pub fn tran_ags(self) -> &'a str {
+    /// `&self`, NOT `self`, even though `Dictionary` is `Copy` and clippy's
+    /// `trivially_copy_pass_by_ref` would rather it took by value: this is a
+    /// PUBLISHED signature, and crates.io freezes what ships. The by-value form
+    /// reached a commit here via a careless `sed` over `fn tran_ags(&self`,
+    /// which matched the private `BundledDict` method AND this one. The public
+    /// API snapshot caught it. Its private neighbours may take `self`; this may
+    /// not, until a major bump says so.
+    pub fn tran_ags(&self) -> &'a str {
         self.base().tran_ags()
     }
 
