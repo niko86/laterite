@@ -555,6 +555,29 @@ jobs:
         working-directory: rust-packages
         run: cargo test -p laterite-ags4-wasm
 
+      # The six feature gates (#330) each have to hold on their own, not just in
+      # the two combinations anyone builds. A gate is only real if the crate
+      # compiles without it — and the way that rots is quiet: an ungated `use`,
+      # or a helper that drifts onto a gated type, breaks `--no-default-features`
+      # while `default = full` stays green everywhere else in CI.
+      #
+      # `--no-default-features` runs the tests too: the slim shape is what npm
+      # ships, so its 89 tests are a shipped artifact's tests, not a compile
+      # check. The per-feature loop is `clippy` only — `-D warnings` is the
+      # point there, since an unused import under one gate is exactly the
+      # symptom, and it costs a check rather than a link per feature.
+      - name: cargo test + clippy (laterite-ags4-wasm, feature gates)
+        working-directory: rust-packages
+        run: |
+          set -euo pipefail
+          cargo test -p laterite-ags4-wasm --no-default-features
+          for f in excel arrow certify diff merge censor; do
+            echo "::group::laterite-ags4-wasm --features $f"
+            cargo clippy -p laterite-ags4-wasm --no-default-features --features "$f" \
+              --target wasm32-unknown-unknown -- -D warnings
+            echo "::endgroup::"
+          done
+
       # What each publish-set crate would put in its `.crate` tarball, compared
       # against a checked-in manifest. A step in THIS job rather than a workflow
       # of its own: it needs the Rust toolchain already set up here, and a new
@@ -857,6 +880,24 @@ jobs:
       - name: gen_doc_outputs --check (docs example output == real stdout, wasm)
         working-directory: ${{ github.workspace }}
         run: python3 tools/gen_doc_outputs.py --check --surface wasm
+
+      # The SLIM wasm (#330) — the artifact npm actually gets, which the step
+      # above does NOT build: `build:wasm:all` builds the full engine, because
+      # that is what the web app runs. Built and checked here rather than only
+      # in release.yml for the reason prepare-wasm-package.sh's header records
+      # about the npm notice guard: a publish-path check whose first execution
+      # is a live release takes three tag moves to get right. This is the same
+      # check, reachable on every PR.
+      #
+      # Cheap where it sits: wasm-pack and the wasm32 toolchain are already
+      # installed for the step above, and sccache has the dependency crates warm
+      # from the full build, so only the slim leaf recompiles.
+      - name: wasm — build the slim artifact and hold it to its ceiling
+        working-directory: ${{ github.workspace }}
+        run: |
+          wasm-pack build rust-packages/laterite-ags4-wasm --target web --release \
+            --out-dir "$RUNNER_TEMP/wasm-slim" -- --no-default-features
+          node tools/release/check-wasm-slim.mjs "$RUNNER_TEMP/wasm-slim"
 
       - name: sccache stats
         if: always()

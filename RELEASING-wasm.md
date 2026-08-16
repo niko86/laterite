@@ -70,12 +70,21 @@ So the name is created by **one authenticated publish from a workstation**, afte
 which CI takes over. That is what happened for `0.8.1`:
 
 ```bash
-wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir /tmp/wasm-pkg
+# `-- --no-default-features` builds the SLIM artifact — since #330 that is what
+# @laterite/ags4-wasm is. The cargo flags MUST follow `--`; wasm-pack exits ZERO
+# when they land in the wrong place, having produced nothing, so the size check
+# below is what tells you the build was real.
+wasm-pack build rust-packages/laterite-ags4-wasm --target web --release \
+  --out-dir /tmp/wasm-pkg -- --no-default-features
+node tools/release/check-wasm-slim.mjs /tmp/wasm-pkg  # slim surface + size ceiling
 tools/release/prepare-wasm-package.sh /tmp/wasm-pkg
 tools/release/verify-npm-notice.sh /tmp/wasm-pkg     # prove the notice rides
 npm login
 npm publish /tmp/wasm-pkg --access public --otp=<6-digit>
 ```
+
+(The `0.8.1` run predates #330 and had no `--no-default-features`; it published
+the full engine.)
 
 **Three separate auth failures sit on that path, in this order.** Each reports a
 different code and none of them names its real cause:
@@ -131,8 +140,10 @@ trace. Re-run the command above rather than trusting the sentence.
 
 ## What a `wasm-v*` tag triggers
 
-- **`build-wasm`** — `wasm-pack build --target web --release`, then
-  `tools/release/prepare-wasm-package.sh`, uploaded as the `wasm-pkg` artifact.
+- **`build-wasm`** — `wasm-pack build --target web --release
+  -- --no-default-features` (the SLIM artifact, #330), then
+  `tools/release/check-wasm-slim.mjs` and `tools/release/prepare-wasm-package.sh`,
+  uploaded as the `wasm-pkg` artifact.
   Built **once**; `wasm-verify` and `wasm-publish` both consume those same bytes,
   so what was checked is what ships.
 - **`wasm-verify`** — packaging checks with **no environment and no secrets**, so
@@ -188,7 +199,9 @@ the 0.8.0 npm release, whose notice guard was inline bash reachable only by
 pushing a real tag and took three attempts and three tag moves to get right:
 
 ```bash
-wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir /tmp/wasm-pkg
+wasm-pack build rust-packages/laterite-ags4-wasm --target web --release \
+  --out-dir /tmp/wasm-pkg -- --no-default-features
+node tools/release/check-wasm-slim.mjs /tmp/wasm-pkg
 tools/release/prepare-wasm-package.sh /tmp/wasm-pkg
 tools/release/verify-npm-notice.sh /tmp/wasm-pkg
 (cd /tmp/wasm-pkg && npm pack --dry-run)
@@ -202,8 +215,12 @@ short of publishing.
 - **`--target web`** — ESM with an explicit `init()`, the shape the crate README
   documents and the web app already consumes. It works both under a bundler and
   from a plain module script, unlike `--target bundler`.
-- **Size**: ~2.0 MB packed, ~7.2 MB unpacked (the `.wasm` is ~7.1 MB). Consumers
-  should lazy-load it rather than putting it in a critical bundle.
+- **Size**: the `.wasm` is **1.8 MiB** (749 KiB gzipped), re-measured 2026-08-16.
+  It was ~7.1 MB until #330 gated `excel`/`arrow`/`certify`/`diff`/`merge`/
+  `censor` out of the published build; a source build with `default = full` is
+  still 5.1 MiB. Consumers should lazy-load it rather than putting it in a
+  critical bundle. `check-wasm-slim.mjs` holds both figures — a gzip ceiling and
+  a raw one — so if either jumps back, the publish built the wrong shape.
 - The package name is **rewritten** from wasm-pack's crate-derived
   `laterite-ags4-wasm`; `--scope` would give `@laterite/laterite-ags4-wasm`, which
   is not the published name.

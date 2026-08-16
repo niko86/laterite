@@ -938,8 +938,29 @@ jobs:
       # documents and the web app already consumes. Not `bundler` — that output
       # only works under a webpack-style loader, while `web` works there AND
       # from a plain module script.
-      - name: wasm-pack build
-        run: wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir "$GITHUB_WORKSPACE/wasm-pkg"
+      #
+      # `--no-default-features` builds the SLIM artifact (#330): validate, read,
+      # build, fix, rules, dictionary — without Excel, Arrow IPC, the
+      # certificate stack, diff, merge or censor. 1.8 MiB raw / 749 KiB gzipped
+      # against the full engine's 5.1 MiB / 1.71 MiB. The web app keeps building
+      # the full engine from source (`default = full`); this is the shape npm
+      # gets, and `check-wasm-slim.mjs` below is what proves it IS that shape.
+      #
+      # The cargo flags MUST follow `--`. wasm-pack forwards everything after it
+      # to cargo and rejects unknown flags of its own — but the failure exits
+      # ZERO, so a misplaced flag reads as a successful build that quietly
+      # produced nothing. (Same family as the wasm-opt trap in #330: on the
+      # publish path, "it succeeded" is not evidence.)
+      - name: wasm-pack build (slim)
+        run: wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir "$GITHUB_WORKSPACE/wasm-pkg" -- --no-default-features
+
+      # The slim build's two promises, checked before anything is packaged: it
+      # exports the slim surface and nothing more, and it is still small. Runs
+      # here rather than in `wasm-verify` on purpose — a failure means the BUILD
+      # was wrong, so it should stop at the build rather than after an artifact
+      # upload that would then be the thing under test.
+      - name: Check the artifact is the slim one
+        run: node tools/release/check-wasm-slim.mjs "$GITHUB_WORKSPACE/wasm-pkg"
 
       # Rewrites the wasm-pack manifest to the published name, sets
       # publishConfig.access (scoped packages default to PRIVATE → E402), and

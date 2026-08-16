@@ -5,10 +5,13 @@ status: drafted
 tags: [concept, architecture, wasm]
 ags_editions: []
 volatile: [sizes]
-volatile_asof: 2026-08-03
+volatile_asof: 2026-08-16
 repo_refs:
   wasm: "repo:rust-packages/laterite-ags4-wasm/src/lib.rs"
+  manifest: "repo:rust-packages/laterite-ags4-wasm/Cargo.toml"
   deploy: "repo:.github/workflows/deploy-validator.yml"
+  release: "repo:.github/workflows/release.yml"
+  slim_gate: "repo:tools/release/check-wasm-slim.mjs"
   web: "repo:web/"
   gitignore: "repo:.gitignore"
   types_leaf: "repo:rust-packages/laterite-ags4-types/src/lib.rs"
@@ -18,8 +21,9 @@ sources: []
 # tech stack: the browser wasm path
 
 > [!note] Two browser wasm modules, not one
-> This page describes the **engine** wasm (`laterite-ags4-wasm`, ~6.9 MB raw /
-> ~1.9 MB gzipped — re-measured 2026-08-03) —
+> This page describes the **engine** wasm (`laterite-ags4-wasm`, 5.1 MiB raw /
+> 1.71 MiB gzipped for the full build — re-measured 2026-08-16, post-#336,
+> post-#330 and post-#342) —
 > `validate`/`parse`/`diff`/`merge`/`to_ags4`, run in a Web Worker. Since
 > #533 (part of the #527 convergence arc) the browser also loads a SEPARATE,
 > deliberately tiny sibling — `laterite-ags4-tokenizer-wasm` (~30 KB / ~13 KB
@@ -59,7 +63,8 @@ wasm-pack downloads rejects unless every feature is enabled.
 > `compute_fixes`/`apply_fixes` — live in the crate — were once missing from
 > an old checked-in `.d.ts` until it was regenerated).
 
-The crate exposes **seven** `#[wasm_bindgen]` entry points
+The crate exposes these `#[wasm_bindgen]` entry points — **ten** in every
+build, plus seven more behind the features described below
 (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`):
 
 - `validate(bytes, dict_version, include_fyi, encoding, max_per_rule)` → a
@@ -114,6 +119,58 @@ The crate exposes **seven** `#[wasm_bindgen]` entry points
 > encoding `<select>` only offers UTF-8/Windows-1252 (a closed union), so the UI
 > itself could never trigger the old fallback, but a direct wasm caller could.
 > See [[data-single-source-audit]] and [[surface-census]]'s `encodings` table.
+
+## Two shapes of the same crate (#330)
+
+Since #330 the crate is **feature-gated**, and the artifact the browser fetches
+depends on who built it. Six features — `excel`, `arrow`, `certify`, `diff`,
+`merge`, `censor` — sit behind `default = full`
+(`repo:rust-packages/laterite-ags4-wasm/Cargo.toml`), so a plain `wasm-pack
+build` is unchanged and `repo:.github/workflows/deploy-validator.yml` still ships
+the whole engine to the app.
+
+`repo:.github/workflows/release.yml` builds `--no-default-features` instead, so
+**npm's `@laterite/ags4-wasm` is the slim artifact**: validate, read, build, fix,
+rules, dictionary, versions. Measured 2026-08-16, same toolchain, wasm-bindgen
+pinned 0.2.125, `wasm-opt = ['-O', '-all']`:
+
+| build | raw | gzip -9 | brotli -q 11 | 
+|---|---:|---:|---:|
+| full (`default`) | 5,314,319 | 1,798,129 | 1,301,063 |
+| slim (`--no-default-features`) | 1,913,737 | 767,370 | 587,212 |
+
+**Name the instrument or the number is unreproducible.** The gzip column is the
+`gzip -9` binary; `repo:tools/release/check-wasm-slim.mjs` uses node's `zlib` at
+the same level and reads ~8 KB HIGHER on the same bytes, which is why its ceiling
+is stated in its own units rather than these. Brotli at `-q 11` is the artifact's
+floor, not what a CDN serves — Cloudflare's is ~10% under gzip, so treat the
+gzip column as the honest delivery figure and this one as a lower bound.
+
+Two things about that split are easy to get wrong:
+
+- **It is not a subset relation.** `read()` survives, but its Arrow door
+  (`arrow_ipc`) does not — the slim build reads a group through `rows_json()`
+  instead, same `parse_value` cast, JSON framing. A consumer holding `arrow_ipc`
+  is not carried across.
+- **No single byte-count axis judges it.** `repo:tools/release/check-wasm-slim.mjs`
+  holds an exact check of the exported surface plus **two** ceilings, gzip and
+  raw, and the three catch different failures. A flipped feature shows up in the
+  export list and essentially nowhere else — `certify`, `diff`, `censor` and
+  `merge` cost +14 to +36 KiB gzipped each, which no ceiling with honest headroom
+  would fire on. Gzip catches what a client pays. Raw catches what compresses
+  away: #342's duplicate dictionary was +1375 KiB raw against +98 KiB gzipped,
+  and would have cleared a gzip-only ceiling by five kilobytes. (Same axis
+  disagreement as #330's rejected `wasm-opt -Oz`: −360 KB raw, +1.2 KB brotli —
+  which is why neither axis is allowed to be the only instrument.)
+
+  This corrects an earlier reading of the same gate. Before #342, turning `diff`
+  on appeared to cost 1.47 MB raw against 82 KB brotli, and that lopsidedness was
+  taken as proof that raw was simply the wrong axis. It was not `diff`: it was the
+  duplicate dictionary `diff` dragged in. With the duplicate gone `diff` costs
+  55 KB raw against 17 KB brotli — an ordinary code ratio.
+
+`opt-level = "z"` and `"s"` were both measured on #330 and both **rejected** —
+13–95% slower in the browser for 164–400 KB. Do not re-propose them.
 
 Phase 3 (Explore + Fix + Tools) is **delivered** (PR series #27–#38) — the
 explorer (Arrow IPC → DuckDB-wasm + ECharts + an Analyse view), the Fix tab,

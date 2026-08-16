@@ -334,7 +334,7 @@ _Notes:_
 | rust (chained) | ✓ | ✓ | ✓ |   |
 
 _Findings:_
-- 🟠 P2 · **browser** out.bytes `wasm-read-emit` — the wasm read handle (ParsedDataset) exposes only group_codes/meta/arrow_ipc (typed table-out) — no .text/.bytes AGS4 re-emit, so there is no round-trip AGS4 out of a browser read (Python/Node Ags4File have .text/.bytes/.save). Compute the fix instead via the separate build/apply verbs.
+- 🟠 P2 · **browser** out.bytes `wasm-read-emit` — the wasm read handle (ParsedDataset) exposes only group_codes/meta/rows_json — and arrow_ipc where the `arrow` feature is built (#330; the published package is the slim build, which has rows_json only). All are typed table-out: no .text/.bytes AGS4 re-emit on the handle itself, so there is no round-trip AGS4 out of a browser read the way Python/Node Ags4File have .text/.bytes/.save. Assemblable rather than absent since #330 — meta() + rows_json() together ARE build_ags4's input shape, so read -> edit -> write composes through the separate build verb (held by `rows_json_feeds_build_ags4_straight_back` in the crate's tests); the gap is that the handle does not do it for you.
 
 _Notes:_
 - _rust_: Partial. `Written` exposes bytes only. The earlier note here claimed a String door needed a lossy/strict decision first — that was wrong: the concern applies to READING arbitrary files, not to our own emitter's output, which is UTF-8 by construction. Python already treats it that way, with `Ags4File.text` primary and `.bytes` its UTF-8 encoding.
