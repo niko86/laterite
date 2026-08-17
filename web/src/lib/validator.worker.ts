@@ -32,17 +32,14 @@ import wasmUrl from "../wasm/ags4_wasm_bg.wasm?url";
 import { createEngineDispatch } from "./engineDispatch";
 import type { WorkerReq, WorkerRes } from "./engineDispatch";
 
-// Re-exported so `validatorClient.ts` keeps importing the protocol from a worker
-// it talks to, rather than reaching past it into the shared dispatch. These four
-// are what it imports; the other thirteen per-op request types were forwarded
-// here too until #354, read by nobody — they are live members of `WorkerReq` in
-// `engineDispatch.ts` either way, and types erase, so the bundle never knew.
-export type {
-  WorkerReq,
-  WorkerRes,
-  ReportMeta,
-  CensorTally,
-} from "./engineDispatch";
+// Re-exported so `validatorClient.ts` keeps importing the two result shapes it
+// names from a worker it talks to, rather than reaching past it into the shared
+// dispatch. `WorkerReq`/`WorkerRes` were forwarded here for the same reason and
+// are not any more: since #357 the wire types are read by `workerChannel.ts`,
+// which takes them from `engineDispatch` directly. That is not inconsistency —
+// the channel must not import this module even for a type, because a unit test
+// importing the channel would then load a file that spawns wasm.
+export type { ReportMeta, CensorTally } from "./engineDispatch";
 
 // Under the DOM lib (tsconfig), the dedicated-worker global's
 // transfer-list `postMessage(message, transfer)` overload isn't visible;
