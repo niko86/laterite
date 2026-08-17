@@ -28,14 +28,11 @@ default `object` dtype path is used; `string_dtype="string"` raises an
 actionable error rather than downgrading.
 
 ```python
-from laterite import compat as AGS4
+--8<-- "python/ex22_string_dtype.py:code"
+```
 
-# object dtype (numpy) — today's python-ags4 baseline, the default
-tables, _ = AGS4.AGS4_to_dataframe("delivery.ags")
-
-# string dtype (pandas' Arrow-backed str) — needs [compat,pyarrow]
-tables, _ = AGS4.AGS4_to_dataframe("delivery.ags", string_dtype="string")
-AGS4.set_string_dtype("string")            # process-wide (or LATERITE_COMPAT_STRING_DTYPE)
+```text
+--8<-- "python/ex22_string_dtype.out"
 ```
 
 !!! note "Which extra do I want?"

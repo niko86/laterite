@@ -38,10 +38,11 @@ One variation — to list every group code, not just `LOCA`'s children, import t
 whole graph:
 
 ```python
-from laterite.registry import GROUPS, child_groups
+--8<-- "python/ex20_registry_graph.py:code"
+```
 
-print(len(GROUPS))                       # 174 groups in the union dictionary
-print([g.code for g in child_groups("PROJ")])   # top of the tree
+```text
+--8<-- "python/ex20_registry_graph.out"
 ```
 
 Gotcha: `child_groups` is **one level** of the tree, not the full subtree —
