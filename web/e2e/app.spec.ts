@@ -1369,6 +1369,79 @@ test("a dead engine worker is not reused: Explore reports, and the always-on wor
   }
 });
 
+// #359: the same reachability, for the always-on worker's own tab. ValidatePane
+// carried a "Validator error: …" fallback that could never render: it sat
+// behind a `<Show when={report()}>` that throws once the resource has errored,
+// and the pane's effect + memos read the resource outside every fallback — so a
+// rejected validate froze the tab on whatever it was showing, for ever. A crash
+// AFTER boot is what reaches that state: at boot a dead engine is App's banner
+// (#353); past boot, the op rejection belongs to the pane.
+test("a validate the engine cannot serve is reported on the pane, not frozen over", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  let blocked = 0;
+  let arm = false;
+  // Armed only after boot: the first worker must come up healthy so the
+  // page-level dead-engine banner stays out of this test. Once armed, the
+  // REPLACEMENT worker's script never arrives either — so the validate below
+  // rejects instead of landing on a fresh healthy engine.
+  await page.route(/validator\.worker-[^/]*\.js$/, async (route) => {
+    if (!arm) {
+      await route.continue();
+      return;
+    }
+    blocked++;
+    await route.abort();
+  });
+  try {
+    await page.goto(APP);
+    await page.getByRole("button", { name: /Clean \(minimal\)/ }).click();
+    await expect(page.getByText(/Clean — 0 findings/)).toBeVisible();
+
+    // Kill the live worker the one way a test can reach it: an uncaught throw
+    // inside the worker fires the parent Worker's `error` event, and the
+    // channel retires (terminates) the corpse (#363). Waiting for the close is
+    // what makes the next step deterministic — by then the channel holds no
+    // worker, so the validate below must spawn the doomed replacement.
+    arm = true;
+    const worker = page
+      .workers()
+      .find((w) => w.url().includes("validator.worker"));
+    if (!worker) throw new Error("validator worker not found");
+    const gone = new Promise<void>((resolve) => {
+      worker.on("close", () => {
+        resolve();
+      });
+    });
+    await worker.evaluate(() => {
+      setTimeout(() => {
+        throw new Error("e2e: engine down");
+      }, 0);
+    });
+    await gone;
+
+    // The sample list collapses once a file is loaded — re-open it.
+    await page.getByText(/Or try a sample/).click();
+    await page.getByRole("button", { name: /Rule 9.*unknown heading/ }).click();
+
+    // The pane REPORTS — the fallback this ticket makes reachable — and the
+    // errored resource's stale report comes down rather than posing as the
+    // new file's result.
+    await expect(page.getByText(/Validator error:/)).toBeVisible();
+    await expect(page.getByText(/Clean — 0 findings/)).toHaveCount(0);
+    await expect(page.getByText(/Validating…/)).toHaveCount(0);
+    expect(blocked).toBeGreaterThan(0); // the respawn + its block are real
+    // …and it is the pane's failure, not the page's: tier 1 booted fine.
+    await expect(
+      page.getByText(/Failed to load the validator engine/),
+    ).toHaveCount(0);
+  } finally {
+    await ctx.close();
+  }
+});
+
 // #379: the transport worker's death must not wedge the tool. Its old client
 // rejected the requests in flight but kept the dead worker, so the NEXT
 // encrypt posted into the corpse and its promise never settled — spinner for
