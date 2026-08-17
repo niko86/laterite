@@ -147,7 +147,7 @@ jobs:
       # target builds the PyO3 wheel). Non-strict on purpose: a docs link nit must
       # never block the deploy — the PR-time `docs` job (ci.yml) is the strict gate.
       - name: Set up uv (docs build)
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       - name: Build docs
         run: |
           uv sync --group docs
@@ -190,7 +190,7 @@ jobs:
       # one would actively BREAK the deploy (Cloudflare refuses a custom domain
       # on a hostname that already has a CNAME).
       - name: Deploy the app Worker (app.laterite.dev)
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -198,7 +198,7 @@ jobs:
           command: deploy
 
       - name: Deploy the docs Worker (docs.laterite.dev)
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -209,7 +209,7 @@ jobs:
       # so it rides this workflow rather than getting its own, and redeploying
       # it costs a few KB.
       - name: Deploy the apex Worker (laterite.dev)
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
