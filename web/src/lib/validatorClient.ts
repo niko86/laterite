@@ -10,6 +10,10 @@
 // is opened, and serves those two alone — which is what keeps `ParsedDataset`,
 // and in #355 the whole tier-2 engine, off the path of everyone who opens
 // neither. Both speak the same protocol, so one channel drives either.
+//
+// The channel itself — spawn, correlate, retire — is `workerChannel.ts` since
+// #357. What is left here is the half that is about AGS4 rather than about
+// workers: which reply kind resolves which request's promise.
 
 import type {
   ValidationReport,
@@ -22,13 +26,9 @@ import type {
   StandardDict,
   TypeClashMode,
 } from "./validator";
-import type {
-  WorkerReq,
-  WorkerRes,
-  ReportMeta,
-  CensorTally,
-} from "./validator.worker";
+import type { ReportMeta, CensorTally } from "./validator.worker";
 import type { GroupMeta } from "./duckTypes";
+import { createChannel, type WorkerReply } from "./workerChannel";
 
 type Pending =
   | {
@@ -152,186 +152,79 @@ export interface CensorResult {
   tally: CensorTally;
 }
 
-// Omit over a discriminated union must DISTRIBUTE, else only the keys
-// common to every member survive (dropping `dict`/`fixes`/`code`/… from the
-// per-kind requests). The built-in Omit doesn't distribute, so spell it out.
-type DistributiveOmit<T, K extends keyof never> = T extends unknown
-  ? Omit<T, K>
-  : never;
-type ReqInit = DistributiveOmit<WorkerReq, "id">;
-
-// One id space across both workers. Correlation never needs that — a reply only
-// ever meets its own worker's pending table — but two workers each answering
-// "id 3" in a console log is a debugging trap bought for nothing.
-let nextId = 1;
-
-/** One worker, plus the pending table that correlates its replies.
- *
- *  `spawn` runs on the first request (or `start()`) and never again, which is
- *  what lets this module hold a channel for a worker that is never created —
- *  the whole point of the second one (#354). */
-function createChannel(spawn: () => Worker) {
-  const pending = new Map<number, Pending>();
-  let live: { worker: Worker; ready: Promise<void> } | null = null;
-
-  const start = () => {
-    if (live) return live;
-    const worker = spawn();
-
-    // Resolves when the worker has instantiated the wasm; rejects if init
-    // failed. NOTHING gates its first render on this any more (#353) — App only
-    // uses it to sequence the idle warm, and an op that arrives first queues in
-    // the worker behind the same promise. Kept because "engine is up" still has
-    // one consumer, and because a caller that ignores it is not silently racing.
-    const ready = new Promise<void>((resolve, reject) => {
-      const onInit = (e: MessageEvent<WorkerRes>) => {
-        const msg = e.data;
-        if ("type" in msg && msg.type === "ready") {
-          worker.removeEventListener("message", onInit);
-          resolve();
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker messages are a runtime boundary; keep the explicit check though the type narrows to it
-        } else if ("type" in msg && msg.type === "initError") {
-          worker.removeEventListener("message", onInit);
-          reject(new Error(msg.error));
-        }
-      };
-      worker.addEventListener("message", onInit);
+/** Hand a successful reply to the request waiting on it. Both workers speak
+ *  this one protocol, so both channels settle through here — the kind pair is
+ *  the whole of it, and a mismatch is a protocol bug, not a user-visible one. */
+function settle(msg: WorkerReply, p: Pending): void {
+  if (msg.kind === "report" && p.kind === "report") {
+    p.resolve(msg.report);
+  } else if (msg.kind === "cert" && p.kind === "cert") {
+    p.resolve(msg.json);
+  } else if (msg.kind === "gzip" && p.kind === "gzip") {
+    p.resolve({ bytes: msg.bytes, meta: msg.report });
+  } else if (msg.kind === "fixes" && p.kind === "fixes") {
+    p.resolve(msg.fixes);
+  } else if (msg.kind === "applied" && p.kind === "applied") {
+    p.resolve(new Uint8Array(msg.bytes));
+  } else if (msg.kind === "parsed" && p.kind === "parsed") {
+    p.resolve(msg.groups);
+  } else if (msg.kind === "arrow" && p.kind === "arrow") {
+    p.resolve(new Uint8Array(msg.bytes));
+  } else if (msg.kind === "revisionDelta" && p.kind === "revisionDelta") {
+    p.resolve(msg.delta);
+  } else if (msg.kind === "mergeResult" && p.kind === "mergeResult") {
+    p.resolve({
+      bytes: msg.bytes,
+      warnings: JSON.parse(msg.warningsJson) as MergeWarning[],
+      revisions: JSON.parse(msg.revisionsJson) as MergeRevision[],
     });
-    // Only the always-on worker's readiness has a reader (App's). An unread
-    // rejection is an unhandled-rejection log, and a dead second engine is
-    // already reported where it matters — every Explore/Excel op rejects with
-    // that same init error, and both panes display it. Marking it handled here
-    // doesn't take it from `ready()`, which still returns the real promise.
-    void ready.catch(() => undefined);
-
-    worker.addEventListener("message", (e: MessageEvent<WorkerRes>) => {
-      const msg = e.data;
-      if ("type" in msg) return; // ready / initError handled above
-      const p = pending.get(msg.id);
-      if (!p) return; // superseded + already dropped
-      pending.delete(msg.id);
-      if (!msg.ok) {
-        p.reject(new Error(msg.error));
-      } else if (msg.kind === "report" && p.kind === "report") {
-        p.resolve(msg.report);
-      } else if (msg.kind === "cert" && p.kind === "cert") {
-        p.resolve(msg.json);
-      } else if (msg.kind === "gzip" && p.kind === "gzip") {
-        p.resolve({ bytes: msg.bytes, meta: msg.report });
-      } else if (msg.kind === "fixes" && p.kind === "fixes") {
-        p.resolve(msg.fixes);
-      } else if (msg.kind === "applied" && p.kind === "applied") {
-        p.resolve(new Uint8Array(msg.bytes));
-      } else if (msg.kind === "parsed" && p.kind === "parsed") {
-        p.resolve(msg.groups);
-      } else if (msg.kind === "arrow" && p.kind === "arrow") {
-        p.resolve(new Uint8Array(msg.bytes));
-      } else if (msg.kind === "revisionDelta" && p.kind === "revisionDelta") {
-        p.resolve(msg.delta);
-      } else if (msg.kind === "mergeResult" && p.kind === "mergeResult") {
-        p.resolve({
-          bytes: msg.bytes,
-          warnings: JSON.parse(msg.warningsJson) as MergeWarning[],
-          revisions: JSON.parse(msg.revisionsJson) as MergeRevision[],
-        });
-      } else if (msg.kind === "dictionary" && p.kind === "dictionary") {
-        p.resolve(msg.dict);
-      } else if (msg.kind === "censor" && p.kind === "censor") {
-        p.resolve({ text: msg.text, tally: msg.tally });
-      } else if (msg.kind === "toAgs4" && p.kind === "toAgs4") {
-        p.resolve(msg.result);
-      } else if (msg.kind === "excel" && p.kind === "excel") {
-        p.resolve({
-          bytes: msg.bytes,
-          warnings: msg.warnings,
-          sheets: msg.sheets,
-          rows: msg.rows,
-        });
-      } else {
-        p.reject(
-          new Error(`unexpected ${msg.kind} response for ${p.kind} request`),
-        );
-      }
+  } else if (msg.kind === "dictionary" && p.kind === "dictionary") {
+    p.resolve(msg.dict);
+  } else if (msg.kind === "censor" && p.kind === "censor") {
+    p.resolve({ text: msg.text, tally: msg.tally });
+  } else if (msg.kind === "toAgs4" && p.kind === "toAgs4") {
+    p.resolve(msg.result);
+  } else if (msg.kind === "excel" && p.kind === "excel") {
+    p.resolve({
+      bytes: msg.bytes,
+      warnings: msg.warnings,
+      sheets: msg.sheets,
+      rows: msg.rows,
     });
-
-    worker.addEventListener("error", (e) => {
-      // A hard worker error rejects everything in flight rather than hanging.
-      // Only this worker's: the other one's requests are unaffected by it
-      // crashing, which is half of why the split is a process boundary.
-      const err = new Error(e.message || "engine worker crashed");
-      for (const [, p] of pending) p.reject(err);
-      pending.clear();
-    });
-
-    live = { worker, ready };
-    return live;
-  };
-
-  return {
-    start,
-    ready: () => start().ready,
-
-    // Whether this worker exists yet — WITHOUT creating it, which `start()` and
-    // `ready()` both do. The idle warm asks before priming an engine the worker
-    // may already be fetching.
-    started: () => live !== null,
-
-    // Send `bytes` to the worker as a transferable. We transfer a *copy*
-    // (`slice()`) so the caller's original Uint8Array stays intact — the main
-    // thread still needs it to decode the editor text + finding snippets.
-    post(req: ReqInit, bytes: Uint8Array, p: Pending) {
-      const id = nextId++;
-      const copy = bytes.slice().buffer;
-      // Registered AFTER the send, as it always has been: a reply can only
-      // arrive on a later task, and a postMessage that throws then leaves no
-      // entry waiting on an id the worker never saw.
-      start().worker.postMessage({ ...req, id, bytes: copy }, [copy]);
-      pending.set(id, p);
-    },
-
-    // For requests that carry no bytes (e.g. arrowIpc, which reads the worker-
-    // held dataset). No transfer list.
-    postBare(req: ReqInit, p: Pending) {
-      const id = nextId++;
-      start().worker.postMessage({ ...req, id });
-      pending.set(id, p);
-    },
-
-    // For requests carrying TWO byte buffers (the revision diff). Transfer
-    // copies so the caller's originals stay intact (same rationale as post()).
-    postDual(req: ReqInit, a: Uint8Array, b: Uint8Array, p: Pending) {
-      const id = nextId++;
-      const aCopy = a.slice().buffer;
-      const bCopy = b.slice().buffer;
-      start().worker.postMessage({ ...req, id, aBytes: aCopy, bBytes: bCopy }, [
-        aCopy,
-        bCopy,
-      ]);
-      pending.set(id, p);
-    },
-  };
+  } else {
+    p.reject(
+      new Error(`unexpected ${msg.kind} response for ${p.kind} request`),
+    );
+  }
 }
 
 // The always-on worker, created at module load exactly as it always has been:
 // Validate is where a visitor lands, and its engine's deadline is the moment a
 // file is loaded — which the sample buttons can reach in milliseconds.
-const primary = createChannel(
+const primary = createChannel<Pending>(
   () =>
     new Worker(new URL("./validator.worker.ts", import.meta.url), {
       type: "module",
     }),
+  settle,
 );
 primary.start();
 
 // The second worker: Explore's parse + Arrow pulls, and Tools → Excel's two
 // conversions. Nothing here creates it — `startTier2Worker()` and the four ops
 // that need it do, so it stays uncreated for a visit that opens neither tab.
-const tier2 = createChannel(
+const tier2 = createChannel<Pending>(
   () =>
     new Worker(new URL("./tier2.worker.ts", import.meta.url), {
       type: "module",
     }),
+  settle,
 );
+
+/** Re-exported so a pane imports its whole engine surface from one module: the
+ *  ops and the one failure they distinguish. A tier-2 op rejects with this when
+ *  the engine could not be fetched, which is the case a retry can clear (#357). */
+export { EngineLoadError } from "./workerChannel";
 
 export function ready(): Promise<void> {
   return primary.ready();

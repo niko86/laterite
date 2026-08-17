@@ -4,6 +4,7 @@ import {
   excelExport,
   excelImport,
   startTier2Worker,
+  EngineLoadError,
 } from "../../lib/validatorClient";
 import { downloadBlob, baseName } from "../../lib/download";
 
@@ -25,10 +26,22 @@ export const ExcelConverter: Component = () => {
   onMount(startTier2Worker);
 
   const [busy, setBusy] = createSignal<"export" | "import" | null>(null);
-  const [err, setErr] = createSignal<string | null>(null);
+  // A failed conversion and an engine that never downloaded read differently
+  // and end differently: one is about the file, the other is about the network
+  // and clears on a retry (#357). `retry` is what tells them apart on screen.
+  const [err, setErr] = createSignal<{ text: string; retry: boolean } | null>(
+    null,
+  );
   const [warnings, setWarnings] = createSignal<string[]>([]);
   const [note, setNote] = createSignal<string | null>(null);
   const [formatNumeric, setFormatNumeric] = createSignal(true);
+
+  // The last conversion attempted, so "Try again" repeats it — an import's
+  // workbook is gone from the file input by then (it's cleared on change so the
+  // same file can be re-picked), so a retry has to close over it rather than
+  // re-read it. Not a signal: only the click handler reads it, and it changes
+  // nothing on screen by itself.
+  let lastAttempt: (() => Promise<void>) | null = null;
 
   const reset = () => {
     setErr(null);
@@ -36,9 +49,21 @@ export const ExcelConverter: Component = () => {
     setNote(null);
   };
 
+  const failed = (e: unknown) => {
+    setErr(
+      e instanceof EngineLoadError
+        ? {
+            text: "The converter's engine couldn't be downloaded — the rest of the app is unaffected. Check your connection and try again.",
+            retry: true,
+          }
+        : { text: `Conversion failed: ${String(e)}`, retry: false },
+    );
+  };
+
   const runExport = async () => {
     const b = fileStore.bytes();
     if (!b) return;
+    lastAttempt = runExport;
     setBusy("export");
     reset();
     try {
@@ -49,13 +74,14 @@ export const ExcelConverter: Component = () => {
         `${count(r.sheets, "sheet")}, ${count(r.rows, "data row")} → .xlsx`,
       );
     } catch (e) {
-      setErr(String(e));
+      failed(e);
     } finally {
       setBusy(null);
     }
   };
 
   const runImport = async (file: File) => {
+    lastAttempt = () => runImport(file);
     setBusy("import");
     reset();
     try {
@@ -71,7 +97,7 @@ export const ExcelConverter: Component = () => {
         `${count(r.sheets, "sheet")}, ${count(r.rows, "data row")} → .ags`,
       );
     } catch (e) {
-      setErr(String(e));
+      failed(e);
     } finally {
       setBusy(null);
     }
@@ -151,7 +177,24 @@ export const ExcelConverter: Component = () => {
         <p class="text-xs text-ok">✓ {note()}</p>
       </Show>
       <Show when={err()}>
-        <p class="text-xs text-err">Conversion failed: {err()}</p>
+        {(e) => (
+          <div class="flex max-w-prose flex-col items-start gap-2">
+            <p class="text-xs text-err">{e().text}</p>
+            {/* Repeats the attempt, which re-creates the worker the channel
+              retired when its engine failed — so this really re-fetches
+              rather than re-reading a settled rejection (#357). */}
+            <Show when={e().retry}>
+              <button
+                type="button"
+                class="rounded bg-accent/15 px-3 py-1 text-xs font-medium text-accent hover:bg-accent/25"
+                disabled={busy() !== null}
+                onClick={() => void lastAttempt?.()}
+              >
+                Try again
+              </button>
+            </Show>
+          </div>
+        )}
       </Show>
       <Show when={warnings().length > 0}>
         <div class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
