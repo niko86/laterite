@@ -700,20 +700,25 @@ interface NetworkInformation {
   effectiveType: string;
 }
 
-/** Every request for the tier-2 wasm, split by who issued it. A request the
- *  SERVICE WORKER made is a real network download; one it did not is the page or
- *  the second worker asking, which CacheFirst may well answer from cache. Only
- *  the first kind costs a user 5.2 MB, so only the first kind is counted. */
-function watchTier2Fetches(page: Page) {
+/** Every request for URLs matching `pattern`, split by who issued it. A request
+ *  the SERVICE WORKER made is a real network download; one it did not is the
+ *  page or a worker asking, which CacheFirst may well answer from cache. Only
+ *  the first kind costs a user megabytes, so it is counted apart. */
+function watchFetches(page: Page, pattern: RegExp) {
   const network: string[] = [];
   const all: string[] = [];
   page.context().on("request", (r) => {
-    if (!/ags4_wasm_full_bg-[^/]*\.wasm$/.test(r.url())) return;
+    if (!pattern.test(r.url())) return;
     all.push(r.url());
     if (r.serviceWorker()) network.push(r.url());
   });
   return { network, all };
 }
+
+const TIER2_WASM = /ags4_wasm_full_bg-[^/]*\.wasm$/;
+const DUCKDB_WASM = /duckdb-(eh|mvp)-[^/]*\.wasm$/;
+
+const watchTier2Fetches = (page: Page) => watchFetches(page, TIER2_WASM);
 
 /** A visit with the service worker already in control, which is what the warm
  *  needs to be observable: on a cold FIRST visit the SW is still installing when
@@ -856,6 +861,152 @@ test("the idle warm downloads nothing under Data Saver", async ({ page }) => {
       "connection the user has told the browser to spare",
   ).toEqual([]);
   expect(await tier2Cached(page)).toBe(0);
+});
+
+/** Hold every network response matching `pattern` open until the returned
+ *  release is called. Route-level, because the hold must land where the SERVICE
+ *  WORKER's own fetch sees it — page-scoped CDP throttling does not reach it
+ *  (#366 measured that directly: the SW's "throttled" request completed in
+ *  7 ms), so a timing-based hold would silently test nothing. */
+async function holdRequests(page: Page, pattern: RegExp) {
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await page.context().route(pattern, async (route) => {
+    try {
+      await held;
+      await route.continue();
+    } catch {
+      /* the page navigated or closed while its request was held — the aborted
+         request is not the one under test */
+    }
+  });
+  return release;
+}
+
+// The mirror of the race `isTier2Started()` guards (#366): not "the tab opened
+// first, then the warm fired" but "the warm fired first and is STILL DOWNLOADING
+// when the tab opens". The fix lives in the service worker (in-flight coalescing
+// around CacheFirst — src/lib/swCoalesce.ts), which is what covers every path
+// that creates the worker at once; these two hold the end-to-end claim, one per
+// engine, because the warm exists to make exactly these clicks fast and in this
+// window used to make them slower than no warm at all.
+
+test("a tier-2 warm still in flight when Excel opens is ONE download, not two", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await poseAsDevice(page, { saveData: false, effectiveType: "4g" });
+  const seen = watchTier2Fetches(page);
+  const release = await holdRequests(page, TIER2_WASM);
+
+  await controlledVisit(page);
+  // The warm's network download is up — and held at the route, so it is still
+  // in flight however fast localhost answers.
+  await expect
+    .poll(() => seen.network.length, {
+      timeout: 90_000,
+      message:
+        "the warm's own download never started, so there is no in-flight " +
+        "race to judge (if the SW's fetch is invisible here, the route hold " +
+        "cannot have applied either)",
+    })
+    .toBeGreaterThan(0);
+
+  await tab(page, "Tools").click();
+  await page.getByRole("button", { name: /^Excel$/ }).click();
+  // The second worker exists while the warm's download is still held open, so
+  // the race is real by construction — the flight cannot complete before
+  // release(). Its own engine request cannot be watched directly: a request
+  // the SW answers emits no context-level event here, which is precisely what
+  // a coalesced request is. What stands in: the worker fetches at module
+  // scope, within milliseconds of existing, and the settle below dwarfs that —
+  // then the converter rendering proves the joined flight genuinely fed it.
+  await expect.poll(() => tier2Workers(page).length).toBe(1);
+  await page.waitForTimeout(1_500);
+  // The hold is still holding — an empty cache at release time is what proves
+  // the click landed mid-flight rather than after a warm that quietly
+  // finished (if route interception ever stopped reaching the SW's fetch,
+  // this is the assertion that says so instead of a vacuous pass).
+  expect(await tier2Cached(page)).toBe(0);
+  release();
+
+  // The joined download genuinely served the worker: the converter renders and
+  // the bytes reached the runtime cache.
+  await expect(page.getByText(/AGS4 → Excel/)).toBeVisible({
+    timeout: 90_000,
+  });
+  await expect
+    .poll(() => tier2Cached(page), { timeout: 30_000 })
+    .toBeGreaterThan(0);
+
+  expect(
+    seen.network,
+    "opening Excel while the warm was still in flight started a second full " +
+      "download — the service worker is not coalescing concurrent requests " +
+      "for the same URL",
+  ).toHaveLength(1);
+});
+
+test("a DuckDB warm still in flight when Explore opens is ONE download, not two", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  // Same race, third engine tier, ~36 MB: duck.ts's warmFetch no-ops once the
+  // engine is INSTANTIATED, but a warm already downloading when Explore opens
+  // holds no handle getDuckDb() could join — only the SW can merge the two.
+  await poseAsDevice(page, { saveData: false, effectiveType: "4g" });
+  const seen = watchFetches(page, DUCKDB_WASM);
+  const release = await holdRequests(page, DUCKDB_WASM);
+
+  await controlledVisit(page);
+  await expect
+    .poll(() => seen.network.length, {
+      timeout: 90_000,
+      message:
+        "the DuckDB warm's own download never started, so there is no " +
+        "in-flight race to judge",
+    })
+    .toBeGreaterThan(0);
+
+  // Explore needs a file; the capable pose above means no engine gate — the
+  // 36 MB fetch starts on the tab click alone.
+  await page.getByRole("button", { name: /Rule 9.*unknown heading/ }).click();
+  await tab(page, "Explore").click();
+  // DuckDB spawns its worker BEFORE fetching its wasm, and the worker script
+  // is precached — so a live duckdb worker while the warm's download is still
+  // held is "the engine asked mid-flight" made observable. (The request itself
+  // is invisible from out here once the SW answers it — see the tier-2 twin.)
+  await expect
+    .poll(
+      () => page.workers().filter((w) => /duckdb-browser/.test(w.url())).length,
+      {
+        timeout: 60_000,
+        message: "the Explore engine never started loading DuckDB",
+      },
+    )
+    .toBeGreaterThan(0);
+  await page.waitForTimeout(1_500);
+  // As in the tier-2 twin: an empty bucket at release time proves the click
+  // landed mid-flight, and catches a route hold that silently stopped
+  // applying to the SW's own fetch.
+  expect(
+    await page.evaluate(async () => {
+      const names = await caches.keys();
+      if (!names.includes("ags-duckdb-wasm")) return 0;
+      const keys = await (await caches.open("ags-duckdb-wasm")).keys();
+      return keys.filter((k) => /duckdb-(eh|mvp)-.*\.wasm$/.test(k.url)).length;
+    }),
+  ).toBe(0);
+  release();
+
+  await expect(page.getByText(/data rows/)).toBeVisible({ timeout: 120_000 });
+
+  expect(
+    seen.network,
+    "opening Explore while the DuckDB warm was still in flight started a " +
+      "second ~36 MB download — the service worker is not coalescing " +
+      "concurrent requests for the same URL",
+  ).toHaveLength(1);
 });
 
 // Helper: load coords.ags into Explore and open the SQL view.

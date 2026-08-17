@@ -164,6 +164,12 @@
         "issues": [
           373
         ]
+      },
+      {
+        "text": "**A warm still in flight doubled the download when its engine's tab was opened.** The idle warm exists to make the first Explore or Tools → Excel click fast: it primes the tier-2 engine (several MB) and DuckDB (~36 MB) into their CacheFirst buckets while the browser is idle. But `CacheFirst` does no request coalescing, so a click landing while the warm was still downloading started a second full download of the same bytes — the two split the connection, and the click the warm existed to speed up arrived slower than it would have with no warm at all, precisely on the slow links where the megabytes hurt most. The guard built with the warm covered only one direction — a warm firing after the worker exists is skipped — because the mirror cannot be closed from the main thread: the warm holds no handle a later worker could join. The one place every fetch of these artifacts already passes through is the service worker, so it is hand-written now (vite-plugin-pwa's `injectManifest` — the generated mode's rules cannot carry a custom handler; the precache manifest, its globs and their locks are unchanged, and the test holding the tier-2 engine out of the precache still fails on a leak) and every CacheFirst route coalesces in-flight requests: a request for a URL already downloading waits for that download's cache write to settle, then serves from cache. The release point is the write, not the response — at the response the body is still streaming, the cache is still empty, and the second download starts anyway. One download, however many askers, for both engines and every path that creates a worker. Held end to end by tests that pin the warm's download open at route level and open the tab mid-flight, falsified against the generated worker first: both engines measurably downloaded twice. What remains, named at the guard: a page the service worker does not yet control (the cold first visit) has nothing that can merge two downloads.",
+        "issues": [
+          366
+        ]
       }
     ],
     "security": []
