@@ -1,58 +1,39 @@
 // Main-thread handle to the transport worker (zstd + age lock/unlock). The
 // Tools "Transport" pane calls lock()/unlock() and gets a Promise back; the
-// worker owns the lazy-loaded libs. Same request/response-by-id shape as
-// validatorClient.ts.
+// worker owns the lazy-loaded libs.
+//
+// A `workerChannel` consumer since #379, not a hand-rolled copy of one. What
+// the copy got wrong is what the channel exists to get right: its crash
+// handler rejected the requests in flight but KEPT the dead worker, so the
+// next lock()/unlock() posted into the corpse and its promise never settled —
+// the pane's spinner span forever, disabled buttons and all, with the error
+// branch never reached. The channel retires a dead worker, so the next request
+// spawns a fresh one and the user's own retry is what recovers the tool. No
+// pane change: it already renders whatever rejection it is handed.
 
-import type { TransportRes } from "./transport.worker";
+import { createChannel } from "./workerChannel";
+import type { TransportReq, TransportRes } from "./transport.worker";
 
-type Pending = {
+interface Pending {
   resolve: (bytes: Uint8Array) => void;
   reject: (e: Error) => void;
-};
-
-const worker = new Worker(new URL("./transport.worker.ts", import.meta.url), {
-  type: "module",
-});
-
-let nextId = 1;
-const pending = new Map<number, Pending>();
-
-// Resolves once zstd's wasm is instantiated; the pane can gate its first action
-// on it (age is pure-JS, no init).
-const readyPromise = new Promise<void>((resolve, reject) => {
-  const onInit = (e: MessageEvent<TransportRes>) => {
-    const msg = e.data;
-    if ("type" in msg && msg.type === "ready") {
-      worker.removeEventListener("message", onInit);
-      resolve();
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker messages are a runtime boundary; keep the explicit check though the type narrows to it
-    } else if ("type" in msg && msg.type === "initError") {
-      worker.removeEventListener("message", onInit);
-      reject(new Error(msg.error));
-    }
-  };
-  worker.addEventListener("message", onInit);
-});
-
-worker.addEventListener("message", (e: MessageEvent<TransportRes>) => {
-  const msg = e.data;
-  if ("type" in msg) return; // ready / initError handled above
-  const p = pending.get(msg.id);
-  if (!p) return;
-  pending.delete(msg.id);
-  if (msg.ok) p.resolve(new Uint8Array(msg.bytes));
-  else p.reject(new Error(msg.error));
-});
-
-worker.addEventListener("error", (e) => {
-  const err = new Error(e.message || "transport worker crashed");
-  for (const [, p] of pending) p.reject(err);
-  pending.clear();
-});
-
-export function ready(): Promise<void> {
-  return readyPromise;
 }
+
+// Spawned on first use, where the old copy spawned at module load. Nothing
+// needs the scrypt/zstd stack until a lock or unlock is actually requested,
+// and a request that lands before the wasm is up queues in the worker behind
+// its own init.
+const channel = createChannel<TransportRes, TransportReq, Pending>(
+  () =>
+    new Worker(new URL("./transport.worker.ts", import.meta.url), {
+      type: "module",
+    }),
+  // Both reply kinds carry bytes and nothing else — the transport protocol's
+  // whole settle is "hand them over".
+  (msg, p) => {
+    p.resolve(new Uint8Array(msg.bytes));
+  },
+);
 
 function post(
   kind: "lock" | "unlock",
@@ -60,11 +41,11 @@ function post(
   passphrase: string,
 ): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    const id = nextId++;
-    // Transfer a copy so the caller's Uint8Array stays intact.
-    const buf = bytes.slice().buffer;
-    pending.set(id, { resolve, reject });
-    worker.postMessage({ id, kind, bytes: buf, passphrase }, [buf]);
+    channel.post(
+      { kind, bytes: new ArrayBuffer(0), passphrase }, // bytes replaced inside post()
+      bytes,
+      { resolve, reject },
+    );
   });
 }
 

@@ -1,7 +1,8 @@
-// One engine worker's lifecycle — spawning it lazily, correlating its replies,
-// and retiring it when its engine never arrives. Nothing here knows what a
-// reply MEANS; that mapping stays in `validatorClient.ts` beside the typed API
-// it resolves into.
+// One worker's lifecycle — spawning it lazily, correlating its replies, and
+// retiring it when its engine never arrives. Nothing here knows what a reply
+// MEANS; that mapping stays with each consumer (`validatorClient.ts` for the
+// two engine workers, `transportClient.ts` for the transport one) beside the
+// typed API it resolves into.
 //
 // It lived inline there until #357, and moved for a reason the split makes
 // plain: `validatorClient` creates the always-on worker at module load, so a
@@ -10,12 +11,25 @@
 // the behaviour worth testing on its own — a dead worker being dropped rather
 // than kept — is exactly the behaviour that file could not reach.
 
-import type { WorkerReq, WorkerRes } from "./engineDispatch";
+/** The wire shape every worker of ours speaks — two lifecycle messages, then
+ *  id-correlated replies that either carry a kind-specific payload or a bare
+ *  error. A channel is generic over a protocol EXTENDING this (#379): the
+ *  engine protocol (`engineDispatch`'s `WorkerRes`) and the transport protocol
+ *  (`transport.worker`'s `TransportRes`) are both instances, which is what
+ *  lets one channel implementation drive either worker. */
+export type WorkerEnvelope =
+  | { type: "ready" }
+  | { type: "initError"; error: string }
+  | { id: number; ok: true }
+  | { id: number; ok: false; error: string };
 
 /** A SUCCESSFUL reply to a request — all `settle` ever sees. The channel
  *  handles the other three shapes itself: the two lifecycle messages, and a
  *  failed op, which needs no per-kind knowledge to reject. */
-export type WorkerReply = Extract<WorkerRes, { id: number; ok: true }>;
+export type OkReply<Res extends WorkerEnvelope> = Extract<
+  Res,
+  { id: number; ok: true }
+>;
 
 /** The whole of what a channel needs from a pending entry: a way to fail it.
  *  Resolving is per-kind and therefore the caller's business. */
@@ -51,7 +65,6 @@ export class EngineUnavailableError extends Error {
 type DistributiveOmit<T, K extends keyof never> = T extends unknown
   ? Omit<T, K>
   : never;
-type ReqInit = DistributiveOmit<WorkerReq, "id">;
 
 // One id space across every channel. Correlation never needs that — a reply
 // only ever meets its own worker's pending table — but two workers each
@@ -66,10 +79,12 @@ let nextId = 1;
  *
  *  `settle` matches a reply to the pending entry waiting on its id. It is only
  *  called for replies that survived correlation, so it may assume both exist. */
-export function createChannel<P extends Failable>(
-  spawn: () => Worker,
-  settle: (msg: WorkerReply, p: P) => void,
-) {
+export function createChannel<
+  Res extends WorkerEnvelope,
+  Req extends { id: number },
+  P extends Failable,
+>(spawn: () => Worker, settle: (msg: OkReply<Res>, p: P) => void) {
+  type ReqInit = DistributiveOmit<Req, "id">;
   // The pending table belongs to a worker GENERATION, not to the channel: a
   // retirement clears one worker's table without reaching into the requests its
   // replacement is already carrying.
@@ -124,7 +139,7 @@ export function createChannel<P extends Failable>(
     // ignores it is not silently racing.
     const ready = new Promise<void>((resolve, reject) => {
       failReady = reject;
-      const onInit = (e: MessageEvent<WorkerRes>) => {
+      const onInit = (e: MessageEvent<WorkerEnvelope>) => {
         const msg = e.data;
         if ("type" in msg && msg.type === "ready") {
           worker.removeEventListener("message", onInit);
@@ -149,14 +164,18 @@ export function createChannel<P extends Failable>(
     // doesn't take it from `ready()`, which still returns the real promise.
     void ready.catch(() => undefined);
 
-    worker.addEventListener("message", (e: MessageEvent<WorkerRes>) => {
+    worker.addEventListener("message", (e: MessageEvent<WorkerEnvelope>) => {
       const msg = e.data;
       if ("type" in msg) return; // ready / initError handled above
       const p = pending.get(msg.id);
       if (!p) return; // superseded + already dropped, or a retired generation
       pending.delete(msg.id);
+      // The one assertion the generics cost. postMessage is untyped at runtime,
+      // so the listener sees the ENVELOPE; the constraint guarantees every
+      // `ok: true` member of `Res` is such a reply, and narrowing back to the
+      // caller's protocol is exactly what this channel exists to centralise.
       if (!msg.ok) p.reject(new Error(msg.error));
-      else settle(msg, p);
+      else settle(msg as OkReply<Res>, p);
     });
 
     worker.addEventListener("error", (e) => {

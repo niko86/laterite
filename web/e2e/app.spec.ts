@@ -1217,3 +1217,60 @@ test("a dead engine worker is not reused: Explore reports, and the always-on wor
     await ctx.close();
   }
 });
+
+// #379: the transport worker's death must not wedge the tool. Its old client
+// rejected the requests in flight but kept the dead worker, so the NEXT
+// encrypt posted into the corpse and its promise never settled — spinner for
+// ever, no error, and the pane's own error branch unreachable. Now the channel
+// retires a dead worker, so the user's own retry is the recovery: no banner,
+// no dedicated button, just the next click working (the asymmetry with
+// Explore/Excel is deliberate — see #379).
+test("Tools → Transport reports a dead worker, and the plain retry gets a fresh one", async ({
+  browser,
+}) => {
+  test.slow(); // scrypt at the shipped work factor costs real seconds, twice
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  let blocked = 0;
+  let arm = true;
+  // The worker's own chunk — the script never arrives, the Worker fires
+  // `error`, and no zstd/age ever gets as far as initialising.
+  await page.route(/transport\.worker-[^/]*\.js$/, async (route) => {
+    if (arm) {
+      blocked++;
+      await route.abort();
+    } else {
+      await route.continue();
+    }
+  });
+  try {
+    await page.goto(APP);
+    await page.getByRole("button", { name: /Clean \(minimal\)/ }).click();
+    await expect(page.getByText(/Clean — 0 findings/)).toBeVisible();
+
+    await tab(page, "Tools").click();
+    await page.getByRole("button", { name: /^Transport$/ }).click();
+    await page
+      .locator('input[type="password"]')
+      .first()
+      .fill("correct-horse-e2e");
+    await page.getByRole("button", { name: /Encrypt & download/ }).click();
+
+    // The failure must REPORT — the hang this replaces showed nothing at all.
+    await expect(page.locator("p.text-err")).toBeVisible({ timeout: 120_000 });
+    expect(blocked).toBeGreaterThan(0); // the block is real, not a passed test by accident
+
+    // Release the network. The plain retry must spawn a FRESH worker and
+    // finish: with the old client this click posted into the dead one and the
+    // download below never fired.
+    arm = false;
+    const [dl] = await Promise.all([
+      page.waitForEvent("download", { timeout: 120_000 }),
+      page.getByRole("button", { name: /Encrypt & download/ }).click(),
+    ]);
+    expect(dl.suggestedFilename()).toMatch(/\.zst\.age$/);
+    await expect(page.getByText(/Encrypted /)).toBeVisible();
+  } finally {
+    await ctx.close();
+  }
+});
