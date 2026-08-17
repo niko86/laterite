@@ -93,15 +93,20 @@ export function warmLazyAssets(): void {
   // the CRITICAL path, and both of these are speculative.
   onIdle(() => {
     // Explore or Excel may have been opened inside the idle window, in which
-    // case that worker is already fetching this exact URL — and CacheFirst does
-    // not coalesce, so a second request here is a second 5.2 MB download, not a
-    // cache hit. Read at fire time, not at call time, so the whole window counts.
+    // case that worker is already fetching this exact URL — skip rather than
+    // ask again. Read at fire time, not at call time, so the whole window
+    // counts. Since #366 the service worker would coalesce the duplicate
+    // anyway (sw.ts wraps its CacheFirst routes in lib/swCoalesce.ts), so on a
+    // CONTROLLED page this guard only saves a no-op request — but it is the
+    // sole cover on a page the SW does not yet control, i.e. the cold first
+    // visit, whose install runs in parallel with this very warm.
     //
-    // The mirror case is NOT covered: a warm already in flight when the worker
-    // starts still double-downloads, because the warm holds no handle the worker
-    // could join. duck.ts:warmFetch has the same shape and the same hole, so
-    // this is the existing policy rather than a new gap — worth closing for both
-    // at once, not for one of them here.
+    // The mirror case — a warm already in flight when the worker starts — is
+    // the SW's coalescing alone: the warm holds no handle the worker could
+    // join, so no guard here can reach it (same for duck.ts:warmFetch). On
+    // that same uncontrolled cold visit the mirror is accordingly still open,
+    // for the one visitor who opens Explore or Excel inside their first
+    // visit's idle window, before the SW takes control.
     if (isTier2Started()) return;
     void fetch(TIER2_WASM_URL).catch(() => {});
   });

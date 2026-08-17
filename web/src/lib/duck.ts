@@ -71,7 +71,10 @@ export function getDuckDb(): Promise<DuckHandle> {
 /** Prime the engine wasm + worker into the HTTP/SW cache WITHOUT compiling, so
  *  a later Explore click downloads nothing — yet a validate-only session never
  *  pays the 36 MB wasm-compile / worker-spawn / engine-heap cost. Best-effort;
- *  only the variant selectBundle would pick is fetched. No-op once instantiated. */
+ *  only the variant selectBundle would pick is fetched. No-op once instantiated
+ *  — and when Explore opens while this is still DOWNLOADING, the service
+ *  worker coalesces the engine's fetch into it (#366, sw.ts) rather than
+ *  starting a second ~36 MB download; no handle needs to be held here. */
 export async function warmFetch(): Promise<void> {
   if (instance) return;
   try {

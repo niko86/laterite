@@ -286,6 +286,35 @@ from the precache.
 > it is about a speculative fetch stealing from one on the **critical** path, and
 > both of these are speculative.
 
+> [!note] Closed in #366: the mirror race, in the service worker
+> The warm still holds no handle — what changed is that it no longer needs one.
+> Every fetch of these artifacts already passes through the service worker once
+> it controls the page, so that is where the merge lives: SW authorship moved
+> to `injectManifest` (`repo:web/src/sw.ts` — `generateSW`'s `runtimeCaching`
+> rules cannot carry a custom handler, which is what made this a mode change
+> rather than a config edit), and every CacheFirst route is wrapped in
+> in-flight coalescing (`repo:web/src/lib/swCoalesce.ts`, the caching policy
+> itself now in `repo:web/src/lib/swPolicy.ts` where the #339 policy test can
+> still reach it). A request for a URL whose download is already in flight
+> waits for that download's **cache write** to settle, then reads the cache —
+> released at the response instead, the body is still streaming, the cache is
+> still empty, and download #2 starts anyway; workbox's `handleAll` exposes
+> exactly that settlement, which is why the wrapper is small instead of a
+> strategy reimplementation. One wrapper covers both engines, `warmFetch`'s
+> race included, and every path that creates a worker, because none of the five
+> is guarded — the worker's own fetch is merged wherever it came from. Held end
+> to end by two e2es that pin the warm's download open at ROUTE level and open
+> the tab mid-flight, falsified against the generated worker first (both
+> engines measurably downloaded twice); page-scoped CDP throttling cannot run
+> this test — it never reaches the SW's own fetch, whose "throttled" request
+> completed in 7 ms when tried. What stays open is named at the guard in
+> `repo:web/src/lib/prefetch.ts`: a page the SW does not yet control — the cold
+> first visit, install racing the warm — has nothing that can merge two
+> downloads, in either direction. The precache half of this page is untouched:
+> `injectManifest` computes the same manifest from the same globs in
+> `repo:web/vite.config.ts`, all four locks fire as before, and the e2e that
+> holds tier 2 absent from the precache still fails on a leak.
+
 **The app's engine stops being npm's.** `check-wasm-slim.mjs` guards what npm
 ships; it no longer describes what the app precaches. Tier 1 needs its own gate
 or nothing watches the artifact this whole design depends on staying small — it
