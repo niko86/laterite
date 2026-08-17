@@ -54,9 +54,10 @@ const App: Component = () => {
   // reported here, because a rejection is not a wait, and #353 only takes the
   // engine out of the LOADING gate. Leaving the failure to the panes was tried
   // and is a permanent silent state: a Solid resource THROWS when read after an
-  // error, so a pane's own "Validator error: …" fallback never renders and the
+  // error, so an unguarded pane's own error fallback never renders and the
   // tab sits on its spinner for ever (verified by aborting the wasm fetch —
-  // #339's lesson, that a failed engine fetch must never go quiet).
+  // #339's lesson, that a failed engine fetch must never go quiet). #359 has
+  // since guarded the panes; boot failure stays reported at THIS altitude.
   const [engineUp, setEngineUp] = createSignal(false);
   const [engineError, setEngineError] = createSignal<string | null>(null);
   void engineReady().then(

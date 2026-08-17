@@ -8,6 +8,7 @@ import {
 } from "solid-js";
 import { fileStore } from "../../lib/fileStore";
 import { computeFixes, applyFixes, validate } from "../../lib/validatorClient";
+import { engineFailureMessage } from "../../lib/engineFailure";
 import type { Fix, ValidationReport } from "../../lib/validator";
 import { severityOf } from "../../lib/validator";
 import type { Severity } from "../validate/FilterBar";
@@ -104,6 +105,20 @@ export const FixPane: Component = () => {
   // warning box in ags-wiki/design/dec-engine-tiering.md records).
   const fixList = () => (fixes.error ? undefined : fixes());
   const sevReport = () => (report.error ? undefined : report());
+
+  // The guards above stop a rejection THROWING; this is what stops it hiding.
+  // Unread, a failed op degrades to the zero-fix state — "Fix all safe (0)",
+  // a dead engine posing as a genuinely clean file (#391, the #339 silent
+  // state in miniature). Either resource failing is the same dead engine to
+  // the user, so when both reject, reporting the first is reporting both. No
+  // retry button on purpose: the channel has retired the crashed worker, so
+  // the next input recovers by itself.
+  const engineFailure = createMemo(() => {
+    const e: unknown = fixes.error ?? report.error;
+    return e === undefined
+      ? undefined
+      : engineFailureMessage(e, "The fix engine");
+  });
 
   const sevIndex = createMemo(() => buildSevIndex(sevReport()));
   // Named for its argument: this resolves a FIX's severity (by looking up the
@@ -320,6 +335,12 @@ export const FixPane: Component = () => {
         </div>
 
         <Show when={view() === "fixes"}>
+          {/* Not while loading: a recompute after a failure (new file, new
+              encoding) reads as computing, not as the stale failure — the
+              neighbours' guard-first shape. */}
+          <Show when={!fixes.loading && !report.loading && engineFailure()}>
+            <p class="text-sm text-err">{engineFailure()}</p>
+          </Show>
           <div class="flex flex-wrap items-center gap-2 text-sm">
             <button
               type="button"

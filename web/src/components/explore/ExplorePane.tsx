@@ -13,8 +13,8 @@ import {
   parseDataset,
   arrowIpc,
   startTier2Worker,
-  EngineUnavailableError,
 } from "../../lib/validatorClient";
+import { engineFailureMessage } from "../../lib/engineFailure";
 import type { GroupMeta } from "../../lib/duckTypes";
 import { DataTable } from "./DataTable";
 import { SqlConsole } from "./SqlConsole";
@@ -167,21 +167,22 @@ export const ExplorePane: Component = () => {
   // What went wrong, in the terms a user can act on. A tier-2 engine that never
   // arrived is a PARTIAL failure — this tab is out, the rest of the app is not
   // — and the only one of the three a retry can clear once its cause is fixed
-  // (#357, ags-wiki/design/dec-engine-tiering.md).
-  const failure = () => {
-    const e: unknown = dataset.error;
-    if (e instanceof EngineUnavailableError)
-      return e.reason === "load"
-        ? "The explorer's engine couldn't be downloaded — the rest of the app is unaffected. Check your connection and try again."
-        : "The explorer's engine stopped — the rest of the app is unaffected. Trying again starts a fresh one.";
-    // The DuckDB engine wasm is NOT precached (it's 36+ MB), so a FIRST
-    // Explore while offline can't fetch it — degrade to a clear message rather
-    // than a raw "Failed to fetch". Validate / Fix are unaffected (their wasm
-    // is precached).
-    if (!navigator.onLine)
-      return "The data engine isn't cached for offline use yet — open Explore once while online, and it'll work offline after. (Validate & Fix already work offline.)";
-    return `Explore error: ${String(e)}`;
-  };
+  // (#357, ags-wiki/design/dec-engine-tiering.md). The copy is the shared
+  // engine-failure voice (#391); Explore's own is the noun and the offline
+  // override.
+  const failure = () =>
+    engineFailureMessage(
+      dataset.error,
+      "The explorer's engine",
+      // The DuckDB engine wasm is NOT precached (it's 36+ MB), so a FIRST
+      // Explore while offline can't fetch it — degrade to a clear message
+      // rather than a raw "Failed to fetch". Validate / Fix are unaffected
+      // (their wasm is precached), which is why this stays an override passed
+      // here and not a branch of the shared helper.
+      navigator.onLine
+        ? undefined
+        : "The data engine isn't cached for offline use yet — open Explore once while online, and it'll work offline after. (Validate & Fix already work offline.)",
+    );
 
   const totalRows = () => parsed()?.reduce((n, g) => n + g.rows, 0) ?? 0;
   const selectedInfo = () =>
