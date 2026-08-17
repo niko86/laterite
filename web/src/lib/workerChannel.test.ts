@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createChannel,
-  EngineLoadError,
+  EngineUnavailableError,
   type WorkerReply,
 } from "./workerChannel";
 
@@ -222,9 +222,11 @@ describe("createChannel", () => {
 
     // Reported, not hung — on the readiness promise AND on the request that was
     // waiting, both as the one error a retry can clear.
-    await expect(ready).rejects.toThrow(EngineLoadError);
+    await expect(ready).rejects.toThrow(EngineUnavailableError);
     await expect(inflight.promise).rejects.toThrow("Failed to fetch");
-    await expect(inflight.promise).rejects.toBeInstanceOf(EngineLoadError);
+    await expect(inflight.promise).rejects.toBeInstanceOf(
+      EngineUnavailableError,
+    );
     expect(dead.terminated).toBe(true);
     expect(channel.started()).toBe(false);
     expect(spawned).toHaveLength(1);
@@ -235,7 +237,7 @@ describe("createChannel", () => {
     const first = pending();
     channel.post(VALIDATE, new Uint8Array([1]), first.entry);
     last().send({ type: "initError", error: "Failed to fetch" });
-    await expect(first.promise).rejects.toThrow(EngineLoadError);
+    await expect(first.promise).rejects.toThrow(EngineUnavailableError);
 
     // The retry. Without the retirement this posts into the dead worker, which
     // has already replied to everything it will ever reply to, and the promise
@@ -261,7 +263,7 @@ describe("createChannel", () => {
     const deadId = dead.posted[0]!.msg.id as number;
 
     dead.send({ type: "initError", error: "Failed to fetch" });
-    await expect(first.promise).rejects.toThrow(EngineLoadError);
+    await expect(first.promise).rejects.toThrow(EngineUnavailableError);
 
     // The worker answers each queued op with its own `{ ok: false }` after the
     // initError. Those arrive to a table that has already been failed and
@@ -270,20 +272,81 @@ describe("createChannel", () => {
     expect(settled).toHaveLength(0);
   });
 
-  it("fails a crashed worker's in-flight requests", async () => {
+  it("fails the readiness promise when the worker dies without ever loading", async () => {
+    const { channel, last } = harness();
+    // The shape a stale chunk takes after a deploy: `error` fires and no
+    // `initError` ever arrives, so this is the ONLY path that can settle
+    // readiness. App reports a dead engine from it — an unsettled promise there
+    // is a page that never reports and never warms.
+    const ready = channel.ready();
+    last().crash("Failed to load worker script");
+    await expect(ready).rejects.toThrow(EngineUnavailableError);
+    await expect(ready).rejects.toThrow("Failed to load worker script");
+  });
+
+  it("retires a crashed worker, not only its in-flight requests", async () => {
     const { channel, spawned, last } = harness();
     const inflight = pending();
     channel.post(VALIDATE, new Uint8Array([1]), inflight.entry);
-    last().crash("out of memory");
+    const dead = last();
+    dead.crash("out of memory");
 
     await expect(inflight.promise).rejects.toThrow("out of memory");
-    // NOT an EngineLoadError: the engine loaded, the worker died. Only the
-    // load failure offers a retry, because only it has a cause that can be
-    // fixed from outside the app.
-    await expect(inflight.promise).rejects.not.toBeInstanceOf(EngineLoadError);
-    // Dropping the handle here too is #363, which owns the change and its e2e.
-    expect(channel.started()).toBe(true);
+    // The same error type as an engine that never loaded (#363). The causes
+    // differ; what a user can do about them does not, because the worker is
+    // gone either way and the next request starts a fresh one.
+    await expect(inflight.promise).rejects.toBeInstanceOf(
+      EngineUnavailableError,
+    );
+    expect(dead.terminated).toBe(true);
+    expect(channel.started()).toBe(false);
     expect(spawned).toHaveLength(1);
+  });
+
+  it("gives the next request a FRESH worker after a crash", async () => {
+    const { channel, spawned, settled, last } = harness();
+    const first = pending();
+    channel.post(VALIDATE, new Uint8Array([1]), first.entry);
+    last().crash("out of memory");
+    await expect(first.promise).rejects.toThrow("out of memory");
+
+    // Without the retirement this posts into the crashed worker, which will
+    // never reply — so it neither resolves nor rejects. That is the hang: the
+    // requests in flight at crash time report, and everything after them waits
+    // for ever with no error branch ever reached.
+    const retry = pending();
+    channel.post(VALIDATE, new Uint8Array([1]), retry.entry);
+    expect(spawned).toHaveLength(2);
+
+    last().send({ type: "ready" });
+    const id = last().posted[0]!.msg.id as number;
+    last().send({ id, ok: true, kind: "cert", json: "{}" });
+    expect(settled).toHaveLength(1);
+    expect(settled[0]!.p).toBe(retry.entry);
+  });
+
+  it("does not let a second crash take down the replacement worker", async () => {
+    const { channel, spawned, settled } = harness();
+    const first = pending();
+    channel.post(VALIDATE, new Uint8Array([1]), first.entry);
+    const dead = spawned[0]!;
+    dead.crash("out of memory");
+    await expect(first.promise).rejects.toThrow("out of memory");
+
+    const retry = pending();
+    channel.post(VALIDATE, new Uint8Array([1]), retry.entry);
+    expect(spawned).toHaveLength(2);
+
+    // `error` is not a once-only event, and the listener outlives the
+    // retirement. A second one from the corpse must not drop the live worker —
+    // which would silently double every subsequent engine download.
+    dead.crash("out of memory");
+    expect(channel.started()).toBe(true);
+
+    const id = spawned[1]!.posted[0]!.msg.id as number;
+    spawned[1]!.send({ id, ok: true, kind: "cert", json: "{}" });
+    expect(settled).toHaveLength(1);
+    expect(settled[0]!.p).toBe(retry.entry);
   });
 
   it("names a crash with no message", async () => {

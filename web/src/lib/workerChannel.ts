@@ -23,16 +23,25 @@ interface Failable {
   reject: (e: Error) => void;
 }
 
-/** The engine wasm never arrived, or never instantiated — as distinct from an
- *  op that ran and failed. The distinction is the one a user can act on: this
- *  is the failure a RETRY can clear once its cause is fixed, and the tabs that
- *  need the tier-2 engine tell the two apart to say so (#357). */
-export class EngineLoadError extends Error {
-  constructor(message: string) {
+/** No engine is running — as distinct from an op that ran and failed. Either
+ *  way the channel has retired the worker, so the next request starts a fresh
+ *  one: that is what makes this the failure a RETRY can clear, and what the
+ *  tabs read to offer one (#357, widened to the crash in #363).
+ *
+ *  `reason` exists because the two are equally retryable and not equally
+ *  explicable. "Check your connection" is the useful thing to say about an
+ *  engine that never downloaded and a false lead about one that died holding a
+ *  file, so a pane that showed one message for both would be guessing at the
+ *  reader's expense. */
+export class EngineUnavailableError extends Error {
+  readonly reason: "load" | "crash";
+
+  constructor(message: string, reason: "load" | "crash") {
     super(message);
     // Set explicitly: subclassing a built-in leaves `name` as "Error", and this
     // is the string that reaches a console log when nothing catches it.
-    this.name = "EngineLoadError";
+    this.name = "EngineUnavailableError";
+    this.reason = reason;
   }
 }
 
@@ -75,26 +84,46 @@ export function createChannel<P extends Failable>(
     const worker = spawn();
     const pending = new Map<number, P>();
 
-    // The engine never arrived. Fail everything this worker was carrying and
-    // DROP the handle, so the next request spawns a fresh worker that fetches
-    // again (#357). Without the drop a retry posts into the same dead worker,
-    // re-reads its settled rejection, and fails identically however long ago
-    // the cause was fixed — a failure outliving what caused it, which is #339's
-    // lesson one layer up. Terminating is what makes "dropped" true rather than
-    // nominal: the old worker stops answering into a table nobody reads.
+    // Assigned synchronously by the `ready` executor below, and only called
+    // from `retire` — which cannot run before that, since every path to it is a
+    // worker event.
+    let failReady!: (e: Error) => void;
+
+    // This worker is finished — its engine never arrived (#357) or it died
+    // (#363). Fail everything it was carrying and DROP the handle, so the next
+    // request spawns a fresh worker. Without the drop that request is posted
+    // into a dead worker: a failed engine re-reads its settled rejection and
+    // fails identically however long ago the cause was fixed, and a crashed one
+    // does not reply at all. Both are a failure outliving what caused it, which
+    // is #339's lesson one layer up. Terminating is what makes "dropped" true
+    // rather than nominal: the old worker stops answering into a table nobody
+    // reads.
+    //
+    // `failReady` is not a tidy extra. A worker whose SCRIPT fails to load — a
+    // stale chunk after a deploy — fires `error` and never sends `initError`,
+    // so readiness is the one thing no other path can settle. App reads it to
+    // report a dead engine at page level, and an unsettled promise there is a
+    // page that neither reports the failure nor ever warms anything: the silent
+    // state again, at the one altitude that is supposed to catch it.
     const retire = (err: Error) => {
+      // Identity, not truthiness: `error` can fire again on a worker already
+      // retired, and by then `live` may be its replacement — which this must
+      // not take down with it.
       if (live?.worker === worker) live = null;
+      failReady(err);
       for (const [, p] of pending) p.reject(err);
       pending.clear();
       worker.terminate();
     };
 
-    // Resolves when the worker has instantiated the wasm; rejects if init
-    // failed. NOTHING gates its first render on this any more (#353) — App only
-    // uses it to sequence the idle warm, and an op that arrives first queues in
-    // the worker behind the same promise. Kept because "engine is up" still has
-    // one consumer, and because a caller that ignores it is not silently racing.
+    // Resolves when the worker has instantiated the wasm; rejects if it never
+    // does. NOTHING gates its first render on this any more (#353) — App only
+    // uses it to report a dead engine and to sequence the idle warm, and an op
+    // that arrives first queues in the worker behind the same promise. Kept
+    // because "engine is up" still has one consumer, and because a caller that
+    // ignores it is not silently racing.
     const ready = new Promise<void>((resolve, reject) => {
+      failReady = reject;
       const onInit = (e: MessageEvent<WorkerRes>) => {
         const msg = e.data;
         if ("type" in msg && msg.type === "ready") {
@@ -103,13 +132,12 @@ export function createChannel<P extends Failable>(
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- worker messages are a runtime boundary; keep the explicit check though the type narrows to it
         } else if ("type" in msg && msg.type === "initError") {
           worker.removeEventListener("message", onInit);
-          const err = new EngineLoadError(msg.error);
-          reject(err);
-          // The worker replies `{ ok: false }` to each queued op as well, but
-          // those land after this and find their entries already gone. Failing
-          // them HERE is what gives them the load error rather than a bare
-          // string, which is what a pane reads to offer a retry.
-          retire(err);
+          // `retire` rejects `ready` as well. The worker replies `{ ok: false }`
+          // to each queued op too, but those land after this and find their
+          // entries already gone — failing them HERE is what gives them the
+          // typed error rather than a bare string, which is what a pane reads
+          // to offer a retry.
+          retire(new EngineUnavailableError(msg.error, "load"));
         }
       };
       worker.addEventListener("message", onInit);
@@ -132,16 +160,21 @@ export function createChannel<P extends Failable>(
     });
 
     worker.addEventListener("error", (e) => {
-      // A hard worker error rejects everything in flight rather than hanging.
-      // Only this worker's: the other one's requests are unaffected by it
-      // crashing, which is half of why the split is a process boundary.
+      // A worker that crashed, or whose script never loaded. Retired like a
+      // failed engine and for the same reason (#363): rejecting the requests in
+      // flight was never the whole job — it left the handle pointing at a dead
+      // worker, so those requests reported and every request AFTER them was
+      // posted into silence. A hang never rejects, so that was the permanent
+      // silent state with no error branch ever reached.
       //
-      // Deliberately NOT a `retire()` — the handle stays live, so every request
-      // posted after a crash still hangs. That is #363, which owns the change
-      // and the e2e that has to fail without it.
-      const err = new Error(e.message || "engine worker crashed");
-      for (const [, p] of pending) p.reject(err);
-      pending.clear();
+      // Only this worker's requests: the other one's are unaffected by it
+      // crashing, which is half of why the split is a process boundary.
+      retire(
+        new EngineUnavailableError(
+          e.message || "engine worker crashed",
+          "crash",
+        ),
+      );
     });
 
     live = { worker, ready, pending };

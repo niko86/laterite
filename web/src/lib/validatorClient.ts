@@ -222,9 +222,12 @@ const tier2 = createChannel<Pending>(
 );
 
 /** Re-exported so a pane imports its whole engine surface from one module: the
- *  ops and the one failure they distinguish. A tier-2 op rejects with this when
- *  the engine could not be fetched, which is the case a retry can clear (#357). */
-export { EngineLoadError } from "./workerChannel";
+ *  ops, and the one failure they distinguish. An op rejects with this when no
+ *  engine is running — it never downloaded (#357) or its worker died (#363) —
+ *  which is the case a retry can clear, since the channel has retired that
+ *  worker and the next request starts a fresh one. `reason` says which, because
+ *  the two are equally retryable and not equally explicable. */
+export { EngineUnavailableError } from "./workerChannel";
 
 export function ready(): Promise<void> {
   return primary.ready();
