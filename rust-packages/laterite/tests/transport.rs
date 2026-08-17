@@ -12,6 +12,7 @@
 //! - the errors carry the coarse kind the surface documents.
 
 use std::fs;
+use std::time::Instant;
 
 use laterite::transport;
 
@@ -95,6 +96,69 @@ fn pack_then_unpack_returns_the_original_bytes() {
 }
 
 #[test]
+fn the_reported_statistics_are_the_real_ones() {
+    // What each accessor IS, not merely that it is plausible. The round-trip
+    // above proves the envelope works and asserts only `bytes() > 0` and
+    // `ratio() < 1.0`, both of which a constant satisfies: `bytes -> 1` and
+    // `ratio -> 0.0` survived a mutation sweep, and so did `ratio -> -1.0`
+    // (#273). `ratio` is the one that matters most to a caller — it is the
+    // number someone decides whether compression was worth it by.
+    let src = tmp("stats.ags");
+    let packed = tmp("stats.ags.zst");
+    let back = tmp("stats.out.ags");
+    let data = payload();
+    fs::write(&src, &data).unwrap();
+
+    let clock = Instant::now();
+    let stats = transport::pack(&src, &packed).run().unwrap();
+    let pack_wall = clock.elapsed().as_secs_f64();
+    let on_disk = fs::metadata(&packed).unwrap().len();
+
+    assert_eq!(stats.bytes(), on_disk, "bytes() is not the file it wrote");
+    let expected = on_disk as f64 / data.len() as f64;
+    assert!(
+        (stats.ratio() - expected).abs() < 1e-9,
+        "ratio() {} is not output/input ({expected})",
+        stats.ratio()
+    );
+    // The payload is repetitive enough that the ratio is far below 1, so this
+    // could not pass on a payload the envelope failed to compress.
+    assert!(
+        stats.ratio() < 0.5,
+        "ratio {} is not a real one",
+        stats.ratio()
+    );
+
+    // Elapsed gets an INTERVAL, not a property. "Positive and finite" was the
+    // first attempt and the sweep walked straight through it — `elapsed_secs`
+    // replaced by the constant `1.0` satisfies both, and survived. Timing it
+    // from outside gives a real upper bound: the work cannot have taken longer
+    // than the call did. That is exact on any machine, so it cannot go flaky
+    // the way a hand-picked ceiling would, and it leaves no constant standing.
+    assert!(
+        stats.elapsed_secs() > 0.0 && stats.elapsed_secs() <= pack_wall,
+        "pack claims {}s, but the call itself took {pack_wall}s",
+        stats.elapsed_secs()
+    );
+
+    let clock = Instant::now();
+    let opened = transport::unpack(&packed, &back).unwrap();
+    let unpack_wall = clock.elapsed().as_secs_f64();
+    assert_eq!(
+        opened.bytes(),
+        fs::metadata(&back).unwrap().len(),
+        "Unpacked::bytes() is not the file it wrote"
+    );
+    // `Unpacked::elapsed_secs` is its own function, and survived `1.0` for its
+    // own reasons; it needs the bound in its own right.
+    assert!(
+        opened.elapsed_secs() > 0.0 && opened.elapsed_secs() <= unpack_wall,
+        "unpack claims {}s, but the call itself took {unpack_wall}s",
+        opened.elapsed_secs()
+    );
+}
+
+#[test]
 fn pack_bytes_and_pack_agree_so_either_can_open_the_other() {
     // The interop claim in the module docs. If these diverge, a service that
     // seals in memory produces files its own CLI cannot open — and every
@@ -123,11 +187,24 @@ fn lock_then_unlock_returns_the_original_bytes() {
     let data = payload();
     fs::write(&src, &data).unwrap();
 
-    transport::lock(&src, &sealed, "hunter2").run().unwrap();
+    let clock = Instant::now();
+    let stats = transport::lock(&src, &sealed, "hunter2").run().unwrap();
+    let wall = clock.elapsed().as_secs_f64();
     let opened = transport::unlock(&sealed, &back, "hunter2").unwrap();
 
     assert_eq!(usize::try_from(opened.bytes()).unwrap(), data.len());
     assert_eq!(fs::read(&back).unwrap(), data);
+
+    // The sealing path reports too. Asserted inside this test rather than in one
+    // of its own because it runs at `transport::DEFAULT_WORK_FACTOR` — scrypt at
+    // the shipped factor is deliberately expensive, and there is no reason to
+    // pay for it twice.
+    assert_eq!(stats.bytes(), fs::metadata(&sealed).unwrap().len());
+    assert!(
+        stats.elapsed_secs() > 0.0 && stats.elapsed_secs() <= wall,
+        "lock claims {}s, but the call itself took {wall}s",
+        stats.elapsed_secs()
+    );
 }
 
 #[test]
@@ -219,6 +296,56 @@ fn a_passphrase_never_appears_in_a_debug_rendering() {
             rendered.contains("<redacted>"),
             "expected the redaction marker, got: {rendered}"
         );
+    }
+}
+
+#[test]
+fn a_debug_rendering_shows_what_it_is_supposed_to_show() {
+    // The four `Debug` impls the test above does NOT reach. It covers `Lock` and
+    // `LockBytes`, and covers them properly — asserting the redaction MARKER is
+    // present, not merely that the passphrase is absent, so a stub returning an
+    // empty rendering fails it. These four carry no passphrase, so they were
+    // never in its scope, and nothing else had ever read them: all four survived
+    // a sweep replaced with `Ok(Default::default())` (#273).
+    //
+    // Nothing leaks here — that is the point. What is worth asserting about an
+    // impl with no secret in it is that it is INFORMATIVE: the struct name it
+    // claims to be, and the fields someone reading a log line needs.
+    let pack = transport::pack("in.ags", "out.zst");
+    let pack_bytes = transport::pack_bytes(vec![1, 2, 3]);
+
+    let rendered = format!("{pack:?}");
+    assert!(rendered.starts_with("Pack {"), "got: {rendered}");
+    assert!(rendered.contains("in.ags"), "got: {rendered}");
+    assert!(rendered.contains("out.zst"), "got: {rendered}");
+    assert!(rendered.contains("level"), "got: {rendered}");
+
+    let rendered = format!("{pack_bytes:?}");
+    assert!(rendered.starts_with("PackBytes {"), "got: {rendered}");
+    // The LENGTH, never the payload — a delivery in a log line is its own
+    // problem, separate from the passphrase one.
+    assert!(rendered.contains("bytes: 3"), "got: {rendered}");
+    assert!(rendered.contains("level"), "got: {rendered}");
+
+    // The two result types, which carry no secret and are therefore only ever
+    // checked for being informative at all.
+    let src = tmp("debug.ags");
+    let packed = tmp("debug.ags.zst");
+    let back = tmp("debug.out.ags");
+    fs::write(&src, payload()).unwrap();
+    let stats = transport::pack(&src, &packed).run().unwrap();
+    let opened = transport::unpack(&packed, &back).unwrap();
+
+    let rendered = format!("{stats:?}");
+    assert!(rendered.starts_with("Packed {"), "got: {rendered}");
+    for field in ["bytes", "ratio", "elapsed_s"] {
+        assert!(rendered.contains(field), "{field} missing from: {rendered}");
+    }
+
+    let rendered = format!("{opened:?}");
+    assert!(rendered.starts_with("Unpacked {"), "got: {rendered}");
+    for field in ["bytes", "elapsed_s"] {
+        assert!(rendered.contains(field), "{field} missing from: {rendered}");
     }
 }
 
