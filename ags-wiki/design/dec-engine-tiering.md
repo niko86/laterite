@@ -158,6 +158,16 @@ and "validate in progress" are the same thing to a user.
 > branch. ValidatePane's own unreachable fallback is pre-existing and left
 > alone here — it needs a seam to force an op failure before a test of it could
 > be shown to go red, and its `createEffect` reads the resource too.
+>
+> Closed in #359: every report read in
+> `repo:web/src/components/validate/ValidatePane.tsx` now routes through the
+> guarded accessor (the shape the #357 note below names), and the eager readers
+> in `repo:web/src/components/fix/FixPane.tsx` and
+> `repo:web/src/components/explore/ChartBuilder.tsx` got the same treatment.
+> The seam it was waiting on is the crash rejection #363 made routine: its e2e
+> kills the live worker and blocks the replacement's chunk, and was shown red
+> against the unguarded pane — frozen on the previous file's report — before
+> the accessor landed.
 
 **A failed tier-2 fetch is partial, and must read as partial.** The tab that
 needed it reports and offers retry; tier 1 is precached and untouched. #339's
