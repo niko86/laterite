@@ -13,6 +13,7 @@ import {
   parseDataset,
   arrowIpc,
   startTier2Worker,
+  EngineLoadError,
 } from "../../lib/validatorClient";
 import type { GroupMeta } from "../../lib/duckTypes";
 import { DataTable } from "./DataTable";
@@ -82,7 +83,7 @@ export const ExplorePane: Component = () => {
   // Staged bring-up text, so a slow load shows progress instead of a frozen tab.
   const [stage, setStage] = createSignal("Starting the data engine…");
 
-  const [dataset] = createResource(
+  const [dataset, { refetch }] = createResource(
     () => (proceed() ? fileStore.bytes() : undefined),
     async (bytes) => {
       if (bytes.length === 0) return null;
@@ -144,20 +145,48 @@ export const ExplorePane: Component = () => {
     },
   );
 
+  // EVERY read of the parsed dataset goes through here, and the `<Show>` below
+  // is not what makes that necessary. A Solid resource THROWS when read after a
+  // failure, and the readers here are eager memos and an effect — they re-run
+  // the moment the parse fails, outside any `<Show>`, and the throw takes the
+  // whole update with it. So the failure UI never painted and this tab sat on
+  // "Parsing your file…" for ever: the permanent silent state #339 is about,
+  // reached from the one place a fallback cannot guard (#357; the same trap the
+  // warning box in ags-wiki/design/dec-engine-tiering.md records one layer up,
+  // and verified here by an e2e that hung until this existed).
+  const parsed = () => (dataset.error ? undefined : dataset());
+
   // Seed the SQL editor once the first dataset lands (the console is now
   // controlled by ExplorePane, so the default query is set here).
   createEffect(() => {
-    const first = dataset()?.[0];
+    const first = parsed()?.[0];
     if (first && !sqlText())
       setSqlText(`SELECT * FROM "${first.meta.code}" LIMIT 100`);
   });
 
-  const totalRows = () => dataset()?.reduce((n, g) => n + g.rows, 0) ?? 0;
+  // What went wrong, in the terms a user can act on. A tier-2 engine that never
+  // arrived is a PARTIAL failure — this tab is out, the rest of the app is not
+  // — and the only one of the three a retry can clear once its cause is fixed
+  // (#357, ags-wiki/design/dec-engine-tiering.md).
+  const failure = () => {
+    const e: unknown = dataset.error;
+    if (e instanceof EngineLoadError)
+      return "The explorer's engine couldn't be downloaded — the rest of the app is unaffected. Check your connection and try again.";
+    // The DuckDB engine wasm is NOT precached (it's 36+ MB), so a FIRST
+    // Explore while offline can't fetch it — degrade to a clear message rather
+    // than a raw "Failed to fetch". Validate / Fix are unaffected (their wasm
+    // is precached).
+    if (!navigator.onLine)
+      return "The data engine isn't cached for offline use yet — open Explore once while online, and it'll work offline after. (Validate & Fix already work offline.)";
+    return `Explore error: ${String(e)}`;
+  };
+
+  const totalRows = () => parsed()?.reduce((n, g) => n + g.rows, 0) ?? 0;
   const selectedInfo = () =>
-    dataset()?.find((g) => g.meta.code === selected()) ?? null;
+    parsed()?.find((g) => g.meta.code === selected()) ?? null;
   const filteredGroups = createMemo(() => {
     const f = groupFilter().trim().toUpperCase();
-    const ds = dataset() ?? [];
+    const ds = parsed() ?? [];
     if (!f) return ds;
     // Keep the currently-open group in the list even if it doesn't match, so the
     // active highlight doesn't vanish while its table is still on screen.
@@ -171,7 +200,7 @@ export const ExplorePane: Component = () => {
   // (CHILD ⋈ PARENT joins), shown as one-click chips in the SQL console.
   const relatedExamples = createMemo(() => {
     const d = dict();
-    const ds = dataset();
+    const ds = parsed();
     return d && ds
       ? relExamples(
           ds.map((g) => ({ code: g.meta.code, headings: g.meta.headings })),
@@ -217,15 +246,22 @@ export const ExplorePane: Component = () => {
           <Show
             when={!dataset.error}
             fallback={
-              <p class="text-sm text-err">
-                {/* The DuckDB engine wasm is NOT precached (it's 36+ MB), so a
-                  FIRST Explore while offline can't fetch it — degrade to a
-                  clear message rather than a raw "Failed to fetch". Validate /
-                  Fix are unaffected (their wasm is precached). */}
-                {!navigator.onLine
-                  ? "The data engine isn't cached for offline use yet — open Explore once while online, and it'll work offline after. (Validate & Fix already work offline.)"
-                  : `Explore error: ${String(dataset.error)}`}
-              </p>
+              <div class="flex max-w-prose flex-col items-start gap-3">
+                <p class="text-sm text-err">{failure()}</p>
+                {/* A retry that re-runs the whole fetcher, so a dropped engine
+                  is re-fetched rather than re-read: the channel retires a
+                  worker whose engine failed, so this spawns a fresh one
+                  (#357). Offered for every failure here — a stale DuckDB
+                  fetch and a transient parse both clear the same way, and a
+                  button that does nothing is the state we're removing. */}
+                <button
+                  type="button"
+                  class="rounded bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent/25"
+                  onClick={() => void refetch()}
+                >
+                  Try again
+                </button>
+              </div>
             }
           >
             <div class="flex min-w-0 flex-col gap-4">
@@ -316,7 +352,7 @@ export const ExplorePane: Component = () => {
                         }
                       >
                         <option value="">Overview</option>
-                        <For each={dataset()}>
+                        <For each={parsed()}>
                           {(g) => (
                             <option value={g.meta.code}>
                               {g.meta.code} ({g.rows})
@@ -329,7 +365,7 @@ export const ExplorePane: Component = () => {
                       when={selectedInfo()}
                       fallback={
                         <Dashboard
-                          groups={dataset() ?? []}
+                          groups={parsed() ?? []}
                           totalRows={totalRows()}
                           onPick={setSelected}
                         />
@@ -349,12 +385,12 @@ export const ExplorePane: Component = () => {
               <Show when={view() === "sql"}>
                 <div class="flex min-w-0 flex-col gap-3">
                   <SqlBuilder
-                    groups={(dataset() ?? []).map((g) => g.meta)}
+                    groups={(parsed() ?? []).map((g) => g.meta)}
                     dict={dict()}
                     onApply={setSqlText}
                   />
                   <SqlConsole
-                    groups={(dataset() ?? []).map((g) => g.meta.code)}
+                    groups={(parsed() ?? []).map((g) => g.meta.code)}
                     sql={sqlText}
                     setSql={setSqlText}
                     related={relatedExamples()}
@@ -363,12 +399,12 @@ export const ExplorePane: Component = () => {
               </Show>
               <Show when={view() === "charts"}>
                 <ChartBuilder
-                  groups={(dataset() ?? []).map((g) => g.meta)}
+                  groups={(parsed() ?? []).map((g) => g.meta)}
                   dict={dict()}
                 />
               </Show>
               <Show when={view() === "analyse"}>
-                <AnalyseView groups={(dataset() ?? []).map((g) => g.meta)} />
+                <AnalyseView groups={(parsed() ?? []).map((g) => g.meta)} />
               </Show>
             </div>
           </Show>

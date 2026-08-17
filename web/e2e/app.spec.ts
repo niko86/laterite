@@ -1032,3 +1032,124 @@ test("an engine that never arrives is reported, not left spinning", async ({
     await ctx.close();
   }
 });
+
+// --- a tier-2 engine that won't fetch: partial, and recoverable -----------
+
+// Tier 1 is precached, so a tier-2 fetch failure is genuinely PARTIAL and has
+// to read that way (#357, ags-wiki/design/dec-engine-tiering.md): only the tab
+// that needed the second engine is out, and only until a retry succeeds.
+//
+// Both tests below block service workers for the reason the two boot tests
+// above do — page.route() cannot see a fetch the SW answers. Here it matters
+// twice over: with the CacheFirst rule live, a retry could be served from cache
+// and pass without anything having been re-fetched, which is the one thing
+// these tests exist to prove.
+//
+// What makes them falsifiable is the fetch counter. An abort route that never
+// matched, or a retry that re-read a settled rejection instead of asking the
+// network again, both leave it standing still — so the count is asserted to
+// GROW across the retry, not merely to be non-zero.
+async function blockTier2(page: Page) {
+  const state = { blocked: true, fetches: 0 };
+  await page.route(/ags4_wasm_full_bg-[^/]*\.wasm$/, async (route) => {
+    state.fetches++;
+    if (state.blocked) await route.abort();
+    else await route.continue();
+  });
+  return state;
+}
+
+test("Tools → Excel reports an engine it can't fetch, and converts once a retry succeeds", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  const tier2 = await blockTier2(page);
+  try {
+    await page.goto(APP);
+    await page.getByRole("button", { name: /Clean \(minimal\)/ }).click();
+    await expect(page.getByText(/Clean — 0 findings/)).toBeVisible();
+
+    await tab(page, "Tools").click();
+    await page.getByRole("button", { name: /^Excel$/ }).click();
+    await page.getByRole("button", { name: /Download as Excel/ }).click();
+
+    // Reported on the tab that needed it — not a spinner, and not silence.
+    await expect(page.getByText(/engine couldn't be downloaded/)).toBeVisible();
+    expect(tier2.fetches).toBeGreaterThan(0); // the block is real
+    const beforeRetry = tier2.fetches;
+
+    // …and the failure is scoped to it. The page-level engine banner belongs to
+    // tier 1 and must stay silent: a precached engine did not fail.
+    await expect(
+      page.getByText(/Failed to load the validator engine/),
+    ).toHaveCount(0);
+
+    // The cause is fixed. The retry has to reach the network again — which it
+    // can only do if the dead worker was dropped rather than kept.
+    tier2.blocked = false;
+    const [xlsx] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: /^Try again$/ }).click(),
+    ]);
+    expect(xlsx.suggestedFilename()).toMatch(/\.xlsx$/);
+    await expect(page.getByText(/→ \.xlsx/)).toBeVisible();
+    await expect(page.getByText(/engine couldn't be downloaded/)).toHaveCount(
+      0,
+    );
+    expect(tier2.fetches).toBeGreaterThan(beforeRetry);
+
+    // No page reload happened, and tier 1 never stopped working: a fresh
+    // validate still runs in the always-on worker. The sample list collapses
+    // once a file is loaded, so re-open it before reaching for a sample.
+    await tab(page, "Validate").click();
+    await page.getByText(/Or try a sample/).click();
+    await page.getByRole("button", { name: /Rule 9.*unknown heading/ }).click();
+    await expect(page.getByText("✗").first()).toBeVisible();
+  } finally {
+    await ctx.close();
+  }
+});
+
+test("Explore reports an engine it can't fetch, and ingests once a retry succeeds", async ({
+  browser,
+}) => {
+  // DuckDB is fetched and compiled before the parse that fails, and with the
+  // service worker blocked none of it comes from a cache.
+  test.setTimeout(180_000);
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  const tier2 = await blockTier2(page);
+  try {
+    await page.goto(APP);
+    await expect(
+      page.getByRole("button", { name: /Clean \(minimal\)/ }),
+    ).toBeVisible();
+    await page
+      .locator('input[type="file"]')
+      .setInputFiles(fixture("coords.ags"));
+
+    await tab(page, "Explore").click();
+    // The low-end gate holds the DuckDB download on a runner fingerprinted
+    // low-end (see enterExplore in helpers.ts); race it against the failure so
+    // a capable runner pays no extra wait.
+    const failure = page.getByText(/engine couldn't be downloaded/);
+    const gate = page.getByRole("button", { name: /^Continue$/ });
+    await expect(failure.or(gate).first()).toBeVisible({ timeout: 120_000 });
+    if (await gate.isVisible().catch(() => false)) await gate.click();
+
+    // The pane REPORTS. It reached this by rendering an errored resource's
+    // fallback — the state that used to spin for ever because reading the
+    // resource threw before its own error branch could paint.
+    await expect(failure).toBeVisible({ timeout: 120_000 });
+    expect(tier2.fetches).toBeGreaterThan(0);
+    const beforeRetry = tier2.fetches;
+
+    tier2.blocked = false;
+    await page.getByRole("button", { name: /^Try again$/ }).click();
+    await expect(page.getByText(/data rows/)).toBeVisible({ timeout: 120_000 });
+    expect(tier2.fetches).toBeGreaterThan(beforeRetry);
+  } finally {
+    await ctx.close();
+  }
+});
