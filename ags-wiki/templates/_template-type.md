@@ -11,8 +11,8 @@ varies_between_editions: false
 divergences: []
 ags_editions: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 repo_refs:
-  classifier: "repo:packages/ags5-models/src/ags5_models/_types.py::canonical_type"
-  display_hint: "repo:packages/ags5-models/src/ags5_models/_types.py::display_hint"
+  classifier: "repo:packages/laterite/python/laterite/ags_types.py::canonical_type"
+  display_hint: "repo:packages/laterite/python/laterite/ags_types.py::display_hint"
   rule8_impl: "repo:rust-packages/laterite-ags4-validator/src/rules/typed_values.rs"
 related: [rule-08-typed-values]
 sources: [AGS4-4.2-2025.pdf]
