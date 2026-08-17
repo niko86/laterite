@@ -32,7 +32,7 @@ now).
 
 The **repo is the source of truth**. Pages *synthesize, diagram, and
 cross-reference*; they never paste source text from
-`ags5_dictionary.json`, `OBSERVATIONS.md`, the rule `*.rs` files, or
+`ags_dictionary.json`, `OBSERVATIONS.md`, the rule `*.rs` files, or
 the bulk spec PDF (the 154-page Data Dictionary, prose sections).
 Every factual claim carries a citation.
 
@@ -46,8 +46,8 @@ being `RL`):
 2. the ~17 **TYPE definitions** (`spec:` §3.3);
 3. the per-group **heading table** (Heading · Status · Type ·
    Description) — rendered *mechanically from the repo's own
-   `ags5_dictionary.json` model authority* (not the 145-page spec
-   prose), cited `repo:…ags5_dictionary.json groups[code=…]`.
+   `ags_dictionary.json` model authority* (not the 145-page spec
+   prose), cited `repo:…ags_dictionary.json groups[code=…]`.
 Everything else stays link-only — never the spec PDF's prose sections,
 worked examples, suggested-unit tables, or descriptive narrative. If a page and
 its cited source ever disagree → **flag it** (`status: contradicted` +
@@ -229,7 +229,7 @@ Greppable: `^## \[(\d{4}-\d{2}-\d{2})\] (ingest|query|lint) \| (.+)$`.
 
 1. **Classify the source**: spec erratum/new edition · new
    `OBSERVATIONS` O-N · dogfood/parity finding (`laterite-ags4-corpus-qa`) ·
-   `ags5_dictionary.json` change · external doc (→ drop immutably in
+   `ags_dictionary.json` change · external doc (→ drop immutably in
    `sources/external/`, register a `sources/` stub).
 2. Read the source **in full** (never skim a region you will cite).
 3. **Discuss** the proposed page set with the user before writing.

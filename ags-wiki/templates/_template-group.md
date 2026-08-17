@@ -11,7 +11,7 @@ key_headings: []          # status KEY
 required_headings: []     # status REQUIRED
 ags_editions: [4.1]
 repo_refs:
-  dictionary: "repo:rust-packages/laterite-ags4-core/data/ags5_dictionary.json groups[code=<CODE>]"
+  dictionary: "repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json groups[code=<CODE>]"
 related: []
 sources: []
 ---
