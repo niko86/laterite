@@ -318,7 +318,7 @@ design is the **cache split**, dictated by the asset weights:
   it is the measured-value corollary in `repo:ags-wiki/AGS-WIKI.md` §1.
 - **Never precached → runtime-cached `CacheFirst` on first fetch:** the DuckDB
   engine wasm (36 MB EH + 41 MB MVP), the 15 MB OSTN15 grid, and since #355 the
-  **tier-2 engine** (5.2 MB, the full build, `ags-engine-tier2`) — **97 MB** we
+  **tier-2 engine** (the full build, `ags-engine-tier2`) — tens of MB we
   refuse to pull on every install. `globIgnore`d (+ a 3 MiB
   `maximumFileSizeToCacheInBytes` as belt-and-braces) and matched by per-asset
   `CacheFirst` rules (`maxEntries:2`, `purgeOnQuotaError`). This dovetails with
@@ -329,7 +329,8 @@ design is the **cache split**, dictated by the asset weights:
 
 > [!note] This two-way split is now a four-tier one, and it is built
 > [[dec-engine-tiering]] (#338) refines the above: the engine itself splits, so
-> the precached artifact is 839 KiB gzipped rather than 1771, first render gates
+> the precached artifact is the smaller of the two builds — that page's tier table
+> is where the measurements live — first render gates
 > on the ~30 KB tokenizer alone (#353), and the full engine joins DuckDB as a
 > deferred tier fetched on first Explore/Excel open (#354 built the second
 > worker, #355 gave it its own artifact). The precache-vs-runtime reasoning on

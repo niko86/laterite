@@ -500,8 +500,8 @@ test("PWA: the app loads and validates fully offline after first visit", async (
   await page.context().setOffline(true);
   try {
     // Offline reload: the SW must serve the app shell (navigateFallback →
-    // precached index.html), every JS/CSS chunk, and the 2.1 MB tier-1 engine
-    // wasm — all from the precache.
+    // precached index.html), every JS/CSS chunk, and the tier-1 engine wasm —
+    // all from the precache.
     await page.reload();
     await expect(
       page.getByRole("button", { name: /Clean \(minimal\)/ }),

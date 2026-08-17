@@ -182,13 +182,30 @@ Comments lead with **why**, not what — see
 `rust-packages/laterite-ags4-validator/src/parse.rs` for the established tone.
 Don't narrate obvious code.
 
-**Don't write a measured value into a comment.** A number a tool recomputes every
-run — precache weight, artifact size, coverage, a timing — belongs in a gate or an
-assertion, where drifting fails something. In a comment it has no reader, so it
-rots silently and on the next build. Name the instrument, not the reading. A
-gated threshold may be cited (`tools/release/check-wasm-tier1.mjs`'s ceiling), a
-historical series is a record and cannot drift, and loose orders of magnitude are
-fine. Full rule + the worked example that earned it: `ags-wiki/AGS-WIKI.md` §1.
+**Never write a MEASURED value into prose** — a comment, a doc, or a wiki page. A
+number some tool recomputes on every run (the PWA precache weight, an artifact's
+size, a coverage percentage, a benchmark timing) belongs where something *reads*
+it: a gate, a threshold, an assertion. In prose it acquires no reader, so nothing
+fails when it drifts — and it drifts on the very next build. Name the
+**instrument**, not the reading: "the figure `vite-plugin-pwa` prints on every
+build", never the figure.
+
+Worked example (#345): the precache weight was stated in three places and gated
+in none. Each was corrected in turn and wrong again within days — including
+inside the comment that explained the mechanism ("a stale number in a gate fails
+the build, a stale number here fails nobody").
+
+Three carve-outs, and only three:
+
+- **A gated threshold** — cite the gate **by name, never the number inside it**.
+  `tools/release/check-wasm-tier1.mjs` fails CI when its ceilings are crossed, so
+  they cannot go stale; a copy of one in prose propagates it again and rots
+  identically when the ceiling moves. (This is the carve-out most easily misread
+  as "numbers with a gate are fine". They are not.)
+- **A historical series** — 3.3 MB → 4.8 MB → 6.6 MB describes builds that
+  already happened, so it cannot drift.
+- **Loose orders of magnitude** — "a multi-MB engine", "tens of MB". Third-party
+  artifacts this repo neither builds nor measures (DuckDB's ~36/41 MB) count here.
 
 **Surgical, targeted changes.** Change only what the task needs; don't refactor,
 "improve", or reformat adjacent code beyond scope — smaller diffs succeed more and

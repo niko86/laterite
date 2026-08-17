@@ -149,7 +149,7 @@ export const RUNTIME_CACHING: RuntimeCachingRule[] = [
     },
   },
   {
-    // The TIER-2 engine wasm (#355) — the full build, 5.2 MB raw, fetched the
+    // The TIER-2 engine wasm (#355) — the full build, several MB, fetched the
     // first time Explore or Tools → Excel is opened and never on a visit that
     // opens neither. Fingerprinted + immutable, so CacheFirst is safe and the
     // second visit to either tab compiles from cache, offline included.
@@ -227,12 +227,11 @@ export default defineConfig({
     // and the Explore/Charts/Coordinates UIs render offline too; only their heavy
     // *engines* are deferred.
     //
-    // The install's total weight is deliberately NOT stated here (#345).
-    // vite-plugin-pwa prints it as `precache N entries (… KiB)` on every build —
+    // The install's total weight is deliberately NOT stated here (#345):
+    // vite-plugin-pwa prints it as `precache N entries (… KiB)` on every build, so
     // read it from a build. Three hand-written copies of that reading rotted, this
-    // one included, in the same comment that explained why they would: a stale
-    // number in a gate fails the build, and a stale number in a comment fails
-    // nobody. The rule that came out of it is in `ags-wiki/AGS-WIKI.md` §1.
+    // one included. See CLAUDE.md, *Conventions* — measured values go in gates,
+    // not comments.
     //
     // What the tiering did to that install is the part worth keeping, and it is
     // history rather than a reading — the precached engine went 3.3 MB (AGS4
@@ -241,7 +240,7 @@ export default defineConfig({
     // install by about 4.5 MiB in a day.
     //
     // NEVER precached: the DuckDB engine wasm (36 MB EH + 41 MB MVP), the 15 MB
-    // OSTN15 grid, and now the **tier-2** engine (5.2 MB) — the full build, which
+    // OSTN15 grid, and now the **tier-2** engine — the full build, which
     // only Explore and Tools → Excel need. All three are `globIgnore`d here and
     // instead runtime-cached CacheFirst the FIRST time they're actually fetched
     // (the idle-warm in lib/prefetch.ts only fetches DuckDB on a fast,
@@ -315,13 +314,13 @@ export default defineConfig({
           "**/*.map",
         ],
         // 3 MiB, down from 8 (#355) — and the drop is what makes this a guard
-        // again. The precache now carries TIER 1 (2.1 MB raw), not the full
-        // engine, so this number can sit in the gap between the two builds:
-        // above `tools/release/check-wasm-tier1.mjs`'s 2350 KiB raw ceiling,
-        // which is what keeps tier 1 from growing into it, and below tier 2's
-        // 5.2 MB. At 8 MiB it could not catch a leaked tier 2 at all — the full
-        // engine fits under it, which is exactly why the globs above needed a
-        // third lock rather than a bigger number.
+        // again. The precache carries TIER 1 now, not the full engine, so this
+        // cap can sit in the GAP between the two builds: above the raw ceiling
+        // `tools/release/check-wasm-tier1.mjs` holds tier 1 to, and below what
+        // tier 2 weighs. At 8 MiB it could not catch a leaked tier 2 at all — the
+        // full engine fits under it, which is exactly why the globs above needed
+        // a third lock rather than a bigger number. Both bounds live where they
+        // are enforced; restating either here is how the pair silently uncouples.
         //
         // The two ceilings move together: raise the tier-1 gate past this and the
         // engine stops being precached, which costs offline validate. That is

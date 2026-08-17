@@ -54,33 +54,20 @@ its cited source ever disagree → **flag it** (`status: contradicted` +
 a `> [!spec-ambiguity]`/`> [!divergence]` callout), never silently
 "correct" either side.
 
-**Corollary — a MEASURED value is not a fact to copy.** A number some tool
-recomputes on every run — the PWA precache weight, an artifact's size, a coverage
-percentage, a benchmark timing — belongs where something **reads** it: a gate, a
-threshold, an assertion. Copied into prose it acquires no reader, so nothing
-fails when it drifts, and it drifts on the very next build. Name the
-**instrument**, not the reading — "the figure `vite-plugin-pwa` prints on every
-build" rather than the figure itself. This is the same rule as the one above, one
-step further out: there, prose must not restate what the repo defines; here,
-prose must not restate what the repo *measures*.
+**Corollary — a MEASURED value is not a fact to copy either.** The rule above is
+about what the repo **defines**; this is about what it **measures**. A number some
+tool recomputes on every run — an artifact's size, the PWA precache weight, a
+coverage percentage, a benchmark timing — never belongs on a page: in prose it
+acquires no reader, so nothing fails when it drifts, and it drifts on the next
+build. Cite the **instrument** that prints it, or the **gate** that holds it — the
+gate by name, not by the number inside it.
 
-The precache weight is the worked example (#345). It was stated in three places,
-each corrected in turn, and each wrong again within days — including in the very
-comment that explained the mechanism ("a stale number there fails the build and a
-stale number here fails nobody"). Three copies, no consumer, no gate.
-
-Two things this does **not** forbid:
-
-1. **A gated threshold**, which is the value's home rather than a copy of it —
-   `repo:tools/release/check-wasm-tier1.mjs` fails CI when its ceilings are
-   crossed, so they cannot go quietly stale. Cite the **gate**, though, not the
-   number in it: restating the threshold in prose is the same propagation as
-   restating a reading, and rots the same way when the ceiling moves.
-2. **A historical series**, which describes builds that already happened and so
-   cannot drift — 3.3 MB → 4.8 MB → 6.6 MB is a record, not a reading.
-
-Loose orders of magnitude ("a multi-MB engine", "tens of MB") are fine and cannot
-meaningfully rot. Precise readings of the *current* build are what this bans.
+The general form, its three carve-outs (a gated threshold, a historical series,
+loose orders of magnitude) and the worked example that earned it are in
+`repo:CLAUDE.md` under *Conventions*. They live there rather than here because
+that rule governs the whole repo and this manual governs `ags-wiki/` only (§0) —
+so this states the wiki half and defers, rather than keeping a second copy that
+would drift from it, which is the very failure both rules are about.
 
 **Citation grammar** (inline code span):
 - repo file/line — `` `repo:rust-packages/laterite-ags4-validator/src/rules/typed_values.rs:352` ``
