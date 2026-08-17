@@ -117,10 +117,19 @@ export const ValidatePane: Component = () => {
     (src) => runValidate(src.b, src.dict, true, src.enc, DEFAULT_MAX_PER_RULE),
   );
 
+  // EVERY read of the report goes through here. A Solid resource THROWS when
+  // read after a failure, and the readers below are an effect and two eager
+  // memos — they re-run the moment the validate rejects, outside any fallback
+  // a <Show> could guard, and the throw took the whole update down with it. So
+  // a worker crash froze this pane on the PREVIOUS file's report, with its own
+  // "Validator error" branch unreachable below (#359; the shape #363 gave
+  // ExplorePane, per the warning box in ags-wiki/design/dec-engine-tiering.md).
+  const result = () => (report.error ? undefined : report());
+
   // Whenever a NEW report arrives, reset the filter/open state to defaults
   // derived from it.
   createEffect(() => {
-    const r = report();
+    const r = result();
     if (!r) return;
     const ruleKeys = r.findings.map((g) => g.rule);
     const groupKeys = new Set<string>();
@@ -144,7 +153,7 @@ export const ValidatePane: Component = () => {
 
   // The filtered groups the findings list renders. All filters AND.
   const filteredReport = createMemo<ValidationReport | null>(() => {
-    const r = report();
+    const r = result();
     if (!r) return null;
     const rules = selectedRules();
     const sevs = selectedSeverities();
@@ -182,7 +191,7 @@ export const ValidatePane: Component = () => {
       filteredReport()?.findings.reduce((n, g) => n + g.items.length, 0) ?? 0,
   );
   const totalCount = createMemo(
-    () => report()?.findings.reduce((n, g) => n + g.items.length, 0) ?? 0,
+    () => result()?.findings.reduce((n, g) => n + g.items.length, 0) ?? 0,
   );
 
   // FindingsView virtualizes its rows, so an off-screen rule header has no
@@ -262,23 +271,26 @@ export const ValidatePane: Component = () => {
       {/* Right: results */}
       <section class="flex min-w-0 flex-col gap-4">
         <Show
-          when={report()}
+          when={result()}
           fallback={
             <div class="rounded-lg border border-line bg-surface p-6 text-sm text-fg-muted">
+              {/* Guard-first, so the error branch is REACHABLE: `result()`
+                  never throws, and a mid-edit retry (loading, error still
+                  set) reads as validating, not as the stale failure. */}
               <Show
-                when={report.loading}
-                fallback={
-                  <Show
-                    when={Boolean(report.error)}
-                    fallback="Load a file, paste AGS4 text, or pick a sample to validate."
-                  >
+                when={!report.loading}
+                fallback={<Spinner label="Validating…" />}
+              >
+                <Show
+                  when={!report.error}
+                  fallback={
                     <span class="text-err">
                       Validator error: {String(report.error)}
                     </span>
-                  </Show>
-                }
-              >
-                <Spinner label="Validating…" />
+                  }
+                >
+                  Load a file, paste AGS4 text, or pick a sample to validate.
+                </Show>
               </Show>
             </div>
           }

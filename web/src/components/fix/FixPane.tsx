@@ -96,7 +96,16 @@ export const FixPane: Component = () => {
     },
     (src) => validate(src.b, src.dict, true, src.enc, null),
   );
-  const sevIndex = createMemo(() => buildSevIndex(report()));
+
+  // EVERY read of the two resources goes through these. A Solid resource
+  // THROWS when read after a failure, and the readers here are eager — two
+  // memos and the selection-reseed effect — so a rejected op would throw
+  // outside any fallback and take the whole update down (#359; the shape the
+  // warning box in ags-wiki/design/dec-engine-tiering.md records).
+  const fixList = () => (fixes.error ? undefined : fixes());
+  const sevReport = () => (report.error ? undefined : report());
+
+  const sevIndex = createMemo(() => buildSevIndex(sevReport()));
   // Named for its argument: this resolves a FIX's severity (by looking up the
   // finding it came from), distinct from `severityOf`, which resolves a
   // finding's own. The two used to share a name, and the shadowing hid which
@@ -108,7 +117,7 @@ export const FixPane: Component = () => {
   // a fix touching FYI is never a surprise — there's no separate FYI-only fix
   // to gate, so this is transparency, not a toggle.
   const touchesFyi = createMemo(() => {
-    const r = report();
+    const r = sevReport();
     if (!r) return false;
     const rulesWithFyi = new Set(
       r.findings
@@ -118,7 +127,7 @@ export const FixPane: Component = () => {
     // The BOM's FYI is filed under a sibling "FYI (Related to Rule 1)" rule, so
     // also treat a Rule 1 fix as FYI-touching when any FYI-rule is present.
     const hasRule1Fyi = [...rulesWithFyi].some((r) => r.includes("Rule 1"));
-    return (fixes() ?? []).some(
+    return (fixList() ?? []).some(
       (f) =>
         f.risk !== "risky" &&
         (rulesWithFyi.has(f.rule) ||
@@ -142,7 +151,7 @@ export const FixPane: Component = () => {
 
   // Safe fixes are bulk-applicable; risky ones (e.g. typographic→ASCII,
   // duplicate-heading rename) guess intent and are opt-in only.
-  const safeFixes = () => (fixes() ?? []).filter((f) => f.risk !== "risky");
+  const safeFixes = () => (fixList() ?? []).filter((f) => f.risk !== "risky");
 
   // A fix is applied iff selected; default the SAFE fixes to checked, risky
   // ones unchecked (reseeds after each apply, since fixes() recomputes).
@@ -394,7 +403,7 @@ export const FixPane: Component = () => {
           </Show>
 
           <FixesPanel
-            fixes={() => fixes() ?? []}
+            fixes={() => fixList() ?? []}
             text={text}
             selected={selected}
             onToggle={toggleFix}
