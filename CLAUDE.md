@@ -182,6 +182,14 @@ Comments lead with **why**, not what — see
 `rust-packages/laterite-ags4-validator/src/parse.rs` for the established tone.
 Don't narrate obvious code.
 
+**Don't write a measured value into a comment.** A number a tool recomputes every
+run — precache weight, artifact size, coverage, a timing — belongs in a gate or an
+assertion, where drifting fails something. In a comment it has no reader, so it
+rots silently and on the next build. Name the instrument, not the reading. A
+gated threshold may be cited (`tools/release/check-wasm-tier1.mjs`'s ceiling), a
+historical series is a record and cannot drift, and loose orders of magnitude are
+fine. Full rule + the worked example that earned it: `ags-wiki/AGS-WIKI.md` §1.
+
 **Surgical, targeted changes.** Change only what the task needs; don't refactor,
 "improve", or reformat adjacent code beyond scope — smaller diffs succeed more and
 regress less. Spotted relics (dead code, stale comments, redundant tests) get

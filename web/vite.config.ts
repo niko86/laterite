@@ -221,22 +221,24 @@ export default defineConfig({
     // PRECACHE (downloaded at install, then served offline) = the full app
     // shell: EVERY JS/CSS chunk — including the Explore/Charts/Coordinates UI
     // and the DuckDB *worker* glue — plus the reference JSONs, the sample
-    // files, and the 2.1 MB **tier-1** engine wasm. So Validate, Fix, Export and
-    // ALL of Tools work fully offline after one visit, and the Explore/Charts/
-    // Coordinates UIs render offline too; only their heavy *engines* are
-    // deferred.
+    // files, and the **tier-1** engine wasm — held to gzip and raw ceilings by
+    // `tools/release/check-wasm-tier1.mjs`, which is where those numbers live. So
+    // Validate, Fix, Export and ALL of Tools work fully offline after one visit,
+    // and the Explore/Charts/Coordinates UIs render offline too; only their heavy
+    // *engines* are deferred.
     //
-    // That install costs **7269.44 KiB across 46 entries** (measured 2026-08-17,
-    // #356) — the figure vite-plugin-pwa prints as `precache N entries (… KiB)`
-    // on every build, which is where to re-read it rather than trusting this
-    // comment. Every hand-written copy of it in this repo has gone stale at some
-    // point, this one included; #345 tracks gating it instead.
+    // The install's total weight is deliberately NOT stated here (#345).
+    // vite-plugin-pwa prints it as `precache N entries (… KiB)` on every build —
+    // read it from a build. Three hand-written copies of that reading rotted, this
+    // one included, in the same comment that explained why they would: a stale
+    // number in a gate fails the build, and a stale number in a comment fails
+    // nobody. The rule that came out of it is in `ags-wiki/AGS-WIKI.md` §1.
     //
-    // The number is 4.5 MiB smaller than it was the day before, and only the
-    // engine moved: the precached artifact is now the engine minus `arrow` and
-    // `excel` (2.1 MB raw) rather than the whole thing (6.6 MB). Its history is
-    // the shape of the problem the tiering solved — 3.3 MB (AGS4 producer) →
-    // 4.8 MB (content-addressed keychain, #303) → 6.6 MB (Excel) → 2.1 MB.
+    // What the tiering did to that install is the part worth keeping, and it is
+    // history rather than a reading — the precached engine went 3.3 MB (AGS4
+    // producer) → 4.8 MB (content-addressed keychain, #303) → 6.6 MB (Excel), and
+    // then #355 swapped it for the engine minus `arrow` and `excel`, cutting the
+    // install by about 4.5 MiB in a day.
     //
     // NEVER precached: the DuckDB engine wasm (36 MB EH + 41 MB MVP), the 15 MB
     // OSTN15 grid, and now the **tier-2** engine (5.2 MB) — the full build, which
