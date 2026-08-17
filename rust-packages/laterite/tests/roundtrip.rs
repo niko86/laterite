@@ -23,6 +23,25 @@ const SAMPLE: &str = concat!(
     "\"DATA\",\"BH02\",\"CP\"\r\n",
 );
 
+/// A group declared with no DATA rows — itself a Rule 2 violation, which is why
+/// no valid fixture can supply the empty-group case.
+const NO_ROWS: &str = concat!(
+    "\"GROUP\",\"LOCA\"\r\n",
+    "\"HEADING\",\"LOCA_ID\",\"LOCA_TYPE\"\r\n",
+    "\"UNIT\",\"\",\"\"\r\n",
+    "\"TYPE\",\"ID\",\"X\"\r\n",
+);
+
+/// A group whose HEADING row declares nothing, so its DATA row has no cells.
+/// The only route to an empty [`ags4::Row`] through the public surface.
+const NO_HEADINGS: &str = concat!(
+    "\"GROUP\",\"LOCA\"\r\n",
+    "\"HEADING\"\r\n",
+    "\"UNIT\"\r\n",
+    "\"TYPE\"\r\n",
+    "\"DATA\"\r\n",
+);
+
 fn sample() -> ags4::Document {
     ags4::read_bytes(SAMPLE.as_bytes()).run().expect("reads")
 }
@@ -56,7 +75,177 @@ fn rows_is_an_exact_size_iterator() {
     let doc = sample();
     let loca = doc.group("LOCA").unwrap();
     assert_eq!(loca.rows().len(), 2);
-    assert_eq!(loca.rows().count(), 2);
+
+    // Counted by walking to the end, because "it terminates" is half of what is
+    // being claimed — but with a ceiling, so an iterator that never advances
+    // fails HERE rather than spinning, which a bare `.count()` does.
+    //
+    // Note what this does not buy: a sweep still records `next` losing its
+    // increment as a TIMEOUT rather than a failure, because
+    // `walks_headings_and_rows` collects from `rows()` and hangs on the same
+    // mutant, and one hung test holds the whole binary open however fast its
+    // siblings fail. Bounding every consumer to change that would put a ceiling
+    // in tests that are not about iteration, which reads worse than it repays —
+    // and a timeout is still a kill, not a survivor.
+    let mut seen = 0;
+    for _ in loca.rows() {
+        seen += 1;
+        assert!(seen <= 100, "rows() did not terminate");
+    }
+    assert_eq!(seen, 2);
+}
+
+/// The remaining count goes DOWN as the iterator is stepped, and the values come
+/// out in order.
+///
+/// The bounded walk above proves the iterator terminates on the right total; this
+/// pins WHERE it is between steps, which is what `size_hint` promises a caller
+/// pre-sizing a collection. Mutating `self.next += 1` to `*= 1` fails both, and
+/// failed neither before (#377).
+#[test]
+fn stepping_rows_consumes_them() {
+    let doc = sample();
+    let loca = doc.group("LOCA").unwrap();
+    let mut rows = loca.rows();
+
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows.next().unwrap().cell("LOCA_ID"), Some("BH01"));
+    assert_eq!(rows.len(), 1, "the iterator did not advance");
+    assert_eq!(rows.next().unwrap().cell("LOCA_ID"), Some("BH02"));
+    assert_eq!(rows.len(), 0);
+    assert!(rows.next().is_none(), "the iterator ran past its own end");
+}
+
+/// The `is_empty` half of every length accessor.
+///
+/// `len()` is asserted all over this file and `is_empty()` nowhere, so
+/// `Document::is_empty`, `Group::is_empty` and `Row::is_empty` could each be
+/// replaced by a constant (#377). Each needs BOTH answers to be reached, which is
+/// the part that takes a fixture rather than a line.
+#[test]
+fn emptiness_is_asked_of_documents_groups_and_rows() {
+    let mut doc = sample();
+
+    // A document with groups, and then one without — `remove_group` is the only
+    // way to reach the second state through the public surface.
+    assert!(!doc.is_empty());
+    assert!(doc.remove_group("PROJ"));
+    assert!(doc.remove_group("LOCA"));
+    assert!(doc.is_empty(), "every group was removed: {:?}", doc.codes());
+    assert_eq!(doc.len(), 0);
+
+    // A group with rows, and a group declared with none.
+    let empty_doc = ags4::read_bytes(NO_ROWS.as_bytes()).run().expect("reads");
+    let empty_group = empty_doc.group("LOCA").expect("LOCA is declared");
+    assert!(empty_group.is_empty(), "the group has no DATA rows");
+    assert_eq!(empty_group.len(), 0);
+    assert!(empty_group.row(0).is_none());
+
+    let full = sample();
+    let loca = full.group("LOCA").unwrap();
+    assert!(!loca.is_empty());
+
+    // A row's own width — one cell per heading.
+    let row = loca.row(0).unwrap();
+    assert_eq!(row.len(), 2, "one cell per heading");
+    assert!(!row.is_empty());
+
+    // And a row with no cells at all. The first attempt at this test assumed that
+    // was unreachable and asserted only the populated side, which left
+    // `Row::is_empty -> false` alive. `NO_HEADINGS` parses.
+    let bare = ags4::read_bytes(NO_HEADINGS.as_bytes())
+        .run()
+        .expect("reads");
+    let bare_row = bare
+        .group("LOCA")
+        .expect("LOCA is declared")
+        .row(0)
+        .expect("the DATA row is there");
+    assert_eq!(bare_row.len(), 0);
+    assert!(bare_row.is_empty(), "a row with no headings has no cells");
+}
+
+/// `push_row` refuses a heading the group does not have — the counterpart of
+/// `set_cell_refuses_what_it_cannot_do`, which covers only `set_cell`.
+///
+/// Its heading check was free: inverting the comparison inside it survived
+/// (#377), because inverting `any(|x| x == h)` on a group with two headings is
+/// true for every `h`, so the guard stops rejecting anything at all.
+#[test]
+fn push_row_refuses_a_heading_the_group_does_not_have() {
+    let mut doc = sample();
+
+    let err = doc
+        .push_row("LOCA", &[("LOCA_TYPO", "x")])
+        .expect_err("a heading that does not exist must be refused");
+    assert_eq!(err.kind(), laterite::ErrorKind::InvalidArgument);
+    assert!(
+        err.to_string().contains("LOCA_TYPO"),
+        "the message must name the heading it rejected: {err}"
+    );
+
+    // A real heading alongside a bogus one is still refused — the check is per
+    // cell, not "did any of these look right".
+    assert!(
+        doc.push_row("LOCA", &[("LOCA_ID", "BH03"), ("LOCA_TYPO", "x")])
+            .is_err()
+    );
+    assert_eq!(
+        doc.group("LOCA").unwrap().len(),
+        2,
+        "a refused push must not have appended anything"
+    );
+
+    let err = doc
+        .push_row("NOPE", &[("LOCA_ID", "BH03")])
+        .expect_err("a group that does not exist must be refused");
+    assert_eq!(err.kind(), laterite::ErrorKind::InvalidArgument);
+}
+
+/// The four `Debug` impls print SHAPE, never contents.
+///
+/// That is a deliberate choice — the module's own comment says a `dbg!` of a
+/// document should not print a delivery — and nothing enforced it: all four
+/// survived being stubbed to an empty rendering (#377). An empty rendering also
+/// satisfies "does not leak", so the assertion has to be that each one is
+/// informative AND that the cell values are absent.
+#[test]
+fn the_debug_renderings_show_shape_and_not_contents() {
+    let doc = sample();
+    let loca = doc.group("LOCA").unwrap();
+
+    let rendered = format!("{doc:?}");
+    assert!(rendered.starts_with("Document {"), "got: {rendered}");
+    for field in ["groups", "codes", "source_bytes", "encoding", "sliced"] {
+        assert!(rendered.contains(field), "{field} missing from: {rendered}");
+    }
+    assert!(
+        !rendered.contains("BH01"),
+        "a document's Debug must not print the delivery: {rendered}"
+    );
+
+    let rendered = format!("{loca:?}");
+    assert!(rendered.starts_with("Group {"), "got: {rendered}");
+    for field in ["code", "headings", "rows"] {
+        assert!(rendered.contains(field), "{field} missing from: {rendered}");
+    }
+    assert!(rendered.contains("LOCA"), "got: {rendered}");
+    assert!(!rendered.contains("BH01"), "got: {rendered}");
+
+    let rendered = format!("{:?}", loca.row(0).unwrap());
+    assert!(rendered.starts_with("Row {"), "got: {rendered}");
+    assert!(rendered.contains("cells"), "got: {rendered}");
+    assert!(
+        !rendered.contains("BH01"),
+        "a row's Debug must not print its own cells: {rendered}"
+    );
+
+    let rendered = format!("{:?}", loca.rows());
+    assert!(rendered.starts_with("Rows {"), "got: {rendered}");
+    for field in ["group", "remaining"] {
+        assert!(rendered.contains(field), "{field} missing from: {rendered}");
+    }
+    assert!(!rendered.contains("BH01"), "got: {rendered}");
 }
 
 #[test]
