@@ -247,16 +247,55 @@ def _audit(md: Path, tmp: Path) -> tuple[list[str], int, int]:
     return findings, ran, stuck
 
 
+def _compat_knobs() -> dict[str, object]:
+    """Every PROCESS-WIDE compat default, read out of the module that owns them.
+
+    Discovered by prefix rather than listed, so a knob added later is covered
+    without anyone remembering to come back here. That matters because the
+    documented setters are *supposed* to be process-wide — `set_string_dtype`
+    says so on the page — and this file executes documented code for a living.
+    """
+    from laterite import _frames
+
+    return {k: v for k, v in vars(_frames).items() if k.startswith("_DEFAULT_")}
+
+
 @pytest.fixture(scope="module")
 def audited(tmp_path_factory: pytest.TempPathFactory) -> dict:
     tmp = _workdir(tmp_path_factory.mktemp("docs-snippets"))
     out: dict = {"findings": {}, "ran": 0, "stuck": 0}
-    for md in PAGES:
-        f, ran, stuck = _audit(md, tmp)
-        if f:
-            out["findings"][md.relative_to(REPO).as_posix()] = list(dict.fromkeys(f))
-        out["ran"] += ran
-        out["stuck"] += stuck
+    # Executing the docs means executing what the docs correctly document:
+    # `AGS4.set_string_dtype("string")` on `concepts/dependency-shape.md` sets it
+    # for the rest of the interpreter, exactly as written. Nothing put it back,
+    # so every later `compat` test in the same process got `string` where the
+    # DROP-IN CONTRACT asserts `object` — and the suite was green only because
+    # ci.yml happens to pass `packages/laterite/tests` before `tests`. Reverse
+    # the two arguments and it went red for a reason unrelated to the change in
+    # flight (#328).
+    #
+    # Restored around the whole audit rather than per snippet: nothing runs
+    # between the pages, and a page is one program by design. The limit worth
+    # naming — this covers the compat knobs, not any process-wide state a future
+    # snippet might document (an env var, a pandas option). Those would need the
+    # exec moved into a subprocess, which costs a fork per page and buys nothing
+    # until such a snippet exists.
+    before = _compat_knobs()
+    assert before, "no process-wide compat defaults found — has laterite._frames moved?"
+    out["knobs_before"] = before
+    try:
+        for md in PAGES:
+            f, ran, stuck = _audit(md, tmp)
+            if f:
+                out["findings"][md.relative_to(REPO).as_posix()] = list(
+                    dict.fromkeys(f)
+                )
+            out["ran"] += ran
+            out["stuck"] += stuck
+    finally:
+        from laterite import _frames
+
+        for name, value in before.items():
+            setattr(_frames, name, value)
     return out
 
 
@@ -264,6 +303,20 @@ def test_pages_are_discovered() -> None:
     """Zero is a bad witness: an empty page list makes every case below vacuous."""
     assert len(PAGES) > 40, f"only {len(PAGES)} pages found — has the docs tree moved?"
     assert FIXTURE.exists(), f"the shared fixture is gone: {FIXTURE}"
+
+
+def test_running_the_docs_leaves_no_process_wide_state(audited: dict) -> None:
+    """Falsify by deleting the restore in `audited`: `_DEFAULT_STRING_DTYPE` comes
+    back "string", because `concepts/dependency-shape.md` documents the setter and
+    this module runs what the docs say.
+
+    Worth a test of its own rather than trusting the `finally`: the failure it
+    guards against does not appear here at all. It appears in
+    `packages/laterite/tests`, on a test asserting the drop-in's object dtype, and
+    only when that directory is collected AFTER this one — so it reads as an
+    unrelated flake in whatever change happens to be in flight (#328).
+    """
+    assert _compat_knobs() == audited["knobs_before"]
 
 
 def test_documented_python_resolves_against_the_wheel(audited: dict) -> None:
