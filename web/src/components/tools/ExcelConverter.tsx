@@ -4,7 +4,7 @@ import {
   excelExport,
   excelImport,
   startTier2Worker,
-  EngineLoadError,
+  EngineUnavailableError,
 } from "../../lib/validatorClient";
 import { downloadBlob, baseName } from "../../lib/download";
 
@@ -50,14 +50,17 @@ export const ExcelConverter: Component = () => {
   };
 
   const failed = (e: unknown) => {
-    setErr(
-      e instanceof EngineLoadError
-        ? {
-            text: "The converter's engine couldn't be downloaded — the rest of the app is unaffected. Check your connection and try again.",
-            retry: true,
-          }
-        : { text: `Conversion failed: ${String(e)}`, retry: false },
-    );
+    if (e instanceof EngineUnavailableError) {
+      setErr({
+        text:
+          e.reason === "load"
+            ? "The converter's engine couldn't be downloaded — the rest of the app is unaffected. Check your connection and try again."
+            : "The converter's engine stopped — the rest of the app is unaffected. Trying again starts a fresh one.",
+        retry: true,
+      });
+      return;
+    }
+    setErr({ text: `Conversion failed: ${String(e)}`, retry: false });
   };
 
   const runExport = async () => {

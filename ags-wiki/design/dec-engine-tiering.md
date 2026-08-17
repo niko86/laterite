@@ -193,10 +193,37 @@ state.
 > distinct error type rather than the worker's own string, which is what lets a
 > tab offer a retry for the failure a retry can clear and not for a conversion
 > that failed on the file itself.
+
+> [!note] Closed in #363: the crash half, where the hang IS the failure
+> #357 left the hard `error` event rejecting the requests in flight and keeping
+> the handle. That is the half where "posted into the corpse" is literally true:
+> a crashed worker does not reply at all, so the batch in flight reported and
+> every request after it waited for ever. Explore reaches it on the first parse,
+> because opening the tab starts the worker before anything asks it for
+> work. Same `retire()`, called from the `error` handler too, verified by an e2e
+> that blocks the worker's own CHUNK rather than its wasm — with the retirement
+> removed it hangs on "Parsing your file…", which is the symptom exactly.
 >
-> The **hard-`error` half is still open as #363**, deliberately: a crashed
-> worker's handle stays live, and that ticket owns the change and the e2e that
-> has to fail without it.
+> Two things that only became true once one function retired for two reasons.
+> Its identity check earns its place: `error` is not once-only, and a second one
+> from a corpse must not drop the replacement. And **retiring has to settle
+> readiness**, which the init path had been doing for itself — a worker whose
+> SCRIPT never loads fires `error` and sends no `initError` at all, so nothing
+> else can. `App.tsx` reads that promise to report a dead engine at page level;
+> leaving it unsettled is a page that neither reports the failure nor ever warms
+> anything. The silent state again, at the altitude meant to catch it.
+>
+> The error type is `EngineUnavailableError` with a `reason` of `load` or
+> `crash`. One type because the two are equally retryable — the worker is gone
+> either way — and a discriminator because they are not equally explicable:
+> "check your connection" is the useful thing to say about an engine that never
+> downloaded and a false lead about one that died holding a file.
+>
+> **What this does NOT fix is the sibling panes.** ValidatePane and FixPane read
+> their report resource from eager memos and an effect exactly as Explore did,
+> so the trap above is still live there — and #363 makes it easier to reach,
+> since a primary-worker crash is now a routine typed rejection. That is #359,
+> which owns it.
 
 **The precache separation is the fragile part.** Two `wasm-pack` runs both emit
 `ags4_wasm_bg.wasm` by default, so Vite fingerprints them to two hashes with the

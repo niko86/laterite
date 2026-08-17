@@ -13,7 +13,7 @@ import {
   parseDataset,
   arrowIpc,
   startTier2Worker,
-  EngineLoadError,
+  EngineUnavailableError,
 } from "../../lib/validatorClient";
 import type { GroupMeta } from "../../lib/duckTypes";
 import { DataTable } from "./DataTable";
@@ -170,8 +170,10 @@ export const ExplorePane: Component = () => {
   // (#357, ags-wiki/design/dec-engine-tiering.md).
   const failure = () => {
     const e: unknown = dataset.error;
-    if (e instanceof EngineLoadError)
-      return "The explorer's engine couldn't be downloaded — the rest of the app is unaffected. Check your connection and try again.";
+    if (e instanceof EngineUnavailableError)
+      return e.reason === "load"
+        ? "The explorer's engine couldn't be downloaded — the rest of the app is unaffected. Check your connection and try again."
+        : "The explorer's engine stopped — the rest of the app is unaffected. Trying again starts a fresh one.";
     // The DuckDB engine wasm is NOT precached (it's 36+ MB), so a FIRST
     // Explore while offline can't fetch it — degrade to a clear message rather
     // than a raw "Failed to fetch". Validate / Fix are unaffected (their wasm
@@ -196,10 +198,20 @@ export const ExplorePane: Component = () => {
     );
   });
 
+  // The dictionary gets the same treatment as the dataset, and for the same
+  // reason rather than by analogy: `dict` is a resource over a real fetch of the
+  // union JSON, `relatedExamples` below is an eager memo, and the JSX hands
+  // `dict()` to two builders. A failed dictionary fetch would throw from the
+  // memo and take the tab down with exactly the spinner this ticket removed —
+  // the same trap, one resource along. The chips and the builders degrade to
+  // "no relationship help" instead, which is what they already do before it
+  // arrives.
+  const dictionary = () => (dict.error ? undefined : dict());
+
   // Dictionary-derived relationship example queries for the loaded groups
   // (CHILD ⋈ PARENT joins), shown as one-click chips in the SQL console.
   const relatedExamples = createMemo(() => {
-    const d = dict();
+    const d = dictionary();
     const ds = parsed();
     return d && ds
       ? relExamples(
@@ -386,7 +398,7 @@ export const ExplorePane: Component = () => {
                 <div class="flex min-w-0 flex-col gap-3">
                   <SqlBuilder
                     groups={(parsed() ?? []).map((g) => g.meta)}
-                    dict={dict()}
+                    dict={dictionary()}
                     onApply={setSqlText}
                   />
                   <SqlConsole
@@ -400,7 +412,7 @@ export const ExplorePane: Component = () => {
               <Show when={view() === "charts"}>
                 <ChartBuilder
                   groups={(parsed() ?? []).map((g) => g.meta)}
-                  dict={dict()}
+                  dict={dictionary()}
                 />
               </Show>
               <Show when={view() === "analyse"}>
