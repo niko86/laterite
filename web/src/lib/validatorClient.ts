@@ -12,8 +12,10 @@
 // neither. Both speak the same protocol, so one channel drives either.
 //
 // The channel itself — spawn, correlate, retire — is `workerChannel.ts` since
-// #357. What is left here is the half that is about AGS4 rather than about
-// workers: which reply kind resolves which request's promise.
+// #357, and the reply protocol — which reply kind resolves which request's
+// promise — is `engineProtocol.ts` since #380, where a unit test can reach it.
+// What is left here is ownership: the two live workers, and the typed request
+// functions the panes call.
 
 import type {
   ValidationReport,
@@ -26,83 +28,27 @@ import type {
   StandardDict,
   TypeClashMode,
 } from "./validator";
-import type { ReportMeta, CensorTally } from "./validator.worker";
 import type { GroupMeta } from "./duckTypes";
 import type { WorkerReq, WorkerRes } from "./engineDispatch";
-import { createChannel, type OkReply } from "./workerChannel";
+import { createChannel } from "./workerChannel";
+import {
+  settle,
+  type Pending,
+  type GzipResult,
+  type ExcelConversion,
+  type MergeConversion,
+  type CensorResult,
+} from "./engineProtocol";
 
-/** The engine protocol's successful replies — what `settle` maps to pending
- *  request kinds. The channel is protocol-generic since #379; this pins it to
- *  the engine workers' wire type. */
-type WorkerReply = OkReply<WorkerRes>;
-
-type Pending =
-  | {
-      kind: "report";
-      resolve: (r: ValidationReport) => void;
-      reject: (e: Error) => void;
-    }
-  | {
-      kind: "cert";
-      resolve: (json: string) => void;
-      reject: (e: Error) => void;
-    }
-  | {
-      kind: "gzip";
-      resolve: (r: GzipResult) => void;
-      reject: (e: Error) => void;
-    }
-  | { kind: "fixes"; resolve: (r: Fix[]) => void; reject: (e: Error) => void }
-  | {
-      kind: "applied";
-      resolve: (r: Uint8Array) => void;
-      reject: (e: Error) => void;
-    }
-  | {
-      kind: "parsed";
-      resolve: (g: GroupMeta[]) => void;
-      reject: (e: Error) => void;
-    }
-  | {
-      kind: "arrow";
-      resolve: (b: Uint8Array) => void;
-      reject: (e: Error) => void;
-    }
-  | {
-      kind: "revisionDelta";
-      resolve: (d: RevisionDelta) => void;
-      reject: (e: Error) => void;
-    }
-  | {
-      kind: "mergeResult";
-      resolve: (r: MergeConversion) => void;
-      reject: (e: Error) => void;
-    }
-  | {
-      kind: "censor";
-      resolve: (r: CensorResult) => void;
-      reject: (e: Error) => void;
-    }
-  | {
-      kind: "dictionary";
-      resolve: (d: StandardDict) => void;
-      reject: (e: Error) => void;
-    }
-  | {
-      kind: "toAgs4";
-      resolve: (r: ExportResult) => void;
-      reject: (e: Error) => void;
-    }
-  | {
-      kind: "excel";
-      resolve: (r: ExcelConversion) => void;
-      reject: (e: Error) => void;
-    };
-
-export interface GzipResult {
-  bytes: ArrayBuffer;
-  meta: ReportMeta;
-}
+/** Re-exported so a pane's whole engine surface still imports from here. */
+export type {
+  GzipResult,
+  ExcelConversion,
+  MergeWarning,
+  MergeRevision,
+  MergeConversion,
+  CensorResult,
+} from "./engineProtocol";
 
 /** A runtime custom AGS4 dictionary (#568) for `validate`/`certify`: raw `.ags` or
  *  JSON `bytes` (the browser's only form — no filesystem), and `replace` to drop the
@@ -111,97 +57,6 @@ export interface GzipResult {
 export interface CustomDict {
   bytes: Uint8Array;
   replace?: boolean;
-}
-
-/** The result of an Excel conversion: the output file bytes (`.xlsx` for
- *  export, `.ags` for import) plus the engine's warnings and sheet/row counts.
- *  `bytes` is an ArrayBuffer (a `BlobPart`, ready for `downloadBlob`), matching
- *  the gzip-download path. */
-export interface ExcelConversion {
-  bytes: ArrayBuffer;
-  warnings: string[];
-  sheets: number;
-  rows: number;
-}
-
-/** One advisory note from a merge (a recency contradiction, a non-X type widen,
- *  a missing merge-TRAN stamp). Mirrors the wire shape the engine serialises. */
-export interface MergeWarning {
-  kind: string;
-  group: string | null;
-  heading: string | null;
-  message: string;
-}
-
-/** One per-row content revision — a later file changed a KEY-matched row. */
-export interface MergeRevision {
-  group: string;
-  key: string[];
-  changed: string[];
-  winnerFile: number;
-}
-
-/** The result of a merge: the reconciled `.ags` `bytes` (an ArrayBuffer, a
- *  `BlobPart` ready for `downloadBlob`) plus the warnings and per-row revisions
- *  audit the Tools UI surfaces. */
-export interface MergeConversion {
-  bytes: ArrayBuffer;
-  warnings: MergeWarning[];
-  revisions: MergeRevision[];
-}
-
-/** The result of an anonymise: the scrubbed file `text` (a `BlobPart` for
- *  `downloadBlob`) plus the per-action `tally` (cells pseudonymised/blanked/
- *  tokenised/bracket-stripped, and custom groups/columns dropped). */
-export interface CensorResult {
-  text: string;
-  tally: CensorTally;
-}
-
-/** Hand a successful reply to the request waiting on it. Both workers speak
- *  this one protocol, so both channels settle through here — the kind pair is
- *  the whole of it, and a mismatch is a protocol bug, not a user-visible one. */
-function settle(msg: WorkerReply, p: Pending): void {
-  if (msg.kind === "report" && p.kind === "report") {
-    p.resolve(msg.report);
-  } else if (msg.kind === "cert" && p.kind === "cert") {
-    p.resolve(msg.json);
-  } else if (msg.kind === "gzip" && p.kind === "gzip") {
-    p.resolve({ bytes: msg.bytes, meta: msg.report });
-  } else if (msg.kind === "fixes" && p.kind === "fixes") {
-    p.resolve(msg.fixes);
-  } else if (msg.kind === "applied" && p.kind === "applied") {
-    p.resolve(new Uint8Array(msg.bytes));
-  } else if (msg.kind === "parsed" && p.kind === "parsed") {
-    p.resolve(msg.groups);
-  } else if (msg.kind === "arrow" && p.kind === "arrow") {
-    p.resolve(new Uint8Array(msg.bytes));
-  } else if (msg.kind === "revisionDelta" && p.kind === "revisionDelta") {
-    p.resolve(msg.delta);
-  } else if (msg.kind === "mergeResult" && p.kind === "mergeResult") {
-    p.resolve({
-      bytes: msg.bytes,
-      warnings: JSON.parse(msg.warningsJson) as MergeWarning[],
-      revisions: JSON.parse(msg.revisionsJson) as MergeRevision[],
-    });
-  } else if (msg.kind === "dictionary" && p.kind === "dictionary") {
-    p.resolve(msg.dict);
-  } else if (msg.kind === "censor" && p.kind === "censor") {
-    p.resolve({ text: msg.text, tally: msg.tally });
-  } else if (msg.kind === "toAgs4" && p.kind === "toAgs4") {
-    p.resolve(msg.result);
-  } else if (msg.kind === "excel" && p.kind === "excel") {
-    p.resolve({
-      bytes: msg.bytes,
-      warnings: msg.warnings,
-      sheets: msg.sheets,
-      rows: msg.rows,
-    });
-  } else {
-    p.reject(
-      new Error(`unexpected ${msg.kind} response for ${p.kind} request`),
-    );
-  }
 }
 
 // The always-on worker, created at module load exactly as it always has been:
