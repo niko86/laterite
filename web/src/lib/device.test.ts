@@ -19,7 +19,13 @@ interface Nav {
   cores?: number;
 }
 
-function on({ saveData, effectiveType, deviceMemory, cores }: Nav): boolean {
+/** Present this device to the predicate and return its verdict. */
+function lowEndWith({
+  saveData,
+  effectiveType,
+  deviceMemory,
+  cores,
+}: Nav): boolean {
   vi.stubGlobal("navigator", {
     hardwareConcurrency: cores,
     deviceMemory,
@@ -35,39 +41,47 @@ afterEach(() => {
 
 describe("isLowEndDevice", () => {
   it("reads a capable machine as capable", () => {
-    expect(on({ cores: 8, deviceMemory: 8, effectiveType: "4g" })).toBe(false);
+    expect(lowEndWith({ cores: 8, deviceMemory: 8, effectiveType: "4g" })).toBe(
+      false,
+    );
   });
 
   it("treats a browser that reports nothing as capable", () => {
     // Firefox and Safari expose neither `deviceMemory` nor `connection`. Only a
     // POSITIVE low-end reading down-tiers, so silence must not.
-    expect(on({})).toBe(false);
+    expect(lowEndWith({})).toBe(false);
   });
 
   it("treats Data Saver as low-end whatever the hardware says", () => {
-    expect(on({ saveData: true, cores: 16, deviceMemory: 8 })).toBe(true);
+    expect(lowEndWith({ saveData: true, cores: 16, deviceMemory: 8 })).toBe(
+      true,
+    );
   });
 
   it.each(["2g", "slow-2g", "3g"])(
     "treats a %s link as low-end",
     (effectiveType) => {
-      expect(on({ effectiveType, cores: 16, deviceMemory: 8 })).toBe(true);
+      expect(lowEndWith({ effectiveType, cores: 16, deviceMemory: 8 })).toBe(
+        true,
+      );
     },
   );
 
   it("does not read 4g as low-end", () => {
-    expect(on({ effectiveType: "4g", cores: 16, deviceMemory: 8 })).toBe(false);
+    expect(
+      lowEndWith({ effectiveType: "4g", cores: 16, deviceMemory: 8 }),
+    ).toBe(false);
   });
 
   it("treats ≤ 2 GB of RAM as low-end", () => {
     // deviceMemory reports 0.25 | 0.5 | 1 | 2 | 4 | 8 — so `< 4` is the ≤ 2 GB
     // boundary, and 4 itself must stay on the capable side of it.
-    expect(on({ deviceMemory: 2, cores: 16 })).toBe(true);
-    expect(on({ deviceMemory: 4, cores: 16 })).toBe(false);
+    expect(lowEndWith({ deviceMemory: 2, cores: 16 })).toBe(true);
+    expect(lowEndWith({ deviceMemory: 4, cores: 16 })).toBe(false);
   });
 
   it("treats ≤ 2 logical cores as low-end", () => {
-    expect(on({ cores: 2, deviceMemory: 8 })).toBe(true);
-    expect(on({ cores: 4, deviceMemory: 8 })).toBe(false);
+    expect(lowEndWith({ cores: 2, deviceMemory: 8 })).toBe(true);
+    expect(lowEndWith({ cores: 4, deviceMemory: 8 })).toBe(false);
   });
 });

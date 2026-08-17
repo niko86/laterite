@@ -212,6 +212,18 @@ from the precache.
 > `isLowEndDevice()` already reads `saveData` as low-end, so removing the
 > explicit bail changes nothing an e2e can observe — the unit suite holds that
 > half, and the e2e holds the warm being gated at all.
+>
+> Two limits recorded rather than built. The **mirror of that race is open**: a
+> warm already in flight when the worker starts still downloads twice, because
+> the warm holds no handle the worker could join. `repo:web/src/lib/duck.ts`'s
+> `warmFetch` has the same shape and the same hole, so it is the existing policy,
+> and worth closing for both at once rather than for one of them. And **tier 2 is
+> queued ahead of DuckDB on judgement, not measurement** — separate idle ticks
+> put both in flight either way, so the order decides only which starts first;
+> tier 2 leads because Tools → Excel is the only tier-2 consumer that never
+> touches DuckDB. The sequencing argument above does not reach between these two:
+> it is about a speculative fetch stealing from one on the **critical** path, and
+> both of these are speculative.
 
 **The app's engine stops being npm's.** `check-wasm-slim.mjs` guards what npm
 ships; it no longer describes what the app precaches. Tier 1 needs its own gate

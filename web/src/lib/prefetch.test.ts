@@ -13,9 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const TIER2_URL = "/assets/ags4_wasm_full_bg-TEST.wasm";
 
-const { warmFetch, startTier2Worker, tier2Started } = vi.hoisted(() => ({
+const { warmFetch, tier2Started } = vi.hoisted(() => ({
   warmFetch: vi.fn<() => Promise<void>>(() => Promise.resolve()),
-  startTier2Worker: vi.fn(),
   tier2Started: { value: false },
 }));
 
@@ -26,7 +25,6 @@ vi.mock("./duck", () => ({ warmFetch }));
 vi.mock("./tier2Asset", () => ({ TIER2_WASM_URL: TIER2_URL }));
 vi.mock("./validatorClient", () => ({
   isTier2Started: () => tier2Started.value,
-  startTier2Worker,
 }));
 
 interface Device {
@@ -81,13 +79,10 @@ async function warm(device: Device = { cores: 8, memory: 8 }) {
   return warmLazyAssets;
 }
 
-const fetched = () => fetchCalls;
-
 beforeEach(() => {
   fetchCalls = [];
   fetchImpl = () => Promise.resolve();
   warmFetch.mockClear().mockResolvedValue(undefined);
-  startTier2Worker.mockClear();
   tier2Started.value = false;
 });
 
@@ -99,25 +94,28 @@ describe("warmLazyAssets", () => {
   it("primes the tier-2 engine on a capable device, and only fetches it", async () => {
     await warm();
 
-    expect(fetched()).toContain(TIER2_URL);
-    // Fetch, never compile. Instantiating tier 2 means creating the second
-    // worker, and nothing here may do that — the compile belongs to a real
-    // Explore or Excel open, which is the entire point of deferring it.
-    expect(startTier2Worker).not.toHaveBeenCalled();
+    expect(fetchCalls).toContain(TIER2_URL);
     // The DuckDB warm is unchanged, and rides the same gate.
     expect(warmFetch).toHaveBeenCalledOnce();
+    // NO assertion here that the warm didn't COMPILE tier 2. The obvious one —
+    // `expect(startTier2Worker).not.toHaveBeenCalled()` — was written, and is
+    // worthless: this module never imports that function, so it passes on every
+    // build including one that instantiated wasm directly. Compilation means a
+    // real Worker, which this lane cannot observe, so the check lives in
+    // web/e2e/app.spec.ts, where it counts live workers and goes red when the
+    // warm is made to start one.
   });
 
   it("skips both heavy engines on a low-end device, keeping the cheap warms", async () => {
     // 2 logical cores — `isLowEndDevice()` reads that as constrained.
     await warm({ cores: 2 });
 
-    expect(fetched()).not.toContain(TIER2_URL);
+    expect(fetchCalls).not.toContain(TIER2_URL);
     expect(warmFetch).not.toHaveBeenCalled();
     // The few-hundred-kB warms are NOT what the device gate is protecting
     // against, and dropping them would make Charts and Coordinates slower for
     // no saving worth having.
-    expect(fetched()).toEqual(
+    expect(fetchCalls).toEqual(
       expect.arrayContaining([
         expect.stringContaining("ags_dictionary.json"),
         expect.stringContaining("rules-catalogue.json"),
@@ -128,7 +126,7 @@ describe("warmLazyAssets", () => {
   it("downloads nothing at all under Data Saver", async () => {
     await warm({ saveData: true });
 
-    expect(fetched()).toEqual([]);
+    expect(fetchCalls).toEqual([]);
     expect(warmFetch).not.toHaveBeenCalled();
   });
 
@@ -139,22 +137,27 @@ describe("warmLazyAssets", () => {
     tier2Started.value = true;
     await warm();
 
-    expect(fetched()).not.toContain(TIER2_URL);
+    expect(fetchCalls).not.toContain(TIER2_URL);
     expect(warmFetch).toHaveBeenCalledOnce();
   });
 
   it("warms once per session, however often it is called", async () => {
     const warmLazyAssets = await warm();
-    const first = fetched().length;
+    const first = fetchCalls.length;
 
     warmLazyAssets();
     warmLazyAssets();
 
-    expect(fetched().length).toBe(first);
+    expect(fetchCalls.length).toBe(first);
     expect(warmFetch).toHaveBeenCalledOnce();
   });
 
-  it("swallows every failure — the warm is speculative, the real fetch still happens on click", async () => {
+  // Named for what it asserts and no more: that a failed warm stays quiet. The
+  // other half of "silent AND harmless" — the tab that needs the asset still
+  // fetching it after a failed warm — is #357's ticket, and nothing here checks
+  // it. A test named for a claim it doesn't make is how a gap gets counted as
+  // covered.
+  it("swallows every failure rather than surfacing an unhandled rejection", async () => {
     // All of it fails at once: the fetches reject, the DuckDB warm rejects, and
     // the three chunk imports throw on evaluation. NOT ONE may surface as an
     // unhandled rejection — a speculative download that reports its own failure
@@ -193,7 +196,7 @@ describe("warmLazyAssets", () => {
 
     expect(unhandled).toEqual([]);
     // …and it did try, rather than passing by never having warmed anything.
-    expect(fetched()).toContain(TIER2_URL);
+    expect(fetchCalls).toContain(TIER2_URL);
   });
 
   it("falls back to a timer where requestIdleCallback is missing", async () => {
@@ -211,13 +214,13 @@ describe("warmLazyAssets", () => {
 
     const { warmLazyAssets } = await import("./prefetch");
     warmLazyAssets();
-    expect(fetched()).toEqual([]);
+    expect(fetchCalls).toEqual([]);
 
     await vi.advanceTimersByTimeAsync(1500);
     vi.useRealTimers();
     await flush();
 
-    expect(fetched()).toContain(TIER2_URL);
+    expect(fetchCalls).toContain(TIER2_URL);
     expect(warmFetch).toHaveBeenCalledOnce();
   });
 });

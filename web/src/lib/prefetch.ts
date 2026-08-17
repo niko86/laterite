@@ -13,9 +13,12 @@
 // + the EngineGate confirmation for DuckDB; the second worker's own creation for
 // the tier-2 engine).
 //
-// This module is safe to static-import from App: its only static imports are two
-// tiny modules — a capability predicate and a URL string — so none of the heavy
-// deps land in the entry chunk.
+// This module is safe to static-import from App: every HEAVY dep it warms is
+// behind a dynamic import, so none of them land in the entry chunk. Its static
+// imports are a capability predicate, a URL string, and `validatorClient` —
+// which does spawn the primary worker at module scope, and is only safe here
+// because App static-imports it too. Nothing about this module makes that
+// module cheap; it is already paid for.
 
 import { isLowEndDevice } from "./device";
 import { TIER2_WASM_URL } from "./tier2Asset";
@@ -80,15 +83,25 @@ export function warmLazyAssets(): void {
   // — so the compile still waits for the second worker, which only opening one
   // of those tabs creates.
   //
-  // Queued ahead of DuckDB deliberately: at 5.2 MB against 36 it is the one that
-  // can plausibly finish, and Tools → Excel is the only tier-2 consumer that
-  // never touches DuckDB — the one place a skipped warm is the whole delay
-  // rather than a rounding error on a 36 MB wait.
+  // Queued ahead of DuckDB, which is a judgement call and not a measurement:
+  // separate idle ticks put both in flight either way, so the order decides only
+  // which STARTS first, not who gets the bandwidth. Tier 2 goes first because
+  // Tools → Excel is the one tier-2 consumer that never touches DuckDB — the one
+  // place a warm that loses the race is the whole delay rather than a rounding
+  // error on a 36 MB wait. The design's sequencing argument does not apply
+  // between these two: it is about a speculative fetch stealing from a fetch on
+  // the CRITICAL path, and both of these are speculative.
   onIdle(() => {
     // Explore or Excel may have been opened inside the idle window, in which
     // case that worker is already fetching this exact URL — and CacheFirst does
     // not coalesce, so a second request here is a second 5.2 MB download, not a
     // cache hit. Read at fire time, not at call time, so the whole window counts.
+    //
+    // The mirror case is NOT covered: a warm already in flight when the worker
+    // starts still double-downloads, because the warm holds no handle the worker
+    // could join. duck.ts:warmFetch has the same shape and the same hole, so
+    // this is the existing policy rather than a new gap — worth closing for both
+    // at once, not for one of them here.
     if (isTier2Started()) return;
     void fetch(TIER2_WASM_URL).catch(() => {});
   });

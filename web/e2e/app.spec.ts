@@ -550,9 +550,10 @@ test("PWA: the precache carries the tier-1 engine and not tier 2", async ({
 
   // Scoped to the PRECACHE specifically — identified as the cache holding
   // index.html — not to "any cache". Tier 2 is *expected* in a runtime cache
-  // once something fetches it (the next test asserts exactly that), and #356
-  // will warm-fetch it on idle; a whole-storage check would then start failing
-  // for the one behaviour the design wants.
+  // once something fetches it (a later test asserts exactly that), and since
+  // #356 the idle warm puts it there on any capable device without a tab being
+  // opened at all; a whole-storage check would fail for the one behaviour the
+  // design wants.
   const wasm = await page.evaluate(async () => {
     for (const key of await caches.keys()) {
       const reqs = await (await caches.open(key)).keys();
@@ -576,6 +577,17 @@ test("PWA: the precache carries the tier-1 engine and not tier 2", async ({
   expect(wasm?.filter((n) => /^ags4_wasm_full_bg-/.test(n ?? ""))).toEqual([]);
 });
 
+/** How many tier-2 wasm entries the CacheFirst bucket holds. Shared by the
+ *  test that fills it on a real Excel open and the one that fills it on idle
+ *  — the same question asked of the same cache, so the same reader. */
+const tier2Cached = (page: Page) =>
+  page.evaluate(async () => {
+    const names = await caches.keys();
+    if (!names.includes("ags-engine-tier2")) return 0;
+    const keys = await (await caches.open("ags-engine-tier2")).keys();
+    return keys.filter((k) => /ags4_wasm_full_bg-.*\.wasm$/.test(k.url)).length;
+  });
+
 test("PWA: the tier-2 engine lands in its own runtime cache on first Excel use", async ({
   page,
 }) => {
@@ -594,20 +606,57 @@ test("PWA: the tier-2 engine lands in its own runtime cache on first Excel use",
   await page.getByRole("button", { name: /^Excel$/ }).click();
 
   await expect
+    .poll(() => tier2Cached(page), {
+      timeout: 30_000,
+      message:
+        "the tier-2 wasm never reached the ags-engine-tier2 runtime cache — " +
+        "CacheFirst is refetching the full engine on every open",
+    })
+    .toBeGreaterThan(0);
+});
+
+test("PWA: the DuckDB engine actually lands in its runtime cache", async ({
+  page,
+}) => {
+  // #339 tightened both CacheFirst rules from `statuses: [0, 200]` to `[200]`,
+  // so a refused cross-origin fetch can no longer be cached as an opaque
+  // response and then served — or rather, thrown at — forever. The unit guard
+  // (src/lib/sw-cache-policy.test.ts) asserts that policy over the rule set.
+  //
+  // This asserts the half a config test CANNOT see, and it is the half that
+  // fails SILENTLY: if a response ever stopped being cacheable under the
+  // tightened rule, nothing would error — the entry would simply never be
+  // written and CacheFirst would re-download ~36 MB on every single page load,
+  // reported nowhere. Only a real browser against a real service worker can
+  // tell "cached" from "silently refetched every time".
+  //
+  // Rides an Explore load the suite already pays for; the engine is same-origin
+  // out of dist/ here, because VITE_DUCKDB_CDN is a deploy-only setting.
+  await ready(page);
+  // Wait for control BEFORE the engine is fetched. A runtime-caching rule only
+  // sees fetches the worker intercepts, and on a cold first visit the SW may
+  // still be installing when Explore fires — in which case DuckDB loads
+  // straight off the network and the cache stays empty for a reason that has
+  // nothing to do with the rule under test.
+  await waitForServiceWorker(page);
+  await page.getByRole("button", { name: /Rule 9.*unknown heading/ }).click();
+  await enterExplore(page);
+
+  await expect
     .poll(
       () =>
         page.evaluate(async () => {
           const names = await caches.keys();
-          if (!names.includes("ags-engine-tier2")) return 0;
-          const keys = await (await caches.open("ags-engine-tier2")).keys();
-          return keys.filter((k) => /ags4_wasm_full_bg-.*\.wasm$/.test(k.url))
+          if (!names.includes("ags-duckdb-wasm")) return 0;
+          const keys = await (await caches.open("ags-duckdb-wasm")).keys();
+          return keys.filter((k) => /duckdb-(eh|mvp)-.*\.wasm$/.test(k.url))
             .length;
         }),
       {
         timeout: 30_000,
         message:
-          "the tier-2 wasm never reached the ags-engine-tier2 runtime cache — " +
-          "CacheFirst is refetching the full engine on every open",
+          "the DuckDB wasm never reached the ags-duckdb-wasm runtime cache — " +
+          "CacheFirst is refetching it on every load",
       },
     )
     .toBeGreaterThan(0);
@@ -626,10 +675,23 @@ test("PWA: the tier-2 engine lands in its own runtime cache on first Excel use",
  *  means to and passes for the wrong reason. The connection is what each test
  *  actually varies. */
 async function poseAsDevice(page: Page, connection: NetworkInformation) {
+  // `configurable: true` inside a try, matching the two low-end poses this file
+  // and perf.spec.ts already use: a browser that ships one of these as an own
+  // non-configurable property would otherwise throw here and take the page with
+  // it, and a pose is never worth failing a test it isn't about.
   await page.addInitScript((conn) => {
-    Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 });
-    Object.defineProperty(navigator, "deviceMemory", { get: () => 8 });
-    Object.defineProperty(navigator, "connection", { get: () => conn });
+    try {
+      const fixed = (k: string, v: unknown) =>
+        Object.defineProperty(navigator, k, {
+          configurable: true,
+          get: () => v,
+        });
+      fixed("hardwareConcurrency", 8);
+      fixed("deviceMemory", 8);
+      fixed("connection", conn);
+    } catch {
+      /* leave the real values in place */
+    }
   }, connection);
 }
 
@@ -653,14 +715,6 @@ function watchTier2Fetches(page: Page) {
   return { network, all };
 }
 
-const tier2Cached = (page: Page) =>
-  page.evaluate(async () => {
-    const names = await caches.keys();
-    if (!names.includes("ags-engine-tier2")) return 0;
-    const keys = await (await caches.open("ags-engine-tier2")).keys();
-    return keys.filter((k) => /ags4_wasm_full_bg-.*\.wasm$/.test(k.url)).length;
-  });
-
 /** A visit with the service worker already in control, which is what the warm
  *  needs to be observable: on a cold FIRST visit the SW is still installing when
  *  the idle tick fires, so the fetch goes straight to the network and the
@@ -671,6 +725,63 @@ async function controlledVisit(page: Page) {
   await ready(page);
   await waitForServiceWorker(page);
 }
+
+test("the warm waits for tier 1 — the two engines are never in flight together", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  // The criterion the design argues hardest for ("Why sequenced": tier 1 is on
+  // the critical path, tier 2 is speculative, and fetching them together lets
+  // the speculative one steal bandwidth from the needed one — landing exactly on
+  // the sample-file path, where a user can go from cold paint to needing the
+  // engine in milliseconds).
+  //
+  // It holds because App.tsx fires `warmLazyAssets()` from an effect gated on
+  // engine readiness. Nothing else observed that, so moving the call out of the
+  // gate — the one edit that breaks this — left every other test green.
+  //
+  // A COLD first visit, deliberately: no service worker in control yet, so both
+  // engines come off the network where their order is visible. The link is
+  // throttled because localhost finishes 2.1 MB before an overlap could be seen
+  // at all, which would make this pass on any build.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Network.emulateNetworkConditions", {
+    offline: false,
+    latency: 20,
+    downloadThroughput: (4 * 1024 * 1024) / 8, // ~4 Mbps
+    uploadThroughput: (1 * 1024 * 1024) / 8,
+  });
+
+  const order: string[] = [];
+  page.context().on("requestfinished", (r) => {
+    if (/ags4_wasm_bg-[^/]*\.wasm$/.test(r.url())) order.push("tier1-done");
+  });
+  page.context().on("request", (r) => {
+    if (/ags4_wasm_full_bg-[^/]*\.wasm$/.test(r.url()))
+      order.push("tier2-start");
+  });
+
+  await poseAsDevice(page, { saveData: false, effectiveType: "4g" });
+  await ready(page);
+  await expect
+    .poll(() => order.includes("tier2-start"), {
+      timeout: 120_000,
+      message: "the tier-2 warm never fired, so there is no ordering to judge",
+    })
+    .toBe(true);
+
+  // Everything that happened before the warm's FIRST request has to include tier
+  // 1 finishing. Stated as a slice rather than two index comparisons so the one
+  // failure that matters — the warm starting first, which leaves the slice empty
+  // — reports itself as that, and not as "tier 1 was never fetched". (Only the
+  // first of each is in play: the service worker precaches tier 1 too, and those
+  // later duplicates say nothing about when the app's own engine became ready.)
+  expect(
+    order.slice(0, order.indexOf("tier2-start")),
+    "the tier-2 warm started before tier 1 had finished downloading — the " +
+      "speculative fetch is competing with the one on the critical path",
+  ).toContain("tier1-done");
+});
 
 test("the idle warm fetches tier 2 without compiling it, and the Excel that follows refetches nothing", async ({
   page,
@@ -745,53 +856,6 @@ test("the idle warm downloads nothing under Data Saver", async ({ page }) => {
       "connection the user has told the browser to spare",
   ).toEqual([]);
   expect(await tier2Cached(page)).toBe(0);
-});
-
-test("PWA: the DuckDB engine actually lands in its runtime cache", async ({
-  page,
-}) => {
-  // #339 tightened both CacheFirst rules from `statuses: [0, 200]` to `[200]`,
-  // so a refused cross-origin fetch can no longer be cached as an opaque
-  // response and then served — or rather, thrown at — forever. The unit guard
-  // (src/lib/sw-cache-policy.test.ts) asserts that policy over the rule set.
-  //
-  // This asserts the half a config test CANNOT see, and it is the half that
-  // fails SILENTLY: if a response ever stopped being cacheable under the
-  // tightened rule, nothing would error — the entry would simply never be
-  // written and CacheFirst would re-download ~36 MB on every single page load,
-  // reported nowhere. Only a real browser against a real service worker can
-  // tell "cached" from "silently refetched every time".
-  //
-  // Rides an Explore load the suite already pays for; the engine is same-origin
-  // out of dist/ here, because VITE_DUCKDB_CDN is a deploy-only setting.
-  await ready(page);
-  // Wait for control BEFORE the engine is fetched. A runtime-caching rule only
-  // sees fetches the worker intercepts, and on a cold first visit the SW may
-  // still be installing when Explore fires — in which case DuckDB loads
-  // straight off the network and the cache stays empty for a reason that has
-  // nothing to do with the rule under test.
-  await waitForServiceWorker(page);
-  await page.getByRole("button", { name: /Rule 9.*unknown heading/ }).click();
-  await enterExplore(page);
-
-  await expect
-    .poll(
-      () =>
-        page.evaluate(async () => {
-          const names = await caches.keys();
-          if (!names.includes("ags-duckdb-wasm")) return 0;
-          const keys = await (await caches.open("ags-duckdb-wasm")).keys();
-          return keys.filter((k) => /duckdb-(eh|mvp)-.*\.wasm$/.test(k.url))
-            .length;
-        }),
-      {
-        timeout: 30_000,
-        message:
-          "the DuckDB wasm never reached the ags-duckdb-wasm runtime cache — " +
-          "CacheFirst is refetching it on every load",
-      },
-    )
-    .toBeGreaterThan(0);
 });
 
 // Helper: load coords.ags into Explore and open the SQL view.
