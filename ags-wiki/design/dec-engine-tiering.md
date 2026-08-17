@@ -167,7 +167,11 @@ and "validate in progress" are the same thing to a user.
 > The seam it was waiting on is the crash rejection #363 made routine: its e2e
 > kills the live worker and blocks the replacement's chunk, and was shown red
 > against the unguarded pane — frozen on the previous file's report — before
-> the accessor landed.
+> the accessor landed. The boundary question #359 held open is settled the
+> same way: guard-first everywhere, no root `ErrorBoundary` — a failure one
+> pane can report in place must not blank the four that are still working.
+> What #359 did NOT settle is FixPane's silence: it guards but renders no
+> error branch, so a rejected op there reads as an empty fix list (#391).
 
 **A failed tier-2 fetch is partial, and must read as partial.** The tab that
 needed it reports and offers retry; tier 1 is precached and untouched. #339's
