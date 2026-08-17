@@ -226,8 +226,8 @@ export default defineConfig({
     // Coordinates UIs render offline too; only their heavy *engines* are
     // deferred.
     //
-    // That install costs **7269.27 KiB across 46 entries** (measured 2026-08-17,
-    // #355) — the figure vite-plugin-pwa prints as `precache N entries (… KiB)`
+    // That install costs **7269.44 KiB across 46 entries** (measured 2026-08-17,
+    // #356) — the figure vite-plugin-pwa prints as `precache N entries (… KiB)`
     // on every build, which is where to re-read it rather than trusting this
     // comment. Every hand-written copy of it in this repo has gone stale at some
     // point, this one included; #345 tracks gating it instead.

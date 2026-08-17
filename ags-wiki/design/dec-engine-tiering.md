@@ -191,6 +191,40 @@ from the precache.
 > trip before the 5.2 MB fetch it precedes. The wasm stays a `?url` asset in both
 > shapes, which is what actually keeps it out of the chunk.
 
+> [!note] Built in #356, where the warm turned out to rest on a shared URL
+> The warm and the worker have to request the **same fingerprinted asset**, and
+> nothing about two `?url` imports of one file makes that self-evident — they are
+> compiled in different bundles. So the URL moved into one module,
+> `repo:web/src/lib/tier2Asset.ts`, which both import. Vite does resolve it to a
+> single emitted asset, verified in a build rather than assumed; the check with
+> teeth is the e2e that opens Excel **after** a completed warm and asserts no
+> NETWORK request follows, falsified by pointing the worker at a different
+> fingerprint — which is exactly what drift would look like. Telling a cache hit
+> from a download there needs `request.serviceWorker()`: a request the SW issued
+> is a real download, one it did not is the page or the second worker asking,
+> which `CacheFirst` may well answer from cache.
+>
+> Two smaller things the ticket did not anticipate. **An already-started second
+> worker has to suppress the warm** — `CacheFirst` does no request coalescing, so
+> a visitor who reaches Explore inside the idle window would fetch 5.2 MB twice;
+> `isTier2Started()` exists to be asked *without* creating the worker, which is
+> why it is not `ready()`. And the **Data Saver bail is belt-and-braces**:
+> `isLowEndDevice()` already reads `saveData` as low-end, so removing the
+> explicit bail changes nothing an e2e can observe — the unit suite holds that
+> half, and the e2e holds the warm being gated at all.
+>
+> Two limits recorded rather than built. The **mirror of that race is open**: a
+> warm already in flight when the worker starts still downloads twice, because
+> the warm holds no handle the worker could join. `repo:web/src/lib/duck.ts`'s
+> `warmFetch` has the same shape and the same hole, so it is the existing policy,
+> and worth closing for both at once rather than for one of them. And **tier 2 is
+> queued ahead of DuckDB on judgement, not measurement** — separate idle ticks
+> put both in flight either way, so the order decides only which starts first;
+> tier 2 leads because Tools → Excel is the only tier-2 consumer that never
+> touches DuckDB. The sequencing argument above does not reach between these two:
+> it is about a speculative fetch stealing from one on the **critical** path, and
+> both of these are speculative.
+
 **The app's engine stops being npm's.** `check-wasm-slim.mjs` guards what npm
 ships; it no longer describes what the app precaches. Tier 1 needs its own gate
 or nothing watches the artifact this whole design depends on staying small — it
