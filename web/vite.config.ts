@@ -149,6 +149,29 @@ export const RUNTIME_CACHING: RuntimeCachingRule[] = [
     },
   },
   {
+    // The TIER-2 engine wasm (#355) — the full build, 5.2 MB raw, fetched the
+    // first time Explore or Tools → Excel is opened and never on a visit that
+    // opens neither. Fingerprinted + immutable, so CacheFirst is safe and the
+    // second visit to either tab compiles from cache, offline included.
+    urlPattern: ({ url }) =>
+      /\/ags4_wasm_full_bg-[^/]*\.wasm$/.test(url.pathname),
+    handler: "CacheFirst",
+    options: {
+      cacheName: "ags-engine-tier2",
+      // 200 only — the DuckDB rule above says why (#339). Same-origin here, so
+      // an opaque response is not even reachable; the `0` that broke DuckDB was
+      // copied from a rule that could not use it either, and copying a default
+      // rather than deciding it is exactly how that comes back.
+      cacheableResponse: { statuses: [200] },
+      expiration: {
+        // Current build + one stale generation as an update-window fallback.
+        maxEntries: 2,
+        maxAgeSeconds: 60 * 60 * 24 * 60,
+        purgeOnQuotaError: true,
+      },
+    },
+  },
+  {
     // OSTN15 NTv2 grid — ~15 MB, fetched only when "Precise (OSTN15)"
     // coordinates are ticked. Immutable.
     urlPattern: ({ url }) => /\/grids\/.*\.gsb$/.test(url.pathname),
@@ -198,26 +221,30 @@ export default defineConfig({
     // PRECACHE (downloaded at install, then served offline) = the full app
     // shell: EVERY JS/CSS chunk — including the Explore/Charts/Coordinates UI
     // and the DuckDB *worker* glue — plus the reference JSONs, the sample
-    // files, and the ~6.9 MiB *validator* wasm. So Validate/Fix/the dictionary
-    // work fully offline after one visit, and the Explore/Charts/Coordinates
-    // UIs render offline too; only their heavy *engines* are deferred.
+    // files, and the 2.1 MB **tier-1** engine wasm. So Validate, Fix, Export and
+    // ALL of Tools work fully offline after one visit, and the Explore/Charts/
+    // Coordinates UIs render offline too; only their heavy *engines* are
+    // deferred.
     //
-    // That install costs **~11.9 MiB across 45 entries** — the figure vite-plugin-pwa
-    // prints as `precache N entries (… KiB)` on every build, which is where to
-    // re-read it rather than trusting this comment. It said ~5.85 MiB until
-    // 2026-08-16 and had been wrong by more than 2x since the Excel converter
-    // landed: the validator wasm alone grew 3.3 MB -> 4.8 MB -> 6.6 MB across
-    // three features (see maximumFileSizeToCacheInBytes below, which tracks the
-    // same growth and WAS kept current, because a stale number there fails the
-    // build and a stale number here fails nobody).
+    // That install costs **7269.27 KiB across 46 entries** (measured 2026-08-17,
+    // #355) — the figure vite-plugin-pwa prints as `precache N entries (… KiB)`
+    // on every build, which is where to re-read it rather than trusting this
+    // comment. Every hand-written copy of it in this repo has gone stale at some
+    // point, this one included; #345 tracks gating it instead.
     //
-    // NEVER precached: the DuckDB engine wasm (36 MB EH + 41 MB MVP)
-    // and the 15 MB OSTN15 grid — 92 MB we refuse to pull on every install.
-    // Those are `globIgnore`d here and instead runtime-cached CacheFirst the
-    // FIRST time they're actually fetched (the idle-warm in lib/prefetch.ts
-    // only fetches DuckDB on a fast, non-metered link; otherwise it waits for a
-    // real Explore/Coordinates click) — so they cost nothing until used, then
-    // work offline thereafter.
+    // The number is 4.5 MiB smaller than it was the day before, and only the
+    // engine moved: the precached artifact is now the engine minus `arrow` and
+    // `excel` (2.1 MB raw) rather than the whole thing (6.6 MB). Its history is
+    // the shape of the problem the tiering solved — 3.3 MB (AGS4 producer) →
+    // 4.8 MB (content-addressed keychain, #303) → 6.6 MB (Excel) → 2.1 MB.
+    //
+    // NEVER precached: the DuckDB engine wasm (36 MB EH + 41 MB MVP), the 15 MB
+    // OSTN15 grid, and now the **tier-2** engine (5.2 MB) — the full build, which
+    // only Explore and Tools → Excel need. All three are `globIgnore`d here and
+    // instead runtime-cached CacheFirst the FIRST time they're actually fetched
+    // (the idle-warm in lib/prefetch.ts only fetches DuckDB on a fast,
+    // non-metered link; otherwise it waits for a real Explore/Coordinates click)
+    // — so they cost nothing until used, then work offline thereafter.
     VitePWA({
       // 'prompt', not 'autoUpdate': a user mid-analysis (file loaded, query
       // running) shouldn't have the page reloaded out from under them. The
@@ -269,14 +296,44 @@ export default defineConfig({
         ],
         // Belt-and-braces with the runtimeCaching rules below: keep the heavy
         // assets out of the install precache no matter how the globs evolve.
-        globIgnores: ["assets/duckdb-*.wasm", "grids/**", "**/*.map"],
-        // 8 MiB clears the ~6.6 MB validator wasm (the Excel converter — calamine
-        // + rust_xlsxwriter for xlsx_to_ags4/ags4_to_xlsx — pushed it past the old
-        // 6 MiB cap, which silently failed the whole SW build) but still sits far
-        // below the 36 MB DuckDB wasm, so even if a glob slipped, the engine can't
-        // precache. Size history: 4 MiB/~3.3 MB (AGS4 producer) → 6 MiB/~4.8 MB
-        // (content-addressed keychain, #303) → 8 MiB/~6.6 MB (Excel).
-        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        //
+        // `ags4_wasm_full_bg-*.wasm` is tier 2 (#355), and it is the fragile one.
+        // The two engine builds come out of the same crate, and with the same
+        // `--out-name` they would fingerprint to two hashes with the same STEM —
+        // at which case the tier-1 glob above matches BOTH, the install carries
+        // the full engine again, and nothing errors. The distinct `--out-name` in
+        // `web/package.json` is what makes them separable; this is the second
+        // lock, and the e2e assertion that tier 2 is ABSENT from the precache is
+        // the third — the only one that actually fails, since every size ceiling
+        // here has room for it.
+        globIgnores: [
+          "assets/duckdb-*.wasm",
+          "assets/ags4_wasm_full_bg-*.wasm",
+          "grids/**",
+          "**/*.map",
+        ],
+        // 3 MiB, down from 8 (#355) — and the drop is what makes this a guard
+        // again. The precache now carries TIER 1 (2.1 MB raw), not the full
+        // engine, so this number can sit in the gap between the two builds:
+        // above `tools/release/check-wasm-tier1.mjs`'s 2350 KiB raw ceiling,
+        // which is what keeps tier 1 from growing into it, and below tier 2's
+        // 5.2 MB. At 8 MiB it could not catch a leaked tier 2 at all — the full
+        // engine fits under it, which is exactly why the globs above needed a
+        // third lock rather than a bigger number.
+        //
+        // The two ceilings move together: raise the tier-1 gate past this and the
+        // engine stops being precached, which costs offline validate. That is
+        // not silent — vite-plugin-pwa prints "<file> is N MB, and won't be
+        // precached" — but a warning in a build log is not a failing check, so
+        // the tier-1 gate above is what actually holds the pair apart.
+        //
+        // Measured, not assumed: widening the glob above to match both engines
+        // makes this cap fire on tier 2 with exactly that warning, and the app
+        // still builds. Size history: 4 MiB/~3.3 MB (AGS4 producer) →
+        // 6 MiB/~4.8 MB (content-addressed keychain, #303) → 8 MiB/~6.6 MB
+        // (Excel) → 3 MiB/2.1 MB (the tier split, which took Excel and Arrow
+        // back out).
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         // First-install SW controls the page immediately, so an offline reload
         // right after the first visit is already served from cache.

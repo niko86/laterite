@@ -31,6 +31,7 @@ export default tseslint.config(
       "dist/**",
       "node_modules/**",
       "src/wasm/**",
+      "src/wasm-full/**",
       "src/wasm-tokenizer/**",
       // Playwright e2e specs live outside web/tsconfig.json's `include` (they
       // aren't in `tsc --noEmit` scope either) and use their own runner — out

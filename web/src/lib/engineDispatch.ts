@@ -23,28 +23,54 @@ import type {
   TypeClashMode,
 } from "./validator";
 import type { GroupMeta } from "./duckTypes";
-import type * as Ags4Wasm from "../wasm/ags4_wasm.js";
-import type { ParsedDataset } from "../wasm/ags4_wasm.js";
+// Types come from the FULL build because it is the superset — the only one of
+// the two that declares every op a dispatch can serve. Tier 1 is missing
+// `ags4_to_xlsx`, `xlsx_to_ags4` and `ParsedDataset.arrow_ipc` by design (#355),
+// so deriving from it would leave four ops undescribable.
+import type * as FullEngine from "../wasm-full/ags4_wasm_full.js";
+import type {
+  ExcelResult,
+  ParsedDataset,
+} from "../wasm-full/ags4_wasm_full.js";
 
-/** The engine surface the dispatch drives. Structurally the generated wasm
- *  module, narrowed to the twelve functions actually called — so a build that
- *  gates one of them out fails to typecheck HERE, naming the op, rather than at
- *  a call site deep in a branch. */
-export type EngineApi = Pick<
-  typeof Ags4Wasm,
+/** The ops EVERY build serves. Structurally the generated wasm module, narrowed
+ *  to the functions actually called — so a build that gates one of them out
+ *  fails to typecheck where it is PASSED, naming the op, rather than at a call
+ *  site deep in a branch. */
+export type CoreEngineApi = Pick<
+  typeof FullEngine,
   | "validate"
   | "certify"
   | "compute_fixes"
   | "apply_fixes"
-  | "read"
   | "diff"
   | "merge"
   | "censor"
   | "dictionary"
   | "build_ags4"
-  | "ags4_to_xlsx"
-  | "xlsx_to_ags4"
 >;
+
+/** The three names this dispatch can only take from the FULL build. Two of them
+ *  — the Excel conversions — simply do not exist in tier 1. `read` is subtler and
+ *  worth stating precisely: it is UNGATED in the crate, so tier 1 has it, but the
+ *  dataset it returns has no `arrow_ipc` door (that method is the `arrow`
+ *  feature) and this dispatch calls exactly that. So tier 1's `read` is not the
+ *  one meant here, which is why the two builds' `ParsedDataset` types are
+ *  incompatible and passing tier 1's module whole fails to compile.
+ *
+ *  `arrow` + `excel` are the entire weight difference between the tiers —
+ *  839 KiB gzipped against 1771. */
+export type HeavyEngineApi = Pick<
+  typeof FullEngine,
+  "read" | "ags4_to_xlsx" | "xlsx_to_ags4"
+>;
+
+/** What a dispatch drives. The heavy half is OPTIONAL because the always-on
+ *  worker runs tier 1 and passes only the core ops; `validatorClient.ts` never
+ *  routes an Explore or Excel request to it. If one ever arrived anyway, the
+ *  guards below name the missing op instead of failing as "undefined is not a
+ *  function" inside a wasm shim. */
+export type EngineApi = CoreEngineApi & Partial<HeavyEngineApi>;
 
 /** How a dispatch hands a response back. The worker supplies one that posts to
  *  the main thread; a test supplies one that collects. */
@@ -157,9 +183,12 @@ export interface MergeReq {
 /** Per-action cell/structure counts from the shared scrub engine — the leaf's
  *  `Tally`, snake_case as serialised across the wasm boundary. Re-exported from
  *  the crate rather than re-declared: `censor` returns a typed `CensorResult`
- *  now, so this file's copy was a third description of the same eight counters. */
-export type { CensorTally } from "../wasm/ags4_wasm";
-import type { CensorTally } from "../wasm/ags4_wasm";
+ *  now, so this file's copy was a third description of the same eight counters.
+ *  (From the full build, like every other type here — `censor` is in both, so
+ *  the two declarations are identical; taking them all from one build is what
+ *  stops a reader wondering which.) */
+export type { CensorTally } from "../wasm-full/ags4_wasm_full";
+import type { CensorTally } from "../wasm-full/ags4_wasm_full";
 /** Anonymise a file with the shared scrub engine (Tools → Anonymiser, #581).
  *  Carries the file bytes, transferred; `sensitiveJson` is the classification
  *  SSOT; `selectedCodes` (null = every classified heading) restricts the policy
@@ -301,6 +330,15 @@ export function createEngineDispatch(engine: EngineApi, reply: Reply) {
     xlsx_to_ags4,
   } = engine;
 
+  // Reachable only by a routing mistake: `validatorClient.ts` sends all four
+  // arrow/excel ops to the second worker, which runs the full build. Worth a
+  // sentence anyway — the alternative failure is "undefined is not a function"
+  // from inside a wasm shim, which names neither the op nor the reason.
+  const absent = (op: string) =>
+    new Error(
+      `this engine build has no ${op}() — it is tier 1, which drops arrow + excel (#355)`,
+    );
+
   // The most-recently parsed dataset (the Explore/Tools typed-data path).
   // Held because `arrow_ipc(code)` builds each group's Arrow batch lazily AND
   // drops it on return, so the dataset must outlive the parse call to serve
@@ -334,6 +372,7 @@ export function createEngineDispatch(engine: EngineApi, reply: Reply) {
     }
 
     if (req.kind === "parse") {
+      if (!read) throw absent("read");
       dataset?.free();
       const ds = read(new Uint8Array(req.bytes), req.encoding);
       dataset = ds;
@@ -492,10 +531,19 @@ export function createEngineDispatch(engine: EngineApi, reply: Reply) {
       // Both directions return a wasm `ExcelResult` (bytes + warnings + counts);
       // the conversion fns throw (JsError) on empty/invalid input → outer catch.
       // Read the fields, free the wasm struct, transfer the bytes back.
-      const res =
-        req.kind === "excelExport"
-          ? ags4_to_xlsx(new Uint8Array(req.bytes))
-          : xlsx_to_ags4(new Uint8Array(req.bytes), req.formatNumeric);
+      //
+      // An if/else rather than the ternary this was, so each direction is
+      // guarded by the door it actually needs: a shared guard reported the
+      // EXPORT function's name for a failed import, which sends a reader looking
+      // at the wrong half of the boundary.
+      let res: ExcelResult;
+      if (req.kind === "excelExport") {
+        if (!ags4_to_xlsx) throw absent("ags4_to_xlsx");
+        res = ags4_to_xlsx(new Uint8Array(req.bytes));
+      } else {
+        if (!xlsx_to_ags4) throw absent("xlsx_to_ags4");
+        res = xlsx_to_ags4(new Uint8Array(req.bytes), req.formatNumeric);
+      }
       const outBytes = res.bytes;
       const warnings = res.warnings;
       const sheets = res.sheets;

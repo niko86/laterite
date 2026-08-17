@@ -91,26 +91,32 @@ jobs:
         # doesn't); it then fetches a matching wasm-bindgen + binaryen on first build.
         run: command -v wasm-pack >/dev/null 2>&1 || cargo install wasm-pack --locked
 
-      - name: Build wasm (release)
-        run: wasm-pack build rust-packages/laterite-ags4-wasm --target web --release --out-dir "$GITHUB_WORKSPACE/web/src/wasm"
-
-      - name: Build tokenizer wasm (release)
-        # The tiny AGS4 tokenizer/quoter wasm (#533) the app uses on the main
-        # thread — separate ~30 KB module, built from the parse + types leaves.
-        # Before typecheck, which needs its generated .d.ts (App.tsx → tokenizer.ts).
-        run: wasm-pack build rust-packages/laterite-ags4-tokenizer-wasm --target web --release --out-dir "$GITHUB_WORKSPACE/web/src/wasm-tokenizer"
-
-      - name: sccache stats
-        if: always()
-        shell: bash
-        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
-
       - name: Install Node
+        # BEFORE the wasm build, which is `npm run` now — the scripts are where
+        # the tier-1 feature list is written down, and spelling those flags out
+        # here would be the second copy. (`npm run` needs node, not node_modules,
+        # so this doesn't pull `npm ci` forward.)
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
+
+      # All three wasm modules the app loads (see
+      # ags-wiki/design/dec-engine-tiering.md): tier 1 — the engine minus `arrow`
+      # and `excel` — which the always-on worker runs and the service worker
+      # precaches; the full engine for the lazily-created second worker (Explore
+      # and Tools → Excel), `globIgnore`d out of that precache; and the ~30 KB
+      # tokenizer (#533) the main thread instantiates, needed before typecheck,
+      # which reads its generated .d.ts (App.tsx → tokenizer.ts).
+      - name: Build wasm (release) — tier 1, tier 2, tokenizer
+        working-directory: web
+        run: npm run build:wasm:all
+
+      - name: sccache stats
+        if: always()
+        shell: bash
+        run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
       - name: Install deps + Chromium
         working-directory: web

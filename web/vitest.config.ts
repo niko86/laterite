@@ -34,7 +34,7 @@ export default defineConfig({
       // whether the developer happened to have built wasm: with it present the
       // run reports ~47% and FAILS the 95 floor, for no reason anyone changed.
       // Excluded so a local run and the CI run measure the same denominator.
-      exclude: ["src/wasm/**", "src/wasm-tokenizer/**"],
+      exclude: ["src/wasm/**", "src/wasm-full/**", "src/wasm-tokenizer/**"],
       // Floor gate, not a target. Introduced at 65 (68.76% baseline); ratcheted to
       // 95, and now to 99 after duckTypes / loadSensitive / the relationship
       // walkers got suites. A new untested pure module — or deleting a tested one

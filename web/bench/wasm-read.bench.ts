@@ -29,8 +29,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { bench, describe } from "vitest";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const wasmDir = path.join(here, "..", "src", "wasm");
-const wasmBinPath = path.join(wasmDir, "ags4_wasm_bg.wasm");
+// The FULL build (#355): this benches `read` + `arrow_ipc`, the Explore ingest
+// path, and `arrow_ipc` is the `arrow` feature — absent from the tier-1 artifact
+// the always-on worker now runs. Benching the build that cannot do the thing
+// would measure nothing.
+const wasmDir = path.join(here, "..", "src", "wasm-full");
+const wasmBinPath = path.join(wasmDir, "ags4_wasm_full_bg.wasm");
 const fixture = path.join(
   here,
   "..",
@@ -82,7 +86,7 @@ let bytes: Uint8Array = new Uint8Array();
 if (ready) {
   // Computed specifier (not a literal) + /* @vite-ignore */ so Vite's
   // import-analysis doesn't try to resolve the gitignored glue at transform time.
-  const specifier = pathToFileURL(path.join(wasmDir, "ags4_wasm.js")).href;
+  const specifier = pathToFileURL(path.join(wasmDir, "ags4_wasm_full.js")).href;
   glue = (await import(/* @vite-ignore */ specifier)) as WasmGlue;
   await glue.default({ module_or_path: readFileSync(wasmBinPath) });
   bytes = readFileSync(fixture);

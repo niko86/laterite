@@ -12,8 +12,15 @@
 // through the ONE shared `keychain::group_content_hashes`, so matching those
 // values here IS the cross-surface parity proof.
 //
-// `web/src/wasm` is gitignored, built only by `wasm-pack build … --out-dir
-// web/src/wasm` (the `e2e` job in e2e.yml, before `npm run typecheck`/
+// Against the **full** build (`web/src/wasm-full`), which is the one that still
+// carries this door: `arrow_ipc` is the `arrow` feature, and since #355 the app
+// splits its engine in two — tier 1 for Validate/Fix/Export/Tools, the full build
+// for Explore and Excel. So the artifact under test here is still exactly the one
+// the browser instantiates to produce these columns, which is what makes it a
+// cross-surface proof rather than a lab result.
+//
+// Both wasm dirs are gitignored, built only by `wasm-pack build … --out-dir
+// web/src/wasm[-full]` (the `e2e` job in e2e.yml, before `npm run typecheck`/
 // `npm run build`). The FAST `unit` lane in the same workflow deliberately
 // runs vitest with NO wasm build ("no wasm, no browser" — its own header
 // comment), so this suite self-skips when the artifact is absent — the same
@@ -25,8 +32,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { tableFromIPC, type Table } from "apache-arrow";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const wasmDir = path.join(here, "..", "wasm");
-const wasmBinPath = path.join(wasmDir, "ags4_wasm_bg.wasm");
+const wasmDir = path.join(here, "..", "wasm-full");
+const wasmBinPath = path.join(wasmDir, "ags4_wasm_full_bg.wasm");
 const hasWasm = existsSync(wasmBinPath);
 
 // Two deliveries of one project — identical to p-content-hash.test.ts.
@@ -90,7 +97,9 @@ describe.skipIf(!hasWasm)("_content_hash (#448, wasm engine)", () => {
     // import at TRANSFORM time (independent of describe.skipIf, which only
     // skips *running* the test bodies) and fail the whole file when the wasm
     // build is absent (the `unit` CI lane — see the file header).
-    const specifier = pathToFileURL(path.join(wasmDir, "ags4_wasm.js")).href;
+    const specifier = pathToFileURL(
+      path.join(wasmDir, "ags4_wasm_full.js"),
+    ).href;
     glue = await import(/* @vite-ignore */ specifier);
     const wasmBytes = readFileSync(wasmBinPath);
     await glue.default({ module_or_path: wasmBytes });

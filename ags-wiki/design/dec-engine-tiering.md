@@ -168,12 +168,28 @@ state.
 `ags4_wasm_bg.wasm` by default, so Vite fingerprints them to two hashes with the
 **same stem** — and `globPatterns`' `assets/ags4_wasm_bg-*.wasm` matches both.
 Tier 2 would be precached, the install would carry the full engine again, and
-nothing would error. `maximumFileSizeToCacheInBytes` cannot catch it either:
-tier 2 is 5.2 MB raw, under the 8 MiB cap. Hence the distinct `--out-name`, a
-`globIgnores` entry, **and** an e2e assertion in `repo:web/e2e/app.spec.ts` that
-tier 2 is *absent* from the precache. That negative assertion is the only guard
-here that would actually fail — every other one is size-based, and this artifact
-fits under all of them.
+nothing would error. Hence the distinct `--out-name`, a `globIgnores` entry,
+**and** an e2e assertion in `repo:web/e2e/app.spec.ts` that tier 2 is *absent*
+from the precache.
+
+> [!note] Built in #355, which found the locks fire in a different order
+> `maximumFileSizeToCacheInBytes` was written off here — "tier 2 is 5.2 MB raw,
+> under the 8 MiB cap" — and that stopped being true when building this dropped
+> the cap to **3 MiB**, which the tier split made possible: the precached
+> artifact is 2.1 MB now, so the cap can sit between the two engines instead of
+> above both. Falsifying the e2e proved the ordering. Widening the glob to match
+> both engines is caught FIRST by the cap, which refuses tier 2 with a build
+> warning (`… is 5.31 MB, and won't be precached`) — a warning, not a failure, so
+> the e2e is still the only check that *fails*. Both ceilings then move together:
+> raising `check-wasm-tier1.mjs`'s 2350 KiB raw ceiling above the cap would
+> quietly stop the engine being precached at all.
+>
+> Also built differently from the line above: tier 2 is a **static** import in
+> `repo:web/src/lib/tier2.worker.ts`, not a dynamic one. The worker is itself
+> created lazily (#354), so a dynamic import inside it defers nothing a user
+> waits on — it only splits ~21 KB of glue into a second chunk and adds a round
+> trip before the 5.2 MB fetch it precedes. The wasm stays a `?url` asset in both
+> shapes, which is what actually keeps it out of the chunk.
 
 **The app's engine stops being npm's.** `check-wasm-slim.mjs` guards what npm
 ships; it no longer describes what the app precaches. Tier 1 needs its own gate

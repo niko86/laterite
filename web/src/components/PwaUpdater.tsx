@@ -93,10 +93,13 @@ export const PwaUpdater: Component = () => {
           when={needRefresh()}
           fallback={
             <div class="flex items-center gap-3">
-              {/* Scoped deliberately: the precache covers Validate/Fix/the
-                  dictionary; the heavy DuckDB engine (Explore) + OSTN15 grid
-                  (Coordinates) aren't precached, so don't over-promise them. */}
-              <span>Validate &amp; Fix now work offline.</span>
+              {/* Scoped deliberately, and rescoped in #355: tier 1 is precached,
+                  so Validate, Fix, Export and every tool but Excel work offline.
+                  Still NOT precached, so still not promised — the DuckDB engine
+                  (Explore), the OSTN15 grid (Coordinates) and the tier-2 engine
+                  (Explore + Excel). Understating this was the old wording's
+                  fault; overstating it would be the worse one. */}
+              <span>Validate, Fix, Export &amp; Tools now work offline.</span>
               <button
                 type="button"
                 class="rounded border border-line-strong px-2 py-0.5 text-xs text-fg-soft hover:bg-chip"
