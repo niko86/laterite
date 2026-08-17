@@ -158,6 +158,12 @@
         "issues": [
           379
         ]
+      },
+      {
+        "text": "**The wheel's `lat` renders merge's revision audit the way the Rust binary does — `[\"X\"]`, never Python's `['X']`.** The launcher's contract is byte-faithful output to the shipped binary, and the audit line is where it silently wasn't: no test had ever merged two files that actually differ, so the line had never been rendered by anything and an interpolated Python list repr sat there unobserved. Found while wiring the released-wheel docs leg (#282), fixed with the audit's lists rendered element-by-element in the binary's own quoting, and pinned by a test that merges a fixture pair differing in exactly one cell — proven byte-identical against the binary on the same input.",
+        "issues": [
+          373
+        ]
       }
     ],
     "security": []

@@ -189,6 +189,41 @@ def test_merge_two_files(capsys: Any, tmp_path: Any) -> None:
     assert out_ags.exists() and out_ags.stat().st_size > 0
 
 
+def test_merge_revision_audit_renders_like_the_rust_binary(
+    capsys: Any, tmp_path: Any
+) -> None:
+    """#373: the audit line's lists print Rust-``{:?}``-style — ``["X"]``, never
+    Python's ``['X']``.
+
+    This launcher's whole contract is byte-faithful output to the shipped
+    binary, and this line is where it silently wasn't: no test ever merged two
+    files that actually DIFFER, so the revision audit had never been rendered
+    by anything, and an interpolated Python list repr sat there unobserved.
+    The fixture pair changes one cell under the same KEY, which is exactly one
+    revision."""
+    base = tmp_path / "base.ags"
+    rev = tmp_path / "rev.ags"
+    base.write_bytes(_CLEAN.read_bytes())
+    # The same file with one non-KEY cell changed, so the KEY matches and the
+    # later file wins a content revision.
+    revised = _CLEAN.read_bytes().replace(
+        b"Clean minimal AGS4 fixture", b"Revised-title AGS4 fixture"
+    )
+    assert revised != _CLEAN.read_bytes(), "the edit missed — fixture changed?"
+    rev.write_bytes(revised)
+    out_ags = tmp_path / "merged.ags"
+
+    code, out, _ = _run(capsys, "merge", str(base), str(rev), "--out", str(out_ags))
+    assert code == 0
+    assert "row revision(s):" in out, f"the merge produced no revision:\n{out}"
+
+    audit = next(line for line in out.splitlines() if "changed" in line)
+    assert '["' in audit and "['" not in audit, (
+        "the audit must render lists the way the Rust binary's {:?} does "
+        f"(#373): {audit!r}"
+    )
+
+
 def test_merge_needs_two_files_exits_5(capsys: Any, tmp_path: Any) -> None:
     code, _, err = _run(capsys, "merge", str(_CLEAN), "--out", str(tmp_path / "m.ags"))
     assert code == 5
