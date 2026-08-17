@@ -60,9 +60,15 @@ sources: []
 > latency constraint, unlike the tokenizer/quoter pair above); the bundle
 > grew ~6.6→6.64 MB at the time. Re-measured 2026-08-16 (post-#336's
 > dictionary repack and post-#342's de-duplication of it): the FULL engine wasm
-> is **5.1 MiB raw / 1.71 MiB gzipped**, so the 8 MiB PWA precache cap has
-> ~2.9 MiB of headroom on the raw figure — and `censor` is one of the six features #330 gates, so the slim
-> artifact npm gets carries none of this. See [[dec-ags4-censor-leaf]] and
+> is ~5 MiB raw / ~1.7 MiB gzipped. It is **not precached at all** any more:
+> since #355 the full build is tier 2, `globIgnore`d and served by its own
+> `CacheFirst` rule, and `repo:web/vite.config.ts`'s
+> `maximumFileSizeToCacheInBytes` deliberately sits BETWEEN the two engines so it
+> cannot slip back into the install. (This line read "the 8 MiB PWA precache cap
+> has ~2.9 MiB of headroom" until 2026-08-17: the cap moved to 3 MiB and the
+> restated number did not — the exact rot the measured-value corollary in
+> `repo:ags-wiki/AGS-WIKI.md` §1 now rules against.) `censor` is one of the six
+> features #330 gates, so the slim artifact npm gets carries none of this. See [[dec-ags4-censor-leaf]] and
 > "Two shapes of the same crate" in [[tech-stack-wasm]].
 
 ## What it is
