@@ -54,6 +54,21 @@ its cited source ever disagree → **flag it** (`status: contradicted` +
 a `> [!spec-ambiguity]`/`> [!divergence]` callout), never silently
 "correct" either side.
 
+**Corollary — a MEASURED value is not a fact to copy either.** The rule above is
+about what the repo **defines**; this is about what it **measures**. A number some
+tool recomputes on every run — an artifact's size, the PWA precache weight, a
+coverage percentage, a benchmark timing — never belongs on a page: in prose it
+acquires no reader, so nothing fails when it drifts, and it drifts on the next
+build. Cite the **instrument** that prints it, or the **gate** that holds it — the
+gate by name, not by the number inside it.
+
+The general form, its three carve-outs (a gated threshold, a historical series,
+loose orders of magnitude) and the worked example that earned it are in
+`repo:CLAUDE.md` under *Conventions*. They live there rather than here because
+that rule governs the whole repo and this manual governs `ags-wiki/` only (§0) —
+so this states the wiki half and defers, rather than keeping a second copy that
+would drift from it, which is the very failure both rules are about.
+
 **Citation grammar** (inline code span):
 - repo file/line — `` `repo:rust-packages/laterite-ags4-validator/src/rules/typed_values.rs:352` ``
 - repo symbol — `` `repo:.../rules/mod.rs::run_all` ``

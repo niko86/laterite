@@ -105,7 +105,7 @@ jobs:
 
       # The three wasm modules the deployed app loads (#355, design in
       # ags-wiki/design/dec-engine-tiering.md). TIER 1 — the engine minus `arrow`
-      # and `excel`, 2.1 MB raw — is precached and answers Validate, Fix, Export
+      # and `excel` — is precached and answers Validate, Fix, Export
       # and every tool but Excel. TIER 2 is the full build, fetched only when
       # Explore or Tools → Excel is opened and kept OUT of the precache. Plus the
       # ~30 KB tokenizer (#533) the main thread instantiates.
