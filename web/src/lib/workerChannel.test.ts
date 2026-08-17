@@ -2,8 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   createChannel,
   EngineUnavailableError,
-  type WorkerReply,
+  type OkReply,
 } from "./workerChannel";
+import type { WorkerReq, WorkerRes } from "./engineDispatch";
+
+/** The engine protocol's successful replies — the harness drives the channel
+ *  with the same wire type `validatorClient` does. */
+type WorkerReply = OkReply<WorkerRes>;
 
 // The channel's own behaviour, with a fake worker in place of a real one — the
 // reason it is a module of its own (#357). What is under test here is the
@@ -73,7 +78,7 @@ interface TestPending {
 function harness() {
   const spawned: FakeWorker[] = [];
   const settled: { msg: WorkerReply; p: TestPending }[] = [];
-  const channel = createChannel<TestPending>(
+  const channel = createChannel<WorkerRes, WorkerReq, TestPending>(
     () => {
       const w = new FakeWorker();
       spawned.push(w);
@@ -355,5 +360,73 @@ describe("createChannel", () => {
     channel.post(VALIDATE, new Uint8Array([1]), inflight.entry);
     last().crash("");
     await expect(inflight.promise).rejects.toThrow("engine worker crashed");
+  });
+
+  // The channel is generic over the wire protocol (#379): the constraint is the
+  // four-arm envelope, and the engine protocol above is one instance of it.
+  // This drives a SECOND, narrower instance — the transport protocol's shape —
+  // through the same lifecycle, because "one consumer" is exactly the state the
+  // un-pinning exists to leave behind. The scenario is #379's user story at
+  // channel level: the copy this replaced kept a crashed worker's handle, so
+  // the retry posted into the corpse and hung; here the retry must get a fresh
+  // worker and complete.
+  it("drives a second protocol: a transport-shaped crash retires, and the retry completes", async () => {
+    type MiniRes =
+      | { type: "ready" }
+      | { type: "initError"; error: string }
+      | { id: number; ok: true; kind: "locked"; bytes: ArrayBuffer }
+      | { id: number; ok: false; error: string };
+    type MiniReq = {
+      id: number;
+      kind: "lock";
+      bytes: ArrayBuffer;
+      passphrase: string;
+    };
+    interface MiniPending {
+      resolve: (bytes: Uint8Array) => void;
+      reject: (e: Error) => void;
+    }
+
+    const spawned: FakeWorker[] = [];
+    const channel = createChannel<MiniRes, MiniReq, MiniPending>(
+      () => {
+        const w = new FakeWorker();
+        spawned.push(w);
+        return w as unknown as Worker;
+      },
+      (msg, p) => {
+        p.resolve(new Uint8Array(msg.bytes));
+      },
+    );
+    const req = {
+      kind: "lock",
+      bytes: new ArrayBuffer(0),
+      passphrase: "pw",
+    } as const;
+
+    // First attempt: the worker dies mid-KDF. The request must REJECT — the
+    // old transportClient got this half right.
+    const first = new Promise<Uint8Array>((resolve, reject) => {
+      channel.post(req, new Uint8Array([1, 2]), { resolve, reject });
+    });
+    spawned[0]!.crash("scrypt OOM");
+    await expect(first).rejects.toThrow(EngineUnavailableError);
+    expect(spawned[0]!.terminated).toBe(true);
+
+    // The retry: the half it got wrong. A fresh worker, not the corpse — and
+    // the reply settles through the narrow protocol's own types.
+    const again = new Promise<Uint8Array>((resolve, reject) => {
+      channel.post(req, new Uint8Array([3, 4]), { resolve, reject });
+    });
+    expect(spawned.length).toBe(2);
+    expect(spawned[0]!.posted.length).toBe(1); // nothing more reached the corpse
+    const id = spawned[1]!.posted[0]!.msg["id"] as number;
+    spawned[1]!.send({
+      id,
+      ok: true,
+      kind: "locked",
+      bytes: new ArrayBuffer(2),
+    });
+    await expect(again).resolves.toEqual(new Uint8Array(2));
   });
 });

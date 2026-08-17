@@ -28,7 +28,13 @@ import type {
 } from "./validator";
 import type { ReportMeta, CensorTally } from "./validator.worker";
 import type { GroupMeta } from "./duckTypes";
-import { createChannel, type WorkerReply } from "./workerChannel";
+import type { WorkerReq, WorkerRes } from "./engineDispatch";
+import { createChannel, type OkReply } from "./workerChannel";
+
+/** The engine protocol's successful replies — what `settle` maps to pending
+ *  request kinds. The channel is protocol-generic since #379; this pins it to
+ *  the engine workers' wire type. */
+type WorkerReply = OkReply<WorkerRes>;
 
 type Pending =
   | {
@@ -201,7 +207,7 @@ function settle(msg: WorkerReply, p: Pending): void {
 // The always-on worker, created at module load exactly as it always has been:
 // Validate is where a visitor lands, and its engine's deadline is the moment a
 // file is loaded — which the sample buttons can reach in milliseconds.
-const primary = createChannel<Pending>(
+const primary = createChannel<WorkerRes, WorkerReq, Pending>(
   () =>
     new Worker(new URL("./validator.worker.ts", import.meta.url), {
       type: "module",
@@ -213,7 +219,7 @@ primary.start();
 // The second worker: Explore's parse + Arrow pulls, and Tools → Excel's two
 // conversions. Nothing here creates it — `startTier2Worker()` and the four ops
 // that need it do, so it stays uncreated for a visit that opens neither tab.
-const tier2 = createChannel<Pending>(
+const tier2 = createChannel<WorkerRes, WorkerReq, Pending>(
   () =>
     new Worker(new URL("./tier2.worker.ts", import.meta.url), {
       type: "module",
