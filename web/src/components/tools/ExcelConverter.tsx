@@ -61,11 +61,22 @@ export const ExcelConverter: Component = () => {
   };
 
   const runExport = async () => {
-    const b = fileStore.bytes();
-    if (!b) return;
     lastAttempt = runExport;
     setBusy("export");
     reset();
+    const b = fileStore.bytes();
+    if (!b) {
+      // Only reachable from "Try again" — the button itself renders behind a
+      // loaded file. Saying so beats the early return this replaced, which left
+      // the failure and the retry button exactly as they were and made the
+      // click look broken.
+      setErr({
+        text: "There's no file loaded any more — load one in the Validate tab and export again.",
+        retry: false,
+      });
+      setBusy(null);
+      return;
+    }
     try {
       const r = await excelExport(b);
       downloadBlob(r.bytes, `${baseName(fileStore.name())}.xlsx`, XLSX_MIME);

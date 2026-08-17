@@ -164,34 +164,39 @@ needed it reports and offers retry; tier 1 is precached and untouched. #339's
 lesson was that a failed engine fetch must never become a permanent silent
 state.
 
-> [!note] Built in #357, where "reports and offers retry" turned out to be two
-> separate faults
-> Neither half was the UI copy. **The channel had to drop the dead worker.** A
-> worker whose engine fails to instantiate keeps answering from a settled
-> rejection, so a retry posted into it fails identically however long ago the
-> cause was fixed — #339's permanent silent state one layer up, the failure
+> [!note] Built in #357: "reports" and "offers retry" were two separate faults
+> with two separate causes, and neither was the UI copy
+> **What stopped it reporting was the warning box above, understated.** That box
+> says a Solid resource throws when read after an error, so a fallback behind a
+> `<Show>` that reads it first never renders. The `<Show>` is not the mechanism.
+> ExplorePane read the resource from two eager `createMemo`s and an effect —
+> outside every fallback, with nothing to guard them — so the throw took the
+> whole update with it and the tab sat on "Parsing your file…" while a perfectly
+> good error branch waited below. Every read there now goes through one accessor
+> that checks `.error` first. Anything reading a resource that can fail wants
+> that shape, not a `<Show>` — the `<Show>` only ever covered the readers inside
+> it.
+>
+> **What stopped the retry working was the channel keeping the dead worker.** A
+> worker whose engine fails to instantiate does still answer — `tier2.worker.ts`
+> awaits its own `ready` and replies `{ok: false}` on the rejection — so every
+> later request fails identically, from a settled rejection, however long ago the
+> cause was fixed. #339's permanent silent state one layer up: the failure
 > outliving what caused it. `repo:web/src/lib/workerChannel.ts` retires that
 > worker (and terminates it) on `initError`, so the next request spawns a fresh
-> one and fetches again. Explore does not merely fail to *recover* without that:
-> it never *reports*, because opening the tab starts the worker and the parse
-> that follows posts into the corpse — and a hang never rejects. The e2e goes
-> red on both tabs with the retirement removed. The **hard-`error` half is still
-> open as #363**, deliberately: a crashed worker's handle stays live, and that
-> ticket owns the change and the e2e that has to fail without it.
+> one and fetches again. Removing the retirement was tried, and the tab reports
+> `Explore error: TypeError: Failed to fetch` and never recovers — which is why
+> the two faults needed separating: fixing either alone leaves a tab that is
+> honest but stuck, or willing but silent.
 >
-> **And the warning box above understates its own trap.** It says a Solid
-> resource throws when read after an error, so a fallback behind a `<Show>` that
-> reads it first never renders. The `<Show>` is not the mechanism. ExplorePane
-> read the resource from two eager `createMemo`s and an effect — outside every
-> fallback, with nothing to guard them — so the throw took the whole update with
-> it and the tab sat on its spinner while a perfectly good error branch waited
-> below. Every read there now goes through one accessor that checks `.error`
-> first. Anything reading a resource that can fail wants that shape, not a
-> `<Show>`.
+> That retirement is also what gives the failure an identity. It rejects with a
+> distinct error type rather than the worker's own string, which is what lets a
+> tab offer a retry for the failure a retry can clear and not for a conversion
+> that failed on the file itself.
 >
-> The load failure is a distinct error type (`EngineLoadError`), which is what
-> lets a tab offer a retry for the one failure a retry can clear and not for a
-> conversion that failed on the file itself.
+> The **hard-`error` half is still open as #363**, deliberately: a crashed
+> worker's handle stays live, and that ticket owns the change and the e2e that
+> has to fail without it.
 
 **The precache separation is the fragile part.** Two `wasm-pack` runs both emit
 `ags4_wasm_bg.wasm` by default, so Vite fingerprints them to two hashes with the
