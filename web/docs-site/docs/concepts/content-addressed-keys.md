@@ -50,15 +50,11 @@ Two rules govern where you see them:
   with `keys=True`:
 
 ```python
-import laterite as L
-ags = L.read("delivery.ags")
+--8<-- "python/ex21_synthetic_keys.py:code"
+```
 
-ags["LOCA"]                    # AGS columns only
-ags.table("LOCA", keys=True)   # + _id / _parent_id
-L.read("delivery.ags", keys=True)["LOCA"]   # handle-wide default
-
-# joins work regardless of the flag — the engine always has the keys
-ags.sql("SELECT * FROM SAMP s JOIN LOCA l ON s._parent_id = l._id")
+```text
+--8<-- "python/ex21_synthetic_keys.out"
 ```
 
 In Node it is the same shape — `ags.table("LOCA", { keys: true })` and

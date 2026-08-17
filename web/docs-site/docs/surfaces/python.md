@@ -17,9 +17,11 @@ surface has.
 ## The fluent handle
 
 ```python
-import laterite
+--8<-- "python/ex23_fluent_handle.py:code"
+```
 
-laterite.read("delivery.ags").validate().save("checked.ags")
+```text
+--8<-- "python/ex23_fluent_handle.out"
 ```
 
 `read()` returns an `Ags4File` you keep chaining — `validate`, `fix`, `diff`,
