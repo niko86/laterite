@@ -1153,3 +1153,67 @@ test("Explore reports an engine it can't fetch, and ingests once a retry succeed
     await ctx.close();
   }
 });
+
+// --- a worker that dies is not reused --------------------------------------
+
+// The other way an engine goes missing (#363): not a wasm that won't download,
+// but a WORKER that won't run — a script that fails to load, or one that dies.
+// Blocking the chunk is what reaches it, and the failure it guards against is
+// subtler than "no engine": rejecting the requests in flight was never the whole
+// job, because the channel then still pointed at the corpse. Those requests
+// reported and every request AFTER them was posted into silence — and a hang
+// never rejects, so no error branch was ever reached.
+//
+// Opening Explore starts the worker before any parse, so the parse that follows
+// is exactly one of those later requests. That is why this goes red on the tab
+// rather than merely losing a retry.
+test("a dead engine worker is not reused: Explore reports, and the always-on worker carries on", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  let blocked = 0;
+  // The tier-2 worker's own chunk, not its wasm — this is the script that never
+  // arrives, so the Worker fires `error` and no engine ever gets as far as
+  // failing to instantiate.
+  await page.route(/tier2\.worker-[^/]*\.js$/, async (route) => {
+    blocked++;
+    await route.abort();
+  });
+  try {
+    await page.goto(APP);
+    await page.getByRole("button", { name: /Clean \(minimal\)/ }).click();
+    await expect(page.getByText(/Clean — 0 findings/)).toBeVisible();
+
+    await tab(page, "Explore").click();
+    const failure = page.getByText(/engine (stopped|couldn't be downloaded)/);
+    const gate = page.getByRole("button", { name: /^Continue$/ });
+    await expect(failure.or(gate).first()).toBeVisible({ timeout: 120_000 });
+    if (await gate.isVisible().catch(() => false)) await gate.click();
+    await expect(failure).toBeVisible({ timeout: 120_000 });
+    await expect(
+      page.getByRole("button", { name: /^Try again$/ }),
+    ).toBeVisible();
+    expect(blocked).toBeGreaterThan(0); // the block is real
+
+    // Each attempt spawns a fresh worker, so each attempt REJECTS — the
+    // reporting is repeatable rather than a one-off from the batch that
+    // happened to be in flight when it died.
+    const beforeRetry = blocked;
+    await page.getByRole("button", { name: /^Try again$/ }).click();
+    await expect(failure).toBeVisible({ timeout: 120_000 });
+    expect(blocked).toBeGreaterThan(beforeRetry);
+
+    // One worker dying leaves the other's tabs alone — the process boundary is
+    // half the reason the split exists. A fresh validate still runs.
+    await tab(page, "Validate").click();
+    await page.getByText(/Or try a sample/).click();
+    await page.getByRole("button", { name: /Rule 9.*unknown heading/ }).click();
+    await expect(page.getByText("✗").first()).toBeVisible();
+    await expect(
+      page.getByText(/Failed to load the validator engine/),
+    ).toHaveCount(0);
+  } finally {
+    await ctx.close();
+  }
+});
