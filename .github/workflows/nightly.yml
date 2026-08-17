@@ -415,6 +415,45 @@ jobs:
         run: |
           "$GITHUB_WORKSPACE/.released/bin/python" tools/gen_doc_outputs.py \
             --check --surface python
+      # The CLI surface ships in this same wheel and nothing asked it anything
+      # (#282). It matters more since #276 put `uvx --from laterite lat validate
+      # delivery.ags` in the README — a reader-facing install path resolved
+      # entirely from the published wheel.
+      #
+      # WHICH `lat` this is, and it is not the obvious one. Two programs answer to
+      # that name: the shipped Rust binary (`laterite-cli`) the pages are written
+      # about and whose output generated every committed `.out`, and the Python
+      # console script the wheel installs (`laterite._cli`). `pip install
+      # laterite` gives you the SECOND — verified by reading the shebang of
+      # `.released/bin/lat`, which is a Python script. So this leg does not
+      # re-check the Rust CLI: it asks whether the program a reader actually gets
+      # from the wheel does what the pages say. Nothing else asks that, and the
+      # 15 scripts in `web/docs-site/examples/cli/` otherwise run only against a
+      # locally built Rust binary.
+      #
+      # `LAT_BIN` is what carries it: `gen_doc_outputs.py:_lat()` reads that first
+      # and puts its directory on PATH for the `cli` surface, which is how the
+      # scripts' bare `lat` resolves. Running the scripts with plain `bash` and
+      # `LAT_BIN` set would NOT work — they never read that variable.
+      #
+      # Split the same way as the two steps above, and ordered for it: `--check`
+      # writes nothing, so it runs first and reports drift without being able to
+      # mask anything; the write-mode run that follows is the fatal half, since
+      # `run_example` exits hard when a script's exit code is not its
+      # `expect-exit`. Its `.out` writes are discarded with the runner.
+      - name: CLI examples still byte-match the wheel's own `lat` (informational)
+        continue-on-error: true
+        env:
+          LAT_BIN: ${{ github.workspace }}/.released/bin/lat
+        run: |
+          "$GITHUB_WORKSPACE/.released/bin/python" tools/gen_doc_outputs.py \
+            --check --surface cli
+      - name: CLI examples run against the released `lat`
+        env:
+          LAT_BIN: ${{ github.workspace }}/.released/bin/lat
+        run: |
+          "$GITHUB_WORKSPACE/.released/bin/python" tools/gen_doc_outputs.py \
+            --surface cli
 
   # The Node twin of docs-vs-released-wheel: does the live docs site work against
   # the package `npm install laterite` actually gives you?
