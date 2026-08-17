@@ -532,10 +532,25 @@ def _run_merge(args: argparse.Namespace) -> int:
         print(f"  {len(res.revisions)} row revision(s):")
         for r in res.revisions:
             print(
-                f"    {r['group']} {r['key']}: changed {r['changed']} "
+                f"    {r['group']} {_audit_list(r['key'])}: "
+                f"changed {_audit_list(r['changed'])} "
                 f"(from file[{r['winner_file']}])"
             )
     return 0
+
+
+def _audit_list(items: list[str]) -> str:
+    """Render a list the way the Rust ``lat`` binary's ``{:?}`` does: ``["X"]``.
+
+    This launcher's contract is byte-faithful output to the shipped binary, and
+    an f-string interpolating a Python list broke it here — ``['X']`` against
+    the binary's ``["X"]`` (#373). JSON quoting per element matches Rust's
+    ``Debug`` for everything AGS4 can carry: the escapes agree on ``\\``, ``"``
+    and the whitespace escapes, printable non-ASCII stays literal on both sides
+    (``ensure_ascii=False``), and the residual divergence — exotic control
+    characters, ``\\u{7}`` against ``\\u0007`` — cannot reach a cell of a file
+    that parsed."""
+    return "[" + ", ".join(json.dumps(x, ensure_ascii=False) for x in items) + "]"
 
 
 def _run_certify(args: argparse.Namespace) -> int:
