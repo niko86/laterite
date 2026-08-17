@@ -271,6 +271,11 @@ function createChannel(spawn: () => Worker) {
     start,
     ready: () => start().ready,
 
+    // Whether this worker exists yet — WITHOUT creating it, which `start()` and
+    // `ready()` both do. The idle warm asks before priming an engine the worker
+    // may already be fetching.
+    started: () => live !== null,
+
     // Send `bytes` to the worker as a transferable. We transfer a *copy*
     // (`slice()`) so the caller's original Uint8Array stays intact — the main
     // thread still needs it to decode the editor text + finding snippets.
@@ -339,6 +344,15 @@ export function ready(): Promise<void> {
  *  what an e2e in `web/e2e/app.spec.ts` holds us to. */
 export function startTier2Worker(): void {
   tier2.start();
+}
+
+/** True once the second worker exists — so its engine is already downloading or
+ *  downloaded. The idle warm (#356) checks this before priming the same 5.2 MB:
+ *  a visitor who reaches Explore or Excel inside the idle window would otherwise
+ *  fetch it twice, since CacheFirst has no request coalescing. Asking does NOT
+ *  create the worker, which is the whole reason this isn't `ready()`. */
+export function isTier2Started(): boolean {
+  return tier2.started();
 }
 
 /** Validate, returning the (capped, per `maxPerRule`) report. */

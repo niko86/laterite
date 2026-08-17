@@ -57,7 +57,13 @@ The suite is split by intent across two spec files (shared helpers in
   fails silently: a `CacheFirst` rule that stopped accepting the response would
   raise nothing, and simply re-download ~36 MB on every page load. It waits for
   the service worker to take control *before* Explore, since a rule only sees
-  fetches the worker intercepts.
+  fetches the worker intercepts. Since #356 the same block covers the **tier-2
+  idle warm**, which is invisible in the UI in all three of its failure
+  directions — never firing, compiling what it was only meant to fetch, or
+  priming a URL the worker does not load. Those tests pose as a **capable
+  device** first (`hardwareConcurrency` / `deviceMemory` / `connection`): a
+  runner that fingerprints low-end skips the warm by design, so without the pose
+  they would pass for the wrong reason.
 - **`validate-ui.spec.ts` — UI *behaviours* of the Validate page** (the
   interactions, not just rule output): search filtering + the **clear-box-
   restores-all** regression; severity chips show/hide their findings; the

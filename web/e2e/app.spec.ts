@@ -613,6 +613,140 @@ test("PWA: the tier-2 engine lands in its own runtime cache on first Excel use",
     .toBeGreaterThan(0);
 });
 
+// The tier-2 idle warm (#356). Everything about it is invisible in the UI — a
+// warm that never fires, fires twice, or quietly compiles 5.2 MB of wasm all
+// look identical on screen, and all three are regressions these tests exist to
+// catch.
+
+/** Present capable HARDWARE and the given connection to the page, before a line
+ *  of app script runs. The hardware half is not decoration: CI runners routinely
+ *  fingerprint low-end (≤ 2 cores, < 4 GB) — `helpers.ts` already works around
+ *  the same thing for the Explore engine gate — and the warm skips those BY
+ *  DESIGN, so without it a warm test on a runner asserts the opposite of what it
+ *  means to and passes for the wrong reason. The connection is what each test
+ *  actually varies. */
+async function poseAsDevice(page: Page, connection: NetworkInformation) {
+  await page.addInitScript((conn) => {
+    Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 });
+    Object.defineProperty(navigator, "deviceMemory", { get: () => 8 });
+    Object.defineProperty(navigator, "connection", { get: () => conn });
+  }, connection);
+}
+
+interface NetworkInformation {
+  saveData: boolean;
+  effectiveType: string;
+}
+
+/** Every request for the tier-2 wasm, split by who issued it. A request the
+ *  SERVICE WORKER made is a real network download; one it did not is the page or
+ *  the second worker asking, which CacheFirst may well answer from cache. Only
+ *  the first kind costs a user 5.2 MB, so only the first kind is counted. */
+function watchTier2Fetches(page: Page) {
+  const network: string[] = [];
+  const all: string[] = [];
+  page.context().on("request", (r) => {
+    if (!/ags4_wasm_full_bg-[^/]*\.wasm$/.test(r.url())) return;
+    all.push(r.url());
+    if (r.serviceWorker()) network.push(r.url());
+  });
+  return { network, all };
+}
+
+const tier2Cached = (page: Page) =>
+  page.evaluate(async () => {
+    const names = await caches.keys();
+    if (!names.includes("ags-engine-tier2")) return 0;
+    const keys = await (await caches.open("ags-engine-tier2")).keys();
+    return keys.filter((k) => /ags4_wasm_full_bg-.*\.wasm$/.test(k.url)).length;
+  });
+
+/** A visit with the service worker already in control, which is what the warm
+ *  needs to be observable: on a cold FIRST visit the SW is still installing when
+ *  the idle tick fires, so the fetch goes straight to the network and the
+ *  runtime rule never sees it. Every repeat visitor is in the controlled state. */
+async function controlledVisit(page: Page) {
+  await ready(page);
+  await waitForServiceWorker(page);
+  await ready(page);
+  await waitForServiceWorker(page);
+}
+
+test("the idle warm fetches tier 2 without compiling it, and the Excel that follows refetches nothing", async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await poseAsDevice(page, { saveData: false, effectiveType: "4g" });
+  const seen = watchTier2Fetches(page);
+  await controlledVisit(page);
+
+  await expect
+    .poll(() => tier2Cached(page), {
+      timeout: 90_000,
+      message:
+        "the idle warm never primed the tier-2 engine — Explore and Tools → " +
+        "Excel are back to starting a 5.2 MB download on the click",
+    })
+    .toBeGreaterThan(0);
+
+  // FETCH, never compile. Instantiating tier 2 means creating the second
+  // worker, and warming must not: compiling ~5 MB of wasm for two tabs most
+  // visitors never open hands back a good part of what the tiering won.
+  expect(
+    tier2Workers(page),
+    "the warm compiled the tier-2 engine instead of only fetching it",
+  ).toHaveLength(0);
+
+  const beforeNetwork = seen.network.length;
+  const beforeAll = seen.all.length;
+  await tab(page, "Tools").click();
+  await page.getByRole("button", { name: /^Excel$/ }).click();
+  await expect(page.getByText(/AGS4 → Excel/)).toBeVisible();
+  await expect.poll(() => tier2Workers(page).length).toBe(1);
+  // Wait for the second worker to actually ASK for its engine before judging
+  // whether it went to the network — otherwise "nothing was refetched" is just
+  // "nothing has happened yet", and the assertion below passes on any build.
+  await expect
+    .poll(() => seen.all.length, {
+      timeout: 30_000,
+      message: "the second worker never requested the tier-2 engine at all",
+    })
+    .toBeGreaterThan(beforeAll);
+
+  expect(
+    seen.network.length,
+    "opening Excel after a completed warm went back to the network — the warm " +
+      "primed a URL the worker does not load, or CacheFirst is not serving it",
+  ).toBe(beforeNetwork);
+});
+
+test("the idle warm downloads nothing under Data Saver", async ({ page }) => {
+  // Counted on REQUESTS rather than on an empty cache: a 5.2 MB download that
+  // simply hadn't finished yet would leave the cache empty too, so an absent
+  // entry proves nothing. A request that was never made does.
+  //
+  // Two guards enforce this and either alone is enough — `warmLazyAssets`'
+  // explicit Data Saver bail, and `isLowEndDevice()`, which reads `saveData` as
+  // low-end in its own right. So this fails only when the warm is ungated
+  // altogether, which is the regression worth catching; removing one guard is
+  // caught by the unit suite instead.
+  // Capable hardware, metered connection — so the ONLY thing that can stop the
+  // warm here is Data Saver.
+  await poseAsDevice(page, { saveData: true, effectiveType: "4g" });
+  const seen = watchTier2Fetches(page);
+  await controlledVisit(page);
+
+  // Well past the 4 s requestIdleCallback deadline the warm is queued behind.
+  await page.waitForTimeout(8_000);
+
+  expect(
+    seen.all,
+    "Data Saver was ignored — 5.2 MB was speculatively downloaded on a " +
+      "connection the user has told the browser to spare",
+  ).toEqual([]);
+  expect(await tier2Cached(page)).toBe(0);
+});
+
 test("PWA: the DuckDB engine actually lands in its runtime cache", async ({
   page,
 }) => {

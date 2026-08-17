@@ -23,7 +23,9 @@
 // glob and in ags-wiki/design/dec-engine-tiering.md.
 import init from "../wasm-full/ags4_wasm_full.js";
 import * as engine from "../wasm-full/ags4_wasm_full.js";
-import wasmUrl from "../wasm-full/ags4_wasm_full_bg.wasm?url";
+// Not a `?url` import of its own: the idle warm needs the SAME URL, so the two
+// share one — see `tier2Asset.ts` for what drifting them would cost.
+import { TIER2_WASM_URL } from "./tier2Asset";
 import { createEngineDispatch } from "./engineDispatch";
 import type { WorkerReq, WorkerRes } from "./engineDispatch";
 
@@ -48,7 +50,7 @@ const reply = (msg: WorkerRes, transfer?: Transferable[]) => {
   else ctx.postMessage(msg);
 };
 
-const ready: Promise<void> = init({ module_or_path: wasmUrl }).then(
+const ready: Promise<void> = init({ module_or_path: TIER2_WASM_URL }).then(
   () => undefined,
 );
 
