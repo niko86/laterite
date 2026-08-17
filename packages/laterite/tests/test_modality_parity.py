@@ -516,7 +516,10 @@ _WASM_META_ALLOW = {
 }
 
 _WEB_VERB_CAP = {"lock": "transport-lock", "unlock": "transport-lock"}
-_WEB_ALLOW = {"ready"}  # worker readiness handshake, not a capability verb
+# No allow-list entries: the readiness handshake export (`ready`) was dropped
+# in #379 when transportClient moved onto the shared channel — nothing called
+# it, and a request that lands early queues in the worker behind its own init.
+_WEB_ALLOW: set[str] = set()
 
 
 def _wasm_verbs() -> set[str]:
