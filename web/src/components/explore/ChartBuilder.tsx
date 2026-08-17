@@ -214,9 +214,15 @@ export const ChartBuilder: Component<{
     },
   );
 
+  // Reading `rows` after a failed query THROWS (a Solid resource re-reads its
+  // error), and `option` below is an eager memo — unguarded, the throw took
+  // the update down before the sibling error banner in the JSX could render
+  // it (#359, same shape as ExplorePane's accessor).
+  const fetched = () => (rows.error ? undefined : rows());
+
   // Build the ECharts option from the fetched rows + the current controls.
   const option = createMemo<Record<string, unknown> | null>(() => {
-    const data = rows();
+    const data = fetched();
     if (!data || data.length === 0) return null;
     const cType = chartType();
     const hasColour = !!colourCol();

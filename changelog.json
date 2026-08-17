@@ -170,6 +170,9 @@
         "issues": [
           366
         ]
+      },
+      {
+        "text": "**A rejected validate froze the Validate tab on the previous file's report, with its own error message unreachable.** A Solid resource throws when read after a failure, and ValidatePane read its report from an effect, two eager memos and the results `<Show>` itself — so the moment an op rejected (a worker crash, or the engine throwing inside a dispatch), the throw took the whole update down before the pane's own \"Validator error\" fallback could render. What stayed on screen was whatever had last painted — at worst the PREVIOUS file's \"Clean — 0 findings\" over the NEW file's text, a stale verdict posing as a fresh one, with the only trace an uncaught page error. Every report read now routes through one guarded accessor, the shape Explore got when the identical trap took that tab down (the dec-engine-tiering warning box), and the fallback checks guard-first — loading, then error, then the empty state — so the error branch is reachable and a retry in flight reads as validating. The same accessor landed on the eager readers next door: FixPane's severity memos and reseed effect, and ChartBuilder's option memo, whose own error banner sat behind the identical throw. No retry button was added, because none is needed — the worker channel already retires a crashed engine, so the user's next input validates on a fresh one. Guarded by an e2e that kills the live tier-1 worker and blocks its replacement's chunk — shown red against the unguarded pane, frozen exactly as described — and asserts the page-level dead-engine banner stays silent, because a crash after boot belongs to the pane that felt it (#359)."
       }
     ],
     "security": []
