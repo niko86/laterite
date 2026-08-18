@@ -872,6 +872,15 @@ jobs:
           npm run lint
           npm run format:check
 
+      # No emoji in product UI (#406) — a design-system rule that review is bad
+      # at catching, because an emoji arrives one character at a time in a diff
+      # about something else. The sanctioned Unicode glyphs (the theme toggle's
+      # sun and moon, the verdict marks, the paging arrows) are allowlisted in
+      # the script, so this bans the thing and not the vocabulary.
+      - name: web — no emoji in product UI
+        working-directory: web
+        run: npm run check:no-emoji
+
       # The wasm half of #164's doc-output gate. The examples on
       # reference/wasm-api.md import `@laterite/ags4-wasm` by its PUBLISHED name
       # and run headless here, and their committed `.out` is compared to what

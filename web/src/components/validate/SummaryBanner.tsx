@@ -5,6 +5,15 @@ import {
   type SeverityCounts,
   type ValidationReport,
 } from "../../lib/validator";
+import { SummaryBanner as Banner, type BannerKind } from "@shared/components";
+
+// The validate pane's reading of a report, rendered by the shared banner (#406).
+//
+// What used to be here was four copies of the same tinted panel — each with its
+// own hand-picked palette classes — differing only in which severity they were
+// dressed as. The panel moved to the shared primitive, which the fix and tools
+// panes want too; what stays is the part that is genuinely about a
+// ValidationReport: which verdict it is, and how to say it.
 
 const RESOLUTION_BLURB: Record<string, string> = {
   forced: "forced by you",
@@ -31,10 +40,10 @@ export const SummaryBanner: Component<{
   name: string;
 }> = (props) => {
   // FYI findings are informational (extended-ASCII, etc.), not violations.
-  // A file whose ONLY findings are FYI shouldn't look like a failure — amber,
-  // not red (see reportIsOnlyFyi for the severity-default rationale).
+  // A file whose ONLY findings are FYI shouldn't look like a failure — warn,
+  // not err (see reportIsOnlyFyi for the severity-default rationale).
   const onlyFyi = () => reportIsOnlyFyi(props.report);
-  // Headline for the red banner: the per-severity split ("36 errors · 14
+  // Headline for the failure banner: the per-severity split ("36 errors · 14
   // informational") when the report is uncapped, else the true grand total
   // (the split would undercount a per-rule-capped report).
   const headline = () => {
@@ -43,74 +52,63 @@ export const SummaryBanner: Component<{
       ? breakdown(counts)
       : plural(props.report.finding_count, "finding");
   };
+  const against = () =>
+    `Validated against AGS ${props.report.dict_version} — ${
+      RESOLUTION_BLURB[props.report.resolution] ?? props.report.resolution
+    }`;
+  const kind = (): BannerKind =>
+    props.report.ok ? "ok" : onlyFyi() ? "warn" : "err";
+
   return (
     <Show
       when={!props.report.error}
       fallback={
-        <div class="rounded-lg border border-amber-600/50 bg-amber-500/10 p-4">
-          <p class="font-medium text-warn">Could not validate</p>
-          <p class="mt-1 text-sm text-warn">{props.report.error?.message}</p>
-          <p class="mt-1 text-xs text-warn">({props.report.error?.kind})</p>
-        </div>
+        <Banner
+          kind="warn"
+          headline="Could not validate"
+          detail={props.report.error?.message}
+          note={`(${props.report.error?.kind ?? ""})`}
+        />
       }
     >
-      <Show
-        when={props.report.ok}
-        fallback={
-          <Show
-            when={!onlyFyi()}
-            fallback={
-              <div class="rounded-lg border border-amber-600/50 bg-amber-500/10 p-4">
-                <p class="font-medium text-warn">
-                  ⓘ {props.report.finding_count.toLocaleString()} informational
-                  (FYI) finding
-                  {props.report.finding_count === 1 ? "" : "s"} — no errors or
-                  warnings
-                </p>
-                <p class="mt-1 text-sm text-fg-soft">
-                  Validated against AGS {props.report.dict_version} —{" "}
-                  {RESOLUTION_BLURB[props.report.resolution] ??
-                    props.report.resolution}
-                </p>
-                <p class="mt-1 text-xs text-fg-dim">
-                  FYI findings are hidden by default — switch on{" "}
-                  <span class="mono">fyi</span> in the severity filter to see
-                  them.
-                </p>
-              </div>
-            }
-          >
-            <div class="rounded-lg border border-red-600/50 bg-red-500/10 p-4">
-              <p class="font-medium text-err">✗ {headline()}</p>
-              <p class="mt-1 text-sm text-fg-soft">
-                Validated against AGS {props.report.dict_version} —{" "}
-                {RESOLUTION_BLURB[props.report.resolution] ??
-                  props.report.resolution}
-              </p>
-              <Show
-                when={props.report.shown_count < props.report.finding_count}
-              >
-                <p class="mt-2 text-xs text-warn">
-                  Showing the first {props.report.shown_count.toLocaleString()}{" "}
-                  of {props.report.finding_count.toLocaleString()} findings
-                  (capped per rule to keep the page responsive). Download the
-                  full report below, or for very large files use the{" "}
-                  <code class="mono">lat-check</code> CLI.
-                </p>
-              </Show>
-            </div>
+      <Banner
+        kind={kind()}
+        headline={
+          <Show when={!props.report.ok} fallback="Clean — 0 findings">
+            <Show
+              when={!onlyFyi()}
+              fallback={`${props.report.finding_count.toLocaleString()} informational (FYI) finding${
+                props.report.finding_count === 1 ? "" : "s"
+              } — no errors or warnings`}
+            >
+              {headline()}
+            </Show>
           </Show>
         }
-      >
-        <div class="rounded-lg border border-emerald-600/50 bg-emerald-500/10 p-4">
-          <p class="font-medium text-ok">✓ Clean — 0 findings</p>
-          <p class="mt-1 text-sm text-fg-soft">
-            Validated against AGS {props.report.dict_version} —{" "}
-            {RESOLUTION_BLURB[props.report.resolution] ??
-              props.report.resolution}
-          </p>
-        </div>
-      </Show>
+        detail={against()}
+        note={
+          <Show
+            when={!props.report.ok && onlyFyi()}
+            fallback={
+              <Show
+                when={
+                  !props.report.ok &&
+                  props.report.shown_count < props.report.finding_count
+                }
+              >
+                Showing the first {props.report.shown_count.toLocaleString()} of{" "}
+                {props.report.finding_count.toLocaleString()} findings (capped
+                per rule to keep the page responsive). Download the full report
+                below, or for very large files use the{" "}
+                <code class="mono">lat-check</code> CLI.
+              </Show>
+            }
+          >
+            FYI findings are hidden by default — switch on{" "}
+            <span class="mono">fyi</span> in the severity filter to see them.
+          </Show>
+        }
+      />
     </Show>
   );
 };
