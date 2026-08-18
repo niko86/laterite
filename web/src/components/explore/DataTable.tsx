@@ -1,3 +1,4 @@
+import { Button } from "@shared/components";
 import {
   createEffect,
   createMemo,
@@ -106,25 +107,23 @@ export const DataTable: Component<{
 
       <Show when={pageCount() > 1}>
         <div class="flex items-center gap-3 text-xs text-fg-muted">
-          <button
-            type="button"
-            class="rounded-sm border border-line-strong px-2 py-1 hover:bg-chip disabled:opacity-45"
+          <Button
+            size="sm"
             disabled={page() === 0}
             onClick={() => setPage((p) => Math.max(0, p - 1))}
           >
             ← Prev
-          </button>
+          </Button>
           <span>
             Page {page() + 1} of {pageCount()} · {props.rows} rows
           </span>
-          <button
-            type="button"
-            class="rounded-sm border border-line-strong px-2 py-1 hover:bg-chip disabled:opacity-45"
+          <Button
+            size="sm"
             disabled={page() >= pageCount() - 1}
             onClick={() => setPage((p) => Math.min(pageCount() - 1, p + 1))}
           >
             Next →
-          </button>
+          </Button>
         </div>
       </Show>
     </div>

@@ -1,3 +1,4 @@
+import { Button, Checkbox } from "@shared/components";
 import { createResource, createSignal, Show, type Component } from "solid-js";
 import { isLowEndDevice } from "../../lib/device";
 import { goTo } from "../../lib/nav";
@@ -72,30 +73,22 @@ export const EngineGate: Component<{ onConfirm: () => void }> = (props) => {
         Validate and Fix don't need it.
       </p>
       <div class="mt-4 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          class="rounded-md bg-cta px-3 py-1.5 text-sm font-medium text-fg-on-cta hover:bg-cta-hover"
-          onClick={confirm}
-        >
+        <Button variant="primary" onClick={confirm}>
           Continue
-        </button>
-        <button
-          type="button"
-          class="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg-soft hover:bg-chip"
+        </Button>
+        <Button
           onClick={() => {
             goTo("validate");
           }}
         >
           Back to Validate
-        </button>
-        <label class="ml-auto flex items-center gap-1.5 text-xs text-fg-faint">
-          <input
-            type="checkbox"
-            checked={dontAsk()}
-            onInput={(e) => setDontAsk(e.currentTarget.checked)}
-          />
-          Don't ask again
-        </label>
+        </Button>
+        <Checkbox
+          label="Don't ask again"
+          class="ml-auto"
+          checked={dontAsk()}
+          onInput={(e) => setDontAsk(e.currentTarget.checked)}
+        />
       </div>
     </div>
   );

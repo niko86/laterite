@@ -141,6 +141,9 @@ const RICard: Component<{ links: number; orphans: OrphanResult[] }> = (
             </div>
           )}
         </For>
+        {/* The link idiom, not a button family: a cross-tab jump reads as a
+            link (accent, hover underline), same as the footer's — the Button
+            variants are commits and toolbar actions. */}
         <button
           type="button"
           class="self-start text-xs text-accent underline-offset-2 hover:underline"
@@ -186,6 +189,8 @@ const CompletenessCard: Component<{ groups: GroupCompleteness[] }> = (
         <For each={props.groups}>
           {(g) => (
             <div class="rounded-sm border border-line-subtle">
+              {/* List-row disclosure, not a toolbar control — composes from
+                  the tokens directly (the FindingsView header's call). */}
               <button
                 type="button"
                 class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-raised"

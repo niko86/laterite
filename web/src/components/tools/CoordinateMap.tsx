@@ -65,6 +65,9 @@ export const CoordinateMap: Component<{
     void Promise.all([
       import("leaflet"),
       import("leaflet/dist/leaflet.css"),
+      // The token overrides ride the same lazy boundary as leaflet.css — no
+      // map on screen, no override bytes in the entry chunk (#410).
+      import("./coordinate-map.css"),
       // eslint-disable-next-line solid/reactivity -- one-shot init after the dynamic import; the reactive redraw is the createEffect below, not this .then callback
     ]).then(([leaflet]) => {
       if (disposed) return;
@@ -98,7 +101,7 @@ export const CoordinateMap: Component<{
   return (
     <div
       ref={el}
-      class="relative z-0 rounded-lg border border-line"
+      class="map-host relative z-0 rounded-lg border border-line"
       style={{ width: "100%", height: "420px" }}
     />
   );

@@ -15,7 +15,8 @@ import {
 import type { DictGroup, DictVersionOpt } from "../../lib/validator";
 import { dictVersion, setDictVersion } from "../../lib/settings";
 import { Chevron } from "../Chevron";
-import { controlClass, controlFocus } from "../../lib/controls";
+import { searchControl } from "../../lib/controls";
+import { Select } from "@shared/components";
 
 // Searchable reference for the AGS4 groups + their headings, for the SELECTED
 // edition. Projected from the canonical union `ags_dictionary.json` (the single
@@ -65,15 +66,15 @@ export const DictionaryBrowser: Component = () => {
     <div class="flex min-w-0 flex-col gap-3">
       <div class="flex flex-wrap items-center gap-2">
         <input
-          class={`min-w-0 flex-1 rounded-xs border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg ${controlFocus} placeholder:text-fg-dim`}
+          class={`min-w-0 flex-1 ${searchControl}`}
           placeholder="Search groups, headings, descriptions, types… (e.g. LOCA, depth, GEOL_TOP, DT)"
           value={q()}
           onInput={(e) => setQ(e.currentTarget.value)}
         />
         <label class="flex items-center gap-1.5 text-sm text-fg-muted">
           AGS edition
-          <select
-            class={controlClass}
+          <Select
+            width="w-auto"
             value={dictVersion()}
             onChange={(e) => {
               setDictVersion(e.currentTarget.value as DictVersionOpt);
@@ -88,7 +89,7 @@ export const DictionaryBrowser: Component = () => {
                 </option>
               )}
             </For>
-          </select>
+          </Select>
         </label>
       </div>
       <Show
@@ -103,9 +104,13 @@ export const DictionaryBrowser: Component = () => {
             </p>
           }
         >
+          {/* Both counts are DERIVED from the loaded dictionary (the registry's
+              edition projection) — a dictionary edit changes them with no code
+              edit here (#410). */}
           <p class="text-xs text-fg-muted">
-            {groups().length} of {dict()?.groups.length} groups · AGS{" "}
-            {dict()?.ags_edition} standard dictionary
+            {groups().length} of {dict()?.groups.length} groups ·{" "}
+            {dict()?.groups.reduce((n, g) => n + g.headings.length, 0)} headings
+            · AGS {dict()?.ags_edition} standard dictionary
           </p>
           <For each={groups()}>
             {(g) => (

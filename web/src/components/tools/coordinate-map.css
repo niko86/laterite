@@ -1,0 +1,74 @@
+/* Leaflet's control chrome onto the tokens (#410). Leaflet paints its own UI —
+ * zoom buttons, the attribution strip, popups — from leaflet.css literals
+ * (white plates, #ccc rules, its own font stack), so it inherits nothing from
+ * the theme by itself. Loaded WITH leaflet (both dynamic imports sit in
+ * CoordinateMap's onMount) and scoped under the host element's `map-host`
+ * class; the doubled `.map-host.leaflet-container` prefix outweighs leaflet's
+ * own `.leaflet-container`-prefixed rules whichever chunk lands first.
+ *
+ * The TILES stay light in both themes (OSM raster), but these controls are app
+ * chrome overlaying the map, so they follow the theme like every other control
+ * — the light-locked exception is the rust marker, argued in CoordinateMap.tsx. */
+
+.map-host.leaflet-container {
+  font-family: var(--family-ui);
+  /* The pane behind not-yet-loaded tiles, instead of leaflet's #ddd. */
+  background: var(--surface);
+}
+
+/* Zoom control: the system's toolbar-button look on leaflet's a-tags. */
+.map-host.leaflet-container .leaflet-bar {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-menu);
+}
+.map-host.leaflet-container .leaflet-bar a {
+  background: var(--surface-raised);
+  color: var(--fg);
+  border-bottom: 1px solid var(--line);
+}
+.map-host.leaflet-container .leaflet-bar a:hover,
+.map-host.leaflet-container .leaflet-bar a:focus {
+  background: var(--chip);
+  color: var(--fg);
+}
+.map-host.leaflet-container .leaflet-bar a:first-child {
+  border-top-left-radius: calc(var(--radius-md) - 1px);
+  border-top-right-radius: calc(var(--radius-md) - 1px);
+}
+.map-host.leaflet-container .leaflet-bar a:last-child {
+  border-bottom-left-radius: calc(var(--radius-md) - 1px);
+  border-bottom-right-radius: calc(var(--radius-md) - 1px);
+  border-bottom: none;
+}
+.map-host.leaflet-container .leaflet-bar a.leaflet-disabled {
+  background: var(--surface);
+  color: var(--fg-faint);
+}
+
+/* Attribution strip: the required OSM credit, in the app's caption voice. */
+.map-host.leaflet-container .leaflet-control-attribution {
+  background: var(--surface-raised);
+  color: var(--fg-muted);
+}
+.map-host.leaflet-container .leaflet-control-attribution a {
+  color: var(--accent);
+}
+
+/* Popups: the system's popover surface. */
+.map-host.leaflet-container .leaflet-popup-content-wrapper,
+.map-host.leaflet-container .leaflet-popup-tip {
+  background: var(--surface-raised);
+  color: var(--fg);
+  box-shadow: var(--shadow-popover);
+}
+.map-host.leaflet-container .leaflet-popup-content-wrapper {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+.map-host.leaflet-container a.leaflet-popup-close-button {
+  color: var(--fg-muted);
+}
+.map-host.leaflet-container a.leaflet-popup-close-button:hover {
+  color: var(--fg);
+}
