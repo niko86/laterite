@@ -100,7 +100,10 @@ test("a fixable file offers a safe fix and applying it clears the safe set", asy
   const download = page.getByRole("button", { name: /Download \.ags/ });
   await expect(download).toBeVisible();
 
+  // Applying rewrites the loaded file, so the button arms (#409): the first
+  // press turns the label into the question, the second acts.
   await fixAll.click();
+  await page.getByRole("button", { name: /Apply \d+ safe fix/ }).click();
   // After applying, no safe fixes remain …
   await expect(
     page.getByRole("button", { name: /Fix all safe \(0\)/ }),

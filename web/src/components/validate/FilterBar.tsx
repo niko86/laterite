@@ -1,10 +1,10 @@
+import { Button, Input } from "@shared/components";
 import { For, Show, createMemo, type Component } from "solid-js";
 import type { Severity, ValidationReport } from "../../lib/validator";
 import { severityOf } from "../../lib/validator";
 import { shortRule } from "../../lib/rules";
 import { Disclosure } from "../Disclosure";
 import { createMediaQuery } from "../../lib/media";
-import { controlFocus } from "../../lib/controls";
 
 // Re-exported so the many components that import `Severity` from here keep
 // working. The definition lives with `severityOf` in lib/validator, because the
@@ -144,7 +144,11 @@ export const FilterBar: Component<{
       count={activeFilters()}
       bodyClass="flex flex-col gap-3"
     >
-      {/* Rule toggles + jump. Active = shown. */}
+      {/* Rule toggles + jump. Active = shown. The toggle chips stay composed
+          rather than becoming the Chip primitive: Chip's tones say what a
+          thing IS; these say whether it is SHOWN — selection state, which the
+          states contract renders as accent text on the accent-quiet wash.
+          Their metrics landed on the chips rung in #426. */}
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-xs font-medium text-fg-muted">Rules</span>
         <For each={rules()}>
@@ -171,39 +175,41 @@ export const FilterBar: Component<{
                   {shortRule(r.rule)}
                 </button>
                 {/* Jump affordance: arrow forces the group open + scrolls. */}
-                <button
-                  type="button"
-                  class="ml-1 cursor-pointer text-fg-muted hover:text-accent"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="ml-1 hover:text-accent"
                   title="Jump to this rule"
                   onClick={() => {
                     props.onJump(r.rule);
                   }}
                 >
                   ↳
-                </button>
+                </Button>
                 <span class={countBadge}>{r.count}</span>
               </span>
             );
           }}
         </For>
-        <button
-          type="button"
-          class="ml-1 text-xs text-fg-muted underline-offset-2 hover:text-fg hover:underline"
+        <Button
+          variant="ghost"
+          size="sm"
+          class="ml-1"
           onClick={() => {
             props.onSelectedRules(new Set(rules().map((r) => r.rule)));
           }}
         >
           All
-        </button>
-        <button
-          type="button"
-          class="text-xs text-fg-muted underline-offset-2 hover:text-fg hover:underline"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => {
             props.onSelectedRules(new Set());
           }}
         >
           None
-        </button>
+        </Button>
       </div>
 
       {/* Severity + group rows. */}
@@ -269,14 +275,14 @@ export const FilterBar: Component<{
 
       {/* Free-text + showing-N-of-M. */}
       <div class="flex flex-wrap items-center gap-3">
-        <input
+        <Input
           type="search"
           placeholder="Search line text, descriptions, headings, groups…"
           value={props.search()}
           onInput={(e) => {
             onSearchInput(e.currentTarget.value);
           }}
-          class={`min-w-0 flex-1 rounded-xs border border-line-strong bg-surface-raised px-2.5 py-1.5 text-sm text-fg ${controlFocus}`}
+          class="flex-1"
         />
         <span class="text-xs whitespace-nowrap text-fg-muted">
           showing {props.shownCount()} of {props.totalCount()} findings
