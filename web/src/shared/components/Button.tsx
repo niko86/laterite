@@ -1,7 +1,9 @@
 import { splitProps, type Component, type JSX } from "solid-js";
+import { Dynamic } from "solid-js/web";
 
-// The brand's button families. One component, five variants — the app shipped
-// these as five copies; this is the extraction.
+// The brand's button families. One component, six variants — the app shipped
+// five of them as five copies; this is the extraction, plus the outline CTA
+// #395 needed beside the rust fill.
 //
 // THE FILLED VARIANTS ARE RUST, NOT THE SYSTEM'S ACCENT. The design system
 // fills `primary` with `var(--accent)`, which was brand brick when it was
@@ -12,7 +14,8 @@ import { splitProps, type Component, type JSX } from "solid-js";
 // newer decision. `add` and `ghost` keep maroon, because they read as links
 // rather than commits.
 
-export type ButtonVariant = "default" | "primary" | "action" | "add" | "ghost";
+export type ButtonVariant =
+  "default" | "primary" | "action" | "add" | "ghost" | "outline";
 export type ButtonSize = "sm" | "md" | "lg";
 export type ButtonTone = "neutral" | "danger";
 
@@ -40,6 +43,13 @@ const VARIANTS: Record<ButtonVariant, string> = {
   // Quiet icon / ✕ button, muted until hover.
   ghost:
     "bg-transparent text-fg-muted rounded-xs px-[0.3rem] py-[0.1rem] hover:text-fg",
+  // The secondary CTA (#395): maroon outline on the canvas, beside the rust
+  // fill. Accent rather than cta on purpose — "maroon reads, rust acts", so the
+  // quieter of two adjacent calls to action takes the reading colour, and the
+  // page never shows two rust buttons competing to be pressed.
+  outline:
+    "border border-accent bg-transparent text-accent rounded-md px-[0.8rem] " +
+    "py-[0.3rem] font-semibold hover:bg-accent-quiet hover:text-accent-hover",
 };
 
 // `md` is the unstyled middle rung — the variant's own padding stands.
@@ -65,6 +75,17 @@ export const Button: Component<
     iconLeft?: JSX.Element;
     iconRight?: JSX.Element;
     class?: string;
+    /** Render an anchor instead of a button.
+     *
+     * A call to action that NAVIGATES is a link, and has to behave like one —
+     * middle-clickable, copyable, crawlable, and reachable with the keyboard's
+     * link semantics. The landing page's two hero CTAs and its masthead CTA all
+     * navigate (#395). Styling an anchor to look like this button from the
+     * calling surface would be the second button the shared layer exists to
+     * prevent, so the polymorphism lives here. */
+    href?: string;
+    target?: string;
+    rel?: string;
   } & JSX.ButtonHTMLAttributes<HTMLButtonElement>
 > = (props) => {
   const [own, rest] = splitProps(props, [
@@ -75,11 +96,14 @@ export const Button: Component<
     "iconRight",
     "class",
     "children",
+    "href",
   ]);
   const variant = () => own.variant ?? "default";
   return (
-    <button
-      type="button"
+    <Dynamic
+      component={own.href ? "a" : "button"}
+      type={own.href ? undefined : "button"}
+      href={own.href}
       {...rest}
       class={[
         BASE,
@@ -95,6 +119,6 @@ export const Button: Component<
       {own.iconLeft}
       {own.children}
       {own.iconRight}
-    </button>
+    </Dynamic>
   );
 };

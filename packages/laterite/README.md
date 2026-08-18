@@ -184,7 +184,7 @@ across:
 | **Node.js** | [`laterite`](https://www.npmjs.com/package/laterite) — npm | `npm install laterite` |
 | **CLI** | [`lat`](https://github.com/niko86/laterite/releases) | bundled with this wheel |
 | **DuckDB** | [`laterite_ags4`](https://community-extensions.duckdb.org/extensions/laterite_ags4.html) — community extension | `INSTALL laterite_ags4 FROM community;` |
-| **Browser** | [validator + data explorer](https://app.laterite.dev/) — WASM | open in a browser |
+| **Browser** | [`@laterite/ags4-wasm`](https://www.npmjs.com/package/@laterite/ags4-wasm) — npm, or the [validator + data explorer](https://app.laterite.dev/) | `npm install @laterite/ags4-wasm` |
 
 Scriptable output is byte-identical across all of them, so a CI gate and a
 notebook can't disagree.

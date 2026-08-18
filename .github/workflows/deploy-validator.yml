@@ -139,8 +139,17 @@ jobs:
       # carries why it is a separate build rather than a second entry, and fails
       # if an app-only dependency reaches it.
       #
-      # No VITE_BASE / VITE_DUCKDB_CDN: the apex answers at its own root and
-      # loads no engine.
+      # No VITE_BASE: the apex answers at its own root, so there is no Pages
+      # base path to bridge.
+      #
+      # No VITE_DUCKDB_CDN either, but for a narrower reason than it used to be.
+      # The apex is no longer engine-free: #397 put the SLIM validator wasm in
+      # the demo, lazily imported so it is a separate chunk nobody fetches until
+      # they touch a table. That is why the wasm build two steps up is now a
+      # BUILD-ORDER DEPENDENCY of this step and not only of the app's — the
+      # dynamic import still has to resolve at build time. What the apex does not
+      # carry is DuckDB, which is the thing the CDN knob exists for and the thing
+      # the dependency firewall in landing/vite.config.ts fails the build over.
       - name: Build the landing page
         working-directory: web
         run: npm run build:landing

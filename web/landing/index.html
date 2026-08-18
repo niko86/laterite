@@ -9,59 +9,40 @@
       content="Validate, fix, explore and write AGS4 geotechnical transfer files — from Python, Rust, Node, the CLI, DuckDB or the browser."
     />
     <link rel="canonical" href="https://laterite.dev/" />
-    <link rel="stylesheet" href="./landing.css" />
-    <!--
-      STILL THE SHORT VERSION — but built now, and on the shared token layer.
-      (wrangler.jsonc carries why the apex needed to answer at all.)
-
-      What this is NOT yet is the page #334 describes — an install-command
-      selector and a live demo of linked AGS4 group tables the reader can edit
-      and break, validated in the browser. That is #395 onward. #394 changed the
-      ground under the page rather than the page: its own Vite build, the shared
-      tokens and the self-hosted pairing, so the work that follows has somewhere
-      to land. The copy and the three destinations are deliberately unchanged.
-    -->
+    <link rel="icon" type="image/png" href="/icons/icon-128.png" />
+    <!-- Tracks the SYSTEM scheme, as the app's does: theme-color has no class
+         form, so it follows the OS while the page itself follows the stored
+         choice. Values mirror --canvas in each theme. -->
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: light)"
+      content="#ece5e0"
+    />
+    <meta
+      name="theme-color"
+      media="(prefers-color-scheme: dark)"
+      content="#14100f"
+    />
+    <!-- Apply the stored-else-system theme before first paint so a dark-mode
+         visitor never sees a light flash (#400). Byte-identical to the app's
+         script on purpose: the same storage key, so a reader who set the theme
+         in the web app arrives here with it already applied. `theme.ts` then
+         reads this class as its initial state rather than re-deriving it. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("theme");
+          if (
+            t === "dark" ||
+            (!t && matchMedia("(prefers-color-scheme: dark)").matches)
+          )
+            document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="grid min-h-screen place-items-center bg-canvas p-6 text-fg">
-    <main class="w-full max-w-[52ch]">
-      <h1
-        class="font-display text-h1 font-extrabold text-accent min-[30rem]:text-display"
-      >
-        laterite
-      </h1>
-      <p class="mt-1 mb-7 font-mono text-micro uppercase text-fg-faint">
-        AGS4 tooling · beta
-      </p>
-      <p class="mb-7 text-fg-soft">
-        A toolchain for AGS4 geotechnical transfer files — validate, fix,
-        explore and write them, from Python, Rust, Node, the command line,
-        DuckDB or a browser tab.
-      </p>
-      <ul class="m-0 list-none border-t border-line p-0">
-        <li class="border-b border-line">
-          <a class="row-link" href="https://app.laterite.dev/">
-            Validator and data explorer
-            <span class="row-note"
-              >runs in your browser — nothing is uploaded</span
-            >
-          </a>
-        </li>
-        <li class="border-b border-line">
-          <a class="row-link" href="https://docs.laterite.dev/">
-            Documentation
-            <span class="row-note">install, guides, API reference</span>
-          </a>
-        </li>
-        <li class="border-b border-line">
-          <a class="row-link" href="https://github.com/niko86/laterite">
-            Source
-            <span class="row-note">GitHub</span>
-          </a>
-        </li>
-      </ul>
-      <footer class="mt-7 text-caption text-fg-muted">
-        A fuller site is on its way; this is the short version.
-      </footer>
-    </main>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
   </body>
 </html>

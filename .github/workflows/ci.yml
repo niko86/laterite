@@ -1228,6 +1228,22 @@ jobs:
         # hand-edit of a card region.
         run: uv run --no-project python tools/gen_crate_graph.py --check
 
+      - name: install grid names only what we publish
+        # laterite.dev's install cards name five packages a stranger is about to
+        # type, and a landing page advertising a name the registry does not have
+        # is worse than no landing page. The names are generated out of the
+        # manifests that decide them, and this step fails when the generated file
+        # is stale OR when a card's claim is contradicted by its own record —
+        # a crates.io card for a `publish = false` crate, a wasm name
+        # release.yml's publish check would reject, a README and a docs page
+        # disagreeing about the DuckDB extension.
+        #
+        # It has already bitten twice, before shipping: #395 specified "the CLI
+        # on crates.io" (laterite-cli is `publish = false`), and the wheel
+        # README's Browser row named the web app where the grid names the npm
+        # package. Both were caught by this refusing to write the file.
+        run: uv run --no-project python tools/gen_install_channels.py --check
+
       - name: doc references resolve (incl. crates.io-strict for published READMEs)
         # Cheap stdlib check that no doc points at a file that isn't there. It
         # exists because the equivalent manual audit found four dead references

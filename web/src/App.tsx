@@ -16,8 +16,8 @@ import { FixPane } from "./components/fix/FixPane";
 import { ExplorePane } from "./components/explore/ExplorePane";
 import { ToolsPane } from "./components/tools/ToolsPane";
 import { ExportPane } from "./components/export/ExportPane";
-import { ThemeToggle } from "./components/ThemeToggle";
 import { PwaUpdater } from "./components/PwaUpdater";
+import { ThemeToggle } from "./shared/components";
 
 const App: Component = () => {
   // Gate the panes on the tiny main-thread tokenizer wasm (#533) ALONE — the

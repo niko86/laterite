@@ -14,6 +14,10 @@ src/wasm-tokenizer/
 package-lock.json
 # Synced from the repo SSOT (sync-*.mjs) — formatting drifts it from source.
 public/
+# Same rule, one file: the landing demo's group schema, sliced out of the AGS4
+# dictionary on every build. One heading per line is what makes a dictionary
+# change legible in a diff; prettier would wrap them into paragraphs.
+landing/demo/schema.ts
 # MkDocs-flavoured Markdown, which prettier does not speak. It DE-INDENTS
 # admonition bodies (`!!! note` / `??? tip`), and MkDocs needs that indentation
 # to associate the body with the box — so a correctly-written admonition came
