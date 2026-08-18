@@ -193,6 +193,45 @@ icon set that 404s offline is a validator full of unlabelled buttons.
 longer named, so the set cannot drift from the package it came from in either
 direction.
 
+### Four calls the page forced (#395–#400)
+
+Building the page on this ground surfaced four places where a specification and
+the shipped engine disagreed. All four resolved the same way, and it is worth
+naming the principle once: **the engine is the authority, and the page follows
+it.** A demo that quietly disagrees with the tool it advertises is worse than no
+demo, because the reader only discovers the disagreement after installing.
+
+**Fix runs the engine's own fixer.** #398 describes Fix as correcting the decimal
+places, the abbreviation case and the missing `TRAN` group. `lat fix` on the
+seeded delivery applies exactly one repair (`reformat_numeric`) and reports the
+rest as findings. Hand-rolling the other two would make the page repair more than
+the real tool does, so a reader who tried the same file on their own machine
+would get a different answer from the demo that sold it to them. The page calls
+`compute_fixes`/`apply_fixes` and says what it left. The argument #398 wanted — a
+validator tells you what is wrong, a human decides what is right — survives
+intact and is now true of the shipped tool rather than of the page only.
+
+**No package name is written into markup.**
+`repo:tools/gen_install_channels.py` reads each install card's name out of two
+independent records and refuses to emit a card the repo contradicts. It refused
+twice before shipping: #395 specified "the CLI on crates.io" (`laterite-cli` is
+`publish = false`), and the wheel README's Browser row named the web app where
+the grid names the npm package. Both were fixed at the record rather than by
+weakening the check.
+
+**The 820px hide-rule is retired for this page.** The design bundle contradicts
+itself — the foundations artboard hides interactive demos below 820px, and the
+options artboard exists precisely to find an editing pattern that works at 390px.
+The editing pattern wins. A landing page whose one interactive proof is switched
+off for mobile visitors is a landing page that does not land. The policy can
+stand for the browser app, which is a different bar with a different job.
+
+**Cards lift by surface step, not shadow.** #396 asks for a warm shadow on the
+table cards. The shared elevation layer resolves `--shadow-card` to `none`, on
+the argument recorded in its own header that a card reaching for a shadow should
+have to overwrite something that says no — and #400 independently requires
+exactly that in dark. Following the token keeps one answer instead of two.
+
 ## Consequences
 
 **The apex deploy consumes a build.** `repo:.github/workflows/deploy-validator.yml`
