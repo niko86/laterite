@@ -55,7 +55,7 @@ const Card: Component<{ channel: InstallChannel }> = (props) => (
       "border-line": !props.channel.primary,
     }}
   >
-    <p class="flex items-baseline gap-2 font-mono text-micro uppercase tracking-[--track-micro] text-fg-muted">
+    <p class="flex items-baseline gap-2 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
       {props.channel.label}
       {props.channel.registry ? (
         <span class="text-fg-faint">· {props.channel.registry}</span>
@@ -82,7 +82,7 @@ const Card: Component<{ channel: InstallChannel }> = (props) => (
 
 export const InstallGrid: Component = () => (
   <div>
-    <h2 class="font-display text-h2 font-extrabold tracking-[--track-tight] text-accent">
+    <h2 class="font-display text-h2 font-extrabold tracking-(--track-tight) text-accent">
       Pick your stack
     </h2>
     <p class="mt-2 max-w-[60ch] text-fg-soft">

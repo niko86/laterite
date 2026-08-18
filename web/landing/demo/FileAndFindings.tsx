@@ -78,7 +78,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
     <div style={{ "--band": `var(${props.band})` }}>
       <div class="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <h2 class="font-display text-h2 font-extrabold tracking-[--track-tight] text-accent">
+          <h2 class="font-display text-h2 font-extrabold tracking-(--track-tight) text-accent">
             The file, and what the engine says
           </h2>
           <p class="mt-2 max-w-[60ch] text-fg-soft">
@@ -128,7 +128,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
       <div class="mt-6 grid gap-6 min-[64rem]:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] min-[64rem]:items-start">
         {/* The output pane. */}
         <div class="overflow-hidden rounded-lg border border-line bg-surface-code">
-          <p class="border-b border-line px-3 py-2 font-mono text-micro uppercase tracking-[--track-micro] text-fg-muted">
+          <p class="border-b border-line px-3 py-2 font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
             delivery.ags
           </p>
           <div class="max-h-[26rem] overflow-auto overscroll-contain">
@@ -179,7 +179,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
 
         {/* The findings list. */}
         <div>
-          <p class="font-mono text-micro uppercase tracking-[--track-micro] text-fg-muted">
+          <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
             Findings
             <Show when={armed() && report()}>
               <span class="ml-2 text-fg-faint">{findings().length}</span>

@@ -92,7 +92,7 @@ export const PwaUpdater: Component = () => {
       <div
         role="status"
         aria-live="polite"
-        class="fixed inset-x-4 bottom-4 z-[--z-toast] mb-[env(safe-area-inset-bottom)] rounded-md border border-white/[0.18] bg-[--laterite-900] p-3 text-sm text-fg-on-cta shadow-[--shadow-toast] sm:inset-x-auto sm:right-4 sm:max-w-xs"
+        class="fixed inset-x-4 bottom-4 z-(--z-toast) mb-[env(safe-area-inset-bottom)] rounded-md border border-white/[0.18] bg-(--laterite-900) p-3 text-sm text-fg-on-cta shadow-(--shadow-toast) sm:inset-x-auto sm:right-4 sm:max-w-xs"
       >
         <Show
           when={needRefresh()}
@@ -119,7 +119,7 @@ export const PwaUpdater: Component = () => {
           <div class="flex items-center gap-2">
             <button
               type="button"
-              class="rounded-sm px-3 py-1 text-xs font-semibold text-[--laterite-300] hover:text-[--laterite-200]"
+              class="rounded-sm px-3 py-1 text-xs font-semibold text-(--laterite-300) hover:text-(--laterite-200)"
               onClick={applyUpdate}
             >
               Reload

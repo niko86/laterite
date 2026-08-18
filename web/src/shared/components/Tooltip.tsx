@@ -68,10 +68,10 @@ export const Tooltip: Component<{
         <span
           role="tooltip"
           class={[
-            "absolute left-1/2 -translate-x-1/2 z-[--z-tooltip] w-max max-w-[22rem]",
-            "bg-[--laterite-900] text-fg-on-cta border border-white/[0.18]",
+            "absolute left-1/2 -translate-x-1/2 z-(--z-tooltip) w-max max-w-[22rem]",
+            "bg-(--laterite-900) text-fg-on-cta border border-white/[0.18]",
             "text-caption leading-normal text-left rounded-sm px-[0.5rem] py-[0.22rem]",
-            "shadow-[--shadow-tooltip]",
+            "shadow-(--shadow-tooltip)",
             // Never intercepts the pointer — a tooltip that can be hovered can
             // trap the pointer that summoned it.
             "pointer-events-none",

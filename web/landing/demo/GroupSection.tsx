@@ -74,7 +74,7 @@ export const GroupSection: Component<{
                 and MAROON text. Never white or black on a band fill — the
                 mid-ramp bands fail contrast in both directions. */}
             <p
-              class="inline-flex items-center gap-2 rounded-sm border-l-[3px] py-1 pr-3 pl-2 font-mono text-micro font-semibold tracking-[--track-micro] text-accent"
+              class="inline-flex items-center gap-2 rounded-sm border-l-[3px] py-1 pr-3 pl-2 font-mono text-micro font-semibold tracking-(--track-micro) text-accent"
               style={{
                 "border-left-color": `var(${props.band})`,
                 background: `color-mix(in srgb, var(${props.band}) var(--chip-tint-pct), transparent)`,
@@ -90,7 +90,7 @@ export const GroupSection: Component<{
               </Show>
             </p>
 
-            <h2 class="mt-3 font-display text-h2 font-extrabold tracking-[--track-tight] text-accent">
+            <h2 class="mt-3 font-display text-h2 font-extrabold tracking-(--track-tight) text-accent">
               {b().schema.description}
             </h2>
             <p class="mt-2 text-fg-soft">{BLURB[props.code]}</p>

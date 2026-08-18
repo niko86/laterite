@@ -75,7 +75,7 @@ export const Dialog: Component<{
   return (
     <Show when={props.open ?? true}>
       <div
-        class="fixed inset-0 z-[--z-dialog] flex items-start justify-center p-8 bg-[--scrim]"
+        class="fixed inset-0 z-(--z-dialog) flex items-start justify-center p-8 bg-(--scrim)"
         // Dismissing on a scrim click, but only when the press STARTED there —
         // a drag that begins inside the panel and releases on the scrim (a text
         // selection overshooting) is not a dismissal.
@@ -88,7 +88,7 @@ export const Dialog: Component<{
           role="dialog"
           aria-modal="true"
           aria-label={props.title}
-          class="bg-surface border border-line rounded-xl shadow-[--shadow-dialog] pt-4 px-5 pb-5"
+          class="bg-surface border border-line rounded-xl shadow-(--shadow-dialog) pt-4 px-5 pb-5"
           style={{ width: `min(${props.width ?? "var(--dialog-w)"}, 100%)` }}
         >
           <div class="flex justify-between items-center gap-[0.8rem] mb-[0.4rem]">

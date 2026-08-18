@@ -25,8 +25,8 @@ export const Toast: Component<{
     aria-live="polite"
     class={[
       "inline-flex items-center gap-[0.6rem] max-w-[24rem]",
-      "bg-[--laterite-900] text-fg-on-cta border border-white/[0.18]",
-      "rounded-md px-[0.75rem] py-[0.5rem] text-control shadow-[--shadow-toast]",
+      "bg-(--laterite-900) text-fg-on-cta border border-white/[0.18]",
+      "rounded-md px-[0.75rem] py-[0.5rem] text-control shadow-(--shadow-toast)",
     ].join(" ")}
   >
     <span>{props.message}</span>
@@ -34,7 +34,7 @@ export const Toast: Component<{
       <button
         type="button"
         onClick={() => props.onUndo?.()}
-        class="font-semibold text-[--laterite-300] px-[0.3rem] py-[0.15rem] rounded-xs cursor-pointer"
+        class="font-semibold text-(--laterite-300) px-[0.3rem] py-[0.15rem] rounded-xs cursor-pointer"
       >
         Undo
       </button>
@@ -117,7 +117,7 @@ export const ToastHost: Component = () => {
 
   return (
     <div
-      class="fixed bottom-4 left-4 z-[--z-toast]"
+      class="fixed bottom-4 left-4 z-(--z-toast)"
       onMouseEnter={() => {
         setHeld(true);
       }}
@@ -128,7 +128,7 @@ export const ToastHost: Component = () => {
       <Show when={current()}>
         {(item) => (
           <div
-            class="transition-[opacity,transform] duration-[--dur-slow] ease-[--ease-out]"
+            class="transition-[opacity,transform] duration-(--dur-slow) ease-(--ease-out)"
             classList={{
               "opacity-0 translate-y-[12px]": !shown(),
               "opacity-100 translate-y-0": shown(),

@@ -68,7 +68,7 @@ export const Hero: Component = () => (
       aria-hidden="true"
       class="hidden rounded-lg border border-laterite-200 bg-surface-code p-4 min-[64rem]:block"
     >
-      <p class="mb-3 font-mono text-micro uppercase tracking-[--track-micro] text-fg-faint">
+      <p class="mb-3 font-mono text-micro uppercase tracking-(--track-micro) text-fg-faint">
         delivery.ags
       </p>
       <pre class="overflow-x-auto font-mono text-caption leading-[1.7] text-fg-soft">

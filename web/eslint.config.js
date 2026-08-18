@@ -115,7 +115,7 @@ const noRawPalette = {
 
 // The contracts gate (#408) — elevation, motion and states, the same shape as
 // the palette gate above. Every shadow belongs to a floating layer and takes
-// that layer's token (`shadow-[--shadow-toast]`); a Tailwind t-shirt shadow is
+// that layer's token (`shadow-(--shadow-toast)`); a Tailwind t-shirt shadow is
 // a card reaching for elevation it does not have. Nothing is blurred. Hover
 // and press change colour only. A numeric duration bypasses the reduced-motion
 // collapse the tokens carry, so durations are stated as tokens or not at all.
@@ -134,7 +134,7 @@ const BLUR_RE =
 // and does not match here — the bracket is not the word `shadow`.
 const STATE_EFFECT_RE =
   /\b(?:hover|active|group-hover|focus|focus-visible|focus-within):(?:-?(?:translate|scale|rotate)-|(?:drop-)?shadow|opacity-|blur)/;
-// Numeric only: `duration-[--dur-slow]` is the sanctioned token form.
+// Numeric only: `duration-(--dur-slow)` is the sanctioned token form.
 const RAW_DURATION_RE = /\b(?:duration|delay)-(?:\d|\[\d)/;
 // The system's two curves are --ease-out and --ease-in-out; Tailwind's
 // `ease-out`/`ease-in-out` utilities resolve to them (motion.css redefines the
@@ -154,16 +154,16 @@ const noRawEffects = {
     messages: {
       shadow:
         "Untokened shadow '{{match}}' — a shadow means a floating layer, and " +
-        "each layer has one value: shadow-[--shadow-tooltip|menu|toast|" +
-        "popover|dialog|palette]. Cards get border + surface step, no shadow " +
+        "each layer has one value: shadow-(--shadow-tooltip|menu|toast|" +
+        "popover|dialog|palette). Cards get border + surface step, no shadow " +
         "(web/src/shared/styles/elevation.css, #408).",
       blur: "'{{match}}' — nothing in this system is blurred (#408).",
       stateEffect:
         "'{{match}}' — hover and press change colour only: no scale, no " +
         "translate, no shadow lift, no fade (#408).",
       duration:
-        "Raw duration '{{match}}' — use the motion tokens (duration-[--dur-" +
-        "fast|base|slow|panel]) so the reduced-motion collapse in " +
+        "Raw duration '{{match}}' — use the motion tokens (duration-(--dur-" +
+        "fast|base|slow|panel)) so the reduced-motion collapse in " +
         "web/src/shared/styles/motion.css applies; bare transition utilities " +
         "already resolve to --dur-base (#408).",
       easing:
@@ -203,6 +203,49 @@ const noRawEffects = {
           context.report({ node, messageId, data: { match: m[0] } });
           return;
         }
+      }
+    };
+    return {
+      Literal(node) {
+        if (typeof node.value === "string") check(node, node.value);
+      },
+      TemplateElement(node) {
+        check(node, node.value.raw);
+      },
+    };
+  },
+};
+
+// The dropped-var gate (#407). Tailwind v4 removed v3's automatic var()
+// wrapping inside square brackets: `z-[--z-toast]` now emits the literal
+// `z-index: --z-toast`, an invalid declaration every browser silently drops —
+// the utility LOOKS applied and does nothing (verified in the built CSS, which
+// carried `background-color:--scrim` and friends until #407 swept them). The
+// v4 var shorthand is the parenthesised form, `z-(--z-toast)`. The colon
+// exclusion keeps the two legitimate bracket idioms out of the net: an
+// arbitrary PROPERTY (`[--gutter:1rem]`, `[box-shadow:var(--focus-ring)]`)
+// declares, not references, and always carries a colon.
+const DROPPED_VAR_RE = /\[--[^\]:]+\]/;
+const noDroppedVar = {
+  meta: {
+    type: "problem",
+    schema: [],
+    messages: {
+      droppedVar:
+        "'{{match}}' — Tailwind v4 emits this as a literal (invalid) value " +
+        "the browser drops; reference a variable with the parenthesised " +
+        "shorthand instead: utility-(--token) (#407).",
+    },
+  },
+  create(context) {
+    const check = (node, text) => {
+      const m = DROPPED_VAR_RE.exec(text);
+      if (m) {
+        context.report({
+          node,
+          messageId: "droppedVar",
+          data: { match: m[0] },
+        });
       }
     };
     return {
@@ -289,6 +332,7 @@ export default tseslint.config(
         rules: {
           "no-raw-palette": noRawPalette,
           "no-raw-effects": noRawEffects,
+          "no-dropped-var": noDroppedVar,
         },
       },
     },
@@ -297,6 +341,9 @@ export default tseslint.config(
       // The #408 contracts gate — shared primitives included: the contract is
       // the system's, not the app's.
       "design/no-raw-effects": "error",
+      // The #407 dropped-var gate — same scope: a bracket-var utility is
+      // broken CSS wherever it appears.
+      "design/no-dropped-var": "error",
     },
   },
   {
