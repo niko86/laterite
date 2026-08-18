@@ -1165,6 +1165,22 @@ jobs:
         # classifier.
         run: uv run --no-sync python tools/check_support_matrix.py
 
+      - name: speed claims match the benchmark table
+        # Sibling of the check above, same blind spot one layer out (#327).
+        # bench-vs-python-ags4.py already generates the README's speedup tables
+        # against SHA-256-pinned fixtures; what had no link was the PROSE that
+        # quotes them. Re-running the benchmark updated the table and silently
+        # falsified four other files, which is how #326's claim came to sit
+        # below every rung of its own table on the first page a python-ags4
+        # user reads.
+        #
+        # Asserts BAND MEMBERSHIP, not equality: the rungs genuinely differ and
+        # the instrument drifts between runs, so an equality check would flake
+        # on noise and end up disabled — which leaves the prose staler than no
+        # gate at all. Bidirectional, because a table moving up leaves the
+        # prose understating the product and nobody files that as a bug.
+        run: uv run --no-sync python tools/check_speed_claims.py
+
       - name: ruff check
         run: uv run ruff check .
 
