@@ -119,6 +119,14 @@ function offloadDuckdbWasm(): Plugin {
 // atomically, so dispatch with the other value to bridge.
 export default defineConfig({
   base: process.env.VITE_BASE ?? "/",
+  resolve: {
+    alias: {
+      // The shared surface layer (#394): tokens now, primitives next (#406).
+      // landing/vite.config.ts resolves this to the same directory, which is
+      // what makes "a button exists once" structural rather than a convention.
+      "@shared": resolve(import.meta.dirname, "src/shared"),
+    },
+  },
   experimental: {
     // Rewrite ONLY the two oversized DuckDB bundles to the R2 origin. Every
     // other asset keeps the default base-relative URL; returning undefined

@@ -1,0 +1,23 @@
+/* Elevation.
+   Cards do NOT have shadows in this system — they lift by surface step + 1px line.
+   Shadow is reserved for things that float above the page, and each floating layer
+   has its own fixed value (taken from the app's dialogs, menus and toasts). */
+:root {
+  --shadow-none: none;
+  --shadow-card: none;                          /* borders + surface step, not shadow */
+  --shadow-tooltip: 0 2px 8px rgb(0 0 0 / 30%);
+  --shadow-menu: 0 4px 12px rgb(0 0 0 / 25%);
+  --shadow-toast: 0 4px 16px rgb(0 0 0 / 35%);
+  --shadow-popover: 0 6px 20px rgb(0 0 0 / 28%);
+  --shadow-dialog: 0 12px 40px rgb(0 0 0 / 35%);
+  --shadow-palette: 0 14px 44px rgb(0 0 0 / 35%);
+  --shadow-page: 0 4px 24px rgb(63 17 20 / 35%); /* paper on backdrop */
+
+  --scrim: rgb(63 17 20 / 45%);                 /* maroon-tinted, never neutral black */
+  --overlay-blur: none; /* @kind other */ /* the app never blurs a backdrop */
+
+  --z-sticky: 30; /* @kind other */
+  --z-toast: 60; /* @kind other */
+  --z-dialog: 80; /* @kind other */
+  --z-tooltip: 100; /* @kind other */
+}

@@ -1,0 +1,136 @@
+/* The "bedrock" colour vocabulary — one set of values for all three surfaces
+ * (#394, tracking #411).
+ *
+ * This EXTENDS the app's semantic layer rather than replacing it. Every name
+ * the app already resolves through `@theme inline` — the canvas/surface/raised
+ * ladder, `surface-code`, `chip`, the line trio, the five-step fg ramp, and
+ * ok/warn/err/accent — is here under the same name. What is new is everything
+ * BELOW those names: the raw ramps they are cut from, the `*-quiet` tints, and
+ * `info`, `cta`, `focus-ring`. There is no name here the app has and this
+ * does not, which is why this is one vocabulary and not two.
+ *
+ * The ramp is sampled from the strata cross-section in assets/laterite-icon-512.png:
+ * the soil bands give the brand ramp, the auger gives the steel greys, the
+ * neutrals are warm-shifted onto the same hue family. Nothing is invented.
+ *
+ * The direction: MAROON READS, RUST ACTS. Links, headlines and active nav are
+ * maroon; every button and CTA is rust. Those are two different tokens on
+ * purpose — a page where the thing you read and the thing you press are the
+ * same colour makes the reader test every heading with the mouse.
+ *
+ * NOTE for anyone diffing this against design/laterite-mobile-design-system/:
+ * the design system sets `--accent` to brand brick #9b3932. This layer follows
+ * the site direction instead, which resolved links/headlines/active-nav to
+ * maroon #611a1e — the wordmark's own colour, and one step further from rust so
+ * the read/act split survives at small sizes.
+ */
+:root {
+  color-scheme: light;
+
+  /* ── Brand ramp — the strata bands, topsoil to bedrock ──
+     Also the SEVEN-BAND RAIL, exactly: 300 → 900 is the ramp the borehole rail
+     and the group-identity keying (#395) run top to bottom. There is no
+     separate `--strata-*` set, because it would be this one with new names.
+     Band colour encodes GROUP IDENTITY only, never severity. */
+  --laterite-50: #fdf1e7;
+  --laterite-100: #f7cdb2;
+  --laterite-200: #f0a67f; /* peach */
+  --laterite-300: #f09c56; /* sand */
+  --laterite-400: #db7841; /* burnt orange */
+  --laterite-500: #ce5640; /* rust — the action colour */
+  --laterite-600: #be3b2e; /* vermilion */
+  --laterite-700: #9b3932; /* brick — the dominant logo mass */
+  --laterite-800: #7d2622;
+  --laterite-900: #611a1e; /* maroon — logo outline + wordmark */
+  --laterite-950: #3f1114;
+
+  /* ── Steel — the auger / probe ── */
+  --steel-100: #e4e2e1;
+  --steel-300: #c5c3c2;
+  --steel-500: #91858e;
+  --steel-700: #5f5761;
+
+  /* ── Warm neutrals ── */
+  --stone-50: #faf7f5;
+  --stone-100: #f4efeb;
+  --stone-150: #ece5e0;
+  --stone-200: #e2d9d3;
+  --stone-300: #cfc3bb;
+  --stone-400: #a4958d;
+  --stone-500: #7d6e68;
+  --stone-600: #5c504b;
+  --stone-700: #423934;
+  --stone-800: #2b2421;
+  --stone-900: #1c1715;
+  --stone-950: #120e0d;
+
+  /* ── Surfaces (canvas sits BELOW surface, so cards lift) ──
+     `--canvas` is the one token a surface is expected to retune: the docs read
+     long-form on #f4efeb, the landing page wants the stronger card lift of
+     #ece5e0 (web/landing/landing.css sets it). Everything else is shared. */
+  --canvas: var(--stone-100);
+  --surface: var(--stone-50);
+  --surface-raised: var(--stone-150);
+  --surface-code: #f6efe9;
+  --chip: var(--stone-200);
+
+  /* ── Lines ── */
+  --line: var(--stone-200);
+  --line-subtle: var(--stone-150);
+  --line-strong: var(--stone-300);
+
+  /* ── Text ── */
+  --fg: var(--stone-900);
+  --fg-soft: var(--stone-700);
+  --fg-muted: var(--stone-600);
+  --fg-faint: var(--stone-500);
+  --fg-dim: var(--stone-400);
+
+  /* ── Reads: links, headlines, active nav ── */
+  --accent: var(--laterite-900);
+  --accent-hover: var(--laterite-950);
+  --accent-quiet: #f3e3dd;
+
+  /* ── Acts: every button and CTA ──
+     Rust on near-white. The pair is a token rather than two utility classes
+     because the text colour is not free: mid-ramp bands fail contrast against
+     both white and black, so a CTA that picks its own foreground picks wrong. */
+  --cta: var(--laterite-500);
+  --cta-hover: var(--laterite-600);
+  --fg-on-cta: var(--stone-50);
+
+  /* ── Status ──
+     No traffic lights. There is no green in this brand, and severity runs DOWN
+     the strata instead — ochre topsoil for warning, oxide bedrock for error —
+     with the auger's steel for informational and one cool teal for "verified",
+     the single cool note that says a machine checked this rather than a mood.
+     Severity is carried in FORM as well as colour, so it survives greyscale. */
+  --ok: #2f5d5a; /* teal-slate — verified, not "success green" */
+  --ok-quiet: #e3edeb;
+  --warn: #8f5312; /* ochre, the sand band darkened to AA */
+  --warn-quiet: #f8e9d3;
+  --err: #a51f14; /* oxide red — hotter and heavier than brand brick */
+  --err-quiet: #f9e0dc;
+  --info: var(--steel-700); /* the probe */
+  --info-quiet: #ecebee;
+
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  --selection: color-mix(in srgb, var(--laterite-300) 45%, transparent);
+}
+
+/* The dark slot.
+ *
+ * Deliberately EMPTY of values: the dark set is #400's, and it is a real design
+ * pass rather than a lightness flip — the band ramp shifts a step lighter so the
+ * deep strata still hold on a dark canvas, the tints dial down because saturated
+ * washes glow there, and elevation stops being a shadow and starts being a
+ * lighter surface. What lands here is a values change, not a restructure, which
+ * is the only reason this selector exists now rather than arriving with them.
+ *
+ * Class-toggled, not `prefers-color-scheme`: the app already flips `.dark` on
+ * <html> from a stored-else-system choice applied before first paint, and #400
+ * reuses that rather than building a second mechanism. Nothing sets the class on
+ * the landing page yet, so this rule is inert until #400. */
+.dark {
+  color-scheme: dark;
+}

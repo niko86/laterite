@@ -1,0 +1,130 @@
+/* Colour.
+   The palette is sampled pixel-for-pixel from assets/laterite-icon-512.png — the
+   strata cross-section in the logo. Nothing here is invented: the soil bands give
+   the brand ramp, the auger gives the steel greys, and the neutrals are warm-shifted
+   to sit on the same hue family. Token NAMES follow the real web app
+   (web/src/app.css): canvas < surface < surface-raised elevation ladder,
+   fg/fg-soft/fg-muted/fg-faint/fg-dim text ladder, ok/warn/err/accent status. */
+:root {
+  color-scheme: light;
+
+  /* ── Brand ramp — the strata bands, top (topsoil) to bottom (bedrock) ── */
+  --laterite-50: #fdf1e7;
+  --laterite-100: #f7cdb2;
+  --laterite-200: #f0a67f;  /* peach band */
+  --laterite-300: #f09c56;  /* sand band */
+  --laterite-400: #db7841;  /* burnt orange band */
+  --laterite-500: #ce5640;  /* rust band */
+  --laterite-600: #be3b2e;  /* vermilion (crab) */
+  --laterite-700: #9b3932;  /* brick — the dominant logo mass */
+  --laterite-800: #7d2622;
+  --laterite-900: #611a1e;  /* maroon — logo outline + wordmark */
+  --laterite-950: #3f1114;
+
+  /* ── Steel — the auger / probe ── */
+  --steel-100: #e4e2e1;
+  --steel-300: #c5c3c2;
+  --steel-500: #91858e;
+  --steel-700: #5f5761;
+
+  /* ── Warm neutrals ── */
+  --stone-50: #faf7f5;
+  --stone-100: #f4efeb;
+  --stone-150: #ece5e0;
+  --stone-200: #e2d9d3;
+  --stone-300: #cfc3bb;
+  --stone-400: #a4958d;
+  --stone-500: #7d6e68;
+  --stone-600: #5c504b;
+  --stone-700: #423934;
+  --stone-800: #2b2421;
+  --stone-900: #1c1715;
+  --stone-950: #120e0d;
+
+  /* ── Surfaces (elevation ladder: canvas sits BELOW surface so cards lift) ── */
+  --canvas: var(--stone-100);
+  --surface: var(--stone-50);
+  --surface-raised: var(--stone-150);
+  --surface-code: #f6efe9;
+  --chip: var(--stone-200);
+  --page: #ffffff;          /* print/paper parity — never rethemed */
+
+  /* ── Lines ── */
+  --line: var(--stone-200);
+  --line-subtle: var(--stone-150);
+  --line-strong: var(--stone-300);
+
+  /* ── Text ── */
+  --fg: var(--stone-900);
+  --fg-soft: var(--stone-700);
+  --fg-muted: var(--stone-600);
+  --fg-faint: var(--stone-500);
+  --fg-dim: var(--stone-400);
+  --fg-on-accent: #ffffff;
+
+  /* ── Status + interactive ──
+     NO traffic lights. There is no green in this brand, and a green/amber/red
+     trio is the one palette every generic UI reaches for. Severity instead runs
+     DOWN the strata — ochre topsoil (warning) to oxide bedrock (error) — with
+     the auger's steel for informational and a cool teal-slate for "verified",
+     the single cool note that says a machine checked this rather than a mood.
+     Severity is also encoded in FORM (see Chip: rule / solid / outline), so it
+     survives greyscale and colour-blindness. */
+  --accent: #9b3932;        /* brand brick — links, active tab, focus */
+  --accent-hover: #7d2622;
+  --accent-quiet: #f3e3dd;
+  --ok: #2f5d5a;            /* teal-slate — verified, not "success green" */
+  --ok-quiet: #e3edeb;
+  --warn: #8f5312;          /* ochre, from the sand band darkened to AA */
+  --warn-quiet: #f8e9d3;
+  --err: #a51f14;           /* oxide red — hotter + heavier than brand brick */
+  --err-quiet: #f9e0dc;
+  --info: #5f5761;          /* steel — the probe */
+  --info-quiet: #ecebee;
+
+  /* Severity coding for validation findings (AGS4 rule tiers). */
+  --sev-error: var(--err);
+  --sev-warning: var(--warn);
+  --sev-fyi: var(--info);
+
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  --selection: color-mix(in srgb, var(--laterite-300) 45%, transparent);
+}
+
+/* Dark theme. Class-toggled (`.dark` on <html>, matching the web app's
+   theme.ts) — never near-black: the base is a warm brown-black so the brand
+   ramp still reads as soil, and text lands ~13:1 rather than glaring 16:1. */
+.dark {
+  color-scheme: dark;
+
+  --canvas: #14100f;
+  --surface: #1c1715;
+  --surface-raised: #262019;
+  --surface-code: #100c0b;
+  --chip: #332a26;
+
+  --line: #352c28;
+  --line-subtle: #261f1c;
+  --line-strong: #4a3f39;
+
+  --fg: #ede5df;
+  --fg-soft: #d8cbc2;
+  --fg-muted: #a4958d;
+  --fg-faint: #8b7d75;
+  --fg-dim: #6b5e57;
+  --fg-on-accent: #1c1715;
+
+  --accent: var(--laterite-300);
+  --accent-hover: var(--laterite-200);
+  --accent-quiet: #3a2620;
+  --ok: #79c2b4;
+  --ok-quiet: #1e3330;
+  --warn: #e3a447;
+  --warn-quiet: #392a14;
+  --err: #f07f6d;
+  --err-quiet: #3d1c18;
+  --info: #b9b2bd;
+  --info-quiet: #2b262c;
+
+  --selection: color-mix(in srgb, var(--laterite-500) 55%, transparent);
+}

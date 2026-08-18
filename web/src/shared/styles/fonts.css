@@ -1,0 +1,33 @@
+/* The three families of the "bedrock" pairing, self-hosted (#394).
+ *
+ * Both design documents this work is drawn from (design/) load their fonts from
+ * the Google Fonts CDN. The apex's whole pitch is that it does not phone
+ * anywhere — nothing is uploaded, nothing is fetched — so a third-party font
+ * origin on the page that makes that claim is the one place it cannot be true.
+ * Self-hosted here, and later on the docs and the app.
+ *
+ * Fontsource rather than hand-cut .woff2 binaries: the packages ride the web
+ * project's single dependency set, they carry the upstream OFL notices, and
+ * their @font-face blocks are unicode-range split PER SCRIPT — which is the
+ * subsetting. A latin reader fetches the latin file and nothing else; the
+ * latin-ext and vietnamese files are emitted but never requested. Committed
+ * binaries would be smaller on disk and silently tofu the first time a page
+ * needed a glyph the one-off subsetting run did not anticipate.
+ *
+ * `wght.css` is the upright axis only — the italic file is a second download
+ * this pairing never sets.
+ *
+ * DISPLAY IS FIGTREE, NOT A SLAB. Both design documents specify a
+ * Rockwell-lineage slab, on the reasoning that it is what the mark reads as.
+ * The mark is not a slab: the wordmark in assets/laterite-social-preview.png is
+ * a heavy geometric-humanist sans, and the design system says so itself in two
+ * other sections — naming Figtree 800 as what to set "laterite" in. See
+ * ags-wiki/design/dec-landing-build-shared-tokens.md.
+ */
+@import "@fontsource-variable/figtree/wght.css";
+@import "@fontsource-variable/public-sans/wght.css";
+/* Mono is static-weight upstream; 400 for data and code, 600 for the emphasis
+ * weight the app already uses. Latin only — the per-subset entry, so no
+ * cyrillic or greek face is emitted at all. */
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";

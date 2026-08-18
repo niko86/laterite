@@ -13,7 +13,10 @@ import { configDefaults, defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    // `landing/**` is the apex's own build (#394): its dependency firewall is
+    // pure logic that must be tested, and it lives beside the config it guards
+    // rather than in the app's source tree.
+    include: ["src/**/*.test.ts", "landing/**/*.test.ts"],
     exclude: [
       ...configDefaults.exclude,
       "src/lib/agsline.test.ts",

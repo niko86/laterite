@@ -1,0 +1,17 @@
+/* The shared token layer — one set of values for laterite.dev, docs.laterite.dev
+ * and app.laterite.dev (#394, tracking #411).
+ *
+ * Plain CSS custom properties on purpose. Two of the three surfaces build with
+ * Tailwind and one is a MkDocs override layer with no build step at all, so the
+ * tokens themselves carry no framework: a Tailwind surface additionally imports
+ * tailwind-theme.css, which bridges these into utilities.
+ *
+ * It lives HERE, under the web source tree the two Vite builds share, rather
+ * than under web/landing/ — this is the shared artefact all three surfaces
+ * consume, not a landing-page file to be promoted once someone else needs it.
+ * The app is the one surface not yet reading it: its move is a larger migration
+ * (#403) with its own sequence, and it lands on this layer rather than a copy.
+ */
+@import "./fonts.css";
+@import "./colors.css";
+@import "./typography.css";

@@ -1,0 +1,32 @@
+// Renamed from knip.json (#394) only so the entries below can say why they are
+// here — an unexplained ignore is indistinguishable from a stale one.
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": [
+    "docs-site/**",
+    // The shared token layer and the landing stylesheet are reached from an
+    // HTML <link>, then through a chain of CSS @imports. Knip follows CSS
+    // imported from JavaScript (which is how src/app.css stays visible to it)
+    // but not from markup, so every file in that chain reads as unused. The fix
+    // knip would accept — importing the stylesheet from a TS entry — means
+    // adding JavaScript to a page that currently ships none, which is a worse
+    // trade than this line.
+    "src/shared/styles/**",
+    "landing/landing.css",
+  ],
+  "ignoreBinaries": ["wasm-pack"],
+  "ignoreDependencies": [
+    "globals",
+    // Same blind spot, from the dependency side: these three are consumed by
+    // `@import` inside src/shared/styles/fonts.css. They are the self-hosted
+    // pairing — if they ever really are unused, the page loses its type.
+    "@fontsource-variable/figtree",
+    "@fontsource-variable/public-sans",
+    "@fontsource/ibm-plex-mono",
+  ],
+  // The apex builds from its own config (#394); without this knip sees one Vite
+  // project where there are two.
+  "vite": {
+    "config": ["vite.config.ts", "landing/vite.config.ts"],
+  },
+}

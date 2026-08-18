@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/colors.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/typography.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/elevation.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/motion.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/styles.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/_ds_bundle.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:#ece5e0;font-family:"Public Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#611a1e;text-decoration:none}a:hover{color:#3f1114;text-decoration:underline}
+::-webkit-scrollbar{height:6px;width:6px}::-webkit-scrollbar-thumb{background:#cfc3bb;border-radius:3px}
+</style>
+</helmet>
+
+<div style="display:flex;gap:44px;align-items:flex-start;padding:40px 44px 56px;min-height:100vh">
+
+<div style="display:flex;flex-direction:column;gap:14px;flex:none">
+<div style="display:flex;align-items:baseline;gap:9px">
+<span style="font:700 0.72rem/1 'IBM Plex Mono',monospace;letter-spacing:0.05em;text-transform:uppercase;color:#9b3932">demo site · mobile</span>
+<span style="font:400 0.8rem/1 'Public Sans',sans-serif;color:#7d6e68">laterite.dev on the 1c pairing · 390 × 844</span>
+</div>
+
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div class="{{ themeClass }}" style="{{ shell }}">
+
+<div style="position:sticky;top:0;z-index:30;background:var(--surface);background-image:linear-gradient(90deg,#f09c56,#db7841 30%,#ce5640 55%,#be3b2e 75%,#611a1e);background-size:100% 3px;background-position:bottom;background-repeat:no-repeat">
+<div style="display:flex;align-items:center;gap:9px;padding:52px 16px 10px">
+<img src="assets/laterite-icon-256.png" alt="laterite" style="width:26px;height:26px;display:block;flex:none">
+<span style="font:700 1.35rem/1 'Zilla Slab',Rockwell,serif;letter-spacing:-0.01em;color:var(--accent)">laterite</span>
+<span style="flex:1"></span>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.ThemeToggle" dc-props="{{ themeToggleProps }}" hint-size="34px,28px"></x-import>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:30px;padding:22px 16px 36px">
+
+<div style="display:flex;flex-direction:column;gap:0.9rem">
+<span style="display:flex;align-items:center;gap:0.5rem;font:600 0.78rem/1.3 'IBM Plex Mono',monospace;letter-spacing:0.05em;text-transform:uppercase;color:#9b3932"><span style="width:4px;height:1.15em;background:#f09c56;flex:none"></span>AGS4 toolkit · five surfaces</span>
+<h1 style="margin:0;font:700 2.1rem/1.06 'Zilla Slab',Rockwell,serif;letter-spacing:-0.022em;color:var(--accent);text-wrap:balance">AGS4, shown rather than explained.</h1>
+<p style="margin:0;font:400 1rem/1.6 'Public Sans',sans-serif;color:var(--fg-soft);text-wrap:pretty">On a wide screen this page is a real AGS4 delivery you type into, rewriting and revalidating the file on every keystroke. On a phone it is the short version — the tables need width to read honestly.</p>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<a href="#top" style="border:1px solid var(--accent);color:var(--accent);border-radius:5px;padding:0.55rem 1.1rem;font:600 1rem/1.3 'Public Sans',sans-serif;text-decoration:none">Read the docs</a>
+</div>
+<span style="font:400 0.85rem/1.45 'Public Sans',sans-serif;color:var(--fg-faint)">Compiled to WebAssembly · MIT licensed · <a href="#top">in beta</a></span>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:0.7rem">
+<h2 style="margin:0;font:700 1.5rem/1.12 'Zilla Slab',Rockwell,serif;letter-spacing:-0.015em;color:var(--accent)">Get it for your stack</h2>
+<p style="margin:0;font:400 0.95rem/1.6 'Public Sans',sans-serif;color:var(--fg-soft)">Same engine, whichever door you come in by. Every surface is in beta.</p>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.CodeTabs" dc-props="{{ codeTabsProps }}" hint-size="100%,190px"></x-import>
+<span style="display:flex;align-items:center;gap:0.5rem;font:600 0.8rem/1.4 'IBM Plex Mono',monospace;letter-spacing:0.04em;text-transform:uppercase;color:var(--fg-faint)">Scroll to see the demo <span style="font-size:1rem">↓</span></span>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:0.9rem;border-top:1px solid var(--line);padding-top:22px">
+<h2 style="margin:0;font:700 1.65rem/1.12 'Zilla Slab',Rockwell,serif;letter-spacing:-0.015em;color:var(--accent)">Four groups, one delivery</h2>
+<p style="margin:0;font:400 1rem/1.65 'Public Sans',sans-serif;color:var(--fg-soft);text-wrap:pretty">Each group is keyed to the one above it. That repetition of columns <em>is</em> the relationship — AGS has no ids and no joins.</p>
+
+<div style="display:flex;flex-direction:column">
+<sc-for list="{{ chain }}" as="g" hint-placeholder-count="4">
+<div style="display:flex;gap:12px;align-items:stretch">
+<div style="width:14px;flex:none;display:flex;justify-content:center;padding-top:6px">
+<span style="{{ g.rule }}"></span>
+</div>
+<div style="flex:1;padding-bottom:14px;display:flex;flex-direction:column;gap:5px">
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+<span style="{{ g.chip }}">{{ g.code }}</span>
+<span style="font:600 0.95rem/1.3 'Public Sans',sans-serif;color:var(--fg)">{{ g.title }}</span>
+</div>
+<span style="font:400 0.95rem/1.55 'Public Sans',sans-serif;color:var(--fg-soft)">{{ g.text }}</span>
+<span style="{{ g.keyNote }}">{{ g.key }}</span>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:0.9rem">
+<h2 style="margin:0;font:700 1.65rem/1.12 'Zilla Slab',Rockwell,serif;letter-spacing:-0.015em;color:var(--accent)">The file, and what the engine thinks of it</h2>
+<p style="margin:0;font:400 1rem/1.65 'Public Sans',sans-serif;color:var(--fg-soft);text-wrap:pretty">The delivery those four groups emit, line for line. Tap a finding to jump to its line — the output scrolls sideways rather than shrinking to fit.</p>
+
+<div style="border:1px solid var(--line);border-radius:8px;background:var(--surface);overflow:hidden">
+<div style="display:flex;align-items:baseline;gap:8px;padding:0.5rem 0.7rem;border-bottom:1px solid var(--line);background:var(--surface-raised)">
+<span style="font:600 0.9rem/1.3 'IBM Plex Mono',monospace;color:var(--fg-soft)">demo-delivery.ags</span>
+<span style="font:400 0.78rem/1.3 'Public Sans',sans-serif;color:var(--fg-faint);margin-left:auto">{{ fileMeta }}</span>
+</div>
+<div style="max-height:250px;overflow:auto">
+<sc-for list="{{ lines }}" as="l" hint-placeholder-count="12">
+<div style="{{ l.style }}"><span style="display:inline-block;width:2.1rem;text-align:right;padding-right:0.7rem;color:var(--fg-dim);flex:none">{{ l.n }}</span>{{ l.text }}</div>
+</sc-for>
+</div>
+</div>
+
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.SummaryBanner" dc-props="{{ bannerProps }}" hint-size="100%,86px"></x-import>
+
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ fixButtonProps }}" hint-size="180px,34px">{{ fixLabel }}</x-import>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ resetButtonProps }}" hint-size="80px,30px">Reset</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ findings }}" as="f" hint-placeholder-count="5">
+<button onClick="{{ f.jump }}" style="{{ f.style }}">
+<span style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Chip" tone="{{ f.tone }}" variant="{{ f.variant }}" hint-size="54px,18px">{{ f.sev }}</x-import>
+<span style="font:600 0.85rem/1.3 'IBM Plex Mono',monospace;color:var(--fg)">{{ f.rule }}</span>
+<span style="{{ f.fixChip }}">fixable</span>
+</span>
+<span style="font:400 0.92rem/1.5 'Public Sans',sans-serif;color:var(--fg-soft)">{{ f.desc }}</span>
+<span style="font:400 0.8rem/1.3 'IBM Plex Mono',monospace;color:var(--fg-faint)">{{ f.where }}</span>
+</button>
+</sc-for>
+</div>
+
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Admonition" kind="note" title="What the real engine adds" hint-size="100%,120px">This page runs a cut-down rule set. The shipped engine carries the full numbered AGS4 rule catalogue, every dictionary edition, the repair engine, revision diff, certificates, Excel conversion and SQL across groups — byte-identical on every surface.</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:16px">
+<span style="font:400 0.85rem/1.55 'Public Sans',sans-serif;color:var(--fg-faint)">laterite — MIT-licensed AGS4 tooling. Built from the published AGS4 specification, not adapted from another library.</span>
+<div style="display:flex;gap:14px;flex-wrap:wrap;font:500 0.9rem/1.3 'Public Sans',sans-serif">
+<a href="#top">GitHub</a><a href="#top">PyPI</a><a href="#top">npm</a><a href="#top">Feedback</a>
+</div>
+</div>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="flex:none;width:280px;display:flex;flex-direction:column;gap:18px;padding-top:26px">
+<h3 style="margin:0;font:700 1.6rem/1.12 'Zilla Slab',Rockwell,serif;letter-spacing:-0.015em;color:#611a1e">What carried over</h3>
+<p style="margin:0;font:400 0.9rem/1.6 'Public Sans',sans-serif;color:#423934;text-wrap:pretty">The 1c pairing as pushed in turn 3: Zilla Slab headings in maroon, Public Sans body, rust for anything that acts, band colour reserved for group identity.</p>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 0.85rem/1.3 'Public Sans',sans-serif;color:#1c1715">Install moved up</span><span style="font:400 0.85rem/1.55 'Public Sans',sans-serif;color:#5c504b">The hero file excerpt is gone; the code tabs answer “what is this” faster on a phone, and a scroll cue hands off to the demo.</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 0.85rem/1.3 'Public Sans',sans-serif;color:#1c1715">Connectors become a dashed rule</span><span style="font:400 0.85rem/1.55 'Public Sans',sans-serif;color:#5c504b">The routed elbow between tables collapses to one dashed vertical rule down the chain, each step tinted with its stratum band.</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 0.85rem/1.3 'Public Sans',sans-serif;color:#1c1715">The file stays live</span><span style="font:400 0.85rem/1.55 'Public Sans',sans-serif;color:#5c504b">Findings are click-to-jump and Fix applies safe repairs only — the orphaned key deliberately survives it.</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 0.85rem/1.3 'Public Sans',sans-serif;color:#1c1715">Next</span><span style="font:400 0.85rem/1.55 'Public Sans',sans-serif;color:#5c504b">Four candidate interactions for the editable part live in <strong>Mobile Demo Options</strong> — pick one and it drops into this page here.</span></div>
+</div>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:800,&quot;height&quot;:1000},&quot;darkMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Screen&quot;},&quot;fixApplied&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Screen&quot;},&quot;groupBands&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Treatment&quot;}}">
+const BAND = { PROJ: "#db7841", LOCA: "#ce5640", SAMP: "#be3b2e", LLPL: "#9b3932" };
+
+const CHAIN = [
+  { code: "PROJ", title: "Project information", text: "One row names the job — project id, client, contractor, and the location the whole delivery belongs to.", key: "◆ PROJ_ID is the key everything below hangs off" },
+  { code: "LOCA", title: "Location details", text: "One row per borehole or trial pit, with ground level and final depth typed as 2DP.", key: "◆ keyed by LOCA_ID" },
+  { code: "SAMP", title: "Sample information", text: "Repeats the hole's key and adds depth, reference and sample type.", key: "◆ LOCA_ID + SAMP_TOP + SAMP_REF" },
+  { code: "LLPL", title: "Liquid and plastic limit", text: "Repeats the whole sample key and adds lab results. The same shape carries all 174 groups.", key: "◆ full SAMP key repeated" }
+];
+
+const LINES = [
+  [1, '"GROUP","PROJ"', 0], [2, '"HEADING","PROJ_ID","PROJ_NAME","PROJ_CLNT"', 0],
+  [3, '"UNIT","","",""', 0], [4, '"TYPE","ID","X","X"', 0],
+  [5, '"DATA","121415","Wembley Park GI","Brent CC"', 1],
+  [6, '"GROUP","LOCA"', 0], [7, '"HEADING","LOCA_ID","LOCA_TYPE","LOCA_GL","LOCA_FDEP","LOCA_REM"', 0],
+  [8, '"UNIT","","","m","m",""', 0], [9, '"TYPE","ID","PA","2DP","2DP","X"', 0],
+  [10, '"DATA","BH01","CP","12.30","25.00",""', 1],
+  [11, '"DATA","BH02","CP","11.8","24.50",""', 1],
+  [12, '"DATA","TP03","TP","10.95","4.20",""', 1],
+  [13, '"GROUP","SAMP"', 0], [14, '"HEADING","LOCA_ID","SAMP_TOP","SAMP_REF","SAMP_TYPE"', 0],
+  [15, '"UNIT","","m","",""', 0], [16, '"TYPE","ID","2DP","ID","PA"', 0],
+  [17, '"DATA","BH01","3.50","S1","b"', 1],
+  [18, '"DATA","BH02","6.00","S2","D"', 1],
+  [19, '"GROUP","LLPL"', 0], [20, '"HEADING","LOCA_ID","SAMP_TOP","SAMP_REF","LLPL_LL","LLPL_PL"', 0],
+  [21, '"UNIT","","m","","",""', 0], [22, '"TYPE","ID","2DP","ID","0DP","0DP"', 0],
+  [23, '"DATA","BH01","3.50","S1","42","19"', 1],
+  [24, '"DATA","BH02","9.00","S3","55","24"', 1]
+];
+
+const FINDINGS = [
+  { sev: "error", rule: "Rule 5 — data type", desc: 'LOCA_GL is "11.8" against TYPE 2DP — two decimal places expected.', where: "LOCA · row 2", fix: true, line: 11 },
+  { sev: "error", rule: "Rule 10 — KEY", desc: 'LLPL row 2 points at SAMP_REF "S3", which has no parent row in SAMP.', where: "LLPL · row 2", fix: false, line: 24 },
+  { sev: "warning", rule: "Rule 16 — abbreviation", desc: 'SAMP_TYPE "b" is not in the ABBR group — expected "B".', where: "SAMP · row 1", fix: true, line: 17 },
+  { sev: "warning", rule: "Rule 17 — TRAN absent", desc: "No TRAN group, so the dictionary edition was resolved by fallback rather than an exact TRAN_AGS match.", where: "file", fix: true, line: 1 },
+  { sev: "fyi", rule: "FYI — blank column", desc: "LOCA_REM is blank on every row. Deliverable, but the column carries nothing.", where: "LOCA", fix: false, line: 7 }
+];
+
+const TONE = { error: "err", warning: "warn", fyi: "info" };
+const FORM = { error: "solid", warning: "rule", fyi: "rule" };
+
+const LIGHT = {
+  "--canvas": "#ece5e0", "--surface": "#faf7f5", "--surface-raised": "#f4efeb", "--surface-code": "#f6efe9",
+  "--line": "#e2d9d3", "--line-subtle": "#ece5e0", "--line-strong": "#cfc3bb",
+  "--accent": "#611a1e", "--accent-hover": "#3f1114", "--accent-quiet": "#f3e3dd"
+};
+const DARK = {
+  "--canvas": "#14100f", "--surface": "#1c1715", "--surface-raised": "#262019", "--surface-code": "#100c0b",
+  "--line": "#352c28", "--line-subtle": "#261f1c", "--line-strong": "#4a3f39",
+  "--accent": "#f09c56", "--accent-hover": "#f0a67f", "--accent-quiet": "#3a2620"
+};
+
+class Component extends DCLogic {
+  state = { dark: null, sel: null, fixed: null };
+
+  get dark() { return this.state.dark ?? !!this.props.darkMode; }
+  get fixed() { return this.state.fixed ?? !!this.props.fixApplied; }
+  get bands() { return this.props.groupBands !== false; }
+
+  renderVals() {
+    const fixed = this.fixed, dark = this.dark, sel = this.state.sel;
+    const findings = fixed ? FINDINGS.filter(f => !f.fix) : FINDINGS;
+    const counts = findings.reduce((a, f) => ({ ...a, [f.sev]: (a[f.sev] || 0) + 1 }), {});
+    const fixable = findings.filter(f => f.fix);
+    const hot = sel != null && findings[sel] ? findings[sel].line : null;
+    const lines = LINES.map(([n, text, data]) => [n, fixed && n === 11 ? text.replace('"11.8"', '"11.80"') : text, data]);
+
+    const headline = counts.error || counts.warning
+      ? [counts.error && counts.error + " error" + (counts.error === 1 ? "" : "s"),
+         counts.warning && counts.warning + " warning" + (counts.warning === 1 ? "" : "s"),
+         counts.fyi && counts.fyi + " informational"].filter(Boolean).join(" · ")
+      : counts.fyi ? counts.fyi + " informational (FYI) finding" + (counts.fyi === 1 ? "" : "s") + " — no errors or warnings"
+      : "Clean — 0 findings";
+
+    return {
+      themeClass: dark ? "dark" : "",
+      shell: {
+        minHeight: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column",
+        background: "var(--canvas)", color: "var(--fg)", fontFamily: "'Public Sans', system-ui, sans-serif",
+        ...(dark ? DARK : LIGHT)
+      },
+      themeToggleProps: {
+        mode: dark ? "dark" : "light",
+        onToggle: () => this.setState({ dark: !dark }),
+        style: { fontSize: "1rem", padding: "0.25rem 0.55rem", borderRadius: "5px" }
+      },
+
+      chain: CHAIN.map((g, i) => ({
+        code: g.code, title: g.title, text: g.text, key: g.key,
+        chip: {
+          fontFamily: "var(--font-mono)", fontSize: "0.95rem", fontWeight: 700, letterSpacing: "0.03em",
+          color: dark ? BAND[g.code] : "var(--accent)", borderRadius: "3px", padding: "0.1rem 0.5rem",
+          background: this.bands ? "color-mix(in srgb, " + BAND[g.code] + " " + (dark ? "24%" : "26%") + ", transparent)" : "var(--surface-raised)",
+          boxShadow: this.bands ? "inset 3px 0 0 " + BAND[g.code] : "inset 3px 0 0 var(--line-strong)"
+        },
+        rule: {
+          width: "2px", flex: 1, minHeight: i === CHAIN.length - 1 ? "0" : "100%",
+          borderLeft: i === CHAIN.length - 1 ? "none" : "2px dashed " + (this.bands ? BAND[g.code] : "var(--line-strong)"),
+          display: "block"
+        },
+        keyNote: {
+          fontFamily: "var(--font-mono)", fontSize: "0.8rem", lineHeight: 1.4,
+          color: this.bands && !dark ? BAND[g.code] : "var(--fg-faint)"
+        }
+      })),
+
+      fileMeta: lines.length + " lines · " + (fixed ? "781" : "779") + " bytes · UTF-8",
+      lines: lines.map(([n, text, data]) => ({
+        n, text,
+        style: {
+          display: "flex", whiteSpace: "pre", fontFamily: "var(--font-mono)", fontSize: "0.85rem",
+          lineHeight: 1.75, padding: "0 0.7rem 0 0",
+          color: data ? "var(--fg)" : "var(--fg-muted)",
+          background: n === hot ? "var(--warn-quiet)" : "transparent",
+          boxShadow: n === hot ? "inset 3px 0 0 var(--warn)" : "none"
+        }
+      })),
+
+      bannerProps: {
+        kind: counts.error ? "err" : counts.warning || counts.fyi ? "warn" : "ok",
+        headline,
+        detail: fixed ? "Validated against AGS 4.1.1 — exact TRAN_AGS match" : "Validated against AGS 4.1.1 — fallback (TRAN_AGS missing)",
+        note: fixed ? "Safe fixes applied. The orphaned key needs a human decision." : null,
+        style: { fontSize: "0.95rem" }
+      },
+      fixLabel: fixable.length ? "Fix " + fixable.length + " safe finding" + (fixable.length === 1 ? "" : "s") : "Nothing safe left to fix",
+      fixButtonProps: {
+        variant: "action", disabled: !fixable.length,
+        onClick: () => this.setState({ fixed: true, sel: null }),
+        style: { fontSize: "0.95rem", padding: "0.4rem 1rem" }
+      },
+      resetButtonProps: {
+        size: "sm",
+        onClick: () => this.setState({ fixed: false, sel: null }),
+        style: { fontSize: "0.85rem" }
+      },
+
+      findings: findings.map((f, i) => ({
+        sev: f.sev, rule: f.rule, desc: f.desc, where: f.where,
+        tone: TONE[f.sev], variant: FORM[f.sev],
+        jump: () => this.setState({ sel: sel === i ? null : i }),
+        style: {
+          appearance: "none", textAlign: "left", cursor: "pointer", width: "100%",
+          display: "flex", flexDirection: "column", gap: "5px",
+          borderRadius: "8px", padding: "0.6rem 0.7rem",
+          border: "1px solid " + (sel === i ? "var(--accent)" : "var(--line)"),
+          background: sel === i ? "var(--accent-quiet)" : "var(--surface)",
+          transition: "background-color 150ms cubic-bezier(.33,1,.68,1), border-color 150ms cubic-bezier(.33,1,.68,1)"
+        },
+        fixChip: {
+          fontFamily: "var(--font-mono)", fontSize: "0.72rem", fontWeight: 600, letterSpacing: "0.05em",
+          textTransform: "uppercase", borderRadius: "3px", padding: "0.12rem 0.45rem",
+          border: "1px solid color-mix(in srgb, var(--ok) 55%, transparent)", color: "var(--ok)",
+          display: f.fix ? "inline-block" : "none"
+        }
+      })),
+
+      codeTabsProps: {
+        style: { fontSize: "0.92rem" },
+        tabs: [
+          { label: "Python", code: 'pip install laterite\n\nimport laterite\nreport = laterite.validate("delivery.ags")\nags = laterite.read("delivery.ags")\nags["LOCA"]["LOCA_GL"][0]   # → 12.3, a float' },
+          { label: "Node", code: 'npm install laterite\n\nimport { read, validate } from "laterite";\nconst ags = read("delivery.ags");\nvalidate("delivery.ags").toJson();' },
+          { label: "CLI", code: "uvx --from laterite lat validate delivery.ags\n\nlat fix delivery.ags\nlat diff old.ags new.ags\nlat certify delivery.ags" },
+          { label: "DuckDB", code: "INSTALL laterite_ags4 FROM community;\nLOAD laterite_ags4;\n\nSELECT loca_id, loca_gl\nFROM read_ags('delivery.ags', 'LOCA');" }
+        ]
+      }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

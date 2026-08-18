@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/colors.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/typography.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/elevation.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/motion.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/styles.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/_ds_bundle.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:#ece5e0;font-family:"Public Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;--canvas:#ece5e0;--surface:#faf7f5;--surface-raised:#f4efeb;--surface-code:#f6efe9;--line:#e2d9d3;--line-subtle:#ece5e0;--line-strong:#cfc3bb;--accent:#611a1e;--accent-hover:#3f1114;--accent-quiet:#f3e3dd}
+a{color:#611a1e;text-decoration:none}a:hover{color:#3f1114;text-decoration:underline}
+::-webkit-scrollbar{height:6px;width:6px}::-webkit-scrollbar-thumb{background:#cfc3bb;border-radius:3px}
+@keyframes ed-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:0s !important;transition-duration:0s !important}}
+</style>
+</helmet>
+
+<section id="t2" style="padding:40px 44px 48px;border-bottom:1px solid rgb(0 0 0 / 8%)">
+<div style="display:flex;flex-direction:column;gap:0.6rem;max-width:60rem;margin-bottom:26px">
+<span style="font:600 0.72rem/1 'IBM Plex Mono',monospace;letter-spacing:0.05em;text-transform:uppercase;color:#7d6e68">Turn 2 · one page, one interaction</span>
+<h1 style="margin:0;font:700 2.4rem/1.08 'Zilla Slab',Rockwell,serif;letter-spacing:-0.022em;color:#611a1e">The whole page, with a row carousel</h1>
+<p style="margin:0;font:400 1.0625rem/1.65 'Public Sans',sans-serif;color:#423934;max-width:66ch;text-wrap:pretty">The <a href="#1c">1c</a> table kept, but the flow is the full demo page — all four groups, the file, the findings. Tap any cell and that <em>row</em> opens as an <a href="#1b">1b</a>-style carousel of field cards, landing on the field you tapped, with the rule that's failing written under the value. Tapping a finding jumps straight to its field.</p>
+</div>
+
+<div id="2a" style="display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:9px;flex:none">
+<div style="display:flex;align-items:baseline;gap:9px">
+<a href="#2a" style="font:600 0.72rem/1 'IBM Plex Mono',monospace;background:#611a1e;color:#faf7f5;border-radius:4px;padding:0.2rem 0.45rem;text-decoration:none">2a</a>
+<span style="font:600 0.95rem/1.3 'Public Sans',sans-serif;color:#1c1715">Frozen key + row carousel, in the page flow</span>
+</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" keyboard="{{ kbOpen }}" hint-size="402px,874px">
+<div style="{{ shell }}">
+<div style="{{ topBar }}">
+<span style="font:700 1.1rem/1 'Zilla Slab',Rockwell,serif;color:var(--accent)">laterite</span>
+<span style="width:1px;height:14px;background:var(--line-strong)"></span>
+<span style="font:600 0.85rem/1 'Public Sans',sans-serif;color:var(--fg)">build a file</span>
+<span style="flex:1"></span>
+<span style="{{ verdictPill2 }}">{{ verdictShort }}</span>
+</div>
+
+<div data-scrollcol="2a" style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:18px;padding:0 0 24px">
+
+<div style="flex:none;min-height:520px;display:flex;flex-direction:column;justify-content:center;gap:1rem;padding:24px 16px 8px">
+<span style="display:flex;align-items:center;gap:0.5rem;font:600 0.78rem/1.3 'IBM Plex Mono',monospace;letter-spacing:0.05em;text-transform:uppercase;color:#9b3932"><span style="width:4px;height:1.15em;background:#f09c56;flex:none"></span>AGS4 toolkit · five surfaces</span>
+<h1 style="margin:0;font:700 2.35rem/1.05 'Zilla Slab',Rockwell,serif;letter-spacing:-0.024em;color:var(--accent);text-wrap:balance">AGS4, shown rather than explained.</h1>
+<p style="margin:0;font:400 1rem/1.6 'Public Sans',sans-serif;color:var(--fg-soft);text-wrap:pretty">Below is a real delivery — a project, its boreholes, their samples, a lab test. Type in it and the file rewrites itself as you go. Nothing is uploaded.</p>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+<button onClick="{{ tryDemo }}" style="{{ ctaPrim }}">Try the demo ⌄</button>
+<button onClick="{{ goInstall }}" style="{{ ctaGhost }}">Get it for your stack</button>
+</div>
+<span style="font:400 0.85rem/1.45 'Public Sans',sans-serif;color:var(--fg-faint)">Compiled to WebAssembly · MIT licensed · in beta</span>
+<span style="width:84px;height:4px;border-radius:2px;background:linear-gradient(90deg,#f09c56,#db7841 35%,#ce5640 65%,#9b3932)"></span>
+<span style="align-self:center;margin-top:22px;font:400 1.2rem/1 'Public Sans',sans-serif;color:var(--fg-dim)">⌄</span>
+</div>
+
+<div data-anchor="demo" style="flex:none;display:flex;flex-direction:column;gap:0.5rem;padding:16px 16px 0;background-image:linear-gradient(90deg,#f09c56,#db7841 30%,#ce5640 55%,#be3b2e 75%,#611a1e);background-size:100% 2px;background-position:top;background-repeat:no-repeat">
+<h2 style="margin:0;font:700 1.6rem/1.1 'Zilla Slab',Rockwell,serif;letter-spacing:-0.018em;color:var(--accent)">A real delivery, four groups</h2>
+<p style="margin:0;font:400 0.95rem/1.55 'Public Sans',sans-serif;color:var(--fg-soft)">Tap any <span style="text-decoration:underline dashed;text-decoration-color:var(--line-strong);text-underline-offset:3px">dashed value</span> to edit its row. The row locks to the editor while you type.</p>
+</div>
+
+<sc-for list="{{ groups2 }}" as="g2" hint-placeholder-count="4">
+<div style="flex:none;display:flex;flex-direction:column">
+<sc-if value="{{ g2.join }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:8px;padding:0 16px 10px">
+<span style="{{ g2.joinRule }}"></span>
+<span style="{{ g2.joinLabel }}">{{ g2.join }}</span>
+</div>
+</sc-if>
+<div style="{{ g2.card }}">
+<div style="{{ g2.head }}">
+<span style="{{ g2.chip }}">{{ g2.code }}</span>
+<span style="font:600 0.9rem/1.3 'Public Sans',sans-serif;color:var(--fg)">{{ g2.name }}</span>
+<span style="margin-left:auto;font:400 0.75rem/1.3 'IBM Plex Mono',monospace;color:var(--fg-faint)">{{ g2.count }}</span>
+</div>
+<div style="overflow-x:auto">
+<table style="border-collapse:separate;border-spacing:0;font-family:'IBM Plex Mono',monospace;font-size:0.85rem;white-space:nowrap;min-width:100%">
+<thead><tr>
+<sc-for list="{{ g2.heads }}" as="h" hint-placeholder-count="4">
+<th style="{{ h.style }}">{{ h.text }}</th>
+</sc-for>
+</tr></thead>
+<tbody>
+<sc-for list="{{ g2.rows }}" as="row" hint-placeholder-count="3">
+<tr data-edrow="{{ row.mark }}">
+<sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="4">
+<td style="{{ c.td }}"><button onClick="{{ c.pick }}" style="{{ c.btn }}">{{ c.value }}</button></td>
+</sc-for>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</sc-for>
+
+<div style="flex:none;display:flex;flex-direction:column;gap:12px;padding:0 16px">
+<h3 style="margin:6px 0 0;font:700 1.35rem/1.12 'Zilla Slab',Rockwell,serif;letter-spacing:-0.015em;color:var(--accent)">The file, and what the engine thinks of it</h3>
+<div style="{{ fileCard }}">
+<div style="{{ fileBar }}"><span style="font:600 0.85rem/1.3 'IBM Plex Mono',monospace;color:var(--fg-soft)">demo-delivery.ags</span><span style="font:400 0.75rem/1.3 'Public Sans',sans-serif;color:var(--fg-faint);margin-left:auto">{{ fileMeta }}</span></div>
+<div style="max-height:230px;overflow:auto">
+<sc-for list="{{ lines }}" as="l" hint-placeholder-count="16">
+<div style="{{ l.style }}"><span style="{{ l.num }}">{{ l.n }}</span>{{ l.text }}</div>
+</sc-for>
+</div>
+</div>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.SummaryBanner" dc-props="{{ bannerProps }}" hint-size="100%,80px"></x-import>
+<div style="display:flex;gap:8px;align-items:center">
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ fixProps }}" hint-size="150px,32px">{{ fixLabel }}</x-import>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ resetProps }}" hint-size="70px,28px">Reset</x-import>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ findings2 }}" as="f" hint-placeholder-count="5">
+<button onClick="{{ f.open }}" style="{{ f.card }}">
+<span style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><x-import component-from-global-scope="LateriteDesignSystem_9f517b.Chip" tone="{{ f.tone }}" variant="{{ f.variant }}" hint-size="54px,18px">{{ f.sev }}</x-import><span style="font:600 0.82rem/1.3 'IBM Plex Mono',monospace;color:var(--fg)">{{ f.rule }}</span><span style="{{ f.jumpHint }}">tap to edit ›</span></span>
+<span style="font:400 0.9rem/1.5 'Public Sans',sans-serif;color:var(--fg-soft);text-align:left">{{ f.desc }}</span>
+</button>
+</sc-for>
+</div>
+<span style="font:400 0.8rem/1.5 'Public Sans',sans-serif;color:var(--fg-faint)">Runs a cut-down rule set — the shipped engine carries the full catalogue.</span>
+</div>
+
+<div data-anchor="install" style="flex:none;display:flex;flex-direction:column;gap:12px;margin:8px 16px 0;border-top:1px solid var(--line)">
+<h3 style="margin:10px 0 0;font:700 1.35rem/1.12 'Zilla Slab',Rockwell,serif;letter-spacing:-0.015em;color:var(--accent)">Convinced? Take it with you</h3>
+<p style="margin:0;font:400 0.95rem/1.55 'Public Sans',sans-serif;color:var(--fg-soft)">Same engine, whichever door you come in by. Every surface is in beta — the engine is tested; what it hasn't had is your files.</p>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.CodeTabs" dc-props="{{ codeTabsProps }}" hint-size="100%,180px"></x-import>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<a href="#2a" style="background:#ce5640;color:#faf7f5;border-radius:5px;padding:0.5rem 1rem;font:600 0.95rem/1.3 'Public Sans',sans-serif;text-decoration:none">Open the full web app</a>
+<a href="#2a" style="border:1px solid var(--accent);color:var(--accent);border-radius:5px;padding:0.5rem 1rem;font:600 0.95rem/1.3 'Public Sans',sans-serif;text-decoration:none">Read the docs</a>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding:12px 0 4px">
+<span style="font:400 0.8rem/1.5 'Public Sans',sans-serif;color:var(--fg-faint)">laterite — MIT-licensed AGS4 tooling, built from the published AGS4 specification.</span>
+<div style="display:flex;gap:14px;flex-wrap:wrap;font:500 0.85rem/1.3 'Public Sans',sans-serif">
+<a href="#2a">GitHub</a><a href="#2a">PyPI</a><a href="#2a">npm</a><a href="#2a">Docs</a><a href="#2a">Feedback</a>
+</div>
+</div>
+</div>
+</div>
+
+<sc-if value="{{ kbOpen }}" hint-placeholder-val="{{ false }}">
+<div style="{{ edPanel }}">
+<div style="{{ edHead }}">
+<span style="{{ edChip }}">{{ edCode }}</span>
+<span style="font:600 0.82rem/1.3 'IBM Plex Mono',monospace;color:var(--fg)">{{ edTitle }}</span>
+<span style="font:400 0.75rem/1.3 'IBM Plex Mono',monospace;color:var(--fg-faint)">{{ edPos }}</span>
+<span style="flex:1"></span>
+<button onClick="{{ nextErr }}" style="{{ errBtn }}">next ✗ ›</button>
+<button onClick="{{ edClose }}" style="{{ doneBtn }}">Done</button>
+</div>
+<div style="overflow:hidden;padding:8px 0 2px">
+<div style="{{ edTrack }}">
+<sc-for list="{{ edCards }}" as="cd" hint-placeholder-count="4">
+<div style="{{ cd.style }}">
+<div style="display:flex;align-items:baseline;gap:7px">
+<span style="{{ cd.head }}">{{ cd.heading }}</span>
+<span style="font:400 0.72rem/1.3 'IBM Plex Mono',monospace;color:var(--fg-faint)">{{ cd.meta }}</span>
+</div>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Input" dc-props="{{ cd.input }}" hint-size="100%,38px"></x-import>
+<span style="{{ cd.noteStyle }}">{{ cd.note }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;justify-content:center;gap:6px;padding:4px 0 8px">
+<sc-for list="{{ edDots }}" as="d" hint-placeholder-count="4">
+<button onClick="{{ d.go }}" style="{{ d.style }}"></button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+</x-import>
+<p style="margin:0;max-width:402px;font:400 0.85rem/1.55 'Public Sans',sans-serif;color:#5c504b">One continuous page. The editor is the demo site's documented pattern — a full-width panel between table and footer, never floating — but paged like a carousel so one field gets the screen, its ◆/TYPE metadata beside it and the failing rule spelled out under the value.</p>
+</div>
+</div>
+<p style="margin:26px 0 0;font:400 0.9rem/1.6 'Public Sans',sans-serif;color:#5c504b;max-width:66ch">Try next: "drop <a href="#2a">2a</a> into the demo site page" · "peek the next field card like Instagram" · "auto-advance to the next bad value on fix"</p>
+</section>
+
+<section id="t1" style="padding:40px 44px 56px">
+<div style="display:flex;flex-direction:column;gap:0.6rem;max-width:60rem;margin-bottom:26px">
+<span style="font:600 0.72rem/1 'IBM Plex Mono',monospace;letter-spacing:0.05em;text-transform:uppercase;color:#7d6e68">Turn 1 · the editable demo on a phone</span>
+<h1 style="margin:0;font:700 2.4rem/1.08 'Zilla Slab',Rockwell,serif;letter-spacing:-0.022em;color:#611a1e">Four ways to type into an AGS file on 390px</h1>
+<p style="margin:0;font:400 1.0625rem/1.65 'Public Sans',sans-serif;color:#423934;max-width:66ch;text-wrap:pretty">All four edit the <em>same</em> delivery — change a value in one phone and the other three follow, along with the file and the findings. So the comparison is only about the interaction: how it feels to fix <span style="font-family:'IBM Plex Mono',monospace">11.8</span> → <span style="font-family:'IBM Plex Mono',monospace">11.80</span>, and whether you can still see what the engine thinks while you do it.</p>
+<p style="margin:0;font:400 0.95rem/1.6 'Public Sans',sans-serif;color:#5c504b;max-width:66ch">Seeded on arrival: a level short of 2DP, a lower-case sample type, a lab row pointing at a sample that doesn't exist, and no TRAN group. <strong>Fix</strong> repairs the safe three; the orphan needs a human.</p>
+</div>
+
+<div style="display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
+
+<div id="1a" style="display:flex;flex-direction:column;gap:9px;flex:none">
+<div style="display:flex;align-items:baseline;gap:9px">
+<a href="#1a" style="font:600 0.72rem/1 'IBM Plex Mono',monospace;background:#611a1e;color:#faf7f5;border-radius:4px;padding:0.2rem 0.45rem;text-decoration:none">1a</a>
+<span style="font:600 0.95rem/1.3 'Public Sans',sans-serif;color:#1c1715">Bottom sheet</span>
+<span style="font:400 0.85rem/1.3 'Public Sans',sans-serif;color:#7d6e68">iOS Maps / Stripe checkout</span>
+</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="{{ shell }}">
+<div style="{{ topBar }}">
+<span style="font:700 1.1rem/1 'Zilla Slab',Rockwell,serif;color:var(--accent)">laterite</span>
+<span style="width:1px;height:14px;background:var(--line-strong)"></span>
+<span style="font:600 0.85rem/1 'Public Sans',sans-serif;color:var(--fg)">build a file</span>
+<span style="flex:1"></span>
+<span style="{{ verdictPill }}">{{ verdictShort }}</span>
+</div>
+
+<div style="flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:14px">
+<div style="{{ fileCard }}">
+<div style="{{ fileBar }}"><span style="font:600 0.85rem/1.3 'IBM Plex Mono',monospace;color:var(--fg-soft)">demo-delivery.ags</span><span style="font:400 0.75rem/1.3 'Public Sans',sans-serif;color:var(--fg-faint);margin-left:auto">{{ fileMeta }}</span></div>
+<div style="max-height:300px;overflow:auto">
+<sc-for list="{{ lines }}" as="l" hint-placeholder-count="16">
+<div style="{{ l.style }}"><span style="{{ l.num }}">{{ l.n }}</span>{{ l.text }}</div>
+</sc-for>
+</div>
+</div>
+<div style="flex:none;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ findings }}" as="f" hint-placeholder-count="4">
+<div style="{{ f.card }}">
+<span style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><x-import component-from-global-scope="LateriteDesignSystem_9f517b.Chip" tone="{{ f.tone }}" variant="{{ f.variant }}" hint-size="54px,18px">{{ f.sev }}</x-import><span style="font:600 0.82rem/1.3 'IBM Plex Mono',monospace;color:var(--fg)">{{ f.rule }}</span></span>
+<span style="font:400 0.9rem/1.5 'Public Sans',sans-serif;color:var(--fg-soft)">{{ f.desc }}</span>
+</div>
+</sc-for>
+</div>
+<div style="height:140px;flex:none"></div>
+</div>
+
+<div style="{{ sheetWrap }}">
+<div style="{{ sheet }}">
+<div onClick="{{ toggleSheet }}" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 16px 10px;cursor:pointer">
+<span style="width:38px;height:5px;border-radius:3px;background:var(--line-strong)"></span>
+<div style="display:flex;align-items:baseline;gap:8px;width:100%">
+<span style="font:700 1.05rem/1.2 'Zilla Slab',Rockwell,serif;color:var(--accent)">The delivery</span>
+<span style="font:400 0.8rem/1.3 'IBM Plex Mono',monospace;color:var(--fg-faint)">{{ sheetHint }}</span>
+<span style="flex:1"></span>
+<span style="font:400 1rem/1 'Public Sans',sans-serif;color:var(--fg-muted)">{{ sheetChevron }}</span>
+</div>
+</div>
+<div style="{{ sheetBody }}">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<sc-for list="{{ sheetFields }}" as="f" hint-placeholder-count="6">
+<label style="display:flex;flex-direction:column;gap:3px;min-width:0">
+<span style="{{ f.label }}">{{ f.name }}</span>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Input" dc-props="{{ f.input }}" hint-size="100%,28px"></x-import>
+<span style="font:400 0.72rem/1.3 'Public Sans',sans-serif;color:var(--fg-dim)">{{ f.hint }}</span>
+</label>
+</sc-for>
+</div>
+<div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ fixProps }}" hint-size="150px,32px">{{ fixLabel }}</x-import>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ resetProps }}" hint-size="70px,28px">Reset</x-import>
+</div>
+</div>
+</div>
+</div>
+</div>
+</x-import>
+<p style="margin:0;max-width:402px;font:400 0.85rem/1.55 'Public Sans',sans-serif;color:#5c504b">Half-height sheet over the live file. Drag-handle header collapses it to a peek bar, so the findings you're fixing stay visible behind. Cheapest to build; the sheet hides half the file while open.</p>
+</div>
+
+<div id="1b" style="display:flex;flex-direction:column;gap:9px;flex:none">
+<div style="display:flex;align-items:baseline;gap:9px">
+<a href="#1b" style="font:600 0.72rem/1 'IBM Plex Mono',monospace;background:#611a1e;color:#faf7f5;border-radius:4px;padding:0.2rem 0.45rem;text-decoration:none">1b</a>
+<span style="font:600 0.95rem/1.3 'Public Sans',sans-serif;color:#1c1715">Group pager</span>
+<span style="font:400 0.85rem/1.3 'Public Sans',sans-serif;color:#7d6e68">Instagram carousel / Trello mobile</span>
+</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="{{ shell }}">
+<div style="{{ topBar }}">
+<span style="font:700 1.1rem/1 'Zilla Slab',Rockwell,serif;color:var(--accent)">laterite</span>
+<span style="width:1px;height:14px;background:var(--line-strong)"></span>
+<span style="font:600 0.85rem/1 'Public Sans',sans-serif;color:var(--fg)">{{ pagerTitle }}</span>
+<span style="flex:1"></span>
+<span style="{{ verdictPill }}">{{ verdictShort }}</span>
+</div>
+
+<div style="display:flex;align-items:center;gap:10px;padding:10px 16px 0">
+<sc-for list="{{ pagerDots }}" as="d" hint-placeholder-count="4">
+<button onClick="{{ d.go }}" style="{{ d.style }}">{{ d.code }}</button>
+</sc-for>
+</div>
+
+<div style="flex:1;overflow:auto;padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px">
+<div style="{{ pagerCard }}">
+<div style="display:flex;align-items:center;gap:9px;padding:0.75rem 0.8rem 0.6rem;border-bottom:1px solid var(--line)">
+<span style="{{ pagerChip }}">{{ pagerCode }}</span>
+<span style="font:600 0.95rem/1.3 'Public Sans',sans-serif;color:var(--fg)">{{ pagerName }}</span>
+<span style="margin-left:auto;font:400 0.78rem/1.3 'IBM Plex Mono',monospace;color:var(--fg-faint)">{{ pagerCount }}</span>
+</div>
+<div style="display:flex;flex-direction:column">
+<sc-for list="{{ pagerRecords }}" as="r" hint-placeholder-count="3">
+<div style="{{ r.wrap }}">
+<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px">
+<span style="font:600 0.78rem/1.3 'IBM Plex Mono',monospace;letter-spacing:0.04em;color:var(--fg-faint)">{{ r.label }}</span>
+<span style="{{ r.badge }}">{{ r.badgeText }}</span>
+</div>
+<div style="display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center">
+<sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="4">
+<span style="{{ c.head }}">{{ c.heading }}</span>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Input" dc-props="{{ c.input }}" hint-size="100%,28px"></x-import>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+<span style="flex:none;font:400 0.85rem/1.5 'Public Sans',sans-serif;color:var(--fg-muted)">{{ pagerBlurb }}</span>
+<div style="flex:none;display:flex;gap:8px">
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ pagerPrev }}" hint-size="80px,30px">‹ back</x-import>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ pagerNext }}" hint-size="110px,30px">{{ pagerNextLabel }}</x-import>
+</div>
+</div>
+
+<div style="{{ liveStrip }}">
+<span style="font:600 0.72rem/1.3 'IBM Plex Mono',monospace;letter-spacing:0.05em;color:rgb(255 255 255 / 60%)">LIVE FILE</span>
+<span style="font:400 0.82rem/1.4 'IBM Plex Mono',monospace;color:#fdf1e7;white-space:pre;overflow:hidden;text-overflow:ellipsis">{{ liveLine }}</span>
+<div style="display:flex;gap:10px;align-items:center">
+<span style="font:400 0.78rem/1.3 'Public Sans',sans-serif;color:rgb(255 255 255 / 70%)">{{ verdictLong }}</span>
+<span style="flex:1"></span>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ fixPropsDark }}" hint-size="120px,28px">{{ fixLabelShort }}</x-import>
+</div>
+</div>
+</div>
+</x-import>
+<p style="margin:0;max-width:402px;font:400 0.85rem/1.55 'Public Sans',sans-serif;color:#5c504b">One group per card, swiped through in KEY order, rows as stacked records instead of a grid. Teaches the parent → child chain by making you walk it; a wide group needs a lot of scrolling.</p>
+</div>
+
+<div id="1c" style="display:flex;flex-direction:column;gap:9px;flex:none">
+<div style="display:flex;align-items:baseline;gap:9px">
+<a href="#1c" style="font:600 0.72rem/1 'IBM Plex Mono',monospace;background:#611a1e;color:#faf7f5;border-radius:4px;padding:0.2rem 0.45rem;text-decoration:none">1c</a>
+<span style="font:600 0.95rem/1.3 'Public Sans',sans-serif;color:#1c1715">Frozen key + cell inspector</span>
+<span style="font:400 0.85rem/1.3 'Public Sans',sans-serif;color:#7d6e68">Google Sheets mobile</span>
+</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="{{ shell }}">
+<div style="{{ topBar }}">
+<span style="font:700 1.1rem/1 'Zilla Slab',Rockwell,serif;color:var(--accent)">laterite</span>
+<span style="width:1px;height:14px;background:var(--line-strong)"></span>
+<span style="font:600 0.85rem/1 'IBM Plex Mono',monospace;color:var(--fg)">LOCA</span>
+<span style="flex:1"></span>
+<span style="{{ verdictPill }}">{{ verdictShort }}</span>
+</div>
+
+<div style="flex:1;overflow:auto;padding:14px 0 20px;display:flex;flex-direction:column;gap:14px">
+<p style="margin:0;flex:none;padding:0 16px;font:400 0.9rem/1.5 'Public Sans',sans-serif;color:var(--fg-muted)">The table stays a table: it scrolls sideways, the KEY column is pinned, and type is never shrunk. Tap any cell.</p>
+<div style="flex:none;overflow-x:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--surface)">
+<table style="border-collapse:separate;border-spacing:0;font-family:'IBM Plex Mono',monospace;font-size:0.88rem;white-space:nowrap">
+<thead>
+<tr>
+<th style="position:sticky;left:0;z-index:2;background:var(--surface-raised);border-right:1px solid var(--line-strong);border-bottom:1px solid var(--line);padding:0.4rem 0.6rem;text-align:left;font:600 0.78rem/1.3 'Public Sans',sans-serif;color:var(--fg-muted)">LOCA_ID ◆</th>
+<sc-for list="{{ gridHeads }}" as="h" hint-placeholder-count="3">
+<th style="border-bottom:1px solid var(--line);background:var(--surface-raised);padding:0.4rem 0.7rem;text-align:left;font:600 0.78rem/1.3 'Public Sans',sans-serif;color:var(--fg-muted)">{{ h.heading }}<span style="font-family:'IBM Plex Mono',monospace;font-weight:400;color:var(--fg-faint)">{{ h.type }}</span></th>
+</sc-for>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{ gridRows }}" as="row" hint-placeholder-count="3">
+<tr>
+<sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="4">
+<td style="{{ c.td }}"><button onClick="{{ c.pick }}" style="{{ c.btn }}">{{ c.value }}</button></td>
+</sc-for>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+<div style="flex:none;padding:0 16px;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ findings }}" as="f" hint-placeholder-count="4">
+<div style="{{ f.card }}">
+<span style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><x-import component-from-global-scope="LateriteDesignSystem_9f517b.Chip" tone="{{ f.tone }}" variant="{{ f.variant }}" hint-size="54px,18px">{{ f.sev }}</x-import><span style="font:600 0.82rem/1.3 'IBM Plex Mono',monospace;color:var(--fg)">{{ f.rule }}</span></span>
+<span style="font:400 0.9rem/1.5 'Public Sans',sans-serif;color:var(--fg-soft)">{{ f.desc }}</span>
+</div>
+</sc-for>
+</div>
+<div style="height:220px;flex:none"></div>
+</div>
+
+<div style="{{ inspectorWrap }}">
+<div style="display:flex;align-items:center;gap:8px;padding:0.5rem 0.8rem;border-bottom:1px solid var(--line);background:var(--surface-raised)">
+<span style="font:600 0.8rem/1.3 'IBM Plex Mono',monospace;color:var(--accent)">{{ inspectorPath }}</span>
+<span style="font:400 0.75rem/1.3 'Public Sans',sans-serif;color:var(--fg-faint)">{{ inspectorMeta }}</span>
+<span style="flex:1"></span>
+<button onClick="{{ inspectorPrev }}" style="{{ stepBtn }}">‹</button>
+<button onClick="{{ inspectorNext }}" style="{{ stepBtn }}">›</button>
+</div>
+<div style="padding:0.7rem 0.8rem 0.9rem;display:flex;flex-direction:column;gap:8px">
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Input" dc-props="{{ inspectorInput }}" hint-size="100%,40px"></x-import>
+<span style="font:400 0.8rem/1.45 'Public Sans',sans-serif;color:var(--fg-muted)">{{ inspectorHint }}</span>
+<div style="display:flex;gap:8px">
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ fixProps }}" hint-size="150px,32px">{{ fixLabel }}</x-import>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ inspectorDone }}" hint-size="70px,28px">Done</x-import>
+</div>
+</div>
+</div>
+</div>
+</x-import>
+<p style="margin:0;max-width:402px;font:400 0.85rem/1.55 'Public Sans',sans-serif;color:#5c504b">Closest to the desktop page and to how engineers already work: real grid, pinned key, an inspector docked where a keyboard would be, with ‹ › to walk the row. Densest option — and the only one that keeps the ◆ key tint doing its job.</p>
+</div>
+
+<div id="1d" style="display:flex;flex-direction:column;gap:9px;flex:none">
+<div style="display:flex;align-items:baseline;gap:9px">
+<a href="#1d" style="font:600 0.72rem/1 'IBM Plex Mono',monospace;background:#611a1e;color:#faf7f5;border-radius:4px;padding:0.2rem 0.45rem;text-decoration:none">1d</a>
+<span style="font:600 0.95rem/1.3 'Public Sans',sans-serif;color:#1c1715">One field at a time</span>
+<span style="font:400 0.85rem/1.3 'Public Sans',sans-serif;color:#7d6e68">Typeform / Duolingo</span>
+</div>
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+<div style="{{ shell }}">
+<div style="{{ topBar }}">
+<span style="font:700 1.1rem/1 'Zilla Slab',Rockwell,serif;color:var(--accent)">laterite</span>
+<span style="width:1px;height:14px;background:var(--line-strong)"></span>
+<span style="font:600 0.85rem/1 'Public Sans',sans-serif;color:var(--fg)">{{ wizardStepLabel }}</span>
+<span style="flex:1"></span>
+<span style="{{ verdictPill }}">{{ verdictShort }}</span>
+</div>
+<div style="display:flex;gap:3px;padding:10px 16px 0">
+<sc-for list="{{ wizardTicks }}" as="t" hint-placeholder-count="6">
+<span style="{{ t.style }}"></span>
+</sc-for>
+</div>
+
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px;padding:16px">
+<span style="{{ wizardChip }}">{{ wizardGroup }}</span>
+<h2 style="margin:0;font:700 1.85rem/1.15 'Zilla Slab',Rockwell,serif;letter-spacing:-0.018em;color:var(--accent);text-wrap:balance">{{ wizardPrompt }}</h2>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Input" dc-props="{{ wizardInput }}" hint-size="100%,52px"></x-import>
+<div style="display:flex;align-items:baseline;gap:8px">
+<span style="font:600 0.78rem/1.3 'IBM Plex Mono',monospace;letter-spacing:0.04em;color:var(--fg-faint)">{{ wizardType }}</span>
+<span style="font:400 0.9rem/1.5 'Public Sans',sans-serif;color:var(--fg-muted)">{{ wizardHint }}</span>
+</div>
+<div style="{{ wizardVerdictCard }}">
+<span style="font:600 0.92rem/1.4 'Public Sans',sans-serif">{{ wizardVerdictText }}</span>
+<span style="font:400 0.85rem/1.45 'Public Sans',sans-serif;opacity:0.85">{{ wizardVerdictNote }}</span>
+</div>
+<div style="display:flex;gap:8px;align-items:center">
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ wizardBack }}" hint-size="80px,34px">‹ back</x-import>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Button" dc-props="{{ wizardNext }}" hint-size="120px,34px">{{ wizardNextLabel }}</x-import>
+</div>
+</div>
+
+<div style="border-top:1px solid var(--line);background:var(--surface);padding:0.6rem 0.9rem 1.4rem;display:flex;flex-direction:column;gap:4px">
+<span style="font:600 0.72rem/1.3 'IBM Plex Mono',monospace;letter-spacing:0.05em;color:var(--fg-faint)">THE LINE YOU ARE WRITING</span>
+<span style="font:400 0.85rem/1.5 'IBM Plex Mono',monospace;color:var(--fg);white-space:pre;overflow-x:auto">{{ wizardLine }}</span>
+</div>
+</div>
+</x-import>
+<p style="margin:0;max-width:402px;font:400 0.85rem/1.55 'Public Sans',sans-serif;color:#5c504b">One heading per screen, with the emitted line under it and the verdict answering back as you go. Best at teaching a stranger what AGS4 <em>is</em>; the slowest way to edit anything, and it hides the table shape entirely.</p>
+</div>
+
+</div>
+
+<p style="margin:26px 0 0;font:400 0.9rem/1.6 'Public Sans',sans-serif;color:#5c504b;max-width:66ch">Try next: “drop <a href="#1c">1c</a> into the demo page” · “<a href="#1a">1a</a> but the sheet peeks with the verdict line” · “combine <a href="#1b">1b</a> cards with <a href="#1c">1c</a>'s inspector” · “more directions”</p>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1800,&quot;height&quot;:1100}}">
+const BAND = { PROJ: "#db7841", LOCA: "#ce5640", SAMP: "#be3b2e", LLPL: "#9b3932" };
+const LOCA_ABBR = ["CP", "TP", "RC", "WS"];
+const SAMP_ABBR = ["B", "D", "U", "W", "ES"];
+
+const SEED = {
+  proj: ["121415", "Wembley Park GI", "Brent CC"],
+  loca: [["BH01", "CP", "12.30", "25.00"], ["BH02", "CP", "11.8", "24.50"], ["TP03", "TP", "10.95", "4.20"]],
+  samp: [["BH01", "3.50", "S1", "b"], ["BH02", "6.00", "S2", "D"]],
+  llpl: [["BH01", "3.50", "S1", "42", "19"], ["BH02", "9.00", "S3", "55", "24"]],
+  tran: false
+};
+
+const GROUPS = {
+  PROJ: { name: "Project information", heads: ["PROJ_ID", "PROJ_NAME", "PROJ_CLNT"], types: ["ID", "X", "X"], key: [1, 0, 0], blurb: "One row names the job. Everything below hangs off PROJ_ID." },
+  LOCA: { name: "Location details", heads: ["LOCA_ID", "LOCA_TYPE", "LOCA_GL", "LOCA_FDEP"], types: ["ID", "PA", "2DP", "2DP"], key: [1, 0, 0, 0], blurb: "One row per borehole or pit. LOCA_ID is the key SAMP repeats." },
+  SAMP: { name: "Sample information", heads: ["LOCA_ID", "SAMP_TOP", "SAMP_REF", "SAMP_TYPE"], types: ["ID", "2DP", "ID", "PA"], key: [1, 1, 1, 0], blurb: "Repeats the hole's key and adds depth, reference and type." },
+  LLPL: { name: "Liquid and plastic limit", heads: ["LOCA_ID", "SAMP_TOP", "SAMP_REF", "LLPL_LL", "LLPL_PL"], types: ["ID", "2DP", "ID", "0DP", "0DP"], key: [1, 1, 1, 0, 0], blurb: "Repeats the whole sample key and adds lab results." }
+};
+const ORDER = ["PROJ", "LOCA", "SAMP", "LLPL"];
+
+const WIZARD = [
+  { group: "PROJ", row: 0, col: 0, prompt: "What is the project id?", hint: "The key every group below repeats." },
+  { group: "LOCA", row: 1, col: 0, prompt: "Name the second location.", hint: "Boreholes are usually BH01, BH02 …" },
+  { group: "LOCA", row: 1, col: 1, prompt: "How was it formed?", hint: "An abbreviation, and it has to exist in ABBR: CP, TP, RC, WS." },
+  { group: "LOCA", row: 1, col: 2, prompt: "Ground level at that hole?", hint: "TYPE 2DP means exactly two decimal places — 11.8 is an error, 11.80 is not." },
+  { group: "SAMP", row: 0, col: 3, prompt: "What kind of sample came out?", hint: "B bulk, D disturbed, U undisturbed, W water. Case matters." },
+  { group: "LLPL", row: 1, col: 2, prompt: "Which sample was tested?", hint: "It has to be a SAMP_REF that exists, or the row is an orphan." }
+];
+
+const HINTS = {
+  PROJ_ID: "The key every group below repeats.", PROJ_NAME: "Free text (X).", PROJ_CLNT: "Free text (X).",
+  LOCA_ID: "The key SAMP and LLPL repeat — blank it and nothing can hang off this row.",
+  LOCA_TYPE: "Must exist in the ABBR group: CP, TP, RC, WS.",
+  LOCA_GL: "Two decimal places, always — 11.8 fails, 11.80 passes.", LOCA_FDEP: "Two decimal places, always.",
+  SAMP_TOP: "Depth in metres, 2DP.", SAMP_REF: "The sample's own key — LLPL repeats it.",
+  SAMP_TYPE: "ABBR: B, D, U, W, ES. Case matters.",
+  LLPL_LL: "A whole number (0DP).", LLPL_PL: "A whole number (0DP)."
+};
+const JOINS = { LOCA: "every location belongs to the one project", SAMP: "joined on LOCA_ID", LLPL: "joined on LOCA_ID · SAMP_TOP · SAMP_REF" };
+
+const num2 = /^-?\d+\.\d{2}$/;
+const num0 = /^-?\d+$/;
+
+function validate(m) {
+  const out = [];
+  const locaIds = m.loca.map(r => r[0]);
+  const sampRefs = m.samp.map(r => r[2]);
+  m.loca.forEach((r, i) => {
+    if (!r[0].trim()) out.push({ sev: "error", rule: "Rule 10 — KEY blank", desc: "LOCA_ID is empty, so nothing can be keyed to this row.", where: "LOCA · row " + (i + 1), fix: false, at: ["LOCA", i, 0] });
+    if (!LOCA_ABBR.includes(r[1])) out.push({ sev: "warning", rule: "Rule 16 — abbreviation", desc: 'LOCA_TYPE "' + r[1] + '" is not in the ABBR group — expected one of CP, TP, RC, WS.', where: "LOCA · row " + (i + 1), fix: LOCA_ABBR.includes(r[1].toUpperCase()), at: ["LOCA", i, 1] });
+    [2, 3].forEach(c => {
+      if (!num2.test(r[c])) out.push({ sev: "error", rule: "Rule 5 — data type", desc: GROUPS.LOCA.heads[c] + ' is "' + r[c] + '" against TYPE 2DP — two decimal places expected.', where: "LOCA · row " + (i + 1), fix: !isNaN(parseFloat(r[c])), at: ["LOCA", i, c] });
+    });
+  });
+  m.samp.forEach((r, i) => {
+    if (!locaIds.includes(r[0])) out.push({ sev: "error", rule: "Rule 10 — KEY", desc: 'SAMP row ' + (i + 1) + ' points at LOCA_ID "' + r[0] + '", which has no parent row.', where: "SAMP · row " + (i + 1), fix: false, at: ["SAMP", i, 0] });
+    if (!SAMP_ABBR.includes(r[3])) out.push({ sev: "warning", rule: "Rule 16 — abbreviation", desc: 'SAMP_TYPE "' + r[3] + '" is not in the ABBR group — expected "' + r[3].toUpperCase() + '".', where: "SAMP · row " + (i + 1), fix: SAMP_ABBR.includes(r[3].toUpperCase()), at: ["SAMP", i, 3] });
+  });
+  m.llpl.forEach((r, i) => {
+    if (!sampRefs.includes(r[2])) out.push({ sev: "error", rule: "Rule 10 — KEY", desc: 'LLPL row ' + (i + 1) + ' points at SAMP_REF "' + r[2] + '", which has no parent row in SAMP.', where: "LLPL · row " + (i + 1), fix: false, at: ["LLPL", i, 2] });
+    [3, 4].forEach(c => { if (!num0.test(r[c])) out.push({ sev: "error", rule: "Rule 5 — data type", desc: GROUPS.LLPL.heads[c] + ' is "' + r[c] + '" against TYPE 0DP — a whole number expected.', where: "LLPL · row " + (i + 1), fix: false, at: ["LLPL", i, c] }); });
+  });
+  if (!m.tran) out.push({ sev: "warning", rule: "Rule 17 — TRAN absent", desc: "No TRAN group, so the dictionary edition was resolved by fallback rather than an exact TRAN_AGS match.", where: "file", fix: true, at: null });
+  out.push({ sev: "fyi", rule: "FYI — blank column", desc: "LOCA_REM is blank on every row. Deliverable, but the column carries nothing.", where: "LOCA", fix: false, at: null });
+  const rank = { error: 0, warning: 1, fyi: 2 };
+  return out.sort((a, b) => rank[a.sev] - rank[b.sev]);
+}
+
+function emit(m) {
+  const lines = [];
+  const push = (kind, text, at) => lines.push({ kind, text, at });
+  if (m.tran) {
+    push(0, '"GROUP","TRAN"'); push(0, '"HEADING","TRAN_AGS","TRAN_DATE"');
+    push(0, '"UNIT","",""'); push(0, '"TYPE","X","DT"'); push(1, '"DATA","4.1.1","2026-08-17"');
+  }
+  ORDER.forEach(code => {
+    const g = GROUPS[code];
+    const rows = code === "PROJ" ? [m.proj] : m[code.toLowerCase()];
+    push(0, '"GROUP","' + code + '"');
+    push(0, '"HEADING",' + g.heads.map(h => '"' + h + '"').join(","));
+    push(0, '"UNIT",' + g.heads.map((h, i) => '"' + (g.types[i] === "2DP" && h !== "SAMP_TOP" ? "m" : g.types[i] === "2DP" ? "m" : "") + '"').join(","));
+    push(0, '"TYPE",' + g.types.map(t => '"' + t + '"').join(","));
+    rows.forEach((r, i) => push(1, '"DATA",' + r.map(v => '"' + v + '"').join(","), [code, i]));
+  });
+  return lines.map((l, i) => ({ ...l, n: i + 1 }));
+}
+
+function applyFixes(m) {
+  const pad = v => { const f = parseFloat(v); return isNaN(f) ? v : f.toFixed(2); };
+  return {
+    proj: [...m.proj],
+    loca: m.loca.map(r => [r[0], LOCA_ABBR.includes(r[1].toUpperCase()) ? r[1].toUpperCase() : r[1], pad(r[2]), pad(r[3])]),
+    samp: m.samp.map(r => [r[0], pad(r[1]), r[2], SAMP_ABBR.includes(r[3].toUpperCase()) ? r[3].toUpperCase() : r[3]]),
+    llpl: m.llpl.map(r => [...r]),
+    tran: true
+  };
+}
+
+const clone = m => JSON.parse(JSON.stringify(m));
+
+class Component extends DCLogic {
+  state = { model: clone(SEED), sheet: true, page: 1, cell: ["LOCA", 1, 2], step: 3, ed: null, idx: 0, seen: false };
+
+  get scrollCol() { return document.querySelector('[data-scrollcol="2a"]'); }
+
+  componentDidUpdate() {
+    const ed = this.state.ed, key = ed ? ed.g + ":" + ed.r + ":" + this.state.idx : "";
+    if (key === this._edKey) return;
+    this._edKey = key;
+    if (!ed) return;
+    const lock = smooth => {
+      const c = this.scrollCol;
+      const el = c && c.querySelector('[data-edrow="1"]');
+      if (!c || !el) return;
+      const cr = c.getBoundingClientRect(), r = el.getBoundingClientRect();
+      const top = c.scrollTop + (r.bottom - cr.bottom) + 4;
+      if (smooth) c.scrollTo({ top, behavior: "smooth" }); else c.scrollTop = top;
+    };
+    clearTimeout(this._lockT1); clearTimeout(this._lockT2);
+    this._lockT1 = setTimeout(() => lock(false), 280);
+    this._lockT2 = setTimeout(() => lock(true), 560);
+  }
+
+  goto(anchor) {
+    const c = this.scrollCol;
+    const el = c && c.querySelector('[data-anchor="' + anchor + '"]');
+    if (!c || !el) return;
+    c.scrollTo({ top: c.scrollTop + el.getBoundingClientRect().top - c.getBoundingClientRect().top - 6, behavior: "smooth" });
+  }
+
+  nextError(findings) {
+    const list = findings.filter(f => f.at).sort((a, b) => ORDER.indexOf(a.at[0]) - ORDER.indexOf(b.at[0]) || a.at[1] - b.at[1] || a.at[2] - b.at[2]);
+    if (!list.length) return;
+    const ed = this.state.ed, idx = this.state.idx || 0;
+    let i = ed ? list.findIndex(f => ORDER.indexOf(f.at[0]) > ORDER.indexOf(ed.g) || (f.at[0] === ed.g && (f.at[1] > ed.r || (f.at[1] === ed.r && f.at[2] > idx)))) : 0;
+    if (i < 0) i = 0;
+    const f = list[i];
+    this.setState({ ed: { g: f.at[0], r: f.at[1] }, idx: f.at[2], seen: true });
+  }
+
+  set(group, row, col, value) {
+    this.setState(s => {
+      const m = clone(s.model);
+      if (group === "PROJ") m.proj[col] = value; else m[group.toLowerCase()][row][col] = value;
+      return { model: m };
+    });
+  }
+
+  input(group, row, col, extra) {
+    const g = GROUPS[group];
+    const rows = group === "PROJ" ? [this.state.model.proj] : this.state.model[group.toLowerCase()];
+    const value = rows[row][col];
+    const bad = this.findings.some(f => f.at && f.at[0] === group && f.at[1] === row && f.at[2] === col);
+    return {
+      value, mono: true, invalid: bad,
+      onChange: e => this.set(group, row, col, e.target.value),
+      style: { fontSize: "0.95rem", padding: "0.35rem 0.5rem", borderRadius: "3px", background: "var(--surface)", ...(extra || {}) }
+    };
+  }
+
+  get findings() { return this._f || (this._f = validate(this.state.model)); }
+
+  renderVals() {
+    this._f = null;
+    const m = this.state.model, findings = this.findings, lines = emit(m);
+    const counts = findings.reduce((a, f) => ({ ...a, [f.sev]: (a[f.sev] || 0) + 1 }), {});
+    const fixable = findings.filter(f => f.fix);
+    const badAt = (g, r, c) => findings.some(f => f.at && f.at[0] === g && f.at[1] === r && (c == null || f.at[2] === c));
+    const verdictKind = counts.error ? "err" : counts.warning ? "warn" : counts.fyi ? "warn" : "ok";
+    const verdictColour = { err: "var(--err)", warn: "var(--warn)", ok: "var(--ok)" }[verdictKind];
+    const verdictShort = counts.error ? "✗ " + counts.error + " error" + (counts.error === 1 ? "" : "s")
+      : counts.warning ? "ⓘ " + counts.warning + " warning" + (counts.warning === 1 ? "" : "s")
+      : "✓ clean";
+    const verdictLong = [counts.error && counts.error + " error" + (counts.error === 1 ? "" : "s"),
+      counts.warning && counts.warning + " warning" + (counts.warning === 1 ? "" : "s"),
+      counts.fyi && counts.fyi + " informational"].filter(Boolean).join(" · ") || "Clean — 0 findings";
+
+    const shell = { minHeight: "100%", height: "100%", display: "flex", flexDirection: "column", background: "var(--canvas)", color: "var(--fg)", fontFamily: "'Public Sans', system-ui, sans-serif", position: "relative", overflow: "hidden" };
+    const topBar = { position: "relative", zIndex: 20, display: "flex", alignItems: "center", gap: "8px", padding: "52px 14px 9px", background: "var(--surface)", backgroundImage: "linear-gradient(90deg,#f09c56,#db7841 30%,#ce5640 55%,#be3b2e 75%,#611a1e)", backgroundSize: "100% 3px", backgroundPosition: "bottom", backgroundRepeat: "no-repeat", flex: "none" };
+    const verdictPill = { fontFamily: "var(--font-mono)", fontSize: "0.72rem", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", borderRadius: "3px", padding: "0.18rem 0.45rem", color: verdictKind === "ok" ? "var(--ok)" : verdictColour, background: verdictKind === "err" ? "var(--err-quiet)" : verdictKind === "warn" ? "var(--warn-quiet)" : "var(--ok-quiet)", boxShadow: "inset 3px 0 0 " + verdictColour };
+    const findingCard = f => ({ flex: "none", display: "flex", flexDirection: "column", gap: "4px", borderRadius: "8px", padding: "0.55rem 0.65rem", background: "var(--surface)", border: "1px solid var(--line)" });
+    const fixBtn = dark => ({ variant: "action", disabled: !fixable.length, onClick: () => this.setState({ model: applyFixes(m) }), style: { fontSize: "0.9rem", padding: "0.35rem 0.9rem", ...(dark ? { background: "rgb(255 255 255 / 12%)", borderColor: "rgb(255 255 255 / 30%)", color: "#fdf1e7" } : null) } });
+
+    const sheetOpen = this.state.sheet;
+    const page = this.state.page, code = ORDER[page], g = GROUPS[code];
+    const rows = code === "PROJ" ? [m.proj] : m[code.toLowerCase()];
+    const [cg, cr, cc] = this.state.cell;
+    const step = Math.min(this.state.step, WIZARD.length - 1), w = WIZARD[step], wg = GROUPS[w.group];
+    const wRows = w.group === "PROJ" ? [m.proj] : m[w.group.toLowerCase()];
+
+    return {
+      shell, topBar, verdictPill, verdictShort, verdictLong,
+      fixLabel: fixable.length ? "Fix " + fixable.length + " safe finding" + (fixable.length === 1 ? "" : "s") : "Nothing safe left to fix",
+      fixLabelShort: fixable.length ? "Fix " + fixable.length + " safe" : "Nothing to fix",
+      fixProps: fixBtn(false), fixPropsDark: fixBtn(true),
+      resetProps: { size: "sm", onClick: () => this.setState({ model: clone(SEED) }), style: { fontSize: "0.85rem" } },
+
+      findings: findings.map(f => ({ sev: f.sev, rule: f.rule, desc: f.desc, tone: { error: "err", warning: "warn", fyi: "info" }[f.sev], variant: { error: "solid", warning: "rule", fyi: "rule" }[f.sev], card: findingCard(f) })),
+
+      fileMeta: lines.length + " lines · UTF-8",
+      fileCard: { flex: "none", border: "1px solid var(--line)", borderRadius: "8px", background: "var(--surface)", overflow: "hidden" },
+      fileBar: { display: "flex", alignItems: "baseline", gap: "8px", padding: "0.45rem 0.65rem", borderBottom: "1px solid var(--line)", background: "var(--surface-raised)" },
+      lines: lines.map(l => ({
+        n: l.n, text: l.text,
+        num: { display: "inline-block", width: "1.9rem", textAlign: "right", paddingRight: "0.6rem", color: "var(--fg-dim)", flex: "none" },
+        style: {
+          display: "flex", whiteSpace: "pre", fontFamily: "var(--font-mono)", fontSize: "0.82rem", lineHeight: 1.7, paddingRight: "0.6rem",
+          color: l.kind ? "var(--fg)" : "var(--fg-muted)",
+          background: l.at && badAt(l.at[0], l.at[1], null) ? "var(--err-quiet)" : "transparent",
+          boxShadow: l.at && badAt(l.at[0], l.at[1], null) ? "inset 3px 0 0 var(--err)" : "none"
+        }
+      })),
+
+      toggleSheet: () => this.setState({ sheet: !sheetOpen }),
+      sheetChevron: sheetOpen ? "⌄" : "⌃",
+      sheetHint: sheetOpen ? "live · no submit" : "tap to open",
+      sheetWrap: { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 30, paddingBottom: "22px", background: "transparent" },
+      sheet: { background: "var(--surface)", borderTop: "1px solid var(--line)", borderRadius: "12px 12px 0 0", boxShadow: "0 -12px 40px rgb(97 26 30 / 22%)", transition: "transform 180ms cubic-bezier(.33,1,.68,1)" },
+      sheetBody: { maxHeight: sheetOpen ? "420px" : "0", overflow: "hidden", padding: sheetOpen ? "0 16px 14px" : "0 16px", transition: "max-height 200ms cubic-bezier(.33,1,.68,1), padding 200ms cubic-bezier(.33,1,.68,1)" },
+      sheetFields: [["PROJ", 0, 0, "the job's key"], ["LOCA", 1, 0, "second borehole"], ["LOCA", 1, 1, "CP, TP, RC, WS"], ["LOCA", 1, 2, "2DP — two decimals"], ["SAMP", 0, 3, "B, D, U, W, ES"], ["LLPL", 1, 2, "must exist in SAMP"]].map(([grp, r, c, hint]) => ({
+        name: GROUPS[grp].heads[c], hint,
+        label: { fontFamily: "var(--font-mono)", fontSize: "0.72rem", fontWeight: 600, letterSpacing: "0.04em", color: badAt(grp, r, c) ? "var(--err)" : "var(--fg-muted)" },
+        input: this.input(grp, r, c)
+      })),
+
+      pagerTitle: code + " · " + (page + 1) + " of 4",
+      pagerCode: code, pagerName: g.name, pagerBlurb: g.blurb,
+      pagerCount: rows.length + (rows.length === 1 ? " row" : " rows"),
+      pagerCard: { flex: "none", border: "1px solid var(--line)", borderRadius: "8px", background: "var(--surface)", overflow: "hidden", backgroundImage: "linear-gradient(90deg," + BAND[code] + "," + BAND[code] + ")", backgroundSize: "100% 3px", backgroundPosition: "top", backgroundRepeat: "no-repeat" },
+      pagerChip: { fontFamily: "var(--font-mono)", fontSize: "0.95rem", fontWeight: 700, letterSpacing: "0.03em", color: "var(--accent)", borderRadius: "3px", padding: "0.1rem 0.5rem", background: "color-mix(in srgb, " + BAND[code] + " 26%, transparent)", boxShadow: "inset 3px 0 0 " + BAND[code] },
+      pagerDots: ORDER.map((c2, i) => ({
+        code: c2, go: () => this.setState({ page: i }),
+        style: { appearance: "none", cursor: "pointer", flex: 1, borderRadius: "3px", padding: "0.25rem 0", fontFamily: "var(--font-mono)", fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.04em", color: i === page ? "var(--accent)" : "var(--fg-faint)", background: i === page ? "color-mix(in srgb, " + BAND[c2] + " 22%, transparent)" : "transparent", border: "none", boxShadow: "inset 0 -2px 0 " + (i === page ? BAND[c2] : "var(--line)") }
+      })),
+      pagerRecords: rows.map((r, i) => ({
+        label: code + " · row " + (i + 1),
+        badgeText: badAt(code, i, null) ? "needs attention" : "ok",
+        badge: { fontFamily: "var(--font-mono)", fontSize: "0.68rem", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", borderRadius: "3px", padding: "0.1rem 0.4rem", color: badAt(code, i, null) ? "var(--err)" : "var(--ok)", border: "1px solid " + (badAt(code, i, null) ? "var(--err)" : "color-mix(in srgb, var(--ok) 55%, transparent)") },
+        wrap: { padding: "0.7rem 0.8rem", borderBottom: i === rows.length - 1 ? "none" : "1px solid var(--line-subtle)", background: badAt(code, i, null) ? "color-mix(in srgb, var(--err-quiet) 55%, transparent)" : "transparent" },
+        cells: GROUPS[code].heads.map((h, c) => ({
+          heading: h + (GROUPS[code].key[c] ? " ◆" : ""),
+          head: { fontFamily: "var(--font-mono)", fontSize: "0.78rem", fontWeight: 600, color: GROUPS[code].key[c] ? BAND[code] : "var(--fg-muted)", whiteSpace: "nowrap" },
+          input: this.input(code, i, c)
+        }))
+      })),
+      pagerPrev: { size: "sm", disabled: page === 0, onClick: () => this.setState({ page: Math.max(0, page - 1) }), style: { fontSize: "0.85rem" } },
+      pagerNext: { variant: page === 3 ? "default" : "action", size: "sm", onClick: () => this.setState({ page: (page + 1) % 4 }), style: { fontSize: "0.85rem" } },
+      pagerNextLabel: page === 3 ? "back to PROJ ↻" : ORDER[page + 1] + " ›",
+      liveStrip: { flex: "none", zIndex: 20, background: "#611a1e", borderTop: "1px solid rgb(255 255 255 / 18%)", padding: "0.5rem 0.9rem 1.5rem", display: "flex", flexDirection: "column", gap: "4px" },
+      liveLine: (lines.find(l => l.at && l.at[0] === code) || lines[lines.length - 1]).text,
+
+      gridHeads: GROUPS.LOCA.heads.slice(1).map((h, i) => ({ heading: h + " ", type: GROUPS.LOCA.types[i + 1] })),
+      gridRows: m.loca.map((r, i) => ({
+        cells: r.map((v, c) => {
+          const bad = badAt("LOCA", i, c), sel = cg === "LOCA" && cr === i && cc === c;
+          return {
+            value: v, pick: () => this.setState({ cell: ["LOCA", i, c] }),
+            td: { position: c === 0 ? "sticky" : "static", left: c === 0 ? 0 : "auto", zIndex: c === 0 ? 1 : 0, background: c === 0 ? (GROUPS.LOCA.key[c] ? "color-mix(in srgb, #ce5640 13%, var(--surface))" : "var(--surface)") : bad ? "var(--err-quiet)" : "var(--surface)", borderRight: c === 0 ? "1px solid var(--line-strong)" : "none", borderBottom: "1px solid var(--line-subtle)", boxShadow: c === 0 ? "inset 3px 0 0 #ce5640" : "none", padding: 0 },
+            btn: { appearance: "none", border: "none", background: "transparent", width: "100%", textAlign: "left", cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: "0.88rem", padding: "0.5rem 0.7rem", color: bad ? "var(--err)" : "var(--fg)", fontWeight: bad ? 600 : 400, boxShadow: sel ? "inset 0 0 0 2px var(--accent)" : bad ? "inset 0 -2px 0 var(--err)" : "none" }
+          };
+        })
+      })),
+      inspectorWrap: { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 30, background: "var(--surface)", borderTop: "1px solid var(--line)", boxShadow: "0 -12px 40px rgb(97 26 30 / 22%)", paddingBottom: "20px" },
+      inspectorPath: "LOCA." + GROUPS.LOCA.heads[cc] + " · row " + (cr + 1),
+      inspectorMeta: GROUPS.LOCA.types[cc] + (cc >= 2 ? " · m" : "") + (GROUPS.LOCA.key[cc] ? " · KEY" : ""),
+      inspectorHint: cc === 2 || cc === 3 ? "Two decimal places, always — 11.8 fails Rule 5, 11.80 passes." : cc === 1 ? "Must exist in the ABBR group: CP, TP, RC, WS." : "The key SAMP and LLPL repeat. Blank it and nothing can hang off this row.",
+      inspectorInput: this.input("LOCA", cr, cc, { fontSize: "1.1rem", padding: "0.5rem 0.6rem" }),
+      inspectorPrev: () => this.setState({ cell: ["LOCA", cr, (cc + 3) % 4] }),
+      inspectorNext: () => this.setState({ cell: ["LOCA", cr, (cc + 1) % 4] }),
+      inspectorDone: { size: "sm", onClick: () => this.setState({ cell: ["LOCA", (cr + 1) % 3, cc] }), style: { fontSize: "0.85rem" } },
+      stepBtn: { appearance: "none", cursor: "pointer", border: "1px solid var(--line-strong)", background: "var(--surface)", color: "var(--fg-soft)", borderRadius: "4px", width: "26px", height: "26px", fontSize: "0.9rem", lineHeight: 1 },
+
+      wizardStepLabel: "field " + (step + 1) + " of " + WIZARD.length,
+      wizardTicks: WIZARD.map((x, i) => ({ style: { flex: 1, height: "4px", borderRadius: "2px", background: i <= step ? BAND[x.group] : "var(--line)" } })),
+      wizardChip: { alignSelf: "flex-start", fontFamily: "var(--font-mono)", fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.03em", color: "var(--accent)", borderRadius: "3px", padding: "0.1rem 0.5rem", background: "color-mix(in srgb, " + BAND[w.group] + " 26%, transparent)", boxShadow: "inset 3px 0 0 " + BAND[w.group] },
+      wizardGroup: w.group + " · " + wg.heads[w.col],
+      wizardPrompt: w.prompt, wizardHint: w.hint, wizardType: "TYPE " + wg.types[w.col],
+      wizardInput: this.input(w.group, w.row, w.col, { fontSize: "1.35rem", padding: "0.5rem 0.6rem", borderRadius: "5px" }),
+      wizardVerdictCard: { display: "flex", flexDirection: "column", gap: "3px", borderRadius: "8px", padding: "0.6rem 0.7rem", background: badAt(w.group, w.row, w.col) ? "var(--err-quiet)" : "var(--ok-quiet)", color: badAt(w.group, w.row, w.col) ? "var(--err)" : "var(--ok)", border: "1px solid " + (badAt(w.group, w.row, w.col) ? "color-mix(in srgb, var(--err) 45%, transparent)" : "color-mix(in srgb, var(--ok) 45%, transparent)") },
+      wizardVerdictText: badAt(w.group, w.row, w.col) ? "✗ " + (findings.find(f => f.at && f.at[0] === w.group && f.at[1] === w.row && f.at[2] === w.col) || {}).rule : "✓ this field passes",
+      wizardVerdictNote: badAt(w.group, w.row, w.col) ? (findings.find(f => f.at && f.at[0] === w.group && f.at[1] === w.row && f.at[2] === w.col) || {}).desc : verdictLong + " in the file overall",
+      wizardBack: { size: "sm", disabled: step === 0, onClick: () => this.setState({ step: Math.max(0, step - 1) }), style: { fontSize: "0.9rem" } },
+      wizardNext: { variant: "action", onClick: () => this.setState({ step: (step + 1) % WIZARD.length }), style: { fontSize: "0.9rem", padding: "0.35rem 0.9rem" } },
+      wizardNextLabel: step === WIZARD.length - 1 ? "start again ↻" : "next field ›",
+      wizardLine: (lines.find(l => l.at && l.at[0] === w.group && l.at[1] === w.row) || { text: "" }).text,
+
+      bannerProps: {
+        kind: verdictKind, headline: verdictLong,
+        detail: m.tran ? "Validated against AGS 4.1.1 — exact TRAN_AGS match" : "Validated against AGS 4.1.1 — fallback (TRAN_AGS missing)",
+        style: { fontSize: "0.92rem", padding: "0.7rem 0.8rem" }
+      },
+      findings2: findings.map(f => ({
+        sev: f.sev, rule: f.rule, desc: f.desc,
+        tone: { error: "err", warning: "warn", fyi: "info" }[f.sev],
+        variant: { error: "solid", warning: "rule", fyi: "rule" }[f.sev],
+        open: f.at ? () => this.setState({ ed: { g: f.at[0], r: f.at[1] }, idx: f.at[2] ?? 0, seen: true }) : () => {},
+        jumpHint: { marginLeft: "auto", font: "400 0.72rem/1.3 'IBM Plex Mono', monospace", color: "var(--accent)", display: f.at ? "inline" : "none" },
+        card: { ...findingCard(f), appearance: "none", width: "100%", textAlign: "left", cursor: f.at ? "pointer" : "default" }
+      })),
+      ...this.editorVals(m, findings),
+      tryDemo: () => { this.setState({ seen: true }); this.goto("demo"); },
+      verdictPill2: { ...verdictPill, display: this.state.seen ? "inline-block" : "none" },
+      goInstall: () => this.goto("install"),
+      nextErr: () => this.nextError(findings),
+      errBtn: { appearance: "none", cursor: "pointer", border: "1px solid color-mix(in srgb, var(--err) 55%, transparent)", background: "transparent", color: "var(--err)", borderRadius: "4px", height: "26px", padding: "0 0.5rem", font: "600 0.75rem/1 'IBM Plex Mono', monospace", letterSpacing: "0.03em" },
+      ctaPrim: { appearance: "none", cursor: "pointer", border: "none", background: "#ce5640", color: "#faf7f5", borderRadius: "5px", padding: "0.55rem 1.1rem", font: "600 1rem/1.3 'Public Sans', sans-serif" },
+      ctaGhost: { appearance: "none", cursor: "pointer", background: "transparent", border: "1px solid var(--accent)", color: "var(--accent)", borderRadius: "5px", padding: "0.55rem 1.1rem", font: "600 1rem/1.3 'Public Sans', sans-serif" },
+      codeTabsProps: {
+        style: { fontSize: "0.9rem" },
+        tabs: [
+          { label: "Python", code: 'pip install laterite\n\nimport laterite\nreport = laterite.validate("delivery.ags")\nags = laterite.read("delivery.ags")' },
+          { label: "Node", code: 'npm install laterite\n\nimport { read, validate } from "laterite";\nvalidate("delivery.ags").toJson();' },
+          { label: "CLI", code: "uvx --from laterite lat validate delivery.ags\n\nlat fix delivery.ags\nlat certify delivery.ags" },
+          { label: "DuckDB", code: "INSTALL laterite_ags4 FROM community;\nLOAD laterite_ags4;\n\nSELECT loca_id, loca_gl\nFROM read_ags('delivery.ags', 'LOCA');" }
+        ]
+      },
+      groups2: ORDER.map(code => {
+        const g = GROUPS[code];
+        const rows = code === "PROJ" ? [m.proj] : m[code.toLowerCase()];
+        const ed = this.state.ed;
+        const open = !!ed && ed.g === code;
+        const er = open ? Math.min(ed.r, rows.length - 1) : 0;
+        const idx = open ? Math.min(this.state.idx || 0, g.heads.length - 1) : 0;
+        return {
+          code, name: g.name, join: JOINS[code] || false,
+          joinRule: { width: "2px", height: "20px", borderLeft: "2px dashed " + BAND[code], marginLeft: "22px", display: "block" },
+          count: rows.length + (rows.length === 1 ? " row" : " rows"),
+          card: { margin: 0, borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)", background: "var(--surface)", overflow: "hidden", backgroundImage: "linear-gradient(90deg," + BAND[code] + "," + BAND[code] + ")", backgroundSize: "100% 3px", backgroundPosition: "top", backgroundRepeat: "no-repeat" },
+          chip: { fontFamily: "var(--font-mono)", fontSize: "0.88rem", fontWeight: 700, letterSpacing: "0.03em", color: "var(--accent)", borderRadius: "3px", padding: "0.08rem 0.45rem", background: "color-mix(in srgb, " + BAND[code] + " 26%, transparent)", boxShadow: "inset 3px 0 0 " + BAND[code] },
+          head: { display: "flex", alignItems: "center", gap: "8px", padding: "0.65rem 0.8rem 0.55rem", borderBottom: "1px solid var(--line)", background: "color-mix(in srgb, " + BAND[code] + " 9%, var(--surface))" },
+          joinLabel: { font: "400 0.75rem/1.3 'IBM Plex Mono', monospace", color: "color-mix(in srgb, " + BAND[code] + " 75%, var(--fg))" },
+          heads: g.heads.map((h, c) => ({
+            text: h + (g.key[c] ? " ◆" : ""),
+            style: { position: c === 0 ? "sticky" : "static", left: 0, zIndex: c === 0 ? 2 : 0, background: "var(--surface-raised)", borderRight: c === 0 ? "1px solid var(--line-strong)" : "none", borderBottom: "1px solid var(--line)", padding: "0.35rem 0.6rem", textAlign: "left", font: "600 0.75rem/1.3 'Public Sans', sans-serif", color: g.key[c] ? BAND[code] : "var(--fg-muted)", whiteSpace: "nowrap" }
+          })),
+          rows: rows.map((r, i) => ({
+            mark: open && er === i ? "1" : "",
+            cells: r.map((v, c) => {
+              const bad = findings.some(f => f.at && f.at[0] === code && f.at[1] === i && f.at[2] === c);
+              const selCell = open && er === i && idx === c;
+              const inRow = open && er === i;
+              return {
+                value: v === "" ? "—" : v,
+                pick: () => this.setState({ ed: { g: code, r: i }, idx: c, seen: true }),
+                td: { position: c === 0 ? "sticky" : "static", left: 0, zIndex: c === 0 ? 1 : 0, background: c === 0 ? "color-mix(in srgb, " + BAND[code] + " 13%, var(--surface))" : bad ? "var(--err-quiet)" : inRow ? "color-mix(in srgb, var(--accent-quiet) 60%, var(--surface))" : "var(--surface)", borderRight: c === 0 ? "1px solid var(--line-strong)" : "none", borderBottom: "1px solid var(--line-subtle)", boxShadow: c === 0 ? "inset 3px 0 0 " + BAND[code] : "none", padding: 0 },
+                btn: { appearance: "none", border: "none", background: "transparent", width: "100%", textAlign: "left", cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: "0.85rem", padding: "0.45rem 0.6rem", color: bad ? "var(--err)" : "var(--fg)", fontWeight: bad ? 600 : 400, textDecoration: "underline dashed", textDecorationColor: bad ? "var(--err)" : "var(--line-strong)", textUnderlineOffset: "3px", boxShadow: selCell ? "inset 0 0 0 2px var(--accent)" : "none" }
+              };
+            })
+          }))
+        };
+      })
+    };
+  }
+
+  editorVals(m, findings) {
+    const ed = this.state.ed;
+    if (!ed) return { kbOpen: false, edChip: {}, edCode: "", edTitle: "", edPos: "", edTrack: {}, edCards: [], edDots: [], edPanel: {}, edHead: {}, edPrev: () => {}, edNext: () => {}, edClose: () => {}, doneBtn: this.doneBtnStyle() };
+    const code = ed.g, g = GROUPS[code];
+    const rows = code === "PROJ" ? [m.proj] : m[code.toLowerCase()];
+    const er = Math.min(ed.r, rows.length - 1);
+    const idx = Math.min(this.state.idx || 0, g.heads.length - 1);
+    const keyVal = rows[er][0] || "—";
+    return {
+      kbOpen: true,
+      doneBtn: this.doneBtnStyle(),
+      edPanel: { flex: "none", background: "var(--surface)", borderTop: "3px solid " + BAND[code], boxShadow: "0 -12px 40px rgb(97 26 30 / 22%)", animation: "ed-rise 180ms cubic-bezier(.33,1,.68,1)" },
+      edHead: { display: "flex", alignItems: "center", gap: "8px", padding: "0.5rem 0.8rem", borderBottom: "1px solid var(--line)", background: "color-mix(in srgb, " + BAND[code] + " 12%, var(--surface))" },
+      edCode: code,
+      edChip: { fontFamily: "var(--font-mono)", fontSize: "0.8rem", fontWeight: 700, letterSpacing: "0.03em", color: "var(--accent)", borderRadius: "3px", padding: "0.08rem 0.45rem", background: "color-mix(in srgb, " + BAND[code] + " 26%, transparent)", boxShadow: "inset 3px 0 0 " + BAND[code] },
+      edTitle: "row " + (er + 1) + " · " + keyVal,
+      edPos: (idx + 1) + " of " + g.heads.length + " · " + g.heads[idx],
+      edPrev: () => this.setState({ idx: (idx + g.heads.length - 1) % g.heads.length }),
+      edNext: () => this.setState({ idx: (idx + 1) % g.heads.length }),
+      edClose: () => this.setState({ ed: null }),
+      edTrack: { display: "flex", gap: "10px", padding: "0 16px", transform: "translateX(" + (-idx * 296) + "px)", transition: "transform 180ms cubic-bezier(.33,1,.68,1)" },
+      edCards: g.heads.map((h, c) => {
+        const f = findings.find(x => x.at && x.at[0] === code && x.at[1] === er && x.at[2] === c);
+        return {
+          heading: h + (g.key[c] ? " ◆" : ""),
+          head: { fontFamily: "var(--font-mono)", fontSize: "0.85rem", fontWeight: 700, color: g.key[c] ? BAND[code] : "var(--fg)" },
+          meta: "TYPE " + g.types[c] + (g.types[c] === "2DP" ? " · m" : ""),
+          input: this.input(code, er, c, { fontSize: "1.1rem", padding: "0.45rem 0.55rem", borderRadius: "5px" }),
+          note: f ? "✗ " + f.rule + " — " + f.desc : HINTS[h],
+          noteStyle: { font: "400 0.8rem/1.45 'Public Sans', sans-serif", color: f ? "var(--err)" : "var(--fg-muted)" },
+          style: { flex: "none", width: "286px", display: "flex", flexDirection: "column", gap: "7px", border: "1px solid " + (c === idx ? "var(--accent)" : "var(--line)"), borderRadius: "8px", background: "var(--surface)", padding: "0.65rem 0.7rem 0.75rem", opacity: c === idx ? 1 : 0.55, transition: "opacity 180ms cubic-bezier(.33,1,.68,1), border-color 180ms cubic-bezier(.33,1,.68,1)" }
+        };
+      }),
+      edDots: g.heads.map((h, c) => {
+        const bad = findings.some(f => f.at && f.at[0] === code && f.at[1] === er && f.at[2] === c);
+        return {
+          go: () => this.setState({ idx: c }),
+          style: { appearance: "none", cursor: "pointer", width: c === idx ? "18px" : "7px", height: "7px", borderRadius: "4px", border: "none", padding: 0, background: bad ? "var(--err)" : c === idx ? BAND[code] : "var(--line-strong)", transition: "width 180ms cubic-bezier(.33,1,.68,1)" }
+        };
+      })
+    };
+  }
+
+  doneBtnStyle() {
+    return { appearance: "none", cursor: "pointer", border: "1px solid var(--accent)", background: "var(--accent-quiet)", color: "var(--accent)", borderRadius: "4px", height: "26px", padding: "0 0.6rem", font: "600 0.8rem/1 'Public Sans', sans-serif" };
+  }
+}
+
+</script>
+</body>
+</html>

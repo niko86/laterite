@@ -1,0 +1,51 @@
+/* Type.
+   The rem scale is lifted verbatim from the app's 2026-08-06 type sweep: dense,
+   tool-shaped, with hard floors (sentence text never below 0.8rem, uppercase
+   micro-labels never below ~0.7rem). Display sizes are additions for the docs
+   site + marketing surfaces, where the wordmark voice needs room. */
+:root {
+  /* Display = slab, headings and wordmark only. Never set body copy in it. */
+  --font-display: "Rokkitt", "Rockwell", Georgia, serif;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Root size — the app scales this up on large high-DPI panels. */
+  --ui-scale: 1; /* @kind other */
+  --font-size-root: calc(14px * var(--ui-scale));
+
+  /* Tool UI scale (rem) */
+  --text-bubble: 0.65rem;   /* count bubbles ONLY */
+  --text-micro: 0.72rem;    /* uppercase micro-heads, tags */
+  --text-caption: 0.8rem;   /* captions, hints — sentence-text floor */
+  --text-control: 0.82rem;  /* buttons, inputs, table cells */
+  --text-body: 0.85rem;     /* primary body */
+  --text-lead: 0.95rem;     /* section heads */
+  --text-title: 1rem;       /* dialog h2 */
+  --text-page: 1.25rem;     /* page h1 */
+
+  /* Editorial / docs scale */
+  --text-h3: 1.15rem;
+  --text-h2: 1.5rem;
+  --text-h1: 2rem;
+  --text-display: 2.75rem;
+  --text-hero: 3.75rem;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.3;
+  --leading-normal: 1.45;   /* the app's baseline */
+  --leading-relaxed: 1.55;
+  --leading-loose: 1.7;     /* docs prose */
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;   /* the app's emphasis weight */
+  --weight-bold: 700;
+  --weight-extrabold: 800;  /* wordmark / hero only */
+
+  --tracking-micro: 0.05em; /* uppercase labels */
+  --tracking-tight: -0.01em;
+  --tracking-hero: -0.025em;
+
+  --measure-prose: 68ch;
+  --measure-note: 56rem;
+}

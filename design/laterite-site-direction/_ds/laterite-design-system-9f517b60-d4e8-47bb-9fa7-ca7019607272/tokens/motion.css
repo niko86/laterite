@@ -1,0 +1,27 @@
+/* Motion.
+   Short, functional, one easing. Nothing bounces; nothing springs. Every duration
+   collapses to 0 under prefers-reduced-motion (the app wraps each transition in
+   dur() and mirrors it in CSS). */
+:root {
+  --dur-instant: 0ms; /* @kind other */
+  --dur-fast: 120ms; /* @kind other */ /* opacity fades */
+  --dur-base: 150ms; /* @kind other */ /* colour + transform */
+  --dur-slow: 180ms; /* @kind other */ /* enter/exit — toast fly-in y:12 */
+  --dur-panel: 200ms; /* @kind other */ /* width/height reveals */
+
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1); /* @kind other */ /* svelte cubicOut */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* @kind other */
+
+  --tooltip-delay: 300ms; /* @kind other */
+  --toast-life: 4000ms; /* @kind other */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0.01ms; /* @kind other */
+    --dur-base: 0.01ms; /* @kind other */
+    --dur-slow: 0.01ms; /* @kind other */
+    --dur-panel: 0.01ms; /* @kind other */
+    --tooltip-delay: 0ms; /* @kind other */
+  }
+}
