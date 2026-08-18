@@ -56,6 +56,18 @@ describe("emit", () => {
     expect(emit(SEEDED)).toBe(seededText);
   });
 
+  it("skips lines that arrive before any GROUP", () => {
+    // AGS4 files in the wild open with a GROUP line, but a truncated paste into
+    // the demo would not. Dropping the orphaned rows beats attributing them to
+    // whichever group happens to come next.
+    const stray = parse(
+      '"DATA","x"\r\n"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n',
+    );
+    expect(stray).toHaveLength(1);
+    expect(stray[0]?.code).toBe("PROJ");
+    expect(stray[0]?.rows).toHaveLength(0);
+  });
+
   it("re-quotes a value containing a quote", () => {
     const one = parse(
       '"GROUP","PROJ"\r\n"HEADING","PROJ_ID"\r\n"UNIT",""\r\n"TYPE","ID"\r\n"DATA","a""b"\r\n',
@@ -85,6 +97,13 @@ describe("lineOfRow", () => {
     // page bands that line from this function, so a drift here would band the
     // wrong row while the finding text stayed correct.
     expect(lineOfRow(SEEDED, "LOCA", 0)).toBe(11);
+  });
+
+  it("answers -1 for a group the delivery does not carry", () => {
+    // Deliberately out of range rather than a plausible number: the output pane
+    // bands whatever line this returns, and a silently-wrong line would mark a
+    // row the finding is not about — worse than marking nothing.
+    expect(lineOfRow(SEEDED, "GEOL", 0)).toBe(-1);
   });
 });
 
@@ -136,6 +155,12 @@ describe("the model and the generated schema agree", () => {
       const parsed = SEEDED.find((x) => x.code === g.code)!;
       expect(parsed.headings).toEqual(g.headings.map((h) => h.name));
     }
+  });
+
+  it("has no KEY set for a group the demo does not draw", () => {
+    // `addRow` passes this straight into the inherit step, so an empty list has
+    // to mean "inherit nothing" rather than throwing on a group the slice omits.
+    expect(keyHeadings("GEOL")).toEqual([]);
   });
 
   it("marks the same KEY set the dictionary does", () => {
