@@ -76,8 +76,8 @@ Changelog = "https://github.com/niko86/laterite/blob/main/CHANGELOG.md"
 # Arrow-backed `str` dtype (`string_dtype="string"`, the pandas-3 baseline), so
 # pyarrow is an opt-in accelerator, never required for the drop-in.
 compat = ["pandas<3"]
-pyarrow = ["pyarrow>=25.0.0"]
-all = ["pandas<3", "pyarrow>=25.0.0"]
+pyarrow = ["pyarrow>=25.0.1"]
+all = ["pandas<3", "pyarrow>=25.0.1"]
 
 [project.scripts]
 # `lat` — the Python face of the same CLI, byte-faithful to the Rust `lat`
