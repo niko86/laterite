@@ -18,12 +18,100 @@
 // build output (dist), vendored deps and *.d.ts are ignored — never hand-edited.
 // Plain-JS build scripts (scripts/*.mjs) are out of scope for this TS-focused
 // pass; Prettier still formats them (see .prettierignore).
+import { readFileSync } from "node:fs";
+
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 import solid from "eslint-plugin-solid/configs/recommended";
 import vitest from "@vitest/eslint-plugin";
 import prettier from "eslint-config-prettier";
 import globals from "globals";
+
+// The raw-palette gate (#404). Application colour resolves through the shared
+// tokens (ok/warn/err/info/accent/cta + their -quiet washes, the laterite
+// ramp, the neutral roles) — a raw Tailwind palette class (`bg-emerald-600`,
+// `text-sky-50`) or a pasted hex (`#0ea5e9` was sky-500 wearing a disguise)
+// bypasses the vocabulary and breaks in one theme or the other. The banned
+// family names are READ OUT OF tailwindcss's own shipped theme rather than
+// restated here, so the list tracks the vendor instead of rotting against it.
+// The `(?<!--)` guard keeps token *references* (`var(--stone-100)`,
+// `text-[--steel-500]`) legal: our own vars share family names with Tailwind's.
+const tailwindFamilies = [
+  ...new Set(
+    [
+      ...readFileSync(
+        new URL("./node_modules/tailwindcss/theme.css", import.meta.url),
+        "utf8",
+      ).matchAll(/--color-([a-z]+)-\d+/g),
+    ].map((m) => m[1]),
+  ),
+];
+const RAW_PALETTE_RE = new RegExp(
+  `(?<!--)\\b(?:${tailwindFamilies.join("|")})-\\d\\d\\d?\\b`,
+);
+// 6/8-digit forms only: issue references ("#448", "#1024") share the 3- and
+// 4-digit shape, and the app writes no shorthand hex.
+const RAW_HEX_RE = /#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/;
+// A status/accent/cta BACKGROUND with an alpha is a hand-mixed tint — the
+// -quiet token is the sanctioned wash (#404, AC "tinted fills use the -quiet
+// tokens"). Backgrounds only: border/text alpha (border-ok\/45, border-err\/60)
+// is the system's own idiom for hairlines and stays legal.
+const MIXED_TINT_RE =
+  /\bbg-(?:ok|warn|err|info|accent|cta)(?:-hover|-quiet)?\/\d/;
+const noRawPalette = {
+  meta: {
+    type: "problem",
+    schema: [],
+    messages: {
+      palette:
+        "Raw Tailwind palette class '{{match}}' — status, accent and tinted " +
+        "fills resolve through the shared tokens (ok/warn/err/info/accent/cta " +
+        "+ -quiet washes; see web/src/shared/styles/colors.css, #404).",
+      hex:
+        "Raw colour literal '{{match}}' — resolve it from a token instead " +
+        "(getComputedStyle(...).getPropertyValue('--…') where a class cannot " +
+        "carry it; see web/src/shared/styles/colors.css, #404).",
+      mixedTint:
+        "Hand-mixed tint '{{match}}' — tinted fills take the status's -quiet " +
+        "token (bg-ok-quiet, bg-err-quiet, …), not an alpha on the solid " +
+        "token (#404).",
+    },
+  },
+  create(context) {
+    const check = (node, text) => {
+      const palette = RAW_PALETTE_RE.exec(text);
+      if (palette) {
+        context.report({
+          node,
+          messageId: "palette",
+          data: { match: palette[0] },
+        });
+        return;
+      }
+      const hex = RAW_HEX_RE.exec(text);
+      if (hex) {
+        context.report({ node, messageId: "hex", data: { match: hex[0] } });
+        return;
+      }
+      const tint = MIXED_TINT_RE.exec(text);
+      if (tint) {
+        context.report({
+          node,
+          messageId: "mixedTint",
+          data: { match: tint[0] },
+        });
+      }
+    };
+    return {
+      Literal(node) {
+        if (typeof node.value === "string") check(node, node.value);
+      },
+      TemplateElement(node) {
+        check(node, node.value.raw);
+      },
+    };
+  },
+};
 
 export default tseslint.config(
   {
@@ -83,6 +171,20 @@ export default tseslint.config(
     ...vitest.configs.recommended,
   },
   prettier,
+  {
+    // The gate itself (#404) — application source only. The landing surface
+    // still carries stone-* classes (its own tickets' territory) and the
+    // config/scripts layer legitimately names colours (this file, the tokens'
+    // build plumbing), so the scope is exactly the app the ticket covers.
+    name: "design/no-raw-palette",
+    files: ["src/**/*.{ts,tsx}"],
+    plugins: {
+      design: { rules: { "no-raw-palette": noRawPalette } },
+    },
+    rules: {
+      "design/no-raw-palette": "error",
+    },
+  },
   {
     // #615 burn-down: the many `${count}`-style numeric interpolations are safe
     // (numbers stringify losslessly), so allowNumber lets them through; the only

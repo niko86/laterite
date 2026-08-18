@@ -40,7 +40,8 @@ export function severityOf(f: Pick<FindingDto, "severity">): Severity {
 }
 
 /** True when a report has findings but EVERY one is FYI (informational) — the
- *  signal the SummaryBanner uses to show amber rather than red. */
+ *  signal the SummaryBanner uses to show the info tier rather than the error
+ *  one. */
 export function reportIsOnlyFyi(report: ValidationReport): boolean {
   return (
     report.finding_count > 0 &&

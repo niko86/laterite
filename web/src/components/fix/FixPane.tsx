@@ -296,7 +296,7 @@ export const FixPane: Component = () => {
           </p>
           <button
             type="button"
-            class="mt-4 rounded bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent/25"
+            class="mt-4 rounded bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
             onClick={() => {
               goTo("validate");
             }}
@@ -344,7 +344,7 @@ export const FixPane: Component = () => {
           <div class="flex flex-wrap items-center gap-2 text-sm">
             <button
               type="button"
-              class="rounded bg-emerald-600/80 px-3 py-1.5 font-medium text-emerald-50 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+              class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-40"
               disabled={busy() || fixCount() === 0}
               onClick={() => void fixAllSafe()}
             >
@@ -395,7 +395,7 @@ export const FixPane: Component = () => {
           <Show when={touchesFyi()}>
             <p class="rounded-lg border border-line bg-surface px-3 py-2 text-xs text-fg-faint">
               Heads-up: a fix changes the file itself, so applying one can also
-              clear a related <span class="text-accent">FYI</span> advisory tied
+              clear a related <span class="text-info">FYI</span> advisory tied
               to the same issue (e.g. stripping a Rule 1 BOM). The Validate
               severity filter only controls what's <em>listed</em> there — it
               doesn't limit what gets fixed. Each fix is badged with the
@@ -404,7 +404,7 @@ export const FixPane: Component = () => {
           </Show>
 
           <Show when={looksMojibake()}>
-            <div class="rounded-lg border border-amber-600/50 bg-amber-500/10 p-3 text-sm">
+            <div class="rounded-lg border border-warn/45 bg-warn-quiet p-3 text-sm">
               <p class="text-warn">
                 This file has replacement characters (�) — it looks like
                 Windows-1252 / Latin-1 read as UTF-8. Those non-ASCII bytes are
@@ -413,7 +413,7 @@ export const FixPane: Component = () => {
               </p>
               <button
                 type="button"
-                class="mt-2 rounded bg-amber-600/80 px-3 py-1 text-xs font-medium text-amber-50 hover:bg-amber-600"
+                class="mt-2 rounded bg-cta px-3 py-1 text-xs font-medium text-fg-on-cta hover:bg-cta-hover"
                 onClick={() => {
                   setEncoding("windows-1252");
                 }}

@@ -242,7 +242,7 @@ export const ValidatePane: Component = () => {
           onAligned={setAligned}
         />
         <Show when={replacementChars() > 0}>
-          <div class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm">
+          <div class="rounded-lg border border-warn/45 bg-warn-quiet px-3 py-2 text-sm">
             <p class="text-warn">
               {replacementChars()} replacement character
               {replacementChars() === 1 ? "" : "s"} (�) — this file looks like

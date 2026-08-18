@@ -82,15 +82,16 @@ export const FilterBar: Component<{
     return next;
   };
 
-  // Severity chip colours, consistent with severityBand (rose/amber/sky).
+  // Severity chip colours, consistent with severityBand — each tier's
+  // status token on its own quiet wash; fyi renders as the info tier.
   const sevActiveClass = (s: Severity): string => {
     switch (s) {
       case "error":
-        return "border-err/60 bg-err/15 text-err";
+        return "border-err/60 bg-err-quiet text-err";
       case "warning":
-        return "border-warn/60 bg-warn/15 text-warn";
+        return "border-warn/60 bg-warn-quiet text-warn";
       case "fyi":
-        return "border-accent/60 bg-accent/15 text-accent";
+        return "border-info/60 bg-info-quiet text-info";
     }
   };
 
@@ -150,7 +151,7 @@ export const FilterBar: Component<{
               <span
                 class={chipBase}
                 classList={{
-                  "border-accent bg-accent/15 text-accent": active(),
+                  "border-accent bg-accent-quiet text-accent": active(),
                   [chipOff]: !active(),
                 }}
                 title={r.rule}
@@ -244,7 +245,7 @@ export const FilterBar: Component<{
                     type="button"
                     class={chipBase}
                     classList={{
-                      "border-accent bg-accent/15 text-accent": active(),
+                      "border-accent bg-accent-quiet text-accent": active(),
                       [chipOff]: !active(),
                     }}
                     onClick={() => {

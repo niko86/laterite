@@ -250,7 +250,7 @@ export const Anonymiser: Component = () => {
           </label>
           <button
             type="button"
-            class="rounded bg-emerald-600/80 px-3 py-1.5 font-medium text-emerald-50 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-40"
             disabled={busy() || selected().size === 0}
             onClick={() => void save()}
           >

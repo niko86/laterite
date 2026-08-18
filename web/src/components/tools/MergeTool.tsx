@@ -265,7 +265,7 @@ const MergeError: Component<{
     CLASH_MODES.filter((m) => m.value !== "error" && m.value !== props.mode);
 
   return (
-    <div class="rounded-lg border border-err/40 bg-err/5 p-4 text-sm">
+    <div class="rounded-lg border border-err/45 bg-err-quiet p-4 text-sm">
       <p class="text-err">Could not merge: {String(props.error)}</p>
       <Show when={isTypeClash() && offers().length > 0}>
         <p class="mt-2 text-xs text-fg-muted">
@@ -310,7 +310,7 @@ const MergeView: Component<{
       <div class="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          class="rounded bg-emerald-600/80 px-3 py-1.5 text-sm font-medium text-emerald-50 hover:bg-emerald-600"
+          class="rounded bg-cta px-3 py-1.5 text-sm font-medium text-fg-on-cta hover:bg-cta-hover"
           onClick={() => {
             props.onDownload();
           }}

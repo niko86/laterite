@@ -7,7 +7,7 @@ import {
   type ValidationReport,
 } from "./validator";
 
-// reportIsOnlyFyi decides amber (informational) vs red (failure) in the
+// reportIsOnlyFyi decides info (informational) vs err (failure) in the
 // SummaryBanner. The boundaries matter: one real error among many FYI must
 // stay red.
 //
@@ -45,7 +45,7 @@ const report = (findings: FindingDto[]): ValidationReport => ({
 });
 
 describe("reportIsOnlyFyi", () => {
-  it("is false for a clean report (0 findings ⇒ green, not amber)", () => {
+  it("is false for a clean report (0 findings ⇒ ok, not info)", () => {
     expect(reportIsOnlyFyi(report([]))).toBe(false);
   });
 

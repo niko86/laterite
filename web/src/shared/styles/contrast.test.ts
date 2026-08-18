@@ -114,6 +114,20 @@ describe.each(Object.entries(themes))("%s theme", (_name, tokens) => {
     }
   });
 
+  // The solid status fills (#404): the Chip's solid form and the findings'
+  // char-level hit marks set `text-surface` on bg-ok/warn/err/info/accent —
+  // the surface token flips with the theme, so the pairing has to hold AA in
+  // both directions (light text on dark fills in light, dark text on the
+  // lightened fills in dark).
+  it("holds the on-fill text to AA on the solid status and accent fills", () => {
+    for (const bg of ["accent", "ok", "warn", "err", "info"]) {
+      expect(
+        ratio(tokens, "surface", bg),
+        `surface on ${bg}`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
   it("holds the rust CTA pair to the UI-component floor", () => {
     expect(ratio(tokens, "fg-on-cta", "cta")).toBeGreaterThanOrEqual(3.0);
     expect(ratio(tokens, "fg-on-cta", "cta-hover")).toBeGreaterThanOrEqual(3.0);

@@ -121,7 +121,7 @@ const RICard: Component<{ links: number; orphans: OrphanResult[] }> = (
       <div class="mt-2 flex flex-col gap-2">
         <For each={props.orphans}>
           {(o) => (
-            <div class="rounded border border-rose-500/30 bg-rose-500/5 px-3 py-2">
+            <div class="rounded border border-err/45 bg-err-quiet px-3 py-2">
               <div class="flex flex-wrap items-baseline gap-2 text-sm">
                 <span class="mono font-medium text-fg">
                   {o.child} → {o.parent}
@@ -158,10 +158,10 @@ const RICard: Component<{ links: number; orphans: OrphanResult[] }> = (
 // --- completeness (+ why typed) ---
 
 function fillClass(pct: number): string {
-  if (pct === 0) return "bg-rose-500/20 text-err";
-  if (pct < 0.5) return "bg-amber-500/20 text-warn";
-  if (pct < 1) return "bg-accent/15 text-accent";
-  return "bg-emerald-500/15 text-ok";
+  if (pct === 0) return "bg-err-quiet text-err";
+  if (pct < 0.5) return "bg-warn-quiet text-warn";
+  if (pct < 1) return "bg-info-quiet text-info";
+  return "bg-ok-quiet text-ok";
 }
 
 const CompletenessCard: Component<{ groups: GroupCompleteness[] }> = (
@@ -200,7 +200,7 @@ const CompletenessCard: Component<{ groups: GroupCompleteness[] }> = (
                   {Math.round(g.overall * 100)}% filled
                 </span>
                 <Show when={g.emptyCols.length > 0}>
-                  <span class="rounded bg-rose-500/15 px-1.5 py-0.5 text-xs text-err">
+                  <span class="rounded bg-err-quiet px-1.5 py-0.5 text-xs text-err">
                     {g.emptyCols.length} empty col
                     {g.emptyCols.length === 1 ? "" : "s"}
                   </span>
@@ -303,7 +303,7 @@ const CoverageCard: Component<{ cov: Coverage }> = (props) => {
                         <td
                           class="px-2 py-1 text-center"
                           classList={{
-                            "bg-emerald-500/15 text-ok": here,
+                            "bg-ok-quiet text-ok": here,
                             "text-fg-dim": !here,
                           }}
                         >

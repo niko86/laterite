@@ -16,6 +16,7 @@ import type {
 import { severityOf } from "../../lib/validator";
 import { ruleAnchor, shortRule } from "../../lib/rules";
 import { Chevron } from "../Chevron";
+import { Chip, type ChipTone, type ChipVariant } from "@shared/components";
 import {
   splitAgsFields,
   groupBlock,
@@ -48,30 +49,63 @@ function snippet(
   return out;
 }
 
-/** Hit-row band background, keyed off the RESOLVED severity.
+/** Hit-row band background — the status tier's quiet wash. Colour is
+ *  supplementary here: the tier itself is stated by the finding's form-encoded
+ *  chip (see SEVERITY_CHIP), so the list still reads in greyscale.
  *
- *  This used to take the raw wire field and fall back to amber when it was
- *  absent — which painted every error in the warning colour, because absent is
+ *  This used to take the raw wire field and fall back to the warning tint when
+ *  it was absent — which painted every error in the warning colour, because absent is
  *  exactly what an error looks like on the wire. Taking `Severity` makes the
  *  switch exhaustive, so there is no fallback arm left to be wrong. */
 function severityBand(severity: Severity): string {
   switch (severity) {
     case "error":
-      return "bg-rose-500/10";
+      return "bg-err-quiet";
     case "warning":
-      return "bg-amber-500/10";
+      return "bg-warn-quiet";
     case "fyi":
-      return "bg-accent/10";
+      return "bg-info-quiet";
   }
 }
 
+/** Char-level hit mark: a SOLID fill in the tier's status colour. Solid, not
+ *  a wash — it sits inside a row already banded with the tier's quiet wash, so
+ *  it has to be the loudest object in the block. `text-surface` rather than a
+ *  fixed light foreground: the status colours lighten in dark, so the on-fill
+ *  text flips to the dark surface with the theme. */
+function severityMark(severity: Severity): string {
+  switch (severity) {
+    case "error":
+      return "bg-err text-surface";
+    case "warning":
+      return "bg-warn text-surface";
+    case "fyi":
+      return "bg-info text-surface";
+  }
+}
+
+/** Severity stated in FORM as well as hue (#404): error is a solid fill,
+ *  warning a 3px stratum tick, fyi a hairline stencil — three shapes the Chip
+ *  primitive already carries, so the tiers stay apart in greyscale. */
+const SEVERITY_CHIP: Record<
+  Severity,
+  { tone: ChipTone; variant: ChipVariant }
+> = {
+  error: { tone: "err", variant: "solid" },
+  warning: { tone: "warn", variant: "rule" },
+  fyi: { tone: "info", variant: "outline" },
+};
+
 /** Wrap a `[start, end)` code-point sub-range of `raw` in a strong
  *  highlight, leaving the surrounding text plain. Slicing is code-point
- *  correct (via Array.from) so a multibyte line can't split a char. */
+ *  correct (via Array.from) so a multibyte line can't split a char.
+ *  `mark` defaults to the error tier's solid fill — the diff previews reuse
+ *  this for their del side, where err is the honest tone. */
 export function highlightSpan(
   raw: string,
   start: number,
   end: number,
+  mark: string = severityMark("error"),
 ): JSX.Element {
   const cps = Array.from(raw);
   const s = Math.max(0, Math.min(start, cps.length));
@@ -79,9 +113,7 @@ export function highlightSpan(
   return (
     <>
       {cps.slice(0, s).join("")}
-      <span class="rounded-sm bg-rose-500/40 text-rose-50">
-        {cps.slice(s, e).join("")}
-      </span>
+      <span class={`rounded-sm ${mark}`}>{cps.slice(s, e).join("")}</span>
       {cps.slice(e).join("")}
     </>
   );
@@ -95,9 +127,10 @@ export function highlightSpan(
  *  3. else → plain raw.
  *  `field_index` is tag-stripped, so the raw on-line field is `+1`. */
 function renderLine(raw: string, f: FindingDto): JSX.Element {
+  const mark = severityMark(severityOf(f));
   // char_span supersedes field_index.
   if (f.char_span) {
-    return highlightSpan(raw, f.char_span[0], f.char_span[1]);
+    return highlightSpan(raw, f.char_span[0], f.char_span[1], mark);
   }
 
   const targeted =
@@ -113,7 +146,7 @@ function renderLine(raw: string, f: FindingDto): JSX.Element {
   // over-wide token highlight that lit `"ERES_LAB",` comma and all.
   const field = fields[idx]; // idx bounds checked above → in-bounds.
   if (!field) return raw;
-  return highlightSpan(raw, field.valueStart, field.valueEnd);
+  return highlightSpan(raw, field.valueStart, field.valueEnd, mark);
 }
 
 /** Render one aligned-columns row. The hit row highlights the targeted
@@ -124,6 +157,7 @@ function renderAlignedRow(row: AlignedRow, f: FindingDto): JSX.Element {
   if (!row.hit) {
     return <>{row.cells.map((c) => c.padded).join("")}</>;
   }
+  const mark = severityMark(severityOf(f));
   const idx =
     (f.target === "heading" || f.target === "cell" || f.target === "group") &&
     f.field_index != null
@@ -135,7 +169,7 @@ function renderAlignedRow(row: AlignedRow, f: FindingDto): JSX.Element {
         {(c, i) =>
           // eslint-disable-next-line solid/reactivity -- <For> over positional cells that never reorder + idx is constant, so i()'s once-read stays correct
           i() === idx
-            ? highlightSpan(c.padded, c.valueStart, c.valueEnd)
+            ? highlightSpan(c.padded, c.valueStart, c.valueEnd, mark)
             : c.padded
         }
       </For>
@@ -161,9 +195,16 @@ const FindingRow: Component<{
     const b = block();
     return b && props.aligned() ? alignBlock(b) : null;
   });
+  const severity = () => severityOf(props.f);
   return (
     <div class="min-w-0 border-t border-line px-3 py-2 text-sm">
       <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <Chip
+          tone={SEVERITY_CHIP[severity()].tone}
+          variant={SEVERITY_CHIP[severity()].variant}
+        >
+          {severity()}
+        </Chip>
         <span class="text-fg-faint">
           {props.f.line != null ? `line ${props.f.line}` : "—"}
         </span>

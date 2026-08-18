@@ -24,15 +24,19 @@ const RULE: Record<ChipTone, string> = {
   muted: "bg-surface-raised text-fg-muted border-l-line-strong",
 };
 
-// Neutral and muted have no saturated fill to sit white text on, so they invert
-// onto the foreground ramp instead.
+// On-fill text is `text-surface`, not `text-fg-on-cta` (#404): the status and
+// accent fills LIGHTEN in dark, so a fixed near-white foreground vanishes on
+// them — the surface token flips to the dark ground with the theme, keeping
+// dark text on light fills there and light text on dark fills in light. The
+// CTA is the one fill that never changes, which is why fg-on-cta exists and
+// stays fixed; none of these fills has that property.
 const SOLID: Record<ChipTone, string> = {
   neutral: "bg-fg-soft text-surface",
-  accent: "bg-accent text-fg-on-cta",
-  ok: "bg-ok text-fg-on-cta",
-  warn: "bg-warn text-fg-on-cta",
-  err: "bg-err text-fg-on-cta",
-  info: "bg-info text-fg-on-cta",
+  accent: "bg-accent text-surface",
+  ok: "bg-ok text-surface",
+  warn: "bg-warn text-surface",
+  err: "bg-err text-surface",
+  info: "bg-info text-surface",
   muted: "bg-fg-soft text-surface",
 };
 

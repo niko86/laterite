@@ -27,6 +27,14 @@ export const CoordinateMap: Component<{
 
   const draw = () => {
     if (!map || !L || !layer) return;
+    // Marker colour: the CTA rust, read from the token at draw time (Leaflet
+    // paints canvas/SVG, so no class can carry it). Rust is the one colour
+    // that does not flip with the theme — right here, because the OSM tiles
+    // stay light in both themes, so the marker must too. Resolved rather than
+    // restated: a pasted hex is how a raw palette value got in (#404).
+    const marker = getComputedStyle(document.documentElement)
+      .getPropertyValue("--cta")
+      .trim();
     layer.clearLayers();
     const latlngs: [number, number][] = [];
     for (const p of props.points()) {
@@ -37,9 +45,9 @@ export const CoordinateMap: Component<{
       popup.textContent = `${p.id || "(no id)"} — ${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`;
       L.circleMarker(ll, {
         radius: 6,
-        color: "#0ea5e9",
+        color: marker,
         weight: 2,
-        fillColor: "#0ea5e9",
+        fillColor: marker,
         fillOpacity: 0.5,
       })
         .bindPopup(popup)

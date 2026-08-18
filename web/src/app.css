@@ -6,7 +6,10 @@
    arrangement into the shared layer under the SAME names, so consuming it here
    is a values swap: every neutral call site in the component tree lands on the
    pairing's warm palette with no component edits. The accent/status palette
-   classes sprinkled inline (emerald/amber/red/sky) are a separate ticket. */
+   classes that were sprinkled inline (emerald/amber/red/sky) are gone (#404):
+   status, accent and tinted fills resolve through ok/warn/err/info/accent/cta
+   and their -quiet washes, and an eslint gate (design/no-raw-palette) keeps
+   raw palette classes out of application code. */
 @import "@shared/styles/tokens.css";
 @import "@shared/styles/tailwind-theme.css";
 

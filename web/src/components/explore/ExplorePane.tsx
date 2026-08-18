@@ -234,7 +234,7 @@ export const ExplorePane: Component = () => {
           </p>
           <button
             type="button"
-            class="mt-4 rounded bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent/25"
+            class="mt-4 rounded bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
             onClick={() => {
               goTo("validate");
             }}
@@ -269,7 +269,7 @@ export const ExplorePane: Component = () => {
                   button that does nothing is the state we're removing. */}
                 <button
                   type="button"
-                  class="rounded bg-accent/15 px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent/25"
+                  class="rounded bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
                   onClick={() => void refetch()}
                 >
                   Try again
