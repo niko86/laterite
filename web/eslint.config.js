@@ -35,7 +35,7 @@ import globals from "globals";
 // family names are READ OUT OF tailwindcss's own shipped theme rather than
 // restated here, so the list tracks the vendor instead of rotting against it.
 // The `(?<!--)` guard keeps token *references* (`var(--stone-100)`,
-// `text-[--steel-500]`) legal: our own vars share family names with Tailwind's.
+// `text-(--steel-500)`) legal: our own vars share family names with Tailwind's.
 const tailwindFamilies = [
   ...new Set(
     [
