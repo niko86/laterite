@@ -42,28 +42,53 @@ strict: true
 
 theme:
   name: material
+  # The override layer (#401). Two things the bedrock pairing needs cannot be
+  # reached from a stylesheet: the masthead lockup (product name · section ·
+  # version, which is markup) and the band swatch each top-level nav section
+  # carries. Everything else on this site is CSS.
+  custom_dir: overrides
+  # No third-party font origin. Material's default `{% block fonts %}` preconnects
+  # to fonts.gstatic.com and pulls Roboto from fonts.googleapis.com; `false`
+  # removes both, and stylesheets/tokens.css (generated from the shared layer)
+  # supplies the self-hosted faces plus the `--md-text-font` / `--md-code-font`
+  # hooks Material composes its families from.
+  font: false
   palette:
+    # `primary`/`accent` are `custom` so that NO `[data-md-color-primary=…]` rule
+    # exists in Material's palette.css — that selector outranks `:root`, so a
+    # named primary (this was `deep orange`) silently beats the pairing's own
+    # values wherever the two disagree. The scheme names stay Material's, because
+    # `slate` is what its toggle writes and what the generated token bundle
+    # rewrites the shared `.dark` rule onto.
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: deep orange
-      accent: deep orange
+      primary: custom
+      accent: custom
       toggle: { icon: material/weather-night, name: Switch to dark mode }
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: deep orange
-      accent: deep orange
+      primary: custom
+      accent: custom
       toggle: { icon: material/weather-sunny, name: Switch to light mode }
   features:
     - navigation.sections
     - navigation.top
     - navigation.tracking
     - navigation.indexes
+    # The mono uppercase breadcrumb the direction puts above each page h1. It
+    # also carries the "where am I" job the masthead used to do by swapping the
+    # lockup for the page title on scroll — the lockup is now fixed.
+    - navigation.path
     - content.code.copy
     - content.code.annotate
     - content.tabs.link
     - search.highlight
     - search.suggest
     - toc.follow
+  # Both written into the build by scripts/gen_brand.py from the repo-root
+  # `assets/` — the one place the mark is drawn.
+  logo: assets/laterite.svg
+  favicon: assets/laterite-icon-128.png
   icon:
     repo: fontawesome/brands/github
 
@@ -76,6 +101,7 @@ plugins:
   # generated SUMMARY.md. Pages are NOT committed (no 174-file churn per dict edit).
   - gen-files:
       scripts:
+        - scripts/gen_brand.py
         - scripts/gen_groups.py
         - scripts/gen_types.py
         # `lat` command reference — rendered from the shipped README-cli.md
@@ -129,9 +155,16 @@ markdown_extensions:
 
 # Group-catalogue master table: filter + 20-per-page pagination + family-card
 # filtering (vanilla JS, no third-party dependency — keeps the docs CDN-free).
+# `rail.js` is the table-of-contents strata rail (#401) — the same vanilla,
+# CDN-free contract.
 extra_javascript:
   - javascripts/catalogue.js
+  - javascripts/rail.js
+# Order matters: the generated token bundle defines the vocabulary, the override
+# layer maps Material onto it, and the catalogue sheet dresses the one spotlight.
 extra_css:
+  - stylesheets/tokens.css
+  - stylesheets/laterite.css
   - stylesheets/catalogue.css
 
 nav:

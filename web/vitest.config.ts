@@ -16,7 +16,14 @@ export default defineConfig({
     // `landing/**` is the apex's own build (#394): its dependency firewall is
     // pure logic that must be tested, and it lives beside the config it guards
     // rather than in the app's source tree.
-    include: ["src/**/*.test.ts", "landing/**/*.test.ts"],
+    // `scripts/**` joins them for the same reason (#401): the docs' copy of the
+    // shared token layer is generated, and the rules deciding what that copy
+    // says are pure functions that must not be tested by eyeballing the output.
+    include: [
+      "src/**/*.test.ts",
+      "landing/**/*.test.ts",
+      "scripts/**/*.test.mjs",
+    ],
     exclude: [
       ...configDefaults.exclude,
       "src/lib/agsline.test.ts",

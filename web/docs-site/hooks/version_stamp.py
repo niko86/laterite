@@ -47,5 +47,10 @@ def on_config(config: Any, **_: Any) -> Any:
     # Fail the build rather than stamp a guess: an unreadable version here means
     # the path moved, and a footer quietly falling back to "unknown" is the kind
     # of silent degradation that survives for months.
-    config.copyright = stamp(product_version())
+    version = product_version()
+    config.copyright = stamp(version)
+    # The masthead lockup reads "laterite · docs · v<version>" (#401), and it
+    # reads it from here rather than from a second lookup — the whole reason this
+    # hook exists is that a hand-typed version is a copy, and a copy drifts.
+    config.extra["version"] = version
     return config

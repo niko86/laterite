@@ -1,0 +1,88 @@
+{#-
+  The masthead (#401). Forked from mkdocs-material 9.7.7's partials/header.html —
+  diff it against the upstream file after a Material bump, because this carries
+  its structure (the drawer label, the palette form, the search include and the
+  repo source block are all verbatim) and only replaces the title block.
+
+  Two changes, and both are markup rather than style:
+
+  1. THE LOCKUP. Stock renders `site_name`, then swaps it for the page title on
+     scroll. The direction wants a fixed navigational lockup instead — product
+     name, section, version — with the PRODUCT NAME IN THE UI FONT. That is the
+     lockup rule: the brand lockup on the apex uses the display face, this one
+     does not, because here "laterite" is a place in a path and not a wordmark.
+     The version comes from config.extra.version, which hooks/version_stamp.py
+     reads from the shipped wheel — the same single lookup that stamps the footer.
+     The "where am I" job the scroll-swap did is now the breadcrumb
+     (`navigation.path`), which says it in full rather than one level of it.
+
+  2. THE CTA. The rust "Open the web app" button, which is the same object in the
+     same colour on all three surfaces — that is what makes it read as the action
+     everywhere. It is a plain link; `md-header__cta` is styled in laterite.css.
+
+  The mark's light plate is NOT here: this chrome is dark in both themes, so the
+  plate is unconditional and belongs in CSS (`.md-header .md-logo img`).
+-#}
+{% set class = "md-header" %}
+{% if "navigation.tabs.sticky" in features %}
+  {% set class = class ~ " md-header--shadow md-header--lifted" %}
+{% elif "navigation.tabs" not in features %}
+  {% set class = class ~ " md-header--shadow" %}
+{% endif %}
+<header class="{{ class }}" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="{{ lang.t('header') }}">
+    <a href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}" title="{{ config.site_name | e }}" class="md-header__button md-logo" aria-label="{{ config.site_name }}" data-md-component="logo">
+      {% include "partials/logo.html" %}
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      {% set icon = config.theme.icon.menu or "material/menu" %}
+      {% include ".icons/" ~ icon ~ ".svg" %}
+    </label>
+    <div class="md-header__title md-header__title--lockup">
+      <a class="md-header__lockup" href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}">
+        <span class="md-header__product">{{ config.site_name }}</span>
+        <span class="md-header__sep" aria-hidden="true">|</span>
+        <span class="md-header__section">docs</span>
+        {% if config.extra.version %}
+          <span class="md-header__version">v{{ config.extra.version }}</span>
+        {% endif %}
+      </a>
+    </div>
+    {% if config.theme.palette %}
+      {% if not config.theme.palette is mapping %}
+        {% include "partials/palette.html" %}
+      {% endif %}
+    {% endif %}
+    {% if not config.theme.palette is mapping %}
+      {% include "partials/javascripts/palette.html" %}
+    {% endif %}
+    {% if config.extra.alternate %}
+      {% include "partials/alternate.html" %}
+    {% endif %}
+    {% if "material/search" in config.plugins %}
+      {% set search = config.plugins["material/search"] | attr("config") %}
+      {% if search.enabled %}
+        <label class="md-header__button md-icon" for="__search">
+          {% set icon = config.theme.icon.search or "material/magnify" %}
+          {% include ".icons/" ~ icon ~ ".svg" %}
+        </label>
+        {% include "partials/search.html" %}
+      {% endif %}
+    {% endif %}
+    {% if config.repo_url %}
+      <div class="md-header__source">
+        {% include "partials/source.html" %}
+      </div>
+    {% endif %}
+    <a class="md-header__cta" href="https://app.laterite.dev/">Open the web app</a>
+  </nav>
+  {#- Not a border: a border cannot carry a gradient. The apex closes its
+      masthead with the same ramp at 3px; the docs take 2px, because this chrome
+      is dark and the rule reads heavier against it. -#}
+  <div class="md-header__strata" aria-hidden="true"></div>
+  {% if "navigation.tabs.sticky" in features %}
+    {% if "navigation.tabs" in features %}
+      {% include "partials/tabs.html" %}
+    {% endif %}
+  {% endif %}
+</header>

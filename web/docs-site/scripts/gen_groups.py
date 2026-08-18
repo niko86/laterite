@@ -208,11 +208,21 @@ for fam, desc in cd.FAMILIES:
         f'- [{label}](#group-table){{ data-family="{fam}" }}'
         + (f"<br><small>{desc}</small>" if desc else "")
     )
+# The spotlight's caption (#401). Both facts are READ, not typed: the count is
+# the registry's, the edition span is the union dictionary's. A caption is prose,
+# and a measured number written into prose acquires no reader — nothing would
+# fail when the dictionary gained a group or an edition, and it would be wrong on
+# the next build.
+_ED_SPAN = f"{_ALL_EDS[0]}–{_ALL_EDS[-1]}" if len(_ALL_EDS) > 1 else _ALL_EDS[0]
+_EDITION_LABEL = "editions" if len(_ALL_EDS) > 1 else "edition"
 land += [
     "",
     "</div>",
     "",
     '<div class="group-table" id="group-table" markdown>',
+    "",
+    f'<p class="group-caption">{len(GROUPS)} groups · '
+    f"dictionary {_EDITION_LABEL} {_ED_SPAN}</p>",
     "",
     "| Code | Group | Family | Parent | Headings | Editions |",
     "|---|---|---|:--|--:|:--|",

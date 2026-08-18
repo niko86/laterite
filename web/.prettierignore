@@ -27,3 +27,10 @@ landing/demo/schema.ts
 # The content tabs (`=== "Python"`) and snippet includes (`--8<--`) survive only
 # by luck. Formatting here is a human's job, not the formatter's.
 docs-site/docs/
+# The Material theme overrides (#401). Prettier's html parser does not speak
+# Jinja, so it reflows tags across lines mid-statement (`{% include\n"…" %}`).
+# That still runs, but it destroys the one property these files are maintained
+# by: each is a fork of a partial shipped inside mkdocs-material, and the way a
+# version bump gets reviewed is by diffing ours against theirs. A reformatted
+# fork diffs against upstream on every line.
+docs-site/overrides/

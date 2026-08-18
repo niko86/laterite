@@ -121,6 +121,13 @@ jobs:
               - 'examples/sample_site.ags'   # the fixture that gate reads (subprocess cwd = repo root)
               - 'web/docs-site/scripts/**'   # catalogue_data/gen_* — its drift gate (test_groups_catalogue_faithful) runs in the python job
               - 'web/docs-site/hooks/**'    # mkdocs build hooks — ruff lints them in the python job, so they must fire `code`
+              # The docs stylesheets are READ by test_docs_band_containment.py in
+              # the python job (#401): band colour may only paint the nav, the TOC
+              # rail, the masthead hairline and the catalogue cap, never prose. A
+              # CSS-only edit is exactly how that constraint would be broken, so
+              # without this the one change the gate exists to catch is the one
+              # change that would not run it.
+              - 'web/docs-site/docs/stylesheets/**'
               # SSOT paths a gate IN THIS REPO actually reads. That is the rule
               # every block below invokes: an entry earns its place by naming a
               # path some test or step here opens. List a path for a gate that
@@ -880,6 +887,20 @@ jobs:
       - name: web — no emoji in product UI
         working-directory: web
         run: npm run check:no-emoji
+
+      # The docs' copy of the shared token layer (#401). docs.laterite.dev has no
+      # bundler, so it cannot follow the @import chain into src/shared/styles or
+      # into the Fontsource packages — its tokens and its three self-hosted
+      # families are GENERATED into web/docs-site/docs/ and committed.
+      #
+      # A copy nobody re-generates is the whole risk: a retuned colour would ship
+      # to the app and the apex and silently leave the docs on the old palette,
+      # and nothing about the docs would look broken enough to notice. HERE
+      # because this job already runs `npm ci` in web/, which is all the check
+      # needs — it reads node_modules and compares, it does not build.
+      - name: web — docs token bundle matches the shared layer
+        working-directory: web
+        run: npm run check:docs-tokens
 
       # The wasm half of #164's doc-output gate. The examples on
       # reference/wasm-api.md import `@laterite/ags4-wasm` by its PUBLISHED name
