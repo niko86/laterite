@@ -19,6 +19,9 @@ repo_refs:
   theme_css: "repo:web/docs-site/docs/stylesheets/laterite.css"
   token_sync: "repo:web/scripts/sync-docs-tokens.mjs"
   band_gate: "repo:tests/test_docs_band_containment.py"
+  released_legs: "repo:.github/workflows/nightly.yml"
+  released_crates: "repo:tools/check_released_crate_readmes.py"
+  released_crates_gate: "repo:tests/test_released_crate_readmes.py"
 related: [validator-site, playwright-e2e, dec-landing-build-shared-tokens]
 sources: []
 ---
@@ -183,6 +186,47 @@ Key facts:
   signal rather than a bug in the job: the published package IS broken for readers,
   and the remedy is a release. Like the wheel leg it stays out of `notify`'s
   `needs`, so it emails rather than filing an issue about a state already known.
+- **…and the browser twin, `docs-vs-released-wasm` (#283).** `npm install
+  @laterite/ags4-wasm` unpinned, then the five `examples/wasm/ex*.mjs` against it.
+  The crate says `publish = false` — for *crates.io*; it **is** the npm package,
+  with `wasm-pack` writing the published manifest from its version line. Same
+  calibration, one difference that matters: **equal version numbers do not mean
+  equal artifacts here**, because the browser package releases on its own
+  `wasm-v*` tag while the crate's version line only moves at the next umbrella
+  bump — so the tree can carry weeks of unreleased wasm at a version string
+  identical to npm's, and the wheel leg's "same version, so any failure is a real
+  defect" would be a lie. The step prints the npm **publish date** beside this
+  tree's HEAD date instead. The swap itself is one seam: `WASM_PKG_DIR` tells
+  `gen_doc_outputs.py:_wasm_pkg()` which package to symlink into the examples'
+  `node_modules`, exactly as `LAT_BIN` does for the CLI examples — and, like it,
+  the resolved path is printed rather than assumed. **Expect it red** until the
+  next `wasm-v*` release: `ex03_read.mjs` pulls rows through `rows_json()`, which
+  the published artifact predates.
+- **…and the crates.io twin, `docs-vs-released-crates` (#283).** #278 wired every
+  publishable crate's README example into `cargo test --workspace` via
+  `#[cfg(doctest)] #[doc = include_str!("../README.md")]` — which compiles it
+  *inside the workspace*, where each `laterite-*` dependency resolves through a
+  `path =` entry to the source next door. The reader's path is `cargo add
+  laterite-ags4-core` and then that same example, against the **released** crate
+  and its **released** dependency graph, where a re-export or a feature gate that
+  exists only in the tree is not there. So
+  `repo:tools/check_released_crate_readmes.py` generates a scratch consumer per
+  crate — crate `cargo add`ed from the registry, tree README dropped in beside it
+  with the same three-line wiring — and runs `cargo test --doc`. **No `path =`
+  anywhere is the whole instrument**, and it is asserted by
+  `repo:tests/test_released_crate_readmes.py` rather than trusted to the
+  generator; that test also holds the two derived rules (which crates are
+  subjects, and which `use` roots become dependencies — `use` roots only, or the
+  facade's `ags4::read(…)` would send `cargo add ags4` at the registry). One
+  class here, not two: a README doctest has no committed `.out`, so there is no
+  drift half — it compiles and runs, or it does not. Out of `notify` all the
+  same, with the released-vs-tree pair printed per crate to separate a defect
+  from ordinary tree-ahead drift — and printed only as far as it goes, since a
+  version it could not read establishes no direction at all. A crate that is
+  publishable but **not yet uploaded** (`publish_crates.py`'s `DEFERRED` state,
+  earmarked next for `laterite-ags4-excel`) is reported as *unasked*, never
+  failed: "not released yet" must not arrive looking like "the released README is
+  broken".
 - **Changelog page — generated, version-stamped (#372).** `reference/changelog.md`
   is built by `web/docs-site/scripts/gen_changelog.py` (a `gen-files` script)
   from the repo-root `CHANGELOG.md` plus the shipped version read from

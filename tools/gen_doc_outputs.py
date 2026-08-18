@@ -56,7 +56,15 @@ visible rather than absorbed.
 
 Run: `uv run --no-sync python tools/gen_doc_outputs.py` (stdlib only). Needs the
 surfaces it is asked for to be built: `lat` on PATH or in the workspace target dir
-for cli, `laterite-node/dist` for node, the installed wheel for python.
+for cli, `laterite-node/dist` for node, the installed wheel for python,
+`web/src/wasm` for wasm.
+
+TWO SURFACES TAKE THEIR ARTIFACT FROM THE ENVIRONMENT, and both are the same
+question asked twice: `LAT_BIN` for cli and `WASM_PKG_DIR` for wasm. Nightly's
+`docs-vs-released-*` legs run these examples against the PUBLISHED artifact
+rather than this tree's build, so which one was used is a measurement rather than
+an assumption — and it is PRINTED either way: `main()` prints what `_lat()`
+resolved, `_link_wasm()` prints the package it linked.
 """
 
 from __future__ import annotations
@@ -174,23 +182,57 @@ SURFACES = {
 }
 
 
+def _wasm_pkg() -> Path:
+    """Which wasm package the examples run against — not always this tree's build.
+
+    The same shape as `_lat()`, for the same reason. Nightly's
+    `docs-vs-released-wasm` leg asks whether the pages work against the package
+    `npm install @laterite/ags4-wasm` actually serves, so the directory is an
+    INPUT to this script rather than a constant: `WASM_PKG_DIR` if set (that leg
+    pins it at the installed package), else this checkout's `wasm-pack` output.
+
+    Nothing else about the wasm surface changes — the examples still import the
+    published name, and the symlink below is still what makes that resolve.
+    """
+    if env := os.environ.get("WASM_PKG_DIR"):
+        # RESOLVED, because the two things done with this path resolve relative
+        # paths against DIFFERENT directories: the existence check below reads it
+        # from the cwd, while the symlink target is looked up from the link's own
+        # directory, deep under `web/docs-site/examples/`. A relative
+        # `WASM_PKG_DIR` would pass the check and then write a dangling link —
+        # every example dying with ERR_MODULE_NOT_FOUND directly under a printed
+        # line saying the package was found.
+        return Path(env).resolve()
+    return WASM_PKG
+
+
 def _link_wasm() -> None:
-    """Put the built wasm package where Node resolves `@laterite/ags4-wasm`.
+    """Put the wasm package where Node resolves `@laterite/ags4-wasm`.
 
     The examples import the published name rather than a relative path, because a
     reader copying one should get working code, not a path into this repo. The
     same trick `docs-examples.test.ts` uses for the node examples — idempotent,
-    gitignored, and pointing at whatever `wasm-pack build` last produced.
+    gitignored, and pointing at whatever `_wasm_pkg()` resolved. Which package
+    that was is PRINTED: a gate whose subject depends on the caller's environment
+    must say what it measured.
     """
-    if not (WASM_PKG / "ags4_wasm.js").exists():
+    pkg = _wasm_pkg()
+    if not (pkg / "ags4_wasm.js").exists():
         sys.exit(
-            f"gen_doc_outputs: surface wasm needs a built package at "
-            f"{WASM_PKG.relative_to(ROOT)} — run `npm run build:wasm` in web/ first"
+            f"gen_doc_outputs: surface wasm needs a built package at {pkg} — "
+            "run `npm run build:wasm` in web/ first, or point WASM_PKG_DIR at one"
         )
+    print(f"wasm package: {pkg}")
     WASM_LINK.parent.mkdir(parents=True, exist_ok=True)
-    if WASM_LINK.is_symlink() or WASM_LINK.exists():
+    # A REAL directory can sit here, not just the symlink this writes: anyone
+    # pointing WASM_PKG_DIR at an installed package is the same person liable to
+    # have run `npm install @laterite/ags4-wasm` in the examples tree first, and
+    # `unlink()` on a directory raises instead of replacing it.
+    if WASM_LINK.is_symlink() or WASM_LINK.is_file():
         WASM_LINK.unlink()
-    WASM_LINK.symlink_to(WASM_PKG, target_is_directory=True)
+    elif WASM_LINK.is_dir():
+        shutil.rmtree(WASM_LINK)
+    WASM_LINK.symlink_to(pkg, target_is_directory=True)
 
 
 def run_example(surface: Surface, path: Path) -> str:
