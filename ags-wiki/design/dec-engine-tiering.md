@@ -149,7 +149,7 @@ and "validate in progress" are the same thing to a user.
 > init error to every op. It does — and the pane still cannot show it. A Solid
 > resource **throws when read after an error** (`if (err !== undefined && !pr)
 > throw err`), so `repo:web/src/components/validate/ValidatePane.tsx`'s own
-> `Validator error: …` fallback sits behind a `<Show when={report()}>` that
+> error fallback sits behind a `<Show when={report()}>` that
 > throws before reaching it, and with no `ErrorBoundary` in the tree the tab
 > stays on its spinner for ever — the exact permanent silent state #339 is
 > about. So `repo:web/src/App.tsx` still reports a failed engine at page level
@@ -171,7 +171,19 @@ and "validate in progress" are the same thing to a user.
 > same way: guard-first everywhere, no root `ErrorBoundary` — a failure one
 > pane can report in place must not blank the four that are still working.
 > What #359 did NOT settle is FixPane's silence: it guards but renders no
-> error branch, so a rejected op there reads as an empty fix list (#391).
+> error branch, so a rejected op there reads as an empty fix list — closed in
+> #391. The pane now renders the failure in its fixes view, and the copy is
+> shared: `repo:web/src/lib/engineFailure.ts` maps the
+> `EngineUnavailableError` load/crash split plus the untyped fallback to one
+> voice, parameterised by each pane's own noun, and FixPane, ValidatePane and
+> ExplorePane all render through it. Explore's offline-DuckDB copy stays an
+> override passed by Explore alone — it describes tier-3 caching and is false
+> for panes whose wasm is precached. One sentence went with the sharing:
+> Explore's crash line no longer ends "Trying again starts a fresh one." —
+> the Try again button beneath it is the affordance, and the panes without
+> that button must not inherit the sentence. Pinned by an e2e that reaches
+> Fix with the #359 recipe, shown red against the pre-fix build: "Fix all
+> safe (0)" with no failure line, a dead engine posing as a clean file.
 
 **A failed tier-2 fetch is partial, and must read as partial.** The tab that
 needed it reports and offers retry; tier 1 is precached and untouched. #339's
@@ -199,7 +211,7 @@ state.
 > outliving what caused it. `repo:web/src/lib/workerChannel.ts` retires that
 > worker (and terminates it) on `initError`, so the next request spawns a fresh
 > one and fetches again. Removing the retirement was tried, and the tab reports
-> `Explore error: TypeError: Failed to fetch` and never recovers — which is why
+> a raw `Failed to fetch` and never recovers — which is why
 > the two faults needed separating: fixing either alone leaves a tab that is
 > honest but stuck, or willing but silent.
 >
