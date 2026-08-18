@@ -1,3 +1,4 @@
+import { Button } from "@shared/components";
 import {
   For,
   Show,
@@ -393,6 +394,26 @@ export const FindingsView: Component<{
     });
   });
 
+  // The rule chip's tone (#409): a header wears its group's WORST severity,
+  // so a rule that raises one error among warnings still reads as an error
+  // rule. Per-row severity stays on each row's own chip.
+  const ruleSeverity = createMemo(() => {
+    const m = new Map<string, Severity>();
+    for (const g of props.report.findings) {
+      let s: Severity = "fyi";
+      for (const it of g.items) {
+        const v = severityOf(it);
+        if (v === "error") {
+          s = "error";
+          break;
+        }
+        if (v === "warning") s = "warning";
+      }
+      m.set(g.rule, s);
+    }
+    return m;
+  });
+
   onMount(() => {
     // eslint-disable-next-line solid/reactivity -- imperative jump handler invoked on user action; reading model() at call-time is intended (event-handler-like)
     props.registerJump?.((rule) => {
@@ -405,24 +426,24 @@ export const FindingsView: Component<{
     <Show when={props.report.findings.length > 0} fallback={null}>
       <div class="flex min-w-0 flex-col gap-3">
         <div class="flex items-center gap-3 text-xs text-fg-muted">
-          <button
-            type="button"
-            class="underline-offset-2 hover:text-fg hover:underline"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               props.onExpandAll();
             }}
           >
             Expand all
-          </button>
-          <button
-            type="button"
-            class="underline-offset-2 hover:text-fg hover:underline"
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               props.onCollapseAll();
             }}
           >
             Collapse all
-          </button>
+          </Button>
         </div>
         <div
           ref={scrollEl}
@@ -476,6 +497,11 @@ export const FindingsView: Component<{
                           }
                         >
                           {(h) => (
+                            /* A full-bleed virtualized list-row disclosure,
+                               not a toolbar control — the Button primitive's
+                               families are toolbar objects, so this row
+                               styles from the tokens directly (the same call
+                               Disclosure's summary makes). */
                             <button
                               type="button"
                               id={ruleAnchor(h().rule)}
@@ -485,7 +511,13 @@ export const FindingsView: Component<{
                               class="flex w-full scroll-mt-4 items-baseline gap-2 border-b border-line bg-surface-raised px-3 py-2 text-left text-sm font-medium text-fg"
                             >
                               <Chevron open={h().open} class="self-center" />
-                              {shortRule(h().rule)}
+                              <Chip
+                                {...SEVERITY_CHIP[
+                                  ruleSeverity().get(h().rule) ?? "fyi"
+                                ]}
+                              >
+                                {shortRule(h().rule)}
+                              </Chip>
                               <span class="ml-2 text-xs font-normal text-fg-faint">
                                 {h().count} finding{h().count === 1 ? "" : "s"}
                               </span>

@@ -87,7 +87,9 @@ test("Fix: the whole-file diff scrolls inside its cap instead of growing the pag
   await tab(page, "Fix").click();
   // The diff pre only renders once the current file differs from the original,
   // so apply the safe fixes first to give it content.
+  // Press through the armed-confirm question (#409).
   await page.getByRole("button", { name: /Fix all safe/ }).click();
+  await page.getByRole("button", { name: /Apply \d+ safe fix/ }).click();
   await page.getByRole("button", { name: /^Diff$/ }).click();
   const pre = page.locator("pre.scroll-region");
   await expect(pre).toBeVisible();

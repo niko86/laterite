@@ -21,7 +21,7 @@ import {
   setFixView as setView,
 } from "../../lib/settings";
 import { goTo } from "../../lib/nav";
-import { ArmedButton } from "@shared/components";
+import { ArmedButton, Button, Checkbox } from "@shared/components";
 import { PillToggle } from "../PillToggle";
 import { FixesPanel, fixKey } from "../validate/FixesPanel";
 import { FileDiff } from "./FileDiff";
@@ -270,15 +270,15 @@ export const FixPane: Component = () => {
             Load an AGS4 file in the Validate tab — the safe automatic fixes for
             it appear here, with a before/after diff. Nothing is uploaded.
           </p>
-          <button
-            type="button"
-            class="mt-4 rounded-md bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
+          <Button
+            variant="outline"
+            class="mt-4"
             onClick={() => {
               goTo("validate");
             }}
           >
             Go to Validate to load a file →
-          </button>
+          </Button>
         </div>
       }
     >
@@ -301,13 +301,9 @@ export const FixPane: Component = () => {
           {/* Persistent download — independent of view + whether any fixes
               remain (the old Export lived inside FixesPanel and vanished once
               the file was clean, exactly when you'd want to save it). */}
-          <button
-            type="button"
-            class="ml-auto rounded-md border border-line-strong px-3 py-1.5 font-medium text-fg-soft hover:bg-chip"
-            onClick={exportFixed}
-          >
+          <Button class="ml-auto" onClick={exportFixed}>
             Download .ags
-          </button>
+          </Button>
         </div>
 
         <Show when={view() === "fixes"}>
@@ -333,30 +329,27 @@ export const FixPane: Component = () => {
             </Show>
           </Show>
           <div class="flex flex-wrap items-center gap-2 text-sm">
-            <button
-              type="button"
-              class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
+            <ArmedButton
+              variant="primary"
+              confirm={`Apply ${fixCount()} safe fix${fixCount() === 1 ? "" : "es"}?`}
               disabled={busy() || fixCount() === 0}
-              onClick={() => void fixAllSafe()}
+              onConfirm={() => void fixAllSafe()}
             >
               Fix all safe ({fixCount()})
-            </button>
-            <button
-              type="button"
-              class="rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip disabled:opacity-45"
+            </ArmedButton>
+            <ArmedButton
+              confirm="Apply safe fixes until clean?"
               disabled={busy() || fixCount() === 0}
-              onClick={() => void iterateToClean()}
+              onConfirm={() => void iterateToClean()}
             >
               Fix until clean
-            </button>
-            <button
-              type="button"
-              class="rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip disabled:opacity-45"
+            </ArmedButton>
+            <Button
               disabled={busy() || undoStack().length === 0}
               onClick={undo}
             >
               Undo
-            </button>
+            </Button>
             {/* The one action here with no undo — revert clears the stack, so
                 it arms (#408): first press asks, second acts. */}
             <ArmedButton
@@ -369,14 +362,12 @@ export const FixPane: Component = () => {
             <Show when={busy()}>
               <span class="text-xs text-fg-muted">Applying…</span>
             </Show>
-            <label class="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-fg-muted">
-              <input
-                type="checkbox"
-                checked={aligned()}
-                onChange={(e) => setAligned(e.currentTarget.checked)}
-              />
-              Aligned columns
-            </label>
+            <Checkbox
+              label="Aligned columns"
+              class="ml-auto"
+              checked={aligned()}
+              onChange={(e) => setAligned(e.currentTarget.checked)}
+            />
           </div>
 
           {/* Why a fix can clear something Validate wasn't showing: fixes change
@@ -403,15 +394,16 @@ export const FixPane: Component = () => {
                 Rule 1 errors with <strong>no per-character fix</strong>; the
                 remedy is an encoding switch, not the Fix tab.
               </p>
-              <button
-                type="button"
-                class="mt-2 rounded-sm bg-cta px-3 py-1 text-xs font-medium text-fg-on-cta hover:bg-cta-hover"
+              <Button
+                variant="primary"
+                size="sm"
+                class="mt-2"
                 onClick={() => {
                   setEncoding("windows-1252");
                 }}
               >
                 Switch encoding to Windows-1252
-              </button>
+              </Button>
             </div>
           </Show>
 

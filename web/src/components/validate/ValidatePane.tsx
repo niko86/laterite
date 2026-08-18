@@ -22,6 +22,7 @@ import {
   aligned,
   setAligned,
 } from "../../lib/settings";
+import { Button } from "@shared/components";
 import { InputPane } from "./InputPane";
 import { Controls } from "./Controls";
 import { SummaryBanner } from "./SummaryBanner";
@@ -249,15 +250,15 @@ export const ValidatePane: Component = () => {
               Windows-1252 / Latin-1, not UTF-8, so those bytes show as Rule 1
               errors.
             </p>
-            <button
-              type="button"
-              class="mt-1.5 rounded-sm border border-line-strong px-2 py-1 text-xs font-medium text-fg-soft hover:bg-chip"
+            <Button
+              size="sm"
+              class="mt-1.5"
               onClick={() => {
                 setEncoding("windows-1252");
               }}
             >
               Switch encoding to Windows-1252
-            </button>
+            </Button>
           </div>
         </Show>
         <SampleLoader

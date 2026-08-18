@@ -2,7 +2,12 @@ import { For, Show, createMemo, type Component, type JSX } from "solid-js";
 import type { Fix, SpanEdit } from "../../lib/validator";
 import type { Severity } from "./FilterBar";
 import { shortRule, ruleAnchor } from "../../lib/rules";
-import { Chip, type ChipTone, type ChipVariant } from "@shared/components";
+import {
+  ArmedButton,
+  Chip,
+  type ChipTone,
+  type ChipVariant,
+} from "@shared/components";
 
 import { highlightSpan, SEVERITY_CHIP } from "./FindingsView";
 import { fixBlock, alignBlock, type AlignedRow } from "../../lib/agsline";
@@ -216,6 +221,12 @@ export const FixesPanel: Component<{
     return (
       <div class="rounded-lg border border-line bg-surface px-3 py-2 text-sm">
         <label class="flex cursor-pointer items-start gap-2">
+          {/* Native in-label input, not the Checkbox primitive: this row's
+              label is rich JSX (label text + rule chip + severity badge),
+              which the primitive's string `label` cannot express — growing
+              its API for one call site would be the speculative kind of
+              generality. The in-label input keeps the free toggle-on-click
+              and AT behaviour the primitive exists to give. */}
           <input
             type="checkbox"
             class="mt-1"
@@ -226,12 +237,14 @@ export const FixesPanel: Component<{
           />
           <span class="min-w-0 flex-1">
             <span class="text-fg">{f.label}</span>
-            <a
-              href={`#${ruleAnchor(f.rule)}`}
-              class="ml-2 rounded-sm bg-chip px-1.5 py-0.5 text-xs text-fg-soft hover:text-fg"
-            >
-              {shortRule(f.rule)}
+            <a href={`#${ruleAnchor(f.rule)}`} class="ml-2">
+              <Chip tone="neutral" variant="outline" class="hover:text-fg">
+                {shortRule(f.rule)}
+              </Chip>
             </a>
+            <Show when={f.line != null}>
+              <span class="ml-2 text-xs text-fg-faint">line {f.line}</span>
+            </Show>
             <Show when={props.severityOf}>
               {(severityOf) => (
                 <Chip class="ml-1.5" {...chipFor(severityOf()(f))}>
@@ -276,16 +289,16 @@ export const FixesPanel: Component<{
     >
       <div class="flex min-w-0 flex-col gap-3">
         <div class="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            class="rounded-md bg-cta px-3 py-1.5 text-sm font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
+          <ArmedButton
+            variant="primary"
+            confirm={`Apply ${selectedFixes().length} selected fix${selectedFixes().length === 1 ? "" : "es"}?`}
             disabled={selectedFixes().length === 0}
-            onClick={() => {
+            onConfirm={() => {
               props.onApply(selectedFixes());
             }}
           >
             Apply selected ({selectedFixes().length})
-          </button>
+          </ArmedButton>
           <span class="text-xs text-fg-faint">
             {props.fixes().length} fix{props.fixes().length === 1 ? "" : "es"}{" "}
             available

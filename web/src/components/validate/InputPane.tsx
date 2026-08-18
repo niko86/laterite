@@ -1,4 +1,5 @@
 import { createSignal, type Component } from "solid-js";
+import { Button } from "@shared/components";
 
 /** Read a dropped/selected file into bytes + its name. */
 async function readFile(
@@ -30,13 +31,9 @@ export const InputPane: Component<{
         <label class="text-sm font-medium text-fg-soft">
           AGS4 input{props.name ? ` — ${props.name}` : ""}
         </label>
-        <button
-          type="button"
-          class="rounded-sm border border-line-strong px-2 py-1 text-xs text-fg-soft hover:bg-chip"
-          onClick={() => fileInput?.click()}
-        >
+        <Button size="sm" onClick={() => fileInput?.click()}>
           Choose file…
-        </button>
+        </Button>
         {/*
           No `accept` filter on purpose: `.ags` has no registered MIME
           type/UTI, so mobile pickers (esp. iOS) translate any accept list

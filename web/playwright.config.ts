@@ -1,6 +1,10 @@
 import { defineConfig } from "@playwright/test";
 
 const BASE = process.env.VITE_BASE ?? "/";
+// Overridable so two checkouts (a worktree and the main clone) can run e2e on
+// one machine without reusing each other's preview server — reuseExistingServer
+// makes a same-port collision silently test the OTHER checkout's build.
+const PORT = Number(process.env.PW_PORT ?? 4173);
 
 // End-to-end tests drive the REAL app (wasm validator in a Web Worker +
 // DuckDB-wasm) in headless Chromium against a local `vite preview` of the
@@ -23,7 +27,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 30_000 },
   use: {
-    baseURL: "http://localhost:4173",
+    baseURL: `http://localhost:${PORT}`,
     trace: "on-first-retry",
   },
   projects: [
@@ -46,8 +50,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run preview -- --port 4173 --strictPort",
-    url: `http://localhost:4173${BASE}`,
+    command: `npm run preview -- --port ${PORT} --strictPort`,
+    url: `http://localhost:${PORT}${BASE}`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

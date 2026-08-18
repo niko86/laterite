@@ -1,4 +1,5 @@
 import { type Component, createSignal, Show } from "solid-js";
+import { Button } from "@shared/components";
 import { certify } from "../../lib/validatorClient";
 import type { DictVersionOpt, EncodingOpt } from "../../lib/validator";
 
@@ -41,14 +42,9 @@ export const DownloadCertificate: Component<{
 
   return (
     <div class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-line bg-surface p-3 text-sm">
-      <button
-        type="button"
-        disabled={busy()}
-        onClick={() => void download()}
-        class="rounded-md border border-line-strong px-3 py-1.5 text-fg transition-colors hover:border-accent hover:text-accent disabled:opacity-45"
-      >
+      <Button disabled={busy()} onClick={() => void download()}>
         {busy() ? "Minting…" : "Download certificate (.ags.idx)"}
-      </button>
+      </Button>
       <span class="text-xs text-fg-faint">
         A validity certificate for this clean file — the same{" "}
         <code class="mono">.ags.idx</code> the CLI and libraries mint, so a

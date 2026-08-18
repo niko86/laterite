@@ -3,7 +3,7 @@ import type { DictVersionOpt, EncodingOpt } from "../../lib/validator";
 import { DICT_VERSIONS as DICT_VERSION_VALUES } from "../../lib/editions";
 import { Card } from "../Card";
 import { ControlGrid } from "../ControlGrid";
-import { controlClass } from "../../lib/controls";
+import { Checkbox, Field, Select } from "@shared/components";
 
 // Built from the generated editions SSOT (#529); only the "auto" label is UI copy
 // and stays here. Was a hand-listed array edited in lockstep with three other copies.
@@ -26,15 +26,11 @@ export const Controls: Component<{
   aligned: boolean;
   onAligned: (v: boolean) => void;
 }> = (props) => {
-  const selectClass = controlClass;
-
   return (
     <Card>
       <ControlGrid>
-        <label class="flex flex-col gap-1 text-xs text-fg-muted">
-          Dictionary edition
-          <select
-            class={selectClass}
+        <Field label="Dictionary edition">
+          <Select
             value={props.dictVersion}
             onChange={(e) => {
               props.onDictVersion(e.currentTarget.value as DictVersionOpt);
@@ -43,13 +39,11 @@ export const Controls: Component<{
             <For each={DICT_VERSIONS}>
               {(d) => <option value={d.value}>{d.label}</option>}
             </For>
-          </select>
-        </label>
+          </Select>
+        </Field>
 
-        <label class="flex flex-col gap-1 text-xs text-fg-muted">
-          Encoding
-          <select
-            class={selectClass}
+        <Field label="Encoding">
+          <Select
             value={props.encoding}
             onChange={(e) => {
               props.onEncoding(e.currentTarget.value as EncodingOpt);
@@ -58,20 +52,21 @@ export const Controls: Component<{
             <For each={ENCODINGS}>
               {(en) => <option value={en.value}>{en.label}</option>}
             </For>
-          </select>
-        </label>
+          </Select>
+        </Field>
 
-        <label class="flex items-center gap-2 text-sm text-fg-soft sm:self-end sm:pb-1.5">
-          <input
-            type="checkbox"
-            class="h-4 w-4 rounded-xs border-line-strong bg-surface-raised"
-            checked={props.aligned}
-            onChange={(e) => {
-              props.onAligned(e.currentTarget.checked);
-            }}
-          />
-          Aligned columns
-        </label>
+        {/* Not a Field: the fixed control-h box exists to align bordered
+            controls, and a bare checkbox centred in one floats below the
+            selects' boxes rather than beside them — self-end against the row
+            is what actually lines it up. */}
+        <Checkbox
+          label="Aligned columns"
+          checked={props.aligned}
+          onChange={(e) => {
+            props.onAligned(e.currentTarget.checked);
+          }}
+          class="sm:self-end sm:pb-1.5"
+        />
       </ControlGrid>
     </Card>
   );
