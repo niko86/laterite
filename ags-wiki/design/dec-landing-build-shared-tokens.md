@@ -81,7 +81,7 @@ two surfaces drift on versions, and there is no version skew worth having
 between a page and the app it links to.
 
 **Sharing a toolchain is not sharing a bundle — and a check says so.**
-`repo:web/landing/heavyDeps.ts` fails the landing build if an app-only
+`repo:web/landing/appOnlyDependencies.ts` fails the landing build if an app-only
 dependency reaches the module graph. The rule is inverted from the obvious one:
 rather than a denylist of banned packages, *everything the web project declares
 is forbidden on the apex unless explicitly shared*. A denylist has to be

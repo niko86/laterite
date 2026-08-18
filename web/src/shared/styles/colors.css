@@ -121,11 +121,11 @@
 /* The dark slot.
  *
  * Deliberately EMPTY of values: the dark set is #400's, and it is a real design
- * pass (the band ramp shifts one step lighter so the deep strata hold on a dark
- * canvas, tints dial down from 26/18% to 20/14%, elevation stops being a shadow
- * and starts being a lighter surface). What lands here is a values change, not
- * a restructure — which is the only reason this selector exists now rather than
- * arriving with them.
+ * pass rather than a lightness flip — the band ramp shifts a step lighter so the
+ * deep strata still hold on a dark canvas, the tints dial down because saturated
+ * washes glow there, and elevation stops being a shadow and starts being a
+ * lighter surface. What lands here is a values change, not a restructure, which
+ * is the only reason this selector exists now rather than arriving with them.
  *
  * Class-toggled, not `prefers-color-scheme`: the app already flips `.dark` on
  * <html> from a stored-else-system choice applied before first paint, and #400

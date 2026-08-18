@@ -6,7 +6,10 @@ import { resolve } from "node:path";
 // because Vite's native config loader (the coming default) rejects the short
 // forms with a warning on every build.
 import pkg from "../package.json" with { type: "json" };
-import { appOnlyPackages, findForbiddenModules } from "./heavyDeps.ts";
+import {
+  appOnlyPackages,
+  findForbiddenModules,
+} from "./appOnlyDependencies.ts";
 
 // laterite.dev — the apex, built here rather than in the app's config (#394).
 //
@@ -26,7 +29,7 @@ import { appOnlyPackages, findForbiddenModules } from "./heavyDeps.ts";
 // components classed with the shared tokens, and a build that cannot compile
 // one is not the gate this ticket is supposed to be.
 
-// The other half of the separation — see heavyDeps.ts for why this is an
+// The other half of the separation — see appOnlyDependencies.ts for why this is an
 // allowlist inverted rather than a list of banned packages.
 //
 // Scope: the JavaScript module graph. A dependency reaching the page through
@@ -53,7 +56,7 @@ function noAppOnlyDependencies(): Plugin {
           lines.join("\n") +
           `\n\nlaterite.dev is a small page that loads no engine. If one of ` +
           `these genuinely belongs on both surfaces, add it to SHARED_PACKAGES ` +
-          `in web/landing/heavyDeps.ts — deliberately, and with the size in ` +
+          `in web/landing/appOnlyDependencies.ts — deliberately, and with the size in ` +
           `mind.`,
       );
     },
@@ -70,6 +73,9 @@ export default defineConfig({
     alias: {
       // Both builds resolve this to the same directory, which is what lets a
       // button exist once (#394). The app's config carries the twin entry.
+      // landing.css imports the token layer THROUGH it rather than by relative
+      // path, so the alias is exercised by every build rather than merely
+      // declared until the shared primitives (#406) arrive.
       "@shared": resolve(import.meta.dirname, "../src/shared"),
     },
   },

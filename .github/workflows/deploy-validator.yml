@@ -134,12 +134,10 @@ jobs:
           npm ci
           npm run build
 
-      # The apex (#394). Its own Vite config, its own output — sharing this
-      # project's dependency set and nothing else. Deliberately NOT a second
-      # entry in the app's build: that config carries the PWA layer, the SPA 404
-      # fallback and the DuckDB→R2 relocation above, none of which belong on a
-      # small static page, and a shared-chunk split would let the app's heavy
-      # dependencies reach it unnoticed. The build fails if one does.
+      # The apex (#394). Its own Vite config and its own output, sharing this
+      # project's dependency set and the `npm ci` above — web/landing/vite.config.ts
+      # carries why it is a separate build rather than a second entry, and fails
+      # if an app-only dependency reaches it.
       #
       # No VITE_BASE / VITE_DUCKDB_CDN: the apex answers at its own root and
       # loads no engine.

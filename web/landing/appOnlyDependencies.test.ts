@@ -3,7 +3,7 @@ import {
   appOnlyPackages,
   findForbiddenModules,
   SHARED_PACKAGES,
-} from "./heavyDeps";
+} from "./appOnlyDependencies";
 
 describe("appOnlyPackages", () => {
   it("forbids everything declared that is not explicitly shared", () => {

@@ -17,8 +17,9 @@
  * answer:
  *
  *   - Figtree's x-height is much the larger of the two, so at equal em size it
- *     reads bigger. Every display step comes down ~12% to land at the same
- *     APPARENT size the slab had.
+ *     reads bigger. Every display step comes down to land at the same APPARENT
+ *     size the slab had — furthest at the top of the scale, where the
+ *     difference is most visible, and barely at all by h3.
  *   - A slab's serifs bridge the gaps between letters; a geometric sans has
  *     nothing doing that job, and its round open counters widen the gaps
  *     instead. So tracking goes further negative at the display end, not less.

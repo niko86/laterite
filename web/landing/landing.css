@@ -1,6 +1,6 @@
 @import "tailwindcss";
-@import "../src/shared/styles/tokens.css";
-@import "../src/shared/styles/tailwind-theme.css";
+@import "@shared/styles/tokens.css";
+@import "@shared/styles/tailwind-theme.css";
 
 /* Explicit rather than relying on Tailwind's automatic content detection: this
    build's root is web/landing/, and the shared directory it draws components
