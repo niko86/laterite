@@ -7,6 +7,8 @@ import { EngineUnavailableError } from "./workerChannel";
 // app" reassurance), not word-for-word — wording can be tuned without a test
 // edit, but a pane must never lose its noun or show "check your connection"
 // for a crash, which is a false lead about an engine that died holding a file.
+// The one exception is the untyped fallback line, pinned exactly: its defects
+// are word-level (a doubled "Error:" prefix, a bare trailing colon — #415).
 
 describe("engineFailureMessage", () => {
   it("maps a load failure to download copy carrying the pane's noun", () => {
@@ -29,10 +31,29 @@ describe("engineFailureMessage", () => {
     expect(msg).not.toMatch(/connection/);
   });
 
-  it("falls back to the stringified error for anything untyped", () => {
+  it("unwraps a plain Error in the fallback — no doubled prefix (#415)", () => {
+    // Why plain Errors reach this branch: the comment on the fallback itself.
     expect(engineFailureMessage(new Error("boom"), "The validator")).toBe(
-      "The validator failed: Error: boom",
+      "The validator failed: boom",
     );
+  });
+
+  it("keeps the name of a named error — it's half the information", () => {
+    expect(
+      engineFailureMessage(
+        new TypeError("Failed to fetch"),
+        "The explorer's engine",
+      ),
+    ).toBe("The explorer's engine failed: TypeError: Failed to fetch");
+  });
+
+  it("never ends the line at a bare colon for an empty-message Error", () => {
+    expect(engineFailureMessage(new Error(""), "The validator")).toBe(
+      "The validator failed: Error",
+    );
+  });
+
+  it("falls back to the stringified value for a non-Error rejection", () => {
     // Rejections aren't always Error instances at a runtime boundary.
     expect(engineFailureMessage("boom", "The fix engine")).toBe(
       "The fix engine failed: boom",

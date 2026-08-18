@@ -35,5 +35,14 @@ export function engineFailureMessage(
     return e.reason === "load"
       ? `${engine} couldn't be downloaded — the rest of the app is unaffected. Check your connection and try again.`
       : `${engine} stopped — the rest of the app is unaffected.`;
-  return untypedFallback ?? `${engine} failed: ${String(e)}`;
+  // Op-level worker failures arrive as `new Error(msg.error)`, so `String(e)`
+  // would double the phrasing: "… failed: Error: <message>" (#415). Strip only
+  // the redundant plain-`Error` prefix — a named type (TypeError) keeps its
+  // name, which is half the information, and an empty message keeps `String(e)`
+  // so the line never ends at a bare colon.
+  const detail =
+    e instanceof Error && e.name === "Error" && e.message !== ""
+      ? e.message
+      : String(e);
+  return untypedFallback ?? `${engine} failed: ${detail}`;
 }
