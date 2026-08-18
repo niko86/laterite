@@ -66,7 +66,7 @@ export const InputPane: Component<{
         }}
         class="rounded-lg border-2 border-dashed transition-colors"
         classList={{
-          "border-accent bg-accent/5": dragging(),
+          "border-accent bg-accent-quiet": dragging(),
           "border-line-strong": !dragging(),
         }}
       >

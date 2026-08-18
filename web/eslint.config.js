@@ -52,6 +52,12 @@ const RAW_PALETTE_RE = new RegExp(
 // 6/8-digit forms only: issue references ("#448", "#1024") share the 3- and
 // 4-digit shape, and the app writes no shorthand hex.
 const RAW_HEX_RE = /#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/;
+// A status/accent/cta BACKGROUND with an alpha is a hand-mixed tint — the
+// -quiet token is the sanctioned wash (#404, AC "tinted fills use the -quiet
+// tokens"). Backgrounds only: border/text alpha (border-ok\/45, border-err\/60)
+// is the system's own idiom for hairlines and stays legal.
+const MIXED_TINT_RE =
+  /\bbg-(?:ok|warn|err|info|accent|cta)(?:-hover|-quiet)?\/\d/;
 const noRawPalette = {
   meta: {
     type: "problem",
@@ -65,6 +71,10 @@ const noRawPalette = {
         "Raw colour literal '{{match}}' — resolve it from a token instead " +
         "(getComputedStyle(...).getPropertyValue('--…') where a class cannot " +
         "carry it; see web/src/shared/styles/colors.css, #404).",
+      mixedTint:
+        "Hand-mixed tint '{{match}}' — tinted fills take the status's -quiet " +
+        "token (bg-ok-quiet, bg-err-quiet, …), not an alpha on the solid " +
+        "token (#404).",
     },
   },
   create(context) {
@@ -81,6 +91,15 @@ const noRawPalette = {
       const hex = RAW_HEX_RE.exec(text);
       if (hex) {
         context.report({ node, messageId: "hex", data: { match: hex[0] } });
+        return;
+      }
+      const tint = MIXED_TINT_RE.exec(text);
+      if (tint) {
+        context.report({
+          node,
+          messageId: "mixedTint",
+          data: { match: tint[0] },
+        });
       }
     };
     return {
@@ -154,7 +173,7 @@ export default tseslint.config(
   prettier,
   {
     // The gate itself (#404) — application source only. The landing surface
-    // still carries two stone-* classes (its own tickets' territory) and the
+    // still carries stone-* classes (its own tickets' territory) and the
     // config/scripts layer legitimately names colours (this file, the tokens'
     // build plumbing), so the scope is exactly the app the ticket covers.
     name: "design/no-raw-palette",

@@ -210,7 +210,7 @@ export const ExcelConverter: Component = () => {
             <Show when={e().retry}>
               <button
                 type="button"
-                class="rounded bg-accent/15 px-3 py-1 text-xs font-medium text-accent hover:bg-accent/25"
+                class="rounded bg-accent-quiet px-3 py-1 text-xs font-medium text-accent hover:text-accent-hover"
                 disabled={busy() !== null}
                 onClick={() => void lastAttempt?.()}
               >

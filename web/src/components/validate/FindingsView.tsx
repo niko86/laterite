@@ -105,7 +105,7 @@ export function highlightSpan(
   raw: string,
   start: number,
   end: number,
-  mark: string = "bg-err text-surface",
+  mark: string = severityMark("error"),
 ): JSX.Element {
   const cps = Array.from(raw);
   const s = Math.max(0, Math.min(start, cps.length));
@@ -195,14 +195,15 @@ const FindingRow: Component<{
     const b = block();
     return b && props.aligned() ? alignBlock(b) : null;
   });
+  const severity = () => severityOf(props.f);
   return (
     <div class="min-w-0 border-t border-line px-3 py-2 text-sm">
       <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <Chip
-          tone={SEVERITY_CHIP[severityOf(props.f)].tone}
-          variant={SEVERITY_CHIP[severityOf(props.f)].variant}
+          tone={SEVERITY_CHIP[severity()].tone}
+          variant={SEVERITY_CHIP[severity()].variant}
         >
-          {severityOf(props.f)}
+          {severity()}
         </Chip>
         <span class="text-fg-faint">
           {props.f.line != null ? `line ${props.f.line}` : "—"}

@@ -265,7 +265,7 @@ const MergeError: Component<{
     CLASH_MODES.filter((m) => m.value !== "error" && m.value !== props.mode);
 
   return (
-    <div class="rounded-lg border border-err/40 bg-err/5 p-4 text-sm">
+    <div class="rounded-lg border border-err/45 bg-err-quiet p-4 text-sm">
       <p class="text-err">Could not merge: {String(props.error)}</p>
       <Show when={isTypeClash() && offers().length > 0}>
         <p class="mt-2 text-xs text-fg-muted">
