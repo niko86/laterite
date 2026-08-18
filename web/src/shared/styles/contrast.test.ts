@@ -139,6 +139,17 @@ describe.each(Object.entries(themes))("%s theme", (_name, tokens) => {
   });
 });
 
+// The landing's depth pill rides the borehole rail on one `text-surface`
+// across both themes, because its FILL inverts with them: accent in light,
+// laterite-300 in dark. The light half falls under the solid-fills case above;
+// laterite-300 is a brand-ramp step rather than a status token, so the dark
+// half is asserted here and nowhere else. Dark ONLY, deliberately — in light
+// `--surface` is near-white and would sit on that same sand at no contrast at
+// all, which is precisely why the pill does not use that combination there.
+it("holds the depth pill's on-fill text to AA where its dark fill applies", () => {
+  expect(ratio(dark, "surface", "laterite-300")).toBeGreaterThanOrEqual(4.5);
+});
+
 // The theme-color metas and the PWA manifest splash are read by the browser
 // before any CSS loads, so they carry mirrored hexes of --canvas rather than
 // a var() — the one duplication the platform forces. Mirrors drift; this

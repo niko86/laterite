@@ -5,6 +5,19 @@
  * place the four-band gradient appears; a table cap uses a single solid band
  * (#396), because a gradient there would read as four groups rather than one.
  *
+ * The chrome is OPAQUE (#408). It used to be a 95%-alpha surface over a small
+ * backdrop filter — the last blurred surface anywhere, against a system whose
+ * rule is that nothing is. Frosting the content sliding underneath cost a
+ * compositor layer to say what the strata rule below already says: the chrome
+ * is in front.
+ *
+ * The filter utility is NAMED here in prose rather than spelled as its class,
+ * deliberately. Tailwind scans this file as raw text and cannot tell code from
+ * comment, so writing the class out — even to record removing it — puts it back
+ * in the generated CSS. The eslint gate cannot catch that either: it reads
+ * string literals, not comments. Verified by rebuilding and grepping the
+ * emitted stylesheet for the class, which is where the truth is.
+ *
  * The brand lockup is the mark plus the wordmark in Figtree 800 maroon. The
  * display face and the wordmark are the same face now, so the two read as one
  * object rather than a logo beside a label. On light chrome the mark sits bare;
@@ -24,7 +37,7 @@ const NAV = [
 ];
 
 export const Masthead: Component = () => (
-  <header class="sticky top-0 z-30 bg-surface/95 backdrop-blur-sm">
+  <header class="sticky top-0 z-30 bg-surface">
     <div class="flex items-center gap-4 px-4 py-2.5 sm:px-6">
       <a
         href="/"
@@ -37,8 +50,14 @@ export const Masthead: Component = () => (
           width="28"
           height="28"
           /* The plate is dark-chrome only (#400): the mark's outline is maroon
-             and disappears into a near-black canvas without it. */
-          class="size-7 rounded-[5px] dark:bg-stone-50 dark:p-[3px]"
+             and disappears into a near-black canvas without it.
+
+             The ramp token by reference, not `bg-stone-50` — that class is
+             TAILWIND's stone (cool grey), while ours is warm; the two differ by
+             enough to read as a grey chip behind a warm mark. No semantic token
+             fits: every surface role flips dark with the theme, and this plate
+             must stay light in dark chrome, which is the whole point of it. */
+          class="size-7 rounded-[5px] dark:bg-[var(--stone-50)] dark:p-[3px]"
         />
         <span class="font-display text-h3 font-extrabold tracking-[--track-tight] text-accent">
           laterite

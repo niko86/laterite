@@ -150,7 +150,7 @@ export const GroupTable: Component<{
                               props.onPick(rowIndex(), col());
                             }}
                             aria-label={`Edit ${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`}
-                            class="w-full rounded-xs px-1 text-left font-mono hover:bg-accent-quiet focus-visible:outline-none focus-visible:[box-shadow:var(--focus-ring)]"
+                            class="w-full rounded-xs px-1 text-left font-mono hover:bg-accent-quiet focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
                             classList={{ "bg-accent-quiet": isPicked() }}
                           >
                             <Show
