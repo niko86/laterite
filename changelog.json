@@ -227,6 +227,9 @@
       },
       {
         "text": "**A family of design-token styles that silently never applied now does.** Tailwind's v4 line dropped the older shorthand that wrapped a square-bracketed token reference in `var()`, so utilities written that way compiled to invalid declarations every browser discards — the class sat in the markup looking applied while the style never rendered. In the validator app that was the dialog's dimming scrim, the toast and tooltip fills and shadows, and control heights; on the landing page, the strata band keying and the display tracking. All of them now use the supported reference form, verified against the built stylesheets, and a lint gate keeps the broken shorthand from coming back."
+      },
+      {
+        "text": "**A delivery carrying hundreds of fixes no longer mounts hundreds of fix cards.** The Fix tab's scroll cap (#407) bounded the *page* — the cards scroll inside it while the Apply bar stays put — but bounded nothing about what mounted: every fix still built its card, and every card a full aligned GROUP diff block, tens of thousands of DOM nodes with almost all of them off-screen at any moment. The safe list is now windowed the way the findings list one tab over already was, mounting only the visible slice plus its overscan, with the same measured-size resets the findings list learned the hard way. The risky group — small, opt-in, and read whole before ticking anything in it — keeps its plain rendering below the window, and nothing about the cap or the Apply bar moved. (#435)"
       }
     ],
     "security": []

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ready, load } from "./helpers";
+import { ready, load, tab } from "./helpers";
 
-// UI-behaviour coverage for the wasm Validate page: the *interactions*
+// UI-behaviour coverage for the wasm Validate + Fix pages: the *interactions*
 // (search, severity filtering, encoding toggle, dictionary selector, list
 // virtualization) rather than "does the engine flag rule X" — that path is
 // covered by app.spec.ts. Each test drives the real wasm app in the browser.
@@ -85,6 +85,33 @@ test("the dictionary-edition selector re-validates without breaking", async ({
   await expect(sel).toHaveValue("4.0.3");
 });
 
+// The windowing falsification, shared by both virtualized lists (findings,
+// safe fixes): far fewer [data-index] rows in the DOM than `total` proves the
+// list is windowed rather than all-mounted, and scrolling the region to the
+// bottom must mount clearly higher-indexed rows. Only virtual rows carry
+// data-index, and panes unmount on tab switch, so the count can't cross-match
+// the other tab's list.
+async function expectWindowed(page: Page, total: number) {
+  const indices = () =>
+    page
+      .locator("[data-index]")
+      .evaluateAll((els) =>
+        els.map((e) => Number(e.getAttribute("data-index"))),
+      );
+  const before = await indices();
+  expect(before.length).toBeGreaterThan(0);
+  expect(before.length).toBeLessThan(Math.min(60, total));
+  const maxBefore = Math.max(...before);
+
+  const scroller = page
+    .locator("div.scroll-region")
+    .filter({ has: page.locator("[data-index]") });
+  await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await expect
+    .poll(async () => Math.max(...(await indices())))
+    .toBeGreaterThan(maxBefore + 50);
+}
+
 test("the findings list virtualizes — only a window renders, scrolling reveals more", async ({
   page,
 }) => {
@@ -94,23 +121,31 @@ test("the findings list virtualizes — only a window renders, scrolling reveals
   const { total } = await shownNow(page);
   expect(total).toBeGreaterThan(150);
 
-  const indices = () =>
-    page
-      .locator("[data-index]")
-      .evaluateAll((els) =>
-        els.map((e) => Number(e.getAttribute("data-index"))),
-      );
-  const before = await indices();
-  // Far fewer rows in the DOM than the total → it's windowed, not all-mounted.
-  expect(before.length).toBeLessThan(60);
-  const maxBefore = Math.max(...before);
+  await expectWindowed(page, total);
+});
 
-  // Scroll the findings container to the bottom → higher-indexed rows mount.
-  const scroller = page
-    .locator("div.scroll-region")
-    .filter({ has: page.locator("[data-index]") });
-  await scroller.evaluate((el) => el.scrollTo(0, el.scrollHeight));
-  await expect
-    .poll(async () => Math.max(...(await indices())))
-    .toBeGreaterThan(maxBefore + 50);
+test("the safe-fix list virtualizes — a window of cards, with the risky group reachable below", async ({
+  page,
+}) => {
+  await ready(page);
+  // One 1dp reformat per LOCA data row (safe), plus one ambiguous DT date
+  // (risky) — the issue's synthetic shape.
+  await load(page, "many_fixes.ags");
+  await tab(page, "Fix").click();
+
+  // Every safe fix is on offer (the count is real). Polled: the button
+  // renders "(0)" until the engine's computeFixes batch lands.
+  const fixAll = page.getByRole("button", { name: /Fix all safe \(\d+\)/ });
+  const totalNow = async () =>
+    Number(((await fixAll.textContent()) ?? "").match(/\((\d+)\)/)?.[1] ?? 0);
+  await expect.poll(totalNow).toBeGreaterThan(300);
+
+  // Only a window of cards is in the DOM (#435): the scroll cap bounded the
+  // page while every card still mounted its full aligned diff block.
+  await expectWindowed(page, await totalNow());
+
+  // The risky group — small, opt-in, NOT virtualised — still renders in full
+  // below the safe list.
+  await expect(page.getByText(/Risky fixes \(1\)/)).toBeVisible();
+  await expect(page.getByText(/Canonicalise datetime/)).toBeVisible();
 });
