@@ -119,10 +119,18 @@ redefines the `leading-normal` utility for every surface that imports the layer,
 and nothing anywhere would fail.
 
 **Authored shared from the start, because promotion never happens on time.** The
-app is the one surface not yet reading the layer — its move is a larger
-migration (#403) — but it lands on *this* file rather than a copy of it. Had the
+app's move was a larger migration (#403), and it landed on *this* file rather
+than a copy of it — the values swap the arrangement was built for. Had the
 tokens been written under `web/landing/`, the docs ticket and the app ticket
-would each have had a reason to copy rather than move.
+would each have had a reason to copy rather than move. #403 also moved the dark
+set (#400's) from the landing stylesheet into the shared `.dark` slot once the
+app became its second renderer, and the move surfaced two value repairs in the
+dark CTA trio — an accidental hue shift ridden in through the shifted band
+ramp, and the one quiet wash the dark pass never dialled down. Both are
+documented where they are fixed (`repo:web/src/shared/styles/colors.css`) and
+held by the token-contrast gate beside it
+(`repo:web/src/shared/styles/contrast.test.ts`), which also pins the light/dark
+CTA identity the first dark set broke by inheritance.
 
 ### The display face: neither bundle's, and not the handoff's either
 

@@ -123,19 +123,85 @@
   --selection: color-mix(in srgb, var(--laterite-300) 45%, transparent);
 }
 
-/* The dark slot.
+/* The dark set (#400, promoted here by #403).
  *
- * Deliberately EMPTY of values: the dark set is #400's, and it is a real design
- * pass rather than a lightness flip — the band ramp shifts a step lighter so the
- * deep strata still hold on a dark canvas, the tints dial down because saturated
- * washes glow there, and elevation stops being a shadow and starts being a
- * lighter surface. What lands here is a values change, not a restructure, which
- * is the only reason this selector exists now rather than arriving with them.
+ * A real design pass rather than a lightness flip — and authored ONCE, here,
+ * now that the app is the second surface rendering it. It landed on the
+ * landing page first (#400) and moved into this slot when #403 made the app
+ * consume the layer — values as #400 set them, except the two CTA repairs the
+ * move surfaced (marked below); web/landing/landing.css keeps only its own
+ * tint-percentage dials.
  *
- * Class-toggled, not `prefers-color-scheme`: the app already flips `.dark` on
- * <html> from a stored-else-system choice applied before first paint, and #400
- * reuses that rather than building a second mechanism. Nothing sets the class on
- * the landing page yet, so this rule is inert until #400. */
+ * Class-toggled, not `prefers-color-scheme`: an explicit choice has to be able
+ * to beat the OS in BOTH directions, and a media query cannot express "I want
+ * light on a dark-mode machine". Each surface applies `.dark` pre-paint from
+ * the persisted-else-system choice and the shared theme.ts owns it from there.
+ *
+ * A surface that retunes a token in its own `:root` AFTER importing this file
+ * outranks this block by source order — `:root` and `.dark` tie on
+ * specificity. A light-only retune must therefore say so in its selector
+ * (`:root:not(.dark)`, as the landing's canvas retune does) rather than rely
+ * on never being loaded dark. */
 .dark {
   color-scheme: dark;
+
+  /* The band ramp shifts ONE STEP LIGHTER. The light ramp's deep strata vanish
+     against a near-black canvas, so every band moves up and the ramp gains a
+     lighter head — and because the rail, the table caps, the chips and the
+     KEY-column edges all read `--laterite-*`, redefining the ramp here moves
+     every one of them at once. There is no second band list anywhere. */
+  --laterite-300: #f0a67f;
+  --laterite-400: #f09c56;
+  --laterite-500: #db7841;
+  --laterite-600: #ce5640;
+  --laterite-700: #be3b2e;
+  --laterite-800: #9b3932;
+  --laterite-900: #7d2622;
+
+  /* Elevation stops being a shadow and starts being a lighter surface. */
+  --canvas: #14100f;
+  --surface: #1c1715;
+  --surface-raised: #262019;
+  --surface-code: #100c0b;
+  --chip: #261f1c;
+
+  --line: #352c28;
+  --line-subtle: #261f1c;
+  --line-strong: #4a3f39;
+
+  --fg: #ede5df;
+  --fg-soft: #d8cbc2;
+  --fg-muted: #a4958d;
+  --fg-faint: #8b7d75;
+  --fg-dim: #6b5e57;
+
+  /* Headlines and links follow the accent, so they are SAND in dark, not
+     maroon — maroon on near-black is unreadable at body weight. */
+  --accent: #f09c56;
+  --accent-hover: #f0a67f;
+  --accent-quiet: #3a2620;
+
+  /* The rust CTA does NOT change. It is the one object that is the same colour
+     in both themes, which is what makes it read as the action everywhere. That
+     has to be said in VALUES here, not left to inheritance: the light block
+     writes `--cta: var(--laterite-500)`, and this block shifts the ramp, so an
+     un-redeclared CTA silently rides it to burnt orange — the exact drift this
+     comment used to deny was happening (#403). Steps down the SHIFTED ramp, so
+     the resolved pair is identical to light's rust/vermilion. */
+  --cta: var(--laterite-600);
+  --cta-hover: var(--laterite-700);
+  /* The wash under a "runs something" control dials down like every other
+     quiet: the light block's pale pink is the one wash #400 missed, and it
+     glowed on near-black (#403). Same family as the neighbouring quiets,
+     tuned so text-cta clears the ratio light accepts on its wash. */
+  --cta-quiet: #38201a;
+
+  --ok: #79c2b4;
+  --ok-quiet: #1d2c29;
+  --warn: #e3a447;
+  --warn-quiet: #2e2313;
+  --err: #f07f6d;
+  --err-quiet: #331b18;
+  --info: #b9b2bd;
+  --info-quiet: #242226;
 }
