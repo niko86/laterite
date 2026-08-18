@@ -387,7 +387,7 @@ export const SqlBuilder: Component<{
             </span>
             <button
               type="button"
-              class="rounded border border-line-strong px-2 py-0.5 text-xs text-fg-soft hover:bg-chip"
+              class="rounded-sm border border-line-strong px-2 py-0.5 text-xs text-fg-soft hover:bg-chip"
               onClick={addCond}
             >
               + add
@@ -516,14 +516,14 @@ export const SqlBuilder: Component<{
         <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
           <button
             type="button"
-            class="shrink-0 self-start rounded bg-surface-raised px-3 py-1.5 text-xs font-medium text-fg hover:bg-chip"
+            class="shrink-0 self-start rounded-md bg-surface-raised px-3 py-1.5 text-xs font-medium text-fg hover:bg-chip"
             onClick={() => {
               props.onApply(sql());
             }}
           >
             Use this SQL ↓
           </button>
-          <pre class="mono min-w-0 flex-1 overflow-x-auto rounded border border-line bg-surface-raised p-2 text-xs text-fg-soft">
+          <pre class="mono min-w-0 flex-1 overflow-x-auto rounded-sm border border-line bg-surface-raised p-2 text-xs text-fg-soft">
             {sql()}
           </pre>
         </div>

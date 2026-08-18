@@ -8,7 +8,9 @@ export const CONTROL_CLASS = [
   "font-ui text-control w-full min-w-0",
   "px-[0.4rem] py-[0.25rem] rounded-xs",
   "border border-line-strong bg-surface-raised text-fg",
-  "outline-none focus-visible:[box-shadow:var(--focus-ring)] focus-visible:border-accent",
+  // outline-hidden so forced-colors mode (which discards the box-shadow ring)
+  // still gets an outline to repaint.
+  "outline-hidden focus-visible:[box-shadow:var(--focus-ring)] focus-visible:border-accent",
 ].join(" ");
 
 export const Input: Component<

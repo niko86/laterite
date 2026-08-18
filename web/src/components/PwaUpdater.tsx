@@ -84,10 +84,15 @@ export const PwaUpdater: Component = () => {
 
   return (
     <Show when={needRefresh() || (offlineReady() && !offlineDismissed())}>
+      {/* This floats, so it is a TOAST and takes the toast's whole contract
+          (#408): the dark maroon panel, white-alpha border, the toast's one
+          shadow value — the same skin as the shared Toast, which this predates
+          and can't reuse (persistent, two actions). It had been a raised card
+          with a t-shirt shadow, the app's only one. */}
       <div
         role="status"
         aria-live="polite"
-        class="fixed inset-x-4 bottom-4 z-50 mb-[env(safe-area-inset-bottom)] rounded-lg border border-line-strong bg-surface-raised p-3 text-sm text-fg shadow-lg sm:inset-x-auto sm:right-4 sm:max-w-xs"
+        class="fixed inset-x-4 bottom-4 z-[--z-toast] mb-[env(safe-area-inset-bottom)] rounded-md border border-white/[0.18] bg-[--laterite-900] p-3 text-sm text-fg-on-cta shadow-[--shadow-toast] sm:inset-x-auto sm:right-4 sm:max-w-xs"
       >
         <Show
           when={needRefresh()}
@@ -102,7 +107,7 @@ export const PwaUpdater: Component = () => {
               <span>Validate, Fix, Export &amp; Tools now work offline.</span>
               <button
                 type="button"
-                class="rounded border border-line-strong px-2 py-0.5 text-xs text-fg-soft hover:bg-chip"
+                class="rounded-sm border border-white/[0.18] px-2 py-0.5 text-xs text-fg-on-cta/80 hover:bg-white/10"
                 onClick={dismissOffline}
               >
                 Dismiss
@@ -114,14 +119,14 @@ export const PwaUpdater: Component = () => {
           <div class="flex items-center gap-2">
             <button
               type="button"
-              class="rounded bg-accent px-3 py-1 text-xs font-medium text-canvas hover:opacity-90"
+              class="rounded-sm px-3 py-1 text-xs font-semibold text-[--laterite-300] hover:text-[--laterite-200]"
               onClick={applyUpdate}
             >
               Reload
             </button>
             <button
               type="button"
-              class="rounded border border-line-strong px-2 py-1 text-xs text-fg-soft hover:bg-chip"
+              class="rounded-sm border border-white/[0.18] px-2 py-1 text-xs text-fg-on-cta/65 hover:bg-white/10 hover:text-fg-on-cta"
               onClick={close}
             >
               Later

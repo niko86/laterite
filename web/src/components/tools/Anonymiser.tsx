@@ -250,7 +250,7 @@ export const Anonymiser: Component = () => {
           </label>
           <button
             type="button"
-            class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
             disabled={busy() || selected().size === 0}
             onClick={() => void save()}
           >
@@ -313,7 +313,7 @@ export const Anonymiser: Component = () => {
                           </span>
                           <Show when={action()}>
                             {(a) => (
-                              <span class="rounded bg-line/60 px-1 text-[10px] text-fg-faint">
+                              <span class="rounded-xs bg-line/60 px-1 text-[10px] text-fg-faint">
                                 {ACTION_LABEL[a()]}
                               </span>
                             )}

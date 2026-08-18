@@ -104,7 +104,7 @@ const FilePicker: Component<{
     <input
       type="file"
       accept=".ags,.txt,text/plain"
-      class="text-xs text-fg-muted file:mr-2 file:rounded file:border-0 file:bg-chip file:px-2 file:py-1 file:text-fg-soft"
+      class="text-xs text-fg-muted file:mr-2 file:rounded-sm file:border-0 file:bg-chip file:px-2 file:py-1 file:text-fg-soft"
       onChange={(e) => {
         props.onPick(e);
       }}
@@ -177,7 +177,7 @@ const GroupDeltaView: Component<{ g: GroupDelta }> = (props) => {
         <Show
           when={g.keyed}
           fallback={
-            <span class="rounded bg-warn-quiet px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-warn">
+            <span class="rounded-xs bg-warn-quiet px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-warn">
               unkeyed
             </span>
           }

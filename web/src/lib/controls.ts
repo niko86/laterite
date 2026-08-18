@@ -10,9 +10,15 @@
 //                   WHERE filters, the snippet-name box, the sidebar filter).
 //
 // Prominent search inputs (Rule/Dictionary/Template) are a deliberately larger,
-// already-consistent role (rounded-lg px-3 py-2) and stay as they are.
-export const controlClass =
-  "rounded border border-line-strong bg-surface-raised px-2 py-1.5 text-sm text-fg outline-none focus:border-accent";
+// already-consistent role (px-3 py-2) and keep their size; radius and focus
+// treatment are the same input contract as here (#408).
+//
+// `outline-hidden`, not `outline-none`: forced-colors mode discards the
+// box-shadow ring, and outline-hidden leaves a transparent outline behind for
+// it to repaint — so high contrast keeps a focus indicator (#408).
+export const controlFocus =
+  "outline-hidden focus-visible:[box-shadow:var(--focus-ring)] focus-visible:border-accent";
 
-export const controlCompact =
-  "rounded border border-line-strong bg-surface-raised px-2 py-1 text-xs text-fg outline-none focus:border-accent";
+export const controlClass = `rounded-xs border border-line-strong bg-surface-raised px-2 py-1.5 text-sm text-fg ${controlFocus}`;
+
+export const controlCompact = `rounded-xs border border-line-strong bg-surface-raised px-2 py-1 text-xs text-fg ${controlFocus}`;

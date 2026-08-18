@@ -20,6 +20,7 @@ import {
   setFixView as setView,
 } from "../../lib/settings";
 import { goTo } from "../../lib/nav";
+import { ArmedButton } from "@shared/components";
 import { PillToggle } from "../PillToggle";
 import { FixesPanel, fixKey } from "../validate/FixesPanel";
 import { FileDiff } from "./FileDiff";
@@ -296,7 +297,7 @@ export const FixPane: Component = () => {
           </p>
           <button
             type="button"
-            class="mt-4 rounded bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
+            class="mt-4 rounded-md bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
             onClick={() => {
               goTo("validate");
             }}
@@ -327,7 +328,7 @@ export const FixPane: Component = () => {
               the file was clean, exactly when you'd want to save it). */}
           <button
             type="button"
-            class="ml-auto rounded border border-line-strong px-3 py-1.5 font-medium text-fg-soft hover:bg-chip"
+            class="ml-auto rounded-md border border-line-strong px-3 py-1.5 font-medium text-fg-soft hover:bg-chip"
             onClick={exportFixed}
           >
             Download .ags
@@ -344,7 +345,7 @@ export const FixPane: Component = () => {
           <div class="flex flex-wrap items-center gap-2 text-sm">
             <button
               type="button"
-              class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-40"
+              class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
               disabled={busy() || fixCount() === 0}
               onClick={() => void fixAllSafe()}
             >
@@ -352,7 +353,7 @@ export const FixPane: Component = () => {
             </button>
             <button
               type="button"
-              class="rounded border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip disabled:opacity-40"
+              class="rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip disabled:opacity-45"
               disabled={busy() || fixCount() === 0}
               onClick={() => void iterateToClean()}
             >
@@ -360,20 +361,21 @@ export const FixPane: Component = () => {
             </button>
             <button
               type="button"
-              class="rounded border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip disabled:opacity-40"
+              class="rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip disabled:opacity-45"
               disabled={busy() || undoStack().length === 0}
               onClick={undo}
             >
               Undo
             </button>
-            <button
-              type="button"
-              class="rounded border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip disabled:opacity-40"
+            {/* The one action here with no undo — revert clears the stack, so
+                it arms (#408): first press asks, second acts. */}
+            <ArmedButton
+              confirm="Discard all fixes?"
               disabled={busy()}
-              onClick={revertOriginal}
+              onConfirm={revertOriginal}
             >
               Revert to original
-            </button>
+            </ArmedButton>
             <Show when={busy()}>
               <span class="text-xs text-fg-muted">Applying…</span>
             </Show>
@@ -413,7 +415,7 @@ export const FixPane: Component = () => {
               </p>
               <button
                 type="button"
-                class="mt-2 rounded bg-cta px-3 py-1 text-xs font-medium text-fg-on-cta hover:bg-cta-hover"
+                class="mt-2 rounded-sm bg-cta px-3 py-1 text-xs font-medium text-fg-on-cta hover:bg-cta-hover"
                 onClick={() => {
                   setEncoding("windows-1252");
                 }}

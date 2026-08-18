@@ -121,7 +121,7 @@ const RICard: Component<{ links: number; orphans: OrphanResult[] }> = (
       <div class="mt-2 flex flex-col gap-2">
         <For each={props.orphans}>
           {(o) => (
-            <div class="rounded border border-err/45 bg-err-quiet px-3 py-2">
+            <div class="rounded-sm border border-err/45 bg-err-quiet px-3 py-2">
               <div class="flex flex-wrap items-baseline gap-2 text-sm">
                 <span class="mono font-medium text-fg">
                   {o.child} → {o.parent}
@@ -185,7 +185,7 @@ const CompletenessCard: Component<{ groups: GroupCompleteness[] }> = (
       <div class="mt-2 flex flex-col gap-1">
         <For each={props.groups}>
           {(g) => (
-            <div class="rounded border border-line-subtle">
+            <div class="rounded-sm border border-line-subtle">
               <button
                 type="button"
                 class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-surface-raised"
@@ -195,12 +195,12 @@ const CompletenessCard: Component<{ groups: GroupCompleteness[] }> = (
                 <span class="mono font-medium text-fg">{g.code}</span>
                 <span class="text-xs text-fg-dim">{g.total} rows</span>
                 <span
-                  class={`ml-auto rounded px-1.5 py-0.5 text-xs ${fillClass(g.overall)}`}
+                  class={`ml-auto rounded-xs px-1.5 py-0.5 text-xs ${fillClass(g.overall)}`}
                 >
                   {Math.round(g.overall * 100)}% filled
                 </span>
                 <Show when={g.emptyCols.length > 0}>
-                  <span class="rounded bg-err-quiet px-1.5 py-0.5 text-xs text-err">
+                  <span class="rounded-xs bg-err-quiet px-1.5 py-0.5 text-xs text-err">
                     {g.emptyCols.length} empty col
                     {g.emptyCols.length === 1 ? "" : "s"}
                   </span>
@@ -272,7 +272,7 @@ const CoverageCard: Component<{ cov: Coverage }> = (props) => {
         Which boreholes appear in which groups — {missing()} gap
         {missing() === 1 ? "" : "s"} (a borehole with no rows in that group).
       </p>
-      <div class="scroll-region mt-2 rounded border border-line-subtle">
+      <div class="scroll-region mt-2 rounded-sm border border-line-subtle">
         <table class="min-w-full text-xs">
           {/* Two-axis frozen header/column: stack order corner (z-30) > header
               row + pinned column (z-20/z-10) > data cells, all opaque so nothing

@@ -440,7 +440,7 @@ export const ChartBuilder: Component<{
             <Chevron />
             SQL
           </summary>
-          <pre class="mono mt-1 overflow-x-auto rounded border border-line bg-surface-raised p-2 text-fg-soft">
+          <pre class="mono mt-1 overflow-x-auto rounded-sm border border-line bg-surface-raised p-2 text-fg-soft">
             {sql()}
           </pre>
         </details>

@@ -477,10 +477,11 @@
  * The scrim is maroon-tinted, never neutral black, and never blurred — the
  * system is explicit on both counts.
  *
- * `--shadow-*` is a Tailwind theme namespace, so these redefine `shadow-md` and
- * friends for surfaces that import this layer. Same deliberate override
- * metrics.css documents, for the same reason: one elevation scale, and the
- * utilities resolve to it.
+ * Unlike metrics.css, these deliberately do NOT take Tailwind's t-shirt names
+ * (`--shadow-md` and friends stay untouched): a floating layer is reached by
+ * its own name — `shadow-[--shadow-toast]` — and the t-shirt utilities are
+ * gated out of application code entirely (design/no-raw-effects, #408), so a
+ * card cannot reach for a generic elevation that happens to look right.
  */
 :root {
   --shadow-none: none;
@@ -532,6 +533,15 @@
 
   --tooltip-delay: 300ms;
   --toast-life: 4000ms;
+
+  /* Tailwind's bare `transition-*` utilities resolve their defaults through
+     these two, so redefining them puts every undecorated transition on the
+     system's easing and base duration — and on the reduced-motion collapse
+     below, since --dur-base is what it rewrites. A call site states a duration
+     only to be deliberately slower (the toast's fly-in, a panel reveal), never
+     to restate this default (#408). */
+  --default-transition-duration: var(--dur-base);
+  --default-transition-timing-function: var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -541,5 +551,11 @@
     --dur-slow: 0.01ms;
     --dur-panel: 0.01ms;
     --tooltip-delay: 0ms;
+
+    /* The spinner is the one keyframe animation in the system, and
+       `animate-spin` resolves through this variable — so the collapse stays a
+       token concern here too. The frozen arc still reads as "busy" beside its
+       label; what stops is the motion (#408). */
+    --animate-spin: none;
   }
 }

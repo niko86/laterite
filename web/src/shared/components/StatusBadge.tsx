@@ -43,7 +43,7 @@ export const StatusBadge: Component<
     <span
       {...rest}
       class={[
-        "inline-block font-mono font-bold uppercase rounded-[2px]",
+        "inline-block font-mono font-bold uppercase rounded-xs",
         "text-[length:var(--size-bubble)] tracking-[0.09em]",
         solid()
           ? `border ${SOLID[tone()]} text-fg-on-cta px-[0.5rem] py-[0.16rem]`

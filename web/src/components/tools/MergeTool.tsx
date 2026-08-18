@@ -237,7 +237,7 @@ const FilePicker: Component<{
     <input
       type="file"
       accept=".ags,.txt,text/plain"
-      class="text-xs text-fg-muted file:mr-2 file:rounded file:border-0 file:bg-chip file:px-2 file:py-1 file:text-fg-soft"
+      class="text-xs text-fg-muted file:mr-2 file:rounded-sm file:border-0 file:bg-chip file:px-2 file:py-1 file:text-fg-soft"
       onChange={(e) => {
         props.onPick(e);
       }}
@@ -310,7 +310,7 @@ const MergeView: Component<{
       <div class="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          class="rounded bg-cta px-3 py-1.5 text-sm font-medium text-fg-on-cta hover:bg-cta-hover"
+          class="rounded-md bg-cta px-3 py-1.5 text-sm font-medium text-fg-on-cta hover:bg-cta-hover"
           onClick={() => {
             props.onDownload();
           }}

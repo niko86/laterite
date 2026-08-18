@@ -210,7 +210,7 @@ const ShareButton: Component = () => {
     <button
       type="button"
       onClick={() => void copy()}
-      class="rounded border border-line-strong px-2 py-1 text-xs text-fg-soft transition-colors hover:bg-chip"
+      class="rounded-sm border border-line-strong px-2 py-1 text-xs text-fg-soft transition-colors hover:bg-chip"
       title="Copy a link that restores the current dictionary / encoding / view settings"
     >
       {copied() ? "Link copied ✓" : "Share"}

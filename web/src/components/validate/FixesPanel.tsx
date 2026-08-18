@@ -221,14 +221,14 @@ export const FixesPanel: Component<{
             <span class="text-fg">{f.label}</span>
             <a
               href={`#${ruleAnchor(f.rule)}`}
-              class="ml-2 rounded bg-chip px-1.5 py-0.5 text-xs text-fg-soft hover:text-fg"
+              class="ml-2 rounded-sm bg-chip px-1.5 py-0.5 text-xs text-fg-soft hover:text-fg"
             >
               {shortRule(f.rule)}
             </a>
             <Show when={props.severityOf}>
               {(severityOf) => (
                 <span
-                  class={`ml-1.5 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${SEV_BADGE[severityOf()(f)]}`}
+                  class={`ml-1.5 rounded-xs px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${SEV_BADGE[severityOf()(f)]}`}
                 >
                   {severityOf()(f)}
                 </span>
@@ -244,7 +244,7 @@ export const FixesPanel: Component<{
             </p>
           }
         >
-          <pre class="mono mt-2 max-w-full overflow-x-auto rounded bg-surface-code p-2 text-xs leading-relaxed text-fg-soft">
+          <pre class="mono mt-2 max-w-full overflow-x-auto rounded-sm bg-surface-code p-2 text-xs leading-relaxed text-fg-soft">
             <For each={f.edits}>
               {(edit) =>
                 props.aligned?.() ? (
@@ -273,7 +273,7 @@ export const FixesPanel: Component<{
         <div class="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            class="rounded bg-cta px-3 py-1.5 text-sm font-medium text-fg-on-cta hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded-md bg-cta px-3 py-1.5 text-sm font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
             disabled={selectedFixes().length === 0}
             onClick={() => {
               props.onApply(selectedFixes());

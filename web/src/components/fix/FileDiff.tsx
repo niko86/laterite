@@ -61,7 +61,7 @@ export const FileDiff: Component<{
               <span class="text-err">−{r().removed} removed</span>
               <span class="text-fg-dim">vs. the originally-loaded file</span>
               <Show when={r().capped}>
-                <span class="rounded bg-warn-quiet px-1.5 py-0.5 text-warn">
+                <span class="rounded-xs bg-warn-quiet px-1.5 py-0.5 text-warn">
                   large change — shown as a block replace
                 </span>
               </Show>

@@ -1,4 +1,5 @@
 import { For, createSignal, type Component } from "solid-js";
+import { ArmedButton } from "@shared/components";
 import { SAMPLES } from "../../lib/validator";
 import { Disclosure } from "../Disclosure";
 
@@ -6,6 +7,8 @@ export const SampleLoader: Component<{
   onLoad: (bytes: Uint8Array, name: string) => void;
   /** Open the sample list initially (e.g. when the editor is still empty). */
   open?: boolean;
+  /** A file is already loaded, so a sample would discard it — arm first (#408). */
+  replaces?: boolean;
 }> = (props) => {
   const [error, setError] = createSignal<string | null>(null);
 
@@ -34,14 +37,15 @@ export const SampleLoader: Component<{
         <div class="flex flex-wrap gap-2">
           <For each={SAMPLES}>
             {(s) => (
-              <button
-                type="button"
-                onClick={() => void load(s.file)}
-                class="rounded border border-line-strong px-2.5 py-1 text-xs text-fg-soft transition-colors hover:border-accent hover:text-accent"
+              <ArmedButton
+                confirm="Replace loaded file?"
+                armWhen={props.replaces ?? false}
+                onConfirm={() => void load(s.file)}
+                size="sm"
                 title={s.blurb}
               >
                 {s.name}
-              </button>
+              </ArmedButton>
             )}
           </For>
         </div>

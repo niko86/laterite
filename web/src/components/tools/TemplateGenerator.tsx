@@ -20,7 +20,7 @@ import type {
   DictVersionOpt,
 } from "../../lib/validator";
 import { dictVersion, setDictVersion } from "../../lib/settings";
-import { controlClass } from "../../lib/controls";
+import { controlClass, controlFocus } from "../../lib/controls";
 
 // Template generator: pick AGS groups for the SELECTED edition and emit a blank
 // GROUP/HEADING/UNIT/TYPE skeleton (no DATA rows) ready to fill in — with the
@@ -104,7 +104,7 @@ export const TemplateGenerator: Component = () => {
 
       <div class="flex flex-wrap items-center gap-3">
         <input
-          class="min-w-0 flex-1 rounded-lg border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg outline-none placeholder:text-fg-dim"
+          class={`min-w-0 flex-1 rounded-xs border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg ${controlFocus} placeholder:text-fg-dim`}
           placeholder="Search groups… (e.g. LOCA, sample)"
           value={q()}
           onInput={(e) => setQ(e.currentTarget.value)}
@@ -142,7 +142,7 @@ export const TemplateGenerator: Component = () => {
       <div class="flex flex-wrap items-center gap-3 text-sm">
         <button
           type="button"
-          class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-40"
+          class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
           disabled={picked().size === 0}
           onClick={save}
         >
@@ -166,7 +166,7 @@ export const TemplateGenerator: Component = () => {
         <div class="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
           <For each={groups()}>
             {(g) => (
-              <label class="flex cursor-pointer items-start gap-2 rounded border border-line bg-surface px-2 py-1.5 text-sm">
+              <label class="flex cursor-pointer items-start gap-2 rounded-sm border border-line bg-surface px-2 py-1.5 text-sm">
                 <input
                   type="checkbox"
                   class="mt-1"

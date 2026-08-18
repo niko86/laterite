@@ -82,7 +82,7 @@ export const ExportPane: Component = () => {
           <label class="flex flex-col gap-1 text-xs text-fg-muted">
             Edition
             <select
-              class="rounded border border-line bg-surface px-2 py-1 text-sm text-fg"
+              class="rounded-xs border border-line bg-surface px-2 py-1 text-sm text-fg"
               value={edition()}
               onInput={(e) => setEdition(e.currentTarget.value as Edition)}
             >
@@ -94,7 +94,7 @@ export const ExportPane: Component = () => {
           <label class="flex flex-col gap-1 text-xs text-fg-muted">
             Mode
             <select
-              class="rounded border border-line bg-surface px-2 py-1 text-sm text-fg"
+              class="rounded-xs border border-line bg-surface px-2 py-1 text-sm text-fg"
               value={mode()}
               onInput={(e) => setMode(e.currentTarget.value as EmitMode)}
             >
@@ -109,7 +109,7 @@ export const ExportPane: Component = () => {
           Group data (JSON) — an array of{" "}
           <code>{"{ code, headings, rows }"}</code>
           <textarea
-            class="h-64 w-full rounded border border-line bg-surface px-2 py-1 font-mono text-xs text-fg"
+            class="h-64 w-full rounded-xs border border-line bg-surface px-2 py-1 font-mono text-xs text-fg"
             spellcheck={false}
             value={json()}
             onInput={(e) => setJson(e.currentTarget.value)}
@@ -119,7 +119,7 @@ export const ExportPane: Component = () => {
         <div class="mt-3 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            class="rounded border border-accent px-3 py-1.5 font-medium text-accent hover:bg-chip disabled:opacity-50"
+            class="rounded-md border border-accent px-3 py-1.5 font-medium text-accent hover:bg-chip disabled:opacity-45"
             disabled={busy()}
             onClick={() => void build(true)}
           >
@@ -127,7 +127,7 @@ export const ExportPane: Component = () => {
           </button>
           <button
             type="button"
-            class="rounded border border-line-strong px-3 py-1.5 font-medium text-fg-soft hover:bg-chip disabled:opacity-50"
+            class="rounded-md border border-line-strong px-3 py-1.5 font-medium text-fg-soft hover:bg-chip disabled:opacity-45"
             disabled={busy()}
             onClick={() => void build(false)}
           >
@@ -135,7 +135,7 @@ export const ExportPane: Component = () => {
           </button>
           <button
             type="button"
-            class="rounded px-2 py-1.5 text-sm text-fg-muted hover:text-fg"
+            class="rounded-sm px-2 py-1.5 text-sm text-fg-muted hover:text-fg"
             onClick={() => {
               setJson(EXAMPLE);
               setResult(null);
@@ -151,7 +151,7 @@ export const ExportPane: Component = () => {
 
         <Show when={error()}>
           {(err) => (
-            <p class="mt-3 rounded border border-line bg-chip px-3 py-2 text-sm text-warn">
+            <p class="mt-3 rounded-sm border border-line bg-chip px-3 py-2 text-sm text-warn">
               {err()}
             </p>
           )}
@@ -182,7 +182,7 @@ export const ExportPane: Component = () => {
                 </For>
               </ul>
             </Show>
-            <pre class="max-h-96 overflow-auto rounded border border-line bg-surface p-2 font-mono text-xs text-fg">
+            <pre class="max-h-96 overflow-auto rounded-sm border border-line bg-surface p-2 font-mono text-xs text-fg">
               {r().text}
             </pre>
           </Card>

@@ -150,7 +150,7 @@ export const ExcelConverter: Component = () => {
             <button
               type="button"
               disabled={busy() !== null}
-              class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
               onClick={() => void runExport()}
             >
               {busy() === "export"
@@ -168,7 +168,7 @@ export const ExcelConverter: Component = () => {
       <div class="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
         <p class="text-sm font-medium text-fg-soft">Excel → AGS4</p>
         <div class="flex flex-wrap items-center gap-3 text-sm">
-          <label class="cursor-pointer rounded border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip">
+          <label class="cursor-pointer rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip">
             {busy() === "import" ? "Converting…" : "Choose an .xlsx file…"}
             <input
               type="file"
@@ -210,7 +210,7 @@ export const ExcelConverter: Component = () => {
             <Show when={e().retry}>
               <button
                 type="button"
-                class="rounded bg-accent-quiet px-3 py-1 text-xs font-medium text-accent hover:text-accent-hover"
+                class="rounded-sm bg-accent-quiet px-3 py-1 text-xs font-medium text-accent hover:text-accent-hover"
                 disabled={busy() !== null}
                 onClick={() => void lastAttempt?.()}
               >

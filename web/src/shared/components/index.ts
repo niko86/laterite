@@ -10,6 +10,7 @@
 // control in the landing masthead, and #400 requires ONE mechanism rather
 // than a second implementation, so it and lib/theme.ts came across together.
 
+export { ArmedButton } from "./ArmedButton";
 export {
   Button,
   type ButtonSize,

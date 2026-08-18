@@ -11,7 +11,7 @@ import { Spinner } from "../Spinner";
 import { Disclosure } from "../Disclosure";
 import { isLowEndDevice } from "../../lib/device";
 import { createMediaQuery } from "../../lib/media";
-import { controlCompact } from "../../lib/controls";
+import { controlCompact, controlFocus } from "../../lib/controls";
 
 // Free-form SQL over the ingested typed tables. Every group of the loaded
 // file is already a DuckDB table (ExplorePane ingests them all for the
@@ -133,7 +133,7 @@ export const SqlConsole: Component<{
           {(s) => (
             <button
               type="button"
-              class="rounded border border-line-strong px-2 py-0.5 text-fg-soft hover:bg-chip"
+              class="rounded-sm border border-line-strong px-2 py-0.5 text-fg-soft hover:bg-chip"
               onClick={() => {
                 setSql(s.sql);
               }}
@@ -152,7 +152,7 @@ export const SqlConsole: Component<{
         >
           <For each={snippets()}>
             {(s) => (
-              <span class="inline-flex items-center gap-1 rounded border border-line-strong px-2 py-0.5 text-xs">
+              <span class="inline-flex items-center gap-1 rounded-sm border border-line-strong px-2 py-0.5 text-xs">
                 <button
                   type="button"
                   class="text-accent hover:underline"
@@ -179,7 +179,7 @@ export const SqlConsole: Component<{
       </Show>
 
       <textarea
-        class="mono h-32 w-full resize-y rounded-lg border border-line-strong bg-surface-raised p-3 text-xs text-fg outline-none"
+        class={`mono h-32 w-full resize-y rounded-xs border border-line-strong bg-surface-raised p-3 text-xs text-fg ${controlFocus}`}
         spellcheck={false}
         value={sql()}
         onInput={(e) => {
@@ -191,7 +191,7 @@ export const SqlConsole: Component<{
       <div class="flex flex-wrap items-center gap-3 text-xs">
         <button
           type="button"
-          class="rounded bg-surface-raised px-3 py-1.5 font-medium text-fg hover:bg-chip"
+          class="rounded-md bg-surface-raised px-3 py-1.5 font-medium text-fg hover:bg-chip"
           onClick={runIt}
         >
           Run <span class="text-fg-muted">⌘/Ctrl+↵</span>
@@ -204,7 +204,7 @@ export const SqlConsole: Component<{
         />
         <button
           type="button"
-          class="rounded border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-40"
+          class="rounded-sm border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-45"
           disabled={!snipName().trim()}
           onClick={save}
         >

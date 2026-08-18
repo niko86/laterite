@@ -15,7 +15,7 @@ import {
 import type { DictGroup, DictVersionOpt } from "../../lib/validator";
 import { dictVersion, setDictVersion } from "../../lib/settings";
 import { Chevron } from "../Chevron";
-import { controlClass } from "../../lib/controls";
+import { controlClass, controlFocus } from "../../lib/controls";
 
 // Searchable reference for the AGS4 groups + their headings, for the SELECTED
 // edition. Projected from the canonical union `ags_dictionary.json` (the single
@@ -65,7 +65,7 @@ export const DictionaryBrowser: Component = () => {
     <div class="flex min-w-0 flex-col gap-3">
       <div class="flex flex-wrap items-center gap-2">
         <input
-          class="min-w-0 flex-1 rounded-lg border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg outline-none placeholder:text-fg-dim"
+          class={`min-w-0 flex-1 rounded-xs border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg ${controlFocus} placeholder:text-fg-dim`}
           placeholder="Search groups, headings, descriptions, types… (e.g. LOCA, depth, GEOL_TOP, DT)"
           value={q()}
           onInput={(e) => setQ(e.currentTarget.value)}

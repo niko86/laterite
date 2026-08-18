@@ -15,9 +15,11 @@ export const PillToggle: Component<{
     onClick={() => {
       props.onClick();
     }}
-    class="rounded px-3 py-1 font-medium transition-colors"
+    class="rounded-sm px-3 py-1 font-medium transition-colors"
     classList={{
-      "bg-chip text-accent": props.active,
+      // The selected marker for a pill is the QUIET ACCENT fill (#408) — the
+      // neutral chip wash is the hover idiom, not the selected one.
+      "bg-accent-quiet text-accent": props.active,
       "text-fg-muted hover:text-fg": !props.active,
     }}
   >
