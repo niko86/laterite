@@ -88,7 +88,7 @@ const App: Component = () => {
     <div class="min-h-screen flex flex-col">
       <header class="border-b border-line px-4 py-4 sm:px-6">
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 class="text-xl font-semibold text-fg">AGS4 Validator</h1>
+          <h1 class="font-display text-xl font-bold text-fg">AGS4 Validator</h1>
           <span class="hidden text-sm text-fg-muted sm:inline">
             + data explorer
           </span>

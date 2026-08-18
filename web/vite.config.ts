@@ -198,11 +198,12 @@ export default defineConfig({
         short_name: "AGS4 Validator",
         description:
           "Validate, fix and explore AGS4 geotechnical transfer files entirely in your browser — nothing is uploaded.",
-        // Dark Primer canvas (= app's --canvas in dark) for a polished splash
-        // + task-switcher; the running app's status bar is themed dynamically
-        // by the media-queried <meta name="theme-color"> in index.html.
-        theme_color: "#0d1117",
-        background_color: "#0d1117",
+        // The pairing's dark canvas (= --canvas in dark, shared colors.css)
+        // for a polished splash + task-switcher; the running app's status bar
+        // is themed dynamically by the media-queried <meta name="theme-color">
+        // in index.html.
+        theme_color: "#14100f",
+        background_color: "#14100f",
         display: "standalone",
         orientation: "any",
         categories: ["productivity", "utilities"],
@@ -247,6 +248,12 @@ export default defineConfig({
           "assets/ags4_wasm_full_bg-*.wasm",
           "grids/**",
           "**/*.map",
+          // Fontsource's @font-face blocks are unicode-range split per script
+          // (#403): a latin reader fetches the latin files and nothing else.
+          // Precaching the other scripts would be the ONE way those files ever
+          // get requested — the install would download what no page view does.
+          "assets/*-latin-ext-*.woff2",
+          "assets/*-vietnamese-*.woff2",
         ],
         // 3 MiB, down from 8 (#355) — and the drop is what makes this a guard
         // again. The precache carries TIER 1 now, not the full engine, so this
