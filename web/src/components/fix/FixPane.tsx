@@ -9,9 +9,10 @@ import {
 import { fileStore } from "../../lib/fileStore";
 import { computeFixes, applyFixes, validate } from "../../lib/validatorClient";
 import { engineFailureMessage } from "../../lib/engineFailure";
-import type { Fix, ValidationReport } from "../../lib/validator";
+import type { Fix } from "../../lib/validator";
 import { severityOf } from "../../lib/validator";
 import type { Severity } from "../validate/FilterBar";
+import { buildSevIndex, fixSeverity } from "../../lib/fixSeverity";
 import {
   dictVersion,
   encoding,
@@ -33,46 +34,8 @@ import { FileDiff } from "./FileDiff";
 // (so a cp1252 file is fixed in its own encoding, not mis-read as UTF-8);
 // apply_fixes re-encodes the output to UTF-8, so we reset the selector after.
 
-// Severity is a FINDING property, not a FIX one — by design the Rust `Fix`
-// model omits it so the parity oracle's byte-identical JSON can't regress (see
-// wiki design/validator-finding-ux). So to tell whether a fix touches an
-// FYI-classified finding (the surprise: Validate hides FYI by default, yet a
-// fix for it — e.g. a Rule 1 BOM/extended-char — still showed up and got
-// applied here), we map each fix to the severity of the finding it resolves,
-// joining on rule + line against a fresh validation report. Most-severe wins on
-// a tie, so a fix is treated as FYI only when its finding is unambiguously FYI.
-const RANK: Record<Severity, number> = { error: 0, warning: 1, fyi: 2 };
-const moreSevere = (a: Severity, b: Severity): Severity =>
-  RANK[a] <= RANK[b] ? a : b;
-interface SevIndex {
-  byRuleLine: Map<string, Severity>;
-  byRule: Map<string, Severity>;
-}
-function buildSevIndex(report: ValidationReport | undefined): SevIndex {
-  const byRuleLine = new Map<string, Severity>();
-  const byRule = new Map<string, Severity>();
-  if (report)
-    for (const g of report.findings)
-      for (const it of g.items) {
-        const s = severityOf(it);
-        if (it.line != null) {
-          const k = `${g.rule}|${it.line}`;
-          const prev = byRuleLine.get(k);
-          byRuleLine.set(k, prev ? moreSevere(prev, s) : s);
-        }
-        const pr = byRule.get(g.rule);
-        byRule.set(g.rule, pr ? moreSevere(pr, s) : s);
-      }
-  return { byRuleLine, byRule };
-}
-function fixSeverity(idx: SevIndex, f: Fix): Severity {
-  const lines = f.line != null ? [f.line] : f.edits.map((e) => e.line);
-  for (const ln of lines) {
-    const s = idx.byRuleLine.get(`${f.rule}|${ln}`);
-    if (s) return s;
-  }
-  return idx.byRule.get(f.rule) ?? "warning";
-}
+// The fix→severity join lives in lib/fixSeverity (#412) — see its header for
+// why a fix has no severity of its own.
 
 export const FixPane: Component = () => {
   const [fixes] = createResource(
@@ -105,7 +68,14 @@ export const FixPane: Component = () => {
   // outside any fallback and take the whole update down (#359; the shape the
   // warning box in ags-wiki/design/dec-engine-tiering.md records).
   const fixList = () => (fixes.error ? undefined : fixes());
-  const sevReport = () => (report.error ? undefined : report());
+  // `loading` sits in this guard alongside `error` because a Solid resource
+  // keeps its PREVIOUS value across a refetch: without it, the second file you
+  // open is labelled from the first file's report until the new one lands — a
+  // confident badge sourced from different bytes, worse than the `warning`
+  // default #412 removed. So this answers one question only: is there a report
+  // for THESE bytes? Both readers below want that same answer.
+  const sevReport = () =>
+    report.error || report.loading ? undefined : report();
 
   // The guards above stop a rejection THROWING; this is what stops it hiding.
   // Unread, a failed op degrades to the zero-fix state — "Fix all safe (0)",
@@ -126,7 +96,12 @@ export const FixPane: Component = () => {
   // finding it came from), distinct from `severityOf`, which resolves a
   // finding's own. The two used to share a name, and the shadowing hid which
   // was which at each call site.
-  const fixSeverityOf = (f: Fix): Severity => fixSeverity(sevIndex(), f);
+  // `undefined` while there is no report — the badges say "unlabelled" rather
+  // than guessing (#412). That covers the still-LOADING report too, not just a
+  // failed one: both are "nobody has looked yet", and the old default painted
+  // every badge `warning` for that beat on every file.
+  const fixSeverityOf = (f: Fix): Severity | undefined =>
+    fixSeverity(sevIndex(), f);
   // Whether any safe fix also resolves an FYI advisory tied to the same issue
   // (e.g. the Rule 1 BOM strip clears both the Rule 1 finding AND its
   // "FYI (Related to Rule 1)" sibling). Drives the one-line explainer below so
@@ -341,6 +316,21 @@ export const FixPane: Component = () => {
               neighbours' guard-first shape. */}
           <Show when={!fixes.loading && !report.loading && engineFailure()}>
             <p class="text-sm text-err">{engineFailure()}</p>
+            {/* The asymmetric window (#412): `retire()` rejects only the
+                PENDING op, so a computeFixes that already answered survives the
+                worker that died under the labelling validate — real fixes, no
+                report. Gated on there BEING fixes: when both ops reject the
+                panel is empty and there is nothing left to qualify. Says
+                "labels", not "severities", because the fixes' own severity is
+                not what changed — only our ability to name it. */}
+            <Show
+              when={report.error !== undefined && (fixList()?.length ?? 0) > 0}
+            >
+              <p class="text-sm text-fg-muted">
+                Severity labels are unavailable while the fix engine is down —
+                the fixes below are still correct.
+              </p>
+            </Show>
           </Show>
           <div class="flex flex-wrap items-center gap-2 text-sm">
             <button

@@ -87,7 +87,11 @@ function severityMark(severity: Severity): string {
 /** Severity stated in FORM as well as hue (#404): error is a solid fill,
  *  warning a 3px stratum tick, fyi a hairline stencil — three shapes the Chip
  *  primitive already carries, so the tiers stay apart in greyscale. */
-const SEVERITY_CHIP: Record<
+/** Exported so FixesPanel badges a fix with the SAME chip the finding it
+ *  resolves wears (#412). Duplicating it there let the two drift apart on the
+ *  next tone tweak, which is exactly the mismatch a shared badge exists to
+ *  prevent. */
+export const SEVERITY_CHIP: Record<
   Severity,
   { tone: ChipTone; variant: ChipVariant }
 > = {
