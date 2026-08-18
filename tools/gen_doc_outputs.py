@@ -62,8 +62,9 @@ for cli, `laterite-node/dist` for node, the installed wheel for python,
 TWO SURFACES TAKE THEIR ARTIFACT FROM THE ENVIRONMENT, and both are the same
 question asked twice: `LAT_BIN` for cli and `WASM_PKG_DIR` for wasm. Nightly's
 `docs-vs-released-*` legs run these examples against the PUBLISHED artifact
-rather than this tree's build, so which one was used is a measurement — printed
-by `_lat()` and `_link_wasm()` rather than assumed.
+rather than this tree's build, so which one was used is a measurement rather than
+an assumption — and it is PRINTED either way: `main()` prints what `_lat()`
+resolved, `_link_wasm()` prints the package it linked.
 """
 
 from __future__ import annotations
@@ -194,7 +195,14 @@ def _wasm_pkg() -> Path:
     published name, and the symlink below is still what makes that resolve.
     """
     if env := os.environ.get("WASM_PKG_DIR"):
-        return Path(env)
+        # RESOLVED, because the two things done with this path resolve relative
+        # paths against DIFFERENT directories: the existence check below reads it
+        # from the cwd, while the symlink target is looked up from the link's own
+        # directory, deep under `web/docs-site/examples/`. A relative
+        # `WASM_PKG_DIR` would pass the check and then write a dangling link —
+        # every example dying with ERR_MODULE_NOT_FOUND directly under a printed
+        # line saying the package was found.
+        return Path(env).resolve()
     return WASM_PKG
 
 
@@ -216,8 +224,14 @@ def _link_wasm() -> None:
         )
     print(f"wasm package: {pkg}")
     WASM_LINK.parent.mkdir(parents=True, exist_ok=True)
-    if WASM_LINK.is_symlink() or WASM_LINK.exists():
+    # A REAL directory can sit here, not just the symlink this writes: anyone
+    # pointing WASM_PKG_DIR at an installed package is the same person liable to
+    # have run `npm install @laterite/ags4-wasm` in the examples tree first, and
+    # `unlink()` on a directory raises instead of replacing it.
+    if WASM_LINK.is_symlink() or WASM_LINK.is_file():
         WASM_LINK.unlink()
+    elif WASM_LINK.is_dir():
+        shutil.rmtree(WASM_LINK)
     WASM_LINK.symlink_to(pkg, target_is_directory=True)
 
 

@@ -221,7 +221,12 @@ Key facts:
   class here, not two: a README doctest has no committed `.out`, so there is no
   drift half — it compiles and runs, or it does not. Out of `notify` all the
   same, with the released-vs-tree pair printed per crate to separate a defect
-  from ordinary tree-ahead drift.
+  from ordinary tree-ahead drift — and printed only as far as it goes, since a
+  version it could not read establishes no direction at all. A crate that is
+  publishable but **not yet uploaded** (`publish_crates.py`'s `DEFERRED` state,
+  earmarked next for `laterite-ags4-excel`) is reported as *unasked*, never
+  failed: "not released yet" must not arrive looking like "the released README is
+  broken".
 - **Changelog page — generated, version-stamped (#372).** `reference/changelog.md`
   is built by `web/docs-site/scripts/gen_changelog.py` (a `gen-files` script)
   from the repo-root `CHANGELOG.md` plus the shipped version read from

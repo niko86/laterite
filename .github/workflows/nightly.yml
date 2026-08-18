@@ -600,16 +600,36 @@ jobs:
           EOF
           )
           # The publish date, because the version pair cannot carry this one on its
-          # own (see the job header). `npm view` serves it per version.
-          published=$(npm view @laterite/ags4-wasm time --json \
-            | python3 -c "import json,sys; print(json.load(sys.stdin).get('$released','unknown'))")
+          # own (see the job header). `npm view` serves it per version — and this
+          # is CONTEXT, so it must not be able to take the job down: a registry
+          # 5xx or a rate-limit would otherwise abort the step under `pipefail`
+          # before either measurement below runs, and the only signal is an email
+          # indistinguishable from this leg's documented expected-red. Hence the
+          # fetch and the parse are separate: `|| true` keeps a failed lookup out
+          # of `pipefail`'s reach, and empty input then falls out of the parse as
+          # the same one "unknown" the parse failure gives.
+          raw=$(npm view @laterite/ags4-wasm time --json 2>/dev/null || true)
+          published=$(printf '%s' "$raw" | python3 -c "
+          import json, sys
+          try:
+              print(json.load(sys.stdin).get('$released', 'unknown'))
+          except Exception:
+              print('unknown — the registry did not answer')
+          ")
           echo "released npm : $released (published $published)"
           echo "this tree    : $tree (HEAD $(git log -1 --format=%cI))"
           echo "The browser package releases on its own \`wasm-v*\` tag, so equal"
           echo "version numbers do NOT mean equal artifacts — compare the dates."
       # The expected-drift class, and it runs FIRST because `--check` writes
-      # nothing: it reports drift without being able to mask anything the fatal
-      # step below would otherwise find.
+      # nothing — so it cannot mask what the fatal step below would find.
+      #
+      # It does NOT report on every example, and the limit is worth knowing while
+      # this leg sits in its expected-red state: `--check` runs the examples
+      # before comparing any of them, and `run_example` exits hard on the first
+      # wrong exit code. Examples sorted after the failing one are neither run nor
+      # compared. That is inherited from the CLI half of the wheel leg rather than
+      # chosen here, and it errs the safe way — under-reporting drift, never
+      # hiding a failure to run, which the step below answers for all five.
       - name: Committed .out still byte-matches (informational)
         continue-on-error: true
         run: python3 tools/gen_doc_outputs.py --check --surface wasm

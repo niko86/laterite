@@ -81,14 +81,29 @@ RUST_FENCE = re.compile(r"^```rust[^\n]*\n(?P<body>.*?)^```$", re.M | re.S)
 #: The root of a `use` path — the crate the example needs on its dependency line.
 USE_ROOT = re.compile(r"^\s*use\s+([a-z][a-z0-9_]*)\s*(?:::|;)", re.M)
 
+#: Any path root, `use` line or not — `laterite_ags4_parse::ParseError` in a
+#: return type needs the dependency just as much as an import does. Admitted only
+#: when it names one of OURS (see `example_deps`), which is what keeps it from
+#: fetching a stranger.
+PATH_ROOT = re.compile(r"(?<![\w:.])([a-z][a-z0-9_]*)::")
+
 #: Roots that name no crate. `crate`/`self`/`super` are relative paths, and the
 #: three implicit ones are already there.
 NOT_A_DEPENDENCY = frozenset({"std", "core", "alloc", "crate", "self", "super"})
 
-#: The scratch consumer's edition — 2024, which is BOTH what `cargo new` gives a
-#: reader today and what the crates themselves are, so the doctest compiles under
-#: the same rules on either side of the registry.
-EDITION = "2024"
+#: Fallback edition for the scratch consumer. Only reached if a manifest omits
+#: `edition`; the real value is read per-crate, because rustdoc compiles a README
+#: doctest under the CONSUMER's edition and a leg compiling under different rules
+#: from the crate's own doctest would report phantom breakage.
+DEFAULT_EDITION = "2024"
+
+#: `cargo add` saying "this crate is not on crates.io", which is a state of
+#: release prep and NOT a broken README. `publish_crates.py` holds crates back
+#: deliberately (its `DEFERRED` set), and a crate prepared for the registry but
+#: not yet uploaded would otherwise fail here identically to one whose published
+#: example is broken. Same distinction `check_package_contents.NOT_YET_PUBLISHABLE`
+#: draws, read off the same cargo message rather than off a second list.
+NOT_ON_REGISTRY = "no matching package named"
 
 
 def die(msg: str) -> None:
@@ -106,6 +121,8 @@ class Subject:
     tree_version: str
     #: Registry names to `cargo add`, the crate itself first.
     deps: tuple[str, ...]
+    #: The crate's own edition, which rustdoc will compile its doctest under.
+    edition: str
 
 
 def _manifest(crate: str) -> dict:
@@ -153,18 +170,34 @@ def registry_name(root: str, ours: set[str]) -> str:
 
 
 def example_deps(readme_text: str, crate: str, ours: set[str]) -> tuple[str, ...]:
-    """`crate` first, then every other crate its README's rust fences import."""
-    roots = [
-        root
-        for fence in RUST_FENCE.finditer(readme_text)
-        for root in USE_ROOT.findall(fence.group("body"))
-        if root not in NOT_A_DEPENDENCY
-    ]
+    """`crate` first, then every other crate its README's rust fences need.
+
+    TWO PASSES, and the asymmetry between them is the whole safety property.
+
+    A `use` root is taken as written, whatever it names: an example that imports
+    a third-party crate needs it, and `serde_json` can only be discovered this
+    way. Any OTHER path root — `laterite_ags4_parse::ParseError` in a return
+    type, with no matching import — is admitted **only if it resolves to one of
+    ours**. Bare-root matching cannot be trusted in general, because
+    `use laterite::ags4;` followed by `ags4::read(…)` would otherwise send
+    `cargo add ags4` at the registry; requiring the second pass to hit a crate
+    directory in `rust-packages/` closes the gap for our own crates without ever
+    reaching for a stranger's.
+    """
     deps = [crate]
-    for root in roots:
-        name = registry_name(root, ours)
+
+    def admit(name: str) -> None:
         if name not in deps:
             deps.append(name)
+
+    for fence in RUST_FENCE.finditer(readme_text):
+        body = fence.group("body")
+        for root in USE_ROOT.findall(body):
+            if root not in NOT_A_DEPENDENCY:
+                admit(registry_name(root, ours))
+        for root in PATH_ROOT.findall(body):
+            if root not in NOT_A_DEPENDENCY and root.replace("_", "-") in ours:
+                admit(registry_name(root, ours))
     return tuple(deps)
 
 
@@ -180,10 +213,16 @@ def subjects() -> list[Subject]:
     ours = workspace_crate_names()
     for readme in sorted(RUST.glob("*/README.md")):
         crate = readme.parent.name
+        # A rust-fenced README in a directory with no manifest is not a crate at
+        # all. The two scans disagree about what a subdirectory is, and the
+        # disagreement must not come out as a bare traceback from `_manifest`.
+        if crate not in ours:
+            continue
         text = readme.read_text(encoding="utf-8")
         if not RUST_FENCE.search(text):
             continue
-        if _manifest(crate)["package"].get("publish") is False:
+        pkg = _manifest(crate)["package"]
+        if pkg.get("publish") is False:
             continue
         out.append(
             Subject(
@@ -191,6 +230,7 @@ def subjects() -> list[Subject]:
                 readme=readme,
                 tree_version=_tree_version(crate),
                 deps=example_deps(text, crate, ours),
+                edition=str(pkg.get("edition", DEFAULT_EDITION)),
             )
         )
     return out
@@ -215,7 +255,12 @@ def scaffold(subject: Subject, into: Path) -> Path:
         "[package]\n"
         f'name = "readme-{subject.crate}"\n'
         'version = "0.0.0"\n'
-        f'edition = "{EDITION}"\n'
+        # The SUBJECT crate's edition, not a constant: rustdoc compiles a README
+        # doctest under the CONSUMER's edition, so a fixed one here would compile
+        # the example under different rules from the crate's own in-tree doctest
+        # the moment a crate moves edition — and report the difference as the
+        # released crate being broken.
+        f'edition = "{subject.edition}"\n'
         "publish = false\n",
         encoding="utf-8",
     )
@@ -231,7 +276,9 @@ def scaffold(subject: Subject, into: Path) -> Path:
     return root
 
 
-def _run(argv: list[str], cwd: Path, env_target: Path) -> subprocess.CompletedProcess:
+def _run(
+    argv: list[str], cwd: Path, env_target: Path, capture: bool = False
+) -> subprocess.CompletedProcess:
     """One cargo invocation, with the shared target dir.
 
     Shared across all ten consumers on purpose: they overlap almost entirely in
@@ -239,12 +286,27 @@ def _run(argv: list[str], cwd: Path, env_target: Path) -> subprocess.CompletedPr
     difference between a nightly leg that fits in its timeout and one that does
     not.
     """
-    return subprocess.run(
+    proc = subprocess.run(
         argv,
         cwd=cwd,
         env={**os.environ, "CARGO_TARGET_DIR": str(env_target)},
         text=True,
+        capture_output=capture,
     )
+    if capture:
+        print(proc.stdout, end="")
+        print(proc.stderr, end="", file=sys.stderr)
+    return proc
+
+
+def add_argv(subject: Subject) -> list[str]:
+    """The `cargo add` this consumer runs — every dependency FROM THE REGISTRY.
+
+    Its own function so a test can assert what it does not contain. `--path` here
+    is the one edit that would silently turn this leg back into a second copy of
+    the workspace's doctest run, and no compiler would ever object to it.
+    """
+    return ["cargo", "add", *subject.deps]
 
 
 def resolved_version(root: Path, crate: str) -> str:
@@ -258,21 +320,53 @@ def resolved_version(root: Path, crate: str) -> str:
     return "?"
 
 
-def check(subject: Subject, work: Path, target: Path) -> bool:
-    """Compile (and run) `subject`'s README example against the released crate."""
+def drift(released: str, tree: str) -> str:
+    """How the two versions relate, stated only as far as they support.
+
+    This line is, by the nightly leg's own design, the only thing separating a
+    real defect from ordinary tree-ahead drift — so it must not assert a
+    DIRECTION it has not established. An unread version says so; a tree that is
+    BEHIND the registry (a release cut from elsewhere) is its own sentence, not
+    the same one.
+    """
+    if "?" in (released, tree):
+        return "  VERSION UNREAD — cannot say which side is ahead"
+    if released == tree:
+        return "  same version — any failure below is a real defect"
+
+    def key(v: str) -> tuple:
+        return tuple(int(p) if p.isdigit() else p for p in re.split(r"[.\-+]", v))
+
+    try:
+        ahead = key(tree) > key(released)
+    except TypeError:  # a prerelease against a plain triple; don't guess
+        return "  VERSIONS DIFFER — compare them by hand"
+    if ahead:
+        return "  TREE IS AHEAD — unreleased API in the README fails until a release"
+    return "  TREE IS BEHIND the registry — this checkout predates the release"
+
+
+def check(subject: Subject, work: Path, target: Path) -> bool | None:
+    """Compile (and run) `subject`'s README example against the released crate.
+
+    True passed, False failed, None not on the registry yet (see `NOT_ON_REGISTRY`).
+    """
     print(f"\n=== {subject.crate}", flush=True)
     root = scaffold(subject, work)
 
-    added = _run(["cargo", "add", *subject.deps], root, target)
+    argv = add_argv(subject)
+    added = _run(argv, root, target, capture=True)
     if added.returncode != 0:
-        print(f"  FAIL cargo add {' '.join(subject.deps)} — see the output above")
+        if NOT_ON_REGISTRY in added.stderr:
+            print("  SKIP — not on crates.io yet, so there is no release to ask")
+            return None
+        print(f"  FAIL {' '.join(argv)} — see the output above")
         return False
 
     released = resolved_version(root, subject.crate)
     print(f"  released crate : {released}")
     print(f"  this tree      : {subject.tree_version}")
-    if released != subject.tree_version:
-        print("  TREE IS AHEAD — unreleased API in the README fails until a release")
+    print(drift(released, subject.tree_version))
     print(f"  dependencies   : {' '.join(subject.deps)}", flush=True)
 
     return _run(["cargo", "test", "--doc"], root, target).returncode == 0
@@ -325,16 +419,28 @@ def main() -> int:
         work = Path(tmp.name)
     target = work / ".target"
 
+    failed: list[str] = []
+    skipped: list[str] = []
     try:
-        failed = [s.crate for s in found if not check(s, work, target)]
+        for s in found:
+            verdict = check(s, work, target)
+            if verdict is None:
+                skipped.append(s.crate)
+            elif not verdict:
+                failed.append(s.crate)
     finally:
         if tmp is not None:
             tmp.cleanup()
 
+    asked = len(found) - len(skipped)
     print(
-        f"\n{len(found) - len(failed)}/{len(found)} README example(s) compile "
+        f"\n{asked - len(failed)}/{asked} README example(s) compile "
         "against the crate on crates.io"
     )
+    # Never silently: a leg that covered less than it appears to is the failure
+    # this repo has been bitten by before (#207).
+    if skipped:
+        print("not on the registry yet, so unasked: " + ", ".join(skipped))
     if failed:
         print("FAILED: " + ", ".join(failed), file=sys.stderr)
         return 1
