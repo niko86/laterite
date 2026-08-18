@@ -237,7 +237,7 @@ export const Anonymiser: Component = () => {
           <label class="flex items-center gap-1.5 text-xs text-fg-muted">
             Preset
             <Select
-              class="w-auto"
+              width="w-auto"
               value={preset()}
               onChange={(e) =>
                 setPreset(e.currentTarget.value as Preset | "custom")
@@ -260,7 +260,7 @@ export const Anonymiser: Component = () => {
           <label class="flex items-center gap-1.5 text-xs text-fg-muted">
             token
             <Input
-              class="w-28"
+              width="w-28"
               value={token()}
               onInput={(e) => setToken(e.currentTarget.value)}
             />

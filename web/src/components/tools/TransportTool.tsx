@@ -147,7 +147,7 @@ export const TransportTool: Component = () => {
             type="password"
             placeholder="Passphrase"
             autocomplete="new-password"
-            class="w-48"
+            width="w-48"
             value={lockPass()}
             onInput={(e) => setLockPass(e.currentTarget.value)}
           />
@@ -209,7 +209,7 @@ export const TransportTool: Component = () => {
             type="password"
             placeholder="Passphrase"
             autocomplete="new-password"
-            class="w-48"
+            width="w-48"
             value={unlockPass()}
             onInput={(e) => setUnlockPass(e.currentTarget.value)}
           />

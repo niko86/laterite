@@ -276,7 +276,8 @@ export const SqlBuilder: Component<{
               </span>
               <Select
                 aria-label="table"
-                class="font-mono min-w-0 flex-1 max-w-md"
+                mono
+                width="min-w-0 flex-1 max-w-md"
                 value={table()}
                 onChange={(e) => setTable(e.currentTarget.value)}
               >
@@ -295,7 +296,7 @@ export const SqlBuilder: Component<{
                 <Show when={joined()}>
                   <Select
                     aria-label="join type"
-                    class="w-auto"
+                    width="w-auto"
                     value={joinKind()}
                     onChange={(e) =>
                       setJoinKind(e.currentTarget.value as "LEFT" | "INNER")
@@ -307,7 +308,8 @@ export const SqlBuilder: Component<{
                 </Show>
                 <Select
                   aria-label="related group"
-                  class="font-mono min-w-0 flex-1 max-w-md"
+                  mono
+                  width="min-w-0 flex-1 max-w-md"
                   value={joinCode()}
                   onChange={(e) => {
                     const v = e.currentTarget.value;
@@ -391,7 +393,7 @@ export const SqlBuilder: Component<{
               <div class="flex flex-wrap items-center gap-1.5 text-xs">
                 <Select
                   aria-label="filter column"
-                  class="w-auto"
+                  width="w-auto"
                   value={
                     joined() ? `${cond.alias ?? BASE}.${cond.col}` : cond.col
                   }
@@ -412,7 +414,7 @@ export const SqlBuilder: Component<{
                 </Select>
                 <Select
                   aria-label="filter operator"
-                  class="w-auto"
+                  width="w-auto"
                   value={cond.op}
                   onChange={(e) => setCond(i(), { op: e.currentTarget.value })}
                 >
@@ -421,7 +423,7 @@ export const SqlBuilder: Component<{
                 <Show when={cond.op === "LIKE"}>
                   <Select
                     aria-label="filter wildcard"
-                    class="w-auto"
+                    width="w-auto"
                     value={cond.wildcard ?? "contains"}
                     onChange={(e) =>
                       setCond(i(), {
@@ -436,7 +438,7 @@ export const SqlBuilder: Component<{
                 </Show>
                 <Show when={cond.op !== "IS NULL" && cond.op !== "IS NOT NULL"}>
                   <Input
-                    class="w-32"
+                    width="w-32"
                     placeholder="value"
                     value={cond.val}
                     onInput={(e) =>
@@ -469,7 +471,7 @@ export const SqlBuilder: Component<{
             <label class="flex items-center gap-2 text-xs text-fg-muted">
               Order by
               <Select
-                class="w-auto"
+                width="w-auto"
                 value={orderBy()}
                 onChange={(e) => setOrderBy(e.currentTarget.value)}
               >
@@ -480,7 +482,7 @@ export const SqlBuilder: Component<{
               </Select>
               <Select
                 aria-label="order direction"
-                class="w-auto"
+                width="w-auto"
                 value={orderDir()}
                 onChange={(e) =>
                   setOrderDir(e.currentTarget.value as "ASC" | "DESC")
@@ -496,7 +498,7 @@ export const SqlBuilder: Component<{
                 type="number"
                 min="0"
                 title="0 = no limit (every row)"
-                class="w-20"
+                width="w-20"
                 value={limit()}
                 onInput={(e) => setLimit(Number(e.currentTarget.value) || 0)}
               />

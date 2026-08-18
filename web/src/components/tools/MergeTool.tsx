@@ -145,7 +145,7 @@ export const MergeTool: Component = () => {
             If the files type a column differently:
           </span>
           <Select
-            class="w-auto"
+            width="w-auto"
             value={onTypeClash()}
             onChange={(e) =>
               setOnTypeClash(e.currentTarget.value as TypeClashMode)
@@ -161,31 +161,31 @@ export const MergeTool: Component = () => {
             Stamp a merge transmission (all five, or none):
           </span>
           <Input
-            class="w-16"
+            width="w-16"
             placeholder="issue"
             value={issue()}
             onInput={(e) => setIssue(e.currentTarget.value)}
           />
           <Input
-            class="w-28"
+            width="w-28"
             placeholder="yyyy-mm-dd"
             value={date()}
             onInput={(e) => setDate(e.currentTarget.value)}
           />
           <Input
-            class="w-24"
+            width="w-24"
             placeholder="producer"
             value={producer()}
             onInput={(e) => setProducer(e.currentTarget.value)}
           />
           <Input
-            class="w-24"
+            width="w-24"
             placeholder="recipient"
             value={recipient()}
             onInput={(e) => setRecipient(e.currentTarget.value)}
           />
           <Input
-            class="w-20"
+            width="w-20"
             placeholder="status"
             value={status()}
             onInput={(e) => setStatus(e.currentTarget.value)}

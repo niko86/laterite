@@ -16,11 +16,26 @@ const CARET = [
 ].join(" ");
 
 export const Select: Component<
-  { class?: string } & JSX.SelectHTMLAttributes<HTMLSelectElement>
+  {
+    /** AGS codes and column names — options that should align like a column. */
+    mono?: boolean;
+    /** Sizing utilities (`w-auto`, `min-w-0 flex-1`); replaces `w-full min-w-0` — see Input. */
+    width?: string;
+    class?: string;
+  } & JSX.SelectHTMLAttributes<HTMLSelectElement>
 > = (props) => {
-  const [own, rest] = splitProps(props, ["class", "children"]);
+  const [own, rest] = splitProps(props, ["mono", "width", "class", "children"]);
   return (
-    <select {...rest} class={`${CONTROL_CLASS} ${CARET} ${own.class ?? ""}`}>
+    <select
+      {...rest}
+      class={[
+        own.width ?? "w-full min-w-0",
+        own.mono ? "font-mono" : "font-ui",
+        CONTROL_CLASS,
+        CARET,
+        own.class ?? "",
+      ].join(" ")}
+    >
       {own.children}
     </select>
   );

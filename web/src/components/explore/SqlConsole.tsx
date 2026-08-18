@@ -153,16 +153,19 @@ export const SqlConsole: Component<{
           <For each={snippets()}>
             {(s) => (
               <span class="inline-flex items-center gap-1 rounded-sm border border-line-strong px-2 py-0.5 text-xs">
-                <Button
-                  variant="ghost"
-                  size="sm"
+                {/* The link idiom (see AnalyseView): the snippet name reads
+                    as an inline link in its chip, not a Button family —
+                    repainting a ghost from the call site is the drift
+                    Button.tsx itself warns against. */}
+                <button
+                  type="button"
                   class="text-accent hover:text-accent-hover"
                   onClick={() => {
                     setSql(s.sql);
                   }}
                 >
                   {s.name}
-                </Button>
+                </button>
                 {/* Native: the destructive ghost hover (muted -> err) the
                     Button primitive doesn't model — see SqlBuilder. */}
                 <button
@@ -196,7 +199,7 @@ export const SqlConsole: Component<{
           Run <span class="text-cta/70">⌘/Ctrl+↵</span>
         </Button>
         <Input
-          class="w-32"
+          width="w-32"
           placeholder="snippet name"
           value={snipName()}
           onInput={(e) => setSnipName(e.currentTarget.value)}

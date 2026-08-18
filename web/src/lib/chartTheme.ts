@@ -6,16 +6,20 @@ import { theme } from "../shared/lib/theme";
 // re-read when the theme flips: callers touch `theme()` through here, so a
 // memo that spreads these values rebuilds on toggle.
 //
-// THE PALETTE IS TOKEN STEPS, VALIDATED, AND THE DARK HALF IS A KNOWN
-// COMPROMISE. Light `laterite-500/300/700` passes the dataviz validator's six
-// checks on the light surface (one sanctioned contrast WARN on sand — the
-// legend and the results table beneath the chart are its required relief).
-// The same steps resolve through the dark-shifted ramp for dark, where the
-// validator shows no fully-passing sequence EXISTS in this vocabulary: the
-// brand ramp is sequential by construction, and the dark surface squeezes it
-// below the normal-vision separation floor. Maximum-separation steps ship;
-// the token-extension decision is #434. Fixed assignment, never re-ranked:
-// colour follows the series, not its position after a filter.
+// THE PALETTE IS TOKEN STEPS, AND THE DARK HALF IS A KNOWN COMPROMISE. The
+// sequence was chosen against the dataviz palette validator — the instrument
+// to re-run after any ramp edit, never prose to trust — which seated a
+// passing head trio on the light surface and could not on the dark one: the
+// brand ramp is sequential by construction, and the dark surface squeezes
+// adjacent steps together. The extension to six keeps that recorded head
+// (500/300/700) and interleaves the remaining band so every added neighbour
+// pair clears the floors the head pair cannot; #434 records the verdicts and
+// owns the token-extension decision. Step 200 is excluded: dark mode does not
+// re-map it, so it collides with dark 300. Beyond six values ECharts cycles
+// and colours repeat — the honest fix is folding into "Other", a behavioural
+// change this presentation ticket doesn't take. Assignment is ECharts' series
+// order; entity-stable colour across filters would need the builder to pin
+// colours per value, not taken here either.
 const readVar = (name: string): string =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -41,6 +45,9 @@ export function chartTokens(): ChartTokens {
       readVar("--laterite-500"),
       readVar("--laterite-300"),
       readVar("--laterite-700"),
+      readVar("--laterite-400"),
+      readVar("--laterite-900"),
+      readVar("--laterite-600"),
     ],
     fgSoft: readVar("--fg-soft"),
     fgDim: readVar("--fg-dim"),

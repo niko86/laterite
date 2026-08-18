@@ -20,7 +20,7 @@ import type {
   DictVersionOpt,
 } from "../../lib/validator";
 import { dictVersion, setDictVersion } from "../../lib/settings";
-import { controlFocus } from "../../lib/controls";
+import { searchControl } from "../../lib/controls";
 import { Button, Checkbox, Select } from "@shared/components";
 
 // Template generator: pick AGS groups for the SELECTED edition and emit a blank
@@ -104,11 +104,8 @@ export const TemplateGenerator: Component = () => {
       </p>
 
       <div class="flex flex-wrap items-center gap-3">
-        {/* The prominent search role — deliberately larger (px-3 py-2) than the
-            Input control, per lib/controls.ts; radius + focus are the same
-            contract (#408). */}
         <input
-          class={`min-w-0 flex-1 rounded-xs border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg ${controlFocus} placeholder:text-fg-dim`}
+          class={`min-w-0 flex-1 ${searchControl}`}
           placeholder="Search groups… (e.g. LOCA, sample)"
           value={q()}
           onInput={(e) => setQ(e.currentTarget.value)}
@@ -121,7 +118,7 @@ export const TemplateGenerator: Component = () => {
         <label class="flex items-center gap-1.5 text-xs text-fg-muted">
           AGS edition
           <Select
-            class="w-auto"
+            width="w-auto"
             value={dictVersion()}
             onChange={(e) => {
               setDictVersion(e.currentTarget.value as DictVersionOpt);

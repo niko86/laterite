@@ -272,7 +272,7 @@ export const CoordinateTool: Component = () => {
             <label class="flex items-center gap-1.5 text-fg-muted">
               Source grid
               <Select
-                class="w-auto"
+                width="w-auto"
                 value={crs()}
                 onChange={(e) => setCrs(e.currentTarget.value as SystemId)}
               >
