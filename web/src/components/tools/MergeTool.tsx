@@ -1,3 +1,4 @@
+import { Button, Input, Select } from "@shared/components";
 import {
   createResource,
   createSignal,
@@ -8,7 +9,6 @@ import {
 import { mergeFiles, type MergeConversion } from "../../lib/validatorClient";
 import { fileStore } from "../../lib/fileStore";
 import { downloadBlob, baseName } from "../../lib/download";
-import { controlCompact } from "../../lib/controls";
 import type { TypeClashMode } from "../../lib/validator";
 
 // Merge: reconcile two AGS4 deliveries of one project into one file, in the
@@ -144,8 +144,8 @@ export const MergeTool: Component = () => {
           <span class="text-fg-dim">
             If the files type a column differently:
           </span>
-          <select
-            class={controlCompact}
+          <Select
+            class="w-auto"
             value={onTypeClash()}
             onChange={(e) =>
               setOnTypeClash(e.currentTarget.value as TypeClashMode)
@@ -154,38 +154,38 @@ export const MergeTool: Component = () => {
             <For each={CLASH_MODES}>
               {(m) => <option value={m.value}>{m.label}</option>}
             </For>
-          </select>
+          </Select>
         </label>
         <span class="flex items-center gap-1.5">
           <span class="text-fg-dim">
             Stamp a merge transmission (all five, or none):
           </span>
-          <input
-            class={`${controlCompact} w-16`}
+          <Input
+            class="w-16"
             placeholder="issue"
             value={issue()}
             onInput={(e) => setIssue(e.currentTarget.value)}
           />
-          <input
-            class={`${controlCompact} w-28`}
+          <Input
+            class="w-28"
             placeholder="yyyy-mm-dd"
             value={date()}
             onInput={(e) => setDate(e.currentTarget.value)}
           />
-          <input
-            class={`${controlCompact} w-24`}
+          <Input
+            class="w-24"
             placeholder="producer"
             value={producer()}
             onInput={(e) => setProducer(e.currentTarget.value)}
           />
-          <input
-            class={`${controlCompact} w-24`}
+          <Input
+            class="w-24"
             placeholder="recipient"
             value={recipient()}
             onInput={(e) => setRecipient(e.currentTarget.value)}
           />
-          <input
-            class={`${controlCompact} w-20`}
+          <Input
+            class="w-20"
             placeholder="status"
             value={status()}
             onInput={(e) => setStatus(e.currentTarget.value)}
@@ -234,6 +234,9 @@ const FilePicker: Component<{
 }> = (props) => (
   <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-line-strong bg-surface px-3 py-3 text-sm hover:border-accent">
     <span class="font-medium text-fg-soft">{props.label}</span>
+    {/* Native file input inside the dashed drop-target label — the system's
+        drop-zone idiom; the ::file-selector-button pseudo is the one control
+        no primitive can wrap. */}
     <input
       type="file"
       accept=".ags,.txt,text/plain"
@@ -275,6 +278,8 @@ const MergeError: Component<{
           <For each={offers()}>
             {(m) => (
               <li>
+                {/* The link idiom (see AnalyseView): a suggestion that reads
+                    as a link, not a Button family. */}
                 <button
                   type="button"
                   class="text-accent underline hover:no-underline"
@@ -308,15 +313,14 @@ const MergeView: Component<{
   return (
     <div class="flex min-w-0 flex-col gap-3">
       <div class="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          class="rounded-md bg-cta px-3 py-1.5 text-sm font-medium text-fg-on-cta hover:bg-cta-hover"
+        <Button
+          variant="primary"
           onClick={() => {
             props.onDownload();
           }}
         >
           Download merged (.ags)
-        </button>
+        </Button>
         <span class="text-xs text-fg-dim">
           {r.revisions.length} row revision{r.revisions.length === 1 ? "" : "s"}{" "}
           · {r.warnings.length} warning{r.warnings.length === 1 ? "" : "s"}

@@ -71,6 +71,9 @@ export const RuleExplainer: Component = () => {
 
   return (
     <div class="flex min-w-0 flex-col gap-3">
+      {/* The prominent search role — deliberately larger (px-3 py-2) than the
+          Input control, per lib/controls.ts; radius + focus are the same
+          contract (#408). */}
       <input
         class={`w-full rounded-xs border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg ${controlFocus} placeholder:text-fg-dim`}
         placeholder="Search rules… (e.g. duplicate, datetime, heading)"

@@ -20,7 +20,8 @@ import type {
   DictVersionOpt,
 } from "../../lib/validator";
 import { dictVersion, setDictVersion } from "../../lib/settings";
-import { controlClass, controlFocus } from "../../lib/controls";
+import { controlFocus } from "../../lib/controls";
+import { Button, Checkbox, Select } from "@shared/components";
 
 // Template generator: pick AGS groups for the SELECTED edition and emit a blank
 // GROUP/HEADING/UNIT/TYPE skeleton (no DATA rows) ready to fill in — with the
@@ -103,24 +104,24 @@ export const TemplateGenerator: Component = () => {
       </p>
 
       <div class="flex flex-wrap items-center gap-3">
+        {/* The prominent search role — deliberately larger (px-3 py-2) than the
+            Input control, per lib/controls.ts; radius + focus are the same
+            contract (#408). */}
         <input
           class={`min-w-0 flex-1 rounded-xs border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg ${controlFocus} placeholder:text-fg-dim`}
           placeholder="Search groups… (e.g. LOCA, sample)"
           value={q()}
           onInput={(e) => setQ(e.currentTarget.value)}
         />
-        <label class="flex cursor-pointer items-center gap-1.5 text-xs text-fg-muted">
-          <input
-            type="checkbox"
-            checked={requiredOnly()}
-            onChange={(e) => setRequiredOnly(e.currentTarget.checked)}
-          />
-          Required headings only
-        </label>
+        <Checkbox
+          label="Required headings only"
+          checked={requiredOnly()}
+          onChange={(e) => setRequiredOnly(e.currentTarget.checked)}
+        />
         <label class="flex items-center gap-1.5 text-xs text-fg-muted">
           AGS edition
-          <select
-            class={controlClass}
+          <Select
+            class="w-auto"
             value={dictVersion()}
             onChange={(e) => {
               setDictVersion(e.currentTarget.value as DictVersionOpt);
@@ -135,20 +136,17 @@ export const TemplateGenerator: Component = () => {
                 </option>
               )}
             </For>
-          </select>
+          </Select>
         </label>
       </div>
 
       <div class="flex flex-wrap items-center gap-3 text-sm">
-        <button
-          type="button"
-          class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
-          disabled={picked().size === 0}
-          onClick={save}
-        >
+        <Button variant="primary" disabled={picked().size === 0} onClick={save}>
           Download template ({picked().size})
-        </button>
+        </Button>
         <Show when={picked().size > 0}>
+          {/* The link idiom (see AnalyseView): an undo-suggestion that reads
+              as inline text, not a Button family. */}
           <button
             type="button"
             class="text-xs text-fg-muted underline-offset-2 hover:text-fg hover:underline"
@@ -166,6 +164,9 @@ export const TemplateGenerator: Component = () => {
         <div class="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
           <For each={groups()}>
             {(g) => (
+              /* Native in-label input: the label is a bordered list row with
+                 a mono code + muted description — richer than the Checkbox
+                 primitive's string label (the FixesPanel call). */
               <label class="flex cursor-pointer items-start gap-2 rounded-sm border border-line bg-surface px-2 py-1.5 text-sm">
                 <input
                   type="checkbox"

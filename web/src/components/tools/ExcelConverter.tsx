@@ -1,3 +1,4 @@
+import { Button, Checkbox } from "@shared/components";
 import { createSignal, For, onMount, Show, type Component } from "solid-js";
 import { fileStore } from "../../lib/fileStore";
 import {
@@ -147,16 +148,15 @@ export const ExcelConverter: Component = () => {
           }
         >
           <div class="flex flex-wrap items-center gap-3 text-sm">
-            <button
-              type="button"
+            <Button
+              variant="primary"
               disabled={busy() !== null}
-              class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
               onClick={() => void runExport()}
             >
               {busy() === "export"
                 ? "Converting…"
                 : "Download as Excel (.xlsx)"}
-            </button>
+            </Button>
             <span class="text-xs text-fg-faint">
               from {fileStore.name() || "the loaded file"}
             </span>
@@ -168,6 +168,8 @@ export const ExcelConverter: Component = () => {
       <div class="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
         <p class="text-sm font-medium text-fg-soft">Excel → AGS4</p>
         <div class="flex flex-wrap items-center gap-3 text-sm">
+          {/* Native file input inside the bordered picker label — the
+              file-selector idiom; no primitive wraps a hidden <input type=file>. */}
           <label class="cursor-pointer rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip">
             {busy() === "import" ? "Converting…" : "Choose an .xlsx file…"}
             <input
@@ -182,14 +184,11 @@ export const ExcelConverter: Component = () => {
               }}
             />
           </label>
-          <label class="flex cursor-pointer items-center gap-1.5 text-xs text-fg-muted">
-            <input
-              type="checkbox"
-              checked={formatNumeric()}
-              onChange={(e) => setFormatNumeric(e.currentTarget.checked)}
-            />
-            Re-format numeric columns to their TYPE
-          </label>
+          <Checkbox
+            label="Re-format numeric columns to their TYPE"
+            checked={formatNumeric()}
+            onChange={(e) => setFormatNumeric(e.currentTarget.checked)}
+          />
         </div>
         <p class="text-xs text-fg-faint">
           Each sheet needs a <code class="mono">HEADING</code> column; columns
@@ -208,14 +207,13 @@ export const ExcelConverter: Component = () => {
               retired when its engine failed — so this really re-fetches
               rather than re-reading a settled rejection (#357). */}
             <Show when={e().retry}>
-              <button
-                type="button"
-                class="rounded-sm bg-accent-quiet px-3 py-1 text-xs font-medium text-accent hover:text-accent-hover"
+              <Button
+                variant="outline"
                 disabled={busy() !== null}
                 onClick={() => void lastAttempt?.()}
               >
                 Try again
-              </button>
+              </Button>
             </Show>
           </div>
         )}

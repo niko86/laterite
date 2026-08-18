@@ -101,6 +101,9 @@ const FilePicker: Component<{
 }> = (props) => (
   <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-dashed border-line-strong bg-surface px-3 py-3 text-sm hover:border-accent">
     <span class="font-medium text-fg-soft">{props.label}</span>
+    {/* Native file input inside the dashed drop-target label — the system's
+        drop-zone idiom; the ::file-selector-button pseudo is the one control
+        no primitive can wrap (the MergeTool call). */}
     <input
       type="file"
       accept=".ags,.txt,text/plain"

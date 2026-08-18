@@ -10,7 +10,7 @@ import {
 import { splitAgsFields } from "../../lib/agsline";
 import { fileStore } from "../../lib/fileStore";
 import { downloadBlob, baseName } from "../../lib/download";
-import { controlCompact } from "../../lib/controls";
+import { Button, Checkbox, Input, Select } from "@shared/components";
 import { censorFile, type CensorResult } from "../../lib/validatorClient";
 import {
   loadSensitive,
@@ -236,8 +236,8 @@ export const Anonymiser: Component = () => {
         <div class="flex flex-wrap items-center gap-3 text-sm">
           <label class="flex items-center gap-1.5 text-xs text-fg-muted">
             Preset
-            <select
-              class={controlCompact}
+            <Select
+              class="w-auto"
               value={preset()}
               onChange={(e) =>
                 setPreset(e.currentTarget.value as Preset | "custom")
@@ -246,34 +246,30 @@ export const Anonymiser: Component = () => {
               <For each={PRESETS}>
                 {(p) => <option value={p.id}>{p.label}</option>}
               </For>
-            </select>
+            </Select>
           </label>
-          <button
-            type="button"
-            class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
+          <Button
+            variant="primary"
             disabled={busy() || selected().size === 0}
             onClick={() => void save()}
           >
             {busy()
               ? "Redacting…"
               : `Download redacted (${selectedCells()} cells)`}
-          </button>
+          </Button>
           <label class="flex items-center gap-1.5 text-xs text-fg-muted">
             token
-            <input
-              class={`w-28 ${controlCompact}`}
+            <Input
+              class="w-28"
               value={token()}
               onInput={(e) => setToken(e.currentTarget.value)}
             />
           </label>
-          <label class="flex items-center gap-1.5 text-xs text-fg-muted">
-            <input
-              type="checkbox"
-              checked={dropCustom()}
-              onChange={(e) => setDropCustom(e.currentTarget.checked)}
-            />
-            drop non-standard groups
-          </label>
+          <Checkbox
+            label="drop non-standard groups"
+            checked={dropCustom()}
+            onChange={(e) => setDropCustom(e.currentTarget.checked)}
+          />
         </div>
 
         <Show when={note()}>
@@ -294,6 +290,10 @@ export const Anonymiser: Component = () => {
                       const key = colKey(g.code, h);
                       const action = () => acts().get(h);
                       return (
+                        /* Native in-label input: the label carries the
+                           selection-state repaint and an action badge — richer
+                           than the Checkbox primitive's string label (the
+                           FixesPanel call). */
                         <label class="flex cursor-pointer items-center gap-1 text-xs">
                           <input
                             type="checkbox"
