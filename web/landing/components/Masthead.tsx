@@ -52,9 +52,11 @@ export const Masthead: Component = () => (
           /* The plate is dark-chrome only (#400): the mark's outline is maroon
              and disappears into a near-black canvas without it.
 
-             The ramp token by reference, not `bg-stone-50` — that class is
-             TAILWIND's stone (cool grey), while ours is warm; the two differ by
-             enough to read as a grey chip behind a warm mark. No semantic token
+             The ramp token by reference, not Tailwind's own stone background
+             utility — that palette is the COOL stone, while ours is warm; the
+             two differ by enough to read as a grey chip behind a warm mark.
+             The class is named in prose, not spelled, for the same reason as
+             the filter note above: spelling it here re-emits it. No semantic token
              fits: every surface role flips dark with the theme, and this plate
              must stay light in dark chrome, which is the whole point of it. */
           class="size-7 rounded-[5px] dark:bg-[var(--stone-50)] dark:p-[3px]"

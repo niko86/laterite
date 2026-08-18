@@ -29,8 +29,10 @@ import globals from "globals";
 
 // The raw-palette gate (#404). Application colour resolves through the shared
 // tokens (ok/warn/err/info/accent/cta + their -quiet washes, the laterite
-// ramp, the neutral roles) — a raw Tailwind palette class (`bg-emerald-600`,
-// `text-sky-50`) or a pasted hex (`#0ea5e9` was sky-500 wearing a disguise)
+// ramp, the neutral roles) — a raw Tailwind palette class (`bg-emerald-*`,
+// `text-sky-*`; starred here because Tailwind scans THIS file as raw text and
+// a complete class in a comment is emitted into the app's stylesheet) or a
+// pasted hex (`#0ea5e9` was sky-500 wearing a disguise)
 // bypasses the vocabulary and breaks in one theme or the other. The banned
 // family names are READ OUT OF tailwindcss's own shipped theme rather than
 // restated here, so the list tracks the vendor instead of rotting against it.
