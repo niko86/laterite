@@ -6,9 +6,9 @@
 //! (if it's a real divergence) is frozen as a finding; a seen one
 //! advances staleness. `stale_soft` → **auto-permute** (rotate the
 //! target along the blind-spot backlog / toggle the scaffold —
-//! escaping the dead end *without* asking Claude). `stale_hard` →
-//! stop, emit a frontier report, exit 2 (Claude authors the next
-//! strategy). The binary embeds no LLM.
+//! escaping the dead end *without* a new strategy). `stale_hard` →
+//! stop, emit a frontier report, exit 2 (the next strategy is
+//! authored by hand). The binary embeds no LLM.
 //!
 //! Determinism: every choice consumes the strategy-seeded `Rng`, the
 //! ledger cold-starts deterministically in a fresh out-dir, and Rust
@@ -345,7 +345,7 @@ fn maybe_permute(
         *status = "stalled";
         permutes.push(serde_json::json!({
             "generation": iter_n, "reason": "stale_hard",
-            "action": "emit frontier — Claude must author the next strategy"
+            "action": "emit frontier — the next strategy must be authored by hand"
         }));
         return;
     }

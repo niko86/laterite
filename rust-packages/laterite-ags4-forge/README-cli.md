@@ -4,8 +4,8 @@ Evolutionary AGS4 dual-validation dogfood generator. It **generates**
 AGS4 files and runs each through the in-process Rust validator and
 (when available) the official `python-ags4`, classifying every result
 with the shared `laterite-ags4-parity` model (the same `classify`/`reconcile`
-+ O-2/O-3/O-26/O-30/O-34 arms `laterite-ags4-corpus-qa` uses). Claude authors a
-declarative strategy; this binary is the deterministic
++ O-2/O-3/O-26/O-30/O-34 arms `laterite-ags4-corpus-qa` uses). A declarative
+strategy file drives the loop; this binary is the deterministic
 mutate/validate/report muscle and embeds **no LLM**.
 
 > Status: **complete (P0–P5)** — `check`, `gen`, `run` (the

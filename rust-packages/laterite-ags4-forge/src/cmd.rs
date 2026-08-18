@@ -26,7 +26,7 @@ use crate::strategy::{ConfidenceCfg, Strategy};
 use crate::synth::Scaffold;
 
 /// Next free `O-N` from the canonical OBSERVATIONS authority (the CLI
-/// only drafts the stub; Claude writes the ratified entry).
+/// only drafts the stub; the author writes the ratified entry).
 fn next_obs_id() -> String {
     let p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../laterite-ags4-validator/OBSERVATIONS.md");
@@ -279,7 +279,7 @@ pub fn run(args: &RunArgs, ctx: Ctx) -> Result<i32> {
         );
         return Ok(5);
     }
-    // Flag-built strategy; a `--strategy` file (the Claude↔CLI
+    // Flag-built strategy; a `--strategy` file (the author↔CLI
     // contract) wins wholesale if given (already schema-validated by
     // `Strategy::load`).
     let strat = if let Some(sp) = &args.strategy {
@@ -361,7 +361,7 @@ pub fn run(args: &RunArgs, ctx: Ctx) -> Result<i32> {
 
     // ddmin every finding to a minimal, signature-preserving repro +
     // a drafted insight/O-N stub (the §12.5 hand-off). The CLI only
-    // drafts — Claude ratifies and writes OBSERVATIONS.md.
+    // drafts — the author ratifies and writes OBSERVATIONS.md.
     if !outcome.report.findings.is_empty() {
         let repro_root = run_dir(&out, &run_id).join("repros");
         let next = next_obs_id();
