@@ -2,8 +2,8 @@
 // driven by EITHER engine build (#338, see ags-wiki/design/dec-engine-tiering.md).
 //
 // The worker used to bind its engine by static import, which meant a second
-// worker running a DIFFERENT build could not exist without duplicating all
-// thirteen ops. Here the engine is a parameter, so the always-on worker can run
+// worker running a DIFFERENT build could not exist without duplicating every
+// op. Here the engine is a parameter, so the always-on worker can run
 // the tier-1 engine and a lazily-created one can run the full engine for Explore
 // and Excel, off the same code.
 //
@@ -18,7 +18,6 @@ import type {
   ValidationReport,
   Fix,
   RevisionDelta,
-  StandardDict,
   ExportResult,
   TypeClashMode,
 } from "./validator";
@@ -46,7 +45,6 @@ export type CoreEngineApi = Pick<
   | "diff"
   | "merge"
   | "censor"
-  | "dictionary"
   | "build_ags4"
 >;
 
@@ -205,14 +203,6 @@ export interface CensorReq {
   dropCustom: boolean;
   includeFreetext: boolean;
 }
-/** Load the bundled STANDARD dictionary for an edition (Tools reference).
- *  Carries no file bytes — it reads the engine's own per-edition dict. */
-export interface DictionaryReq {
-  id: number;
-  kind: "dictionary";
-  /** "auto"/null → the fallback edition; else 4.0.3|4.0.4|4.1|4.1.1|4.2. */
-  edition: string | null;
-}
 /** Build valid AGS4 from per-group data (Export tab). Carries no file bytes
  *  — `groupsJson` is the `[{code, headings, rows}, …]` shape `build_ags4` wants. */
 export interface ToAgs4Req {
@@ -247,7 +237,6 @@ export type WorkerReq =
   | RevisionDiffReq
   | MergeReq
   | CensorReq
-  | DictionaryReq
   | ToAgs4Req
   | ExcelExportReq
   | ExcelImportReq;
@@ -278,7 +267,6 @@ export type WorkerRes =
       warningsJson: string;
       revisionsJson: string;
     }
-  | { id: number; ok: true; kind: "dictionary"; dict: StandardDict }
   | { id: number; ok: true; kind: "censor"; text: string; tally: CensorTally }
   | { id: number; ok: true; kind: "toAgs4"; result: ExportResult }
   | {
@@ -324,7 +312,6 @@ export function createEngineDispatch(engine: EngineApi, reply: Reply) {
     diff,
     merge,
     censor,
-    dictionary,
     build_ags4,
     ags4_to_xlsx,
     xlsx_to_ags4,
@@ -481,12 +468,6 @@ export function createEngineDispatch(engine: EngineApi, reply: Reply) {
         text: res.text,
         tally: res.tally,
       });
-      return;
-    }
-
-    if (req.kind === "dictionary") {
-      const dict = dictionary(req.edition ?? undefined);
-      reply({ id: req.id, ok: true, kind: "dictionary", dict });
       return;
     }
 

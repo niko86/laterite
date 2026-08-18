@@ -20,7 +20,7 @@ import {
   type Reply,
 } from "./engineDispatch";
 import type { WorkerRes } from "./engineDispatch";
-import type { StandardDict, ValidationReport } from "./validator";
+import type { ValidationReport } from "./validator";
 import type { ParsedDataset } from "../wasm-full/ags4_wasm_full.js";
 
 /** Only the members a given test actually exercises need to be real. */
@@ -34,7 +34,6 @@ const fakeEngine = (over: Partial<EngineApi> = {}): EngineApi =>
     diff: vi.fn(() => ({})),
     merge: vi.fn(() => fakeMergeResult()),
     censor: vi.fn(() => ({ text: "scrubbed", tally: {} })),
-    dictionary: vi.fn(() => ({ ags_edition: "4.1.1", groups: [] })),
     build_ags4: vi.fn(() => ({})),
     ags4_to_xlsx: vi.fn(() => fakeExcelResult()),
     xlsx_to_ags4: vi.fn(() => fakeExcelResult()),
@@ -108,39 +107,56 @@ const validateReq = (over = {}) =>
     ...over,
   }) as Parameters<ReturnType<typeof createEngineDispatch>>[0];
 
+/** wasm has no clock, so `checkedAt` is always the caller's — fixed here so a
+ *  test can assert on it. */
+const CHECKED_AT = "2026-08-16T00:00:00Z";
+
+const certifyReq = (over = {}) =>
+  ({
+    id: 1,
+    kind: "certify",
+    bytes: new ArrayBuffer(0),
+    dict: null,
+    encoding: "utf-8",
+    checkedAt: CHECKED_AT,
+    ...over,
+  }) as Parameters<ReturnType<typeof createEngineDispatch>>[0];
+
+// These three watch the injection itself, not the op they drive it with. They
+// used `dictionary` until #349 retired it; `certify` carries them now because
+// it is the same shape of witness — a core op every build has, one call in and
+// one reply out — and nothing here is about certification.
 describe("engine injection", () => {
   it("routes an op to the engine it was constructed with", async () => {
-    const dict = {
-      ags_edition: "4.1.1",
-      groups: [],
-    } as unknown as StandardDict;
-    const dictionary = vi.fn(() => dict);
+    const certify = vi.fn(() => '{"v":2}');
     const { at, reply } = collect();
 
-    const dispatch = createEngineDispatch(fakeEngine({ dictionary }), reply);
-    await dispatch({ id: 7, kind: "dictionary", edition: "4.1.1" });
+    const dispatch = createEngineDispatch(fakeEngine({ certify }), reply);
+    await dispatch(certifyReq({ id: 7 }));
 
-    expect(dictionary).toHaveBeenCalledWith("4.1.1");
-    expect(at(0).msg).toEqual({ id: 7, ok: true, kind: "dictionary", dict });
+    expect(certify).toHaveBeenCalledWith(
+      expect.any(Uint8Array),
+      expect.objectContaining({ checkedAt: CHECKED_AT }),
+    );
+    expect(at(0).msg).toEqual({
+      id: 7,
+      ok: true,
+      kind: "cert",
+      json: '{"v":2}',
+    });
   });
 
   it("gives two dispatches genuinely separate engines", async () => {
     // The property the second worker depends on. If the engine were captured at
     // module scope instead of per-dispatch, both of these would hit the same fn.
-    const a = vi.fn(() => ({ ags_edition: "4.1.1", groups: [] }));
-    const b = vi.fn(() => ({ ags_edition: "4.2", groups: [] }));
+    const a = vi.fn(() => '{"engine":"a"}');
+    const b = vi.fn(() => '{"engine":"b"}');
 
-    const dispatchA = createEngineDispatch(
-      fakeEngine({ dictionary: a }),
-      () => {},
-    );
-    const dispatchB = createEngineDispatch(
-      fakeEngine({ dictionary: b }),
-      () => {},
-    );
+    const dispatchA = createEngineDispatch(fakeEngine({ certify: a }), () => {});
+    const dispatchB = createEngineDispatch(fakeEngine({ certify: b }), () => {});
 
-    await dispatchA({ id: 1, kind: "dictionary", edition: null });
-    await dispatchB({ id: 2, kind: "dictionary", edition: null });
+    await dispatchA(certifyReq({ id: 1 }));
+    await dispatchB(certifyReq({ id: 2 }));
 
     expect(a).toHaveBeenCalledTimes(1);
     expect(b).toHaveBeenCalledTimes(1);
@@ -153,13 +169,11 @@ describe("engine injection", () => {
       throw new Error("engine exploded");
     });
     const dispatch = createEngineDispatch(
-      fakeEngine({ dictionary: boom }),
+      fakeEngine({ certify: boom }),
       () => {},
     );
 
-    await expect(
-      dispatch({ id: 1, kind: "dictionary", edition: null }),
-    ).rejects.toThrow(/engine exploded/);
+    await expect(dispatch(certifyReq())).rejects.toThrow(/engine exploded/);
   });
 });
 
@@ -170,7 +184,7 @@ describe("engine injection", () => {
 // failure has to name the op and the reason: an engine build is not something a
 // reader can see from "undefined is not a function" inside a wasm shim.
 describe("an engine build without arrow or excel", () => {
-  // The nine ops tier 1 serves — the same list `validator.worker.ts` passes.
+  // The eight ops tier 1 serves — the same list `validator.worker.ts` passes.
   const tier1Engine = () => {
     const {
       validate,
@@ -180,7 +194,6 @@ describe("an engine build without arrow or excel", () => {
       diff,
       merge,
       censor,
-      dictionary,
       build_ags4,
     } = fakeEngine();
     return {
@@ -191,7 +204,6 @@ describe("an engine build without arrow or excel", () => {
       diff,
       merge,
       censor,
-      dictionary,
       build_ags4,
     };
   };
@@ -200,9 +212,9 @@ describe("an engine build without arrow or excel", () => {
     const { at, reply } = collect();
     const dispatch = createEngineDispatch(tier1Engine(), reply);
 
-    await dispatch({ id: 1, kind: "dictionary", edition: null });
+    await dispatch(certifyReq());
 
-    expect(at(0).msg).toMatchObject({ id: 1, ok: true, kind: "dictionary" });
+    expect(at(0).msg).toMatchObject({ id: 1, ok: true, kind: "cert" });
   });
 
   it("names `read` when asked to parse", async () => {
@@ -470,17 +482,15 @@ describe("the request → engine argument contract", () => {
     expect(arrow_ipc).toHaveBeenLastCalledWith("LOCA", true, true);
   });
 
-  it("normalises the nullable options of diff, merge, dictionary, certify and toAgs4", async () => {
+  it("normalises the nullable options of diff, merge, certify and toAgs4", async () => {
     const diff = vi.fn(() => ({}));
     const merge = vi.fn(() => fakeMergeResult());
-    const dictionary = vi.fn(() => ({ ags_edition: "4.1.1", groups: [] }));
     const certify = vi.fn(() => "{}");
     const build_ags4 = vi.fn(() => ({}));
     const dispatch = createEngineDispatch(
       fakeEngine({
         diff: diff as unknown as EngineApi["diff"],
         merge: merge as unknown as EngineApi["merge"],
-        dictionary: dictionary as unknown as EngineApi["dictionary"],
         certify: certify as unknown as EngineApi["certify"],
         build_ags4: build_ags4 as unknown as EngineApi["build_ags4"],
       }),
@@ -522,11 +532,6 @@ describe("the request → engine argument contract", () => {
         tran: undefined,
       },
     );
-
-    // "auto" arrives as null and must become "the bundled edition", not a
-    // dictionary literally named null.
-    await dispatch({ id: 3, kind: "dictionary", edition: null });
-    expect(dictionary).toHaveBeenCalledWith(undefined);
 
     await dispatch({
       id: 4,

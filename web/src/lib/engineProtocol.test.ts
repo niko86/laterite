@@ -130,15 +130,6 @@ describe("settle", () => {
     });
   });
 
-  it("dictionary → the standard dict", () => {
-    const dict = { edition: "4.1.1" } as never;
-    const { resolved } = outcome(
-      { id: 1, ok: true, kind: "dictionary", dict },
-      "dictionary",
-    );
-    expect(resolved).toBe(dict);
-  });
-
   it("censor → the scrubbed text plus the tally", () => {
     const tally = { pseudonymised: 3 } as never;
     const { resolved } = outcome(
@@ -204,7 +195,6 @@ describe("settle", () => {
       "revisionDelta",
       "mergeResult",
       "censor",
-      "dictionary",
       "toAgs4",
       "excel",
     ];

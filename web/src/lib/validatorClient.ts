@@ -25,7 +25,6 @@ import type {
   ExportResult,
   Fix,
   RevisionDelta,
-  StandardDict,
   TypeClashMode,
 } from "./validator";
 import type { GroupMeta } from "./duckTypes";
@@ -375,23 +374,6 @@ export function censorFile(
       },
       bytes,
       { kind: "censor", resolve, reject },
-    );
-  });
-}
-
-/** The bundled STANDARD dictionary for an edition (Tools reference) — the real
- *  per-edition AGS4 dictionary (canonical names + descriptions + units + types
- *  + status). `edition`: "auto"/null → the fallback edition; else 4.0.3…4.2. */
-export function dictionary(
-  edition: DictVersionOpt | null,
-): Promise<StandardDict> {
-  return new Promise((resolve, reject) => {
-    primary.postBare(
-      {
-        kind: "dictionary",
-        edition: edition && edition !== "auto" ? edition : null,
-      },
-      { kind: "dictionary", resolve, reject },
     );
   });
 }
