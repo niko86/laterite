@@ -4,8 +4,8 @@
 # spec-valid file from the bundled standard dictionary then inject one
 # targeted violation), runs each through the in-process Rust validator
 # and (confidence-gated) python-ags4, and evolves toward novel
-# divergences. Claude authors a declarative strategy; this binary is
-# the deterministic mutate/evolve/report muscle and embeds NO LLM.
+# divergences. A declarative strategy file drives the loop; this binary
+# is the deterministic mutate/evolve/report muscle and embeds NO LLM.
 #
 # Reuses laterite-ags4-validator (lib API), the shared laterite-ags4-parity crate
 # (classify/reconcile/PyOracle/Rng — identical verdict semantics to

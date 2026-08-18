@@ -77,7 +77,7 @@ pub enum Commands {
     /// signature-preserving reproducer (e.g. a corpus-qa ACTION file).
     Minimize(MinimizeArgs),
     /// Author / schema-check / explain a declarative strategy file
-    /// (the Claude↔CLI contract). `validate` runs nothing (read-only).
+    /// (the author↔CLI contract). `validate` runs nothing (read-only).
     Strategy(StrategyArgs),
     /// Inspect the persistent parity-confidence ledger.
     Confidence(ConfidenceArgs),
@@ -332,8 +332,8 @@ const HELP_EPILOG: &str = "--readme  print the full CLI guide and exit.
 exit codes:
   0  success / no parity action (clean or documented divergence)
   1  parity action present — a real Rust↔python divergence to triage
-  2  run stalled — stale_hard reached, frontier.json emitted; Claude
-     must author the next (permuted) strategy
+  2  run stalled — stale_hard reached, frontier.json emitted; the
+     next (permuted) strategy must be authored by hand
   3  I/O — file not found / out-dir unwritable
   5  bad args (unknown --scaffold / --inject / --combine token)
 

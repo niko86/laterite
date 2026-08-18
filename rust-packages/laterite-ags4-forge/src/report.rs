@@ -496,7 +496,7 @@ pub struct RunReport {
 }
 
 impl RunReport {
-    /// The `stale_hard` hand-back to Claude: everything needed to
+    /// The `stale_hard` hand-back: everything needed to
     /// author the next (permuted) strategy, minus the bulky candidate
     /// stream.
     pub fn frontier(&self) -> serde_json::Value {
