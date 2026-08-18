@@ -45,10 +45,11 @@ function resolveVar(tokens: Record<string, string>, name: string): string {
   let value = tokens[name];
   if (value === undefined) throw new Error(`undefined token --${name}`);
   for (;;) {
-    const ref = value.match(/^var\(--([\w-]+)\)$/)?.[1];
+    const ref: string | undefined = value.match(/^var\(--([\w-]+)\)$/)?.[1];
     if (ref === undefined) break;
-    value = tokens[ref] as string;
-    if (value === undefined) throw new Error(`undefined token --${ref}`);
+    const next: string | undefined = tokens[ref];
+    if (next === undefined) throw new Error(`undefined token --${ref}`);
+    value = next;
   }
   if (!/^#[0-9a-f]{6}$/i.test(value)) {
     throw new Error(`--${name} did not resolve to a hex colour: ${value}`);
