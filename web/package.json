@@ -38,6 +38,8 @@
     "e2e:ui": "playwright test --ui",
     "knip": "knip",
     "sync-icons": "node scripts/sync-icons.mjs",
+    "sync-docs-tokens": "node scripts/sync-docs-tokens.mjs",
+    "check:docs-tokens": "node scripts/sync-docs-tokens.mjs --check",
     "check:no-emoji": "node scripts/check-no-emoji.mjs"
   },
   "dependencies": {

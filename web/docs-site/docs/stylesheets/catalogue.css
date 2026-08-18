@@ -11,39 +11,131 @@
   min-width: 100%;
 }
 
-/* Group-catalogue master table: filter box + pager (see javascripts/catalogue.js). */
+/* ── The catalogue spotlight (#401) ──
+ *
+ * THE one sanctioned spotlight on this site. The direction allows exactly one
+ * object per surface to lift out of the page with a border, a warm shadow and a
+ * strata cap; on the apex it is the group tables, and here it is the catalogue.
+ * The restraint is the point — a second spotlight makes the first one furniture.
+ *
+ * Behaviour is unchanged: the filter, the 20-per-page pager, the family cards and
+ * "show all" are javascripts/catalogue.js as before, and this is a restyle of a
+ * working thing. */
+.group-table {
+  position: relative;
+  margin: 1.5rem 0;
+  padding: 1rem 0.9rem 0.6rem;
+  border: 1px solid var(--laterite-200);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  /* Warm, not neutral: the shadow is cast by a maroon page, not a grey one — and
+     it says so in the TOKEN rather than in maroon's current hex, so a retune of
+     the ramp reaches here along with every other surface. */
+  box-shadow:
+    0 14px 34px -18px color-mix(in srgb, var(--laterite-900) 38%, transparent),
+    0 2px 6px -2px color-mix(in srgb, var(--laterite-900) 14%, transparent);
+}
+
+/* The card deliberately does NOT clip its overflow, and the strata cap carries
+   its own corner radius instead (below).
+   Material renders the table itself as an `inline-block` with `overflow: auto`,
+   so the TABLE is the horizontal scroll container — the six columns are wider
+   than the reading column and the last of them is reached by scrolling it. A
+   clipping ancestor would hide the edge of a scroller the reader still has to
+   use, which is a worse failure than it looks: the column appears cut off
+   rather than scrollable. */
+
+/* Dark lifts by LIGHTENING — the raised surface does the work and the shadow
+   goes black and secondary, because a warm shadow on near-black is invisible. */
+[data-md-color-scheme="slate"] .group-table {
+  background: var(--surface-raised);
+  border-color: var(--laterite-800);
+  box-shadow:
+    0 14px 34px -18px rgb(0 0 0 / 62%),
+    0 2px 6px -2px rgb(0 0 0 / 40%);
+}
+
+/* The 3px four-band strata cap. A gradient here rather than a solid band because
+   the catalogue is EVERY group — the apex uses a solid cap on a table that is
+   one group, precisely so the two cannot be confused. */
+.group-table::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  /* Its own radius, because the card no longer clips (see above). */
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: linear-gradient(
+    to right,
+    var(--laterite-300),
+    var(--laterite-400) 33%,
+    var(--laterite-500) 66%,
+    var(--laterite-700)
+  );
+}
+
+/* Caption: the group count and the dictionary edition span, both written by
+   scripts/gen_groups.py from the registry that generates the table itself. */
+.group-caption {
+  margin: 0 0 0.6rem;
+  font-family: var(--family-mono);
+  font-size: var(--size-micro);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--track-micro);
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
 .group-table .group-filter {
   width: 100%;
   box-sizing: border-box;
-  padding: 0.5rem 0.7rem;
-  margin: 0.4rem 0 0.8rem;
-  border: 1px solid var(--md-default-fg-color--lighter);
-  border-radius: 0.2rem;
-  background: var(--md-default-bg-color);
-  color: var(--md-default-fg-color);
-  font-size: 0.78rem;
+  padding: 0.4rem 0.6rem;
+  margin: 0 0 0.7rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--canvas);
+  color: var(--fg);
+  font-family: var(--family-ui);
+  font-size: var(--size-caption);
 }
 
 .group-table .group-filter:focus {
   outline: none;
-  border-color: var(--md-accent-fg-color);
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 
 .group-pager {
   display: flex;
   align-items: center;
-  gap: 0.8rem;
-  margin: 0.8rem 0;
+  gap: 0.7rem;
+  margin: 0.7rem 0 0.2rem;
+}
+
+/* Mono throughout — the pager counts records, and every number on this site that
+   counts something sets in the data face. */
+.group-pager button,
+.group-pager-info {
+  font-family: var(--family-mono);
+  font-size: var(--size-micro);
+  letter-spacing: var(--track-micro);
 }
 
 .group-pager button {
-  padding: 0.3rem 0.75rem;
-  border: 1px solid var(--md-default-fg-color--lighter);
-  border-radius: 0.2rem;
-  background: var(--md-default-bg-color);
-  color: var(--md-primary-fg-color);
-  font-size: 0.75rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--canvas);
+  color: var(--accent);
   cursor: pointer;
+  transition:
+    background var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) var(--ease-out);
+}
+
+.group-pager button:hover:not(:disabled) {
+  background: var(--accent-quiet);
+  border-color: var(--accent);
 }
 
 .group-pager button:disabled {
@@ -55,11 +147,15 @@
    way back to the unfiltered table. */
 .group-pager .group-clear {
   margin-left: auto;
-  border-color: var(--md-accent-fg-color);
-  color: var(--md-accent-fg-color);
+  border-color: var(--cta);
+  color: var(--cta);
+}
+.group-pager .group-clear:hover {
+  background: var(--cta-quiet);
+  border-color: var(--cta);
 }
 
 .group-pager-info {
-  color: var(--md-default-fg-color--light);
-  font-size: 0.72rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
 }

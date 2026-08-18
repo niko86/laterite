@@ -1,0 +1,545 @@
+/* GENERATED FILE — DO NOT EDIT.
+ *
+ * The shared token layer (#394), carried onto the docs site by
+ * web/scripts/sync-docs-tokens.mjs. The source is web/src/shared/styles/ — edit
+ * there and re-run `npm run sync-docs-tokens`; CI runs it with --check.
+ *
+ * The one transform applied on the way: the shared layer's `.dark` rule becomes
+ * Material's `[data-md-color-scheme="slate"]`, so the docs render the same dark
+ * values the app and the apex do and Material's palette toggle still drives them.
+ */
+
+/* ── src/shared/styles/fonts.css ── */
+/* The three families of the "bedrock" pairing, self-hosted (#394).
+ *
+ * Both design documents this work is drawn from (design/) load their fonts from
+ * the Google Fonts CDN. The apex's whole pitch is that it does not phone
+ * anywhere — nothing is uploaded, nothing is fetched — so a third-party font
+ * origin on the page that makes that claim is the one place it cannot be true.
+ * Self-hosted here, and later on the docs and the app.
+ *
+ * Fontsource rather than hand-cut .woff2 binaries: the packages ride the web
+ * project's single dependency set, they carry the upstream OFL notices, and
+ * their @font-face blocks are unicode-range split PER SCRIPT — which is the
+ * subsetting. A latin reader fetches the latin file and nothing else; the
+ * latin-ext and vietnamese files are emitted but never requested. Committed
+ * binaries would be smaller on disk and silently tofu the first time a page
+ * needed a glyph the one-off subsetting run did not anticipate.
+ *
+ * `wght.css` is the upright axis only — the italic file is a second download
+ * this pairing never sets.
+ *
+ * DISPLAY IS FIGTREE, NOT A SLAB. Both design documents specify a
+ * Rockwell-lineage slab, on the reasoning that it is what the mark reads as.
+ * The mark is not a slab: the wordmark in assets/laterite-social-preview.png is
+ * a heavy geometric-humanist sans, and the design system says so itself in two
+ * other sections — naming Figtree 800 as what to set "laterite" in. See
+ * ags-wiki/design/dec-landing-build-shared-tokens.md.
+ */
+/* figtree-latin-ext-wght-normal */
+@font-face {
+  font-family: 'Figtree Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  src: url(../fonts/figtree-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+
+/* figtree-latin-wght-normal */
+@font-face {
+  font-family: 'Figtree Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  src: url(../fonts/figtree-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+/* public-sans-vietnamese-wght-normal */
+@font-face {
+  font-family: 'Public Sans Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../fonts/public-sans-vietnamese-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0102-0103,U+0110-0111,U+0128-0129,U+0168-0169,U+01A0-01A1,U+01AF-01B0,U+0300-0301,U+0303-0304,U+0308-0309,U+0323,U+0329,U+1EA0-1EF9,U+20AB;
+}
+
+/* public-sans-latin-ext-wght-normal */
+@font-face {
+  font-family: 'Public Sans Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../fonts/public-sans-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+
+/* public-sans-latin-wght-normal */
+@font-face {
+  font-family: 'Public Sans Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(../fonts/public-sans-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+/* ibm-plex-mono-latin-400-normal */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(../fonts/ibm-plex-mono-latin-400-normal.woff2) format('woff2'), url(../fonts/ibm-plex-mono-latin-400-normal.woff) format('woff');
+}
+/* ibm-plex-mono-latin-600-normal */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url(../fonts/ibm-plex-mono-latin-600-normal.woff2) format('woff2'), url(../fonts/ibm-plex-mono-latin-600-normal.woff) format('woff');
+}
+
+/* ── src/shared/styles/colors.css ── */
+/* The "bedrock" colour vocabulary — one set of values for all three surfaces
+ * (#394, tracking #411).
+ *
+ * This EXTENDS the app's semantic layer rather than replacing it. Every name
+ * the app already resolves through `@theme inline` — the canvas/surface/raised
+ * ladder, `surface-code`, `chip`, the line trio, the five-step fg ramp, and
+ * ok/warn/err/accent — is here under the same name. What is new is everything
+ * BELOW those names: the raw ramps they are cut from, the `*-quiet` tints, and
+ * `info`, `cta`, `focus-ring`. There is no name here the app has and this
+ * does not, which is why this is one vocabulary and not two.
+ *
+ * The ramp is sampled from the strata cross-section in assets/laterite-icon-512.png:
+ * the soil bands give the brand ramp, the auger gives the steel greys, the
+ * neutrals are warm-shifted onto the same hue family. Nothing is invented.
+ *
+ * The direction: MAROON READS, RUST ACTS. Links, headlines and active nav are
+ * maroon; every button and CTA is rust. Those are two different tokens on
+ * purpose — a page where the thing you read and the thing you press are the
+ * same colour makes the reader test every heading with the mouse.
+ *
+ * NOTE for anyone diffing this against design/laterite-mobile-design-system/:
+ * the design system sets `--accent` to brand brick #9b3932. This layer follows
+ * the site direction instead, which resolved links/headlines/active-nav to
+ * maroon #611a1e — the wordmark's own colour, and one step further from rust so
+ * the read/act split survives at small sizes.
+ */
+:root {
+  color-scheme: light;
+
+  /* ── Brand ramp — the strata bands, topsoil to bedrock ──
+     Also the SEVEN-BAND RAIL, exactly: 300 → 900 is the ramp the borehole rail
+     and the group-identity keying (#395) run top to bottom. There is no
+     separate `--strata-*` set, because it would be this one with new names.
+     Band colour encodes GROUP IDENTITY only, never severity. */
+  --laterite-50: #fdf1e7;
+  --laterite-100: #f7cdb2;
+  --laterite-200: #f0a67f; /* peach */
+  --laterite-300: #f09c56; /* sand */
+  --laterite-400: #db7841; /* burnt orange */
+  --laterite-500: #ce5640; /* rust — the action colour */
+  --laterite-600: #be3b2e; /* vermilion */
+  --laterite-700: #9b3932; /* brick — the dominant logo mass */
+  --laterite-800: #7d2622;
+  --laterite-900: #611a1e; /* maroon — logo outline + wordmark */
+  --laterite-950: #3f1114;
+
+  /* ── Steel — the auger / probe ── */
+  --steel-100: #e4e2e1;
+  --steel-300: #c5c3c2;
+  --steel-500: #91858e;
+  --steel-700: #5f5761;
+
+  /* ── Warm neutrals ── */
+  --stone-50: #faf7f5;
+  --stone-100: #f4efeb;
+  --stone-150: #ece5e0;
+  --stone-200: #e2d9d3;
+  --stone-300: #cfc3bb;
+  --stone-400: #a4958d;
+  --stone-500: #7d6e68;
+  --stone-600: #5c504b;
+  --stone-700: #423934;
+  --stone-800: #2b2421;
+  --stone-900: #1c1715;
+  --stone-950: #120e0d;
+
+  /* ── Surfaces (canvas sits BELOW surface, so cards lift) ──
+     `--canvas` is the one token a surface is expected to retune: the docs read
+     long-form on #f4efeb, the landing page wants the stronger card lift of
+     #ece5e0 (web/landing/landing.css sets it). Everything else is shared. */
+  --canvas: var(--stone-100);
+  --surface: var(--stone-50);
+  --surface-raised: var(--stone-150);
+  --surface-code: #f6efe9;
+  --chip: var(--stone-200);
+
+  /* ── Lines ── */
+  --line: var(--stone-200);
+  --line-subtle: var(--stone-150);
+  --line-strong: var(--stone-300);
+
+  /* ── Text ── */
+  --fg: var(--stone-900);
+  --fg-soft: var(--stone-700);
+  --fg-muted: var(--stone-600);
+  --fg-faint: var(--stone-500);
+  --fg-dim: var(--stone-400);
+
+  /* ── Reads: links, headlines, active nav ── */
+  --accent: var(--laterite-900);
+  --accent-hover: var(--laterite-950);
+  --accent-quiet: #f3e3dd;
+
+  /* ── Acts: every button and CTA ──
+     Rust on near-white. The pair is a token rather than two utility classes
+     because the text colour is not free: mid-ramp bands fail contrast against
+     both white and black, so a CTA that picks its own foreground picks wrong. */
+  --cta: var(--laterite-500);
+  --cta-hover: var(--laterite-600);
+  --fg-on-cta: var(--stone-50);
+  /* The tinted wash under a "runs something" control (#406). The design system
+     put that variant on `--accent-quiet`, but its `--accent` was brick and ours
+     is maroon — under the read/act split an action that runs must be rust, so
+     it needs a rust tint rather than a maroon one to sit in. */
+  --cta-quiet: #f7e4de;
+
+  /* ── Status ──
+     No traffic lights. There is no green in this brand, and severity runs DOWN
+     the strata instead — ochre topsoil for warning, oxide bedrock for error —
+     with the auger's steel for informational and one cool teal for "verified",
+     the single cool note that says a machine checked this rather than a mood.
+     Severity is carried in FORM as well as colour, so it survives greyscale. */
+  --ok: #2f5d5a; /* teal-slate — verified, not "success green" */
+  --ok-quiet: #e3edeb;
+  --warn: #8f5312; /* ochre, the sand band darkened to AA */
+  --warn-quiet: #f8e9d3;
+  --err: #a51f14; /* oxide red — hotter and heavier than brand brick */
+  --err-quiet: #f9e0dc;
+  --info: var(--steel-700); /* the probe */
+  --info-quiet: #ecebee;
+
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+  --selection: color-mix(in srgb, var(--laterite-300) 45%, transparent);
+}
+
+/* The dark set (#400, promoted here by #403).
+ *
+ * A real design pass rather than a lightness flip — and authored ONCE, here,
+ * now that the app is the second surface rendering it. It landed on the
+ * landing page first (#400) and moved into this slot when #403 made the app
+ * consume the layer — values as #400 set them, except the two CTA repairs the
+ * move surfaced (marked below); web/landing/landing.css keeps only its own
+ * tint-percentage dials.
+ *
+ * Class-toggled, not `prefers-color-scheme`: an explicit choice has to be able
+ * to beat the OS in BOTH directions, and a media query cannot express "I want
+ * light on a dark-mode machine". Each surface applies `.dark` pre-paint from
+ * the persisted-else-system choice and the shared theme.ts owns it from there.
+ *
+ * A surface that retunes a token in its own `:root` AFTER importing this file
+ * outranks this block by source order — `:root` and `.dark` tie on
+ * specificity. A light-only retune must therefore say so in its selector
+ * (`:root:not(.dark)`, as the landing's canvas retune does) rather than rely
+ * on never being loaded dark. */
+[data-md-color-scheme="slate"] {
+  color-scheme: dark;
+
+  /* The band ramp shifts ONE STEP LIGHTER. The light ramp's deep strata vanish
+     against a near-black canvas, so every band moves up and the ramp gains a
+     lighter head — and because the rail, the table caps, the chips and the
+     KEY-column edges all read `--laterite-*`, redefining the ramp here moves
+     every one of them at once. There is no second band list anywhere. */
+  --laterite-300: #f0a67f;
+  --laterite-400: #f09c56;
+  --laterite-500: #db7841;
+  --laterite-600: #ce5640;
+  --laterite-700: #be3b2e;
+  --laterite-800: #9b3932;
+  --laterite-900: #7d2622;
+
+  /* Elevation stops being a shadow and starts being a lighter surface. */
+  --canvas: #14100f;
+  --surface: #1c1715;
+  --surface-raised: #262019;
+  --surface-code: #100c0b;
+  --chip: #261f1c;
+
+  --line: #352c28;
+  --line-subtle: #261f1c;
+  --line-strong: #4a3f39;
+
+  --fg: #ede5df;
+  --fg-soft: #d8cbc2;
+  --fg-muted: #a4958d;
+  --fg-faint: #8b7d75;
+  --fg-dim: #6b5e57;
+
+  /* Headlines and links follow the accent, so they are SAND in dark, not
+     maroon — maroon on near-black is unreadable at body weight. */
+  --accent: #f09c56;
+  --accent-hover: #f0a67f;
+  --accent-quiet: #3a2620;
+
+  /* The rust CTA does NOT change. It is the one object that is the same colour
+     in both themes, which is what makes it read as the action everywhere. That
+     has to be said in VALUES here, not left to inheritance: the light block
+     writes `--cta: var(--laterite-500)`, and this block shifts the ramp, so an
+     un-redeclared CTA silently rides it to burnt orange — the exact drift this
+     comment used to deny was happening (#403). Steps down the SHIFTED ramp, so
+     the resolved pair is identical to light's rust/vermilion. */
+  --cta: var(--laterite-600);
+  --cta-hover: var(--laterite-700);
+  /* The wash under a "runs something" control dials down like every other
+     quiet: the light block's pale pink is the one wash #400 missed, and it
+     glowed on near-black (#403). Same family as the neighbouring quiets,
+     tuned so text-cta clears the ratio light accepts on its wash. */
+  --cta-quiet: #38201a;
+
+  --ok: #79c2b4;
+  --ok-quiet: #1d2c29;
+  --warn: #e3a447;
+  --warn-quiet: #2e2313;
+  --err: #f07f6d;
+  --err-quiet: #331b18;
+  --info: #b9b2bd;
+  --info-quiet: #242226;
+}
+
+/* ── src/shared/styles/typography.css ── */
+/* Type for the "bedrock" pairing (#394).
+ *
+ * The runtime names here are `--family-*`, `--size-*`, `--lh-*` and `--track-*`
+ * rather than the obvious `--font-*`, `--text-*`, `--leading-*` and
+ * `--tracking-*`, for the same reason the colour layer says `--canvas` and not
+ * `--color-canvas`: all four of those ARE Tailwind theme namespaces. A token
+ * sharing a name with its own bridge entry resolves to itself, and — worse —
+ * one declared at `:root` silently redefines the utility of the same name for
+ * every surface that imports this, which is a coupling nothing would fail on.
+ * The bridge (tailwind-theme.css) maps one set onto the other; a surface with
+ * no Tailwind — the docs — reads these directly.
+ *
+ * THE DISPLAY SCALE IS RE-TUNED, NOT INHERITED. The sizes it replaces were set
+ * for a Rockwell-lineage slab, and the display face is now Figtree, a heavy
+ * geometric-humanist sans (see fonts.css for why). The two do not share
+ * metrics, and carrying the old numbers across would have been the easy wrong
+ * answer:
+ *
+ *   - Figtree's x-height is much the larger of the two, so at equal em size it
+ *     reads bigger. Every display step comes down to land at the same APPARENT
+ *     size the slab had — furthest at the top of the scale, where the
+ *     difference is most visible, and barely at all by h3.
+ *   - A slab's serifs bridge the gaps between letters; a geometric sans has
+ *     nothing doing that job, and its round open counters widen the gaps
+ *     instead. So tracking goes further negative at the display end, not less.
+ *   - That same large x-height eats the interline gap, so the hero's leading
+ *     opens from the slab's 1.02 rather than staying there.
+ *
+ * The TOOL scale below is untouched. It was lifted from the app's own type
+ * sweep, it is set in the body face, and the body face did not change — only
+ * the display face did.
+ */
+:root {
+  /* "Variable" suffixes are Fontsource's family names for the variable cuts;
+     the static fallbacks after them are what a reader gets if the woff2 never
+     arrives. Display is never used for body copy. */
+  --family-display:
+    "Figtree Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Helvetica, Arial, sans-serif;
+  --family-ui:
+    "Public Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Helvetica, Arial, sans-serif;
+  --family-mono:
+    "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* ── Tool UI scale (the app's, unchanged) ── */
+  --size-bubble: 0.65rem; /* count bubbles only */
+  --size-micro: 0.72rem; /* uppercase micro-heads, tags */
+  --size-caption: 0.8rem; /* captions, hints — the sentence-text floor */
+  --size-control: 0.82rem; /* buttons, inputs, table cells */
+  --size-body: 0.85rem; /* primary body */
+  --size-lead: 0.95rem; /* section heads */
+  --size-title: 1rem; /* dialog h2 */
+  --size-page: 1.25rem; /* page h1 */
+
+  /* ── Editorial / marketing scale (re-tuned for Figtree) ── */
+  --size-h3: 1.1rem;
+  --size-h2: 1.4rem;
+  --size-h1: 1.8rem;
+  --size-display: 2.4rem;
+  --size-hero: 3.35rem;
+
+  /* Prose lead — the sentence under a hero headline, the one place marketing
+     copy sets larger than the tool body. */
+  --size-prose: 1.05rem;
+
+  --lh-hero: 1.06;
+  --lh-display: 1.1;
+  --lh-tight: 1.15;
+  --lh-snug: 1.3;
+  --lh-normal: 1.45; /* the app's baseline */
+  --lh-relaxed: 1.55;
+  --lh-loose: 1.7; /* docs prose */
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600; /* the app's emphasis weight */
+  --weight-bold: 700; /* display floor */
+  --weight-extrabold: 800; /* wordmark + hero */
+
+  /* Uppercase micro-labels track WIDER than the slab wanted: geometric caps are
+     near-circular and close up on each other at 0.72rem. */
+  --track-micro: 0.08em;
+  --track-tight: -0.015em;
+  --track-display: -0.025em;
+  --track-hero: -0.03em;
+
+  --measure-prose: 68ch;
+}
+
+/* ── src/shared/styles/metrics.css ── */
+/* Spacing, radii and control metrics (#406).
+ *
+ * #394 authored colour and type and stopped there, because nothing consumed
+ * these yet. The shared primitives do: the design system states its control
+ * contracts in exactly these tokens, and "matching the control metrics" is not
+ * possible without them.
+ *
+ * Fractional-rem steps rather than a 4/8 grid — these are the values the app
+ * already ships (0.15 / 0.25 / 0.4 / 0.6 / 0.8rem paddings), which is why its
+ * controls read tight. Rounding them to a tidy grid would be a redesign
+ * wearing the clothes of a cleanup.
+ *
+ * ── A DELIBERATE OVERRIDE, STATED OUT LOUD ──
+ * `--radius-*` and `--spacing` are Tailwind theme namespaces, so declaring them
+ * at `:root` after `@import "tailwindcss"` redefines what `rounded-md` and the
+ * spacing scale mean for every surface importing this layer. That is intended
+ * here and is why these keep the design system's own names: one radius scale,
+ * and the utilities resolve to it. It is the opposite call from the one
+ * typography.css makes — there the collision was accidental and the tokens were
+ * renamed out of the way; here it is the point. The difference is that this is
+ * written down.
+ */
+:root {
+  --space-0: 0;
+  --space-05: 0.15rem;
+  --space-1: 0.25rem;
+  --space-2: 0.4rem;
+  --space-3: 0.6rem;
+  --space-4: 0.8rem;
+  --space-5: 1rem;
+  --space-6: 1.25rem;
+  --space-7: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 3rem;
+  --space-12: 4rem;
+  --space-16: 6rem;
+
+  /* Small and consistent; nothing in the brand is pill-soft except chips. */
+  --radius-xs: 3px; /* inputs, add-chips, status badges */
+  --radius-sm: 4px; /* small buttons, tooltips */
+  --radius-md: 5px; /* buttons, toasts */
+  --radius-lg: 6px; /* menus, popovers */
+  --radius-xl: 8px; /* cards, dialogs */
+  --radius-2xl: 10px; /* chips, large panels */
+  --radius-pill: 999px;
+
+  --border-hairline: 1px;
+  --border-emphasis: 2px;
+
+  --control-h-sm: 1.6rem;
+  --control-h: 1.9rem;
+  --control-h-lg: 2.25rem;
+  --tap-min: 44px; /* touch surfaces */
+
+  --shell-max: 80rem; /* app shell */
+  --prose-max: 68rem; /* docs column */
+  --dialog-w: 24rem;
+  --dialog-w-wide: 38rem;
+}
+
+/* ── src/shared/styles/elevation.css ── */
+/* Elevation (#406).
+ *
+ * Cards do NOT have shadows in this system — they lift by a surface step and a
+ * 1px line, which is why `--shadow-card` is `none` rather than absent: a card
+ * reaching for a shadow should have to overwrite something that says no.
+ *
+ * Shadow is reserved for things that genuinely float above the page, and each
+ * floating layer gets its own fixed value rather than a t-shirt scale, because
+ * there are only six of them and they are not interchangeable.
+ *
+ * The scrim is maroon-tinted, never neutral black, and never blurred — the
+ * system is explicit on both counts.
+ *
+ * `--shadow-*` is a Tailwind theme namespace, so these redefine `shadow-md` and
+ * friends for surfaces that import this layer. Same deliberate override
+ * metrics.css documents, for the same reason: one elevation scale, and the
+ * utilities resolve to it.
+ */
+:root {
+  --shadow-none: none;
+  --shadow-card: none; /* borders + surface step, not shadow */
+  --shadow-tooltip: 0 2px 8px rgb(0 0 0 / 30%);
+  --shadow-menu: 0 4px 12px rgb(0 0 0 / 25%);
+  --shadow-toast: 0 4px 16px rgb(0 0 0 / 35%);
+  --shadow-popover: 0 6px 20px rgb(0 0 0 / 28%);
+  --shadow-dialog: 0 12px 40px rgb(0 0 0 / 35%);
+  --shadow-palette: 0 14px 44px rgb(0 0 0 / 35%);
+  --shadow-page: 0 4px 24px rgb(63 17 20 / 35%); /* paper on backdrop */
+
+  --scrim: rgb(63 17 20 / 45%);
+
+  --z-sticky: 30;
+  --z-toast: 60;
+  --z-dialog: 80;
+  --z-tooltip: 100;
+}
+
+/* ── src/shared/styles/motion.css ── */
+/* Motion (#406).
+ *
+ * Short, functional, one easing. Nothing bounces, springs, scales in or
+ * parallaxes. The single enter animation in the whole system is the toast's
+ * 12px fly-in; everything else is a colour or opacity change.
+ *
+ * The reduced-motion contract lives HERE rather than at each call site, which
+ * is the point of putting durations in tokens at all: a component that
+ * transitions `var(--dur-base)` honours the preference without knowing the
+ * preference exists, and a new component cannot forget to.
+ *
+ * Not collapsed to 0ms but to 0.01ms — a zero-length transition fires no
+ * `transitionend`, so anything sequencing off that event would hang rather than
+ * skip. The delay tokens go to a true 0: nothing waits on those.
+ *
+ * `--ease-*` is a Tailwind theme namespace; see metrics.css for why that
+ * override is deliberate here.
+ */
+:root {
+  --dur-instant: 0ms;
+  --dur-fast: 120ms; /* opacity fades */
+  --dur-base: 150ms; /* colour + transform */
+  --dur-slow: 180ms; /* enter/exit — the toast fly-in */
+  --dur-panel: 200ms; /* width/height reveals */
+
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --tooltip-delay: 300ms;
+  --toast-life: 4000ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0.01ms;
+    --dur-base: 0.01ms;
+    --dur-slow: 0.01ms;
+    --dur-panel: 0.01ms;
+    --tooltip-delay: 0ms;
+  }
+}

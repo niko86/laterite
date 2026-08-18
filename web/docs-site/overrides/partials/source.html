@@ -1,0 +1,35 @@
+{#-
+  The repository link (#401). Forked from mkdocs-material 9.7.7's
+  partials/source.html; one attribute removed.
+
+  Stock carries `data-md-component="source"`, which is what makes Material's
+  bundle call api.github.com for the repository facts: two requests, one to
+  `/repos/{owner}/{repo}/releases/latest` for the latest tag and one to
+  `/repos/{owner}/{repo}` for stars and forks.
+
+  BE PRECISE ABOUT THE FREQUENCY, because the obvious guess is wrong and it is
+  the whole weight of the argument: the result is cached in sessionStorage under
+  `__source`, so this is TWO REQUESTS PER BROWSER TAB, not per page view.
+  Instant navigation within a session re-reads the cache.
+
+  It is still an off-origin request, and this site self-hosts its fonts
+  precisely so that it makes none — so the reader is not announced to a third
+  party at all rather than once per visit. That is a smaller win than "on every
+  page", and it is the honest size of it.
+
+  WHAT IS LOST: three facts under the repo name — latest release tag, stars,
+  forks. The link, the icon and the repo name are unchanged. The version fact is
+  the one worth a thought, and dropping it is arguably a gain here: it showed the
+  latest GitHub RELEASE TAG, while the masthead lockup beside it shows the
+  version these docs were built from, which is the number a reader of this page
+  actually needs.
+-#}
+<a href="{{ config.repo_url }}" title="{{ lang.t('source') }}" class="md-source">
+  <div class="md-source__icon md-icon">
+    {% set icon = config.theme.icon.repo or "fontawesome/brands/git-alt" %}
+    {% include ".icons/" ~ icon ~ ".svg" %}
+  </div>
+  <div class="md-source__repository">
+    {{ config.repo_name }}
+  </div>
+</a>

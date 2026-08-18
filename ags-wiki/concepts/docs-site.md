@@ -15,7 +15,11 @@ repo_refs:
   glossary: "repo:web/docs-site/scripts/gen_types.py"
   catalogue_data: "repo:web/docs-site/scripts/catalogue_data.py"
   catalogue_js: "repo:web/docs-site/docs/javascripts/catalogue.js"
-related: [validator-site, playwright-e2e]
+  theme_overrides: "repo:web/docs-site/overrides"
+  theme_css: "repo:web/docs-site/docs/stylesheets/laterite.css"
+  token_sync: "repo:web/scripts/sync-docs-tokens.mjs"
+  band_gate: "repo:tests/test_docs_band_containment.py"
+related: [validator-site, playwright-e2e, dec-landing-build-shared-tokens]
 sources: []
 ---
 
@@ -217,6 +221,57 @@ Key facts:
   dictionary / OBSERVATIONS faithfulness gates. The paginate / filter / family-card
   / "show all" UX is vanilla JS (`repo:web/docs-site/docs/javascripts/catalogue.js`),
   CDN-free.
+- **The theme layer — Material mapped onto the shared tokens (#401).** The docs
+  are the third surface of the one visual direction ([[dec-landing-build-shared-tokens]]),
+  and the only one with **no bundler**: MkDocs copies `docs/` verbatim, so it can
+  follow neither the shared layer's relative `@import` chain nor the Fontsource
+  package specifiers inside it. So the tokens are **generated into the docs tree
+  and committed** by `repo:web/scripts/sync-docs-tokens.mjs` — one bundle
+  (`docs/stylesheets/tokens.css`) plus the `.woff2` files its faces name — with
+  `--check` wired into `ci.yml`'s `ts-lint` job, the one that already runs
+  `npm ci` in `web/`. Without that gate a retuned colour ships to the app and the
+  apex and silently leaves the docs on the old palette, and nothing about the
+  docs looks broken enough for anyone to notice. The one transform on the way is
+  the selector: the shared layer's `.dark` rule becomes Material's
+  `[data-md-color-scheme="slate"]`, which is what lets the docs run the same dark
+  VALUES as the other two while **Material's own palette toggle keeps working**
+  untouched. `theme.font: false` removes the `fonts.gstatic.com` preconnect, and
+  the fork of `partials/source.html` drops `data-md-component="source"` so the
+  bundle stops calling `api.github.com` for the repository facts (latest tag,
+  stars, forks) — **twice per browser tab**, not per page view: Material caches
+  the result in `sessionStorage` under `__source`, and the per-page reading is
+  the easy mistake to make from a request log. The site now loads **no**
+  third-party origin.
+  `repo:web/docs-site/docs/stylesheets/laterite.css` maps Material's ~60 `--md-*`
+  variables onto the token names; that mapping is the leverage, because it
+  restyles the generated catalogue pages — one per AGS4 group — that nobody
+  reviews by eye.
+  **Two Material conventions bite here and both are commented at the rule:**
+  its defaults are declared on `:root,[data-md-color-scheme=default]` — and that
+  second half matches `<body>`, so for INHERITED properties it beats a `:root`
+  override by proximity, not specificity (the symptom is a white canvas and stock
+  black body copy while the chrome and nav, which take colour directly, look
+  correct); and each admonition type is painted at **three** selectors
+  (`.md-typeset .admonition.tip`), so a two-selector override leaves stock blue
+  titles and teal icons under correctly-recoloured borders.
+  `repo:web/docs-site/overrides` holds the two forked partials — the masthead
+  (the navigational lockup `laterite | docs · v<version>`, whose version comes
+  from the `version_stamp.py` hook rather than a second lookup) and the repo
+  link. **Diff a fork against its upstream partial after a Material bump**;
+  `web/.prettierignore` excludes them so the formatter cannot destroy that
+  diffability by reflowing the Jinja.
+  > The band-keyed left nav is the reason `repo:tests/test_docs_band_containment.py`
+  > exists. Each top-level section takes the next colour from the strata ramp in
+  > **nav order** (pure CSS `:nth-child(7n+k)`, so a renamed section keeps its
+  > place), and the active item carries its section's band as a 3px inset rule.
+  > That is safe ONLY while band colour stays off prose: on a documentation site
+  > for a *validator*, the warm ramp and the severity palette are the same family,
+  > so a rust-tinted callout is indistinguishable from an error. The gate parses
+  > every hand-written docs stylesheet and fails if a band token reaches a
+  > selector outside the allowlist (nav, TOC rail, masthead hairline, catalogue
+  > cap). It is a gate rather than a convention because the failure **looks like a
+  > design choice**, and because the change that would cause it — a CSS-only edit —
+  > is why `web/docs-site/docs/stylesheets/**` had to join the `code` filter.
 - **Two CI gates, both via `ci.yml`'s `changes`-job filter** (see
   ci-and-runners):
   - *Build half* — the `docs` job `uv sync --group docs` (mkdocs-material +
