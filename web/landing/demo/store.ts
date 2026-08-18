@@ -11,7 +11,13 @@
  * surface, which is why each of them calls it rather than one of them owning it.
  */
 
-import { batch, createEffect, createMemo, createSignal, on } from "solid-js";
+import {
+  createMemo,
+  createResource,
+  createRoot,
+  createSignal,
+  type Accessor,
+} from "solid-js";
 import {
   SEEDED,
   addRow as addRowTo,
@@ -24,9 +30,7 @@ import { keyHeadings } from "./schema";
 import { engine, validateText, type Finding, type Report } from "./engine";
 
 const [delivery, setDelivery] = createSignal<Delivery>(SEEDED);
-const [report, setReport] = createSignal<Report | null>(null);
 const [armed, setArmed] = createSignal(false);
-const [busy, setBusy] = createSignal(false);
 const [focusLine, setFocusLine] = createSignal<number | null>(null);
 
 /** The cell the row carousel is open on, or null when it is closed. */
@@ -41,34 +45,51 @@ const [picked, setPicked] = createSignal<{
  *  the reader is looking at. */
 const text = createMemo(() => emit(delivery()));
 
+/* The validation pass, as a resource rather than a hand-rolled async effect.
+ *
+ * The first version of this was `createEffect(on([armed, text], async …))` with
+ * a monotonic counter to drop stale results. It looked right and it was subtly
+ * broken: the report SIGNAL held the correct new value while every subscriber
+ * stayed one update behind, so editing 11.8 to 11.80 cleared Rule 8 from the
+ * engine's output and left the page still showing it — the demo contradicting
+ * the engine it exists to demonstrate, which is the single worst thing this
+ * page can do.
+ *
+ * `createResource` is the primitive for exactly this shape. It owns the async
+ * lifecycle, discards superseded fetches itself, and exposes `.loading` — so
+ * there is no counter to get wrong. The source returns `false` until armed,
+ * which is how a resource is told not to fetch yet.
+ *
+ * `createRoot` because this graph lives at module scope: without an owner Solid
+ * warns that the computations can never be disposed, and it is right — this
+ * store IS the page's lifetime, so the root is stated rather than left implicit.
+ */
+const { report, busy } = createRoot(() => {
+  const [res] = createResource(
+    () => (armed() ? text() : false),
+    (current: string) => validateText(current),
+  );
+  // Named accessors rather than the resource itself, so callers read `report()`
+  // and `busy()` without knowing this is a resource — and so the resource's
+  // `undefined`-before-first-fetch becomes the `null` the UI already handles.
+  const report: Accessor<Report | null> = () => res() ?? null;
+  const busy: Accessor<boolean> = () => res.loading;
+  return { report, busy };
+});
+
 export { armed, busy, delivery, focusLine, picked, report, text };
 export { setFocusLine, setPicked };
 
-/** Load the engine. Idempotent; the first caller pays and the rest await. */
+/** Load the engine. Idempotent; the first caller pays and the rest await.
+ *
+ * Arming flips the resource's source from `false` to the current text, which is
+ * what starts the first validation — the reader's first interaction shows them
+ * findings rather than an empty panel. */
 export function arm(): void {
   if (armed()) return;
   setArmed(true);
   void engine();
 }
-
-// Revalidate on every change once armed. `on(..., { defer: false })` so arming
-// validates the seeded delivery immediately rather than waiting for an edit —
-// the reader's first interaction should show them findings, not an empty panel.
-let run = 0;
-createEffect(
-  on([armed, text], async ([isArmed, current]) => {
-    if (!isArmed) return;
-    const mine = ++run;
-    setBusy(true);
-    const next = await validateText(current);
-    // A keystroke landed while this was in flight; its result is the current one.
-    if (mine !== run) return;
-    batch(() => {
-      setReport(next);
-      setBusy(false);
-    });
-  }),
-);
 
 export function setCell(
   group: string,
@@ -137,6 +158,22 @@ export function findingsForGroup(group: string): Finding[] {
   return (report()?.findings ?? []).filter(
     (f) => f.group === group && f.heading === null,
   );
+}
+
+/** Group-level findings whose text names this heading.
+ *
+ * Rule 16 reports "Abbreviation \"b\" under SAMP_TYPE is not defined" against the
+ * GROUP, with no heading and no data row — correctly, because it is a statement
+ * about the group's use of that abbreviation and not about one row. But #398
+ * asks the field card to write the failing rule under the field being edited,
+ * and a reader typing in SAMP_TYPE needs to see it.
+ *
+ * So the carousel shows these ALONGSIDE the cell findings rather than as them.
+ * The distinction is kept: the cell is not marked failing (no ✗, no red value),
+ * because attaching a group finding to row 1 would be a lie in a file where rows
+ * 1 and 3 both carried the bad value. */
+export function groupFindingsNaming(group: string, heading: string): Finding[] {
+  return findingsForGroup(group).filter((f) => f.desc.includes(heading));
 }
 
 export type { Finding, Report };

@@ -24,7 +24,7 @@ import { For, Show, createMemo, type Component } from "solid-js";
 import { Button } from "@shared/components";
 import type { DemoGroup } from "./schema";
 import type { Group } from "./delivery";
-import { findingsForCell, setCell } from "./store";
+import { findingsForCell, groupFindingsNaming, setCell } from "./store";
 
 /** Rule 8's message names the TYPE but not what it means. A newcomer editing
  *  `11.8` needs "two decimal places", not "does not match its declared TYPE
@@ -61,6 +61,15 @@ export const RowCarousel: Component<{
   const failing = createMemo(() => {
     const h = heading();
     return h ? findingsForCell(props.schema.code, props.row, h.name) : [];
+  });
+
+  /** What the card WRITES OUT: this cell's findings plus the group-level ones
+   *  that name this heading. `failing()` alone drives the red border, so a
+   *  group finding explains without accusing the row. */
+  const explains = createMemo(() => {
+    const h = heading();
+    if (!h) return [];
+    return [...failing(), ...groupFindingsNaming(props.schema.code, h.name)];
   });
 
   const step = (by: number) => {
@@ -147,15 +156,15 @@ export const RowCarousel: Component<{
               />
 
               <p class="mt-2 text-caption text-fg-faint">
-                {TYPE_IN_WORDS[h().type] ?? `AGS TYPE ${h().type}`}
+                {TYPE_IN_WORDS[h().type] ?? `AGS TYPE ${h().type}`}.
                 <Show when={h().key}>
                   {" "}
-                  This is a KEY field, so it also has to match the parent row
-                  this one hangs off.
+                  It is a KEY field, so it also has to match the parent row this
+                  one hangs off.
                 </Show>
               </p>
 
-              <For each={failing()}>
+              <For each={explains()}>
                 {(finding) => (
                   <p class="mt-2 rounded-md border border-err/40 bg-err-quiet px-3 py-2 text-caption text-err">
                     <span class="font-semibold">{finding.rule}</span> —{" "}

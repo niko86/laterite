@@ -56,7 +56,19 @@ export const GroupSection: Component<{
   return (
     <Show when={bits()}>
       {(b) => (
-        <div class="grid gap-8 min-[64rem]:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] min-[64rem]:items-start">
+        <div
+          class="grid gap-8 min-[64rem]:items-start"
+          classList={{
+            /* The table column is the wider of the two, on BOTH sides of the
+               alternation. Swapping only the ORDER leaves the table in the
+               22rem prose column every other section, which clipped SAMP_ID
+               off SAMP and three columns off LLPL. */
+            "min-[64rem]:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]":
+              props.tableFirst,
+            "min-[64rem]:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]":
+              !props.tableFirst,
+          }}
+        >
           <div classList={{ "min-[64rem]:order-2": props.tableFirst }}>
             {/* The group chip: band tint, a solid band rule inset on the left,
                 and MAROON text. Never white or black on a band fill — the

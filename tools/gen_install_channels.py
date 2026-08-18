@@ -164,7 +164,7 @@ def resolve(sources: dict[str, str]) -> list[Card]:
             package=cli,
             command=f"pip install {wheel}",
             href="https://github.com/niko86/laterite/releases",
-            note=f"`{cli}` ships with the wheel — or take the standalone binary",
+            note=f"{cli} ships with the wheel — or take the standalone binary",
         ),
         Card(
             id="duckdb",

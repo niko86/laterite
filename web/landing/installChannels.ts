@@ -49,7 +49,7 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     package: "lat",
     command: "pip install laterite",
     href: "https://github.com/niko86/laterite/releases",
-    note: "`lat` ships with the wheel \u2014 or take the standalone binary",
+    note: "lat ships with the wheel \u2014 or take the standalone binary",
     primary: false,
   },
   {

@@ -81,7 +81,9 @@ export const Rail: Component = () => {
       aria-hidden="true"
       class="pointer-events-none fixed top-0 bottom-0 left-0 z-20 w-2 min-[68rem]:w-24 min-[68rem]:border-r min-[68rem]:border-line min-[68rem]:bg-surface"
     >
-      <div class="relative h-full">
+      {/* Inset below the masthead so the first tick is not hidden behind it,
+          and off the bottom so the last one is not flush to the edge. */}
+      <div class="relative h-full pt-14 pb-6">
         {/* The strip: seven equal bands, top to bottom, one per section. */}
         <div class="absolute inset-y-0 left-0 w-2 overflow-hidden min-[68rem]:left-6 min-[68rem]:w-[26px] min-[68rem]:rounded-sm">
           <For each={SECTIONS}>
@@ -121,7 +123,7 @@ export const Rail: Component = () => {
         </div>
 
         {/* The depth scale, clear of the pill's widest state. */}
-        <div class="absolute inset-y-0 left-[58px] hidden w-[38px] min-[68rem]:block">
+        <div class="absolute inset-y-0 left-[56px] hidden w-[44px] min-[68rem]:block">
           <For each={SECTIONS}>
             {(section, i) => (
               <div

@@ -70,7 +70,7 @@ const Card: Component<{ channel: InstallChannel }> = (props) => (
     </a>
 
     <div class="mt-3 flex items-start gap-2 rounded-md border border-line-subtle bg-surface-code px-3 py-2">
-      <code class="min-w-0 flex-1 font-mono text-caption break-all text-fg">
+      <code class="min-w-0 flex-1 font-mono text-caption break-words whitespace-pre-wrap text-fg">
         {props.channel.command}
       </code>
       <CopyButton command={props.channel.command} label={props.channel.label} />

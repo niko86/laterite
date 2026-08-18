@@ -255,3 +255,75 @@ def test_json_report_round_trips(report) -> None:
     """The page consumes engine output as JSON; assert the shape it will read."""
     parsed = json.loads(report.to_json())
     assert isinstance(parsed, dict)
+
+
+# --- the editing loop, against the engine rather than the rendered list ---
+
+
+def _validate(text: str, tmp_path: Path):
+    laterite = pytest.importorskip("laterite", reason="needs the built wheel")
+    path = tmp_path / "edited.ags"
+    path.write_bytes(text.encode("utf-8"))
+    return laterite.validate(str(path))
+
+
+def test_repairing_the_2dp_defect_removes_rule_8_from_the_engine(tmp_path) -> None:
+    """#398's acceptance criterion, asserted on the ENGINE's output and not on
+    the rendered list — a page that merely stopped drawing a finding while the
+    validator still reported it would pass a UI assertion and be a lie.
+
+    The edit is exactly the one the page's `setCell` makes: one cell in the LOCA
+    row, `11.8` to `11.80`. Everything else has to survive it, which is the half
+    that catches an edit path that rewrites more than the cell it was given.
+    """
+    src = DELIVERY.read_bytes().decode("utf-8")
+    edited = src.replace('"BH01","CP","11.8"', '"BH01","CP","11.80"')
+    assert edited != src, "the seeded 2DP defect is no longer where the edit expects it"
+
+    got = {_identity(r) for r in _validate(edited, tmp_path).findings.to_dicts()}
+    gone = SEEDED - got
+    assert gone == {("AGS Format Rule 8", "LOCA", "LOCA_GL")}, (
+        f"repairing the decimal places should clear Rule 8 and nothing else; "
+        f"it cleared {sorted(map(str, gone))}"
+    )
+    assert not got - SEEDED, "the edit introduced a finding the page never mentions"
+
+
+def test_the_orphan_survives_every_safe_repair(tmp_path) -> None:
+    """The page's argument, pinned. Fix applies the mechanical repairs; the
+    orphaned LLPL row is what a validator can only report and a human has to
+    decide about, so it must still be there afterwards."""
+    src = DELIVERY.read_bytes().decode("utf-8")
+    edited = src.replace('"BH01","CP","11.8"', '"BH01","CP","11.80"').replace(
+        '"S1","b"', '"S1","B"'
+    )
+    got = {_identity(r) for r in _validate(edited, tmp_path).findings.to_dicts()}
+    assert ("AGS Format Rule 10c", "LLPL", None) in got, (
+        "the orphaned LLPL row was repaired away — the page's whole "
+        "validator-versus-fixer argument depends on it standing"
+    )
+
+
+def test_the_shipped_fixer_repairs_one_thing_and_says_so(tmp_path) -> None:
+    """What the page's Fix button actually does, since it calls the engine's own
+    fixer rather than a bespoke repair. #398's text describes three repairs; the
+    engine mechanically applies one. This pins the real number so the page's copy
+    cannot drift from it — and fails loudly if the fixer ever grows the other
+    two, which would be the moment to reword the button's note."""
+    laterite = pytest.importorskip("laterite", reason="needs the built wheel")
+    result = laterite.fix(str(DELIVERY))
+
+    assert len(result.applied) == 1, (
+        f"the shipped fixer now applies {len(result.applied)} fixes, not 1 — the "
+        "landing page's Fix note says what is left needs a human, and that "
+        f"count moved: {[f['kind'] for f in result.applied]}"
+    )
+    assert result.applied[0]["kind"] == "reformat_numeric"
+    assert result.applied[0]["rule"].endswith("Rule 8")
+
+    # And what it leaves is the three the page says need a human.
+    left = {_identity(r) for r in _validate(result.text, tmp_path).findings.to_dicts()}
+    assert left == SEEDED - {("AGS Format Rule 8", "LOCA", "LOCA_GL")}, (
+        f"the fixer's output no longer fails in the three ways the page's Fix "
+        f"note describes: {sorted(map(str, left))}"
+    )

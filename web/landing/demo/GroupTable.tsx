@@ -26,7 +26,7 @@
  * band rule at the boundary where the key ends and the data begins.
  */
 
-import { For, Show, type Component } from "solid-js";
+import { For, Show, createMemo, type Component } from "solid-js";
 import type { DemoGroup } from "./schema";
 import type { Group } from "./delivery";
 import { findingsForCell } from "./store";
@@ -41,15 +41,6 @@ export const GroupTable: Component<{
 }> = (props) => {
   const lastKey = () =>
     props.schema.headings.reduce((at, h, i) => (h.key ? i : at), -1);
-
-  const cellClass = (col: number, failing: boolean) =>
-    [
-      "px-3 py-1.5 whitespace-nowrap text-caption",
-      // One region, one tint — no per-column striping.
-      props.schema.headings[col]?.key ? "bg-[--key-tint]" : "",
-      col === lastKey() ? "border-r-[3px] border-r-[--band]" : "",
-      failing ? "text-err font-semibold" : "text-fg",
-    ].join(" ");
 
   return (
     <div
@@ -81,18 +72,14 @@ export const GroupTable: Component<{
                 {(heading, col) => (
                   <th
                     scope="col"
-                    class={[
-                      "px-3 py-2 font-mono text-micro font-semibold whitespace-nowrap",
-                      heading.key
-                        ? "bg-[--key-tint] text-accent"
-                        : "text-fg-muted",
-                      col() === lastKey()
-                        ? "border-r-[3px] border-r-[--band]"
-                        : "",
-                      col() === 0
-                        ? "sticky left-0 z-10 bg-surface dark:bg-surface-raised"
-                        : "",
-                    ].join(" ")}
+                    class="px-3 py-2 font-mono text-micro font-semibold whitespace-nowrap"
+                    classList={{
+                      "bg-[--key-tint] text-accent": heading.key,
+                      "text-fg-muted": !heading.key,
+                      "border-r-[3px] border-r-[--band]": col() === lastKey(),
+                      "sticky left-0 z-10 bg-surface dark:bg-surface-raised":
+                        col() === 0,
+                    }}
                   >
                     <span class="flex items-baseline gap-1">
                       <Show when={heading.key}>
@@ -124,24 +111,38 @@ export const GroupTable: Component<{
                 <tr class="border-b border-line-subtle last:border-b-0">
                   <For each={props.schema.headings}>
                     {(heading, col) => {
-                      const failing = () =>
-                        findingsForCell(
-                          props.schema.code,
-                          rowIndex(),
-                          heading.name,
-                        ).length > 0;
-                      const isPicked = () => {
+                      /* `createMemo` + `classList`, not a joined class string.
+                         A `class={[...].join(" ")}` here computed ONCE and never
+                         re-ran when the report arrived, so a failing cell stayed
+                         unmarked while the findings panel beside it was correct
+                         — the page contradicting itself in the one place a
+                         reader is looking. classList takes accessors and is
+                         unambiguously reactive. */
+                      const failing = createMemo(
+                        () =>
+                          findingsForCell(
+                            props.schema.code,
+                            rowIndex(),
+                            heading.name,
+                          ).length > 0,
+                      );
+                      const isPicked = createMemo(() => {
                         const p = props.picked;
                         return p?.row === rowIndex() && p.col === col();
-                      };
+                      });
                       return (
                         <td
-                          class={[
-                            cellClass(col(), failing()),
-                            col() === 0
-                              ? "sticky left-0 z-10 bg-surface dark:bg-surface-raised"
-                              : "",
-                          ].join(" ")}
+                          class="px-3 py-1.5 text-caption whitespace-nowrap"
+                          classList={{
+                            // One region, one tint — no per-column striping.
+                            "bg-[--key-tint]": heading.key,
+                            "border-r-[3px] border-r-[--band]":
+                              col() === lastKey(),
+                            "font-semibold text-err": failing(),
+                            "text-fg": !failing(),
+                            "sticky left-0 z-10 bg-surface dark:bg-surface-raised":
+                              col() === 0,
+                          }}
                         >
                           <button
                             type="button"
@@ -149,12 +150,8 @@ export const GroupTable: Component<{
                               props.onPick(rowIndex(), col());
                             }}
                             aria-label={`Edit ${heading.name} on row ${rowIndex() + 1} of ${props.schema.code}`}
-                            class={[
-                              "w-full rounded-xs px-1 text-left font-mono",
-                              "hover:bg-accent-quiet focus-visible:outline-none",
-                              "focus-visible:[box-shadow:var(--focus-ring)]",
-                              isPicked() ? "bg-accent-quiet" : "",
-                            ].join(" ")}
+                            class="w-full rounded-xs px-1 text-left font-mono hover:bg-accent-quiet focus-visible:outline-none focus-visible:[box-shadow:var(--focus-ring)]"
+                            classList={{ "bg-accent-quiet": isPicked() }}
                           >
                             <Show
                               when={row[col()]}
