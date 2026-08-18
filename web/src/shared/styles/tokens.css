@@ -15,3 +15,9 @@
 @import "./fonts.css";
 @import "./colors.css";
 @import "./typography.css";
+/* Added by #406, when the shared primitives became the first thing to consume
+   them. Three of these families deliberately reuse Tailwind's own theme
+   namespaces — each file says so at the top and why. */
+@import "./metrics.css";
+@import "./elevation.css";
+@import "./motion.css";

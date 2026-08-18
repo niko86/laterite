@@ -138,8 +138,8 @@ pub fn minimize(text: &str, oracle: Option<&PyOracle>) -> (String, Sig) {
 
 /// Pre-fill an `insights/` + drafted-`O-NN` stub for the §12.5 flow.
 /// The CLI only *drafts* (it embeds no LLM and never writes
-/// `OBSERVATIONS.md`); Claude reviews, fills judgement, and writes the
-/// ratified O-N deliberately.
+/// `OBSERVATIONS.md`); the author reviews, fills judgement, and writes
+/// the ratified O-N deliberately.
 pub fn insight_stub(sig: &Sig, injection: &str, repro_rel: &str, next_obs: &str) -> String {
     let (tag, rust, py) = sig;
     format!(

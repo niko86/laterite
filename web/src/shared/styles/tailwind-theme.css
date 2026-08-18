@@ -40,6 +40,7 @@
   --color-accent-quiet: var(--accent-quiet);
   --color-cta: var(--cta);
   --color-cta-hover: var(--cta-hover);
+  --color-cta-quiet: var(--cta-quiet);
   --color-fg-on-cta: var(--fg-on-cta);
 
   /* Status */
@@ -77,8 +78,11 @@
      a hero set at the body's line-height and the body's tracking is the most
      common way this scale gets misused, and pairing them here means `text-hero`
      cannot be taken without them. */
+  /* No paired letter-spacing on --text-micro: that size sets both uppercase AGS
+     codes (which want the wide tracking) and sentence-case labels (which do
+     not), so tracking is not a property of the size here the way it is on the
+     display steps below. Call sites set `tracking-micro` when they want it. */
   --text-micro: var(--size-micro);
-  --text-micro--letter-spacing: var(--track-micro);
   --text-caption: var(--size-caption);
   --text-control: var(--size-control);
   --text-body: var(--size-body);
@@ -96,4 +100,8 @@
   --text-hero: var(--size-hero);
   --text-hero--line-height: var(--lh-hero);
   --text-hero--letter-spacing: var(--track-hero);
+
+  /* The one tracking step call sites reach for by name: uppercase micro-labels
+     and AGS codes. The rest ride on the display sizes above. */
+  --tracking-micro: var(--track-micro);
 }

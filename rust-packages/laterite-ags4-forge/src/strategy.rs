@@ -1,4 +1,4 @@
-//! The declarative strategy — the Claude↔CLI contract.
+//! The declarative strategy — the author↔CLI contract.
 //!
 //! `run` builds it from flags, or loads it wholesale from a TOML/JSON file
 //! via `--strategy` / `forge strategy` ([`Strategy::load`]). The `serde`
@@ -162,8 +162,8 @@ impl Strategy {
         };
         format!(
             "# laterite-ags4-forge strategy — the executable twin of an\n\
-             # ags-wiki/strategies/strat-forge-*.md page. Claude authors\n\
-             # this from the wiki (parity-matrix blind spots, OBSERVATIONS,\n\
+             # ags-wiki/strategies/strat-forge-*.md page. It is authored\n\
+             # from the wiki (parity-matrix blind spots, OBSERVATIONS,\n\
              # the rule pages); the binary is the deterministic executor.\n\
              #\n# `forge strategy validate <f>` checks this without running\n\
              # anything; `forge run --strategy <f>` executes it.\n\n{}",

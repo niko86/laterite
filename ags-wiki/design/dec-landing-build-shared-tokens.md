@@ -161,6 +161,38 @@ fonts from a third-party CDN. The apex is a small page whose whole pitch is that
 it does not phone anywhere; a third-party font origin on the page making that
 claim is the one place it cannot be true.
 
+### Two calls the primitives forced (#406)
+
+**The token layer grew three families, and two of them deliberately collide.**
+The primitives state their control contracts in spacing, radii, elevation and
+motion tokens, so "match the control metrics" was not possible without them
+(`repo:web/src/shared/styles/metrics.css` and its two neighbours). `--radius-*`,
+`--shadow-*`, `--ease-*` and `--spacing` are Tailwind theme namespaces, and
+declaring them at `:root` redefines `rounded-md`, `shadow-md` and the spacing
+scale for every surface that imports the layer. Here that is the **point** — one
+radius scale, and the utilities resolve to it — which is the opposite call from
+the one the type metrics needed, where the same collision was accidental and the
+tokens were renamed out of the way. Both files say which they are; the failure
+mode this design is guarding against is a collision nobody wrote down.
+
+**The filled buttons are rust, not the system's `--accent`.** The design system
+fills `primary` with `--accent`, which was brand brick when it was written. This
+layer resolved `--accent` to maroon and gave rust its own `--cta`, so
+implementing that contract literally would have made every commit button the
+colour of the prose around it — the read/act split undone by following the
+document that proposed it. The prop names, the variants and the metrics are the
+system's; the colour role is the newer decision. `add` and `ghost` keep maroon,
+because they read as links rather than commits.
+
+**The icons are vendored, and that is the same argument as the fonts.** The
+system's own `Icon` fetches each glyph from a CDN and its readme flags that as
+the thing to change for an offline build. The app is a PWA with a precache, so an
+icon set that 404s offline is a validator full of unlabelled buttons.
+`repo:web/scripts/sync-icons.mjs` refreshes a committed working set from
+`lucide-static` and fails on an icon that upstream renamed or one vendored but no
+longer named, so the set cannot drift from the package it came from in either
+direction.
+
 ## Consequences
 
 **The apex deploy consumes a build.** `repo:.github/workflows/deploy-validator.yml`
