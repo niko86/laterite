@@ -682,11 +682,17 @@ body {
 [data-md-color-scheme="slate"] .md-rail__probe {
   background: var(--steel-300);
 }
-/* Below Material's desktop breakpoint the table of contents collapses into the
-   page rather than sitting in a rail, so there is no edge for this to run down.
+/* The rail exists to run down the table of contents' edge, so it appears and
+   disappears exactly with it — and 60em is MATERIAL'S number, not one of ours:
+   it is where `.md-sidebar--secondary:not([hidden])` becomes `display: block`.
+   Copying the wrong breakpoint here is a silent, specific bug: the earlier
+   76.1875em was the layout breakpoint, and between the two the reader got a
+   table of contents with no strip beside it, on every window from 960 to
+   1219px. Nothing fails when these drift apart, so on a Material bump this is
+   the value to re-check.
    (It needs no reduced-motion arm: rail.js SETS the position rather than
    transitioning to it, so the strip never animates in the first place.) */
-@media screen and (max-width: 76.1875em) {
+@media screen and (max-width: 59.9375em) {
   .md-rail {
     display: none;
   }
