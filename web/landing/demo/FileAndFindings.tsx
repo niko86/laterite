@@ -40,7 +40,7 @@ const FindingRow: Component<{ finding: Finding }> = (props) => (
       type="button"
       class={[
         "w-full rounded-md border px-3 py-2 text-left text-caption",
-        "focus-visible:outline-none focus-visible:[box-shadow:var(--focus-ring)]",
+        "focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]",
         SEVERITY_CLASS[props.finding.severity] ?? SEVERITY_CLASS.error,
       ].join(" ")}
       disabled={props.finding.line === null}

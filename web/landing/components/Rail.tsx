@@ -114,9 +114,16 @@ export const Rail: Component = () => {
         />
 
         {/* The depth pill rides the strip. Depth and nothing else: no unit and
-            no group name, because the scale beside it carries both. */}
+            no group name, because the scale beside it carries both.
+
+            One `text-surface` covers both themes and replaces the light/dark
+            foreground pair this used to carry: the fill inverts across themes
+            (maroon `accent` in light, sand `laterite-300` in dark) and so does
+            `--surface`, so the on-fill text lands light-on-dark and then
+            dark-on-light without a `dark:` variant. The #404 mechanism the
+            shared Chip records. */}
         <div
-          class="absolute hidden -translate-y-1/2 rounded-pill bg-accent px-2 py-0.5 font-mono text-[0.62rem] text-stone-50 min-[68rem]:block dark:bg-laterite-300 dark:text-stone-950"
+          class="absolute hidden -translate-y-1/2 rounded-pill bg-accent px-2 py-0.5 font-mono text-[0.62rem] text-surface min-[68rem]:block dark:bg-laterite-300"
           style={{ top: `${probe()}%`, left: "6px" }}
         >
           {depthLabel(depthAt(progress(), total))}

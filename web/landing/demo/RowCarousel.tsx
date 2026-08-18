@@ -139,7 +139,7 @@ export const RowCarousel: Component<{
               <p class="mt-1 text-caption text-fg-muted">{h().description}</p>
 
               <input
-                class="mt-3 w-full rounded-md border border-line-strong bg-surface px-3 py-2 font-mono text-body text-fg focus-visible:outline-none focus-visible:[box-shadow:var(--focus-ring)]"
+                class="mt-3 w-full rounded-md border border-line-strong bg-surface px-3 py-2 font-mono text-body text-fg focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]"
                 classList={{ "border-err": failing().length > 0 }}
                 value={value()}
                 aria-label={`${h().name} value`}

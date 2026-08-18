@@ -275,12 +275,15 @@ export default tseslint.config(
   },
   prettier,
   {
-    // The gate itself (#404) — application source only. The landing surface
-    // still carries stone-* classes (its own tickets' territory) and the
-    // config/scripts layer legitimately names colours (this file, the tokens'
-    // build plumbing), so the scope is exactly the app the ticket covers.
+    // The gate itself (#404) — every rendering surface, app and landing alike.
+    // The landing was carved out while it still carried stone-* classes; those
+    // are gone, so the exemption went with them. It is the surface that most
+    // needed the gate: it shares this Tailwind scan with the app, so a raw
+    // class here reaches the app's bundle whether or not the app names it.
+    // Still out of scope: the config/scripts layer (this file, the tokens'
+    // build plumbing), which legitimately names colours.
     name: "design/no-raw-palette",
-    files: ["src/**/*.{ts,tsx}"],
+    files: ["src/**/*.{ts,tsx}", "landing/**/*.{ts,tsx}"],
     plugins: {
       design: {
         rules: {
