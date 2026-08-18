@@ -20,7 +20,7 @@ export const Field: Component<{
     class={`flex flex-col gap-1 text-micro text-fg-muted min-w-0 ${props.class ?? ""}`}
   >
     {props.label}
-    <span class="grid content-center min-h-[--control-h] min-w-0">
+    <span class="grid content-center min-h-(--control-h) min-w-0">
       {props.children}
     </span>
     <Show when={props.hint}>

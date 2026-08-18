@@ -21,7 +21,7 @@ export type ButtonTone = "neutral" | "danger";
 
 const BASE =
   "inline-flex items-center gap-[0.4rem] font-ui leading-normal cursor-pointer " +
-  "transition-colors duration-[--dur-base] ease-[--ease-out] " +
+  "transition-colors duration-(--dur-base) ease-(--ease-out) " +
   "focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]";
 
 const VARIANTS: Record<ButtonVariant, string> = {

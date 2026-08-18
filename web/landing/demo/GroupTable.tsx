@@ -59,7 +59,7 @@ export const GroupTable: Component<{
     >
       {/* The cap: a single solid band, not the masthead's four-band gradient —
           a gradient here would read as four groups rather than one. */}
-      <div aria-hidden="true" class="h-[3px] w-full bg-[--band]" />
+      <div aria-hidden="true" class="h-[3px] w-full bg-(--band)" />
 
       <div class="overflow-x-auto overscroll-x-contain">
         <table class="w-full border-collapse text-left">
@@ -74,9 +74,9 @@ export const GroupTable: Component<{
                     scope="col"
                     class="px-3 py-2 font-mono text-micro font-semibold whitespace-nowrap"
                     classList={{
-                      "bg-[--key-tint] text-accent": heading.key,
+                      "bg-(--key-tint) text-accent": heading.key,
                       "text-fg-muted": !heading.key,
-                      "border-r-[3px] border-r-[--band]": col() === lastKey(),
+                      "border-r-[3px] border-r-(--band)": col() === lastKey(),
                       "sticky left-0 z-10 bg-surface dark:bg-surface-raised":
                         col() === 0,
                     }}
@@ -87,7 +87,7 @@ export const GroupTable: Component<{
                             already in the header's title attribute. */}
                         <span
                           aria-hidden="true"
-                          class="text-[0.6em] text-[--band]"
+                          class="text-[0.6em] text-(--band)"
                         >
                           ◆
                         </span>
@@ -135,8 +135,8 @@ export const GroupTable: Component<{
                           class="px-3 py-1.5 text-caption whitespace-nowrap"
                           classList={{
                             // One region, one tint — no per-column striping.
-                            "bg-[--key-tint]": heading.key,
-                            "border-r-[3px] border-r-[--band]":
+                            "bg-(--key-tint)": heading.key,
+                            "border-r-[3px] border-r-(--band)":
                               col() === lastKey(),
                             "font-semibold text-err": failing(),
                             "text-fg": !failing(),

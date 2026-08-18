@@ -184,7 +184,7 @@ export const TemplateGenerator: Component = () => {
       </Show>
 
       <Show when={template()}>
-        <pre class="mono max-h-72 max-w-full overflow-auto rounded-lg border border-line bg-surface-code p-2 text-xs leading-relaxed text-fg-soft">
+        <pre class="scroll-region mono max-w-full rounded-lg border border-line bg-surface-code p-2 text-xs leading-relaxed text-fg-soft">
           {template()}
         </pre>
       </Show>

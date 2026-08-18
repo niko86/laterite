@@ -18,7 +18,7 @@ export const Checkbox: Component<
       <input
         {...rest}
         type="checkbox"
-        class="w-[0.9rem] h-[0.9rem] m-0 accent-[--accent]"
+        class="w-[0.9rem] h-[0.9rem] m-0 accent-(--accent)"
       />
       {own.label}
     </label>

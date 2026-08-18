@@ -67,7 +67,11 @@ export const FileDiff: Component<{
               </Show>
             </div>
 
-            <pre class="mono max-w-full overflow-x-auto rounded-lg border border-line bg-surface-code p-2 text-xs leading-relaxed">
+            {/* scroll-region (#407): the diff of a large file is thousands of
+                rows — it scrolls inside its cap rather than growing the page
+                (the cap also covers horizontal overflow, so the old
+                overflow-x-auto rides along). */}
+            <pre class="scroll-region mono max-w-full rounded-lg border border-line bg-surface-code p-2 text-xs leading-relaxed">
               <For each={shown()}>{(row) => <DiffRowView row={row} />}</For>
             </pre>
 

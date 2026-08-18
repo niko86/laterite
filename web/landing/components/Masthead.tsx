@@ -59,7 +59,7 @@ export const Masthead: Component = () => (
              must stay light in dark chrome, which is the whole point of it. */
           class="size-7 rounded-[5px] dark:bg-[var(--stone-50)] dark:p-[3px]"
         />
-        <span class="font-display text-h3 font-extrabold tracking-[--track-tight] text-accent">
+        <span class="font-display text-h3 font-extrabold tracking-(--track-tight) text-accent">
           laterite
         </span>
       </a>

@@ -14,14 +14,14 @@ const STENCIL: Record<StatusTone, string> = {
   pass: "text-ok border-ok",
   fail: "text-err border-err",
   warn: "text-warn border-warn",
-  unknown: "text-[--steel-500] border-[--steel-500]",
+  unknown: "text-(--steel-500) border-(--steel-500)",
 };
 
 const SOLID: Record<StatusTone, string> = {
   pass: "bg-ok border-ok",
   fail: "bg-err border-err",
   warn: "bg-warn border-warn",
-  unknown: "bg-[--steel-500] border-[--steel-500]",
+  unknown: "bg-(--steel-500) border-(--steel-500)",
 };
 
 export const StatusBadge: Component<

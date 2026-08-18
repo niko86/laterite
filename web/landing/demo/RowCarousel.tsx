@@ -91,7 +91,7 @@ export const RowCarousel: Component<{
       }}
     >
       <div class="flex items-center justify-between gap-3">
-        <p class="font-mono text-micro uppercase tracking-[--track-micro] text-fg-muted">
+        <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
           {props.schema.code} · row {props.row + 1} · field {props.col + 1} of{" "}
           {props.schema.headings.length}
         </p>
@@ -123,7 +123,7 @@ export const RowCarousel: Component<{
             <div class="min-w-0 flex-1 rounded-md border border-line bg-surface p-3">
               <p class="flex flex-wrap items-baseline gap-2">
                 <Show when={h().key}>
-                  <span aria-hidden="true" class="text-[--band]">
+                  <span aria-hidden="true" class="text-(--band)">
                     ◆
                   </span>
                 </Show>

@@ -473,9 +473,13 @@ const Dashboard: Component<{
         below) to see its rows.
       </p>
     </Card>
-    <div class="overflow-x-auto rounded-lg border border-line">
+    {/* scroll-region (#407): a full delivery lists every group here — the
+        table scrolls inside its cap with the header held sticky (the
+        ResultsGrid idiom: the th bottom border rides the sticky header, since
+        a row border-top would scroll away under it). */}
+    <div class="scroll-region rounded-lg border border-line">
       <table class="w-full text-sm">
-        <thead class="bg-surface-raised text-fg-soft">
+        <thead class="sticky top-0 z-10 bg-surface-raised text-fg-soft [&_th]:border-b [&_th]:border-line">
           <tr>
             <th class="px-3 py-1.5 text-left font-medium">Group</th>
             <th class="px-3 py-1.5 text-right font-medium">Rows</th>
