@@ -35,6 +35,10 @@ repo_name: niko86/laterite
 copyright: laterite — MIT-licensed AGS4 tooling
 hooks:
   - hooks/version_stamp.py
+  # Holds the TOC rail's media query to mkdocs-material's own sidebar
+  # breakpoint, which it necessarily copies (#402). Warns rather than raises, so
+  # `--strict` fails on a PR and the deliberately non-strict deploy stays green.
+  - hooks/rail_breakpoint.py
 
 docs_dir: docs
 site_dir: ../docs-dist
