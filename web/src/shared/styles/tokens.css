@@ -9,8 +9,9 @@
  * It lives HERE, under the web source tree the two Vite builds share, rather
  * than under web/landing/ — this is the shared artefact all three surfaces
  * consume, not a landing-page file to be promoted once someone else needs it.
- * The app is the one surface not yet reading it: its move is a larger migration
- * (#403) with its own sequence, and it lands on this layer rather than a copy.
+ * The app landed on this layer in #403 — dark set included, promoted into
+ * colors.css when the app became its second consumer. The docs surface (#401)
+ * is the one not yet reading it.
  */
 @import "./fonts.css";
 @import "./colors.css";
