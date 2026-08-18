@@ -328,7 +328,9 @@ const MergeView: Component<{
           <p class="mb-1 text-xs font-medium uppercase tracking-wide text-fg-dim">
             Rows the incoming file revised
           </p>
-          <div class="mono flex flex-col gap-1 overflow-x-auto text-xs">
+          {/* scroll-region (#407): one line per revised row is unbounded on a
+              big merge — the list scrolls inside its cap. */}
+          <div class="scroll-region mono flex flex-col gap-1 text-xs">
             <For each={r.revisions}>
               {(rev) => (
                 <div class="min-w-max">
@@ -352,7 +354,7 @@ const MergeView: Component<{
           <p class="mb-1 text-xs font-medium uppercase tracking-wide text-fg-dim">
             Warnings
           </p>
-          <ul class="flex flex-col gap-1 text-xs text-fg-muted">
+          <ul class="scroll-region flex flex-col gap-1 text-xs text-fg-muted">
             <For each={r.warnings}>
               {(w) => (
                 <li>

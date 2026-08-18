@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { ready, load, enterExplore } from "./helpers";
+import { ready, load, enterExplore, tab } from "./helpers";
 
 // Responsive layout checks. This spec is viewport-aware and runs under BOTH the
 // desktop `chromium` (1280) project and the `mobile` (390) project, asserting
@@ -17,6 +17,87 @@ async function expectNoHScroll(page: Page) {
   );
   expect(overflow, "page must not scroll horizontally").toBeLessThanOrEqual(1);
 }
+
+test("Shell: the lockup, the centred column, the full-width tab hairline, the toast layer", async ({
+  page,
+}) => {
+  await ready(page);
+
+  // The lockup (#407): the brand word sets in the display face at 800; the
+  // product name sets in the UI face at 600 — never the display face, which
+  // is the rule the system spells out (a long product name in a heavy display
+  // weight reads as packaging).
+  const h1 = page.getByRole("heading", { level: 1 });
+  await expect(h1).toContainText("laterite");
+  await expect(h1).toContainText("AGS4 Validator");
+  const brand = h1.locator("span", { hasText: /^laterite$/ });
+  const product = h1.locator("span", { hasText: /^AGS4 Validator$/ });
+  expect(
+    await brand.evaluate((el) => getComputedStyle(el).fontFamily),
+  ).toContain("Figtree");
+  expect(await brand.evaluate((el) => getComputedStyle(el).fontWeight)).toBe(
+    "800",
+  );
+  expect(
+    await product.evaluate((el) => getComputedStyle(el).fontFamily),
+  ).toContain("Public Sans");
+  expect(await product.evaluate((el) => getComputedStyle(el).fontWeight)).toBe(
+    "600",
+  );
+
+  // The shell centres at the system's width with its fixed gutters.
+  const main = page.locator("main");
+  expect(await main.evaluate((el) => getComputedStyle(el).maxWidth)).toBe(
+    "1280px",
+  );
+  expect(await main.evaluate((el) => getComputedStyle(el).paddingLeft)).toBe(
+    "20px",
+  );
+
+  // The tab bar's hairline runs the full viewport width even though the strip
+  // centres, and the active tab is marked by the 2px accent underline.
+  const hairline = page.locator('nav[aria-label="Sections"] > div').first();
+  const hairlineWidth = await hairline.evaluate((el) => el.clientWidth);
+  // Full width = the document's client width (the viewport minus any
+  // scrollbar), not the nominal viewport size.
+  expect(hairlineWidth).toBe(
+    await page.evaluate(() => document.documentElement.clientWidth),
+  );
+  const active = page.getByRole("tab", { selected: true });
+  expect(
+    await active.evaluate((el) => getComputedStyle(el).borderBottomWidth),
+  ).toBe("2px");
+
+  // The toast host layers above everything — its z-index token must RESOLVE
+  // (the bracket-var regression this branch fixes left it invalid, which
+  // computes as auto).
+  const toastHost = page.locator('[class*="z-(--z-toast)"]');
+  expect(await toastHost.evaluate((el) => getComputedStyle(el).zIndex)).toBe(
+    "60",
+  );
+
+  await expectNoHScroll(page);
+});
+
+test("Fix: the whole-file diff scrolls inside its cap instead of growing the page", async ({
+  page,
+}) => {
+  await ready(page);
+  await load(page, "fixable.ags");
+  await tab(page, "Fix").click();
+  // The diff pre only renders once the current file differs from the original,
+  // so apply the safe fixes first to give it content.
+  await page.getByRole("button", { name: /Fix all safe/ }).click();
+  await page.getByRole("button", { name: /^Diff$/ }).click();
+  const pre = page.locator("pre.scroll-region");
+  await expect(pre).toBeVisible();
+  const overflowY = await pre.evaluate((el) => getComputedStyle(el).overflowY);
+  expect(["auto", "scroll"]).toContain(overflowY);
+  expect(await pre.evaluate((el) => getComputedStyle(el).maxHeight)).not.toBe(
+    "none",
+  );
+  await expectNoHScroll(page);
+});
 
 test("Validate: fits the viewport; the sample list collapses once a file is loaded", async ({
   page,

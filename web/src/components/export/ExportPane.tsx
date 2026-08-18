@@ -182,7 +182,7 @@ export const ExportPane: Component = () => {
                 </For>
               </ul>
             </Show>
-            <pre class="max-h-96 overflow-auto rounded-sm border border-line bg-surface p-2 font-mono text-xs text-fg">
+            <pre class="scroll-region rounded-sm border border-line bg-surface p-2 font-mono text-xs text-fg">
               {r().text}
             </pre>
           </Card>

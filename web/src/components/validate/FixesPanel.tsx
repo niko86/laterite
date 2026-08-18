@@ -292,23 +292,28 @@ export const FixesPanel: Component<{
           </span>
         </div>
 
-        <For each={safeOrdered()}>{(f) => fixCard(f)}</For>
+        {/* scroll-region (#407): a dirty file can carry hundreds of fixes —
+            the cards scroll inside the cap while the Apply bar above stays
+            put, rather than growing the page by one card per fix. */}
+        <div class="scroll-region flex min-w-0 flex-col gap-3">
+          <For each={safeOrdered()}>{(f) => fixCard(f)}</For>
 
-        <Show when={riskyOrdered().length > 0}>
-          <div class="rounded-lg border border-warn/45 bg-warn-quiet px-3 py-2">
-            <p class="text-sm font-medium text-warn">
-              Risky fixes ({riskyOrdered().length}) — opt-in
-            </p>
-            <p class="mt-0.5 text-xs text-fg-dim">
-              These guess intent (a lossy or surprising rewrite) and are{" "}
-              <span class="font-medium">excluded from "Fix all safe"</span>.
-              Review and tick the ones you want, then Apply selected.
-            </p>
-            <div class="mt-2 flex flex-col gap-2">
-              <For each={riskyOrdered()}>{(f) => fixCard(f)}</For>
+          <Show when={riskyOrdered().length > 0}>
+            <div class="rounded-lg border border-warn/45 bg-warn-quiet px-3 py-2">
+              <p class="text-sm font-medium text-warn">
+                Risky fixes ({riskyOrdered().length}) — opt-in
+              </p>
+              <p class="mt-0.5 text-xs text-fg-dim">
+                These guess intent (a lossy or surprising rewrite) and are{" "}
+                <span class="font-medium">excluded from "Fix all safe"</span>.
+                Review and tick the ones you want, then Apply selected.
+              </p>
+              <div class="mt-2 flex flex-col gap-2">
+                <For each={riskyOrdered()}>{(f) => fixCard(f)}</For>
+              </div>
             </div>
-          </div>
-        </Show>
+          </Show>
+        </div>
       </div>
     </Show>
   );

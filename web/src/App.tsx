@@ -18,6 +18,7 @@ import { ToolsPane } from "./components/tools/ToolsPane";
 import { ExportPane } from "./components/export/ExportPane";
 import { PwaUpdater } from "./components/PwaUpdater";
 import { ThemeToggle } from "./shared/components";
+import mark from "../../assets/laterite-icon-128.png";
 
 const App: Component = () => {
   // Gate the panes on the tiny main-thread tokenizer wasm (#533) ALONE — the
@@ -86,26 +87,56 @@ const App: Component = () => {
 
   return (
     <div class="min-h-screen flex flex-col">
-      <header class="border-b border-line px-4 py-4 sm:px-6">
-        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 class="font-display text-xl font-bold text-fg">AGS4 Validator</h1>
-          <span class="hidden text-sm text-fg-muted sm:inline">
-            + data explorer
-          </span>
-          <div class="ml-auto flex items-center gap-2 self-center">
-            <ShareButton />
-            <ThemeToggle />
+      <header class="border-b border-line">
+        <div class="mx-auto w-full max-w-shell px-5 py-4">
+          <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            {/* The system's lockup: mark · "laterite" in the display face ·
+                a hairline divider · the product name in the UI face · a muted
+                qualifier. The product name never sets in the display face — a
+                long name in an 800 display weight reads as packaging; the
+                display voice is the brand word's. The plate under the mark is
+                dark-chrome only: its maroon outline disappears into a
+                near-black canvas without one. The ramp token by reference
+                (the landing masthead's call): no semantic surface token fits,
+                because every surface role flips dark with the theme and this
+                plate must stay light in dark chrome — that is its point. */}
+            <img
+              src={mark}
+              alt=""
+              width="28"
+              height="28"
+              class="size-7 rounded-md dark:bg-(--stone-50) dark:p-[3px]"
+            />
+            <h1 class="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-1">
+              <span class="font-display text-h3 font-extrabold text-accent">
+                laterite
+              </span>
+              <span
+                aria-hidden="true"
+                class="w-px self-stretch bg-line-strong"
+              />
+              <span class="text-lead font-semibold text-fg">
+                AGS4 Validator
+              </span>
+              <span class="hidden text-caption text-fg-muted sm:inline">
+                + data explorer
+              </span>
+            </h1>
+            <div class="ml-auto flex items-center gap-2">
+              <ShareButton />
+              <ThemeToggle />
+            </div>
           </div>
+          <p class="mt-1 text-xs text-fg-faint">
+            Runs entirely in your browser — your file never leaves your machine.
+            No server, nothing uploaded.
+          </p>
         </div>
-        <p class="mt-1 text-xs text-fg-faint">
-          Runs entirely in your browser — your file never leaves your machine.
-          No server, nothing uploaded.
-        </p>
       </header>
 
       <Tabs active={tab()} onChange={setTab} />
 
-      <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">
+      <main class="mx-auto w-full max-w-shell flex-1 px-5 py-6">
         {/* Failure first, then the value: reading an errored resource THROWS,
             so a failure checked from inside the fallback never gets to
             render itself. */}
@@ -133,59 +164,61 @@ const App: Component = () => {
         </Show>
       </main>
 
-      <footer class="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line px-4 py-3 text-xs text-fg-dim sm:px-6">
-        <span>
-          Powered by{" "}
-          <a
-            href="https://github.com/niko86/laterite"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="font-medium text-accent hover:underline"
-          >
-            laterite
-          </a>
-          , a clean-room Rust AGS4 engine compiled to WebAssembly — the same
-          engine runs this app.
-        </span>
-        <span class="whitespace-nowrap">
-          <span class="text-fg-faint" aria-hidden="true">
-            ·
-          </span>{" "}
-          <a
-            href="https://docs.laterite.dev/reference/support/"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-accent hover:underline"
-          >
-            in beta
-          </a>
-        </span>
-        <span class="whitespace-nowrap">
-          <span class="text-fg-faint" aria-hidden="true">
-            ·
-          </span>{" "}
-          <a
-            href="https://github.com/niko86/laterite"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-accent hover:underline"
-          >
-            GitHub
-          </a>
-        </span>
-        <span class="whitespace-nowrap">
-          <span class="text-fg-faint" aria-hidden="true">
-            ·
-          </span>{" "}
-          <a
-            href="https://pypi.org/project/laterite/"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-accent hover:underline"
-          >
-            PyPI
-          </a>
-        </span>
+      <footer class="border-t border-line">
+        <div class="mx-auto flex w-full max-w-shell flex-wrap items-center gap-x-2 gap-y-1 px-5 py-3 text-xs text-fg-dim">
+          <span>
+            Powered by{" "}
+            <a
+              href="https://github.com/niko86/laterite"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="font-medium text-accent hover:underline"
+            >
+              laterite
+            </a>
+            , a clean-room Rust AGS4 engine compiled to WebAssembly — the same
+            engine runs this app.
+          </span>
+          <span class="whitespace-nowrap">
+            <span class="text-fg-faint" aria-hidden="true">
+              ·
+            </span>{" "}
+            <a
+              href="https://docs.laterite.dev/reference/support/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-accent hover:underline"
+            >
+              in beta
+            </a>
+          </span>
+          <span class="whitespace-nowrap">
+            <span class="text-fg-faint" aria-hidden="true">
+              ·
+            </span>{" "}
+            <a
+              href="https://github.com/niko86/laterite"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-accent hover:underline"
+            >
+              GitHub
+            </a>
+          </span>
+          <span class="whitespace-nowrap">
+            <span class="text-fg-faint" aria-hidden="true">
+              ·
+            </span>{" "}
+            <a
+              href="https://pypi.org/project/laterite/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-accent hover:underline"
+            >
+              PyPI
+            </a>
+          </span>
+        </div>
       </footer>
 
       <PwaUpdater />

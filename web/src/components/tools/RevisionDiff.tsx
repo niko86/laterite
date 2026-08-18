@@ -158,7 +158,12 @@ const DeltaView: Component<{
           </p>
         </Show>
 
-        <For each={d.groups}>{(g) => <GroupDeltaView g={g} />}</For>
+        {/* scroll-region (#407): the per-group deltas run to hundreds of rows
+            per group — they scroll under the totals rather than growing the
+            page. */}
+        <div class="scroll-region flex min-w-0 flex-col gap-3">
+          <For each={d.groups}>{(g) => <GroupDeltaView g={g} />}</For>
+        </div>
       </div>
     </Show>
   );

@@ -73,6 +73,12 @@
   --font-ui: var(--family-ui);
   --font-mono: var(--family-mono);
 
+  /* Layout maxima (#407): `max-w-shell` is the app shell's one centring width.
+     `--container-*` is Tailwind's max-width namespace, so this is a bridge
+     entry like the colours above, not a new token — the value stays in
+     metrics.css. */
+  --container-shell: var(--shell-max);
+
   /* Sizes. Each display step carries its own leading and tracking as paired
      modifiers rather than as separate `--leading-*`/`--tracking-*` entries:
      a hero set at the body's line-height and the body's tracking is the most
