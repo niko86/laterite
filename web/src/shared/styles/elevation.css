@@ -13,7 +13,7 @@
  *
  * Unlike metrics.css, these deliberately do NOT take Tailwind's t-shirt names
  * (`--shadow-md` and friends stay untouched): a floating layer is reached by
- * its own name — `shadow-[--shadow-toast]` — and the t-shirt utilities are
+ * its own name — `shadow-(--shadow-toast)` — and the t-shirt utilities are
  * gated out of application code entirely (design/no-raw-effects, #408), so a
  * card cannot reach for a generic elevation that happens to look right.
  */
