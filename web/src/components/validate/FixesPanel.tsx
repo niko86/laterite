@@ -1,4 +1,12 @@
-import { For, Show, createMemo, type Component, type JSX } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  type Component,
+  type JSX,
+} from "solid-js";
+import { createVirtualizer } from "@tanstack/solid-virtual";
 import type { Fix, SpanEdit } from "../../lib/validator";
 import type { Severity } from "./FilterBar";
 import { shortRule, ruleAnchor } from "../../lib/rules";
@@ -213,6 +221,38 @@ export const FixesPanel: Component<{
     ordered().filter((f) => props.selected().has(fixKey(f))),
   );
 
+  // The safe list is windowed the way FindingsView windows findings, and for
+  // the same reason transferred (#435): a real delivery carries hundreds of
+  // fixes, and every card mounts a full aligned GROUP diff block, so the
+  // scroll cap bounds the page while the DOM still grows by one card per fix.
+  // The risky group stays a plain <For> below the window: small, opt-in, and
+  // its warning framing reads better whole.
+  let scrollEl!: HTMLDivElement;
+  const virtualizer = createVirtualizer({
+    get count() {
+      return safeOrdered().length;
+    },
+    getScrollElement: () => scrollEl,
+    // A seed only — measureElement corrects each mounted card (height varies
+    // with the diff block).
+    estimateSize: () => 150,
+    overscan: 12,
+  });
+
+  // Same load-bearing triggers as FindingsView's measure effect — see its
+  // comment for the full why: the by-index measurement cache goes stale when
+  // the model remaps indices (apply/recompute), the aligned toggle re-renders
+  // every card WITHOUT a model change, and the rAF re-measure catches the
+  // pre-layout first run.
+  createEffect(() => {
+    safeOrdered();
+    props.aligned?.();
+    virtualizer.measure();
+    requestAnimationFrame(() => {
+      virtualizer.measure();
+    });
+  });
+
   // One fix card (checkbox + label + rule link + per-edit diff). Shared by
   // the safe + risky groups.
   const fixCard = (f: Fix): JSX.Element => {
@@ -307,9 +347,51 @@ export const FixesPanel: Component<{
 
         {/* scroll-region (#407): a dirty file can carry hundreds of fixes —
             the cards scroll inside the cap while the Apply bar above stays
-            put, rather than growing the page by one card per fix. */}
-        <div class="scroll-region flex min-w-0 flex-col gap-3">
-          <For each={safeOrdered()}>{(f) => fixCard(f)}</For>
+            put, rather than growing the page by one card per fix. Card
+            spacing lives on each virtual row (pb-3), not a flex gap: the
+            rows are absolutely positioned, so a gap would never separate
+            them. shrink-0 on the sizing div is load-bearing — its only
+            children are absolutely positioned, so its min-content height is
+            zero and the flex column would otherwise crush it flat instead
+            of letting it overflow into the scroll. */}
+        <div ref={scrollEl} class="scroll-region flex min-w-0 flex-col">
+          <div
+            class="relative w-full shrink-0"
+            style={{ height: `${virtualizer.getTotalSize()}px` }}
+          >
+            <For each={virtualizer.getVirtualItems()}>
+              {(vi) => {
+                // Reactive row read + index guard, as in FindingsView: an
+                // apply shrinks safeOrdered() under still-mounted indices,
+                // and a once-captured fix would render stale content.
+                const fix = () => safeOrdered()[vi.index];
+                return (
+                  <Show when={fix()}>
+                    {(f) => (
+                      <div
+                        data-index={vi.index}
+                        ref={(el) => {
+                          queueMicrotask(() => {
+                            virtualizer.measureElement(el);
+                          });
+                        }}
+                        class="pb-3"
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          transform: `translateY(${vi.start}px)`,
+                        }}
+                      >
+                        {fixCard(f())}
+                      </div>
+                    )}
+                  </Show>
+                );
+              }}
+            </For>
+          </div>
 
           <Show when={riskyOrdered().length > 0}>
             <div class="rounded-lg border border-warn/45 bg-warn-quiet px-3 py-2">
