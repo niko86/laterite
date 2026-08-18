@@ -6,7 +6,7 @@
 // nothing failing.
 //
 // Everything else here pins the half of this module the Playwright suite is
-// BLIND to. e2e drives all thirteen ops through a real browser, so it proves
+// BLIND to. e2e drives every op through a real browser, so it proves
 // the wasm computes the right answer — but it cannot see a leaked wasm handle,
 // a dropped transfer list, or a `?? false` flipped to `?? true`. Delete the
 // `finally` that frees the merge result and every e2e test still passes while
@@ -152,8 +152,14 @@ describe("engine injection", () => {
     const a = vi.fn(() => '{"engine":"a"}');
     const b = vi.fn(() => '{"engine":"b"}');
 
-    const dispatchA = createEngineDispatch(fakeEngine({ certify: a }), () => {});
-    const dispatchB = createEngineDispatch(fakeEngine({ certify: b }), () => {});
+    const dispatchA = createEngineDispatch(
+      fakeEngine({ certify: a }),
+      () => {},
+    );
+    const dispatchB = createEngineDispatch(
+      fakeEngine({ certify: b }),
+      () => {},
+    );
 
     await dispatchA(certifyReq({ id: 1 }));
     await dispatchB(certifyReq({ id: 2 }));
