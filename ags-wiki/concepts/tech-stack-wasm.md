@@ -235,8 +235,8 @@ worker of its sole consumer.
 The split is enforced at compile time, not by convention: `EngineApi` in
 `repo:web/src/lib/engineDispatch.ts` is the full build's type with `read`,
 `ags4_to_xlsx` and `xlsx_to_ags4` marked optional, and `validator.worker.ts`
-names the nine ops tier 1 serves rather than handing over its whole module. Add
-one of the other four there and it stops typechecking, naming
+names the ops tier 1 serves one by one rather than handing over its whole
+module. Add one of the other four there and it stops typechecking, naming
 `ParsedDataset.arrow_ipc` as what tier 1 does not have.
 
 > [!note] DuckDB-wasm asset loading (resolved)

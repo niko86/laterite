@@ -184,7 +184,7 @@ describe("engine injection", () => {
 // failure has to name the op and the reason: an engine build is not something a
 // reader can see from "undefined is not a function" inside a wasm shim.
 describe("an engine build without arrow or excel", () => {
-  // The eight ops tier 1 serves — the same list `validator.worker.ts` passes.
+  // The ops tier 1 serves — the same list `validator.worker.ts` passes.
   const tier1Engine = () => {
     const {
       validate,

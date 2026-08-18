@@ -111,7 +111,7 @@ of DuckDB anyway, and Excel conversion.
 already the isolation boundary — and since #351 the ops it serves live in
 `repo:web/src/lib/engineDispatch.ts`, parameterised by the engine module, so a
 second worker is a second `createEngineDispatch(...)` rather than a second copy
-of thirteen ops. The parsed-dataset handle lives in that closure, which is what
+of every op. The parsed-dataset handle lives in that closure, which is what
 gives each worker its own; the two engines serve disjoint tabs; the only
 stateful handle is Explore's own. So "both resident" is not duplication being
 tolerated — it is the process boundary matching the feature split. Opening

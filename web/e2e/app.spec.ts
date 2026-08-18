@@ -150,8 +150,10 @@ test("Tools → Dictionary loads the per-edition standard dict (searchable + sel
 }) => {
   await ready(page);
   await tab(page, "Tools").click();
-  // The engine's per-edition standard dictionary loaded (auto → 4.1.1) — not
-  // the old static scaffolded JSON whose descriptions were mostly empty.
+  // The per-edition standard dictionary loaded (auto → 4.1.1) — the CANONICAL
+  // union JSON, projected by `lib/dict.ts`, not the old scaffolded JSON whose
+  // descriptions were mostly empty. (Not the engine: #349 settled the static
+  // union as the web's single dict source and removed the engine op.)
   await expect(page.getByText(/AGS 4\.1\.1 standard dictionary/)).toBeVisible();
   // Description search now works: "depth" matches a heading DESCRIPTION (the
   // bug was ~91% empty descriptions), surfacing SAMP (SAMP_TOP = depth to top).
@@ -515,10 +517,12 @@ test("PWA: the app loads and validates fully offline after first visit", async (
     await page.getByRole("button", { name: /Clean \(minimal\)/ }).click();
     await expect(page.getByText(/Clean — 0 findings/)).toBeVisible();
 
-    // Tools works offline too, which is what tier 1 bought and what the
-    // "Validate, Fix, Export & Tools now work offline" notice now claims (#355).
-    // The dictionary is served by the same worker and the same precached
-    // artifact, so this is the claim itself rather than a proxy for it.
+    // Tools works offline too — the other half of the "Validate, Fix, Export &
+    // Tools now work offline" notice (#355). The validate above is the ENGINE
+    // half; this is the asset half, and deliberately so: the Dictionary browser
+    // reads the precached static union JSON, not the worker (#349), so what it
+    // proves is that the dict asset is in the precache. Both halves have to
+    // hold for the notice to be true, which is why the test checks both.
     await tab(page, "Tools").click();
     await page.getByRole("button", { name: /^Dictionary$/ }).click();
     await expect(page.getByPlaceholder(/Search/).first()).toBeVisible();
