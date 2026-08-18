@@ -272,6 +272,20 @@ Key facts:
   > cap). It is a gate rather than a convention because the failure **looks like a
   > design choice**, and because the change that would cause it — a CSS-only edit —
   > is why `web/docs-site/docs/stylesheets/**` had to join the `code` filter.
+  > The **table-of-contents strata rail** (#402, `repo:web/docs-site/docs/javascripts/rail.js`)
+  > is the hairline dose of the apex's borehole rail — six pixels, four bands, a
+  > canvas veil and a steel probe, and deliberately **no numeric readout**: the
+  > apex's rail reads out a depth because on that page the depth is the joke, and
+  > a documentation page has none. It must appear and disappear exactly with the
+  > table of contents, which CSS cannot ask about — so its media query carries a
+  > COPY of Material's `.md-sidebar--secondary` breakpoint, and
+  > `repo:web/docs-site/hooks/rail_breakpoint.py` reads that number out of the
+  > CSS mkdocs-material shipped and holds ours to it. The copy rotted on its
+  > first outing (76.1875em, the *layout* breakpoint, against the sidebar's real
+  > 60em), which left a table of contents with no strip beside it on every window
+  > between 960 and 1219px — invisible in a diff and in a screenshot at one
+  > width. The hook WARNS rather than raises, so `--strict` fails it on a PR
+  > while the deliberately non-strict deploy stays green.
 - **Two CI gates, both via `ci.yml`'s `changes`-job filter** (see
   ci-and-runners):
   - *Build half* — the `docs` job `uv sync --group docs` (mkdocs-material +
