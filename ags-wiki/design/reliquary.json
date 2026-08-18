@@ -268,6 +268,54 @@
       "status": "spotted",
       "removed_in": "not yet — the PR that retires the AGS5 page classes from the public vault",
       "evidence": "Same shape as the `requirement` class above: **0 live pages** (`type: experiment` outside `templates/`: 0), AGS5-worded throughout (its `evidence` field still points into the decoupled `packages/ags5-` tree), and load-bearing as a `TEMPLATE_SCHEMA` source until the class itself is retired. Retire both together or neither. Spotted 2026-08-12"
+    },
+    {
+      "symbol": "`list_rules()` (wasm)",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn list_rules`",
+      "axis": "code",
+      "status": "keep",
+      "removed_in": "— (published surface)",
+      "evidence": "Inventoried by #349 as having **no web caller** (0 hits in `web/src`, `web/e2e`, `web/scripts` — verified 2026-08-18; the Rule explainer reads `public/rules-catalogue.json`, synced by `scripts/sync-rules.mjs`). Not a relic: it is part of the **published** `@laterite/ags4-wasm` surface, named in `EXPECTED_FUNCTIONS` in BOTH `tools/release/check-wasm-slim.mjs` and `check-wasm-tier1.mjs`, documented available in `web/docs-site/docs/reference/wasm-api.md`, with a cookbook page and node/py twins. \"No UI caller\" is not \"no caller\" — removing it is an npm breaking change, not a cleanup."
+    },
+    {
+      "symbol": "`version()` (wasm)",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn version`",
+      "axis": "code",
+      "status": "keep",
+      "removed_in": "— (live caller)",
+      "evidence": "Inventoried by #349 as having no web caller — **true, and misleading**: it has a live NON-web caller. The wasm compliance runner calls it (`glue.version?.()`, the satellite's `tools/compliance/emit_js.mjs`), which is the exact purpose its own docstring records — it exists because that harness had hard-coded `version: \"0.5.1\"` and printed a false cross-surface identity (#556). Also in both release gates' `EXPECTED_FUNCTIONS` and the published API docs. Deleting it would re-open the bug it was added to close."
+    },
+    {
+      "symbol": "`engine_version()` (wasm)",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn engine_version`",
+      "axis": "code",
+      "status": "keep",
+      "removed_in": "— (cert-trust, prospective)",
+      "evidence": "No web caller (verified 2026-08-18). Retained on two independent grounds. (1) **Prospective feature, not dead code**: [[cert-trust-v2]] defines engine identity as a tuple `EngineId = (validator, validator_version, engine_fingerprint, compat)`, and this export is the browser's route to the validator's own version — a browser-minted certificate needs it. (2) It is in `EXPECTED_FUNCTIONS` in both release gates and the published API docs. Its docstring is candid that it is \"useful for humans, useless as an identity\" on its own — the identity claim belongs to the fingerprint below; the two are recorded together because a future cert-trust build reads them as a pair."
+    },
+    {
+      "symbol": "`engine_fingerprint()` (wasm)",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn engine_fingerprint`",
+      "axis": "code",
+      "status": "keep",
+      "removed_in": "— (cert-trust, prospective)",
+      "evidence": "No web caller (verified 2026-08-18). **A missing feature, not a dead one** — the case #349 asked to be checked before removal, and the check says keep. [[cert-trust-v2]] names `engine_fingerprint` in `EngineId` and requires its equality for a cert to be trusted; it is a build-time SHA-256 over every rule source, the dictionary and the rules catalogue, so it is the only thing that can show two surfaces agree on the RULES rather than merely shipping together. Deleting it would have to be walked back the moment browser-minted certs land. Also in both release gates' `EXPECTED_FUNCTIONS`, the published API docs, and `tools/xcheck/`."
+    },
+    {
+      "symbol": "`build_ags4_ipc()` (wasm)",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn build_ags4_ipc`",
+      "axis": "code",
+      "status": "keep",
+      "removed_in": "— (published, feature-gated)",
+      "evidence": "Inventoried by #349 as never imported by either worker — true (the app's Export pane uses the JSON door `build_ags4`). Not a relic: it is the **Arrow** door of the same verb, gated behind the `arrow` feature, documented in `wasm-api.md` as \"build from source\" and in `surfaces/browser.md`, and carried in the cross-surface modality register (`modality.json`, held by `packages/laterite/tests/test_modality_parity.py`) — so removing it would drop a modality row and fail that gate. `check-wasm-tier1.mjs` names it among the exports whose ABSENCE defines tier 1, which is a dependency on the name too."
+    },
+    {
+      "symbol": "`dictionary()` (wasm)",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn dictionary`",
+      "axis": "code",
+      "status": "keep",
+      "removed_in": "— (published surface)",
+      "evidence": "Made caller-less on the web by **this** change (#349): the app's Dictionary browser and Template generator read the static union `ags_dictionary.json` via `lib/dict.ts`, which #349 settled as the web's single dict source, so the worker op and client fn were removed. Recorded here per the relic discipline — add the row in the PR that strands the export — but `keep`, on the same grounds as its four siblings above: it is named in `EXPECTED_FUNCTIONS` in BOTH `tools/release/check-wasm-slim.mjs` and `check-wasm-tier1.mjs` and documented available in `web/docs-site/docs/reference/wasm-api.md`, so it is published npm surface. Its TYPE is still load-bearing web-side even with no caller: `web/src/lib/validator.ts` re-exports `StandardDict` from the engine so the local projection must keep conforming to what this export returns."
     }
   ]
 }

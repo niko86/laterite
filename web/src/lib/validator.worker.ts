@@ -68,7 +68,7 @@ ready.then(
   },
 );
 
-// The nine ops tier 1 serves, named one by one rather than handed the whole
+// The ops tier 1 serves, named one by one rather than handed the whole
 // module. This build *has* `read`, but its `ParsedDataset` has no `arrow_ipc`
 // door and it has no Excel conversions at all — so listing what this worker can
 // serve is what makes the tier boundary a compile error rather than a runtime
@@ -82,7 +82,6 @@ const dispatch = createEngineDispatch(
     diff: engine.diff,
     merge: engine.merge,
     censor: engine.censor,
-    dictionary: engine.dictionary,
     build_ags4: engine.build_ags4,
   },
   reply,

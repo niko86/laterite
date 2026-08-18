@@ -133,9 +133,10 @@ export type { BuildReport as ExportResult } from "../wasm/ags4_wasm";
 // dictionary (canonical names, descriptions, units, types, status). The VALUE is
 // produced locally by `lib/dict.ts::projectEdition` from the canonical union
 // `ags_dictionary.json` (the single web dict source), but the TYPE is the
-// engine's, so the local projection has to keep conforming to what
-// `dictionary(edition)` returns — which is the contract that comment used to
-// assert by hand. ---
+// engine's, so the local projection has to keep conforming to what the crate's
+// `dictionary()` export returns — which is the contract that comment used to
+// assert by hand. Nothing here CALLS that export: #349 removed the web-side op,
+// settling the static JSON as the design. The type is the whole of the tie. ---
 export type { DictGroup, DictHeading, StandardDict } from "../wasm/ags4_wasm";
 
 // --- Revision diff (Tools): the `laterite-ags4-wasm` diff(a, b) result. KEY-aware,

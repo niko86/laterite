@@ -3,9 +3,9 @@
 // knowledge, no I/O — and a module of its own since #380 for the same reason
 // `workerChannel` became one in #357: `validatorClient` spawns its always-on
 // worker at module load, so nothing in it is importable by a unit test
-// (`ReferenceError: Worker is not defined`), and the thirteen kind-pairs below
-// plus the mismatch branch — the one that reports a protocol bug — had no test
-// surface at all.
+// (`ReferenceError: Worker is not defined`), and the kind-pairs below plus the
+// mismatch branch — the one that reports a protocol bug — had no test surface
+// at all.
 //
 // `validatorClient` re-exports the result interfaces, so panes keep importing
 // their whole engine surface from one module.
@@ -15,7 +15,6 @@ import type {
   ExportResult,
   Fix,
   RevisionDelta,
-  StandardDict,
 } from "./validator";
 import type { ReportMeta, CensorTally } from "./validator.worker";
 import type { GroupMeta } from "./duckTypes";
@@ -126,11 +125,6 @@ export type Pending =
       reject: (e: Error) => void;
     }
   | {
-      kind: "dictionary";
-      resolve: (d: StandardDict) => void;
-      reject: (e: Error) => void;
-    }
-  | {
       kind: "toAgs4";
       resolve: (r: ExportResult) => void;
       reject: (e: Error) => void;
@@ -167,8 +161,6 @@ export function settle(msg: WorkerReply, p: Pending): void {
       warnings: JSON.parse(msg.warningsJson) as MergeWarning[],
       revisions: JSON.parse(msg.revisionsJson) as MergeRevision[],
     });
-  } else if (msg.kind === "dictionary" && p.kind === "dictionary") {
-    p.resolve(msg.dict);
   } else if (msg.kind === "censor" && p.kind === "censor") {
     p.resolve({ text: msg.text, tally: msg.tally });
   } else if (msg.kind === "toAgs4" && p.kind === "toAgs4") {
