@@ -535,6 +535,132 @@ jobs:
         continue-on-error: true
         run: python3 tools/gen_doc_outputs.py --check --surface node
 
+  # The BROWSER twin (#283): does `reference/wasm-api.md` work against the package
+  # `npm install @laterite/ags4-wasm` actually gives you?
+  #
+  # The wasm crate says `publish = false` — for crates.io. It IS the npm package:
+  # `wasm-pack` writes the published manifest from its version line and release.yml
+  # pushes it on a `wasm-v*` tag. So there is a real published artifact with five
+  # docs examples, and until this job the only thing running them was ci.yml's
+  # `web` leg, against a local `wasm-pack build`.
+  #
+  # EQUAL VERSION NUMBERS DO NOT MEAN EQUAL ARTIFACTS HERE, and that is the one
+  # way this leg differs from the wheel and node ones. The browser package
+  # releases on its OWN tag while the crate's version line only moves at the next
+  # umbrella bump — so the tree can carry weeks of unreleased wasm changes at a
+  # version string identical to npm's. The wheel leg's "same version — any failure
+  # below is a real defect" would be a lie here. The step below prints the npm
+  # PUBLISH DATE beside this tree's HEAD date instead, which is the pair that
+  # actually separates a defect from ordinary tree-ahead drift.
+  #
+  # EXPECT THIS RED until the next `wasm-v*` release. `ex03_read.mjs` pulls rows
+  # through `rows_json()` — the accessor the slim engine tier exposes — and the
+  # published artifact predates it, so the example dies with `dataset.rows_json is
+  # not a function` while both version strings read the same. That is the state
+  # this leg was built to make visible, not a bug in the job; the remedy is a
+  # release. Which release, and how far behind it is, is what the step below
+  # prints — don't restate it here, it moves on the next publish.
+  #
+  # Calibrated like both existing legs, and NOT in `notify` for the same reason: an
+  # example that FAILS TO RUN fails the job, a committed `.out` that no longer
+  # byte-matches does not. GitHub-hosted and toolchain-free — a published npm
+  # package needs no Rust, no wasm-pack and no wasm32 target.
+  docs-vs-released-wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Where the two run steps below look for the package. `gen_doc_outputs.py`
+      # reads this (see `_wasm_pkg()`) and symlinks it into the examples' own
+      # `node_modules`, which is how their `@laterite/ags4-wasm` import resolves —
+      # the same seam `LAT_BIN` is for the CLI examples.
+      WASM_PKG_DIR: ${{ runner.temp }}/released-wasm/node_modules/@laterite/ags4-wasm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 22
+      # No version pin: the point is whatever `npm install @laterite/ags4-wasm`
+      # resolves to today.
+      - name: Install the PUBLISHED package, as a reader would
+        run: |
+          set -euxo pipefail
+          work="${RUNNER_TEMP:-/tmp}/released-wasm"
+          mkdir -p "$work"
+          cd "$work"
+          npm init -y >/dev/null
+          npm install @laterite/ags4-wasm
+      - name: State what is under test
+        run: |
+          set -euo pipefail
+          released=$(node -p "require('$WASM_PKG_DIR/package.json').version")
+          tree=$(python3 - <<'EOF'
+          import pathlib, tomllib
+          m = pathlib.Path("rust-packages/laterite-ags4-wasm/Cargo.toml")
+          print(tomllib.loads(m.read_text())["package"]["version"])
+          EOF
+          )
+          # The publish date, because the version pair cannot carry this one on its
+          # own (see the job header). `npm view` serves it per version.
+          published=$(npm view @laterite/ags4-wasm time --json \
+            | python3 -c "import json,sys; print(json.load(sys.stdin).get('$released','unknown'))")
+          echo "released npm : $released (published $published)"
+          echo "this tree    : $tree (HEAD $(git log -1 --format=%cI))"
+          echo "The browser package releases on its own \`wasm-v*\` tag, so equal"
+          echo "version numbers do NOT mean equal artifacts — compare the dates."
+      # The expected-drift class, and it runs FIRST because `--check` writes
+      # nothing: it reports drift without being able to mask anything the fatal
+      # step below would otherwise find.
+      - name: Committed .out still byte-matches (informational)
+        continue-on-error: true
+        run: python3 tools/gen_doc_outputs.py --check --surface wasm
+      # The actionable class: a documented example that does not RUN. Write mode is
+      # the fatal half — `run_example` exits hard when an example's exit code is
+      # not its `expect-exit`. Its `.out` writes are discarded with the runner.
+      - name: Docs examples run against the released package
+        run: python3 tools/gen_doc_outputs.py --surface wasm
+
+  # The crates.io twin (#283). #278 wired every publishable crate's README example
+  # into `cargo test --workspace` — but through
+  # `#[cfg(doctest)] #[doc = include_str!("../README.md")]`, which compiles it
+  # inside the workspace, where each `laterite-*` dependency resolves through a
+  # `path =` entry to the source next door. The reader's path is `cargo add
+  # laterite-ags4-core` and then the example off the crates.io page: the RELEASED
+  # crate plus its RELEASED dependency graph. A re-export or a feature gate that
+  # exists only in this tree compiles there and fails for them.
+  #
+  # So `tools/check_released_crate_readmes.py` builds a scratch consumer per crate
+  # with NO path dependency anywhere — that absence is the whole instrument, and
+  # `tests/test_released_crate_readmes.py` asserts it rather than trusting the
+  # generator to keep it. Unpinned, like the other legs: `cargo add` with no
+  # version is what a reader types.
+  #
+  # ONE CLASS, NOT TWO. The other legs split fatal (an example that fails to run)
+  # from informational (a committed `.out` that no longer byte-matches); a README
+  # doctest has no committed output, so there is no drift half to report — it
+  # compiles and runs, or it does not. Out of `notify`'s `needs` all the same: the
+  # tree legitimately documents unreleased API between releases, and the
+  # released-vs-tree pair the tool prints per crate is what tells that apart from a
+  # defect.
+  #
+  # GitHub-hosted: a Rust toolchain and a registry, no workspace build.
+  docs-vs-released-crates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+      - name: State what is under test
+        run: python3 tools/check_released_crate_readmes.py --list
+      # No `--work-dir`: the default temp dir keeps ten scratch consumers and their
+      # shared target directory out of the checkout entirely. (What actually keeps
+      # them from resolving this workspace's `path =` dependencies is the empty
+      # `[workspace]` table in each generated manifest, wherever they land.)
+      - name: Crate README examples compile against the crates.io release
+        run: python3 tools/check_released_crate_readmes.py
+
   # Cross-surface OUTPUT-VALUE gate (X1). Every OTHER gate compares knob NAMES;
   # this one pushes a committed list of (op × input) cases through all four
   # surface legs (python / node / wasm / CLI) and compares the observed output
