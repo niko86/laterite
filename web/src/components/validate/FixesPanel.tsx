@@ -4,6 +4,10 @@ import type { Severity } from "./FilterBar";
 import { shortRule, ruleAnchor } from "../../lib/rules";
 import { Chip, type ChipTone, type ChipVariant } from "@shared/components";
 
+import { highlightSpan, SEVERITY_CHIP } from "./FindingsView";
+import { fixBlock, alignBlock, type AlignedRow } from "../../lib/agsline";
+import { fixHighlight } from "../../lib/fixpreview";
+
 // A fix wears the SAME chip as the finding it resolves — the map is imported,
 // not copied, so the two cannot drift. Until #412 these were three tints of one
 // form here, so the tiers were told apart by colour ALONE, while the findings
@@ -14,9 +18,6 @@ const chipFor = (
   s: Severity | undefined,
 ): { tone: ChipTone; variant: ChipVariant } =>
   s ? SEVERITY_CHIP[s] : { tone: "muted", variant: "outline" };
-import { highlightSpan, SEVERITY_CHIP } from "./FindingsView";
-import { fixBlock, alignBlock, type AlignedRow } from "../../lib/agsline";
-import { fixHighlight } from "../../lib/fixpreview";
 
 /** A fix key the parent's selected-set keys off. There's at most one fix
  *  of a byte-level kind, and per-line in-line fixes, so kind+rule+line+
