@@ -18,7 +18,13 @@
 // node_modules/lucide-static/icons — and if it does not, say so rather than
 // hand-drawing a replacement (the system is explicit about that).
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -38,11 +44,15 @@ mkdirSync(iconsDir, { recursive: true });
 // it keeps this a plain node script — the manifest is TypeScript, and the names
 // are the one thing here that must not have a second definition.
 const wanted = [
-  ...readFileSync(manifest, "utf8").matchAll(/from "\.\/([a-z0-9-]+)\.svg\?raw"/g),
+  ...readFileSync(manifest, "utf8").matchAll(
+    /from "\.\/([a-z0-9-]+)\.svg\?raw"/g,
+  ),
 ].map((m) => m[1]);
 
 if (wanted.length === 0) {
-  throw new Error(`no icons found in ${path.relative(process.cwd(), manifest)} — has its import shape changed?`);
+  throw new Error(
+    `no icons found in ${path.relative(process.cwd(), manifest)} — has its import shape changed?`,
+  );
 }
 
 for (const name of wanted) {
@@ -66,4 +76,6 @@ if (orphans.length > 0) {
   );
 }
 
-console.log(`sync-icons: ${wanted.length} icon(s) refreshed from lucide-static`);
+console.log(
+  `sync-icons: ${wanted.length} icon(s) refreshed from lucide-static`,
+);

@@ -9,7 +9,7 @@
     "sync-samples": "node scripts/sync-samples.mjs",
     "sync-sensitive": "node scripts/sync-sensitive.mjs",
     "sync-rules": "node scripts/sync-rules.mjs",
-    "sync-assets": "node scripts/sync-dict.mjs && node scripts/sync-samples.mjs && node scripts/sync-sensitive.mjs && node scripts/sync-rules.mjs",
+    "sync-assets": "node scripts/sync-dict.mjs && node scripts/sync-samples.mjs && node scripts/sync-sensitive.mjs && node scripts/sync-rules.mjs && node scripts/sync-icons.mjs",
     "predev": "npm run sync-assets",
     "dev": "vite",
     "prebuild": "npm run sync-assets",
@@ -33,7 +33,9 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
-    "knip": "knip"
+    "knip": "knip",
+    "sync-icons": "node scripts/sync-icons.mjs",
+    "check:no-emoji": "node scripts/check-no-emoji.mjs"
   },
   "dependencies": {
     "@bokuweb/zstd-wasm": "0.0.27",
