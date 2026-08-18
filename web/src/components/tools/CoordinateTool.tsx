@@ -1,3 +1,4 @@
+import { Button, Select } from "@shared/components";
 import {
   createMemo,
   createResource,
@@ -22,7 +23,6 @@ import {
   type SystemId,
 } from "../../lib/coords";
 import { CoordinateMap } from "./CoordinateMap";
-import { controlClass } from "../../lib/controls";
 
 // Coordinate tool: convert a file's LOCA national-grid eastings / northings
 // (LOCA_NATE / LOCA_NATN) to WGS84 latitude / longitude, entirely client-side
@@ -271,15 +271,15 @@ export const CoordinateTool: Component = () => {
           <div class="flex flex-wrap items-center gap-3 text-sm">
             <label class="flex items-center gap-1.5 text-fg-muted">
               Source grid
-              <select
-                class={controlClass}
+              <Select
+                width="w-auto"
                 value={crs()}
                 onChange={(e) => setCrs(e.currentTarget.value as SystemId)}
               >
                 <For each={Object.entries(CRS)}>
                   {([k, d]) => <option value={k}>{d.label}</option>}
                 </For>
-              </select>
+              </Select>
             </label>
 
             <label
@@ -294,6 +294,9 @@ export const CoordinateTool: Component = () => {
                   : "OSTN15 covers Great Britain only"
               }
             >
+              {/* Native in-label input: the label carries a conditional
+                  suffix and a state-dependent title — richer than the
+                  Checkbox primitive's string label (the FixesPanel call). */}
               <input
                 type="checkbox"
                 checked={precise() && preciseSupported()}
@@ -306,31 +309,24 @@ export const CoordinateTool: Component = () => {
               </Show>
             </label>
 
-            <button
-              type="button"
-              class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
+            <Button
+              variant="primary"
               disabled={ok().length === 0 || converted.loading}
               onClick={exportCsv}
             >
               Download CSV ({ok().length})
-            </button>
-            <button
-              type="button"
-              class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
+            </Button>
+            <Button
+              variant="primary"
               disabled={ok().length === 0 || converted.loading}
               onClick={exportGeoJson}
             >
               Download GeoJSON ({ok().length})
-            </button>
+            </Button>
             <Show when={!showMap()}>
-              <button
-                type="button"
-                class="rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip disabled:opacity-45"
-                disabled={ok().length === 0}
-                onClick={requestMap}
-              >
+              <Button disabled={ok().length === 0} onClick={requestMap}>
                 Show on map
-              </button>
+              </Button>
             </Show>
           </div>
 
@@ -380,20 +376,10 @@ export const CoordinateTool: Component = () => {
                 your browser. Only continue if that's acceptable for this data.
               </p>
               <div class="mt-2 flex gap-2 text-sm">
-                <button
-                  type="button"
-                  class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover"
-                  onClick={confirmConsent}
-                >
+                <Button variant="primary" onClick={confirmConsent}>
                   Load map (OpenStreetMap)
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip"
-                  onClick={() => setAskConsent(false)}
-                >
-                  Cancel
-                </button>
+                </Button>
+                <Button onClick={() => setAskConsent(false)}>Cancel</Button>
               </div>
             </div>
           </Show>
@@ -406,13 +392,14 @@ export const CoordinateTool: Component = () => {
                   browser.
                 </span>
                 <span class="flex gap-3">
-                  <button
-                    type="button"
-                    class="hover:text-fg"
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setShowMap(false)}
                   >
                     Hide map
-                  </button>
+                  </Button>
+                  {/* Destructive ghost hover (muted -> err) — see SqlBuilder. */}
                   <button
                     type="button"
                     class="hover:text-err"

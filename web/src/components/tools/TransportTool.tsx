@@ -1,9 +1,9 @@
+import { Button, Input } from "@shared/components";
 import { createSignal, Show, type Component } from "solid-js";
 import { fileStore } from "../../lib/fileStore";
 import { lock, unlock } from "../../lib/transportClient";
 import { downloadBlob } from "../../lib/download";
 import { isLowEndDevice } from "../../lib/device";
-import { controlCompact } from "../../lib/controls";
 import { Spinner } from "../Spinner";
 
 // Tools → Transport: compress + passphrase-encrypt a file to a `.zst.age`
@@ -143,22 +143,23 @@ export const TransportTool: Component = () => {
           )}
         </Show>
         <div class="flex flex-wrap items-center gap-3 text-sm">
-          <input
+          <Input
             type="password"
             placeholder="Passphrase"
             autocomplete="new-password"
-            class={`w-48 ${controlCompact}`}
+            width="w-48"
             value={lockPass()}
             onInput={(e) => setLockPass(e.currentTarget.value)}
           />
-          <button
-            type="button"
+          <Button
+            variant="primary"
             disabled={busy() !== null || !lockSource() || !lockPass()}
-            class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
             onClick={() => void doLock()}
           >
             {busy() === "lock" ? "Encrypting…" : "Encrypt & download"}
-          </button>
+          </Button>
+          {/* Native file input inside a text label — the file-selector idiom;
+              no primitive wraps a hidden <input type=file>. */}
           <label class="cursor-pointer text-xs text-fg-muted hover:text-fg-soft">
             choose a different file…
             <input
@@ -171,6 +172,8 @@ export const TransportTool: Component = () => {
             />
           </label>
           <Show when={lockFile()}>
+            {/* The link idiom (see AnalyseView): an undo-suggestion that reads
+                as inline text, not a Button family. */}
             <button
               type="button"
               class="text-xs text-fg-faint underline hover:text-fg-soft"
@@ -186,6 +189,8 @@ export const TransportTool: Component = () => {
       <div class="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
         <p class="text-sm font-medium text-fg-soft">Decrypt ← .zst.age</p>
         <div class="flex flex-wrap items-center gap-3 text-sm">
+          {/* Native file input inside the bordered picker label — the
+              file-selector idiom; no primitive wraps a hidden <input type=file>. */}
           <label class="cursor-pointer rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip">
             <Show when={unlockFile()} fallback="Choose a .zst.age file…">
               {(f) => f().name}
@@ -200,22 +205,20 @@ export const TransportTool: Component = () => {
               }}
             />
           </label>
-          <input
+          <Input
             type="password"
             placeholder="Passphrase"
             autocomplete="new-password"
-            class={`w-48 ${controlCompact}`}
+            width="w-48"
             value={unlockPass()}
             onInput={(e) => setUnlockPass(e.currentTarget.value)}
           />
-          <button
-            type="button"
+          <Button
             disabled={busy() !== null || !unlockFile() || !unlockPass()}
-            class="rounded-md border border-line-strong px-3 py-1.5 text-fg hover:border-accent hover:text-accent disabled:opacity-45"
             onClick={() => void doUnlock()}
           >
             {busy() === "unlock" ? "Decrypting…" : "Decrypt & download"}
-          </button>
+          </Button>
         </div>
       </div>
 

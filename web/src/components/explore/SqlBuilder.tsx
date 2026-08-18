@@ -1,3 +1,4 @@
+import { Button, Checkbox, Input, Select } from "@shared/components";
 import {
   createEffect,
   createMemo,
@@ -9,7 +10,6 @@ import {
 } from "solid-js";
 import type { GroupMeta } from "../../lib/duckTypes";
 import { Chevron } from "../Chevron";
-import { controlClass, controlCompact } from "../../lib/controls";
 import {
   selectSql,
   type Cond,
@@ -256,7 +256,6 @@ export const SqlBuilder: Component<{
   // The four field controls share the app-wide standard control look; the
   // captions label the blocks (Source / Columns / Filters / Output) so the
   // builder reads as sections instead of one flat row of look-alike selects.
-  const ctrl = controlClass;
   const caption =
     "mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-fg-faint";
 
@@ -275,16 +274,17 @@ export const SqlBuilder: Component<{
               <span class="mono w-11 shrink-0 text-[11px] font-semibold tracking-wide text-accent">
                 FROM
               </span>
-              <select
+              <Select
                 aria-label="table"
-                class={`mono min-w-0 flex-1 max-w-md ${ctrl}`}
+                mono
+                width="min-w-0 flex-1 max-w-md"
                 value={table()}
                 onChange={(e) => setTable(e.currentTarget.value)}
               >
                 <For each={codes()}>
                   {(c) => <option value={c}>{groupLabel(c)}</option>}
                 </For>
-              </select>
+              </Select>
             </div>
             <Show when={related().length > 0}>
               <div class="flex flex-wrap items-center gap-2">
@@ -294,9 +294,9 @@ export const SqlBuilder: Component<{
                   JOIN
                 </span>
                 <Show when={joined()}>
-                  <select
+                  <Select
                     aria-label="join type"
-                    class={ctrl}
+                    width="w-auto"
                     value={joinKind()}
                     onChange={(e) =>
                       setJoinKind(e.currentTarget.value as "LEFT" | "INNER")
@@ -304,11 +304,12 @@ export const SqlBuilder: Component<{
                   >
                     <option value="LEFT">LEFT</option>
                     <option value="INNER">INNER</option>
-                  </select>
+                  </Select>
                 </Show>
-                <select
+                <Select
                   aria-label="related group"
-                  class={`mono min-w-0 flex-1 max-w-md ${ctrl}`}
+                  mono
+                  width="min-w-0 flex-1 max-w-md"
                   value={joinCode()}
                   onChange={(e) => {
                     const v = e.currentTarget.value;
@@ -337,7 +338,7 @@ export const SqlBuilder: Component<{
                       </option>
                     )}
                   </For>
-                </select>
+                </Select>
               </div>
             </Show>
           </div>
@@ -364,14 +365,12 @@ export const SqlBuilder: Component<{
           <div class="flex flex-wrap gap-x-3 gap-y-1">
             <For each={allCols()}>
               {(r) => (
-                <label class="flex cursor-pointer items-center gap-1 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={picked().has(r.key)}
-                    onChange={() => togglePick(r.key)}
-                  />
-                  <span class="mono">{r.label}</span>
-                </label>
+                <Checkbox
+                  mono
+                  label={r.label}
+                  checked={picked().has(r.key)}
+                  onChange={() => togglePick(r.key)}
+                />
               )}
             </For>
           </div>
@@ -385,20 +384,16 @@ export const SqlBuilder: Component<{
                 (WHERE)
               </span>
             </span>
-            <button
-              type="button"
-              class="rounded-sm border border-line-strong px-2 py-0.5 text-xs text-fg-soft hover:bg-chip"
-              onClick={addCond}
-            >
+            <Button variant="add" onClick={addCond}>
               + add
-            </button>
+            </Button>
           </div>
           <For each={conds()}>
             {(cond, i) => (
               <div class="flex flex-wrap items-center gap-1.5 text-xs">
-                <select
+                <Select
                   aria-label="filter column"
-                  class={controlCompact}
+                  width="w-auto"
                   value={
                     joined() ? `${cond.alias ?? BASE}.${cond.col}` : cond.col
                   }
@@ -416,19 +411,19 @@ export const SqlBuilder: Component<{
                   <For each={allCols()}>
                     {(r) => <option value={r.key}>{r.label}</option>}
                   </For>
-                </select>
-                <select
+                </Select>
+                <Select
                   aria-label="filter operator"
-                  class={controlCompact}
+                  width="w-auto"
                   value={cond.op}
                   onChange={(e) => setCond(i(), { op: e.currentTarget.value })}
                 >
                   <For each={OPS}>{(o) => <option value={o}>{o}</option>}</For>
-                </select>
+                </Select>
                 <Show when={cond.op === "LIKE"}>
-                  <select
+                  <Select
                     aria-label="filter wildcard"
-                    class={controlCompact}
+                    width="w-auto"
                     value={cond.wildcard ?? "contains"}
                     onChange={(e) =>
                       setCond(i(), {
@@ -439,11 +434,11 @@ export const SqlBuilder: Component<{
                     <For each={WILDCARDS}>
                       {(w) => <option value={w.v}>{w.label}</option>}
                     </For>
-                  </select>
+                  </Select>
                 </Show>
                 <Show when={cond.op !== "IS NULL" && cond.op !== "IS NOT NULL"}>
-                  <input
-                    class={`w-32 ${controlCompact}`}
+                  <Input
+                    width="w-32"
                     placeholder="value"
                     value={cond.val}
                     onInput={(e) =>
@@ -451,6 +446,10 @@ export const SqlBuilder: Component<{
                     }
                   />
                 </Show>
+                {/* Native, not Button: the states contract's destructive
+                    ghost (muted at rest, err on hover) — the Button
+                    primitive's danger tone is the ARMED repaint, constant
+                    err, which would shout from every row. */}
                 <button
                   type="button"
                   class="text-fg-dim hover:text-err"
@@ -471,8 +470,8 @@ export const SqlBuilder: Component<{
           <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
             <label class="flex items-center gap-2 text-xs text-fg-muted">
               Order by
-              <select
-                class={ctrl}
+              <Select
+                width="w-auto"
                 value={orderBy()}
                 onChange={(e) => setOrderBy(e.currentTarget.value)}
               >
@@ -480,10 +479,10 @@ export const SqlBuilder: Component<{
                 <For each={orderCols()}>
                   {(c) => <option value={c}>{c}</option>}
                 </For>
-              </select>
-              <select
+              </Select>
+              <Select
                 aria-label="order direction"
-                class={ctrl}
+                width="w-auto"
                 value={orderDir()}
                 onChange={(e) =>
                   setOrderDir(e.currentTarget.value as "ASC" | "DESC")
@@ -491,15 +490,15 @@ export const SqlBuilder: Component<{
               >
                 <option value="ASC">ASC</option>
                 <option value="DESC">DESC</option>
-              </select>
+              </Select>
             </label>
             <label class="flex items-center gap-2 text-xs text-fg-muted">
               Limit
-              <input
+              <Input
                 type="number"
                 min="0"
                 title="0 = no limit (every row)"
-                class={`w-20 ${ctrl}`}
+                width="w-20"
                 value={limit()}
                 onInput={(e) => setLimit(Number(e.currentTarget.value) || 0)}
               />
@@ -514,15 +513,14 @@ export const SqlBuilder: Component<{
             top of the preview (not centred against a tall block) and stack them
             on a phone instead of competing for the narrow width. */}
         <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
-          <button
-            type="button"
-            class="shrink-0 self-start rounded-md bg-surface-raised px-3 py-1.5 text-xs font-medium text-fg hover:bg-chip"
+          <Button
+            class="shrink-0 self-start"
             onClick={() => {
               props.onApply(sql());
             }}
           >
             Use this SQL ↓
-          </button>
+          </Button>
           <pre class="mono min-w-0 flex-1 overflow-x-auto rounded-sm border border-line bg-surface-raised p-2 text-xs text-fg-soft">
             {sql()}
           </pre>

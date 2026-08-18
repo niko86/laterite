@@ -6,7 +6,7 @@ import {
   Show,
   type Component,
 } from "solid-js";
-import { controlFocus } from "../../lib/controls";
+import { searchControl } from "../../lib/controls";
 
 // Plain-English reference for the AGS4 validation rules: what each rule
 // checks, its severity, whether the validator can auto-fix it, and any known
@@ -72,7 +72,7 @@ export const RuleExplainer: Component = () => {
   return (
     <div class="flex min-w-0 flex-col gap-3">
       <input
-        class={`w-full rounded-xs border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg ${controlFocus} placeholder:text-fg-dim`}
+        class={`w-full ${searchControl}`}
         placeholder="Search rules… (e.g. duplicate, datetime, heading)"
         value={q()}
         onInput={(e) => setQ(e.currentTarget.value)}

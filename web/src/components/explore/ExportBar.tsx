@@ -1,3 +1,4 @@
+import { Button } from "@shared/components";
 import { createSignal, For, Show, type Component } from "solid-js";
 
 const MIME: Record<"csv" | "json" | "parquet", string> = {
@@ -66,26 +67,24 @@ export const ExportBar: Component<{
       <span class="text-fg-muted">Export:</span>
       <For each={["csv", "json", "parquet"] as const}>
         {(fmt) => (
-          <button
-            type="button"
+          <Button
+            size="sm"
             title={`This query's result as ${fmt.toUpperCase()}`}
-            class="rounded-sm border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-45"
             disabled={busy() !== null}
             onClick={() => void doExport(fmt)}
           >
             {busy() === fmt ? "…" : fmt.toUpperCase()}
-          </button>
+          </Button>
         )}
       </For>
-      <button
-        type="button"
+      <Button
+        size="sm"
         title="The whole keyed database — every group with its _id/_parent_id keys, not just this query"
-        class="rounded-sm border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-45"
         disabled={busy() !== null}
         onClick={() => void doExportDb()}
       >
         {busy() === "duckdb" ? "…" : "DuckDB"}
-      </button>
+      </Button>
       <Show when={note()}>
         <span class="text-warn">{note()}</span>
       </Show>

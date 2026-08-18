@@ -1,3 +1,5 @@
+import { chartTokens } from "../../lib/chartTheme";
+import { Field, Select as SelectControl } from "@shared/components";
 import {
   createEffect,
   createMemo,
@@ -20,7 +22,6 @@ import { Chart } from "./Chart";
 import { ControlGrid } from "../ControlGrid";
 import { Chevron } from "../Chevron";
 import { isLowEndDevice } from "../../lib/device";
-import { controlClass } from "../../lib/controls";
 import {
   relatedGroups,
   joinKeys,
@@ -258,12 +259,28 @@ export const ChartBuilder: Component<{
     }));
 
     const catAxis = cType === "bar" || !xNumeric;
+    // Token-resolved theme (#410): reading chartTokens() here makes this memo
+    // rebuild on theme flip, so the canvas repaints with the flipped values.
+    const tk = chartTokens();
+    const axisText = { color: tk.fgDim };
+    const axisName = { color: tk.fgSoft };
+    const axisLine = { lineStyle: { color: tk.line } };
+    const splitLine = { lineStyle: { color: tk.lineSubtle } };
     return {
       // No entry/update animation — on a weak CPU/GPU animating thousands of
       // points (and re-animating on every control tweak) is the jank.
       animation: false,
-      tooltip: { trigger: cType === "bar" ? "axis" : "item" },
-      legend: hasColour ? { type: "scroll", top: 0 } : undefined,
+      color: tk.palette,
+      textStyle: { color: tk.fgSoft, fontFamily: tk.familyUi },
+      tooltip: {
+        trigger: cType === "bar" ? "axis" : "item",
+        backgroundColor: tk.tooltipBg,
+        borderColor: tk.tooltipBorder,
+        textStyle: { color: tk.tooltipFg },
+      },
+      legend: hasColour
+        ? { type: "scroll", top: 0, textStyle: { color: tk.fgSoft } }
+        : undefined,
       grid: { left: 64, right: 24, top: hasColour ? 36 : 16, bottom: 56 },
       xAxis: {
         type: catAxis ? "category" : "value",
@@ -271,7 +288,10 @@ export const ChartBuilder: Component<{
         nameLocation: "middle",
         nameGap: 36,
         scale: !catAxis,
-        axisLabel: { rotate: catAxis ? 30 : 0 },
+        axisLabel: { rotate: catAxis ? 30 : 0, ...axisText },
+        nameTextStyle: axisName,
+        axisLine,
+        splitLine,
       },
       yAxis: {
         type: "value",
@@ -281,6 +301,10 @@ export const ChartBuilder: Component<{
         nameLocation: "middle",
         nameGap: 46,
         scale: true,
+        axisLabel: axisText,
+        nameTextStyle: axisName,
+        axisLine,
+        splitLine,
       },
       dataZoom: catAxis
         ? undefined
@@ -297,11 +321,9 @@ export const ChartBuilder: Component<{
     allowEmpty?: string;
     ariaLabel?: string;
   }> = (sp) => (
-    <label class="flex flex-col gap-0.5 text-xs text-fg-muted">
-      {sp.label}
-      <select
+    <Field label={sp.label}>
+      <SelectControl
         aria-label={sp.ariaLabel ?? sp.label}
-        class={controlClass}
         value={sp.value}
         onChange={(e) => {
           sp.onChange(e.currentTarget.value);
@@ -313,8 +335,8 @@ export const ChartBuilder: Component<{
         <For each={sp.options}>
           {(o) => <option value={o.value}>{o.label}</option>}
         </For>
-      </select>
-    </label>
+      </SelectControl>
+    </Field>
   );
 
   const colOptions = () =>

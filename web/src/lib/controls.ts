@@ -1,17 +1,14 @@
-// One definition for the app's bordered form controls, so each tab stops
-// drifting its own padding/size/focus treatment (the audit found selects at
-// py-1 vs py-1.5, text-sm vs inherited, and focus:border-accent on some but not
-// others). Compose per-instance modifiers (w-*, mono, flex-1, disabled:*)
-// AROUND these — they only set the shared look.
+// The controls that stay native after the primitives migration (#410), and
+// the shared focus contract they ride.
 //
-//   controlClass  — the standard <select>/<input> (Source/Output, ChartBuilder,
-//                   Controls, Dictionary edition, the mobile group picker, …).
-//   controlCompact — dense inline controls in a text-xs row (the SqlBuilder
-//                   WHERE filters, the snippet-name box, the sidebar filter).
-//
-// Prominent search inputs (Rule/Dictionary/Template) are a deliberately larger,
-// already-consistent role (px-3 py-2) and keep their size; radius and focus
-// treatment are the same input contract as here (#408).
+//   searchControl — the prominent search inputs (Rule/Dictionary/Template): a
+//                   deliberately larger, already-consistent px-3 py-2 role the
+//                   compact Input primitive doesn't cover (#408). Width and
+//                   flex modifiers (w-full, min-w-0 flex-1) compose AROUND it.
+//   controlFocus  — the focus treatment alone, for the SQL console's textarea.
+//                   The bordered <select>/<input> roles that used to live here
+//                   (controlClass/controlCompact) lost their last consumers to
+//                   @shared/components' CONTROL_CLASS and are retired.
 //
 // `outline-hidden`, not `outline-none`: forced-colors mode discards the
 // box-shadow ring, and outline-hidden leaves a transparent outline behind for
@@ -19,6 +16,4 @@
 export const controlFocus =
   "outline-hidden focus-visible:[box-shadow:var(--focus-ring)] focus-visible:border-accent";
 
-export const controlClass = `rounded-xs border border-line-strong bg-surface-raised px-2 py-1.5 text-sm text-fg ${controlFocus}`;
-
-export const controlCompact = `rounded-xs border border-line-strong bg-surface-raised px-2 py-1 text-xs text-fg ${controlFocus}`;
+export const searchControl = `rounded-xs border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg ${controlFocus} placeholder:text-fg-dim`;

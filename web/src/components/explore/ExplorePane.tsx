@@ -1,3 +1,4 @@
+import { Button, Field, Input, Select } from "@shared/components";
 import {
   createEffect,
   createMemo,
@@ -31,7 +32,6 @@ import { EngineGate, engineGateNeeded } from "./EngineGate";
 import { Spinner } from "../Spinner";
 import { Card } from "../Card";
 import { loadDict, relExamples } from "../../lib/relationships";
-import { controlClass, controlCompact } from "../../lib/controls";
 
 interface GroupInfo {
   meta: GroupMeta;
@@ -232,15 +232,15 @@ export const ExplorePane: Component = () => {
             Load an AGS4 file in the Validate tab — it's parsed into typed,
             in-browser DuckDB tables you can browse here. Nothing is uploaded.
           </p>
-          <button
-            type="button"
-            class="mt-4 rounded-md bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
+          <Button
+            variant="outline"
+            class="mt-4"
             onClick={() => {
               goTo("validate");
             }}
           >
             Go to Validate to load a file →
-          </button>
+          </Button>
         </div>
       }
     >
@@ -267,13 +267,9 @@ export const ExplorePane: Component = () => {
                   (#357). Offered for every failure here — a stale DuckDB
                   fetch and a transient parse both clear the same way, and a
                   button that does nothing is the state we're removing. */}
-                <button
-                  type="button"
-                  class="rounded-md bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
-                  onClick={() => void refetch()}
-                >
+                <Button variant="outline" onClick={() => void refetch()}>
                   Try again
-                </button>
+                </Button>
               </div>
             }
           >
@@ -323,13 +319,12 @@ export const ExplorePane: Component = () => {
                   cleanly UNDER the rounded filter input — a bare sticky input
                   let a sliver of each row show through its gap + rounded corners. */}
                     <div class="sticky top-0 z-10 bg-canvas pb-1">
-                      <input
+                      <Input
                         type="search"
                         aria-label="filter groups"
                         placeholder="Filter groups…"
                         value={groupFilter()}
                         onInput={(e) => setGroupFilter(e.currentTarget.value)}
-                        class={`w-full ${controlCompact}`}
                       />
                     </div>
                     <div class="flex flex-col gap-1">
@@ -354,11 +349,9 @@ export const ExplorePane: Component = () => {
                   {/* Main panel */}
                   <section class="min-w-0">
                     {/* Mobile group picker (the sidebar is hidden below md). */}
-                    <label class="mb-3 flex flex-col gap-1 text-xs text-fg-muted sm:hidden">
-                      Group
-                      <select
+                    <Field label="Group" class="mb-3 sm:hidden">
+                      <Select
                         aria-label="group"
-                        class={controlClass}
                         value={selected() ?? ""}
                         onChange={(e) =>
                           setSelected(e.currentTarget.value || null)
@@ -372,8 +365,8 @@ export const ExplorePane: Component = () => {
                             </option>
                           )}
                         </For>
-                      </select>
-                    </label>
+                      </Select>
+                    </Field>
                     <Show
                       when={selectedInfo()}
                       fallback={
@@ -433,6 +426,9 @@ const SidebarButton: Component<{
   active: boolean;
   onClick: () => void;
 }> = (props) => (
+  /* A list row, not a toolbar control — the kit's group list: selection is
+     the quiet accent fill per the states contract, so it composes from the
+     tokens directly rather than through the Button primitive's families. */
   <button
     type="button"
     onClick={() => {

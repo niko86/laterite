@@ -1,5 +1,5 @@
 import { createMemo, createSignal, Show, type Component } from "solid-js";
-import { ArmedButton } from "@shared/components";
+import { ArmedButton, Button, Checkbox } from "@shared/components";
 import { fileStore } from "../../lib/fileStore";
 import { downloadBlob, baseName } from "../../lib/download";
 
@@ -87,27 +87,20 @@ export const Formatter: Component = () => {
           </p>
 
           <div class="flex flex-wrap items-center gap-3 text-sm">
-            <button
-              type="button"
-              class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover"
-              onClick={save}
-            >
+            <Button variant="primary" onClick={save}>
               Download tidied
-            </button>
+            </Button>
             {/* Overwrites the working bytes in place (#408): arm first. The
                 original stays recoverable, but only via Fix's revert — which
                 discards everything else with it. */}
             <ArmedButton confirm="Replace loaded file?" onConfirm={apply}>
               Apply to loaded file
             </ArmedButton>
-            <label class="flex cursor-pointer items-center gap-1.5 text-xs text-fg-muted">
-              <input
-                type="checkbox"
-                checked={stripTrailing()}
-                onChange={(e) => setStripTrailing(e.currentTarget.checked)}
-              />
-              Strip trailing whitespace
-            </label>
+            <Checkbox
+              label="Strip trailing whitespace"
+              checked={stripTrailing()}
+              onChange={(e) => setStripTrailing(e.currentTarget.checked)}
+            />
           </div>
 
           <ul class="flex flex-col gap-1 text-xs text-fg-soft">

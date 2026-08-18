@@ -8,9 +8,14 @@ import { splitProps, type Component, type JSX } from "solid-js";
 // checkbox would be a third of this file and worse at all three.
 
 export const Checkbox: Component<
-  { label: string; class?: string } & JSX.InputHTMLAttributes<HTMLInputElement>
+  {
+    label: string;
+    /** AGS codes and column names — the label sets in the mono face. */
+    mono?: boolean;
+    class?: string;
+  } & JSX.InputHTMLAttributes<HTMLInputElement>
 > = (props) => {
-  const [own, rest] = splitProps(props, ["label", "class"]);
+  const [own, rest] = splitProps(props, ["label", "mono", "class"]);
   return (
     <label
       class={`inline-flex items-center gap-[0.35rem] text-caption text-fg-soft cursor-pointer ${own.class ?? ""}`}
@@ -20,7 +25,7 @@ export const Checkbox: Component<
         type="checkbox"
         class="w-[0.9rem] h-[0.9rem] m-0 accent-(--accent)"
       />
-      {own.label}
+      <span class={own.mono ? "font-mono" : undefined}>{own.label}</span>
     </label>
   );
 };

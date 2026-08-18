@@ -1,3 +1,4 @@
+import { Button, Input } from "@shared/components";
 import {
   createResource,
   createSignal,
@@ -11,7 +12,7 @@ import { Spinner } from "../Spinner";
 import { Disclosure } from "../Disclosure";
 import { isLowEndDevice } from "../../lib/device";
 import { createMediaQuery } from "../../lib/media";
-import { controlCompact, controlFocus } from "../../lib/controls";
+import { controlFocus } from "../../lib/controls";
 
 // Free-form SQL over the ingested typed tables. Every group of the loaded
 // file is already a DuckDB table (ExplorePane ingests them all for the
@@ -131,15 +132,14 @@ export const SqlConsole: Component<{
       >
         <For each={examples()}>
           {(s) => (
-            <button
-              type="button"
-              class="rounded-sm border border-line-strong px-2 py-0.5 text-fg-soft hover:bg-chip"
+            <Button
+              size="sm"
               onClick={() => {
                 setSql(s.sql);
               }}
             >
               {s.name}
-            </button>
+            </Button>
           )}
         </For>
       </Disclosure>
@@ -153,15 +153,21 @@ export const SqlConsole: Component<{
           <For each={snippets()}>
             {(s) => (
               <span class="inline-flex items-center gap-1 rounded-sm border border-line-strong px-2 py-0.5 text-xs">
+                {/* The link idiom (see AnalyseView): the snippet name reads
+                    as an inline link in its chip, not a Button family —
+                    repainting a ghost from the call site is the drift
+                    Button.tsx itself warns against. */}
                 <button
                   type="button"
-                  class="text-accent hover:underline"
+                  class="text-accent hover:text-accent-hover"
                   onClick={() => {
                     setSql(s.sql);
                   }}
                 >
                   {s.name}
                 </button>
+                {/* Native: the destructive ghost hover (muted -> err) the
+                    Button primitive doesn't model — see SqlBuilder. */}
                 <button
                   type="button"
                   class="text-fg-dim hover:text-err"
@@ -189,27 +195,18 @@ export const SqlConsole: Component<{
       />
 
       <div class="flex flex-wrap items-center gap-3 text-xs">
-        <button
-          type="button"
-          class="rounded-md bg-surface-raised px-3 py-1.5 font-medium text-fg hover:bg-chip"
-          onClick={runIt}
-        >
-          Run <span class="text-fg-muted">⌘/Ctrl+↵</span>
-        </button>
-        <input
-          class={`w-32 ${controlCompact} placeholder:text-fg-dim`}
+        <Button variant="action" onClick={runIt}>
+          Run <span class="text-cta/70">⌘/Ctrl+↵</span>
+        </Button>
+        <Input
+          width="w-32"
           placeholder="snippet name"
           value={snipName()}
           onInput={(e) => setSnipName(e.currentTarget.value)}
         />
-        <button
-          type="button"
-          class="rounded-sm border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-45"
-          disabled={!snipName().trim()}
-          onClick={save}
-        >
+        <Button size="sm" disabled={!snipName().trim()} onClick={save}>
           Save
-        </button>
+        </Button>
         <Show when={submitted()}>
           {(sub) => <ExportBar sql={() => sub().sql} filename="query" />}
         </Show>
