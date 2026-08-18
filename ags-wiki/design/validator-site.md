@@ -677,6 +677,8 @@ graph LR
 ```
 
 ## Related
+[[dec-landing-build-shared-tokens]] — the apex's own build beside this one, and the
+token layer both surfaces read (#394) ·
 [[dec-laterite-ags4-types-leaf]] · cli-cloud-workflow · ci-and-runners · [[playwright-e2e]] · [[docs-site]] · [[validator-finding-ux]] · [[laterite-cli]] ·
 laterite-ags5-db · [[parity-model]] · [[effective-dictionary]] ·
 [[design/_README\|AGS5 register]]

@@ -1,26 +1,27 @@
-// The apex, laterite.dev — a placeholder, served as static assets by a Worker
-// with no code. Third of three: `laterite-app` (app.), `laterite-docs` (docs.),
-// this one (bare).
+// The apex, laterite.dev — static assets on a Worker with no code. Third of
+// three: `laterite-app` (app.), `laterite-docs` (docs.), this one (bare).
 //
-// It exists now because the apex was ANSWERING NOTHING while being advertised:
-// the GitHub Pages redirect shim names laterite.dev in its canonical tag and
-// its noscript fallback, so every crawler and every JS-less visitor following
-// that shim was sent to a hostname with no record. A redirect rule would have
-// closed that too, but a Worker is the thing the real landing page will be —
-// so this is the same object, thinner, rather than scaffolding to tear down.
+// It exists because the apex was ANSWERING NOTHING while being advertised: the
+// GitHub Pages redirect shim names laterite.dev in its canonical tag and its
+// noscript fallback, so every crawler and every JS-less visitor following that
+// shim was sent to a hostname with no record. A redirect rule would have closed
+// that too, but a Worker is the thing the real landing page is — so this is the
+// same object, thinner, rather than scaffolding to tear down.
 //
-// `assets.directory` is ./public, NOT ./ — a bare directory would upload this
-// config file alongside the page.
+// `assets.directory` is ./dist — the output of the landing page's OWN Vite
+// build (landing/vite.config.ts, `npm run build:landing`), not a hand-written
+// file, since #394. It is gitignored, so a deploy that skips the build step
+// ships nothing rather than something stale.
 //
 // No `not_found_handling`: the default is an honest 404. The app's
 // single-page-application setting would answer every mistyped path with the
-// landing page, which is wrong for a site that is one real file.
+// landing page, which is wrong for a site that is one real page.
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "laterite-site",
   "compatibility_date": "2026-08-14",
   "assets": {
-    "directory": "./public",
+    "directory": "./dist",
   },
   "routes": [{ "pattern": "laterite.dev", "custom_domain": true }],
 }

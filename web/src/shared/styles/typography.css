@@ -1,0 +1,89 @@
+/* Type for the "bedrock" pairing (#394).
+ *
+ * The runtime names here are `--family-*`, `--size-*`, `--lh-*` and `--track-*`
+ * rather than the obvious `--font-*`, `--text-*`, `--leading-*` and
+ * `--tracking-*`, for the same reason the colour layer says `--canvas` and not
+ * `--color-canvas`: all four of those ARE Tailwind theme namespaces. A token
+ * sharing a name with its own bridge entry resolves to itself, and — worse —
+ * one declared at `:root` silently redefines the utility of the same name for
+ * every surface that imports this, which is a coupling nothing would fail on.
+ * The bridge (tailwind-theme.css) maps one set onto the other; a surface with
+ * no Tailwind — the docs — reads these directly.
+ *
+ * THE DISPLAY SCALE IS RE-TUNED, NOT INHERITED. The sizes it replaces were set
+ * for a Rockwell-lineage slab, and the display face is now Figtree, a heavy
+ * geometric-humanist sans (see fonts.css for why). The two do not share
+ * metrics, and carrying the old numbers across would have been the easy wrong
+ * answer:
+ *
+ *   - Figtree's x-height is much the larger of the two, so at equal em size it
+ *     reads bigger. Every display step comes down ~12% to land at the same
+ *     APPARENT size the slab had.
+ *   - A slab's serifs bridge the gaps between letters; a geometric sans has
+ *     nothing doing that job, and its round open counters widen the gaps
+ *     instead. So tracking goes further negative at the display end, not less.
+ *   - That same large x-height eats the interline gap, so the hero's leading
+ *     opens from the slab's 1.02 rather than staying there.
+ *
+ * The TOOL scale below is untouched. It was lifted from the app's own type
+ * sweep, it is set in the body face, and the body face did not change — only
+ * the display face did.
+ */
+:root {
+  /* "Variable" suffixes are Fontsource's family names for the variable cuts;
+     the static fallbacks after them are what a reader gets if the woff2 never
+     arrives. Display is never used for body copy. */
+  --family-display:
+    "Figtree Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Helvetica, Arial, sans-serif;
+  --family-ui:
+    "Public Sans Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Helvetica, Arial, sans-serif;
+  --family-mono:
+    "IBM Plex Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* ── Tool UI scale (the app's, unchanged) ── */
+  --size-bubble: 0.65rem; /* count bubbles only */
+  --size-micro: 0.72rem; /* uppercase micro-heads, tags */
+  --size-caption: 0.8rem; /* captions, hints — the sentence-text floor */
+  --size-control: 0.82rem; /* buttons, inputs, table cells */
+  --size-body: 0.85rem; /* primary body */
+  --size-lead: 0.95rem; /* section heads */
+  --size-title: 1rem; /* dialog h2 */
+  --size-page: 1.25rem; /* page h1 */
+
+  /* ── Editorial / marketing scale (re-tuned for Figtree) ── */
+  --size-h3: 1.1rem;
+  --size-h2: 1.4rem;
+  --size-h1: 1.8rem;
+  --size-display: 2.4rem;
+  --size-hero: 3.35rem;
+
+  /* Prose lead — the sentence under a hero headline, the one place marketing
+     copy sets larger than the tool body. */
+  --size-prose: 1.05rem;
+
+  --lh-hero: 1.06;
+  --lh-display: 1.1;
+  --lh-tight: 1.15;
+  --lh-snug: 1.3;
+  --lh-normal: 1.45; /* the app's baseline */
+  --lh-relaxed: 1.55;
+  --lh-loose: 1.7; /* docs prose */
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600; /* the app's emphasis weight */
+  --weight-bold: 700; /* display floor */
+  --weight-extrabold: 800; /* wordmark + hero */
+
+  /* Uppercase micro-labels track WIDER than the slab wanted: geometric caps are
+     near-circular and close up on each other at 0.72rem. */
+  --track-micro: 0.08em;
+  --track-tight: -0.015em;
+  --track-display: -0.025em;
+  --track-hero: -0.03em;
+
+  --measure-prose: 68ch;
+}

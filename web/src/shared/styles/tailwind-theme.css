@@ -1,0 +1,99 @@
+/* The Tailwind bridge for the shared tokens (#394).
+ *
+ * `@theme inline` emits each utility's value as `var(--token)`, so `bg-surface`,
+ * `text-fg`, `border-line`, `font-display` and `text-hero` all resolve through
+ * the runtime variables in tokens.css — and flip with the theme, since the
+ * variables are what `.dark` redefines. This is the app's existing arrangement
+ * (web/src/app.css), widened to the pairing's full vocabulary.
+ *
+ * Tailwind-only, and separate from tokens.css for that reason: the docs surface
+ * has no Tailwind and must be able to import the tokens without it.
+ *
+ * Two namespaces are Tailwind's, not ours, which is why the runtime names on
+ * the right differ from the theme keys on the left: `--color-*`, `--font-*` and
+ * `--text-*` are where Tailwind looks for its `bg-`/`text-`/`border-`,
+ * `font-` and text-size utilities.
+ */
+@theme inline {
+  /* Surfaces */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-code: var(--surface-code);
+  --color-chip: var(--chip);
+
+  /* Lines */
+  --color-line: var(--line);
+  --color-line-subtle: var(--line-subtle);
+  --color-line-strong: var(--line-strong);
+
+  /* Text */
+  --color-fg: var(--fg);
+  --color-fg-soft: var(--fg-soft);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-fg-dim: var(--fg-dim);
+
+  /* Reads / acts — the two halves of "maroon reads, rust acts". */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-quiet: var(--accent-quiet);
+  --color-cta: var(--cta);
+  --color-cta-hover: var(--cta-hover);
+  --color-fg-on-cta: var(--fg-on-cta);
+
+  /* Status */
+  --color-ok: var(--ok);
+  --color-ok-quiet: var(--ok-quiet);
+  --color-warn: var(--warn);
+  --color-warn-quiet: var(--warn-quiet);
+  --color-err: var(--err);
+  --color-err-quiet: var(--err-quiet);
+  --color-info: var(--info);
+  --color-info-quiet: var(--info-quiet);
+
+  /* The brand ramp, exposed whole — the seven-band rail and the group-identity
+     keying (#395) index into it by step, so they need every rung, not a
+     hand-picked subset. */
+  --color-laterite-50: var(--laterite-50);
+  --color-laterite-100: var(--laterite-100);
+  --color-laterite-200: var(--laterite-200);
+  --color-laterite-300: var(--laterite-300);
+  --color-laterite-400: var(--laterite-400);
+  --color-laterite-500: var(--laterite-500);
+  --color-laterite-600: var(--laterite-600);
+  --color-laterite-700: var(--laterite-700);
+  --color-laterite-800: var(--laterite-800);
+  --color-laterite-900: var(--laterite-900);
+  --color-laterite-950: var(--laterite-950);
+
+  /* Families */
+  --font-display: var(--family-display);
+  --font-ui: var(--family-ui);
+  --font-mono: var(--family-mono);
+
+  /* Sizes. Each display step carries its own leading and tracking as paired
+     modifiers rather than as separate `--leading-*`/`--tracking-*` entries:
+     a hero set at the body's line-height and the body's tracking is the most
+     common way this scale gets misused, and pairing them here means `text-hero`
+     cannot be taken without them. */
+  --text-micro: var(--size-micro);
+  --text-micro--letter-spacing: var(--track-micro);
+  --text-caption: var(--size-caption);
+  --text-control: var(--size-control);
+  --text-body: var(--size-body);
+  --text-lead: var(--size-lead);
+  --text-prose: var(--size-prose);
+  --text-h3: var(--size-h3);
+  --text-h3--letter-spacing: var(--track-tight);
+  --text-h2: var(--size-h2);
+  --text-h2--letter-spacing: var(--track-tight);
+  --text-h1: var(--size-h1);
+  --text-h1--letter-spacing: var(--track-tight);
+  --text-display: var(--size-display);
+  --text-display--line-height: var(--lh-display);
+  --text-display--letter-spacing: var(--track-display);
+  --text-hero: var(--size-hero);
+  --text-hero--line-height: var(--lh-hero);
+  --text-hero--letter-spacing: var(--track-hero);
+}

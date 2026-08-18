@@ -1,0 +1,48 @@
+@import "tailwindcss";
+@import "../src/shared/styles/tokens.css";
+@import "../src/shared/styles/tailwind-theme.css";
+
+/* Explicit rather than relying on Tailwind's automatic content detection: this
+   build's root is web/landing/, and the shared directory it draws components
+   from (#406) sits outside it. A class that only ever appears in a shared
+   component would otherwise be scanned by the app's build and not this one —
+   the same button, styled on one surface and unstyled on the other. */
+@source "./index.html";
+@source "../src/shared";
+
+/* The one token this surface retunes. The docs read long-form on the lighter
+   --stone-100; the landing page takes the step below it so cards lift harder
+   against it (see the shared colors.css). */
+:root {
+  --canvas: var(--stone-150);
+}
+
+/* Set from the token rather than Tailwind's `leading-relaxed` utility, which
+   carries its own default and would quietly disagree with the shared layer. The
+   generic leading and tracking scales are deliberately NOT bridged into
+   Tailwind (see tailwind-theme.css) — rebinding what `leading-normal` means for
+   every surface is a bigger decision than this page gets to make. */
+body {
+  font-family: var(--family-ui);
+  line-height: var(--lh-relaxed);
+}
+
+::selection {
+  background: var(--selection);
+}
+
+/* The three destination rows. Extracted because it is one thing repeated, not
+   three things that happen to match — and the next hand to touch this file is
+   #395, replacing the list with the real page. */
+@layer components {
+  .row-link {
+    @apply flex flex-col gap-1 py-3.5 text-accent no-underline;
+    @apply hover:text-accent-hover hover:underline focus-visible:underline;
+    @apply min-[30rem]:flex-row min-[30rem]:items-baseline;
+    @apply min-[30rem]:justify-between min-[30rem]:gap-4;
+  }
+
+  .row-note {
+    @apply text-caption text-fg-muted min-[30rem]:text-right;
+  }
+}

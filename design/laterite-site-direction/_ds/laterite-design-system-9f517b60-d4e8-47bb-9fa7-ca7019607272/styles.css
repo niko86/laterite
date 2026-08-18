@@ -1,0 +1,8 @@
+/* laterite design system — global entry point.
+   Consumers link this one file; everything else is @imported from here. */
+@import "tokens/fonts.css";
+@import "tokens/colors.css";
+@import "tokens/typography.css";
+@import "tokens/spacing.css";
+@import "tokens/elevation.css";
+@import "tokens/motion.css";

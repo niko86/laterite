@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/fonts.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/colors.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/typography.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/spacing.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/elevation.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/tokens/motion.css">
+<link rel="stylesheet" href="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/styles.css">
+<script src="_ds/laterite-design-system-9f517b60-d4e8-47bb-9fa7-ca7019607272/_ds_bundle.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rokkitt:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Arvo:wght@400;700&family=Source+Sans+3:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Zilla+Slab:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:#ece5e0;font-family:"IBM Plex Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#9b3932;text-decoration:none}a:hover{color:#7d2622}
+::-webkit-scrollbar{height:6px;width:6px}::-webkit-scrollbar-thumb{background:#cfc3bb;border-radius:3px}
+</style>
+</helmet>
+
+<div style="display:flex;gap:44px;align-items:flex-start;padding:40px 44px 56px;min-height:100vh;box-sizing:border-box">
+
+<div style="display:flex;flex-direction:column;gap:14px;flex:none">
+<div style="display:flex;align-items:baseline;gap:9px">
+<span style="font:700 0.72rem/1 'IBM Plex Mono',monospace;letter-spacing:0.05em;text-transform:uppercase;color:#9b3932">mobile site</span>
+<span style="font:400 0.8rem/1 'IBM Plex Sans',sans-serif;color:#7d6e68">colour &amp; type pairings · 390 × 844</span>
+</div>
+
+<x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" dark="{{ true }}" hint-size="402px,874px">
+<div class="{{ themeClass }}" style="min-height:100%;box-sizing:border-box;display:flex;flex-direction:column;background:var(--canvas);color:var(--fg);font-family:'IBM Plex Sans',system-ui,sans-serif">
+
+<div style="position:sticky;top:0;z-index:30;background:#1c1715">
+<div style="display:flex;align-items:center;gap:9px;padding:56px 14px 10px">
+<span style="background:#faf7f5;border-radius:5px;padding:3px;display:flex;flex:none"><img src="assets/laterite-icon-256.png" alt="laterite" style="width:22px;height:22px;display:block"></span>
+<span style="font:800 1.15rem/1 'Rokkitt',Rockwell,serif;letter-spacing:-0.01em;color:#faf7f5">laterite</span>
+<span style="width:1px;height:15px;background:#5c504b;flex:none"></span>
+<span style="font:600 0.82rem/1 'IBM Plex Sans',sans-serif;color:#e2d9d3">foundations</span>
+<span style="flex:1"></span>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.ThemeToggle" dc-props="{{ themeToggleProps }}" hint-size="34px,28px"></x-import>
+</div>
+<div style="height:2px;background:linear-gradient(to right,#f09c56,#db7841,#ce5640,#9b3932)"></div>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Tabs" dc-props="{{ tabsProps }}" hint-size="100%,34px"></x-import>
+</div>
+
+<sc-if value="{{ isColour }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:26px;padding:20px 16px 8px">
+
+<div style="display:flex;flex-direction:column;gap:7px">
+<span style="font:700 0.72rem/1 'IBM Plex Mono',monospace;letter-spacing:0.05em;color:var(--fg-faint)">BRAND RAMP</span>
+<h2 style="margin:0;font:700 1.5rem/1.15 'Rokkitt',Rockwell,serif;letter-spacing:-0.01em;color:var(--fg)">The palette is a soil profile.</h2>
+<p style="margin:0;font:400 0.95rem/1.6 'IBM Plex Sans',sans-serif;color:var(--fg-soft);text-wrap:pretty">Every value is sampled from the strata in the logo — topsoil at the top, bedrock at the bottom. Tap a band to read its token.</p>
+</div>
+
+<div style="display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden">
+<sc-for list="{{ bands }}" as="b" hint-placeholder-count="7">
+<button onClick="{{ b.pick }}" style="{{ b.style }}">
+<span style="font:500 0.8rem/1 'IBM Plex Mono',monospace">{{ b.token }}</span>
+<span style="font:400 0.8rem/1 'IBM Plex Mono',monospace;opacity:0.85">{{ b.hex }}</span>
+</button>
+</sc-for>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<span style="font:700 0.72rem/1 'IBM Plex Mono',monospace;letter-spacing:0.05em;color:var(--fg-faint)">STEEL — THE AUGER</span>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+<sc-for list="{{ steel }}" as="s" hint-placeholder-count="4">
+<button onClick="{{ s.pick }}" style="{{ s.style }}"><span style="font:400 0.72rem/1 'IBM Plex Mono',monospace;color:var(--fg-muted)">{{ s.short }}</span></button>
+</sc-for>
+</div>
+<p style="margin:0;font:400 0.8rem/1.5 'IBM Plex Sans',sans-serif;color:var(--fg-faint)">The only cool family in the system — warm ground, cool tool.</p>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<span style="font:700 0.72rem/1 'IBM Plex Mono',monospace;letter-spacing:0.05em;color:var(--fg-faint)">WARM NEUTRALS</span>
+<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px">
+<sc-for list="{{ stones }}" as="s" hint-placeholder-count="8">
+<button onClick="{{ s.pick }}" style="{{ s.style }}"><span style="font:400 0.65rem/1 'IBM Plex Mono',monospace;color:{{ s.label }}">{{ s.short }}</span></button>
+</sc-for>
+</div>
+<p style="margin:0;font:400 0.8rem/1.5 'IBM Plex Sans',sans-serif;color:var(--fg-faint)">Stone, not grey — same hue family as the soil. Never pure white or black. Scrolls sideways rather than shrinking.</p>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<span style="font:700 0.72rem/1 'IBM Plex Mono',monospace;letter-spacing:0.05em;color:var(--fg-faint)">SURFACES — LIFT WITHOUT SHADOW</span>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Card" style="display:flex;flex-direction:column;gap:0.6rem" hint-size="100%,150px">
+<span style="font:600 0.95rem/1.3 'IBM Plex Sans',sans-serif;color:var(--fg)">Card on surface</span>
+<span style="font:400 0.85rem/1.45 'IBM Plex Sans',sans-serif;color:var(--fg-soft)">Cards never cast a shadow. They lift by one step of the canvas → surface → raised ladder plus a 1px hairline.</span>
+<div style="background:var(--surface-raised);border:1px solid var(--line);border-radius:6px;padding:0.6rem 0.8rem;font:400 0.8rem/1.4 'IBM Plex Mono',monospace;color:var(--fg-muted)">--surface-raised</div>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="font:700 0.72rem/1 'IBM Plex Mono',monospace;letter-spacing:0.05em;color:var(--fg-faint)">STATUS — NO TRAFFIC LIGHTS</span>
+<p style="margin:0;font:400 0.95rem/1.6 'IBM Plex Sans',sans-serif;color:var(--fg-soft);text-wrap:pretty">Severity runs down the strata instead of green-amber-red, and is encoded in form as well as hue — solid fill, 3px stratum tick, hairline stencil. The list still reads in greyscale.</p>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="background:var(--err);color:#fdf1e7;border-radius:8px;padding:0.6rem 0.8rem;display:flex;flex-direction:column;gap:3px">
+<span style="font:600 0.85rem/1.3 'IBM Plex Sans',sans-serif">✗ 36 errors · 14 informational</span>
+<span style="font:400 0.8rem/1.4 'IBM Plex Mono',monospace;opacity:0.9">--err #a51f14 · oxide bedrock</span>
+</div>
+<div style="background:var(--warn-quiet);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:0 8px 8px 0;padding:0.6rem 0.8rem;display:flex;flex-direction:column;gap:3px">
+<span style="font:600 0.85rem/1.3 'IBM Plex Sans',sans-serif;color:var(--warn)">LOCA_GL missing on 2 locations</span>
+<span style="font:400 0.8rem/1.4 'IBM Plex Mono',monospace;color:var(--fg-muted)">--warn #8f5312 · ochre topsoil</span>
+</div>
+<div style="background:transparent;border:1px solid var(--info);border-radius:8px;padding:0.6rem 0.8rem;display:flex;flex-direction:column;gap:3px">
+<span style="font:600 0.85rem/1.3 'IBM Plex Sans',sans-serif;color:var(--info)">ⓘ 12 informational (FYI) findings</span>
+<span style="font:400 0.8rem/1.4 'IBM Plex Mono',monospace;color:var(--fg-muted)">--info #5f5761 · the probe's steel</span>
+</div>
+<div style="display:flex;align-items:center;gap:8px;padding:0.15rem 0">
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.StatusBadge" tone="pass" hint-size="72px,18px">✓ verified</x-import>
+<span style="font:400 0.8rem/1.4 'IBM Plex Sans',sans-serif;color:var(--fg-faint)">--ok is teal-slate: a machine checked this, not a mood.</span>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isType }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:22px;padding:20px 16px 8px">
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<span style="font:700 0.72rem/1 'IBM Plex Mono',monospace;letter-spacing:0.05em;color:var(--fg-faint)">DISPLAY FACE — THREE CANDIDATES</span>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.PillToggle" dc-props="{{ pillProps }}" hint-size="100%,28px"></x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:0.8rem;font-family:{{ sansStack }}">
+<span style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--laterite-700);line-height:1">{{ pairTag }}</span>
+<h1 style="margin:0;font-family:{{ slabStack }};font-size:2rem;font-weight:{{ slabWeight }};letter-spacing:-0.025em;line-height:1.08;color:var(--fg)">laterite — AGS4, shown rather than explained.</h1>
+<p style="margin:0;font-size:0.95rem;line-height:1.6;color:var(--fg-soft);text-wrap:pretty">Files come back born-typed — a <span style="font-family:{{ monoStack }}">2DP</span> heading is a float, a <span style="font-family:{{ monoStack }}">DT</span> a datetime, an <span style="font-family:{{ monoStack }}">ID</span> a string — so polars, SQL and the typed graph see real types, not text.</p>
+<div style="display:flex;gap:6px;align-items:center">
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Chip" tone="accent" variant="outline" hint-size="52px,20px">4.1.1</x-import>
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Chip" tone="warn" hint-size="52px,20px">beta</x-import>
+</div>
+
+<h2 style="margin:0.6rem 0 0;font-family:{{ slabStack }};font-size:1.25rem;font-weight:700;line-height:1.2;color:var(--fg)">Location details</h2>
+<div style="border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)">
+<div style="overflow-x:auto">
+<table style="border-collapse:collapse;font-family:{{ monoStack }};font-size:0.82rem;white-space:nowrap;min-width:100%">
+<thead><tr>
+<sc-for list="{{ cols }}" as="c" hint-placeholder-count="4">
+<th style="text-align:left;font-family:{{ sansStack }};font-size:0.72rem;letter-spacing:0.05em;font-weight:600;color:var(--fg-muted);border-bottom:1px solid var(--line);padding:0.4rem 0.8rem">{{ c }}</th>
+</sc-for>
+</tr></thead>
+<tbody>
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="3">
+<tr>
+<sc-for list="{{ r }}" as="cell" hint-placeholder-count="4">
+<td style="border-bottom:1px solid var(--line-subtle);padding:0.4rem 0.8rem;color:var(--fg-soft)">{{ cell }}</td>
+</sc-for>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</div>
+<p style="margin:0;font-size:0.8rem;line-height:1.5;color:var(--fg-faint)">Tables keep horizontal scroll rather than shrinking type — a KEY chain at 12px is unreadable.</p>
+
+<h2 style="margin:0.6rem 0 0;font-family:{{ slabStack }};font-size:1.25rem;font-weight:700;line-height:1.2;color:var(--fg)">Install</h2>
+<div style="background:var(--surface-code);border:1px solid var(--line);border-radius:6px;padding:0.7rem 0.9rem;font-family:{{ monoStack }};font-size:0.85rem;line-height:1.5;color:var(--fg);overflow-x:auto;white-space:pre">pip install laterite
+lat validate delivery.ags --json</div>
+
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Card" style="display:flex;flex-direction:column;gap:0.4rem" hint-size="100%,120px">
+<span style="font-size:0.72rem;font-weight:700;letter-spacing:0.05em;font-family:{{ monoStack }};color:var(--fg-faint)">WHY THIS PAIRING</span>
+<span style="font-size:0.85rem;line-height:1.5;color:var(--fg-soft)">{{ pairNote }}</span>
+<span style="font-size:0.8rem;line-height:1.4;font-family:{{ monoStack }};color:var(--accent)">{{ pairStatus }}</span>
+</x-import>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:8px">
+<span style="font:700 0.72rem/1 'IBM Plex Mono',monospace;letter-spacing:0.05em;color:var(--fg-faint)">SCALE FLOORS ON A PHONE</span>
+<sc-for list="{{ scale }}" as="s" hint-placeholder-count="5">
+<div style="display:flex;align-items:baseline;gap:10px;border-bottom:1px solid var(--line-subtle);padding-bottom:6px">
+<span style="font:400 0.72rem/1 'IBM Plex Mono',monospace;color:var(--fg-faint);width:4.2rem;flex:none">{{ s.size }}</span>
+<span style="{{ s.style }}">{{ s.label }}</span>
+</div>
+</sc-for>
+<p style="margin:2px 0 0;font:400 0.8rem/1.5 'IBM Plex Sans',sans-serif;color:var(--fg-faint)">The tool scale is dense at 0.85rem body; on a phone prose steps up to 0.95rem while micro-labels hold the 0.72rem floor.</p>
+</div>
+</div>
+</sc-if>
+
+<div style="position:sticky;bottom:0;z-index:40;margin-top:auto;padding-bottom:26px;background:var(--canvas)">
+<x-import component-from-global-scope="LateriteDesignSystem_9f517b.Toast" dc-props="{{ toastProps }}" hint-size="100%,40px"></x-import>
+</div>
+</div>
+</x-import>
+</div>
+
+<div style="flex:none;width:270px;display:flex;flex-direction:column;gap:18px;padding-top:26px">
+<h3 style="margin:0;font:700 1.5rem/1.15 'Rokkitt',Rockwell,serif;letter-spacing:-0.01em;color:#1c1715">Reading the phone</h3>
+<p style="margin:0;font:400 0.85rem/1.55 'IBM Plex Sans',sans-serif;color:#423934;text-wrap:pretty">The foundations as a handheld surface: the brand ramp becomes a borehole log you scroll down, and the type candidates become a switcher you flip between with the same specimen copy underneath.</p>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 0.8rem/1.3 'IBM Plex Sans',sans-serif;color:#1c1715">Dark chrome, light plate</span><span style="font:400 0.8rem/1.5 'IBM Plex Sans',sans-serif;color:#5c504b">Full-width chrome is warm brown-black closed by the 2px strata hairline; the mark sits on a stone-50 plate so its outline separates.</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 0.8rem/1.3 'IBM Plex Sans',sans-serif;color:#1c1715">Readout instead of a toast</span><span style="font:400 0.8rem/1.5 'IBM Plex Sans',sans-serif;color:#5c504b">Tapping a swatch writes to a fixed maroon bar — the only deep-maroon object allowed at this size.</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 0.8rem/1.3 'IBM Plex Sans',sans-serif;color:#1c1715">No shadows, no blur</span><span style="font:400 0.8rem/1.5 'IBM Plex Sans',sans-serif;color:#5c504b">Cards lift by surface step only. Sticky header and tab bar are opaque, never frosted.</span></div>
+<div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 0.8rem/1.3 'IBM Plex Sans',sans-serif;color:#1c1715">Open question</span><span style="font:400 0.8rem/1.5 'IBM Plex Sans',sans-serif;color:#5c504b">Mobile policy hides interactive demos below 820px. This page is specimen-only, so it stays — a validator screen would not.</span></div>
+</div>
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:820,&quot;height&quot;:1000},&quot;startTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;colour&quot;,&quot;type&quot;],&quot;default&quot;:&quot;colour&quot;,&quot;tsType&quot;:&quot;'colour' | 'type'&quot;,&quot;section&quot;:&quot;Screen&quot;},&quot;pairing&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;A — Rokkitt + Plex&quot;,&quot;B — Arvo + Source Sans 3&quot;,&quot;C — Zilla Slab + Public Sans&quot;],&quot;default&quot;:&quot;A — Rokkitt + Plex&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Screen&quot;},&quot;darkMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Screen&quot;}}">
+const BANDS = [
+  ["--laterite-100", "#f7cdb2", "#7d2622", "pale wash above the profile", 30],
+  ["--laterite-200", "#f0a67f", "#611a1e", "peach band", 34],
+  ["--laterite-300", "#f09c56", "#611a1e", "sand band — dark-mode accent", 38],
+  ["--laterite-400", "#db7841", "#3f1114", "burnt orange band", 42],
+  ["--laterite-500", "#ce5640", "#fdf1e7", "rust band", 46],
+  ["--laterite-600", "#be3b2e", "#fdf1e7", "vermilion — the crab fossil", 44],
+  ["--laterite-700", "#9b3932", "#fdf1e7", "brick — dominant mass, the accent", 56],
+  ["--laterite-800", "#7d2622", "#f7cdb2", "deep brick", 40],
+  ["--laterite-900", "#611a1e", "#f0a67f", "maroon — outline and wordmark", 48]
+];
+const STEEL = [["--steel-100", "#e4e2e1"], ["--steel-300", "#c5c3c2"], ["--steel-500", "#91858e"], ["--steel-700", "#5f5761"]];
+const STONES = [["--stone-50", "#faf7f5"], ["--stone-100", "#f4efeb"], ["--stone-150", "#ece5e0"], ["--stone-200", "#e2d9d3"], ["--stone-300", "#cfc3bb"], ["--stone-400", "#a4958d"], ["--stone-500", "#7d6e68"], ["--stone-600", "#5c504b"], ["--stone-700", "#423934"], ["--stone-900", "#1c1715"]];
+const PAIRS = {
+  A: {
+    label: "A", tag: "option A — Rokkitt + IBM Plex Sans + IBM Plex Mono",
+    slab: '"Rokkitt", Rockwell, Georgia, serif', sans: '"IBM Plex Sans", system-ui, sans-serif',
+    mono: '"IBM Plex Mono", ui-monospace, monospace', weight: 800,
+    note: "Rokkitt is the closest free Rockwell homage — geometric slab, tight and technical. IBM Plex Mono shares Plex Sans' skeleton, so tables and prose read as one family.",
+    status: "currently applied"
+  },
+  B: {
+    label: "B", tag: "option B — Arvo + Source Sans 3 + JetBrains Mono",
+    slab: '"Arvo", Rockwell, Georgia, serif', sans: '"Source Sans 3", system-ui, sans-serif',
+    mono: '"JetBrains Mono", ui-monospace, monospace', weight: 700,
+    note: "Arvo is heavier and squarer — more printed-report weight, less delicate than Rokkitt (400/700 only, so headline weight is fixed). JetBrains Mono is wider in dense AGS tables.",
+    status: "candidate · headline weight fixed at 700"
+  },
+  C: {
+    label: "C", tag: "option C — Zilla Slab + Public Sans + IBM Plex Mono",
+    slab: '"Zilla Slab", Rockwell, Georgia, serif', sans: '"Public Sans", system-ui, sans-serif',
+    mono: '"IBM Plex Mono", ui-monospace, monospace', weight: 700,
+    note: "Zilla Slab has softer wedge-shaped slabs — the most distinctive and least textbook-Rockwell. Public Sans is a plain-spoken civic sans, slightly condensed and good in dense UI.",
+    status: "candidate · reads contemporary, not industrial"
+  }
+};
+
+class Component extends DCLogic {
+  state = { tab: null, pair: null, dark: null, sel: null };
+
+  get dark() { return this.state.dark ?? !!this.props.darkMode; }
+  get tab() { return this.state.tab ?? (String(this.props.startTab || "").indexOf("ype") > -1 ? "type" : "colour"); }
+  get pair() {
+    const k = this.state.pair ?? String(this.props.pairing || "A").trim().charAt(0).toUpperCase();
+    return PAIRS[k] ? k : "A";
+  }
+
+  renderVals() {
+    const sel = this.state.sel;
+    const p = PAIRS[this.pair];
+    const pick = (token, hex, note) => () => this.setState({ sel: { token, hex, note } });
+
+    return {
+      themeClass: this.dark ? "dark" : "",
+      isColour: this.tab === "colour",
+      isType: this.tab === "type",
+
+      themeToggleProps: {
+        mode: this.dark ? "dark" : "light",
+        onToggle: () => this.setState({ dark: !this.dark }),
+        style: { background: "transparent", borderColor: "#5c504b", color: "#e2d9d3", padding: "0.3rem 0.55rem" }
+      },
+      tabsProps: {
+        active: this.tab,
+        onChange: (id) => this.setState({ tab: id }),
+        tabs: [{ id: "colour", label: "Colour" }, { id: "type", label: "Type" }],
+        style: { background: "var(--surface)", padding: "0 0.6rem", fontSize: "0.85rem" }
+      },
+      pillProps: {
+        value: this.pair,
+        onChange: (id) => this.setState({ pair: id }),
+        options: Object.keys(PAIRS).map(k => ({ id: k, label: k + " — " + PAIRS[k].slab.split(",")[0].replace(/"/g, "") })),
+        style: { flexWrap: "wrap" }
+      },
+      toastProps: {
+        message: React.createElement("span", {
+          style: { display: "flex", alignItems: "center", gap: "10px", width: "100%" }
+        },
+          React.createElement("span", { style: { fontFamily: "var(--font-mono)", fontSize: "0.8rem" } }, sel ? sel.token + " · " + sel.hex : "tap a swatch"),
+          React.createElement("span", { style: { fontFamily: "var(--font-ui)", fontSize: "0.8rem", opacity: 0.75, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, sel ? sel.note : "sampled from laterite-icon-512.png"),
+          React.createElement("span", { style: { width: "18px", height: "18px", flex: "none", borderRadius: "3px", border: "1px solid rgb(255 255 255 / 18%)", background: sel ? sel.hex : "transparent" } })
+        ),
+        onDismiss: sel ? () => this.setState({ sel: null }) : undefined,
+        style: { display: "flex", width: "100%", maxWidth: "none", borderRadius: 0, borderLeft: "none", borderRight: "none", borderBottom: "none", padding: "0.5rem 0.9rem" }
+      },
+
+      bands: BANDS.map(([token, hex, fg, note, h]) => ({
+        token, hex, pick: pick(token, hex, note),
+        style: {
+          appearance: "none", border: "none", borderBottom: "1px solid rgb(0 0 0 / 12%)",
+          background: hex, color: fg, height: h + "px", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "0 0.8rem", textAlign: "left", width: "100%",
+          outline: sel && sel.token === token ? "2px solid var(--fg)" : "none", outlineOffset: "-2px"
+        }
+      })),
+
+      steel: STEEL.map(([token, hex]) => ({
+        short: token.replace("--steel-", ""), pick: pick(token, hex, "auger steel — the only cool family"),
+        style: {
+          appearance: "none", background: hex, border: "1px solid var(--line-strong)", borderRadius: "3px",
+          height: "54px", cursor: "pointer", display: "flex", alignItems: "flex-end", justifyContent: "center",
+          padding: "0.25rem", boxShadow: sel && sel.token === token ? "var(--focus-ring)" : "none"
+        }
+      })),
+
+      stones: STONES.map(([token, hex]) => ({
+        short: token.replace("--stone-", ""), label: hex === "#1c1715" || hex === "#423934" || hex === "#5c504b" ? "#f4efeb" : "#423934",
+        pick: pick(token, hex, "warm neutral ramp"),
+        style: {
+          appearance: "none", background: hex, border: "1px solid var(--line-strong)", borderRadius: "3px",
+          width: "56px", height: "56px", flex: "none", cursor: "pointer",
+          display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "0.25rem",
+          boxShadow: sel && sel.token === token ? "var(--focus-ring)" : "none"
+        }
+      })),
+
+      pairTag: p.tag, pairNote: p.note, pairStatus: p.status,
+      slabStack: p.slab, sansStack: p.sans, monoStack: p.mono, slabWeight: p.weight,
+
+      cols: ["LOCA_ID", "LOCA_TYPE", "LOCA_GL", "LOCA_FDEP", "LOCA_REM"],
+      rows: [
+        ["BH01", "CP", "12.30", "25.00", "cased to 6.00 m"],
+        ["BH02", "CP", "11.80", "24.50", "artesian flow at 18.2 m"],
+        ["TP03", "TP", "10.95", "4.20", "backfilled same day"]
+      ],
+
+      scale: [
+        { size: "2rem", label: "Display heading", style: { fontFamily: p.slab, fontWeight: p.weight, fontSize: "1.4rem", lineHeight: 1.15, color: "var(--fg)" } },
+        { size: "0.95rem", label: "Phone prose", style: { fontSize: "0.95rem", fontFamily: p.sans, color: "var(--fg-soft)", lineHeight: 1.4 } },
+        { size: "0.85rem", label: "Tool body", style: { fontSize: "0.85rem", fontFamily: p.sans, color: "var(--fg-soft)", lineHeight: 1.4 } },
+        { size: "0.82rem", label: "LOCA_GL 12.30", style: { fontSize: "0.82rem", fontFamily: p.mono, color: "var(--fg-soft)", lineHeight: 1.4 } },
+        { size: "0.72rem", label: "DICTIONARY EDITION", style: { fontSize: "0.72rem", fontFamily: p.mono, letterSpacing: "0.05em", color: "var(--fg-muted)", lineHeight: 1.4 } }
+      ],
+
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>laterite — AGS4 tooling</title>
+    <meta
+      name="description"
+      content="Validate, fix, explore and write AGS4 geotechnical transfer files — from Python, Rust, Node, the CLI, DuckDB or the browser."
+    />
+    <link rel="canonical" href="https://laterite.dev/" />
+    <link rel="stylesheet" href="./landing.css" />
+    <!--
+      STILL THE SHORT VERSION — but built now, and on the shared token layer.
+
+      The apex needed to exist before it needed to be good: the GitHub Pages
+      redirect shim names laterite.dev in its canonical tag and its noscript
+      fallback, so until something answered here, every crawler following that
+      shim was pointed at nothing. That is what the hand-written placeholder
+      this replaces was for.
+
+      What it is NOT yet is the page #334 describes — an install-command
+      selector and a live demo of linked AGS4 group tables the reader can edit
+      and break, validated in the browser. That is #395 onward. This ticket
+      (#394) changed the ground under the page, not the page: its own Vite
+      build, the shared tokens and the self-hosted pairing, so the work that
+      follows has somewhere to land.
+
+      The copy and the three destinations are deliberately unchanged.
+    -->
+  </head>
+  <body class="grid min-h-screen place-items-center bg-canvas p-6 text-fg">
+    <main class="w-full max-w-[52ch]">
+      <h1
+        class="font-display text-h1 font-extrabold text-accent min-[30rem]:text-display"
+      >
+        laterite
+      </h1>
+      <p class="mt-1 mb-7 font-mono text-micro uppercase text-fg-faint">
+        AGS4 tooling · beta
+      </p>
+      <p class="mb-7 text-fg-soft">
+        A toolchain for AGS4 geotechnical transfer files — validate, fix,
+        explore and write them, from Python, Rust, Node, the command line,
+        DuckDB or a browser tab.
+      </p>
+      <ul class="m-0 list-none border-t border-line p-0">
+        <li class="border-b border-line">
+          <a class="row-link" href="https://app.laterite.dev/">
+            Validator and data explorer
+            <span class="row-note"
+              >runs in your browser — nothing is uploaded</span
+            >
+          </a>
+        </li>
+        <li class="border-b border-line">
+          <a class="row-link" href="https://docs.laterite.dev/">
+            Documentation
+            <span class="row-note">install, guides, API reference</span>
+          </a>
+        </li>
+        <li class="border-b border-line">
+          <a class="row-link" href="https://github.com/niko86/laterite">
+            Source
+            <span class="row-note">GitHub</span>
+          </a>
+        </li>
+      </ul>
+      <footer class="mt-7 text-caption text-fg-muted">
+        A fuller site is on its way; this is the short version.
+      </footer>
+    </main>
+  </body>
+</html>

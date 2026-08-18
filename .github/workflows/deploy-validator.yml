@@ -2,7 +2,7 @@
 # docs, and publish them to FOUR places in one run — because they are one build
 # whose outputs land in different stores:
 #
-#   laterite.dev       Worker (web/landing/wrangler.jsonc)    apex placeholder
+#   laterite.dev       Worker (web/landing/wrangler.jsonc)    the landing page
 #   app.laterite.dev   Worker (web/wrangler.jsonc)            the browser app
 #   docs.laterite.dev  Worker (web/docs-site/wrangler.jsonc)  the mkdocs site
 #   cdn.laterite.dev   R2 bucket laterite-cdn                 the DuckDB engine
@@ -134,6 +134,19 @@ jobs:
           npm ci
           npm run build
 
+      # The apex (#394). Its own Vite config, its own output — sharing this
+      # project's dependency set and nothing else. Deliberately NOT a second
+      # entry in the app's build: that config carries the PWA layer, the SPA 404
+      # fallback and the DuckDB→R2 relocation above, none of which belong on a
+      # small static page, and a shared-chunk split would let the app's heavy
+      # dependencies reach it unnoticed. The build fails if one does.
+      #
+      # No VITE_BASE / VITE_DUCKDB_CDN: the apex answers at its own root and
+      # loads no engine.
+      - name: Build the landing page
+        working-directory: web
+        run: npm run build:landing
+
       # mkdocs builds into web/docs-dist (its site_dir) — its OWN directory,
       # not inside web/dist. It used to build into web/dist/docs because one
       # Pages artifact carried the app and the docs together; on separate hosts
@@ -205,9 +218,9 @@ jobs:
           workingDirectory: web/docs-site
           command: deploy
 
-      # The apex placeholder. Nothing builds it — it is one hand-written file —
-      # so it rides this workflow rather than getting its own, and redeploying
-      # it costs a few KB.
+      # The apex. Built two steps up, from web/landing/dist — it rides this
+      # workflow rather than getting its own because it shares this project's
+      # dependency set and its `npm ci`.
       - name: Deploy the apex Worker (laterite.dev)
         uses: cloudflare/wrangler-action@v4
         with:

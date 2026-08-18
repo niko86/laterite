@@ -1,0 +1,10 @@
+/* Fonts.
+   SUBSTITUTION NOTE: the repos ship no font binaries, and the licensed face used
+   for the laterite wordmark is not in the source. The wordmark reads as a
+   geometric slab in the Rockwell lineage, so:
+     display  → Rokkitt   (the closest free Rockwell homage; headings + wordmark only)
+     UI/body  → IBM Plex Sans (engineering-neutral humanist, not a system default)
+     mono     → IBM Plex Mono (same family skeleton as the body face)
+   Slab is for display ONLY — never body copy. Loaded from the Google Fonts CDN;
+   swap in real files here if you have them. */
+@import url("https://fonts.googleapis.com/css2?family=Rokkitt:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");

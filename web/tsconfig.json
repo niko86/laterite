@@ -14,7 +14,16 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    // Vite's native config loader (the coming default) requires a real file
+    // extension on relative imports; landing/vite.config.ts writes
+    // `./heavyDeps.ts` to satisfy it, and this is what lets tsc read that.
+    // Permissive, not mandatory — no other import in the project changes.
+    "allowImportingTsExtensions": true,
+    // Mirrors the `@shared` alias both Vite configs resolve (#394) — without
+    // it `tsc --noEmit` and the type-aware eslint pass cannot follow a shared
+    // import, and the two builds would agree while the editor disagreed.
+    "paths": { "@shared/*": ["./src/shared/*"] }
   },
-  "include": ["src", "bench", "vite.config.ts"]
+  "include": ["src", "bench", "landing", "vite.config.ts"]
 }
