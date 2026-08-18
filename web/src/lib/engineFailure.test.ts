@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { engineFailureMessage } from "./engineFailure";
 import { EngineUnavailableError } from "./workerChannel";
 
-// The one-voice mapping the three engine panes render (#391). The copy shapes
+// The one-voice mapping the engine-failure surfaces render (#391; the Excel
+// converter joined in #414). The copy shapes
 // are pinned loosely (noun + the load/crash discriminator + the "rest of the
 // app" reassurance), not word-for-word — wording can be tuned without a test
 // edit, but a pane must never lose its noun or show "check your connection"

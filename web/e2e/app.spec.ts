@@ -1369,18 +1369,19 @@ test("a dead engine worker is not reused: Explore reports, and the always-on wor
   }
 });
 
-// --- a crash past boot belongs to the pane (#359, #391) ---------------------
+// --- a crash past boot belongs to the pane (#359, #391, #414) ---------------
 //
-// The shared recipe for reaching an op rejection on the always-on worker with
-// a HEALTHY boot (so App's page-level banner, #353's altitude, stays out of
-// the test): let the first worker come up, kill it, and block the replacement.
+// The shared recipe for reaching an op rejection on a worker with a HEALTHY
+// boot (so App's page-level banner, #353's altitude, stays out of the test):
+// let the first worker come up, kill it, and block the replacement. The same
+// recipe serves both workers — the chunk pattern and URL fragment pick one.
 
 // Armed only after boot. Once armed, the REPLACEMENT worker's script never
 // arrives either — so the op after the kill rejects instead of landing on a
 // fresh healthy engine.
-async function blockValidatorRespawn(page: Page) {
+async function blockWorkerRespawn(page: Page, chunk: RegExp) {
   const state = { armed: false, blocked: 0 };
-  await page.route(/validator\.worker-[^/]*\.js$/, async (route) => {
+  await page.route(chunk, async (route) => {
     if (!state.armed) {
       await route.continue();
       return;
@@ -1396,11 +1397,9 @@ async function blockValidatorRespawn(page: Page) {
 // retires (terminates) the corpse (#363). Waiting for the close is what makes
 // the caller's next step deterministic — by then the channel holds no worker,
 // so the next op must spawn the (doomed) replacement.
-async function killValidatorWorker(page: Page) {
-  const worker = page
-    .workers()
-    .find((w) => w.url().includes("validator.worker"));
-  if (!worker) throw new Error("validator worker not found");
+async function killWorker(page: Page, urlPart: string) {
+  const worker = page.workers().find((w) => w.url().includes(urlPart));
+  if (!worker) throw new Error(`${urlPart} worker not found`);
   const gone = new Promise<void>((resolve) => {
     worker.on("close", () => {
       resolve();
@@ -1426,14 +1425,17 @@ test("a validate the engine cannot serve is reported on the pane, not frozen ove
 }) => {
   const ctx = await browser.newContext({ serviceWorkers: "block" });
   const page = await ctx.newPage();
-  const respawn = await blockValidatorRespawn(page);
+  const respawn = await blockWorkerRespawn(
+    page,
+    /validator\.worker-[^/]*\.js$/,
+  );
   try {
     await page.goto(APP);
     await page.getByRole("button", { name: /Clean \(minimal\)/ }).click();
     await expect(page.getByText(/Clean — 0 findings/)).toBeVisible();
 
     respawn.armed = true;
-    await killValidatorWorker(page);
+    await killWorker(page, "validator.worker");
 
     // The sample list collapses once a file is loaded — re-open it.
     await page.getByText(/Or try a sample/).click();
@@ -1469,14 +1471,17 @@ test("a fix computation the engine cannot serve is reported, not shown as a clea
 }) => {
   const ctx = await browser.newContext({ serviceWorkers: "block" });
   const page = await ctx.newPage();
-  const respawn = await blockValidatorRespawn(page);
+  const respawn = await blockWorkerRespawn(
+    page,
+    /validator\.worker-[^/]*\.js$/,
+  );
   try {
     await page.goto(APP);
     await page.getByRole("button", { name: /Clean \(minimal\)/ }).click();
     await expect(page.getByText(/Clean — 0 findings/)).toBeVisible();
 
     respawn.armed = true;
-    await killValidatorWorker(page);
+    await killWorker(page, "validator.worker");
 
     await tab(page, "Fix").click();
 
@@ -1491,6 +1496,65 @@ test("a fix computation the engine cannot serve is reported, not shown as a clea
     await expect(
       page.getByText(/Failed to load the validator engine/),
     ).toHaveCount(0);
+  } finally {
+    await ctx.close();
+  }
+});
+
+// #414: the same crash, on the second worker's own tool. The converter renders
+// the shared crash copy plus its own trailing retry sentence, composed by
+// string concatenation in the pane — and pinned nowhere else: the shared
+// helper's unit tests keep the crash wording deliberately loose, so a tune
+// there that malformed the composition would ship with every other gate green.
+// This holds the whole composed sentence. The converter's LOAD half (and a
+// retry re-fetching a wasm that never downloaded) is the blocked-tier-2 test
+// far above; this one proves the crash branch keeps the sentence's promise —
+// the button is offered, and trying again really does start a fresh worker.
+test("an Excel conversion the engine cannot serve is reported, and trying again starts a fresh worker", async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  const respawn = await blockWorkerRespawn(page, /tier2\.worker-[^/]*\.js$/);
+  try {
+    await page.goto(APP);
+    await page.getByRole("button", { name: /Clean \(minimal\)/ }).click();
+    await expect(page.getByText(/Clean — 0 findings/)).toBeVisible();
+
+    // Opening the tool is what starts the tier-2 worker; wait until it exists
+    // so the kill has a worker to reach.
+    await tab(page, "Tools").click();
+    await page.getByRole("button", { name: /^Excel$/ }).click();
+    await expect.poll(() => tier2Workers(page).length).toBe(1);
+
+    respawn.armed = true;
+    await killWorker(page, "tier2.worker");
+
+    // The conversion lands on the doomed replacement — a script that never
+    // arrives is a crash, not a failed download, so this is the branch that
+    // appends the retry sentence.
+    await page.getByRole("button", { name: /Download as Excel/ }).click();
+    await expect(
+      page.getByText(
+        "The converter's engine stopped — the rest of the app is unaffected. " +
+          "Trying again starts a fresh one.",
+      ),
+    ).toBeVisible();
+    expect(respawn.blocked).toBeGreaterThan(0); // the doomed respawn is real
+    // …and it is the pane's failure, not the page's: tier 1 never wobbled.
+    await expect(
+      page.getByText(/Failed to load the validator engine/),
+    ).toHaveCount(0);
+
+    // The sentence is a promise; withdraw the block and hold it to it.
+    respawn.armed = false;
+    const [xlsx] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: /^Try again$/ }).click(),
+    ]);
+    expect(xlsx.suggestedFilename()).toMatch(/\.xlsx$/);
+    await expect(page.getByText(/→ \.xlsx/)).toBeVisible();
+    await expect(page.getByText(/engine stopped/)).toHaveCount(0);
   } finally {
     await ctx.close();
   }

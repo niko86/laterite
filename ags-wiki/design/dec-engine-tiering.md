@@ -176,7 +176,7 @@ and "validate in progress" are the same thing to a user.
 > shared: `repo:web/src/lib/engineFailure.ts` maps the
 > `EngineUnavailableError` load/crash split plus the untyped fallback to one
 > voice, parameterised by each pane's own noun, and FixPane, ValidatePane and
-> ExplorePane all render through it. Explore's offline-DuckDB copy stays an
+> ExplorePane all took it up in #391. Explore's offline-DuckDB copy stays an
 > override passed by Explore alone — it describes tier-3 caching and is false
 > for panes whose wasm is precached. One sentence went with the sharing:
 > Explore's crash line no longer ends "Trying again starts a fresh one." —

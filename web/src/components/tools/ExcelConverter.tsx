@@ -50,13 +50,13 @@ export const ExcelConverter: Component = () => {
     setNote(null);
   };
 
-  // The copy is the shared engine-failure voice (#391, joined in #414); the
-  // converter's own is its noun, the untyped "Conversion failed" override (an
-  // error that isn't the engine going missing is about the workbook, not the
-  // engine), and the crash line's trailing retry sentence — a promise only
-  // honest beside this pane's Try again button, which is why it rides here as
-  // a suffix and not in the shared copy. Retryability stays out of the shared
-  // mapping too: the flag derives beside the call, from the same instanceof.
+  // The copy is the shared engine-failure voice — engineFailureMessage's doc
+  // carries the shared rationale (#391, #414). Only the converter's own says
+  // stay here: the untyped override reads "Conversion failed" because such an
+  // error is about the workbook, not the engine — and it keeps `String(e)`,
+  // #415's doubled prefix included, because #414 pinned the rendered lines
+  // byte-for-byte; the crash suffix is honest only beside this pane's Try
+  // again button; and `retry` derives beside the call.
   const failed = (e: unknown) => {
     const retry = e instanceof EngineUnavailableError;
     const text = engineFailureMessage(
