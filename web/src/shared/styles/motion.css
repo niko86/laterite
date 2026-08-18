@@ -1,0 +1,41 @@
+/* Motion (#406).
+ *
+ * Short, functional, one easing. Nothing bounces, springs, scales in or
+ * parallaxes. The single enter animation in the whole system is the toast's
+ * 12px fly-in; everything else is a colour or opacity change.
+ *
+ * The reduced-motion contract lives HERE rather than at each call site, which
+ * is the point of putting durations in tokens at all: a component that
+ * transitions `var(--dur-base)` honours the preference without knowing the
+ * preference exists, and a new component cannot forget to.
+ *
+ * Not collapsed to 0ms but to 0.01ms — a zero-length transition fires no
+ * `transitionend`, so anything sequencing off that event would hang rather than
+ * skip. The delay tokens go to a true 0: nothing waits on those.
+ *
+ * `--ease-*` is a Tailwind theme namespace; see metrics.css for why that
+ * override is deliberate here.
+ */
+:root {
+  --dur-instant: 0ms;
+  --dur-fast: 120ms; /* opacity fades */
+  --dur-base: 150ms; /* colour + transform */
+  --dur-slow: 180ms; /* enter/exit — the toast fly-in */
+  --dur-panel: 200ms; /* width/height reveals */
+
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --tooltip-delay: 300ms;
+  --toast-life: 4000ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0.01ms;
+    --dur-base: 0.01ms;
+    --dur-slow: 0.01ms;
+    --dur-panel: 0.01ms;
+    --tooltip-delay: 0ms;
+  }
+}

@@ -98,6 +98,11 @@
   --cta: var(--laterite-500);
   --cta-hover: var(--laterite-600);
   --fg-on-cta: var(--stone-50);
+  /* The tinted wash under a "runs something" control (#406). The design system
+     put that variant on `--accent-quiet`, but its `--accent` was brick and ours
+     is maroon — under the read/act split an action that runs must be rust, so
+     it needs a rust tint rather than a maroon one to sit in. */
+  --cta-quiet: #f7e4de;
 
   /* ── Status ──
      No traffic lights. There is no green in this brand, and severity runs DOWN
