@@ -177,7 +177,7 @@ const GroupDeltaView: Component<{ g: GroupDelta }> = (props) => {
         <Show
           when={g.keyed}
           fallback={
-            <span class="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-warn">
+            <span class="rounded bg-warn-quiet px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-warn">
               unkeyed
             </span>
           }

@@ -40,8 +40,9 @@ export const SummaryBanner: Component<{
   name: string;
 }> = (props) => {
   // FYI findings are informational (extended-ASCII, etc.), not violations.
-  // A file whose ONLY findings are FYI shouldn't look like a failure — warn,
-  // not err (see reportIsOnlyFyi for the severity-default rationale).
+  // A file whose ONLY findings are FYI shouldn't look like a failure — the
+  // info tier, not err (see reportIsOnlyFyi for the severity-default
+  // rationale).
   const onlyFyi = () => reportIsOnlyFyi(props.report);
   // Headline for the failure banner: the per-severity split ("36 errors · 14
   // informational") when the report is uncapped, else the true grand total
@@ -57,7 +58,7 @@ export const SummaryBanner: Component<{
       RESOLUTION_BLURB[props.report.resolution] ?? props.report.resolution
     }`;
   const kind = (): BannerKind =>
-    props.report.ok ? "ok" : onlyFyi() ? "warn" : "err";
+    props.report.ok ? "ok" : onlyFyi() ? "info" : "err";
 
   return (
     <Show

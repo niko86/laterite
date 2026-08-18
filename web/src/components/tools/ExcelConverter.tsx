@@ -150,7 +150,7 @@ export const ExcelConverter: Component = () => {
             <button
               type="button"
               disabled={busy() !== null}
-              class="rounded bg-emerald-600/80 px-3 py-1.5 font-medium text-emerald-50 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => void runExport()}
             >
               {busy() === "export"
@@ -221,7 +221,7 @@ export const ExcelConverter: Component = () => {
         )}
       </Show>
       <Show when={warnings().length > 0}>
-        <div class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+        <div class="rounded-lg border border-warn/45 bg-warn-quiet p-3">
           <p class="text-xs font-medium text-warn">
             {count(warnings().length, "warning")}:
           </p>

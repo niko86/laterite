@@ -308,7 +308,7 @@ export const CoordinateTool: Component = () => {
 
             <button
               type="button"
-              class="rounded bg-emerald-600/80 px-3 py-1.5 font-medium text-emerald-50 hover:bg-emerald-600 disabled:opacity-40"
+              class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-40"
               disabled={ok().length === 0 || converted.loading}
               onClick={exportCsv}
             >
@@ -316,7 +316,7 @@ export const CoordinateTool: Component = () => {
             </button>
             <button
               type="button"
-              class="rounded bg-emerald-600/80 px-3 py-1.5 font-medium text-emerald-50 hover:bg-emerald-600 disabled:opacity-40"
+              class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-40"
               disabled={ok().length === 0 || converted.loading}
               onClick={exportGeoJson}
             >
@@ -354,7 +354,7 @@ export const CoordinateTool: Component = () => {
 
           <Show when={converted()?.gridError}>
             {(err) => (
-              <p class="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+              <p class="rounded border border-warn/45 bg-warn-quiet px-3 py-2 text-xs text-warn">
                 Couldn't load the OSTN15 grid ({err()}) — showing ~5 m Helmert
                 results instead. The grid ships at{" "}
                 <span class="mono">grids/{GRID_FILE}</span>.
@@ -368,8 +368,8 @@ export const CoordinateTool: Component = () => {
               Rendered ABOVE the results table so clicking "Show on map" gives
               immediate visible feedback instead of appending off-screen below it. */}
           <Show when={askConsent()}>
-            <div class="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-              <p class="text-sm font-medium text-amber-200">
+            <div class="rounded-lg border border-warn/45 bg-warn-quiet p-3">
+              <p class="text-sm font-medium text-warn">
                 Show these points on a map?
               </p>
               <p class="mt-1 max-w-prose text-xs text-fg-muted">
@@ -382,7 +382,7 @@ export const CoordinateTool: Component = () => {
               <div class="mt-2 flex gap-2 text-sm">
                 <button
                   type="button"
-                  class="rounded bg-sky-600 px-3 py-1.5 font-medium text-sky-50 hover:bg-sky-500"
+                  class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover"
                   onClick={confirmConsent}
                 >
                   Load map (OpenStreetMap)

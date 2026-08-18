@@ -35,16 +35,16 @@ interface Catalogue {
 function sevClass(sev: string): string {
   switch (sev) {
     case "error":
-      return "bg-rose-500/15 text-err";
+      return "bg-err-quiet text-err";
     case "warning":
-      return "bg-amber-500/15 text-warn";
+      return "bg-warn-quiet text-warn";
     // A rule whose finding is always an error, but which can ALSO emit a
     // related FYI/Warning bucket (e.g. Rule 1 extended-ASCII, Rule 16/18 DICT)
     // — the catalogue marks these `mixed`. Amber, like a warning.
     case "mixed":
-      return "bg-amber-500/15 text-warn";
+      return "bg-warn-quiet text-warn";
     case "fyi":
-      return "bg-accent/15 text-accent";
+      return "bg-info-quiet text-info";
     default:
       return "bg-chip text-fg-soft";
   }
@@ -107,7 +107,7 @@ export const RuleExplainer: Component = () => {
                     {r.severity}
                   </span>
                   <Show when={r.fixable}>
-                    <span class="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ok">
+                    <span class="rounded bg-ok-quiet px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ok">
                       auto-fixable
                     </span>
                   </Show>

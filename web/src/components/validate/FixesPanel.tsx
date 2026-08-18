@@ -4,11 +4,12 @@ import type { Severity } from "./FilterBar";
 import { shortRule, ruleAnchor } from "../../lib/rules";
 
 // Severity badge tints, consistent with the FilterBar severity chips + the
-// FindingsView bands (rose / amber / sky).
+// FindingsView bands — each tier's status token on its own quiet wash; fyi
+// renders as the info tier.
 const SEV_BADGE: Record<Severity, string> = {
-  error: "bg-err/15 text-err",
-  warning: "bg-warn/15 text-warn",
-  fyi: "bg-accent/15 text-accent",
+  error: "bg-err-quiet text-err",
+  warning: "bg-warn-quiet text-warn",
+  fyi: "bg-info-quiet text-info",
 };
 import { highlightSpan } from "./FindingsView";
 import { fixBlock, alignBlock, type AlignedRow } from "../../lib/agsline";
@@ -37,9 +38,7 @@ function afterLine(raw: string, edit: SpanEdit): JSX.Element {
   return (
     <>
       {before}
-      <span class="rounded-sm bg-rose-500/40 text-rose-50">
-        {repl.join("")}
-      </span>
+      <span class="rounded-sm bg-ok text-surface">{repl.join("")}</span>
       {after}
     </>
   );
@@ -53,13 +52,13 @@ const EditDiff: Component<{ edit: SpanEdit; lines: () => string[] }> = (
   return (
     <div class="mt-1 space-y-0.5">
       <div class="flex items-start gap-2">
-        <span class="select-none text-xs text-rose-400">−</span>
+        <span class="select-none text-xs text-err">−</span>
         <span class="min-w-0 break-all">
           {highlightSpan(raw(), props.edit.start, props.edit.end)}
         </span>
       </div>
       <div class="flex items-start gap-2">
-        <span class="select-none text-xs text-emerald-400">+</span>
+        <span class="select-none text-xs text-ok">+</span>
         <span class="min-w-0 break-all">{afterLine(raw(), props.edit)}</span>
       </div>
     </div>
@@ -92,9 +91,9 @@ function fixRow(
   }
   const band =
     row.variant === "del"
-      ? "bg-rose-500/10"
+      ? "bg-err-quiet"
       : row.variant === "ins"
-        ? "bg-emerald-500/10"
+        ? "bg-ok-quiet"
         : "";
   const mark = row.variant === "del" ? "−" : row.variant === "ins" ? "+" : " ";
   const hl =
@@ -114,9 +113,7 @@ function fixRow(
           // highlight them wholesale on the ins side so the additions are visible.
           if (row.variant === "ins" && appendFrom !== null && i() >= appendFrom)
             return (
-              <span class="rounded-sm bg-emerald-500/40 text-emerald-50">
-                {c.padded}
-              </span>
+              <span class="rounded-sm bg-ok text-surface">{c.padded}</span>
             );
           /* eslint-enable solid/reactivity */
           return c.padded;
@@ -276,7 +273,7 @@ export const FixesPanel: Component<{
         <div class="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            class="rounded bg-emerald-600/80 px-3 py-1.5 text-sm font-medium text-emerald-50 hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded bg-cta px-3 py-1.5 text-sm font-medium text-fg-on-cta hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-40"
             disabled={selectedFixes().length === 0}
             onClick={() => {
               props.onApply(selectedFixes());
@@ -293,7 +290,7 @@ export const FixesPanel: Component<{
         <For each={safeOrdered()}>{(f) => fixCard(f)}</For>
 
         <Show when={riskyOrdered().length > 0}>
-          <div class="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+          <div class="rounded-lg border border-warn/45 bg-warn-quiet px-3 py-2">
             <p class="text-sm font-medium text-warn">
               Risky fixes ({riskyOrdered().length}) — opt-in
             </p>

@@ -61,7 +61,7 @@ export const FileDiff: Component<{
               <span class="text-err">−{r().removed} removed</span>
               <span class="text-fg-dim">vs. the originally-loaded file</span>
               <Show when={r().capped}>
-                <span class="rounded bg-amber-500/15 px-1.5 py-0.5 text-warn">
+                <span class="rounded bg-warn-quiet px-1.5 py-0.5 text-warn">
                   large change — shown as a block replace
                 </span>
               </Show>
@@ -103,9 +103,9 @@ const DiffRowView: Component<{ row: DiffRow }> = (props) => {
   }
   const band =
     row.type === "del"
-      ? "bg-rose-500/10 text-rose-200"
+      ? "bg-err-quiet text-err"
       : row.type === "ins"
-        ? "bg-emerald-500/10 text-emerald-200"
+        ? "bg-ok-quiet text-ok"
         : "text-fg-muted";
   const mark = row.type === "del" ? "−" : row.type === "ins" ? "+" : " ";
   return (
