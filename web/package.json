@@ -63,6 +63,7 @@
     "eslint-plugin-solid": "^0.15.0",
     "globals": "^17.11.0",
     "knip": "^6.32.2",
+    "lucide-static": "^1.31.0",
     "prettier": "^3.9.6",
     "tailwindcss": "^4.1.0",
     "typescript": "^6.0.3",
