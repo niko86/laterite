@@ -178,6 +178,56 @@ severity-free, protecting the parity oracle):
 Behaviour of fix-all-safe / fix-until-clean is unchanged. e2e `fix-severity.spec`
 (BOM fixture `bom_only.ags`) guards the badge + explainer.
 
+#### B5a — the label a nobody-looked report cannot carry (2026-08-18, #412)
+
+B5's join answers from a report, and B5 left it answering even when there is no
+report. `workerChannel`'s `retire()` rejects only the **pending** op
+(`repo:web/src/lib/workerChannel.ts`), so a `computeFixes` that already replied
+survives the worker that dies under the labelling `validate`: real fixes, no
+report, every badge falling to the join's `?? "warning"`. Error-backed and
+FYI-backed fixes then read alike, and the FYI explainer above suppresses itself
+— `touchesFyi()` needs the report the pane no longer has.
+
+The cure is to stop letting one return value mean two absences. `buildSevIndex`
+returns `undefined` for **no report**; a report that merely doesn't raise a given
+rule still yields the `"warning"` default, so the benign gap is not repainted.
+`fixSeverity` is therefore `Severity | undefined`, and `FixesPanel` renders the
+undefined case as a `muted`/`outline` **`unlabelled`** chip rather than a
+confident tier.
+
+The pane-side guard has to say `loading` as well as `error`, and that arm is the
+one a reviewer caught: a Solid resource keeps its PREVIOUS value across a
+refetch, so a guard reading only `.error` labels the second file you open from
+the FIRST file's report — a confident badge sourced from different bytes, which
+is worse than the `warning` default this record removes, not better. So
+`sevReport()` answers one question — is there a report for THESE bytes — and
+both readers (`sevIndex` and `touchesFyi`) take that same answer.
+
+This is the third recorded instance of one fallback. `severityOf`
+(`repo:web/src/lib/validator.ts`) carries the first: defaulting absent severity
+to `"warning"` at five sites silently reclassified every error, because absent
+is how the wire encodes an error. `FindingsView`'s `severityBand`
+(`repo:web/src/components/validate/FindingsView.tsx`) carries the second, cured
+by making the switch exhaustive so no fallback arm remains. Read the three
+together: a severity default is a guess wearing a tier's clothes, and the fix is
+always to make the absence representable instead.
+
+Two things deliberately **not** done. The shared `engineFailureMessage` keeps its
+"the rest of the app is unaffected" wording — true on the three panes that aren't
+this one — and FixPane carries the exception itself, the same way the helper's
+per-surface overrides already work. And `touchesFyi()` keeps returning `false`
+silently: with no report we cannot know whether a fix touches FYI, and a banner
+saying so would claim knowledge the pane hasn't got.
+
+The badges moved onto the shared `Chip` in the same change. B5's three tints
+differed only in colour, so after the status-token work (#404) findings survived
+greyscale and fix badges did not — a ticket about badges failing to distinguish
+severities is the right place to close that.
+
+Unit-tested at `repo:web/src/lib/fixSeverity.test.ts` — the join lifted out of the
+pane precisely so the no-report state is constructible, `web/` having no
+component-test stack.
+
 ## Decisions — Workstream A (locked 2026-05-30)
 
 From the A1 (data-model) + A2 (rule matrix) doc pair → user decisions:

@@ -2,18 +2,22 @@ import { For, Show, createMemo, type Component, type JSX } from "solid-js";
 import type { Fix, SpanEdit } from "../../lib/validator";
 import type { Severity } from "./FilterBar";
 import { shortRule, ruleAnchor } from "../../lib/rules";
+import { Chip, type ChipTone, type ChipVariant } from "@shared/components";
 
-// Severity badge tints, consistent with the FilterBar severity chips + the
-// FindingsView bands — each tier's status token on its own quiet wash; fyi
-// renders as the info tier.
-const SEV_BADGE: Record<Severity, string> = {
-  error: "bg-err-quiet text-err",
-  warning: "bg-warn-quiet text-warn",
-  fyi: "bg-info-quiet text-info",
-};
-import { highlightSpan } from "./FindingsView";
+import { highlightSpan, SEVERITY_CHIP } from "./FindingsView";
 import { fixBlock, alignBlock, type AlignedRow } from "../../lib/agsline";
 import { fixHighlight } from "../../lib/fixpreview";
+
+// A fix wears the SAME chip as the finding it resolves — the map is imported,
+// not copied, so the two cannot drift. Until #412 these were three tints of one
+// form here, so the tiers were told apart by colour ALONE, while the findings
+// list next door had already moved to form (#404). `unlabelled` is the fourth
+// state: no report to join against, so no severity is known — see
+// lib/fixSeverity for why that is distinct from a rule the report didn't raise.
+const chipFor = (
+  s: Severity | undefined,
+): { tone: ChipTone; variant: ChipVariant } =>
+  s ? SEVERITY_CHIP[s] : { tone: "muted", variant: "outline" };
 
 /** A fix key the parent's selected-set keys off. There's at most one fix
  *  of a byte-level kind, and per-line in-line fixes, so kind+rule+line+
@@ -175,8 +179,11 @@ export const FixesPanel: Component<{
   /** When true, preview each fix as its aligned enclosing GROUP block. */
   aligned?: () => boolean;
   /** Optional: the severity of the finding each fix resolves → renders a badge
-   *  so it's clear a fix touches an FYI-only finding (hidden on Validate). */
-  severityOf?: (f: Fix) => Severity;
+   *  so it's clear a fix touches an FYI-only finding (hidden on Validate).
+   *  Returns `undefined` when the resolver has no report to join against — the
+   *  fix stands, its label doesn't, and the badge says so rather than guessing
+   *  (#412). */
+  severityOf?: (f: Fix) => Severity | undefined;
 }> = (props) => {
   const lines = createMemo(() => props.text().split(/\r?\n/));
 
@@ -227,11 +234,9 @@ export const FixesPanel: Component<{
             </a>
             <Show when={props.severityOf}>
               {(severityOf) => (
-                <span
-                  class={`ml-1.5 rounded-xs px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${SEV_BADGE[severityOf()(f)]}`}
-                >
-                  {severityOf()(f)}
-                </span>
+                <Chip class="ml-1.5" {...chipFor(severityOf()(f))}>
+                  {severityOf()(f) ?? "unlabelled"}
+                </Chip>
               )}
             </Show>
           </span>
