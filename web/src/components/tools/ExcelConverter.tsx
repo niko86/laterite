@@ -7,6 +7,7 @@ import {
   EngineUnavailableError,
 } from "../../lib/validatorClient";
 import { downloadBlob, baseName } from "../../lib/download";
+import { engineFailureMessage } from "../../lib/engineFailure";
 
 const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -49,18 +50,27 @@ export const ExcelConverter: Component = () => {
     setNote(null);
   };
 
+  // The copy is the shared engine-failure voice — engineFailureMessage's doc
+  // carries the shared rationale (#391, #414). Only the converter's own says
+  // stay here: the untyped override reads "Conversion failed" because such an
+  // error is about the workbook, not the engine — and it keeps `String(e)`,
+  // #415's doubled prefix included, because #414 pinned the rendered lines
+  // byte-for-byte; the crash suffix is honest only beside this pane's Try
+  // again button; and `retry` derives beside the call.
   const failed = (e: unknown) => {
-    if (e instanceof EngineUnavailableError) {
-      setErr({
-        text:
-          e.reason === "load"
-            ? "The converter's engine couldn't be downloaded — the rest of the app is unaffected. Check your connection and try again."
-            : "The converter's engine stopped — the rest of the app is unaffected. Trying again starts a fresh one.",
-        retry: true,
-      });
-      return;
-    }
-    setErr({ text: `Conversion failed: ${String(e)}`, retry: false });
+    const retry = e instanceof EngineUnavailableError;
+    const text = engineFailureMessage(
+      e,
+      "The converter's engine",
+      `Conversion failed: ${String(e)}`,
+    );
+    setErr({
+      text:
+        retry && e.reason === "crash"
+          ? `${text} Trying again starts a fresh one.`
+          : text,
+      retry,
+    });
   };
 
   const runExport = async () => {

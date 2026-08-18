@@ -176,12 +176,16 @@ and "validate in progress" are the same thing to a user.
 > shared: `repo:web/src/lib/engineFailure.ts` maps the
 > `EngineUnavailableError` load/crash split plus the untyped fallback to one
 > voice, parameterised by each pane's own noun, and FixPane, ValidatePane and
-> ExplorePane all render through it. Explore's offline-DuckDB copy stays an
+> ExplorePane all took it up in #391. Explore's offline-DuckDB copy stays an
 > override passed by Explore alone — it describes tier-3 caching and is false
 > for panes whose wasm is precached. One sentence went with the sharing:
 > Explore's crash line no longer ends "Trying again starts a fresh one." —
 > the Try again button beneath it is the affordance, and the panes without
-> that button must not inherit the sentence. Pinned by an e2e that reaches
+> that button must not inherit the sentence. Tools → Excel, scoped out of
+> #391 because its failure state also derives a retry flag, joined in #414:
+> the flag derives beside its call and the crash line keeps that sentence as
+> a pane-side suffix — that pane owns a Try again button, so the promise is
+> honest there. Pinned by an e2e that reaches
 > Fix with the #359 recipe, shown red against the pre-fix build: "Fix all
 > safe (0)" with no failure line, a dead engine posing as a clean file.
 

@@ -1,16 +1,18 @@
 import { EngineUnavailableError } from "./workerChannel";
 
-/** One voice for a dead engine, across the three panes that render one
- *  (#391): FixPane, ValidatePane, ExplorePane.
+/** One voice for a dead engine, across the four surfaces that render one:
+ *  FixPane, ValidatePane, ExplorePane (#391), and the Excel converter (#414).
  *
  *  Before this they spoke three ways — ExplorePane with typed copy,
  *  ValidatePane with a bare stringified error, FixPane not at all, its empty
  *  fix list posing as a clean file. The mapping lives here so the same
- *  failure reads the same everywhere; what stays with each pane is only its
- *  own noun for `engine` ("The validator", "The fix engine", …), capitalised
- *  to open the sentence. The Excel tool keeps its own hand-rolled copy on
- *  purpose (#391 scoped it out): its failure line also derives a retry flag,
- *  which this mapping deliberately doesn't model.
+ *  failure reads the same everywhere; what stays with each surface is only
+ *  its own noun for `engine` ("The validator", "The fix engine", …),
+ *  capitalised to open the sentence. The Excel converter (scoped out of #391,
+ *  joined in #414) also derives a retry flag beside its call and suffixes its
+ *  crash line with a retry sentence next to its Try again button — both stay
+ *  pane-side because retryability is something this mapping deliberately
+ *  doesn't model.
  *
  *  The load/crash split is `EngineUnavailableError`'s reason for existing:
  *  the two are equally retryable — the channel has retired the worker either
@@ -20,11 +22,15 @@ import { EngineUnavailableError } from "./workerChannel";
  *  a file.
  *
  *  `untypedFallback` replaces only the last branch — an error that is not an
- *  engine-availability failure. It exists for ExplorePane's offline case: its
- *  DuckDB wasm is the one engine NOT precached, so a first Explore while
- *  offline fails with a raw fetch error worth explaining. That copy describes
- *  tier-3 caching and would be false in the panes whose wasm is precached,
- *  which is why it is an override passed by one caller and not a branch here.
+ *  engine-availability failure. Each caller's copy is true only where it
+ *  stands, which is why both are overrides passed in and not branches here.
+ *  ExplorePane's offline case: its DuckDB wasm is the one engine NOT
+ *  precached, so a first Explore while offline fails with a raw fetch error
+ *  worth explaining — copy describing tier-3 caching that would be false in
+ *  the panes whose wasm is precached. The Excel converter's op-level line: an
+ *  untyped error there is a conversion that failed, about the workbook and
+ *  not the engine, so it keeps "Conversion failed" over this branch's
+ *  engine-noun framing.
  */
 export function engineFailureMessage(
   e: unknown,
