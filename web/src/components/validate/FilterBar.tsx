@@ -4,6 +4,7 @@ import { severityOf } from "../../lib/validator";
 import { shortRule } from "../../lib/rules";
 import { Disclosure } from "../Disclosure";
 import { createMediaQuery } from "../../lib/media";
+import { controlFocus } from "../../lib/controls";
 
 // Re-exported so the many components that import `Severity` from here keep
 // working. The definition lives with `severityOf` in lib/validator, because the
@@ -112,8 +113,10 @@ export const FilterBar: Component<{
     }, 180);
   };
 
+  // Chips take the chips rung of the radius scale (metrics.css) — the one
+  // deliberately-soft step in the brand — not a full pill (#408).
   const chipBase =
-    "rounded-full border px-2.5 py-1 text-xs transition-colors cursor-pointer select-none";
+    "rounded-2xl border px-2.5 py-1 text-xs transition-colors cursor-pointer select-none";
   const chipOff = "border-line bg-chip text-fg-faint hover:border-line-strong";
   const countBadge =
     "ml-1.5 rounded-full bg-chip px-1.5 text-[10px] text-fg-soft";
@@ -273,7 +276,7 @@ export const FilterBar: Component<{
           onInput={(e) => {
             onSearchInput(e.currentTarget.value);
           }}
-          class="min-w-0 flex-1 rounded border border-line-strong bg-surface-raised px-2.5 py-1.5 text-sm text-fg outline-none focus:border-accent"
+          class={`min-w-0 flex-1 rounded-xs border border-line-strong bg-surface-raised px-2.5 py-1.5 text-sm text-fg ${controlFocus}`}
         />
         <span class="text-xs whitespace-nowrap text-fg-muted">
           showing {props.shownCount()} of {props.totalCount()} findings

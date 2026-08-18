@@ -113,6 +113,109 @@ const noRawPalette = {
   },
 };
 
+// The contracts gate (#408) — elevation, motion and states, the same shape as
+// the palette gate above. Every shadow belongs to a floating layer and takes
+// that layer's token (`shadow-[--shadow-toast]`); a Tailwind t-shirt shadow is
+// a card reaching for elevation it does not have. Nothing is blurred. Hover
+// and press change colour only. A numeric duration bypasses the reduced-motion
+// collapse the tokens carry, so durations are stated as tokens or not at all.
+// Disabled is reduced opacity with the default cursor — never a repaint, never
+// `not-allowed`.
+// Sized forms only, same trade the palette gate's hex check makes: Tailwind
+// still compiles v3's BARE `shadow`/`blur`, but "blur" is a DOM event name and
+// both are ordinary English (a test named "…on blur" is a string literal), so
+// the bare forms are review's problem, not this regex's.
+const TSHIRT_SHADOW_RE =
+  /(?<!-)\b(?:drop-shadow|inset-shadow|shadow)-(?:2xs|xs|sm|md|lg|xl|2xl)\b/;
+const BLUR_RE =
+  /\bbackdrop-blur\b|(?<!-)\bblur-(?:none|xs|sm|md|lg|xl|2xl|3xl|\[)/;
+// A transform, shadow or fade on an interaction state. The focus ring is a
+// box-shadow ARBITRARY PROPERTY (`focus-visible:[box-shadow:var(--focus-ring)]`)
+// and does not match here — the bracket is not the word `shadow`.
+const STATE_EFFECT_RE =
+  /\b(?:hover|active|group-hover|focus|focus-visible|focus-within):(?:-?(?:translate|scale|rotate)-|(?:drop-)?shadow|opacity-|blur)/;
+// Numeric only: `duration-[--dur-slow]` is the sanctioned token form.
+const RAW_DURATION_RE = /\b(?:duration|delay)-(?:\d|\[\d)/;
+// The system's two curves are --ease-out and --ease-in-out; Tailwind's
+// `ease-out`/`ease-in-out` utilities resolve to them (motion.css redefines the
+// variables), but `ease-linear`/`ease-in` have no token behind them. The \b
+// keeps `ease-initial` out of the net.
+const RAW_EASE_RE = /\bease-(?:linear|in)\b(?!-)/;
+// The spinner is the system's ONE keyframe animation (and reduced motion
+// collapses it via --animate-spin); nothing pulses, pings or bounces.
+const KEYFRAME_RE = /\banimate-(?:pulse|ping|bounce)\b/;
+// outline-hidden, not outline-none: forced-colors mode discards box-shadow
+// rings, and outline-hidden leaves a transparent outline for it to repaint.
+const OUTLINE_NONE_RE = /\boutline-none\b/;
+const noRawEffects = {
+  meta: {
+    type: "problem",
+    schema: [],
+    messages: {
+      shadow:
+        "Untokened shadow '{{match}}' — a shadow means a floating layer, and " +
+        "each layer has one value: shadow-[--shadow-tooltip|menu|toast|" +
+        "popover|dialog|palette]. Cards get border + surface step, no shadow " +
+        "(web/src/shared/styles/elevation.css, #408).",
+      blur: "'{{match}}' — nothing in this system is blurred (#408).",
+      stateEffect:
+        "'{{match}}' — hover and press change colour only: no scale, no " +
+        "translate, no shadow lift, no fade (#408).",
+      duration:
+        "Raw duration '{{match}}' — use the motion tokens (duration-[--dur-" +
+        "fast|base|slow|panel]) so the reduced-motion collapse in " +
+        "web/src/shared/styles/motion.css applies; bare transition utilities " +
+        "already resolve to --dur-base (#408).",
+      easing:
+        "'{{match}}' — the system's curves are ease-out and ease-in-out " +
+        "(resolving to the motion tokens); nothing accelerates in (#408).",
+      keyframe:
+        "'{{match}}' — the spinner is the system's one keyframe animation; " +
+        "nothing pulses, pings or bounces (#408).",
+      outlineNone:
+        "'outline-none' — use outline-hidden: forced-colors mode discards " +
+        "the box-shadow focus ring, and outline-hidden leaves an outline " +
+        "for it to repaint (#408).",
+      cursor:
+        "'cursor-not-allowed' — a disabled control keeps the default cursor " +
+        "and reduces opacity; it never scolds the pointer (#408).",
+      disabledRepaint:
+        "'{{match}}' — disabled is reduced opacity, never a repaint: a grey " +
+        "disabled primary loses the colour that says what it would do (#408).",
+    },
+  },
+  create(context) {
+    const checks = [
+      [TSHIRT_SHADOW_RE, "shadow"],
+      [BLUR_RE, "blur"],
+      [STATE_EFFECT_RE, "stateEffect"],
+      [RAW_DURATION_RE, "duration"],
+      [RAW_EASE_RE, "easing"],
+      [KEYFRAME_RE, "keyframe"],
+      [OUTLINE_NONE_RE, "outlineNone"],
+      [/\bcursor-not-allowed\b/, "cursor"],
+      [/\bdisabled:(?:bg|text|border)-/, "disabledRepaint"],
+    ];
+    const check = (node, text) => {
+      for (const [re, messageId] of checks) {
+        const m = re.exec(text);
+        if (m) {
+          context.report({ node, messageId, data: { match: m[0] } });
+          return;
+        }
+      }
+    };
+    return {
+      Literal(node) {
+        if (typeof node.value === "string") check(node, node.value);
+      },
+      TemplateElement(node) {
+        check(node, node.value.raw);
+      },
+    };
+  },
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -179,10 +282,18 @@ export default tseslint.config(
     name: "design/no-raw-palette",
     files: ["src/**/*.{ts,tsx}"],
     plugins: {
-      design: { rules: { "no-raw-palette": noRawPalette } },
+      design: {
+        rules: {
+          "no-raw-palette": noRawPalette,
+          "no-raw-effects": noRawEffects,
+        },
+      },
     },
     rules: {
       "design/no-raw-palette": "error",
+      // The #408 contracts gate — shared primitives included: the contract is
+      // the system's, not the app's.
+      "design/no-raw-effects": "error",
     },
   },
   {

@@ -251,7 +251,7 @@ export const ValidatePane: Component = () => {
             </p>
             <button
               type="button"
-              class="mt-1.5 rounded border border-line-strong px-2 py-1 text-xs font-medium text-fg-soft hover:bg-chip"
+              class="mt-1.5 rounded-sm border border-line-strong px-2 py-1 text-xs font-medium text-fg-soft hover:bg-chip"
               onClick={() => {
                 setEncoding("windows-1252");
               }}
@@ -260,7 +260,11 @@ export const ValidatePane: Component = () => {
             </button>
           </div>
         </Show>
-        <SampleLoader onLoad={loadBytes} open={!editorText()} />
+        <SampleLoader
+          onLoad={loadBytes}
+          open={!editorText()}
+          replaces={!!editorText()}
+        />
         <InputPane
           text={editorText}
           name={name()}

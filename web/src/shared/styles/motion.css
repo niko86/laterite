@@ -28,6 +28,15 @@
 
   --tooltip-delay: 300ms;
   --toast-life: 4000ms;
+
+  /* Tailwind's bare `transition-*` utilities resolve their defaults through
+     these two, so redefining them puts every undecorated transition on the
+     system's easing and base duration — and on the reduced-motion collapse
+     below, since --dur-base is what it rewrites. A call site states a duration
+     only to be deliberately slower (the toast's fly-in, a panel reveal), never
+     to restate this default (#408). */
+  --default-transition-duration: var(--dur-base);
+  --default-transition-timing-function: var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -37,5 +46,11 @@
     --dur-slow: 0.01ms;
     --dur-panel: 0.01ms;
     --tooltip-delay: 0ms;
+
+    /* The spinner is the one keyframe animation in the system, and
+       `animate-spin` resolves through this variable — so the collapse stays a
+       token concern here too. The frozen arc still reads as "busy" beside its
+       label; what stops is the motion (#408). */
+    --animate-spin: none;
   }
 }

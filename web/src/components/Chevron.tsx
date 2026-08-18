@@ -19,7 +19,7 @@ export const Chevron: Component<{ class?: string; open?: boolean }> = (
   <svg
     viewBox="0 0 16 16"
     aria-hidden="true"
-    class={`h-3.5 w-3.5 shrink-0 text-fg-muted transition-transform duration-150 ${props.open === undefined ? "group-open:rotate-90" : props.open ? "rotate-90" : ""} ${props.class ?? ""}`}
+    class={`h-3.5 w-3.5 shrink-0 text-fg-muted transition-transform ${props.open === undefined ? "group-open:rotate-90" : props.open ? "rotate-90" : ""} ${props.class ?? ""}`}
   >
     <path
       d="M6 4l4 4-4 4"

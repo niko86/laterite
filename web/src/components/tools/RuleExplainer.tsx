@@ -6,6 +6,7 @@ import {
   Show,
   type Component,
 } from "solid-js";
+import { controlFocus } from "../../lib/controls";
 
 // Plain-English reference for the AGS4 validation rules: what each rule
 // checks, its severity, whether the validator can auto-fix it, and any known
@@ -71,7 +72,7 @@ export const RuleExplainer: Component = () => {
   return (
     <div class="flex min-w-0 flex-col gap-3">
       <input
-        class="w-full rounded-lg border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg outline-none placeholder:text-fg-dim"
+        class={`w-full rounded-xs border border-line-strong bg-surface-raised px-3 py-2 text-sm text-fg ${controlFocus} placeholder:text-fg-dim`}
         placeholder="Search rules… (e.g. duplicate, datetime, heading)"
         value={q()}
         onInput={(e) => setQ(e.currentTarget.value)}
@@ -102,12 +103,12 @@ export const RuleExplainer: Component = () => {
                   <span class="mono font-medium text-fg">Rule {r.rule}</span>
                   <span class="text-fg-soft">{r.title}</span>
                   <span
-                    class={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${sevClass(r.severity)}`}
+                    class={`rounded-xs px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${sevClass(r.severity)}`}
                   >
                     {r.severity}
                   </span>
                   <Show when={r.fixable}>
-                    <span class="rounded bg-ok-quiet px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ok">
+                    <span class="rounded-xs bg-ok-quiet px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ok">
                       auto-fixable
                     </span>
                   </Show>

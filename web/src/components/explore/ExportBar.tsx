@@ -69,7 +69,7 @@ export const ExportBar: Component<{
           <button
             type="button"
             title={`This query's result as ${fmt.toUpperCase()}`}
-            class="rounded border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-40"
+            class="rounded-sm border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-45"
             disabled={busy() !== null}
             onClick={() => void doExport(fmt)}
           >
@@ -80,7 +80,7 @@ export const ExportBar: Component<{
       <button
         type="button"
         title="The whole keyed database — every group with its _id/_parent_id keys, not just this query"
-        class="rounded border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-40"
+        class="rounded-sm border border-line-strong px-2 py-1 text-fg-soft hover:bg-chip disabled:opacity-45"
         disabled={busy() !== null}
         onClick={() => void doExportDb()}
       >

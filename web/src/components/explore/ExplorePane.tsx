@@ -234,7 +234,7 @@ export const ExplorePane: Component = () => {
           </p>
           <button
             type="button"
-            class="mt-4 rounded bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
+            class="mt-4 rounded-md bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
             onClick={() => {
               goTo("validate");
             }}
@@ -269,7 +269,7 @@ export const ExplorePane: Component = () => {
                   button that does nothing is the state we're removing. */}
                 <button
                   type="button"
-                  class="rounded bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
+                  class="rounded-md bg-accent-quiet px-3 py-1.5 text-sm font-medium text-accent hover:text-accent-hover"
                   onClick={() => void refetch()}
                 >
                   Try again
@@ -438,9 +438,11 @@ const SidebarButton: Component<{
     onClick={() => {
       props.onClick();
     }}
-    class="flex items-center justify-between rounded px-2.5 py-1 text-left transition-colors"
+    class="flex items-center justify-between rounded-sm px-2.5 py-1 text-left transition-colors"
     classList={{
-      "bg-chip text-accent font-medium": props.active,
+      // Selected list rows take the quiet accent fill (#408), same as pills;
+      // hover keeps the raised surface — the two must read differently.
+      "bg-accent-quiet text-accent font-medium": props.active,
       "text-fg-soft hover:bg-surface-raised": !props.active,
     }}
   >

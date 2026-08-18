@@ -108,7 +108,7 @@ export const DataTable: Component<{
         <div class="flex items-center gap-3 text-xs text-fg-muted">
           <button
             type="button"
-            class="rounded border border-line-strong px-2 py-1 hover:bg-chip disabled:opacity-40"
+            class="rounded-sm border border-line-strong px-2 py-1 hover:bg-chip disabled:opacity-45"
             disabled={page() === 0}
             onClick={() => setPage((p) => Math.max(0, p - 1))}
           >
@@ -119,7 +119,7 @@ export const DataTable: Component<{
           </span>
           <button
             type="button"
-            class="rounded border border-line-strong px-2 py-1 hover:bg-chip disabled:opacity-40"
+            class="rounded-sm border border-line-strong px-2 py-1 hover:bg-chip disabled:opacity-45"
             disabled={page() >= pageCount() - 1}
             onClick={() => setPage((p) => Math.min(pageCount() - 1, p + 1))}
           >

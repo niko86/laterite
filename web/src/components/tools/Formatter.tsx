@@ -1,4 +1,5 @@
 import { createMemo, createSignal, Show, type Component } from "solid-js";
+import { ArmedButton } from "@shared/components";
 import { fileStore } from "../../lib/fileStore";
 import { downloadBlob, baseName } from "../../lib/download";
 
@@ -88,18 +89,17 @@ export const Formatter: Component = () => {
           <div class="flex flex-wrap items-center gap-3 text-sm">
             <button
               type="button"
-              class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover"
+              class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover"
               onClick={save}
             >
               Download tidied
             </button>
-            <button
-              type="button"
-              class="rounded border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip"
-              onClick={apply}
-            >
+            {/* Overwrites the working bytes in place (#408): arm first. The
+                original stays recoverable, but only via Fix's revert — which
+                discards everything else with it. */}
+            <ArmedButton confirm="Replace loaded file?" onConfirm={apply}>
               Apply to loaded file
-            </button>
+            </ArmedButton>
             <label class="flex cursor-pointer items-center gap-1.5 text-xs text-fg-muted">
               <input
                 type="checkbox"

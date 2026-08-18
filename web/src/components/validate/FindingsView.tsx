@@ -208,13 +208,13 @@ const FindingRow: Component<{
         <span class="text-fg-faint">
           {props.f.line != null ? `line ${props.f.line}` : "—"}
         </span>
-        <span class="rounded bg-chip px-1.5 py-0.5 text-xs text-fg-soft">
+        <span class="rounded-xs bg-chip px-1.5 py-0.5 text-xs text-fg-soft">
           {props.f.group || "—"}
         </span>
         <span class="text-fg">{props.f.desc}</span>
       </div>
       <Show when={props.f.line != null}>
-        <pre class="mono mt-2 max-w-full overflow-x-auto rounded bg-surface-code p-2 text-xs leading-relaxed text-fg-muted">
+        <pre class="mono mt-2 max-w-full overflow-x-auto rounded-sm bg-surface-code p-2 text-xs leading-relaxed text-fg-muted">
           <Show
             when={alignedBlock()}
             fallback={
@@ -478,7 +478,7 @@ export const FindingsView: Component<{
                               onClick={() => {
                                 props.onToggle(h().rule);
                               }}
-                              class="flex w-full scroll-mt-4 items-baseline gap-2 border-b border-line bg-surface-raised px-3 py-2 text-left text-sm font-medium text-fg backdrop-blur"
+                              class="flex w-full scroll-mt-4 items-baseline gap-2 border-b border-line bg-surface-raised px-3 py-2 text-left text-sm font-medium text-fg"
                             >
                               <Chevron open={h().open} class="self-center" />
                               {shortRule(h().rule)}

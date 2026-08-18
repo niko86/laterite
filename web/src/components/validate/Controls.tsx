@@ -64,7 +64,7 @@ export const Controls: Component<{
         <label class="flex items-center gap-2 text-sm text-fg-soft sm:self-end sm:pb-1.5">
           <input
             type="checkbox"
-            class="h-4 w-4 rounded border-line-strong bg-surface-raised"
+            class="h-4 w-4 rounded-xs border-line-strong bg-surface-raised"
             checked={props.aligned}
             onChange={(e) => {
               props.onAligned(e.currentTarget.checked);

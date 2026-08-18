@@ -154,7 +154,7 @@ export const TransportTool: Component = () => {
           <button
             type="button"
             disabled={busy() !== null || !lockSource() || !lockPass()}
-            class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
             onClick={() => void doLock()}
           >
             {busy() === "lock" ? "Encrypting…" : "Encrypt & download"}
@@ -186,7 +186,7 @@ export const TransportTool: Component = () => {
       <div class="flex flex-col gap-2 rounded-lg border border-line bg-surface p-3">
         <p class="text-sm font-medium text-fg-soft">Decrypt ← .zst.age</p>
         <div class="flex flex-wrap items-center gap-3 text-sm">
-          <label class="cursor-pointer rounded border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip">
+          <label class="cursor-pointer rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip">
             <Show when={unlockFile()} fallback="Choose a .zst.age file…">
               {(f) => f().name}
             </Show>
@@ -211,7 +211,7 @@ export const TransportTool: Component = () => {
           <button
             type="button"
             disabled={busy() !== null || !unlockFile() || !unlockPass()}
-            class="rounded border border-line-strong px-3 py-1.5 text-fg hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded-md border border-line-strong px-3 py-1.5 text-fg hover:border-accent hover:text-accent disabled:opacity-45"
             onClick={() => void doUnlock()}
           >
             {busy() === "unlock" ? "Decrypting…" : "Decrypt & download"}

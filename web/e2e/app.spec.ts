@@ -1255,7 +1255,10 @@ test("Tools → Excel reports an engine it can't fetch, and converts once a retr
     // once a file is loaded, so re-open it before reaching for a sample.
     await tab(page, "Validate").click();
     await page.getByText(/Or try a sample/).click();
+    // A file is loaded, so the sample button ARMS on the first press (#408) —
+    // the label becomes the question, and the second press loads.
     await page.getByRole("button", { name: /Rule 9.*unknown heading/ }).click();
+    await page.getByRole("button", { name: /Replace loaded file\?/ }).click();
     await expect(page.getByText("✗").first()).toBeVisible();
   } finally {
     await ctx.close();
@@ -1359,7 +1362,10 @@ test("a dead engine worker is not reused: Explore reports, and the always-on wor
     // half the reason the split exists. A fresh validate still runs.
     await tab(page, "Validate").click();
     await page.getByText(/Or try a sample/).click();
+    // A file is loaded, so the sample button ARMS on the first press (#408) —
+    // the label becomes the question, and the second press loads.
     await page.getByRole("button", { name: /Rule 9.*unknown heading/ }).click();
+    await page.getByRole("button", { name: /Replace loaded file\?/ }).click();
     await expect(page.getByText("✗").first()).toBeVisible();
     await expect(
       page.getByText(/Failed to load the validator engine/),
@@ -1439,7 +1445,10 @@ test("a validate the engine cannot serve is reported on the pane, not frozen ove
 
     // The sample list collapses once a file is loaded — re-open it.
     await page.getByText(/Or try a sample/).click();
+    // A file is loaded, so the sample button ARMS on the first press (#408) —
+    // the label becomes the question, and the second press loads.
     await page.getByRole("button", { name: /Rule 9.*unknown heading/ }).click();
+    await page.getByRole("button", { name: /Replace loaded file\?/ }).click();
 
     // The pane REPORTS — the fallback this ticket makes reachable — and the
     // errored resource's stale report comes down rather than posing as the

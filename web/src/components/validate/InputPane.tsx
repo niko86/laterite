@@ -32,7 +32,7 @@ export const InputPane: Component<{
         </label>
         <button
           type="button"
-          class="rounded border border-line-strong px-2 py-1 text-xs text-fg-soft hover:bg-chip"
+          class="rounded-sm border border-line-strong px-2 py-1 text-xs text-fg-soft hover:bg-chip"
           onClick={() => fileInput?.click()}
         >
           Choose file…
@@ -70,8 +70,11 @@ export const InputPane: Component<{
           "border-line-strong": !dragging(),
         }}
       >
+        {/* Focus is the ring only — the textarea is borderless (the drop-zone
+            wrapper carries the border), so the accent-border half of the focus
+            contract has nothing to paint on. */}
         <textarea
-          class="mono h-96 w-full min-w-0 resize-y rounded-lg bg-surface-raised p-3 text-xs leading-relaxed text-fg outline-none placeholder:text-fg-dim"
+          class="mono h-96 w-full min-w-0 resize-y rounded-xs bg-surface-raised p-3 text-xs leading-relaxed text-fg outline-hidden focus-visible:[box-shadow:var(--focus-ring)] placeholder:text-fg-dim"
           placeholder={
             'Drag & drop a .ags file here, or paste AGS4 text…\n\n"GROUP","PROJ"\n"HEADING","PROJ_ID",...'
           }

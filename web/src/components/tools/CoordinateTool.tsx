@@ -308,7 +308,7 @@ export const CoordinateTool: Component = () => {
 
             <button
               type="button"
-              class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-40"
+              class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
               disabled={ok().length === 0 || converted.loading}
               onClick={exportCsv}
             >
@@ -316,7 +316,7 @@ export const CoordinateTool: Component = () => {
             </button>
             <button
               type="button"
-              class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-40"
+              class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover disabled:opacity-45"
               disabled={ok().length === 0 || converted.loading}
               onClick={exportGeoJson}
             >
@@ -325,7 +325,7 @@ export const CoordinateTool: Component = () => {
             <Show when={!showMap()}>
               <button
                 type="button"
-                class="rounded border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip disabled:opacity-40"
+                class="rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip disabled:opacity-45"
                 disabled={ok().length === 0}
                 onClick={requestMap}
               >
@@ -354,7 +354,7 @@ export const CoordinateTool: Component = () => {
 
           <Show when={converted()?.gridError}>
             {(err) => (
-              <p class="rounded border border-warn/45 bg-warn-quiet px-3 py-2 text-xs text-warn">
+              <p class="rounded-sm border border-warn/45 bg-warn-quiet px-3 py-2 text-xs text-warn">
                 Couldn't load the OSTN15 grid ({err()}) — showing ~5 m Helmert
                 results instead. The grid ships at{" "}
                 <span class="mono">grids/{GRID_FILE}</span>.
@@ -382,14 +382,14 @@ export const CoordinateTool: Component = () => {
               <div class="mt-2 flex gap-2 text-sm">
                 <button
                   type="button"
-                  class="rounded bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover"
+                  class="rounded-md bg-cta px-3 py-1.5 font-medium text-fg-on-cta hover:bg-cta-hover"
                   onClick={confirmConsent}
                 >
                   Load map (OpenStreetMap)
                 </button>
                 <button
                   type="button"
-                  class="rounded border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip"
+                  class="rounded-md border border-line-strong px-3 py-1.5 text-fg-soft hover:bg-chip"
                   onClick={() => setAskConsent(false)}
                 >
                   Cancel

@@ -74,14 +74,14 @@ export const EngineGate: Component<{ onConfirm: () => void }> = (props) => {
       <div class="mt-4 flex flex-wrap items-center gap-3">
         <button
           type="button"
-          class="rounded bg-accent px-3 py-1.5 text-sm font-medium text-canvas hover:opacity-90"
+          class="rounded-md bg-cta px-3 py-1.5 text-sm font-medium text-fg-on-cta hover:bg-cta-hover"
           onClick={confirm}
         >
           Continue
         </button>
         <button
           type="button"
-          class="rounded border border-line-strong px-3 py-1.5 text-sm text-fg-soft hover:bg-chip"
+          class="rounded-md border border-line-strong px-3 py-1.5 text-sm text-fg-soft hover:bg-chip"
           onClick={() => {
             goTo("validate");
           }}
