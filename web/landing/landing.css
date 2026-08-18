@@ -10,11 +10,83 @@
 @source "./index.html";
 @source "../src/shared";
 
+@source "./App.tsx";
+@source "./components";
+@source "./demo";
+
 /* The one token this surface retunes. The docs read long-form on the lighter
    --stone-100; the landing page takes the step below it so cards lift harder
    against it (see the shared colors.css). */
 :root {
   --canvas: var(--stone-150);
+
+  /* The two band tints, as percentages rather than colours (#396).
+     A tint is `color-mix(band, transparent, N%)`, so the BAND is the group's
+     and the PERCENTAGE is the theme's — which is what lets #400 dial both down
+     for dark without restating a single band colour. */
+  --chip-tint-pct: 26%;
+  --key-tint-pct: 18%;
+}
+
+/* Dark (#400).
+ *
+ * The band ramp shifts ONE STEP LIGHTER. The light ramp's deep strata vanish
+ * against a near-black canvas, so every band moves up and the ramp gains a
+ * lighter head — and because the rail, the table caps, the chips and the
+ * KEY-column edges all read `--laterite-*`, redefining the ramp here moves every
+ * one of them at once. There is no second band list anywhere.
+ *
+ * Class-toggled rather than `prefers-color-scheme`: an explicit choice has to be
+ * able to beat the OS in BOTH directions, and a media query cannot express "I
+ * want light on a dark-mode machine". index.html applies the class pre-paint and
+ * the shared theme.ts owns it from there. */
+.dark {
+  --laterite-300: #f0a67f;
+  --laterite-400: #f09c56;
+  --laterite-500: #db7841;
+  --laterite-600: #ce5640;
+  --laterite-700: #be3b2e;
+  --laterite-800: #9b3932;
+  --laterite-900: #7d2622;
+
+  --canvas: #14100f;
+  --surface: #1c1715;
+  --surface-raised: #262019;
+  --surface-code: #100c0b;
+  --chip: #261f1c;
+
+  --line: #352c28;
+  --line-subtle: #261f1c;
+  --line-strong: #4a3f39;
+
+  --fg: #ede5df;
+  --fg-soft: #d8cbc2;
+  --fg-muted: #a4958d;
+  --fg-faint: #8b7d75;
+  --fg-dim: #6b5e57;
+
+  /* Headlines and links follow the accent, so they are SAND in dark, not
+     maroon — maroon on near-black is unreadable at body weight. */
+  --accent: #f09c56;
+  --accent-hover: #f0a67f;
+  --accent-quiet: #3a2620;
+
+  /* The rust CTA does NOT change. It is the one object that is the same colour
+     in both themes, which is what makes it read as the action everywhere. */
+
+  --ok: #79c2b4;
+  --ok-quiet: #1d2c29;
+  --warn: #e3a447;
+  --warn-quiet: #2e2313;
+  --err: #f07f6d;
+  --err-quiet: #331b18;
+  --info: #b9b2bd;
+  --info-quiet: #242226;
+
+  /* Tints dial down: a saturated wash that reads as a tint on stone glows on
+     near-black. */
+  --chip-tint-pct: 20%;
+  --key-tint-pct: 14%;
 }
 
 /* Set from the token rather than Tailwind's `leading-relaxed` utility, which

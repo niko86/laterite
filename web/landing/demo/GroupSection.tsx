@@ -1,0 +1,153 @@
+/* One group's section (#396, #398): the chip, the prose, the table, the editor.
+ *
+ * The prose beside each table is what makes the chain teachable — a reader who
+ * cannot see that SAMP hangs off LOCA hangs off PROJ gets nothing from breaking
+ * a row later. The parent named in each line comes from the generated schema's
+ * `parent` field, so a dictionary edition that re-parented a group would change
+ * this sentence without a code edit.
+ */
+
+import { For, Show, createMemo, type Component } from "solid-js";
+import { Button } from "@shared/components";
+import { DEMO_GROUPS } from "./schema";
+import { RowCarousel } from "./RowCarousel";
+import { GroupTable } from "./GroupTable";
+import {
+  addRow,
+  arm,
+  delivery,
+  findingsForGroup,
+  picked,
+  setPicked,
+} from "./store";
+
+/** What each group is FOR, in one sentence a geotechnical newcomer can hold.
+ *  Editorial rather than derived: the dictionary's own descriptions ("Location
+ *  Details") name the group without explaining why it exists. */
+const BLURB: Record<string, string> = {
+  PROJ: "Every delivery starts here. One row, naming the job — and every other group in the file hangs off it.",
+  LOCA: "The holes. One row per borehole or trial pit, with its ground level and how deep it went.",
+  SAMP: "What came out of the hole. Note that LOCA_ID reappears — that repetition IS the link back to the borehole.",
+  LLPL: "Atterberg limits, one row per specimen. Nine columns, seven of them KEY: five restating SAMP's key, two naming the specimen. That is what a join looks like in a format with no joins.",
+};
+
+export const GroupSection: Component<{
+  code: "PROJ" | "LOCA" | "SAMP" | "LLPL";
+  band: string;
+  tableFirst: boolean;
+}> = (props) => {
+  /* One memo rather than two accessors, so a single `Show` narrows both. The
+     lint rule forbids the non-null assertions this would otherwise take, and
+     the pair is genuinely all-or-nothing: a schema without matching data is a
+     generated-file/fixture mismatch, which the Python gate already fails on. */
+  const bits = createMemo(() => {
+    const schema = DEMO_GROUPS.find((g) => g.code === props.code);
+    const data = delivery().find((g) => g.code === props.code);
+    return schema && data ? { schema, data } : undefined;
+  });
+
+  const open = createMemo(() => {
+    const p = picked();
+    return p && p.group === props.code ? { row: p.row, col: p.col } : null;
+  });
+
+  const groupFindings = createMemo(() => findingsForGroup(props.code));
+
+  return (
+    <Show when={bits()}>
+      {(b) => (
+        <div class="grid gap-8 min-[64rem]:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] min-[64rem]:items-start">
+          <div classList={{ "min-[64rem]:order-2": props.tableFirst }}>
+            {/* The group chip: band tint, a solid band rule inset on the left,
+                and MAROON text. Never white or black on a band fill — the
+                mid-ramp bands fail contrast in both directions. */}
+            <p
+              class="inline-flex items-center gap-2 rounded-sm border-l-[3px] py-1 pr-3 pl-2 font-mono text-micro font-semibold tracking-[--track-micro] text-accent"
+              style={{
+                "border-left-color": `var(${props.band})`,
+                background: `color-mix(in srgb, var(${props.band}) var(--chip-tint-pct), transparent)`,
+              }}
+            >
+              {props.code}
+              <Show when={b().schema.parent}>
+                {(parent) => (
+                  <span class="font-normal text-fg-muted">
+                    child of {parent()}
+                  </span>
+                )}
+              </Show>
+            </p>
+
+            <h2 class="mt-3 font-display text-h2 font-extrabold tracking-[--track-tight] text-accent">
+              {b().schema.description}
+            </h2>
+            <p class="mt-2 text-fg-soft">{BLURB[props.code]}</p>
+
+            <Show when={groupFindings().length}>
+              <ul class="mt-4 list-none space-y-2 p-0">
+                <For each={groupFindings()}>
+                  {(f) => (
+                    <li class="rounded-md border border-err/40 bg-err-quiet px-3 py-2 text-caption text-err">
+                      <span class="font-semibold">{f.rule}</span> — {f.desc}
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
+          </div>
+
+          <div classList={{ "min-[64rem]:order-1": props.tableFirst }}>
+            <GroupTable
+              schema={b().schema}
+              data={b().data}
+              band={props.band}
+              picked={open()}
+              onPick={(row, col) => {
+                arm();
+                setPicked({ group: props.code, row, col });
+              }}
+            />
+
+            <div class="mt-3 flex flex-wrap items-center gap-3">
+              <Button
+                variant="add"
+                onClick={() => {
+                  addRow(props.code, b().schema.parent);
+                }}
+              >
+                + row
+                <Show when={b().schema.parent}>
+                  {(parent) => (
+                    <span class="text-fg-faint">
+                      {" "}
+                      (inherits {parent()}'s key)
+                    </span>
+                  )}
+                </Show>
+              </Button>
+              <span class="text-caption text-fg-faint">
+                Tap any cell to edit the row.
+              </span>
+            </div>
+
+            <Show when={open()}>
+              {(cell) => (
+                <RowCarousel
+                  schema={b().schema}
+                  data={b().data}
+                  band={props.band}
+                  row={cell().row}
+                  col={cell().col}
+                  onMove={(col) =>
+                    setPicked({ group: props.code, row: cell().row, col })
+                  }
+                  onClose={() => setPicked(null)}
+                />
+              )}
+            </Show>
+          </div>
+        </div>
+      )}
+    </Show>
+  );
+};
