@@ -39,7 +39,7 @@ Three bins:
 - `laterite-ags4-compliance` — the comparator (the primary bin).
 - `emit-rust` — the rust-surface runner; drives the validator engine directly
   and emits `rust.json` in the schema the comparator reads.
-- `duckdb-parse-check` (#458) — the duckdb *read/parse-agreement* leg: proves
+- `duckdb-parse-check` (laterite-dev#458) — the duckdb *read/parse-agreement* leg: proves
   the read-only extension's `read_ags` produces the same content-addressed key
   set as the core reference (it compares a pre-computed JSON against the core
   reader — it does **not** link the duckdb crate).

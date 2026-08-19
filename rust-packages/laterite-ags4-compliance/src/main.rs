@@ -13,8 +13,8 @@
 //!      be: two surfaces agreeing on which rules fired can still disagree on
 //!      where, how many, or what they said. A split is a binding / serialization
 //!      / build bug — there is no O-N escape hatch. (`duckdb` became a read-only
-//!      reader in #446 → it does read/parse-agreement via the `duckdb-parse-
-//!      check` bin instead, not findings; #458.)
+//!      reader in laterite-dev#446 → it does read/parse-agreement via the `duckdb-parse-
+//!      check` bin instead, not findings; laterite-dev#458.)
 //!   2. **python-ags4 agreement modulo O-N (dogfood).** The canonical laterite
 //!      floor vs python-ags4's floor through [`laterite_ags4_parity::classify`] —
 //!      VERBATIM, so the documented O-2/O-3/O-26/O-30/O-34 divergences reconcile
@@ -25,7 +25,7 @@
 //! `"AGS Format Rule N"` LABEL floor (`rules`) — python-ags4 emits only labels
 //! and the O-N reconciliation is defined over them, so tuples have no peer there.
 //! FYIs are carried separately and compared among all four surfaces (all are
-//! FYI-capable now duckdb has left findings — #194/#458). Both validators emit
+//! FYI-capable now duckdb has left findings — #194/laterite-dev#458). Both validators emit
 //! identical FYI labels, so the floor strip is symmetric, not a reconciliation
 //! of a real divergence.
 
@@ -37,13 +37,13 @@ use serde::Deserialize;
 
 /// The laterite surfaces (same engine; must be byte-identical on the floor),
 /// in canonical order — the first present is the canonical for the python leg.
-/// `duckdb` was dropped here in #458: the extension became a read-only reader
-/// (#446 removed `validate_ags`), so it emits no findings — its cross-surface
+/// `duckdb` was dropped here in laterite-dev#458: the extension became a read-only reader
+/// (laterite-dev#446 removed `validate_ags`), so it emits no findings — its cross-surface
 /// agreement is checked by the `duckdb-parse-check` bin (read/parse-agreement)
 /// instead. See the dev satellite's `tools/compliance/README.md`.
 const LATERITE: &[&str] = &["rust", "python-laterite", "node", "wasm"];
 /// Surfaces that can emit FYI — the same set (duckdb, the only non-FYI surface,
-/// no longer participates in findings-agreement at all; #194/#458).
+/// no longer participates in findings-agreement at all; #194/laterite-dev#458).
 const FYI_CAPABLE: &[&str] = &["rust", "python-laterite", "node", "wasm"];
 const REFERENCE: &str = "python-ags4";
 
@@ -285,7 +285,7 @@ fn load(dir: &PathBuf) -> Result<BTreeMap<String, SurfaceFile>, String> {
         if p.extension().and_then(|e| e.to_str()) != Some("json") {
             continue;
         }
-        // `*-parse.json` is the duckdb read/parse-agreement artifact (#458),
+        // `*-parse.json` is the duckdb read/parse-agreement artifact (laterite-dev#458),
         // a different schema read by the `duckdb-parse-check` bin — never a
         // findings surface, so skip it here or it'd fail to deserialize.
         if p.file_name()
