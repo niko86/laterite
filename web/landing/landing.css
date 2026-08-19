@@ -20,6 +20,12 @@
 @source not "./vite.config.ts";
 @source not "./**/*.test.ts";
 @source not "../src/**/*.test.ts";
+/* The `.tsx` half, which this entry was missing while the app's had both (#452).
+   Neither glob above matches a `.test.tsx`, so a component test — the kind that
+   necessarily WRITES the classes it renders — would have shipped every one of
+   them into this bundle. There are none today; the asymmetry is the defect. */
+@source not "./**/*.test.tsx";
+@source not "../src/**/*.test.tsx";
 
 /* Class-toggled dark mode, exactly as the app's entry declares it (#452).
    Without this, Tailwind's DEFAULT `dark:` applies — `prefers-color-scheme` —

@@ -368,6 +368,27 @@ describe.each(Object.entries(themes))(
         }
       }
     });
+
+    // The PREMISE, which is the half a forgone rung rests on and the half that
+    // can rot. `forgone` says a rung is not a step this surface has; if the
+    // retune that made it true is edited away, the rung is a real step again
+    // and BOTH halves go wrong silently — the ladder stops comparing it against
+    // anything here, hiding a fresh collision, while the markup guard below
+    // keeps rejecting a fill that has become legitimate. So the collision that
+    // justifies the drop is asserted, not assumed.
+    it("only forgoes a rung the ladder genuinely cannot seat", () => {
+      for (const rung of forgone) {
+        const others = LADDER.filter((r) => r !== rung).map((r) =>
+          Math.abs(
+            lightness(resolveVar(t, rung)) - lightness(resolveVar(t, r)),
+          ),
+        );
+        expect(
+          Math.min(...others),
+          `--${rung} is a distinct step again — stop forgoing it`,
+        ).toBeLessThan(STEP_FLOOR);
+      }
+    });
   },
 );
 
@@ -393,36 +414,55 @@ const landingSources = readdirSync(LANDING_DIR, {
   recursive: true,
   encoding: "utf8",
 })
-  // `.ts` as well as `.tsx`: this codebase does keep class strings in plain
-  // modules (`src/lib/controls.ts`). Test files are skipped for the reason
-  // landing.css already `@source not`s them — a class named there never ships.
+  // Everything landing.css's `@source` list reaches, and nothing it does not.
+  // `.ts` as well as `.tsx`, because this codebase does keep class strings in
+  // plain modules (`src/lib/controls.ts`); `.html`, because the entry names
+  // `./index.html` and a class in the shell ships like any other. Test files
+  // are skipped for the reason the entry `@source not`s them — a class named
+  // there never reaches a bundle.
   .filter(
     (f) =>
-      /\.(tsx?|css)$/.test(f) &&
+      /\.(tsx?|css|html)$/.test(f) &&
       !/\.test\.tsx?$/.test(f) &&
       !f.startsWith("dist") &&
       !f.includes("node_modules"),
   )
   .map((f) => [f, readFileSync(resolve(LANDING_DIR, f), "utf8")] as const);
 
+/** Each use of the fill, with its whole variant chain captured.
+ *
+ *  The chain, not just the segment in front: a lookbehind for `dark:` reads
+ *  only the one segment before the utility, so it rejects
+ *  `dark:hover:bg-surface-raised` — correctly guarded, and the natural next
+ *  thing to write — while telling the author to drop the guard. Order within
+ *  the chain carries no meaning to Tailwind, so it carries none here either. */
+const RAISED_FILL = /((?:[\w.[\]%/-]+:)*)bg-surface-raised\b/g;
+const guardedByDark = (chain: string): boolean =>
+  chain.split(":").includes("dark");
+
 describe("the landing's forgone rung", () => {
   // The positive control. The case below asserts an ABSENCE, which a scan that
   // reads nothing — or a pattern that matches nothing — produces just as well.
   it("reads the landing's markup, and the pattern matches", () => {
     expect(landingSources.length).toBeGreaterThan(5);
-    const guarded = landingSources.flatMap(([, src]) => [
-      ...src.matchAll(/dark:bg-surface-raised\b/g),
+    const uses = landingSources.flatMap(([, src]) => [
+      ...src.matchAll(RAISED_FILL),
     ]);
-    expect(guarded.length).toBeGreaterThan(0);
+    expect(uses.length).toBeGreaterThan(0);
+    expect(uses.some((m) => guardedByDark(m[1] as string))).toBe(true);
   });
 
   it("never fills with --surface-raised except behind dark:", () => {
     const offenders = landingSources
-      .filter(([, src]) => /(?<!dark:)\bbg-surface-raised\b/.test(src))
+      .filter(([, src]) =>
+        [...src.matchAll(RAISED_FILL)].some(
+          (m) => !guardedByDark(m[1] as string),
+        ),
+      )
       .map(([file]) => file);
     expect(
       offenders,
-      "the landing's light canvas IS --surface-raised, so this fill is invisible there — use bg-surface to lift or bg-chip to recess, and keep the raised step behind dark:",
+      "the landing's light canvas IS --surface-raised, so this fill is invisible there — lift with the surface step or recess with the chip step, and keep the raised one behind a dark: guard",
     ).toEqual([]);
   });
 });

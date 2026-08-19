@@ -185,11 +185,26 @@ it("holds the depth pill's on-fill text to AA where its dark fill applies", () =
 // before any CSS loads, so they carry mirrored hexes of --canvas rather than
 // a var() — the one duplication the platform forces. Mirrors drift; this
 // holds them to the tokens they claim to mirror.
+/** The hex a `theme-color` meta carries FOR one scheme.
+ *
+ *  Bound to the scheme rather than merely present in the file (#452): a mirror
+ *  that holds both hexes and swaps which is which contains every value it is
+ *  supposed to, and paints a light reader's browser chrome in the dark canvas.
+ *  Both shells write `media` ahead of `content`, which is what makes the pair
+ *  readable in a single match. */
+const themeColorFor = (html: string, scheme: string): string | undefined =>
+  html.match(
+    new RegExp(
+      `prefers-color-scheme:\\s*${scheme}\\)"[\\s\\S]{0,120}?content="(#[0-9a-f]{6})"`,
+      "i",
+    ),
+  )?.[1];
+
 describe("the chrome mirrors of --canvas", () => {
   it("theme-color metas carry both themes' canvas", () => {
     const html = read("../../../index.html");
-    expect(html).toContain(`content="${resolveVar(light, "canvas")}"`);
-    expect(html).toContain(`content="${resolveVar(dark, "canvas")}"`);
+    expect(themeColorFor(html, "light")).toBe(resolveVar(light, "canvas"));
+    expect(themeColorFor(html, "dark")).toBe(resolveVar(dark, "canvas"));
   });
 
   // The landing carries its own pair, and they have to mirror the RETUNED
@@ -197,9 +212,9 @@ describe("the chrome mirrors of --canvas", () => {
   // above, on the one value #452 is about moving.
   it("the landing's theme-color metas carry the landing's canvas", () => {
     const html = read("../../../landing/index.html");
-    for (const theme of ["landing light", "landing dark"] as const) {
-      expect(html).toContain(
-        `content="${resolveVar(themes[theme], "canvas")}"`,
+    for (const scheme of ["light", "dark"] as const) {
+      expect(themeColorFor(html, scheme), `${scheme} meta`).toBe(
+        resolveVar(themes[`landing ${scheme}`], "canvas"),
       );
     }
   });
