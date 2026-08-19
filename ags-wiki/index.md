@@ -1,7 +1,7 @@
 ---
 type: index
-generated: 2026-08-18
-counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 30, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 26}
+generated: 2026-08-19
+counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 30, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 27}
 ---
 # AGS Wiki — Content Catalog
 
@@ -22,11 +22,11 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 30, concept
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
-| Design | 26 |
-| **Total (live)** | **406** |
+| Design | 27 |
+| **Total (live)** | **407** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 25 · `confirmed` 18 · `drafted` 332 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 26 · `confirmed` 18 · `drafted` 332 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -480,6 +480,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 30, concept
 | [[dec-ags4-forge-evolutionary-dogfood]] | accepted | — |
 | [[dec-ags4-merge-semantics]] | accepted | — |
 | [[dec-beta-claim]] | accepted | — |
+| [[dec-chart-identity-vocabulary]] | accepted | — |
 | [[dec-custom-dict-overlay]] | accepted | — |
 | [[dec-dictionary-single-source]] | accepted | — |
 | [[dec-duckdb-extension]] | accepted | — |

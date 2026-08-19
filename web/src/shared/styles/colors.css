@@ -116,8 +116,15 @@
   --warn-quiet: #f8e9d3;
   --err: #a51f14; /* oxide red — hotter and heavier than brand brick */
   --err-quiet: #f9e0dc;
-  --info: var(--steel-700); /* the probe */
-  --info-quiet: #ecebee;
+  /* The probe, in steel BLUE rather than steel grey (#434). Grey was the one
+     status hue that carried no hue at all, and two low-chroma colours have
+     nothing left to tell them apart once colour-vision deficiency removes the
+     hue channel — `info` and `ok` sat at ΔE 1.2 under protanopia. Blue is the
+     hue that survives protan and deutan, which is why every design system that
+     publishes its reasoning puts the informative slot there. The auger is still
+     the referent; steel is blue-grey before it is grey. */
+  --info: #273470;
+  --info-quiet: #e7eaf5;
 
   --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
   --selection: color-mix(in srgb, var(--laterite-300) 45%, transparent);
@@ -163,7 +170,10 @@
   --surface: #1c1715;
   --surface-raised: #262019;
   --surface-code: #100c0b;
-  --chip: #261f1c;
+  /* Was #261f1c, which sat ΔL 0.002 from `--surface-raised` — a chip on a
+     raised card had no edge at all (#434). Moved above raised instead of
+     beside it, so the ladder reads surface → raised → chip → line. */
+  --chip: #332b26;
 
   --line: #352c28;
   --line-subtle: #261f1c;
@@ -198,10 +208,17 @@
 
   --ok: #79c2b4;
   --ok-quiet: #1d2c29;
-  --warn: #e3a447;
+  /* Pale gold, not ochre (#434). The dark ramp lightens `--accent` to sand, and
+     an ochre warning landed on top of it — ΔE 1.1 under deuteranopia, so a link
+     and a warning were the same colour. Status hues are semantically pinned
+     (amber has to read as warning) so the fix is LIGHTNESS, which is the channel
+     a cone deficiency leaves intact: the warning steps up and away from the
+     accent rather than sideways out of amber. */
+  --warn: #fee076;
   --warn-quiet: #2e2313;
   --err: #f07f6d;
   --err-quiet: #331b18;
-  --info: #b9b2bd;
-  --info-quiet: #242226;
+  /* Steel blue, matching the light block's reasoning. */
+  --info: #cff2ff;
+  --info-quiet: #1b262c;
 }

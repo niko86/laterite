@@ -112,8 +112,12 @@ for (const name of localImports(entry)) {
     continue;
   }
 
-  // Exactly one file in the layer carries the dark set; the rewrite must land
-  // on it and nowhere else.
+  // Every file carrying a dark set gets the rewrite. This used to insist on
+  // exactly ONE such file, which was true when colors.css was the only one —
+  // but the count was never the thing worth protecting. What the guard is for
+  // is the silent no-op: a layer that reaches the docs with no dark rule at
+  // all looks like a stylesheet still loading. charts.css (#434) legitimately
+  // carries its own dark values, so the invariant is at least one, below.
   if (/^\.dark(?=\s*\{)/m.test(source)) {
     parts.push(toMaterialScheme(source));
     darkRewrites += 1;
@@ -122,9 +126,9 @@ for (const name of localImports(entry)) {
   }
 }
 
-if (darkRewrites !== 1) {
+if (darkRewrites === 0) {
   throw new Error(
-    `expected exactly one shared stylesheet to carry the dark set, found ${darkRewrites}.`,
+    "no shared stylesheet carries a dark set — the docs would ship light-only.",
   );
 }
 

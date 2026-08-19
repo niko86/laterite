@@ -71,6 +71,13 @@
       },
       {
         "text": "**The install grid cannot advertise a package that is not published.** `tools/gen_install_channels.py` generates laterite.dev's five install cards from the manifests that decide each name — the wheel's pyproject, laterite-node's package.json, `prepare-wasm-package.sh` — and cross-checks every one against a second record before writing the file, so no package name is retyped into markup. A landing page naming a package the registry does not have is worse than no landing page. It refused twice before shipping: the ticket specified “the CLI on crates.io”, but `laterite-cli` is `publish = false` and has never been there (`lat` ships with the wheel and in the GitHub release), and the wheel README's Browser row named the web app where the grid names `@laterite/ags4-wasm`. `--check` runs as a CI drift gate."
+      },
+      {
+        "text": "**A separation gate beside the contrast gate.** `contrast.test.ts` asks whether a colour is legible ON a ground; it never asked whether two colours are legible AGAINST EACH OTHER, and every defect fixed here passed it. The new `separation.test.ts` measures ΔE in OKLab under normal, protan and deutan vision (Machado–Oliveira–Fernandes 2009 at severity 1.0, which is part of the standard rather than an implementation detail) and holds the chart palette to the dataviz method's six checks on both pairlists, every chart slot clear of every status colour, the semantic layer against itself, the elevation ladder to a ΔL floor, and — closing a gap the docs opened — the syntax-highlighting colours against `--surface-code`, the surface they actually sit on. The two pairs that cannot be fixed are pinned at their measured values as ratchets, so they may improve and not decay. Hue angle is deliberately NOT the measure: it scored the pair that started this at 29° apart and safe while they were ΔE 1.1 and indistinguishable. (#434)",
+        "prs": [],
+        "issues": [
+          434
+        ]
       }
     ],
     "changed": [
@@ -147,6 +154,13 @@
       },
       {
         "text": "**The Explore and Tools panes finish the app's move onto the design system — every remaining control a primitive, charts on tokens, the map's chrome included.** The explore surface (data table, results grid, SQL console and builder, chart builder, export bar) and the whole tools tree (dictionary browser, rule explainer, template generator, coordinate tool and map, Excel converter, formatter, merge, revision diff, anonymiser, transport) compose from the shared Button/Input/Select/Checkbox primitives in their proper variants; the deliberate exceptions — the prominent search role, hidden file-selector labels, link-idiom text buttons, rich in-label checkboxes — each carry their reason in place. Chart colours now resolve from the tokens at draw time rather than a library default palette, with one categorical sequence serving both themes (the token vocabulary cannot seat a fully CVD-clean dark trio — recorded as #434). Leaflet's own chrome — zoom control, attribution strip, popups — is brought onto the tokens by an override sheet that rides the map's lazy chunk, so the one third-party panel no longer wears library defaults. The dictionary browser's caption states both of its counts (groups and headings) derived from the loaded edition, so a dictionary edit changes them with no code edit. The only tool that replaces the loaded file (the formatter's Apply) was already behind the armed confirm; the rest download. (#410)"
+      },
+      {
+        "text": "**Charts get their own fenced colour vocabulary, and the status tokens that collided with each other are separated.** The chart palette was cut from the brand ramp, which is a SEQUENTIAL scale — one hue family, monotone lightness — so a categorical channel built on it collapsed on the dark surface no matter how the steps were ordered. `--chart-1..5` now live in their own `shared/styles/charts.css`, fenced one-directionally: nothing there is aliased into the semantic layer and nothing there reads from it, with slot 1 pinned to the CTA by assertion rather than by `var()` so a CTA retune fails a test instead of silently repainting series 1. The hues are Paul Tol's `muted` scheme, minus the sand and olive that crowd `--warn`, snapped to each theme's lightness band. Slots 1–3 are validated on the all-pairs pairlist for scatter, where any two marks can be neighbours; all five are validated adjacent-only for bar and line. Pointing the same measure at the semantic layer found what no gate was asking about: dark `--warn` and `--accent` were ΔE 1.1 apart under deuteranopia — a link and a warning the same colour — and `--info` and `--ok` 1.2 apart under protanopia, because both were low-chroma and a cone deficiency removes the only channel between them. `--warn` steps up in LIGHTNESS to a pale gold rather than sideways out of amber, since status hues are semantically pinned and lightness is the channel a cone deficiency leaves intact; `--info` becomes steel blue rather than steel grey, which is where every design system that publishes its reasoning puts the informative slot. `--chip` in dark sat ΔL 0.002 from `--surface-raised` and moves above it. Light `warn`/`err` is left alone and recorded as accepted: both must clear AA as text on near-white, which forces them into the same dark warm region, and both always ship with an icon and a label. (#434)",
+        "prs": [],
+        "issues": [
+          434
+        ]
       }
     ],
     "deprecated": [],
@@ -230,6 +244,13 @@
       },
       {
         "text": "**A delivery carrying hundreds of fixes no longer mounts hundreds of fix cards.** The Fix tab's scroll cap (#407) bounded the *page* — the cards scroll inside it while the Apply bar stays put — but bounded nothing about what mounted: every fix still built its card, and every card a full aligned GROUP diff block, tens of thousands of DOM nodes with almost all of them off-screen at any moment. The safe list is now windowed the way the findings list one tab over already was, mounting only the visible slice plus its overscan, with the same measured-size resets the findings list learned the hard way. The risky group — small, opt-in, and read whole before ticking anything in it — keeps its plain rendering below the window, and nothing about the cap or the Apply bar moved. (#435)"
+      },
+      {
+        "text": "**Fenced code blocks were invisible in the docs' light theme.** `--surface-code` is tuned to sit on `--surface`, but the docs read long-form on `--canvas`, and it lands ΔL 0.001 from it — contrast ratio 1.00. The block had also been given `border: none` on the reasoning that \"a fenced block is already an object\", which is true only where its fill reads. Retuning the token cannot fix this: it would have to clear both grounds while dodging `--surface-raised` and `--chip`, and the light ladder's five steps span L 0.891–0.978 with no gap that size. One global fill cannot serve three surfaces with three different page grounds, so form carries it — the hairline is back, and line-numbered blocks take the frame on the table rather than down the middle of the two cells. (#434)",
+        "prs": [],
+        "issues": [
+          434
+        ]
       }
     ],
     "security": []

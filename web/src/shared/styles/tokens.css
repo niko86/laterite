@@ -15,6 +15,10 @@
  */
 @import "./fonts.css";
 @import "./colors.css";
+/* Fenced off from colors.css on purpose (#434): chart identity is a separate
+   vocabulary from brand identity, and keeping it a separate file is what makes
+   that legible in the layout rather than only in a comment. */
+@import "./charts.css";
 @import "./typography.css";
 /* Added by #406, when the shared primitives became the first thing to consume
    them. Three of these families deliberately reuse Tailwind's own theme

@@ -6,20 +6,24 @@ import { theme } from "../shared/lib/theme";
 // re-read when the theme flips: callers touch `theme()` through here, so a
 // memo that spreads these values rebuilds on toggle.
 //
-// THE PALETTE IS TOKEN STEPS, AND THE DARK HALF IS A KNOWN COMPROMISE. The
-// sequence was chosen against the dataviz palette validator — the instrument
-// to re-run after any ramp edit, never prose to trust — which seated a
-// passing head trio on the light surface and could not on the dark one: the
-// brand ramp is sequential by construction, and the dark surface squeezes
-// adjacent steps together. The extension to six keeps that recorded head
-// (500/300/700) and interleaves the remaining band so every added neighbour
-// pair clears the floors the head pair cannot; #434 records the verdicts and
-// owns the token-extension decision. Step 200 is excluded: dark mode does not
-// re-map it, so it collides with dark 300. Beyond six values ECharts cycles
-// and colours repeat — the honest fix is folding into "Other", a behavioural
-// change this presentation ticket doesn't take. Assignment is ECharts' series
-// order; entity-stable colour across filters would need the builder to pin
-// colours per value, not taken here either.
+// The palette is the FENCED chart vocabulary, not the brand ramp (#434). The
+// ramp could never do this job: it is a sequential scale, and a categorical
+// channel needs differing hues rather than differing steps. What is here is
+// `--chart-1..5`, whose values, their derivation and their cap all live beside
+// them in shared/styles/charts.css — read that file before changing this list,
+// and re-run the separation gate afterwards rather than trusting either.
+//
+// TWO LIMITS THIS FILE CANNOT ENFORCE, both real:
+//   - Slots 1-3 are the set validated for scatter, where any two marks can sit
+//     side by side; all five are only validated where marks merely touch. This
+//     list hands the full five to every chart form, so a scatter with four or
+//     more series is using a pair that was never checked for it.
+//   - Past five series ECharts cycles and colours repeat outright.
+// Both want the same fix — cap the series count and fold the tail into "Other"
+// — which is behavioural and belongs to the builder, not to a token read.
+// Assignment is still ECharts' series order, so a filter that changes the
+// series count repaints the survivors; entity-stable colour would need the
+// builder to pin colours per value.
 const readVar = (name: string): string =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -42,12 +46,11 @@ export function chartTokens(): ChartTokens {
   void theme();
   return {
     palette: [
-      readVar("--laterite-500"),
-      readVar("--laterite-300"),
-      readVar("--laterite-700"),
-      readVar("--laterite-400"),
-      readVar("--laterite-900"),
-      readVar("--laterite-600"),
+      readVar("--chart-1"),
+      readVar("--chart-2"),
+      readVar("--chart-3"),
+      readVar("--chart-4"),
+      readVar("--chart-5"),
     ],
     fgSoft: readVar("--fg-soft"),
     fgDim: readVar("--fg-dim"),
