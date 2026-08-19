@@ -128,3 +128,31 @@ test("Explore charts: colour a base plot by GEOL stratum via the depth-band join
   await expect(pre).toContainText('c."SAMP_TOP" >= j."GEOL_TOP"');
   await expect(pre).toContainText('j."GEOL_LEG" AS c');
 });
+
+test("Explore charts: a colour column with more values than slots still plots", async ({
+  page,
+}) => {
+  // The fold's own SQL never reaches the disclosure pane — the chart runs a
+  // SECOND query, the cardinality probe that ranks the colour values, and the
+  // unit suite can only assert the string it composes. This is what asserts
+  // DuckDB accepts it: with a colour-by set, the plot WAITS on the probe, so a
+  // canvas at all means the probe ran, returned, and the tail folded.
+  //
+  // SAMP_ID is unique per row, so this fixture's samples are its distinct
+  // colour values — more of them than the scatter cap has slots, which is the
+  // case that used to hand ECharts a palette to cycle. Shrink the fixture below
+  // the cap and this stops exercising the fold: it still checks the probe, it
+  // just checks less. The cap itself is pinned in the node lane, not here.
+  await ready(page);
+  await load(page, "strata.ags");
+  await enterExplore(page);
+  await page.getByRole("button", { name: "Charts" }).click();
+
+  await page.getByLabel("Table").selectOption("SAMP");
+  await page.getByLabel("x axis").selectOption("c.SAMP_TOP");
+  await page.getByLabel("y axis").selectOption("c.SAMP_TOP");
+  await page.getByLabel("colour by").selectOption("c.SAMP_ID");
+
+  await expect(page.locator("canvas").first()).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText(/Chart query error/)).toHaveCount(0);
+});

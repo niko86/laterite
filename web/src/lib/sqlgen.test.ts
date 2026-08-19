@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { chartSql, selectSql, lit, likeLiteral, type JoinSpec } from "./sqlgen";
+import {
+  chartSql,
+  chartRankSql,
+  selectSql,
+  lit,
+  likeLiteral,
+  type JoinSpec,
+} from "./sqlgen";
 
 describe("chartSql", () => {
   it("composes a scatter query (raw X/Y, both non-null)", () => {
@@ -120,6 +127,61 @@ describe("chartSql", () => {
       rowCap: 5,
     });
     expect(s).toContain(`"a""b"`);
+  });
+});
+
+// The probe that decides which colour-by values keep a palette slot. What it
+// must NOT be is a read of the plotted rows: the scatter path is a bare row
+// LIMIT with no ORDER BY, so the values it returns are an arbitrary slice.
+describe("chartRankSql", () => {
+  const base = {
+    table: "LOCA",
+    x: "LOCA_NATE",
+    y: "LOCA_NATN",
+    colour: "LOCA_TYPE",
+    chartType: "scatter" as const,
+    agg: "none" as const,
+    cap: 3,
+  };
+
+  it("ranks by row count, breaking ties on the value", () => {
+    // Deterministic ties are what stop the same delivery assigning different
+    // colours on two loads.
+    expect(chartRankSql(base)).toBe(
+      `SELECT "LOCA_TYPE" AS c, COUNT(*) AS n FROM "LOCA"` +
+        ` WHERE "LOCA_NATE" IS NOT NULL AND "LOCA_NATN" IS NOT NULL` +
+        ` GROUP BY "LOCA_TYPE" ORDER BY n DESC, c ASC LIMIT 3`,
+    );
+  });
+
+  it("asks for exactly the cap, and no probe row for the tail", () => {
+    // Nothing needs to know a tail EXISTS: a value the probe did not return
+    // folds by being absent from the list, which is the same thing that happens
+    // to one it returned past the cap. A `cap + 1` row would be read by no one.
+    expect(chartRankSql({ ...base, cap: 5 })).toContain("LIMIT 5");
+  });
+
+  it("carries the plot's own row filter, so both count the same rows", () => {
+    // An aggregate has already collapsed X, so the plot filters on Y alone —
+    // and a probe that filtered on both would rank over a smaller population
+    // than the chart draws.
+    expect(chartRankSql({ ...base, chartType: "bar", agg: "avg" })).toContain(
+      `FROM "LOCA" WHERE "LOCA_NATN" IS NOT NULL GROUP BY`,
+    );
+    // A COUNT counts rows, so no row is excluded — and neither query filters.
+    expect(
+      chartRankSql({ ...base, y: "", chartType: "bar", agg: "count" }),
+    ).toContain(`FROM "LOCA" GROUP BY`);
+  });
+
+  it("returns '' on exactly the selections the plot query declines", () => {
+    expect(chartRankSql({ ...base, table: "" })).toBe("");
+    expect(chartRankSql({ ...base, x: "" })).toBe("");
+    expect(chartRankSql({ ...base, y: "" })).toBe("");
+  });
+
+  it("quotes identifiers so a rogue quote can't break out", () => {
+    expect(chartRankSql({ ...base, colour: 'a"b' })).toContain(`"a""b"`);
   });
 });
 

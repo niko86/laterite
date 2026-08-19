@@ -12,11 +12,13 @@ import {
 import { scalarText, type GroupMeta } from "../../lib/duckTypes";
 import {
   chartSql,
+  chartRankSql,
   type Agg,
   type ChartType,
   type JoinSpec,
   type QualifiedCol,
 } from "../../lib/sqlgen";
+import { assembleSeries, seriesCap } from "../../lib/chartSeries";
 import { Spinner } from "../Spinner";
 import { Chart } from "./Chart";
 import { ControlGrid } from "../ControlGrid";
@@ -40,10 +42,6 @@ const NUMERIC =
   /DOUBLE|BIGINT|DECIMAL|HUGEINT|FLOAT|INTEGER|REAL|SMALLINT|TINYINT/i;
 const isNumeric = (sqlType: string | undefined) =>
   !!sqlType && NUMERIC.test(sqlType);
-
-const num = (v: unknown): number =>
-  typeof v === "bigint" ? Number(v) : typeof v === "number" ? v : Number(v);
-const str = (v: unknown): string => scalarText(v);
 
 // Plotting thousands of points per-symbol with entry animation melts a weak
 // GPU/CPU — halve the cap on a low-end device (export/SQL still see everything).
@@ -169,39 +167,62 @@ export const ChartBuilder: Component<{
     return joined() ? { alias: c.alias, col: c.col } : c.col;
   };
 
+  const joins = createMemo<JoinSpec[] | undefined>(() => {
+    if (!joined() || !joinPairs().length) return undefined;
+    const rp = rangePred();
+    return [
+      {
+        table: joinCode(),
+        alias: JOIN,
+        kind: "LEFT",
+        leftAlias: BASE,
+        on: joinPairs(),
+        range: rp
+          ? {
+              baseAlias: rp.baseAlias,
+              baseCol: rp.baseCol,
+              top: rp.top,
+              base: rp.base,
+            }
+          : undefined,
+      },
+    ];
+  });
+
+  // The half both queries below share. The probe that ranks the colour values
+  // has to run over the SAME population as the plot — same table, joins,
+  // aliasing and row filter — or it would fold on a count of rows the chart
+  // never draws (#445).
+  const queryBase = () => ({
+    table: table(),
+    alias: joins() ? BASE : undefined,
+    joins: joins(),
+    x: ref(xCol()),
+    y: ref(yCol()),
+    chartType: chartType(),
+    agg: agg(),
+  });
+
   const sql = createMemo(() => {
     if (!table()) return "";
-    let joins: JoinSpec[] | undefined;
-    if (joined() && joinPairs().length) {
-      const rp = rangePred();
-      joins = [
-        {
-          table: joinCode(),
-          alias: JOIN,
-          kind: "LEFT",
-          leftAlias: BASE,
-          on: joinPairs(),
-          range: rp
-            ? {
-                baseAlias: rp.baseAlias,
-                baseCol: rp.baseCol,
-                top: rp.top,
-                base: rp.base,
-              }
-            : undefined,
-        },
-      ];
-    }
     return chartSql({
-      table: table(),
-      alias: joins ? BASE : undefined,
-      joins,
-      x: ref(xCol()),
-      y: ref(yCol()),
+      ...queryBase(),
       colour: colourCol() ? ref(colourCol()) : undefined,
-      chartType: chartType(),
-      agg: agg(),
       rowCap: ROW_CAP,
+    });
+  });
+
+  // Which colour values keep a palette slot is a question about the whole
+  // table, not about the sampled rows: the scatter query is a bare row LIMIT
+  // with no ORDER BY, so its values are an arbitrary slice and a legend saying
+  // "Other" over them would claim something the sample cannot support.
+  const rankSql = createMemo(() => {
+    const colour = colourCol();
+    if (!table() || !colour) return "";
+    return chartRankSql({
+      ...queryBase(),
+      colour: ref(colour),
+      cap: seriesCap(chartType()),
     });
   });
 
@@ -215,53 +236,54 @@ export const ChartBuilder: Component<{
     },
   );
 
+  const [ranked] = createResource(
+    () => rankSql(),
+    async (s) => {
+      if (!s) return [];
+      const { run } = await import("../../lib/duck");
+      const t = await run(s);
+      // Through the same coercion the plotted rows take, so the two sides of
+      // the match agree on what a NULL colour is.
+      return (t.toArray() as Record<string, unknown>[]).map((r) =>
+        scalarText(r.c),
+      );
+    },
+  );
+
   // Reading `rows` after a failed query THROWS (a Solid resource re-reads its
   // error), and `option` below is an eager memo — unguarded, the throw took
   // the update down before the sibling error banner in the JSX could render
   // it (#359, same shape as ExplorePane's accessor).
   const fetched = () => (rows.error ? undefined : rows());
+  const rankedValues = () => (ranked.error ? undefined : ranked());
 
   // Build the ECharts option from the fetched rows + the current controls.
   const option = createMemo<Record<string, unknown> | null>(() => {
     const data = fetched();
     if (!data || data.length === 0) return null;
+    // With a colour-by the plot WAITS for the probe rather than splitting on
+    // what the sample happens to contain — the ranking is the only thing that
+    // can say which values keep a slot.
+    const ranking = colourCol() ? rankedValues() : [];
+    if (ranking === undefined) return null;
     const cType = chartType();
     const hasColour = !!colourCol();
     const xNumeric = !aggregating() && isNumeric(byKey(xCol())?.sqlType);
     const xName = byKey(xCol())?.col ?? xCol();
     const yName = byKey(yCol())?.col ?? yCol();
-
-    // Split into series by the colour column (one series per distinct value),
-    // or a single series when no colour-by.
-    const bySeries = new Map<string, [unknown, number][]>();
-    for (const r of data) {
-      const key = hasColour ? str(r.c) : "";
-      let arr = bySeries.get(key);
-      if (!arr) {
-        arr = [];
-        bySeries.set(key, arr);
-      }
-      arr.push([cType === "bar" || !xNumeric ? str(r.x) : num(r.x), num(r.y)]);
-    }
-
-    const seriesType = cType === "scatter" ? "scatter" : cType;
-    const series = [...bySeries.entries()].map(([name, pts]) => ({
-      name: name || undefined,
-      type: seriesType,
-      symbolSize: cType === "scatter" ? 8 : undefined,
-      // Perf knobs for big series on weak hardware: `large` batches scatter
-      // points into one buffered draw (vs an animated per-symbol render that
-      // melts an integrated GPU); LTTB down-samples a dense line without
-      // changing its visible shape.
-      ...(cType === "scatter" ? { large: true, largeThreshold: 2000 } : {}),
-      ...(cType === "line" ? { sampling: "lttb" } : {}),
-      data: pts,
-    }));
-
     const catAxis = cType === "bar" || !xNumeric;
+
     // Token-resolved theme (#410): reading chartTokens() here makes this memo
     // rebuild on theme flip, so the canvas repaints with the flipped values.
     const tk = chartTokens();
+    const series = assembleSeries({
+      rows: data,
+      ranked: ranking,
+      chartType: cType,
+      categoricalX: catAxis,
+      palette: tk.palette,
+      other: tk.other,
+    });
     const axisText = { color: tk.fgDim };
     const axisName = { color: tk.fgSoft };
     const axisLine = { lineStyle: { color: tk.line } };
@@ -270,7 +292,9 @@ export const ChartBuilder: Component<{
       // No entry/update animation — on a weak CPU/GPU animating thousands of
       // points (and re-animating on every control tweak) is the jank.
       animation: false,
-      color: tk.palette,
+      // No root `color`. That array is exactly the palette ECharts walks and
+      // wraps around — past its last entry it repaints slot one rather than
+      // failing — so every series carries its own pinned colour instead.
       textStyle: { color: tk.fgSoft, fontFamily: tk.familyUi },
       tooltip: {
         trigger: cType === "bar" ? "axis" : "item",
@@ -437,9 +461,9 @@ export const ChartBuilder: Component<{
           </p>
         }
       >
-        <Show when={Boolean(rows.error)}>
+        <Show when={Boolean(rows.error) || Boolean(ranked.error)}>
           <p class="text-sm text-err">
-            Chart query error: {String(rows.error)}
+            Chart query error: {String(rows.error ?? ranked.error)}
           </p>
         </Show>
         <Show
@@ -447,7 +471,7 @@ export const ChartBuilder: Component<{
           fallback={
             <span class="text-sm text-fg-muted">
               <Show
-                when={rows.loading}
+                when={rows.loading || ranked.loading}
                 fallback="No rows to plot for this selection."
               >
                 <Spinner label="Querying…" />

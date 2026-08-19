@@ -25,11 +25,25 @@
  * Rust anchors slot 1 because it is the one value identical either side of the
  * theme flip, which keeps the charts recognisably this product's.
  *
- * THE CAP IS THREE, NOT FIVE, FOR SOME CHART FORMS. Slots 1-3 are validated on
- * the all-pairs pairlist and are what scatter, bubble and map may use, where any
- * two marks can land side by side. All five are validated adjacent-only and are
- * available to bar and line, where only touching marks need to separate. Beyond
- * five, colour stops being the answer: fold to "Other" or facet.
+ * NOT EVERY CHART FORM MAY SPEND THE WHOLE SEQUENCE. A head of it is validated
+ * on the ALL-PAIRS pairlist, and that head is what scatter, bubble and map may
+ * use, where any two marks can land side by side; the whole sequence is
+ * validated adjacent-only, which is what bar and line need, since only touching
+ * marks there have to separate. Both ceilings are ENFORCED rather than
+ * described (#445), and neither is written here: `chartSlots.ts` beside this
+ * file holds them, the separation gate validates them, and the chart builder
+ * spends against them. A number in this comment would be a fourth copy that
+ * nothing checks.
+ *
+ * `--chart-other` is where everything past the cap goes. It is deliberately NOT
+ * a sixth hue: a fold is the absence of an identity, so it is drawn as a warm
+ * neutral and the gate holds it BELOW the chroma floor the slots must clear —
+ * the one rule in this file that runs the other way. It also has to sit outside
+ * the mode's lightness band, which is not a preference but the only room left:
+ * a neutral seated INSIDE the band differs from a slot in chroma alone, and
+ * chroma alone does not carry the separation floor — the gate asserts both
+ * halves. So it goes dark on the light surface and light on the dark one,
+ * which is also what makes it recede.
  *
  * Re-run the separation gate beside this file after ANY edit here or to the
  * status tokens — the two sets are measured against each other, so a status
@@ -43,6 +57,11 @@
   --chart-3: #7370dc; /* indigo */
   --chart-4: #278a42; /* green */
   --chart-5: #9d358c; /* purple */
+  /* Off the ramp, like `--chip` and for the same reason: the step it wants is
+     not on it. The two nearest are the fg ramp's, and neither will do — the
+     lighter cannot clear the slots at all, and the darker clears the status
+     vocabulary with almost nothing spare. This sits between them. */
+  --chart-other: #3a332f; /* warm neutral — the folded tail, not a category */
 }
 
 .dark {
@@ -50,4 +69,8 @@
      floor at their light values; cyan and indigo do not, and rust never moves. */
   --chart-4: #077831;
   --chart-5: #a33c92;
+  /* The neutral flips end for end rather than moving a step: it earns its
+     distance from the slots by sitting outside the band, so on a near-black
+     canvas it has to be above the band rather than below it. */
+  --chart-other: #dcd2cb;
 }

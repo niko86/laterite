@@ -108,10 +108,24 @@ keeps its referent.
   region, and the best colour-only alternative costs a near-black warning and a
   muddy error. Dark `err`/`accent` would need a brand change to the accent, which
   is a larger call than this decision should force.
-- **The series cap is not implemented.** `chartTheme.ts` hands all five slots to
-  every chart form, so a scatter with four or more series uses a pair validated
-  only for adjacency, and past five ECharts cycles. Both want the same behavioural
-  fix — cap and fold to "Other" — which belongs to the builder.
+- **The series cap is enforced by the builder, and the fold has its own token**
+  (#445). The caps were a comment here and in the token reader until the chart
+  builder was made to spend against them: `repo:web/src/shared/styles/chartSlots.ts`
+  is now the single definition of both — the slot count and the all-pairs head —
+  read by the gate and by `repo:web/src/lib/chartSeries.ts`, the pure module that
+  turns rows into series. Everything past a form's cap folds into one series in
+  `--chart-other`, which is held to the slots' separation floors and to the
+  *inverse* of their chroma rule, because a fold carries no identity to encode.
+  **Colour follows the value's rank, not its series position**, and the rank is a
+  SQL cardinality probe composed from the plot query's own FROM and WHERE — so
+  nothing about the plotted *slice* can repaint a survivor. Composing it from the
+  plot's population is what costs the other half: adding a join that fans base
+  rows out changes the counts, and so can reorder the ranking. That is the trade
+  taken deliberately, because it is what makes "Other" a claim about the delivery
+  the chart draws. The ranking cannot be read off the plotted rows: the scatter
+  query is a bare row `LIMIT` with no `ORDER BY`, so its values are an arbitrary
+  slice and a legend saying "Other" over them would claim more than the sample
+  supports.
 - **It rules out** reintroducing hue angle as a proximity measure, and reusing the
   brand ramp for any categorical channel.
 
@@ -120,5 +134,7 @@ keeps its referent.
 [[dec-landing-build-shared-tokens]] · repo:web/src/shared/styles/charts.css ·
 repo:web/src/shared/styles/colors.css ·
 repo:web/src/shared/styles/separation.test.ts ·
-repo:web/src/shared/styles/contrast.test.ts · repo:web/src/lib/chartTheme.ts ·
+repo:web/src/shared/styles/contrast.test.ts ·
+repo:web/src/shared/styles/chartSlots.ts · repo:web/src/lib/chartTheme.ts ·
+repo:web/src/lib/chartSeries.ts · repo:web/src/components/explore/ChartBuilder.tsx ·
 repo:web/docs-site/docs/stylesheets/laterite.css

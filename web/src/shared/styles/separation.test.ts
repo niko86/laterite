@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { ALL_PAIRS_CAP, SLOT_COUNT } from "./chartSlots";
 
 // The SEPARATION gate over the shared token layer (#434).
 //
@@ -195,12 +196,16 @@ const CHART_SLOTS = Object.keys(block(charts, ROOT))
   .filter((n) => /^chart-\d+$/.test(n))
   .sort((a, b) => Number(a.slice(6)) - Number(b.slice(6)));
 
-/** Slots validated for chart forms where any two marks can sit side by side. */
-const ALL_PAIRS_CAP = 3;
+// The neutral the builder folds the tail into (#445). Not a slot, and the
+// filter above is what keeps it out of the palette rules — it is held to the
+// separation floors like a slot and to the INVERSE of the chroma rule.
+const OTHER_SLOT = "chart-other";
 
 // The dataviz method's own thresholds.
 const BAND = { light: [0.43, 0.77], dark: [0.48, 0.67] } as const;
 const CHROMA_FLOOR = 0.1;
+/** The fold's neutral, held the other way: it must NOT read as a sixth hue. */
+const CHROMA_CEILING = 0.04;
 const CVD_TARGET = 8;
 const NORMAL_FLOOR = 15;
 const MARK_CONTRAST = 3;
@@ -275,6 +280,54 @@ describe.each(Object.entries(themes))("%s — chart tokens", (_n, theme) => {
       ).toBeGreaterThanOrEqual(MARK_CONTRAST);
     }
   });
+
+  // ── the fold's neutral ───────────────────────────────────────────────────
+  //
+  // The tail past the cap is one series, and it sits beside every surviving
+  // one, so it is held to the all-pairs floors — the same test the scatter-safe
+  // head gets, because that is the relation it is in.
+  const other = resolveVar(t, OTHER_SLOT);
+
+  it("separates the fold's neutral from every slot, for every reader", () => {
+    for (const [i, hex] of palette.entries()) {
+      for (const vision of VISIONS) {
+        const floor = vision === "normal" ? NORMAL_FLOOR : CVD_TARGET;
+        expect(
+          deltaE(other, hex, vision),
+          `--${OTHER_SLOT}↔${CHART_SLOTS[i]} under ${vision}`,
+        ).toBeGreaterThanOrEqual(floor);
+      }
+    }
+  });
+
+  // The chroma rule, run backwards. A slot must be chromatic or it reads as
+  // grey; the fold must read AS grey, because it carries no identity to encode.
+  it("keeps the fold's neutral under the chroma floor, so it reads as grey", () => {
+    expect(chroma(other), `--${OTHER_SLOT} ${other}`).toBeLessThan(
+      CHROMA_CEILING,
+    );
+  });
+
+  // The PREMISE the rule above rests on, and the half that can rot silently.
+  // A neutral seated INSIDE the band differs from a slot in chroma alone, and
+  // chroma alone does not carry the floor — so the separation is bought by
+  // sitting outside the band, not by being neutral. Retune it back inside and
+  // the separation test starts failing for a reason its message cannot give.
+  it("seats the fold's neutral outside the mode's lightness band", () => {
+    const [lo, hi] = BAND[mode];
+    const l = lightness(other);
+    expect(
+      l < lo || l > hi,
+      `--${OTHER_SLOT} ${other} sits at L ${l.toFixed(3)}, inside [${lo}, ${hi}] — a neutral in the band cannot clear the slots on chroma alone`,
+    ).toBe(true);
+  });
+
+  it("holds the fold's neutral to the mark-contrast floor on its surface", () => {
+    expect(
+      contrast(other, resolveVar(t, "surface")),
+      `--${OTHER_SLOT} on --surface`,
+    ).toBeGreaterThanOrEqual(MARK_CONTRAST);
+  });
 });
 
 // ── chart tokens against the status vocabulary ─────────────────────────────
@@ -293,7 +346,10 @@ describe.each(Object.entries(themes))(
   "%s — chart vs status",
   (_n, { tokens: t }) => {
     it("keeps every chart slot clear of every status colour", () => {
-      for (const slot of CHART_SLOTS) {
+      // The fold's neutral is in this relation too, and is the one most at
+      // risk of it: a dimmed status token is low-chroma, and two low-chroma
+      // colours have nothing left to separate them once hue is removed.
+      for (const slot of [...CHART_SLOTS, OTHER_SLOT]) {
         for (const status of STATUS) {
           expect(
             worst(resolveVar(t, slot), resolveVar(t, status)),
@@ -549,15 +605,25 @@ describe("the chart fence", () => {
     expect(resolveVar(dark, "chart-1")).toBe(resolveVar(dark, "cta"));
   });
 
+  // The token reader builds its palette by counting rather than by listing
+  // (#445), because the count is also the cap the builder spends against and
+  // one number cannot be two. What a source grep used to assert — that the
+  // reader names the same slots this file declares — is now two claims about
+  // that count: it matches, and the sequence it indexes into has no holes.
   it("keeps chartTheme's palette in step with the tokens", () => {
+    expect(SLOT_COUNT).toBe(CHART_SLOTS.length);
+    expect(CHART_SLOTS).toEqual(
+      Array.from({ length: SLOT_COUNT }, (_, i) => `chart-${i + 1}`),
+    );
+    expect(ALL_PAIRS_CAP).toBeLessThanOrEqual(SLOT_COUNT);
+  });
+
+  it("has the token reader read the fold's neutral by name", () => {
     const source = readFileSync(
       resolve(import.meta.dirname, "../../lib/chartTheme.ts"),
       "utf8",
     );
-    const used = [...source.matchAll(/readVar\("--(chart-\d+)"\)/g)].map(
-      (m) => m[1],
-    );
-    expect(used).toEqual(CHART_SLOTS);
+    expect(source).toContain(`readVar("--${OTHER_SLOT}")`);
   });
 
   it("keeps the chart tokens out of the semantic layer", () => {
