@@ -320,6 +320,58 @@ describe.each(Object.entries(themes))("%s theme — elevation", (_n, t) => {
   });
 });
 
+// ── fills against strokes ──────────────────────────────────────────────────
+//
+// The elevation gate above compares a surface to a surface. A FILL against a
+// STROKE is a different relation, and nothing asserted it: light `--chip` and
+// light `--line` both resolved to `--stone-200`, so a chip drawn as `bg-chip
+// border-line` (FilterBar's inactive filters) had no edge at all — it read as
+// a gap in the border rather than as an object. `--surface-raised` and
+// `--line-subtle` were the same collision one step up: a row ruled with
+// `border-line-subtle` lost that rule under `hover:bg-surface-raised` (#446).
+//
+// The fills here are the SURFACES — the grounds a container is made of, the
+// same set contrast.test.ts holds the fg ramp against. The `*-quiet` washes
+// are fills too, but they are not in this relation: each is drawn with a
+// border in its OWN status hue (`border-warn/45 bg-warn-quiet`), never against
+// the neutral stroke vocabulary.
+//
+// ΔL is the measure for the reason the elevation gate gives — these are all
+// cut from one warm-neutral ramp, so lightness is the only channel separating
+// any two of them and a hue-blind reader loses nothing.
+//
+// The floor is HALF the elevation step, and that is what the band can hold
+// rather than a considered relaxation. Light `--chip` is fenced above by
+// `--line` and below by contrast.test.ts's floor for `--fg-dim` sitting on it;
+// what is left between `--surface-raised` and the darkest legal chip has to
+// seat two rules as well, and the light neutrals are packed evenly into it
+// with nothing spare. A retune that wants a wider step has to move
+// `--surface-raised` or `--fg-dim` first.
+const FILLS = [
+  "canvas",
+  "surface",
+  "surface-raised",
+  "surface-code",
+  "chip",
+] as const;
+const STROKES = ["line", "line-subtle", "line-strong"] as const;
+const EDGE_FLOOR = 0.01;
+
+describe.each(Object.entries(themes))("%s theme — fill vs stroke", (_n, t) => {
+  it("gives every fill an edge against every stroke", () => {
+    for (const fill of FILLS) {
+      for (const stroke of STROKES) {
+        expect(
+          Math.abs(
+            lightness(resolveVar(t, fill)) - lightness(resolveVar(t, stroke)),
+          ),
+          `--${fill} vs --${stroke}`,
+        ).toBeGreaterThanOrEqual(EDGE_FLOOR);
+      }
+    }
+  });
+});
+
 // ── the code surface ───────────────────────────────────────────────────────
 //
 // The docs map syntax highlighting onto the status and accent tokens
