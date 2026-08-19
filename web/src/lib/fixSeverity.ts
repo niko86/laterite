@@ -23,11 +23,12 @@ export interface SevIndex {
   byRule: Map<string, Severity>;
 }
 
-/** `undefined` when there is NO report to join against — distinct from a report
- *  that simply doesn't mention a given rule. Keeping the two apart is the whole
- *  of #412: an empty index answers every lookup with the `"warning"` default
- *  below, which is a defensible guess about a rule the validator didn't flag
- *  and a fabrication about a validator that never ran. */
+/** `undefined` when there is NO report to join against, as opposed to a report
+ *  that ran and doesn't mention a given rule. #412 split the two because they
+ *  answered differently; after #430 they answer the same, so the split now buys
+ *  only that a caller CAN tell them apart — the badge doesn't. Kept because the
+ *  question "was there a report at all" is the pane's, and reducing it to an
+ *  empty map would leave nowhere to ask it. */
 export function buildSevIndex(
   report: ValidationReport | undefined,
 ): SevIndex | undefined {
@@ -48,15 +49,25 @@ export function buildSevIndex(
   return { byRuleLine, byRule };
 }
 
-/** The severity of the finding this fix resolves, or `undefined` when there is
- *  no report to resolve it against — the fix is real, its label is not known.
+/** The severity of the finding this fix resolves, or `undefined` when no label
+ *  is known — the fix is real either way.
  *
- *  The `?? "warning"` below is NOT that case: it answers for a rule the report
- *  ran and didn't raise. It survives #412 deliberately, but it is the same
- *  shape `severityOf` warns about, so if it ever turns out that a fix whose
- *  rule the validator never flagged is an ENGINE disagreement rather than a
- *  benign gap, this is the one line to change — the two absences no longer
- *  share a return value. */
+ *  THREE states share that `undefined`, and the badge cannot tell them apart:
+ *  the labelling `validate` is still in flight (the ordinary case on every
+ *  file, for as long as that second pass takes); it never answered at all
+ *  (#412); or the report ran and never raised the fix's rule. Only the third
+ *  would be interesting, and it cannot happen — every fixer in `compute_fixes`
+ *  is gated on its numbered rule being a key of the findings it was handed and
+ *  stamps that same key as the fix's `rule`, and those findings come from the
+ *  same door, bytes, dictionary and encoding as this report, which is
+ *  FYI-inclusive and, the part this join leans on, UNCAPPED: a capped report
+ *  can serialise a rule with zero items, and an empty group puts nothing in the
+ *  index.
+ *
+ *  So the argument for `undefined` over the `"warning"` this used to return
+ *  (#430) is not that it diagnoses the impossible state — it can't, it's the
+ *  same chip the loading beat draws — but that a fabricated tier is
+ *  indistinguishable from a real one, while a missing label is merely quiet. */
 export function fixSeverity(
   idx: SevIndex | undefined,
   f: Fix,
@@ -67,5 +78,5 @@ export function fixSeverity(
     const s = idx.byRuleLine.get(`${f.rule}|${ln}`);
     if (s) return s;
   }
-  return idx.byRule.get(f.rule) ?? "warning";
+  return idx.byRule.get(f.rule);
 }

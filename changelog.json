@@ -6,7 +6,14 @@
   "unreleased": {
     "summary": "",
     "added": [],
-    "changed": [],
+    "changed": [
+      {
+        "text": "**A fix whose rule the validator never raised is now badged `unlabelled`, not `warning`.** The Fix tab labels each proposed fix with the severity of the finding it resolves, joining on rule and line against a parallel FYI-inclusive, uncapped report. One arm of that join still answered `warning`: the report never raised the fix's rule at all. It was kept on the theory that it covered a benign gap — a fixer repairing something the validator files under a different rule name — and it covers nothing. Every fixer is gated on its numbered rule being a key of the findings it was handed and stamps that same key onto the fix it emits, and those findings come from the same door, bytes, dictionary and encoding as the report beside them, which additionally carries the warning tier the fix pass leaves off. The state is unreachable, and the point of answering `undefined` for it is not that the badge then diagnoses anything — `unlabelled` is also what every fix wears for the beat before the labelling report lands, so it cannot single the impossible case out — but that an invented tier is indistinguishable from a real one, where a missing label is merely quiet. Nothing changes for a fix whose rule the report did raise, which — across the private corpus, the repo's own fixtures and synthetic files covering every fixable rule and every fix kind — is every fix either can produce.",
+        "issues": [
+          430
+        ]
+      }
+    ],
     "deprecated": [],
     "removed": [],
     "fixed": [
