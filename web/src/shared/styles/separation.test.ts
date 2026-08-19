@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 // The SEPARATION gate over the shared token layer (#434).
@@ -45,8 +45,12 @@ function block(css: string, selector: RegExp): Record<string, string> {
 
 const colors = read("./colors.css");
 const charts = read("./charts.css");
+const landing = read("../../../landing/landing.css");
 const ROOT = /:root\s*\{([\s\S]*?)\n\}/;
 const DARK = /\.dark\s*\{([\s\S]*?)\n\}/;
+// A light-only retune has to say so in its SELECTOR — colors.css's dark block
+// explains why a bare `:root` would beat the shared dark set on source order.
+const LIGHT_ONLY = /:root:not\(\.dark\)\s*\{([\s\S]*?)\n\}/;
 
 const light = { ...block(colors, ROOT), ...block(charts, ROOT) };
 const dark = {
@@ -54,8 +58,48 @@ const dark = {
   ...block(colors, DARK),
   ...block(charts, DARK),
 };
-const themes = { light, dark } as const;
 type Tokens = Record<string, string>;
+
+// The RENDERED themes, not the authored ones (#452).
+//
+// colors.css names `--canvas` as the one token a surface is expected to retune,
+// and the landing page takes that offer — so the light set above is not what
+// laterite.dev paints, and none of the rules below had ever been evaluated
+// against the palette it does. The elevation ladder is what that hid: the
+// landing's canvas and `--surface-raised` were one value, so a panel drawn
+// `border-line bg-surface-raised` had no fill of its own at all.
+//
+// The overlay order is the cascade's, not a convenience: the landing's blocks
+// are imported AFTER colors.css, so its bare `:root` outranks the shared `.dark`
+// (the two tie on specificity), and its `:root:not(.dark)` outranks its own
+// `:root` on specificity.
+//
+// `mode` rather than the set's name is what the two calibrated tables below key
+// on — the chart lightness band and the accepted-pair ratchet are properties of
+// the theme a surface renders IN, not of the surface.
+//
+// `forgone` is the other thing a retune can produce: a rung the surface no
+// longer HAS. The landing's canvas lands on `--surface-raised`'s own value, so
+// in light the two are one colour and "raised" is not a step that exists there.
+// Dropping it from the ladder is only honest because "the landing never fills
+// with it in light" is itself asserted — see the elevation section.
+type Mode = "light" | "dark";
+type Theme = { mode: Mode; tokens: Tokens; forgone: readonly string[] };
+const landingRoot = block(landing, ROOT);
+const themes: Record<string, Theme> = {
+  light: { mode: "light", tokens: light, forgone: [] },
+  dark: { mode: "dark", tokens: dark, forgone: [] },
+  "landing light": {
+    mode: "light",
+    tokens: { ...light, ...landingRoot, ...block(landing, LIGHT_ONLY) },
+    forgone: ["surface-raised"],
+  },
+  "landing dark": {
+    mode: "dark",
+    tokens: { ...dark, ...landingRoot, ...block(landing, DARK) },
+    forgone: [],
+  },
+};
 
 function resolveVar(tokens: Tokens, name: string): string {
   let value = tokens[name];
@@ -171,8 +215,8 @@ const pairs = (n: number, all: boolean): [number, number][] => {
   return out;
 };
 
-describe.each(Object.entries(themes))("%s theme — chart tokens", (name, t) => {
-  const mode = name as keyof typeof BAND;
+describe.each(Object.entries(themes))("%s — chart tokens", (_n, theme) => {
+  const { mode, tokens: t } = theme;
   const palette = CHART_SLOTS.map((slot) => resolveVar(t, slot));
 
   it("seats every slot inside the mode's lightness band", () => {
@@ -245,18 +289,21 @@ describe.each(Object.entries(themes))("%s theme — chart tokens", (name, t) => 
 const STATUS = ["ok", "warn", "err", "info"] as const;
 const STATUS_FLOOR = 6;
 
-describe.each(Object.entries(themes))("%s theme — chart vs status", (_n, t) => {
-  it("keeps every chart slot clear of every status colour", () => {
-    for (const slot of CHART_SLOTS) {
-      for (const status of STATUS) {
-        expect(
-          worst(resolveVar(t, slot), resolveVar(t, status)),
-          `--${slot} vs --${status}`,
-        ).toBeGreaterThanOrEqual(STATUS_FLOOR);
+describe.each(Object.entries(themes))(
+  "%s — chart vs status",
+  (_n, { tokens: t }) => {
+    it("keeps every chart slot clear of every status colour", () => {
+      for (const slot of CHART_SLOTS) {
+        for (const status of STATUS) {
+          expect(
+            worst(resolveVar(t, slot), resolveVar(t, status)),
+            `--${slot} vs --${status}`,
+          ).toBeGreaterThanOrEqual(STATUS_FLOOR);
+        }
       }
-    }
-  });
-});
+    });
+  },
+);
 
 // ── the semantic layer against itself ──────────────────────────────────────
 //
@@ -279,15 +326,15 @@ const ACCEPTED: Record<string, number> = {
 };
 
 describe.each(Object.entries(themes))(
-  "%s theme — semantic layer",
-  (name, t) => {
+  "%s — semantic layer",
+  (_n, { mode, tokens: t }) => {
     it("separates meaning-carrying colours, or records why not", () => {
       for (let i = 0; i < MEANING.length; i++) {
         for (let j = i + 1; j < MEANING.length; j++) {
           const a = MEANING[i] as string;
           const b = MEANING[j] as string;
           const measured = worst(resolveVar(t, a), resolveVar(t, b));
-          const accepted = ACCEPTED[`${name} ${a}/${b}`];
+          const accepted = ACCEPTED[`${mode} ${a}/${b}`];
           // An accepted pair is a ratchet, not an exemption: it may not get worse.
           const floor = accepted ?? MEANING_FLOOR;
           expect(measured, `--${a} vs --${b}`).toBeGreaterThanOrEqual(floor);
@@ -305,18 +352,78 @@ describe.each(Object.entries(themes))(
 const LADDER = ["canvas", "surface", "surface-raised", "chip"] as const;
 const STEP_FLOOR = 0.02;
 
-describe.each(Object.entries(themes))("%s theme — elevation", (_n, t) => {
-  it("keeps every surface a visible step from every other", () => {
-    for (let i = 0; i < LADDER.length; i++) {
-      for (let j = i + 1; j < LADDER.length; j++) {
-        const a = LADDER[i] as string;
-        const b = LADDER[j] as string;
-        expect(
-          Math.abs(lightness(resolveVar(t, a)) - lightness(resolveVar(t, b))),
-          `--${a} vs --${b}`,
-        ).toBeGreaterThanOrEqual(STEP_FLOOR);
+describe.each(Object.entries(themes))(
+  "%s — elevation",
+  (_n, { tokens: t, forgone }) => {
+    it("keeps every surface a visible step from every other", () => {
+      const rungs = LADDER.filter((rung) => !forgone.includes(rung));
+      for (let i = 0; i < rungs.length; i++) {
+        for (let j = i + 1; j < rungs.length; j++) {
+          const a = rungs[i] as string;
+          const b = rungs[j] as string;
+          expect(
+            Math.abs(lightness(resolveVar(t, a)) - lightness(resolveVar(t, b))),
+            `--${a} vs --${b}`,
+          ).toBeGreaterThanOrEqual(STEP_FLOOR);
+        }
       }
-    }
+    });
+  },
+);
+
+// A forgone rung is a CLAIM about markup, and this is what holds it (#452).
+//
+// The landing's light canvas is `--surface-raised`'s own value, so a panel
+// drawn `bg-surface-raised` there has no fill at all — RowCarousel's tray and
+// FileAndFindings' note were exactly that, visible only by their border, on the
+// page with the most first-time readers. Dropping the rung above records that
+// the step does not exist; without this, nothing stops the next component
+// reaching for it and the record becomes prose.
+//
+// Behind `dark:` is fine and is the established pairing on this page
+// (GroupTable's card): the dark ladder has the room the light one does not.
+//
+// WHAT THIS DOES NOT COVER: a SHARED component that fills with it and is
+// rendered here — `Chip`'s neutral and muted forms do, and so does `Input`.
+// The landing imports `Button` and `ThemeToggle` and nothing else, so scanning
+// its own tree is the whole of its markup today; importing one of those would
+// walk straight past this.
+const LANDING_DIR = resolve(import.meta.dirname, "../../../landing");
+const landingSources = readdirSync(LANDING_DIR, {
+  recursive: true,
+  encoding: "utf8",
+})
+  // `.ts` as well as `.tsx`: this codebase does keep class strings in plain
+  // modules (`src/lib/controls.ts`). Test files are skipped for the reason
+  // landing.css already `@source not`s them — a class named there never ships.
+  .filter(
+    (f) =>
+      /\.(tsx?|css)$/.test(f) &&
+      !/\.test\.tsx?$/.test(f) &&
+      !f.startsWith("dist") &&
+      !f.includes("node_modules"),
+  )
+  .map((f) => [f, readFileSync(resolve(LANDING_DIR, f), "utf8")] as const);
+
+describe("the landing's forgone rung", () => {
+  // The positive control. The case below asserts an ABSENCE, which a scan that
+  // reads nothing — or a pattern that matches nothing — produces just as well.
+  it("reads the landing's markup, and the pattern matches", () => {
+    expect(landingSources.length).toBeGreaterThan(5);
+    const guarded = landingSources.flatMap(([, src]) => [
+      ...src.matchAll(/dark:bg-surface-raised\b/g),
+    ]);
+    expect(guarded.length).toBeGreaterThan(0);
+  });
+
+  it("never fills with --surface-raised except behind dark:", () => {
+    const offenders = landingSources
+      .filter(([, src]) => /(?<!dark:)\bbg-surface-raised\b/.test(src))
+      .map(([file]) => file);
+    expect(
+      offenders,
+      "the landing's light canvas IS --surface-raised, so this fill is invisible there — use bg-surface to lift or bg-chip to recess, and keep the raised step behind dark:",
+    ).toEqual([]);
   });
 });
 
@@ -357,20 +464,23 @@ const FILLS = [
 const STROKES = ["line", "line-subtle", "line-strong"] as const;
 const EDGE_FLOOR = 0.01;
 
-describe.each(Object.entries(themes))("%s theme — fill vs stroke", (_n, t) => {
-  it("gives every fill an edge against every stroke", () => {
-    for (const fill of FILLS) {
-      for (const stroke of STROKES) {
-        expect(
-          Math.abs(
-            lightness(resolveVar(t, fill)) - lightness(resolveVar(t, stroke)),
-          ),
-          `--${fill} vs --${stroke}`,
-        ).toBeGreaterThanOrEqual(EDGE_FLOOR);
+describe.each(Object.entries(themes))(
+  "%s — fill vs stroke",
+  (_n, { tokens: t, forgone }) => {
+    it("gives every fill an edge against every stroke", () => {
+      for (const fill of FILLS.filter((f) => !forgone.includes(f))) {
+        for (const stroke of STROKES) {
+          expect(
+            Math.abs(
+              lightness(resolveVar(t, fill)) - lightness(resolveVar(t, stroke)),
+            ),
+            `--${fill} vs --${stroke}`,
+          ).toBeGreaterThanOrEqual(EDGE_FLOOR);
+        }
       }
-    }
-  });
-});
+    });
+  },
+);
 
 // ── the code surface ───────────────────────────────────────────────────────
 //
@@ -378,16 +488,19 @@ describe.each(Object.entries(themes))("%s theme — fill vs stroke", (_n, t) => 
 // (--md-code-hl-* in docs-site/docs/stylesheets/laterite.css), which puts them
 // on `--surface-code`. contrast.test.ts checks those colours against canvas,
 // surface and their own wash — never against the surface they actually sit on.
-describe.each(Object.entries(themes))("%s theme — code surface", (_n, t) => {
-  it("holds the syntax colours to AA on the surface they sit on", () => {
-    for (const token of [...STATUS, "accent"]) {
-      expect(
-        contrast(resolveVar(t, token), resolveVar(t, "surface-code")),
-        `--${token} on --surface-code`,
-      ).toBeGreaterThanOrEqual(4.5);
-    }
-  });
-});
+describe.each(Object.entries(themes))(
+  "%s — code surface",
+  (_n, { tokens: t }) => {
+    it("holds the syntax colours to AA on the surface they sit on", () => {
+      for (const token of [...STATUS, "accent"]) {
+        expect(
+          contrast(resolveVar(t, token), resolveVar(t, "surface-code")),
+          `--${token} on --surface-code`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+  },
+);
 
 // ── the fence ──────────────────────────────────────────────────────────────
 describe("the chart fence", () => {

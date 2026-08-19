@@ -79,7 +79,15 @@ export const RowCarousel: Component<{
 
   return (
     <div
-      class="mt-4 rounded-lg border border-line bg-surface-raised p-4"
+      /* The raised step was the landing's canvas EXACTLY — this page retunes
+         `--canvas` onto `--surface-raised`'s own value — so the tray had no
+         fill of its own and read as bare page inside a border (#452). It
+         RECESSES rather than lifting, unlike GroupTable's card above: it holds
+         field cards filled with `--surface`, and a tray that lifted to meet
+         them would swallow them. Dark keeps the raised step, which is the half
+         of the ladder that has the room. Naming the utility rather than the
+         token here would re-emit it into this bundle (#437). */
+      class="mt-4 rounded-lg border border-line bg-chip p-4 dark:bg-surface-raised"
       style={{ "--band": `var(${props.band})` }}
       role="group"
       aria-label={`Editing row ${props.row + 1} of ${props.schema.code}`}

@@ -116,7 +116,13 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
       </div>
 
       <Show when={fixNote()}>
-        <p class="mt-3 max-w-[70ch] rounded-md border border-line bg-surface-raised px-3 py-2 text-caption text-fg-soft">
+        <p
+          /* The raised step was the landing's canvas exactly (#452), so this
+             note read as bare page inside a border. GroupTable's pairing, for
+             the same reason: the `--surface` fill in light, the raised step in
+             dark. */
+          class="mt-3 max-w-[70ch] rounded-md border border-line bg-surface px-3 py-2 text-caption text-fg-soft dark:bg-surface-raised"
+        >
           {fixNote()} The orphaned <code class="font-mono">LLPL</code> row is
           left standing on purpose: the engine can tell you a lab result points
           at a sample that does not exist, but only a human knows whether the

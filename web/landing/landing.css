@@ -21,6 +21,18 @@
 @source not "./**/*.test.ts";
 @source not "../src/**/*.test.ts";
 
+/* Class-toggled dark mode, exactly as the app's entry declares it (#452).
+   Without this, Tailwind's DEFAULT `dark:` applies — `prefers-color-scheme` —
+   while this page's theme is `.dark` on <html> from the persisted-else-system
+   choice. The two disagree the moment a reader's OS and choice differ: on a
+   dark-mode machine viewing the page in light, every `dark:` utility fired
+   with the LIGHT token values, so GroupTable's card painted `--surface-raised`
+   — which on this surface IS the canvas, leaving the demo table with no fill
+   at all. It rendered correctly only for the readers whose OS already agreed.
+   `dark:` is not a per-entry choice: it means the same thing on both bundles
+   or it means nothing. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* The one token this surface retunes. The docs read long-form on the lighter
    --stone-100; the landing page takes the step below it so cards lift harder
    against it (see the shared colors.css). Light-only BY SELECTOR: this rule
