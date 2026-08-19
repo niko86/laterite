@@ -60,12 +60,18 @@ only thing that shows the claim is not stale:
   #313 (five filters)   1453 paths x 40 patterns = 58120 pairs, exact agreement
                         — `prose` joined for the cadence gate
   #313 (now gated)      1653 paths x 42 patterns = 69426 pairs, exact agreement
-                        — two patterns had landed unre-run; the count is
-                          asserted below now, so a third cannot. Agreement is
-                          under picomatch's `dot: true`, which is what
-                          dorny/paths-filter matches with — at the default the
-                          two part company on 32 dotfile pairs, all of the
-                          `rust-packages/** vs .../.gitignore` shape.
+                        — two patterns had landed unre-run. That run held under
+                          picomatch's `dot: true`, which is what
+                          dorny/paths-filter matches with; at the default the
+                          two parted company on 32 dotfile pairs, every one of
+                          the `rust-packages/** vs .../.gitignore` shape.
+
+Only the PATTERN COUNT in the newest entry is gated, by
+`test_cross_check_series_is_current`. The path count and the pair total are
+log, not assertion — the path count moves with every file added to the repo,
+and gating it would demand a re-run, needing `web/node_modules`, on commits
+that cannot have changed the answer. So the entries above are history and the
+count is the one thing kept honest about the present.
 """
 
 from __future__ import annotations
@@ -326,19 +332,21 @@ def test_buildless_ssots_need_no_heavy_job(
 # --- the wiring, one layer below the patterns ---------------------------------
 #
 # Everything above guards the PATTERNS. Nothing guarded what carries their
-# result to the jobs, and that path has three hops, each of which fails the
-# same silent way — an unresolved GitHub expression is the empty string, the
-# condition is false, and the job simply never runs. #207 with green tests.
+# result to the jobs, and every hop on that path fails the same silent way —
+# an unresolved GitHub expression is the empty string, the condition is false,
+# and the job simply never runs. #207 with green tests.
 #
 #   filters block   `code:` …            the pattern lists above
 #         |         changes.outputs.code: ${{ steps.filter.outputs.code }}
-#         v         `if: needs.changes.outputs.code == 'true'`
+#         v         `if: needs.changes.outputs.code == 'true'`   + needs: changes
 #   the job
 #
 # The middle hop is why these tests read the mapping rather than the filter
 # names directly: an `if:` that names a declared OUTPUT proves nothing if that
 # output is wired to a filter that does not exist. Checking the ends without
-# the middle would report green on exactly the typo it exists to catch.
+# the middle would report green on exactly the typo it exists to catch. The
+# `needs:` edge is a fourth way to reach the same skip, off the value path
+# rather than on it, and is checked last below.
 #
 # Deliberately NOT a job-to-paths model — that would reproduce the declaration
 # one layer up and need its own test to police it. See the derivation note in
@@ -360,15 +368,41 @@ def declared(workflow: dict) -> dict[str, str]:
     return outputs
 
 
-def test_consumed_outputs_are_declared(declared: dict[str, str]) -> None:
-    """Every `needs.changes.outputs.X` names an output `changes` publishes.
+@pytest.fixture(scope="module")
+def mentioned() -> set[str]:
+    """Outputs named anywhere in the raw file, comments included.
 
-    The whole raw file is scanned rather than the job `if:` keys, so a
-    reference from a step-level `if:` or an `env:` is held to the same rule.
+    The permissive end. Used only where a SUPERSET is the safe direction: for
+    "is this reference declared?", reading prose too can raise a false alarm
+    but cannot miss a real one.
     """
-    consumed = set(OUTPUT_REF.findall(CI.read_text(encoding="utf-8")))
-    assert consumed, "nothing consumes the filter outputs — the scan found none"
-    undeclared = sorted(consumed - set(declared))
+    return set(OUTPUT_REF.findall(CI.read_text(encoding="utf-8")))
+
+
+@pytest.fixture(scope="module")
+def consumed(workflow: dict) -> set[str]:
+    """Outputs read by a real condition — job `if:` or step `if:`, nothing else.
+
+    The strict end, and it has to be strict: "is this output read by anybody?"
+    asserts an ABSENCE, and a scan that counts a mention in a YAML comment or a
+    commented-out job would let a dead output pass the one check that exists to
+    find it. Same trap as any gate whose input is wider than its claim (#295).
+    """
+    out: set[str] = set()
+    for job in workflow["jobs"].values():
+        conditions = [job.get("if", "")]
+        conditions += [step.get("if", "") for step in job.get("steps") or []]
+        for condition in conditions:
+            out.update(OUTPUT_REF.findall(str(condition)))
+    return out
+
+
+def test_consumed_outputs_are_declared(
+    declared: dict[str, str], mentioned: set[str]
+) -> None:
+    """Every `needs.changes.outputs.X` names an output `changes` publishes."""
+    assert mentioned, "nothing references the filter outputs — the scan found none"
+    undeclared = sorted(mentioned - set(declared))
     assert not undeclared, (
         f"these are read but never published by `changes`: {undeclared}. Each "
         "resolves to the empty string, so its condition is false and the job "
@@ -376,18 +410,47 @@ def test_consumed_outputs_are_declared(declared: dict[str, str]) -> None:
     )
 
 
-def test_declared_outputs_are_consumed(declared: dict[str, str]) -> None:
+def test_declared_outputs_are_consumed(
+    declared: dict[str, str], consumed: set[str]
+) -> None:
     """...and nothing is published that no job reads.
 
     The other direction, and the cheaper failure: a dead output is a filter
     someone believed was gating something. It costs nothing at runtime, which
     is exactly why it survives.
     """
-    consumed = set(OUTPUT_REF.findall(CI.read_text(encoding="utf-8")))
     unread = sorted(set(declared) - consumed)
     assert not unread, (
-        f"these outputs are published and read by nobody: {unread}. Either a "
-        "job lost its `if:`, or the filter is no longer earning its place"
+        f"these outputs are published and read by no job's `if:`: {unread}. "
+        "Either a job lost its condition, or the filter is no longer earning "
+        "its place"
+    )
+
+
+def test_consumers_declare_the_dependency(workflow: dict) -> None:
+    """A job reading the outputs must also `needs: changes`.
+
+    The fourth hop, and the one that looks least like a bug: the `if:` is
+    spelled correctly, the output exists and is wired to a real filter — but
+    without the dependency GitHub has nothing to substitute, so the expression
+    is the empty string and the job never runs. #207 again, reached by a route
+    none of the three checks above can see.
+    """
+    missing = []
+    for name, job in workflow["jobs"].items():
+        reads = OUTPUT_REF.findall(str(job.get("if", "")))
+        reads += [
+            ref
+            for step in job.get("steps") or []
+            for ref in OUTPUT_REF.findall(str(step.get("if", "")))
+        ]
+        needs = job.get("needs") or []
+        needs = [needs] if isinstance(needs, str) else needs
+        if reads and "changes" not in needs:
+            missing.append(name)
+    assert not missing, (
+        f"these jobs read `needs.changes.outputs.*` without `needs: changes`: "
+        f"{missing}. The reference resolves to nothing and the job is skipped"
     )
 
 
