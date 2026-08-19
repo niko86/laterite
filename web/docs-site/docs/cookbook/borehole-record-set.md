@@ -19,10 +19,10 @@ single borehole's whole story, not one group at a time.
     --8<-- "python/ex03_at_fanout_groups.out"
     ```
 
-    `.at("LOCA", ["BH01", "BH02"])` walks the dictionary's parent graph down from
-    `LOCA` and keeps only the groups that actually carry rows for those locations.
-    `q.groups` is the manifest — `LOCA` itself, `SAMP` (samples), `LLPL` (Atterberg
-    limits) — so you know what's coming before you materialise anything.
+    `.at("LOCA", ["BH01", "BH02"])` filters on the `LOCA_ID` key column, and
+    `q.groups` lists every group in the file that carries it — `LOCA` itself,
+    `SAMP` (samples), `LLPL` (Atterberg limits) — so you know what's coming before
+    you materialise anything.
 
     Then call `.frames()` to materialise the record set as `{group_code: frame}`:
 

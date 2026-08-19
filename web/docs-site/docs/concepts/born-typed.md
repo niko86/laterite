@@ -15,8 +15,8 @@ guessing.
 
 The `2DP` columns (`LOCA_NATE`, `LOCA_GL`) come back as `Float64`; the `ID`
 column (`LOCA_ID`) stays `String`. The mapping follows the `TYPE` row — a `DT`
-heading like `TRAN_DATE` reads as `Datetime(time_unit='us')` (LOCA has no `DT`
-column, so it doesn't appear here).
+heading like `TRAN_DATE` reads as `Datetime(time_unit='us')` (this file's `LOCA`
+carries no `DT` column, so it doesn't appear here).
 
 !!! note "Why it matters"
     A born-typed frame means arithmetic, sorting, and joins just work. Add a
