@@ -1,6 +1,6 @@
-//! `duckdb-parse-check` (#458) — the duckdb surface's *read/parse-agreement* leg.
+//! `duckdb-parse-check` (laterite-dev#458) — the duckdb surface's *read/parse-agreement* leg.
 //!
-//! The `laterite_ags4` DuckDB extension became a read-only reader in #446
+//! The `laterite_ags4` DuckDB extension became a read-only reader in laterite-dev#446
 //! (`validate_ags`/`certify_ags` removed), so it can no longer take part in the
 //! cross-surface *findings*-agreement harness (`laterite-ags4-compliance`). This bin
 //! instead checks the thing the extension actually does: does its `read_ags()`
@@ -261,7 +261,7 @@ fn main() {
     });
 
     let ver = duck.version.as_deref().unwrap_or("?");
-    println!("# duckdb read/parse agreement (#458) — extension v{ver}\n");
+    println!("# duckdb read/parse agreement (laterite-dev#458) — extension v{ver}\n");
     println!("fixtures checked: {}", duck.parses.len());
     println!(
         "registry groups agreeing: {}/{}",

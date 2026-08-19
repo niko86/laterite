@@ -25,8 +25,9 @@ import { fixHighlight } from "../../lib/fixpreview";
 // not copied, so the two cannot drift. Until #412 these were three tints of one
 // form here, so the tiers were told apart by colour ALONE, while the findings
 // list next door had already moved to form (#404). `unlabelled` is the fourth
-// state: no report to join against, so no severity is known — see
-// lib/fixSeverity for why that is distinct from a rule the report didn't raise.
+// state: no severity is known — the labelling report is in flight, or never
+// answered (#412), or (unreachable, #430) ran without raising the fix's rule.
+// One chip for all three; see lib/fixSeverity for why none of them is guessed.
 const chipFor = (
   s: Severity | undefined,
 ): { tone: ChipTone; variant: ChipVariant } =>
@@ -193,9 +194,9 @@ export const FixesPanel: Component<{
   aligned?: () => boolean;
   /** Optional: the severity of the finding each fix resolves → renders a badge
    *  so it's clear a fix touches an FYI-only finding (hidden on Validate).
-   *  Returns `undefined` when the resolver has no report to join against — the
-   *  fix stands, its label doesn't, and the badge says so rather than guessing
-   *  (#412). */
+   *  Returns `undefined` whenever no label is known — no report yet, no report
+   *  at all (#412), or a rule the report never raised (#430). The fix stands,
+   *  its label doesn't, and the badge says so rather than guessing. */
   severityOf?: (f: Fix) => Severity | undefined;
 }> = (props) => {
   const lines = createMemo(() => props.text().split(/\r?\n/));
