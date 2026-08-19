@@ -25,6 +25,12 @@ from pathlib import Path
 
 import pytest
 
+# Needs the built surfaces: this module executes the docs example scripts, which import `laterite`. The buildless
+# `repo-gates` job deselects it; the `python` job runs it after the wheel
+# and the CLI exist.
+pytestmark = pytest.mark.needs_env
+
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_DIR = REPO_ROOT / "web" / "docs-site" / "examples" / "python"
 

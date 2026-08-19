@@ -178,9 +178,10 @@ def test_code_is_false_for_irrelevant_paths(
         "pyproject.toml",
         "uv.lock",
         ".github/workflows/ci.yml",
-        # SSOTs whose drift gates run as steps in the python job.
-        "changelog.json",
-        "observations.json",
+        # SSOTs whose gates still run in a heavy job: modality.json is read by
+        # test_modality_parity in packages/laterite/tests, and the census gate
+        # needs the built launchers. `changelog.json` and `observations.json`
+        # are NOT here any more — see test_buildless_ssots_need_no_heavy_job.
         "modality.json",
         "surface-census.json",
         # Tooling those gates execute.
@@ -198,12 +199,76 @@ def test_code_is_true_for_gate_inputs(filters: dict[str, list[str]], path: str) 
     )
 
 
+# --- gates that moved to the unconditional job -------------------------------
+#
+# #207's lesson was that a gate must fire by DECLARATION, not by accident. An
+# unconditional job satisfies that more strongly than any path list can: there
+# is no condition to get wrong. These two tests are what make that claim
+# checkable rather than a comment — the first proves the job really has no
+# filter, the second proves the narrowing it paid for actually happened.
+
+BUILDLESS_SSOTS = [
+    "changelog.json",
+    "CHANGELOG.md",
+    "observations.json",
+    "OBSERVATIONS.md",
+    "web/docs-site/docs/reference/divergences.md",
+    "web/docs-site/docs/stylesheets/laterite.css",
+    "RELEASING.md",
+    "CONTRIBUTING.md",
+]
+
+
+def test_repo_gates_is_unconditional() -> None:
+    """The buildless job must have no `if:` and no `needs:`.
+
+    Everything below rests on this. The moment `repo-gates` acquires a path
+    filter, every SSOT this commit removed from `code` becomes an undeclared
+    input to a gate that can be skipped — which is #207 exactly, reintroduced
+    by a change that would look like a tidy-up.
+    """
+    workflow = yaml.safe_load(CI.read_text(encoding="utf-8"))
+    job = workflow["jobs"].get("repo-gates")
+    assert job is not None, "the `repo-gates` job is gone; the SSOT gates with it"
+    assert "if" not in job, (
+        "`repo-gates` has grown an `if:`. Either drop it, or put the SSOT paths "
+        "back in `code` — they cannot be undeclared AND skippable."
+    )
+    assert "needs" not in job, (
+        "`repo-gates` now depends on another job, so a failure upstream skips "
+        "the SSOT gates entirely. Same bargain as the `if:` above."
+    )
+
+
+@pytest.mark.parametrize("path", BUILDLESS_SSOTS)
+def test_buildless_ssots_need_no_heavy_job(
+    filters: dict[str, list[str]], path: str
+) -> None:
+    """...and the point of it: these no longer buy a wheel build.
+
+    Guarded rather than merely done, because the natural repair for "did my
+    gate run?" is to add the path back here, which silently restores the
+    two-minute wait this split removed.
+    """
+    assert not _filter_matches(filters["code"], path), (
+        f"{path} fires the heavy jobs again, but its gate runs in `repo-gates`, "
+        "which already runs unconditionally — the wheel build buys nothing"
+    )
+
+
 # --- the audit, made permanent ------------------------------------------------
 
 
 def test_every_linted_file_fires_code(filters: dict[str, list[str]]) -> None:
-    """`ruff check .` and `ruff format --check .` are steps in the `python` job,
-    and they lint the whole repo — not just the paths `code` happens to list.
+    """Every linted file must still fire a job that can catch a lint failure.
+
+    `ruff check .` and `ruff format --check .` moved to `repo-gates`, which runs
+    unconditionally — so strictly this can no longer fail for the reason it was
+    written. It is kept, retargeted, because `tools/**` remains in `code` for a
+    different and still-live reason: heavy gates EXECUTE those scripts
+    (gen_census, wheel_smoke, xcheck, check_msrv, check_public_api). If a future
+    edit narrows `tools/**`, this is what notices that the executing gates lost
+    their trigger.
 
     Derived from ruff's own file list rather than a hand-written one: a new
     script under `tools/` must either be covered by an existing rule or fail
@@ -228,8 +293,9 @@ def test_every_linted_file_fires_code(filters: dict[str, list[str]]) -> None:
 
     missed = sorted(f for f in linted if not _filter_matches(filters["code"], f))
     assert not missed, (
-        f"{len(missed)} file(s) are linted by the `python` job but do not fire "
-        f"`code`, so an edit to them skips the lint entirely: {missed[:10]}"
+        f"{len(missed)} linted file(s) fire no heavy job. Lint itself is safe "
+        f"(`repo-gates` is unconditional), but a script the python/rust jobs "
+        f"EXECUTE would now change without re-running them: {missed[:10]}"
     )
 
 
