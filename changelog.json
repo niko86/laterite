@@ -15,6 +15,12 @@
         "issues": [
           437
         ]
+      },
+      {
+        "text": "**A chip had no edge, because its fill and the rule beside it were the same colour.** In light `--chip` and `--line` both resolved to `--stone-200`, and `--surface-raised` and `--line-subtle` both to `--stone-150` — so a filter chip drawn `bg-chip border-line` read as a gap in the rule rather than as an object, and a table row ruled `border-line-subtle` lost that rule the moment a raised hover filled it. Dark held distinct values for both pairs and was no better off: they differed by less than a rounding error, which is the same defect without the shared value that makes it obvious. Five values move and nothing else does. The invariant is the part worth keeping — the separation gate now asserts that a token whose job is a FILL differs from one whose job is a STROKE, which is a relation nothing measured, its elevation check comparing surface to surface. The floor is what the light neutrals can hold rather than what would be ideal: `--chip` is fenced above by `--line` and below by `--fg-dim`'s contrast floor sitting on it, so the band between `--surface-raised` and the darkest legal chip is split evenly with nothing spare, and a wider step has to move one of those two first.",
+        "issues": [
+          446
+        ]
       }
     ],
     "security": []

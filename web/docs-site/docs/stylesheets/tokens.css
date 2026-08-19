@@ -176,11 +176,24 @@
   --surface: var(--stone-50);
   --surface-raised: var(--stone-150);
   --surface-code: #f6efe9;
-  --chip: var(--stone-200);
+  /* Off the ramp, because the step it wants is not on it. This was
+     `--stone-200` and so was `--line`, which handed a filled object and the
+     edge of a container one value: a chip drawn `bg-chip border-line` had no
+     edge, and read as a gap in the rule rather than as an object (#446). It
+     moves DOWN rather than up, because the band above is spoken for; how much
+     further down it could have gone is set by `--fg-dim` sitting on it, which
+     is contrast.test.ts's floor and not a free choice. */
+  --chip: #e0d6d0;
 
-  /* ── Lines ── */
-  --line: var(--stone-200);
-  --line-subtle: var(--stone-150);
+  /* ── Lines ──
+     Both off the ramp with `--chip`, and for the same collision one step up:
+     `--line-subtle` WAS `--surface-raised`'s value, so a row ruled
+     `border-line-subtle` lost its rule the moment `hover:bg-surface-raised`
+     filled it (#446). The four of them now split the band between
+     `--surface-raised` and the darkest legal chip evenly — there is no slack
+     left in it, and separation.test.ts is what says so. */
+  --line: #e4dbd5;
+  --line-subtle: #e8e0db;
   --line-strong: var(--stone-300);
 
   /* ── Text ── */
@@ -276,11 +289,17 @@
   --surface-code: #100c0b;
   /* Was #261f1c, which sat ΔL 0.002 from `--surface-raised` — a chip on a
      raised card had no edge at all (#434). Moved above raised instead of
-     beside it, so the ladder reads surface → raised → chip → line. */
-  --chip: #332b26;
+     beside it, so the ladder reads surface → raised → chip → line; then down
+     again from #332b26, which had left that ladder's last rung as unreadable
+     as its first — the chip and the rule beside it were one colour in all but
+     name, which is the light set's #446 defect without the shared value that
+     made it obvious. */
+  --chip: #302924;
 
   --line: #352c28;
-  --line-subtle: #261f1c;
+  /* Was #261f1c: `--surface-raised`'s value to within a rounding error, so the
+     rule under a hovered row disappeared here exactly as it did in light. */
+  --line-subtle: #2c2420;
   --line-strong: #4a3f39;
 
   --fg: #ede5df;
