@@ -61,20 +61,13 @@ describe("fixSeverity", () => {
       ]),
     );
     expect(fixSeverity(idx, fix("AGS Format Rule 1", 3))).toBeUndefined();
-    // Same answer for a whole-file fix, which joins through its edits' lines
-    // (none here) and so reaches the rule-only lookup by a second route.
+    // And for a whole-file fix, which carries no line of its own — `fix()`
+    // builds no edits either, so this is the empty-lines path into the same
+    // rule-only lookup. What stops the assertion being vacuous is the
+    // rule-wide hit in "prefers the rule+line hit over the rule-wide one"
+    // below: that path still labels, so returning undefined everywhere would
+    // not satisfy both.
     expect(fixSeverity(idx, fix("AGS Format Rule 1", null))).toBeUndefined();
-  });
-
-  // The guard on that: a rule the report DID raise still labels, so the change
-  // above cannot be satisfied by returning undefined everywhere.
-  it("still labels a fix whose rule the report raised at another line", () => {
-    const idx = buildSevIndex(
-      report([
-        { rule: "AGS Format Rule 8", total: 1, items: [finding(2, "fyi")] },
-      ]),
-    );
-    expect(fixSeverity(idx, fix("AGS Format Rule 8", 99))).toBe("fyi");
   });
 
   it("prefers the rule+line hit over the rule-wide one", () => {

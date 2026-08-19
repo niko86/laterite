@@ -99,7 +99,9 @@ export const FixPane: Component = () => {
   // `undefined` while there is no report — the badges say "unlabelled" rather
   // than guessing (#412). That covers the still-LOADING report too, not just a
   // failed one: both are "nobody has looked yet", and the old default painted
-  // every badge `warning` for that beat on every file.
+  // every badge `warning` for that beat on every file. #430 retired the last
+  // guess (a rule the report never raised), so "unlabelled" now spans all
+  // three — the loading beat being much the commonest of them.
   const fixSeverityOf = (f: Fix): Severity | undefined =>
     fixSeverity(sevIndex(), f);
   // Whether any safe fix also resolves an FYI advisory tied to the same issue

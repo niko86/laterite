@@ -191,6 +191,8 @@ FYI-backed fixes then read alike, and the FYI explainer above suppresses itself
 The cure is to stop letting one return value mean two absences. `buildSevIndex`
 returns `undefined` for **no report**; a report that merely doesn't raise a given
 rule still yields the `"warning"` default, so the benign gap is not repainted.
+(That last clause is **superseded by B5b below** — the gap turned out not to be
+benign, or reachable, and the default is gone.)
 `fixSeverity` is therefore `Severity | undefined`, and `FixesPanel` renders the
 undefined case as a `muted`/`outline` **`unlabelled`** chip rather than a
 confident tier.
@@ -248,26 +250,33 @@ isn't benign; reading the two paths together, it cannot happen at all.
   `compute_fixes_core` takes `include_warnings` from `CheckOptions::default()`
   (off), the report runs with it on.
   `repo:rust-packages/laterite-ags4-validator/src/rules/groups.rs` is the only
-  rule module that reads the flag and none of the eight fixable rules sits
+  rule module that reads the flag, and no rule in `FIXABLE_RULE_LABELS` sits
   behind it — warnings-on merely ADDS the `Warning (Related to Rule N)` labels,
   and the one key warnings-off can hold alone is the top-level `FYI` bucket,
   which no fixer gates on.
 
-So the arm returns `undefined` like its siblings, and an `unlabelled` badge
-beside a real fix now *means* something: the two engine paths disagreeing, which
-is worth looking at rather than dressing as an ordinary tier. Checked
+So the arm returns `undefined` like its siblings. What that buys is NOT a
+diagnostic — `unlabelled` is also the chip every fix wears while the labelling
+`validate` is still in flight, which is the common case on every file, so the
+badge alone can never tell you the engines disagreed. It buys the same thing
+`severityOf` bought: a fabricated tier reads exactly like a real one, and a
+missing label doesn't. The join also leans on the report being **uncapped** —
+`max_per_rule` can serialise a rule with a true `total` and zero items, and an
+empty group puts nothing in the index — which is why FixPane passes
+`maxPerRule: null` and why capping that second pass for performance would
+reintroduce the arm rather than merely slim the payload. Checked
 empirically as well as structurally — a throwaway fix-vs-report differential
 over the private corpus, the repo's own fixtures, and synthetic files for the
 fixers neither exercises, reaching every fixable rule and every `FixKind` with
 no counterexample (run and results on #430, kept out of the tree).
 
-One asymmetry was looked at and left alone. The pane guards the REPORT resource
-on `loading`, not the fixes one, so the mirror-image staleness — this file's
-report labelling the previous file's fixes — is prevented only by ordering: both
-ops go to the same worker in declaration order and `computeFixes` replies before
-the `validate` behind it (`repo:web/src/lib/engineDispatch.ts`). That holds
-today; it is a property of the queue rather than of the guard, and #431's
-component-test seam is where it would be pinned.
+The pane guards the REPORT resource on `loading` and not the fixes one, so the
+mirror-image staleness — this file's report labelling the previous file's fixes —
+is prevented by ordering rather than by a guard: both ops go to the same worker
+in declaration order and `computeFixes` replies synchronously in
+`repo:web/src/lib/engineDispatch.ts`, ahead of the `validate` queued behind it.
+Checked, not fixed: a guard there would blank labels on every refetch to buy
+nothing the queue isn't already buying.
 
 ## Decisions — Workstream A (locked 2026-05-30)
 
