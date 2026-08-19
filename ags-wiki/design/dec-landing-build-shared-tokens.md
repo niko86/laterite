@@ -109,6 +109,16 @@ the app has, the design system has; there are none the other way round. So this
 is a widening, not a second layer — which is most of the argument for sharing
 the app's toolchain in the first place.
 
+**There is now exactly one deliberate exception**, and it proves the rule by how
+hard it was to justify: [[dec-chart-identity-vocabulary]] (#434) puts the chart
+series colours in their own file, fenced so that nothing there is aliased into
+the semantic layer and nothing there reads from it. That is not a second
+vocabulary for the same job — it is a first vocabulary for a *different* job. The
+ramps here are sequential by construction, and a chart legend encodes identity
+rather than position, which no arrangement of one hue family can carry. Because
+this layer is shared, those tokens land on all three surfaces at once even though
+only the app draws charts.
+
 The one genuine rename is the type metrics. `--font-*`, `--text-*`,
 `--leading-*` and `--tracking-*` are all **Tailwind theme namespaces**, so the
 runtime tokens are `--family-*`, `--size-*`, `--lh-*` and `--track-*`

@@ -341,8 +341,16 @@ body {
   color: var(--accent-hover);
 }
 
-/* Inline code on the code surface with a hairline and a small radius. Block code
-   keeps the surface but drops the border — a fenced block is already an object. */
+/* Inline code on the code surface with a hairline and a small radius.
+   A FENCED BLOCK KEEPS THE HAIRLINE TOO (#434). It used to drop it, on the
+   reasoning that "a fenced block is already an object" — but it is only an
+   object where its fill reads, and on this surface the fill does not. The app
+   sets code on `--surface`; the docs read long-form on `--canvas`, and
+   `--surface-code` lands ΔL 0.001 from it, so a light-mode block was invisible.
+   Retuning the token cannot fix it: it would have to clear both grounds while
+   dodging `--surface-raised` and `--chip`, and the light ladder has no gap that
+   size. One global fill cannot serve three surfaces with three page grounds —
+   the border can, so form carries it. */
 .md-typeset code {
   background-color: var(--surface-code);
   border: 1px solid var(--line-subtle);
@@ -351,11 +359,22 @@ body {
 }
 .md-typeset pre > code,
 .md-typeset .highlight code {
-  border: none;
   padding: revert;
 }
 .md-typeset pre > code {
   border-radius: var(--radius-md);
+}
+/* A line-numbered block is two cells, so the frame goes round the TABLE. The
+   code half keeps its own border in the plain case above; here it would draw
+   down the middle, against an unbordered linenos column. */
+.md-typeset .highlighttable {
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.md-typeset .highlighttable code {
+  border: none;
+  border-radius: 0;
 }
 .md-typeset .highlighttable .linenos {
   background-color: var(--surface-raised);

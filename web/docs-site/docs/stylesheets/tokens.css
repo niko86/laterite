@@ -220,8 +220,15 @@
   --warn-quiet: #f8e9d3;
   --err: #a51f14; /* oxide red — hotter and heavier than brand brick */
   --err-quiet: #f9e0dc;
-  --info: var(--steel-700); /* the probe */
-  --info-quiet: #ecebee;
+  /* The probe, in steel BLUE rather than steel grey (#434). Grey was the one
+     status hue that carried no hue at all, and two low-chroma colours have
+     nothing left to tell them apart once colour-vision deficiency removes the
+     hue channel — `info` and `ok` sat at ΔE 1.2 under protanopia. Blue is the
+     hue that survives protan and deutan, which is why every design system that
+     publishes its reasoning puts the informative slot there. The auger is still
+     the referent; steel is blue-grey before it is grey. */
+  --info: #273470;
+  --info-quiet: #e7eaf5;
 
   --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
   --selection: color-mix(in srgb, var(--laterite-300) 45%, transparent);
@@ -267,7 +274,10 @@
   --surface: #1c1715;
   --surface-raised: #262019;
   --surface-code: #100c0b;
-  --chip: #261f1c;
+  /* Was #261f1c, which sat ΔL 0.002 from `--surface-raised` — a chip on a
+     raised card had no edge at all (#434). Moved above raised instead of
+     beside it, so the ladder reads surface → raised → chip → line. */
+  --chip: #332b26;
 
   --line: #352c28;
   --line-subtle: #261f1c;
@@ -302,12 +312,74 @@
 
   --ok: #79c2b4;
   --ok-quiet: #1d2c29;
-  --warn: #e3a447;
+  /* Pale gold, not ochre (#434). The dark ramp lightens `--accent` to sand, and
+     an ochre warning landed on top of it — ΔE 1.1 under deuteranopia, so a link
+     and a warning were the same colour. Status hues are semantically pinned
+     (amber has to read as warning) so the fix is LIGHTNESS, which is the channel
+     a cone deficiency leaves intact: the warning steps up and away from the
+     accent rather than sideways out of amber. */
+  --warn: #fee076;
   --warn-quiet: #2e2313;
   --err: #f07f6d;
   --err-quiet: #331b18;
-  --info: #b9b2bd;
-  --info-quiet: #242226;
+  /* Steel blue, matching the light block's reasoning. */
+  --info: #cff2ff;
+  --info-quiet: #1b262c;
+}
+
+/* ── src/shared/styles/charts.css ── */
+/* Chart-categorical identity — a SEPARATE vocabulary from brand identity (#434).
+ *
+ * The brand ramp cannot carry this job. `--laterite-*` is a SEQUENTIAL scale by
+ * construction — one hue family, monotone lightness — and a categorical channel
+ * needs hues that differ, not steps that differ. Every attempt to seat a series
+ * palette on the ramp failed the same way: adjacent steps that separate on a
+ * light surface collapse on a dark one, and no ordering fixes it.
+ *
+ * So charts get their own tokens, and the fence is one-directional: nothing here
+ * is aliased into the semantic layer, and nothing here reads FROM it. `--chart-1`
+ * is the rust value written out rather than `var(--cta)` — the two are meant to
+ * be equal, and the separation gate asserts it, so the coupling is checked
+ * instead of inherited. A future CTA retune then fails a test rather than
+ * silently repainting series 1.
+ *
+ * These are flat values, not ramps, which departs from the layer's usual
+ * "raw ramps below semantic names" idiom. Deliberately: a chart consumes exactly
+ * one step per family and ECharts derives its own hover and emphasis states, so
+ * three ramps would add tokens no surface reads.
+ *
+ * WHY THESE HUES. Taken from Paul Tol's `muted` qualitative scheme — colour-blind
+ * safe and, unlike a machine-derived set, chosen by eye to sit together — with
+ * its sand and olive dropped, since the brand already owns warm and those two
+ * crowd `--warn`. Lightness is snapped to each theme's band; the hues are Tol's.
+ * Rust anchors slot 1 because it is the one value identical either side of the
+ * theme flip, which keeps the charts recognisably this product's.
+ *
+ * THE CAP IS THREE, NOT FIVE, FOR SOME CHART FORMS. Slots 1-3 are validated on
+ * the all-pairs pairlist and are what scatter, bubble and map may use, where any
+ * two marks can land side by side. All five are validated adjacent-only and are
+ * available to bar and line, where only touching marks need to separate. Beyond
+ * five, colour stops being the answer: fold to "Other" or facet.
+ *
+ * Re-run the separation gate beside this file after ANY edit here or to the
+ * status tokens — the two sets are measured against each other, so a status
+ * retune can invalidate a chart hue without either file looking wrong alone.
+ */
+:root {
+  /* Slots 1-3 are theme-stable: the same value reads on both surfaces, so the
+     dark block below only has to restate the two that move. */
+  --chart-1: #ce5640; /* rust — equal to --cta by assertion, not by reference */
+  --chart-2: #0a6f95; /* cyan */
+  --chart-3: #7370dc; /* indigo */
+  --chart-4: #278a42; /* green */
+  --chart-5: #9d358c; /* purple */
+}
+
+[data-md-color-scheme="slate"] {
+  /* Only the two that the dark band moves. Green and purple sit below the band
+     floor at their light values; cyan and indigo do not, and rust never moves. */
+  --chart-4: #077831;
+  --chart-5: #a33c92;
 }
 
 /* ── src/shared/styles/typography.css ── */
