@@ -2343,7 +2343,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-ags4-wasm"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "arrow",
  "chrono",
@@ -2383,7 +2383,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-cli"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "chrono",
  "clap",
@@ -2417,7 +2417,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-node"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "arrow",
  "encoding_rs",
@@ -2440,7 +2440,7 @@ dependencies = [
 
 [[package]]
 name = "laterite-py"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "arrow",
  "chrono",

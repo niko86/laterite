@@ -15,7 +15,7 @@ sources: []
 # laterite-cli
 
 <!-- BEGIN GENERATED: crate-card — DO NOT EDIT BY HAND. Regenerate: uv run --no-project python tools/gen_crate_graph.py -->
-> [!note] **Not published** — `laterite-cli` is a workspace crate, internal to this repo, at v0.10.1 (its own line).
+> [!note] **Not published** — `laterite-cli` is a workspace crate, internal to this repo, at v0.11.0 (its own line).
 > **Used by** — nothing else in this workspace.
 <!-- END GENERATED: crate-card -->
 

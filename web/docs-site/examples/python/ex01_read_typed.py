@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["laterite==0.10.1"]
+# dependencies = ["laterite==0.11.0"]
 # ///
 """Docs example — born-typed reads. `uv run ex01_read_typed.py` from anywhere.
 
