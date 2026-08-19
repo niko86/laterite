@@ -201,6 +201,11 @@ pub struct ValidateArgs {
     /// Errors only — suppress the WARNING tier (shown by default).
     #[arg(long)]
     pub no_warnings: bool,
+    /// Fail on warnings too (like a compiler's `-Werror`). Warnings are shown
+    /// by default but do not affect the exit code; this opts into that.
+    /// Contradicts `--no-warnings`, which suppresses the tier entirely.
+    #[arg(long, conflicts_with = "no_warnings")]
+    pub warnings_as_errors: bool,
     /// Include FYI-severity findings (e.g. Rule 1).
     #[arg(long)]
     pub show_fyi: bool,

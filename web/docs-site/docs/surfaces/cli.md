@@ -34,14 +34,20 @@ matrix](index.md#what-each-door-can-do) shows the split.
 
 ## CLI-native idioms
 
-**A CI gate is just the exit code** — `0` when clean, non-zero when findings remain:
+**A CI gate is just the exit code** — `0` when the file passed, non-zero when it
+did not:
 
 ```bash
-lat validate "$f" || exit 1        # fail the pipeline on any finding
+lat validate "$f" || exit 1                       # fail on an error
+lat validate "$f" --warnings-as-errors || exit 1  # …and on a warning too
 ```
 
-`0` clean · `1` findings · `3` not-found / unreadable · `4` not-AGS4 / bad input ·
+`0` passed · `1` failed · `3` not-found / unreadable · `4` not-AGS4 / bad input ·
 `5` bad arguments · `6` schema violation.
+
+Errors decide the verdict. A warning is shown and does not fail the run — add
+`--warnings-as-errors` for a stricter gate, the way `-Werror` works. See
+[severity tiers](../concepts/severity-tiers.md).
 
 **Pipe the machine output.** `--json` is pretty, `--ndjson` is one finding per line
 — both stream to `jq`, and both are the same bytes the Python and Node reports emit:

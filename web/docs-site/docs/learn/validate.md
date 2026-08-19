@@ -10,8 +10,11 @@
 
 `read(path).validate()` runs the numbered-rules engine and hands back the
 [`Ags4File`](./read.md) — so it chains. The verdict itself rides on `.report`:
-`is_valid` and `count` are the headline, while `dict_version` and `resolution`
-tell you _which_ AGS edition the rules came from.
+`is_valid` is the headline, `count` says how much the report shows, and
+`dict_version` / `resolution` tell you _which_ AGS edition the rules came from.
+The first two are separate questions — only errors decide `is_valid`, so a file
+with a warning on it passes and still has a finding to read. See [severity
+tiers](../concepts/severity-tiers.md).
 
 !!! note "The edition selects itself"
     You never pass an edition. `dict_version` is read straight from the file's

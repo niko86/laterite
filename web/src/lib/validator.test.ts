@@ -31,11 +31,21 @@ const find = (severity?: FindingDto["severity"]): FindingDto => ({
 /** An error as the engine actually serialises one: no `severity` key. */
 const anError = (): FindingDto => find(undefined);
 
+const tally = (findings: FindingDto[], s?: string) =>
+  findings.filter((f) => f.severity === s).length;
+
 const report = (findings: FindingDto[]): ValidationReport => ({
-  ok: findings.length === 0,
+  // `ok` and `valid` are the VERDICT since #321 — errors only. A report of
+  // nothing but FYIs is therefore valid *and* non-empty, which is exactly the
+  // pair these tests exist to keep apart.
+  ok: tally(findings) === 0,
+  valid: tally(findings) === 0,
   dict_version: "4.1.1",
   resolution: "fallback",
   finding_count: findings.length,
+  errors: tally(findings),
+  warnings: tally(findings, "warning"),
+  fyi: tally(findings, "fyi"),
   shown_count: findings.length,
   findings: findings.length
     ? [{ rule: "Rule 1", total: findings.length, items: findings }]

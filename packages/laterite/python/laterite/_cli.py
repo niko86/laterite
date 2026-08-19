@@ -175,6 +175,7 @@ def _engine(args: argparse.Namespace) -> dict:
         dict_version=args.dict_version,
         include_warnings=not args.no_warnings,
         include_fyi=args.show_fyi,
+        warnings_as_errors=args.warnings_as_errors,
         check_files=args.check_files,
         encoding=args.encoding,
         dict_path=args.dict,
@@ -232,6 +233,7 @@ def _with_cert(args: argparse.Namespace) -> dict:
             dict_version=_pin(args),
             warnings=not args.no_warnings,
             fyi=args.show_fyi,
+            warnings_as_errors=args.warnings_as_errors,
             check_files=args.check_files,
             dictionary=args.dict,
             dict_replace=args.dict_replace,
@@ -882,6 +884,11 @@ def _build_parser() -> argparse.ArgumentParser:
     pv.add_argument("--json", action="store_true")
     pv.add_argument("--ndjson", action="store_true")
     pv.add_argument("--no-warnings", action="store_true")
+    # The VERDICT dial (#321), kept in lockstep with the Rust `lat` binary's
+    # flag of the same name — the two launchers are already documented as
+    # rendering differently, and disagreeing on an EXIT CODE would be a far
+    # sharper defect than disagreeing on a table border.
+    pv.add_argument("--warnings-as-errors", action="store_true")
     pv.add_argument("--show-fyi", action="store_true")
     pv.add_argument("--check-files", action="store_true")
     # The door this launcher never had. The binary and npx both take a `.ags.idx`
@@ -1094,6 +1101,20 @@ def main(argv: list[str] | None = None) -> int:
     # `--dict-replace` + `--dict-version`) surface as exit 5 from the engine, in its words.
     if getattr(args, "json", False) and getattr(args, "ndjson", False):
         print("error: --json and --ndjson are mutually exclusive", file=sys.stderr)
+        return 5
+
+    # The two severity dials contradict each other — one hides the warning tier,
+    # the other makes it fatal (#321) — so refuse rather than silently pick a
+    # winner. The binary spells this as clap's `conflicts_with`, which also
+    # exits 5; stated here for the same reason `--json`/`--ndjson` is, since
+    # argparse's own mutual exclusion would exit 2.
+    if getattr(args, "no_warnings", False) and getattr(
+        args, "warnings_as_errors", False
+    ):
+        print(
+            "error: --no-warnings and --warnings-as-errors are mutually exclusive",
+            file=sys.stderr,
+        )
         return 5
 
     if args.cmd == "rules":

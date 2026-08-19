@@ -302,6 +302,32 @@ pub mod laterite_ags4_validator::rules::structure
 pub fn laterite_ags4_validator::rules::structure::check(&laterite_ags4_parse::ParsedFile, &mut laterite_ags4_validator::findings::Findings)
 pub mod laterite_ags4_validator::rules::typed_values
 pub fn laterite_ags4_validator::rules::typed_values::check(&laterite_ags4_parse::ParsedFile, &mut laterite_ags4_validator::findings::Findings)
+pub mod laterite_ags4_validator::verdict
+pub struct laterite_ags4_validator::verdict::Verdict
+pub laterite_ags4_validator::verdict::Verdict::errors: usize
+pub laterite_ags4_validator::verdict::Verdict::fyi: usize
+pub laterite_ags4_validator::verdict::Verdict::warnings: usize
+impl laterite_ags4_validator::verdict::Verdict
+pub fn laterite_ags4_validator::verdict::Verdict::exit_code(&self) -> i32
+pub fn laterite_ags4_validator::verdict::Verdict::is_valid(&self) -> bool
+pub fn laterite_ags4_validator::verdict::Verdict::of(&laterite_ags4_validator::findings::Findings, bool) -> Self
+pub fn laterite_ags4_validator::verdict::Verdict::total(&self) -> usize
+impl core::clone::Clone for laterite_ags4_validator::verdict::Verdict
+pub fn laterite_ags4_validator::verdict::Verdict::clone(&self) -> laterite_ags4_validator::verdict::Verdict
+impl core::cmp::Eq for laterite_ags4_validator::verdict::Verdict
+impl core::cmp::PartialEq for laterite_ags4_validator::verdict::Verdict
+pub fn laterite_ags4_validator::verdict::Verdict::eq(&self, &laterite_ags4_validator::verdict::Verdict) -> bool
+impl core::fmt::Debug for laterite_ags4_validator::verdict::Verdict
+pub fn laterite_ags4_validator::verdict::Verdict::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for laterite_ags4_validator::verdict::Verdict
+impl core::marker::StructuralPartialEq for laterite_ags4_validator::verdict::Verdict
+impl core::marker::Freeze for laterite_ags4_validator::verdict::Verdict
+impl core::marker::Send for laterite_ags4_validator::verdict::Verdict
+impl core::marker::Sync for laterite_ags4_validator::verdict::Verdict
+impl core::marker::Unpin for laterite_ags4_validator::verdict::Verdict
+impl core::marker::UnsafeUnpin for laterite_ags4_validator::verdict::Verdict
+impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_validator::verdict::Verdict
+impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_validator::verdict::Verdict
 pub mod laterite_ags4_validator::world
 pub enum laterite_ags4_validator::world::WorldScope
 pub laterite_ags4_validator::world::WorldScope::None

@@ -1430,3 +1430,82 @@ def test_by_rule_back_compat_keys_preserved():
     for items in rep.by_rule().values():
         for f in items:
             assert {"line", "group", "desc"} <= set(f)
+
+
+# --- the verdict is not the finding count (#321) -----------------------------
+#
+# A warning-PURE source: an otherwise clean file whose TRAN_AGS names an edition
+# that does not exist. Nothing here breaks a rule, so the whole report is one
+# warning and the two questions — what does it SHOW, what does it CONCLUDE —
+# have different answers. Built by substitution on the clean fixture rather than
+# committed as a second one, so it cannot drift away from it.
+_WARNING_ONLY = _CLEAN.read_bytes().replace(b',"4.2",', b',"4.9.9",').decode()
+
+
+def test_a_warning_is_reported_and_the_file_still_passes():
+    rep = laterite.validate(text=_WARNING_ONLY)
+    assert rep.count == 1
+    assert rep.warnings == 1
+    assert rep.errors == 0
+    assert rep.is_valid is True
+    assert rep.exit_code == 0
+
+
+def test_warnings_as_errors_makes_the_same_file_fail():
+    rep = laterite.validate(text=_WARNING_ONLY, warnings_as_errors=True)
+    assert rep.count == 1  # the report is unchanged — only the verdict moves
+    assert rep.is_valid is False
+    assert rep.exit_code == 1
+
+
+def test_warnings_as_errors_cannot_fail_a_file_that_has_none():
+    """The dial arms the warning tier; it does not invent one. A clean file is
+    clean under `-Werror` too — otherwise nobody could turn it on."""
+    rep = laterite.validate(str(_CLEAN), warnings_as_errors=True)
+    assert rep.count == 0
+    assert rep.is_valid is True
+
+
+def test_fyi_never_decides_the_verdict():
+    """FYIs are shown on request and never fatal — not even under
+    `warnings_as_errors`, which arms ONE tier, not "everything below error".
+
+    An extended-ASCII character is the FYI-pure source: permitted outright, so
+    it draws the informational Rule 1 note and nothing else. (A BOM would not
+    do — its bytes also break Rule 1 proper, and the error would be what
+    failed the file.)"""
+    rep = laterite.validate(
+        text=_CLEAN.read_bytes().decode().replace("Clean minimal", "Café"),
+        fyi=True,
+        warnings_as_errors=True,
+    )
+    assert (rep.errors, rep.warnings) == (0, 0)
+    assert rep.fyi == 1
+    assert rep.is_valid is True
+
+
+def test_the_tier_counts_sum_to_the_reported_count():
+    """`count` is what the report shows; the three tiers partition it. A file
+    carrying all three at once is where a miscounted tier would hide."""
+    src = (_FIX / "rule18_malformed_dict.ags").read_bytes().decode()
+    rep = laterite.validate(text=src.replace("LOCA", "LOCÄ", 1), fyi=True)
+    assert rep.errors and rep.warnings and rep.fyi
+    assert rep.errors + rep.warnings + rep.fyi == rep.count
+
+
+def test_is_valid_and_exit_code_can_never_disagree():
+    """Both read one verdict rather than each deriving its own — the property
+    the split exists to keep, checked over every bundled fixture in both dial
+    positions."""
+    for fx in _FIXTURES:
+        for werror in (False, True):
+            rep = laterite.validate(str(fx), fyi=True, warnings_as_errors=werror)
+            assert rep.is_valid == (rep.exit_code == 0), (fx.name, werror)
+
+
+def test_the_handle_form_takes_the_same_dial():
+    """`read(...).validate(...)` and the free `validate(...)` are one engine —
+    a knob on one that the other silently drops is the drift this catches."""
+    free = laterite.validate(text=_WARNING_ONLY, warnings_as_errors=True)
+    chained = laterite.read(text=_WARNING_ONLY).validate(warnings_as_errors=True).report
+    assert (chained.is_valid, chained.exit_code) == (free.is_valid, free.exit_code)

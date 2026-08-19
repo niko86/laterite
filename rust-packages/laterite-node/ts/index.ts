@@ -142,6 +142,11 @@ export interface ValidateOptions extends FileOptions {
   warnings?: boolean;
   /** Include FYI-severity findings. */
   fyi?: boolean;
+  /** Make warnings decide the verdict (#321). A separate dial from `warnings`,
+   *  which only decides what the report SHOWS: by default a warning is reported
+   *  and `isValid` stays true. This is the compiler's `-Werror`. FYIs are never
+   *  fatal, under this flag or any other. */
+  warningsAsErrors?: boolean;
   /** Also run Rule 20's on-disk half (the sibling `FILE/` tree must exist). */
   checkFiles?: boolean;
   /** A custom AGS4 dictionary to overlay (#568) — a file path or the raw `.ags`/JSON
@@ -206,6 +211,7 @@ export function validate(
     opts.dictVersion,
     opts.warnings,
     opts.fyi,
+    opts.warningsAsErrors,
     opts.checkFiles,
     opts.encoding,
     dictPath,

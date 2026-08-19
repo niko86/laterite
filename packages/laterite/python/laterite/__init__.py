@@ -233,9 +233,12 @@ class Report:
     on-disk half) still ran for real. Either way it is an immutable read-out, not a live
     handle: it carries the answer, you don't act *through* it.
 
-    Read the headline off [`is_valid`][laterite.Report.is_valid] / [`count`][laterite.Report.count] (conformant when the
-    finding count is 0), with [`exit_code`][laterite.Report.exit_code] mirroring what the ``lat``
-    binary would return. [`file`][laterite.Report.file] and [`dict_version`][laterite.Report.dict_version] say *what* was
+    Read the headline off [`is_valid`][laterite.Report.is_valid] — the verdict — with
+    [`count`][laterite.Report.count] beside it saying how much the report *shows*. They are
+    two questions, not one: a warning is reported without failing, so a valid file can carry
+    findings ([`errors`][laterite.Report.errors] / [`warnings`][laterite.Report.warnings] /
+    [`fyi`][laterite.Report.fyi] split the count by tier). [`exit_code`][laterite.Report.exit_code]
+    mirrors what the ``lat`` binary would return. [`file`][laterite.Report.file] and [`dict_version`][laterite.Report.dict_version] say *what* was
     judged and *against which* AGS dictionary edition, and [`resolution`][laterite.Report.resolution]
     records *how* that edition was chosen — ``"exact"`` / ``"guessed"`` / ``"fallback"``
     / ``"forced"``. (It used to read ``"certified"`` when a cert had been used, which
@@ -257,8 +260,11 @@ class Report:
         dict_version: The AGS dictionary edition the rules were resolved against.
         resolution: How that edition was resolved — ``"exact"`` / ``"guessed"`` / ``"fallback"`` / ``"forced"``.
         certified: ``True`` when an ``index=`` certificate answered the content half and the rule engine was skipped.
-        count: Number of findings (0 ⇒ conformant).
-        is_valid: ``True`` when [`count`][laterite.Report.count] is 0.
+        count: Number of findings shown (across whichever tiers were asked for).
+        errors: Findings at the error tier — the only tier that decides the verdict.
+        warnings: Findings at the warning tier — fatal only under ``warnings_as_errors``.
+        fyi: Findings at the fyi tier — never fatal.
+        is_valid: The verdict, read from the engine — **not** ``count == 0``.
         exit_code: Process exit code mirroring the ``lat`` binary.
         findings: Flat polars frame, one row per finding (rule, line, group, desc, severity, target, heading, field_index, data_row).
     """
@@ -319,10 +325,41 @@ class Report:
 
     @property
     def is_valid(self) -> bool:
-        return self._r["count"] == 0
+        """Did the file pass?
+
+        Read from the engine's verdict, **not** derived from
+        [`count`][laterite.Report.count]. The two answer different questions since
+        the severity split: `count` is how much the report *shows*, and a
+        warning is shown by default without failing. A file with one warning
+        and no errors is `is_valid=True, count=1`.
+
+        Ask for `warnings_as_errors=True` and the same file is `False`.
+        """
+        return bool(self._r["valid"])
+
+    @property
+    def errors(self) -> int:
+        """Findings at the **error** tier. These always fail."""
+        return int(self._r["errors"])
+
+    @property
+    def warnings(self) -> int:
+        """Findings at the **warning** tier — present in the report only when
+        ``warnings=True`` (the default), and fatal only under
+        ``warnings_as_errors=True``."""
+        return int(self._r["warnings"])
+
+    @property
+    def fyi(self) -> int:
+        """Findings at the **fyi** tier — present only when ``fyi=True``, and
+        never fatal."""
+        return int(self._r["fyi"])
 
     @property
     def exit_code(self) -> int:
+        """``0`` pass, ``1`` fail — always agrees with
+        [`is_valid`][laterite.Report.is_valid]; the engine derives one from the
+        other so they cannot contradict."""
         return self._r["exit_code"]
 
     @property
@@ -396,7 +433,11 @@ class Report:
         return self._r["ndjson"]
 
     def __repr__(self) -> str:
-        v = "valid" if self.is_valid else f"{self.count} finding(s)"
+        # What the repr states is what the report HOLDS, so it counts findings
+        # rather than reading the verdict — since the severity split a passing
+        # file can carry warnings, and "valid" over a listed finding reads as a
+        # contradiction. The verdict is `is_valid`, and it is asked for by name.
+        v = "valid" if self.count == 0 else f"{self.count} finding(s)"
         return f"<Report {self.file!r} {v} dict={self.dict_version}>"
 
 
@@ -775,6 +816,7 @@ class Ags4File:
         dict_version: Edition | None = None,
         warnings: bool = True,
         fyi: bool = False,
+        warnings_as_errors: bool = False,
         check_files: bool = False,
         encoding: str | None = None,
         dictionary: str | Path | builtins.bytes | None = None,
@@ -790,6 +832,13 @@ class Ags4File:
         by default** (``warnings=True``); pass ``warnings=False`` to drop to
         errors-only, and ``fyi=True`` to add the low-signal FYI tier. (The ``compat``
         shim keeps its own python-ags4-faithful defaults, unaffected by this.)
+
+        Those decide what the report **shows**. What it **concludes** is decided by
+        errors alone, so a file carrying only warnings is
+        [`is_valid`][laterite.Report.is_valid] with a non-zero
+        [`count`][laterite.Report.count]. ``warnings_as_errors=True`` makes warnings
+        fatal too — a compiler's ``-Werror``, and opt-in for the same reason. FYIs
+        never decide anything.
 
         **Certificate short-circuit:** if this handle carries an ``index=`` certificate
         (from [`read`][laterite.read]), it is offered to the engine, which decides whether
@@ -832,6 +881,7 @@ class Ags4File:
             dict_version=dict_version,
             include_warnings=warnings,
             include_fyi=fyi,
+            warnings_as_errors=warnings_as_errors,
             check_files=check_files,
             encoding=encoding if encoding is not None else self._encoding,
             dict_path=dict_path,
@@ -1399,6 +1449,7 @@ def validate(
     dict_version: Edition | None = None,
     warnings: bool = True,
     fyi: bool = False,
+    warnings_as_errors: bool = False,
     check_files: bool = False,
     encoding: str | None = None,
     dictionary: str | Path | builtins.bytes | None = None,
@@ -1415,8 +1466,8 @@ def validate(
     aren't UTF-8, a recognised-but-unsupported edition, an unknown
     ``dict_version`` — *raises*, because there is no meaningful verdict to give.
     Genuine *violations* of a parseable AGS4 file never raise: they come back as
-    findings in the [`Report`][laterite.Report] (a clean file is a [`Report`][laterite.Report] with
-    ``count == 0``).
+    findings in the [`Report`][laterite.Report] (a file with nothing to say about it
+    at all is a [`Report`][laterite.Report] with ``count == 0``).
 
     ``source`` is auto-detected the same way [`read`][laterite.read] does it: a single
     positional argument is sniffed as a path (when it exists on disk — the
@@ -1426,8 +1477,12 @@ def validate(
 
     Severity tiers track importance, and the defaults are tuned for a human
     reading a delivery: **errors and WARNINGs surface by default**
-    (``warnings=True``). Pass ``warnings=False`` for an errors-only verdict, and
-    ``fyi=True`` to add the low-signal FYI tier on top. The tiers are also carried
+    (``warnings=True``). Pass ``warnings=False`` for an errors-only report, and
+    ``fyi=True`` to add the low-signal FYI tier on top. Those choose what the
+    report **shows**; the **verdict** is decided by errors alone, so a file
+    carrying only warnings comes back ``is_valid`` with a non-zero ``count``, and
+    ``warnings_as_errors=True`` is the separate dial that makes warnings fatal
+    (a compiler's ``-Werror``). The tiers are also carried
     on each row of [`Report.findings`][laterite.Report.findings] (``severity``), so a single
     ``validate(warnings=True, fyi=True)`` run can be split back apart downstream.
     (The `laterite.compat` python-ags4 shim keeps its own faithful
@@ -1445,6 +1500,10 @@ def validate(
         warnings: Include WARNING-tier findings alongside errors (default
             ``True``); ``False`` gives an errors-only [`Report`][laterite.Report].
         fyi: Also include the low-signal FYI tier (default ``False``).
+        warnings_as_errors: Let warnings decide the verdict too (default
+            ``False``). A separate question from ``warnings``, which only decides
+            what is shown: without this a warning is reported and the file still
+            passes. FYIs are never fatal, under this flag or any other.
         check_files: Run Rule 20 FILE-attachment checks against files on disk
             (default ``False``).
         encoding: WHATWG encoding label for path / bytes input (default UTF-8;
@@ -1462,8 +1521,9 @@ def validate(
             combined with ``dict_version``.
 
     Returns:
-        A [`Report`][laterite.Report] — ``count`` / ``is_valid`` for the verdict at a glance,
-        and ``findings`` (a polars frame, one row per violation) for the detail.
+        A [`Report`][laterite.Report] — ``is_valid`` for the verdict at a glance,
+        ``count`` (split by ``errors`` / ``warnings`` / ``fyi``) for how much it
+        found, and ``findings`` (a polars frame, one row per violation) for the detail.
 
     Raises:
         FileNotFoundError: ``source`` is a path that doesn't exist, or an IO
@@ -1484,6 +1544,7 @@ def validate(
         dict_version=dict_version,
         include_warnings=warnings,
         include_fyi=fyi,
+        warnings_as_errors=warnings_as_errors,
         check_files=check_files,
         encoding=encoding,
         dict_path=dict_path,

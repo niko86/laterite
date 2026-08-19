@@ -159,6 +159,12 @@ fn the_fingerprint_covers_every_crate_the_verdict_runs_through() {
             "laterite-ags4-validator/src/lib.rs",
             "hosts check_parsed + the edition-resolution policy",
         ),
+        (
+            "laterite-ags4-validator/src/verdict.rs",
+            "decides which tiers are fatal, and therefore whether a file PASSES — the \
+             hand-written list in build.rs did not grow when this module arrived (#321), \
+             which is exactly how the list came to miss three-quarters of the engine before",
+        ),
     ];
 
     for (file, why) in must_cover {

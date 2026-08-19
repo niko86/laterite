@@ -125,6 +125,9 @@ fn main() {
         manifest.join("src/lib.rs"),
         manifest.join("src/parse.rs"),
         manifest.join("src/findings.rs"),
+        // The verdict itself (#321): which tiers are fatal, and therefore whether
+        // a file passes. Nothing decides more of the answer than this file.
+        manifest.join("src/verdict.rs"),
         manifest.join("src/world.rs"),
         manifest.join("src/catalogue.rs"),
     ];

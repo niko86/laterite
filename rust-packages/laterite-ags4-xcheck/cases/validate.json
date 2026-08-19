@@ -16,6 +16,23 @@
       "spec_ref": "The empty-findings render path — a clean file exits 0 with an empty findings map, identically across launchers."
     },
     {
+      "id": "validate.json.warning_tier",
+      "op": "validate_json",
+      "input": { "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/warning_tier_only.ags" },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "A file whose ONLY finding is a WARNING passes (#321): the report shows it, the verdict ignores it, exit 0. The fixture is deliberately warning-pure — an unrecognised TRAN_AGS over an otherwise clean file — so the exit code turns on the tier split and nothing else. Each launcher wires the verdict by hand (render.rs, _cli.py, cli.ts), so nothing but a cross-launcher gate catches one of the three still failing on warnings."
+    },
+    {
+      "id": "validate.json.warning_tier.werror",
+      "op": "validate_json",
+      "input": {
+        "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/warning_tier_only.ags",
+        "flags": ["--warnings-as-errors"]
+      },
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
+      "spec_ref": "The SAME file under `--warnings-as-errors` fails on all three launchers — exit 1, identical render. The pair is the point: one file, one flag, opposite verdicts, so a launcher that ignores the flag (an unwired opt-in reads as a silent pass) splits against the other two instead of quietly agreeing with the default."
+    },
+    {
       "id": "validate.ndjson.findings",
       "op": "validate_ndjson",
       "input": { "fixture": "rust-packages/laterite-ags4-validator/tests/fixtures/rule8_dp_wrong_precision.ags" },

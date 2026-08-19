@@ -26,7 +26,11 @@
 //! - [`check_parsed`] — the same rule run over an already-parsed file. The
 //!   **only** public way in for a caller holding bytes/text rather than a path,
 //!   and the only place that can refuse a request it cannot honestly answer.
-//! - [`is_valid`] — convenience boolean (zero findings).
+//! - [`is_valid`] — convenience boolean (zero findings). Note the name: this
+//!   is "did the run find anything", **not** the verdict.
+//! - [`verdict::Verdict`] — the verdict, and the only producer of it. Every
+//!   surface asks this rather than deriving its own, so `is_valid` and the
+//!   exit code cannot disagree (#321).
 //! - [`resolve_dict_version`] / [`tran_ags_of`] — exposed so callers
 //!   (e.g. the corpus-QA harness) can *report* which edition a file
 //!   was judged against without re-implementing the policy.
@@ -56,6 +60,7 @@ pub mod findings;
 pub mod fixes;
 pub mod parse;
 pub mod rules;
+pub mod verdict;
 pub mod world;
 
 pub use world::WorldScope;
@@ -488,8 +493,13 @@ fn emit_override_warnings(
     }
 }
 
-/// `true` iff `check_file` produced zero findings. What the CLI exit
-/// code and other validate-on-convert callers key off.
+/// `true` iff `check_file` produced zero findings — across whichever tiers
+/// `opts` asked for. What validate-on-convert callers key off.
+///
+/// **Not the verdict**, and no longer what the CLI exit code keys off: since
+/// #321 a warning is reported without failing, so this and [`verdict::Verdict`]
+/// answer different questions on the same file. Reach for `Verdict` when you
+/// mean "did it pass"; this one means "did the run find anything".
 pub fn is_valid(path: &Path, opts: &CheckOptions) -> Result<bool, ValidatorError> {
     Ok(findings::count(&check_file(path, opts)?) == 0)
 }

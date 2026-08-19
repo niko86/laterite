@@ -305,7 +305,12 @@ export const ValidatePane: Component = () => {
             <>
               <SummaryBanner report={r()} name={name()} />
 
-              <Show when={r().ok}>
+              {/* `finding_count`, not `ok`: `ok` became the VERDICT in #321, and
+                  a file can now pass with warnings on it. The offer here has
+                  always been "nothing was found, keep the proof" — so it asks
+                  the question it means rather than riding on a flag whose
+                  meaning moved underneath it. */}
+              <Show when={r().finding_count === 0}>
                 <DownloadCertificate
                   bytes={canonicalBytes}
                   name={name()}

@@ -41,6 +41,7 @@ use laterite_ags4_validator::{
 // "the same row"). Split out rather than left in the list above so a build
 // without either does not warn — and `-D warnings` is a CI gate.
 #[cfg(any(feature = "diff", feature = "merge"))]
+use laterite_ags4_validator::verdict::Verdict;
 use laterite_ags4_validator::{resolve_dict_version, tran_ags_of};
 // Narrower still: only `diff` materialises a `Dictionary` (to read KEY
 // headings off it) — `merge` hands the resolved edition to `MergeOpts` and lets
@@ -148,6 +149,17 @@ struct ValidationReport {
     /// True total across every rule — always the full count the engine
     /// found, independent of any serialization cap.
     finding_count: usize,
+    /// The verdict (#321). Not `finding_count == 0`: a warning is shown by
+    /// default and does not fail, so a file can be `valid` with findings.
+    /// `ok` above is this surface's historical spelling of the same answer and
+    /// now follows it; the duplication is deliberate for one release so the
+    /// browser consumer can migrate off `ok`.
+    valid: bool,
+    /// Per-tier counts. They sum to `finding_count`, and let the UI colour a
+    /// report without re-walking `findings` (which the cap may have clipped).
+    errors: usize,
+    warnings: usize,
+    fyi: usize,
     /// How many `FindingDto` were actually serialized into `findings`
     /// (the sum of each group's `items.len()`). Equals `finding_count`
     /// when uncapped; smaller when `max_per_rule` clipped some groups, so
@@ -174,6 +186,12 @@ impl ValidationReport {
             dict_version: String::new(),
             resolution: String::new(),
             finding_count: 0,
+            // A failure is not a verdict: nothing was validated. `error` below
+            // is what a consumer must read; these are inert.
+            valid: false,
+            errors: 0,
+            warnings: 0,
+            fyi: 0,
             shown_count: 0,
             findings: Vec::new(),
             error: Some(ValErr {
@@ -241,7 +259,9 @@ export interface ValErr {
 
 /** The whole result of a validation run. */
 export interface ValidationReport {
-  /** `error === null && finding_count === 0`. */
+  /** `error === null && valid` — this surface's historical spelling of the
+   *  verdict. **Deprecated in favour of `valid`**, which every surface now
+   *  spells the same way; kept for one release so consumers can migrate. */
   ok: boolean;
   /** The bundled edition judged against (`"4.1.1"`, …); `""` on error. */
   dict_version: string;
@@ -250,6 +270,15 @@ export interface ValidationReport {
   resolution: string;
   /** True total across every rule, independent of any cap. */
   finding_count: number;
+  /** The verdict. **Not** `finding_count === 0`: a warning is reported by
+   *  default and does not fail, so a file can be `valid` with findings. Pass
+   *  `warningsAsErrors: true` to make warnings fatal. */
+  valid: boolean;
+  /** Per-tier counts, summing to `finding_count`. Use these to colour a report
+   *  rather than re-walking `findings`, which a cap may have clipped. */
+  errors: number;
+  warnings: number;
+  fyi: number;
   /** How many findings were actually serialised (≤ `finding_count` when capped). */
   shown_count: number;
   findings: RuleGroup[];
@@ -1259,6 +1288,10 @@ struct ValidateOptions {
     /// made the browser the one surface that disagreed.
     warnings: Option<bool>,
     fyi: Option<bool>,
+    /// The VERDICT dial (#321), separate from the two display dials above.
+    /// Defaults to **false**: a warning is shown and does not fail. Python and
+    /// Node default the same way, so the browser is not the odd surface out.
+    warnings_as_errors: Option<bool>,
     encoding: Option<String>,
     max_per_rule: Option<u32>,
     #[serde(with = "serde_bytes")]
@@ -1271,6 +1304,7 @@ impl WasmOptions for ValidateOptions {
         "dictVersion",
         "warnings",
         "fyi",
+        "warningsAsErrors",
         "encoding",
         "maxPerRule",
         "dictionary",
@@ -1630,6 +1664,10 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
     };
 
     let finding_count = findings::count(&found);
+    // Computed before `found` is consumed by the serialization walk below, and
+    // from the FULL finding set — the `max_per_rule` cap clips what crosses the
+    // boundary, never what the verdict was reached from.
+    let verdict = Verdict::of(&found, o.warnings_as_errors.unwrap_or(false));
     // Raw line text by 1-based line number — `raw_lines` is sequential
     // from 1, but index by `number` defensively rather than assuming the
     // offset. Used to compute a precise char span for cell/heading
@@ -1717,10 +1755,14 @@ fn run(data: &[u8], o: &ValidateOptions) -> ValidationReport {
         .collect();
 
     ValidationReport {
-        ok: finding_count == 0,
+        ok: verdict.is_valid(),
         dict_version: dv.as_str().to_string(),
         resolution: kind.as_str().to_string(),
         finding_count,
+        valid: verdict.is_valid(),
+        errors: verdict.errors,
+        warnings: verdict.warnings,
+        fyi: verdict.fyi,
         shown_count,
         findings: findings_out,
         error: None,

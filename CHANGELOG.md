@@ -13,6 +13,7 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 | version | change |
 |---|---|
+| [Unreleased](#unreleased) | a warning no longer fails a validation run. |
 | [0.11.0](#0110--2026-08-19) | the Node package requires Node >= 22. |
 | [0.11.0](#0110--2026-08-19) | `@laterite/ags4-wasm` is the slim engine — 749 KiB gzipped instead of 1.81 MiB. |
 | [0.10.0](#0100--2026-08-02) | `diff` and `censor` take an options object too. |
@@ -23,6 +24,10 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 | [0.6.0](#060--2026-07-04) | The 174 typed-graph classes moved to the `laterite.groups` submodule. |
 
 ## [Unreleased]
+
+### Changed
+
+- **Breaking: a warning no longer fails a validation run.** The severity tiers decided what a report *showed* and what it *concluded* with one dial, so a file whose only blemish was an unrecognised `TRAN_AGS` edition — no rule broken — exited `1` and failed a CI job. Errors decide the verdict now; warnings stay visible by default and are reported, not fatal. Opt back in with `--warnings-as-errors` (CLI), `warnings_as_errors=True` (Python), `warningsAsErrors: true` (Node, wasm) — the compiler's `-Werror`, opt-in for the same reason. `--no-warnings` is unchanged and still controls what you *see*; passing it together with `--warnings-as-errors` is now rejected rather than silently resolved. `Report.is_valid` follows the verdict instead of `count == 0`, so a passing file can carry findings, and new `errors`/`warnings`/`fyi` counts expose the split. Every surface reads one `Verdict` in the validator rather than keeping its own copy of the formula, so `is_valid` and the exit code cannot disagree.
 
 ## [0.11.0] — 2026-08-19
 

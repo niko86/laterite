@@ -21,6 +21,7 @@ use arrow::ipc::reader::StreamReader;
 use laterite_ags4_validator::dict::Dictionary;
 use laterite_ags4_validator::findings::{Findings, Severity};
 use laterite_ags4_validator::fixes::Fix;
+use laterite_ags4_validator::verdict::Verdict;
 // #168 Phase 3: text/bytes parse through the leaf directly; the FS entry
 // (`parse_file_with_encoding`) stays in the validator (it owns NotFound/Io).
 use laterite_ags4_parse::{ParsedFile, parse_bytes, parse_str};
@@ -370,7 +371,17 @@ pub struct ValidationReport {
     pub file: String,
     pub dict_version: String,
     pub resolution: String,
+    /// Every finding in the report, whatever its tier — what it SHOWS.
     pub count: u32,
+    /// The verdict — what it CONCLUDES (#321). Not `count == 0`: a warning is
+    /// shown by default and does not fail, so a file can be `valid` with a
+    /// non-zero `count`. Always agrees with `exitCode == 0`.
+    pub valid: bool,
+    /// Per-tier counts, so a caller can act on the split without re-walking
+    /// `findings`. They sum to `count`.
+    pub errors: u32,
+    pub warnings: u32,
+    pub fyi: u32,
     /// Did an `index` certificate stand in for the rule engine? Never "the file was not
     /// checked": a world check (Rule 20's on-disk half) runs even on a certified read.
     pub certified: bool,
@@ -396,6 +407,14 @@ impl ValidationReport {
             dict_version: String::new(),
             resolution: String::new(),
             count: 0,
+            // A failure is not a verdict: nothing was validated, so there is no
+            // tier to count and nothing to call valid. `exitCode` above already
+            // carries the real answer (3/4/5), and `ok:false` tells TS to raise
+            // before any of this is read.
+            valid: false,
+            errors: 0,
+            warnings: 0,
+            fyi: 0,
             certified: false,
             revalidate_reason: None,
             findings: Vec::new(),
@@ -544,6 +563,10 @@ fn validate_inner(
 /// Severity tiers track importance (like a compiler): errors **and WARNINGs** are
 /// returned by default (`includeWarnings` defaults to `true`); pass `false` for
 /// errors-only. `includeFyi` (default `false`) adds the low-signal FYI tier.
+///
+/// Those two decide what the report SHOWS. What it CONCLUDES is decided by
+/// errors alone — `warningsAsErrors` (default `false`) is the separate dial that
+/// makes warnings fatal too, the compiler's `-Werror`. FYIs never fail.
 #[napi]
 #[allow(clippy::too_many_arguments)] // the napi surface mirrors lat's flags
 #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
@@ -554,6 +577,9 @@ pub fn run_check(
     dict_version: Option<String>,
     include_warnings: Option<bool>,
     include_fyi: Option<bool>,
+    // The VERDICT dial (#321), separate from the two display dials above: a
+    // warning is shown by default and does not fail; this opts into failure.
+    warnings_as_errors: Option<bool>,
     check_files: Option<bool>,
     encoding: Option<String>,
     // The custom `--dict` overlay (#568): a path OR raw bytes, plus `dictReplace` to drop
@@ -623,13 +649,22 @@ pub fn run_check(
     // exceed the file's cell count — far below u32::MAX for any real file.
     #[allow(clippy::cast_possible_truncation)]
     let count = findings.len() as u32;
+    // `count` is what the report SHOWS; the verdict is what it CONCLUDES
+    // (#321). Both travel to TS so `isValid` never has to re-derive one from
+    // the other — which is exactly how the surfaces would drift.
+    let verdict = Verdict::of(&found, warnings_as_errors.unwrap_or(false));
+    #[allow(clippy::cast_possible_truncation)]
     Ok(ValidationReport {
         ok: true,
         certified,
         revalidate_reason,
         error_kind: None,
         error: None,
-        exit_code: i32::from(count != 0),
+        valid: verdict.is_valid(),
+        errors: verdict.errors as u32,
+        warnings: verdict.warnings as u32,
+        fyi: verdict.fyi as u32,
+        exit_code: verdict.exit_code(),
         json: findings_json(&file, &found),
         ndjson: findings_ndjson(&found),
         file,
