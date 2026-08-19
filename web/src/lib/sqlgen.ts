@@ -122,17 +122,31 @@ function renderCond(ref: string, c: Cond): string {
 export type ChartType = "scatter" | "line" | "bar";
 export type Agg = "none" | "count" | "sum" | "avg" | "min" | "max";
 
-export interface ChartSqlOpts {
+/** What the plot query and the probe that ranks for it must agree on: the same
+ *  table, the same joins and aliasing, and the same X/Y completeness. */
+interface ChartQueryBase {
   table: string;
   /** base alias (join mode). */
   alias?: string;
   joins?: JoinSpec[];
   x: string | QualifiedCol;
   y: string | QualifiedCol;
-  colour?: string | QualifiedCol;
   chartType: ChartType;
   agg: Agg;
+}
+
+export interface ChartSqlOpts extends ChartQueryBase {
+  colour?: string | QualifiedCol;
   rowCap: number;
+}
+
+export interface ChartRankOpts extends ChartQueryBase {
+  /** Required here, unlike the plot query: there is nothing to rank without it. */
+  colour: string | QualifiedCol;
+  /** How many values may keep a colour. Nothing needs to know whether a tail
+   *  exists — a value the probe did not return folds by not being in the list,
+   *  which is the same thing that happens to one ranked past the cap. */
+  cap: number;
 }
 
 /** Resolve a column to its SQL reference: `"col"` single-table; `alias."col"`
@@ -146,30 +160,70 @@ function colRef(
   return joined ? `${baseAlias}.${q(c)}` : q(c);
 }
 
+/** The POPULATION a chart query runs over: the FROM (with its joins and their
+ *  range predicates) and the WHERE that decides which rows are plotted at all,
+ *  plus the alias-aware column resolver both clauses were built with.
+ *
+ *  Shared with `chartRankSql` deliberately, not as a tidy-up. A ranking
+ *  composed over a different population than the plot is wrong in a way
+ *  nothing downstream can see: the fold would call a value "Other" on the
+ *  strength of rows the chart never draws, and the legend would be making a
+ *  claim about the delivery that the query behind it does not support.
+ *
+ *  Returns null when the selection is incomplete (no table/X, or no Y unless
+ *  counting) — the one place both queries decide that. */
+function chartScope(o: ChartQueryBase): {
+  from: string;
+  where: string;
+  ref: (c: string | QualifiedCol) => string;
+  /** Handed back rather than re-derived by the caller: the WHERE above and the
+   *  SELECT list `chartSql` builds branch on the same two facts, and deriving
+   *  them twice is how a filter and an aggregate come to disagree. */
+  counting: boolean;
+  aggregating: boolean;
+} | null {
+  const counting = o.agg === "count";
+  if (!o.table || !o.x) return null;
+  if (!counting && !o.y) return null;
+
+  const joins = o.joins ?? [];
+  const joined = joins.length > 0;
+  const a = o.alias ?? "t0";
+  const ref = (c: string | QualifiedCol) => colRef(c, a, joined);
+  const yr = o.y ? ref(o.y) : "";
+  const aggregating = o.chartType === "bar" && o.agg !== "none";
+  return {
+    from: joined ? fromJoins(o.table, a, joins) : `FROM ${q(o.table)}`,
+    // An aggregate has already collapsed X, so only Y's nulls matter (and a
+    // COUNT counts rows, so none do); a raw plot needs both coordinates.
+    where: aggregating
+      ? counting
+        ? ""
+        : ` WHERE ${yr} IS NOT NULL`
+      : ` WHERE ${ref(o.x)} IS NOT NULL AND ${yr} IS NOT NULL`,
+    ref,
+    counting,
+    aggregating,
+  };
+}
+
 /** Compose the chart query. Returns "" when the selection is incomplete (no
  *  table/X, or no Y unless counting). Scatter/line select raw X/Y (line is
  *  ordered by X); bar with an aggregate GROUP BYs the X category (+ colour).
  *  With `joins`, X/Y/colour are alias-qualified and the JOINs are emitted; the
  *  output aliases (x/y/c) are unchanged so the ECharts mapping is untouched. */
 export function chartSql(o: ChartSqlOpts): string {
-  const { table, x, y, colour, chartType, agg, rowCap } = o;
-  const counting = agg === "count";
-  const aggregating = chartType === "bar" && agg !== "none";
-  const joins = o.joins ?? [];
-  const joined = joins.length > 0;
-  const a = o.alias ?? "t0";
-  if (!table || !x) return "";
-  if (!counting && !y) return "";
-
-  const xr = colRef(x, a, joined);
-  const yr = y ? colRef(y, a, joined) : "";
-  const cr = colour ? colRef(colour, a, joined) : "";
-  const from = joined ? fromJoins(table, a, joins) : `FROM ${q(table)}`;
+  const scope = chartScope(o);
+  if (!scope) return "";
+  const { from, where, ref, counting, aggregating } = scope;
+  const { x, y, colour, chartType, agg, rowCap } = o;
+  const xr = ref(x);
+  const yr = y ? ref(y) : "";
+  const cr = colour ? ref(colour) : "";
   const selC = cr ? `, ${cr} AS c` : "";
   if (aggregating) {
     const yExpr = counting ? "COUNT(*)" : `${agg.toUpperCase()}(${yr})`;
     const groupBy = cr ? `${xr}, ${cr}` : xr;
-    const where = counting ? "" : ` WHERE ${yr} IS NOT NULL`;
     return (
       `SELECT ${xr} AS x, ${yExpr} AS y${selC} ${from}${where}` +
       ` GROUP BY ${groupBy} ORDER BY x LIMIT ${rowCap}`
@@ -177,8 +231,28 @@ export function chartSql(o: ChartSqlOpts): string {
   }
   const order = chartType === "line" ? ` ORDER BY ${xr}` : "";
   return (
-    `SELECT ${xr} AS x, ${yr} AS y${selC} ${from}` +
-    ` WHERE ${xr} IS NOT NULL AND ${yr} IS NOT NULL${order} LIMIT ${rowCap}`
+    `SELECT ${xr} AS x, ${yr} AS y${selC} ${from}${where}${order}` +
+    ` LIMIT ${rowCap}`
+  );
+}
+
+/** Compose the CARDINALITY PROBE that decides which colour-by values keep a
+ *  palette slot: every distinct value with its row count, most rows first.
+ *
+ *  It ranks over the WHOLE table rather than over the plotted rows, and that is
+ *  the point of it. The scatter/line plot query is a bare row `LIMIT` with no
+ *  `ORDER BY`, so the values it happens to return are an arbitrary slice of the
+ *  delivery — folding on their first-appearance order would put a genuinely
+ *  common value into "Other" because it sorted late on disk.
+ *
+ *  Ties break on the value, so the same data always assigns the same colours. */
+export function chartRankSql(o: ChartRankOpts): string {
+  const scope = chartScope(o);
+  if (!scope) return "";
+  const cr = scope.ref(o.colour);
+  return (
+    `SELECT ${cr} AS c, COUNT(*) AS n ${scope.from}${scope.where}` +
+    ` GROUP BY ${cr} ORDER BY n DESC, c ASC LIMIT ${o.cap}`
   );
 }
 

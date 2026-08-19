@@ -14,7 +14,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { JoinSpec, QualifiedCol, SelectOpts } from "./sqlgen";
-import { chartSql, selectSql } from "./sqlgen";
+import { chartSql, chartRankSql, selectSql } from "./sqlgen";
 
 const LOCA_SAMP: JoinSpec = {
   table: "SAMP",
@@ -22,6 +22,20 @@ const LOCA_SAMP: JoinSpec = {
   kind: "LEFT",
   leftAlias: "t0",
   on: [{ left: "LOCA_ID", right: "LOCA_ID" }],
+};
+
+/** The depth-band case: the join carries a half-open range predicate as well as
+ *  its key, which is the part a second composer is most likely to drop. */
+const SAMP_GEOL: JoinSpec = {
+  ...LOCA_SAMP,
+  table: "GEOL",
+  on: [{ left: "LOCA_ID", right: "LOCA_ID" }],
+  range: {
+    baseAlias: "t0",
+    baseCol: "SAMP_TOP",
+    top: "GEOL_TOP",
+    base: "GEOL_BASE",
+  },
 };
 
 /** A complete join-mode request; each test overrides what it is about. */
@@ -228,5 +242,59 @@ describe("join-mode chartSql", () => {
     expect(sql).toContain('AVG(t1."SAMP_TOP") AS y');
     expect(sql).toContain('GROUP BY t0."LOCA_TYPE"');
     expect(sql).toContain('WHERE t1."SAMP_TOP" IS NOT NULL');
+  });
+});
+
+// The colour fold ranks values with a SECOND query, and a second query is a
+// second chance to compose the population differently. If it did — a dropped
+// range predicate, an INNER where the plot LEFTs, the base alias instead of the
+// joined one — it would still return values, still rank them, and still fold:
+// the legend would say "Other" about rows the chart never drew, and nothing
+// downstream could tell.
+describe("the probe ranks over the plot's own population", () => {
+  /** Everything between the SELECT list and the query's own tail — the FROM,
+   *  its joins and the WHERE. The half the two queries must share exactly. */
+  const population = (sql: string) =>
+    sql.slice(sql.indexOf("FROM "), sql.search(/ (GROUP BY|ORDER BY|LIMIT) /));
+
+  const base = {
+    table: "SAMP",
+    joins: [SAMP_GEOL],
+    x: "SAMP_TOP",
+    y: "SAMP_TOP",
+    colour: { alias: "t1", col: "GEOL_LEG" },
+    agg: "none" as const,
+  };
+
+  it.each(["scatter", "line", "bar"] as const)(
+    "composes the same FROM, joins and filter as the %s plot query",
+    (chartType) => {
+      const opts = { ...base, chartType };
+      expect(population(chartRankSql({ ...opts, cap: 3 }))).toBe(
+        population(chartSql({ ...opts, rowCap: 5000 })),
+      );
+    },
+  );
+
+  it("keeps the depth band, and qualifies the colour with the joined alias", () => {
+    const sql = chartRankSql({ ...base, chartType: "scatter", cap: 3 });
+    expect(sql).toContain('LEFT JOIN "GEOL" t1');
+    expect(sql).toContain('t0."SAMP_TOP" >= t1."GEOL_TOP"');
+    expect(sql).toContain('t0."SAMP_TOP" < t1."GEOL_BASE"');
+    expect(sql).toContain('SELECT t1."GEOL_LEG" AS c');
+    expect(sql).toContain('GROUP BY t1."GEOL_LEG"');
+  });
+
+  it("shares the aggregate plot's filter too, which is a different one", () => {
+    // The bar/aggregate arm filters on Y alone. This is the case a probe that
+    // hard-coded the raw plot's `x IS NOT NULL AND y IS NOT NULL` would pass
+    // the three above and still get wrong.
+    const opts = { ...base, chartType: "bar" as const, agg: "avg" as const };
+    expect(population(chartRankSql({ ...opts, cap: 3 }))).toBe(
+      population(chartSql({ ...opts, rowCap: 5000 })),
+    );
+    expect(chartRankSql({ ...opts, cap: 3 })).not.toContain(
+      'WHERE t0."SAMP_TOP" IS NOT NULL AND',
+    );
   });
 });

@@ -1,4 +1,5 @@
 import { theme } from "../shared/lib/theme";
+import { SLOT_COUNT } from "../shared/styles/chartSlots";
 
 // Chart theming from the shared tokens (#410). ECharts is the one renderer
 // that cannot inherit CSS custom properties — it paints a canvas — so the
@@ -8,27 +9,23 @@ import { theme } from "../shared/lib/theme";
 //
 // The palette is the FENCED chart vocabulary, not the brand ramp (#434). The
 // ramp could never do this job: it is a sequential scale, and a categorical
-// channel needs differing hues rather than differing steps. What is here is
-// `--chart-1..5`, whose values, their derivation and their cap all live beside
-// them in shared/styles/charts.css — read that file before changing this list,
-// and re-run the separation gate afterwards rather than trusting either.
+// channel needs differing hues rather than differing steps. What is here is the
+// numbered slots plus the neutral the tail folds into, whose values and their
+// derivation live beside them in shared/styles/charts.css — read that file
+// before changing this one, and re-run the separation gate afterwards rather
+// than trusting either.
 //
-// TWO LIMITS THIS FILE CANNOT ENFORCE, both real:
-//   - Slots 1-3 are the set validated for scatter, where any two marks can sit
-//     side by side; all five are only validated where marks merely touch. This
-//     list hands the full five to every chart form, so a scatter with four or
-//     more series is using a pair that was never checked for it.
-//   - Past five series ECharts cycles and colours repeat outright.
-// Both want the same fix — cap the series count and fold the tail into "Other"
-// — which is behavioural and belongs to the builder, not to a token read.
-// Assignment is still ECharts' series order, so a filter that changes the
-// series count repaints the survivors; entity-stable colour would need the
-// builder to pin colours per value.
+// This is a READ, and how far into the palette a chart form may spend is not
+// something a read can decide: that belongs to the builder, and it takes both
+// ceilings from `shared/styles/chartSlots.ts` (#445). Counting the slots here
+// rather than listing them is what keeps the two from being two numbers.
 const readVar = (name: string): string =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
 export interface ChartTokens {
   palette: string[];
+  /** Where the series past the form's cap go — a neutral, never a sixth hue. */
+  other: string;
   fgSoft: string;
   fgDim: string;
   line: string;
@@ -45,13 +42,10 @@ export function chartTokens(): ChartTokens {
   // signal fires.
   void theme();
   return {
-    palette: [
-      readVar("--chart-1"),
-      readVar("--chart-2"),
-      readVar("--chart-3"),
-      readVar("--chart-4"),
-      readVar("--chart-5"),
-    ],
+    palette: Array.from({ length: SLOT_COUNT }, (_, i) =>
+      readVar(`--chart-${i + 1}`),
+    ),
+    other: readVar("--chart-other"),
     fgSoft: readVar("--fg-soft"),
     fgDim: readVar("--fg-dim"),
     line: readVar("--line"),
