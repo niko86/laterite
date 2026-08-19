@@ -50,6 +50,12 @@ from pathlib import Path
 import pytest
 from python_ags4.check import LATEST_DICT_VERSION, STANDARD_DICT_FILES
 
+# Needs the project environment: this module imports `python_ags4`, a pinned
+# dev-only dependency (and its pandas tail). The buildless `repo-gates` job
+# installs nothing, so it deselects this; the `python` job runs it.
+pytestmark = pytest.mark.needs_env
+
+
 _REPO = Path(__file__).resolve().parents[1]
 _VENDORED = _REPO / "rust-packages/laterite-ags4-validator/data"
 _UNION = _REPO / "rust-packages/laterite-ags4-reference/data/ags_dictionary.json"

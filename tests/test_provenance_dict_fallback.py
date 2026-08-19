@@ -24,6 +24,14 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
+# Needs the built surfaces: this module drives the native `lat` binary as a subprocess. The buildless
+# `repo-gates` job deselects it; the `python` job runs it after the wheel
+# and the CLI exist.
+pytestmark = pytest.mark.needs_env
+
+
 _REPO = Path(__file__).resolve().parents[1]
 _PROVENANCE = _REPO / "rust-packages/laterite-ags4-validator/data/PROVENANCE.md"
 _FIXTURES = _REPO / "rust-packages/laterite-ags4-validator/tests/fixtures/custom_dict"

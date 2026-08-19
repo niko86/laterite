@@ -137,6 +137,14 @@ addopts = "--benchmark-disable"
 markers = [
     "slow: heavy / CI-expensive tests; deselect on the fast path with -m 'not slow'",
     "benchmark: pytest-benchmark perf guards (timings recorded, never gated)",
+    # The root `tests/` suite is overwhelmingly repo-hygiene: it reads files and
+    # compares them. Only a handful import `laterite`, drive the built `lat`
+    # binary, or reach for a dev-only third party, and those few are why the
+    # whole suite used to sit behind a cdylib download and a `cargo build
+    # --release`. This marker names them, so the `repo-gates` job can run
+    # everything else with no build at all. Keeping it honest is
+    # tests/test_build_marker_faithful.py, not reviewer memory.
+    "needs_env: requires the synced project environment (the compiled wheel, the lat binary, or a dev-only third-party dependency); excluded from the buildless repo-gates job",
 ]
 
 [tool.coverage.run]

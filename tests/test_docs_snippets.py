@@ -48,6 +48,12 @@ from pathlib import Path
 
 import pytest
 
+# Needs the built surfaces: this module imports `laterite` to resolve the attribute chains its snippets claim. The buildless
+# `repo-gates` job deselects it; the `python` job runs it after the wheel
+# and the CLI exist.
+pytestmark = pytest.mark.needs_env
+
+
 REPO = Path(__file__).resolve().parents[1]
 DOCS = REPO / "web" / "docs-site" / "docs"
 EXAMPLES = REPO / "web" / "docs-site" / "examples"
