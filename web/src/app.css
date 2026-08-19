@@ -13,6 +13,25 @@
 @import "@shared/styles/tokens.css";
 @import "@shared/styles/tailwind-theme.css";
 
+/* Files that DISCUSS classes without rendering any (#437). Tailwind scans
+   source as raw text and cannot tell code from comment, so a comment naming a
+   complete utility emits it: eslint.config.js cites the palette classes it
+   exists to ban, and was shipping them. Excluded here rather than reworded
+   per-instance, because rewording is a discipline and this is a rule.
+   The auto-detected root is the Vite root (web/), which is why config and test
+   files reach the scan at all; a `.css` comment would not — only .ts/.tsx/.js
+   are scanned, an asymmetry worth knowing before moving prose around. */
+@source not "../eslint.config.js";
+@source not "../vite.config.ts";
+@source not "../scripts";
+/* The docs site renders through MkDocs with its own generated stylesheet, not
+   this bundle — but it sits under the Vite root, so every prose page was being
+   read for class names. Documentation that discusses a utility is the same
+   trap as a comment that does, at the scale of a whole site. */
+@source not "../docs-site";
+@source not "../**/*.test.ts";
+@source not "../**/*.test.tsx";
+
 /* Class-toggled dark mode: `dark:` keys off `.dark` on <html>, set by the
    header toggle (shared theme.ts) — not prefers-color-scheme — with a no-flash
    inline script in index.html applying the persisted/system choice before
