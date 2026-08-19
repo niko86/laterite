@@ -55,6 +55,27 @@ the question that page does not: **when `laterite-py` installs mimalloc as
 > (`fix/mimalloc-coresident-heap-corruption`). Measured results are recorded
 > inline throughout, marked **Measured**.
 
+> [!important] The fault has a second face — recognise it by its precondition
+> #297 recorded `tests/test_docs_snippets.py` as never terminating when selected
+> on its own: CPU-bound, no output, no diagnostic. It was filed as a separate
+> ordering bug, explicitly argued not to be #294, because the shape was a spin
+> rather than corruption. It was this fault. Reconstructed as a 2x2 — our pin
+> (v2 / v3) against pyarrow (inside the window / past it) — with the module's
+> own selection as the probe: only v3 with a pre-25.0.1 pyarrow hangs, and
+> either fix alone clears it. A corrupted free list can spin as readily as it
+> can crash, and which one surfaces depends on allocation order — which is why
+> the module was fine with its siblings collected and not on its own.
+>
+> So do not triage this fault by symptom. The precondition is two co-resident
+> allocators; the symptom is whatever the allocation order makes of it.
+>
+> The pin is now gated off the manifests by
+> `repo:tests/test_allocator_pin_faithful.py`, which discovers every crate that
+> sets a `#[global_allocator]` and asserts the feature. That gate exists because
+> the runtime guard in `repo:packages/laterite/tests/test_public_api_surface.py`
+> can only go red INSIDE the fault window — on a fixed pyarrow it passes
+> whatever the pin says, and the pin is the half we control.
+
 Versions this page is scoped to (`repo:rust-packages/Cargo.lock`,
 `repo:packages/laterite/pyproject.toml`, dev env at 2026-08-13):
 `arrow` **59.2.0**, `pyo3` **0.29.2**, `pyo3-arrow` **0.19.0**,
