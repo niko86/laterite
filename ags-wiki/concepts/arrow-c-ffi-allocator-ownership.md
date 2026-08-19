@@ -42,7 +42,9 @@ the question that page does not: **when `laterite-py` installs mimalloc as
    (§3b). The upstream co-residency reports are **microsoft/mimalloc#1327** and
    **apache/arrow GH-50428**. **Fixed our side by pinning `features = ["v2"]`**
    (PR #301); **fixed upstream in pyarrow 25.0.1**, so the exposure window is
-   pyarrow **24.0.0–25.0.0**.
+   pyarrow **24.0.0–25.0.0**. Read that window as a fact about *which partners
+   happened to be fixed when*, not as the boundary of the fault — see the
+   mechanism note below.
 4. **The `pl.from_pandas` guard stays — but for a different reason than its
    comment claimed.** It never made the pandas path memory-safe, and on the
    pyarrow path it copies nothing at all. It is load-bearing for **dep shape**:
@@ -68,6 +70,24 @@ the question that page does not: **when `laterite-py` installs mimalloc as
 >
 > So do not triage this fault by symptom. The precondition is two co-resident
 > allocators; the symptom is whatever the allocation order makes of it.
+>
+> **The mechanism is narrower than "two mimallocs", and the upstream issue is now
+> closed.** microsoft/mimalloc#1327 records it as macOS-specific: v3 defaulted to
+> **fixed TLS slots 108/109**, which Apple's libpthread reserves for the Swift
+> runtime, so co-resident v3 instances shared those two cells *regardless of
+> symbol visibility*. Either side moving off the fixed slot clears it — which is
+> why a fixed pyarrow was enough on its own. mimalloc **3.4.4** defaults macOS to
+> pthreads TLS and closes it; `libmimalloc-sys` has not vendored that yet, so v3
+> from Rust today is still the faulting build. Tracked with its trigger and
+> re-test procedure in issue #448.
+>
+> Two consequences for reading the version window above. The general case is
+> **any fixed-slot v3 partner**, and Arrow bundles v3 throughout (23.0.0 →
+> 3.1.5, 24.0.0 → 3.2.7, main → 3.3.1), so pyarrow is one instance of a class.
+> And the CPython partner this page and the `Cargo.toml` comment both invoke has
+> **not** been measured: the 3.14 arm run for #447 was GIL-enabled, where
+> CPython's vendored mimalloc is not the active allocator. That needs a
+> free-threaded `3.14t` build before it is stated as fact.
 >
 > The pin is now gated off the manifests by
 > `repo:tests/test_allocator_pin_faithful.py`, which discovers every crate that
