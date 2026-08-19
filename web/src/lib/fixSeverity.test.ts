@@ -49,16 +49,32 @@ describe("fixSeverity", () => {
     expect(fixSeverity(idx, fix("AGS Format Rule 1", null))).toBeUndefined();
   });
 
-  // The other half of #412: a report that simply doesn't mention this fix's
-  // rule is a DIFFERENT absence, and it keeps the long-standing default. If
-  // this goes undefined too, the change has repainted the benign case.
-  it("still defaults to warning when a report exists but omits the rule", () => {
+  // The half #412 left defaulting, decided by #430: a report that never raised
+  // the fix's rule is not a benign gap to paper over with "warning" — it cannot
+  // happen while the two engine paths agree, so the badge has to be able to say
+  // the state is impossible. Asserting "warning" here is what the old default
+  // did; asserting undefined is what makes the impossible state visible.
+  it("has no severity to report when the report never raised the rule", () => {
     const idx = buildSevIndex(
       report([
         { rule: "AGS Format Rule 8", total: 1, items: [finding(2, "fyi")] },
       ]),
     );
-    expect(fixSeverity(idx, fix("AGS Format Rule 1", 3))).toBe("warning");
+    expect(fixSeverity(idx, fix("AGS Format Rule 1", 3))).toBeUndefined();
+    // Same answer for a whole-file fix, which joins through its edits' lines
+    // (none here) and so reaches the rule-only lookup by a second route.
+    expect(fixSeverity(idx, fix("AGS Format Rule 1", null))).toBeUndefined();
+  });
+
+  // The guard on that: a rule the report DID raise still labels, so the change
+  // above cannot be satisfied by returning undefined everywhere.
+  it("still labels a fix whose rule the report raised at another line", () => {
+    const idx = buildSevIndex(
+      report([
+        { rule: "AGS Format Rule 8", total: 1, items: [finding(2, "fyi")] },
+      ]),
+    );
+    expect(fixSeverity(idx, fix("AGS Format Rule 8", 99))).toBe("fyi");
   });
 
   it("prefers the rule+line hit over the rule-wide one", () => {

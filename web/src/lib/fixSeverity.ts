@@ -23,11 +23,12 @@ export interface SevIndex {
   byRule: Map<string, Severity>;
 }
 
-/** `undefined` when there is NO report to join against — distinct from a report
- *  that simply doesn't mention a given rule. Keeping the two apart is the whole
- *  of #412: an empty index answers every lookup with the `"warning"` default
- *  below, which is a defensible guess about a rule the validator didn't flag
- *  and a fabrication about a validator that never ran. */
+/** `undefined` when there is NO report to join against — still a different fact
+ *  from a report that simply doesn't mention a given rule, even though #430 made
+ *  both answer "no label known". This one means nobody looked; the other means
+ *  the validator looked and didn't raise it, which is the state `fixSeverity`
+ *  below argues cannot arise. Answering them from one empty map would merge a
+ *  missing validator into a quiet one, which is the whole of #412. */
 export function buildSevIndex(
   report: ValidationReport | undefined,
 ): SevIndex | undefined {
@@ -48,15 +49,20 @@ export function buildSevIndex(
   return { byRuleLine, byRule };
 }
 
-/** The severity of the finding this fix resolves, or `undefined` when there is
- *  no report to resolve it against — the fix is real, its label is not known.
+/** The severity of the finding this fix resolves, or `undefined` when no label
+ *  is known — the fix is real either way.
  *
- *  The `?? "warning"` below is NOT that case: it answers for a rule the report
- *  ran and didn't raise. It survives #412 deliberately, but it is the same
- *  shape `severityOf` warns about, so if it ever turns out that a fix whose
- *  rule the validator never flagged is an ENGINE disagreement rather than a
- *  benign gap, this is the one line to change — the two absences no longer
- *  share a return value. */
+ *  Two absences reach that `undefined`, and only one of them can happen. There
+ *  may be no report (#412: the labelling `validate` never answered). Or the
+ *  report ran and never raised the fix's rule — which #430 settled as
+ *  unreachable rather than benign: every fixer in `compute_fixes` is gated on
+ *  its numbered rule being a key of the findings it was handed and stamps that
+ *  same key as the fix's `rule`, and those findings come from the same door,
+ *  bytes, dictionary and encoding as this report, which is FYI-inclusive and
+ *  uncapped and carries the warning tier the fix pass leaves off. So the rule
+ *  is always here. If a badge ever says "unlabelled" beside a real fix, the two
+ *  engine paths have diverged — that deserves a loud look, and the `"warning"`
+ *  this used to return would have hidden it behind an ordinary-looking tier. */
 export function fixSeverity(
   idx: SevIndex | undefined,
   f: Fix,
@@ -67,5 +73,5 @@ export function fixSeverity(
     const s = idx.byRuleLine.get(`${f.rule}|${ln}`);
     if (s) return s;
   }
-  return idx.byRule.get(f.rule) ?? "warning";
+  return idx.byRule.get(f.rule);
 }

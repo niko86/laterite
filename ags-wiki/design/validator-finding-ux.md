@@ -228,6 +228,47 @@ Unit-tested at `repo:web/src/lib/fixSeverity.test.ts` — the join lifted out of
 pane precisely so the no-report state is constructible, `web/` having no
 component-test stack.
 
+#### B5b — the arm that could only mean disagreement (2026-08-19, #430)
+
+B5a left one default standing: a fix whose rule the labelling report never
+raised still got `"warning"`. It was kept because the case read as benign — a
+fixer repairing something the validator files under a different rule name. It
+isn't benign; reading the two paths together, it cannot happen at all.
+
+- Every fixer in `repo:rust-packages/laterite-ags4-validator/src/fixes.rs` is
+  gated on `found.contains_key(RULE_X)` / `found.get(RULE_X)` and stamps that
+  same const as the fix's `rule`. Gate key and emitted key are one constant, so
+  a fix's rule is always a key of the findings the fix pass was handed.
+- Both passes enter through the one door,
+  `check_parsed_with_dict(…, &WorldScope::None)`, over the same bytes, encoding
+  and dictionary: the browser's `compute_fixes`
+  (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`) and the labelling
+  `validate` FixPane issues beside it, FYI-inclusive and uncapped.
+- They differ in exactly one option, and it is the harmless direction:
+  `compute_fixes_core` takes `include_warnings` from `CheckOptions::default()`
+  (off), the report runs with it on.
+  `repo:rust-packages/laterite-ags4-validator/src/rules/groups.rs` is the only
+  rule module that reads the flag and none of the eight fixable rules sits
+  behind it — warnings-on merely ADDS the `Warning (Related to Rule N)` labels,
+  and the one key warnings-off can hold alone is the top-level `FYI` bucket,
+  which no fixer gates on.
+
+So the arm returns `undefined` like its siblings, and an `unlabelled` badge
+beside a real fix now *means* something: the two engine paths disagreeing, which
+is worth looking at rather than dressing as an ordinary tier. Checked
+empirically as well as structurally — a throwaway fix-vs-report differential
+over the private corpus, the repo's own fixtures, and synthetic files for the
+fixers neither exercises, reaching every fixable rule and every `FixKind` with
+no counterexample (run and results on #430, kept out of the tree).
+
+One asymmetry was looked at and left alone. The pane guards the REPORT resource
+on `loading`, not the fixes one, so the mirror-image staleness — this file's
+report labelling the previous file's fixes — is prevented only by ordering: both
+ops go to the same worker in declaration order and `computeFixes` replies before
+the `validate` behind it (`repo:web/src/lib/engineDispatch.ts`). That holds
+today; it is a property of the queue rather than of the guard, and #431's
+component-test seam is where it would be pinned.
+
 ## Decisions — Workstream A (locked 2026-05-30)
 
 From the A1 (data-model) + A2 (rule matrix) doc pair → user decisions:
