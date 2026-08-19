@@ -14,6 +14,13 @@
 @source "./components";
 @source "./demo";
 
+/* The exclusion half (#437), same reasoning as the app's entry: the root is
+   auto-detected even where the sources above are explicit, so this build reads
+   the shared tree's tests and its own config too. */
+@source not "./vite.config.ts";
+@source not "./**/*.test.ts";
+@source not "../src/**/*.test.ts";
+
 /* The one token this surface retunes. The docs read long-form on the lighter
    --stone-100; the landing page takes the step below it so cards lift harder
    against it (see the shared colors.css). Light-only BY SELECTOR: this rule
