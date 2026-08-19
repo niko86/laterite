@@ -21,15 +21,51 @@ So: a ban on the pattern class that caused the first, and a live check against
 than a hand-written list, so a new `tools/*.py` cannot fall out of coverage
 without this test noticing.
 
+WHY THE BLOCK ITSELF IS STILL DECLARED, NOT DERIVED (#313). The obvious repair
+for a hand-maintained list that needs its own test suite is to derive it —
+compute each job's required outputs from the paths it reads. It was considered
+and rejected, and this note is here so it is not re-proposed as if it were new.
+Deriving reproduces the hand-maintained declaration ONE LAYER UP: something
+still has to state which paths a job reads, and that statement needs its own
+test to police it. The complaint was never that the list is declared. It was
+that the declaration was only checkable HALFWAY — the patterns were guarded and
+the wiring under them was not. Closing it end-to-end is what derivation was
+really being asked to buy, and it is what the wiring tests below do.
+
+TWO SHAPES OF BLIND GATE, because they need different questions asked (#295):
+
+  NARROWED INPUT    — the gate runs, and silently sees less than its name
+                      claims. `check_dropin_surface` skipping `ast.Assign`;
+                      `check_doc_refs` requiring a `/` in a backticked token.
+                      The fix is for a gate that drops input to SAY what it
+                      dropped, so the scope is visible the first time it runs.
+
+  MISMATCHED TRIGGER — the gate is correct and never fires on a change it
+                      should judge. #207; and the two wasm release ceilings
+                      riding in `ts-lint` on a TS filter (#455). Reporting
+                      dropped input cannot surface this: on a run where the
+                      gate never fired there is no report, and on one where it
+                      did it dropped nothing. The fix is to state what a gate
+                      READS and check the trigger covers it — which is this
+                      file's whole job for the one gate it can see.
+
 `_matches` reimplements the picomatch subset these filters use. It was verified
 against the real `picomatch` (via `web/node_modules`) over every tracked file
 in the repo — exact agreement, including the negation semantics that produced
-#230. Re-run whenever a filter is added, and say what it covered, because the
-number is the only thing that shows the claim is not stale:
+#230. Re-run whenever a PATTERN is added — not whenever a filter is, which is
+what let this go stale — and say what it covered, because the number is the
+only thing that shows the claim is not stale:
 
   #230 (four filters)   1385 paths x every pattern, exact agreement
   #313 (five filters)   1453 paths x 40 patterns = 58120 pairs, exact agreement
                         — `prose` joined for the cadence gate
+  #313 (now gated)      1653 paths x 42 patterns = 69426 pairs, exact agreement
+                        — two patterns had landed unre-run; the count is
+                          asserted below now, so a third cannot. Agreement is
+                          under picomatch's `dot: true`, which is what
+                          dorny/paths-filter matches with — at the default the
+                          two part company on 32 dotfile pairs, all of the
+                          `rust-packages/** vs .../.gitignore` shape.
 """
 
 from __future__ import annotations
@@ -117,6 +153,37 @@ def test_matcher_semantics(pattern: str, path: str, *, expected: bool) -> None:
     assert _matches(pattern, path) is expected
 
 
+# --- the cross-check's own staleness ------------------------------------------
+#
+# The series in this module's docstring is the only evidence `_matches` still
+# agrees with picomatch. It went stale exactly as you would expect a manual
+# protocol to: its trigger was "whenever a FILTER is added" while what
+# invalidates it is a new PATTERN, so two patterns landed unre-run and the
+# newest entry was being read as a statement about the present (#313).
+#
+# The cross-check stays manual — it needs `web/node_modules` for the real
+# picomatch, which no Python job has. What is gated is the CLAIM: if the block
+# has moved since the last run, this fails and names the number to re-run at.
+
+SERIES_ENTRY = re.compile(r"#\d+\s*\([^)]*\)\s+(\d+) paths x (\d+) patterns")
+
+
+def test_cross_check_series_is_current(filters: dict[str, list[str]]) -> None:
+    """The newest series entry must describe the block as it is now."""
+    entries = SERIES_ENTRY.findall(__doc__ or "")
+    assert entries, (
+        "the picomatch cross-check series has gone from this module's "
+        "docstring — without it nothing shows `_matches` was ever verified"
+    )
+    claimed = int(entries[-1][1])
+    live = sum(len(patterns) for patterns in filters.values())
+    assert claimed == live, (
+        f"the cross-check's newest entry covers {claimed} patterns; the filters "
+        f"block now has {live}. Re-run it against the real picomatch and add a "
+        "series entry — the old number is not a statement about the present."
+    )
+
+
 # --- #230: the pattern class that made `code` true for the whole repo ---------
 
 
@@ -139,7 +206,7 @@ def test_no_negated_patterns(filters: dict[str, list[str]]) -> None:
     )
 
 
-# --- it still narrows: paths that must NOT buy a 12-minute python job --------
+# --- it still narrows: paths that must NOT buy the heavy python job ----------
 
 
 @pytest.mark.parametrize(
@@ -253,6 +320,113 @@ def test_buildless_ssots_need_no_heavy_job(
     assert not _filter_matches(filters["code"], path), (
         f"{path} fires the heavy jobs again, but its gate runs in `repo-gates`, "
         "which already runs unconditionally — the wheel build buys nothing"
+    )
+
+
+# --- the wiring, one layer below the patterns ---------------------------------
+#
+# Everything above guards the PATTERNS. Nothing guarded what carries their
+# result to the jobs, and that path has three hops, each of which fails the
+# same silent way — an unresolved GitHub expression is the empty string, the
+# condition is false, and the job simply never runs. #207 with green tests.
+#
+#   filters block   `code:` …            the pattern lists above
+#         |         changes.outputs.code: ${{ steps.filter.outputs.code }}
+#         v         `if: needs.changes.outputs.code == 'true'`
+#   the job
+#
+# The middle hop is why these tests read the mapping rather than the filter
+# names directly: an `if:` that names a declared OUTPUT proves nothing if that
+# output is wired to a filter that does not exist. Checking the ends without
+# the middle would report green on exactly the typo it exists to catch.
+#
+# Deliberately NOT a job-to-paths model — that would reproduce the declaration
+# one layer up and need its own test to police it. See the derivation note in
+# this module's docstring.
+
+OUTPUT_REF = re.compile(r"needs\.changes\.outputs\.([A-Za-z0-9_-]+)")
+FILTER_REF = re.compile(r"steps\.filter\.outputs\.([A-Za-z0-9_-]+)")
+
+
+@pytest.fixture(scope="module")
+def workflow() -> dict:
+    return yaml.safe_load(CI.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="module")
+def declared(workflow: dict) -> dict[str, str]:
+    outputs = workflow["jobs"]["changes"].get("outputs")
+    assert outputs, "the `changes` job publishes no outputs; nothing can gate"
+    return outputs
+
+
+def test_consumed_outputs_are_declared(declared: dict[str, str]) -> None:
+    """Every `needs.changes.outputs.X` names an output `changes` publishes.
+
+    The whole raw file is scanned rather than the job `if:` keys, so a
+    reference from a step-level `if:` or an `env:` is held to the same rule.
+    """
+    consumed = set(OUTPUT_REF.findall(CI.read_text(encoding="utf-8")))
+    assert consumed, "nothing consumes the filter outputs — the scan found none"
+    undeclared = sorted(consumed - set(declared))
+    assert not undeclared, (
+        f"these are read but never published by `changes`: {undeclared}. Each "
+        "resolves to the empty string, so its condition is false and the job "
+        "never runs, with every other test here still green (#207)"
+    )
+
+
+def test_declared_outputs_are_consumed(declared: dict[str, str]) -> None:
+    """...and nothing is published that no job reads.
+
+    The other direction, and the cheaper failure: a dead output is a filter
+    someone believed was gating something. It costs nothing at runtime, which
+    is exactly why it survives.
+    """
+    consumed = set(OUTPUT_REF.findall(CI.read_text(encoding="utf-8")))
+    unread = sorted(set(declared) - consumed)
+    assert not unread, (
+        f"these outputs are published and read by nobody: {unread}. Either a "
+        "job lost its `if:`, or the filter is no longer earning its place"
+    )
+
+
+def test_declared_outputs_are_wired_to_real_filters(
+    declared: dict[str, str], filters: dict[str, list[str]]
+) -> None:
+    """The middle hop: each output must resolve to a filter that exists.
+
+    `code: ${{ steps.filter.outputs.cdoe }}` publishes an output whose name is
+    right and whose value is always empty. Both tests above pass on it.
+    """
+    for name, expression in declared.items():
+        referenced = FILTER_REF.findall(str(expression))
+        assert referenced, (
+            f"`changes.outputs.{name}` does not read `steps.filter.outputs.*` "
+            f"at all: {expression!r}"
+        )
+        missing = sorted(set(referenced) - set(filters))
+        assert not missing, (
+            f"`changes.outputs.{name}` reads {missing}, which the filters block "
+            f"does not define — it can only ever be empty. Declared: "
+            f"{sorted(filters)}"
+        )
+
+
+def test_every_filter_reaches_a_job(
+    declared: dict[str, str], filters: dict[str, list[str]]
+) -> None:
+    """And the far end: a filter nobody publishes is a list nothing reads.
+
+    `dorny/paths-filter` computes every filter whether or not it is exposed,
+    so this cannot fail loudly at runtime — the pattern list just sits there
+    looking load-bearing.
+    """
+    exposed = {f for e in declared.values() for f in FILTER_REF.findall(str(e))}
+    stranded = sorted(set(filters) - exposed)
+    assert not stranded, (
+        f"these filters are computed and never published: {stranded}. Nothing "
+        "can gate on them, so their patterns are maintained for no reader"
     )
 
 
