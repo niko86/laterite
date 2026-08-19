@@ -151,7 +151,7 @@ export const ExportPane: Component = () => {
 
         <Show when={error()}>
           {(err) => (
-            <p class="mt-3 rounded-sm border border-line bg-chip px-3 py-2 text-sm text-warn">
+            <p class="mt-3 rounded-sm border border-warn/45 bg-warn-quiet px-3 py-2 text-sm text-warn">
               {err()}
             </p>
           )}
