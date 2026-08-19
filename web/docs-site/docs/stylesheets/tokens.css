@@ -189,8 +189,8 @@
      Both off the ramp with `--chip`, and for the same collision one step up:
      `--line-subtle` WAS `--surface-raised`'s value, so a row ruled
      `border-line-subtle` lost its rule the moment `hover:bg-surface-raised`
-     filled it (#446). The four of them now split the band between
-     `--surface-raised` and the darkest legal chip evenly — there is no slack
+     filled it (#446). `--surface-raised`, these two and `--chip` now split the
+     band between raised and the darkest legal chip evenly — there is no slack
      left in it, and separation.test.ts is what says so. */
   --line: #e4dbd5;
   --line-subtle: #e8e0db;
