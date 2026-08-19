@@ -79,7 +79,16 @@ export const RowCarousel: Component<{
 
   return (
     <div
-      class="mt-4 rounded-lg border border-line bg-surface-raised p-4"
+      /* The raised step was the landing's canvas EXACTLY — this page retunes
+         `--canvas` onto `--surface-raised`'s own value — so the tray had no
+         fill of its own and read as bare page inside a border (#452).
+         It lifts, and the field card below drops a step to make room, which is
+         the order dark has always read in: lifted tray, recessed card. Doing it
+         the other way round — recessing the tray onto `--chip` — costs the nav
+         buttons their hover, since the default Button hovers to that same fill
+         and would dissolve into the tray it sits on. Naming a utility rather
+         than a token here would re-emit it into this bundle (#437). */
+      class="mt-4 rounded-lg border border-line bg-surface p-4 dark:bg-surface-raised"
       style={{ "--band": `var(${props.band})` }}
       role="group"
       aria-label={`Editing row ${props.row + 1} of ${props.schema.code}`}
@@ -120,7 +129,13 @@ export const RowCarousel: Component<{
 
         <Show when={heading()}>
           {(h) => (
-            <div class="min-w-0 flex-1 rounded-md border border-line bg-surface p-3">
+            <div
+              /* A step BELOW the tray, not level with it (#452): light takes
+                 the canvas, dark keeps the surface it always had. This is also
+                 what gives the value input its own step in light, where the
+                 card and the input were one fill told apart by a border. */
+              class="min-w-0 flex-1 rounded-md border border-line bg-canvas p-3 dark:bg-surface"
+            >
               <p class="flex flex-wrap items-baseline gap-2">
                 <Show when={h().key}>
                   <span aria-hidden="true" class="text-(--band)">

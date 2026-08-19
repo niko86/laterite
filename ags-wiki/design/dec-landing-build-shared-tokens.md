@@ -271,6 +271,19 @@ than `prefers-color-scheme` because the app already flips `.dark` on `<html>`
 from a stored-else-system choice applied before first paint, and reusing that
 beats building a second mechanism.
 
+**Class-toggling is two decisions, not one, and only the first is shared.** The
+`.dark` selector above switches the VALUES and lives in the shared layer, so
+every surface gets it by importing. The `dark:` UTILITY VARIANT is declared per
+ENTRY, and Tailwind's default for it is `prefers-color-scheme` — so an entry
+that does not override it drives its dark utilities from the OS while its values
+follow the class. The two agree only while a reader's OS and their stored choice
+agree. #452 found the landing's entry had never declared the override (the app's
+had from the start), which left the demo table with no fill for any dark-machine
+reader viewing the page in light. Both entries now declare it, and
+`repo:web/src/shared/styles/bundle-palette.test.ts` compiles each bundle and
+fails on a dark utility that reached it through a media query — per entry,
+because a new entry starts from the vendor default.
+
 **One token is expected to be retuned per surface.** `--canvas` — the docs read
 long-form on the lighter step, the landing page takes the one below it so cards
 lift harder. Everything else is shared, and a surface reaching for a second

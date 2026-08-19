@@ -7,8 +7,9 @@ import { resolve } from "node:path";
 // The acceptance bar for the app's move onto these tokens was "contrast is
 // verified across the app in both themes, not sampled on one screen" — and a
 // one-off sample is exactly what rots: the next value retune re-fails nothing.
-// So the verification lives here, against the same colors.css every surface
-// renders, computed per WCAG 2.x relative luminance.
+// So the verification lives here, against the palette each surface actually
+// paints — the shared layer plus whatever that surface retunes on top of it
+// (#452) — computed per WCAG 2.x relative luminance.
 //
 // Thresholds are the DESIGN's, not one blanket number, and they live in the
 // assertions below and nowhere else:
@@ -23,13 +24,17 @@ import { resolve } from "node:path";
 //     trade at #406. The gate catches the failure dark actually shipped
 //     with — a wash the dark pass never dialled down (fixed in #403).
 
-const css = readFileSync(resolve(import.meta.dirname, "colors.css"), "utf8");
+const read = (file: string): string =>
+  readFileSync(resolve(import.meta.dirname, file), "utf8");
 
-function block(selector: RegExp): Record<string, string> {
+const css = read("colors.css");
+const landing = read("../../../landing/landing.css");
+
+function block(css: string, selector: RegExp): Record<string, string> {
   const body = css.match(selector)?.[1];
   if (body === undefined) throw new Error(`selector not found: ${selector}`);
   const out: Record<string, string> = {};
-  // Comments in this file legitimately QUOTE declarations; parse only code.
+  // Comments in these files legitimately QUOTE declarations; parse only code.
   const code = body.replace(/\/\*[\s\S]*?\*\//g, "");
   for (const declaration of code.matchAll(/--([\w-]+):\s*([^;]+);/g)) {
     out[declaration[1] as string] = (declaration[2] as string).trim();
@@ -37,9 +42,35 @@ function block(selector: RegExp): Record<string, string> {
   return out;
 }
 
-const light = block(/:root\s*\{([\s\S]*?)\n\}/);
-const dark = { ...light, ...block(/\.dark\s*\{([\s\S]*?)\n\}/) };
-const themes = { light, dark } as const;
+const ROOT = /:root\s*\{([\s\S]*?)\n\}/;
+const DARK = /\.dark\s*\{([\s\S]*?)\n\}/;
+// A light-only retune has to say so in its SELECTOR — colors.css's dark block
+// explains why a bare `:root` would beat the shared dark set on source order.
+const LIGHT_ONLY = /:root:not\(\.dark\)\s*\{([\s\S]*?)\n\}/;
+
+const light = block(css, ROOT);
+const dark = { ...light, ...block(css, DARK) };
+
+// The RENDERED themes, not the authored ones (#452).
+//
+// colors.css names `--canvas` as the one token a surface is expected to retune,
+// and the landing page takes that offer. So the light set above is not what
+// laterite.dev paints, and every threshold below was being asserted about a
+// palette one shipped surface does not use. A surface joins this map by having
+// its stylesheet parsed here, and then costs nothing further: the cases are all
+// `describe.each` over it already.
+//
+// The overlay order is the cascade's, not a convenience: the landing's blocks
+// are imported AFTER colors.css, so its bare `:root` outranks the shared `.dark`
+// (the two tie on specificity), and its `:root:not(.dark)` outranks its own
+// `:root` on specificity.
+const landingRoot = block(landing, ROOT);
+const themes = {
+  light,
+  dark,
+  "landing light": { ...light, ...landingRoot, ...block(landing, LIGHT_ONLY) },
+  "landing dark": { ...dark, ...landingRoot, ...block(landing, DARK) },
+} as const;
 
 function resolveVar(tokens: Record<string, string>, name: string): string {
   let value = tokens[name];
@@ -154,21 +185,42 @@ it("holds the depth pill's on-fill text to AA where its dark fill applies", () =
 // before any CSS loads, so they carry mirrored hexes of --canvas rather than
 // a var() — the one duplication the platform forces. Mirrors drift; this
 // holds them to the tokens they claim to mirror.
+/** The hex a `theme-color` meta carries FOR one scheme.
+ *
+ *  Bound to the scheme rather than merely present in the file (#452): a mirror
+ *  that holds both hexes and swaps which is which contains every value it is
+ *  supposed to, and paints a light reader's browser chrome in the dark canvas.
+ *  Both shells write `media` ahead of `content`, which is what makes the pair
+ *  readable in a single match. */
+const themeColorFor = (html: string, scheme: string): string | undefined =>
+  html.match(
+    new RegExp(
+      `prefers-color-scheme:\\s*${scheme}\\)"[\\s\\S]{0,120}?content="(#[0-9a-f]{6})"`,
+      "i",
+    ),
+  )?.[1];
+
 describe("the chrome mirrors of --canvas", () => {
   it("theme-color metas carry both themes' canvas", () => {
-    const html = readFileSync(
-      resolve(import.meta.dirname, "../../../index.html"),
-      "utf8",
-    );
-    expect(html).toContain(`content="${resolveVar(light, "canvas")}"`);
-    expect(html).toContain(`content="${resolveVar(dark, "canvas")}"`);
+    const html = read("../../../index.html");
+    expect(themeColorFor(html, "light")).toBe(resolveVar(light, "canvas"));
+    expect(themeColorFor(html, "dark")).toBe(resolveVar(dark, "canvas"));
+  });
+
+  // The landing carries its own pair, and they have to mirror the RETUNED
+  // canvas rather than the shared one — the same blind spot as the thresholds
+  // above, on the one value #452 is about moving.
+  it("the landing's theme-color metas carry the landing's canvas", () => {
+    const html = read("../../../landing/index.html");
+    for (const scheme of ["light", "dark"] as const) {
+      expect(themeColorFor(html, scheme), `${scheme} meta`).toBe(
+        resolveVar(themes[`landing ${scheme}`], "canvas"),
+      );
+    }
   });
 
   it("manifest splash carries the dark canvas", () => {
-    const config = readFileSync(
-      resolve(import.meta.dirname, "../../../vite.config.ts"),
-      "utf8",
-    );
+    const config = read("../../../vite.config.ts");
     const canvas = resolveVar(dark, "canvas");
     expect(config).toContain(`theme_color: "${canvas}"`);
     expect(config).toContain(`background_color: "${canvas}"`);
