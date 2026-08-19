@@ -568,12 +568,6 @@ jobs:
   docs-vs-released-wasm:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      # Where the two run steps below look for the package. `gen_doc_outputs.py`
-      # reads this (see `_wasm_pkg()`) and symlinks it into the examples' own
-      # `node_modules`, which is how their `@laterite/ags4-wasm` import resolves —
-      # the same seam `LAT_BIN` is for the CLI examples.
-      WASM_PKG_DIR: ${{ runner.temp }}/released-wasm/node_modules/@laterite/ags4-wasm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
@@ -589,6 +583,18 @@ jobs:
           cd "$work"
           npm init -y >/dev/null
           npm install @laterite/ags4-wasm
+          # Where the steps below look for the package. `gen_doc_outputs.py`
+          # reads this (see `_wasm_pkg()`) and symlinks it into the examples' own
+          # `node_modules`, which is how their `@laterite/ags4-wasm` import
+          # resolves — the same seam `LAT_BIN` is for the CLI examples.
+          #
+          # Published from HERE, derived from `$work`, rather than declared as a
+          # job-level `env:` — the `runner` context is not available in one, and
+          # GitHub rejects the WHOLE FILE for using it there, which is a startup
+          # failure: no job runs, no `notify` fires, and the only trace is a run
+          # with no jobs in it. Deriving it from `$work` also means the install
+          # path and the read path cannot drift apart.
+          echo "WASM_PKG_DIR=$work/node_modules/@laterite/ags4-wasm" >> "$GITHUB_ENV"
       - name: State what is under test
         run: |
           set -euo pipefail
