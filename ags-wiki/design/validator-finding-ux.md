@@ -191,6 +191,8 @@ FYI-backed fixes then read alike, and the FYI explainer above suppresses itself
 The cure is to stop letting one return value mean two absences. `buildSevIndex`
 returns `undefined` for **no report**; a report that merely doesn't raise a given
 rule still yields the `"warning"` default, so the benign gap is not repainted.
+(That last clause is **superseded by B5b below** — the gap turned out not to be
+benign, or reachable, and the default is gone.)
 `fixSeverity` is therefore `Severity | undefined`, and `FixesPanel` renders the
 undefined case as a `muted`/`outline` **`unlabelled`** chip rather than a
 confident tier.
@@ -227,6 +229,54 @@ severities is the right place to close that.
 Unit-tested at `repo:web/src/lib/fixSeverity.test.ts` — the join lifted out of the
 pane precisely so the no-report state is constructible, `web/` having no
 component-test stack.
+
+#### B5b — the arm that could only mean disagreement (2026-08-19, #430)
+
+B5a left one default standing: a fix whose rule the labelling report never
+raised still got `"warning"`. It was kept because the case read as benign — a
+fixer repairing something the validator files under a different rule name. It
+isn't benign; reading the two paths together, it cannot happen at all.
+
+- Every fixer in `repo:rust-packages/laterite-ags4-validator/src/fixes.rs` is
+  gated on `found.contains_key(RULE_X)` / `found.get(RULE_X)` and stamps that
+  same const as the fix's `rule`. Gate key and emitted key are one constant, so
+  a fix's rule is always a key of the findings the fix pass was handed.
+- Both passes enter through the one door,
+  `check_parsed_with_dict(…, &WorldScope::None)`, over the same bytes, encoding
+  and dictionary: the browser's `compute_fixes`
+  (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`) and the labelling
+  `validate` FixPane issues beside it, FYI-inclusive and uncapped.
+- They differ in exactly one option, and it is the harmless direction:
+  `compute_fixes_core` takes `include_warnings` from `CheckOptions::default()`
+  (off), the report runs with it on.
+  `repo:rust-packages/laterite-ags4-validator/src/rules/groups.rs` is the only
+  rule module that reads the flag, and no rule in `FIXABLE_RULE_LABELS` sits
+  behind it — warnings-on merely ADDS the `Warning (Related to Rule N)` labels,
+  and the one key warnings-off can hold alone is the top-level `FYI` bucket,
+  which no fixer gates on.
+
+So the arm returns `undefined` like its siblings. What that buys is NOT a
+diagnostic — `unlabelled` is also the chip every fix wears while the labelling
+`validate` is still in flight, which is the common case on every file, so the
+badge alone can never tell you the engines disagreed. It buys the same thing
+`severityOf` bought: a fabricated tier reads exactly like a real one, and a
+missing label doesn't. The join also leans on the report being **uncapped** —
+`max_per_rule` can serialise a rule with a true `total` and zero items, and an
+empty group puts nothing in the index — which is why FixPane passes
+`maxPerRule: null` and why capping that second pass for performance would
+reintroduce the arm rather than merely slim the payload. Checked
+empirically as well as structurally — a throwaway fix-vs-report differential
+over the private corpus, the repo's own fixtures, and synthetic files for the
+fixers neither exercises, reaching every fixable rule and every `FixKind` with
+no counterexample (run and results on #430, kept out of the tree).
+
+The pane guards the REPORT resource on `loading` and not the fixes one, so the
+mirror-image staleness — this file's report labelling the previous file's fixes —
+is prevented by ordering rather than by a guard: both ops go to the same worker
+in declaration order and `computeFixes` replies synchronously in
+`repo:web/src/lib/engineDispatch.ts`, ahead of the `validate` queued behind it.
+Checked, not fixed: a guard there would blank labels on every refetch to buy
+nothing the queue isn't already buying.
 
 ## Decisions — Workstream A (locked 2026-05-30)
 

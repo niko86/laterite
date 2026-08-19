@@ -97,7 +97,7 @@ jobs:
               - 'rust-packages/**'
               # There were two `!` rules here — `!rust-packages/laterite-node/**/*.ts`
               # and the `.json` twin — meant to keep a bench/config-only edit in
-              # laterite-node from firing the ~12-min `python` job. They did the
+              # laterite-node from firing the heavy `python` job. They did the
               # exact opposite (#230). dorny/paths-filter treats each entry as an
               # independent pattern and OR's the results, and picomatch's `!x`
               # matches EVERYTHING THAT IS NOT x — so `!…/*.ts` matched CHANGELOG.md,
@@ -132,7 +132,7 @@ jobs:
               # SSOT paths a gate IN THIS REPO actually reads. That is the rule
               # every block below invokes: an entry earns its place by naming a
               # path some test or step here opens. List a path for a gate that
-              # doesn't run and an SSOT / doc edit fires the ~12-min `python` job
+              # doesn't run and an SSOT / doc edit fires the heavy `python` job
               # for nothing (a README badge bump rebuilding the whole wheel is the
               # visible symptom); leave a live gate's inputs unlisted and it never
               # fires at all (#207). This block used to open by saying the root
@@ -258,7 +258,7 @@ jobs:
               #
               # Wide, but not costly: the job is stdlib + pytest, no wheel, no
               # Rust, ~1s of work. It is deliberately NOT folded into `code` —
-              # that would make a README typo rebuild the wheel in the ~12-min
+              # that would make a README typo rebuild the wheel in the heavy
               # python job, which is how a cheap gate acquires an expensive
               # reputation and then a paths filter that quietly kills it.
               - '**/*.md'
