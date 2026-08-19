@@ -8,7 +8,7 @@
 #     "altair>=5.4",
 #     "folium>=0.17",
 #     "pyproj>=3.6",
-#     "laterite==0.10.1",
+#     "laterite==0.11.0",
 # ]
 # ///
 """laterite — an interactive tour (a marimo notebook).

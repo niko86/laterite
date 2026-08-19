@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["laterite[compat]==0.10.1"]
+# dependencies = ["laterite[compat]==0.11.0"]
 # ///
 """Docs example — run it with `uv run ex05_query_builder.py`, from anywhere.
 

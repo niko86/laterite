@@ -13,8 +13,8 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 
 | version | change |
 |---|---|
-| [Unreleased](#unreleased) | the Node package requires Node >= 22. |
-| [Unreleased](#unreleased) | `@laterite/ags4-wasm` is the slim engine — 749 KiB gzipped instead of 1.81 MiB. |
+| [0.11.0](#0110--2026-08-19) | the Node package requires Node >= 22. |
+| [0.11.0](#0110--2026-08-19) | `@laterite/ags4-wasm` is the slim engine — 749 KiB gzipped instead of 1.81 MiB. |
 | [0.10.0](#0100--2026-08-02) | `diff` and `censor` take an options object too. |
 | [0.9.0](#090--2026-07-30) | every `@laterite/ags4-wasm` export takes an options object. |
 | [0.9.0](#090--2026-07-30) | a synthesised `TRAN` is stamped by the caller, never invented. |
@@ -23,6 +23,8 @@ Every change listed here declares itself breaking — at `0.x` a breaking change
 | [0.6.0](#060--2026-07-04) | The 174 typed-graph classes moved to the `laterite.groups` submodule. |
 
 ## [Unreleased]
+
+## [0.11.0] — 2026-08-19
 
 ### Added
 
@@ -321,7 +323,8 @@ A round of cross-surface I/O-form additions from the modality audit — every ca
 - **`fix()`'s residual findings report at the same errors+warnings tier on every surface.** The re-validation that produces a fix's residual had drifted (Python errors+FYI, Node errors-only, CLI errors+warnings); all three now match each surface's `validate()` default, so a warning a fix leaves behind is reported consistently. ([#294](https://github.com/niko86/laterite/pull/294))
 - **`laterite.compat` raised `SyntaxError` on Python 3.12 / 3.13.** Three `except` clauses used the unparenthesized multi-exception form that only became valid in 3.14; now parenthesized — behaviour unchanged on every version. ([#303](https://github.com/niko86/laterite/pull/303))
 
-[Unreleased]: https://github.com/niko86/laterite/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/niko86/laterite/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/niko86/laterite/releases/tag/v0.11.0
 [0.10.1]: https://github.com/niko86/laterite/releases/tag/v0.10.1
 [0.10.0]: https://github.com/niko86/laterite/releases/tag/v0.10.0
 [0.9.0]: https://github.com/niko86/laterite/releases/tag/v0.9.0
