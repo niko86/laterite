@@ -133,10 +133,20 @@ to be finished by hand.
 
 So when a release adds a target, before cutting `node-v*`:
 
-1. publish that one package from a granular token with **Read and write** on the
-   `@laterite` scope, built from the release's own artifacts;
-2. set its trusted publisher on npmjs.com to match the others;
-3. revoke the token.
+1. `npm login` — NOT a granular token. A token scoped to `@laterite` covers the
+   platform packages and **not** the unscoped `laterite` package, which fails
+   only at the last publish of the sequence, as `403 … You may not perform that
+   action with these credentials`; and `laterite` may additionally carry
+   *Publishing access → Require two-factor authentication and disallow tokens*,
+   which no token satisfies by design. A login session is the account, so it
+   clears both.
+2. publish that one package from the release's own artifacts;
+3. set its trusted publisher on npmjs.com to match the others;
+4. `npm logout`.
+
+`npm publish ./npm/<platform>` needs the leading `./` — `npm/<x>` is npm's
+`owner/repo` shorthand, so without it npm tries to clone `github.com/npm/<x>`
+and reports a git error that names neither the registry nor the directory.
 
 It is a one-time cost per NEW package name, not per release — after step 2 the
 name is on the OIDC path with its siblings. Beware the half-published state if
