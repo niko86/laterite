@@ -7,8 +7,8 @@
 #      engine → must be byte-identical on the rule floor;
 #   2. python-ags4 is the O-N-aware reference, compared via laterite-ags4-parity's
 #      `classify` VERBATIM (no parity logic re-derived → no clean-room drift).
-# (duckdb became a read-only reader in #446 → it does read/parse-agreement
-#  via the `duckdb-parse-check` bin, not findings; #458.)
+# (duckdb became a read-only reader in laterite-dev#446 → it does read/parse-agreement
+#  via the `duckdb-parse-check` bin, not findings; laterite-dev#458.)
 #
 # The OUTPUT-VALUE gate (`xcheck`/`emit-cases` + the case manifest) is a
 # SEPARATE concern and lives in its own lean crate `laterite-ags4-xcheck`, so
@@ -33,7 +33,7 @@ laterite-ags4-parity = { path = "../laterite-ags4-parity" }
 # is the LEAN engine (phf + thiserror + chrono + encoding_rs), so this adds no
 # heavy dep beyond what laterite-ags4-parity already pulls transitively.
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
-# The duckdb read/parse-agreement leg (`duckdb-parse-check`, #458) computes its
+# The duckdb read/parse-agreement leg (`duckdb-parse-check`, laterite-dev#458) computes its
 # reference with the core reader (`read_ags4_bytes`) + the content-addressed
 # keychain — the exact read path the extension mirrors — so a match proves
 # duckdb's `read_ags` agrees with the shipped read path.
@@ -51,7 +51,7 @@ path = "src/main.rs"
 name = "emit-rust"
 path = "src/bin/emit_rust.rs"
 
-# The duckdb read/parse-agreement leg (#458) — checks the read-only extension's
+# The duckdb read/parse-agreement leg (laterite-dev#458) — checks the read-only extension's
 # `read_ags` produces the same content-addressed key set as the core reference.
 [[bin]]
 name = "duckdb-parse-check"

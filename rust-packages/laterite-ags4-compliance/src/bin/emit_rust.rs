@@ -8,7 +8,7 @@
 //! Python surfaces.
 //! This is the *reference* engine every laterite surface (python-laterite /
 //! node / wasm / duckdb) wraps, so its rule FLOOR is the identity the
-//! 4-laterite check holds the bindings to (duckdb left findings in #458).
+//! 4-laterite check holds the bindings to (duckdb left findings in laterite-dev#458).
 //!
 //! Knob choices are the harness invariants (plan §3.3/§3.4): FYI + warnings
 //! **ON** (so the FYI-capable surfaces are comparable), `check_files` **OFF**
