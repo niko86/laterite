@@ -556,10 +556,7 @@ function runValidate(p: Parsed, json: boolean, ndjson: boolean): number {
   // makes it fatal — so refuse rather than silently pick a winner. `lat`'s clap
   // spells this `conflicts_with`; argparse's is `add_mutually_exclusive_group`.
   if (p.flags["no-warnings"] && p.flags["warnings-as-errors"])
-    fail(
-      "--no-warnings and --warnings-as-errors cannot be used together",
-      5,
-    );
+    fail("--no-warnings and --warnings-as-errors cannot be used together", 5);
   const opts: ValidateOptions = {
     warnings: !p.flags["no-warnings"],
     fyi: !!p.flags["show-fyi"],
@@ -606,7 +603,9 @@ function runValidate(p: Parsed, json: boolean, ndjson: boolean): number {
     // leaves by `report.exitCode` alone.
     const lines = [
       head,
-      report.count === 0 ? "  clean — no findings" : `  ${report.count} finding(s)`,
+      report.count === 0
+        ? "  clean — no findings"
+        : `  ${report.count} finding(s)`,
     ];
     if (report.count !== 0) {
       for (const line of report.toNdjson().trimEnd().split("\n")) {

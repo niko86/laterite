@@ -316,6 +316,14 @@
       "status": "keep",
       "removed_in": "— (published surface)",
       "evidence": "Made caller-less on the web by **this** change (#349): the app's Dictionary browser and Template generator read the static union `ags_dictionary.json` via `lib/dict.ts`, which #349 settled as the web's single dict source, so the worker op and client fn were removed. Recorded here per the relic discipline — add the row in the PR that strands the export — but `keep`, on the same grounds as its four siblings above: it is named in `EXPECTED_FUNCTIONS` in BOTH `tools/release/check-wasm-slim.mjs` and `check-wasm-tier1.mjs` and documented available in `web/docs-site/docs/reference/wasm-api.md`, so it is published npm surface. Its TYPE is still load-bearing web-side even with no caller: `web/src/lib/validator.ts` re-exports `StandardDict` from the engine so the local projection must keep conforming to what this export returns."
+    },
+    {
+      "symbol": "`laterite_ags4_validator::is_valid()`",
+      "verify": "`rust-packages/laterite-ags4-validator/src/lib.rs::pub fn is_valid`",
+      "axis": "code",
+      "status": "spotted",
+      "removed_in": "the release that bumps the engine tier off 0.9.0",
+      "evidence": "Renamed to `is_clean` in #321, when a warning stopped failing a file and \"zero findings\" stopped being the verdict — two public `is_valid` in one crate that disagree on a warning-carrying file. Kept as a `#[deprecated]` delegating alias so the rename reaches a crates.io consumer as a warning naming both replacements rather than a build failure; 0 callers in this tree."
     }
   ]
 }

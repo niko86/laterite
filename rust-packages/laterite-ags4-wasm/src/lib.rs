@@ -34,14 +34,15 @@ use laterite_ags4_parse::{ParsedFile, parse_bytes};
 use laterite_ags4_types::sql_type;
 use laterite_ags4_validator::{
     CheckOptions, DictVersion, ValidatorError, WorldScope, check_parsed_with_dict, dict::FALLBACK,
-    findings, fixes, overlay,
+    findings, fixes, overlay, verdict::Verdict,
 };
 // Only `diff` and `merge` read the edition off the file being compared (KEY
 // headings come from the dictionary, so which edition changes what counts as
 // "the same row"). Split out rather than left in the list above so a build
-// without either does not warn — and `-D warnings` is a CI gate.
+// without either does not warn — and `-D warnings` is a CI gate. Nothing goes
+// BETWEEN this comment and its `use`: an unconditional import landing there
+// inherits the gate and takes the conditional one out of it, both at once.
 #[cfg(any(feature = "diff", feature = "merge"))]
-use laterite_ags4_validator::verdict::Verdict;
 use laterite_ags4_validator::{resolve_dict_version, tran_ags_of};
 // Narrower still: only `diff` materialises a `Dictionary` (to read KEY
 // headings off it) — `merge` hands the resolved edition to `MergeOpts` and lets

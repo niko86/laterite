@@ -544,6 +544,7 @@ pub fn laterite_ags4_validator::compute_fixes(&laterite_ags4_parse::ParsedFile, 
 pub fn laterite_ags4_validator::editions_joined(&str) -> alloc::string::String
 pub fn laterite_ags4_validator::fix_document(&[u8], &laterite_ags4_validator::CheckOptions, bool) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::fix_document_selective(&[u8], &laterite_ags4_validator::CheckOptions, bool, core::option::Option<&[alloc::string::String]>, &[alloc::string::String]) -> core::result::Result<laterite_ags4_validator::fixes::FixOutcome, laterite_ags4_validator::error::ValidatorError>
+pub fn laterite_ags4_validator::is_clean(&std::path::Path, &laterite_ags4_validator::CheckOptions) -> core::result::Result<bool, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::is_valid(&std::path::Path, &laterite_ags4_validator::CheckOptions) -> core::result::Result<bool, laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::resolve_dict_version(core::option::Option<laterite_ags4_reference::dict::dict_data::DictVersion>, core::option::Option<&str>) -> core::result::Result<(laterite_ags4_reference::dict::dict_data::DictVersion, laterite_ags4_reference::dict::DictResolution), laterite_ags4_validator::error::ValidatorError>
 pub fn laterite_ags4_validator::tran_ags_of(&laterite_ags4_parse::ParsedFile) -> core::option::Option<alloc::string::String>

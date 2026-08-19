@@ -12,7 +12,11 @@
         "breaking": true
       }
     ],
-    "deprecated": [],
+    "deprecated": [
+      {
+        "text": "**`laterite_ags4_validator::is_valid` is renamed `is_clean`; the old name is deprecated, not removed.** The free function returns `true` when a run produced zero findings — the same answer as the verdict right up until the entry above changed that. Two public `is_valid` in one crate, disagreeing on a warning-carrying file, is a trap set for whoever reaches for the obvious name next, so the one that does not mean the verdict gives the name up. `is_clean` is the house phrase for what it computes: every surface's report already prints `clean (0 findings)`. Same signature, same polarity. The old name stays as a `#[deprecated]` delegating alias — a crates.io consumer should meet this as a warning naming BOTH replacements, since the two now answer different questions and they have to choose, and a hard break would give them nothing to choose from. It is inventoried in the reliquary for deletion in the release that bumps the engine tier."
+      }
+    ],
     "removed": [],
     "fixed": [],
     "security": []

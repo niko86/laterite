@@ -71,7 +71,12 @@ already-parsed file with no path), `check_parsed` (**the CONTENT/WORLD
 door** underneath it, taking an *already-resolved* dictionary — runs CONTENT
 (`rules::run_all`, now crate-private) and WORLD (`world::run`), and is the only
 place that can refuse a `check_files` request with nothing to check against
-rather than silently reporting clean — see [[cert-trust-v2]]), `is_valid`,
+rather than silently reporting clean — see [[cert-trust-v2]]), `verdict::Verdict`
+(the SINGLE producer of the verdict — `exit_code()` derived from `is_valid()`, so
+no surface can compute one and disagree with the other), `is_clean` (called
+`is_valid` until #321, when a warning stopped failing a file and the two answers
+came apart — this one is "did the run find anything", and the rename is what
+stops the next caller reaching for the wrong one),
 `resolve_dict_version` / `tran_ags_of` (so callers can *report* the judged
 edition), and the `CheckOptions` struct (now carrying `custom_dict:
 Option<overlay::CustomDict>`). The crate also re-exports `overlay::{parse_dict,

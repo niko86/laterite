@@ -16,7 +16,7 @@
 use std::path::PathBuf;
 
 use laterite_ags4_validator::{
-    CheckOptions, ValidatorError, check_file, findings, is_valid, parse,
+    CheckOptions, ValidatorError, check_file, findings, is_clean, parse, verdict,
 };
 
 fn fixture(name: &str) -> PathBuf {
@@ -69,13 +69,54 @@ fn missing_file_is_a_hard_error_not_a_finding() {
 }
 
 #[test]
-fn is_valid_mirrors_zero_findings() {
-    // The CLI exit code + `db-to-ags4 --validate` key off `is_valid`.
-    // The conformant fixture is valid; a defect-bearing one is not, and
-    // a missing file is still a hard error (not `false`).
-    assert!(is_valid(&fixture("clean_minimal.ags"), &CheckOptions::default()).unwrap());
-    assert!(!is_valid(&fixture("rule13_no_proj.ags"), &CheckOptions::default()).unwrap());
-    assert!(is_valid(&fixture("does_not_exist.ags"), &CheckOptions::default()).is_err());
+fn is_clean_mirrors_zero_findings() {
+    // What `validate-on-convert` callers key off. The conformant fixture finds
+    // nothing; a defect-bearing one does; a missing file is still a hard error
+    // (not `false`).
+    assert!(is_clean(&fixture("clean_minimal.ags"), &CheckOptions::default()).unwrap());
+    assert!(!is_clean(&fixture("rule13_no_proj.ags"), &CheckOptions::default()).unwrap());
+    assert!(is_clean(&fixture("does_not_exist.ags"), &CheckOptions::default()).is_err());
+}
+
+#[test]
+fn is_clean_is_not_the_verdict() {
+    // The reason for the #321 rename, asserted rather than left to the doc
+    // comment: on a warning-PURE file the two answers differ. Nothing else in
+    // the suite can show it — on a clean file and on an error file they agree,
+    // which is how one name covered both for as long as it did.
+    //
+    // Warning-pure by substitution on the clean fixture: an edition that does
+    // not exist breaks no rule, so the whole report is the one warning. Temp,
+    // not a committed sibling, so it cannot drift away from what it is derived
+    // from. Bytes, so the CRLF that Rule 2a requires survives.
+    use std::io::Write;
+    let bytes = std::fs::read(fixture("clean_minimal.ags")).unwrap();
+    let src = String::from_utf8(bytes)
+        .unwrap()
+        .replace("\"4.2\"", "\"4.9.9\"");
+    let mut f = tempfile::Builder::new().suffix(".ags").tempfile().unwrap();
+    f.write_all(src.as_bytes()).unwrap();
+    f.flush().unwrap();
+
+    // The crate default is errors-only; the warning tier has to be asked for
+    // here, exactly as the binding layer asks for it.
+    let opts = CheckOptions {
+        include_warnings: true,
+        ..CheckOptions::default()
+    };
+    let found = check_file(f.path(), &opts).unwrap();
+    let v = verdict::Verdict::of(&found, false);
+    assert_eq!(
+        (v.errors, v.warnings),
+        (0, 1),
+        "the file must be warning-pure"
+    );
+    assert!(v.is_valid(), "a warning does not fail the file");
+    assert!(
+        !is_clean(f.path(), &opts).unwrap(),
+        "…and yet the run found something — the two answers must differ here, \
+         which is the whole reason for the rename",
+    );
 }
 
 // ---- V1: line-level rules (1, 3, 5, 6) -----------------------------

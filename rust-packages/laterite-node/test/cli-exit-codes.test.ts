@@ -171,7 +171,6 @@ describe("the --tran-* flags", () => {
   });
 });
 
-
 // The two severity dials, which are two dials (#321): one decides what the
 // report SHOWS, the other what it CONCLUDES. This launcher wires both by hand,
 // as do the other two, so the pairing is worth pinning here as well as in the
