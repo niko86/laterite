@@ -7,6 +7,13 @@ Already have code built on `python-ags4`? Swap the import for `laterite.compat`
 and the existing `AGS4_to_dataframe` call works unchanged — same `(tables,
 headings)` 2-tuple, same pandas frames.
 
+!!! tip "Deciding rather than doing?"
+
+    This page is task-shaped. If the question is whether to move at all — what is
+    mirrored, which upstream version you get, and what your CI will do afterwards
+    — start at
+    [Coming from python-ags4](../reference/coming-from-python-ags4.md).
+
 ```python
 --8<-- "python/ex11_compat.py:code"
 ```
