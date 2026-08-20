@@ -12,7 +12,7 @@ import {
   type ValidationReport,
 } from "../../lib/validator";
 import { validate as runValidate } from "../../lib/validatorClient";
-import { engineFailureMessage } from "../../lib/engineFailure";
+import { tier1EngineFailureMessage } from "../../lib/engineFailure";
 import { fileStore } from "../../lib/fileStore";
 import {
   dictVersion,
@@ -291,7 +291,7 @@ export const ValidatePane: Component = () => {
                   when={!report.error}
                   fallback={
                     <span class="text-err">
-                      {engineFailureMessage(report.error, "The validator")}
+                      {tier1EngineFailureMessage(report.error, "The validator")}
                     </span>
                   }
                 >
