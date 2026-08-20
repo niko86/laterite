@@ -1,0 +1,122 @@
+# TEMPORARY — delete this file once #448 has its measurement.
+#
+# This is an INSTRUMENT, not a gate. It is `workflow_dispatch`-only: it never
+# fires on a push, a PR or a schedule, so it cannot fail anyone's build and
+# cannot silently become part of the required set. It is inventoried in
+# `ags-wiki/design/reliquary.json` for exactly that reason — "temporary" survives
+# by nobody remembering, and the reliquary is this repo's answer to that.
+#
+# ## What it measures, and why there is no macOS leg
+#
+# The mimalloc v2 pin (#294/#301) exists for a **macOS-specific** fault: v3
+# defaulted to Apple's fixed TLS slots 108/109, so two co-resident v3 instances
+# shared them. The pin is not platform-gated, so Linux and Windows carry a macOS
+# fix and nobody has measured what it costs them (#448).
+#
+# That question is WITHIN-platform — same box, three binaries — so a macOS
+# baseline would answer a different question. Comparing Linux-v3 against
+# macOS-v2 measures the machines.
+#
+# ## The two legs, and why they are not the same kind of runner
+#
+# Linux runs on the self-hosted pool: a dedicated box is the right instrument
+# for a timing comparison, where GitHub's shared vCPUs are not. Windows has no
+# self-hosted runner, so it takes `windows-2022` — which means the Windows
+# numbers are noisier, and the harness's own drift probe is what says whether
+# they are readable at all rather than a reader having to guess.
+#
+# The harness (`tools/bench/allocator_ab.py`) carries the method: A/B/A ordering,
+# a system-allocator control arm that must separate or the run proves nothing,
+# and a distinct-binary check so a failed feature swap cannot report three
+# readings of the same build.
+
+name: "allocator-bench (temporary, #448)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      reps:
+        description: "Timed runs per arm (more = steadier, slower)"
+        required: false
+        default: "15"
+      size:
+        description: "Fixture size for `forge scale` (e.g. 10MB, 25MB)"
+        required: false
+        default: "25MB"
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The self-hosted pool, by the same label set ci.yml uses.
+          - name: linux (self-hosted)
+            runner: '["self-hosted","linux","x64","laterite-linux"]'
+          # No self-hosted Windows exists; this is the runner release.yml already
+          # builds the Windows wheel on.
+          - name: windows (github-hosted)
+            runner: '"windows-2022"'
+    runs-on: ${{ fromJSON(matrix.runner) }}
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Installed rather than assumed. Both images probably carry a toolchain,
+      # but "probably" is the wrong footing for a measurement: an arm built by a
+      # different compiler than its sibling is not a comparison, and the pin is
+      # what makes the three arms the same build in every respect but the
+      # allocator.
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      # A reading is only attributable if the log says what produced it.
+      - name: State what is under test
+        shell: bash
+        run: |
+          echo "runner:  ${{ matrix.name }}"
+          echo "os:      $(uname -a 2>/dev/null || ver)"
+          rustc --version
+          cargo --version
+          "$(command -v python3 || command -v python)" --version
+
+      # Deliberately NOT sccache/mold: the three arms must be built the same way
+      # as each other, and a shared compile cache that hits for one arm and
+      # misses for another changes nothing about the RUN but wastes the reader's
+      # trust in the build log.
+      - name: Measure
+        shell: bash
+        run: |
+          # `python3` is not a reliable name on the Windows image, where the
+          # interpreter is on PATH as `python`. Resolve it rather than picking
+          # one and finding out on the runner.
+          PY="$(command -v python3 || command -v python)"
+          "$PY" tools/bench/allocator_ab.py \
+            --reps "${{ inputs.reps }}" \
+            --size "${{ inputs.size }}" \
+            2>&1 | tee bench.log
+
+      # The verdict line is the point of the run, so put it where the run is
+      # read rather than only in the log.
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## ${{ matrix.name }}"
+            echo
+            sed -n '/^| arm |/,$p' bench.log
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the readings
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: allocator-bench-${{ strategy.job-index }}
+          path: bench.log
+          retention-days: 14
