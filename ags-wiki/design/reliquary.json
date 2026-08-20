@@ -271,7 +271,7 @@
     },
     {
       "symbol": "`list_rules()` (wasm)",
-      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn list_rules`",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/metadata.rs::pub fn list_rules`",
       "axis": "code",
       "status": "keep",
       "removed_in": "— (published surface)",
@@ -279,7 +279,7 @@
     },
     {
       "symbol": "`version()` (wasm)",
-      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn version`",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/metadata.rs::pub fn version`",
       "axis": "code",
       "status": "keep",
       "removed_in": "— (live caller)",
@@ -287,7 +287,7 @@
     },
     {
       "symbol": "`engine_version()` (wasm)",
-      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn engine_version`",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/metadata.rs::pub fn engine_version`",
       "axis": "code",
       "status": "keep",
       "removed_in": "— (cert-trust, prospective)",
@@ -295,7 +295,7 @@
     },
     {
       "symbol": "`engine_fingerprint()` (wasm)",
-      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn engine_fingerprint`",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/metadata.rs::pub fn engine_fingerprint`",
       "axis": "code",
       "status": "keep",
       "removed_in": "— (cert-trust, prospective)",
@@ -303,7 +303,7 @@
     },
     {
       "symbol": "`build_ags4_ipc()` (wasm)",
-      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn build_ags4_ipc`",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/build.rs::pub fn build_ags4_ipc`",
       "axis": "code",
       "status": "keep",
       "removed_in": "— (published, feature-gated)",
@@ -311,7 +311,7 @@
     },
     {
       "symbol": "`dictionary()` (wasm)",
-      "verify": "`rust-packages/laterite-ags4-wasm/src/lib.rs::pub fn dictionary`",
+      "verify": "`rust-packages/laterite-ags4-wasm/src/dictionary.rs::pub fn dictionary`",
       "axis": "code",
       "status": "keep",
       "removed_in": "— (published surface)",

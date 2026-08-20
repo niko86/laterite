@@ -7,7 +7,7 @@ ags_editions: []
 volatile: [sizes]
 volatile_asof: 2026-08-16
 repo_refs:
-  wasm: "repo:rust-packages/laterite-ags4-wasm/src/lib.rs"
+  wasm: "repo:rust-packages/laterite-ags4-wasm/src"
   manifest: "repo:rust-packages/laterite-ags4-wasm/Cargo.toml"
   deploy: "repo:.github/workflows/deploy-validator.yml"
   release: "repo:.github/workflows/release.yml"
@@ -68,7 +68,7 @@ wasm-pack downloads rejects unless every feature is enabled.
 
 The crate exposes these `#[wasm_bindgen]` entry points — **ten** in every
 build, plus seven more behind the features described below
-(`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`):
+(one module per verb under `repo:rust-packages/laterite-ags4-wasm/src`):
 
 - `validate(bytes, dict_version, include_fyi, encoding, max_per_rule)` → a
   `ValidationReport` JS object — the whole clean-room rule engine run
