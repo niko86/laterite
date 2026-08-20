@@ -33,7 +33,7 @@ than an example's.
 
 The private dev satellite has a monthly twin of this file that takes the local-build
 path, wired into its `compliance-report.yml` after building the extension from
-source. Two gates, two artifacts, one question each; this is the one that runs in
+source.  cadence: compliance-report Two gates, two artifacts, one question each; this is the one that runs in
 the repo the docs live in.
 
 A LOAD failure in local-build mode is ABI drift between pip `duckdb` and the
