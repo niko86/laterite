@@ -9,7 +9,7 @@ repo_refs:
   specs: "repo:web/e2e"
   fixtures: "repo:web/e2e/fixtures"
   workflow: "repo:.github/workflows/e2e.yml"
-related: [validator-site, tech-stack-wasm, docs-site]
+related: [validator-site, tech-stack-wasm, docs-site, dec-web-test-altitude]
 sources: []
 ---
 
@@ -120,3 +120,5 @@ flowchart LR
 - [[validator-site]]
 - [[tech-stack-wasm]]
 - [[docs-site]]
+- [[dec-web-test-altitude]] — why `web/` has no layer between this suite and
+  the unit lane, and what to do instead when a guard wants pinning lower.
