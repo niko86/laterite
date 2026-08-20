@@ -32,6 +32,7 @@
           "--no-warnings": false,
           "--out": true,
           "--show-fyi": false,
+          "--warnings-as-errors": false,
           "<file>": true
         },
         "read": {
@@ -263,6 +264,7 @@
           "--no-warnings": false,
           "--out": true,
           "--show-fyi": false,
+          "--warnings-as-errors": false,
           "<file>": true
         }
       },
@@ -411,6 +413,7 @@
           "--no-warnings": false,
           "--out": true,
           "--show-fyi": false,
+          "--warnings-as-errors": false,
           "<file>": true
         }
       },

@@ -115,6 +115,7 @@ const SPECS: Record<string, Spec> = {
       "no-warnings",
       "out",
       "show-fyi",
+      "warnings-as-errors",
     ],
     valued: ["dict", "dict-version", "encoding", "index", "json-out", "out"],
     positionals: ["<file>"],
@@ -551,9 +552,15 @@ function runValidate(p: Parsed, json: boolean, ndjson: boolean): number {
   const file = p.positionals[0];
   if (!file) fail("validate needs a file", 5);
   if (!existsSync(file)) fail(`${file}: not found`, 3);
+  // The two dials contradict each other — one hides the warning tier, the other
+  // makes it fatal — so refuse rather than silently pick a winner. `lat`'s clap
+  // spells this `conflicts_with`; argparse's is `add_mutually_exclusive_group`.
+  if (p.flags["no-warnings"] && p.flags["warnings-as-errors"])
+    fail("--no-warnings and --warnings-as-errors cannot be used together", 5);
   const opts: ValidateOptions = {
     warnings: !p.flags["no-warnings"],
     fyi: !!p.flags["show-fyi"],
+    warningsAsErrors: !!p.flags["warnings-as-errors"],
     dictVersion: pin(p),
     encoding: str(p.flags["encoding"]),
     checkFiles: !!p.flags["check-files"],
@@ -590,11 +597,17 @@ function runValidate(p: Parsed, json: boolean, ndjson: boolean): number {
     emit(report.toNdjson(), out);
   } else {
     const head = `${file} — ${report.dictVersion} (${report.resolution})`;
+    // What the report SHOWS is a question about findings, not about the verdict
+    // — since #321 a file can pass with warnings on it, and printing
+    // "clean — no findings" over a listed warning would be a lie. The verdict
+    // leaves by `report.exitCode` alone.
     const lines = [
       head,
-      report.isValid ? "  clean — no findings" : `  ${report.count} finding(s)`,
+      report.count === 0
+        ? "  clean — no findings"
+        : `  ${report.count} finding(s)`,
     ];
-    if (!report.isValid) {
+    if (report.count !== 0) {
       for (const line of report.toNdjson().trimEnd().split("\n")) {
         // NDJSON is our own `lat-check --ndjson` output (one flat finding per
         // line), so the shape is known — assert it rather than reading `any`.

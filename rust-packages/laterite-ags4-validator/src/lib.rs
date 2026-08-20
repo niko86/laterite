@@ -26,7 +26,12 @@
 //! - [`check_parsed`] — the same rule run over an already-parsed file. The
 //!   **only** public way in for a caller holding bytes/text rather than a path,
 //!   and the only place that can refuse a request it cannot honestly answer.
-//! - [`is_valid`] — convenience boolean (zero findings).
+//! - [`is_clean`] — convenience boolean (zero findings), named for the
+//!   "clean (0 findings)" line the surfaces print. It answers "did the run find
+//!   anything", which since #321 is **not** the verdict.
+//! - [`verdict::Verdict`] — the verdict, and the only producer of it. Every
+//!   surface asks this rather than deriving its own, so `is_valid` and the
+//!   exit code cannot disagree (#321).
 //! - [`resolve_dict_version`] / [`tran_ags_of`] — exposed so callers
 //!   (e.g. the corpus-QA harness) can *report* which edition a file
 //!   was judged against without re-implementing the policy.
@@ -56,6 +61,7 @@ pub mod findings;
 pub mod fixes;
 pub mod parse;
 pub mod rules;
+pub mod verdict;
 pub mod world;
 
 pub use world::WorldScope;
@@ -488,10 +494,36 @@ fn emit_override_warnings(
     }
 }
 
-/// `true` iff `check_file` produced zero findings. What the CLI exit
-/// code and other validate-on-convert callers key off.
-pub fn is_valid(path: &Path, opts: &CheckOptions) -> Result<bool, ValidatorError> {
+/// `true` iff `check_file` produced zero findings — across whichever tiers
+/// `opts` asked for, so an errors-only `opts` calls a warning-carrying file
+/// clean. "Clean (0 findings)" is what every surface's report already prints;
+/// this is that sentence as a boolean. What validate-on-convert callers key off.
+///
+/// **Not the verdict.** It was called `is_valid` until #321, when the two
+/// questions came apart: a warning is now reported without failing, so this and
+/// [`verdict::Verdict::is_valid`] disagree on the same file. One name for both
+/// was harmless while they coincided and is a trap now — reach for `Verdict`
+/// when you mean "did it pass", and this when you mean "did the run find
+/// anything".
+pub fn is_clean(path: &Path, opts: &CheckOptions) -> Result<bool, ValidatorError> {
     Ok(findings::count(&check_file(path, opts)?) == 0)
+}
+
+/// Renamed to [`is_clean`] — see it for why.
+///
+/// Kept as a delegating alias rather than deleted so the rename reaches a
+/// crates.io consumer as a **warning naming its replacement**, not as a build
+/// failure they have to diagnose. That matters more than usual here: the two
+/// candidate replacements answer different questions now, so a consumer must
+/// choose, and a hard break gives them nothing to choose from. Inventoried in
+/// the reliquary for deletion in the release that bumps the engine tier.
+#[deprecated(
+    since = "0.10.0",
+    note = "renamed: use `is_clean` for \"did the run find anything\", or \
+            `verdict::Verdict::is_valid` for the verdict — since #321 they differ"
+)]
+pub fn is_valid(path: &Path, opts: &CheckOptions) -> Result<bool, ValidatorError> {
+    is_clean(path, opts)
 }
 
 #[cfg(test)]

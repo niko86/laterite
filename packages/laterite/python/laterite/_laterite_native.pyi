@@ -8840,6 +8840,7 @@ def run_check(
     dict_version: Any = ...,
     include_warnings: Any = ...,
     include_fyi: Any = ...,
+    warnings_as_errors: Any = ...,
     check_files: Any = ...,
     encoding: Any = ...,
     dict_path: Any = ...,

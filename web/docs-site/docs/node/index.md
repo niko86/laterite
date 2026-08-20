@@ -20,7 +20,9 @@ console.log(report.isValid, report.count, report.dictVersion, report.resolution)
 ```
 
 `validate(path)` runs the numbered-rules engine and returns a `Report`. `isValid`
-is the headline verdict (zero findings), `count` the number of findings, and
+is the headline verdict — errors only, so a file carrying nothing but warnings is
+valid with a non-zero `count` (pass `{ warningsAsErrors: true }` to make warnings
+fatal). `count` is the number of findings shown, `errors`/`warnings`/`fyi` split it, and
 `dictVersion` / `resolution` tell you which AGS edition the rules came from —
 selected automatically from the file's `TRAN_AGS`, never passed in. Group them by
 rule (the same shape as Python's `by_rule()`):

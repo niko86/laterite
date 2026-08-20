@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
 import { main } from "../ts/cli";
+import { validate } from "../ts/index";
 
 const pkgDir = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const FIX = resolve(
@@ -167,5 +168,74 @@ describe("the --tran-* flags", () => {
     expect(code).not.toBe(0);
     // The message names the rule, which is what proves it came from the library.
     expect(stderr.length).toBeGreaterThan(0);
+  });
+});
+
+// The two severity dials, which are two dials (#321): one decides what the
+// report SHOWS, the other what it CONCLUDES. This launcher wires both by hand,
+// as do the other two, so the pairing is worth pinning here as well as in the
+// cross-launcher gate.
+describe("the severity dials", () => {
+  // Warning-pure by construction: an otherwise clean file whose TRAN_AGS names
+  // an edition that does not exist. No rule is broken, so the verdict turns on
+  // the tier split and nothing else.
+  const WARN_ONLY = resolve(
+    pkgDir,
+    "..",
+    "laterite-ags4-xcheck",
+    "cases",
+    "inputs",
+    "warning_tier_only.ags",
+  );
+
+  it("shows a warning and still exits 0", () => {
+    const { code, stdout } = runCli(["validate", WARN_ONLY]);
+    expect(code).toBe(0);
+    expect(stdout).toContain("1 finding(s)");
+  });
+
+  it("fails on the same file under --warnings-as-errors", () => {
+    const { code, stdout } = runCli([
+      "validate",
+      WARN_ONLY,
+      "--warnings-as-errors",
+    ]);
+    expect(code).toBe(1);
+    // The REPORT is unchanged — only the verdict moved.
+    expect(stdout).toContain("1 finding(s)");
+  });
+
+  it("hides the warning under --no-warnings, and still exits 0", () => {
+    const { code, stdout } = runCli(["validate", WARN_ONLY, "--no-warnings"]);
+    expect(code).toBe(0);
+    expect(stdout).toContain("clean — no findings");
+  });
+
+  it("refuses both dials at once rather than picking a winner", () => {
+    const { code, stderr } = runCli([
+      "validate",
+      WARN_ONLY,
+      "--no-warnings",
+      "--warnings-as-errors",
+    ]);
+    expect(code).toBe(5);
+    expect(stderr).toContain("cannot be used together");
+  });
+
+  it("cannot fail a file that has no warnings to promote", () => {
+    // The control: the dial arms the warning tier, it does not invent one.
+    expect(runCli(["validate", CLEAN, "--warnings-as-errors"]).code).toBe(0);
+  });
+
+  it("reports isValid as the verdict, not as `count === 0`", () => {
+    const shown = validate(WARN_ONLY);
+    expect([shown.count, shown.warnings, shown.errors]).toEqual([1, 1, 0]);
+    expect(shown.isValid).toBe(true);
+    expect(shown.exitCode).toBe(0);
+
+    const fatal = validate(WARN_ONLY, { warningsAsErrors: true });
+    expect(fatal.count).toBe(1);
+    expect(fatal.isValid).toBe(false);
+    expect(fatal.exitCode).toBe(1);
   });
 });

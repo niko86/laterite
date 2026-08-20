@@ -130,6 +130,7 @@
     "src/rules/relational.rs",
     "src/rules/structure.rs",
     "src/rules/typed_values.rs",
+    "src/verdict.rs",
     "src/world.rs"
   ],
   "laterite-transport": [

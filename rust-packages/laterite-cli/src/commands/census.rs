@@ -327,7 +327,12 @@ mod tests {
         for valued in ["--dict-version", "--dict", "--encoding", "--index", "--out"] {
             assert!(arg(valued), "{valued} takes a value");
         }
-        for boolean in ["--no-warnings", "--show-fyi", "--check-files"] {
+        for boolean in [
+            "--no-warnings",
+            "--warnings-as-errors",
+            "--show-fyi",
+            "--check-files",
+        ] {
             assert!(!arg(boolean), "{boolean} is a bare switch");
         }
     }

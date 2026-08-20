@@ -279,6 +279,7 @@ fn severity_str(s: Severity) -> &'static str {
 // not a guarantee, and there were three such copies (#530). Now `lat validate
 // --json`, `laterite`'s report JSON and Node's all come out of one function.
 use laterite_ags4_validator::findings::{findings_json, findings_ndjson};
+use laterite_ags4_validator::verdict::Verdict;
 
 fn err_dict<'py>(
     py: Python<'py>,
@@ -300,7 +301,7 @@ fn err_dict<'py>(
 /// error, exit_code}` (the Python layer raises the mapped exception;
 /// the CLI uses `exit_code` directly).
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, check_files=false, encoding=None, dict_path=None, dict_bytes=None, dict_replace=false, cert=None))]
+#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, warnings_as_errors=false, check_files=false, encoding=None, dict_path=None, dict_bytes=None, dict_replace=false, cert=None))]
 #[allow(clippy::too_many_arguments)]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
@@ -312,6 +313,11 @@ fn run_check<'py>(
     dict_version: Option<String>,
     include_warnings: bool,
     include_fyi: bool,
+    // The VERDICT dial, distinct from the two display dials above (#321): a
+    // warning is shown by default and does not fail, and this opts into it
+    // failing. Passing it without `include_warnings` is inert rather than an
+    // error — there are no warnings in the report to escalate.
+    warnings_as_errors: bool,
     check_files: bool,
     encoding: Option<String>,
     // The custom `--dict` overlay (#568): a path OR raw bytes, plus `dict_replace` to drop
@@ -406,8 +412,17 @@ fn run_check<'py>(
                     items.append(o)?;
                 }
             }
+            // `count` is what the report SHOWS; the verdict is what it
+            // CONCLUDES (#321). Both are emitted so the Python layer never has
+            // to re-derive either — `Report.is_valid` reads `valid`, not
+            // `count == 0`, which is how the two stopped being the same claim.
+            let verdict = Verdict::of(&found, warnings_as_errors);
             d.set_item("count", count)?;
-            d.set_item("exit_code", i32::from(count != 0))?;
+            d.set_item("errors", verdict.errors)?;
+            d.set_item("warnings", verdict.warnings)?;
+            d.set_item("fyi", verdict.fyi)?;
+            d.set_item("valid", verdict.is_valid())?;
+            d.set_item("exit_code", verdict.exit_code())?;
             d.set_item("findings", items)?;
             d.set_item("json", findings_json(&file, &found))?;
             d.set_item("ndjson", findings_ndjson(&found))?;

@@ -7,8 +7,8 @@ the same capability [python-ags4](https://gitlab.com/ags-data-format-wg/ags-pyth
 **Status: V0–V8 + dictionary auto-selection shipped.** Parsing, the
 five bundled standard dictionaries (build-time `phf` codegen, zero
 startup cost) with per-file `TRAN_AGS` edition auto-selection, the
-public API (`check_file` / `check_file_with_dict` / `is_valid` /
-`CheckOptions`), the `lat` CLI, and the full numbered-rule set
+public API (`check_file` / `check_file_with_dict` / `verdict::Verdict` /
+`is_clean` / `CheckOptions`), the `lat` CLI, and the full numbered-rule set
 (Rules 1–20) are implemented, regression-tested, and dogfooded
 against real-world deliveries + cross-checked vs `python-ags4`.
 Deliberate divergences from python are logged in

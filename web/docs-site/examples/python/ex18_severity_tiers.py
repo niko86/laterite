@@ -35,21 +35,22 @@ _EDITION.write_bytes(_FIXTURE.read_bytes().replace(b',"4.1.1",', b',"4.9.9",'))
 # --8<-- [start:code]
 import laterite
 
-# Default: errors + warnings. The unrecognised-edition warning shows.
-print(laterite.read("examples/sample_site_edition.ags").validate().report.count)
+SRC = "examples/sample_site_edition.ags"
 
-# Errors only — the warning is gone, the verdict is clean.
-print(
-    laterite.read("examples/sample_site_edition.ags")
-    .validate(warnings=False)
-    .report.count
-)
+# Default: errors + warnings. The unrecognised-edition warning shows — and the
+# file still PASSES, because only errors decide the verdict.
+shown = laterite.read(SRC).validate().report
+print(shown.count, shown.warnings, shown.is_valid)
 
-assert laterite.read("examples/sample_site_edition.ags").validate().report.count == 1
-assert (
-    laterite.read("examples/sample_site_edition.ags")
-    .validate(warnings=False)
-    .report.count
-    == 0
-)
+# --no-warnings' twin: the warning is hidden. The verdict never moved.
+hidden = laterite.read(SRC).validate(warnings=False).report
+print(hidden.count, hidden.warnings, hidden.is_valid)
+
+# The other dial: same report, opposite verdict.
+strict = laterite.read(SRC).validate(warnings_as_errors=True).report
+print(strict.count, strict.warnings, strict.is_valid)
+
+assert (shown.count, shown.is_valid) == (1, True)
+assert (hidden.count, hidden.is_valid) == (0, True)
+assert (strict.count, strict.is_valid) == (1, False)
 # --8<-- [end:code]

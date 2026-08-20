@@ -449,8 +449,12 @@ export declare function resolveEncodingLabel(label?: string | undefined | null):
  * Severity tiers track importance (like a compiler): errors **and WARNINGs** are
  * returned by default (`includeWarnings` defaults to `true`); pass `false` for
  * errors-only. `includeFyi` (default `false`) adds the low-signal FYI tier.
+ *
+ * Those two decide what the report SHOWS. What it CONCLUDES is decided by
+ * errors alone — `warningsAsErrors` (default `false`) is the separate dial that
+ * makes warnings fatal too, the compiler's `-Werror`. FYIs never fail.
  */
-export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null, cert?: Sidecar | undefined | null): ValidationReport
+export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, warningsAsErrors?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null, cert?: Sidecar | undefined | null): ValidationReport
 
 /**
  * The merge result. `bytes` is the reconciled AGS4 document; `warningsJson` and
@@ -550,7 +554,21 @@ export interface ValidationReport {
   file: string
   dictVersion: string
   resolution: string
+  /** Every finding in the report, whatever its tier — what it SHOWS. */
   count: number
+  /**
+   * The verdict — what it CONCLUDES (#321). Not `count == 0`: a warning is
+   * shown by default and does not fail, so a file can be `valid` with a
+   * non-zero `count`. Always agrees with `exitCode == 0`.
+   */
+  valid: boolean
+  /**
+   * Per-tier counts, so a caller can act on the split without re-walking
+   * `findings`. They sum to `count`.
+   */
+  errors: number
+  warnings: number
+  fyi: number
   /**
    * Did an `index` certificate stand in for the rule engine? Never "the file was not
    * checked": a world check (Rule 20's on-disk half) runs even on a certified read.
