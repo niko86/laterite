@@ -22,6 +22,18 @@ def _src(*parts: str) -> str:
     return _ROOT.joinpath(*parts).read_text(encoding="utf-8")
 
 
+def _crate_src(crate: str) -> str:
+    """Every module of a crate's `src/`, as one text to match against.
+
+    Not `src/lib.rs`: the wasm crate is one module per verb since #381, so the
+    `classify` arm and the severity call these tests look for are two different
+    files. Reading the directory keeps the assertions about the SURFACE rather
+    than about where in it someone last put the code.
+    """
+    src = _ROOT / "rust-packages" / crate / "src"
+    return "\n".join(p.read_text(encoding="utf-8") for p in sorted(src.glob("*.rs")))
+
+
 # The canonical PRODUCER table — the 6 `ValidatorError` variants. The surfaces
 # add two consumer-only kinds no Rust producer emits: `not_utf8` (the validator
 # decodes lossily, so it never surfaces) and `bad_args` (the arg/dispatch layer).
@@ -83,7 +95,7 @@ def test_wasm_io_collapse_is_an_allowlisted_live_divergence():
     allowlist LIVE: the collapse must still be in wasm source AND the producer
     must still say "not_found" for NotFound — else the divergence is gone and this
     allowlist should shrink."""
-    wasm = _src("rust-packages", "laterite-ags4-wasm", "src", "lib.rs")
+    wasm = _crate_src("laterite-ags4-wasm")
     err = _src("rust-packages", "laterite-ags4-validator", "src", "error.rs")
     assert 'ValidatorError::NotFound(_) | ValidatorError::Io { .. } => "io"' in wasm
     assert 'ValidatorError::NotFound(_) => "not_found"' in err
@@ -97,7 +109,7 @@ def test_severity_is_single_sourced_not_debug_derived():
     """Node/wasm stop deriving the severity token from `format!("{:?}")`; the
     emitted tokens are the three canonical ones."""
     for surface in ("laterite-node", "laterite-ags4-wasm"):
-        s = _src("rust-packages", surface, "src", "lib.rs")
+        s = _crate_src(surface)
         assert 'format!("{s:?}").to_lowercase()' not in s, (
             f"{surface} still Debug-derives severity"
         )

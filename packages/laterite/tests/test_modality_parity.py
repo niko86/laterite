@@ -50,7 +50,22 @@ from laterite import transport
 REPO = Path(__file__).parents[3]
 REGISTER = REPO / "modality.json"
 TS = REPO / "rust-packages" / "laterite-node" / "ts"
-WASM_LIB = REPO / "rust-packages" / "laterite-ags4-wasm" / "src" / "lib.rs"
+WASM_SRC = REPO / "rust-packages" / "laterite-ags4-wasm" / "src"
+
+
+def _wasm_source() -> str:
+    """Every module of the wasm crate, as one text to match against.
+
+    The whole `src/`, not `lib.rs`: that crate is one module per verb (#381), so
+    the exports these gates enumerate are spread across it. A single-file read
+    finds nothing and — for the orphan guard — would report every verb as
+    missing rather than saying it had looked in the wrong place.
+    """
+    return "\n".join(
+        p.read_text(encoding="utf-8") for p in sorted(WASM_SRC.glob("*.rs"))
+    )
+
+
 WEB_TRANSPORT = REPO / "web" / "src" / "lib" / "transportClient.ts"
 
 _AGS = "\r\n".join(
@@ -534,7 +549,7 @@ def _wasm_verbs() -> set[str]:
     guard passes while the export is unmapped. Exactly what this test exists to
     prevent.
     """
-    src = WASM_LIB.read_text(encoding="utf-8")
+    src = _wasm_source()
     return set(
         re.findall(r"^#\[wasm_bindgen\]\n(?:^#\[[^\n]*\]\n)*^pub fn (\w+)", src, re.M)
     )
@@ -567,7 +582,7 @@ def _wasm_verb_arity() -> dict[str, int]:
     why-comments, and those contain prose commas that would otherwise be counted
     as parameters (which is exactly how this parser was wrong on first write).
     """
-    src = WASM_LIB.read_text(encoding="utf-8")
+    src = _wasm_source()
     out: dict[str, int] = {}
     for m in re.finditer(
         r"^#\[wasm_bindgen\]\n(?:^#\[[^\n]*\]\n)*^pub fn (\w+)\s*\(", src, re.M
