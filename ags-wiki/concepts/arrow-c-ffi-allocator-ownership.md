@@ -312,8 +312,25 @@ matters, and it is documented in the wild:
   <https://github.com/microsoft/mimalloc/issues/1327> Its shape matches ours
   closely — macOS arm64, a PyO3/abi3 cdylib linking mimalloc through
   `libmimalloc-sys` as `#[global_allocator]`, and a discriminating matrix over
-  extension-version × pyarrow-version. It also records a **third** instance we had
-  only inferred: **CPython 3.14 vendors its own mimalloc v3.3.2**.
+  extension-version × pyarrow-version.
+
+  > [!warning] Corrected — CPython is **not** a third v3 instance
+  > This page previously read that upstream issue as recording a third instance:
+  > *"CPython 3.14 vendors its own mimalloc v3.3.2"*, and `laterite-py`'s
+  > `Cargo.toml` leaned on it as a second reason for the pin. Checked against
+  > CPython's own source, that is false. `Include/internal/mimalloc/mimalloc.h`
+  > carries `MI_MALLOC_VERSION 212` — **v2.1.2** — on both the `3.14` branch and
+  > `main`, and the shipped free-threaded build agrees. v2 takes the contested
+  > macOS TLS slot only under `MI_MALLOC_OVERRIDE`, which CPython never defines;
+  > v3 made fixed slots 108/109 the macOS default for *everyone*, which is the
+  > whole mechanism. **CPython cannot be in this collision.** Three mimallocs
+  > share the process — ours, pyarrow's (`default_memory_pool().backend_name` →
+  > `mimalloc`) and CPython's — and only two were ever in the fault.
+  >
+  > The quoted issue text above is left as written: it is theirs, not ours, and
+  > how it squares with CPython's source is an upstream question. What is settled
+  > is that **we** should not have asserted it. The pin is unaffected — the
+  > pyarrow half is measured and sufficient on its own. See #448.
 - **apache/arrow GH-50428** is the same fault seen from Arrow's side —
   *"pyarrow 24.0.0 regression: co-loading a native extension bundling mimalloc v3
   SIGSEGVs in bundled mimalloc at interpreter teardown"* — **closed**, milestone
