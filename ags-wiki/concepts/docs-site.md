@@ -19,6 +19,7 @@ repo_refs:
   theme_css: "repo:web/docs-site/docs/stylesheets/laterite.css"
   token_sync: "repo:web/scripts/sync-docs-tokens.mjs"
   band_gate: "repo:tests/test_docs_band_containment.py"
+  duckdb_gate: "repo:tests/test_docs_duckdb_examples.py"
   released_legs: "repo:.github/workflows/nightly.yml"
   released_crates: "repo:tools/check_released_crate_readmes.py"
   released_crates_gate: "repo:tests/test_released_crate_readmes.py"
@@ -68,11 +69,17 @@ Key facts:
     row's content was right, so somebody ran it once; nothing re-ran it. Wiring
     a block to an example is therefore not bookkeeping, and an *unwired* output
     block is the actual risk surface — see the orphan-block note below.
-  - *duckdb* — `tests/test_docs_duckdb_examples.py` (dev satellite), env-gated on
-    `LATERITE_DUCKDB_EXT`; per-PR the `.sql` files are include-checked only
-    (`--strict` + `check_paths`), that tree's **monthly `compliance-report.yml`**
-    runs them live against the from-source extension (fail-soft: ABI drift = visible
-    skip, broken snippet = red). `_`-prefixed files (`_install.sql`) are
+  - *duckdb* — `tests/test_docs_duckdb_examples.py`, env-gated, and the one gate
+    here whose subject is **not** built from this tree: `LATERITE_DUCKDB_COMMUNITY=1`
+    installs the PUBLISHED community extension, `LATERITE_DUCKDB_EXT=<path>` loads a
+    local build, and which one ran is printed rather than assumed. Per-PR the `.sql`
+    files are include-checked only (`--strict` + `check_paths`); **nightly's
+    `docs-vs-released-duckdb`** runs them against the published extension, and a
+    local-build twin of this file runs monthly in the dev satellite's
+    `compliance-report.yml`. Fail-soft only where the failure is not about the docs:
+    ABI drift in local-build mode is a visible skip, and so is "the community
+    repository has no build for this DuckDB yet" — a broken snippet is red either
+    way. `_`-prefixed files (`_install.sql`) are
     include-only boilerplate. That "monthly" is a claim about another repo's
     cron, and [[stated-cadences-faithful]] is what holds it to it.
     <!-- cadence: ci --><!-- cadence: compliance-report -->
@@ -407,7 +414,7 @@ the mirror only — keeping the private preview free of the docs.
 ```mermaid
 flowchart LR
   ex["examples/{python,node,cli,duckdb}/*"] -->|--8<-- snippet| page["docs/**.md"]
-  ex -->|subprocess + asserts| gate["per-surface gates: test_docs_examples.py ·<br/>docs-examples.test.ts · test_docs_cli_examples.py (.out) ·<br/>test_docs_duckdb_examples.py (monthly)"]
+  ex -->|subprocess + asserts| gate["per-surface gates: test_docs_examples.py ·<br/>docs-examples.test.ts · test_docs_cli_examples.py (.out) ·<br/>test_docs_duckdb_examples.py (nightly, published ext)"]
   wheel["uv sync --group docs<br/>(local working-tree wheel)"] -->|mkdocstrings introspects| page
   reg["laterite.registry + ags_dictionary.json (eds)"] -->|gen_groups/gen_types| page
   cd["catalogue_data.py<br/>(families, provenance, TYPE_GLOSSARY)"] --> page
