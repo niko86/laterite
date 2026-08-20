@@ -390,6 +390,7 @@ jobs:
       # A gate whose subject depends on the environment must say what it measured
       # — the same reason `gen_doc_outputs.py:_lat()` prints the binary it picked.
       - name: State what is under test
+        id: under-test
         run: |
           set -euo pipefail
           py="$GITHUB_WORKSPACE/.released/bin/python"
@@ -401,11 +402,31 @@ jobs:
           )
           echo "released wheel : $released"
           echo "this tree      : $tree"
-          [ "$released" = "$tree" ] \
-            && echo "same version — any failure below is a real defect" \
-            || echo "TREE IS AHEAD — unreleased API in the docs is expected until the next release"
+          # Whether the tree is AHEAD is a question about commits, not version
+          # strings. `main` keeps the tag's version until the next bump, so a merge
+          # landing after the tag — #468's verdict split, the day 0.11.0 published —
+          # leaves both numbers equal while the documented API has moved on, and this
+          # gate then reports the docs' unreleased API as a defect for however many
+          # weeks pass before the next release. Ask git which commit shipped instead.
+          ahead=true
+          if git fetch --no-tags --depth=1 origin \
+               "+refs/tags/v$released:refs/tags/v$released" >/dev/null 2>&1; then
+            [ "$(git rev-parse "v$released^{commit}")" = "$(git rev-parse HEAD)" ] && ahead=false
+          else
+            # The tag the released artefact was cut from cannot be resolved. Do NOT
+            # quietly fall through to "informational": an undetermined comparison
+            # that turns the gate off is the shape this repo keeps re-learning —
+            # zero is a bad witness. Stay fatal and say why.
+            echo "::warning::cannot resolve refs/tags/v$released — the comparison below is unverified, and this run stays fatal"
+            ahead=false
+          fi
+          echo "tree_ahead=$ahead" >> "$GITHUB_OUTPUT"
+          [ "$ahead" = "false" ] \
+            && echo "this checkout IS v$released — any failure below is a real defect" \
+            || echo "TREE IS AHEAD of v$released — unreleased API in the docs is expected; failures below are reported, not fatal"
       # The actionable class: a documented example that does not RUN.
       - name: Docs examples + snippets execute against the released wheel
+        continue-on-error: ${{ steps.under-test.outputs.tree_ahead == 'true' }}
         run: |
           "$GITHUB_WORKSPACE/.released/bin/python" -m pytest \
             tests/test_docs_examples.py tests/test_docs_snippets.py -q --no-header
@@ -500,6 +521,7 @@ jobs:
           npm install laterite
           npm install @duckdb/node-api || echo "PEER INSTALL FAILED — see the job header"
       - name: State what is under test
+        id: under-test
         run: |
           set -euo pipefail
           work="${RUNNER_TEMP:-/tmp}/released-npm"
@@ -510,15 +532,35 @@ jobs:
           echo "released npm : $released"
           echo "this tree    : $tree"
           echo "optional peer: $peer"
-          [ "$released" = "$tree" ] \
-            && echo "same version — any failure below is a real defect" \
-            || echo "TREE IS AHEAD — unreleased API in the docs is expected until the next release"
+          # Whether the tree is AHEAD is a question about commits, not version
+          # strings. `main` keeps the tag's version until the next bump, so a merge
+          # landing after the tag — #468's verdict split, the day 0.11.0 published —
+          # leaves both numbers equal while the documented API has moved on, and this
+          # gate then reports the docs' unreleased API as a defect for however many
+          # weeks pass before the next release. Ask git which commit shipped instead.
+          ahead=true
+          if git fetch --no-tags --depth=1 origin \
+               "+refs/tags/node-v$released:refs/tags/node-v$released" >/dev/null 2>&1; then
+            [ "$(git rev-parse "node-v$released^{commit}")" = "$(git rev-parse HEAD)" ] && ahead=false
+          else
+            # The tag the released artefact was cut from cannot be resolved. Do NOT
+            # quietly fall through to "informational": an undetermined comparison
+            # that turns the gate off is the shape this repo keeps re-learning —
+            # zero is a bad witness. Stay fatal and say why.
+            echo "::warning::cannot resolve refs/tags/node-v$released — the comparison below is unverified, and this run stays fatal"
+            ahead=false
+          fi
+          echo "tree_ahead=$ahead" >> "$GITHUB_OUTPUT"
+          [ "$ahead" = "false" ] \
+            && echo "this checkout IS node-v$released — any failure below is a real defect" \
+            || echo "TREE IS AHEAD of node-v$released — unreleased API in the docs is expected; failures below are reported, not fatal"
           [ "$peer" != "ABSENT" ] \
             || echo "PEER ABSENT — sql()/at() examples will fail; if the published peerDependencies range is still >=1.5.0 this is the known ETARGET, and the remedy is a release"
       # The actionable class: a documented example that does not RUN. The examples
       # resolve `import … from "laterite"` through a symlink, so pointing it at the
       # installed package is the whole of the swap.
       - name: Docs examples run against the released package
+        continue-on-error: ${{ steps.under-test.outputs.tree_ahead == 'true' }}
         run: |
           set -euo pipefail
           ex="$GITHUB_WORKSPACE/web/docs-site/examples/node"
