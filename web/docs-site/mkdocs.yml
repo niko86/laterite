@@ -226,6 +226,7 @@ nav:
       - DuckDB functions: reference/duckdb-functions.md
       - AGS data types: reference/types.md
       - Group catalogue: reference/groups/
+      - Coming from python-ags4: reference/coming-from-python-ags4.md
       - Known divergences (O-N): reference/divergences.md
       - Support modules: reference/modules.md
       - Python cheatsheet: reference/cheatsheet.md
