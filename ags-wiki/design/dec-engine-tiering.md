@@ -189,6 +189,24 @@ and "validate in progress" are the same thing to a user.
 > Fix with the #359 recipe, shown red against the pre-fix build: "Fix all
 > safe (0)" with no failure line, a dead engine posing as a clean file.
 
+> [!note] Finished in #413: the load line had inherited the same absent affordance
+> The rule above — *the panes without that button must not inherit the
+> sentence* — was applied to the crash line in #391 and not to the load one,
+> which went on ending "Check your connection and try again." on Validate and
+> Fix. Same defect, one branch over: it names a control neither pane renders,
+> and connection advice only reads as advice beside one. `engineFailureMessage`
+> now takes the sentence that closes the load line, and
+> `tier1EngineFailureMessage` is the door the two tier-1 panes come through —
+> they get "Load your file again to retry.", the recovery their shared channel
+> actually gives them. Both wordings live in the module rather than at the call
+> sites, because the choice follows the channel and not the pane.
+>
+> **Left alone on purpose: "the rest of the app is unaffected."** It is true of
+> a transient crash and misleading only when the cause persists, which is a
+> weaker claim than an affordance that is not on the screen — and one voice is
+> worth keeping for it. Explore and the Excel converter keep the default
+> closing sentence, and Excel's pane-side crash suffix stays where #414 put it.
+
 **A failed tier-2 fetch is partial, and must read as partial.** The tab that
 needed it reports and offers retry; tier 1 is precached and untouched. #339's
 lesson was that a failed engine fetch must never become a permanent silent
