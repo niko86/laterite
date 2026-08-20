@@ -8,7 +8,7 @@ import {
 } from "solid-js";
 import { fileStore } from "../../lib/fileStore";
 import { computeFixes, applyFixes, validate } from "../../lib/validatorClient";
-import { engineFailureMessage } from "../../lib/engineFailure";
+import { tier1EngineFailureMessage } from "../../lib/engineFailure";
 import type { Fix } from "../../lib/validator";
 import { severityOf } from "../../lib/validator";
 import type { Severity } from "../validate/FilterBar";
@@ -88,7 +88,7 @@ export const FixPane: Component = () => {
     const e: unknown = fixes.error ?? report.error;
     return e === undefined
       ? undefined
-      : engineFailureMessage(e, "The fix engine");
+      : tier1EngineFailureMessage(e, "The fix engine");
   });
 
   const sevIndex = createMemo(() => buildSevIndex(sevReport()));
