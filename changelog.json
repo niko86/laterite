@@ -5,7 +5,11 @@
   "semver": true,
   "unreleased": {
     "summary": "",
-    "added": [],
+    "added": [
+      {
+        "text": "**A “Coming from python-ags4” page** — the drop-in had no front door. `cookbook/compat.md` is task-shaped (“how do I do X with the shim”); this is arrival-shaped (“I have python-ags4 code and I am deciding”), and the two want different readers and different lifetimes. It carries the one-token claim and why it is structural rather than approximate, the module map with `ags4_cli` named as a deliberate non-mirror, the permanent non-goal of a top-level `python_ags4` import name (it would collide in `site-packages`, and as a separate distribution it would break this repo's own parity oracle), how to read the upstream pin off `compat.PYTHON_AGS4_COMPAT`, and the exit-code answer a migrant actually arrives with. That last one is the #321 half: through `compat.check_file` nothing changes shape because it runs the FYI tier and not the warning tier, and on the native surface a warning is shown without failing the run. The gap list itself is not copied — `compat-surface-gaps.json` is the authority and a copy would be quietly wrong one upstream release later."
+      }
+    ],
     "changed": [
       {
         "text": "**Breaking: a warning no longer fails a validation run.** The severity tiers decided what a report *showed* and what it *concluded* with one dial, so a file whose only blemish was an unrecognised `TRAN_AGS` edition — no rule broken — exited `1` and failed a CI job. Errors decide the verdict now; warnings stay visible by default and are reported, not fatal. Opt back in with `--warnings-as-errors` (CLI), `warnings_as_errors=True` (Python), `warningsAsErrors: true` (Node, wasm) — the compiler's `-Werror`, opt-in for the same reason. `--no-warnings` is unchanged and still controls what you *see*; passing it together with `--warnings-as-errors` is now rejected rather than silently resolved. `Report.is_valid` follows the verdict instead of `count == 0`, so a passing file can carry findings, and new `errors`/`warnings`/`fyi` counts expose the split. Every surface reads one `Verdict` in the validator rather than keeping its own copy of the formula, so `is_valid` and the exit code cannot disagree.",

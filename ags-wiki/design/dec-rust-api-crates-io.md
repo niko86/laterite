@@ -6,7 +6,7 @@ tags: [design, decision, api, rust, crates-io, versioning]
 decided: 2026-07-29
 supersedes: []
 from_gap: []
-related: [dec-facade-parity, api-surface-1.0, dec-rust-drives-python, dec-laterite-ags4-types-leaf, crate-map, crate-dependency-graph, dec-monorepo-structure, dec-duckdb-extension, pyo3-boundary, reliquary]
+related: [dec-engine-publish-automation, dec-facade-parity, api-surface-1.0, dec-rust-drives-python, dec-laterite-ags4-types-leaf, crate-map, crate-dependency-graph, dec-monorepo-structure, dec-duckdb-extension, pyo3-boundary, reliquary]
 sources:
   - "https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html"
   - "https://doc.rust-lang.org/cargo/reference/publishing.html"
@@ -428,6 +428,12 @@ exactly its job rather than a decision anyone had to remember at the keyboard.
 `tools/publish_crates.py` runs it: waves derived from the manifests, a wait for
 each wave to become *resolvable* (not merely uploaded) before the next starts,
 and idempotent so a failure is resumed rather than restarted.
+
+Whether that script should be replaced by `release-plz` was asked before beta
+made the answer load-bearing, and answered **not yet** — with the trigger that
+would reopen it recorded rather than left to memory. See
+[[dec-engine-publish-automation]]; the short version is that the objection is not
+mechanical fit, and "when there are N crates" is explicitly *not* the trigger.
 
 ### Two things crates.io does that only a publish reveals
 
