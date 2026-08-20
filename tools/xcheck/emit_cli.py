@@ -146,16 +146,22 @@ def fix_json(argv0: list[str], case: dict, repo_root: Path) -> dict:
 
 
 def validate_json(argv0: list[str], case: dict, repo_root: Path) -> dict:
-    """`lat validate <fixture> --json` — the triplicated findings-JSON renderer
-    (laterite-py/src/lib.rs, laterite-node/src/lib.rs "ported verbatim",
+    """`lat validate <fixture> --json [flags…]` — the triplicated findings-JSON
+    renderer (laterite-py/src/lib.rs, laterite-node/src/lib.rs "ported verbatim",
     render.rs "byte-identical" by hand-discipline). Store the RAW stdout so any
     drift — structural OR formatting — is a split; the exit code is part of the
     value (a launcher that renders findings but exits 0 is a bug). Run from the
     repo root with the repo-relative path so the render's `file` field is
-    identical across launchers rather than an absolute machine path."""
+    identical across launchers rather than an absolute machine path.
+
+    `input.flags` appends verb flags verbatim. It exists for the severity dials
+    (#321), where the interesting value is the EXIT CODE rather than the render:
+    the same file must pass on all three launchers and fail on all three under
+    `--warnings-as-errors`, and each launcher wires that dial by hand."""
     fixture = case["input"]["fixture"]
+    flags = case["input"].get("flags", [])
     r = subprocess.run(
-        [*argv0, "validate", fixture, "--json"],
+        [*argv0, "validate", fixture, "--json", *flags],
         cwd=repo_root,
         capture_output=True,
         text=True,

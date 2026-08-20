@@ -13,9 +13,11 @@ export type RuleFinding = Omit<Finding, "rule">;
  * conformant, and if not, why".
  *
  * Start with the headline getters. `isValid` is the one most callers branch on —
- * it is `true` iff there are zero findings, which is deliberately *distinct* from
- * the native `ok` flag (`ok` only means the source was parseable enough to
- * validate). `count` is the number of findings, and `exitCode` mirrors what the
+ * it is the engine's VERDICT, which is deliberately *distinct* from the native
+ * `ok` flag (`ok` only means the source was parseable enough to validate) and,
+ * since #321, from "zero findings": a warning is reported without being fatal,
+ * so a valid file can carry findings. `count` is the number of findings —
+ * `errors`/`warnings`/`fyi` split it by tier — and `exitCode` mirrors what the
  * `lat-check` binary would return for the same file, so a CLI wrapper can pass it
  * straight through. The provenance getters — `file`, `dictVersion` (the AGS
  * edition the rules were drawn from), and `resolution` — say *what* was checked
@@ -75,13 +77,28 @@ export class Report {
   get count(): number {
     return this.#r.count;
   }
-  /** `true` iff there are zero findings (distinct from the native `ok`, which
-   * only means "validatable"). */
+  /** The VERDICT (distinct from the native `ok`, which only means
+   * "validatable"). Not `count === 0`: since #321 a warning is reported without
+   * being fatal, so a valid file can carry findings. The engine decides this
+   * once — reading it here rather than recomputing keeps `isValid` and
+   * `exitCode` from ever disagreeing. */
   get isValid(): boolean {
-    return this.#r.count === 0;
+    return this.#r.valid;
   }
   get exitCode(): number {
     return this.#r.exitCode;
+  }
+  /** Findings in the error tier — the only tier that decides the verdict. */
+  get errors(): number {
+    return this.#r.errors;
+  }
+  /** Findings in the warning tier. Fatal only under `warningsAsErrors`. */
+  get warnings(): number {
+    return this.#r.warnings;
+  }
+  /** Findings in the FYI tier. Never fatal. */
+  get fyi(): number {
+    return this.#r.fyi;
   }
   /** All findings, in `lat-check` order: `{rule, line?, group, desc, severity?}`. */
   get findings(): Finding[] {
@@ -109,7 +126,7 @@ export class Report {
   }
 
   toString(): string {
-    const v = this.isValid ? "valid" : `${this.count} finding(s)`;
+    const v = this.count === 0 ? "valid" : `${this.count} finding(s)`;
     return `<Report ${JSON.stringify(this.file)} ${v} dict=${this.dictVersion}>`;
   }
 }

@@ -57,8 +57,20 @@ export const SummaryBanner: Component<{
     `Validated against AGS ${props.report.dict_version} — ${
       RESOLUTION_BLURB[props.report.resolution] ?? props.report.resolution
     }`;
+  // The banner dresses the report by what it FOUND, never by `report.ok` —
+  // which became the verdict in #321, so a warnings-only file is `ok` and would
+  // have been headlined "Clean — 0 findings" over a table of warnings. The tier
+  // counts come off the report itself rather than out of `severityCounts`,
+  // which sums the SERIALIZED findings and undercounts a capped report.
+  const found = () => props.report.finding_count > 0;
   const kind = (): BannerKind =>
-    props.report.ok ? "ok" : onlyFyi() ? "info" : "err";
+    !found()
+      ? "ok"
+      : props.report.errors > 0
+        ? "err"
+        : props.report.warnings > 0
+          ? "warn"
+          : "info";
 
   return (
     <Show
@@ -75,7 +87,7 @@ export const SummaryBanner: Component<{
       <Banner
         kind={kind()}
         headline={
-          <Show when={!props.report.ok} fallback="Clean — 0 findings">
+          <Show when={found()} fallback="Clean — 0 findings">
             <Show
               when={!onlyFyi()}
               fallback={`${props.report.finding_count.toLocaleString()} informational (FYI) finding${
@@ -89,13 +101,10 @@ export const SummaryBanner: Component<{
         detail={against()}
         note={
           <Show
-            when={!props.report.ok && onlyFyi()}
+            when={onlyFyi()}
             fallback={
               <Show
-                when={
-                  !props.report.ok &&
-                  props.report.shown_count < props.report.finding_count
-                }
+                when={props.report.shown_count < props.report.finding_count}
               >
                 Showing the first {props.report.shown_count.toLocaleString()} of{" "}
                 {props.report.finding_count.toLocaleString()} findings (capped

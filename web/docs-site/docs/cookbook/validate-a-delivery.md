@@ -18,7 +18,8 @@ in-process from Python or Node, in SQL from DuckDB, at the shell with
 
     `read(path).validate()` runs the rule engine and returns the
     [`Ags4File`](../learn/read.md), so it chains; the verdict rides on `.report`.
-    `is_valid` and `count` are the headline. `dict_version` and `resolution`
+    `is_valid` is the headline verdict — errors only, so a file whose findings
+    are all warnings passes with a non-zero `count`. `dict_version` and `resolution`
     tell you *which* edition the rules came from — both read straight off the
     file: the edition is taken from `TRAN_AGS`, and `resolution='exact'` means
     that edition was matched on the nose (otherwise laterite falls back to the
@@ -79,8 +80,10 @@ in-process from Python or Node, in SQL from DuckDB, at the shell with
     ```
 
     Add `--json` for machine-readable findings keyed by rule. The exit code is
-    unchanged — `0` for an empty `findings`, `1` when it's populated — so a CI
-    gate can branch without parsing stdout:
+    unchanged — `0` when the file passed, `1` when it did not — so a CI gate can
+    branch without parsing stdout. Note that the two are separate answers: only
+    errors fail a run, so `findings` can be populated on an exit `0`. Add
+    `--warnings-as-errors` if the gate should fail on warnings too:
 
     ```bash
     --8<-- "cli/validate_json.sh:cmd"
@@ -95,5 +98,8 @@ edition from the file's `TRAN_AGS` — the Python/Node `report` and the CLI's
 `--json` carry identical findings. Reach for the CLI in a build gate (exit `1`
 fails the build); reach for `.validate()` when you want to keep working with
 the parsed file in the same process.
+
+How strict that gate is, is your call: see [severity
+tiers](../concepts/severity-tiers.md) for the two dials.
 
 See also: [lat CLI](../reference/cli.md) · [Certify a file](./certify.md)

@@ -74,8 +74,9 @@ Parked on `Ags4File.report` after `.validate()`.
 
 | Method / attr   | Returns         | Notes                                     |
 | --------------- | --------------- | ----------------------------------------- |
-| `.is_valid`     | `bool`          | `True` when zero findings                 |
-| `.count`        | `int`           | number of findings                        |
+| `.is_valid`     | `bool`          | the verdict — `True` when no ERROR        |
+| `.count`        | `int`           | number of findings shown                  |
+| `.errors` / `.warnings` / `.fyi` | `int` | that count, split by tier          |
 | `.dict_version` | `str`           | AGS edition the rules resolved to         |
 | `.resolution`   | `str`           | how that edition was chosen               |
 | `.findings`     | `list[Finding]` | rule · line · group · description         |

@@ -91,13 +91,15 @@ uvx --from laterite lat validate delivery.ags   # try it with no install at all
 lat delivery.ags                       # shorthand for `lat validate`
 lat validate delivery.ags --json       # machine-readable findings
 lat validate delivery.ags --no-warnings   # errors only
+lat validate delivery.ags --warnings-as-errors  # fail on warnings too (-Werror)
 lat fix delivery.ags                   # repair → sibling .fixed.ags (safe fixes)
 lat diff old.ags new.ags               # KEY-aware revision delta
 lat certify delivery.ags               # mint delivery.ags.idx if clean
 lat rules                              # the AGS4 rule catalogue
 ```
 
-Exit codes: `0` clean · `1` findings · `3` unreadable · `4` not AGS4 · `5` bad args · `6` schema.
+Exit codes: `0` passed · `1` failed · `3` unreadable · `4` not AGS4 · `5` bad args · `6` schema.
+Errors decide the verdict; a warning is reported without failing the run.
 `lat --readme` prints the full guide.
 </details>
 

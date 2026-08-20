@@ -50,6 +50,9 @@ report (certify / pack / unpack / lock / unlock / excel) reject them.
     --encoding <name>    source encoding: utf-8 (default) | cp1252 | latin1 |
                          iso-8859-1 | iso-8859-15 (latin1 ≈ Windows-1252)
     --no-warnings        errors only — suppress the WARNING tier (shown by default)
+    --warnings-as-errors fail on warnings too (a compiler's -Werror). Warnings are
+                         shown by default but do not decide the exit code; this
+                         opts into that. Contradicts --no-warnings
     --show-fyi           include FYI-severity findings (e.g. Rule 1)
     --check-files        also run Rule 20's on-disk FILE/<fset>/<name> check
     --json               machine-readable findings (pretty JSON)
@@ -168,8 +171,12 @@ Progress is on stderr; the report on stdout.
 
 ## Exit codes
 
-    0  clean (no findings)
-    1  findings present
+Errors decide the verdict. A warning is REPORTED, not fatal — the exit code and
+the findings table answer different questions, and `--warnings-as-errors` is what
+joins them.
+
+    0  the file passed
+    1  the file failed
     3  file not found / unreadable
     4  not UTF-8 / not an AGS4 file / unsupported AGS edition (3.x) / bad input
     5  bad arguments

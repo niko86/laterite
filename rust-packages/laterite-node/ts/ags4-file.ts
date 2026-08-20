@@ -357,6 +357,7 @@ export class Ags4File {
           opts.dictVersion,
           opts.warnings,
           opts.fyi,
+          opts.warningsAsErrors,
           opts.checkFiles,
           opts.encoding ?? base.encoding,
           dictPath,

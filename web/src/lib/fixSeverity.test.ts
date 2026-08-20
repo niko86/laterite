@@ -15,16 +15,26 @@ const finding = (
   ...(severity ? { severity } : {}),
 });
 
-const report = (findings: RuleGroup[]): ValidationReport => ({
-  ok: false,
-  dict_version: "4.1.1",
-  resolution: "exact",
-  finding_count: findings.reduce((n, g) => n + g.items.length, 0),
-  shown_count: findings.reduce((n, g) => n + g.items.length, 0),
-  findings,
-  error: null,
-  revalidate_reason: null,
-});
+const report = (findings: RuleGroup[]): ValidationReport => {
+  const items = findings.flatMap((g) => g.items);
+  const tier = (s?: string) => items.filter((it) => it.severity === s).length;
+  return {
+    ok: false,
+    valid: false,
+    dict_version: "4.1.1",
+    resolution: "exact",
+    finding_count: items.length,
+    // Errors are the findings with NO `severity` — the engine's encoding, the
+    // same one `severityOf` exists to read (see `finding` above).
+    errors: tier(undefined),
+    warnings: tier("warning"),
+    fyi: tier("fyi"),
+    shown_count: items.length,
+    findings,
+    error: null,
+    revalidate_reason: null,
+  };
+};
 
 const fix = (rule: string, line: number | null): Fix =>
   ({

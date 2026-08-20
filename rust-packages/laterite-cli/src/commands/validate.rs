@@ -6,7 +6,7 @@
 use std::process::exit;
 
 use laterite_ags4_trust::{Request, check};
-use laterite_ags4_validator::{CheckOptions, WorldScope, findings};
+use laterite_ags4_validator::{CheckOptions, WorldScope, findings, verdict::Verdict};
 use laterite_cliutil::{Spinner, write_atomic};
 
 use crate::cli::ValidateArgs;
@@ -95,7 +95,11 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
 
     match result {
         Ok(found) => {
+            // `n` is what the report SHOWS (every tier the caller asked for);
+            // `verdict` is what it CONCLUDES. They stopped being the same
+            // question in #321 — a warning prints and does not fail.
             let n = findings::count(&found);
+            let verdict = Verdict::of(&found, args.warnings_as_errors);
 
             #[cfg(feature = "tui")]
             if args.tui {
@@ -110,7 +114,7 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
                     if let Err(e) = crate::tui::run(&found, name, opts.dict_version) {
                         eprintln!("error: tui: {e}");
                     }
-                    exit(if n == 0 { 0 } else { 1 });
+                    exit(verdict.exit_code());
                 }
                 eprintln!(
                     "note: --tui requires an interactive terminal; using {} output",
@@ -118,7 +122,7 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
                 );
             }
 
-            let code = i32::from(n != 0);
+            let code = verdict.exit_code();
 
             // `--json-out`: always tee a JSON artifact, independent of stdout.
             if let Some(p) = args.json_out.as_deref() {
