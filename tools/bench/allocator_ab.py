@@ -57,6 +57,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
+import platform
 import shutil
 import statistics
 import subprocess
@@ -184,6 +186,40 @@ def time_arm(arm: Arm, fixture: Path, reps: int) -> None:
         arm.times.append((time.perf_counter() - t0) * 1000.0)
 
 
+def state_the_toolchain() -> None:
+    """A reading is only attributable if the output says what produced it.
+
+    This lives here rather than in the workflow because the workflow cannot say
+    it portably: the Linux legs have bash and the self-hosted Windows VM has
+    neither bash nor pwsh on PATH (`release.yml` records both facts). Anything
+    the harness can say about itself, it should."""
+    print(f"platform: {platform.platform()}  python {platform.python_version()}")
+    for tool in ("rustc", "cargo"):
+        try:
+            out = subprocess.run(
+                [tool, "--version"], capture_output=True, text=True, check=True
+            )
+            print(f"{tool}: {out.stdout.strip()}")
+        except (OSError, subprocess.CalledProcessError) as e:
+            raise SystemExit(f"allocator_ab: {tool} is not usable here: {e}") from e
+
+
+def emit(text: str, log: Path) -> None:
+    """stdout for the run log, the file for the artifact, and — on a runner —
+    the job summary, so the verdict lands where the run is actually read rather
+    than only at the bottom of a log nobody opens.
+
+    Done here rather than by piping through `tee` and `sed` in the workflow for
+    the same portability reason as above: that pipeline needs a shell both
+    platforms do not share."""
+    print(text, flush=True)
+    log.write_text(text, encoding="utf-8")
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary:
+        with Path(summary).open("a", encoding="utf-8") as fh:
+            fh.write(text + "\n")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--reps", type=int, default=15, help="timed runs per arm")
@@ -197,6 +233,7 @@ def main() -> int:
     args = ap.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    state_the_toolchain()
     fixture = ensure_fixture(args.size, args.out_dir / f"scale-{args.size}.ags")
 
     built = {label: build_arm(label, args.out_dir) for label in ("v2", "v3", "system")}
@@ -294,8 +331,7 @@ def main() -> int:
             "is at least this large. Worth taking to #448."
         )
 
-    out = "\n".join(lines)
-    print(out, flush=True)
+    emit("\n".join(lines), args.out_dir / "bench.log")
     return 0
 
 

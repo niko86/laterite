@@ -43,6 +43,14 @@ on:
         description: "Fixture size for `forge scale` (e.g. 10MB, 25MB)"
         required: false
         default: "25MB"
+      windows_runner:
+        description: "Windows leg: github-hosted, or the self-hosted box once it is registered on THIS repo"
+        required: false
+        default: github-hosted
+        type: choice
+        options:
+          - github-hosted
+          - self-hosted
 
 permissions:
   contents: read
@@ -57,10 +65,31 @@ jobs:
           # The self-hosted pool, by the same label set ci.yml uses.
           - name: linux (self-hosted)
             runner: '["self-hosted","linux","x64","laterite-linux"]'
-          # No self-hosted Windows exists; this is the runner release.yml already
-          # builds the Windows wheel on.
-          - name: windows (github-hosted)
-            runner: '"windows-2022"'
+          # Windows is switchable, because the good runner is not reachable from
+          # here YET. A self-hosted Windows box exists — `ags5-win11-runner` —
+          # but it is registered on the PRIVATE satellite, and `niko86` is a User
+          # account rather than an Organization, so there are no runner groups to
+          # share it through: a runner belongs to the repo it was configured
+          # against. Asking for those labels here does not fail, it QUEUES, until
+          # the job times out an hour later.
+          #
+          # Registering the same machine a second time against this repo is the
+          # fix (one box can host several runner services). Label it
+          # `laterite-windows`, to match `laterite-linux` and because
+          # `ags5-win11` carries a name that outlived what this repo holds. Then
+          # dispatch with `windows_runner: self-hosted` — no edit needed here.
+          #
+          # Until then the default is `windows-2022`, which release.yml already
+          # builds the Windows wheel on. Its numbers are noisier; the harness's
+          # own noise floor is what says whether they are readable.
+          #
+          # One line on purpose: a folded scalar here keeps its newlines inside
+          # the `${{ }}` (the continuations are more-indented, so YAML does not
+          # fold them), and this is the wrong place to find out whether the
+          # expression parser minds — a bad runner label does not error, it
+          # queues until the timeout.
+          - name: windows (${{ inputs.windows_runner }})
+            runner: "${{ inputs.windows_runner == 'self-hosted' && '[\"self-hosted\",\"windows\",\"x64\",\"laterite-windows\"]' || '\"windows-2022\"' }}"
     runs-on: ${{ fromJSON(matrix.runner) }}
     timeout-minutes: 60
 
@@ -75,48 +104,63 @@ jobs:
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
-      # A reading is only attributable if the log says what produced it.
-      - name: State what is under test
+      # Python comes from uv rather than from the box. The Windows runner has no
+      # interpreter on PATH, and "install Python on the runner" would make the
+      # job depend on hand-configured machine state — the thing a self-healing
+      # pool exists to avoid, and something the github-hosted fallback leg would
+      # not share. This is also the house pattern: nothing here uses
+      # `setup-python`; every workflow gets its interpreter from uv, and
+      # release.yml already proves that path on a self-hosted Windows VM.
+      #
+      # The harness is stdlib-only on purpose, so `--no-project` is enough — no
+      # sync, no lockfile, no wheel build.
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+
+      # SPLIT BY SHELL, copying release.yml, which learned both of these on the
+      # very Windows VM this job now targets:
+      #
+      #   * bash is not on PATH for the Windows runner service, so `shell: bash`
+      #     is not portable across these legs;
+      #   * the DEFAULT Windows shell is `pwsh` (PowerShell 7+), which is not
+      #     pre-installed — so a step with no `shell:` fails there. `powershell`
+      #     is the built-in 5.1, and `-ExecutionPolicy Bypass` gets past the
+      #     Win11 default of Restricted, per-step rather than machine-wide.
+      #
+      # Everything else the job needs to say — the toolchain versions, the
+      # results table, the job summary — the harness does for itself, precisely
+      # so there is no third shell-shaped step to keep portable.
+      - name: Install Python (Linux / macOS)
+        if: runner.os != 'Windows'
         shell: bash
-        run: |
-          echo "runner:  ${{ matrix.name }}"
-          echo "os:      $(uname -a 2>/dev/null || ver)"
-          rustc --version
-          cargo --version
-          "$(command -v python3 || command -v python)" --version
+        run: uv python install 3.14
+
+      - name: Install Python (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: uv python install 3.14
 
       # Deliberately NOT sccache/mold: the three arms must be built the same way
       # as each other, and a shared compile cache that hits for one arm and
-      # misses for another changes nothing about the RUN but wastes the reader's
-      # trust in the build log.
-      - name: Measure
+      # misses for another changes nothing about the RUN but plenty about how
+      # much the build log can be trusted.
+      - name: Measure (Linux / macOS)
+        if: runner.os != 'Windows'
         shell: bash
-        run: |
-          # `python3` is not a reliable name on the Windows image, where the
-          # interpreter is on PATH as `python`. Resolve it rather than picking
-          # one and finding out on the runner.
-          PY="$(command -v python3 || command -v python)"
-          "$PY" tools/bench/allocator_ab.py \
-            --reps "${{ inputs.reps }}" \
-            --size "${{ inputs.size }}" \
-            2>&1 | tee bench.log
+        run: uv run --no-project python tools/bench/allocator_ab.py --reps "${{ inputs.reps }}" --size "${{ inputs.size }}"
 
-      # The verdict line is the point of the run, so put it where the run is
-      # read rather than only in the log.
-      - name: Summary
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo "## ${{ matrix.name }}"
-            echo
-            sed -n '/^| arm |/,$p' bench.log
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Measure (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        run: uv run --no-project python tools/bench/allocator_ab.py --reps "${{ inputs.reps }}" --size "${{ inputs.size }}"
 
       - name: Keep the readings
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: allocator-bench-${{ strategy.job-index }}
-          path: bench.log
+          path: output/allocator-ab/bench.log
           retention-days: 14
+          if-no-files-found: warn
