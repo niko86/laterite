@@ -254,7 +254,7 @@ as stable):
   `repo:rust-packages/laterite-cli/src/commands/merge.rs`), `laterite.merge(*sources, …)`
   (N-ary PyO3, `merge_files` in `repo:rust-packages/laterite-py/src/lib.rs`), Node `merge(sources[], …)`
   (N-ary napi, `repo:rust-packages/laterite-node/src/lib.rs` + `ts/index.ts`), and the browser
-  **Tools → Merge** tab (2-file only, `repo:rust-packages/laterite-ags4-wasm/src/lib.rs::merge` +
+  **Tools → Merge** tab (2-file only, `repo:rust-packages/laterite-ags4-wasm/src/merge.rs::merge` +
   `repo:web/src/components/tools/MergeTool.tsx`) — one leaf, four surfaces, the CLI/Python/Node paths
   N-ary while the browser UI is deliberately pairwise. The `lat merge` door above is itself one tool
   behind three launchers — the native binary, `uvx --from laterite lat`, and `npx laterite` — and
@@ -298,7 +298,7 @@ as stable):
   is, so it re-runs on every call. See [[cert-trust-v2]]. Consumers: all four surfaces
   (`repo:rust-packages/laterite-cli/src/commands/{validate,certify}.rs`,
   `repo:rust-packages/laterite-py/src/lib.rs`, `repo:rust-packages/laterite-node/src/lib.rs`,
-  `repo:rust-packages/laterite-ags4-wasm/src/lib.rs`).
+  `repo:rust-packages/laterite-ags4-wasm/src/certify.rs`).
 - `laterite-py` — the PyO3 cdylib behind the `laterite` wheel ([[pyo3-boundary]]).
 - `laterite-ags4-wasm` — the browser cdylib ([[tech-stack-wasm]]).
 - `laterite-ags4-tokenizer-wasm` — a SEPARATE, deliberately tiny browser cdylib (#533, part of the

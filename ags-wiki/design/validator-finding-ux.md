@@ -244,7 +244,7 @@ isn't benign; reading the two paths together, it cannot happen at all.
 - Both passes enter through the one door,
   `check_parsed_with_dict(…, &WorldScope::None)`, over the same bytes, encoding
   and dictionary: the browser's `compute_fixes`
-  (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`) and the labelling
+  (`repo:rust-packages/laterite-ags4-wasm/src/fixes.rs`) and the labelling
   `validate` FixPane issues beside it, FYI-inclusive and uncapped.
 - They differ in exactly one option, and it is the harmless direction:
   `compute_fixes_core` takes `include_warnings` from `CheckOptions::default()`

@@ -157,13 +157,20 @@ def test_allowlist_is_live():
 #: Repo path to the wasm surface, whose `WasmOptions::KEYS` consts are the
 #: enforced option vocabulary (see the module docstring for why KEYS and not the
 #: TypeScript interfaces).
-_WASM_LIB = (
-    Path(__file__).parents[3]
-    / "rust-packages"
-    / "laterite-ags4-wasm"
-    / "src"
-    / "lib.rs"
-)
+#:
+#: The whole `src/`, not `lib.rs`: that crate is one module per verb (#381), so
+#: its options structs sit in different files and a single-file read finds none
+#: of them. Reading the directory also means a NEW verb module is covered the
+#: day it lands, with nothing here to remember to update.
+_WASM_SRC = Path(__file__).parents[3] / "rust-packages" / "laterite-ags4-wasm" / "src"
+
+
+def _wasm_source() -> str:
+    """Every module of the wasm crate, as one text to match against."""
+    return "\n".join(
+        p.read_text(encoding="utf-8") for p in sorted(_WASM_SRC.glob("*.rs"))
+    )
+
 
 #: op -> (wasm options struct, allowlist of by-design gaps with the REASON).
 #:
@@ -213,14 +220,16 @@ def _wasm_keys(struct: str) -> set[str]:
     TypeScript. The wasm crate's own `option_keys_match_the_structs` is what
     keeps KEYS honest against the struct; this only has to read it correctly.
     """
-    src = _WASM_LIB.read_text(encoding="utf-8")
+    src = _wasm_source()
     m = re.search(
         rf"impl WasmOptions for {struct}\s*\{{\s*const KEYS[^=]*=\s*&\[(.*?)\];",
         src,
         re.DOTALL,
     )
     if m is None:
-        raise AssertionError(f"no `impl WasmOptions for {struct}` in {_WASM_LIB.name}")
+        raise AssertionError(
+            f"no `impl WasmOptions for {struct}` anywhere in {_WASM_SRC.name}/"
+        )
     keys = set(re.findall(r'"(\w+)"', m.group(1)))
     assert keys, f"{struct}: KEYS parsed as empty — the regex has drifted"
     return keys
