@@ -58,9 +58,24 @@ crate-type = ["cdylib"]
 # extension's copy to v2 as the fix. Measured here: pyarrow 24.0.0/25.0.0
 # corrupt 44 of 50 shapes under v3, 0 of 50 under v2.
 #
-# Do NOT unpin just because pyarrow >=25.0.1 is fixed — we do not control the
-# pyarrow a user installs, and CPython 3.14 vendors its own mimalloc v3 as a
-# second co-residency partner regardless of pyarrow.
+# Do NOT unpin just because pyarrow >=25.0.1 is fixed: we do not control the
+# pyarrow a user installs, and 24.0.0-25.0.0 stay installable forever. That
+# reason stands alone, which matters, because the OTHER reason this comment used
+# to give was false.
+#
+# It claimed CPython 3.14 vendors its own mimalloc v3, making it a second
+# partner regardless of pyarrow. CPython vendors **v2.1.2** —
+# `Include/internal/mimalloc/mimalloc.h`, `MI_MALLOC_VERSION 212`, on both the
+# 3.14 branch and main — and v2 only takes the contested macOS TLS slot under
+# `MI_MALLOC_OVERRIDE`, which CPython never defines. The fault is v3-vs-v3
+# contending for slots 108/109, which v3 made the macOS default for everyone.
+# CPython cannot be in that collision. Three mimallocs share the process (ours,
+# pyarrow's, CPython's); only two were ever in the fault.
+#
+# So the pin has one job — keep US off the fixed slot so we cannot collide with
+# pyarrow — and it costs nothing to keep: measured on both self-hosted runners,
+# v2 and v3 are indistinguishable while the system allocator is 36% (Linux) and
+# 53-63% (Windows) slower. See #448.
 mimalloc = { version = "0.1", features = ["v2"] }
 laterite-ags4-validator = { path = "../laterite-ags4-validator" }
 # The shared parse leaf (#168 Phase 3): the binding parses text/bytes through
