@@ -5,7 +5,7 @@ laterite is a **clean-room** re-implementation of the AGS4 rules, calibrated aga
 (see [Cross-surface parity](../concepts/cross-surface-parity.md)). Two independent implementations of
 one specification will disagree, so every disagreement is written down rather than smoothed over.
 
-**17 of them change what you see.** They are not all the same kind of thing, which is why this
+**18 of them change what you see.** They are not all the same kind of thing, which is why this
 page is grouped by what actually happened rather than filed under one heading: some are deliberate
 differences from python-ags4, some are places the two agree and the *spec* is the outlier, and some are
 laterite's own false negatives that the comparison caught and closed.
@@ -49,7 +49,8 @@ same source, so a record cannot be resolved there and stay live here.
 |---|---|
 | **O-43** | A self-declared but non-standard `PA` abbreviation → a laterite **FYI** (Related to Rule 16). |
 | **O-44** | Structural validation of a file-level `DICT` group → a laterite **WARNING** (Related to Rule 18). |
-| **O-45** | An unrecognised `TRAN_AGS` edition → a laterite **WARNING** (Related to Rule 14), shown by default. |
+| **O-45** | An unrecognised `TRAN_AGS` edition → a laterite **WARNING** (Related to Rule 14), shown by default and **not fatal**. |
+| **O-51** | A custom-dictionary **overlay** that redefines the standard schema is reported — a **WARNING** when it changes row identity (re-parent, KEY demotion), an **FYI** otherwise. |
 
 !!! tip "Reading the tiers"
     Whether a difference surfaces as an **error**, **warning** or **FYI** follows

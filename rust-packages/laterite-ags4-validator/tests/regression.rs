@@ -572,6 +572,12 @@ fn rule_labels_inventory_is_grounded_against_real_emissions() {
         "FYI (Related to Rule 1)",
         "FYI (Related to Rule 16)",
         "Warning (Related to Rule 18)",
+        // The custom-overlay buckets (#568, tiered by #321). No fixture in this
+        // directory can emit them — they need a `--dict` overlay, which is an
+        // option rather than a file — so they are listed for the record rather
+        // than exercised here; `override_*` in the crate's own tests covers them.
+        "DICT",
+        "FYI (Related to DICT)",
     ]
     .into_iter()
     .collect();
