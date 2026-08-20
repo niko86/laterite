@@ -99,10 +99,15 @@ def con():
         except Exception as e:  # pip-duckdb vs extension C-API drift, not a doc break
             pytest.skip(f"extension load failed (ABI drift?): {e}")
 
-    version, mode = c.execute(
+    row = c.execute(
         "SELECT extension_version, install_mode FROM duckdb_extensions()"
         " WHERE extension_name = 'laterite_ags4'"
     ).fetchone()
+    # The LOAD above succeeded, so the row exists — but `fetchone()` is
+    # `… | None` and a bare unpack would raise a TypeError naming the tuple
+    # rather than the missing extension, three lines from the cause.
+    assert row is not None, "laterite_ags4 loaded but duckdb_extensions() omits it"
+    version, mode = row
     print(
         f"\nunder test: laterite_ags4 {version} ({mode}) on duckdb {duckdb.__version__}"
     )
