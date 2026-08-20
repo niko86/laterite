@@ -147,6 +147,10 @@ function added upstream can't quietly go missing here.
 `compat` is a **package** mirroring upstream's own layout, so upstream's import
 shapes work with one token changed:
 
+<!-- doc-snippet: skip — the left-hand lines are UPSTREAM's imports, shown to be
+     replaced. `python_ags4` deliberately does not ship here (see the caveat
+     below), so executing this fence asserts the opposite of what it teaches. -->
+
 ```python
 from python_ags4 import AGS4          # becomes:
 from laterite.compat import AGS4
