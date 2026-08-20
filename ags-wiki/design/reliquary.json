@@ -324,6 +324,14 @@
       "status": "spotted",
       "removed_in": "the release that bumps the engine tier off 0.9.0",
       "evidence": "Renamed to `is_clean` in #321, when a warning stopped failing a file and \"zero findings\" stopped being the verdict — two public `is_valid` in one crate that disagree on a warning-carrying file. Kept as a `#[deprecated]` delegating alias so the rename reaches a crates.io consumer as a warning naming both replacements rather than a build failure; 0 callers in this tree."
+    },
+    {
+      "symbol": "`.github/workflows/allocator-bench.yml` + `tools/bench/allocator_ab.py`",
+      "verify": "`.github/workflows/allocator-bench.yml::allocator-bench (temporary, #448)`",
+      "axis": "code",
+      "status": "spotted",
+      "removed_in": "the PR that records the #448 measurement",
+      "evidence": "Added deliberately temporary, and inventoried in the same change rather than after it. It is an INSTRUMENT, not a gate: `workflow_dispatch`-only, so it never fires on a push, a PR or a schedule and cannot enter the required set. It answers one question — on Linux and Windows, does mimalloc v3 beat the v2 pin by enough to narrow that pin to `cfg(target_os = \"macos\")`? — and once #448 carries the answer there is nothing left for it to measure. A measurement harness kept past its measurement becomes a build cost nobody can justify and nobody dares delete, which is what this row exists to prevent."
     }
   ]
 }
