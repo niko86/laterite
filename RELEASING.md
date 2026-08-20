@@ -119,6 +119,47 @@ nowhere. If skipping feels right, the thing you actually want is per-product
 versions, which is a different scheme; see
 `ags-wiki/design/dec-rust-api-crates-io.md` rather than skipping a tag here.
 
+**A release that adds a platform target needs ONE manual publish first.** Each
+`napi` target in `rust-packages/laterite-node/package.json` is its own npm
+package (`aarch64-unknown-linux-gnu` → `@laterite/native-linux-arm64-gnu`), and
+the npm job authenticates by OIDC alone — deliberately, see the comment on the
+publish step. A trusted publisher is configured *per package* on npmjs.com, so a
+name that has never been published cannot have one, and npm answers `PUT` with
+`404 … could not be found or you do not have permission to access it`. Every
+name on the registry today was created while `NODE_AUTH_TOKEN` still existed
+(dropped 2026-07-30, #174); the first release to add a target after that — 0.11.0,
+carrying arm64 Linux from #316 — failed on exactly this, half-published, and had
+to be finished by hand.
+
+So when a release adds a target, before cutting `node-v*`:
+
+1. `npm login` — NOT a granular token. A token scoped to `@laterite` covers the
+   platform packages and **not** the unscoped `laterite` package, which fails
+   only at the last publish of the sequence, as `403 … You may not perform that
+   action with these credentials`; and `laterite` may additionally carry
+   *Publishing access → Require two-factor authentication and disallow tokens*,
+   which no token satisfies by design. A login session is the account, so it
+   clears both.
+2. publish that one package from the release's own artifacts;
+3. set its trusted publisher on npmjs.com to match the others;
+4. `npm logout`.
+
+`npm publish ./npm/<platform>` needs the leading `./` — `npm/<x>` is npm's
+`owner/repo` shorthand, so without it npm tries to clone `github.com/npm/<x>`
+and reports a git error that names neither the registry nor the directory.
+
+It is a one-time cost per NEW package name, not per release — after step 2 the
+name is on the OIDC path with its siblings. Beware the half-published state if
+you find out the hard way: `napi pre-publish` aborts on the first failure, so the
+targets ahead of the new one in the list are already on the registry, and npm
+refuses to publish over them (`cannot publish over the previously published
+versions`). Re-running the job cannot get past that — finish the remaining
+packages by hand, then `napi pre-publish -t npm --skip-optional-publish` to sync
+the main package's `optionalDependencies` before publishing it. Build from the
+tag's artifacts (`gh run download <the failed run>`), never a fresh local build:
+the published number must carry the same engine every other surface published at
+that number.
+
 > Cutting a release on a **new** tag fires **two** workflow runs — a `push` (tag) run
 > and a `release` run — because GitHub raises both events. That's expected: the `push`
 > run builds + publishes; the `release` run no-ops (jobs skip on `release`). They no
