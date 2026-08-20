@@ -65,7 +65,7 @@
     {
       "id": "browser",
       "label": "Browser (wasm crate + web/src/lib)",
-      "source": "rust-packages/laterite-ags4-wasm/src/lib.rs + web/src/lib/*.ts",
+      "source": "rust-packages/laterite-ags4-wasm/src/*.rs + web/src/lib/*.ts",
       "reflection": "orphan-guard"
     },
     {

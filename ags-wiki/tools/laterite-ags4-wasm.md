@@ -11,7 +11,7 @@ volatile: [sizes]
 volatile_asof: 2026-08-16
 repo_refs:
   root: "repo:rust-packages/laterite-ags4-wasm"
-  lib: "repo:rust-packages/laterite-ags4-wasm/src/lib.rs"
+  src: "repo:rust-packages/laterite-ags4-wasm/src"
 related: [crate-map, laterite-ags4-validator, laterite-ags4-types, tech-stack-wasm, validator-site, dec-ags4-merge-semantics, O-42, cert-trust-v2, dec-ags4-censor-leaf, laterite-ags4-corpus-qa]
 sources: []
 ---
@@ -80,7 +80,8 @@ nothing uploaded. The *why* and roadmap live in [[validator-site]]; the
 wasm tech detail (Arrow-IPC → DuckDB-wasm, the build pipeline) is
 [[tech-stack-wasm]].
 
-The exports (`repo:rust-packages/laterite-ags4-wasm/src/lib.rs`). Since #330
+The exports — one module per verb under `repo:rust-packages/laterite-ags4-wasm/src`, with the crate root
+reduced to declarations and re-exports (#381). Since #330
 **seven of them are feature-gated** — `certify`, `diff`, `merge`, `censor`,
 `ags4_to_xlsx`/`xlsx_to_ags4` (`excel`) and `build_ags4_ipc` (`arrow`), plus
 `ParsedDataset::arrow_ipc` — all ON under `default = full`, so the app sees

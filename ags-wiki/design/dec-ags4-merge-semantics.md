@@ -211,7 +211,7 @@ equal bytes compare unequal across the boundary.
 --out`, `laterite.merge(*sources, …)`, and Node's `merge(sources[], …)` are
 all N-ary (2+ files) — the same reconciliation a delivery of any batch size
 needs. The browser **Tools → Merge** tab is 2-file only
-(`repo:rust-packages/laterite-ags4-wasm/src/lib.rs::merge`,
+(`repo:rust-packages/laterite-ags4-wasm/src/merge.rs::merge`,
 `repo:web/src/components/tools/MergeTool.tsx`) — a deliberately narrower UI
 for the common "merge one incoming delivery into what I'm working on" case,
 not a capability gap in the underlying leaf (which is N-ary).
