@@ -729,6 +729,101 @@ jobs:
       - name: Crate README examples compile against the crates.io release
         run: python3 tools/check_released_crate_readmes.py
 
+  # Does the LIVE docs site work against the extension a reader can actually
+  # INSTALL? The fourth and last artifact in #283's set, and the one furthest from
+  # this tree: the DuckDB extension ships from a SEPARATE repo
+  # (`niko86/laterite-duckdb`) through the community-extensions pipeline, which has
+  # its own build, its own toolchain image and its own DuckDB target. Every other
+  # DuckDB check in this project — including the dev satellite's monthly
+  # compliance leg — loads a locally built cdylib, so "our build works" was the
+  # only claim anyone was making, and it is not the claim the pages make.
+  #
+  # WHAT A RED RUN MEANS HERE, and it differs from its three siblings. There is
+  # deliberately no joint release train with `laterite-duckdb`
+  # (`ags-wiki/design/dec-duckdb-extension.md`): the extension must merely be
+  # CURRENT, which until now was an assertion with nothing behind it. This job is
+  # what makes it checkable. So a failure is usually a signal about the OTHER repo
+  # — it needs a release, or the community listing needs its version and `ref:`
+  # bumped — and the fix lands there. The one case where it lands here is an
+  # example rewritten onto API the published extension does not have yet.
+  #
+  # Out of `notify`'s `needs`, for the same reason as its three siblings: the docs
+  # track HEAD, so a window where the tree is ahead of the published extension is a
+  # CHOSEN state, and an issue filed about a choice already made is noise that gets
+  # muted. A red run emails.
+  #
+  # NEITHER SIDE IS PINNED, because neither side is pinned for a reader: `uv pip
+  # install duckdb` resolves whatever is current, and `INSTALL … FROM community`
+  # serves whatever that DuckDB has a build for. The pairing is the thing under
+  # test. That does admit one failure this repo cannot fix — DuckDB releases a new
+  # version and the community rebuild has not landed yet, which is days, not weeks
+  # — so the probe below splits it out: the examples step always RUNS (a skipped
+  # step would be a green job that tested nothing), but it is only fatal when the
+  # extension actually installed. Same calibration as the wheel and npm legs.
+  #
+  # GitHub-hosted and toolchain-free: pip `duckdb` and a network install. No Rust,
+  # no maturin, no extension build.
+  docs-vs-released-duckdb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+      # Deliberately not `uv sync`: this leg imports `duckdb` and `pytest` and
+      # nothing else — building this workspace's wheel would drag in Rust to test
+      # an artifact built somewhere else entirely.
+      - name: Install duckdb + pytest
+        run: |
+          set -euxo pipefail
+          uv venv --python 3.12 --clear "$GITHUB_WORKSPACE/.duckdb-leg"
+          uv pip install --python "$GITHUB_WORKSPACE/.duckdb-leg/bin/python" duckdb pytest
+      # A gate whose subject depends on the environment must say what it measured
+      # — the same reason `gen_doc_outputs.py:_lat()` prints the binary it picked.
+      - name: State what is under test
+        id: under-test
+        run: |
+          set -euo pipefail
+          "$GITHUB_WORKSPACE/.duckdb-leg/bin/python" - >> "$GITHUB_OUTPUT" <<'EOF'
+          import duckdb
+
+          print(f"duckdb={duckdb.__version__}")
+          con = duckdb.connect()
+          try:
+              con.execute("INSTALL laterite_ags4 FROM community")
+              con.execute("LOAD laterite_ags4")
+          except Exception as exc:
+              # One line, truncated: $GITHUB_OUTPUT is line-oriented and a DuckDB
+              # HTTP error carries a multi-line hint.
+              print("installable=false")
+              print(f"why={' '.join(str(exc).split())[:300]}")
+          else:
+              (version,) = con.execute(
+                  "SELECT extension_version FROM duckdb_extensions()"
+                  " WHERE extension_name = 'laterite_ags4'"
+              ).fetchone()
+              print("installable=true")
+              print(f"extension={version}")
+          EOF
+          echo "--- under test ---"
+          cat "$GITHUB_OUTPUT"
+      - name: No community build for this DuckDB yet
+        if: steps.under-test.outputs.installable != 'true'
+        run: |
+          echo "::warning::laterite_ags4 did not install from the community repository on duckdb ${{ steps.under-test.outputs.duckdb }} — ${{ steps.under-test.outputs.why }}. The examples step below runs anyway and is NON-FATAL this run; if this persists past a DuckDB release cycle it is a real gap."
+      # Non-fatal only when the extension could not be installed at all — see the
+      # header. If it installed, an example that fails to run means a reader
+      # following the live site gets an error instead of a result, and that is red.
+      - name: Docs SQL examples run against the community-published extension
+        continue-on-error: ${{ steps.under-test.outputs.installable != 'true' }}
+        env:
+          LATERITE_DUCKDB_COMMUNITY: "1"
+        run: |
+          "$GITHUB_WORKSPACE/.duckdb-leg/bin/python" -m pytest \
+            tests/test_docs_duckdb_examples.py -q -rs -s
+
   # Cross-surface OUTPUT-VALUE gate (X1). Every OTHER gate compares knob NAMES;
   # this one pushes a committed list of (op × input) cases through all four
   # surface legs (python / node / wasm / CLI) and compares the observed output
