@@ -9,6 +9,10 @@ INSTALL laterite_ags4 FROM community;
 LOAD laterite_ags4;
 ```
 
+Needs **DuckDB 1.5.4 or newer**, on every host. The community repository publishes
+one build per DuckDB release from the point an extension is accepted, so earlier
+DuckDB versions have nothing to fetch.
+
 ## Read-only — validation lives in the CLI & library
 
 The extension is a **read-only reader**: it reads, joins and inspects, but it
