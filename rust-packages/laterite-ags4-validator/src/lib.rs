@@ -379,9 +379,10 @@ pub fn check_parsed_with_dict(
         let dict = Dictionary::layered(&delta);
         let mut found = check_parsed(parsed, &dict, opts, world)?;
         // Honour + warn (#568 §3): the overlay takes effect, but every override
-        // of a STANDARD group/heading is surfaced loudly (KEY demotion loudest),
-        // so a bespoke dictionary can never silently reshape the standard schema.
-        emit_override_warnings(custom, &delta, &mut found);
+        // of a STANDARD group/heading is surfaced, so a bespoke dictionary can
+        // never silently reshape the standard schema. Which TIER each override
+        // lands in is the #321 surprise test — see the function.
+        emit_override_findings(custom, &delta, opts, &mut found);
         return Ok((found, custom.base_version, custom.resolution));
     }
 
@@ -412,27 +413,45 @@ pub fn check_parsed_with_dict(
     Ok((found, dv, kind))
 }
 
-/// Surface each override a custom overlay makes to a STANDARD group/heading as a
-/// WARNING (#568 §3, honour + warn). Only overlays (not full replacements — a
+/// Surface each override a custom overlay makes to a STANDARD group/heading
+/// (#568 §3, honour + warn). Only overlays (not full replacements — a
 /// replacement is declared, not an override) and only groups/headings the base
-/// actually defines. A KEY→non-KEY status change is called out as the loudest.
-fn emit_override_warnings(
+/// actually defines.
+///
+/// **Two tiers, by the #321 rule: a WARNING predicts a downstream *surprise*.**
+/// Re-parenting and KEY demotion both change row identity silently, so they stay
+/// WARNING. A plain type/status override changes nothing the caller did not ask
+/// for in the file they wrote — it is announced and honoured, with no surprise
+/// left over — so it is an FYI.
+///
+/// Gated on the tier flags, which it did not use to be: `emit_override_warnings`
+/// took no `CheckOptions` and fired unconditionally, so `--no-warnings` (whose
+/// whole contract is "errors only") did not suppress these. The in-crate tests
+/// asserted them under `CheckOptions::default()` — `include_warnings: false` —
+/// which is what a gate looks like when it isn't there. It matters more now:
+/// the FYI tier is opt-in, and an FYI nobody can turn off is not one.
+fn emit_override_findings(
     custom: &overlay::CustomDict,
     delta: &overlay::OwnedDelta,
+    opts: &CheckOptions,
     found: &mut Findings,
 ) {
     if !custom.fall_through {
         return; // a full replacement redefines the schema wholesale, by design
     }
+    if !opts.include_warnings && !opts.include_fyi {
+        return; // nothing this function emits is error-tier
+    }
     let base = Dictionary::bundled(custom.base_version);
 
-    // Re-parented standard groups.
+    // Re-parented standard groups. A SURPRISE: Rule 10c reads parentage, so a
+    // row's relational identity changes without the file saying anything.
     let mut groups: Vec<&String> = delta.groups.keys().collect();
     groups.sort();
     for code in groups {
         if let Some(bg) = base.group(code) {
             let meta = &delta.groups[code];
-            if meta.parent != bg.parent {
+            if meta.parent != bg.parent && opts.include_warnings {
                 findings::add_at(
                     found,
                     "DICT",
@@ -463,33 +482,45 @@ fn emit_override_warnings(
         let over = &delta.headings[key];
         let key_demotion = bh.status.contains("KEY") && !over.status.contains("KEY");
         if key_demotion {
-            findings::add_at(
-                found,
-                "DICT",
-                None,
-                group,
-                format!(
-                    "custom dictionary demotes standard KEY heading {group}/{heading} \
-                     to status {:?} — honoured, but it changes row identity.",
-                    over.status
-                ),
-                findings::Location::default(),
-                findings::Severity::Warning,
-            );
+            // A SURPRISE: KEY is what makes a row identifiable, so Rules 10a/10c
+            // start answering differently about rows nobody edited.
+            if opts.include_warnings {
+                findings::add_at(
+                    found,
+                    "DICT",
+                    None,
+                    group,
+                    format!(
+                        "custom dictionary demotes standard KEY heading {group}/{heading} \
+                         to status {:?} — honoured, but it changes row identity.",
+                        over.status
+                    ),
+                    findings::Location::default(),
+                    findings::Severity::Warning,
+                );
+            }
         } else if bh.ags_type != over.ags_type || bh.status != over.status {
-            findings::add_at(
-                found,
-                "DICT",
-                None,
-                group,
-                format!(
-                    "custom dictionary overrides standard heading {group}/{heading} \
-                     ({}/{} → {}/{}) — honoured.",
-                    bh.ags_type, bh.status, over.ags_type, over.status
-                ),
-                findings::Location::default(),
-                findings::Severity::Warning,
-            );
+            // NOT a surprise, so FYI since #321: the caller declared this
+            // override in the dictionary they passed, it is honoured exactly as
+            // declared, and no downstream consumer receives anything other than
+            // what the file says. Worth being able to see; not worth interrupting.
+            // Its own label, so the `DICT` bucket stays warning-pure — the same
+            // reason `FYI (Related to Rule N)` is separate from the rule's own key.
+            if opts.include_fyi {
+                findings::add_at(
+                    found,
+                    "FYI (Related to DICT)",
+                    None,
+                    group,
+                    format!(
+                        "custom dictionary overrides standard heading {group}/{heading} \
+                         ({}/{} → {}/{}) — honoured.",
+                        bh.ags_type, bh.status, over.ags_type, over.status
+                    ),
+                    findings::Location::default(),
+                    findings::Severity::Fyi,
+                );
+            }
         }
     }
 }
@@ -570,10 +601,31 @@ mod tests {
         assert_eq!(s.split('|').count(), DictVersion::ALL.len());
     }
 
-    /// An overlay that re-parents a standard group, demotes a standard KEY, and
-    /// retypes a standard non-KEY heading must WARN on each (honour + warn, #568).
+    /// Both tiers on — what a `lat validate --dict … --show-fyi` run asks for.
+    /// The tests below used `Default` (errors only) and still saw these
+    /// findings, which is how the missing tier gate stayed invisible; asking
+    /// explicitly is what makes the gate's own test below mean something.
+    fn overlay_opts(custom: overlay::CustomDict) -> CheckOptions {
+        CheckOptions {
+            custom_dict: Some(custom),
+            include_warnings: true,
+            include_fyi: true,
+            ..Default::default()
+        }
+    }
+
+    /// An overlay that re-parents a standard group and demotes two standard KEYs
+    /// WARNs on each (honour + warn, #568) — both are downstream surprises, which
+    /// is what keeps them in the warning tier under #321.
+    ///
+    /// This used to claim `SAMP_TOP` was "a standard non-KEY heading" being
+    /// retyped, and asserted only that some finding mentioned it. Base `SAMP_TOP`
+    /// is `2DP/KEY`, so it is a second KEY DEMOTION and the assertion was passing
+    /// on the demotion message — the retype branch was never reached here at all.
+    /// `override_warnings_distinguish_demote_from_type_and_status_change` below is
+    /// what actually covers it, on LOCA.
     #[test]
-    fn override_warnings_flag_reparent_demotion_and_type_change() {
+    fn override_warnings_flag_reparent_and_two_key_demotions() {
         let dict_json = br#"{"groups":{"SAMP":{"parent":"PROJ","headings":[
             {"name":"SAMP_ID","type":"ID","status":"REQUIRED"},
             {"name":"SAMP_TOP","type":"X","status":"REQUIRED"}
@@ -586,10 +638,7 @@ mod tests {
             "test.json",
         )
         .expect("custom dict parses");
-        let opts = CheckOptions {
-            custom_dict: Some(custom),
-            ..Default::default()
-        };
+        let opts = overlay_opts(custom);
         let pf = parse::parse_str(
             "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n",
         )
@@ -602,15 +651,85 @@ mod tests {
                 .any(|f| f.desc.contains("re-parents") && f.desc.contains("SAMP")),
             "re-parent warning missing: {dict:?}"
         );
+        // BOTH headings are KEY in the base, so both demote. Named separately so
+        // a regression that drops one is not hidden by the other.
+        for hd in ["SAMP_ID", "SAMP_TOP"] {
+            assert!(
+                dict.iter()
+                    .any(|f| f.desc.contains("demotes") && f.desc.contains(hd)),
+                "KEY-demotion warning missing for {hd}: {dict:?}"
+            );
+        }
+        // Every finding here is a surprise, so the bucket is warning-pure and can
+        // be asserted whole — a demotion mis-tiered into FYI fails this.
         assert!(
             dict.iter()
-                .any(|f| f.desc.contains("demotes") && f.desc.contains("SAMP_ID")),
-            "KEY-demotion warning missing: {dict:?}"
+                .all(|f| f.severity == findings::Severity::Warning),
+            "the DICT bucket must be warning-pure: {dict:?}"
         );
         assert!(
-            dict.iter().any(|f| f.desc.contains("SAMP_TOP")),
-            "type-change warning missing: {dict:?}"
+            !found.contains_key("FYI (Related to DICT)"),
+            "nothing here is a plain retype, so the FYI bucket must be absent: {:?}",
+            found.get("FYI (Related to DICT)")
         );
+    }
+
+    /// The tier flags reach these findings at all — which they did not until
+    /// #321. `--no-warnings` promises errors only, and an opt-in FYI nobody can
+    /// turn off is not opt-in. Asserted at three settings because the interesting
+    /// failure is a gate that is present but reads the wrong flag.
+    #[test]
+    fn override_findings_honour_the_tier_flags() {
+        // One overlay producing BOTH tiers, so each flag can be shown to move its
+        // own tier and only its own: SAMP_ID KEY→REQUIRED is a demotion
+        // (WARNING), LOCA_TYPE PA/OTHER→X/OTHER is a plain retype of a non-KEY
+        // heading (FYI). A single-tier fixture would let a gate reading the wrong
+        // flag pass half the assertions.
+        let dict_json = br#"{"groups":{
+            "SAMP":{"parent":"LOCA","headings":[
+                {"name":"SAMP_ID","type":"ID","status":"REQUIRED"}
+            ]},
+            "LOCA":{"parent":"PROJ","headings":[
+                {"name":"LOCA_TYPE","type":"X","status":"OTHER"}
+            ]}
+        }}"#;
+        let pf = parse::parse_str(
+            "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n",
+        )
+        .expect("parses");
+        let run = |warnings: bool, fyi: bool| {
+            let custom = overlay::parse_dict(
+                dict_json,
+                overlay::DictFormat::Json,
+                encoding_rs::UTF_8,
+                overlay::BaseSpec::Auto,
+                "test.json",
+            )
+            .expect("custom dict parses");
+            let opts = CheckOptions {
+                custom_dict: Some(custom),
+                include_warnings: warnings,
+                include_fyi: fyi,
+                ..Default::default()
+            };
+            let (found, _dv, _res) =
+                check_parsed_with_dict(&pf, &opts, &WorldScope::None).expect("runs");
+            (
+                found.contains_key("DICT"),
+                found.contains_key("FYI (Related to DICT)"),
+            )
+        };
+
+        // Errors only — the `--no-warnings` contract. Neither tier may appear.
+        assert_eq!(
+            run(false, false),
+            (false, false),
+            "errors-only leaked a tier"
+        );
+        // The default: warnings shown, FYI still opt-in.
+        assert_eq!(run(true, false), (true, false), "default tier set wrong");
+        // `--show-fyi` alone, which is also what compat runs.
+        assert_eq!(run(false, true), (false, true), "fyi requested alone");
     }
 
     #[test]
@@ -634,38 +753,45 @@ mod tests {
             "test.json",
         )
         .expect("custom dict parses");
-        let opts = CheckOptions {
-            custom_dict: Some(custom),
-            ..Default::default()
-        };
+        let opts = overlay_opts(custom);
         let pf = parse::parse_str(
             "\"GROUP\",\"PROJ\"\r\n\"HEADING\",\"PROJ_ID\"\r\n\"UNIT\",\"\"\r\n\"TYPE\",\"ID\"\r\n\"DATA\",\"P1\"\r\n",
         )
         .expect("parses");
         let (found, _dv, _res) =
             check_parsed_with_dict(&pf, &opts, &WorldScope::None).expect("runs");
-        let dict = found.get("DICT").expect("DICT override warnings");
+        // Every branch here is an "overrides" line, so all three land in the FYI
+        // bucket now — and the WARNING bucket must be absent entirely, which is
+        // the assertion that would catch a demotion applied to the wrong branch.
+        assert!(
+            !found.contains_key("DICT"),
+            "no surprise here, so nothing may warn: {:?}",
+            found.get("DICT")
+        );
+        let fyi = found
+            .get("FYI (Related to DICT)")
+            .expect("the override FYI bucket");
         let has = |needle: &str, hd: &str| {
-            dict.iter()
+            fyi.iter()
                 .any(|f| f.desc.contains(needle) && f.desc.contains(hd))
         };
         // KEY retained ⇒ an "overrides" line, and explicitly NOT a "demotes" one.
         assert!(
             has("overrides", "LOCA_ID"),
-            "LOCA_ID type-change override: {dict:?}"
+            "LOCA_ID type-change override: {fyi:?}"
         );
         assert!(
             !has("demotes", "LOCA_ID"),
-            "LOCA_ID must not read as a demotion: {dict:?}"
+            "LOCA_ID must not read as a demotion: {fyi:?}"
         );
-        // Single-facet type-only and status-only changes each still warn.
+        // Single-facet type-only and status-only changes are each still reported.
         assert!(
             has("overrides", "LOCA_TYPE"),
-            "LOCA_TYPE type-only override: {dict:?}"
+            "LOCA_TYPE type-only override: {fyi:?}"
         );
         assert!(
             has("overrides", "LOCA_REM"),
-            "LOCA_REM status-only override: {dict:?}"
+            "LOCA_REM status-only override: {fyi:?}"
         );
     }
 

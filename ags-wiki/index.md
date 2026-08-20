@@ -1,7 +1,7 @@
 ---
 type: index
-generated: 2026-08-19
-counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 30, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 27}
+generated: 2026-08-20
+counts: {rules: 28, groups: 177, types: 17, observations: 51, tools: 30, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 28}
 ---
 # AGS Wiki — Content Catalog
 
@@ -14,7 +14,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 30, concept
 | Rules | 28 |
 | Groups | 177 |
 | Types | 17 |
-| Observations | 50 |
+| Observations | 51 |
 | Tools | 30 |
 | Concepts | 30 |
 | Editions | 5 |
@@ -22,11 +22,11 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 30, concept
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
-| Design | 27 |
-| **Total (live)** | **407** |
+| Design | 28 |
+| **Total (live)** | **409** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 26 · `confirmed` 18 · `drafted` 332 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 27 · `confirmed` 18 · `drafted` 333 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -319,6 +319,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 30, concept
 | [[O-48]] | drafted | NOTE |
 | [[O-49]] | drafted | VARIANCE |
 | [[O-50]] | drafted | VARIANCE |
+| [[O-51]] | drafted | VARIANCE |
 
 ## Tools
 
@@ -495,6 +496,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 50, tools: 30, concept
 | [[dec-python-imports-rust-library]] | accepted | — |
 | [[dec-rust-api-crates-io]] | accepted | — |
 | [[dec-rust-drives-python]] | accepted | — |
+| [[dec-verdict-severity-split]] | accepted | — |
 | [[reliquary]] | accepted | — |
 | [[validator-finding-ux]] | proposed | — |
 | [[validator-site]] | accepted | — |
