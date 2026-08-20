@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import os
 import platform
 import shutil
@@ -205,22 +206,39 @@ def state_the_toolchain() -> None:
 
 
 def emit(text: str, log: Path) -> None:
-    """stdout for the run log, the file for the artifact, and — on a runner —
-    the job summary, so the verdict lands where the run is actually read rather
-    than only at the bottom of a log nobody opens.
+    """The file for the artifact, the job summary on a runner, and stdout last.
 
     Done here rather than by piping through `tee` and `sed` in the workflow for
-    the same portability reason as above: that pipeline needs a shell both
-    platforms do not share."""
-    print(text, flush=True)
+    the same portability reason as the banner above: that pipeline needs a shell
+    both platforms do not share.
+
+    **Durable first, fragile last** — and that order is the fix for a real
+    failure, not a preference. The first Windows run measured everything
+    correctly and then died in `print`: the console there is cp1252, which has
+    no U+2212 MINUS SIGN, and the table header carried one. Because printing
+    came first, a cosmetic encoding fault also took out `bench.log` and left the
+    artifact step with nothing to upload — a completed measurement lost to its
+    own presentation layer. Both writes specify their encoding, so only stdout
+    was ever at risk; it now goes last, after the results are already on disk.
+    """
     log.write_text(text, encoding="utf-8")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with Path(summary).open("a", encoding="utf-8") as fh:
             fh.write(text + "\n")
+    print(text, flush=True)
 
 
 def main() -> int:
+    # The Windows console is cp1252 and this file's prose is not. Reconfiguring
+    # the stream is what keeps a typographic character in a comment or a verdict
+    # line from failing a run that has already done all of its work — the class
+    # of fault, not just the one character that fired it.
+    # `isinstance` rather than `hasattr`: the duck-typed check narrows to
+    # `object`, which `ty` correctly refuses to call a method on.
+    if isinstance(sys.stdout, io.TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8")
+
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--reps", type=int, default=15, help="timed runs per arm")
     ap.add_argument("--size", default="25MB", help="forge scale target size")
@@ -288,7 +306,7 @@ def main() -> int:
 
     lines = [
         "",
-        "| arm | min (ms) | median (ms) | vs v2 (− = faster) |",
+        "| arm | min (ms) | median (ms) | vs v2 (negative = faster) |",
         "|---|---:|---:|---:|",
     ]
     for arm in order:
