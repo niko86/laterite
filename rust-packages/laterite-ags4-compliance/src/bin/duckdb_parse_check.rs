@@ -31,7 +31,7 @@
 //! builds it).  cadence: compliance-report
 //! Exit 1 on any disagreement (a missing/extra registry group, an `_id`-set
 //! split, or a read-error disagreement) EXCEPT a documented inherent divergence
-//! (see [`known_divergence`]).
+//! (see [`known_divergence`] for a group, [`known_read_error`] for a whole file).
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -102,6 +102,18 @@ fn reference(reg: &Registry, bytes: &[u8]) -> Result<Reference, String> {
     })
 }
 
+/// Why duckdb refuses `DuplicateHeaders.ags`, in the extension's own terms: a
+/// repeated HEADING cannot become a SQL column without silently merging two of
+/// them, so `read_ags` refuses rather than lose data, and points at recovery
+/// mode (which keeps both, suffixed). The core reader has no such constraint —
+/// it collapses the duplicates into its name-keyed row map. Shared by both
+/// allowlists below so the group-scoped and file-scoped excuses cannot come to
+/// describe the same divergence differently.
+const DUPLICATE_HEADINGS: &str = "a repeated heading cannot be a SQL column \
+     without silently merging two (AGS4 Rule 7), so duckdb's read_ags refuses \
+     and offers recovery mode; the core reader collapses the duplicate \
+     headings into its name-keyed row map";
+
 /// Known, inherent duckdb read/parse divergences — a real, understood difference
 /// between duckdb's `read_ags` and the core reader that is EXPECTED, so it's
 /// tolerated (reported, not failed). The analog of the findings harness's O-N
@@ -110,11 +122,26 @@ fn reference(reg: &Registry, bytes: &[u8]) -> Result<Reference, String> {
 /// not silently excused.
 fn known_divergence(fixture: &str, group: &str) -> Option<&'static str> {
     match (fixture, group) {
-        ("DuplicateHeaders.ags", "SAMP") => Some(
-            "a group with duplicate heading columns cannot be a SQL table \
-             (duckdb's read_ags rejects it); the core reader collapses the \
-             duplicate headings into its name-keyed row map",
-        ),
+        // Kept for the group-scoped shape of this divergence. The extension
+        // currently refuses the whole file (see `known_read_error`), so this arm
+        // is not the one that fires today — it is what fires if `read_ags` ever
+        // narrows the refusal back to the offending group.
+        ("DuplicateHeaders.ags", "SAMP") => Some(DUPLICATE_HEADINGS),
+        _ => None,
+    }
+}
+
+/// The same idea one level up: duckdb declining to read a fixture AT ALL, where
+/// the reference reads it, for a reason we have accepted.
+///
+/// Keyed on the fixture AND the reason, never the fixture alone. `read_ags`
+/// refuses a file for many reasons, and a blanket per-fixture excuse would
+/// swallow the next, unrelated one silently — the failure mode the whole
+/// harness exists to catch. Matching the extension's own words is what keeps
+/// "this refusal" from widening into "any refusal of this file".
+fn known_read_error(fixture: &str, err: &str) -> Option<&'static str> {
+    match fixture {
+        "DuplicateHeaders.ags" if err.contains("duplicate heading") => Some(DUPLICATE_HEADINGS),
         _ => None,
     }
 }
@@ -159,12 +186,21 @@ fn compare(
 
         // read-error agreement: if duckdb couldn't read the file, the reference
         // must also fail (a hard-error fixture agrees by both failing).
-        if fp.read_error.is_some() {
+        if let Some(err) = fp.read_error.as_deref() {
             if refr.is_ok() {
-                r.mismatches.push(format!(
-                    "{}: duckdb read-error but the reference parsed it",
-                    fp.fixture
-                ));
+                match known_read_error(&fp.fixture, err) {
+                    Some(why) => r
+                        .known
+                        .push(format!("{}: not read by duckdb at all — {why}", fp.fixture)),
+                    // The error text, not just the fact of one: a bare "duckdb
+                    // read-error but the reference parsed it" sends the next
+                    // reader to rebuild the extension to find out WHY, which is
+                    // a CI log that reports a failure without its evidence.
+                    None => r.mismatches.push(format!(
+                        "{}: duckdb read-error but the reference parsed it — {err}",
+                        fp.fixture
+                    )),
+                }
             }
             continue;
         }
@@ -424,6 +460,47 @@ mod tests {
         let r = run(&duck);
         assert_eq!(r.mismatches.len(), 1);
         assert!(r.mismatches[0].contains("read-error but the reference parsed"));
+    }
+
+    #[test]
+    fn tolerates_a_documented_whole_file_refusal() {
+        // What the live gate hit (laterite-dev#659): the extension refuses
+        // `DuplicateHeaders.ags` outright — `ags_groups` itself raises — so the
+        // divergence never reaches the group arms. Documented reason, so it is
+        // reported and tolerated rather than failing the leg.
+        let mut duck = duck_for("DuplicateHeaders.ags", AGS_SAMP, None);
+        duck.parses[0].read_error = Some(
+            "Binder Error: read_ags: did not parse as AGS4 (duplicate heading \
+             \"SAMP_BASE\" in group \"SAMP\" (AGS4 Rule 7) — reading it would \
+             silently merge two columns; re-read in recovery mode …)"
+                .into(),
+        );
+        duck.parses[0].groups.clear();
+        let r = compare(registry(), &duck, |_| Ok(AGS_SAMP.to_vec()));
+        assert!(
+            r.mismatches.is_empty(),
+            "a documented whole-file refusal must not fail: {:?}",
+            r.mismatches
+        );
+        assert_eq!(r.known.len(), 1, "it must still be REPORTED, not silent");
+    }
+
+    #[test]
+    fn a_different_refusal_of_the_same_fixture_still_fails() {
+        // The excuse is keyed on the reason, not the filename. Any other reason
+        // duckdb might refuse this same file is a new divergence, and the
+        // message must carry duckdb's own words so CI says why.
+        let mut duck = duck_for("DuplicateHeaders.ags", AGS_SAMP, None);
+        duck.parses[0].read_error = Some("IO Error: file vanished mid-read".into());
+        duck.parses[0].groups.clear();
+        let r = compare(registry(), &duck, |_| Ok(AGS_SAMP.to_vec()));
+        assert_eq!(r.mismatches.len(), 1, "an undocumented refusal must fail");
+        assert!(
+            r.mismatches[0].contains("file vanished mid-read"),
+            "the failure must carry duckdb's reason: {:?}",
+            r.mismatches
+        );
+        assert!(r.known.is_empty());
     }
 
     #[test]
