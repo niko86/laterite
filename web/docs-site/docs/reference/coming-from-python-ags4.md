@@ -11,6 +11,7 @@ For the task-shaped version — _how do I do X with the drop-in_ — see
 
 ## One token changes
 
+<!-- doc-code: skip — installs packages — a gate that ran it would rewrite its own environment -->
 ```bash
 pip install laterite[compat]
 ```

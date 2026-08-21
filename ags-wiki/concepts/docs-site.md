@@ -166,6 +166,16 @@ Key facts:
   diagram — a `text` fence that is a *drawing*, not the output of anything, so it
   is correctly and permanently unwired. Worth stating so nobody "fixes" it: the
   right target is **zero gateable orphans**, not zero orphans.
+- **The INPUT half, and why it came second.** Everything above gates the block
+  showing what an example *prints*. Nothing gated the fence showing what a reader
+  *runs*, so a snippet could use a name the page never binds and no gate could
+  say — which is exactly what two cookbook pages did, and for long enough that
+  nobody could date it. `--check-pages` now classifies every code fence as
+  **include / inline / skipped / prose** on the same opt-out-with-a-reason
+  contract, and prints the counts. **`inline` is the one to watch**: fences a
+  reader can copy that no gate has yet executed. See [[dec-doc-code-fences]] for
+  why a page is one program per surface rather than one per fence, and why `bash`
+  is excluded by name rather than by silence.
 - **One nightly leg asks the READER's question.** Every gate above runs against the
   working-tree cdylib, so all of them answer "is the site consistent with HEAD" —
   and the reader is not on HEAD, they are on `pip install laterite`. The

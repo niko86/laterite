@@ -5,6 +5,7 @@ laterite reads, validates, queries and **produces** AGS4 geotechnical data. File
 API. One engine drives Python, the `lat` CLI, Node and DuckDB, and it's a drop-in for
 python-ags4, rebuilt on a Rust core for speed.
 
+<!-- doc-code: skip — installs packages — a gate that ran it would rewrite its own environment -->
 ```bash
 pip install laterite
 ```

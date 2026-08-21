@@ -101,6 +101,7 @@ least informative answer available. `promote` keeps the column _numeric_.
 
 === "CLI"
 
+    <!-- doc-code: skip — illustrative `lat` usage over placeholder paths; the CLI examples that ARE executed live in examples/cli/ (#513) -->
     ```bash
     lat merge phase1.ags phase2.ags --out merged.ags --on-type-clash promote
     ```

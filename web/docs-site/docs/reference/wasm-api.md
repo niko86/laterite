@@ -5,6 +5,7 @@ reader, repairer and emitter the [Python wheel](./api.md), the
 [Node addon](./node-api.md) and the [DuckDB extension](./duckdb-functions.md)
 run, in a page, with no server.
 
+<!-- doc-code: skip — installs packages — a gate that ran it would rewrite its own environment -->
 ```bash
 npm i @laterite/ags4-wasm
 ```
@@ -42,6 +43,7 @@ The crate's cargo features are `excel`, `arrow`, `certify`, `diff`, `merge` and
 `censor`, and they are **on by default** — so a source build gives you the full
 engine, and the published package is the deliberately trimmed one:
 
+<!-- doc-code: skip — a `wasm-pack` build of this repo, not something a reader runs -->
 ```bash
 # everything
 wasm-pack build rust-packages/laterite-ags4-wasm --target web --release

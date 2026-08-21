@@ -55,6 +55,7 @@ When the verdict is *all* you want, name the cert on `validate` instead:
 
 === "CLI"
 
+    <!-- doc-code: skip — illustrative `lat` usage over placeholder paths; the CLI examples that ARE executed live in examples/cli/ (#513) -->
     ```bash
     lat validate delivery.ags --index delivery.ags.idx
     ```

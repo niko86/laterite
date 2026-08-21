@@ -48,6 +48,8 @@
     "and expect it to go stale harmlessly — the gate takes whichever of the two",
     "is higher, so a forgotten override is overtaken rather than obeyed."
   ],
+  "claimed_through": 514,
+  "claimed_through_note": "#513 and #514 are issues filed in THIS repo on 2026-08-21 (the doc-code-fence gate and the PEP 723 gap). The derived watermark reads merged PRs only, so it sits at #512 and would call a bare #513 foreign until the next PR merges past it. Goes stale harmlessly: the gate takes whichever is higher.",
   "satellite": {
     "repo": "laterite-dev",
     "note": "Same owner, private. Qualified rather than linked: a 404 is honest about being unreachable, where a bare number actively lies.",

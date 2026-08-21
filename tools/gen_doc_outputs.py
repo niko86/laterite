@@ -113,6 +113,90 @@ TEXT_FENCE_RE = re.compile(r"^[ \t]*```text\n", re.M)
 #: `# expect-exit: N` in a CLI example — several demonstrate a *failing* run.
 EXPECT_EXIT_RE = re.compile(r"^#\s*expect-exit:\s*(\d+)\s*$", re.M)
 
+# ---------------------------------------------------------------------------
+# The INPUT half of the same guarantee (#513).
+#
+# Everything above gates the `text` block that shows what an example PRINTS.
+# Nothing gated the fence that shows what a reader RUNS — so a snippet could name
+# a variable the page never binds and no gate could tell. Same shape deliberately:
+# one convention with two halves, not two conventions.
+#
+# This is the STRUCTURAL half only. It classifies fences; it executes nothing.
+# Running them is the next step, and it lands per surface behind this.
+# ---------------------------------------------------------------------------
+
+#: The opt-out, spelled to match `doc-output: skip` so there is one thing to learn.
+CODE_SKIP_RE = re.compile(
+    r"<!-- doc-code: skip(?:\s*[—-]\s*(?P<reason>[^\n]*?))?\s*-->"
+)
+#: Any fenced block, with the `doc-code` opt-out that may precede it.
+CODE_FENCE_RE = re.compile(
+    r"^(?P<skip>(?:[ \t]*<!-- doc-code:[^\n]*-->\n(?:[ \t]*\n)*)?)"
+    r"(?P<indent>[ \t]*)```(?P<lang>\w+)\n"
+    r"(?P<body>(?:.*?\n)*?)"
+    r"(?P=indent)```\n",
+    re.M,
+)
+#: Fence language -> the surface whose runner will execute it as part of a page
+#: program. Membership IS the decision that a language is meant to be run; a
+#: language absent from both this and EXCLUDED_LANGS is prose (json, yaml, text).
+PAGE_SURFACE = {
+    "python": "python",
+    "sql": "duckdb",
+    "js": "node",
+    "javascript": "node",
+    "ts": "node",
+}
+#: Languages that LOOK runnable and are deliberately never run. A `bash` fence on
+#: a page is an install instruction — `pip install laterite[compat]` — and a gate
+#: that executed one would rewrite the machine it runs on. The exclusion is the
+#: reason they must opt out EXPLICITLY: silence here is indistinguishable from an
+#: oversight, and the next person adding a runnable `lat …` fence would reasonably
+#: assume it was covered.
+EXCLUDED_LANGS = {"bash", "sh", "shell", "console"}
+
+
+def census_code_fences(md: str, page: str) -> tuple[dict[str, int], list[str]]:
+    """Classify every code fence on one page, and report what cannot stand.
+
+    Four states, mirroring the output half:
+
+      included  the fence is an `--8<--` — it is a file, already gated;
+      inline    typed on the page, in a language meant to run (executed once its
+                page-program runner lands);
+      skipped   opts out, with a reason;
+      prose     a language nothing claims to run (json, yaml, diff).
+
+    Two things fail. An opt-out with no reason, because an escape hatch whose use
+    is not on the record is just a silence. And an EXCLUDED language that has not
+    opted out, because "we never run bash" has to be said somewhere a reader of
+    the page can find it.
+    """
+    counts = {"included": 0, "inline": 0, "skipped": 0, "prose": 0}
+    problems: list[str] = []
+    for m in CODE_FENCE_RE.finditer(md):
+        lang = m.group("lang")
+        if lang == "text":
+            continue  # the output half's business
+        where = f"{page}:{md[: m.start('indent')].count(chr(10)) + 1}"
+        if m.group("body").lstrip().startswith("--8<--"):
+            counts["included"] += 1
+            continue
+        skip = CODE_SKIP_RE.search(m.group("skip"))
+        if skip:
+            counts["skipped"] += 1
+            if not (skip.group("reason") or "").strip():
+                problems.append(f"{where}: `{lang}` opts out with no reason")
+            continue
+        if lang in EXCLUDED_LANGS:
+            problems.append(
+                f"{where}: `{lang}` is never executed — it must say so with "
+                "`<!-- doc-code: skip — why -->`"
+            )
+            continue
+        counts["inline" if lang in PAGE_SURFACE else "prose"] += 1
+    return counts, problems
+
 
 @dataclass
 class Surface:
@@ -387,11 +471,20 @@ def main() -> None:
     changed_pages: list[Path] = []
     hand_written: list[str] = []
     unreasoned: list[str] = []
+    code_counts = {"included": 0, "inline": 0, "skipped": 0, "prose": 0}
+    code_problems: list[str] = []
     covered = orphan = 0
     for page in sorted(DOCS.rglob("*.md")):
         md = page.read_text()
         blocks = scan(md)
         orphan += len(TEXT_FENCE_RE.findall(md)) - len(blocks)
+        # The input half runs over EVERY page on every invocation: it reads
+        # Markdown and needs nothing built, so scoping it to the chosen surfaces
+        # would leave fences unclassified in the only lane that always fires.
+        c, p_ = census_code_fences(md, str(page.relative_to(DOCS)))
+        for k, v in c.items():
+            code_counts[k] += v
+        code_problems += p_
         for m in blocks:
             if example_key(m.group("include")) not in wanted:
                 continue  # a surface this run didn't ask for
@@ -410,20 +503,34 @@ def main() -> None:
                 page.write_text(new)
 
     if args.check_pages:
-        problems = [
-            f"{h} is hand-written — it must include its .out or declare a skip"
-            for h in hand_written
-        ] + [f"{u} opts out with no reason" for u in unreasoned]
+        problems = (
+            [
+                f"{h} is hand-written — it must include its .out or declare a skip"
+                for h in hand_written
+            ]
+            + [f"{u} opts out with no reason" for u in unreasoned]
+            + code_problems
+        )
         if problems:
             for p_ in problems:
                 print(f"  {p_}")
             sys.exit(
-                f"gen_doc_outputs: {len(problems)} example-output block(s) are not wired to "
+                f"gen_doc_outputs: {len(problems)} doc block(s) are not wired to "
                 "their example.\nRun: uv run --no-sync python tools/gen_doc_outputs.py"
             )
         print(
             f"gen_doc_outputs: {covered} output block(s) are wired to an example "
             f"({orphan} block(s) have no example and are not gated)"
+        )
+        # Say what the input half saw, pass or fail. `inline` is the number that
+        # matters: fences a reader can copy which no gate has yet executed. It
+        # falls as the per-surface runners land, and stating it is what stops
+        # "structurally classified" reading as "known to run".
+        print(
+            f"gen_doc_outputs: {code_counts['included']} code fence(s) are includes, "
+            f"{code_counts['inline']} inline (classified, NOT yet executed — #513), "
+            f"{code_counts['skipped']} skipped with a reason, "
+            f"{code_counts['prose']} prose"
         )
         return
 

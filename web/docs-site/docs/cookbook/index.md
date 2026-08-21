@@ -1,8 +1,10 @@
 # Cookbook
 
-Task-indexed recipes. Each one is a runnable block you can lift straight into your code — the snippet
-on the page is the _exact_ file the CI gate executes, so the output is real. New here? the
-[Learn path](../learn/index.md) walks the same ground in order; this page is for _"how do I…?"_.
+Task-indexed recipes. Each opens with a runnable block you can lift straight into your code — that
+block is the _exact_ file the CI gate executes, so its output is real. Shorter snippets **after** it
+continue from where it left off rather than standing alone, so lift the opening block with them. New
+here? the [Learn path](../learn/index.md) walks the same ground in order; this page is for
+_"how do I…?"_.
 
 ## Reading & typing
 

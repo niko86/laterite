@@ -37,6 +37,7 @@ matrix](index.md#what-each-door-can-do) shows the split.
 **A CI gate is just the exit code** — `0` when the file passed, non-zero when it
 did not:
 
+<!-- doc-code: skip — illustrative `lat` usage over placeholder paths; the CLI examples that ARE executed live in examples/cli/ (#513) -->
 ```bash
 lat validate "$f" || exit 1                       # fail on an error
 lat validate "$f" --warnings-as-errors || exit 1  # …and on a warning too
@@ -52,6 +53,7 @@ Errors decide the verdict. A warning is shown and does not fail the run — add
 **Pipe the machine output.** `--json` is pretty, `--ndjson` is one finding per line
 — both stream to `jq`, and both are the same bytes the Python and Node reports emit:
 
+<!-- doc-code: skip — illustrative `lat` usage over placeholder paths; the CLI examples that ARE executed live in examples/cli/ (#513) -->
 ```bash
 lat validate delivery.ags --json | jq '.findings | keys'
 lat read delivery.ags LOCA --csv > loca.csv
@@ -65,6 +67,7 @@ lat read delivery.ags LOCA --csv > loca.csv
 validate later. The passphrase for `lock` / `unlock` never appears on the command
 line (it would leak into `ps` and shell history):
 
+<!-- doc-code: skip — illustrative `lat` usage over placeholder paths; the CLI examples that ARE executed live in examples/cli/ (#513) -->
 ```bash
 LAT_TRANSPORT_PASSWORD=… lat lock delivery.ags delivery.ags.age
 lat unlock delivery.ags.age out.ags --password-file pw.txt
