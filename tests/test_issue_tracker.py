@@ -113,6 +113,24 @@ def test_first_failure_creates_the_tracker() -> None:
     assert "first failure tonight" in action["body"]
 
 
+def test_a_docs_leg_failing_alone_opens_an_issue_that_names_it() -> None:
+    """#493's fourth defect, from the tracker's side.
+
+    Nothing here was ever wrong: `plan` reports whatever it is handed. It was
+    handed seven of the nightly's twelve jobs, so a night where only a
+    `docs-vs-released-*` leg failed produced no issue at all — a green tracker
+    over a red run, indistinguishable from a good night. The dependency set is
+    the other half and `tests/test_nightly_wiring.py` holds it; this is the half
+    that says what happens once the leg does arrive."""
+    action = plan(
+        needs(**{"docs-vs-released-duckdb": "failure", "coverage": "success"}),
+        None,
+        RUN,
+    )
+    assert action["action"] == "create"
+    assert "**Failing:** docs-vs-released-duckdb" in action["body"]
+
+
 # --- repeat failure ------------------------------------------------------------
 
 
