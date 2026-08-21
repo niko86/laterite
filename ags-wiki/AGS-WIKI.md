@@ -296,10 +296,9 @@ rule-weakness):
    > guardrail wrongly attributed to the user. Deliberate, visible
    > authority edits are fine; they just go through the JSON.)
 4. Wire `feeds_strategy` so the gap flows into the test strategy.
-   (`feeds_ags5_req` is also on the insight template and fed the AGS5
-   requirement register, retired with that class in #500. It is empty on
-   every page that carries it and is inventoried in [[reliquary]] rather
-   than swept out of 31 pages here.)
+   (Its twin `feeds_ags5_req` fed the AGS5 requirement register, retired
+   with that class in #500, and was removed with the register's last
+   reader — see [[reliquary]].)
 
 ## 13. Status lifecycle
 

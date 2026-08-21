@@ -9,7 +9,6 @@ editions_affected: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 rules: [rule-19-group-name-format]
 proposes_observation: false
 feeds_strategy: []
-feeds_ags5_req: []
 discovered_phase: A
 related: [rule-19-group-name-format, O-06]
 sources: [spec-4.2]

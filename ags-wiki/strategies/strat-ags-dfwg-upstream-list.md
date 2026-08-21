@@ -9,7 +9,6 @@ probe_files: []
 expected_rust: ""
 expected_python: ""
 evidence: "synthesis of the upstream-reportable O-Ns + the probe-confirmed Rule 19 finding"
-feeds_ags5_req: []
 related: [observations-coverage-map, rule19-spec-allows-numbers-validator-may-not, upstream-reporting]
 sources: []
 ---

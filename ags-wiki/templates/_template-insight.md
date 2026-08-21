@@ -9,7 +9,6 @@ editions_affected: []         # subset of [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 rules: []                     # [[rule-…]] stems
 proposes_observation: false   # true => the block below is a drafted O-N for user ratification
 feeds_strategy: []            # [[strategies/…]]
-feeds_ags5_req: []            # [[design/…]]
 discovered_phase: ""          # A | B | C | D
 related: []
 sources: []

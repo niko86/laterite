@@ -9,7 +9,6 @@ probe_files: [ags-wiki/.bootstrap/probes/probe-rule6-embedded-cr.ags]
 expected_rust: "Rule 6"
 expected_python: "no Rule 6 (cascades to 2a/3/5)"
 evidence: "probe-run — ags-wiki/.bootstrap/probes/RESULTS.md"
-feeds_ags5_req: []
 related: [rule-06-comma-no-embedded-crlf, O-02, parity-model, parity-cascade-unreconcilable]
 sources: []
 ---

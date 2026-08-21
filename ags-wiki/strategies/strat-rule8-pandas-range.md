@@ -9,7 +9,6 @@ probe_files: []
 expected_rust: "Rule 8"
 expected_python: "Rule 8"
 evidence: "probe-run / prior dogfood — see body"
-feeds_ags5_req: []
 related: [rule-08-typed-values, O-33, O-12]
 sources: []
 ---

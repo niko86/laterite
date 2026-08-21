@@ -9,7 +9,6 @@ editions_affected: [4.1, 4.1.1, 4.2]
 rules: [rule-15-unit-group, rule-09-unknown-headings]
 proposes_observation: false
 feeds_strategy: []
-feeds_ags5_req: []
 discovered_phase: B
 related: [rule-15-unit-group]
 sources: [spec-4.2]

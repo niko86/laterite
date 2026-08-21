@@ -9,7 +9,6 @@ probe_files: [ags-wiki/.bootstrap/probes/probe-elrg.ags]
 expected_rust: "(hypothesised) Rule 9 on ELRG_*"
 expected_python: "no Rule 9 on ELRG"
 evidence: "probe-run / prior dogfood — see body"
-feeds_ags5_req: []
 related: [rule-09-unknown-headings, elrg-not-in-repo-dictionary, rule15-example-tracks-eres-elrg-removal]
 sources: []
 ---

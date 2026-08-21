@@ -9,7 +9,6 @@ editions_affected: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 rules: [rule-06-comma-no-embedded-crlf, rule-01-ascii, rule-05-quoting]
 proposes_observation: true
 feeds_strategy: [strat-rule6-embedded-cr, strat-parity-matrix]
-feeds_ags5_req: []
 discovered_phase: D
 related: [parity-model, strat-rule6-embedded-cr, strat-parity-matrix, O-35, O-02, O-01, O-03]
 sources: []

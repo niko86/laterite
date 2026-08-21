@@ -33,10 +33,10 @@ TABLE severity, rules FROM "insights"
 WHERE proposes_observation = true AND status != "ratified"
 ```
 
-## Confirmed gaps feeding AGS5
+## Confirmed gaps feeding the test strategy
 
 ```dataview
-TABLE feeds_ags5_req, feeds_strategy FROM "insights"
+TABLE feeds_strategy FROM "insights"
 WHERE status = "confirmed" OR status = "ratified"
 ```
 
