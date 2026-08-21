@@ -31,6 +31,7 @@ count of what was scanned is printed on every run, pass or fail.
 
 from __future__ import annotations
 
+import importlib.util
 import re
 from pathlib import Path
 from typing import Any
@@ -45,6 +46,18 @@ NIGHTLY = REPO / ".github" / "workflows" / "nightly.yml"
 @pytest.fixture(scope="module")
 def workflow() -> dict[str, Any]:
     return yaml.safe_load(NIGHTLY.read_text(encoding="utf-8"))
+
+
+def _load_issue_tracker():
+    """Import `tools/issue_tracker.py` — `tools/` is not a package. Same shape as
+    tests/test_issue_tracker.py's loader, so there is one way to do this."""
+    spec = importlib.util.spec_from_file_location(
+        "issue_tracker", REPO / "tools" / "issue_tracker.py"
+    )
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _steps(job: dict[str, Any]) -> list[dict[str, Any]]:
@@ -68,7 +81,13 @@ def _run_steps(workflow: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
 #: from the ROOTDIR — which is this checkout — no matter which interpreter runs
 #: it. Every pytest in this workflow runs from a venv built ad hoc from a
 #: published artifact, so the plugin is never there to answer for the option.
-NEUTRALISER = 'addopts=""'
+#:
+#: Both quotings and the split form are accepted because the shell accepts them:
+#: a gate that demands one spelling of a working command teaches people to fight
+#: it. What is NOT optional is the `-o` — `addopts=""` on its own is a shell
+#: assignment pytest never sees.
+NEUTRALISER = re.compile(r"""-o[= ]\s*addopts=(""|''|"" |'' )""")
+NEUTRALISER_HUMAN = '-o addopts=""'
 
 #: Invocations exempt from the rule, each with the reason it is exempt. Empty,
 #: and declared rather than derived on purpose: an exemption is a decision
@@ -174,8 +193,8 @@ def test_every_pytest_invocation_neutralises_the_repo_addopts(
         name = step.get("name", "<unnamed>")
         if name in ADDOPTS_EXEMPT:
             continue
-        assert NEUTRALISER in command, (
-            f"{job} / {name!r} invokes pytest without `-o {NEUTRALISER}`. The root "
+        assert NEUTRALISER.search(command), (
+            f"{job} / {name!r} invokes pytest without `{NEUTRALISER_HUMAN}`. The root "
             f'pyproject sets `addopts = "--benchmark-disable"`; an ephemeral env '
             f"without pytest-benchmark exits 4 on it before collecting anything "
             f"(#493). Reproduce locally with `-p no:benchmark`."
@@ -239,26 +258,41 @@ def _legs_with_a_determination(workflow: dict[str, Any]) -> list[str]:
 
 
 def _steps_after_the_determination(job: dict[str, Any]) -> list[dict[str, Any]]:
+    """EVERY step below the determination, `run` and `uses` alike.
+
+    Filtering to `run` steps would be the same blind spot one level down: a
+    `uses:` step added after `under-test` can fail the job just as hard, and a
+    gate meant to prove nothing downstream is fatal must not decide for itself
+    which downstream steps count.
+    """
     steps = _steps(job)
     at = next(i for i, s in enumerate(steps) if s.get("id") == "under-test")
-    return [s for s in steps[at + 1 :] if "run" in s]
+    return steps[at + 1 :]
 
 
-def test_both_released_legs_compute_a_determination(workflow: dict[str, Any]) -> None:
-    assert _legs_with_a_determination(workflow) == [
-        "docs-vs-released-wheel",
-        "docs-vs-released-npm",
-    ]
+#: The legs that determine whether this checkout is the released tag. Declared
+#: once and pinned by the test below, so a third one arriving is a decision
+#: somebody records rather than a parametrize list somebody forgets.
+DETERMINING_LEGS = ("docs-vs-released-wheel", "docs-vs-released-npm")
 
 
-@pytest.mark.parametrize("leg", ["docs-vs-released-wheel", "docs-vs-released-npm"])
+def test_the_determining_legs_are_the_ones_declared(workflow: dict[str, Any]) -> None:
+    """Set equality, not sequence: job ORDER in the workflow is not governance,
+    and a gate that reds on a reordering is a gate people learn to ignore."""
+    assert set(_legs_with_a_determination(workflow)) == set(DETERMINING_LEGS)
+
+
+@pytest.mark.parametrize("leg", DETERMINING_LEGS)
 def test_tree_ahead_amnesties_every_step_that_could_be_fatal(
     workflow: dict[str, Any], leg: str
 ) -> None:
     """AHEAD of the released tag: nothing downstream of the determination may
     fail the job. This is the direction that was broken — the wheel leg's CLI
     write-mode step had no `continue-on-error` at all, so an unreleased CLI
-    change was fatal on a run whose own banner said it would not be."""
+    change was fatal on a run whose own banner said it would not be.
+
+    Nothing is filtered out here, which is the point: this is the half that has
+    to be exhaustive."""
     for step in _steps_after_the_determination(workflow["jobs"][leg]):
         assert continue_on_error(step.get("continue-on-error"), tree_ahead=True), (
             f"{leg} / {step.get('name')!r} stays fatal when the checkout is ahead "
@@ -266,18 +300,49 @@ def test_tree_ahead_amnesties_every_step_that_could_be_fatal(
         )
 
 
-@pytest.mark.parametrize("leg", ["docs-vs-released-wheel", "docs-vs-released-npm"])
+#: The steps that may stay non-fatal at the released tag, named in full per leg.
+#: A committed `.out` that no longer byte-matches is expected drift, never a
+#: defect — but that is a decision about two specific steps, so it is written
+#: down as one. Deriving it from `(informational)` in the step NAME, which is how
+#: this started, makes the opt-out reachable by rename: appending the word to a
+#: step would quietly excuse it from the only rule holding the other direction of
+#: the amnesty, and nothing would say so. Same argument as `ADDOPTS_EXEMPT` and
+#: `TRACKER_EXCLUDED`, and it applies harder here because this table is not empty.
+INFORMATIONAL_STEPS: dict[str, frozenset[str]] = {
+    "docs-vs-released-wheel": frozenset(
+        {
+            "Committed .out still byte-matches (informational)",
+            "CLI examples still byte-match the wheel's own `lat` (informational)",
+        }
+    ),
+    "docs-vs-released-npm": frozenset(
+        {"Committed .out still byte-matches (informational)"}
+    ),
+}
+
+
+@pytest.mark.parametrize("leg", DETERMINING_LEGS)
 def test_at_the_released_tag_the_actionable_steps_are_still_fatal(
-    workflow: dict[str, Any], leg: str
+    workflow: dict[str, Any], leg: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """AT the released tag: an example that fails to run is a real defect and must
     take the job down. The other direction, demonstrated rather than assumed —
-    "always non-fatal" would pass the test above and destroy the leg.
-
-    `(informational)` in a step's name is the declared opt-out: a committed `.out`
-    that no longer byte-matches is expected drift, never a defect."""
+    "always non-fatal" would pass the test above and destroy the leg."""
     steps = _steps_after_the_determination(workflow["jobs"][leg])
-    actionable = [s for s in steps if "(informational)" not in s.get("name", "")]
+    declared = INFORMATIONAL_STEPS[leg]
+    names = {s.get("name", "") for s in steps}
+    assert declared <= names, (
+        f"{leg} declares informational step(s) it no longer has: "
+        f"{sorted(declared - names)}. A renamed step is not an excused one — "
+        f"update INFORMATIONAL_STEPS deliberately or let the rule apply."
+    )
+    actionable = [s for s in steps if s.get("name", "") not in declared]
+    with capsys.disabled():
+        print(
+            f"\n[nightly amnesty] {leg}: {len(actionable)} of {len(steps)} steps "
+            f"below the determination are actionable; "
+            f"{len(declared)} declared informational"
+        )
     assert actionable, f"{leg} has no fatal step left — the determination is decorative"
     for step in actionable:
         assert not continue_on_error(step.get("continue-on-error"), tree_ahead=False), (
@@ -317,3 +382,31 @@ def test_the_tracker_sees_every_nightly_job(
         "to nobody."
     )
     assert needs - jobs == set(), "`notify` depends on a job that no longer exists"
+
+
+def test_a_docs_leg_failing_alone_opens_an_issue_that_names_it(
+    workflow: dict[str, Any],
+) -> None:
+    """The acceptance criterion end to end, over the REAL dependency set.
+
+    `plan()` was never wrong — it reports whatever it is handed, and it was handed
+    seven of twelve jobs. Exercising it against a hand-written `needs` dict would
+    prove nothing about that, which is the whole defect; so the input here is
+    built from the workflow, exactly as GitHub builds it. Drop the leg from
+    `notify`'s `needs` and this goes red because the failure never appears in the
+    context at all — a green tracker over a red run."""
+    tracker = _load_issue_tracker()
+    leg = "docs-vs-released-duckdb"
+    # What the `NEEDS` env carries: one entry per dependency, and nothing else.
+    context = {
+        job: {"result": "failure" if job == leg else "success"}
+        for job in workflow["jobs"]["notify"]["needs"]
+    }
+
+    action = tracker.plan(context, None, "https://example.invalid/run/1")
+
+    assert action["action"] == "create", (
+        f"a nightly in which only {leg} failed opens no tracking issue — the leg "
+        f"cannot reach `notify`"
+    )
+    assert f"**Failing:** {leg}" in action["body"]
