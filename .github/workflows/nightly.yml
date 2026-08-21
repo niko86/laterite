@@ -512,11 +512,14 @@ jobs:
   # `npm ci` installs from the lockfile, so the peer range is never consulted.
   # Fixed in the manifest; `peer-range.test.ts` keeps it fixed.
   #
-  # EXPECT THIS RED UNTIL THAT FIX SHIPS. The manifest on npm still carries the
-  # old range, so the peer step below fails and the three `sql()`/`at()` examples
-  # fail with it. That is the correct signal, not a bug in the job: the published
-  # package IS broken for readers right now, and the remedy is a release. It goes
-  # green on its own the day one is cut.
+  # That fix has since shipped, and this paragraph used to say "EXPECT THIS RED
+  # UNTIL IT DOES" — a claim about a published artifact, written into a comment
+  # that nothing re-reads. It went stale the day the release was cut and stayed
+  # that way, so the leg had a standing excuse for being red long after it had
+  # stopped being red. WHAT A RED RUN MEANS HERE, stated without a reading in it:
+  # the published package is behind what the site documents, and the remedy is a
+  # release. The step below prints the released-vs-tree pair, which is where that
+  # question gets answered on the run rather than from this comment.
   #
   # Calibrated exactly like the wheel leg — an example that FAILS TO RUN fails the
   # job, because a reader following the live site gets a traceback; a committed
@@ -621,13 +624,14 @@ jobs:
   # PUBLISH DATE beside this tree's HEAD date instead, which is the pair that
   # actually separates a defect from ordinary tree-ahead drift.
   #
-  # EXPECT THIS RED until the next `wasm-v*` release. `ex03_read.mjs` pulls rows
-  # through `rows_json()` — the accessor the slim engine tier exposes — and the
-  # published artifact predates it, so the example dies with `dataset.rows_json is
-  # not a function` while both version strings read the same. That is the state
-  # this leg was built to make visible, not a bug in the job; the remedy is a
-  # release. Which release, and how far behind it is, is what the step below
-  # prints — don't restate it here, it moves on the next publish.
+  # This carried the npm leg's twin of that claim — "EXPECT THIS RED until the
+  # next `wasm-v*` release", because `ex03_read.mjs` pulls rows through
+  # `rows_json()` and the published artifact predated it. That release has
+  # shipped. The paragraph even ended by telling the reader not to restate a
+  # figure here "it moves on the next publish", and was itself the thing that
+  # moved: the same objection applies to a STATE as to a number. A red run here
+  # means the published package is behind the site; how far behind is what the
+  # step below prints, and it is the only place that can answer it.
   #
   # Calibrated like both existing legs: an example that FAILS TO RUN fails the
   # job, a committed `.out` that no longer byte-matches does not. What it does NOT
