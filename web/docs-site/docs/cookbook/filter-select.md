@@ -28,6 +28,7 @@ dtype _is_ the AGS type, a numeric filter compares numbers, not strings.
     without one fork bleeding into another:
 
     ```python
+    ags = laterite.read("delivery.ags")
     base = ags.query("SELECT * FROM LOCA")
     rotary = base.filter("LOCA_TYPE = 'RC'")     # base is untouched
     deep   = base.filter("LOCA_GL > 30")         # independent of `rotary`

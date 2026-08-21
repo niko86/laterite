@@ -43,6 +43,7 @@ When the verdict is *all* you want, name the cert on `validate` instead:
 
 === "Python"
 
+    <!-- doc-code: skip — needs a cert from the example above, which mints it in a temp dir; the shape is the lesson -->
     ```python
     laterite.validate("delivery.ags", index="delivery.ags.idx")
     ```

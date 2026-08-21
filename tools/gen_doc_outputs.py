@@ -75,6 +75,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -85,6 +86,13 @@ if TYPE_CHECKING:
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "web" / "docs-site" / "docs"
 EXAMPLES = ROOT / "web" / "docs-site" / "examples"
+#: What the docs read from. `sample_site` is what the example FILES open by
+#: path; `sample_strata` is the same file plus a GEOL group, and is what the
+#: pages' narrative `delivery.ags` is seeded from — `sql-across-groups.md`
+#: documents a three-way join through GEOL, so a fixture without it would
+#: make a real, working capability look broken.
+FIXTURE = ROOT / "examples" / "sample_site.ags"
+DELIVERY_FIXTURE = ROOT / "examples" / "sample_strata.ags"
 
 #: Where the built wasm package lands, and where Node must see it to resolve the
 #: published name. wasm-pack names the package after the CRATE
@@ -154,6 +162,123 @@ PAGE_SURFACE = {
 #: oversight, and the next person adding a runnable `lat …` fence would reasonably
 #: assume it was covered.
 EXCLUDED_LANGS = {"bash", "sh", "shell", "console"}
+
+
+#: A named section inside an example file: `# --8<-- [start:code]` … `[end:code]`.
+#: Pages include a SECTION so the machinery stays in the file and only the lesson
+#: reaches the page — so a page program has to resolve the same slice MkDocs does.
+SECTION_RE = (
+    r"(?s)^[ \t]*#\s*--8<--\s*\[start:{name}\]\n(.*?)^[ \t]*#\s*--8<--\s*\[end:{name}\]"
+)
+#: The include target inside a fence body.
+INCLUDE_IN_FENCE_RE = re.compile(r'--8<--\s*"([^"]+)"')
+
+
+def _dedent(body: str, indent: str) -> str:
+    """Strip a tabbed block's indent, or the source is a syntax error.
+
+    Cookbook pages put fences inside `pymdownx.tabbed`, which indents them four
+    spaces. Concatenating that verbatim yields `IndentationError` on the first
+    line and would make every tabbed page fail for a reason that has nothing to
+    do with the snippet.
+    """
+    if not indent:
+        return body
+    return "".join(
+        line[len(indent) :] if line.startswith(indent) else line
+        for line in body.splitlines(keepends=True)
+    )
+
+
+def resolve_include(ref: str) -> str | None:
+    """The source a page's `--8<--` actually pulls in, section suffix honoured."""
+    rel, _, section = ref.partition(":")
+    path = EXAMPLES / rel
+    if not path.exists():
+        return None
+    text = path.read_text(encoding="utf-8")
+    if not section:
+        return text
+    m = re.search(SECTION_RE.format(name=re.escape(section)), text, re.M)
+    return m.group(1) if m else None
+
+
+def page_program(md: str, lang: str) -> tuple[str, int]:
+    """One page's fences of `lang`, concatenated in document order.
+
+    Document order, ignoring tab boundaries, because that is the order a reader
+    meets them — and it is what makes a page's include and a continuation further
+    down ONE program. That pairing is the whole point: the continuations refer to
+    names the include bound, so running them apart proves nothing.
+
+    Returns the source and how many INLINE fences it contains. Zero inline means
+    the page is only includes, which `test_docs_examples.py` already runs as
+    files; executing it again here would add cost and no coverage.
+    """
+    parts: list[str] = []
+    inline = 0
+    for m in CODE_FENCE_RE.finditer(md):
+        if m.group("lang") != lang or CODE_SKIP_RE.search(m.group("skip")):
+            continue
+        body = _dedent(m.group("body"), m.group("indent"))
+        if body.lstrip().startswith("--8<--"):
+            ref = INCLUDE_IN_FENCE_RE.search(body)
+            src = resolve_include(ref.group(1)) if ref else None
+            if src is not None:
+                parts.append(src)
+            continue
+        inline += 1
+        parts.append(body)
+    return "\n".join(parts), inline
+
+
+def run_page_programs(surface: Surface, lang: str) -> list[tuple[str, str]]:
+    """Execute every page program for one surface. Returns (page, stderr) failures.
+
+    "Does not raise" is the bar. A continuation typically just prints, and
+    demanding assertions would mean editing every one of them — the rewrite the
+    one-program-per-page decision exists to avoid. It is still enough to catch
+    what is actually broken here: a name the page never binds raises NameError.
+    """
+    failures: list[tuple[str, str]] = []
+    ran = 0
+    for page in sorted(DOCS.rglob("*.md")):
+        src, inline = page_program(page.read_text(encoding="utf-8"), lang)
+        if not inline or not src.strip():
+            continue
+        ran += 1
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            f = work / f"page_program{Path(surface.pattern).suffix}"
+            f.write_text(src, encoding="utf-8")
+            # A SEEDED cwd, not the repo root. Pages say `delivery.ags` — it is the
+            # site's narrative filename, in 31 places — and rewriting every one to
+            # the fixture path would trade the docs' voice for the gate's
+            # convenience. Seeding the working directory instead keeps page text
+            # and executed text identical, which is the property both existing
+            # gates advertise; only the environment is prepared, exactly as
+            # `test_docs_examples.py` prepares one by running from the repo root.
+            #
+            # It also removes a real hazard: `delivery.ags` EXISTS at the repo root
+            # as a gitignored working artifact holding only PROJ, so running from
+            # there gave `read-a-group.md` a KeyError on a missing LOCA rather than
+            # the FileNotFoundError CI would have seen. A gate whose result depends
+            # on an untracked file is not a gate.
+            (work / "examples").mkdir()
+            shutil.copy(FIXTURE, work / "examples" / FIXTURE.name)
+            shutil.copy(DELIVERY_FIXTURE, work / "delivery.ags")
+            proc = subprocess.run(
+                surface.argv(f),
+                cwd=work,
+                capture_output=True,
+                text=True,
+                timeout=300,
+                env={**os.environ, **surface.env},
+            )
+        if proc.returncode != 0:
+            failures.append((str(page.relative_to(DOCS)), proc.stderr.strip()))
+    print(f"gen_doc_outputs: ran {ran} {lang} page program(s); {len(failures)} failed")
+    return failures
 
 
 def census_code_fences(md: str, page: str) -> tuple[dict[str, int], list[str]]:
@@ -401,12 +526,41 @@ def main() -> None:
         help="the structural half only: no example is run, so nothing needs building",
     )
     ap.add_argument(
+        "--run-pages",
+        action="store_true",
+        help="execute each page's fences as one program (nightly; needs the surface built)",
+    )
+    ap.add_argument(
         "--surface",
         action="append",
         choices=sorted(SURFACES),
         help="limit to one surface (repeatable); default is every surface not needing extra tooling",
     )
     args = ap.parse_args()
+
+    if args.run_pages:
+        # Nightly lane. The structural half (--check-pages) runs on every PR and
+        # says which fences SHOULD run; this is what actually runs them.
+        bad: list[tuple[str, str]] = []
+        for lang, surface_name in sorted(PAGE_SURFACE.items()):
+            if args.surface and surface_name not in args.surface:
+                continue
+            s = SURFACES[surface_name]
+            if s.requires and not shutil.which(s.requires):
+                print(
+                    f"gen_doc_outputs: {lang} page programs SKIPPED — {s.requires} not found"
+                )
+                continue
+            bad += [(f"{lang} · {p}", err) for p, err in run_page_programs(s, lang)]
+        if bad:
+            for where, err in bad:
+                tail = "\n    ".join(err.splitlines()[-4:])
+                print(f"\n  {where}\n    {tail}")
+            sys.exit(
+                f"\ngen_doc_outputs: {len(bad)} page program(s) do not run. A reader "
+                "following the page hits this."
+            )
+        return
 
     # `default` marks a surface whose examples need extra tooling to RUN. That is
     # irrelevant to --check-pages, which runs nothing — so the structural half
@@ -528,9 +682,18 @@ def main() -> None:
         # "structurally classified" reading as "known to run".
         print(
             f"gen_doc_outputs: {code_counts['included']} code fence(s) are includes, "
-            f"{code_counts['inline']} inline (classified, NOT yet executed — #513), "
+            f"{code_counts['inline']} inline, "
             f"{code_counts['skipped']} skipped with a reason, "
             f"{code_counts['prose']} prose"
+        )
+        # Which of the inline ones a runner actually executes, because "classified"
+        # and "known to run" are different claims and the gap between them is the
+        # thing worth watching. This half runs no examples, so it reports the
+        # SHAPE of the coverage; `--run-pages` is what proves it.
+        pending = sorted(set(PAGE_SURFACE) - {"python"})
+        print(
+            "gen_doc_outputs: page programs execute in the nightly "
+            f"(`--run-pages`); runners live for python, pending for {', '.join(pending)}"
         )
         return
 
