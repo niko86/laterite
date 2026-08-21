@@ -204,8 +204,9 @@ jobs:
               # Watching only laterite-node/** silently SKIPPED the node job on a
               # dependency change (a validator/types/emit edit ran rust + python but
               # not node). Watch all of rust-packages/** so node can never drift out
-              # of sync with its deps; the node job is ~40s, so the occasional run on
-              # an unrelated crate is cheap insurance against a silent skip.
+              # of sync with its deps. The trade is deliberate and holds at any job
+              # duration: a silent skip is a correctness failure, while a run on an
+              # unrelated crate is only cost.
               - 'rust-packages/**'
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
@@ -245,7 +246,9 @@ jobs:
               # editing one can only weaken it — raise a ceiling, widen a surface
               # list. Without this a PR whose entire diff is "make the gate stop
               # failing" would never run the gate. Narrow on purpose: the rest of
-              # `tools/release/**` has no business waking a 20-minute job.
+              # `tools/release/**` has no business waking a job that installs a Rust
+              # toolchain and the wasm32 target and builds every wasm crate before
+              # it lints a line.
               - 'tools/release/*wasm*.mjs'
             prose:
               # `prose` = the cadence gate's inputs, and they really are this
@@ -540,7 +543,7 @@ jobs:
         || needs.changes.result != 'success'
         || needs.changes.outputs.code == 'true') }}
     runs-on: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) || github.event_name == 'schedule') && 'ubuntu-latest' || fromJSON('["self-hosted","linux","x64","laterite-linux"]') }}
-    # 35 min ceiling (generous): the AGS5 crates (the bundled-DuckDB long pole)
+    # The ceiling below is generous: the AGS5 crates (the bundled-DuckDB long pole)
     # were decoupled to ags5/, so the kept workspace links no bundled DuckDB and
     # a cold build is much faster; warmed runs (sccache hits) finish in minutes.
     timeout-minutes: 35
@@ -891,7 +894,7 @@ jobs:
   # web/ MUST build its wasm bindings first: eslint's type-aware rules
   # (`no-unsafe-*`) resolve the `../wasm/ags4_wasm.js` import through its GENERATED
   # .d.ts. With no wasm built the import is `any` and every call through it trips a
-  # FALSE no-unsafe error (75 of them) — so the wasm build is a lint prerequisite,
+  # FALSE no-unsafe error, in bulk — so the wasm build is a lint prerequisite,
   # not a test artefact. node/ needs no wasm (it links its own napi addon).
   ts-lint:
     needs: changes
@@ -1010,11 +1013,12 @@ jobs:
       # measures the artifact the app actually ships rather than a second build
       # of the same flags: the step above already built it.
       #
-      # 839.2 KiB gzip / 2093.9 KiB raw against ceilings of 940 / 2350. The raw
-      # ceiling is also load-bearing downstream — `maximumFileSizeToCacheInBytes`
-      # in web/vite.config.ts sits at 3 MiB, above this gate and below the full
-      # engine, so raising this one without moving that one would quietly stop
-      # the engine being precached at all.
+      # The gzip and raw ceilings live in tools/release/check-wasm-tier1.mjs,
+      # which fails this step when either is crossed — the only place either
+      # number belongs. The raw one is load-bearing downstream as well:
+      # `maximumFileSizeToCacheInBytes` in web/vite.config.ts sits above it and
+      # below the full engine, so raising this gate without moving that setting
+      # would quietly stop the engine being precached at all.
       - name: wasm — hold the tier-1 artifact to its ceiling
         working-directory: web
         run: npm run check:wasm-tier1
@@ -1116,10 +1120,11 @@ jobs:
       # packages); this just acknowledges it so the log isn't noisy. NOT a
       # perf fix — that would need the cache to share the venv's filesystem.
       UV_LINK_MODE: copy
-    # 30 min ceiling: the cdylib is now built ONCE in build-ext and downloaded
-    # here (see the download step below), so this job's only compile is the lean
-    # lat CLI (no bundled DuckDB) plus uv sync + pytest — comfortably under 30 on
-    # a warm sccache. (Was 50 when this job compiled the PyO3 cdylib itself.)
+    # The ceiling below is generous: the cdylib is now built ONCE in build-ext
+    # and downloaded here (see the download step below), so this job's only
+    # compile is the lean lat CLI (no bundled DuckDB) plus uv sync + pytest —
+    # comfortably inside it on a warm sccache. (It was 50 minutes when this job
+    # compiled the PyO3 cdylib itself.)
     timeout-minutes: 30
     steps:
       # needs: build-ext gives this job the prebuilt _laterite_native cdylib
