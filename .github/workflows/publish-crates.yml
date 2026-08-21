@@ -1,0 +1,104 @@
+name: publish-crates
+
+# The engine's release to crates.io, which was the last registry published by
+# hand from a laptop (#463). It is also the only APPEND-ONLY one of the three:
+# a published version can never be withdrawn or re-cut, so there is no
+# equivalent of the tag retarget that recovered 0.8.0. The most consequential,
+# least reversible step had no CI, no environment gate and no approval.
+#
+# NO STORED CREDENTIAL. crates.io supports Trusted Publishing, so this
+# authenticates the way `pypi-publish` and `npm-publish` in release.yml already
+# do — an OIDC exchange, `id-token: write` and nothing in the repo's secrets.
+# The token `crates-io-auth-action` mints is short-lived and its own post-step
+# revokes it when the job ends.
+#
+# Its own file rather than a job in release.yml, deliberately: the engine moves
+# on its own clock. release.yml is driven by the three tag trains (`v*`,
+# `node-v*`, `wasm-v*`) and the engine has no tag — RELEASING.md cuts it from
+# `main` once the bump PR merges, usually BEFORE the product release it is the
+# substrate for. A dispatch job living among tag-gated ones would need an `if:`
+# excluding every train, which is the shape that goes wrong silently.
+#
+# ⚠️ The crates.io side pins THIS FILENAME. Each of the 11 crates carries a
+# Trusted Publishing config naming `publish-crates.yml` and the `crates`
+# environment; renaming or moving this file breaks all 11 at once, and the
+# failure appears at publish time, on the registry that cannot be un-published.
+
+on:
+  workflow_dispatch:
+    inputs:
+      execute:
+        description: "Publish for real. Left off, this prints the waves and stops."
+        type: boolean
+        default: false
+
+# Least-privilege default, matching release.yml: the publish job escalates
+# explicitly below and nothing else here gets a broad token.
+permissions:
+  contents: read
+
+# crates.io is append-only, so two concurrent runs is a risk with no undo.
+# `publish_crates.py` is idempotent (a version already on the registry is
+# skipped), which makes a collision survivable rather than safe — this makes it
+# impossible. Never cancel in progress: killing a run mid-wave is exactly the
+# half-done state the script's docstring calls the bad one.
+concurrency:
+  group: publish-crates
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Layer 1 of the gate, at workflow level: a dispatch can be fired from any
+    # branch, and the script's own preflight refuses anything but `main`. This
+    # says so before a runner is spent. Layer 2 is the `crates` environment's
+    # reviewer; layer 3 is crates.io itself, which validates this repo, this
+    # filename and this environment over OIDC and rejects a mismatch upstream.
+    if: github.ref == 'refs/heads/main'
+    name: crates.io (engine + facade)
+    runs-on: ubuntu-latest
+    environment: crates
+    permissions:
+      contents: read
+      id-token: write # OIDC token exchange for crates.io trusted publishing
+    # Generous: `cargo publish` builds every crate to verify it, and the script
+    # waits for each wave to become RESOLVABLE from the index before starting
+    # the next — the step a naive publish loop skips and fails partway through.
+    timeout-minutes: 60
+    steps:
+      # `ref: main` so `git rev-parse --abbrev-ref HEAD` answers `main` rather
+      # than a detached `HEAD`, and `fetch-depth: 0` so `origin/main` resolves:
+      # the preflight asserts HEAD *is* origin/main, which a shallow checkout
+      # cannot answer.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+
+      # State what is under test before doing anything irreversible — the same
+      # discipline the docs-vs-released legs use. A dry run prints the same
+      # plan, so the two are comparable line for line.
+      - name: what this run would publish
+        run: uv run --no-project python tools/publish_crates.py
+
+      - uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
+        id: auth
+
+      # `--execute` only when asked. The default dispatch is a rehearsal that
+      # performs every check and publishes nothing, which is the script's own
+      # default and the reason it is safe to run this workflow to look.
+      #
+      # If the minted token expires mid-run (long waves, slow index), re-run:
+      # the script skips what is already on the registry and resumes.
+      - name: publish
+        if: inputs.execute
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: uv run --no-project python tools/publish_crates.py --execute
