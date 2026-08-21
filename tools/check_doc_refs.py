@@ -107,8 +107,12 @@ def _targets(text: str) -> tuple[set[str], set[str]]:
     matches so they cannot drift apart into a filter whose complement nobody
     computes — which is exactly how the blind spot lasted.
 
-    Markdown links are unfiltered, because a link target is path-shaped by
-    definition; nothing is ever dropped on that side.
+    Markdown links skip the `/` rule entirely — a link target is path-shaped by
+    definition — so the split is about backticked tokens and nothing else. Links
+    are still subject to `EXTERNAL` below, which is a second, narrower drop this
+    tool does not yet count (#295 item 2): `http://` and `#` are deliberately out
+    of scope, but `<` also swallows Markdown's angle-bracket form, so
+    `[x](<tools/gone.md>)` is a LOCAL dead reference that lands in neither half.
     """
     checked: set[str] = set()
     skipped: set[str] = set()
@@ -212,8 +216,8 @@ def main() -> None:
     hint = "" if args.skipped or not result.skipped else " (--skipped lists them)"
     print(
         f"check_doc_refs: skipped {len(result.skipped)} slash-free backticked "
-        f"token(s) in {docs} doc(s); a bare filename is not path-shaped, so "
-        f"nothing resolved it{hint}"
+        f"token(s) in {docs} doc(s) — a bare filename is not path-shaped, so "
+        f"this gate never resolved it as a citation{hint}"
     )
 
     if not result.problems:

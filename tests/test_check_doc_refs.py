@@ -95,6 +95,15 @@ def test_markdown_link_to_a_bare_filename_is_still_checked() -> None:
     assert skipped == set()
 
 
+def test_a_linked_target_does_not_cancel_the_same_token_in_prose() -> None:
+    """Counted per citation, not per filename — deliberately, so the number means
+    "references this gate did not resolve", which is what a widening decision
+    needs. The doc is fine; the backticked citation is still one nothing read."""
+    targets, skipped = gate._targets("[c](COMPAT.md) beside prose `COMPAT.md`")
+    assert targets == {"COMPAT.md"}
+    assert skipped == {"COMPAT.md"}
+
+
 def test_a_token_the_regex_never_matched_is_not_counted() -> None:
     """`read()` and `pandas` are not suffixed, so they are not dropped input."""
     _, skipped = gate._targets("call `read()` on a `pandas` frame")
