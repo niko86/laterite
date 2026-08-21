@@ -111,9 +111,11 @@ edition · comparison`
 
 **Campaign classes** (added Phase 0 of the Ingest campaign — see
 `.bootstrap/INGEST-PLAN.md`): `insight` (gap register) · `strategy`
-(Rust↔python test-probe register) · `decision` / `experiment` /
-`requirement` (the `design/` strand). These are *campaign-
-authored*, not bootstrap stubs — they progress past `stub` (see §13).
+(Rust↔python test-probe register) · `decision` (the `design/` strand).
+These are *campaign-authored*, not bootstrap stubs — they progress past
+`stub` (see §13). Phase 0 also added `requirement` and `experiment`,
+retired by #500: both were AGS5-strand classes, the strand is dormant and
+lives in the private satellite, and neither ever had a live page here.
 
 ## 4. Frontmatter schema
 
@@ -132,8 +134,7 @@ controlled vocabularies are documented in each template. Vocab:
 - `gap_kind` ∈ `spec-ambiguity | spec-contradiction | cross-edition-regression | spec-vs-rust | rust-vs-python | rule-weakness`
 - `insight.status` ∈ `hypothesis | probed | confirmed | ratified | refuted`; `severity` ∈ `low | med | high`
 - `strategy.status` ∈ `proposed | probed | confirmed`
-- `requirement.status` ∈ `proposed | accepted | prototyped | validated | rejected`; `priority` ∈ `must | should | could`
-- `experiment.outcome` ∈ `worked | partial | failed`; `decision.status` ∈ `proposed | accepted | superseded | rejected`
+- `decision.status` ∈ `proposed | accepted | superseded | rejected`
 - `tool.status` also allows `superseded` — a retired-package page kept as a redirect-stub tombstone (the same terminal word `decision` uses)
 - `superseded_by` — **required on any `status: superseded` page** (D4): the successor page stem(s) (`[a, b]` or a bare `a`), each of which must resolve; the page must *also* carry a read-time tombstone callout (`> [!…]` naming the supersession). A superseded page missing either is invalid; these pages get a dedicated **Retired / Superseded** index section.
 - `location` (`type: source`, A12) — where the artifact is, and Lint resolves it: a `repo:` citation (resolved by A1 under the §1 grammar), a repo-relative path that must exist on disk, or `"<filename> — not vendored; see the body"` for an artifact this repo doesn't hold (and then the named file must genuinely be absent — the marker is a checked claim, not a way to silence a dead path).
@@ -294,8 +295,11 @@ rule-weakness):
    > `OBSERVATIONS.md`; the user ratifies" — that was a self-imposed
    > guardrail wrongly attributed to the user. Deliberate, visible
    > authority edits are fine; they just go through the JSON.)
-4. Wire `feeds_strategy` / `feeds_ags5_req` so the gap flows into the
-   test strategy and the AGS5 requirement register.
+4. Wire `feeds_strategy` so the gap flows into the test strategy.
+   (`feeds_ags5_req` is also on the insight template and fed the AGS5
+   requirement register, retired with that class in #500. It is empty on
+   every page that carries it and is inventoried in [[reliquary]] rather
+   than swept out of 31 pages here.)
 
 ## 13. Status lifecycle
 

@@ -62,8 +62,6 @@ CLASS_ORDER = [
     "decision",
     "concept",
     "insight",
-    "experiment",
-    "requirement",
     "strategy",
     "comparison",
     "rule",
