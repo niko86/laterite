@@ -321,7 +321,7 @@ def test_buildless_ssots_need_no_heavy_job(
 
     Guarded rather than merely done, because the natural repair for "did my
     gate run?" is to add the path back here, which silently restores the
-    two-minute wait this split removed.
+    wheel build this split removed.
     """
     assert not _filter_matches(filters["code"], path), (
         f"{path} fires the heavy jobs again, but its gate runs in `repo-gates`, "

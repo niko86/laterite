@@ -135,9 +135,9 @@ jobs:
         # (89.6% → 89.24%), so the floor did not have to move.
         #
         # 88 -> 93 (2026-08-03). Actual has been 94.44-95.91 across the last four
-        # nightlies (94.88 on 2026-08-02), so the old floor sat ~7 points under
-        # reality and would not have caught a whole crate going dark. 93 keeps
-        # ~1.4 points under the LOWEST of those runs, which is the margin the
+        # nightlies (94.88 on 2026-08-02), so the old floor sat far under reality
+        # and would not have caught a whole crate going dark. 93 sits just under
+        # the LOWEST of those runs, which is the margin the
         # denominator churn needs: it moved 15,522 -> 16,659 lines in that window
         # when the `laterite` facade crate landed, and a floor tighter than the
         # denominator's own drift fails on arithmetic rather than on coverage.
@@ -177,8 +177,9 @@ jobs:
       # run on the host.
       #
       # The remaining gap is the wasm-bindgen boundary and it is a HARD ceiling
-      # here, not a backlog: ~127 of the residual lines are `JsValue`/`JsError`
-      # marshalling, which `cargo test` cannot call at all. Covering them needs
+      # here, not a backlog: the residual lines are dominated by
+      # `JsValue`/`JsError` marshalling, which `cargo test` cannot call at all.
+      # Covering them needs
       # `wasm-bindgen-test` on wasm32 — a target llvm-cov cannot instrument — so
       # those tests would not move this number even once written. They are
       # exercised end-to-end instead, by the `wasm-engine` xcheck leg (build_ags4)
