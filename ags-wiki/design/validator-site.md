@@ -348,7 +348,9 @@ design is the **cache split**, dictated by the asset weights:
 > then throws; with `[200]` the entry is refused and a healthy 200 still caches.
 >
 > This is what made 2026-08-16 expensive: the `laterite-cdn` bucket shipped with
-> no CORS configuration (#340 is the recurrence guard), the fetch was blocked,
+> no CORS configuration ([[dec-cdn-configuration]] is the recurrence guard the
+> #340 thread settled on — the config is recorded in-tree and asserted on the
+> deploy, never applied from CI), the fetch was blocked,
 > and the server-side fix took minutes — but each affected device needed
 > `caches.delete('ags-duckdb-wasm')` typed into a console to recover.
 >
