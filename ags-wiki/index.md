@@ -1,7 +1,7 @@
 ---
 type: index
-generated: 2026-08-20
-counts: {rules: 28, groups: 177, types: 17, observations: 51, tools: 30, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 29}
+generated: 2026-08-21
+counts: {rules: 28, groups: 177, types: 17, observations: 51, tools: 30, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 30}
 ---
 # AGS Wiki — Content Catalog
 
@@ -22,11 +22,11 @@ counts: {rules: 28, groups: 177, types: 17, observations: 51, tools: 30, concept
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
-| Design | 29 |
-| **Total (live)** | **410** |
+| Design | 30 |
+| **Total (live)** | **411** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 28 · `confirmed` 18 · `drafted` 333 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 29 · `confirmed` 18 · `drafted` 333 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -498,6 +498,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 51, tools: 30, concept
 | [[dec-rust-api-crates-io]] | accepted | — |
 | [[dec-rust-drives-python]] | accepted | — |
 | [[dec-verdict-severity-split]] | accepted | — |
+| [[dec-web-test-altitude]] | accepted | — |
 | [[reliquary]] | accepted | — |
 | [[validator-finding-ux]] | proposed | — |
 | [[validator-site]] | accepted | — |

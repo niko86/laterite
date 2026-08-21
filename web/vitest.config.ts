@@ -4,6 +4,13 @@ import { configDefaults, defineConfig } from "vitest/config";
 // helpers, and the rest of the wasm-free modules. Component rendering (Solid +
 // DOM) is exercised end-to-end by the Playwright suite (web/e2e), so these run
 // in a plain node env with no plugins — fast, no JSDOM, no Rust/wasm toolchain.
+// That sentence WAS the whole decision, recorded where only someone editing
+// this file would meet it (#431). It now has a page —
+// ags-wiki/design/dec-web-test-altitude.md — which adds the half it was
+// missing: when a guard is worth pinning below e2e, EXTRACT the decision
+// into a pure function and test it here. A test that wants a DOM is a
+// signal the logic wants lifting out of the component, not that this lane
+// wants widening.
 //
 // The tokenizer-dependent tests (agsline display helpers + fix-preview
 // geometry) now call the wasm-backed tokenizer (#533), so they run in the
