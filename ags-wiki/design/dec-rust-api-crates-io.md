@@ -224,8 +224,16 @@ Three consequences worth recording here rather than only in the prose:
   its drift gate live — not GitHub Releases. `repo:tools/gen_changelog.py` renders a
   **Breaking changes** index from the declared flag (#317), so the clause resolves to
   a short list rather than ~40KB of prose. No changelog covers the facade or the
-  engine tier at all today; a facade `CHANGELOG.md` is deferred to laterite#319,
-  paired with folding it into `repo:changelog.json` at [[dec-facade-parity]] phase 8.
+  engine tier at all today, and **laterite#319 decided none will**. A second file
+  was the wrong shape twice over: it is machinery with a known expiry date
+  ([[dec-facade-parity]] phase 8 gives the facade the product number, at which
+  point a separate changelog has nothing left to say), and it would support a
+  promise the row above explicitly withholds. What #319 found instead was that
+  the facade's history was already reachable and had quietly stopped being so —
+  product `0.10.0`'s facade entries name their `0.1.x` in the prose and
+  `0.11.0`'s do not. The fix is that convention, restored in `repo:RELEASING.md`
+  beside the hand bump: an entry describing a facade change names the version it
+  ships in. No generator mode, no second file, nothing to retire at phase 8.
 - **The engine tier's anti-promise is generated, not written.** `repo:tools/gen_crate_graph.py`
   stamps one line into each published non-facade README through the `availability`
   region (#317) — ten hand-written sentences would be ten things to drift.
