@@ -124,6 +124,10 @@ describe("validate(file, { index }) — the second door (#271)", () => {
     const free = validate(f, { index: idx, warnings: false });
     const handle = read(f, { index: idx }).validate({ warnings: false }).report;
     const plain = validate(f, { warnings: false });
+    // `.report` is `Report | undefined` — it is unset until `.validate()` runs.
+    // Narrowed rather than optional-chained so a MISSING report fails loudly
+    // here instead of turning every comparison below into `undefined === …`.
+    if (!handle) throw new Error(".report is unset after validate()");
 
     expect([free.certified, handle.certified, plain.certified]).toEqual([
       true,
@@ -174,6 +178,7 @@ describe("validate(file, { index }) — the second door (#271)", () => {
     writeFileSync(f, Buffer.concat([CLEAN, Buffer.from('"DATA","EXTRA"\r\n')]));
 
     const rep = handle.validate({ warnings: false }).report; // must NOT throw
+    if (!rep) throw new Error(".report is unset after validate()");
     expect(rep.certified).toBe(false);
     expect(rep.revalidateReason).toBeTruthy();
   });
