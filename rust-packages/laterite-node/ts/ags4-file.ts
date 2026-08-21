@@ -43,7 +43,7 @@ export interface Ags4Source {
 }
 
 /** Knobs for {@link Ags4File.certify} / {@link Ags4File.certifyBytes}: the edition pin
- *  and the #568 custom-`--dict` overlay the certificate is minted against. Each defaults
+ *  and the laterite-dev#568 custom-`--dict` overlay the certificate is minted against. Each defaults
  *  to the last `.validate()` on this handle (see `#mint`). */
 export interface CertifyOptions {
   /** Force the base edition; default is the last `.validate()`'s, else auto from TRAN_AGS. */
@@ -99,7 +99,7 @@ export class Ags4File {
   // against. NOT a trust claim — the mint re-validates; this only says with which
   // dictionary.
   #lastDictVersion: string | undefined;
-  // Same provenance for a `--dict` custom overlay (#568): the dictionary the last
+  // Same provenance for a `--dict` custom overlay (laterite-dev#568): the dictionary the last
   // `.validate()` overlaid and whether it replaced the base, so a following `.certify()`
   // mints against the same effective dictionary (and stamps its {name, hash}).
   #lastDictionary: string | Uint8Array | undefined;

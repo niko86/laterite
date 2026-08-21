@@ -124,7 +124,7 @@ describe("lat node CLI", () => {
   });
 
   // --- merge: the verb this launcher SHIPPED WITHOUT ---------------------
-  // `lat merge` landed in the native binary (#494) and never reached here. No gate
+  // `lat merge` landed in the native binary (laterite-dev#494) and never reached here. No gate
   // caught it, because every cross-surface gate compared one hand-list to another.
   // These pin the verb's OUTPUT, not just its existence: the merged bytes and the
   // `--json` wire summary are contractually identical across all three launchers.

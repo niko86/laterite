@@ -46,7 +46,7 @@ pub fn report_table(path: &Path, found: &Findings, n: usize) {
 /// A `&Path`-taking adapter over the engine's renderer — the rendering itself
 /// lives beside `Finding` in `laterite_ags4_validator::findings` so this
 /// binary, laterite-py and laterite-node cannot spell `--json` differently
-/// (#530).
+/// (laterite-dev#530).
 pub fn json_value(path: &Path, found: &Findings) -> Value {
     findings::findings_json_value(&path.display().to_string(), found)
 }

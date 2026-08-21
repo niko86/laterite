@@ -255,7 +255,7 @@ const FilePicker: Component<{
 
 /** A TYPE clash offers a way out; a UNIT clash deliberately does NOT (no mode can
  *  absorb metres-vs-millimetres, and offering a button would send the user in a
- *  circle — see #501). So only offer the modes when the engine says "type conflict". */
+ *  circle — see laterite-dev#501). So only offer the modes when the engine says "type conflict". */
 const MergeError: Component<{
   error: unknown;
   mode: TypeClashMode;

@@ -55,7 +55,7 @@ _KNOWN_RESOLUTIONS = [
     # RL is a delimited RECORD LINK (`GROUP|KEY1|KEY2`, AGS Rule 11) — text, not a
     # number. This row asserted DECIMAL, which is how the bug survived: parsing a
     # link as a float yields Null, so every RL column read back as an all-null f64
-    # and the link was destroyed (#503).
+    # and the link was destroyed (laterite-dev#503).
     ("RL", CanonicalType.STRING),
     ("DT", CanonicalType.DATETIME),
     ("YN", CanonicalType.BOOL),
@@ -286,7 +286,7 @@ def test_parse_value_integer_code_round_trips(n):
 
 
 # ---------------------------------------------------------------------------
-# parse_value — exact canonical values (the #531 single-source guard)
+# parse_value — exact canonical values (the laterite-dev#531 single-source guard)
 #
 # The PyO3 wrapper no longer re-implements the format tables / typed parsers:
 # it dispatches on `canonical_type` and calls the SAME `parse_datetime` /
@@ -328,6 +328,6 @@ def test_parse_value_numeric_exact_values():
 
 
 def test_parse_value_record_link_stays_string():
-    # RL is a delimited record LINK (text), never a number — the #503 guard.
+    # RL is a delimited record LINK (text), never a number — the laterite-dev#503 guard.
     assert parse_value("SAMP|BH01|1.00", "RL") == "SAMP|BH01|1.00"
     assert isinstance(parse_value("SAMP|BH01|1.00", "RL"), str)

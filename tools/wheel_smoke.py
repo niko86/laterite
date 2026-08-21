@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Post-install smoke for the PUBLISHED wheel (#554).
+"""Post-install smoke for the PUBLISHED wheel (laterite-dev#554).
 
 Imports `laterite` and runs one real validate. It is meant to run inside an
 ISOLATED venv that holds only the installed wheel — no workspace checkout, no

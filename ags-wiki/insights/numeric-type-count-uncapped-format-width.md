@@ -65,14 +65,14 @@ python-ags4's `f"{float(s):.0f}"` keeps full precision (`1E30` →
 `9223372036854775807` vs `1000000000000000019884624838656`). That is a real
 value *divergence* (we lose precision, python doesn't), the inverse of this
 page's DoS shape — unbounded OUTPUT here, unbounded INPUT into a bounded
-`i64` store there. It was hardened separately in #611, range-guarding to
+`i64` store there. It was hardened separately in laterite-dev#611, range-guarding to
 Null instead of saturating; see the sibling [[O-50]] /
 [[0dp-integer-conversion-precision-loss]] for the full account — not fixed
 by this page's clamp.
 
 ## OBSERVATIONS entry — **ratified as [[O-49]]**
 > [!note] Written into `repo:OBSERVATIONS.md#o-49` (5-field house style).
-> **Our decision** (#610): clamp the count to `MAX_NUMERIC_COUNT = 30` at all
+> **Our decision** (laterite-dev#610): clamp the count to `MAX_NUMERIC_COUNT = 30` at all
 > six sites (`laterite-ags4-types` nDP/nSF/nSCI + `laterite-ags4-excel` Dp/Sci/
 > `format_sf`) before it reaches a format width. Regression tests
 > `repo:rust-packages/laterite-ags4-types/src/lib.rs::nsf_count_is_clamped_so_a_crafted_type_cannot_dos`

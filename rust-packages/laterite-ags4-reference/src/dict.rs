@@ -7,7 +7,7 @@
 //! tables instantiate, plus the version selector + lookup surface the
 //! rule modules (V3+) use.
 //!
-//! [`Dictionary`] is a lifetime-parametric enum (#568): `Bundled` is the
+//! [`Dictionary`] is a lifetime-parametric enum (laterite-dev#568): `Bundled` is the
 //! zero-cost `&'static` phf handle used everywhere today; `Layered` overlays
 //! a runtime-owned [`OwnedDelta`](crate::overlay::OwnedDelta) (a custom `--dict`)
 //! on a bundled base, consulting the tiny delta first and falling through to the
@@ -94,11 +94,11 @@ pub enum DictResolution {
     #[serde(rename = "fallback")]
     Fallback,
     /// A custom `--dict` overlay whose base edition was detected structurally
-    /// from the dictionary itself (#568 §2 `detect_base`).
+    /// from the dictionary itself (laterite-dev#568 §2 `detect_base`).
     #[serde(rename = "structural")]
     StructuralBase,
     /// A custom `--dict --dict-replace` full replacement — no base edition
-    /// contributes (#568 §2).
+    /// contributes (laterite-dev#568 §2).
     #[serde(rename = "replacement")]
     Replacement,
 }
@@ -296,7 +296,7 @@ pub fn heading_key(group: &str, heading: &str) -> String {
 
 /// Read-only handle onto one bundled standard dictionary. Cheap to copy
 /// (just static map refs + a str). This is today's `Dictionary` verbatim,
-/// renamed (#568): the hot path only ever touches this, and `build.rs` /
+/// renamed (laterite-dev#568): the hot path only ever touches this, and `build.rs` /
 /// the phf codegen are unchanged.
 #[derive(Debug, Clone, Copy)]
 pub struct BundledDict {
@@ -399,7 +399,7 @@ impl BundledDict {
 
     /// Every heading in this edition as `(name, HeadingRef)` — the composite phf
     /// key `"GROUP\u{1f}HEADING"` reduced to its heading name. `detect_base`
-    /// (#568 §2) scores a custom dict's headings against an edition by NAME,
+    /// (laterite-dev#568 §2) scores a custom dict's headings against an edition by NAME,
     /// ignoring which group each lives under, so it needs name + (type, status)
     /// flat. A name that appears under several groups yields one tuple each.
     pub(crate) fn iter_headings(self) -> impl Iterator<Item = (&'static str, HeadingRef<'static>)> {
@@ -434,7 +434,7 @@ impl BundledDict {
 }
 
 /// Read-only dictionary handle. `Bundled` is the zero-cost `&'static` phf edition
-/// used everywhere; `Layered` overlays a runtime-owned custom-dict delta (#568).
+/// used everywhere; `Layered` overlays a runtime-owned custom-dict delta (laterite-dev#568).
 /// `Copy` (both arms are refs/statics), so every by-value `dict: Dictionary` site
 /// is unaffected by the enum change.
 #[derive(Debug, Clone, Copy)]
@@ -456,7 +456,7 @@ impl<'a> Dictionary<'a> {
     }
 
     /// Overlay a runtime custom-dict `delta` on its (already-detected) base edition.
-    /// Nothing constructs a delta before #568 Phase 2; the arm compiles now.
+    /// Nothing constructs a delta before laterite-dev#568 Phase 2; the arm compiles now.
     #[must_use]
     pub fn layered(delta: &'a OwnedDelta) -> Dictionary<'a> {
         Dictionary::Layered {
@@ -488,7 +488,7 @@ impl<'a> Dictionary<'a> {
     }
 
     /// Canonical description for an abbreviation in the standard ABBR table.
-    /// v1: always the base's picklist — custom ABBR is a v2 cut (#568 §6).
+    /// v1: always the base's picklist — custom ABBR is a v2 cut (laterite-dev#568 §6).
     #[must_use]
     pub fn abbr_desc(&self, heading: &str, code: &str) -> Option<&'a str> {
         let mut k = String::with_capacity(heading.len() + 1 + code.len());
@@ -517,7 +517,7 @@ impl<'a> Dictionary<'a> {
     }
 
     /// The `TRAN_AGS` value this dictionary edition expects (Rule 14). v1: the
-    /// base's — custom `TRAN_AGS` is a v2 cut (#568 §6).
+    /// base's — custom `TRAN_AGS` is a v2 cut (laterite-dev#568 §6).
     #[must_use]
     /// `&self`, NOT `self`, even though `Dictionary` is `Copy` and clippy's
     /// `trivially_copy_pass_by_ref` would rather it took by value: this is a

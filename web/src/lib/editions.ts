@@ -4,7 +4,7 @@
 // Every editions list on the web reads THIS module — settings validation, the
 // validate/export dropdowns, the `DictVersionOpt` type — replacing what used to
 // be four hand-maintained copies (settings.ts, validator.ts, Controls.tsx,
-// ExportPane.tsx), edited in lockstep by hand (#529, the web remainder of #509's
+// ExportPane.tsx), edited in lockstep by hand (laterite-dev#529, the web remainder of laterite-dev#509's
 // edition single-sourcing for the Rust/Python/Node surfaces).
 //
 // The values are `ags_dictionary.json`'s own `editions` array (the union

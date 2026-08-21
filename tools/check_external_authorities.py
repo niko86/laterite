@@ -7,7 +7,7 @@ The far half of the cadence gate, and the half that stops it being decorative.
 which this repo's CI cannot read. The root-suite gate
 `tests/test_stated_cadences_faithful.py` therefore checks this repo's prose
 against that mirror — and a mirror with nothing comparing it back to its subject
-is #549's Shape 1, the gate enforcing a proxy for the promise (the same hole
+is laterite-dev#549's Shape 1, the gate enforcing a proxy for the promise (the same hole
 `test_vendored_authority_faithful.py` closed at the dictionary's root). This
 script is the comparison, and it necessarily runs in the OTHER repo:
 
@@ -26,7 +26,7 @@ copy of this one would be the same class of bug it exists to catch.
 
 WHY IT CAN BE A PER-PR GATE, unlike `ruleset-drift.yml` — the precedent it
 otherwise follows. That one is a cron because its subject is GitHub's API, and a
-per-PR gate on a flaky remote fails for reasons the PR didn't cause (#561). This
+per-PR gate on a flaky remote fails for reasons the PR didn't cause (laterite-dev#561). This
 one's subject is a file on disk in the checkout. There is no network, so there is
 no "could not read" that isn't a genuine fault, and a mismatch is always
 actionable by whoever is editing the workflow.

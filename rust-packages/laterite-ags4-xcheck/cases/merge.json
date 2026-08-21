@@ -11,7 +11,7 @@
         ]
       },
       "legs": ["cli-native", "cli-uvx", "cli-npx"],
-      "spec_ref": "`lat merge <a> <b> --out merged.ags` — THE verb whose ABSENCE from npx started this arc (#494/#508) and had no standing cross-surface output-value case (proven by hand ONCE in #508; see arc-cross-surface-truth). Merging base then rev exercises the whole contract in one file: LOCA_NATE on BH1 resolves to 150.00 (LAST file wins the KEY conflict — argument-order recency), BH2 survives (union, not intersection), BH3 is added, and merge synthesises TRAN / UNIT / TYPE. The merged bytes are deterministic — the synthesised TRAN uses the FIXED `1900-01-01` placeholder, not a wall-clock date — so this pins the merged CONTENT byte-identical across the three launchers (#555 part 2)."
+      "spec_ref": "`lat merge <a> <b> --out merged.ags` — THE verb whose ABSENCE from npx started this arc (laterite-dev#494/#508) and had no standing cross-surface output-value case (proven by hand ONCE in laterite-dev#508; see arc-cross-surface-truth). Merging base then rev exercises the whole contract in one file: LOCA_NATE on BH1 resolves to 150.00 (LAST file wins the KEY conflict — argument-order recency), BH2 survives (union, not intersection), BH3 is added, and merge synthesises TRAN / UNIT / TYPE. The merged bytes are deterministic — the synthesised TRAN uses the FIXED `1900-01-01` placeholder, not a wall-clock date — so this pins the merged CONTENT byte-identical across the three launchers (laterite-dev#555 part 2)."
     }
   ]
 }

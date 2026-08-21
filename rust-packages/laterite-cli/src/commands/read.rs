@@ -103,7 +103,7 @@ fn render_group(group: &AgsGroup, json: bool, csv: bool) -> String {
     if json {
         // JSON + CSV come from core's `read_render` — the same writers Node and
         // Python now call, so `read --json`/`--csv` is one format, not three
-        // hand-synced ones (#530). The table stays local: it renders through
+        // hand-synced ones (laterite-dev#530). The table stays local: it renders through
         // `laterite-cliutil`'s styled grid, a CLI-only concern.
         read_render::render_rows_json(&group.headings, &rows)
     } else if csv {

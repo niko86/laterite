@@ -9,7 +9,7 @@
 # with the same parse leaf every surface wraps and runs N-way equality (ZERO
 # normalisation, JSON value equality), exiting non-zero on any unexplained split.
 #
-# Split out of the dev `ags4-compliance` crate (#553 reversal, the public-is-dev-
+# Split out of the dev `ags4-compliance` crate (laterite-dev#553 reversal, the public-is-dev-
 # home flip): that crate's findings/duckdb harness needs the private `ags4-parity`
 # oracle, but this output-value gate needs only the public emit/parse/validator/
 # core leaves — so it ships here on its own, without dragging the oracle public.

@@ -21,7 +21,7 @@ import { ThemeToggle } from "./shared/components";
 import mark from "../../assets/laterite-icon-128.png";
 
 const App: Component = () => {
-  // Gate the panes on the tiny main-thread tokenizer wasm (#533) ALONE — the
+  // Gate the panes on the tiny main-thread tokenizer wasm (laterite-dev#533) ALONE — the
   // validate/fix views + tools call it synchronously through
   // `splitAgsFields`/`quoteAgsField`, so a pane genuinely cannot paint before
   // it. The multi-MB engine is deliberately NOT awaited (#353): its deadline is

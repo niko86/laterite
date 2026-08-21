@@ -404,7 +404,7 @@ fn padding_is_not_reported_as_a_revision() {
     assert_eq!(r.revisions[0].changed, vec!["LOCA_GL".to_string()]);
 }
 
-/// Promote must not open a hole in the UNIT gate (#501): metres vs millimetres is
+/// Promote must not open a hole in the UNIT gate (laterite-dev#501): metres vs millimetres is
 /// still fatal, in the new mode as in every other.
 #[test]
 fn promote_does_not_weaken_the_unit_conflict_gate() {

@@ -134,7 +134,7 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
             eprintln!("error: TYPE conflict in {group}.{heading}: files declared {types:?}");
             // Both escape hatches, in lattice order — promote first, because it is
             // the one that KEEPS the type. Offering only the lossy one would push
-            // every clash toward X, which is exactly what #500 set out to stop.
+            // every clash toward X, which is exactly what laterite-dev#500 set out to stop.
             eprintln!(
                 "hint: --on-type-clash promote  keeps the greatest precision when every code is \
                  nDP (e.g. 2DP + 5DP -> 5DP, coarser values zero-padded; no digit is changed)"
@@ -152,7 +152,7 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
         }) => {
             eprintln!("error: UNIT conflict in {group}.{heading}: files declared {units:?}");
             // Deliberately NO mode hint here: no mode absorbs a unit clash.
-            // Offering one here would send the user in a circle (see #501).
+            // Offering one here would send the user in a circle (see laterite-dev#501).
             eprintln!(
                 "hint: merge will not convert units, and no mode can absorb this — picking one \
                  would silently mislabel the other file's values. Reconcile the UNIT row in the \

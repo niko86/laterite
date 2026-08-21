@@ -1,5 +1,5 @@
 // The browser's AGS4 line tokenizer + field quoter — sourced from the shared
-// Rust leaves through a tiny dedicated wasm (#533, part of the #527 arc).
+// Rust leaves through a tiny dedicated wasm (laterite-dev#533, part of the laterite-dev#527 arc).
 //
 // This retires the hand-written TS state machine that used to live in
 // agsline.ts: `splitAgsFields` now wraps `laterite_ags4_parse::scan::scan_line`
@@ -11,7 +11,7 @@
 // thread at boot — the app gates first render on `tokenizerReady()`, so the
 // synchronous `splitAgsFields`/`quoteAgsField` below never run before the wasm
 // is live. The offset model these return is browser-only by design (excluded
-// from the #555 cross-surface value gate); its lossless-reassembly + code-point
+// from the laterite-dev#555 cross-surface value gate); its lossless-reassembly + code-point
 // offset invariants are pinned in Rust (`display_spans.rs` proptest), and the
 // byte->code-point conversion the adapter performs is pinned in this lane.
 

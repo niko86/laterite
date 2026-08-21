@@ -87,7 +87,7 @@ export interface ValidateReq {
   /** When set, gzip the JSON in-worker and return bytes, not the object —
    *  keeps the multi-hundred-MB string off the main thread (Phase: download). */
   gzip?: boolean;
-  /** An optional custom AGS4 dictionary as raw bytes (`.ags` or JSON), #568 — the
+  /** An optional custom AGS4 dictionary as raw bytes (`.ags` or JSON), laterite-dev#568 — the
    *  browser's only form (no filesystem). `dictReplace` drops the bundled base so
    *  the dict fully replaces the standard. Omitted ⇒ the bundled edition. */
   dictBytes?: Uint8Array;
@@ -111,7 +111,7 @@ export interface CertifyReq {
   dict: DictVersionOpt | null;
   encoding: EncodingOpt;
   checkedAt: string;
-  /** Mint against a custom dictionary (#568); the cert records its `{name, hash}`
+  /** Mint against a custom dictionary (laterite-dev#568); the cert records its `{name, hash}`
    *  so a later `validate --index` re-validates when the effective dict differs. */
   dictBytes?: Uint8Array;
   dictReplace?: boolean;
@@ -187,7 +187,7 @@ export interface MergeReq {
  *  stops a reader wondering which.) */
 export type { CensorTally } from "../wasm-full/ags4_wasm_full";
 import type { CensorTally } from "../wasm-full/ags4_wasm_full";
-/** Anonymise a file with the shared scrub engine (Tools → Anonymiser, #581).
+/** Anonymise a file with the shared scrub engine (Tools → Anonymiser, laterite-dev#581).
  *  Carries the file bytes, transferred; `sensitiveJson` is the classification
  *  SSOT; `selectedCodes` (null = every classified heading) restricts the policy
  *  to the user's ticked columns; `token` replaces token/brackets hits;
@@ -451,7 +451,7 @@ export function createEngineDispatch(engine: EngineApi, reply: Reply) {
     }
 
     if (req.kind === "censor") {
-      // The shared scrub engine (#581). Hashes the bytes for PROJ_ID's filehash,
+      // The shared scrub engine (laterite-dev#581). Hashes the bytes for PROJ_ID's filehash,
       // decodes lossily, applies the (optionally column-restricted) policy, and
       // returns the anonymised text + per-action tally. Never throws for normal
       // input; a bad sensitiveJson → JsError → outer catch → ok:false.

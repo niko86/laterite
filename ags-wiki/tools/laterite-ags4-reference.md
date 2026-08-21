@@ -32,27 +32,27 @@ sources: []
 
 ## What it is
 
-The AGS4 **reference-data leaf** (#475): everything mechanically derived from
+The AGS4 **reference-data leaf** (laterite-dev#475): everything mechanically derived from
 the bundled `ags_dictionary.json` / `rules_meta.json` JSON, single-sourced in
 one wasm-safe crate — the multi-edition dictionary registry, the per-edition
 `phf`-compiled dictionary projection, and the rules-catalogue data accessors.
 "Leaf" names its position, not its dep count: it is **not dependency-free** —
-it takes `laterite-ags4-types` for `keychain`, which is why #550's engine-fingerprint
+it takes `laterite-ags4-types` for `keychain`, which is why laterite-dev#550's engine-fingerprint
 walk must recurse *through* it to reach that crate. The page said
-"dependency-free" until #557; it was one of six hand-copied copies of a claim
+"dependency-free" until laterite-dev#557; it was one of six hand-copied copies of a claim
 that stopped being true when the types edge landed, and nothing compared any of
 them to the manifest. Extracted out of `laterite-ags4-core` and
 `laterite-ags4-validator` so a consumer that only wants reference data (the
 read-only DuckDB extension, `laterite-ags4-diff`) can depend on this leaf
 alone instead of pulling in the rest of core or the whole rule engine.
 
-Landed in two PRs. **PR1** (#488) moved the **union registry projection**
+Landed in two PRs. **PR1** (laterite-dev#488) moved the **union registry projection**
 (`GroupDescriptor`/`Heading`/`Registry`/`union_groups`/`ancestor_chain`/
 `inherited_key_names`) out of `laterite-ags4-core::registry` into
 `repo:rust-packages/laterite-ags4-reference/src/union.rs` — core's
 `registry` module became a flat `pub use laterite_ags4_reference::union::*;`
 re-export, so `laterite_ags4_core::registry::…` is unchanged for every
-consumer. **PR2** (#492, this page) moved the rest: the **per-edition `phf`
+consumer. **PR2** (laterite-dev#492, this page) moved the rest: the **per-edition `phf`
 projection** — `build.rs` + `repo:rust-packages/laterite-ags4-reference/src/dict.rs`
 (`Dictionary`, `DictEntry`, `GroupMeta`, `DictResolution`, `DictVersion`,
 `dictionary_dto`) — out of the validator's own `build.rs`/`src/dict.rs`; the
@@ -63,7 +63,7 @@ projection** — `build.rs` + `repo:rust-packages/laterite-ags4-reference/src/di
 respectively) — the leaf now owns this data outright rather than reading a
 sibling crate's `data/` by relative path.
 
-At the time (#475 PR2) the validator lost its `build.rs`/`src/dict.rs` entirely;
+At the time (laterite-dev#475 PR2) the validator lost its `build.rs`/`src/dict.rs` entirely;
 it re-exports the `dict` module and the two catalogue accessors unchanged (see
 [[laterite-ags4-validator]]), so every existing downstream path
 (`laterite_ags4_validator::dict::…`, `laterite_ags4_validator::{RULE_LABELS,
@@ -72,7 +72,7 @@ the Cargo edges moved. (`src/dict.rs` is still gone; **the validator regained a
 `build.rs`** in the unrelated `cert-trust-v2` arc's PR 2, 2026-07-14 — a
 build-time `ENGINE_FINGERPRINT` hash that at the time covered the rule sources
 plus this leaf's two bundled JSON files, nothing to do with the dictionary
-projection this page describes. That changed with **#550** (2026-07-16): the
+projection this page describes. That changed with **laterite-dev#550** (2026-07-16): the
 fingerprint now also hashes this leaf's own `build.rs` — the code that
 *generates* the per-edition phf tables below, as distinct from the JSON it
 reads — because a projection-code change alone (no JSON edit) changes a
@@ -155,7 +155,7 @@ registry; [[laterite-ags4-validator]] depends on it for the dict projection +
 catalogue. Nothing in the leaf depends back on either — that's what keeps it
 a genuine leaf rather than a re-introduced cycle.
 
-**Payoff partly taken (#475 follow-up, #493)**: `laterite-ags4-diff` now
+**Payoff partly taken (laterite-dev#475 follow-up, laterite-dev#493)**: `laterite-ags4-diff` now
 depends on this leaf directly instead of the whole validator (it only ever
 touched `Dictionary`/`DictVersion`, never the rule engine). The same follow-up
 repointed [[laterite-py]]'s `build.rs` onto `union_groups()` for its
@@ -185,7 +185,7 @@ prior derivation) share it instead of each re-deriving row identity. The
 content-addressed `_id`/`_parent_id` golden UUIDs (#303) are unchanged — the
 move is behaviour-neutral. See [[dec-ags4-merge-semantics]].
 
-**Custom-dictionary overlay (#568, 2026-07-18)**: the leaf gained a fifth
+**Custom-dictionary overlay (laterite-dev#568, 2026-07-18)**: the leaf gained a fifth
 module, `overlay` (`repo:rust-packages/laterite-ags4-reference/src/overlay.rs`
 — `parse_dict`/`CustomDict`/`OwnedDelta`/`build_delta`/`detect_base`) plus
 `dict_read.rs`, the FIRST place the workspace reads an AGS4 DICT group at

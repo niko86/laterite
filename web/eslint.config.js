@@ -349,7 +349,7 @@ export default tseslint.config(
     },
   },
   {
-    // #615 burn-down: the many `${count}`-style numeric interpolations are safe
+    // laterite-dev#615 burn-down: the many `${count}`-style numeric interpolations are safe
     // (numbers stringify losslessly), so allowNumber lets them through; the only
     // real offenders were three `string | undefined` regex capture groups in
     // agsTypeInfo.ts, fixed at source. Back at `error` — a genuinely unstringify-
@@ -363,7 +363,7 @@ export default tseslint.config(
     },
   },
   {
-    // #615: the type-boundary family is burned down to zero and enforced at
+    // laterite-dev#615: the type-boundary family is burned down to zero and enforced at
     // `error` in shipped source, but test files legitimately assert-then-access
     // (`x!` after an `expect`) and poke untyped boundaries (JSON.parse, native
     // returns) — grinding those into narrows adds bulk with no safety gain, since
@@ -382,7 +382,7 @@ export default tseslint.config(
     },
   },
   {
-    // #615: the two ratcheted eslint-plugin-solid rules are burned to zero. Every
+    // laterite-dev#615: the two ratcheted eslint-plugin-solid rules are burned to zero. Every
     // current flag was verified a false positive (stable <For>-keyed / remounted-
     // per-result props, function-prop aliases, one-shot init callbacks, imperative
     // handlers) and scoped-disabled with a reason at its site, so flip both from

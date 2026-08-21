@@ -49,7 +49,7 @@ THE DOCS SITE'S THIRD COPY (#320). `web/docs-site/docs/reference/divergences.md`
 is the user-facing view — the one an evaluating reader actually meets — and it was
 hand-written against this gated SSOT, with no generator and no gate. It drifted
 the way that shape always does: it told readers the external `--dict` override was
-"deferred" a release after #568 shipped it, and it never gained O-49 or O-50.
+"deferred" a release after laterite-dev#568 shipped it, and it never gained O-49 or O-50.
 
 Membership is a FIELD (`user_facing`), not a derivation from `kind`, because the
 two are different sets: O-2 and O-8 are BUG yet plainly user-visible, and O-25 is
@@ -101,7 +101,7 @@ COVERAGE_MARKER = "observations-coverage"
 #: The docs site's user-facing view of the catalogue. It was hand-written, with
 #: no generator and no gate, and it had drifted exactly the way that shape always
 #: does: it told readers the `--dict` override was "deferred" a release after
-#: #568 shipped it, and it never gained O-49 or O-50.
+#: laterite-dev#568 shipped it, and it never gained O-49 or O-50.
 #:
 #: Membership is a field (`user_facing`), not a derivation from `kind` — the two
 #: are genuinely different sets. O-2 and O-8 are BUG yet plainly user-visible,

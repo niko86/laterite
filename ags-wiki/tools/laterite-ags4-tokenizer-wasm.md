@@ -25,7 +25,7 @@ sources: []
 
 ## What it is
 
-A **tiny** browser wasm module (#533): two thin `#[wasm_bindgen]` wrappers over the
+A **tiny** browser wasm module (laterite-dev#533): two thin `#[wasm_bindgen]` wrappers over the
 shared Rust leaves, so the browser's per-line tokenizing and quoting run off the
 **same authority as every other surface** instead of a hand-maintained TypeScript
 copy:
@@ -40,7 +40,7 @@ line primitives, so the compiled artifact stays small (a size gate keeps that
 honest, and default features leave arrow OFF so only the `&str`-only tables
 compile). The old TS copy in `web/src/lib/agsline.ts` is retired against it — the
 same "one authority, not a per-surface reimplementation" move as
-[[laterite-ags4-censor]], which is the *other* wasm face of the #533/#527
+[[laterite-ags4-censor]], which is the *other* wasm face of the laterite-dev#533/#527
 convergence.
 
 ## Inputs / outputs

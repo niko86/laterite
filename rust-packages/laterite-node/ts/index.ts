@@ -149,7 +149,7 @@ export interface ValidateOptions extends FileOptions {
   warningsAsErrors?: boolean;
   /** Also run Rule 20's on-disk half (the sibling `FILE/` tree must exist). */
   checkFiles?: boolean;
-  /** A custom AGS4 dictionary to overlay (#568) — a file path or the raw `.ags`/JSON
+  /** A custom AGS4 dictionary to overlay (laterite-dev#568) — a file path or the raw `.ags`/JSON
    *  bytes of one — so a bespoke group (or a re-parented/overridden standard heading)
    *  validates as first-class instead of being flagged unknown. The base edition is
    *  detected from the dictionary itself unless `dictVersion` forces it or `dictReplace`
@@ -160,7 +160,7 @@ export interface ValidateOptions extends FileOptions {
   dictReplace?: boolean;
 }
 
-/** Split a `dictionary` custom-dict override (#568) into the `[dictPath, dictBytes]`
+/** Split a `dictionary` custom-dict override (laterite-dev#568) into the `[dictPath, dictBytes]`
  *  the native `runCheck`/`fixFile`/`Sidecar.mint` take. A string is a filesystem path;
  *  raw bytes are the in-memory spelling. */
 function splitDict(

@@ -58,7 +58,7 @@ into "fails loudly if the ground moves" — and it is the seed of the
 AGS5 requirement req-reproducible-conformance-corpus (ship a
 versioned conformance corpus + pinned reference oracle).
 
-## Update (2026-07-17) — #558 extended the pin to the data it protects
+## Update (2026-07-17) — laterite-dev#558 extended the pin to the data it protects
 > [!note] This page's fix pinned the *version string* and made drift loud
 > via `--selfcheck`; it never checked whether the five vendored `.ags`
 > dictionaries — themselves derived from that pinned python-ags4 — still

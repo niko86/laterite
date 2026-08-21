@@ -90,7 +90,7 @@ function persistedBool(
   ];
 }
 
-// The selectable dictionary versions — the generated SSOT (#529). `readonly
+// The selectable dictionary versions — the generated SSOT (laterite-dev#529). `readonly
 // string[]` so `.includes(persistedString)` typechecks against an arbitrary string.
 const DICTS: readonly string[] = DICT_VERSIONS;
 const ENCS = ["utf-8", "windows-1252"];

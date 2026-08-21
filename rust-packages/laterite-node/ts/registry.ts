@@ -130,7 +130,7 @@ export function childGroups(parentCode: string): GroupDescriptor[] {
  *
  * Delegates to the native `laterite_ags4_core::registry::ancestor_chain` — the
  * ONE Rust definition of the group tree, the same walk the Python wheel binds —
- * rather than re-walking `.parent` pointers in TS (#532). The native error for an
+ * rather than re-walking `.parent` pointers in TS (laterite-dev#532). The native error for an
  * unknown code is re-typed to {@link Ags4Error} to keep this facade's contract. */
 export function ancestorChain(code: string): string[] {
   try {
@@ -147,7 +147,7 @@ export function ancestorChain(code: string): string[] {
  *
  * Delegates to the native `laterite_ags4_core::registry::inherited_key_names`
  * (the same leaf the Python wheel binds) rather than re-implementing the
- * KEY-intersection in TS (#532); native returns the names sorted, wrapped here in
+ * KEY-intersection in TS (laterite-dev#532); native returns the names sorted, wrapped here in
  * a Set. The native error for an unknown code is re-typed to {@link Ags4Error}.
  *
  * @param code The group whose inherited KEY names to gather.

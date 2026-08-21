@@ -1,4 +1,4 @@
-// The `--dict` custom-dictionary overlay (#568) on the Node surface — the library
+// The `--dict` custom-dictionary overlay (laterite-dev#568) on the Node surface — the library
 // (`validate({ dictionary })`, `Report.revalidateReason`, `certify({ dictionary })`) and
 // the `lat` CLI. These assert the OUTPUT — the count of `XTRA` findings, `certified`, and
 // the `revalidateReason` token — never that the flag merely parses: a flag that is
@@ -30,7 +30,7 @@ const xtra = (report: ReturnType<typeof validate>): number =>
 const cli = (...args: string[]) =>
   spawnSync("node", [BIN, ...args], { encoding: "utf8" });
 
-describe("lat node — custom-dictionary overlay (#568)", () => {
+describe("lat node — custom-dictionary overlay (laterite-dev#568)", () => {
   it("the bundled dictionary flags the unknown XTRA group", () => {
     expect(xtra(validate(DELIVERY))).toBeGreaterThan(0);
   });

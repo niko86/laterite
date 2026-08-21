@@ -49,7 +49,7 @@ export type {
   CensorResult,
 } from "./engineProtocol";
 
-/** A runtime custom AGS4 dictionary (#568) for `validate`/`certify`: raw `.ags` or
+/** A runtime custom AGS4 dictionary (laterite-dev#568) for `validate`/`certify`: raw `.ags` or
  *  JSON `bytes` (the browser's only form — no filesystem), and `replace` to drop the
  *  bundled base so the dict fully replaces the standard rather than overlaying it.
  *  Omit the argument entirely to validate against the bundled edition. */
@@ -344,7 +344,7 @@ export function mergeFiles(
   });
 }
 
-/** Anonymise a file with the shared scrub engine (Tools → Anonymiser, #581) —
+/** Anonymise a file with the shared scrub engine (Tools → Anonymiser, laterite-dev#581) —
  *  the same `laterite-ags4-censor` engine the corpus tool drives. `sensitiveJson`
  *  is the classification SSOT text; `selectedCodes` (null = every classified
  *  heading) restricts scrubbing to the user's ticked columns; `token` is the

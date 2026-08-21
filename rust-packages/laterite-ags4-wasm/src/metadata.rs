@@ -3,7 +3,7 @@
 //! Plain-Rust signatures, unlike almost everything else here — which is why
 //! they are the four exports a native `cargo test` can drive end to end. That
 //! matters most for the identity pair: `engine_fingerprint` exists precisely
-//! because a *constant* once stood in for a real answer (#556), and a constant
+//! because a *constant* once stood in for a real answer (laterite-dev#556), and a constant
 //! is what these would silently become if someone replaced a crate lookup with
 //! a literal.
 use wasm_bindgen::prelude::*;
@@ -25,7 +25,7 @@ pub fn list_rules() -> String {
 /// back. The harness then printed "wasm v0.5.1" next to three 0.7.0 surfaces and
 /// called the comparison 4-laterite identity. The build was current; only the
 /// report lied. Node had this all along and asked the module; wasm had nothing to
-/// ask, which is why someone wrote a constant instead. (#556)
+/// ask, which is why someone wrote a constant instead. (laterite-dev#556)
 #[wasm_bindgen]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()

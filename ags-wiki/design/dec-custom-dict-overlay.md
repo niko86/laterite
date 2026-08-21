@@ -20,7 +20,7 @@ from the five official editions — see [[dec-dictionary-single-source]]), so a
 runtime-parsed dictionary looked like a broad, regression-prone lifetime
 refactor threaded through every rule module for a feature validation didn't
 strictly need. For a period the flag was plumbed but refused with a `BadDict`
-error (exit 5). **#568** revisited that call as a focused seven-phase arc
+error (exit 5). **laterite-dev#568** revisited that call as a focused seven-phase arc
 (designed by ultracode workflows, owner-steered) and shipped it. This page
 records the decisions and the why; [[O-28]] is the observation, this page is
 the design.
@@ -179,7 +179,7 @@ no need to also redefine what edition strings or abbreviation codes mean.
   built yet.
 - **PROVENANCE's fallback claim is now true and gated.** `rust-packages/laterite-ags4-validator/data/PROVENANCE.md`
   states a consumer who cannot rely on the embedded ©AGS dictionary can supply
-  their own at validation time — that claim was false before #568 (the flag
+  their own at validation time — that claim was false before laterite-dev#568 (the flag
   refused). `tests/test_provenance_dict_fallback.py` pins both halves: the
   document still makes the claim, and `--dict` no longer exits 5 for a valid
   custom dictionary.

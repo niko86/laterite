@@ -19,7 +19,7 @@ sources: []
 ## What it is
 > [!quote] The content gate for the five vendored `Standard_dictionary_v4_*.ags`
 > files (`repo:rust-packages/laterite-ags4-validator/data`) — the root
-> authority every dictionary in the product descends from (#558):
+> authority every dictionary in the product descends from (laterite-dev#558):
 > `tools/gen_dictionary.py` projects them into
 > `rust-packages/laterite-ags4-reference/data/ags_dictionary.json`, and the
 > validator, the wasm build, the typed-graph codegen, and the web all read
@@ -38,7 +38,7 @@ regenerating took the union from **174 → 175 groups**, and
 `gen_dictionary.py` and asserts the committed union matches, which only
 proves the union agrees with *whatever the files currently say*. The
 invented group would have compiled into the validator, the wasm build, and
-the typed graph with every existing gate green. This is #549's Shape 1 (the
+the typed graph with every existing gate green. This is laterite-dev#549's Shape 1 (the
 gate enforces a proxy for the promise, and nothing compares the proxy back
 to the promise) sitting at the dictionary's root.
 
@@ -106,7 +106,7 @@ not audit that source.
 
 ## Correcting the record
 
-Issue #558's own framing claimed the five `.ags` sources "have no
+Issue laterite-dev#558's own framing claimed the five `.ags` sources "have no
 provenance" and carry less metadata than
 `tools/vendor/laterite-duckdb-functions.json`. That is false —
 `data/PROVENANCE.md` predates this gate and was already thorough: source,

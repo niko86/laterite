@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enforce the python-ags4 parity contract BY IDENTITY, not by count (#556).
+"""Enforce the python-ags4 parity contract BY IDENTITY, not by count (laterite-dev#556).
 
 The gate this replaces was:
 
@@ -11,7 +11,7 @@ at 121 and the job goes green — the regression is invisible precisely because
 something else improved at the same time. The number also said nothing about WHICH
 divergences we accept: the ten deliberate non-closures lived only in prose that no
 job read, so the contract the CI enforced and the contract we'd actually agreed
-were different objects, and nothing compared them. (#549's Shape 1, in its plainest
+were different objects, and nothing compared them. (laterite-dev#549's Shape 1, in its plainest
 form.)
 
 So: pin the failing SET. Three outcomes, and the third is the interesting one.

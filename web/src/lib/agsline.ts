@@ -2,7 +2,7 @@
 //
 // The offset-preserving tokenizer + field quoter this builds on
 // (`splitAgsFields` / `quoteAgsField` / `agsLine`) now live in `./tokenizer`,
-// backed by the shared Rust leaves through a tiny wasm (#533, part of the #527
+// backed by the shared Rust leaves through a tiny wasm (laterite-dev#533, part of the laterite-dev#527
 // arc) — the browser no longer carries its own copy. This module keeps the
 // browser-only DISPLAY logic (block reconstruction, DATA windowing, column
 // alignment, fix-preview pairing) that CONSUMES those tokens. The tokenizer
@@ -23,7 +23,7 @@ export type { AgsField } from "./tokenizer";
 // noUncheckedIndexedAccess TypeScript still types those reads `T | undefined`;
 // the assertions faithfully express hand-verified invariants across this index-
 // dense alignment/windowing code, so no-non-null-assertion is disabled file-wide
-// here (#615) — same rationale as linediff.ts.
+// here (laterite-dev#615) — same rationale as linediff.ts.
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 // --- GROUP-block reconstruction + column alignment ---

@@ -46,7 +46,7 @@ contract: `lat` itself ships behind three launchers (the native binary,
 (#430). [[surface-census]] is the mechanical check of that claim at the
 verb level — each launcher reflects its own parser rather than a
 hand-list, so a verb missing from one launcher (as `merge` briefly was,
-#494) is a finding, not a silent gap.
+laterite-dev#494) is a finding, not a silent gap.
 
 ## Diagram
 

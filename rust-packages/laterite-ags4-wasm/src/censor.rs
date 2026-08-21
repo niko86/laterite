@@ -1,7 +1,7 @@
-//! `censor()` — anonymise a file with the shared scrub engine (#581).
+//! `censor()` — anonymise a file with the shared scrub engine (laterite-dev#581).
 //!
 //! The browser Anonymiser drives the SAME `laterite-ags4-censor` engine the
-//! corpus `censor` tool uses (Phase 2 of the #527 convergence), instead of a
+//! corpus `censor` tool uses (Phase 2 of the laterite-dev#527 convergence), instead of a
 //! hand-written TS reimplementation. It's a batch action (Download click), off
 //! the render path, so it rides the engine wasm asynchronously in the validator
 //! worker rather than a boot-critical main-thread instance.

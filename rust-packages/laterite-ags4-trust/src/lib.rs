@@ -130,7 +130,7 @@ pub fn split_options(
         include_warnings, // which severity tiers the engine runs
         include_fyi,      //   "
         encoding,         // how the bytes decode to text
-        // A custom `--dict` overlay (#568) is CONTENT: it was parsed once at the
+        // A custom `--dict` overlay (laterite-dev#568) is CONTENT: it was parsed once at the
         // surface boundary into an owned `CustomDict`, and its identity (base + delta,
         // hashed) is a pure function of that dictionary — nothing on disk is read per
         // file. So the cert can and must speak for it: which dictionary produced the
@@ -162,7 +162,7 @@ pub fn split_options(
             // The decoder is part of the question, not just of the parse. The findings are
             // a function of bytes AND decoder, and the certificate seals only the bytes.
             encoding: encoding.name().to_string(),
-            // The custom overlay this request uses (#568) — compared against the cert's
+            // The custom overlay this request uses (laterite-dev#568) — compared against the cert's
             // own record. `custom_dict` here is the destructured `&Option<CustomDict>`.
             custom_dict: custom_dict.as_ref().map(custom_dict_record),
         },
@@ -312,7 +312,7 @@ pub fn mint(
         // What the bytes were READ as. `Sidecar::decide` refuses a request made through a
         // different decoder: same bytes, different text, different question.
         encoding: full.encoding.name().to_string(),
-        // The custom overlay this verdict was reached against (#568), so a later
+        // The custom overlay this verdict was reached against (laterite-dev#568), so a later
         // request supplying a different (or no) dict revalidates rather than trusting a
         // cert minted under another dictionary.
         custom_dict: opts.custom_dict.as_ref().map(custom_dict_record),

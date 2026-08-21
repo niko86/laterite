@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 // 1.4 MB raw and only ~82 KB of what a browser actually downloads. Raw size is
 // what found it.
 //
-// #475 PR2: the SSOT JSON physically lives in this leaf's own `data/` — every
+// laterite-dev#475 PR2: the SSOT JSON physically lives in this leaf's own `data/` — every
 // other reader (this crate's build.rs, laterite-py's build.rs, the node
 // typed-graph codegen, the web sync scripts, the Python generators) reads it
 // cross-crate/cross-package from there, at build time.
@@ -83,7 +83,7 @@ impl GroupDescriptor {
 /// fields ARE each heading's latest-edition definition; the `by_ed`/`eds`
 /// per-edition variation is intentionally not captured (serde drops the unknown
 /// fields) — the registry consumes the UNION at the latest-edition definition.
-// `pub(crate)` (not private): the custom-dictionary overlay (#568, `overlay.rs`
+// `pub(crate)` (not private): the custom-dictionary overlay (laterite-dev#568, `overlay.rs`
 // + `dict_read.rs`) deserialises a `--dict` JSON straight into these structs, so
 // the custom-JSON schema and the bundled `ags_dictionary.json` schema can never
 // drift — there is one serde definition, not two. `Clone` so a parsed
@@ -124,7 +124,7 @@ pub(crate) struct DictionaryFile {
 
 impl DictGroup {
     /// An empty group shell the runtime `.ags` reader fills incrementally as it
-    /// walks GROUP / HEADING rows (#568 `dict_read`).
+    /// walks GROUP / HEADING rows (laterite-dev#568 `dict_read`).
     pub(crate) fn empty() -> Self {
         DictGroup {
             parent: None,

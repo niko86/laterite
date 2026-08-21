@@ -38,7 +38,7 @@ sources: []
 > for the tag train and what bootstrapping the name cost.
 
 > [!note] Not the only browser wasm module
-> Since #533 (part of the #527 convergence arc) the browser also loads a
+> Since laterite-dev#533 (part of the laterite-dev#527 convergence arc) the browser also loads a
 > SEPARATE, deliberately tiny sibling cdylib, `laterite-ags4-tokenizer-wasm`
 > (~30 KB vs this crate's 5.1 MiB, full build) — two `#[wasm_bindgen]` wrappers over
 > `laterite-ags4-parse::scan::scan_line` and `laterite-ags4-types::quote_field` for
@@ -46,7 +46,7 @@ sources: []
 > in this crate's Web Worker. It shares no dependency edge with this crate.
 > See [[crate-map]] for its full listing.
 
-> [!note] A seventh export: `censor` (#581 Phase 2, 2026-07-18)
+> [!note] A seventh export: `censor` (laterite-dev#581 Phase 2, 2026-07-18)
 > `censor(data, sensitiveJson, { selectedCodes, token, dropCustom,
 > includeFreetext }) -> { text, tally }` wraps the shared `laterite-ags4-censor`
 > scrub engine, so the browser Anonymiser's Download action drives the SAME
@@ -146,7 +146,7 @@ none. [[tech-stack-wasm]] carries the split and the measurements:
   [[dec-ags4-merge-semantics]].
 - `censor(data, sensitiveJson, { selectedCodes, token, dropCustom,
   includeFreetext })` → `{ text, tally }` (the **Tools → Anonymiser** Download
-  action, #581 Phase 2, 2026-07-18). SHA-256-hashes `data` for `PROJ_ID`'s
+  action, laterite-dev#581 Phase 2, 2026-07-18). SHA-256-hashes `data` for `PROJ_ID`'s
   filehash (full 64-hex), lossily decodes it, resolves
   `sensitive_headings.json` into a `Policy` via
   `laterite_ags4_censor::Policy::from_sensitive_json`, restricts it to
@@ -177,7 +177,7 @@ no per-cell JS objects and no `TRY_CAST` — the explorer casts a file
 
 `repo:rust-packages/laterite-ags4-wasm` — depends on [[laterite-ags4-validator]] (the
 engine), [[laterite-ags4-types]] (shared casting), `laterite-ags4-censor` (the
-`censor` export, #581 Phase 2), and `arrow` (IPC feature only). Excluded from
+`censor` export, laterite-dev#581 Phase 2), and `arrow` (IPC feature only). Excluded from
 the host `cargo build/clippy/test --workspace` (CI's `--exclude
 laterite-ags4-wasm`); built *for wasm* only via wasm-pack in the deploy
 workflow.

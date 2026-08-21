@@ -140,7 +140,7 @@ describe("cli (in-process): census", () => {
     expect(c.editions.length).toBeGreaterThan(0);
     expect(c.fallback_edition).toMatch(/^4\./);
     // `cp1252x` is a bogus label the wrapper must resolve to null (the wrapper-bug
-    // regression #555 pins this).
+    // regression laterite-dev#555 pins this).
     expect(c.encodings["cp1252x"]).toBeNull();
     expect(c.encodings["utf-8"]).not.toBeNull();
   });

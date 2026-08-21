@@ -1,16 +1,16 @@
-# AGS4 reference-data leaf (#475): the multi-edition dictionary, single-sourced
+# AGS4 reference-data leaf (laterite-dev#475): the multi-edition dictionary, single-sourced
 # from ags_dictionary.json. PR1 carries the UNION registry projection (moved out
 # of laterite-ags4-core so consumers that only want the dictionary — the DuckDB
 # extension, laterite-ags4-diff — needn't pull the rest of core/validator). The
 # per-edition phf projection + the rules catalogue join it in PR2.
 #
 # A near-leaf: its TWO workspace deps are `laterite-ags4-types` (wasm consumes `keychain`
-# for `_id`/`_parent_id`) and `laterite-ags4-parse` (the #568 runtime `.ags` custom-
+# for `_id`/`_parent_id`) and `laterite-ags4-parse` (the laterite-dev#568 runtime `.ags` custom-
 # dict reader reuses the shared tokenizer — both are wasm-clean sibling leaves, so no
-# added wasm weight). It said "a true leaf: no workspace-crate deps" until #557; that
+# added wasm weight). It said "a true leaf: no workspace-crate deps" until laterite-dev#557; that
 # stopped being true when the types dep landed, and nothing noticed because a manifest
 # comment is read by no one and gated by nothing (now `tests/dep_graph.rs` gates it).
-# It matters beyond tidiness: #550's engine-fingerprint walk has to RECURSE through
+# It matters beyond tidiness: laterite-dev#550's engine-fingerprint walk has to RECURSE through
 # this crate to reach those leaves, precisely because this is not a leaf.
 [package]
 name = "laterite-ags4-reference"
@@ -40,7 +40,7 @@ serde = { version = "1", features = ["derive"] }
 # on-disk dictionary + Python's dict-preserving json.dumps (same pin as core).
 serde_json = { version = "1", features = ["preserve_order"] }
 # Compile-time perfect-hash maps for the bundled standard dictionaries —
-# zero startup cost, no runtime parse (moved from the validator, PR2 #475).
+# zero startup cost, no runtime parse (moved from the validator, PR2 laterite-dev#475).
 # phf does NOT implement PhfHash for tuples, so dict keys are composite
 # "GROUP\u{1f}HEADING" strings.
 phf = "0.14"
@@ -60,7 +60,7 @@ uuid = { version = "1", features = ["v8"] }
 # Default features only — the `arrow` feature stays off here.
 laterite-ags4-types = { workspace = true }
 # The shared tolerant AGS4 tokenizer (#168 leaf) — reused by `dict_read.rs` to read
-# a runtime `--dict` custom dictionary from a plain `.ags` file (#568). A wasm-clean
+# a runtime `--dict` custom dictionary from a plain `.ags` file (laterite-dev#568). A wasm-clean
 # sibling leaf (`encoding_rs` + `memchr` only), so it adds zero wasm-hostile weight;
 # `tests/dep_graph.rs` pins that.
 laterite-ags4-parse = { workspace = true }
@@ -71,7 +71,7 @@ encoding_rs = "0.8"
 [build-dependencies]
 # build.rs projects each edition out of the consolidated union dictionary
 # (this leaf's own data/ags_dictionary.json) into phf static tables in
-# OUT_DIR/dict_data.rs. Moved from the validator (PR2 #475).
+# OUT_DIR/dict_data.rs. Moved from the validator (PR2 laterite-dev#475).
 phf_codegen = "0.14"
 serde_json = "1"
 

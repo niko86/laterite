@@ -228,6 +228,15 @@ already do it. A filter nobody can see is a blind spot with a green tick on it.
 (#295 found three of these in one day; #460 is the one gate still owing the
 report.)
 
+**A bare `#N` means an issue or PR in THIS repo.** That is what a reader
+assumes and what GitHub autolinks, so a number that means somewhere else carries
+its repo — `laterite-dev#512` for the dev satellite, `microsoft/mimalloc#1327`
+upstream. Getting it wrong is not a dead link: a borrowed number resolves to
+nothing until this repo's numbering climbs past it, and then starts resolving to
+a real, plausible, unrelated page with nothing failing anywhere (#458).
+`tools/check_issue_refs.py` holds the numbers already known to be foreign; it
+cannot judge a new one, and says so on every run.
+
 `output/` is gitignored working space. `experiments/` holds dictionary
 scaffolders — not production code.
 

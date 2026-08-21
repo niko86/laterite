@@ -40,7 +40,7 @@ path = "src/lib.rs"
 # guarantee (no pyo3/polars/walkdir/rayon/ratatui) holds.
 sha2 = "0.11"
 # Reads THIS manifest's `[dependencies]` to discover the in-workspace path deps to
-# cover (#550) — a hand-written file list is exactly how the fingerprint came to
+# cover (laterite-dev#550) — a hand-written file list is exactly how the fingerprint came to
 # miss the crates that decide Rule 8, field boundaries, and the edition tables.
 # Build-only, same as sha2. A hand-rolled scan would be smaller but would re-create
 # the failure this whole crate is about: a parser that quietly matches less than it
@@ -49,14 +49,14 @@ toml = "1"
 
 [dependencies]
 # The phf-projected dictionary (Dictionary/DictVersion/dictionary_dto/…),
-# moved out of this crate's own build.rs into a wasm-safe leaf (#475 PR2) so
+# moved out of this crate's own build.rs into a wasm-safe leaf (laterite-dev#475 PR2) so
 # non-validator consumers (the DuckDB extension, laterite-ags4-diff) can
 # depend on the dictionary without pulling the rest of the rule engine.
 laterite-ags4-reference = { workspace = true }
 # The AGS type-system leaf: Rule 8 + the fixes engine re-export its numeric
 # expected-forms (format_ndp/format_nsf/format_nsci) instead of hand-porting
 # them, so the formatter that JUDGES a typed value is the same one that WRITES
-# it via ags4_str (#528 — the port agreed but nothing gated it). Costs nothing:
+# it via ags4_str (laterite-dev#528 — the port agreed but nothing gated it). Costs nothing:
 # already in this crate's build graph transitively via laterite-ags4-reference,
 # and its only deps are chrono (the same minimal std-only build listed below)
 # + serde_json (already linked transitively — see the serde note). Arrow is
@@ -95,9 +95,9 @@ serde = { version = "1", features = ["derive"] }
 # serialization" and this crate wrote no JSON — but that rule is exactly what
 # produced THREE hand-copied renderers (the CLI's render.rs, laterite-py's and
 # laterite-node's, synced only by "byte-identical"/"ported verbatim" comments),
-# so #530 moved the renderer next to the type it renders and the copies were
+# so laterite-dev#530 moved the renderer next to the type it renders and the copies were
 # deleted. Costs nothing: serde_json already rode into this crate's build
-# transitively via laterite-ags4-reference (#475), which parses its two bundled
+# transitively via laterite-ags4-reference (laterite-dev#475), which parses its two bundled
 # JSON files; it compiles clean on wasm32 and is not on the lean-dep guard list
 # (pyo3|polars|walkdir|rayon|ratatui), so the engine-purity guarantee holds.
 #

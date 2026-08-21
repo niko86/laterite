@@ -8,7 +8,7 @@
         "fixture": "rust-packages/laterite-ags4-xcheck/cases/inputs/diff_base.ags"
       },
       "legs": ["cli-native", "cli-uvx", "cli-npx"],
-      "spec_ref": "`lat unpack <p.zst> out` — inverts `pack`. Each leg packs the fixture (deterministic setup) then unpacks it; the value under test is the RECOVERED AGS4 text, which must equal the original bytes on every launcher. A launcher whose unpack corrupts or truncates the zstd payload shows as a text split against the others' faithful round-trip (#555 part 2)."
+      "spec_ref": "`lat unpack <p.zst> out` — inverts `pack`. Each leg packs the fixture (deterministic setup) then unpacks it; the value under test is the RECOVERED AGS4 text, which must equal the original bytes on every launcher. A launcher whose unpack corrupts or truncates the zstd payload shows as a text split against the others' faithful round-trip (laterite-dev#555 part 2)."
     }
   ]
 }

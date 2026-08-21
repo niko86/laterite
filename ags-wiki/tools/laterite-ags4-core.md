@@ -34,7 +34,7 @@ wheel (laterite-py-ags5).
 Modules (`repo:rust-packages/laterite-ags4-core/src/lib.rs`): `registry` (the
 174-group AGS4 union dictionary loaded at build time + group-tree
 descriptors — 92 is the dormant AGS5-only count, a different dictionary
-entirely; since #475 this module is a flat `pub use` re-export of
+entirely; since laterite-dev#475 this module is a flat `pub use` re-export of
 [[laterite-ags4-reference]]'s `union`, so this path is unchanged for every
 consumer), `ddl`
 (pure-string DDL emitter — no DuckDB connection), `ags4_codec` (CRLF /

@@ -122,7 +122,7 @@ pub type Findings = BTreeMap<String, Vec<Finding>>;
 // binary, laterite-py and laterite-node each used to carry their own copy,
 // kept in sync only by "byte-identical to the binary's ndjson_string" /
 // "ported verbatim from laterite-py's findings_ndjson" comments — three
-// chances for `--json` to mean three different things (#530). They now all
+// chances for `--json` to mean three different things (laterite-dev#530). They now all
 // call these.
 //
 // Key ORDER is part of the output contract and depends on serde_json's

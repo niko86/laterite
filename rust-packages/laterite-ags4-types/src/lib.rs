@@ -185,7 +185,7 @@ pub fn ags4_str(value: &Value, ags_type: &str) -> String {
             return i.to_string();
         }
         // A float value under a 0DP type is unusual — `parse_value` now nulls an
-        // out-of-range 0DP cell (#611), so this only sees a float from an odd
+        // out-of-range 0DP cell (laterite-dev#611), so this only sees a float from an odd
         // re-typed import. Render it only if it fits i64 (see `f64_fits_i64`);
         // otherwise blank, rather than fabricate a saturated integer.
         if let Some(f) = value.as_f64().filter(|f| f64_fits_i64(*f)) {
@@ -225,7 +225,7 @@ pub fn ags4_str(value: &Value, ags_type: &str) -> String {
 // field quoting: `laterite-ags4-emit`'s byte-faithful `write_row` streams
 // through it, and the browser tokenizer's tiny wasm reuses it via
 // `quote_field`, so the browser's old TS copy (`quoteAgsField` in agsline.ts)
-// is retired against one Rust source (#533, part of the #527 convergence arc).
+// is retired against one Rust source (laterite-dev#533, part of the laterite-dev#527 convergence arc).
 
 /// Write `value` as one AGS4-quoted field to `out`: wrap it in double quotes,
 /// doubling any embedded `"` (`""`) — AGS4's Rule-1 field escaping.
@@ -272,7 +272,7 @@ pub fn quote_field(value: &str) -> String {
 // validator used to carry a hand-port of all three, kept honest only by a
 // "ported from ags_types::ags4_str" comment — it agreed, but nothing checked
 // it, so a validator could have judged a value by a different formatter than
-// the one that WRITES it (#528). laterite-ags4-excel keeps its own, deliberately
+// the one that WRITES it (laterite-dev#528). laterite-ags4-excel keeps its own, deliberately
 // divergent formatter (uppercase `E`, bare `"0"` for SF-of-zero) — that
 // divergence is by design and pinned in xcheck-allow.json.
 
@@ -283,7 +283,7 @@ pub fn quote_field(value: &str) -> String {
 /// crafted spec like "9999999999DP" from asking for a ~10-billion-char string
 /// (an OOM/DoS), or wrapping the i32 cast inside `format_nsf`. Real AGS4 numeric
 /// counts are single-digit, so no legitimate value is affected. Hardens the
-/// #610 Class B divergence (O-49); python-ags4 shares the same unbounded read.
+/// laterite-dev#610 Class B divergence (O-49); python-ags4 shares the same unbounded read.
 const MAX_NUMERIC_COUNT: usize = 30;
 
 /// nDP expected form — fixed-point with exactly `n` fractional digits.
@@ -444,7 +444,7 @@ pub fn parse_value(raw: Option<&str>, ags_type: &str) -> Value {
     };
     match ct {
         CanonicalType::String | CanonicalType::Enum => Value::String(s.to_string()),
-        // One integer parser (range-guarded, #611) for the leaf and laterite-py.
+        // One integer parser (range-guarded, laterite-dev#611) for the leaf and laterite-py.
         CanonicalType::Integer => parse_ags_integer(s).map_or(Value::Null, Value::from),
         CanonicalType::Decimal => parse_ags_decimal(s)
             .and_then(Number::from_f64)
@@ -551,11 +551,11 @@ fn f64_fits_i64(f: f64) -> bool {
 
 /// Parse an AGS4 Integer (`0DP`) cell to an `i64`, or `None` when the text is
 /// not a finite number OR falls outside i64's range. The single source for the
-/// leaf's own `parse_value`/`ags4_str` and laterite-py's PyO3 wrapper (#611
-/// finishes the #531 dedup — that PR single-sourced the date/time/bool parsers
+/// leaf's own `parse_value`/`ags4_str` and laterite-py's PyO3 wrapper (laterite-dev#611
+/// finishes the laterite-dev#531 dedup — that PR single-sourced the date/time/bool parsers
 /// but left this Integer arm copied three ways).
 ///
-/// The range guard is the #611 hardening: an out-of-range value returns `None`
+/// The range guard is the laterite-dev#611 hardening: an out-of-range value returns `None`
 /// (→ a Null typed value / `None` in Python) instead of the silently
 /// *fabricated* `i64::MAX` a saturating `as` cast produced. Real geotech
 /// integers never approach i64 (~9.2e18) — the largest integer column in
@@ -584,7 +584,7 @@ pub fn parse_ags_integer(s: &str) -> Option<i64> {
 
 /// Parse an AGS4 Decimal-typed cell to an `f64`, or `None` when not a finite
 /// number. The single source for the leaf's `parse_value` Decimal arm and
-/// laterite-py's wrapper (the #531/#611 dedup, Decimal half).
+/// laterite-py's wrapper (the laterite-dev#531/#611 dedup, Decimal half).
 #[must_use]
 pub fn parse_ags_decimal(s: &str) -> Option<f64> {
     match s.parse::<f64>() {
@@ -742,7 +742,7 @@ mod tests {
     #[test]
     fn nsf_count_is_clamped_so_a_crafted_type_cannot_dos() {
         // The SF count is read straight from a file's TYPE spec ("3SF") with no
-        // upper bound (#610 Class B, O-49). python-ags4's `_format_SF` reads it
+        // upper bound (laterite-dev#610 Class B, O-49). python-ags4's `_format_SF` reads it
         // the same way at arbitrary precision, so a crafted "9999999999SF" makes
         // it request a ~10-billion-place format width and OOM. We clamp to
         // MAX_NUMERIC_COUNT first, so an absurd count collapses to a bounded
@@ -799,7 +799,7 @@ mod tests {
         assert_eq!(sql_type("DT"), "TIMESTAMP");
         assert_eq!(sql_type("YN"), "BOOLEAN");
         // RL is a delimited RECORD LINK (`GROUP|KEY1|KEY2`, AGS Rule 11), so it
-        // stores as text. It was DOUBLE — which nulled every link on read (#503).
+        // stores as text. It was DOUBLE — which nulled every link on read (laterite-dev#503).
         assert_eq!(sql_type("RL"), "VARCHAR");
         // Unknown / passthrough code.
         assert_eq!(sql_type("BANANA"), "VARCHAR");
@@ -807,7 +807,7 @@ mod tests {
 
     #[test]
     fn canonical_type_rl_is_a_text_record_link_not_a_number() {
-        // #503: RL was Decimal. A record link is `SAMP|BH01|1.00` — parsing it as a
+        // laterite-dev#503: RL was Decimal. A record link is `SAMP|BH01|1.00` — parsing it as a
         // float yields Null, so the column read back as an all-null f64 and the
         // link was destroyed. This assertion previously pinned the bug.
         assert_eq!(canonical_type("RL"), Some(CanonicalType::String));
@@ -822,7 +822,7 @@ mod tests {
     /// (through `serde_json::Value::to_string`), yet the two crates are bound
     /// only by this behaviour — nothing at compile time couples them. So a
     /// change to any literal below silently re-computes every `_content_hash`
-    /// already in the wild: the #503 RL episode did precisely this (RL went
+    /// already in the wild: the laterite-dev#503 RL episode did precisely this (RL went
     /// Decimal→String, the hashed form of every record-link cell changed, and
     /// no test failed). If you move one of these deliberately you MUST bump
     /// `keychain::CONTENT_HASH_DOMAIN` in the same change, so an old hash and a
@@ -832,7 +832,7 @@ mod tests {
         let pv = |ty: &str, raw: &str| parse_value(Some(raw), ty).to_string();
 
         // String family — quoted, verbatim. RL is a record LINK (text), never a
-        // number: `SAMP|BH01|1.00` stays a string (#503).
+        // number: `SAMP|BH01|1.00` stays a string (laterite-dev#503).
         assert_eq!(pv("X", "silty CLAY"), "\"silty CLAY\"");
         assert_eq!(pv("ID", "BH01"), "\"BH01\"");
         assert_eq!(pv("PA", "CU"), "\"CU\"");
@@ -1049,7 +1049,7 @@ mod tests {
             parse_ags_integer("9223372036854774784"),
             Some(9_223_372_036_854_774_784)
         );
-        // Out-of-range -> None, NOT a fabricated i64::MAX (the #611 hardening).
+        // Out-of-range -> None, NOT a fabricated i64::MAX (the laterite-dev#611 hardening).
         assert_eq!(parse_ags_integer("1E30"), None);
         assert_eq!(parse_ags_integer("99999999999999999999"), None);
         assert_eq!(parse_ags_integer("-1E30"), None);
@@ -1063,7 +1063,7 @@ mod tests {
 
     #[test]
     fn parse_value_0dp_overflow_is_null_not_fabricated() {
-        // The observable #611 change: a giant 0DP value no longer canonicalises
+        // The observable laterite-dev#611 change: a giant 0DP value no longer canonicalises
         // to a fabricated i64::MAX — it becomes Null. In-range is unchanged, so
         // _content_hash for real data is untouched.
         assert_eq!(parse_value(Some("42"), "0DP"), Value::from(42));
