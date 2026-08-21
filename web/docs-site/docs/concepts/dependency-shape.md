@@ -3,6 +3,7 @@
 `pip install laterite` pulls **polars + duckdb** only — no pandas, no pyarrow.
 A base install stays lean.
 
+<!-- doc-code: skip — installs packages — a gate that ran it would rewrite its own environment -->
 ```bash
 pip install laterite                  # polars + duckdb only
 pip install laterite[compat]          # + pandas<3 (the python-ags4 drop-in) — pyarrow-free

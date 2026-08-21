@@ -1,5 +1,6 @@
 # Node
 
+<!-- doc-code: skip — installs packages — a gate that ran it would rewrite its own environment -->
 ```bash
 npm install laterite
 ```
