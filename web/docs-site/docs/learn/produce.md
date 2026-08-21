@@ -43,8 +43,8 @@ demands them rather than letting a half-stamp reach the file. `TRAN_AGS`,
 file the emitter is writing, so it fills them.
 
 Synthesis is opt-in on every surface (`synthesise_metadata=` in Python,
-`{ synthesiseMetadata }` in Node, `synthesise_metadata` in the browser wasm
-build) so nothing appears in your file that you didn't ask for.
+`{ synthesiseMetadata }` in Node and in the browser wasm build) so nothing
+appears in your file that you didn't ask for.
 
 ## From a typed PROJ graph
 

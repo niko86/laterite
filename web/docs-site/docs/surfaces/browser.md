@@ -55,9 +55,10 @@ and choose how to settle a type clash), the **transport** lock/unlock round-trip
 anonymiser.
 
 **Export** — assemble or paste per-group data and get a byte-faithful AGS4 file
-back. Direct wasm callers get `synthesise_metadata` on `build_ags4` /
-`build_ags4_ipc` to derive the `UNIT`/`TYPE` catalogs, plus the five `tran_*`
-arguments to stamp a `TRAN` — the browser twin of the Python and Node flags.
+back. Direct wasm callers get `synthesiseMetadata` on `build_ags4` /
+`build_ags4_ipc` to derive the `UNIT`/`TYPE` catalogs, plus a `tran` object
+carrying its five required fields to stamp a `TRAN` — the browser twin of the
+Python and Node flags.
 
 ## Same engine, in the browser
 

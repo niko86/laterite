@@ -9,14 +9,19 @@ you are; the behaviour behind it is identical.
 The parser that tokenises an AGS4 file, the dictionary that types each column,
 and the numbered-rules validator are all Rust. Nothing reimplements them per
 language. So a file that reads clean in Python reads clean at the CLI, in Node,
-and inside DuckDB — same dtypes, same findings, same rule numbers. There is no
+and in the browser — same dtypes, same findings, same rule numbers. There is no
 "Python parser" drifting from a "JavaScript parser"; there is one engine with
 several front doors:
 
 - **Python** — `import laterite` (this site).
 - **`lat` CLI** — `lat validate delivery.ags --json` (see the [CLI reference](../reference/cli.md)).
 - **Node** — `laterite` on npm.
-- **DuckDB** — the `laterite_ags4` loadable extension.
+- **The browser** — `@laterite/ags4-wasm`, the same engine compiled to wasm (see
+  the [wasm reference](../reference/wasm-api.md)).
+- **DuckDB** — the `laterite_ags4` loadable extension. A **read-only** door: it
+  reads and types a file but runs no rules, so it is the one door that does not
+  carry the guarantee above (see
+  [Cross-surface parity](./cross-surface-parity.md)).
 
 ## Many input doors
 
