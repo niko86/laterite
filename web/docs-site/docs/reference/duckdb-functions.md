@@ -61,16 +61,43 @@ SELECT heading, unit, ags_type, sql_type FROM ags_dictionary() WHERE "group" = '
 
 ## Materialise a store
 
-`load_ags` emits the `CREATE TABLE` DDL to persist every group as an indexed,
-repeat-/remote-queryable store — turning a one-shot read into a durable database.
+Two functions turn a one-shot read into a durable, indexed store. Both **emit
+DDL rather than running it** — the extension API cannot cleanly issue
+`CREATE TABLE` or `ATTACH` from inside a table function — so each returns an
+ordered `(seq, stmt)` script for you to execute.
 
-| Function         | Returns                                                            |
-| ---------------- | ------------------------------------------------------------------ |
-| `load_ags(path)` | `(seq, stmt)` — ordered `CREATE TABLE` DDL, one statement per row. |
+| Function                     | Returns                                                                        |
+| ---------------------------- | ------------------------------------------------------------------------------ |
+| `load_ags(path)`             | ordered DDL materialising every group into the **current** database.           |
+| `to_duckdb(path, out_db)`    | ordered DDL persisting every group into a **standalone** `.duckdb` at `out_db`. |
 
 ```sql
 SELECT stmt FROM load_ags('delivery.ags') ORDER BY seq;
 ```
+
+The difference is where the tables land. `load_ags` creates them here;
+`to_duckdb` wraps the same per-group DDL in `ATTACH '<out_db>' AS _lat_out;` …
+`DETACH _lat_out;`, so you can persist to any file from any session:
+
+```sql
+SELECT stmt FROM to_duckdb('delivery.ags', 'delivery.duckdb') ORDER BY seq;
+```
+
+Stitch the statements into one script and execute that — the ordering matters,
+so keep the `ORDER BY`:
+
+```sql
+SELECT string_agg(stmt, e'\n' ORDER BY seq)
+FROM to_duckdb('delivery.ags', 'delivery.duckdb');
+```
+
+Feed the result back to whichever host you're in: `con.execute(script)` from a
+driver, or `duckdb -c "$script"` from a shell.
+
+Each group becomes an `ags_<group>` table indexed on `_id`, and on `_parent_id`
+too where the group has a dictionary parent. Those keys are byte-identical to
+`read_ags`'s, so the resulting file matches what the Python and Node
+`to_duckdb()` produce — one store shape that every surface agrees on.
 
 !!! note "Read-only query surface"
     DuckDB is a **read** door — it reads and inspects, but doesn't validate,
