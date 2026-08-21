@@ -32,6 +32,9 @@
       },
       {
         "text": "**A validator test claimed to cover the type-override branch and never reached it.** `override_warnings_flag_reparent_demotion_and_type_change` described `SAMP_TOP` as \"a standard non-KEY heading\" being retyped and asserted only that some finding mentioned it. `SAMP_TOP` is `2DP/KEY` in the base, so it is a second KEY demotion and the assertion was passing on the demotion message. The branch was covered elsewhere, on `LOCA`, which is why nothing looked wrong — but a fixture that cannot reach the code its name claims is worth no confidence at all."
+      },
+      {
+        "text": "**The Validate and Fix panes told you to try again, next to no Try again button.** Both share the tier-1 engine channel and deliberately have no retry control — the channel retires a dead worker, so the next file, paste or sample starts a fresh one — yet a failed engine download ended “Check your connection and try again.” on all four surfaces that render one. That names an affordance only Explore and the Excel converter have, and it is the same inherited-affordance fault the shared copy already fixed one branch over, on the crash line. The two tier-1 panes now close on “Load your file again to retry.”, which is the recovery they actually offer. Explore and the converter are unchanged."
       }
     ],
     "security": []

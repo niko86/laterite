@@ -29,8 +29,8 @@ currency — the set of `"AGS Format Rule N"` labels that fired — then asserts
    differences reconcile, and only an _unexplained_ difference is flagged.
 
 This runs two ways: a **per-PR gate** (the four in-repo surfaces, on every change
-that could move a finding) and a **monthly full-matrix report** (all six,
-including the DuckDB extension built from source).
+that could move a finding) and a **full-matrix report** (all six, including the
+DuckDB extension built from source), which is run on-demand.
 <!-- cadence: compliance -->
 <!-- cadence: compliance-report -->
 
