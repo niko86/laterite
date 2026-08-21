@@ -1,6 +1,6 @@
 ---
 type: decision
-title: "The reliquary — relics inventoried for surgical removal"
+title: "The reliquary — the decision record for anything that looks removable"
 status: accepted
 tags: [design, decision, process, relics]
 decided: 2026-06-19
@@ -10,11 +10,25 @@ related: [api-surface-1.0, ags4-output, mutation-sweep]
 sources: []
 ---
 
-# The reliquary — relics inventoried for surgical removal
+# The reliquary — the decision record for anything that looks removable
 
-The single living register of **spotted-but-not-yet-removed** code/doc relics, per the *"Surgical, targeted changes"* convention. A relic is **inventoried here first**,
-then **expunged in the PR that retires the feature it belongs to** — with its now-redundant
-tests, **individually, never an opportunistic sweep**.
+The single living register of code/doc relics, per the *"Surgical, targeted changes"*
+convention — the ones **still present** and the ones **already gone**. A relic is
+**inventoried here first**, then **expunged in the PR that retires the feature it belongs
+to** — with its now-redundant tests, **individually, never an opportunistic sweep**.
+
+**Three verdicts, and the middle one is not a holding pen.** `spotted` is removal debt
+waiting on a trigger. `removed` is the receipt — kept, not pruned, because "we already
+looked at this and it is gone" is the answer to a question somebody will ask again.
+`keep` is a **reviewed retention**: an item that reads as dead to every scout and is not,
+with the reason written down. That last class is the register's highest-value content and
+the easiest to mistake for an oversight — `engine_fingerprint()` has no caller in this
+tree and is required by [[cert-trust-v2]]; `version()` has no *web* caller and a live
+harness one. Each of those rows exists so the next person does not re-chase a call graph
+that has already been chased and answered.
+
+So the register is not a list of pending deletions with some exceptions in it. It is the
+**decision record for anything that looks removable**, whatever the decision was.
 
 > **Discipline:** removing a relic is part of the work of the PR that supersedes it, not a
 > later batch cleanup. Add a row when you *spot* one; flip its status when the superseding
@@ -85,8 +99,8 @@ it, and name that PR in *Removed-in*). Verify `—` = display-only.
 | `include_warnings: true` (diff) | `rust-packages/laterite-cli/src/commands/diff.rs::include_warnings: true` | code | removed | mutation-sweep cleanup (coverage-rust) | inert survivor 2026-07-27: `diff` never runs the rule engine, so `opts.include_warnings` was never read — cargo-culted from `validate`/`fix`. Collapsed to `CheckOptions::default()`. See [[mutation-sweep]] |
 | `include_warnings: true` (merge) | `rust-packages/laterite-cli/src/commands/merge.rs::include_warnings: true` | code | removed | mutation-sweep cleanup (coverage-rust) | same inert pattern as `diff` — `merge` parses/reconciles but never runs the rule engine, so `opts.include_warnings` was never read. Collapsed to `CheckOptions::default()` |
 | `GroupDescriptor::table()`/`view()` | `rust-packages/laterite-ags4-reference/src/union.rs::fn table` | code | removed | #175, re-removed in #189 | DuckDB `g_<code>`/`v_<code>` name builders on the reference-data leaf. Verified dead 2026-07-29: the only occurrences repo-wide were the two fns and their own unit test, and `laterite-duckdb` never references `GroupDescriptor` — it builds no `g_`/`v_` names at all. Publishing would have frozen an unrelated product's naming into a dictionary crate's public API. Deleted in #175; **#178 restored them** (it branched before #175 and squash-merged after, so its diff undid the removal — the same revert that took out the #176 crate rename). Re-deleted in #189. See [[dec-rust-api-crates-io]], laterite#161 |
-| `_template-requirement.md` — the `requirement` page class | `ags-wiki/templates/_template-requirement.md::AGS5 req` | doc | spotted | not yet — the PR that retires the AGS5 page classes from the public vault | AGS5-strand page class with **0 live pages** (`type: requirement` outside `templates/`: 0). Not a plain delete: `lint.py` builds `TEMPLATE_SCHEMA` *from* each `_template-<class>.md`, so removing the file removes the schema for its `type:` — a vault-wide change, not a file removal. The AGS5 strand is dormant and lives in the private satellite, so its page classes are residue here. Spotted 2026-08-12 while removing the AGS5 title from `_template-decision.md`; templates are invisible to the linter (`SKIP_DIRS` includes `templates`, deliberately — they are its schema source), which is why this survived. See [[dec-monorepo-structure]] |
-| `_template-experiment.md` — the `experiment` page class | `ags-wiki/templates/_template-experiment.md::AGS5 experiment` | doc | spotted | not yet — the PR that retires the AGS5 page classes from the public vault | Same shape as the `requirement` class above: **0 live pages** (`type: experiment` outside `templates/`: 0), AGS5-worded throughout (its `evidence` field still points into the decoupled `packages/ags5-` tree), and load-bearing as a `TEMPLATE_SCHEMA` source until the class itself is retired. Retire both together or neither. Spotted 2026-08-12 |
+| `_template-requirement.md` — the `requirement` page class | `ags-wiki/templates/_template-requirement.md::AGS5 req` | doc | spotted | not yet — #500, which retires the AGS5 page classes from the public vault | AGS5-strand page class with **0 live pages** (`type: requirement` outside `templates/`: 0). Not a plain delete: `lint.py` builds `TEMPLATE_SCHEMA` *from* each `_template-<class>.md`, so removing the file removes the schema for its `type:` — a vault-wide change, not a file removal. The AGS5 strand is dormant and lives in the private satellite, so its page classes are residue here. Spotted 2026-08-12 while removing the AGS5 title from `_template-decision.md`; templates are invisible to the linter (`SKIP_DIRS` includes `templates`, deliberately — they are its schema source), which is why this survived. See [[dec-monorepo-structure]] |
+| `_template-experiment.md` — the `experiment` page class | `ags-wiki/templates/_template-experiment.md::AGS5 experiment` | doc | spotted | not yet — #500, which retires the AGS5 page classes from the public vault | Same shape as the `requirement` class above: **0 live pages** (`type: experiment` outside `templates/`: 0), AGS5-worded throughout (its `evidence` field still points into the decoupled `packages/ags5-` tree), and load-bearing as a `TEMPLATE_SCHEMA` source until the class itself is retired. Retire both together or neither. Spotted 2026-08-12 |
 | `list_rules()` (wasm) | `rust-packages/laterite-ags4-wasm/src/metadata.rs::pub fn list_rules` | code | keep | — (published surface) | Inventoried by #349 as having **no web caller** (0 hits in `web/src`, `web/e2e`, `web/scripts` — verified 2026-08-18; the Rule explainer reads `public/rules-catalogue.json`, synced by `scripts/sync-rules.mjs`). Not a relic: it is part of the **published** `@laterite/ags4-wasm` surface, named in `EXPECTED_FUNCTIONS` in BOTH `tools/release/check-wasm-slim.mjs` and `check-wasm-tier1.mjs`, documented available in `web/docs-site/docs/reference/wasm-api.md`, with a cookbook page and node/py twins. "No UI caller" is not "no caller" — removing it is an npm breaking change, not a cleanup. |
 | `version()` (wasm) | `rust-packages/laterite-ags4-wasm/src/metadata.rs::pub fn version` | code | keep | — (live caller) | Inventoried by #349 as having no web caller — **true, and misleading**: it has a live NON-web caller. The wasm compliance runner calls it (`glue.version?.()`, the satellite's `tools/compliance/emit_js.mjs`), which is the exact purpose its own docstring records — it exists because that harness had hard-coded `version: "0.5.1"` and printed a false cross-surface identity (laterite-dev#556). Also in both release gates' `EXPECTED_FUNCTIONS` and the published API docs. Deleting it would re-open the bug it was added to close. |
 | `engine_version()` (wasm) | `rust-packages/laterite-ags4-wasm/src/metadata.rs::pub fn engine_version` | code | keep | — (cert-trust, prospective) | No web caller (verified 2026-08-18). Retained on two independent grounds. (1) **Prospective feature, not dead code**: [[cert-trust-v2]] defines engine identity as a tuple `EngineId = (validator, validator_version, engine_fingerprint, compat)`, and this export is the browser's route to the validator's own version — a browser-minted certificate needs it. (2) It is in `EXPECTED_FUNCTIONS` in both release gates and the published API docs. Its docstring is candid that it is "useful for humans, useless as an identity" on its own — the identity claim belongs to the fingerprint below; the two are recorded together because a future cert-trust build reads them as a pair. |
@@ -95,6 +109,7 @@ it, and name that PR in *Removed-in*). Verify `—` = display-only.
 | `dictionary()` (wasm) | `rust-packages/laterite-ags4-wasm/src/dictionary.rs::pub fn dictionary` | code | keep | — (published surface) | Made caller-less on the web by **this** change (#349): the app's Dictionary browser and Template generator read the static union `ags_dictionary.json` via `lib/dict.ts`, which #349 settled as the web's single dict source, so the worker op and client fn were removed. Recorded here per the relic discipline — add the row in the PR that strands the export — but `keep`, on the same grounds as its four siblings above: it is named in `EXPECTED_FUNCTIONS` in BOTH `tools/release/check-wasm-slim.mjs` and `check-wasm-tier1.mjs` and documented available in `web/docs-site/docs/reference/wasm-api.md`, so it is published npm surface. Its TYPE is still load-bearing web-side even with no caller: `web/src/lib/validator.ts` re-exports `StandardDict` from the engine so the local projection must keep conforming to what this export returns. |
 | `laterite_ags4_validator::is_valid()` | `rust-packages/laterite-ags4-validator/src/lib.rs::pub fn is_valid` | code | spotted | the release that bumps the engine tier off 0.9.0 | Renamed to `is_clean` in #321, when a warning stopped failing a file and "zero findings" stopped being the verdict — two public `is_valid` in one crate that disagree on a warning-carrying file. Kept as a `#[deprecated]` delegating alias so the rename reaches a crates.io consumer as a warning naming both replacements rather than a build failure; 0 callers in this tree. |
 | `.github/workflows/allocator-bench.yml` + `tools/bench/allocator_ab.py` | `.github/workflows/allocator-bench.yml::allocator-bench (temporary, #448)` | code | removed | the PR that recorded the #448 measurement (runs 32418268428 / 32421189772) | Added deliberately temporary and inventoried in the same change; removed in the PR its own row named. It was an INSTRUMENT, not a gate — `workflow_dispatch`-only, never on a push, a PR or a schedule — and it answered exactly one question: on Linux and Windows, does mimalloc v3 beat the v2 pin by enough to narrow that pin to `cfg(target_os = "macos")`? Measured on both self-hosted runners at the 25 MB rung: no. The system-allocator control separated by 36.2% on Linux and 62.6% on Windows, so the harness demonstrably resolved allocator effects — and against that, the v2/v3 gap sat inside the noise floor on both, pointing in OPPOSITE directions (v3 3.3% slower on Linux, 1.7% faster on Windows). The answer is on #448; the harness that produced it has nothing left to measure. Kept past that point it would be a build cost nobody could justify and nobody would dare delete. |
+| `tests/p1-flagship.cjs` (node) | rust-packages/laterite-node/tests/p1-flagship.cjs::P1 — the native engine core | code | spotted | not yet — the PR that next touches the node surface's test wiring | A pre-vitest CommonJS smoke script, sole occupant of `tests/` — and `vitest.config.ts` reads `test/`, one letter away, which is why nothing has run it and nothing noticed. Zero references repo-wide (no `package.json` script, no workflow, no doc); it arrived in a pre-flip `sync: public tree` commit and no commit has touched it since. What it asserts — parse→Arrow IPC, validate, byte-faithful emit, data→AGS4 — is covered by the `test/` suite that replaced it, so this is a superseded copy rather than lost coverage. Found by `knip` (the only genuine orphan in the 2026-08-21 three-scout pass; vulture's four `tools/` hits all had live callers in `tests/`, and web's 70 knip hits are overwhelmingly the #418 Solid primitives, built ahead of the app restyle they are for). **Confirm before deleting**: a file vitest cannot see is exactly the shape that reads as dead while being someone's manual smoke test. |
 <!-- END GENERATED: reliquary-register -->
 
 ## Finding relics — tooling
@@ -117,6 +132,13 @@ of these tools is blind to some caller, so a hit is a *question*, not a verdict.
   reachable by a downstream crate never warns even when genuinely dead, and the
   codebase carries deliberate `#[allow(dead_code)]` (e.g. `DuckParse::surface`).
   So `0 warnings` means "no *intra-crate* dead code", not "no dead code".
+  It is also **silent on any name starting with `_`** — that leading underscore
+  is the language's own "intentionally unused" marker, so `fn _helper()` is
+  invisible to this scout however dead it is. Worth knowing twice over: it is a
+  real hiding place, and it silently invalidates a hand-rolled positive control
+  named `_probe`, which reads as "the lint is off" rather than "the probe was
+  wrong". **Verify the scout on a normally-named dead item before trusting a
+  clean run** — a green scan and a broken scan look identical.
 - **Python `vulture`** — scoped (`[tool.vulture]`) to `packages/…/laterite` +
   `tools`, so it **cannot see `tests/`**. Two false-positive classes follow:
   1. *Public API* — most `packages/…/laterite` hits are methods/properties/enum
