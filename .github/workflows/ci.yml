@@ -359,6 +359,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # `check_issue_refs.py` (below) derives its watermark from the merged-PR
+          # history of the default branch, which a shallow (default) checkout does
+          # not have. The gate REFUSES on a shallow clone rather than reading a low
+          # watermark, so this is load-bearing and its absence fails loudly — the
+          # same bargain changelog.yml struck for the same reason.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: false
@@ -398,6 +405,12 @@ jobs:
       # `#N` is a claim that a number is OURS — #458 is the write-up of what
       # that costs once the numbering climbs past a number being borrowed,
       # which it now has.
+      #
+      # This one needs the job's `fetch-depth: 0` (see the checkout above): its
+      # watermark is the highest PR number merged into the default branch, read
+      # off git rather than the API because this job has none. A shallow clone
+      # cannot answer that, so the gate REFUSES rather than reading a low
+      # watermark and rejecting correct references to recent numbers.
       - name: bare `#N` means an issue in this repo
         run: uv run --no-project python tools/check_issue_refs.py
 
