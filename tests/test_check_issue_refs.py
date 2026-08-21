@@ -29,6 +29,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO = Path(__file__).resolve().parents[1]
 DATA = REPO / "foreign-issue-refs.json"
@@ -50,8 +51,15 @@ gate = _load()
 
 
 def test_the_tree_is_clean(capsys: pytest.CaptureFixture[str]) -> None:
-    """The sweep's own assertion: no known-foreign number is bare in the tree."""
-    assert gate.main() == 0, capsys.readouterr().out
+    """The sweep's own assertion: no known-foreign number is bare in the tree.
+
+    Both streams in the message: the violations go to stdout, but the gate's one
+    refusal — a shallow clone, with no merged-PR history to take a watermark from
+    — goes to stderr, and without it this reads as a bare `assert 1 == 0`.
+    """
+    captured = gate.main()
+    out, err = capsys.readouterr()
+    assert captured == 0, f"{err}{out}"
 
 
 def test_it_reports_what_it_could_not_judge(
@@ -270,3 +278,62 @@ def test_this_repo_has_actually_reached_the_numbers_it_released() -> None:
     assert watermark >= found[0]
     _, released = gate.load_expected(watermark)
     assert all(n <= watermark for n in released)
+
+
+# --- the gate's own precondition ---------------------------------------------
+
+
+def _pytest_paths(run: str) -> list[str]:
+    """The path arguments of every pytest invocation in a `run:` block.
+
+    Enough of a parser to tell "the whole root suite" from "one file in it":
+    `cadence` runs `pytest tests/test_stated_cadences_faithful.py` and does not
+    collect this module, so it does not need the history.
+    """
+    paths = []
+    for command in run.replace("\\\n", " ").splitlines():
+        tokens = command.split()
+        if not any("pytest" in t for t in tokens):
+            continue
+        paths += [
+            t.strip("\"'")
+            for t in tokens
+            if not t.startswith("-") and (t == "tests" or t.startswith("tests/"))
+        ]
+    return paths
+
+
+def _collects_this_module(paths: list[str]) -> bool:
+    return any(
+        p in {"tests", Path(__file__).name, f"tests/{Path(__file__).name}"}
+        for p in paths
+    )
+
+
+def test_every_job_that_runs_this_suite_checks_out_full_history() -> None:
+    """A shallow clone makes the gate refuse, which is right — but it fails on a
+    CHECKOUT SETTING, in a job whose diff has nothing to do with it.
+
+    That is not hypothetical: the watermark landed with `fetch-depth: 0` on
+    `repo-gates`, which runs the tool, and not on `python`, which runs the tool's
+    tests. Four red tests, none of them about the change. Fixing the job it was
+    noticed in would leave the next one to find the same way, so the rule is
+    checked instead: collect this module, carry the history.
+    """
+    ci = yaml.safe_load(
+        (REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    )
+
+    for name, job in ci["jobs"].items():
+        steps = [s for s in job.get("steps", []) if isinstance(s, dict)]
+        paths = [p for s in steps for p in _pytest_paths(s.get("run") or "")]
+        if not _collects_this_module(paths):
+            continue
+        checkouts = [s for s in steps if "actions/checkout" in str(s.get("uses", ""))]
+        assert checkouts, f"job {name!r} runs this suite without checking out"
+        for step in checkouts:
+            assert (step.get("with") or {}).get("fetch-depth") == 0, (
+                f"job {name!r} collects {Path(__file__).name} but checks out "
+                f"shallow. The gate derives its watermark from merged-PR history "
+                f"and refuses without it — give this checkout `fetch-depth: 0`."
+            )

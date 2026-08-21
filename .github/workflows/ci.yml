@@ -1175,6 +1175,15 @@ jobs:
       # lat CLI build further down (the byte-parity tests exercise the shipped
       # binary at target/release/lat).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The root `tests/` suite runs here in full, and it includes
+          # `test_check_issue_refs.py`, whose gate derives a watermark from the
+          # merged-PR history of the default branch. A shallow clone has none, so
+          # the gate REFUSES — correctly — and four tests fail on a checkout
+          # setting rather than on anything in the diff. `repo-gates` carries the
+          # same line for the same gate; `tests/test_check_issue_refs.py` asserts
+          # every job that collects it has this.
+          fetch-depth: 0
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
