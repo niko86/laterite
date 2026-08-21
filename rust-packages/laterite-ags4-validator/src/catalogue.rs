@@ -15,7 +15,7 @@
 //! that `fixable` matches the fix engine ([`crate::fixes::FIXABLE_RULE_LABELS`]).
 //!
 //! [`RULE_LABELS`] and [`rule_metadata_json`] themselves moved to the
-//! `laterite-ags4-reference` leaf (#475 PR2) — re-exported below — so a
+//! `laterite-ags4-reference` leaf (laterite-dev#475 PR2) — re-exported below — so a
 //! consumer that only wants the inventory/metadata needn't depend on the
 //! whole rule engine. This gate stays here: it needs
 //! [`crate::fixes::FIXABLE_RULE_LABELS`], which the leaf can't see.

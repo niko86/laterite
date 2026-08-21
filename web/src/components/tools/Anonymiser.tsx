@@ -21,7 +21,7 @@ import {
 } from "../../lib/sensitive";
 
 // Anonymiser / redactor: strip identifying data before sharing a file. The
-// scrub runs in the shared `laterite-ags4-censor` engine (#581) via the
+// scrub runs in the shared `laterite-ags4-censor` engine (laterite-dev#581) via the
 // validator worker — the SAME engine the corpus `censor` tool drives, so the
 // two can't drift. Each column's action comes from the sensitive-headings SSOT
 // (sensitive_headings.json): location IDs are PSEUDONYMISED (a stable per-column
@@ -160,7 +160,7 @@ export const Anonymiser: Component = () => {
     return n;
   });
 
-  // Anonymise via the shared scrub engine in the validator worker (#581) — the
+  // Anonymise via the shared scrub engine in the validator worker (laterite-dev#581) — the
   // SAME `laterite-ags4-censor` engine the corpus `censor` tool drives. A batch
   // action (Download), so it rides the worker asynchronously; the file hash,
   // pseudonym maps, custom-group dropping and quoting all live in the engine.

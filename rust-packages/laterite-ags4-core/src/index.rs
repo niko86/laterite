@@ -335,7 +335,7 @@ pub struct EngineId {
     pub compat: Option<String>,
 }
 
-/// The custom dictionary (#568 `--dict`) a verdict was reached against, recorded
+/// The custom dictionary (laterite-dev#568 `--dict`) a verdict was reached against, recorded
 /// on the certificate. It is a RECORD, not a contract: a mismatch — different
 /// content, or a cert that names a dict the request doesn't supply (or vice
 /// versa) — means "revalidate", never "hard-fail". The index vouches for what
@@ -376,7 +376,7 @@ pub struct Question {
     /// compared everything *but* this would vouch for an error-clean file that has an
     /// error in it.
     pub encoding: String,
-    /// The custom `--dict` overlay (#568) this request supplies, or `None` for the
+    /// The custom `--dict` overlay (laterite-dev#568) this request supplies, or `None` for the
     /// bundled path. Compared against the cert's own record in [`Sidecar::decide`]:
     /// a difference revalidates (never hard-fails).
     pub custom_dict: Option<CustomDictRef>,
@@ -419,7 +419,7 @@ pub enum RevalidateReason {
     /// The cert measured the tier and found findings. It stores counts, not findings,
     /// so it knows there is something to say but not what — the engine must speak.
     TierNotClean(Tier),
-    /// The cert and this request name a different custom `--dict` overlay (#568) —
+    /// The cert and this request name a different custom `--dict` overlay (laterite-dev#568) —
     /// one supplies a dict the other doesn't, or the same-named dict has different
     /// content. The effective dictionary changed, so the verdict may differ.
     DictionaryChanged,
@@ -529,8 +529,8 @@ pub struct ValidationStamp {
     /// did not say which decoder produced it would be an incomplete statement about the
     /// content it claims to have checked.
     pub encoding: String,
-    /// The custom `--dict` overlay (#568) this verdict was reached against, or `None`
-    /// for the bundled path. `#[serde(default)]`: certs minted before #568 have no
+    /// The custom `--dict` overlay (laterite-dev#568) this verdict was reached against, or `None`
+    /// for the bundled path. `#[serde(default)]`: certs minted before laterite-dev#568 have no
     /// such field and correctly deserialise to `None` (a bundled verdict).
     #[serde(default)]
     pub custom_dict: Option<CustomDictRef>,
@@ -754,7 +754,7 @@ impl Sidecar {
             (EditionInput::Forced { edition }, Some(want)) if edition == want => {}
             _ => return Decision::Revalidate(R::EditionDiffers),
         }
-        // The custom `--dict` overlay (#568). A difference — different content, or one
+        // The custom `--dict` overlay (laterite-dev#568). A difference — different content, or one
         // side present and the other absent — changes the effective dictionary, so the
         // cert answers a different question. This match is hand-written, not
         // exhaustiveness-checked, so this arm is deliberate: warn-and-revalidate, NOT a
@@ -1280,7 +1280,7 @@ mod tests {
     /// The custom-dict comparison arm in `decide` is hand-written, NOT
     /// exhaustiveness-checked (`decide` is a sequence of `if`s), so a forgotten
     /// arm would silently reopen O-48. This pins all four cases — and pins that a
-    /// difference REVALIDATES, never hard-fails (the index is a record, #568 §4).
+    /// difference REVALIDATES, never hard-fails (the index is a record, laterite-dev#568 §4).
     #[test]
     fn a_custom_dict_difference_revalidates_rather_than_hard_fails() {
         use RevalidateReason as R;

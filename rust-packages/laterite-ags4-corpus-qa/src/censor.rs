@@ -6,7 +6,7 @@
 //! committed with no client data.
 //!
 //! The scrub ENGINE itself now lives in the shared `laterite-ags4-censor` leaf
-//! (#581) — the same engine the browser `Anonymiser` drives via the engine
+//! (laterite-dev#581) — the same engine the browser `Anonymiser` drives via the engine
 //! wasm, so the two can't drift. This module is the corpus **wrapper** around
 //! it: resolve the classification into a [`Policy`], run the crawl manifest's
 //! files through [`censor`] in parallel, name each output by its source hash,

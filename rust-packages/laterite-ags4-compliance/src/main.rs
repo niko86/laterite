@@ -9,7 +9,7 @@
 //!      (rust / python-laterite / node / wasm) wraps the SAME engine, so over
 //!      any fixture their finding FLOOR must be IDENTICAL — compared as full
 //!      TUPLES (rule, line, group, desc, `field_index`) in a count-sensitive
-//!      multiset (#555 part 1), not the deduplicated rule-label SET it used to
+//!      multiset (laterite-dev#555 part 1), not the deduplicated rule-label SET it used to
 //!      be: two surfaces agreeing on which rules fired can still disagree on
 //!      where, how many, or what they said. A split is a binding / serialization
 //!      / build bug — there is no O-N escape hatch. (`duckdb` became a read-only
@@ -50,7 +50,7 @@ const REFERENCE: &str = "python-ags4";
 #[derive(Debug, Deserialize)]
 struct SurfaceFile {
     surface: String,
-    /// The surface's own reported version. COMPARED across surfaces since #556 —
+    /// The surface's own reported version. COMPARED across surfaces since laterite-dev#556 —
     /// a version split means "same engine" is false and the identity claim is
     /// vacuous. It was collected and printed and never checked, which is how
     /// `wasm v0.5.1` sat beside three `v0.7.0` surfaces under the heading
@@ -62,8 +62,8 @@ struct SurfaceFile {
     ///
     /// It is also the check we actually want: `version` is a PROXY for "the same
     /// engine decided these", and a proxy is what this whole arc keeps finding
-    /// (#549). Two surfaces can share a version and still embed different engine
-    /// builds — exactly the false clean #550's `ENGINE_FINGERPRINT` exists to
+    /// (laterite-dev#549). Two surfaces can share a version and still embed different engine
+    /// builds — exactly the false clean laterite-dev#550's `ENGINE_FINGERPRINT` exists to
     /// prevent, one layer out. Populating it means each surface exposing that
     /// fingerprint, which none does today.
     ///
@@ -86,7 +86,7 @@ struct FixtureFindings {
     rules: Vec<String>,
     /// The `"AGS Format Rule N"` floor as full TUPLES (rule, line, group, desc,
     /// `field_index`) — the value the 4-laterite identity check actually compares
-    /// (#555 part 1). `rules` is a projection of this (its deduplicated labels);
+    /// (laterite-dev#555 part 1). `rules` is a projection of this (its deduplicated labels);
     /// carrying the tuples is the point — two surfaces agreeing on WHICH rules
     /// fired can still disagree on WHERE / HOW MANY / WHAT they said, and that
     /// split lived under the label set where no comparator could reach it. FYI
@@ -182,14 +182,14 @@ struct Report {
     binding_splits: Vec<(String, Vec<(String, TupleFloor)>)>,
     /// fixtures where the FYI-capable surfaces disagree on the FYI set
     fyi_splits: Vec<String>,
-    /// LATERITE surfaces that produced no results file at all (#556). The
+    /// LATERITE surfaces that produced no results file at all (laterite-dev#556). The
     /// invariant above says "4-laterite identity (HARD)" — but a surface whose
     /// runner died was silently filtered out of `present_lat` and the remaining
     /// three agreed with each other, so the gate reported COMPLIANCE OK having
     /// quietly stopped checking the thing it names. Absence of evidence read as
     /// evidence of agreement.
     missing_surfaces: Vec<String>,
-    /// fixture → the present surfaces that didn't report it (#556). The subtler
+    /// fixture → the present surfaces that didn't report it (laterite-dev#556). The subtler
     /// half: a surface can be present yet skip a fixture, and `lat.iter().all()`
     /// over ONE element is vacuously true — so a fixture only one surface
     /// reported counted as "identical across four". Cross-surface agreement with
@@ -224,7 +224,7 @@ fn compare(idx: &Index, fixtures: &BTreeSet<String>) -> Report {
         .collect();
     for fx in fixtures {
         // (1) 4-laterite identity over the present surfaces — on the full
-        // finding TUPLES, not the deduplicated label set (#555 part 1).
+        // finding TUPLES, not the deduplicated label set (laterite-dev#555 part 1).
         let lat: Vec<(String, TupleFloor)> = present_lat
             .iter()
             .filter_map(|s| idx[*s].get(fx).map(|f| (s.to_string(), tuple_floor(f))))
@@ -401,7 +401,7 @@ fn main() {
     // It showed `wasm v0.5.1` beside three `v0.7.0` surfaces and still called the
     // result 4-laterite identity. If the versions disagree, the premise is false
     // and "identical" means nothing: four surfaces agreeing is only evidence when
-    // they are four builds of the same thing. (#556)
+    // they are four builds of the same thing. (laterite-dev#556)
     let versions: Vec<(&str, &str)> = LATERITE
         .iter()
         .filter_map(|s| {
@@ -482,7 +482,7 @@ fn main() {
         }
     }
 
-    // #556 (RC-5, advisory by default): this line used to read
+    // laterite-dev#556 (RC-5, advisory by default): this line used to read
     //     rep.binding_splits.is_empty() && rep.actions.is_empty()
     // while the harness ALSO computed fyi_splits (detected, printed, unit-tested by
     // a function named `..._is_flagged`, and called "a binding FYI bug" in its own
@@ -573,7 +573,7 @@ mod tests {
     #[test]
     fn a_surface_that_never_reported_is_not_agreement() {
         // wasm's runner died. The other three agree with each other, and before
-        // #556 that printed COMPLIANCE OK — the gate quietly stopped checking the
+        // laterite-dev#556 that printed COMPLIANCE OK — the gate quietly stopped checking the
         // fourth surface while still calling itself 4-laterite identity.
         let pairs: Vec<_> = all_four("a.ags")
             .into_iter()
@@ -647,7 +647,7 @@ mod tests {
 
     #[test]
     fn same_labels_different_location_is_a_binding_split() {
-        // The #555 part-1 capability: two surfaces agree on WHICH rule fired
+        // The laterite-dev#555 part-1 capability: two surfaces agree on WHICH rule fired
         // (both "AGS Format Rule 8") but disagree on WHERE. The old deduplicated
         // LABEL floor saw {Rule 8} == {Rule 8} and called it identical; the tuple
         // floor sees line 5 != line 6 and splits.

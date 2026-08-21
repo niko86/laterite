@@ -13,7 +13,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 // wants widening.
 //
 // The tokenizer-dependent tests (agsline display helpers + fix-preview
-// geometry) now call the wasm-backed tokenizer (#533), so they run in the
+// geometry) now call the wasm-backed tokenizer (laterite-dev#533), so they run in the
 // separate wasm lane (vitest.wasm.config.ts, in the e2e job) and are excluded
 // here to keep this lane pure + fast. The tokenizer's own invariants are pinned
 // in Rust (laterite-ags4-parse's `display_spans.rs` proptest).

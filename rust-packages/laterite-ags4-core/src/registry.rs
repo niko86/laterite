@@ -2,7 +2,7 @@
 //!
 //! The union-projection code (the `GroupDescriptor`/`Heading` structs,
 //! `union_groups`, the `Registry` singleton, and the parent-chain walks) moved
-//! into `laterite-ags4-reference` in #475 (PR1) so consumers that only need the
+//! into `laterite-ags4-reference` in laterite-dev#475 (PR1) so consumers that only need the
 //! dictionary — the read-only DuckDB extension, `laterite-ags4-diff` — can
 //! depend on that leaf without pulling in the rest of core.
 //!

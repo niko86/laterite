@@ -27,10 +27,10 @@ sources: []
 ## What it is
 
 The shared AGS4 **anonymisation / redaction** engine — one copy of the scrub
-logic, extracted (#581) out of `laterite-ags4-corpus-qa`'s `censor.rs` so the
+logic, extracted (laterite-dev#581) out of `laterite-ags4-corpus-qa`'s `censor.rs` so the
 browser Anonymiser drives the *same* engine (through the engine wasm) instead of a
-hand-written TypeScript reimplementation. It is part of the #527 cross-surface
-convergence arc and the sibling of the #533 tokenizer/quoter work: the scrub reads
+hand-written TypeScript reimplementation. It is part of the laterite-dev#527 cross-surface
+convergence arc and the sibling of the laterite-dev#533 tokenizer/quoter work: the scrub reads
 fields through the shared [[laterite-ags4-parse]] leaf (`scan_line`) and re-quotes
 through [[laterite-ags4-types]] (`quote_field`), so there is **no fourth AGS4
 tokenizer**. The design rationale is [[dec-ags4-censor-leaf]].

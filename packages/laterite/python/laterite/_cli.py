@@ -10,7 +10,7 @@ strings are built by the *same* serde_json calls in the native module). A bare
 The verbs are **not listed here, or anywhere else**: :func:`_build_parser` is the
 one place they are declared, and :func:`_subcommands` / :func:`census` read them
 back off it. That is deliberate. A second hand-written verb table is what let
-``lat merge`` ship in the native binary (#494) and never reach this launcher, with
+``lat merge`` ship in the native binary (laterite-dev#494) and never reach this launcher, with
 every cross-surface gate still green — they all compared one hand-list to another.
 ``tools/gen_census.py`` now diffs this parser against clap's; see the wiki's
 ``concepts/surface-census.md``.
@@ -44,7 +44,7 @@ _DICT_CHOICES = ("auto", *_native.registry_editions())
 #: The `--on-type-clash` modes, from `TypeClashMode::ALL` in laterite-ags4-merge —
 #: same single-sourcing as `_DICT_CHOICES` one line up, for the same reason. This
 #: was a hand-typed `("error", "widen", "promote")`, one of four copies of a set the
-#: Rust enum already owns (#555); a fourth mode would have reached none of them.
+#: Rust enum already owns (laterite-dev#555); a fourth mode would have reached none of them.
 _CLASH_CHOICES = tuple(_native.registry_type_clash_modes())
 
 #: Encoding labels the surface census resolves on every launcher. Mirrors
@@ -328,7 +328,7 @@ def _run_fix(args: argparse.Namespace) -> int:
     by_rule = json.loads(r["findings_json"])
     n_residual = sum(len(v) for v in by_rule.values())
 
-    # --json: the machine-readable report replaces the human summary (#545). Same
+    # --json: the machine-readable report replaces the human summary (laterite-dev#545). Same
     # shape as the native `lat fix --json` — `applied` is the native `fix_file`'s
     # `{kind, label, rule, line, risk}` ledger verbatim. Exit unchanged (0/1).
     if args.json:
@@ -343,7 +343,7 @@ def _run_fix(args: argparse.Namespace) -> int:
         # ensure_ascii=False: a fix label carries the reformat arrow (`"10.5" → "10.50"`,
         # Rule 8), and Python's json.dumps ASCII-escapes it to `→` while the native
         # serde_json and npx JSON.stringify emit the raw UTF-8 char. Without this the
-        # three launchers' `fix --json` diverge on an ordinary DP-precision fix (#545).
+        # three launchers' `fix --json` diverge on an ordinary DP-precision fix (laterite-dev#545).
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return 0 if n_residual == 0 else 1
 
@@ -464,7 +464,7 @@ def _run_merge(args: argparse.Namespace) -> int:
     revisions}` shape. Exit 0 merged · 3 read/write · 4 parse · 5 bad args ·
     6 an irreconcilable TYPE/UNIT clash.
 
-    This verb reached the native binary in #494 and did not reach this launcher
+    This verb reached the native binary in laterite-dev#494 and did not reach this launcher
     until the surface census caught the omission — the first bug that gate found.
     """
     from pathlib import Path
@@ -490,7 +490,7 @@ def _run_merge(args: argparse.Namespace) -> int:
         )
     except laterite.MergeConflictError as e:
         # The library message already carries the full guidance (which modes settle
-        # this clash, and — for a UNIT clash — that none of them do, #501), so we do
+        # this clash, and — for a UNIT clash — that none of them do, laterite-dev#501), so we do
         # NOT append CLI hints on top: that doubled the advice.
         #
         # It is still not byte-faithful to the Rust `lat merge`, which prints
@@ -610,7 +610,7 @@ def _emit(body: str, out: str | None) -> int:
 the `lat` binary and Node use. This module used to hand-port RFC-4180 quoting
 and reach for Python's `json.dumps` while the binary used `serde_json` and Node
 used `JSON.stringify` — three libraries held byte-identical by discipline, with
-no gate on `read` output (#530). """
+no gate on `read` output (laterite-dev#530). """
 
 
 def _read_table(headings: list[str], rows: list[list[str]]) -> str:
@@ -811,7 +811,7 @@ def _run_excel(args: argparse.Namespace) -> int:
 def _global_parent() -> argparse.ArgumentParser:
     # `--quiet` is the one genuinely cross-cutting flag, so it stays global (mirrors
     # the native `Cli`). `--json`/`--ndjson` moved onto each report-producing verb in
-    # #545 — a verb that can't render JSON now rejects the flag instead of ignoring
+    # laterite-dev#545 — a verb that can't render JSON now rejects the flag instead of ignoring
     # it — so they are declared per-subparser below, not here.
     p = argparse.ArgumentParser(add_help=False)
     p.add_argument("--quiet", action="store_true")
@@ -824,7 +824,7 @@ def _dict_parent() -> argparse.ArgumentParser:
     p.add_argument("--dict")
     # (with --dict) treat the custom dictionary as a FULL REPLACEMENT — no base edition
     # contributes. Mirrors the native `DictArgs::dict_replace`; contradicts --dict-version
-    # (the native/library reject the pair with exit 5). (#568)
+    # (the native/library reject the pair with exit 5). (laterite-dev#568)
     p.add_argument("--dict-replace", dest="dict_replace", action="store_true")
     p.add_argument("--encoding")
     return p
@@ -850,7 +850,7 @@ def _with_default_subcommand(argv: list[str], p: argparse.ArgumentParser) -> lis
     Rust argv pre-scan. Leading `-` tokens are valueless bools, so a run of them is
     skipped without consuming a value.
 
-    Inserts `validate` at the FRONT (not before the file): since #545 moved
+    Inserts `validate` at the FRONT (not before the file): since laterite-dev#545 moved
     `--json`/`--ndjson` onto the verbs, a leading `lat --json <file>` must become
     `lat validate --json <file>` so the flag lands after the verb that declares it
     (before, with the flags global, position was immaterial)."""
@@ -870,7 +870,7 @@ def _build_parser() -> argparse.ArgumentParser:
     Extracted from ``main`` so :func:`census` can REFLECT the very parser that
     parses the real command line, rather than describing it from a second list.
     That distinction is the whole point of the surface census: ``lat merge``
-    shipped in the native binary (#494) and never reached this launcher, and no
+    shipped in the native binary (laterite-dev#494) and never reached this launcher, and no
     gate saw it, because every gate compared one hand-list against another.
     """
     gp, dp = _global_parent(), _dict_parent()
@@ -879,7 +879,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     pv = sub.add_parser("validate", add_help=False, parents=[gp, dp])
     pv.add_argument("file")
-    # `--json`/`--ndjson` are per-verb now (#545). validate is the only verb that
+    # `--json`/`--ndjson` are per-verb now (laterite-dev#545). validate is the only verb that
     # streams NDJSON; the json↔ndjson mutual exclusion is enforced in `main`.
     pv.add_argument("--json", action="store_true")
     pv.add_argument("--ndjson", action="store_true")
@@ -1095,7 +1095,7 @@ def main(argv: list[str] | None = None) -> int:
         print("error: a subcommand or input file is required", file=sys.stderr)
         return 5
 
-    # `--dict` is now a real custom-dictionary overlay (#568): each verb threads it into
+    # `--dict` is now a real custom-dictionary overlay (laterite-dev#568): each verb threads it into
     # the native engine (validate/fix) or the library (certify), so there is no refusal
     # here any more. The dict's own errors (unreadable file, malformed dict,
     # `--dict-replace` + `--dict-version`) surface as exit 5 from the engine, in its words.

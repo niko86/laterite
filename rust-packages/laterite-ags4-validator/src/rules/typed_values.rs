@@ -586,7 +586,7 @@ fn dt_semantic_ok(value: &str, unit: &str) -> bool {
 // The nDP / nSCI / nSF expected forms come from the AGS type-system leaf —
 // the SAME functions `laterite_ags4_types::ags4_str` uses to WRITE a typed value,
 // so the form Rule 8 EXPECTS and the form `build_ags4` EMITS cannot drift
-// (#528). All three were a hand-port here, kept honest only by a "ported from
+// (laterite-dev#528). All three were a hand-port here, kept honest only by a "ported from
 // ags_types::ags4_str" comment: it agreed with the authority, but nothing
 // gated it — a validator judging a value by a different formatter than the one
 // that writes it. Re-exported at the old path, so Rule 8 above and the fixes

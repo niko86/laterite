@@ -211,7 +211,7 @@ fn write_group_row(
 
 /// `usize` column index → the `u16` `rust_xlsxwriter` wants. A group with more
 /// than `u16::MAX` headings can't happen from a normal dictionary group (58 max
-/// — #475's `ags_dictionary.json`), but an oversized or malformed HEADING row
+/// — laterite-dev#475's `ags_dictionary.json`), but an oversized or malformed HEADING row
 /// (a passthrough/dynamic group, or a corrupt file) could plausibly carry tens
 /// of thousands of fields without needing a huge file — each field can be a
 /// few bytes. `as u16` would silently WRAP that into an existing column,
@@ -556,7 +556,7 @@ fn numeric_prefix(upper: &str, suffix: &str) -> Option<usize> {
 /// significant digits, so clamp to this generous ceiling first — a crafted
 /// "9999999999DP" then can't ask for a ~10-billion-char string (an OOM/DoS) or
 /// wrap the i32 cast in `format_sf`. Real AGS4 numeric counts are single-digit,
-/// so no legitimate value is affected. Hardens #610 Class B (O-49).
+/// so no legitimate value is affected. Hardens laterite-dev#610 Class B (O-49).
 const MAX_NUMERIC_COUNT: usize = 30;
 
 /// Significant-figure formatter — mirrors python-ags4's `_format_SF`.
@@ -719,7 +719,7 @@ mod tests {
     #[test]
     fn format_sf_count_is_clamped_so_a_crafted_type_cannot_dos() {
         // The SF count comes straight from the file's TYPE spec ("3SF") with no
-        // upper bound (#610 Class B, O-49). python-ags4's `_format_SF` reads it
+        // upper bound (laterite-dev#610 Class B, O-49). python-ags4's `_format_SF` reads it
         // the same way at arbitrary precision, so a crafted "9999999999SF" makes
         // it request a ~10-billion-place width and OOM. We clamp to
         // MAX_NUMERIC_COUNT first, so an absurd count collapses to a bounded string.

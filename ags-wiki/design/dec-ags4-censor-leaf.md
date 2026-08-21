@@ -1,6 +1,6 @@
 ---
 type: decision
-title: "laterite-ags4-censor: extracting the AGS4 scrub engine into a shared leaf (#581)"
+title: "laterite-ags4-censor: extracting the AGS4 scrub engine into a shared leaf (laterite-dev#581)"
 status: accepted
 tags: [design, decision]
 decided: "2026-07-18"
@@ -28,8 +28,8 @@ tokenizer to apply them: the corpus tool's private `parse_fields`/
 `emit_fields`, and the browser's `splitAgsFields`/`quoteAgsField`
 (`repo:web/src/lib/agsline.ts`). That private tokenizer was a **fourth**
 independent AGS4 line tokenizer, alongside the three `laterite-ags4-parse`
-had already converged onto ([[dec-laterite-ags4-types-leaf]], #168, #533) — exactly
-the drift shape the #527 cross-surface convergence arc exists to close.
+had already converged onto ([[dec-laterite-ags4-types-leaf]], #168, laterite-dev#533) — exactly
+the drift shape the laterite-dev#527 cross-surface convergence arc exists to close.
 
 ## Options considered
 
@@ -88,7 +88,7 @@ its dep graph via the keychain) — the wasm grew ~6.6→6.64 MB, still under
 the 8 MiB PWA precache cap. The validator worker
 (`web/src/lib/validator.worker.ts`) and its client
 (`web/src/lib/validatorClient.ts`) gained a `censor` RPC op, async/batch like
-`diff`/`merge`, off the render path (unlike the #533 tokenizer wasm, which is
+`diff`/`merge`, off the render path (unlike the laterite-dev#533 tokenizer wasm, which is
 on it) — the right fit for a Download action, not a boot-critical instance.
 `web/src/components/tools/Anonymiser.tsx`'s hand-written TS scrub (a `sha16`
 file id, a pseudonym pass, a per-cell `redact` switch, `redactLine`,
@@ -149,7 +149,7 @@ behaviours that had never been directly compared before:
    well-formed input: converging two implementations turned up a case the
    older one handled less carefully than it could have.
 4. **Reach the browser via the existing engine wasm, not a new tiny crate.**
-   #533 chose a dedicated tiny cdylib (`laterite-ags4-tokenizer-wasm`) for
+   laterite-dev#533 chose a dedicated tiny cdylib (`laterite-ags4-tokenizer-wasm`) for
    the tokenizer/quoter specifically because that pair is needed
    synchronously on every keystroke of the inline line editor — loading the
    6.9 MB engine wasm for that would be the wrong trade

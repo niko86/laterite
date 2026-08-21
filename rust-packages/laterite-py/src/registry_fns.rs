@@ -122,7 +122,7 @@ fn registry_fallback_edition() -> String {
 /// [`TypeClashMode::ALL`] in `laterite-ags4-merge`, and Python kept a hand-typed
 /// copy (`_cli.py`'s `_CLASH_CHOICES`) sitting one line below `_DICT_CHOICES`,
 /// which already asks the registry. A fourth mode added to the Rust enum would
-/// have reached the copy through no path — the exact drift shape #549 is about.
+/// have reached the copy through no path — the exact drift shape laterite-dev#549 is about.
 /// Ordered because `ALL` is (Error/default first), and `--help` prints it.
 #[pyfunction]
 fn registry_type_clash_modes() -> Vec<String> {

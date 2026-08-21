@@ -62,9 +62,9 @@ describe("registry traversal", () => {
 
   // These two walks are now the native binding (laterite_ags4_core::registry),
   // the SAME leaf the Python wheel binds — not a TS re-implementation of the parent
-  // walk / KEY-intersection (#532). The values below are the leaf's; the unknown-code
+  // walk / KEY-intersection (laterite-dev#532). The values below are the leaf's; the unknown-code
   // case also pins that the native error surfaces as an Ags4Error with the message intact.
-  it("ancestorChain walks code → root (native binding, #532)", () => {
+  it("ancestorChain walks code → root (native binding, laterite-dev#532)", () => {
     expect(registry.ancestorChain("PROJ")).toEqual(["PROJ"]); // root
     expect(registry.ancestorChain("SAMP")).toEqual(["SAMP", "LOCA", "PROJ"]);
     expect(() => registry.ancestorChain("NOPE")).toThrow(Ags4Error);
@@ -73,7 +73,7 @@ describe("registry traversal", () => {
     );
   });
 
-  it("inheritedKeyNames is the direct-parent intersection (native binding, #532)", () => {
+  it("inheritedKeyNames is the direct-parent intersection (native binding, laterite-dev#532)", () => {
     const inherited = registry.inheritedKeyNames("SAMP");
     expect(inherited.has("LOCA_ID")).toBe(true); // shared with the direct parent LOCA
     expect(inherited.has("PROJ_ID")).toBe(false); // NOT inherited — SAMP carries no PROJ_ID key

@@ -107,7 +107,7 @@ schedule that no longer holds, not one you would rather not annotate.
 `compliance-report.yml` and `compliance.yml` live in the dev satellite, which
 this repo's CI cannot read. `repo:external-authorities.json` mirrors their
 `cron:`/`on:` values so the gate can run offline — and a mirror with nothing
-comparing it back to its subject is **#549's Shape 1** exactly: the gate
+comparing it back to its subject is **laterite-dev#549's Shape 1** exactly: the gate
 enforcing a proxy for the promise. `check_external_authorities.py` is the
 comparison, and it necessarily runs *there*.
 

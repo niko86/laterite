@@ -132,7 +132,7 @@ def _loca_rows(text: str) -> list[list[str]]:
     return rows
 
 
-# --- UNIT reconciliation (#501) -------------------------------------------
+# --- UNIT reconciliation (laterite-dev#501) -------------------------------------------
 # TYPE has a universal absorber (`X`); UNIT has none. So a unit clash is fatal in
 # EVERY mode — the one place merge is deliberately less forgiving than it is about
 # types. Before this, merge took the first non-empty UNIT, discarded the other,
@@ -186,7 +186,7 @@ def test_a_blank_unit_is_not_a_conflict():
     assert '"UNIT","","m"' in merged.text, "the declared unit must survive"
 
 
-# --- the type-clash lattice (#500) ----------------------------------------
+# --- the type-clash lattice (laterite-dev#500) ----------------------------------------
 # `widen` is byte-faithful but throws the TYPE away, and `X` is the LEAST
 # informative resolution available. `promote` keeps the column numeric when every
 # clashing code is nDP: max precision, coarser values zero-padded. Rule 8 demands a
@@ -296,7 +296,7 @@ def test_an_unknown_mode_is_rejected_by_name():
 
 
 # --- the uvx launcher: the verb this CLI SHIPPED WITHOUT ---------------------
-# `lat merge` landed in the native binary (#494) and never reached `laterite._cli`.
+# `lat merge` landed in the native binary (laterite-dev#494) and never reached `laterite._cli`.
 # No gate caught it: every cross-surface gate compared one hand-list against another
 # hand-list, and both were equally wrong. The surface census (tools/gen_census.py)
 # now diffs each launcher's OWN parser against clap's. These tests pin the verb's

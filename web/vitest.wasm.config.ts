@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 // The tokenizer-dependent tests — the agsline GROUP-block/alignment display
 // helpers and the fix-preview geometry — call the wasm-backed
-// `splitAgsFields`/`quoteAgsField` (#533). They run in THIS lane, which inits
+// `splitAgsFields`/`quoteAgsField` (laterite-dev#533). They run in THIS lane, which inits
 // the tiny tokenizer wasm from disk in a setup file, rather than the fast
 // pure-node `unit` lane (vitest.config.ts). CI runs this in the e2e job, after
 // building the wasm; locally, `npm run build:wasm-tokenizer` first, then

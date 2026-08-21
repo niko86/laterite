@@ -102,7 +102,7 @@ pub(crate) struct ValidationReport {
     /// Why a proffered `.ags.idx` certificate did NOT stand in for the rule engine,
     /// as the stable snake_case token (`"dictionary_changed"`, `"content_changed"`,
     /// …), else `null`. Present for cross-surface shape parity with `Report`
-    /// (laterite-py) and Node's `revalidateReason` (#568 Phase 6). **Structurally
+    /// (laterite-py) and Node's `revalidateReason` (laterite-dev#568 Phase 6). **Structurally
     /// always `null` here:** this surface has no cert-consume door — `validate`
     /// re-runs the engine unconditionally (`certify` only *mints*), so no
     /// certificate is ever offered to accept or reject. The field exists so a JS
@@ -365,7 +365,7 @@ pub fn validate(data: &[u8], opts: Option<ValidateOptionsJs>) -> ValidationRepor
 /// line via the parse leaf's [`laterite_ags4_parse::field_span`].
 ///
 /// This derivation exists on NO other surface — `char_span` is serialized only
-/// by wasm, and it drives the browser's cell/heading highlight — yet before #555
+/// by wasm, and it drives the browser's cell/heading highlight — yet before laterite-dev#555
 /// part 1 it had zero test coverage (and `field_span`, the leaf it calls, had
 /// none either). Extracted from `run`'s finding-mapping closure so the precedence
 /// AND the offset it produces are pinned by the `derive_char_span_*` tests.
@@ -626,7 +626,7 @@ mod tests {
         assert!(!quiet.warnings.unwrap_or(true));
     }
 
-    // The #568 Phase-3 end-to-end fixtures, shared with the validator's `custom_dict.rs`
+    // The laterite-dev#568 Phase-3 end-to-end fixtures, shared with the validator's `custom_dict.rs`
     // so the browser is proven against the same bytes: a bespoke `XTRA` group hung off
     // the standard `SAMP`, and a delivery that uses it.
     const DELIVERY: &[u8] = include_bytes!(

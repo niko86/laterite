@@ -88,7 +88,7 @@ _KIND_TO_EXC: dict[str, type[Ags4Error]] = {
     "bad_args": BadDictError,
     "world_check_requires_source": WorldCheckRequiresSourceError,
     "type_conflict": MergeConflictError,
-    # Fatal in EVERY merge mode — no `on_type_clash` value absorbs a unit clash (#501).
+    # Fatal in EVERY merge mode — no `on_type_clash` value absorbs a unit clash (laterite-dev#501).
     "unit_conflict": MergeConflictError,
     "emit_error": MergeConflictError,
 }

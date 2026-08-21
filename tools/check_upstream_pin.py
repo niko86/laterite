@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Notice when the pinned python-ags4 goes stale (#558).
+"""Notice when the pinned python-ags4 goes stale (laterite-dev#558).
 
 `parity.yml`'s header states why the cron exists:
 

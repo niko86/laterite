@@ -38,7 +38,7 @@ fn merge_errors_on_type_conflict_exit_6_and_offers_both_ways_out() {
         "stderr: {err}"
     );
     // Both escape hatches must be offered — naming only the lossy one would push
-    // every clash toward X, which is what the lattice (#500) set out to stop.
+    // every clash toward X, which is what the lattice (laterite-dev#500) set out to stop.
     assert!(
         err.contains("--on-type-clash promote"),
         "offers promote: {err}"

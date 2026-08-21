@@ -510,7 +510,7 @@ _WASM_VERB_CAP = {
 # Verbs with no file-I/O modality (catalogue/dictionary lookups, build metadata) —
 # the by-design allowlist, hygiene-checked below so it can't mask a removed verb.
 # `version` reports CARGO_PKG_VERSION, mirroring Node's `version()`; it takes no
-# input and touches no file, so it has no I/O modality to register. Added in #556,
+# input and touches no file, so it has no I/O modality to register. Added in laterite-dev#556,
 # where `ags4-compliance`'s wasm runner had HARD-CODED `version: "0.5.1"` because
 # wasm exported nothing to ask — the report then claimed the wasm leg tested a
 # two-minor-old build while the gate called it 4-laterite identity.
@@ -521,7 +521,7 @@ _WASM_VERB_CAP = {
 # carry their own, so a matching `version` across surfaces now shows only that
 # they shipped together. The fingerprint is a digest of the engine's actual
 # inputs, so surfaces reporting the same one are running the same rules — which
-# is what #556's report thought it was asserting.
+# is what laterite-dev#556's report thought it was asserting.
 _WASM_META_ALLOW = {
     "list_rules",
     "dictionary",

@@ -1,7 +1,7 @@
 //! AGS4 reference data — a wasm-safe leaf, single-sourced from
 //! `ags_dictionary.json`.
 //!
-//! Extracted from `laterite-ags4-core` (#475) so consumers that only need the
+//! Extracted from `laterite-ags4-core` (laterite-dev#475) so consumers that only need the
 //! dictionary — the read-only DuckDB extension, `laterite-ags4-diff` — can
 //! depend on this leaf instead of pulling in the rest of core (or the whole
 //! validator). PR1 carried the [`union`] registry projection. PR2 adds the
@@ -14,7 +14,7 @@
 
 pub mod catalogue;
 pub mod dict;
-// Runtime-owned custom-dictionary overlay (#568): the sparse delta a `--dict`
+// Runtime-owned custom-dictionary overlay (laterite-dev#568): the sparse delta a `--dict`
 // override contributes over a bundled base. `dict::Dictionary::Layered` borrows it.
 pub mod overlay;
 // The runtime `.ags` DICT-group reader `overlay::parse_dict` dispatches to for the

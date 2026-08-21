@@ -163,7 +163,7 @@ fn write_row<W: Write>(out: &mut W, cells: &[&str]) -> Result<(), EmitError> {
         }
         // One shared authority for AGS4 field quoting (laterite-ags4-types) — the
         // exact primitive the browser tokenizer's wasm calls, so the escaping
-        // rule can't drift between the writer and the browser (#533). Streams
+        // rule can't drift between the writer and the browser (laterite-dev#533). Streams
         // straight into `out`, so the writer's hot path stays allocation-free.
         laterite_ags4_types::write_quoted_field(out, c).map_err(|e| io_err(&e))?;
     }

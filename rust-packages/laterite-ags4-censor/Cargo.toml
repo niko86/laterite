@@ -1,10 +1,10 @@
-# The shared AGS4 anonymisation engine (#581). ONE copy of the scrub logic —
+# The shared AGS4 anonymisation engine (laterite-dev#581). ONE copy of the scrub logic —
 # the five actions (filehash / pseudonym / blank / token / brackets), the
 # two-pass per-heading pseudonym map, custom-group/column dropping and the
 # ABBR-of-sensitive tokenisation — extracted out of `ags4-corpus-qa`'s
 # `censor.rs` so the browser `Anonymiser` drives the SAME engine (via the
-# engine wasm) instead of hand-reimplementing it in TS. Part of the #527
-# cross-surface convergence arc, the sibling of the #533 tokenizer/quoter work.
+# engine wasm) instead of hand-reimplementing it in TS. Part of the laterite-dev#527
+# cross-surface convergence arc, the sibling of the laterite-dev#533 tokenizer/quoter work.
 #
 # A wasm-clean leaf by construction: it tokenizes via the shared parse leaf
 # (`tokenize_spans`), re-quotes via `laterite-ags4-types` (`quote_field`), and reads
@@ -22,14 +22,14 @@ publish = false
 
 [dependencies]
 # Tokenizing: the SAME offset-preserving `tokenize_spans` the browser display
-# path and the tokenizer wasm use (#533) — so the scrub reads fields through the
+# path and the tokenizer wasm use (laterite-dev#533) — so the scrub reads fields through the
 # one AGS4 line authority, not a private fourth tokenizer.
 laterite-ags4-parse = { path = "../laterite-ags4-parse" }
 # Standard group/heading codes for `drop_custom` — from the dictionary SSOT the
-# reference leaf owns (#475), not a re-embedded copy of ags_dictionary.json.
+# reference leaf owns (laterite-dev#475), not a re-embedded copy of ags_dictionary.json.
 laterite-ags4-reference = { path = "../laterite-ags4-reference" }
 # Canonical AGS4 field quoting for re-emitted (scrubbed / column-dropped) cells:
-# `quote_field` — the quoter authority (#528/#533 Decision C). Default features
+# `quote_field` — the quoter authority (laterite-dev#528/#533 Decision C). Default features
 # (arrow off) keep this leaf light + wasm-clean.
 laterite-ags4-types = { path = "../laterite-ags4-types" }
 serde = { version = "1", features = ["derive"] }

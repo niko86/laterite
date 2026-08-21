@@ -9,7 +9,7 @@
 // Together they close the loop. Change `HANDLERS` without regenerating the census and
 // this fails; let the census drift from the native binary and the python job fails.
 // Neither can be dodged by touching only one surface — which is exactly how `lat merge`
-// shipped in the binary (#494) and never arrived here, with every gate still green.
+// shipped in the binary (laterite-dev#494) and never arrived here, with every gate still green.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -116,7 +116,7 @@ describe("surface census: npx", () => {
     //     an unrecognised token is spliced to `validate` and treated as a FILENAME
     //     (`lat foo.ags` ≡ `lat validate foo.ags`). So a verb the CLI does not know
     //     announces itself as `error: <verb>: not found`. That exact string is the
-    //     tell, and it is what `merge` would have printed before #494 reached here.
+    //     tell, and it is what `merge` would have printed before laterite-dev#494 reached here.
     //
     //  2. THE DOOR IS THERE AND FALLS OVER. An uncaught throw prints a V8 stack trace
     //     — which is how `lat rules` was found crashing on this launcher (it iterated

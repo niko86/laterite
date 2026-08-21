@@ -223,7 +223,7 @@ export default defineConfig({
         // App-shell precache. `ags` pulls in the tiny sample files (offline
         // "load sample"); the two validator wasms are named in explicitly (the
         // `.wasm` extension is deliberately NOT in the glob above so the heavy
-        // DuckDB engine can't slip in). The tiny tokenizer wasm (#533) is
+        // DuckDB engine can't slip in). The tiny tokenizer wasm (laterite-dev#533) is
         // boot-critical — the app gates first render on it — so it MUST be
         // precached or the app never renders offline.
         globPatterns: [

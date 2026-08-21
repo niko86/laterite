@@ -78,7 +78,7 @@ def fix_dest(argv0: list[str], case: dict, repo_root: Path) -> dict:
 
     `created` + `exit` stay verbatim — the created NAME is the whole trigger for
     drift #3 (a filesystem side-effect no other gate compares) and it CAUGHT that
-    drift, so it is load-bearing and must not be replaced (#548). The addition is
+    drift, so it is load-bearing and must not be replaced (laterite-dev#548). The addition is
     `repaired`: the bytes `lat fix` — the one verb that REWRITES the user's data —
     actually wrote, which no cross-launcher check has ever compared. The output is
     deterministic (the fixture carries a fixed TRAN date, no wall-clock injection),
@@ -117,8 +117,8 @@ def fix_dest(argv0: list[str], case: dict, repo_root: Path) -> dict:
 
 
 def fix_json(argv0: list[str], case: dict, repo_root: Path) -> dict:
-    """`lat fix <name> --json` — the machine-readable repair report #545 gave the one
-    verb that REWRITES the user's data. Before #545 `fix` ACCEPTED the (global) `--json`
+    """`lat fix <name> --json` — the machine-readable repair report laterite-dev#545 gave the one
+    verb that REWRITES the user's data. Before laterite-dev#545 `fix` ACCEPTED the (global) `--json`
     but ignored it — a silent no-op that fell through to the human summary; now it emits
     `{file, dest, applied, residual}`, a report hand-synced across the three launchers
     (native serde_json, uvx json.dumps, npx JSON.stringify). Three hand-written copies of
@@ -171,7 +171,7 @@ def validate_json(argv0: list[str], case: dict, repo_root: Path) -> dict:
 
 def read_render(argv0: list[str], case: dict, repo_root: Path) -> dict:
     """`lat read <fixture> [GROUP] --json|--csv` — the read renderers, which
-    #530 family B converged onto core's `read_render` after they had been written
+    laterite-dev#530 family B converged onto core's `read_render` after they had been written
     three times in three languages with no gate over them at all.
 
     Captured as RAW BYTES, decoded strict UTF-8: what a launcher puts on stdout
@@ -194,9 +194,9 @@ def read_render(argv0: list[str], case: dict, repo_root: Path) -> dict:
 def rules_json(argv0: list[str], case: dict, repo_root: Path) -> dict:
     """`lat rules --json` — the rules catalogue, documented byte-identical to the
     Rust binary across all three launchers. Takes no fixture. This is the verb that
-    CRASHED on npx (#508: it iterated `{schema_version, rules: [...]}` as if it were
+    CRASHED on npx (laterite-dev#508: it iterated `{schema_version, rules: [...]}` as if it were
     an array, and only `--json`, the one path the tests then covered, worked). It had
-    no xcheck case at all until #555 — the exact 'a verb every launcher HAS but one
+    no xcheck case at all until laterite-dev#555 — the exact 'a verb every launcher HAS but one
     cannot RUN is invisible to a name-only diff' shape. Raw stdout + exit, so any
     drift (structure or formatting) is a split."""
     r = subprocess.run(
@@ -247,7 +247,7 @@ def diff_json(argv0: list[str], case: dict, repo_root: Path) -> dict:
 
 def merge_out(argv0: list[str], case: dict, repo_root: Path) -> dict:
     """`lat merge <files...> --out merged.ags` — the verb whose ABSENCE from npx
-    STARTED this arc (#494/#508) and still had no cross-surface output-value case.
+    STARTED this arc (laterite-dev#494/#508) and still had no cross-surface output-value case.
     Copy the inputs into a temp dir, merge to a sibling, and observe the merged
     BYTES (the AGS4 text) + exit. The merged content is deterministic — a synthesised
     TRAN carries the FIXED `1900-01-01` placeholder, not a wall-clock date, and no

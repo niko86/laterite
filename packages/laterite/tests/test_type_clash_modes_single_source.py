@@ -5,12 +5,12 @@
 nothing comparing the copies back: `_cli.py`'s `_CLASH_CHOICES` (the argparse choice
 list, load-bearing — it decides what the CLI accepts) sat one line below
 `_DICT_CHOICES`, which already asks the registry. A fourth mode added to the Rust
-enum would have reached the copy through no path. That is #549's Shape 1 (a hand-list
+enum would have reached the copy through no path. That is laterite-dev#549's Shape 1 (a hand-list
 believed complete, nothing comparing it to the promise) applied to a closed value set
-— the same shape as #550's fingerprint list and #557's rename.
+— the same shape as laterite-dev#550's fingerprint list and laterite-dev#557's rename.
 
 `registry_type_clash_modes()` now exposes `TypeClashMode::ALL` to Python, and
-`_CLASH_CHOICES` derives from it (#555 part 3). This file pins the *remaining*
+`_CLASH_CHOICES` derives from it (laterite-dev#555 part 3). This file pins the *remaining*
 copies that structurally cannot self-derive — the `Literal[...]` type alias needs
 literal arguments, so it can't consume a runtime function — to that one source. They
 pass trivially today; they are written for the day a mode is added, when the derived
@@ -18,7 +18,7 @@ list moves past a hand-list and the hand-list goes red.
 
 The TypeScript copies (`laterite-node/ts/index.ts`, `web/src/lib/validator.ts`) are
 the same shape one surface over; they are checked by the census value-set parity gate
-(#555 part 3b) rather than here, because this suite cannot reach them.
+(laterite-dev#555 part 3b) rather than here, because this suite cannot reach them.
 """
 
 from __future__ import annotations

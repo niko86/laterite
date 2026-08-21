@@ -31,7 +31,7 @@ binary is the authority, and every other launcher is diffed against it.
 The point is what a *value*-comparison gate structurally cannot reach. Feed one
 file through every surface and compare the outputs, and you still learn nothing
 about a verb one launcher never implemented: **a door that does not exist has no
-output to compare.** `lat merge` shipped in the binary (#494) and reached neither
+output to compare.** `lat merge` shipped in the binary (laterite-dev#494) and reached neither
 other launcher; every cross-surface gate stayed green, because each compared one
 hand-list against another hand-list and both were equally wrong. The census is the
 first thing that could see it — and it did, on its first run.
@@ -211,7 +211,7 @@ table above, and each one names a class:
   compares streams.
 
 Closing that class means comparing what the surfaces *produce*, not what they
-advertise. That gate has since landed: [[laterite-ags4-xcheck]] (#519-525) pushes a
+advertise. That gate has since landed: [[laterite-ags4-xcheck]] (laterite-dev#519-525) pushes a
 committed case manifest through every surface and compares the observed *values*, with
 the in-process Rust leaf as an authority column. See [[modality-register]] for the
 I/O-form axis the value gate does not cover.

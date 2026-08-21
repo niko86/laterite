@@ -13,9 +13,9 @@ sources: []
 # `.ags.idx` v2 — content-sealed certificates, world-live checks, one door
 
 > [!done] **Shipped — this is the model, not a plan.** PRs 1–7 of the rollout
-> landed as four PRs: **#512** (core format v2), **#513** (validator: engine
-> fingerprint + the WORLD module), **#514** (an unplanned sibling — the one-door
-> resolve+run, below), and **#515** (the `laterite-ags4-trust` crate + the migration
+> landed as four PRs: **laterite-dev#512** (core format v2), **laterite-dev#513** (validator: engine
+> fingerprint + the WORLD module), **laterite-dev#514** (an unplanned sibling — the one-door
+> resolve+run, below), and **laterite-dev#515** (the `laterite-ags4-trust` crate + the migration
 > of all four surfaces onto it, which could not be split further: the format change
 > deletes the predicates every surface calls, so the workspace does not compile until
 > they have all moved). This page is the durable record of the 31-agent adversarial
@@ -64,14 +64,14 @@ Let:
   identified by `EngineId = (validator, validator_version, engine_fingerprint, compat)`
   where `engine_fingerprint` is a **build-time SHA-256** (§4.4 of the source plan), not
   a hand-bumped semver. As shipped in PR 2 it hashed only the validator crate's own
-  rule sources + the two bundled dictionary JSON files; **#550** found that left three
+  rule sources + the two bundled dictionary JSON files; **laterite-dev#550** found that left three
   verdict-determining paths uncovered and widened it to hash every **in-workspace**
   crate the verdict is expressed through, discovered by walking `[dependencies]` path
   deps transitively (`repo:rust-packages/laterite-ags4-validator/build.rs`) — see
   residual 3 in §10.
 - **I** = the **content inputs**: every element of `CheckOptions` other than the bytes
   that can change a byte-pure verdict. Today: `edition` (`Auto{resolved}` |
-  `Forced{v}`), `encoding` (WHATWG label), and — since **#568** shipped the runtime
+  `Forced{v}`), `encoding` (WHATWG label), and — since **laterite-dev#568** shipped the runtime
   `--dict` overlay — `custom_dict` (`Option<CustomDictRef>`, `{name, hash}`). A custom
   dictionary is parsed once at the surface boundary into an owned, base-resolved
   `CustomDict` whose identity is a pure function of the dictionary itself, independent
@@ -181,7 +181,7 @@ Enforced three ways, in descending strength:
    build** (the exhaustive `split_options` destructure) and the author must classify
    it CONTENT / WORLD before it compiles. `custom_dict` — the deferred [[O-28]]
    external dictionary this section once named as the obvious untested case — landed
-   in **#568** and exercised exactly this defence: it classified CONTENT (its identity
+   in **laterite-dev#568** and exercised exactly this defence: it classified CONTENT (its identity
    is a pure function of the parsed dictionary, not the delivery file), so the
    destructure required no loosening to accommodate it. See [[dec-custom-dict-overlay]].
    A future WORLD-classified knob wires into `run_world`, which is never skipped.
@@ -353,8 +353,8 @@ Nine risks, none hidden:
    `rules/*.rs`*. Neither catches a rule that reaches external state through a helper
    crate. No effect system, no proof.
 3. **The engine fingerprint covers the validator's own source + data, and — since
-   #550 — every in-workspace crate the verdict is expressed through; it does not
-   cover external crates, the compiler, or `Cargo.lock`.** #550
+   laterite-dev#550 — every in-workspace crate the verdict is expressed through; it does not
+   cover external crates, the compiler, or `Cargo.lock`.** laterite-dev#550
    (`repo:rust-packages/laterite-ags4-validator/build.rs`) replaced the original
    hand-listed rule-source hash with a derivation that walks `[dependencies]` path
    deps transitively — dev-/build-deps are **not** followed, so
@@ -373,7 +373,7 @@ Nine risks, none hidden:
    unrelated `cargo update` — upstream churn nobody here controls — so external
    deps stay uncovered on purpose. That argument was a false dichotomy applied to
    **in-workspace** path deps, though: no `cargo update` ever touches them, they
-   move only when this repo edits them, and #550 closed exactly that gap for the
+   move only when this repo edits them, and laterite-dev#550 closed exactly that gap for the
    crates that actually decide a verdict.
 4. **`checked_at` still never expires.** A cert is trusted regardless of age; only
    bytes/engine/inputs invalidate it. Correct given (1)–(3) pin everything a CONTENT
@@ -400,9 +400,9 @@ Nine risks, none hidden:
 ## 8. Implementation plan (ordered; each step is its own PR)
 
 Tracking table — resume state for a future session. As of 2026-07-14: **PR 1** is merged
-(#512, `feat/cert-trust-v2-core`) with a **narrower shipped scope than first drafted
-here** — see its row; **PR 2** is merged (#513, `feat/cert-trust-v2-world`); an
-**unplanned PR** landed between them (#514, `fix/edition-guard-modality`) — the one-door
+(laterite-dev#512, `feat/cert-trust-v2-core`) with a **narrower shipped scope than first drafted
+here** — see its row; **PR 2** is merged (laterite-dev#513, `feat/cert-trust-v2-world`); an
+**unplanned PR** landed between them (laterite-dev#514, `fix/edition-guard-modality`) — the one-door
 resolve+run that fixed the bytes/text edition-guard drift, and the arc's first
 cross-surface **output-value** gate; and **PRs 3–7 ship together** in
 `feat/cert-trust-crate`, because they cannot ship apart: PR 3 changes the `.ags.idx`
@@ -414,8 +414,8 @@ remove. PRs 8–9 remain `todo`. Flip a row's status as its PR lands.
 
 | PR | Scope | Status |
 |---|---|---|
-| **PR 1** | **Core: locator honesty — multi-span `GroupIndex`, format v2.** **Re-scoped from the original plan (below) to just the byte-index fix; everything else this row used to list moved to PR 3.** `laterite-ags4-parse`: new `GroupRecord { code, byte_offset, line }` + `ParsedFile.group_records` — every occurrence of a GROUP, not the first-seen-wins dedup `groups`/`group_order` keep for the typed view. `rust-packages/laterite-ags4-core/src/index.rs`: `GroupIndex` now maps a code to a `Vec<Range>` (all spans), with `spans()` / `range()` (`None` for a redeclared group rather than guessing) / `is_unambiguous()`; `Sidecar.groups` is `HashMap<String, Vec<Range>>`; `SIDECAR_VERSION` bumped 1→2; `index_ags4_bytes` walks `group_records`. `laterite-py`: `Sidecar.index()` returns `{code: [(start, end), …]}`. Fixes bug 7 (redeclared-`GROUP` index truncation). **Deferred to PR 3** (where the trust crate is their only consumer, so they can be designed together with it): `TierCoverage`, `ContentInputs`, `EditionInput`, `EngineId`, `Decision`, `RevalidateReason`, `TrustPolicy`, `MintToken`, `Sidecar::decide`, private fields + accessors, deleting `check_files` from `ValidationStamp`. | open (#512) |
-| **PR 2** | **Validator: engine fingerprint + world module + loud pathless failure.** New `laterite-ags4-validator/build.rs` emits `LATERITE_ENGINE_FINGERPRINT` — a build-time SHA-256 (16 hex chars) over the rule sources (`src/rules/**`, `lib.rs`, `parse.rs`, `findings.rs`, `world.rs`, `catalogue.rs`) plus the two bundled reference-leaf JSON files — exposed as `pub const ENGINE_FINGERPRINT`; `sha2` is a **build-dependency only** (`lean_dep_graph` still passes, since it checks `-e normal`). Declared residual, in the `build.rs` header: a dependency bump that changes rule behaviour without touching those files is not caught — hashing the whole resolved dep tree was rejected as it would invalidate every cert on any unrelated `cargo update`. **Coverage later widened by #550** (residual 3 in §10, below): the hand-listed file set left three verdict-determining paths uncovered — `laterite-ags4-types` (owns `format_nsf`, which computes Rule 8's verdict), `laterite-ags4-parse` (the tokenizer deciding field boundaries), and `laterite-ags4-reference`'s `build.rs` (which *generates* the per-edition dictionary tables from the JSON that was hashed) — so editing any of them left a stale cert reading `Vouched`. #550 replaced the hand list with a derivation over `[dependencies]` path deps, walked transitively (dev-/build-deps excluded); the `cargo update` argument above still holds, but only for genuinely external deps, not in-workspace ones. New `src/world.rs`: `pub enum WorldScope { None, OnDisk(PathBuf) }` + `pub fn run` — houses `rule_20_on_disk`, moved out of `rules/references.rs` (with its 3 tests; `WorldScope` lives in the validator, not the not-yet-existing PR-3 trust crate, a deviation from §2 above). `rules::run_all` is now CONTENT-only and `pub(crate)` (lost its `source` param and the on-disk call — nothing outside the crate can reach the rule engine directly any more). New `pub fn check_parsed(parsed, dict, opts, world) -> Result<Findings, ValidatorError>` — **the one door**: refuses (`WorldCheckRequiresSource`, exit 5 — the bad-*arguments* code) when `check_files` is set and `world` is `None`, else runs CONTENT ∪ WORLD, the world call sitting outside any branch a future cert-skip could hide behind. All four out-of-crate `run_all` callers now go through it: `laterite-ags4-emit`, `laterite-py` (text+bytes), `laterite-node` (text+bytes), `laterite-ags4-wasm` (3 sites). Surface plumbing: `_errors.py`/`errors.ts` gain `WorldCheckRequiresSourceError`, `cli.ts` maps it to exit 5, `laterite-ags4-parity`/`laterite-ags4-corpus-qa` name it in their exhaustive matches. `lat` is unaffected (`check_file` always has a path). **Closes bug 2**, the headline: `check_files=true` on bytes/text — every non-`lat` surface, wasm always — silently reported Rule 20 clean; now refuses instead. | done |
+| **PR 1** | **Core: locator honesty — multi-span `GroupIndex`, format v2.** **Re-scoped from the original plan (below) to just the byte-index fix; everything else this row used to list moved to PR 3.** `laterite-ags4-parse`: new `GroupRecord { code, byte_offset, line }` + `ParsedFile.group_records` — every occurrence of a GROUP, not the first-seen-wins dedup `groups`/`group_order` keep for the typed view. `rust-packages/laterite-ags4-core/src/index.rs`: `GroupIndex` now maps a code to a `Vec<Range>` (all spans), with `spans()` / `range()` (`None` for a redeclared group rather than guessing) / `is_unambiguous()`; `Sidecar.groups` is `HashMap<String, Vec<Range>>`; `SIDECAR_VERSION` bumped 1→2; `index_ags4_bytes` walks `group_records`. `laterite-py`: `Sidecar.index()` returns `{code: [(start, end), …]}`. Fixes bug 7 (redeclared-`GROUP` index truncation). **Deferred to PR 3** (where the trust crate is their only consumer, so they can be designed together with it): `TierCoverage`, `ContentInputs`, `EditionInput`, `EngineId`, `Decision`, `RevalidateReason`, `TrustPolicy`, `MintToken`, `Sidecar::decide`, private fields + accessors, deleting `check_files` from `ValidationStamp`. | open (laterite-dev#512) |
+| **PR 2** | **Validator: engine fingerprint + world module + loud pathless failure.** New `laterite-ags4-validator/build.rs` emits `LATERITE_ENGINE_FINGERPRINT` — a build-time SHA-256 (16 hex chars) over the rule sources (`src/rules/**`, `lib.rs`, `parse.rs`, `findings.rs`, `world.rs`, `catalogue.rs`) plus the two bundled reference-leaf JSON files — exposed as `pub const ENGINE_FINGERPRINT`; `sha2` is a **build-dependency only** (`lean_dep_graph` still passes, since it checks `-e normal`). Declared residual, in the `build.rs` header: a dependency bump that changes rule behaviour without touching those files is not caught — hashing the whole resolved dep tree was rejected as it would invalidate every cert on any unrelated `cargo update`. **Coverage later widened by laterite-dev#550** (residual 3 in §10, below): the hand-listed file set left three verdict-determining paths uncovered — `laterite-ags4-types` (owns `format_nsf`, which computes Rule 8's verdict), `laterite-ags4-parse` (the tokenizer deciding field boundaries), and `laterite-ags4-reference`'s `build.rs` (which *generates* the per-edition dictionary tables from the JSON that was hashed) — so editing any of them left a stale cert reading `Vouched`. laterite-dev#550 replaced the hand list with a derivation over `[dependencies]` path deps, walked transitively (dev-/build-deps excluded); the `cargo update` argument above still holds, but only for genuinely external deps, not in-workspace ones. New `src/world.rs`: `pub enum WorldScope { None, OnDisk(PathBuf) }` + `pub fn run` — houses `rule_20_on_disk`, moved out of `rules/references.rs` (with its 3 tests; `WorldScope` lives in the validator, not the not-yet-existing PR-3 trust crate, a deviation from §2 above). `rules::run_all` is now CONTENT-only and `pub(crate)` (lost its `source` param and the on-disk call — nothing outside the crate can reach the rule engine directly any more). New `pub fn check_parsed(parsed, dict, opts, world) -> Result<Findings, ValidatorError>` — **the one door**: refuses (`WorldCheckRequiresSource`, exit 5 — the bad-*arguments* code) when `check_files` is set and `world` is `None`, else runs CONTENT ∪ WORLD, the world call sitting outside any branch a future cert-skip could hide behind. All four out-of-crate `run_all` callers now go through it: `laterite-ags4-emit`, `laterite-py` (text+bytes), `laterite-node` (text+bytes), `laterite-ags4-wasm` (3 sites). Surface plumbing: `_errors.py`/`errors.ts` gain `WorldCheckRequiresSourceError`, `cli.ts` maps it to exit 5, `laterite-ags4-parity`/`laterite-ags4-corpus-qa` name it in their exhaustive matches. `lat` is unaffected (`check_file` always has a path). **Closes bug 2**, the headline: `check_files=true` on bytes/text — every non-`lat` surface, wasm always — silently reported Rule 20 clean; now refuses instead. | done |
 | **PR 3** | **The trust crate.** New `laterite-ags4-trust`: `Request`, `DictRequest`, `Outcome`, `CheckedRun`, `split_options` (exhaustive destructure), `check()`, `mint()`, `engine_id()` — plus the `TierCoverage`/`ContentInputs`/`EditionInput`/`EngineId`/`Decision`/`RevalidateReason`/`TrustPolicy`/`MintToken`/`Sidecar::decide` work re-scoped out of PR 1 (its row). `WorldScope` is **re-exported from the validator** (PR 2 defined it there, not here — see §2's note). `mint` forces both tiers, refuses iff `errors > 0`. `check` = `decide()` → (vouched ? empty : engine) ∪ `run_world` (unconditional). **As shipped:** `TrustPolicy` and `MintToken` proved unnecessary — `Question` (what is being asked) + `EngineId` (who is asking) carry everything `decide` needs, and the mint takes no verdict to token-guard. **`ContentInputs` was ALSO collapsed into `Question`, and that was a mistake**: `edition` came across and `encoding` did not, which is the sixth false clean (§2a — caught before merge, fixed in the same PR, gated at three levels). The lesson is in §2a; the correction here is that this row once read "`ContentInputs` … proved unnecessary", and a future reader should see what that sentence cost. `MintError` (validate / not-certifiable / not-indexable) is its own type: squeezing "cannot certify: 3 errors" into `ValidatorError::NotAgs4` produced the sentence *"not a parseable AGS4 file: cannot certify…"* about a file that parsed perfectly. | done (with PRs 4–7) |
 | **PR 4** | **`lat`.** `repo:rust-packages/laterite-cli/src/commands/cert.rs`: delete `try_certified_skip`/`mint_index`/`report_certified_skip`; `commands/certify.rs`/`commands/validate.rs` build a `Request` and call `trust::{mint, check}`. `--check-files` on a stdin/bytes input now errors loudly. **As shipped:** `report_certified_skip` was KEPT (a certified run must say the engine was skipped, and say that a `--check-files` half still ran); `--check-files` was **removed from `certify`** on all three launchers — a certificate is a statement about bytes, and the directory beside them is not one. | done |
 | **PR 5** | **`laterite-py`.** Remove `PySidecar::assemble` and its `warnings=0, fyi=0` defaults; add `trust_check`/`trust_mint` natives. `repo:packages/laterite/python/laterite/__init__.py`: delete the skip conjunction, `Report.from_cert`, `_mint_cert`, `_require_clean_validation`, `_last_check_files`, `_last_forced`; `certify()` now runs a fresh full-tier check. **`repo:packages/laterite/python/laterite/_cli.py`: delete its own `is_valid` certify gate** (bug 8, the fifth site). **As shipped:** `Report.resolution` no longer carries `"certified"` as a value — it says which dictionary judged the file, and the new `Report.certified` says whether the engine ran. One field, one question. | done |

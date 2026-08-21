@@ -51,7 +51,7 @@ So the dict-extraction was abandoned. The inversion is the real underlying item.
 
 ## What was done (2026-07-11)
 
-The cut was simpler than the options first framed. #473 had already emptied `CliError`
+The cut was simpler than the options first framed. laterite-dev#473 had already emptied `CliError`
 of its CLI/ags5 baggage — it is now just `FileNotFound` + `Schema`, a near-native data
 error — so relocating it (the old **Option B**, a new `laterite-cli-error` crate)
 became unnecessary. Since `write_ags4`'s sole caller is `laterite-ags4-excel`, the whole
@@ -76,12 +76,12 @@ wants it — the read-only DuckDB extension ([[dec-duckdb-extension]]) — still
 deps `validator` for the dictionary, so it needs the **dictionary-leaf extraction**
 too before it slims (see the dead-end section above: dict-extraction is the part that
 hits a package cycle). This cut was the half that was clean; the dictionary-leaf
-extraction (#475) is the half that followed: **PR1** (#488) moved the union registry
-out of `core`, and **PR2** (#492) moved the rest — the per-edition `phf` projection and
+extraction (laterite-dev#475) is the half that followed: **PR1** (laterite-dev#488) moved the union registry
+out of `core`, and **PR2** (laterite-dev#492) moved the rest — the per-edition `phf` projection and
 the rules catalogue out of the validator, plus the bundled JSON data itself — into
 [[laterite-ags4-reference]], which now carries everything the DuckDB extension needs.
 The **repoint** itself — pointing the extension and `laterite-ags4-diff` at the leaf
-instead of the whole validator — is half done: #475's in-tree follow-up (#493)
+instead of the whole validator — is half done: laterite-dev#475's in-tree follow-up (laterite-dev#493)
 repointed `laterite-ags4-diff` (it only ever used `Dictionary`/`DictVersion`, never
 the rule engine) and, while there, also repointed [[laterite-py]]'s `build.rs` onto
 the leaf's `union_groups()`, retiring a third independent reader of the union JSON.

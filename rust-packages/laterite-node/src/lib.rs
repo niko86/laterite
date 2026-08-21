@@ -428,12 +428,12 @@ impl ValidationReport {
 // (`laterite_ags4_validator::findings`), re-exported here at the old private
 // path so the call sites below are unchanged. This module used to carry a copy
 // "ported verbatim from laterite-py's findings_ndjson" — the third of three
-// hand-copies of one format (#530). `lat validate --json`, laterite-py's report
+// hand-copies of one format (laterite-dev#530). `lat validate --json`, laterite-py's report
 // JSON and this binding now all come out of the same function.
 use laterite_ags4_validator::findings::{findings_json, findings_ndjson};
 
 /// Parse the `--dict` custom-dictionary override for a node call, mirroring the CLI's
-/// `apply_dict_args` and laterite-py's helper (#568). The dict arrives as a filesystem
+/// `apply_dict_args` and laterite-py's helper (laterite-dev#568). The dict arrives as a filesystem
 /// path OR raw bytes; the base edition is detected structurally from the dict itself
 /// unless `over` forces it (`dictVersion`) or `dict_replace` drops it. `enc` is the
 /// caller's already-resolved source encoding — the same one it hands `CheckOptions`.
@@ -448,7 +448,7 @@ fn build_custom_dict(
     enc: &'static encoding_rs::Encoding,
 ) -> std::result::Result<Option<overlay::CustomDict>, (i32, &'static str, String)> {
     // Where the bytes come from, and the advisory name the cert records (basename for a
-    // path, a neutral label for in-memory bytes — never a filesystem path, #568 §4).
+    // path, a neutral label for in-memory bytes — never a filesystem path, laterite-dev#568 §4).
     let (bytes, name): (Vec<u8>, String) = if let Some(p) = dict_path {
         let b = std::fs::read(Path::new(p))
             .map_err(|e| (5, "bad_dict", format!("cannot read dict {p}: {e}")))?;
@@ -582,7 +582,7 @@ pub fn run_check(
     warnings_as_errors: Option<bool>,
     check_files: Option<bool>,
     encoding: Option<String>,
-    // The custom `--dict` overlay (#568): a path OR raw bytes, plus `dictReplace` to drop
+    // The custom `--dict` overlay (laterite-dev#568): a path OR raw bytes, plus `dictReplace` to drop
     // the base. Same currency every surface shares.
     dict_path: Option<String>,
     dict_bytes: Option<Uint8Array>,
@@ -898,7 +898,7 @@ pub fn merge(
         // throw in the SEP form the TS `fromNativeError` maps to MergeConflictError.
         // UnitConflict rides the same channel: it is a schema-level rejection too,
         // and the message carries the distinction (no mode absorbs a unit clash —
-        // #501). Grouped rather than split because the TS side has one
+        // laterite-dev#501). Grouped rather than split because the TS side has one
         // MergeConflictError, and its `.message` is what a caller reads.
         Err(
             e @ (MergeError::TypeConflict { .. }
@@ -949,7 +949,7 @@ pub fn read_groups_raw(path: String, recover_duplicate_headings: Option<bool>) -
 /// writer. `ts/cli.ts` used to build this with `JSON.stringify(x, null, 2)`
 /// while the binary used `serde_json` and Python used `json.dumps` — three
 /// different JSON libraries kept byte-identical by hand-discipline, with no gate
-/// on `read` output (#530).
+/// on `read` output (laterite-dev#530).
 #[napi]
 #[must_use]
 #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
@@ -1026,7 +1026,7 @@ impl Sidecar {
                 encoding.unwrap_or_default()
             ))
         })?;
-        // The cert records WHICH custom dictionary judged the file (#568, O-48): a mint
+        // The cert records WHICH custom dictionary judged the file (laterite-dev#568, O-48): a mint
         // against a `--dict` overlay stamps its {name, hash}, and a later read naming a
         // different dict revalidates rather than inheriting a stale verdict.
         let custom_dict = build_custom_dict(
@@ -1662,7 +1662,7 @@ pub fn editions() -> Vec<String> {
 /// laterite-ags4-merge. Exposed so the JS launcher does not keep a hand-written
 /// copy — it had two (the census `values` for `merge --on-type-clash`, and the
 /// unknown-mode error message in `cli.ts`), and a fourth mode added to the enum
-/// would have reached neither (#555).
+/// would have reached neither (laterite-dev#555).
 #[napi]
 #[must_use]
 pub fn type_clash_modes() -> Vec<String> {
@@ -1689,7 +1689,7 @@ pub fn fallback_edition() -> String {
 /// (`registry_fns.rs::registry_ancestor_chain`). Node used to re-walk `.parent`
 /// pointers in TypeScript (`ts/registry.ts`), a hand-kept-in-sync copy of that
 /// logic; routing through the binding removes it so the tree can't drift from the
-/// leaf (#532, #527).
+/// leaf (laterite-dev#532, laterite-dev#527).
 #[napi]
 #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn registry_ancestor_chain(code: String) -> Result<Vec<String>> {
@@ -1710,8 +1710,8 @@ pub fn registry_ancestor_chain(code: String) -> Result<Vec<String>> {
 ///
 /// The intersection is `laterite_ags4_core::registry::inherited_key_names`, the
 /// same leaf function the Python wheel binds; Node used to re-implement the
-/// KEY-intersection logic in TypeScript. Deleting that copy is the point of #532
-/// (part of the #527 leaf-convergence arc).
+/// KEY-intersection logic in TypeScript. Deleting that copy is the point of laterite-dev#532
+/// (part of the laterite-dev#527 leaf-convergence arc).
 #[napi]
 #[allow(clippy::needless_pass_by_value)] // napi boundary: owns the deserialized input
 pub fn registry_inherited_key_names(code: String) -> Result<Vec<String>> {

@@ -10,7 +10,7 @@ import {
 } from "./agsline";
 
 // Runs in the WASM lane (vitest.wasm.config.ts): splitAgsFields/quoteAgsField
-// are now backed by the tiny tokenizer wasm (#533), init'd from disk in the
+// are now backed by the tiny tokenizer wasm (laterite-dev#533), init'd from disk in the
 // lane's setup file. The tokenizer's invariants are pinned AUTHORITATIVELY in
 // Rust (laterite-ags4-parse's `display_spans.rs` proptest); the checks below
 // double as a cross-check that the wasm boundary hands JS the right shape

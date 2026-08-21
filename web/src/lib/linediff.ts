@@ -18,7 +18,7 @@
 // noUncheckedIndexedAccess TypeScript still types those reads `T | undefined`;
 // the assertion is the honest expression of a hand-verified invariant, and
 // narrowing each read would add branches to correct, test-pinned hot loops for
-// zero runtime benefit — so no-non-null-assertion is disabled file-wide (#615).
+// zero runtime benefit — so no-non-null-assertion is disabled file-wide (laterite-dev#615).
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 export type DiffType = "eq" | "del" | "ins";

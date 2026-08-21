@@ -107,7 +107,7 @@ jobs:
       # and `excel` — which the always-on worker runs and the service worker
       # precaches; the full engine for the lazily-created second worker (Explore
       # and Tools → Excel), `globIgnore`d out of that precache; and the ~30 KB
-      # tokenizer (#533) the main thread instantiates, needed before typecheck,
+      # tokenizer (laterite-dev#533) the main thread instantiates, needed before typecheck,
       # which reads its generated .d.ts (App.tsx → tokenizer.ts).
       - name: Build wasm (release) — tier 1, tier 2, tokenizer
         working-directory: web
@@ -130,7 +130,7 @@ jobs:
         working-directory: web
         run: npm run typecheck
 
-      - name: Tokenizer wasm — size gate + wasm test lane (#533)
+      - name: Tokenizer wasm — size gate + wasm test lane (laterite-dev#533)
         # Prove the tokenizer wasm stayed tiny (a heavy dep creeping in would
         # balloon it), then run the tokenizer-dependent vitest lane (agsline
         # display helpers + fix-preview geometry) against the real wasm — these

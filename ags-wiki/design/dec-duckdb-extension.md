@@ -85,7 +85,7 @@ isn't verified here; the extension crate lives in the external
 `niko86/laterite-duckdb` repo, not this workspace.)* Distribution is via
 DuckDB **Community Extensions**, **not** the PyPI/npm mirror — so this
 never enters the wheel-weight split ([[crate-map]]). The community-side
-0.7.0 wasm release (PR #2197) is **pending the DuckDB maintainers' merge**
+0.7.0 wasm release (PR duckdb/community-extensions#2197) is **pending the DuckDB maintainers' merge**
 as of this writing — the migration itself is done and repo-side wasm
 builds green, but the public wasm *publish* is not yet live.
 
@@ -176,7 +176,7 @@ opt-in `read(content_hash=…)` or Node's opt-in `{contentHash}` — because
 `read_ags` is a SQL query surface with no clean-default-frame promise to
 protect; a caller who wants it gone drops it with `SELECT * EXCLUDE
 (_content_hash)`. This **completes** the #448 `_content_hash` cross-surface
-rollout (Python #499/#536, Node #537, wasm #538, now the extension) — every
+rollout (Python laterite-dev#499/#536, Node laterite-dev#537, wasm laterite-dev#538, now the extension) — every
 read surface carries it. See [[dec-ags4-merge-semantics]] for the
 TYPE-canonicalised hash semantics themselves (`0.002` == `0.00200` under a
 `2DP` column).
@@ -396,7 +396,7 @@ single-source stay in the monorepo).
   applies — `validate_ags` was removed in the 0.7.0 read-only rework.) <!-- retired: validate_ags -->
 - **P4 Community-Extension packaging** — **shipped.** `niko86/laterite-duckdb`
   exists (its own PR-tier `ci.yml`), and the `duckdb/community-extensions` PR
-  (#2079) is live at `v0.4.1`; releases go out via `scripts/release.sh`. Its
+  (duckdb/community-extensions#2079) is live at `v0.4.1`; releases go out via `scripts/release.sh`. Its
   **release is now automated + unified onto the laterite version (#372):**
   `scripts/release.sh <version>` takes the version as a **required arg** (it
   tracks the laterite release number), and a tag-driven `.github/workflows/release.yml`
@@ -411,9 +411,9 @@ single-source stay in the monorepo).
   community CI's binaryen rejected; the `duckdb` crate's rustc 1.86 floor
   avoids it), so the extension now builds all three wasm variants
   (`wasm_mvp`/`wasm_eh`/`wasm_threads`). The repo-side migration + wasm
-  builds are done; the **community-side 0.7.0 wasm publish (PR #2197) is
+  builds are done; the **community-side 0.7.0 wasm publish (PR duckdb/community-extensions#2197) is
   still pending the DuckDB maintainers' merge** as of this writing — the
-  `#2079`/`v0.4.1` community-PR reference above predates this and likely
+  `duckdb/community-extensions#2079`/`v0.4.1` community-PR reference above predates this and likely
   needs its own re-check (not verified in this pass). musl status unverified.
 
 ## Diagram

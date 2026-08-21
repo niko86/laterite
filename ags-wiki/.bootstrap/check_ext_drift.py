@@ -59,7 +59,7 @@ def collect_ext_refs(allowlist: set[str]) -> set[tuple[str, str | None]]:
             continue
         # log.md is append-only HISTORY: an entry narrating a past drift (e.g.
         # "found ext:…/test-duckdb-ext.sh 404s") spells the very ref it reports
-        # dead, so scanning it re-flags the drift FOREVER (#495) — the citation
+        # dead, so scanning it re-flags the drift FOREVER (laterite-dev#495) — the citation
         # isn't a live claim, it's the record of finding it gone. Exempt it, the
         # same treatment lint.py gives log.md's dead repo: refs. Live pages, where
         # a citation IS a standing claim, are still scanned.

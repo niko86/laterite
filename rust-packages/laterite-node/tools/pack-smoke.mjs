@@ -51,7 +51,7 @@ const required = [
   // The `lat` console script (`bin: { lat: "./bin.mjs" }`) and the CLI module it
   // imports `main()` from. `npm install laterite` puts `lat` on PATH via bin.mjs,
   // so a tarball that ships the library but drops these publishes a broken `lat`
-  // — a gap the library-only smoke below never saw (#554).
+  // — a gap the library-only smoke below never saw (laterite-dev#554).
   "bin.mjs",
   "dist/cli.mjs",
 ];
@@ -122,7 +122,7 @@ try {
   // 5 — spawn the packed `lat` console script. `bin.mjs` imports `main()` from
   // `dist/cli.mjs`; running it end-to-end (through the dropped-in native `.node`)
   // proves the [bin] entry point resolves and runs from the tarball — a DIFFERENT
-  // resolution path than the library `import`/`require` above (#554: the console
+  // resolution path than the library `import`/`require` above (laterite-dev#554: the console
   // script rots while the library gate stays green).
   writeFileSync(join(root, "_cli-fixture.ags"), ags);
   const cliOut = run(

@@ -67,8 +67,8 @@ refuses to trust from an older-schema launcher — a stale-but-answering
 drift", which is a real failure mode it was built to catch (a release
 binary one commit old did exactly that).
 
-> [!done] **Closed 2026-07-17 (#529, the web remainder of #509, part of the
-> #527 convergence arc).** The web app doesn't front `lat` at all, so the
+> [!done] **Closed 2026-07-17 (laterite-dev#529, the web remainder of laterite-dev#509, part of the
+> laterite-dev#527 convergence arc).** The web app doesn't front `lat` at all, so the
 > census could never reach it — but the same hand-copy risk existed one
 > layer up: the five editions were hand-listed in **four** TS files
 > (`web/src/lib/settings.ts`'s `DICTS`, `validator.ts`'s `DictVersionOpt`

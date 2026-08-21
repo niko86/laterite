@@ -1,14 +1,14 @@
 //! Stage F2b-1+: typed-graph codegen.
 //!
 //! Consumes `laterite_ags4_reference::union::union_groups()` — the SAME union
-//! reconstruction the registry/DDL use (#475) — and emits one `#[pyclass]`
+//! reconstruction the registry/DDL use (laterite-dev#475) — and emits one `#[pyclass]`
 //! struct per AGS group into `$OUT_DIR/typed_groups.rs`. The `typed_graph::groups`
 //! module `include!`s the generated file.
 //!
 //! This used to be a third independent reader of `ags_dictionary.json`
 //! (alongside the reference leaf's own registry and `tools/generate_pyi.py`);
 //! going through the leaf's API instead means there's exactly one place that
-//! turns the on-disk JSON into the group/heading/parent shape (#475 follow-up).
+//! turns the on-disk JSON into the group/heading/parent shape (laterite-dev#475 follow-up).
 //!
 //! Why include! over a proc-macro: see
 //! [[dec-rust-typed-graph]] — the generated file is mechanically

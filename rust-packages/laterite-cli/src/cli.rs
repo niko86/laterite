@@ -3,7 +3,7 @@
 //! Follows the workspace CLI lineage (`ags4-forge` / `ags4-corpus-qa`): `--quiet`
 //! is the one **global** flag, results to **stdout**, progress to **stderr**, typed
 //! exit codes in `after_help`. Each verb owns its flags, so a flag can't reach a
-//! verb it doesn't belong to — which is the whole point of #545: `--json`/`--ndjson`
+//! verb it doesn't belong to — which is the whole point of laterite-dev#545: `--json`/`--ndjson`
 //! are declared **per-verb, only on the verbs that produce a report**, so a verb
 //! that can't render JSON (`certify`, the transport verbs, …) rejects the flag
 //! structurally instead of accepting it and silently rendering a table. They used to
@@ -171,7 +171,7 @@ pub struct DictArgs {
     /// 4.0.3 | 4.0.4 | 4.1 | 4.1.1 | 4.2. With `--dict`, selects the overlay BASE.
     #[arg(long, value_name = "V")]
     pub dict_version: Option<String>,
-    /// Custom dictionary override (#568): an `.ags` or JSON dictionary layered over
+    /// Custom dictionary override (laterite-dev#568): an `.ags` or JSON dictionary layered over
     /// a base edition detected from the dictionary itself. Overrides of standard
     /// definitions are honoured with a warning.
     #[arg(long, value_name = "PATH")]

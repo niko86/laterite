@@ -44,7 +44,7 @@ See [[rule-08-typed-values]] · [[parity-model]].
 > `i64` on both validators — but the separate string→number CONVERSION of
 > that cell diverged: laterite's pre-#611 `f as i64` silently saturated an
 > out-of-range value to a fabricated `i64::MAX`, where python-ags4's
-> `int(float(s))` keeps full precision. #611's `parse_ags_integer` range-
+> `int(float(s))` keeps full precision. laterite-dev#611's `parse_ags_integer` range-
 > guards the conversion to Null instead. See [[O-50]] /
 > [[0dp-integer-conversion-precision-loss]].
 

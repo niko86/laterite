@@ -77,7 +77,7 @@ pub fn apply_dict_args(mut opts: CheckOptions, d: &DictArgs) -> CheckOptions {
         // With `--dict`, `--dict-version` (already folded into `opts.dict_version`
         // above) selects the OVERLAY BASE rather than a bundled edition;
         // `--dict-replace` drops the base entirely; otherwise the base is detected
-        // structurally from the dictionary itself (#568 §2).
+        // structurally from the dictionary itself (laterite-dev#568 §2).
         let base = if d.dict_replace {
             overlay::BaseSpec::Replace
         } else if let Some(v) = opts.dict_version {
@@ -85,7 +85,7 @@ pub fn apply_dict_args(mut opts: CheckOptions, d: &DictArgs) -> CheckOptions {
         } else {
             overlay::BaseSpec::Auto
         };
-        // Advisory label for the cert — the basename, never the path (#568 §4).
+        // Advisory label for the cert — the basename, never the path (laterite-dev#568 §4).
         let name = p
             .file_name()
             .and_then(|s| s.to_str())

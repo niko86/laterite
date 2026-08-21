@@ -5,7 +5,7 @@
 //! Runs once per build. Output is `include!`d by `src/dict.rs`, so this leaf
 //! (and every consumer of its `dict` module — the validator, wasm, node)
 //! pays zero startup cost and never parses the dictionary at runtime. Moved
-//! here from `laterite-ags4-validator/build.rs` (#475 PR2) so a consumer that
+//! here from `laterite-ags4-validator/build.rs` (laterite-dev#475 PR2) so a consumer that
 //! only wants the compiled dictionary needn't depend on the whole rule engine.
 //!
 //! SINGLE SOURCE OF TRUTH: the union JSON is the one machine-readable form of the
@@ -117,7 +117,7 @@ fn main() {
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR set by cargo");
     let dest = Path::new(&out_dir).join("dict_data.rs");
 
-    // The union JSON now lives in this leaf's own data/ (#475 PR2 relocated it
+    // The union JSON now lives in this leaf's own data/ (laterite-dev#475 PR2 relocated it
     // out of laterite-ags4-core).
     let manifest = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR set by cargo");
     let union_path = Path::new(&manifest).join("data/ags_dictionary.json");

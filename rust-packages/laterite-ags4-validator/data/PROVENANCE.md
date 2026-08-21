@@ -71,7 +71,7 @@ This note exists so the provenance and the decision are explicit and
 auditable.
 
 <!-- dict-fallback-claim -->
-**The stated fallback now exists (#568).** If AGS objects to the bundled
+**The stated fallback now exists (laterite-dev#568).** If AGS objects to the bundled
 dictionary, the retreat is the runtime `--dict` custom-dictionary override:
 ship no bundled copy and require the user to supply their own
 freely-downloaded dictionary (or an entirely bespoke one) at validation time.

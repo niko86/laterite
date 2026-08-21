@@ -52,7 +52,7 @@ fn main() {
         }
     };
 
-    // `--json`/`--ndjson` are per-verb now (#545): a verb that renders JSON declares
+    // `--json`/`--ndjson` are per-verb now (laterite-dev#545): a verb that renders JSON declares
     // them, one that can't never sees the flag. Only `--quiet` remains global.
     let quiet = cli.quiet;
     match &cli.command {
@@ -84,7 +84,7 @@ fn main() {
 /// (`--json`/`--ndjson`/`--quiet`), so a run of them can be skipped without
 /// consuming a value.
 ///
-/// Since #545 moved `--json`/`--ndjson` off the global scope onto each verb, the
+/// Since laterite-dev#545 moved `--json`/`--ndjson` off the global scope onto each verb, the
 /// splice inserts `validate` at the **front** (not before the file), so a leading
 /// `lat --json foo.ags` becomes `lat validate --json foo.ags` — the flag now lands
 /// *after* the subcommand that declares it, where clap can parse it. (Before, with

@@ -1,5 +1,5 @@
 # `laterite-ags4-tokenizer-wasm` — the browser's AGS4 line tokenizer + field
-# quoter, as a DEDICATED tiny wasm module (#533, part of the #527 arc).
+# quoter, as a DEDICATED tiny wasm module (laterite-dev#533, part of the laterite-dev#527 arc).
 #
 # The browser used to carry its own hand-written tokenizer/quoter
 # (`web/src/lib/agsline.ts`). This crate retires that copy: it compiles the

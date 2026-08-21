@@ -1,5 +1,5 @@
 //! The browser's AGS4 line tokenizer + field quoter, as a tiny wasm module
-//! (#533). Two thin `#[wasm_bindgen]` wrappers over the shared Rust leaves so
+//! (laterite-dev#533). Two thin `#[wasm_bindgen]` wrappers over the shared Rust leaves so
 //! the browser drives off the same authority as every other surface:
 //!   - [`tokenize_spans`] wraps `laterite_ags4_parse::scan::scan_line`;
 //!   - [`quote_field`] wraps `laterite_ags4_types::quote_field`.

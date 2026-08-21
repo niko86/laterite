@@ -1,4 +1,4 @@
-//! Runtime `.ags` DICT-group reader for the `--dict` override (#568 Phase 2).
+//! Runtime `.ags` DICT-group reader for the `--dict` override (laterite-dev#568 Phase 2).
 //!
 //! The bundled dictionaries are compiled from `ags_dictionary.json` at build
 //! time; this is the FIRST place we read an AGS4 DICT group at *runtime*, so a

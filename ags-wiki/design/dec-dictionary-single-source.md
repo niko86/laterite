@@ -18,7 +18,7 @@ The AGS4 standard dictionary has one **origin**: the five official
 `Standard_dictionary_v4_*.ags` files (4.0.3 → 4.2), vendored at
 `repo:rust-packages/laterite-ags4-validator/data` (provenance: python-ags4
 1.2.0; see that crate's `PROVENANCE.md`; that claim went unchecked until
-**#558** — see [[vendored-authority-faithful]]). (Earlier, pre-registry dictionary
+**laterite-dev#558** — see [[vendored-authority-faithful]]). (Earlier, pre-registry dictionary
 population used ad hoc scaffolder scripts (dev satellite) to infer/merge
 entries from sample files instead of one canonical converter — not
 production code, but the predecessor this decision's single-converter
@@ -60,18 +60,18 @@ phases:
   workspace-relative path to the sibling core crate) and projects each edition
   into the **same** `phf` tables — the [[laterite-ags4-wasm]] `dictionary()`
   export follows for free. The five `.ags` stay put as `gen_dictionary.py`'s
-  input; `build.rs` no longer reads them. (Since relocated: #475 PR2 moved
+  input; `build.rs` no longer reads them. (Since relocated: laterite-dev#475 PR2 moved
   this `build.rs` + projection, and the JSON itself, into the dedicated
   [[laterite-ags4-reference]] leaf — the validator re-exports the result and,
   at the time, no longer had a `build.rs` of its own. It regained one in the
   unrelated `cert-trust-v2` arc's PR 2 (2026-07-14) for a build-time
   `ENGINE_FINGERPRINT` hash over the rule sources — at the time nothing to do
-  with the dictionary projection described here, though **#550** (2026-07-16)
+  with the dictionary projection described here, though **laterite-dev#550** (2026-07-16)
   later widened that hash to also cover the reference leaf's own `build.rs` —
   i.e. the code that *generates* the phf tables this decision describes, not
   just the JSON it reads — because a change to that projection code changes a
   verdict without changing the fingerprint otherwise. See [[cert-trust-v2]].)
-- **#475 follow-ups (#493).** The reference leaf's extraction (PR1/PR2) closed
+- **laterite-dev#475 follow-ups (laterite-dev#493).** The reference leaf's extraction (PR1/PR2) closed
   two of the workspace's three independent Rust readers of `ags_dictionary.json`
   (the validator's `phf` projection and [[laterite-ags4-core]]'s registry both
   now resolve through it). The third — [[laterite-py]]'s `build.rs`, which
@@ -114,13 +114,13 @@ doesn't use them (it checks each heading's own declared unit/type).
   via `CARGO_MANIFEST_DIR`). Safe: the validator is `publish = false` (workspace-
   only), and the maturin sdist vendors path-dep crates as siblings — verified by
   building + installing the sdist in isolation. (This cross-crate `include_str!`
-  reach was itself later removed: #475 PR2 relocated the JSON into the reference
+  reach was itself later removed: laterite-dev#475 PR2 relocated the JSON into the reference
   leaf's own `data/`, so `build.rs` now reads its own crate's data.)
 - The validator gains a `serde_json` build-dependency (replacing `csv`).
 - **Effective dictionary unchanged** — [[effective-dictionary]] (standard ∪ the
   file's DICT group) is about validation-time merge, independent of how the
   standard half is sourced.
-- **The origin's own faithfulness was unguarded until #558.**
+- **The origin's own faithfulness was unguarded until laterite-dev#558.**
   `test_dictionary_faithful.py` proves the union is a faithful *render* of
   the five `.ags` files; it never proved — and by construction cannot
   prove — that the five files themselves are faithful to the source

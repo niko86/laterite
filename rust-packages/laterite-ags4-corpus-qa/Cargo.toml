@@ -49,7 +49,7 @@ laterite-ags4-parity = { path = "../laterite-ags4-parity" }
 # `OutputMode` ValueEnum derive for the global `--output` flag. Pulls
 # comfy-table/indicatif transitively (so they're no longer named here).
 laterite-cliutil = { path = "../laterite-cliutil", features = ["clap"] }
-# The shared AGS4 scrub engine (#581): `censor` + Policy/CensorOptions/Tally.
+# The shared AGS4 scrub engine (laterite-dev#581): `censor` + Policy/CensorOptions/Tally.
 # The anonymisation logic itself moved here out of this crate's src/censor.rs so
 # the browser Anonymiser drives the SAME engine — this crate is now just the
 # crawler/manifest wrapper around it.

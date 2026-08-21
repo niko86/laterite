@@ -145,7 +145,7 @@ laterite-ags4-diff = { path = "../laterite-ags4-diff", optional = true }
 # recency, widen-to-X). Wasm-safe: it pulls only parse + emit + reference, all
 # already here — the same leaf PyO3 + Node + the CLI reuse.
 laterite-ags4-merge = { path = "../laterite-ags4-merge", optional = true }
-# `censor()` — the shared AGS4 scrub engine (#581) behind the browser
+# `censor()` — the shared AGS4 scrub engine (laterite-dev#581) behind the browser
 # Anonymiser, the SAME engine the corpus `censor` tool drives. Wasm-safe: it
 # pulls only parse + reference + types, all already here. The leaf takes a
 # precomputed content hash (file_id), so this wrapper hashes the bytes itself

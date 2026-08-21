@@ -48,13 +48,13 @@ gather→check→cross-check), plus two added 2026-06-21:
   + their orphaned `DICT`/`ABBR` definitions, and applies any `--redact`
   keyword. Writes hash-named files + a source-stripped manifest (a
   drop-in for `validate`/`baseline`). The SSOT is registered in
-  [[data-single-source-audit]]. **The scrub engine itself moved out (#581,
+  [[data-single-source-audit]]. **The scrub engine itself moved out (laterite-dev#581,
   2026-07-18)** into the shared `laterite-ags4-censor` leaf — this
   subcommand (`repo:rust-packages/laterite-ags4-corpus-qa/src/censor.rs`) is now just
   the crawler/manifest wrapper: resolve the SSOT into a `Policy`, run each
   manifest entry through the leaf's `censor()` in parallel, name outputs by
   source hash. **The browser `Anonymiser` now drives the same leaf too**
-  (#581 Phase 2, 2026-07-18) via a `censor` export on the engine wasm
+  (laterite-dev#581 Phase 2, 2026-07-18) via a `censor` export on the engine wasm
   ([[laterite-ags4-wasm]]) — the two tools are independent callers of one
   engine, not two implementations. See [[crate-map]] ·
   [[dec-ags4-censor-leaf]].

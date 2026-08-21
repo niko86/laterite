@@ -1,4 +1,4 @@
-"""The vendored AGS4 dictionaries must still equal the source they claim (#558).
+"""The vendored AGS4 dictionaries must still equal the source they claim (laterite-dev#558).
 
 `rust-packages/laterite-ags4-validator/data/PROVENANCE.md` makes a precise,
 falsifiable claim: the five `Standard_dictionary_v4_*.ags` were
@@ -16,7 +16,7 @@ generator and asserts the committed union still equals the projection — so it
 proves the union is faithful to *whatever the files currently say*, not that the
 files are faithful to their stated source. Hand-edit a `.ags` and regenerate and
 every gate goes green: the derivation is guarded, the authority it derives from is
-not. That is #549's Shape 1 at the root of the dictionary — the gate enforces a
+not. That is laterite-dev#549's Shape 1 at the root of the dictionary — the gate enforces a
 PROXY (the projection) for the promise (this is the AGS standard's dictionary),
 and nothing compares proxy back to promise.
 

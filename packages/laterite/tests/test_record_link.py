@@ -1,4 +1,4 @@
-"""`RL` (Record Link) is TEXT, not a number (#503).
+"""`RL` (Record Link) is TEXT, not a number (laterite-dev#503).
 
 An RL cell is a delimited reference — `GROUP|KEY1|KEY2`, split on `TRAN_DLIM`
 (AGS Rule 11). `canonical_type("RL")` returned `decimal`, so `sql_type` was

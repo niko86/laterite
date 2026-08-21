@@ -16,7 +16,7 @@
 #                                declared types). Depending on the reference
 #                                leaf directly (not the validator) means diff
 #                                pulls in dictionary data only, not the rule
-#                                engine (#475 follow-up).
+#                                engine (laterite-dev#475 follow-up).
 #   - laterite-ags4-types           — parse_value, the canonical cast that makes the
 #                                cell comparison type-aware ("1.0" == "1.00").
 # All three are already dependencies of `laterite-ags4-wasm`, so repointing it

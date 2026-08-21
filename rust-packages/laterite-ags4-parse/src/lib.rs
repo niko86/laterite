@@ -890,7 +890,7 @@ pub fn field_span(line: &str, field_index: u32) -> Option<(u32, u32)> {
         }
     }
 }
-// --- offset-preserving field tokenizer (#533) -----------------------
+// --- offset-preserving field tokenizer (laterite-dev#533) -----------------------
 //
 // RETIRED 2026-07-24. `AgsSpan` + `tokenize_spans` were a third hand-written
 // implementation of the AGS4 line grammar; `scan::RawField` is a strict

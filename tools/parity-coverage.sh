@@ -24,7 +24,7 @@ SIBLING="$REPO_ROOT/../ags-python-library"
 PY_AGS4_VERSION="${PYTHON_AGS4_VERSION:-1.2.0}"
 # The floor is 121, not 122: O-47 made test_rule_6_2 a CORRECT divergence and
 # lowered it. parity.yml was updated at the time; this default was not, and
-# nor was any published claim (#556). The SET is now the contract —
+# nor was any published claim (laterite-dev#556). The SET is now the contract —
 # parity-known-failures.json + tools/check_parity.py; this stays a count only
 # because this script is a local coverage helper, not the gate.
 PARITY_MIN="${PARITY_MIN_PASSING:-121}"

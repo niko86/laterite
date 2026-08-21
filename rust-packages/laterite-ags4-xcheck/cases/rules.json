@@ -6,7 +6,7 @@
       "op": "rules_json",
       "input": {},
       "legs": ["cli-native", "cli-uvx", "cli-npx"],
-      "spec_ref": "`lat rules --json` emits the numbered-rules catalogue (`{schema_version, rules:[...]}`), documented byte-identical to the Rust binary on every launcher (README-cli.md). It is the verb that CRASHED on npx (#508 — the JS launcher iterated the object as an array; only `--json`, the path then tested, worked) and had NO cross-surface case until #555 part 2. A verb every launcher advertises but one cannot run is invisible to a name-only census diff; this pins the whole render + exit code equal across the three."
+      "spec_ref": "`lat rules --json` emits the numbered-rules catalogue (`{schema_version, rules:[...]}`), documented byte-identical to the Rust binary on every launcher (README-cli.md). It is the verb that CRASHED on npx (laterite-dev#508 — the JS launcher iterated the object as an array; only `--json`, the path then tested, worked) and had NO cross-surface case until laterite-dev#555 part 2. A verb every launcher advertises but one cannot run is invisible to a name-only census diff; this pins the whole render + exit code equal across the three."
     }
   ]
 }

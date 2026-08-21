@@ -8,7 +8,7 @@ import { Card } from "../Card";
 import { toAgs4 } from "../../lib/validatorClient";
 import { downloadBlob } from "../../lib/download";
 import type { EmitMode, ExportResult } from "../../lib/validator";
-import { EDITIONS, type Edition } from "../../lib/editions"; // generated SSOT (#529)
+import { EDITIONS, type Edition } from "../../lib/editions"; // generated SSOT (laterite-dev#529)
 const MODES: { id: EmitMode; label: string }[] = [
   { id: "autofix", label: "AutoFix — apply safe fixes" },
   { id: "report", label: "Report — emit as-is + findings" },

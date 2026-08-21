@@ -139,7 +139,7 @@ Bool, DT → Timestamp(µs), ID/X → Utf8). Engine crates reused unchanged:
   `ags_dictionary.json`; 92 was the pre-#173/AGS5-only count).
 
 **`registry`'s tree walks are now native, not re-implemented (2026-07-17,
-#532, part of the #527 leaf-convergence arc).** `ts/registry.ts`'s
+laterite-dev#532, part of the laterite-dev#527 leaf-convergence arc).** `ts/registry.ts`'s
 `ancestorChain`/`inheritedKeyNames` used to walk `.parent` pointers and
 KEY-intersect against the direct parent in TypeScript — a hand-kept-in-sync
 copy of `laterite_ags4_core::registry::{ancestor_chain, inherited_key_names}`,
@@ -162,7 +162,7 @@ TS implementation: `ancestorChain("SAMP") = ["SAMP","LOCA","PROJ"]`;
 `inheritedKeyNames("SAMP") = {"LOCA_ID"}`. See
 `repo:rust-packages/laterite-node/test/p3-registry.test.ts` and
 [[data-single-source-audit]] (the #181 audit's "relationship logic
-reimplemented per surface... logic-duplication only, no action" call — #532
+reimplemented per surface... logic-duplication only, no action" call — laterite-dev#532
 closes that for these two walks on this surface).
 
 ## Why Arrow-direct (no DuckDB by default)

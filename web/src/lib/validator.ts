@@ -99,7 +99,7 @@ export type FixRisk = Fix["risk"];
 // trip through the worker (the only wasm owner) and so are async there.
 
 // The selectable dictionary version — single-sourced onto the generated editions
-// module (#529). It was a hand-typed union kept in lockstep by hand with three
+// module (laterite-dev#529). It was a hand-typed union kept in lockstep by hand with three
 // other web copies + the dictionary; re-exported here so its many importers
 // (Controls, ExportPane, validatorClient, settings, …) are unchanged.
 export type { DictVersionOpt } from "./editions";

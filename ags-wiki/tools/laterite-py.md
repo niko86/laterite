@@ -67,7 +67,7 @@ surfaces — `merge_files` in `src/lib.rs` is the new 2026-07-12 addition, see
 `build.rs`'s typed-graph codegen, below). Built **only via maturin** (`maturin develop` /
 `maturin build`), never a bare `cargo build`; the cdylib loads in Python
 as `laterite._laterite_native`. Its `build.rs` also emits the typed-graph
-`#[pyclass]` codegen — since #475's follow-up (#493) it does so via
+`#[pyclass]` codegen — since laterite-dev#475's follow-up (laterite-dev#493) it does so via
 [[laterite-ags4-reference]]'s `union::union_groups()` as a build-dependency,
 not by hand-parsing `ags_dictionary.json` itself. That retired the workspace's
 **third** independent reader of the union JSON (the reference leaf's own

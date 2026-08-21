@@ -28,7 +28,7 @@ sources: []
 > post-#330 and post-#342; [[dec-engine-tiering]] splits what the browser
 > actually loads into four tiers, of which this full build is the heaviest) —
 > `validate`/`parse`/`diff`/`merge`/`to_ags4`, run in a Web Worker. Since
-> #533 (part of the #527 convergence arc) the browser also loads a SEPARATE,
+> laterite-dev#533 (part of the laterite-dev#527 convergence arc) the browser also loads a SEPARATE,
 > deliberately tiny sibling — `laterite-ags4-tokenizer-wasm` (~30 KB / ~13 KB
 > gzipped) — instantiated once on the **main thread** at boot, purely for the
 > inline line editor/preview's synchronous tokenize/quote calls

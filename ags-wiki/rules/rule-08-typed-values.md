@@ -37,7 +37,7 @@ Value vs declared UNIT/TYPE. Structural per-char matcher + chrono semantic check
 
 The `n` in a parametric TYPE (`nDP`/`nSF`/`nSCI`) is read straight off the file's TYPE row with no upper bound and feeds a format width when this rule renders a value to its expected form — a crafted count was an OOM/DoS on both validators, hardened by a clamp; see [[O-49]] / [[numeric-type-count-uncapped-format-width]].
 
-A separate, narrower issue lives one step further along the same `0DP` path: Rule 8's strict grammar check (`is_ndp(s, 0)`) already flags an out-of-range/fractional integer cell on both validators, but the *conversion* of that cell to a number diverged — laterite's pre-#611 `f as i64` saturated to a fabricated `i64::MAX` where python-ags4's `int(float(s))` preserves full precision. #611 range-guards the conversion to Null instead; see [[O-50]] / [[0dp-integer-conversion-precision-loss]].
+A separate, narrower issue lives one step further along the same `0DP` path: Rule 8's strict grammar check (`is_ndp(s, 0)`) already flags an out-of-range/fractional integer cell on both validators, but the *conversion* of that cell to a number diverged — laterite's pre-#611 `f as i64` saturated to a fabricated `i64::MAX` where python-ags4's `int(float(s))` preserves full precision. laterite-dev#611 range-guards the conversion to Null instead; see [[O-50]] / [[0dp-integer-conversion-precision-loss]].
 
 *Clean-room: rule logic derived from the spec; python-ags4 (LGPL) read only for behavioural parity, never copied (see the module header).*
 

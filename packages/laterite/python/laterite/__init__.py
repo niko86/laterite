@@ -142,7 +142,7 @@ def _looks_like_ags_text(s: str) -> bool:
 def _split_dict(
     dictionary: str | os.PathLike[str] | bytes | bytearray | memoryview | None,
 ) -> tuple[str | None, bytes | None]:
-    """Normalise a ``dictionary=`` custom-dict override (#568) to the
+    """Normalise a ``dictionary=`` custom-dict override (laterite-dev#568) to the
     ``(dict_path, dict_bytes)`` pair the native call takes. A str/PathLike is a
     filesystem path; raw bytes are the in-memory spelling (the portable one — wasm
     has no FS). ``None`` in ⇒ ``(None, None)`` (no override)."""
@@ -551,7 +551,7 @@ class Ags4File:
         # mints a cert for the edition you actually validated against. NOT a trust claim —
         # the mint re-validates; this only says which dictionary to re-validate with.
         self._last_dict_version: Edition | None = None
-        # Same provenance for a `--dict` custom overlay (#568): the dictionary the last
+        # Same provenance for a `--dict` custom overlay (laterite-dev#568): the dictionary the last
         # `.validate()` overlaid and whether it replaced the base, so a following
         # `.certify()` mints against the same effective dictionary (and stamps its
         # {name, hash}) rather than flagging the file's bespoke groups as unknown.
@@ -860,7 +860,7 @@ class Ags4File:
         [`WorldCheckRequiresSourceError`][laterite.WorldCheckRequiresSourceError] rather
         than reporting Rule 20 clean.
 
-        ``dictionary=`` overlays a custom AGS4 dictionary (#568) — a path or the raw
+        ``dictionary=`` overlays a custom AGS4 dictionary (laterite-dev#568) — a path or the raw
         ``.ags``/JSON bytes of one — so a bespoke group hung off a standard one validates
         as first-class rather than being flagged unknown. The base edition is detected from
         the dictionary itself; ``dict_version=`` forces it, or ``dict_replace=True`` drops
@@ -944,7 +944,7 @@ class Ags4File:
         Pass ``dict_version=`` to certify against a forced edition; by default it uses the
         edition of the last [`validate`][laterite.validate] on this handle (or auto-resolves
         from ``TRAN_AGS``). ``dictionary=`` / ``dict_replace=`` certify against a custom
-        ``--dict`` overlay (#568) and stamp its identity into the cert, so a later
+        ``--dict`` overlay (laterite-dev#568) and stamp its identity into the cert, so a later
         ``read(index=...)`` that names a different dictionary revalidates rather than
         inheriting a stale verdict; both default to the last ``validate`` on this handle.
         A later ``read(..., index=...)`` consumes the cert.
@@ -1510,7 +1510,7 @@ def validate(
             ignored for ``text=``). Set it for legacy ``cp1252`` / ``latin1``
             deliveries so extended-ASCII cells decode correctly rather than
             surfacing as Rule 1 findings.
-        dictionary: A custom AGS4 dictionary to overlay (#568) — a path or the raw
+        dictionary: A custom AGS4 dictionary to overlay (laterite-dev#568) — a path or the raw
             ``.ags``/JSON bytes of one — so a bespoke group (or a re-parented or
             overridden standard heading) validates as first-class instead of being
             flagged unknown. The base edition is detected from the dictionary itself

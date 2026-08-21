@@ -1,4 +1,4 @@
-"""#568 Phase 7 — the PROVENANCE `--dict` fallback claim, enforced BOTH ways.
+"""laterite-dev#568 Phase 7 — the PROVENANCE `--dict` fallback claim, enforced BOTH ways.
 
 `rust-packages/laterite-ags4-validator/data/PROVENANCE.md` states the licence
 retreat from the bundled ©AGS dictionary: a consumer who cannot rely on the
@@ -6,7 +6,7 @@ embedded copy can supply their own at validation time via the runtime `--dict`
 custom-dictionary override. That claim was once FALSE — the flag parsed the file
 and then *refused* (`external --dict override is not implemented`, O-28) — while a
 sibling document asserted the capability was available, and nothing compared the
-two. #568 made it real across all four surfaces.
+two. laterite-dev#568 made it real across all four surfaces.
 
 This gate is the missing comparison, a two-way pin so the claim cannot silently
 un-become true again:
@@ -52,7 +52,7 @@ def test_provenance_states_the_dict_fallback_exists() -> None:
     )
     assert "--dict" in text and "now exists" in text, (
         "PROVENANCE.md must state the runtime --dict custom-dictionary fallback now "
-        "exists (#568); the licence risk position rests on it"
+        "exists (laterite-dev#568); the licence risk position rests on it"
     )
 
 
@@ -63,7 +63,7 @@ def _lat_validate(*args: str) -> int:
     in-process uvx launcher (`laterite._cli.main`, the same engine + the same
     `--dict` codepath) so the claim is pinned even where the Rust binary is not
     built. It deliberately never *skips*: a claim with no test that runs is exactly
-    the gap #568 closed.
+    the gap laterite-dev#568 closed.
     """
     for prof in ("release", "debug"):
         native = _REPO / "rust-packages" / "target" / prof / "lat"
@@ -88,7 +88,7 @@ def test_lat_validate_dict_does_not_refuse() -> None:
     rc = _lat_validate("--dict", str(_DICT), str(_DELIVERY))
     assert rc != _BAD_DICT_EXIT, (
         f"`lat validate --dict` exited {_BAD_DICT_EXIT} (BadDict) — the custom-"
-        f"dictionary fallback PROVENANCE.md promises has regressed (O-28 / #568)"
+        f"dictionary fallback PROVENANCE.md promises has regressed (O-28 / laterite-dev#568)"
     )
 
 

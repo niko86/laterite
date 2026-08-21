@@ -40,7 +40,7 @@ import {
 // dumps these keys, and `main` dispatches through them, so the npx launcher cannot
 // advertise a verb it does not run, or run one it does not advertise.
 //
-// `merge` is the verb this table LOST: it shipped in the native binary (#494) and
+// `merge` is the verb this table LOST: it shipped in the native binary (laterite-dev#494) and
 // never arrived here, and no gate noticed — see tools/gen_census.py, which now
 // diffs these keys against clap's and fails if one launcher is missing a door.
 //
@@ -57,7 +57,7 @@ import {
 //     cp1252 file was decoded as UTF-8 and the findings blamed the file.
 //   * `--dict <custom.ags>` was accepted and IGNORED, so a user's project dictionary
 //     was quietly dropped, the file was checked against the bundled one, and the tool
-//     said "clean". `--dict` is now a real custom-dictionary overlay (#568), honoured
+//     said "clean". `--dict` is now a real custom-dictionary overlay (laterite-dev#568), honoured
 //     on every surface — an `.ags`/JSON dictionary layered over a base edition, with
 //     `--dict-replace` for a full replacement.
 interface Spec {
@@ -89,7 +89,7 @@ function flagValueSets(): Record<string, readonly string[]> {
 }
 
 /** Accepted on every verb (a boolean). Mirrors clap's one remaining global arg —
- *  `--json`/`--ndjson` moved onto the report-producing verbs in #545, so a verb that
+ *  `--json`/`--ndjson` moved onto the report-producing verbs in laterite-dev#545, so a verb that
  *  can't render JSON rejects the flag (via `rejectUnknownFlags`) instead of ignoring it. */
 const GLOBAL_FLAGS = ["quiet"] as const;
 
@@ -267,7 +267,7 @@ export function census(): unknown {
             takes_value: (SPECS[verb]?.valued ?? []).includes(f),
             // The closed value set this flag accepts, where it has one. Empty
             // otherwise — matching the other launchers, which report `[]` for a
-            // free-form or boolean flag. This is what #555 part 3b added: before,
+            // free-form or boolean flag. This is what laterite-dev#555 part 3b added: before,
             // the census had no per-arg value column, so a launcher accepting a
             // DIFFERENT set of `--on-type-clash` modes was invisible to the diff.
             values: [...(valueSets[f] ?? [])].sort(),
@@ -447,7 +447,7 @@ function emit(body: string, out: string | undefined): void {
 // → core's single writers), not here. This file used to hand-port RFC-4180
 // quoting and build the JSON with `JSON.stringify(x, null, 2)` while the binary
 // used serde_json and Python used json.dumps — three libraries held
-// byte-identical by discipline, with no gate on `read` output (#530).
+// byte-identical by discipline, with no gate on `read` output (laterite-dev#530).
 
 function runRead(p: Parsed, json: boolean): number {
   const file = p.positionals[0];
@@ -644,7 +644,7 @@ function runFix(p: Parsed, json: boolean): number {
   if (!file) fail("fix needs a file", 5);
   if (!existsSync(file)) fail(`${file}: not found`, 3);
   // Native `fixFile` directly (not the library `fix()`): the `--dict` custom overlay
-  // (#568) is a CLI flag, not a public `FixOptions` knob — mirrors the uvx launcher,
+  // (laterite-dev#568) is a CLI flag, not a public `FixOptions` knob — mirrors the uvx launcher,
   // which likewise reaches `_native.fix_file(dict_path=…)` past the library `fix()`.
   const r = fixFile(
     file,
@@ -667,7 +667,7 @@ function runFix(p: Parsed, json: boolean): number {
     : (str(p.flags["fix-out"]) ?? siblingFixedPath(file));
   result.save(dest);
   const residual = result.findings.length;
-  // --json: the machine-readable report replaces the human note (#545). Same shape
+  // --json: the machine-readable report replaces the human note (laterite-dev#545). Same shape
   // and key order as the native `lat fix --json` / uvx — `applied` is the native
   // `fixFile` `{kind, label, rule, line, risk}` ledger; `residual` is the count.
   // (`risky_available` is human-only: `FixReport` has no risky-count to mirror.)
@@ -760,7 +760,7 @@ function runMerge(p: Parsed, json: boolean): number {
   // Reject an unknown mode instead of letting it fall through as `undefined` (which
   // would silently mean "error" — a typo'd `--on-type-clash promot` would then refuse
   // the merge and look like a real type clash). The accepted set and the message are
-  // BOTH the engine's `TypeClashMode::ALL` (#555) — this was two hand-typed copies of
+  // BOTH the engine's `TypeClashMode::ALL` (laterite-dev#555) — this was two hand-typed copies of
   // the modes, which a fourth mode would have reached through neither.
   const modes = typeClashModes();
   if (!modes.includes(clash)) {

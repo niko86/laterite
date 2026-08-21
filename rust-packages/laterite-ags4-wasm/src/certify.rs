@@ -86,7 +86,7 @@ extern "C" {
 /// the stamp no longer has a field in which to say otherwise.
 ///
 /// `dict_bytes` / `dict_replace` mint the certificate against a custom dictionary
-/// (#568), the same overlay `validate` accepts: the stamp records the dict's
+/// (laterite-dev#568), the same overlay `validate` accepts: the stamp records the dict's
 /// `{name, hash}` so a later `validate --index` on any surface re-validates (never
 /// silently vouches) when the effective dictionary differs (O-48, record-not-contract).
 ///

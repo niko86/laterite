@@ -24,7 +24,7 @@ use laterite_ags4_validator::findings::count_by_rule;
 use laterite_ags4_validator::{CheckOptions, check_file};
 use serde::Serialize;
 
-/// One floor finding as the comparator's 4-laterite check compares it (#555
+/// One floor finding as the comparator's 4-laterite check compares it (laterite-dev#555
 /// part 1) — rule label + the WHERE (`line`/`group`/`field_index`) and WHAT
 /// (`desc`). Field names + order match `laterite-ags4-compliance`'s `FindingTuple`.
 #[derive(Serialize)]
@@ -45,7 +45,7 @@ struct Fixture {
     /// input; kept for that comparison and back-compat).
     rules: Vec<String>,
     /// The `"AGS Format Rule N"` floor as full TUPLES — what the 4-laterite
-    /// identity check actually compares (#555 part 1).
+    /// identity check actually compares (laterite-dev#555 part 1).
     findings: Vec<FindingTuple>,
     /// The `"FYI …"` labels (compared only among the FYI-capable surfaces).
     fyi: Vec<String>,

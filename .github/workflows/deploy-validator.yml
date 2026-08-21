@@ -34,11 +34,11 @@ on:
       - "rust-packages/laterite-ags4-wasm/**"
       - "rust-packages/laterite-ags4-validator/**"
       - "rust-packages/laterite-ags4-types/**"
-      # The tiny main-thread tokenizer wasm (#533) + its other leaf source
+      # The tiny main-thread tokenizer wasm (laterite-dev#533) + its other leaf source
       # (parse; types already listed above).
       - "rust-packages/laterite-ags4-tokenizer-wasm/**"
       - "rust-packages/laterite-ags4-parse/**"
-      # The shared scrub engine (#581) — the engine wasm's `censor()` export
+      # The shared scrub engine (laterite-dev#581) — the engine wasm's `censor()` export
       # drives the browser Anonymiser off it.
       - "rust-packages/laterite-ags4-censor/**"
       - ".github/workflows/deploy-validator.yml"
@@ -108,7 +108,7 @@ jobs:
       # and `excel` — is precached and answers Validate, Fix, Export
       # and every tool but Excel. TIER 2 is the full build, fetched only when
       # Explore or Tools → Excel is opened and kept OUT of the precache. Plus the
-      # ~30 KB tokenizer (#533) the main thread instantiates.
+      # ~30 KB tokenizer (laterite-dev#533) the main thread instantiates.
       #
       # `--out-name ags4_wasm_full` (in the npm script) is what keeps the two
       # engines apart: both wasm-pack runs emit `ags4_wasm_bg.wasm` by default,

@@ -141,16 +141,16 @@ serde_json = { version = "1", features = ["preserve_order"] }
 # datetime/date/time objects.
 chrono = "0.4"
 # Already compiled transitively via laterite-ags4-parse; named as a DIRECT dep so the
-# `--dict` overlay helper (#568) can spell `&'static encoding_rs::Encoding` and resolve the
+# `--dict` overlay helper (laterite-dev#568) can spell `&'static encoding_rs::Encoding` and resolve the
 # source encoding once, in the caller, instead of re-resolving the label inside. A direct
 # dep costs nothing at build/link time (the crate is already in the tree) — it just lets
-# this crate name a type it now legitimately uses. (Revived from the reliquary in #568.)
+# this crate name a type it now legitimately uses. (Revived from the reliquary in laterite-dev#568.)
 encoding_rs = "0.8"
 
 # Used only by build.rs (Stage F2b-1 typed-graph codegen): consumes the
 # reference leaf's `union` module (union_groups()) to emit OUT_DIR/typed_groups.rs
 # — the same union reconstruction the registry/DDL use, so this is no longer a
-# third independent reader of ags_dictionary.json (#475 follow-up). No direct
+# third independent reader of ags_dictionary.json (laterite-dev#475 follow-up). No direct
 # JSON parsing here any more, so serde_json is no longer a build-dependency.
 [build-dependencies]
 laterite-ags4-reference = { path = "../laterite-ags4-reference" }

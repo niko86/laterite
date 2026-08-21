@@ -4,7 +4,7 @@
 //! `release/v0.1.0-prep`. This crate holds the modules that don't need DuckDB:
 //!
 //! - [`registry`] — re-exports the AGS4 multi-edition dictionary union
-//!   (`laterite-ags4-reference::union`, moved out in #475) + group-tree
+//!   (`laterite-ags4-reference::union`, moved out in laterite-dev#475) + group-tree
 //!   descriptors.
 //! - [`ags_types`] — canonical type system (ID, X, 1DP, 2DP, PA, …)
 //!   + value parsing/formatting.
@@ -31,7 +31,7 @@ pub mod keychain;
 // The `lat read` output formats. Lives beside the read codec that produces the
 // rows: every surface (the `lat` binary, laterite-py, laterite-node) renders
 // `read --json` / `--csv` through these, instead of each hand-writing its own
-// CSV quoter and reaching for its own JSON library (#530).
+// CSV quoter and reaching for its own JSON library (laterite-dev#530).
 pub mod read_render;
 pub mod registry;
 // `transport` (pack/unpack/lock/unlock) is behind the default-on `transport`

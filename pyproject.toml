@@ -96,7 +96,7 @@ dev = [
     "pyrage>=1.2",
     # Used only by tools/make-white-bg.py (one-off brand-asset flattening,
     # not imported by anything shipped). Declared here (rather than pulled
-    # ephemerally via `--with`) so the widened ty scope (lever 7 of #585,
+    # ephemerally via `--with`) so the widened ty scope (lever 7 of laterite-dev#585,
     # tools/ + tests/) can resolve the import instead of flagging it.
     "pillow>=11",
 ]
@@ -261,7 +261,7 @@ ignore = [
 
 # --- Type-faithfulness gate (#303 Phase 1) --------------------------------
 # Astral `ty` (preview). Originally scoped to the SHIPPED `laterite` package
-# only; widened (lever 7 of #585) to also cover the repo's own `tools/` +
+# only; widened (lever 7 of laterite-dev#585) to also cover the repo's own `tools/` +
 # `tests/` — a generator/tool bug (undeclared dep, lying annotation) is worth
 # catching too, and ruff's checks (unused imports/vars) don't type-check
 # return values the way `ty` does. Resolves polars/duckdb + the generated

@@ -1,4 +1,4 @@
-"""`--dict` custom-dictionary overlay (#568) on the Python surface.
+"""`--dict` custom-dictionary overlay (laterite-dev#568) on the Python surface.
 
 The overlay lets a delivery carry a bespoke group (here `XTRA`, hung off the standard
 `SAMP`) and still validate as first-class, instead of being flagged unknown. These tests
