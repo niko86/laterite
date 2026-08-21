@@ -173,7 +173,7 @@ _NOT_SCANNED = frozenset(
 #: Seed list, extendable — same posture as lint.py's A2 retired terms. "nightly"
 #: is deliberately absent: it is both a cadence and the name of a workflow in
 #: this repo, so it cannot be scanned as one without meaning the other.
-_CADENCE_WORDS = ("daily", "weekly", "monthly", "per-PR")
+_CADENCE_WORDS = ("daily", "weekly", "monthly", "per-PR", "on-demand")
 _WORD_RES = {
     w: re.compile(rf"(?<![\w-]){re.escape(w)}(?![\w-])", re.I) for w in _CADENCE_WORDS
 }
@@ -223,6 +223,14 @@ def cadence_of(form: str, value: str) -> str:
         if value == "pull_request":
             return "per-PR"
         raise CadenceError(f"no cadence word for trigger {value!r}")
+    # A workflow with a manual trigger and NO cron. Still a claim worth
+    # mirroring: "it runs when someone runs it" is what the prose says, and
+    # without a record for it the tripwire stops watching the workflow — a
+    # sentence could then put a cron back in prose that no cron backs.
+    if form == "manual":
+        if value == "workflow_dispatch":
+            return "on-demand"
+        raise CadenceError(f"no cadence word for manual {value!r}")
     if form != "cron":
         raise CadenceError(f"unknown authority form {form!r}")
 
@@ -517,12 +525,13 @@ def test_no_cadence_claim_goes_unannotated() -> None:
         ("cron", "0 4 * * *", "daily"),
         ("cron", "17 6 * * *", "daily"),
         ("trigger", "pull_request", "per-PR"),
+        ("manual", "workflow_dispatch", "on-demand"),
     ],
 )
 def test_cadence_of_classifies_every_cron_in_use(
     form: str, value: str, expected: str
 ) -> None:
-    """The seven crons across both repos, plus the one trigger form mirrored."""
+    """The crons across both repos, plus the trigger and manual forms mirrored."""
     assert cadence_of(form, value) == expected
 
 
@@ -537,7 +546,7 @@ def test_the_mirrors_own_claims_are_reconcilable_in_shape() -> None:
     records = json.loads(_MIRROR.read_text("utf-8"))["authorities"]
     assert records, "an empty mirror is not a pass"
     for rec in records:
-        assert rec["form"] in {"cron", "trigger"}, rec["id"]
+        assert rec["form"] in {"cron", "trigger", "manual"}, rec["id"]
         assert rec["repo"] == "niko86/laterite-dev", (
             f"{rec['id']}: records only reconcile where a far-side job runs; "
             f"adding a repo means adding that job first"

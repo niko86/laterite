@@ -75,13 +75,13 @@ Key facts:
     local build, and which one ran is printed rather than assumed. Per-PR the `.sql`
     files are include-checked only (`--strict` + `check_paths`); **nightly's
     `docs-vs-released-duckdb`** runs them against the published extension, and a
-    local-build twin of this file runs monthly in the dev satellite's
+    local-build twin of this file runs on-demand in the dev satellite's
     `compliance-report.yml`. Fail-soft only where the failure is not about the docs:
     ABI drift in local-build mode is a visible skip, and so is "the community
     repository has no build for this DuckDB yet" — a broken snippet is red either
     way. `_`-prefixed files (`_install.sql`) are
-    include-only boilerplate. That "monthly" is a claim about another repo's
-    cron, and [[stated-cadences-faithful]] is what holds it to it.
+    include-only boilerplate. That cadence is a claim about another repo's
+    workflow, and [[stated-cadences-faithful]] is what holds it to it.
     <!-- cadence: ci --><!-- cadence: compliance-report -->
   Browser tabs are **prose** (the web app has no user-facing code API).
 - **A Python example is `uv run`-able on its own** — all 18, plus the marimo tour.
@@ -354,7 +354,8 @@ Key facts:
     sit in the `node` filter so Node-snippet edits re-run the vitest gate. The
     wasm tree has its own per-PR leg in the `web` job — `gen_doc_outputs.py
     --check --surface wasm` — on `web/**` + `rust-packages/**`. The duckdb
-    gate's per-PR leg is include-check only (runtime is monthly, above).
+    gate's per-PR leg is include-check only (runtime is nightly + on-demand,
+    above).
 - **Deploy.** The mkdocs build in
   `repo:.github/workflows/deploy-validator.yml` deploys the docs to the public
   Pages site (`/laterite/docs/`). The build is deliberately **non-strict** — a

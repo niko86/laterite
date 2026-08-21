@@ -123,7 +123,7 @@ class Surface:
     #: argv for an example, given its path. `lat` resolves at call time.
     argv: Callable[[Path], list[str]]
     #: Included in a default run. duckdb is not: its examples need the built
-    #: DuckDB extension, which the dev satellite gates monthly, off the PR path.
+    #: DuckDB extension, which the dev satellite gates on-demand, off the PR path.
     #: cadence: compliance-report
     default: bool = True
     requires: str = ""

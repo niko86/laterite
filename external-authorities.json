@@ -30,8 +30,8 @@
       "kind": "cadence",
       "repo": "niko86/laterite-dev",
       "path": ".github/workflows/compliance-report.yml",
-      "form": "cron",
-      "value": "0 4 1 * *",
+      "form": "manual",
+      "value": "workflow_dispatch",
       "aliases": [
         "compliance-report.yml",
         "compliance harness",
@@ -39,7 +39,7 @@
         "full matrix report",
         "matrix report"
       ],
-      "note": "The 6-surface findings-agreement report (4 laterite surfaces + python-ags4 + the from-source DuckDB extension). Called 'weekly' on two published pages until #311; that was parity.yml's cadence, conflated with this."
+      "note": "The 6-surface findings-agreement report (4 laterite surfaces + python-ags4 + the from-source DuckDB extension). Ran monthly (`0 4 1 * *`) until 2026-08-20, when the satellite's scheduled runs were retired; it is now on-demand (`workflow_dispatch`) plus the PR trigger mirrored here. Called 'weekly' on two published pages until #311; that was parity.yml's cadence, conflated with this."
     },
     {
       "id": "compliance",
