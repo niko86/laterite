@@ -454,15 +454,20 @@ for _tpath in sorted(TEMPLATES_DIR.glob("_template-*.md")):
         TEMPLATE_SCHEMA[_tm.group(1)] = top_level_keys(_tfm)
 
 # B1 — status vocabulary per `type:`. AGS-WIKI.md §4 states the common
-# stub->drafted->reviewed(->stale/contradicted) vocab plus 5 campaign-class
-# overrides explicitly (insight/strategy/requirement/decision) but is
-# SILENT on `experiment.status` (§4 documents `experiment.outcome`, not
-# `.status`) — per §4's own rule ("controlled vocabularies are documented
-# in each template"), the experiment template's inline comment
-# (`planned | running | done`) is the documented source for that one, so
-# it's included here rather than flagged as a gap. `source` has no override
+# stub->drafted->reviewed(->stale/contradicted) vocab plus the campaign-class
+# overrides explicitly (insight/strategy/decision). `source` has no override
 # anywhere (template default is `stub`, same shape as the common classes) so
-# it inherits COMMON. Two real gaps deliberately NOT papered over — see the
+# it inherits COMMON.
+#
+# `requirement` and `experiment` were here until #500 retired both classes: the
+# AGS5 strand is dormant and lives in the private satellite, and neither class
+# had a live page in this vault. `experiment` was also the one entry §4 did not
+# state — it documented `experiment.outcome`, not `.status`, and the vocabulary
+# was read off the template's own inline comment under §4's rule that
+# "controlled vocabularies are documented in each template". Retiring the
+# template retired the only source that entry had.
+#
+# Two real gaps deliberately NOT papered over — see the
 # report + AGS-WIKI.md §12: (a) `insight` status `refuted` is in live use
 # (2 pages) but absent from both §4 and the template comment; (b) 3 retired
 # `tools/*.md` pages use `superseded`, anticipating the not-yet-built D4
@@ -486,15 +491,7 @@ STATUS_VOCAB: dict[str, set[str]] = dict.fromkeys(
 )
 STATUS_VOCAB["insight"] = {"hypothesis", "probed", "confirmed", "ratified", "refuted"}
 STATUS_VOCAB["strategy"] = {"proposed", "probed", "confirmed"}
-STATUS_VOCAB["requirement"] = {
-    "proposed",
-    "accepted",
-    "prototyped",
-    "validated",
-    "rejected",
-}
 STATUS_VOCAB["decision"] = {"proposed", "accepted", "superseded", "rejected"}
-STATUS_VOCAB["experiment"] = {"planned", "running", "done"}
 # `tool` additionally allows `superseded`: a retired-package page kept as a
 # redirect-stub tombstone (tools/ags5-{ags4,db,models} — deleted in the F2c
 # arc). Same terminal word `decision` already uses; the package was superseded
