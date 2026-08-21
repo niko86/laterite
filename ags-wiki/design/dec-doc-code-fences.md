@@ -166,7 +166,10 @@ type-only import on `reference/wasm-api.md`, whose package is the browser one.
 Running it under the Node surface would answer a question nobody asked, and a
 page-to-surface rule built for a single type declaration would be machinery
 bought for a case that does not exist. The census reports it as pending on every
-run, which is the claim that stays true either way.
+run, which is the claim that stays true either way. #519 carries the three ways
+to close it — page-to-surface routing, a type-only fence class, or type-CHECKING
+rather than executing — and the choice between them is a decision rather than an
+implementation detail, which is why it is on the tracker and not in this page.
 
 **Two fences were marked because their twins already were.** Both Node tabs on
 `cookbook/merge-deliveries.md`, and the Node tab of an already-marked block on

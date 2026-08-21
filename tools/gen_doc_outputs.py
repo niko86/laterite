@@ -244,7 +244,9 @@ HERE = "--run-pages"
 #: asked. Mapping language to surface cannot express that, and inventing a
 #: page-to-surface rule for a single type declaration would be machinery bought
 #: for a case that does not exist yet. The census reports it as pending on every
-#: run, which is the only claim that stays true either way.
+#: run, which is the only claim that stays true either way; #519 carries the
+#: three ways to close it, because the choice between them is a decision and not
+#: an implementation detail.
 PAGE_RUNNER: dict[str, str | None] = {
     "python": HERE,
     "sql": "tests/test_docs_duckdb_examples.py",
