@@ -212,6 +212,22 @@ The facade crate `laterite` is published by the same tool but carries its **own*
 `0.1.x`, bumped by hand in `rust-packages/laterite/Cargo.toml`. It is neither
 tier until it reaches parity with the Python and Node surfaces.
 
+**When you bump it, name that number in the changelog entry.** The facade has no
+changelog of its own and is not owed one: #318 scoped *"read the changelog before
+upgrading"* to the product line, because Cargo will not resolve a caret
+requirement across a `0.x` minor, so a facade consumer is protected by the
+resolver whether they read anything or not. Its history therefore lives in
+`changelog.json` with everything else, and the only route from crates.io to
+*"what moved in 0.1.3"* is finding that number written in the prose. Product
+`0.10.0`'s facade entries do it — *"functional at 0.1.0"*, *"in 0.1.1"*,
+*"0.1.2"*. `0.11.0`'s do not, and that is the whole of #319: a route that worked
+stopped working, silently, at the last release.
+
+Nothing needs backfilling. The next facade cut carries everything landed since
+`0.1.2`, so its entry names that version and what went into it. And the
+convention retires itself — at `ags-wiki/design/dec-facade-parity.md` phase 8 the
+facade joins the product number and there is only one version left to name.
+
 ### Pre-releases (RC / dev)
 
 The API may still change pre-1.0, so cut a release candidate first when in doubt.
