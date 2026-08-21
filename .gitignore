@@ -118,3 +118,12 @@ mutants.out.old/
 # here is what lets Node's resolver find the locally-built package —
 # gen_doc_outputs.py drops it in, same trick as the node examples' symlink above.
 web/docs-site/examples/wasm/node_modules/
+
+# `wrangler` writes the Cloudflare account it resolved into `.wrangler/cache/`
+# in whatever directory it ran from: the repo root when the R2 CORS config is
+# reapplied by hand (that is the command deploy-validator.yml's failure message
+# hands you, and its `--file` path is root-relative), `web/` when CI runs it.
+# Unanchored so it catches both. Ignored rather than left loose because it
+# names the account and `git add -A` is this repo's normal staging step — the
+# same way #225 swept CLI scratch output into the root.
+.wrangler/
