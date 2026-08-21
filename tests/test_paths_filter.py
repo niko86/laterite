@@ -65,6 +65,10 @@ only thing that shows the claim is not stale:
                           dorny/paths-filter matches with; at the default the
                           two parted company on 32 dotfile pairs, every one of
                           the `rust-packages/** vs .../.gitignore` shape.
+  #494 (tools narrowed) 1684 paths x 48 patterns = 80832 pairs, exact agreement
+                        — `tools/**` split into the nine scripts a gated job
+                          runs, so the count went UP while the filter narrowed.
+                          `dot: true`, as above.
 
 Only the PATTERN COUNT in the newest entry is gated, by
 `test_cross_check_series_is_current`. The path count and the pair total are
@@ -77,8 +81,6 @@ count is the one thing kept honest about the present.
 from __future__ import annotations
 
 import re
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -257,12 +259,16 @@ def test_code_is_false_for_irrelevant_paths(
         # are NOT here any more — see test_buildless_ssots_need_no_heavy_job.
         "modality.json",
         "surface-census.json",
-        # Tooling those gates execute.
-        "tools/gen_changelog.py",
-        "tools/gen_observations.py",
+        # Tooling a heavy job executes or opens. The other four names that were
+        # here — gen_changelog, gen_observations, check_doc_refs, and a
+        # `tools/xcheck/run.py` the repo has never had — asserted that `code`
+        # covered them, which `tools/**` did, for gates that all run in
+        # `repo-gates`. They are in BUILDLESS_TOOLS below now, asserting the
+        # opposite, which is the claim that was true all along.
         "tools/gen_census.py",
-        "tools/check_doc_refs.py",
-        "tools/xcheck/run.py",
+        "tools/gen_doc_outputs.py",
+        "tools/generate_pyi.py",
+        "tools/release/public-api/laterite.txt",
     ],
 )
 def test_code_is_true_for_gate_inputs(filters: dict[str, list[str]], path: str) -> None:
@@ -496,43 +502,118 @@ def test_every_filter_reaches_a_job(
 # --- the audit, made permanent ------------------------------------------------
 
 
-def test_every_linted_file_fires_code(filters: dict[str, list[str]]) -> None:
-    """Every linted file must still fire a job that can catch a lint failure.
+TOOL_INVOCATION = re.compile(r"\btools/[A-Za-z0-9_/.-]+\.(?:py|sh|mjs)\b")
 
-    `ruff check .` and `ruff format --check .` moved to `repo-gates`, which runs
-    unconditionally — so strictly this can no longer fail for the reason it was
-    written. It is kept, retargeted, because `tools/**` remains in `code` for a
-    different and still-live reason: heavy gates EXECUTE those scripts
-    (gen_census, wheel_smoke, xcheck, check_msrv, check_public_api). If a future
-    edit narrows `tools/**`, this is what notices that the executing gates lost
-    their trigger.
 
-    Derived from ruff's own file list rather than a hand-written one: a new
-    script under `tools/` must either be covered by an existing rule or fail
-    here, which is the only way this stays true as the repo grows.
+def _gated_jobs(workflow: dict) -> dict[str, set[str]]:
+    """Every job with a path gate, mapped to the filters it ORs over.
+
+    The `if:` expressions are all of one shape — `!cancelled() && (not a PR ||
+    changes did not run || <filter> == 'true' || …)`. OR, so a job runs when ANY
+    of its filters is true, and a tool it invokes needs a rule in any ONE of
+    them. Reading the names out of the expression rather than restating them
+    keeps this honest when a job's gate is widened.
     """
-    ruff = shutil.which("ruff")
-    assert ruff, (
-        "ruff is a dev dependency and a CI gate; without it this check cannot "
-        "run, and a check that cannot run must not pass silently"
-    )
-    listed = subprocess.run(
-        [ruff, "check", ".", "--show-files"],
-        cwd=REPO,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.splitlines()
-    linted = [
-        str(Path(line).resolve().relative_to(REPO)) for line in listed if line.strip()
-    ]
-    assert linted, "ruff reported no files to lint — the check did not run"
+    out: dict[str, set[str]] = {}
+    for name, job in workflow["jobs"].items():
+        names = set(OUTPUT_REF.findall(str(job.get("if", ""))))
+        if names:
+            out[name] = names
+    return out
 
-    missed = sorted(f for f in linted if not _filter_matches(filters["code"], f))
+
+def test_every_executed_tool_fires_its_job(
+    workflow: dict, filters: dict[str, list[str]]
+) -> None:
+    """A gated job must be triggered by every `tools/` script it runs.
+
+    This replaces a check derived from `ruff --show-files`, which asked whether
+    a linted file fires `code`. That question stopped being the right one when
+    ruff moved to the unconditional `repo-gates` job — but the answer it
+    happened to give was load-bearing, because `code` listed `tools/**` and the
+    lint check was the only thing holding the glob in place. Removing the glob
+    without replacing the check would have left every executing gate trusting a
+    hand-written list, which is #207 waiting to happen.
+
+    So the question is asked properly instead: for each gated job, take the
+    `tools/` scripts its own `run:` lines name and require the job's filters to
+    reach them. Nothing is hand-listed — a step added tomorrow is covered the
+    day it lands, and a filter narrowed past one of its gates fails here rather
+    than in six months on the PR that needed the gate.
+
+    It found a live one on the commit that introduced it: the `node` job runs
+    `gen_doc_outputs.py --check --surface node` and no rule in `node` named the
+    generator, so editing it re-ran the python surface's drift gate and not the
+    node one.
+    """
+    missed: list[str] = []
+    for job, names in _gated_jobs(workflow).items():
+        steps = workflow["jobs"][job].get("steps") or []
+        scripts = {
+            s
+            for step in steps
+            for s in TOOL_INVOCATION.findall(str(step.get("run", "")))
+        }
+        missed.extend(
+            f"{job} runs {script}, gated on {sorted(names)}"
+            for script in sorted(scripts)
+            if not any(_filter_matches(filters[n], script) for n in sorted(names))
+        )
+
     assert not missed, (
-        f"{len(missed)} linted file(s) fire no heavy job. Lint itself is safe "
-        f"(`repo-gates` is unconditional), but a script the python/rust jobs "
-        f"EXECUTE would now change without re-running them: {missed[:10]}"
+        "a gated job invokes a tool that no rule in its own filters reaches, so "
+        "editing that tool will not re-run the gate that executes it (#207):\n  "
+        + "\n  ".join(missed)
+    )
+
+
+# Tools whose only gate is an UNFILTERED job — `repo-gates` here, or a workflow
+# with no path filter at all (`wiki-lint.yml`, `nightly.yml`). Same bargain as
+# BUILDLESS_SSOTS above and guarded for the same reason: the natural repair for
+# "did my gate run?" is to add the path back to `code`, which buys a cargo
+# build, the cdylib, pytest and a wheel smoke for a script no heavy job touches.
+#
+# Judgement, not derivation, and that is deliberate: a tool can also reach a
+# heavy job by being READ rather than run (`generate_pyi.py` is imported by a
+# test in the python job), and no scan of `run:` lines can see that. Adding a
+# name here is a claim that nothing in a filtered job opens it.
+BUILDLESS_TOOLS = [
+    "tools/check_doc_refs.py",  # repo-gates
+    "tools/check_issue_refs.py",  # repo-gates
+    "tools/gen_changelog.py",  # repo-gates
+    "tools/gen_crate_graph.py",  # repo-gates
+    "tools/gen_install_channels.py",  # repo-gates
+    "tools/gen_modality.py",  # repo-gates
+    "tools/gen_observations.py",  # repo-gates
+    "tools/release/trusted_publishing.py",  # no CI job at all — run by hand, once
+    "tools/xcheck/emit_py.py",  # nightly.yml, which has no path filter
+    "ags-wiki/.bootstrap/lint.py",  # wiki-lint.yml
+    "ags-wiki/.bootstrap/reindex.py",  # wiki-lint.yml
+    "examples/laterite_tour.py",  # a marimo notebook; no job runs it
+]
+
+
+@pytest.mark.parametrize("path", BUILDLESS_TOOLS)
+def test_buildless_tools_need_no_heavy_job(
+    filters: dict[str, list[str]], path: str
+) -> None:
+    assert not _filter_matches(filters["code"], path), (
+        f"{path} fires the heavy jobs, and no filtered job runs or reads it — "
+        "the cargo build, the cdylib, pytest and the wheel smoke all buy nothing"
+    )
+
+
+@pytest.mark.parametrize("path", BUILDLESS_TOOLS)
+def test_buildless_tools_exist(path: str) -> None:
+    """...and each one names a real file.
+
+    A path that no longer exists asserts nothing while passing — which is how
+    `tools/xcheck/run.py` sat in the gate-inputs list next to this one, naming a
+    file the repo has never had.
+    """
+    assert (REPO / path).is_file(), (
+        f"{path} does not exist, so the claim above is vacuous — delete the "
+        "entry or fix the path"
     )
 
 

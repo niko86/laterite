@@ -76,7 +76,22 @@ def test_it_counts_what_it_scanned(capsys: pytest.CaptureFixture[str]) -> None:
     assert int(match.group(1)) > 0
 
 
-@pytest.mark.parametrize("number", [475, 1327])
+def _exemplars() -> list[int]:
+    """One satellite number and one third-party number, taken FROM the set.
+
+    These were written as literals — `[475, 1327]` — and 475 was claimed by this
+    repo four months later, at which point the test asserted that a number the
+    set had correctly released was still in it. The exemplar is now the LOWEST
+    satellite number still held, which is the one nearest to being claimed next
+    and therefore the most useful canary; the third-party numbers belong to
+    other projects and cannot be claimed here at all, so the lowest of those is
+    a stable pick.
+    """
+    doc = json.loads(DATA.read_text(encoding="utf-8"))
+    return [min(doc["satellite"]["numbers"]), min(int(n) for n in doc["foreign"])]
+
+
+@pytest.mark.parametrize("number", _exemplars())
 def test_a_bare_foreign_number_is_matched_and_a_qualified_one_is_not(
     number: int,
 ) -> None:

@@ -87,9 +87,10 @@ jobs:
           # python job), and the docs EXAMPLES + their shared fixture
           # (tests/test_docs_examples.py runs them in the python job). The docs
           # *pages* deliberately DON'T trip `code` — they're link-gated by the
-          # cheap `docs` job below. `tools/**` DOES trip it, because `ruff check .`
-          # runs in the python job and lints every one of those files; assets and
-          # the wiki (bar its three linted scripts) still don't.
+          # cheap `docs` job below. Individual `tools/` scripts trip it when a
+          # code-gated job EXECUTES them and only then — this was `tools/**`
+          # while `ruff check .` ran in the python job, and the glob outlived
+          # that. Assets and the wiki still don't.
           # `node` = the laterite-node crate + TS package (drives the `node` job).
           # `docs` = the MkDocs site (drives the `docs` strict-build link gate).
           filters: |
@@ -114,7 +115,6 @@ jobs:
               - 'tests/**'              # the root suite = AGS4 dictionary-faithfulness tests (run below)
               - 'pyproject.toml'
               - 'uv.lock'
-              - 'tools/generate_pyi.py'
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
               - 'web/docs-site/examples/**'  # docs example sources — test_docs_examples.py executes these
@@ -139,11 +139,9 @@ jobs:
               # `tests/` suite was private-only and absent from this mirror — it
               # is present, and its gates are part of why entries below exist.
               # ...and by the modality drift gate. The generator half needs no
-              # entry: `tools/**` below already covers it.
+              # entry: `gen_modality.py` runs in `repo-gates`, unconditionally.
               - 'modality.json'          # read by test_modality_parity (packages/laterite/tests)
               - 'COMPAT.md'              # referenced by test_laterite (packages/laterite/tests)
-              - 'tools/gen_census.py'    # referenced by test_merge (packages/laterite/tests)
-              - 'tools/wheel_smoke.py'   # the wheel-smoke job's post-install smoke (laterite-dev#554)
               # The O-N catalogue SSOT + its render + the generator. These belong
               # in `code` for the same reason as the entries above and NOT for the
               # reason the block warns against: the drift gate genuinely runs in
@@ -152,8 +150,8 @@ jobs:
               # an edit to the SSOT alone would sail past, which is precisely how
               # the census gate came to be unpassable-by-construction (#207).
               # `observations.json` / `OBSERVATIONS.md` are NOT listed: their drift
-              # gate moved to the unconditional `repo-gates` job. The generator
-              # itself stays covered by `tools/**` below (ruff lints it).
+              # gate moved to the unconditional `repo-gates` job, and so did the
+              # generator — nothing here needs to reach either.
               # divergences.md joined that render in #320 and follows it to
               # `repo-gates` for the same reason.
               # The changelog trio, for the identical reason — its drift gate
@@ -178,20 +176,37 @@ jobs:
               # still build one. Splitting that test is the remaining half of
               # this problem and is not attempted here.
               - 'README.md'
-              # `ruff check .` and `ruff format --check .` are steps in the python
-              # job and lint the WHOLE repo, not the subset listed above. While the
-              # `!` rules made `code` universally true that cost nothing; the moment
-              # they went, 26 linted files — 20 in tools/, 2 in tools/xcheck/, 3 in
-              # ags-wiki/.bootstrap/, 1 in examples/ — would have stopped firing the
-              # only job that lints them. Declared here so the gate fires by
-              # DECLARATION rather than by the accident this commit removes (#207 is
-              # what that failure looks like). `tools/**` rather than `tools/**/*.py`
-              # so a new helper is covered on the day it lands, whatever its
-              # extension; test_paths_filter derives the set from ruff itself and
-              # fails if any linted file falls outside.
-              - 'tools/**'
-              - 'ags-wiki/.bootstrap/**/*.py'
-              - 'examples/**/*.py'
+              # The tools a `code`-gated job RUNS — and only those.
+              #
+              # This was `tools/**`, plus `ags-wiki/.bootstrap/**/*.py` and
+              # `examples/**/*.py`, and all three were declared for one reason:
+              # `ruff check .` and `ruff format --check .` were steps in the
+              # python job, so every linted file had to fire it or go unlinted.
+              # Ruff has since moved to `repo-gates`, which has no filter and
+              # therefore cannot fail to run. The globs outlived their reason and
+              # kept charging for it — editing a stdlib-only release helper, or a
+              # wiki script whose only gate lives in `wiki-lint.yml`, bought a
+              # cargo build, the PyO3 cdylib, pytest and a wheel smoke.
+              #
+              # Enumerated rather than glob'd, because "a heavy job runs this" is
+              # a property of the script and nothing about the directory implies
+              # it. That is the #207 side of the trade, so it is not left to
+              # care: `test_every_executed_tool_fires_its_job` reads ci.yml's own
+              # `run:` blocks and fails if a filtered job invokes a tool no rule
+              # here reaches — a narrowing cannot quietly disarm a gate.
+              - 'tools/check_msrv.py'              # publish-gates
+              - 'tools/check_package_contents.py'  # rust + publish-gates
+              - 'tools/check_public_api.py'        # publish-gates
+              - 'tools/check_semver.py'            # publish-gates
+              - 'tools/check_speed_claims.py'      # python
+              - 'tools/check_support_matrix.py'    # python
+              - 'tools/gen_census.py'              # python — `--check` vs the built launchers
+              - 'tools/gen_doc_outputs.py'         # python (python+cli surfaces); also in `node`
+              - 'tools/wheel_smoke.py'             # wheel-smoke's post-install smoke (laterite-dev#554)
+              # Reached by a TEST rather than a `run:` line, so the derived check
+              # above cannot see them. Declared by hand, with the reader named:
+              - 'tools/generate_pyi.py'            # imported by test_pyi_stubs_match_generator
+              - 'tools/release/public-api/**'      # read by test_modality_parity
               # The surface census: `gen_census.py --check` runs as its own step in
               # the python job and compares the SSOT against the live launchers, so
               # both the SSOT and its render are inputs to a gate that already exists.
@@ -211,6 +226,13 @@ jobs:
               - '.github/workflows/ci.yml'
               - '.github/actions/build-accel/**'
               - 'web/docs-site/examples/node/**'  # docs Node snippets — test/docs-examples.test.ts executes these in vitest
+              # The node job runs `gen_doc_outputs.py --check --surface node`,
+              # and nothing declared it: an edit to the generator re-ran the
+              # PYTHON surface's drift gate and not this one. A live #207, found
+              # by the derived check rather than by a reading of this list.
+              # `ts-lint` runs the wasm surface and is gated `node || web`, so
+              # this entry covers it too; `web` needs no twin.
+              - 'tools/gen_doc_outputs.py'
               - 'examples/sample_site.ags'        # the fixture those snippets read (subprocess cwd = repo root)
             docs:
               # The MkDocs site + its nav/config drive the `docs` job's
@@ -342,10 +364,9 @@ jobs:
           enable-cache: false
 
       # ruff lints the WHOLE repo, not the shipped package, so it has no reason
-      # to wait for one to be built. `tools/**` stays declared in `code` all the
-      # same: test_paths_filter derives the linted set from ruff itself and
-      # fails if a linted file fires no heavy job, and narrowing that is a
-      # separate question from where the linter runs.
+      # to wait for one to be built. Moving it here is also what let `code` drop
+      # `tools/**`: while lint ran in the python job every linted file had to
+      # fire that job, and here there is no filter to fire.
       - name: ruff check
         run: uv run --no-project --with ruff ruff check .
 
