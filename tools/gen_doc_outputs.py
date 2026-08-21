@@ -93,6 +93,35 @@ EXAMPLES = ROOT / "web" / "docs-site" / "examples"
 #: make a real, working capability look broken.
 FIXTURE = ROOT / "examples" / "sample_site.ags"
 DELIVERY_FIXTURE = ROOT / "examples" / "sample_strata.ags"
+#: The filenames the docs NARRATE — names a reader is meant to substitute their
+#: own file for. Seeded from the fixture so a page program can run without the
+#: pages being rewritten to a repo path, which would cost the docs their voice
+#: for the gate's convenience.
+#:
+#: Inputs only. `out.ags`, `merged.ags` and `clean.ags` are things a fence WRITES,
+#: and pre-creating them would let a snippet that never wrote its output pass.
+NARRATIVE_INPUTS = (
+    "delivery.ags",
+    "site.ags",
+    "phase1.ags",
+    "phase2.ags",
+    "a.ags",
+    "b.ags",
+)
+
+
+def seed_workdir(work: Path) -> None:
+    """Give a page program the files its text names.
+
+    Shared with `tests/test_docs_duckdb_examples.py` so both surfaces seed the
+    same way — two runners preparing subtly different worlds is how a fence
+    passes on one surface and fails on the other for reasons about neither.
+    """
+    (work / "examples").mkdir(exist_ok=True)
+    shutil.copy(FIXTURE, work / "examples" / FIXTURE.name)
+    for name in NARRATIVE_INPUTS:
+        shutil.copy(DELIVERY_FIXTURE, work / name)
+
 
 #: Where the built wasm package lands, and where Node must see it to resolve the
 #: published name. wasm-pack names the package after the CRATE
@@ -154,6 +183,23 @@ PAGE_SURFACE = {
     "js": "node",
     "javascript": "node",
     "ts": "node",
+}
+#: This script's own runner, named once so the routing table and the loop that
+#: obeys it cannot drift apart through a typo in a string literal.
+HERE = "--run-pages"
+#: Fence language -> WHERE its page programs are executed today; `None` means
+#: classified but not yet run. Two runners rather than one because the SQL half
+#: needs a loaded extension and a live connection, which the pytest module
+#: already owns — and because the `duckdb` Surface below shells out to the
+#: DuckDB CLI, a binary `pip install duckdb` does not ship. Routing sql through
+#: here would print "SKIPPED — duckdb not found" on every machine and read as a
+#: gap where there is a gate.
+PAGE_RUNNER: dict[str, str | None] = {
+    "python": HERE,
+    "sql": "tests/test_docs_duckdb_examples.py",
+    "js": None,
+    "javascript": None,
+    "ts": None,
 }
 #: Languages that LOOK runnable and are deliberately never run. A `bash` fence on
 #: a page is an install instruction — `pip install laterite[compat]` — and a gate
@@ -232,6 +278,51 @@ def page_program(md: str, lang: str) -> tuple[str, int]:
     return "\n".join(parts), inline
 
 
+#: A statement that ASKS for rows, so "returned none" is worth reporting. The
+#: DDL a page opens with (`INSTALL`, `LOAD`) returns nothing by definition.
+RETURNS_ROWS_RE = re.compile(
+    r"^\s*(SELECT|WITH|FROM|VALUES|SHOW|DESCRIBE|PIVOT)\b", re.I
+)
+
+
+def sql_statements(src: str) -> list[tuple[str, bool]]:
+    """Split a SQL page program into (statement, asks-for-rows) pairs.
+
+    Here rather than in `tests/test_docs_duckdb_examples.py` because that module
+    only runs where the extension installs, and neither the split nor the
+    row-asking judgement needs a database — putting them here is what lets the
+    buildless lane exercise them.
+
+    The split is a plain `;` scan: a semicolon inside a string literal would cut
+    a statement in half. No documented example contains one, and the failure is
+    loud rather than silent (the halves are not valid SQL), so a SQL parser
+    would be machinery bought against a fault that announces itself.
+
+    Leading `--` comments are stepped over rather than treated as the statement.
+    Dropping a chunk that merely STARTS with one drops the query underneath it,
+    and introducing a query with a comment is how these pages teach — the first
+    example on `duckdb/index.md` is one, and it silently never ran.
+    """
+    out: list[tuple[str, bool]] = []
+    for raw in src.split(";"):
+        stmt = raw.strip()
+        body = "\n".join(_after_the_preamble(stmt.splitlines()))
+        if not body.strip():
+            continue  # blank, or comment-only: nothing to execute
+        out.append((stmt, RETURNS_ROWS_RE.match(body) is not None))
+    return out
+
+
+def _after_the_preamble(lines: list[str]) -> list[str]:
+    """Where the statement really starts: past any leading blank or `--` lines."""
+    i = 0
+    while i < len(lines) and (
+        not lines[i].strip() or lines[i].lstrip().startswith("--")
+    ):
+        i += 1
+    return lines[i:]
+
+
 def run_page_programs(surface: Surface, lang: str) -> list[tuple[str, str]]:
     """Execute every page program for one surface. Returns (page, stderr) failures.
 
@@ -264,9 +355,7 @@ def run_page_programs(surface: Surface, lang: str) -> list[tuple[str, str]]:
             # there gave `read-a-group.md` a KeyError on a missing LOCA rather than
             # the FileNotFoundError CI would have seen. A gate whose result depends
             # on an untracked file is not a gate.
-            (work / "examples").mkdir()
-            shutil.copy(FIXTURE, work / "examples" / FIXTURE.name)
-            shutil.copy(DELIVERY_FIXTURE, work / "delivery.ags")
+            seed_workdir(work)
             proc = subprocess.run(
                 surface.argv(f),
                 cwd=work,
@@ -526,7 +615,7 @@ def main() -> None:
         help="the structural half only: no example is run, so nothing needs building",
     )
     ap.add_argument(
-        "--run-pages",
+        HERE,
         action="store_true",
         help="execute each page's fences as one program (nightly; needs the surface built)",
     )
@@ -543,6 +632,8 @@ def main() -> None:
         # says which fences SHOULD run; this is what actually runs them.
         bad: list[tuple[str, str]] = []
         for lang, surface_name in sorted(PAGE_SURFACE.items()):
+            if PAGE_RUNNER[lang] != HERE:
+                continue  # not this runner's language; the census says whose
             if args.surface and surface_name not in args.surface:
                 continue
             s = SURFACES[surface_name]
@@ -690,10 +781,11 @@ def main() -> None:
         # and "known to run" are different claims and the gap between them is the
         # thing worth watching. This half runs no examples, so it reports the
         # SHAPE of the coverage; `--run-pages` is what proves it.
-        pending = sorted(set(PAGE_SURFACE) - {"python"})
+        live = sorted(f"{k} ({v})" for k, v in PAGE_RUNNER.items() if v)
+        pending = sorted(k for k, v in PAGE_RUNNER.items() if not v)
         print(
-            "gen_doc_outputs: page programs execute in the nightly "
-            f"(`--run-pages`); runners live for python, pending for {', '.join(pending)}"
+            "gen_doc_outputs: page programs execute in the nightly — "
+            f"{'; '.join(live)}; pending for {', '.join(pending)}"
         )
         return
 

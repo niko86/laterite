@@ -48,9 +48,11 @@ flip `validate_ags` onto its certified fast path.
 
 from __future__ import annotations
 
+import functools
 import os
 import re
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -136,4 +138,105 @@ def test_docs_duckdb_example_runs(
     )
     assert len(rows) == int(m.group(1)), (
         f"{sql_file.name}: {len(rows)} row(s), expected {m.group(1)}:\n{rows}"
+    )
+
+
+# --- SQL page programs (#513 step 3) -----------------------------------------
+#
+# The example FILES above are one half. The other half is the SQL typed directly
+# onto a page rather than included from one — every statement a reader copies out
+# of the prose — and until now nothing ran a single one of them.
+#
+# Built by `gen_doc_outputs.page_program`, the same function the Python runner
+# uses, so a page's fences concatenate the same way on every surface. Executed
+# HERE rather than in that tool because it documents itself as stdlib-only and
+# runs in a buildless lane — importing `duckdb` there would break both. This file
+# already owns the connection, the extension-mode reporting and the env gating.
+
+_GEN = _REPO / "tools" / "gen_doc_outputs.py"
+_DOCS = _REPO / "web" / "docs-site" / "docs"
+
+
+@functools.cache
+def _gen_doc_outputs():
+    """Load the builder without importing `tools` as a package.
+
+    Registered in `sys.modules` before execution because the module defines a
+    dataclass, and `dataclasses` resolves the defining module by name — an
+    unregistered one gives `AttributeError: 'NoneType' object has no attribute
+    '__dict__'` at import time rather than anything about dataclasses.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("gen_doc_outputs", _GEN)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["gen_doc_outputs"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _page_program(md: str, lang: str) -> tuple[str, int]:
+    return _gen_doc_outputs().page_program(md, lang)
+
+
+def _sql_pages() -> list[Path]:
+    return [
+        p
+        for p in sorted(_DOCS.rglob("*.md"))
+        if _page_program(p.read_text(encoding="utf-8"), "sql")[1]
+    ]
+
+
+_SQL_PAGES = _sql_pages()
+
+
+def test_sql_page_library_is_non_empty() -> None:
+    """Zero pages would make every case below vacuous — the same guard the
+    example library carries, for the same reason."""
+    assert _SQL_PAGES, "no docs page has an inline SQL fence"
+
+
+@pytest.mark.parametrize(
+    "page", _SQL_PAGES, ids=lambda p: p.relative_to(_DOCS).as_posix()
+)
+def test_sql_page_program_runs(page: Path, con, tmp_path: Path, monkeypatch) -> None:
+    """A page's SQL fences, concatenated and run as one script.
+
+    "Does not raise" is the bar, as for the Python programs. It is weaker here
+    than the `-- expect-rows` the example files carry — a query can bind and
+    return nothing — but it still catches the class that matters: a column or
+    group the extension does not have. The join this found on
+    `cookbook/sql-across-groups.md` failed exactly that way.
+
+    Zero-row statements are counted and reported rather than failed, so the
+    weaker guarantee is visible instead of assumed.
+    """
+    # The SAME seeding the Python runner uses, from the same function — two
+    # runners preparing subtly different worlds is how a fence passes on one
+    # surface and fails on the other for reasons about neither.
+    _gen_doc_outputs().seed_workdir(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    src, _ = _page_program(page.read_text(encoding="utf-8"), "sql")
+    ran = empty = queried = 0
+    for stmt, asks_for_rows in _gen_doc_outputs().sql_statements(src):
+        rows = con.execute(stmt).fetchall()
+        ran += 1
+        # Only a statement that ASKS for rows can suspiciously return none, and
+        # counting the `INSTALL`/`LOAD` boilerplate inflated both halves of the
+        # ratio — a report that cries wolf on its own preamble is one nobody
+        # reads the day it means something.
+        if not asks_for_rows:
+            continue
+        queried += 1
+        if not rows:
+            empty += 1
+    # Printed pass or fail, because the row audit LOOKS AT LESS than it runs, and
+    # this line is the only place that gap is visible. Reporting solely on a
+    # nonzero `empty` would make a page whose statements are all boilerplate
+    # indistinguishable from one whose every query finds rows.
+    print(
+        f"\n{page.relative_to(_DOCS)}: {ran} statement(s) ran, {queried} asked for "
+        f"rows, {empty} of those returned none"
     )

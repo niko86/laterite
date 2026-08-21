@@ -117,6 +117,40 @@ snippets that name placeholders *on purpose* to show an API shape, like
 Collapsing those three into "8 failures" would have produced eight edits, most
 of them wrong.
 
+## The SQL half: a second runner, and what it found
+
+**Two runners, and a table saying which owns a language.** SQL page programs run
+in `tests/test_docs_duckdb_examples.py`, not in `--run-pages`. That module already
+owns the connection, the env gating and the "which extension is under test"
+reporting; and the `duckdb` surface in the tool shells out to the DuckDB CLI,
+which `pip install duckdb` does not ship — routing SQL through `--run-pages` would
+print a SKIP line on every machine for a language that is in fact gated, which
+reads as a hole where there is a handoff. `PAGE_RUNNER` names the owner per
+language, `None` meaning pending, and the census prints it: **adding a language to
+the runnable set forces the same edit to say who executes it.**
+
+**Seeding superseded the plan to rewrite the SQL fences.** The grilling that
+settled this decision agreed to rewrite the hand-written statements to the real
+fixture before running them. Seeding made that unnecessary — the fences
+run unedited — so the rewrite never happened, and the fences that *were* edited
+were edited because they were wrong, not because the gate needed them to be.
+
+**The split had to learn what a comment is.** Statements are separated on `;`, and
+dropping any chunk that starts with `--` looked like the way to skip comments. It
+drops the query *underneath* the comment, and introducing a query with a comment
+is how these pages teach — so `duckdb/index.md`'s first example never ran. It was
+one of the two zero-row queries: every borehole in the fixture is above sea level,
+and the page asked for `loca_gl < 0`. A gate that skips its subject is worse than
+no gate, because it reports green.
+
+**Zero rows is reported, not failed.** "Does not raise" is a weaker bar here than
+the `-- expect-rows: N` the example *files* carry — a query can bind and return
+nothing, which is exactly how those two defects survived. The runner counts
+statements that ask for rows and got none, and prints the count; only statements
+that *ask* are counted, because `INSTALL` and `LOAD` return nothing by definition
+and a report that cries wolf on its own preamble is one nobody reads the day it
+means something.
+
 ## Consequences
 
 - A new fence in a runnable language is covered from the moment it is added, and
@@ -128,8 +162,10 @@ of them wrong.
 - `cookbook/index.md` could no longer claim the snippet on the page is the exact
   file CI executes. It now says the opening block is, and that later snippets
   continue from it — which is also the more useful thing for a reader to know.
-- SQL fences still have to be run; `delivery.ags` is now seeded for them too, so
-  what remains is a duckdb runner rather than a fixture problem.
+- SQL page programs run against the **community-published** extension, in the
+  nightly leg that already asks the reader's question — so a page and the
+  extension a reader installs are checked together. What remains unrun is
+  `js`/`ts`, and `PAGE_RUNNER` says so on every structural run.
 - The nightly step is fatal only when the checkout matches the released tag. It is
   amnestied when the tree is AHEAD, because the leg's banner promises that and
   `test_nightly_wiring.py` enforces it — a page program breaking because this tree
@@ -141,6 +177,7 @@ of them wrong.
 ## Related
 
 `repo: tools/gen_doc_outputs.py` · `repo: tests/test_doc_code_fences.py` ·
+`repo: tests/test_docs_duckdb_examples.py` ·
 `repo: examples/sample_strata.ags` · `repo: .github/workflows/nightly.yml` ·
 `repo: tests/test_docs_examples.py` ·
 `repo: rust-packages/laterite-node/test/docs-examples.test.ts`
