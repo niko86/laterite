@@ -177,11 +177,15 @@ Key facts:
   example that **fails to run** fails the job, because a reader following the live
   site would get a traceback; a committed `.out` that no longer byte-matches is
   reported and **not** fatal, because output drift is the ordinary consequence of
-  the tree being ahead of the release. For the same reason the job is deliberately
-  **not** in `notify`'s `needs` — the docs track HEAD by decision and the site
-  deploys from main, so documenting unreleased API is a chosen state, and a gate
-  that files a tracking issue about a choice already made is noise that gets muted.
-  GitHub-hosted and toolchain-free: a published wheel needs no Rust and no maturin.
+  the tree being ahead of the release. Which of the two a run is in is decided
+  ONCE, by the `under-test` step asking git whether this checkout is the released
+  tag, and **every** fatal step reads that one answer — the fix in #493, where the
+  CLI write-mode step did not, so an unreleased *Python* change was amnestied and
+  an unreleased *CLI* change was fatal on the same run. The job used to stay out
+  of `notify`'s `needs` as a second guard on the same window; that guard also hid
+  real failures, so the legs report and the determination does the separating
+  (`repo:tests/test_nightly_wiring.py` holds both halves). GitHub-hosted and
+  toolchain-free: a published wheel needs no Rust and no maturin.
 - **…and its Node twin, `docs-vs-released-npm`.** Same question, same calibration:
   `npm install laterite` unpinned, then the optional peer **exactly as the docs and
   the runtime error tell a reader to install it**, then the examples. Building it
@@ -191,8 +195,9 @@ Key facts:
   the manifest on npm still carries the old range, the peer install fails with
   ETARGET and the three `sql()`/`at()` examples fail with it. That is the correct
   signal rather than a bug in the job: the published package IS broken for readers,
-  and the remedy is a release. Like the wheel leg it stays out of `notify`'s
-  `needs`, so it emails rather than filing an issue about a state already known.
+  and the remedy is a release. Like the wheel leg it computes `tree_ahead` and every
+  fatal step reads it, which is what lets it report to `notify` without filing an
+  issue about a state already known.
 - **…and the browser twin, `docs-vs-released-wasm` (#283).** `npm install
   @laterite/ags4-wasm` unpinned, then the five `examples/wasm/ex*.mjs` against it.
   The crate says `publish = false` — for *crates.io*; it **is** the npm package,
@@ -226,11 +231,13 @@ Key facts:
   subjects, and which `use` roots become dependencies — `use` roots only, or the
   facade's `ags4::read(…)` would send `cargo add ags4` at the registry). One
   class here, not two: a README doctest has no committed `.out`, so there is no
-  drift half — it compiles and runs, or it does not. Out of `notify` all the
-  same, with the released-vs-tree pair printed per crate to separate a defect
-  from ordinary tree-ahead drift — and printed only as far as it goes, since a
-  version it could not read establishes no direction at all. A crate that is
-  publishable but **not yet uploaded** (`publish_crates.py`'s `DEFERRED` state,
+  drift half — it compiles and runs, or it does not. The released-vs-tree pair is
+  **printed** per crate to separate a defect from ordinary tree-ahead drift —
+  printed only as far as it goes, since a version it could not read establishes no
+  direction at all, and printed rather than *consumed*, which is why a tree-ahead
+  red here reaches the nightly tracker where the wheel and npm legs' would not
+  (`repo:.github/workflows/nightly.yml`, the `notify` header, names that trade).
+  A crate that is publishable but **not yet uploaded** (`publish_crates.py`'s `DEFERRED` state,
   earmarked next for `laterite-ags4-excel`) is reported as *unasked*, never
   failed: "not released yet" must not arrive looking like "the released README is
   broken".
