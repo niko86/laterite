@@ -71,7 +71,7 @@ transmission details.
 
 Every door runs the same emitter over the same dictionary, and metadata synthesis
 is opt-in on all of them — `synthesise_metadata=` in Python, `{ synthesiseMetadata }`
-in Node, `synthesise_metadata` in the browser build. Without it you get exactly the
+in Node and in the browser build. Without it you get exactly the
 groups you supplied, plus findings naming the catalogs you didn't.
 
 See also: [Build from a typed graph](./build-from-typed-graph.md) · [Produce AGS4](../learn/produce.md)

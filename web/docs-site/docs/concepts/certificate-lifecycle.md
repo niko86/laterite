@@ -17,8 +17,10 @@ single rule.
 `certify()` needs a prior clean `validate()` on the same handle — it writes
 `<path>.ags.idx` next to the file. Re-reading with `index=` hands that cert back;
 because the file's content hash still matches the one baked into the cert,
-`validate()` returns immediately and `report.resolution == "certified"` instead
-of re-deriving the verdict from the rules.
+`validate()` returns immediately and `report.certified` is `True` instead of
+re-deriving the verdict from the rules. `resolution` answers a different
+question — which dictionary edition judged the file — so the output above reads
+`True exact`, not `certified`.
 
 The check is exact: the cert vouches for _those_ bytes only. Edit one character
 and the hash no longer matches, so the cert is ignored and the rule engine runs
