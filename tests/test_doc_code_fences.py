@@ -347,3 +347,17 @@ def test_a_short_failure_is_not_elided() -> None:
     out = gen_doc_outputs._excerpt(err)
     assert "elided" not in out
     assert "three" in out
+
+
+def test_a_runner_that_finds_no_pages_fails(tmp_path, monkeypatch) -> None:
+    """Zero is the one result a green run cannot mean.
+
+    `test_docs_examples.py` guards its glob against a moved directory making
+    every example "pass" by not running, and #513 names that guard as the
+    precedent the page half had not inherited. With no pages to find, nothing is
+    executed — so this exercises the guard itself rather than any surface.
+    """
+    monkeypatch.setattr(gen_doc_outputs, "DOCS", tmp_path)
+    with pytest.raises(SystemExit) as e:
+        gen_doc_outputs.run_page_programs(gen_doc_outputs.SURFACES["node"], ["js"])
+    assert "discovery is broken" in str(e.value)

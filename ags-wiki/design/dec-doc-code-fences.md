@@ -190,6 +190,19 @@ raises nothing. It was fixed because it was found while fixing the fence beside
 it, and it is recorded here because a threshold nobody explains reads as
 arbitrary to whoever meets it next.
 
+**What "does not raise" still cannot see, stated rather than discovered later.**
+`reference/node-api.md` branched on `file.report.ok`. A `Report` has no `ok` — it
+carries `isValid`, the separate `count == 0`; `ok` belongs to the fix report and
+the un-validatable failure report. So `!file.report.ok` is `!undefined`, always
+true, and the documented example rewrote `clean.ags` for a **clean** file. The
+page program runs it without complaint, because taking the wrong branch raises
+nothing. The SQL half bought a cheap partial answer to the same blind spot by
+counting rows; there is no equally cheap equivalent here, and pretending
+otherwise is what would make the gate's green misleading. It was found by reading
+the shipped `index.d.ts` after the runner brought attention to the page — which
+is the honest description of what this class of gate does: it gets you to the
+page, not to the defect.
+
 **Both ends of a failure, because runtimes disagree about which one matters.** The
 failure display kept the last four lines of stderr, which is where a Python
 traceback puts the exception — and where Node puts loader frames. The first run
@@ -215,6 +228,12 @@ how many lines it dropped.
   symlink its neighbour re-points, so there is no second swap to keep in step.
 - What remains unrun is `ts` alone, and `PAGE_RUNNER` says so on every structural
   run rather than leaving it to be inferred from silence.
+- **A runner that finds no pages fails.** Zero is the one result a green run
+  cannot mean: a fence-regex change, a routing-table typo or a moved docs
+  directory each empty the loop, and each would otherwise exit 0. This is
+  `test_docs_examples.py`'s vacuous-glob guard, finally extended to the page
+  half — the issue behind this work named that precedent and it had been left
+  unapplied through three of the four steps.
 - The nightly step is fatal only when the checkout matches the released tag. It is
   amnestied when the tree is AHEAD, because the leg's banner promises that and
   `test_nightly_wiring.py` enforces it — a page program breaking because this tree

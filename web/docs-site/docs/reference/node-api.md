@@ -64,7 +64,7 @@ chained verbs return something you keep working on.
 
 ```js
 const file = read("delivery.ags").validate({ warnings: true });
-if (!file.report.ok) file.fix().save("clean.ags");
+if (!file.report.isValid) file.fix().save("clean.ags");
 ```
 
 !!! note "Python-only"

@@ -449,6 +449,19 @@ def run_page_programs(surface: Surface, langs: list[str]) -> list[tuple[str, str
         f"gen_doc_outputs: ran {ran} {surface.name} page program(s) "
         f"({'/'.join(langs)}); {len(failures)} failed"
     )
+    if not ran:
+        # Zero is the one result a green run cannot mean. `test_docs_examples.py`
+        # guards its glob for exactly this reason — "a moved directory would make
+        # every example pass by not running" — and the issue behind this work
+        # names that guard as the precedent the page half had not inherited. A
+        # fence-regex change, a routing-table typo, or a docs directory moving
+        # would each empty this loop, and every one of them would exit 0.
+        sys.exit(
+            f"gen_doc_outputs: no {surface.name} page programs found "
+            f"({'/'.join(langs)}) — the surface is routed to this runner, so "
+            "finding none means discovery is broken, not that there is nothing "
+            "to run"
+        )
     return failures
 
 
