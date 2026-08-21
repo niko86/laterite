@@ -80,11 +80,23 @@ Two conditions were considered; only one needs watching.
   as a deliberate decision, and that decision reopens this question by itself.
   Nothing needs to watch for it.
 - **The crates.io publish needs to leave the maintainer's laptop.** The stronger
-  trigger, and the one being tracked — see
+  trigger, and the one that was being tracked — see
   [#463](https://github.com/niko86/laterite/issues/463), which carries the
   evidence and records the publisher-half-step as the alternative it was measured
   against. That framing is deliberate: adopting release-plz stays **one decision**
   away rather than one investigation away.
+
+  > [!note] The trigger fired, and release-plz was not what answered it
+  > #463 moved the publish into `repo:.github/workflows/publish-crates.yml`,
+  > authenticated by crates.io Trusted Publishing — an OIDC exchange with no
+  > stored token, the same shape `pypi-publish` and `npm-publish` already use.
+  > What changed under this page is the registry, not the tool: crates.io shipped
+  > trusted publishing after the spike, so the half-step that made release-plz
+  > attractive here (someone to hold the credential) stopped being needed at all.
+  >
+  > So the condition is **spent**, not pending. Adopting release-plz is now a
+  > plain decision with nothing waiting on it, which is a weaker case than the
+  > one this page deferred — the manual step it would have refunded is gone.
 
 **"When there are N crates" is NOT the trigger**, and recording that was half the
 point of the spike. `publish_crates.py` derives its waves from the manifests on
@@ -96,9 +108,12 @@ another engine crate costs nothing release-plz would refund.
 - `repo:tools/publish_crates.py` stays, and stays the only publish path for the
   engine tier. `repo:tools/release/engine-version.toml` and its guard test stay
   with it.
-- The highest-consequence manual step in the release process remains manual, on
-  the one registry that cannot be corrected after the fact. That is the accepted
-  cost, and #463 is where it gets paid.
+- ~~The highest-consequence manual step in the release process remains manual, on
+  the one registry that cannot be corrected after the fact.~~ **Paid, in #463.**
+  The publish runs from GitHub behind the `crates` environment's reviewer, so the
+  append-only registry is now the one with an approval in front of it rather than
+  the one without. What stays manual is the *dispatch* and the approval, which is
+  the point of them.
 - **If this is revisited, start from #216's spike comment, not from that issue's
   body** — the body was written before any of it was checked against the source,
   and several of its premises did not survive contact.

@@ -191,16 +191,33 @@ git switch -c release/engine-0.10.0
 tools/release/bump-version.sh engine minor   # stamps rust-packages/Cargo.toml only
 gh pr create -B main -t "release: engine 0.10.0" -b "engine version bump"
 
-# once merged, from main:
-uv run --no-sync python tools/publish_crates.py             # dry run — prints the waves
-uv run --no-sync python tools/publish_crates.py --execute
+# once merged, publish from GitHub — never from a laptop (#463):
+gh workflow run publish-crates.yml --ref main                      # rehearsal: prints the waves
+gh workflow run publish-crates.yml --ref main -f execute=true      # the real thing
 ```
 
-`publish_crates.py` derives the dependency waves from the manifests, waits for
-each wave to become *resolvable* from the registry before starting the next, and
-is idempotent — a re-run after a failure resumes rather than restarting. It
-refuses a dirty tree, any branch but `main`, and any crate marked
-`publish = false`.
+Then **approve the `crates` environment** in the resulting Actions run, the same
+way `pypi` and `npm` are approved.
+
+`.github/workflows/publish-crates.yml` runs `tools/publish_crates.py` — the same
+script, in the one place it should run. crates.io is the only **append-only**
+registry of the three: a published version can never be withdrawn or re-cut,
+and there is no equivalent of the tag retarget that recovered 0.8.0. Doing the
+least reversible step by hand, with no environment gate and no approval, was
+what #463 was filed about.
+
+It carries no token. crates.io Trusted Publishing validates this repo, that
+workflow **filename** and the `crates` environment over OIDC — so renaming or
+moving that file breaks the publish for all eleven crates at once. The
+per-crate configs live under each crate's Settings → Trusted Publishing on
+crates.io.
+
+Locally the script is still the way to *look*: run it with no flags and it
+performs every check and prints what it would do. It derives the dependency
+waves from the manifests, waits for each wave to become *resolvable* from the
+registry before starting the next, and is idempotent — a re-run after a failure
+resumes rather than restarting. It refuses a dirty tree, any branch but `main`,
+and any crate marked `publish = false`.
 
 **An engine release reaches nobody on its own.** Every product is built from
 these crates and keeps shipping the previous engine until it is rebuilt, so
