@@ -53,6 +53,7 @@ path.
 | `ags_relationships()`                                  | the group parent/child (KEY) graph                          |
 | `ags_rules()`                                          | the AGS4 numbered-rule catalogue (severity, fixability)     |
 | `load_ags(path)`                                       | CREATE TABLE DDL to materialise an indexed, keyed copy      |
+| `to_duckdb(path, out_db)`                              | the same DDL, wrapped to persist into a standalone `.duckdb` |
 
 ## Inspect the dictionary
 
