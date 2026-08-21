@@ -51,7 +51,13 @@ describe("chartSql", () => {
     );
   });
 
-  it("bar + avg + colour groups by X and the colour column", () => {
+  it("declines to compose an aggregate + colour without the probe's answer", () => {
+    // The two-phase contract, held HERE rather than in the component (#457).
+    // On this path the colour column is a group key, so the fold has to happen
+    // inside the GROUP BY or not at all — and what survives is the probe's
+    // answer. Composing without it would emit a `c` the assembler cannot match
+    // against the ranking, which paints every series neutral: a chart that
+    // looks drawn and is wrong. "" is the loud answer.
     expect(
       chartSql({
         table: "T",
@@ -62,12 +68,33 @@ describe("chartSql", () => {
         agg: "avg",
         rowCap: 100,
       }),
+    ).toBe("");
+  });
+
+  it("bar + avg + colour folds the tail inside the GROUP BY", () => {
+    expect(
+      chartSql({
+        table: "T",
+        x: "g",
+        y: "v",
+        colour: "k",
+        chartType: "bar",
+        agg: "avg",
+        rowCap: 100,
+        fold: { keep: ["a", "b"], label: "Other" },
+      }),
     ).toBe(
-      `SELECT "g" AS x, AVG("v") AS y, "k" AS c FROM "T" WHERE "v" IS NOT NULL GROUP BY "g", "k" ORDER BY x LIMIT 100`,
+      `SELECT "g" AS x, AVG("v") AS y,` +
+        ` CASE WHEN COALESCE(CAST("k" AS VARCHAR), '') IN ('a', 'b')` +
+        ` THEN COALESCE(CAST("k" AS VARCHAR), '') ELSE 'Other' END AS c` +
+        ` FROM "T" WHERE "v" IS NOT NULL` +
+        ` GROUP BY "g", CASE WHEN COALESCE(CAST("k" AS VARCHAR), '') IN ('a', 'b')` +
+        ` THEN COALESCE(CAST("k" AS VARCHAR), '') ELSE 'Other' END` +
+        ` ORDER BY x LIMIT 100`,
     );
   });
 
-  it("bar + count + colour: COUNT(*), no Y filter, grouped by X and colour", () => {
+  it("bar + count + colour: COUNT(*), no Y filter, folded and grouped", () => {
     expect(
       chartSql({
         table: "T",
@@ -77,9 +104,34 @@ describe("chartSql", () => {
         chartType: "bar",
         agg: "count",
         rowCap: 100,
+        fold: { keep: ["a"], label: "Other" },
       }),
     ).toBe(
-      `SELECT "g" AS x, COUNT(*) AS y, "k" AS c FROM "T" GROUP BY "g", "k" ORDER BY x LIMIT 100`,
+      `SELECT "g" AS x, COUNT(*) AS y,` +
+        ` CASE WHEN COALESCE(CAST("k" AS VARCHAR), '') IN ('a')` +
+        ` THEN COALESCE(CAST("k" AS VARCHAR), '') ELSE 'Other' END AS c` +
+        ` FROM "T"` +
+        ` GROUP BY "g", CASE WHEN COALESCE(CAST("k" AS VARCHAR), '') IN ('a')` +
+        ` THEN COALESCE(CAST("k" AS VARCHAR), '') ELSE 'Other' END` +
+        ` ORDER BY x LIMIT 100`,
+    );
+  });
+
+  it("aggregates with no colour at all, exactly as before", () => {
+    // The fold only exists where a colour column does; nothing on this path
+    // changed, and a `fold` handed in anyway is not a group key to apply.
+    const bare = {
+      table: "GEOL" as const,
+      x: "GEOL_LEG",
+      y: "",
+      chartType: "bar" as const,
+      agg: "count" as const,
+      rowCap: 5000,
+    };
+    const expected = `SELECT "GEOL_LEG" AS x, COUNT(*) AS y FROM "GEOL" GROUP BY "GEOL_LEG" ORDER BY x LIMIT 5000`;
+    expect(chartSql(bare)).toBe(expected);
+    expect(chartSql({ ...bare, fold: { keep: ["a"], label: "Other" } })).toBe(
+      expected,
     );
   });
 
@@ -130,6 +182,122 @@ describe("chartSql", () => {
   });
 });
 
+// The tail fold, on the one path that can merge it correctly (#457). An
+// aggregating bar groups by (x, colour), so folding in the assembler leaves the
+// tail with one point per folded value PER CATEGORY, drawn on top of each other
+// — a single visible bar with no sign that more than one value is under it.
+// Inside the GROUP BY the aggregate is computed over the merged group's own
+// rows instead, which makes `avg` as correct as `sum`.
+describe("chartSql — the fold", () => {
+  const bar = {
+    table: "T",
+    x: "g",
+    y: "v",
+    colour: "k",
+    chartType: "bar" as const,
+    agg: "avg" as const,
+    rowCap: 100,
+  };
+
+  it("quotes every survivor, including one that looks like a number", () => {
+    // NOT through `lit`, whose bare-number branch is a trap here: DuckDB reads
+    // `"k" IN (1)` as a NUMERIC comparison, which matches the string '01' to 1
+    // and hard-errors on the first non-numeric row in the column. The left side
+    // is text by construction, so the literals are too.
+    const s = chartSql({ ...bar, fold: { keep: ["1", "01"], label: "Other" } });
+    expect(s).toContain(`IN ('1', '01')`);
+    expect(s).not.toContain(`IN (1,`);
+  });
+
+  it("escapes a quote in a survivor and in the label", () => {
+    const s = chartSql({
+      ...bar,
+      fold: { keep: ["O'Brien"], label: "Other's" },
+    });
+    expect(s).toContain(`IN ('O''Brien')`);
+    expect(s).toContain(`ELSE 'Other''s'`);
+  });
+
+  it("emits the caller's label, so a value named 'Other' keeps its own bar", () => {
+    // `foldLabel` steps the fold aside from a survivor carrying that name, and
+    // the query now MATERIALISES that label as data — so it has to be the same
+    // string the legend will show, not a second guess at it.
+    const s = chartSql({
+      ...bar,
+      fold: { keep: ["Other", "b"], label: "Other (2)" },
+    });
+    expect(s).toContain(`IN ('Other', 'b')`);
+    expect(s).toContain(`ELSE 'Other (2)' END`);
+  });
+
+  it("emits no IN list when the probe ranked nothing", () => {
+    // The probe returns no rows only when nothing passes the shared WHERE — so
+    // this query has none either. `IN ()` is a syntax error where there is
+    // nothing to fold.
+    const s = chartSql({ ...bar, fold: { keep: [], label: "Other" } });
+    expect(s).toContain(`COALESCE(CAST("k" AS VARCHAR), '') AS c`);
+    expect(s).not.toContain("CASE");
+    expect(s).not.toContain("IN (");
+  });
+
+  it.each(["sum", "avg", "min", "max"] as const)(
+    "computes %s over the folded group rather than over its folded parts",
+    (agg) => {
+      // The merge IS the grouping: every aggregate the form offers runs over
+      // the merged group's own rows, so none of them needs a merge rule of its
+      // own. `avg` is the one that could not be merged after the fact, and it
+      // takes this path unchanged alongside the three that could.
+      const s = chartSql({
+        ...bar,
+        agg,
+        fold: { keep: ["a"], label: "Other" },
+      });
+      expect(s).toContain(`${agg.toUpperCase()}("v") AS y`);
+      expect(s).toContain(`GROUP BY "g", CASE WHEN`);
+      expect(s).toContain(`ELSE 'Other' END ORDER BY x`);
+    },
+  );
+
+  it("leaves scatter and line composing exactly as they did", () => {
+    // Their pooling is CORRECT — a point cloud has nothing to merge — so the
+    // fold must not reach them even when one is handed over.
+    const raw = { ...bar, chartType: "scatter" as const, agg: "none" as const };
+    const expected = `SELECT "g" AS x, "v" AS y, "k" AS c FROM "T" WHERE "g" IS NOT NULL AND "v" IS NOT NULL LIMIT 100`;
+    expect(chartSql(raw)).toBe(expected);
+    expect(chartSql({ ...raw, fold: { keep: ["a"], label: "Other" } })).toBe(
+      expected,
+    );
+    // Bar with NO aggregate is a raw plot too, and takes the same path.
+    expect(
+      chartSql({
+        ...raw,
+        chartType: "bar",
+        fold: { keep: ["a"], label: "Other" },
+      }),
+    ).toContain(`"k" AS c`);
+  });
+
+  it("folds a colour that came from the joined table", () => {
+    const s = chartSql({
+      ...bar,
+      alias: "t0",
+      joins: [
+        {
+          table: "GEOL",
+          alias: "t1",
+          kind: "LEFT",
+          leftAlias: "t0",
+          on: [{ left: "LOCA_ID", right: "LOCA_ID" }],
+        },
+      ],
+      colour: { alias: "t1", col: "GEOL_LEG" },
+      fold: { keep: ["CL"], label: "Other" },
+    });
+    expect(s).toContain(`COALESCE(CAST(t1."GEOL_LEG" AS VARCHAR), '')`);
+    expect(s).toContain(`GROUP BY t0."g", CASE WHEN`);
+  });
+});
+
 // The probe that decides which colour-by values keep a palette slot. What it
 // must NOT be is a read of the plotted rows: the scatter path is a bare row
 // LIMIT with no ORDER BY, so the values it returns are an arbitrary slice.
@@ -172,6 +340,43 @@ describe("chartRankSql", () => {
     expect(
       chartRankSql({ ...base, y: "", chartType: "bar", agg: "count" }),
     ).toContain(`FROM "LOCA" GROUP BY`);
+  });
+
+  it("ranks the same rendering of the value the plot query will emit", () => {
+    // The assembler matches the probe's values against the plot's by STRING,
+    // and on the aggregating path the plot has to render the colour as text to
+    // name the fold at all — DuckDB writes a DOUBLE as '1.0' where JS writes
+    // '1'. Rank the raw value there and no survivor would ever match its own
+    // rows: every series would fall into the neutral (#457).
+    expect(chartRankSql({ ...base, chartType: "bar", agg: "avg" })).toContain(
+      `SELECT COALESCE(CAST("LOCA_TYPE" AS VARCHAR), '') AS c, COUNT(*) AS n`,
+    );
+    expect(chartRankSql({ ...base, chartType: "bar", agg: "avg" })).toContain(
+      `GROUP BY COALESCE(CAST("LOCA_TYPE" AS VARCHAR), '') ORDER BY n DESC`,
+    );
+    // Scatter and line rank the raw value, exactly as they did.
+    expect(chartRankSql(base)).toContain(`SELECT "LOCA_TYPE" AS c`);
+    expect(chartRankSql({ ...base, chartType: "line" })).not.toContain("CAST");
+  });
+
+  it("renders the colour identically to the plot query it ranks for", () => {
+    // The invariant the two-phase path stands on. The assembler matches the
+    // probe's values against the plotted rows' BY STRING, so if these two
+    // expressions ever diverge no survivor matches its own rows: every series
+    // painted neutral, under a legend naming none of them, with no error
+    // anywhere. Derived from both strings rather than restated, so a change to
+    // one composer alone cannot leave this green.
+    const expr = (sql: string) =>
+      /COALESCE\(CAST\(.*? AS VARCHAR\), ''\)/.exec(sql)?.[0];
+    const opts = { ...base, chartType: "bar" as const, agg: "avg" as const };
+    const probe = chartRankSql({ ...opts, cap: 3 });
+    const plot = chartSql({
+      ...opts,
+      rowCap: 100,
+      fold: { keep: ["A"], label: "Other" },
+    });
+    expect(expr(probe)).toBeDefined();
+    expect(expr(plot)).toBe(expr(probe));
   });
 
   it("returns '' on exactly the selections the plot query declines", () => {

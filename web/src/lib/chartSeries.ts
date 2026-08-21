@@ -82,8 +82,13 @@ export const seriesCap = (chartType: ChartType): number =>
  *  "Other" is a real value in more than one AGS abbreviation list, and two
  *  ECharts series sharing a name share a legend entry — so the fold steps
  *  aside rather than colliding with a value it is not. Same idiom as
- *  `dedupeOut` in the SQL composer. */
-function foldLabel(survivors: readonly string[]): string {
+ *  `dedupeOut` in the SQL composer.
+ *
+ *  Exported because the aggregating bar folds in SQL (#457): that query
+ *  materialises this label as DATA, so the literal it emits and the legend
+ *  entry here have to be one function's answer over one list. Two guesses at
+ *  it would put the fold's own rows in a series named something else. */
+export function foldLabel(survivors: readonly string[]): string {
   let label = OTHER;
   for (let n = 2; survivors.includes(label); n++) label = `${OTHER} (${n})`;
   return label;
@@ -124,14 +129,18 @@ export function assembleSeries(o: AssembleOpts): ChartSeries[] {
   // Bucketed by SLOT, not by name: `foldLabel` keeps the legend unambiguous,
   // but only an index can keep a value named "Other" out of the fold's DATA.
   //
-  // Points are POOLED, never merged. On an aggregated bar the query has already
-  // grouped by (x, colour), so folding several values leaves the tail with more
-  // than one point per category, drawn at the same place. Merging them here is
-  // not available: the right merge is the aggregate's own — sum for sum and
-  // count, min for min, max for max — and there is no honest one for avg, whose
-  // mean of means is not the mean. Doing it correctly means re-aggregating in
-  // SQL, which is a change to the plot query's shape rather than to the probe.
-  // Pinned by a test so the shape is known and not accidental.
+  // Points are POOLED, never merged, and that is the whole of what this loop
+  // may do. For a point cloud pooling IS the fold — scatter and line have
+  // nothing to merge. For an aggregated bar it was wrong: the query had already
+  // grouped by (x, colour), so folding several values left the tail with a bar
+  // per folded value at the same category, at the same width, one over another.
+  // The merge was never available here — the right one is the aggregate's own,
+  // and avg has none that is honest, since a mean of means is not the mean
+  // without each group's row count, which this row set does not carry. So that
+  // path now folds in SQL instead, inside the GROUP BY, where the aggregate
+  // runs over the merged group's raw rows and avg is as correct as sum (#457).
+  // The label arrives here as an ordinary colour value, absent from the
+  // ranking, and buckets to the fold below with no special case.
   const FOLD = -1;
   const buckets = new Map<number, ChartPoint[]>();
   for (const row of o.rows) {

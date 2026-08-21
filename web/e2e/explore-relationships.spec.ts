@@ -154,5 +154,63 @@ test("Explore charts: a colour column with more values than slots still plots", 
   await page.getByLabel("colour by").selectOption("c.SAMP_ID");
 
   await expect(page.locator("canvas").first()).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByText(/Chart query error/)).toHaveCount(0);
+  // Either query — the plot's or the probe's — and the banner names which.
+  await expect(page.getByText(/query error/)).toHaveCount(0);
+});
+
+test("Explore charts: an aggregated bar MERGES the folded tail, avg included", async ({
+  page,
+}) => {
+  // The numeric half of #457, which only real DuckDB can answer. The unit lane
+  // pins the string the composer emits; what it cannot show is that grouping on
+  // that expression makes the aggregate run over the merged group's RAW rows.
+  //
+  // chart_fold.ags is built for exactly that: SAMP_REF has 7 distinct values,
+  // two more than a bar's slot count, and the two that fold carry an uneven
+  // number of rows under SAMP_TYPE "U" — S6 one row at 20.00, S7 two at 40.00
+  // and 120.00. Merged, the mean is 60. The old fold drew those as TWO bars,
+  // at 20 and at 80, at one category; averaging them after the fact would give
+  // 50, which is the answer `avg` has no honest way to reach from the plotted
+  // rows. Even row counts would leave 60 and 50 equal and the assertion
+  // toothless.
+  await ready(page);
+  await load(page, "chart_fold.ags");
+  await enterExplore(page);
+  await page.getByRole("button", { name: "Charts" }).click();
+
+  await page.getByLabel("Table").selectOption("SAMP");
+  await page.getByLabel("Chart").selectOption("bar");
+  await page.getByLabel("Aggregate").selectOption("avg");
+  await page.getByLabel("x axis").selectOption("c.SAMP_TYPE");
+  await page.getByLabel("y axis").selectOption("c.SAMP_TOP");
+  await page.getByLabel("colour by").selectOption("c.SAMP_REF");
+
+  await expect(page.locator("canvas").first()).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText(/query error/)).toHaveCount(0);
+
+  // The pane shows the query that RAN — the folded one, composed only once the
+  // probe had ranked the survivors. Before this it showed the plain query and
+  // never mentioned the probe at all.
+  await page.locator("details summary").first().click();
+  const pre = page.locator("details pre").first();
+  await expect(pre).toContainText(`IN ('S1', 'S2', 'S3', 'S4', 'S5')`);
+  await expect(pre).toContainText(`ELSE 'Other' END`);
+  const sql = (await pre.textContent()) ?? "";
+
+  // Run that same query through the SQL console: the canvas cannot be read, and
+  // the value the tail bar is drawn at is the whole claim.
+  await page.getByRole("button", { name: "SQL" }).click();
+  await runSql(page, sql);
+  await expect(page.getByText(/SQL error/)).toHaveCount(0);
+
+  const tail = page.locator("tbody tr").filter({ hasText: "Other" });
+  // ONE row per category, not one per folded value — the merge itself.
+  await expect(tail).toHaveCount(2, { timeout: 30_000 });
+  // Asserted on the CELL, not on the row's run-together text: 60 is the mean of
+  // 20, 40 and 120. 20 and 80 are the two bars the pooled fold drew here, 50
+  // their after-the-fact mean — none of the three survive the merge.
+  const cell = (v: string | RegExp) =>
+    page.getByRole("cell", { name: v, exact: true });
+  await expect(tail.filter({ has: cell("60") })).toHaveCount(1);
+  await expect(tail.filter({ has: cell(/^(50|80|20)$/) })).toHaveCount(0);
 });

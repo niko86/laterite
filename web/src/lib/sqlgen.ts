@@ -6,12 +6,14 @@
  *  heading with a `"` can't break out. */
 export const q = (id: string) => `"${id.replace(/"/g, '""')}"`;
 
+/** A single-quoted string literal, internal quotes doubled. The one place a
+ *  user value is escaped into SQL; `lit` is its number-aware caller. */
+const textLit = (v: string) => `'${v.replace(/'/g, "''")}'`;
+
 /** A WHERE value literal: a bare number stays unquoted (numeric comparison);
  *  anything else becomes a single-quoted string literal (quotes escaped). */
 export const lit = (v: string) =>
-  v.trim() !== "" && !Number.isNaN(Number(v))
-    ? v.trim()
-    : `'${v.replace(/'/g, "''")}'`;
+  v.trim() !== "" && !Number.isNaN(Number(v)) ? v.trim() : textLit(v);
 
 // --- LIKE wildcard control ---------------------------------------------------
 export type Wildcard = "contains" | "starts" | "ends" | "exact";
@@ -135,9 +137,24 @@ interface ChartQueryBase {
   agg: Agg;
 }
 
+/** The tail fold, on the aggregating bar path: which colour values keep a group
+ *  of their own, and the label everything else collapses onto. */
+export interface ChartFold {
+  /** The survivors, as `chartRankSql` returned them and as the series
+   *  assembler will match them — text, not values. */
+  keep: readonly string[];
+  /** `foldLabel`'s answer for exactly that list. The query MATERIALISES this
+   *  as data, so it has to be the string the legend will show, not a second
+   *  guess at it — see `chartSeries.foldLabel`. */
+  label: string;
+}
+
 export interface ChartSqlOpts extends ChartQueryBase {
   colour?: string | QualifiedCol;
   rowCap: number;
+  /** Required on the aggregating path with a colour-by, ignored everywhere
+   *  else. Without it that path composes NO query — see `chartSql`. */
+  fold?: ChartFold;
 }
 
 export interface ChartRankOpts extends ChartQueryBase {
@@ -147,6 +164,33 @@ export interface ChartRankOpts extends ChartQueryBase {
    *  exists — a value the probe did not return folds by not being in the list,
    *  which is the same thing that happens to one ranked past the cap. */
   cap: number;
+}
+
+/** The colour value AS TEXT — DuckDB's own rendering, NULL read as the empty
+ *  string, which is `scalarText`'s two rules moved into SQL.
+ *
+ *  Aggregating with a colour-by is the one path where the query has to NAME the
+ *  fold, and a name is a string. `CASE WHEN … THEN <a DOUBLE> ELSE 'Other' END`
+ *  does not widen to VARCHAR in DuckDB: it resolves to DOUBLE and fails the
+ *  whole query converting 'Other'. So the colour becomes text BEFORE the fold
+ *  is applied — and the probe renders it the same way, because the assembler
+ *  matches the two by string and DuckDB writes a DOUBLE as '1.0' where JS
+ *  writes '1'. Rendering them differently would leave no survivor matching its
+ *  own rows: every series in the neutral, under a legend naming none of them. */
+const colourText = (cr: string) => `COALESCE(CAST(${cr} AS VARCHAR), '')`;
+
+/** The colour expression an aggregating plot query groups by: the value as
+ *  text, with everything the probe did not rank collapsed onto one label. */
+function foldedColour(cr: string, fold: ChartFold): string {
+  const ce = colourText(cr);
+  // No survivors means the probe found no rows — and it shares this query's
+  // FROM and WHERE, so neither does this one. `IN ()` is a syntax error where
+  // there is nothing to fold.
+  if (fold.keep.length === 0) return ce;
+  return (
+    `CASE WHEN ${ce} IN (${fold.keep.map(textLit).join(", ")})` +
+    ` THEN ${ce} ELSE ${textLit(fold.label)} END`
+  );
 }
 
 /** Resolve a column to its SQL reference: `"col"` single-table; `alias."col"`
@@ -207,28 +251,40 @@ function chartScope(o: ChartQueryBase): {
   };
 }
 
-/** Compose the chart query. Returns "" when the selection is incomplete (no
- *  table/X, or no Y unless counting). Scatter/line select raw X/Y (line is
- *  ordered by X); bar with an aggregate GROUP BYs the X category (+ colour).
- *  With `joins`, X/Y/colour are alias-qualified and the JOINs are emitted; the
- *  output aliases (x/y/c) are unchanged so the ECharts mapping is untouched. */
+/** Compose the chart query. Scatter/line select raw X/Y (line is ordered by X);
+ *  bar with an aggregate GROUP BYs the X category (+ the folded colour). With
+ *  `joins`, X/Y/colour are alias-qualified and the JOINs are emitted; the output
+ *  aliases (x/y/c) are unchanged so the ECharts mapping is untouched.
+ *
+ *  Returns "" when there is no query to compose: an incomplete selection (no
+ *  table/X, or no Y unless counting), or — on the aggregating path with a
+ *  colour-by — no `fold`.
+ *
+ *  That second case is the two-phase dependency, held here rather than in the
+ *  component (#457). On that path the colour is a GROUP KEY, so the tail has to
+ *  fold inside the GROUP BY or not at all, and what survives is the probe's
+ *  answer. Composing without it would emit a `c` the assembler cannot match
+ *  against the ranking — every series painted neutral under a legend naming
+ *  none of them, a chart that looks drawn and is wrong. "" is the loud answer,
+ *  and it makes the wait the composer's rule rather than a caller's discipline. */
 export function chartSql(o: ChartSqlOpts): string {
   const scope = chartScope(o);
   if (!scope) return "";
   const { from, where, ref, counting, aggregating } = scope;
-  const { x, y, colour, chartType, agg, rowCap } = o;
+  const { x, y, colour, chartType, agg, rowCap, fold } = o;
   const xr = ref(x);
   const yr = y ? ref(y) : "";
   const cr = colour ? ref(colour) : "";
-  const selC = cr ? `, ${cr} AS c` : "";
   if (aggregating) {
+    if (cr && !fold) return "";
+    const ce = cr && fold ? foldedColour(cr, fold) : "";
     const yExpr = counting ? "COUNT(*)" : `${agg.toUpperCase()}(${yr})`;
-    const groupBy = cr ? `${xr}, ${cr}` : xr;
     return (
-      `SELECT ${xr} AS x, ${yExpr} AS y${selC} ${from}${where}` +
-      ` GROUP BY ${groupBy} ORDER BY x LIMIT ${rowCap}`
+      `SELECT ${xr} AS x, ${yExpr} AS y${ce ? `, ${ce} AS c` : ""} ${from}${where}` +
+      ` GROUP BY ${ce ? `${xr}, ${ce}` : xr} ORDER BY x LIMIT ${rowCap}`
     );
   }
+  const selC = cr ? `, ${cr} AS c` : "";
   const order = chartType === "line" ? ` ORDER BY ${xr}` : "";
   return (
     `SELECT ${xr} AS x, ${yr} AS y${selC} ${from}${where}${order}` +
@@ -249,7 +305,12 @@ export function chartSql(o: ChartSqlOpts): string {
 export function chartRankSql(o: ChartRankOpts): string {
   const scope = chartScope(o);
   if (!scope) return "";
-  const cr = scope.ref(o.colour);
+  // The aggregating path renders the colour as text so its plot query can name
+  // the fold, and this ranking has to be a ranking of exactly the values that
+  // query emits — the assembler matches the two by string. See `colourText`.
+  const cr = scope.aggregating
+    ? colourText(scope.ref(o.colour))
+    : scope.ref(o.colour);
   return (
     `SELECT ${cr} AS c, COUNT(*) AS n ${scope.from}${scope.where}` +
     ` GROUP BY ${cr} ORDER BY n DESC, c ASC LIMIT ${o.cap}`

@@ -126,6 +126,22 @@ keeps its referent.
   query is a bare row `LIMIT` with no `ORDER BY`, so its values are an arbitrary
   slice and a legend saying "Other" over them would claim more than the sample
   supports.
+- **On one form the fold happens in SQL, and the plot query is two-phase**
+  (#457). The fold above is a *pooling* of points, which is the whole of what a
+  point cloud wants. An aggregating bar is the exception: its query groups by
+  (category, colour), so pooling left the tail with a bar per folded value at one
+  category, drawn at one width, one over another — read as a single bar. The
+  merge is not available at the assembler, because the right one is the
+  aggregate's own and `avg` has none that is honest without each group's row
+  count. So that path composes its plot query only once the probe has answered,
+  mapping non-survivors to `foldLabel`'s own string inside the `GROUP BY`
+  (`repo:web/src/lib/sqlgen.ts`), and the aggregate runs over the merged group's
+  raw rows. Three costs were accepted with it, and are not defects: the plot
+  query stops being a pure function of the form controls, its round trip is
+  serialised behind the probe's, and the colour is rendered as text on **both**
+  queries there — a `CASE` naming the fold resolves to the column's own type in
+  DuckDB and fails the query converting `'Other'`, and the two renderings have to
+  match or no survivor matches its own rows.
 - **It rules out** reintroducing hue angle as a proximity measure, and reusing the
   brand ramp for any categorical channel.
 
@@ -136,5 +152,6 @@ repo:web/src/shared/styles/colors.css ·
 repo:web/src/shared/styles/separation.test.ts ·
 repo:web/src/shared/styles/contrast.test.ts ·
 repo:web/src/shared/styles/chartSlots.ts · repo:web/src/lib/chartTheme.ts ·
-repo:web/src/lib/chartSeries.ts · repo:web/src/components/explore/ChartBuilder.tsx ·
+repo:web/src/lib/chartSeries.ts · repo:web/src/lib/sqlgen.ts ·
+repo:web/src/components/explore/ChartBuilder.tsx ·
 repo:web/docs-site/docs/stylesheets/laterite.css
