@@ -9,7 +9,6 @@ editions_affected: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 rules: []
 proposes_observation: true
 feeds_strategy: [strat-parity-matrix]
-feeds_ags5_req: []
 discovered_phase: D
 related: [parity-model, strat-parity-matrix, oracle-drift-pin, rust-vs-python-ags4-parity, O-36]
 sources: []

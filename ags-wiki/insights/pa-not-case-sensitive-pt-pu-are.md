@@ -9,7 +9,6 @@ editions_affected: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 rules: [rule-16-abbr-group, rule-15-unit-group, rule-17-type-group]
 proposes_observation: false
 feeds_strategy: []
-feeds_ags5_req: []
 discovered_phase: A
 related: [start-here]
 sources: [spec-4.2]

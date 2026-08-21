@@ -9,7 +9,6 @@ editions_affected: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 rules: [rule-07-heading-order]
 proposes_observation: true
 feeds_strategy: [strat-o8-dup-heading-refuted]
-feeds_ags5_req: []
 discovered_phase: D
 related: [O-08, strat-o8-dup-heading-refuted, rule-07-heading-order, rule-09-unknown-headings]
 sources: []

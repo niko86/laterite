@@ -9,7 +9,6 @@ probe_files: [ags-wiki/.bootstrap/probes/parity-matrix.json]
 expected_rust: ""
 expected_python: ""
 evidence: "forge mine report.json per run (combo · seed · signature · divergence_prone · verdict · python_rules)"
-feeds_ags5_req: []
 related: [laterite-ags4-forge, evolutionary-dogfooding, strat-parity-matrix, strat-forge-rule10a-relational, parity-model]
 sources: []
 ---

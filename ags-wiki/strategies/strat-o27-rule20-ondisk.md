@@ -9,7 +9,6 @@ probe_files: [ags-wiki/.bootstrap/probes/probe-o27-file-ondisk.ags]
 expected_rust: "Rule 20 (with --check-files) — matches python"
 expected_python: "Rule 20 (always-on on-disk)"
 evidence: "probe-run + implementation — ags-wiki/.bootstrap/probes/RESULTS.md"
-feeds_ags5_req: []
 related: [rule-20-file-fset, O-27, parity-model, parity-cascade-unreconcilable, cert-trust-v2]
 sources: []
 ---

@@ -9,7 +9,6 @@ probe_files: [ags-wiki/.bootstrap/probes/probe-forge-rule10a-relational.ags]
 expected_rust: "Rule 10a (duplicate KEY tuple within SAMP under one LOCA)"
 expected_python: "Rule 10a (rule_10a duplicate key) — expected AGREE; to be confirmed by probe"
 evidence: "laterite-ags4-forge gen(loca-samp,inject rule10a) → ddmin → probe-forge-rule10a-relational.ags; reproduced via lat (exit 1, Rule 10a) AND uv run tools/py_ags4_check_json.py (Rule 10a fired), cwd repo root → forge classify = AGREE"
-feeds_ags5_req: []
 related: [rule-10a-key-uniqueness, parity-model, evolutionary-dogfooding, laterite-ags4-forge, strat-parity-matrix, O-35, O-03]
 sources: []
 ---

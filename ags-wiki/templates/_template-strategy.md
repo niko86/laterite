@@ -9,7 +9,6 @@ probe_files: []               # ags-wiki/.bootstrap/probes/<name>.ags
 expected_rust: ""
 expected_python: ""
 evidence: ""                  # probe output ref once run
-feeds_ags5_req: []
 related: []
 sources: []
 ---

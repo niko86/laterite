@@ -9,7 +9,6 @@ probe_files: [ags-wiki/.bootstrap/probes/probe-o8-dup-heading.ags]
 expected_rust: "Rule 7 (duplicate field names), completes (bounds-guarded)"
 expected_python: "(hypothesised) IndexError crash → PythonError"
 evidence: "probe-run — ags-wiki/.bootstrap/probes/RESULTS.md"
-feeds_ags5_req: []
 related: [rule-07-heading-order, rule-09-unknown-headings, O-08, o8-unreachable-rename-dup-headers]
 sources: []
 ---

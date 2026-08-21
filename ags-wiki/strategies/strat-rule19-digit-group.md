@@ -9,7 +9,6 @@ probe_files: [ags-wiki/.bootstrap/probes/probe-rule19-digit.ags]
 expected_rust: "Rule 19 (de-facto exactly-4-letters — correct vs the dictionary)"
 expected_python: "no Rule 19 (python's len==4 & isupper() both pass 'AB12' — a narrower de-facto check)"
 evidence: "probe-run / prior dogfood — see body"
-feeds_ags5_req: []
 related: [rule-19-group-name-format, rule19-spec-allows-numbers-validator-may-not, O-06, O-07]
 sources: []
 ---

@@ -9,7 +9,6 @@ editions_affected: [4.0.3, 4.0.4, 4.1, 4.1.1, 4.2]
 rules: [rule-08-typed-values]
 proposes_observation: true
 feeds_strategy: []
-feeds_ags5_req: []
 discovered_phase: D
 related: [rule-08-typed-values, nDP, O-49, O-50, python-ags4]
 sources: [spec-4.2]
