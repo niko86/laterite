@@ -586,6 +586,12 @@ BUILDLESS_TOOLS = [
     "tools/gen_modality.py",  # repo-gates
     "tools/gen_observations.py",  # repo-gates
     "tools/release/trusted_publishing.py",  # no CI job at all — run by hand, once
+    # The first tools added after `code` stopped listing `tools/**` (#271's
+    # measurement harnesses). Under the old glob a bench script nobody runs in
+    # CI bought a cargo build, the cdylib, pytest and a wheel smoke; these fire
+    # only the cheap stdlib `cadence` job, which is the narrowing working.
+    "tools/bench-cert-parse-share.py",
+    "tools/bench-cert-python-routes.py",
     "tools/xcheck/emit_py.py",  # nightly.yml, which has no path filter
     "ags-wiki/.bootstrap/lint.py",  # wiki-lint.yml
     "ags-wiki/.bootstrap/reindex.py",  # wiki-lint.yml
