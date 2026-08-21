@@ -1,5 +1,5 @@
 import { scalarText } from "./duckTypes";
-import type { ChartType } from "./sqlgen";
+import type { ChartFold, ChartType } from "./sqlgen";
 import { ALL_PAIRS_CAP, SLOT_COUNT } from "../shared/styles/chartSlots";
 
 // Turning fetched rows into ECharts series, with the colour-by split BOUNDED
@@ -94,6 +94,28 @@ export function foldLabel(survivors: readonly string[]): string {
   return label;
 }
 
+/** The fold an aggregating bar's plot query may be composed with, given the
+ *  ranking probe's state — or `undefined`, meaning there is nothing to compose
+ *  yet and the query must wait (#457).
+ *
+ *  Extracted from the component because the guard is invisible there, and was
+ *  wrong for exactly that reason. A Solid resource keeps its PREVIOUS value
+ *  while refetching — `state: "refreshing"`, `loading: true`, the old value
+ *  still readable — so "have we an answer?" cannot be asked of the value alone.
+ *  It answers with the last colour column's survivors, an `IN (…)` list naming
+ *  a column the query no longer mentions; and before any colour is picked at
+ *  all it answers with the empty list the probe's own empty query resolves to,
+ *  which composes the unfolded query against exactly the high-cardinality
+ *  column the fold exists to bound. Loading is not an answer. */
+export function foldFor(probe: {
+  loading: boolean;
+  /** `undefined` when the probe failed — see the component's error accessor. */
+  values: readonly string[] | undefined;
+}): ChartFold | undefined {
+  if (probe.loading || probe.values === undefined) return undefined;
+  return { keep: probe.values, label: foldLabel(probe.values) };
+}
+
 /** Rows + ranked values + form → the ECharts series array.
  *
  *  Every series carries its own `itemStyle.color`, and the option this feeds
@@ -182,6 +204,12 @@ export function assembleSeries(o: AssembleOpts): ChartSeries[] {
   pinned.forEach((p, i) => {
     emit(i, p.value, p.colour);
   });
-  emit(FOLD, foldLabel(pinned.map((p) => p.value)), o.other);
+  // Named from the RANKING, not from the slots it filled. `foldFor` labels the
+  // SQL literal off the same list, and the two have to be one answer over one
+  // list — they coincide only while the palette is exactly as long as the cap
+  // and the probe's LIMIT is the same number. Shrink the palette and `pinned`
+  // becomes a shorter list, whose `foldLabel` can differ from the string the
+  // query already wrote into the rows.
+  emit(FOLD, foldLabel(o.ranked), o.other);
   return out;
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assembleSeries,
+  foldFor,
   foldLabel,
   seriesCap,
   type AssembleOpts,
@@ -158,6 +159,66 @@ describe("assembleSeries — the cap", () => {
     // And the value's OWN rows stayed with the value, not with the fold.
     expect(series[0]?.data).toHaveLength(1);
     expect(series[0]?.itemStyle.color).toBe(PALETTE[0]);
+  });
+});
+
+// The guard that decides whether the aggregating bar has a query to compose at
+// all. It lives here rather than in the component because it was WRONG there
+// and invisible: the component could only be read as "we wait for the probe",
+// which is not what the code did.
+describe("foldFor", () => {
+  it("treats a REFETCHING probe as no answer, however good its value looks", () => {
+    // The regression. A Solid resource keeps its previous value while
+    // refetching, so the value alone is the LAST colour column's survivors —
+    // an `IN (…)` list naming a column the query no longer mentions. Before
+    // any colour is picked it is worse: the empty list the probe's own empty
+    // query resolves to, which composes the UNFOLDED query against exactly the
+    // high-cardinality column the fold exists to bound.
+    expect(foldFor({ loading: true, values: ["a", "b"] })).toBeUndefined();
+    expect(foldFor({ loading: true, values: [] })).toBeUndefined();
+  });
+
+  it("treats a FAILED probe as no answer", () => {
+    expect(foldFor({ loading: false, values: undefined })).toBeUndefined();
+  });
+
+  it("hands back the survivors and the label from ONE list", () => {
+    // The query materialises the label as data, so this and the legend entry
+    // below have to be one function's answer over one list.
+    expect(foldFor({ loading: false, values: ["a", "b"] })).toEqual({
+      keep: ["a", "b"],
+      label: "Other",
+    });
+    expect(foldFor({ loading: false, values: ["Other", "b"] })).toEqual({
+      keep: ["Other", "b"],
+      label: "Other (2)",
+    });
+    // An empty answer is still an ANSWER — the probe found no rows, and the
+    // composer has a shape for that.
+    expect(foldFor({ loading: false, values: [] })).toEqual({
+      keep: [],
+      label: "Other",
+    });
+  });
+
+  it("names the fold what the assembler will name it, off a SHORT palette", () => {
+    // The two used to be computed from different lists — the assembler from
+    // the slots it filled, the composer from the whole probe answer — which
+    // agree only while the palette is exactly as long as the cap. Below that
+    // they diverge, and the series carrying the query's own rows is named
+    // something the query never wrote.
+    const ranked = ["a", "b", "Other"];
+    const fold = foldFor({ loading: false, values: ranked });
+    const series = assembleSeries({
+      rows: [{ x: "X1", y: 1, c: fold?.label }],
+      ranked,
+      chartType: "bar",
+      categoricalX: true,
+      palette: PALETTE.slice(0, 2),
+      other: OTHER_COLOUR,
+    });
+    expect(series.at(-1)?.name).toBe(fold?.label);
+    expect(series.at(-1)?.itemStyle.color).toBe(OTHER_COLOUR);
   });
 });
 

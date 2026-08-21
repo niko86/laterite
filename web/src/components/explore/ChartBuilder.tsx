@@ -18,7 +18,7 @@ import {
   type JoinSpec,
   type QualifiedCol,
 } from "../../lib/sqlgen";
-import { assembleSeries, foldLabel, seriesCap } from "../../lib/chartSeries";
+import { assembleSeries, foldFor, seriesCap } from "../../lib/chartSeries";
 import { Spinner } from "../Spinner";
 import { Chart } from "./Chart";
 import { ControlGrid } from "../ControlGrid";
@@ -217,6 +217,11 @@ export const ChartBuilder: Component<{
     });
   });
 
+  // Declared BEFORE the plot query below, and that order is load-bearing: both
+  // resources track their source in a `createComputed`, which run in creation
+  // order, so this one has already flipped `loading` by the time the plot
+  // query's recomputes and reads it. The other order dispatches one query
+  // against a stale ranking before correcting itself.
   const [ranked] = createResource(
     () => rankSql(),
     async (s) => {
@@ -252,16 +257,14 @@ export const ChartBuilder: Component<{
       rowCap: ROW_CAP,
     };
     if (!aggregating() || !colour) return chartSql(opts);
-    const survivors = rankedValues();
-    // Pending, or failed. Either way there is nothing to run: `chartSql`
+    // Pending, refetching, or failed — none of them an answer. `chartSql`
     // composes no query on this path without the fold, and one composed
-    // without it would draw a DIFFERENT chart — unfolded, every series in the
-    // neutral — with nothing on screen saying the colouring had failed.
-    if (survivors === undefined) return "";
-    return chartSql({
-      ...opts,
-      fold: { keep: survivors, label: foldLabel(survivors) },
-    });
+    // without it would draw a DIFFERENT chart, with nothing on screen saying
+    // the colouring had gone wrong. `ranked.loading` is load-bearing and not
+    // belt-and-braces: see `foldFor`.
+    const fold = foldFor({ loading: ranked.loading, values: rankedValues() });
+    if (!fold) return "";
+    return chartSql({ ...opts, fold });
   });
 
   const [rows] = createResource(

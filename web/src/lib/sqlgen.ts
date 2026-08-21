@@ -183,14 +183,17 @@ const colourText = (cr: string) => `COALESCE(CAST(${cr} AS VARCHAR), '')`;
  *  text, with everything the probe did not rank collapsed onto one label. */
 function foldedColour(cr: string, fold: ChartFold): string {
   const ce = colourText(cr);
-  // No survivors means the probe found no rows — and it shares this query's
-  // FROM and WHERE, so neither does this one. `IN ()` is a syntax error where
-  // there is nothing to fold.
-  if (fold.keep.length === 0) return ce;
-  return (
-    `CASE WHEN ${ce} IN (${fold.keep.map(textLit).join(", ")})` +
-    ` THEN ${ce} ELSE ${textLit(fold.label)} END`
-  );
+  // No survivors is written as a predicate that cannot hold, NOT as a colour
+  // expression without the fold. SQL has no empty `IN ()` — it is a syntax
+  // error — and dropping the CASE instead would compose a differently SHAPED
+  // query off an empty list: every distinct value keeping its own group, which
+  // is the behaviour the fold exists to prevent. One shape, whatever the probe
+  // answered, so an empty list can only ever mean "everything folds".
+  const holds =
+    fold.keep.length === 0
+      ? "FALSE"
+      : `${ce} IN (${fold.keep.map(textLit).join(", ")})`;
+  return `CASE WHEN ${holds} THEN ${ce} ELSE ${textLit(fold.label)} END`;
 }
 
 /** Resolve a column to its SQL reference: `"col"` single-table; `alias."col"`

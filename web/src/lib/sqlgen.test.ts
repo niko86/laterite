@@ -230,14 +230,21 @@ describe("chartSql — the fold", () => {
     expect(s).toContain(`ELSE 'Other (2)' END`);
   });
 
-  it("emits no IN list when the probe ranked nothing", () => {
-    // The probe returns no rows only when nothing passes the shared WHERE — so
-    // this query has none either. `IN ()` is a syntax error where there is
-    // nothing to fold.
+  it("keeps the CASE when the probe ranked nothing, on a predicate that cannot hold", () => {
+    // SQL has no empty `IN ()`, and the answer is NOT to drop the CASE: that
+    // composes a differently shaped query off an empty list — every distinct
+    // value keeping its own group, which is the behaviour the fold exists to
+    // prevent. One shape, so an empty list can only mean "everything folds".
     const s = chartSql({ ...bar, fold: { keep: [], label: "Other" } });
-    expect(s).toContain(`COALESCE(CAST("k" AS VARCHAR), '') AS c`);
-    expect(s).not.toContain("CASE");
+    expect(s).toContain(
+      `CASE WHEN FALSE THEN COALESCE(CAST("k" AS VARCHAR), '') ELSE 'Other' END AS c`,
+    );
     expect(s).not.toContain("IN (");
+    // The shape is the same one a non-empty probe answer composes.
+    const filled = chartSql({ ...bar, fold: { keep: ["a"], label: "Other" } });
+    const shape = (q: string) =>
+      q.replace(/CASE WHEN .*? THEN/g, "CASE WHEN … THEN");
+    expect(shape(s)).toBe(shape(filled));
   });
 
   it.each(["sum", "avg", "min", "max"] as const)(
