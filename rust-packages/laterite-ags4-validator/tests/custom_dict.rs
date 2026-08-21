@@ -1,4 +1,4 @@
-//! End-to-end coverage for the `--dict` custom-dictionary overlay (#568 Phase 3).
+//! End-to-end coverage for the `--dict` custom-dictionary overlay (laterite-dev#568 Phase 3).
 //!
 //! Proves the whole arc a client wants: a bespoke group hung off a standard one
 //! (`XTRA` off `SAMP`, borrowing the standard `SAMP_ID` KEY) is UNKNOWN to the

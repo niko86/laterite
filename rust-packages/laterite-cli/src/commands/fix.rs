@@ -79,7 +79,7 @@ pub fn run(args: &FixArgs, json: bool, quiet: bool) -> ! {
             outcome.applied.iter().map(applied_fix_json).collect();
         // `risky_available` is a human-only hint here: the Node `FixReport` has no
         // risky-count field to mirror, so keeping it out of the machine report is what
-        // keeps `fix --json` byte-identical across the three launchers (#545).
+        // keeps `fix --json` byte-identical across the three launchers (laterite-dev#545).
         let report = json!({
             "file": path.display().to_string(),
             "dest": dest.display().to_string(),

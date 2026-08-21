@@ -16,10 +16,10 @@
 //! typed parsers (`parse_datetime` / `parse_date` / `parse_time` /
 //! `parse_bool`) live in the leaf (`laterite_ags4_core::ags_types`, i.e.
 //! `laterite-ags4-types`) and back the leaf's own `parse_value` too, so there is
-//! one parser and one set of format tables (#531). This wrapper only
+//! one parser and one set of format tables (laterite-dev#531). This wrapper only
 //! dispatches on `canonical_type` and maps each parsed value to its Python
 //! object — the same canonicalisation that feeds `_content_hash`, now with
-//! a single source instead of a drift-prone second copy (see #503).
+//! a single source instead of a drift-prone second copy (see laterite-dev#503).
 
 use laterite_ags4_core::ags_types::{
     CanonicalType, canonical_type as rs_canonical_type, display_hint as rs_display_hint,
@@ -87,7 +87,7 @@ fn parse_value<'py>(
         CanonicalType::String | CanonicalType::Enum => Ok(s.into_pyobject(py)?.into_any()),
         // The same range-guarded parsers the leaf's `parse_value` uses, so the
         // typed-read Python object can't drift from the `_content_hash`
-        // canonicalisation (#611 finishes the #531 dedup for Integer/Decimal).
+        // canonicalisation (laterite-dev#611 finishes the laterite-dev#531 dedup for Integer/Decimal).
         CanonicalType::Integer => Ok(parse_ags_integer(s)
             .map(|i| i.into_pyobject(py).map(pyo3::Bound::into_any))
             .transpose()?

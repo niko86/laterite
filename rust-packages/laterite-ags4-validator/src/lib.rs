@@ -75,12 +75,12 @@ pub use fixes::{
     fix_document_selective,
 };
 // The phf-projected dictionary (`Dictionary`, `DictVersion`, `dictionary_dto`,
-// …) moved into the reference leaf (#475 PR2). Re-exported as a module (not
+// …) moved into the reference leaf (laterite-dev#475 PR2). Re-exported as a module (not
 // just the three names above) so every existing `crate::dict::…` /
 // `laterite_ags4_validator::dict::…` path throughout this crate + its
 // consumers (laterite-py, laterite-node, wasm) keeps resolving unchanged.
 pub use laterite_ags4_reference::dict;
-// The runtime custom-dictionary overlay (#568): `CustomDict` (parsed once at the
+// The runtime custom-dictionary overlay (laterite-dev#568): `CustomDict` (parsed once at the
 // surface boundary, carried on `CheckOptions::custom_dict`), `parse_dict`, and
 // its `DictError`. Re-exported so surfaces build a `CustomDict` through
 // `laterite_ags4_validator::overlay::…` without reaching past the validator.
@@ -107,7 +107,7 @@ pub struct CheckOptions {
     /// `Some(v)` ⇒ force edition `v`, ignoring `TRAN_AGS`.
     pub dict_version: Option<DictVersion>,
     /// Override the bundled dictionary with a runtime custom dictionary
-    /// (#568, O-28). Parsed ONCE at the surface boundary into a
+    /// (laterite-dev#568, O-28). Parsed ONCE at the surface boundary into a
     /// [`overlay::CustomDict`] — a base-resolved sparse overlay (or full
     /// replacement) — so a batch run pays the parse cost once, reused across
     /// every file. `None` ⇒ the bundled path (`dict_version` / `TRAN_AGS`
@@ -366,7 +366,7 @@ pub fn check_parsed_with_dict(
     opts: &CheckOptions,
     world: &WorldScope,
 ) -> Result<(Findings, DictVersion, DictResolution), ValidatorError> {
-    // The custom-dictionary path (#568): the base + delta are already fixed on
+    // The custom-dictionary path (laterite-dev#568): the base + delta are already fixed on
     // the `CustomDict` (parsed once at the surface boundary), so there is no
     // `TRAN_AGS` resolution and no 4.0.3→4.0.4 content guard — the caller chose
     // the base deliberately. `build_delta` re-derives the stack-local overlay the
@@ -378,7 +378,7 @@ pub fn check_parsed_with_dict(
         })?;
         let dict = Dictionary::layered(&delta);
         let mut found = check_parsed(parsed, &dict, opts, world)?;
-        // Honour + warn (#568 §3): the overlay takes effect, but every override
+        // Honour + warn (laterite-dev#568 §3): the overlay takes effect, but every override
         // of a STANDARD group/heading is surfaced, so a bespoke dictionary can
         // never silently reshape the standard schema. Which TIER each override
         // lands in is the #321 surprise test — see the function.
@@ -414,7 +414,7 @@ pub fn check_parsed_with_dict(
 }
 
 /// Surface each override a custom overlay makes to a STANDARD group/heading
-/// (#568 §3, honour + warn). Only overlays (not full replacements — a
+/// (laterite-dev#568 §3, honour + warn). Only overlays (not full replacements — a
 /// replacement is declared, not an override) and only groups/headings the base
 /// actually defines.
 ///
@@ -564,7 +564,7 @@ mod tests {
 
     #[test]
     fn custom_dict_is_honoured_not_rejected() {
-        // The #568 reversal of the old refusal: a valid `--dict` overlay resolves
+        // The laterite-dev#568 reversal of the old refusal: a valid `--dict` overlay resolves
         // to its detected base and runs the rules against the layered dictionary,
         // rather than short-circuiting to BadDict.
         let dict_json = br#"{"groups":{"TEST":{"parent":"SAMP","headings":[
@@ -615,7 +615,7 @@ mod tests {
     }
 
     /// An overlay that re-parents a standard group and demotes two standard KEYs
-    /// WARNs on each (honour + warn, #568) — both are downstream surprises, which
+    /// WARNs on each (honour + warn, laterite-dev#568) — both are downstream surprises, which
     /// is what keeps them in the warning tier under #321.
     ///
     /// This used to claim `SAMP_TOP` was "a standard non-KEY heading" being

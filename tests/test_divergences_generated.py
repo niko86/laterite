@@ -2,7 +2,7 @@
 
 The page it replaced was hand-written against a generated, gated SSOT — the one
 shape in this repo that has drifted every single time. It told readers the
-`--dict` override was "deferred" a release after #568 shipped it, and it never
+`--dict` override was "deferred" a release after laterite-dev#568 shipped it, and it never
 gained O-49 or O-50.
 
 These tests hold the two halves that a stale-file `--check` alone does not: that
@@ -66,7 +66,7 @@ def test_the_stated_count_is_the_rendered_count(data: dict) -> None:
 def test_a_resolved_record_cannot_stay_on_the_page(data: dict) -> None:
     """The live defect #320 was filed for, in its general form.
 
-    O-28 shipped in #568 and the page still called it deferred. Marking a record
+    O-28 shipped in laterite-dev#568 and the page still called it deferred. Marking a record
     resolved while leaving it user-facing must fail, not render.
     """
     mutated = copy.deepcopy(data)

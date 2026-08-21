@@ -143,7 +143,7 @@ jobs:
               - 'modality.json'          # read by test_modality_parity (packages/laterite/tests)
               - 'COMPAT.md'              # referenced by test_laterite (packages/laterite/tests)
               - 'tools/gen_census.py'    # referenced by test_merge (packages/laterite/tests)
-              - 'tools/wheel_smoke.py'   # the wheel-smoke job's post-install smoke (#554)
+              - 'tools/wheel_smoke.py'   # the wheel-smoke job's post-install smoke (laterite-dev#554)
               # The O-N catalogue SSOT + its render + the generator. These belong
               # in `code` for the same reason as the entries above and NOT for the
               # reason the block warns against: the drift gate genuinely runs in
@@ -372,6 +372,14 @@ jobs:
       - name: doc references resolve (incl. crates.io-strict for published READMEs)
         run: uv run --no-project python tools/check_doc_refs.py --check
 
+      # Sibling of the gate above, and here for the same reason it is: no build,
+      # a file walk, and an unconditional job so it cannot stop firing. A bare
+      # `#N` is a claim that a number is OURS — #458 is the write-up of what
+      # that costs once the numbering climbs past a number being borrowed,
+      # which it now has.
+      - name: bare `#N` means an issue in this repo
+        run: uv run --no-project python tools/check_issue_refs.py
+
       # The repo-truth suite, minus the handful that need a build. See the
       # `cadence` job above for why `-o addopts=""` is load-bearing (the root
       # pyproject sets --benchmark-disable, and pytest-benchmark is absent from
@@ -392,7 +400,7 @@ jobs:
     # success() to any `if:` without a status-check function, so a job whose
     # `needs` FAILED is skipped before the condition is ever read. Referencing
     # needs.changes.result is NOT such a function — without !cancelled() this
-    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # whole clause is a no-op (measured, laterite-dev#561: `deny` stayed skipped while
     # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
     # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
     # the filter failing to answer must never read as "nothing changed".
@@ -535,7 +543,7 @@ jobs:
     # success() to any `if:` without a status-check function, so a job whose
     # `needs` FAILED is skipped before the condition is ever read. Referencing
     # needs.changes.result is NOT such a function — without !cancelled() this
-    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # whole clause is a no-op (measured, laterite-dev#561: `deny` stayed skipped while
     # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
     # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
     # the filter failing to answer must never read as "nothing changed".
@@ -614,11 +622,11 @@ jobs:
         run: |
           rustup target add wasm32-unknown-unknown
           cargo build -p laterite-ags4-parse --target wasm32-unknown-unknown
-          # The tiny browser tokenizer wasm (#533) is built from parse + types;
+          # The tiny browser tokenizer wasm (laterite-dev#533) is built from parse + types;
           # compile it for wasm32 here so a wasm-incompatible change to either
           # leaf (or the wrapper) fails in this fast job, not only in e2e/deploy.
           cargo build -p laterite-ags4-tokenizer-wasm --target wasm32-unknown-unknown
-          # The shared scrub engine (#581) becomes a wasm dependency of the
+          # The shared scrub engine (laterite-dev#581) becomes a wasm dependency of the
           # engine wasm (browser Anonymiser) in Phase 2. Build it for wasm32 NOW
           # so a wasm-hostile change (it pulls parse + reference + types) fails
           # in this fast job, not at adoption.
@@ -765,7 +773,7 @@ jobs:
     # success() to any `if:` without a status-check function, so a job whose
     # `needs` FAILED is skipped before the condition is ever read. Referencing
     # needs.changes.result is NOT such a function — without !cancelled() this
-    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # whole clause is a no-op (measured, laterite-dev#561: `deny` stayed skipped while
     # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
     # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
     # the filter failing to answer must never read as "nothing changed".
@@ -882,10 +890,10 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
-  # TS lint + format gate (#585 / #615): the two shipped TS surfaces — web/ (the
+  # TS lint + format gate (laterite-dev#585 / laterite-dev#615): the two shipped TS surfaces — web/ (the
   # Solid browser validator) and rust-packages/laterite-node (the npm bindings) —
   # run `eslint . --max-warnings 0` (0 errors AND 0 warnings) + `prettier --check`.
-  # The #615/#621 burn-down fixed every rule at source and flipped them to `error`;
+  # The laterite-dev#615/#621 burn-down fixed every rule at source and flipped them to `error`;
   # `--max-warnings 0` (#65) makes a future regression to `warn` fatal too, so the
   # "flip to error" can't silently erode. This is the CI-enforcement half, so a
   # regression can't merge (until now the gate was runnable locally via `npm run
@@ -1097,7 +1105,7 @@ jobs:
     # success() to any `if:` without a status-check function, so a job whose
     # `needs` FAILED is skipped before the condition is ever read. Referencing
     # needs.changes.result is NOT such a function — without !cancelled() this
-    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # whole clause is a no-op (measured, laterite-dev#561: `deny` stayed skipped while
     # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
     # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
     # the filter failing to answer must never read as "nothing changed".
@@ -1105,7 +1113,7 @@ jobs:
     # NB there is deliberately NO `needs.build-ext.result == 'success'` guard:
     # build-ext (the prebuilt-cdylib producer) is NOT a required check, so if it
     # fails python must FAIL — its download-artifact step 404s — not SKIP. A
-    # skipped required check counts as success (the #561 trap), which would let a
+    # skipped required check counts as success (the laterite-dev#561 trap), which would let a
     # broken build merge. `!cancelled()` runs python despite a build-ext failure
     # so the missing artefact surfaces as red here (python IS required).
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
@@ -1334,7 +1342,7 @@ jobs:
         shell: bash
         run: command -v sccache >/dev/null 2>&1 && sccache --show-stats || true
 
-  # Published-wheel smoke (#554): the per-PR proof that the ARTEFACT users receive
+  # Published-wheel smoke (laterite-dev#554): the per-PR proof that the ARTEFACT users receive
   # actually installs-and-imports. Every OTHER Python gate reaches `laterite`
   # through `maturin develop` (an editable install with the cdylib compiled into
   # the source tree) and reaches the CLI's `main()` through the `__main__` guard —
@@ -1449,7 +1457,7 @@ jobs:
     # success() to any `if:` without a status-check function, so a job whose
     # `needs` FAILED is skipped before the condition is ever read. Referencing
     # needs.changes.result is NOT such a function — without !cancelled() this
-    # whole clause is a no-op (measured, #561: `deny` stayed skipped while
+    # whole clause is a no-op (measured, laterite-dev#561: `deny` stayed skipped while
     # `docs` with !cancelled() ran a full wheel+mkdocs build). `!= 'success'`
     # rather than `== 'failure'` so ANY non-answer (failed/cancelled) means RUN:
     # the filter failing to answer must never read as "nothing changed".

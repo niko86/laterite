@@ -29,7 +29,7 @@ tree, so `_IN_REPO` points at the file and the cron is read from it directly.
 `compliance-report.yml` and `compliance.yml` are in the dev satellite, invisible
 to this repo's CI, so `external-authorities.json` mirrors them — and that mirror
 is itself reconciled against the real files by `tools/check_external_authorities.py`
-running in THAT repo. Without the far-side job this test would be #549's Shape 1:
+running in THAT repo. Without the far-side job this test would be laterite-dev#549's Shape 1:
 enforcing a proxy for a promise, with nothing comparing the proxy back.
 
 The derived word is computed from the cron rather than written down beside it.

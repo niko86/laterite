@@ -838,7 +838,7 @@ jobs:
   # a leg that stops reporting would otherwise degrade to a warning above a green
   # run. Lives in laterite-ags4-xcheck
   # (split out of the dev ags4-compliance crate — its findings half needs the
-  # private ags4-parity oracle; #553 reversal, the public-is-dev-home flip).
+  # private ags4-parity oracle; laterite-dev#553 reversal, the public-is-dev-home flip).
   # GitHub-hosted: it builds all four surfaces (~50 min cold), so it runs off the
   # 2-lane pool on free public minutes, in parallel with the pool jobs.
   output-values:

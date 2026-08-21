@@ -392,7 +392,7 @@ fn main() {
     // identically by every surface, so every leg agrees with itself forever while
     // the two PATHS disagree. A divergence is pinned with the sentinel leg
     // `@equivalent_to` (verdict `by-design` — the Excel round-trip's lossy 3SF
-    // formatting is accepted, gated at the formatter level by #517).
+    // formatting is accepted, gated at the formatter level by laterite-dev#517).
     for case in &cases {
         let Some(target) = &case.equivalent_to else {
             continue;

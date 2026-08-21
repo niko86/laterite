@@ -145,7 +145,7 @@ can't reach the tool without reaching the (hand-`include_str!`'d) guide the docs
 render from.
 
 Row 2's five `.ags` files needed the same split, and didn't have it until it
-was measured (#558): appending a fabricated group to `Standard_dictionary_v4_2.ags`
+was measured (laterite-dev#558): appending a fabricated group to `Standard_dictionary_v4_2.ags`
 and regenerating moved the union 174 → 175 groups with `test_dictionary_faithful.py`
 still `5 passed` — that gate only proves the union agrees with *whatever the
 files currently say*. The content gate for that row is the
@@ -196,7 +196,7 @@ flowchart LR
 - [[laterite-ags4-validator]] — `check_parsed_with_dict`, the door bug 4's fix consolidated onto
 - [[cert-trust-v2]] — the sibling "surfaces reach past the door" bug (WORLD, not CONTENT) that motivated this page's framing
 - [[O-42]] — the content guard bug 4's modalities disagreed on whether to run
-- ags4-output-value-gate — the general cross-surface output-VALUE gate (#519–525), sharing a crate with laterite-ags4-compliance
+- ags4-output-value-gate — the general cross-surface output-VALUE gate (laterite-dev#519–525), sharing a crate with laterite-ags4-compliance
 - [[vendored-authority-faithful]] — the content gate that closes the "Faithfulness gates" table's row-2 gap: `test_dictionary_faithful.py` proved render-drift, not that the vendored `.ags` files match their claimed source
 - [[pyo3-boundary]] · [[crate-map]] — the surfaces the properties run across
 - [[playwright-e2e]] — the browser end of the test pyramid

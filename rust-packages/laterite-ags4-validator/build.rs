@@ -20,7 +20,7 @@
 //!    repair cannot change what the engine *decides*.
 //!
 //! 2. **Every in-workspace crate the verdict is expressed THROUGH**, discovered by
-//!    walking `[dependencies]` path deps transitively (#550). This half used to be
+//!    walking `[dependencies]` path deps transitively (laterite-dev#550). This half used to be
 //!    missing, and it was not a small gap: `laterite-ags4-types` owns `format_nsf`, the
 //!    formatter that *computes* Rule 8's verdict; `laterite-ags4-parse` owns the
 //!    tokenizer that *decides field boundaries*; `laterite-ags4-reference`'s
@@ -76,7 +76,7 @@
 //! `laterite-ags4-validator 0.1.0` picks up `laterite-ags4-parse 0.1.1` on any
 //! `cargo update` — the tokenizer that decides where fields end — and every
 //! certificate they hold keeps reading `Vouched` against an engine that now decides
-//! differently. Precisely the bug #550 fixed, reopened for registry consumers only.
+//! differently. Precisely the bug laterite-dev#550 fixed, reopened for registry consumers only.
 //!
 //! So when an in-workspace dependency's sources are NOT reachable, its identity goes
 //! into the digest as `name@version` instead. That is sound in exactly the place it

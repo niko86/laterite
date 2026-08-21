@@ -47,7 +47,7 @@ laterite-ags4-types = { workspace = true }
 # extends this dep to core's read path.
 laterite-ags4-parse = { workspace = true }
 # The AGS4 dictionary registry (union projection), extracted to its own leaf
-# (#475) so dictionary-only consumers needn't pull the rest of core. Re-exported
+# (laterite-dev#475) so dictionary-only consumers needn't pull the rest of core. Re-exported
 # as `laterite_ags4_core::registry` (see registry.rs) — an API-preserving move.
 laterite-ags4-reference = { workspace = true }
 serde = { version = "1", features = ["derive"] }

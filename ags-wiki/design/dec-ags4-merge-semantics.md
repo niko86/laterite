@@ -86,9 +86,9 @@ replaced the two-state `lenient: bool` with a typed `on_type_clash` choice —
 `TypeClashMode::ALL` + its `FromStr`: the CLI's clap `PossibleValuesParser` is
 *projected* from `ALL`, and Python/Node/wasm all parse the caller's string
 through the same `FromStr`, so no surface can drift on the token names or the
-rejection message. Because merge shipped in #494 on 2026-07-13 but 0.7.0 (the
+rejection message. Because merge shipped in laterite-dev#494 on 2026-07-13 but 0.7.0 (the
 last PyPI/npm publish) went out 2026-07-08, `merge()`/`lenient` had never been
-released — #500 is a clean replacement, not a breaking change, and carries no
+released — laterite-dev#500 is a clean replacement, not a breaking change, and carries no
 deprecated alias.
 
 - `error` (default) — refuse. Reconciling two independent producers' declared
@@ -155,7 +155,7 @@ argument didn't exist when merge v1 shipped `Strict`/`Lenient` — `promote` is
 the response to it, not a re-litigation.
 
 **#448 rollout now complete, every read surface.** `_content_hash` ships on
-Python (#499/#536), Node (#537), wasm (#538) and — as of laterite-duckdb#28
+Python (laterite-dev#499/#536), Node (laterite-dev#537), wasm (laterite-dev#538) and — as of laterite-duckdb#28
 — the DuckDB extension's `read_ags`/`read_ags_text`, where it is
 trailing and always-on (the library surfaces keep it opt-in). `SELECT
 DISTINCT ON (_content_hash)` is the SQL form of the value-dedup this section
@@ -184,7 +184,7 @@ circle. **Blank is not a
 disagreement**: an empty `UNIT` means "unspecified", so blank-vs-`m` resolves to
 `m` and all-blank stays empty for emit to fill from the dictionary — only two
 *different non-empty* units conflict. (found while speccing the
-TYPE lattice in #500, and strictly more urgent than it.)
+TYPE lattice in laterite-dev#500, and strictly more urgent than it.)
 
 **A KEY-value correction is architecturally inseparable from a new row —
 pinned, not a bug.** If a later file corrects `"BH1"` → `"BH01"`, merge has
@@ -225,7 +225,7 @@ not a capability gap in the underlying leaf (which is N-ary).
   rule** available given AGS4 has no per-row timestamp; anything smarter
   would be inventing precision the format doesn't carry.
 - **Sharing `key_heading_names` with diff closes a drift vector** the same
-  way the #475 dictionary-leaf extraction did: two independent derivations of
+  way the laterite-dev#475 dictionary-leaf extraction did: two independent derivations of
   "what identifies a row" could silently diverge; one shared function cannot.
 - **TYPE-conflict `error`-by-default matches the "required CLI args, not
   hard-coded defaults" convention's spirit** — a lossy, hard-to-reverse
@@ -251,7 +251,7 @@ not a capability gap in the underlying leaf (which is N-ary).
   *inside a persisted store* via the same keychain, a different problem from
   this leaf's file-to-file reconciliation with no store at all.
 - **Test coverage**: 46 crate tests (`poc.rs` 15 + `hardening.rs` 10 +
-  `unit_conflict.rs` 7 + `promote.rs` 12 (#500's lattice, `EmitMode::Strict`
+  `unit_conflict.rs` 7 + `promote.rs` 12 (laterite-dev#500's lattice, `EmitMode::Strict`
   as the Rule 8/17 validity oracle) + `properties.rs` 2 proptest invariants —
   order-independence of the merged KEY set, and a reformatted re-send
   collapsing with zero revisions), 16 Python

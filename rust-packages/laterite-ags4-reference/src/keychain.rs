@@ -250,7 +250,7 @@ const CONTENT_HASH_DOMAIN: &str = "\u{1f}CONTENT2";
 ///   different groups can never collide.
 /// - **The UNIT is folded into the hash.** So a `10.0 m` and a `10.0 ft` cell
 ///   never dedup — `laterite-ags4-merge` refuses that pair as irreconcilable
-///   (#501), and collapsing it here would be silent data loss. A blank unit
+///   (laterite-dev#501), and collapsing it here would be silent data loss. A blank unit
 ///   means "unspecified": it trims to `""`, the same constant for every blank
 ///   cell, matching `merged_unit`'s `filter(|u| !u.is_empty())` — so two
 ///   blank-unit cells still dedup among themselves, but never against a
@@ -275,7 +275,7 @@ pub fn content_hash(group_code: &str, cells: &[(&str, &str, &str, &str)]) -> Uui
                 v => Some((
                     (*heading).to_string(),
                     // UNIT folded in so `10.0 m` and `10.0 ft` never dedup — merge
-                    // refuses that pair as irreconcilable (#501); collapsing it
+                    // refuses that pair as irreconcilable (laterite-dev#501); collapsing it
                     // would be silent data loss. A blank unit is "unspecified" and
                     // trims to "" (constant for every blank), matching
                     // `merged_unit`'s `filter(|u| !u.is_empty())`: blanks dedup
@@ -989,14 +989,14 @@ mod tests {
 
     /// The UNIT rule, pinned: a stated unit distinguishes, a blank unit is
     /// "unspecified" and dedups only against other blanks, and re-emitting
-    /// the SAME unit still dedups. See [`content_hash`]'s UNIT rule and #501.
+    /// the SAME unit still dedups. See [`content_hash`]'s UNIT rule and laterite-dev#501.
     #[test]
     fn content_hash_folds_unit() {
         let metres = content_hash("LOCA", &cells(&[("LOCA_GL", "m", "2DP", "10.00")]));
         let feet = content_hash("LOCA", &cells(&[("LOCA_GL", "ft", "2DP", "10.00")]));
         assert_ne!(
             metres, feet,
-            "same value, different non-blank unit — must NOT dedup (#501)"
+            "same value, different non-blank unit — must NOT dedup (laterite-dev#501)"
         );
 
         let blank = content_hash("LOCA", &cells(&[("LOCA_GL", "", "2DP", "10.00")]));

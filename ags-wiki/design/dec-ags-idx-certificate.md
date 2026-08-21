@@ -46,7 +46,7 @@ sources: []
 >   **errors**.
 >
 > The v1 *index* half — byte offsets, size/SHA freshness, the remote ETag shortcut — was
-> sound and survives intact in v2 (with the multi-span fix from #512).
+> sound and survives intact in v2 (with the multi-span fix from laterite-dev#512).
 
 ## Context
 

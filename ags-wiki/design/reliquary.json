@@ -283,7 +283,7 @@
       "axis": "code",
       "status": "keep",
       "removed_in": "— (live caller)",
-      "evidence": "Inventoried by #349 as having no web caller — **true, and misleading**: it has a live NON-web caller. The wasm compliance runner calls it (`glue.version?.()`, the satellite's `tools/compliance/emit_js.mjs`), which is the exact purpose its own docstring records — it exists because that harness had hard-coded `version: \"0.5.1\"` and printed a false cross-surface identity (#556). Also in both release gates' `EXPECTED_FUNCTIONS` and the published API docs. Deleting it would re-open the bug it was added to close."
+      "evidence": "Inventoried by #349 as having no web caller — **true, and misleading**: it has a live NON-web caller. The wasm compliance runner calls it (`glue.version?.()`, the satellite's `tools/compliance/emit_js.mjs`), which is the exact purpose its own docstring records — it exists because that harness had hard-coded `version: \"0.5.1\"` and printed a false cross-surface identity (laterite-dev#556). Also in both release gates' `EXPECTED_FUNCTIONS` and the published API docs. Deleting it would re-open the bug it was added to close."
     },
     {
       "symbol": "`engine_version()` (wasm)",

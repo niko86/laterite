@@ -5,7 +5,7 @@ import { Card } from "../Card";
 import { ControlGrid } from "../ControlGrid";
 import { Checkbox, Field, Select } from "@shared/components";
 
-// Built from the generated editions SSOT (#529); only the "auto" label is UI copy
+// Built from the generated editions SSOT (laterite-dev#529); only the "auto" label is UI copy
 // and stays here. Was a hand-listed array edited in lockstep with three other copies.
 const DICT_VERSIONS: { value: DictVersionOpt; label: string }[] =
   DICT_VERSION_VALUES.map((v) => ({

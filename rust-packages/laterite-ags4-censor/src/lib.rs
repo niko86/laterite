@@ -1,9 +1,9 @@
 //! `laterite-ags4-censor` — the shared AGS4 anonymisation engine.
 //!
-//! ONE copy of the scrub logic, extracted (#581) out of `ags4-corpus-qa`'s
+//! ONE copy of the scrub logic, extracted (laterite-dev#581) out of `ags4-corpus-qa`'s
 //! `censor.rs` so the browser `Anonymiser` drives the same engine (through the
-//! engine wasm) instead of a hand-written TS reimplementation. Part of the #527
-//! cross-surface convergence arc — the sibling of the #533 tokenizer/quoter
+//! engine wasm) instead of a hand-written TS reimplementation. Part of the laterite-dev#527
+//! cross-surface convergence arc — the sibling of the laterite-dev#533 tokenizer/quoter
 //! work: the scrub now reads fields through the shared [`scan_line`] parse
 //! leaf and re-quotes through `laterite-ags4-types`, so no fourth AGS4 tokenizer.
 //!

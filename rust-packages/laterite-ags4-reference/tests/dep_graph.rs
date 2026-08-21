@@ -1,7 +1,7 @@
-//! Leaf-purity guard for the reference crate (#568 §4).
+//! Leaf-purity guard for the reference crate (laterite-dev#568 §4).
 //!
 //! `laterite-ags4-reference` is a *near-leaf*: it takes `laterite-ags4-types` (for
-//! `keychain`) and, since #568, `laterite-ags4-parse` (the runtime `.ags`
+//! `keychain`) and, since laterite-dev#568, `laterite-ags4-parse` (the runtime `.ags`
 //! custom-dict reader). Both are wasm-clean sibling leaves — the whole point of
 //! adding the parse dep here rather than reimplementing a tokenizer is that it
 //! drags in NOTHING wasm-hostile. This pins that: the normal graph must never
@@ -9,7 +9,7 @@
 //! `laterite-ags4-parse`'s `dep_graph.rs`.
 //!
 //! Until this test, the crate's "near-leaf" status was asserted only by a
-//! manifest comment — read by no one, gated by nothing (#557's lesson). The
+//! manifest comment — read by no one, gated by nothing (laterite-dev#557's lesson). The
 //! `.ags`-reader dep is exactly the kind of edge that could have smuggled in
 //! wasm weight unnoticed; now it can't.
 

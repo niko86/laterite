@@ -1,5 +1,5 @@
 //! The two facts about `ENGINE_FINGERPRINT` that no other test in the tree can
-//! state (#550).
+//! state (laterite-dev#550).
 //!
 //! Why they live *here*, of all places: `decide()` is `laterite-ags4-core`'s, and
 //! core takes the fingerprint as a **parameter** — it cannot see the real one, so
@@ -53,7 +53,7 @@ fn as_minted() -> Question {
 /// `engine_golden.ags.idx` was minted by the pre-#550 engine (fingerprint
 /// `5f725e53c36f7074`) — not hand-written, not fabricated: `lat certify` produced
 /// it, and that value is independently reproducible from that engine's file list.
-/// #550 widened the covered set, so the fingerprint moved and this cert became the
+/// laterite-dev#550 widened the covered set, so the fingerprint moved and this cert became the
 /// artefact of a genuinely older engine. It stays one forever: returning to that
 /// exact digest would mean reverting the coverage AND every covered byte.
 ///
@@ -114,7 +114,7 @@ fn the_golden_cert_is_vouched_by_the_engine_that_minted_it() {
 /// The fingerprint must cover every crate the verdict is expressed through — not
 /// just the crate that hosts the rules.
 ///
-/// The floor is hand-written on purpose, and that is not a contradiction of #550's
+/// The floor is hand-written on purpose, and that is not a contradiction of laterite-dev#550's
 /// "derive, don't list". `build.rs` DERIVES the set; this pins the MINIMUM that set
 /// must contain, with the reason each entry decides a verdict. Narrow the
 /// derivation and this fails. A derivation with nothing holding it to a floor is
@@ -130,7 +130,7 @@ fn the_fingerprint_covers_every_crate_the_verdict_runs_through() {
     let must_cover = [
         (
             "laterite-ags4-types/src/lib.rs",
-            "owns format_nsf — the formatter that COMPUTES Rule 8's verdict (#528 routed \
+            "owns format_nsf — the formatter that COMPUTES Rule 8's verdict (laterite-dev#528 routed \
              the validator's hand-port through it)",
         ),
         (

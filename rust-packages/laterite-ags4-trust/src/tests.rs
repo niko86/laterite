@@ -613,7 +613,7 @@ fn a_world_we_were_handed_but_not_asked_to_look_at_is_not_looked_at() {
 
 #[test]
 fn an_external_dict_is_honoured_not_refused() {
-    // #568 reversed the O-28 deferral: a valid `--dict` overlay now RUNS (layered
+    // laterite-dev#568 reversed the O-28 deferral: a valid `--dict` overlay now RUNS (layered
     // over its detected base) rather than erroring BadDict at the door. The overlay
     // adds a group the file doesn't use, so the verdict is unchanged from a bundled
     // run — the point is that it is honoured, not refused.

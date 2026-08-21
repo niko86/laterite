@@ -252,7 +252,7 @@ wrong — the four doc deletions are on that page's phase-8 checklist.
   `laterite-ags4-validator/build.rs` derives its covered set by recursing into `path`
   deps read from `Cargo.toml`; `cargo publish` strips that key, so the recursion
   silently stops and the fingerprint covers only the validator's own files. That
-  regresses to exactly the stale-`Vouched` bug #550 fixed. The recommended API exposes
+  regresses to exactly the stale-`Vouched` bug laterite-dev#550 fixed. The recommended API exposes
   `engine_fingerprint()` publicly, which turns an internal narrowing into a published
   contract that misreports itself.
 - **laterite#159 — no `include` allowlist. DONE.** `cargo package` ships everything not
@@ -629,7 +629,7 @@ The fingerprint rather than the version, because only the fingerprint can be
 believed: edit a rule and forget to bump anything and the semver is unchanged
 while the digest moves. Two surfaces reporting the same fingerprint **are**
 running the same rules; two reporting the same release number merely shipped
-together. This repo has already been burned by the weaker claim — [[modality-register|#556]]
+together. This repo has already been burned by the weaker claim — [[modality-register|laterite-dev#556]]
 added wasm's `version()` because a compliance report hard-coded `"0.5.1"` and
 kept printing it while the workspace moved to 0.7.0. The build was current; only
 the report lied.
@@ -648,7 +648,7 @@ would they differ? — is that **half the legs run against built artefacts**:
 dist and a napi addon, `python` against an installed wheel. Any of those can be
 stale while every case still matches, because a stale engine and a current one
 usually agree. The run then reports N-way identity across a surface compiled some
-time ago. That is [[modality-register|#556]] again, one level up: a report
+time ago. That is [[modality-register|laterite-dev#556]] again, one level up: a report
 claiming an identity it had not checked.
 
 Verified by falsification rather than by reasoning — doctoring `wasm-engine`'s

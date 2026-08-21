@@ -75,7 +75,7 @@ as stable):
   (`build_group_ipc` = that builder + StreamWriter framing — the single parser-agnostic
   composition `laterite-node` and `laterite-ags4-wasm` frame each group's IPC stream with,
   fed a positional `cell(col,row)` so the leaf stays parser-free). Also owns the AGS4 **field
-  quoter** (#533, part of the #527 convergence arc): `write_quoted_field`/`quote_field`, added
+  quoter** (laterite-dev#533, part of the laterite-dev#527 convergence arc): `write_quoted_field`/`quote_field`, added
   beside `ags4_str` as the single write-side authority for wrapping a value in `"…"` and
   doubling an embedded quote. `laterite-ags4-emit`'s byte-faithful `write_row` streams through
   it; the browser reaches it via the new tiny `laterite-ags4-tokenizer-wasm` (below), retiring
@@ -111,28 +111,28 @@ as stable):
   the `laterite-ags4-tokenizer-wasm` adapter that actually needs them, so the validator's per-line walk
   stops paying for a requirement it never had. `split_ags_line` and `field_span` still carry their own
   implementations (2 remaining, deliberately: folding `field_span` would cost its short-circuit).
-- [[laterite-ags4-reference]] — the AGS4 **reference-data leaf** (#475): the multi-edition dictionary,
+- [[laterite-ags4-reference]] — the AGS4 **reference-data leaf** (laterite-dev#475): the multi-edition dictionary,
   its per-edition `phf` projection, and the rules-catalogue data accessors — everything mechanically
   derived from `ags_dictionary.json`/`rules_meta.json`, single-sourced in one place. Extracted out of
   `laterite-ags4-core` and `laterite-ags4-validator` so reference-data-only consumers (the read-only
   DuckDB extension, `laterite-ags4-diff`) can depend on it without pulling the rest of core or the whole
-  validator. **PR1** (#488) shipped the **union registry projection** (`GroupDescriptor`/`Heading`/
+  validator. **PR1** (laterite-dev#488) shipped the **union registry projection** (`GroupDescriptor`/`Heading`/
   `Registry`/`union_groups`/`ancestor_chain`/`inherited_key_names`, moved out of `core::registry` — now
   a flat re-export, so `laterite_ags4_core::registry::…` is unchanged for every consumer). **PR2**
-  (#492) joined it: the **per-edition phf projection** (`build.rs` + `dict.rs` — `Dictionary`/
+  (laterite-dev#492) joined it: the **per-edition phf projection** (`build.rs` + `dict.rs` — `Dictionary`/
   `DictVersion`/`DictResolution`, moved out of the validator's own `build.rs`), the **rules-catalogue
   data accessors** (`catalogue.rs` — `RULE_LABELS`/`rule_metadata_json()`, moved from the validator's
   `catalogue.rs`; the `#[cfg(test)]` catalogue↔engine faithfulness gate stays in the validator, since it
   needs `crate::fixes::FIXABLE_RULE_LABELS`), and the **bundled data itself** (`data/ags_dictionary.json`
   + `data/rules_meta.json`, relocated out of `core/data`/`validator/data` — the leaf now owns them
-  outright). At the time (#475 PR2) the validator lost its `build.rs` entirely; it re-exports `dict` +
+  outright). At the time (laterite-dev#475 PR2) the validator lost its `build.rs` entirely; it re-exports `dict` +
   the two catalogue accessors unchanged, so every downstream path (`laterite_ags4_validator::dict::…`,
   the CLI/py/node/wasm surfaces) keeps resolving. **The validator regained a `build.rs` for an
   unrelated reason** in the `cert-trust-v2` arc's PR 2 (2026-07-14, [[cert-trust-v2]]): a build-time
   SHA-256 `ENGINE_FINGERPRINT` so a `.ags.idx` certificate can name the engine that minted it by what
   it actually is, not a hand-bumped `CARGO_PKG_VERSION`; `sha2` is a build-dependency only. At the time
   it hashed only the rule sources + this leaf's two bundled JSON files — nothing to do with the
-  dictionary projection this paragraph otherwise describes — but **#550** (2026-07-16) widened it to
+  dictionary projection this paragraph otherwise describes — but **laterite-dev#550** (2026-07-16) widened it to
   also hash every in-workspace crate the verdict runs through, discovered by walking `[dependencies]`
   path deps transitively (dev-/build-deps excluded): this leaf's `build.rs` (which *generates* the
   phf tables, not just the JSON it reads), `laterite-ags4-types` (`format_nsf`, Rule 8's verdict) and
@@ -143,7 +143,7 @@ as stable):
   function `laterite-ags4-merge`'s revision report and `laterite-ags4-diff` already trust to decide two
   cells are equal, so "are these cells the same" has one authority instead of three that agree by luck.
   `laterite-ags4-types` does NOT depend on this crate, so the edge is cycle-free, and it is itself wasm-safe
-  — which keeps the reference leaf wasm-clean (wasm consumes `keychain` for `_id`/`_parent_id`). **PR3** (#493, an in-tree follow-up) took half of the
+  — which keeps the reference leaf wasm-clean (wasm consumes `keychain` for `_id`/`_parent_id`). **PR3** (laterite-dev#493, an in-tree follow-up) took half of the
   enabled payoff: `laterite-ags4-diff` now depends on the leaf directly instead of the whole validator
   (diff only ever touched `Dictionary`/`DictVersion`, never the rule engine), and [[laterite-py]]'s
   `build.rs` was repointed onto `union_groups()` for its `#[pyclass]` typed-graph codegen — retiring the
@@ -169,7 +169,7 @@ as stable):
   `pub use laterite_ags4_reference::keychain::*;` shim so `laterite_ags4_core::keychain::…` is
   unchanged for every consumer (mirrors the earlier `registry.rs` re-export). Content-addressed
   `_id`/`_parent_id` golden UUIDs are unchanged — behaviour-neutral. **Custom-dictionary overlay
-  (#568, 2026-07-18):** the leaf gained the runtime `--dict` reader — `overlay.rs`
+  (laterite-dev#568, 2026-07-18):** the leaf gained the runtime `--dict` reader — `overlay.rs`
   (`parse_dict`/`CustomDict`/`OwnedDelta`/`build_delta`/`detect_base`) and `dict_read.rs` (the
   FIRST runtime `.ags` DICT-group reader; the bundled dictionaries are all compiled in) — and
   `Dictionary` became lifetime-parametric (`Bundled(BundledDict)` vs `Layered { base, delta }`,
@@ -225,7 +225,7 @@ as stable):
   only — both already wasm-safe, so `laterite-ags4-wasm` can reach it without `laterite-ags4-core`'s wasm-hostile
   deps. First step relieving the `laterite-ags4-core` naming/scope smell. See [[ags4-output]]. Its
   byte-faithful `writer.rs::write_row` no longer carries its own quote-doubling logic — it streams each
-  cell through `laterite_ags4_types::write_quoted_field` (#533), the same quoter the browser now reaches via
+  cell through `laterite_ags4_types::write_quoted_field` (laterite-dev#533), the same quoter the browser now reaches via
   `laterite-ags4-tokenizer-wasm` (below). The old
   `core → emit` layering inversion (`core` depended on `emit` solely for `From<EmitError> for CliError`) was
   **cut** in #441: that conversion moved to its sole consumer `laterite-ags4-excel`, so `core` no longer depends on
@@ -236,8 +236,8 @@ as stable):
   change — `"1.0"` → `"1.00"` — is suppressed). Extracted out of `laterite-ags4-wasm` so PyO3, the CLI
   and `laterite-node` (#294 Batch E/#4) reuse the same diff the browser's Tools tab uses; deps
   `laterite-ags4-parse` + [[laterite-ags4-reference]] + `laterite-ags4-types` (all already wasm-safe). diff
-  only ever touched `Dictionary`/`DictVersion` — never the validator's rule engine — so #475's follow-up
-  (#493) repointed it at the reference leaf directly, dropping the whole validator as a transitive dep.
+  only ever touched `Dictionary`/`DictVersion` — never the validator's rule engine — so laterite-dev#475's follow-up
+  (laterite-dev#493) repointed it at the reference leaf directly, dropping the whole validator as a transitive dep.
   The host parses + resolves the dictionary; the leaf is pure.
 - `laterite-ags4-merge` — the wasm-safe **N-way merge leaf** (2026-07-12, new crate): reconciles N AGS4
   *deliveries* of one project into one file (`merge_parsed(files: &[ParsedFile], opts: &MergeOpts) ->
@@ -258,12 +258,12 @@ as stable):
   `repo:web/src/components/tools/MergeTool.tsx`) — one leaf, four surfaces, the CLI/Python/Node paths
   N-ary while the browser UI is deliberately pairwise. The `lat merge` door above is itself one tool
   behind three launchers — the native binary, `uvx --from laterite lat`, and `npx laterite` — and
-  when it first shipped (#494) it reached only the native binary: every existing cross-surface gate
+  when it first shipped (laterite-dev#494) it reached only the native binary: every existing cross-surface gate
   stayed green because none of them could see a verb that simply didn't exist on the other two
   launchers. [[surface-census]] closed that blind spot by reflecting each launcher's own parser
   instead of hand-listing verbs, and `merge` now reaches all three.
-- `laterite-ags4-censor` — the wasm-clean **shared scrub-engine leaf** (#581, 2026-07-18, Phase 1 of
-  the sibling axis [[dec-laterite-ags4-types-leaf|#533]] left open — both children of the #527 cross-surface
+- `laterite-ags4-censor` — the wasm-clean **shared scrub-engine leaf** (laterite-dev#581, 2026-07-18, Phase 1 of
+  the sibling axis [[dec-laterite-ags4-types-leaf|laterite-dev#533]] left open — both children of the laterite-dev#527 cross-surface
   convergence arc): the five AGS4 anonymisation actions (filehash/pseudonym/blank/token/brackets), the
   two-pass per-heading pseudonym map, custom group/column/orphan-def dropping, and ABBR-of-sensitive
   tokenisation — `censor(text, file_id, &Policy, &CensorOptions) -> (String, Tally)` +
@@ -301,8 +301,8 @@ as stable):
   `repo:rust-packages/laterite-ags4-wasm/src/certify.rs`).
 - `laterite-py` — the PyO3 cdylib behind the `laterite` wheel ([[pyo3-boundary]]).
 - `laterite-ags4-wasm` — the browser cdylib ([[tech-stack-wasm]]).
-- `laterite-ags4-tokenizer-wasm` — a SEPARATE, deliberately tiny browser cdylib (#533, part of the
-  #527 convergence arc; new crate, 2026-07-17): two `#[wasm_bindgen]` wrappers,
+- `laterite-ags4-tokenizer-wasm` — a SEPARATE, deliberately tiny browser cdylib (laterite-dev#533, part of the
+  laterite-dev#527 convergence arc; new crate, 2026-07-17): two `#[wasm_bindgen]` wrappers,
   `tokenize_spans`/`quote_field`, over `laterite-ags4-parse::scan::scan_line` and
   `laterite-ags4-types::quote_field` — nothing else. Deps: `laterite-ags4-parse` + `laterite-ags4-types` only
   (both already wasm-clean, `arrow` OFF), so the compiled artifact is ~30 KB / ~13 KB gzipped versus
@@ -313,14 +313,14 @@ as stable):
   warmed once at boot, and since #353 the app's readiness gate in full — the engine left it) drive off
   the shared tokenizer/quoter **without** loading the engine on the main thread — the option ("B-tiny": a
   dedicated tiny wasm, not gating the TS copy behind a value-gate case, not calling the engine wasm from
-  the main thread) chosen over the alternatives #533 considered. Retires the hand-written
+  the main thread) chosen over the alternatives laterite-dev#533 considered. Retires the hand-written
   `splitAgsFields`/`quoteAgsField` state machine that used to live in `web/src/lib/agsline.ts`, which now
   keeps only the browser-only GROUP-block/alignment DISPLAY logic. The browser's char-offset span model
   stays surface-specific by design — it has no peer on the other three surfaces, so it is excluded from
-  the #555 cross-surface output-value gate the same way wasm's `char_span` is.
+  the laterite-dev#555 cross-surface output-value gate the same way wasm's `char_span` is.
   Excluded from the host workspace `cargo clippy/test --workspace` (CI's `--exclude`), same as the engine
-  wasm; CI also compile-guards it for `wasm32-unknown-unknown`. **Sibling, not folded in:** #581 tracked
-  a *different* axis of the same #527 arc — the browser Anonymiser's redaction engine
+  wasm; CI also compile-guards it for `wasm32-unknown-unknown`. **Sibling, not folded in:** laterite-dev#581 tracked
+  a *different* axis of the same laterite-dev#527 arc — the browser Anonymiser's redaction engine
   (`web/src/components/tools/Anonymiser.tsx`) re-implemented `laterite-ags4-corpus-qa`'s `censor.rs` scrub logic
   independently of this tokenizer work. Phase 1 (2026-07-18) extracted that scrub logic into its own
   leaf, `laterite-ags4-censor` (above); Phase 2 (also 2026-07-18) added a `censor` export to the engine

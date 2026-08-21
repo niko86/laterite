@@ -385,7 +385,7 @@ export declare function readGroupsRaw(path: string, recoverDuplicateHeadings?: b
  * (`registry_fns.rs::registry_ancestor_chain`). Node used to re-walk `.parent`
  * pointers in TypeScript (`ts/registry.ts`), a hand-kept-in-sync copy of that
  * logic; routing through the binding removes it so the tree can't drift from the
- * leaf (#532, #527).
+ * leaf (laterite-dev#532, laterite-dev#527).
  */
 export declare function registryAncestorChain(code: string): Array<string>
 
@@ -407,8 +407,8 @@ export declare function registryDictionaryJson(edition?: string | undefined | nu
  *
  * The intersection is `laterite_ags4_core::registry::inherited_key_names`, the
  * same leaf function the Python wheel binds; Node used to re-implement the
- * KEY-intersection logic in TypeScript. Deleting that copy is the point of #532
- * (part of the #527 leaf-convergence arc).
+ * KEY-intersection logic in TypeScript. Deleting that copy is the point of laterite-dev#532
+ * (part of the laterite-dev#527 leaf-convergence arc).
  */
 export declare function registryInheritedKeyNames(code: string): Array<string>
 
@@ -423,7 +423,7 @@ export declare function renderReadCsv(headings: Array<string>, rows: Array<Array
  * writer. `ts/cli.ts` used to build this with `JSON.stringify(x, null, 2)`
  * while the binary used `serde_json` and Python used `json.dumps` — three
  * different JSON libraries kept byte-identical by hand-discipline, with no gate
- * on `read` output (#530).
+ * on `read` output (laterite-dev#530).
  */
 export declare function renderReadJson(headings: Array<string>, rows: Array<Array<string>>): string
 
@@ -521,7 +521,7 @@ export declare function transportUnpackBytes(data: Uint8Array): Buffer
  * laterite-ags4-merge. Exposed so the JS launcher does not keep a hand-written
  * copy — it had two (the census `values` for `merge --on-type-clash`, and the
  * unknown-mode error message in `cli.ts`), and a fourth mode added to the enum
- * would have reached neither (#555).
+ * would have reached neither (laterite-dev#555).
  */
 export declare function typeClashModes(): Array<string>
 

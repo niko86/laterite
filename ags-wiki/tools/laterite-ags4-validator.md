@@ -33,7 +33,7 @@ embeds. It implements the numbered AGS4 rules from the published spec
 The compiled-in dictionaries are sourced from the **single consolidated union**
 `repo:rust-packages/laterite-ags4-reference/data/ags_dictionary.json`, but this
 crate no longer projects them itself: its own `build.rs` and `src/dict.rs` were
-**moved into the [[laterite-ags4-reference]] leaf** (#475 PR2) — that leaf's
+**moved into the [[laterite-ags4-reference]] leaf** (laterite-dev#475 PR2) — that leaf's
 `build.rs` reads the JSON and projects each edition into its `phf` lookup
 tables (headings, groups, order, the ABBR pick-list, `TRAN_AGS`), and this
 crate re-exports the result as `pub use laterite_ags4_reference::dict;`, so
@@ -64,7 +64,7 @@ Entry points (`repo:rust-packages/laterite-ags4-validator/src/lib.rs`):
 either the [[O-28]] custom-`--dict` overlay path (`opts.custom_dict`, if a caller
 supplied one: `build_delta` + `Dictionary::layered` + `check_parsed`, then
 `emit_override_warnings` surfaces every override of a STANDARD group/heading as
-a loud WARNING, honour + warn, KEY demotion loudest — #568) or the bundled path
+a loud WARNING, honour + warn, KEY demotion loudest — laterite-dev#568) or the bundled path
 (`resolve_dict_version` + `guard_4_0_4`, the O-42 content guard, [[O-42]]) +
 `check_parsed` + the O-42 transparency FYI, for a caller holding an
 already-parsed file with no path), `check_parsed` (**the CONTENT/WORLD
@@ -84,7 +84,7 @@ CustomDict, DictError}` (defined in [[laterite-ags4-reference]]) so every surfac
 builds a `CustomDict` through one function rather than each hand-rolling the
 parse. See [[dec-custom-dict-overlay]] for the design — this door used to hold
 a private `reject_custom_dict(opts)` that refused any custom dictionary
-outright; #568 replaced the refusal with the honour-and-warn path above.
+outright; laterite-dev#568 replaced the refusal with the honour-and-warn path above.
 
 **Which door a modality goes through, and why it has to differ:** a **path**
 goes through `check_file_with_dict`, the only modality that can answer
@@ -127,7 +127,7 @@ reached only through `check_parsed`. A new build-time `ENGINE_FINGERPRINT`
 for an `.ags.idx` certificate, rather than the hand-bumped `VERSION`
 (`CARGO_PKG_VERSION`), which does not change when a rule's logic does. As
 shipped in PR 2 the hash covered only this crate's own rule sources plus the
-reference leaf's two bundled JSON files; **#550** (2026-07-16) found that left
+reference leaf's two bundled JSON files; **laterite-dev#550** (2026-07-16) found that left
 three verdict-determining paths uncovered — `laterite-ags4-types::format_nsf`
 (computes Rule 8's verdict), `laterite-ags4-parse` (decides field boundaries),
 and `laterite-ags4-reference`'s `build.rs` (generates the per-edition
@@ -152,7 +152,7 @@ catalogue lives at
 `repo:rust-packages/laterite-ags4-validator` — near the root of the
 dependency graph, but not a zero-dep leaf itself: it depends on two lean,
 wasm-safe leaves — [[laterite-ags4-reference]] (the compiled dictionary +
-rules catalogue, #475) and `laterite-ags4-parse` (the shared tokenizer, #168)
+rules catalogue, laterite-dev#475) and `laterite-ags4-parse` (the shared tokenizer, #168)
 — plus `thiserror` + `chrono` + `encoding_rs` + `deunicode`, and **no other
 workspace crate**. That still-lean dep graph (leaf + leaf + small external
 crates) is what keeps it embeddable in a CLI, a PyO3 cdylib, and a wasm

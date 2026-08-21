@@ -134,7 +134,7 @@ describe("merge → MergeResult", () => {
     expect(() => merge([Buffer.from(A)])).toThrow(RangeError);
   });
 
-  // #501 — TYPE has a universal absorber (`X`); UNIT has none. So a unit clash is
+  // laterite-dev#501 — TYPE has a universal absorber (`X`); UNIT has none. So a unit clash is
   // fatal in EVERY mode, unlike a type clash. Merge used to take the first
   // non-empty UNIT and discard the other silently, labelling `10500.00` mm as
   // metres — and since both are valid `2DP` numbers, nothing downstream could
@@ -173,7 +173,7 @@ describe("merge → MergeResult", () => {
   });
 });
 
-// --- the type-clash lattice (#500) ----------------------------------------
+// --- the type-clash lattice (laterite-dev#500) ----------------------------------------
 // Same three modes, same vocabulary, same resolved values as `test_merge.py` and
 // the Rust `promote.rs` — the shared leaf is the point.
 describe("merge onTypeClash", () => {

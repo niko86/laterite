@@ -1,6 +1,6 @@
 {
   "_comment": [
-    "The python-ags4 parity contract, BY IDENTITY (#556, owner decision 2).",
+    "The python-ags4 parity contract, BY IDENTITY (laterite-dev#556, owner decision 2).",
     "",
     "This replaces PARITY_MIN_PASSING=121 — a COUNT, and a count is blind to a swap:",
     "one test regressing while another starts passing holds at 121 and reports green.",

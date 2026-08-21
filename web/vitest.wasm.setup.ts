@@ -1,4 +1,4 @@
-// Init the tiny AGS4 tokenizer wasm (#533) ONCE, up front, from the built
+// Init the tiny AGS4 tokenizer wasm (laterite-dev#533) ONCE, up front, from the built
 // artifact — so the wasm-backed `splitAgsFields`/`quoteAgsField` run
 // synchronously in the tests of this lane (agsline display helpers +
 // fix-preview geometry). In the browser the app awaits `tokenizerReady()`

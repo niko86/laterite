@@ -34,7 +34,7 @@
       "op": "fix_json",
       "input": { "fixture": "rust-packages/laterite-ags4-validator/tests/fixtures/rule8_dp_wrong_precision.ags", "as": "data.ags" },
       "legs": ["cli-native", "cli-uvx", "cli-npx"],
-      "spec_ref": "`lat fix data.ags --json` emits `{file, dest, applied, residual}` — the machine report #545 gave `fix` (the one verb that rewrites the user's data), which ACCEPTED but silently IGNORED `--json` before. The fixture applies a real DP-precision fix, so `applied` is NON-EMPTY — this pins the per-entry `{kind,label,rule,line,risk}` serialization, hand-synced across native serde_json / uvx json.dumps / npx JSON.stringify (npx must coerce napi's `undefined`→`null` for an absent `line`, the exact drift an empty `applied` would hide). Run with a relative name so `file`/`dest` are launcher-independent; raw stdout + exit (0 clean · 1 residual) is the pinned value."
+      "spec_ref": "`lat fix data.ags --json` emits `{file, dest, applied, residual}` — the machine report laterite-dev#545 gave `fix` (the one verb that rewrites the user's data), which ACCEPTED but silently IGNORED `--json` before. The fixture applies a real DP-precision fix, so `applied` is NON-EMPTY — this pins the per-entry `{kind,label,rule,line,risk}` serialization, hand-synced across native serde_json / uvx json.dumps / npx JSON.stringify (npx must coerce napi's `undefined`→`null` for an absent `line`, the exact drift an empty `applied` would hide). Run with a relative name so `file`/`dest` are launcher-independent; raw stdout + exit (0 clean · 1 residual) is the pinned value."
     }
   ]
 }

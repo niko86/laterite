@@ -430,7 +430,7 @@ jobs:
             artefacts/*.tar.gz
             artefacts/*.zip
 
-  # Pre-publish gate (#554): install-and-import the EXACT built wheel BEFORE it can
+  # Pre-publish gate (laterite-dev#554): install-and-import the EXACT built wheel BEFORE it can
   # reach PyPI, so a wheel that compiles but doesn't import (a broken cdylib, a
   # renamed console script, a bad [project.scripts]) can never be published. The
   # per-PR ci.yml `wheel-smoke` job proves the mechanism on every change; this
@@ -510,7 +510,7 @@ jobs:
     name: pypi (laterite)
     runs-on: ubuntu-latest
     # verify-wheel gates the publish: the exact built wheel must install-and-import
-    # on the 3.12/3.13/3.14 floor before it can reach PyPI (#554).
+    # on the 3.12/3.13/3.14 floor before it can reach PyPI (laterite-dev#554).
     needs: [build-wheels, verify-wheel]
     environment: pypi
     permissions:

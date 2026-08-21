@@ -1,6 +1,6 @@
 ---
 type: insight
-title: "0DP integer CONVERSION range-guards an out-of-i64 value to Null (#611) — was a fabricated i64::MAX; python-ags4's conversion keeps full precision"
+title: "0DP integer CONVERSION range-guards an out-of-i64 value to Null (laterite-dev#611) — was a fabricated i64::MAX; python-ags4's conversion keeps full precision"
 status: ratified
 tags: [insight]
 gap_kind: rust-vs-python
@@ -41,12 +41,12 @@ sources: [spec-4.2]
   so `"1E30"` silently became `9223372036854775807`, a number that was never
   in the file. The identical shape was copied three ways: the leaf's own
   `parse_value`/`ags4_str`, and laterite-py's PyO3 `parse_value` wrapper
-  (`repo:rust-packages/laterite-py/src/ags_types_fns.rs`) — the #531
+  (`repo:rust-packages/laterite-py/src/ags_types_fns.rs`) — the laterite-dev#531
   single-sourcing dedup covered the date/time/bool parsers but left this
-  Integer arm un-converged (the #503 record-link lesson: a typed-read object
+  Integer arm un-converged (the laterite-dev#503 record-link lesson: a typed-read object
   and the hash canonicalisation can silently drift from each other when they
   don't share one function).
-- **#611**: `parse_ags_integer` (`repo:rust-packages/laterite-ags4-types/src/lib.rs::parse_ags_integer`)
+- **laterite-dev#611**: `parse_ags_integer` (`repo:rust-packages/laterite-ags4-types/src/lib.rs::parse_ags_integer`)
   range-guards via `f64_fits_i64`
   (`repo:rust-packages/laterite-ags4-types/src/lib.rs::f64_fits_i64`) before the
   cast — out of `i64` range → `None` (a Null typed value / Python `None`);
@@ -58,7 +58,7 @@ sources: [spec-4.2]
   pin both the guard and that unchanged behaviour. `laterite-py`'s Integer/
   Decimal `parse_value` arms
   (`repo:rust-packages/laterite-py/src/ags_types_fns.rs`) now route through
-  the same `parse_ags_integer`/`parse_ags_decimal` — the #531 dedup finished
+  the same `parse_ags_integer`/`parse_ags_decimal` — the laterite-dev#531 dedup finished
   for this pair, so the typed-read object and `_content_hash` cannot drift.
 
 ## Why it matters
@@ -80,7 +80,7 @@ widen if that ever becomes necessary.
 
 ## OBSERVATIONS entry — **ratified as [[O-50]]**
 > [!note] Written into `repo:OBSERVATIONS.md#o-50` (5-field house style).
-> **Our decision** (#611): range-guard `parse_ags_integer` so an out-of-`i64`
+> **Our decision** (laterite-dev#611): range-guard `parse_ags_integer` so an out-of-`i64`
 > `0DP` value converts to Null, not a saturated integer — the "reject
 > overflow" option, single-sourced across the leaf's `parse_value`/`ags4_str`
 > and laterite-py's PyO3 wrapper so the typed-read object and the hash

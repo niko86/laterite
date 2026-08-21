@@ -256,7 +256,7 @@ where
     match canonical_type(ags_type) {
         Some(CanonicalType::Integer) => {
             // `parse_ags_integer` is `int(float(s))` (tolerates `"5.0"`/`"5.7"`,
-            // truncates toward zero) with the #611 i64 range guard nulling
+            // truncates toward zero) with the laterite-dev#611 i64 range guard nulling
             // out-of-range values. A None/empty cell → null. Same result the old
             // `parse_value` Integer arm produced, without the `Value` round-trip.
             let mut b = Int64Builder::with_capacity(n_rows);

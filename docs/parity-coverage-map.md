@@ -44,7 +44,7 @@ Rust engine.
 
 Expected result: **121 passed, 10 failed**, and the ten failures are
 exactly the set named in `parity-known-failures.json` — which is what
-`tools/check_parity.py` enforces, by IDENTITY rather than by count (#556).
+`tools/check_parity.py` enforces, by IDENTITY rather than by count (laterite-dev#556).
 A count alone cannot see a SWAP: one test regressing while another starts
 passing holds the total and reads as green.
 

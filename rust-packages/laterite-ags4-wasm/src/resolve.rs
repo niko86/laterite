@@ -58,7 +58,7 @@ pub(crate) fn resolve_dict_override(s: Option<&str>) -> Result<Option<DictVersio
     }
 }
 
-/// Build the runtime custom-dictionary overlay (#568) from browser-supplied bytes.
+/// Build the runtime custom-dictionary overlay (laterite-dev#568) from browser-supplied bytes.
 ///
 /// The wasm sandbox has no filesystem, so — unlike the CLI/Python/Node twins — this
 /// has no path arm: a custom dict always arrives as raw bytes (a `Uint8Array` the UI

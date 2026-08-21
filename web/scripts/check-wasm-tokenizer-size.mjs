@@ -1,4 +1,4 @@
-// Size gate for the tiny AGS4 tokenizer wasm (#533).
+// Size gate for the tiny AGS4 tokenizer wasm (laterite-dev#533).
 //
 // The tokenizer wasm exists to give the browser the shared Rust
 // tokenizer/quoter WITHOUT the 6.9 MB engine — its whole justification is that

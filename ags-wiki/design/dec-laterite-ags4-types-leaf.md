@@ -57,14 +57,14 @@ Typed parsers ride alongside `parse_value`. `parse_datetime(s) ->
 Option<NaiveDateTime>` came first — the *typed* datetime the Arrow
 `Timestamp` column needs (the string-returning `parse_value` can't fill a
 typed Arrow column) — and `parse_date` / `parse_time` / `parse_bool` joined
-it in #531. All four own the single `DATETIME_FORMATS` / `DATE_FORMATS` /
+it in laterite-dev#531. All four own the single `DATETIME_FORMATS` / `DATE_FORMATS` /
 `TIME_FORMATS` tables and back `parse_value`'s own Datetime/Date/Time/Bool
 arms, so the leaf has one parser per category. `laterite-py`'s PyO3 wrapper
 (`repo:rust-packages/laterite-py/src/ags_types_fns.rs`) now calls the same
 four instead of re-implementing them — the second copy that fed
-`_content_hash` and risked the #503 canonicalisation drift is gone.
+`_content_hash` and risked the laterite-dev#503 canonicalisation drift is gone.
 
-The same shape landed for the **write** side in #528: `ags4_str`'s inline
+The same shape landed for the **write** side in laterite-dev#528: `ags4_str`'s inline
 nDP / nSF / nSCI arms became `format_ndp` / `format_nsf` / `format_nsci`
 (`pub`, taking `(f64, n)`), and `laterite-ags4-validator`'s Rule 8 + fixes
 engine re-export those instead of the hand-port they carried — so the
@@ -78,7 +78,7 @@ records its transitive count unmoved (3) while direct deps went 2→3.
 `"0"` for SF-of-zero), pinned by-design and bounded by its own
 formatter-authority matrix — see ags4-output-value-gate.
 
-A third line primitive joined the leaf in #533 (the last child of the #527
+A third line primitive joined the leaf in laterite-dev#533 (the last child of the laterite-dev#527
 convergence arc): `write_quoted_field<W: Write>`/`quote_field`, added beside
 `ags4_str` — the inverse of a tokenizer's inner-value unescape, and the single
 authority for AGS4 field quoting (wrap in `"…"`, double an embedded `"`,
@@ -86,7 +86,7 @@ Rule-1 escaping). Its **home** was itself a small ultracode-panel decision:
 Option C, `laterite-ags4-types` next to `ags4_str`, over the alternatives (a new
 standalone quoting crate, or leaving it hand-copied per surface) — it adds
 **zero new dependency edges** (`laterite-ags4-emit` already depends on
-`laterite-ags4-types`) and matches the #528 precedent directly above: the sibling
+`laterite-ags4-types`) and matches the laterite-dev#528 precedent directly above: the sibling
 value→AGS4-string formatter already lives here, so the field-level wire-form
 authority does too. `laterite-ags4-emit`'s byte-faithful `writer.rs::write_row`
 now streams every cell through `write_quoted_field` instead of its own inline
@@ -100,7 +100,7 @@ ported verbatim from the hand-written TS state machine that used to live in
 `web/src/lib/agsline.ts`) and `quote_field` — through a **new, deliberately
 tiny** wasm crate, `laterite-ags4-tokenizer-wasm` (deps: `laterite-ags4-parse`
 + `laterite-ags4-types` only, both already wasm-safe). This is "approach B-tiny" in
-#533's own framing: a dedicated tiny cdylib (~30 KB / ~13 KB gzipped, proven by
+laterite-dev#533's own framing: a dedicated tiny cdylib (~30 KB / ~13 KB gzipped, proven by
 a size gate — `repo:web/scripts/check-wasm-tokenizer-size.mjs`), not gating the
 old TS copy behind a value-gate case and not calling the 6.9 MB engine wasm
 (`laterite-ags4-wasm`) on the main thread just for line tokenizing. `agsline.ts`
@@ -109,11 +109,11 @@ tokenizer/quoter seam lives in `web/src/lib/tokenizer.ts`, warmed once at boot
 behind the app's existing readiness gate. See [[crate-map]] for the crate's
 full dependency listing. The browser's char-offset span model (the wasm adapter's
 `start`/`end`/`valueStart`/`valueEnd`) stays surface-specific *by design* — it
-is excluded from the #555 cross-surface output-value
+is excluded from the laterite-dev#555 cross-surface output-value
 gate the same way wasm's own `char_span` already is, since neither has a peer
-on the other three surfaces. **Sibling, not folded in:** #581 is a
-*different* axis of the same #527 arc — the browser Anonymiser's redaction
-*engine*, not a tokenizer/quoter concern, and was deliberately out of #533's
+on the other three surfaces. **Sibling, not folded in:** laterite-dev#581 is a
+*different* axis of the same laterite-dev#527 arc — the browser Anonymiser's redaction
+*engine*, not a tokenizer/quoter concern, and was deliberately out of laterite-dev#533's
 scope. Its Phase 1 (2026-07-18) extracted `laterite-ags4-corpus-qa`'s `censor.rs` scrub
 logic into its own leaf, `laterite-ags4-censor` (see [[crate-map]]); Phase 2
 (also 2026-07-18) routed the browser Anonymiser through a `censor` export on
@@ -170,7 +170,7 @@ graph TD
   laterite["laterite-py"]
   validator["laterite-ags4-validator"]
   wasm["laterite-ags4-wasm<br/>browser cdylib"]
-  tokwasm["laterite-ags4-tokenizer-wasm<br/>tiny browser cdylib (#533)"]
+  tokwasm["laterite-ags4-tokenizer-wasm<br/>tiny browser cdylib (laterite-dev#533)"]
   types --> core
   types --> wasm
   types --> tokwasm
@@ -186,5 +186,5 @@ graph TD
 [[dec-rust-drives-python]] · laterite-ags5-db · [[laterite-cli]] · [[DT]] · [[0DP]] ·
 [[effective-dictionary]] · [[dec-duckdb-extension|laterite-duckdb reuses this typing authority]] ·
 [[design/_README\|AGS5 register]] · [[crate-map|laterite-ags4-tokenizer-wasm's full crate listing]] ·
-the #555 gate the browser's char-offset span is excluded from ·
-[[dec-ags4-censor-leaf|#581, the sibling scrub-engine convergence]]
+the laterite-dev#555 gate the browser's char-offset span is excluded from ·
+[[dec-ags4-censor-leaf|laterite-dev#581, the sibling scrub-engine convergence]]

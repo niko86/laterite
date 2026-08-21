@@ -1,5 +1,5 @@
 //! The DISPLAY tokenizer contract — inherited from the retired `tokenize_spans`
-//! (#533) and now carried by `scan::scan_line(line, DISPLAY)`.
+//! (laterite-dev#533) and now carried by `scan::scan_line(line, DISPLAY)`.
 //!
 //! These guarantees came originally from the browser's hand-written TS
 //! `splitAgsFields`, moved into Rust so the two could not drift, and survive

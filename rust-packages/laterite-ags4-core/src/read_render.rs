@@ -9,7 +9,7 @@
 //! hand-ports of RFC-4180 quoting, and the three JSON writers were three
 //! *different JSON libraries* — `serde_json`, JS's `JSON.stringify(x, null, 2)`
 //! and Python's `json.dumps(indent=2, ensure_ascii=False)` — held byte-identical
-//! only by hand-discipline, with no gate on `lat read` output at all (#530).
+//! only by hand-discipline, with no gate on `lat read` output at all (laterite-dev#530).
 //! Rendering here means one writer per format, and `read --json` / `--csv`
 //! cannot mean three different things.
 //!

@@ -1,4 +1,4 @@
-//! Runtime-owned dictionary delta for the `--dict` override (#568).
+//! Runtime-owned dictionary delta for the `--dict` override (laterite-dev#568).
 //!
 //! The bundled path stays `&'static` phf (zero startup, no parse). A custom
 //! dictionary is expressed as a **sparse overlay**: owned data for the *delta*
@@ -49,7 +49,7 @@ pub struct OwnedGroupMeta {
 #[derive(Debug, Clone)]
 pub struct OwnedDelta {
     /// The bundled edition this delta layers over — a property of the dictionary
-    /// itself (detected once at parse, not per delivery file). See #568 §2.
+    /// itself (detected once at parse, not per delivery file). See laterite-dev#568 §2.
     pub base_version: DictVersion,
     /// When `false`, this is a **full replacement**: lookups never fall through to
     /// the base, so the base contributes nothing.
@@ -61,7 +61,7 @@ pub struct OwnedDelta {
     /// Touched groups → the delta-added heading NAMES in dictionary order, so
     /// [`crate::dict::Dictionary::group_headings`] can append them after the base's.
     pub group_headings: HashMap<String, Vec<String>>,
-    /// Custom ABBR picklists — empty in v1 (a v2 cut, #568 §6). Reserved so the
+    /// Custom ABBR picklists — empty in v1 (a v2 cut, laterite-dev#568 §6). Reserved so the
     /// on-disk/owned shape is stable when v2 populates it.
     pub abbrs: HashMap<String, String>,
 }
@@ -91,12 +91,12 @@ impl OwnedDelta {
     }
 }
 
-// ─── Custom-dictionary parsing (#568 Phase 2) ───────────────────────────────
+// ─── Custom-dictionary parsing (laterite-dev#568 Phase 2) ───────────────────────────────
 //
 // One dispatcher (`parse_dict`) over two accepted formats. It produces a
 // base-resolved [`CustomDict`] whose `{ base_version, hash }` are precomputed
 // here at the surface boundary — so the certificate can record which dictionary
-// reached a verdict with no delivery bytes in hand (#568 §4). Nothing in the
+// reached a verdict with no delivery bytes in hand (laterite-dev#568 §4). Nothing in the
 // validator calls this yet; Phase 3 wires it.
 
 /// Input format of a `--dict` file.
@@ -123,7 +123,7 @@ pub enum BaseSpec {
 
 /// Why a `--dict` file could not be turned into a usable dictionary. Every
 /// variant names the DICTIONARY's own problem (never the delivery file), so a
-/// surface reports it before any data rule runs (#568 §4). `line` is the
+/// surface reports it before any data rule runs (laterite-dev#568 §4). `line` is the
 /// 1-indexed source line for the `.ags` path, `0` for the JSON path (serde owns
 /// JSON syntax locations via [`DictError::MalformedJson`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -219,7 +219,7 @@ pub struct CustomDict {
     /// The bundled edition this dict layers over (forced, detected, or — for a
     /// full replacement — the latest, unused since nothing falls through).
     pub base_version: DictVersion,
-    /// How the base was chosen — recorded on the certificate (#568 §4).
+    /// How the base was chosen — recorded on the certificate (laterite-dev#568 §4).
     pub resolution: DictResolution,
     /// `false` only for a full replacement: lookups then never see the base.
     pub fall_through: bool,
@@ -229,7 +229,7 @@ pub struct CustomDict {
     /// never a path.
     pub name: String,
     /// SHA-256 over (normalised delta ⊕ base edition ⊕ mode). Precomputed so the
-    /// cert can record it with no delivery bytes in hand (#568 §4).
+    /// cert can record it with no delivery bytes in hand (laterite-dev#568 §4).
     pub hash: [u8; 32],
 }
 
@@ -338,7 +338,7 @@ fn parse_json_dict(bytes: &[u8]) -> Result<DictionaryFile, DictError> {
 }
 
 /// Detect the bundled edition a custom dict best overlays — a pure function of
-/// the dictionary (#568 §2). Signal is heading-NAME reuse across the whole
+/// the dictionary (laterite-dev#568 §2). Signal is heading-NAME reuse across the whole
 /// edition; score is `(type, status)` agreement over that signal. Distinct
 /// filters, so a variant that changes a heading's type/status scores `< 1.0`.
 /// A dict with no standard-named heading at all (`signal == 0`) defaults to the

@@ -341,10 +341,10 @@ matters, and it is documented in the wild:
   from the other direction.
 
 > [!caution] Cite these as the same *family*, not the same *symptom*
-> #1327 and GH-50428 both crash at **interpreter teardown** (#1327's repro exits
+> microsoft/mimalloc#1327 and GH-50428 both crash at **interpreter teardown** (microsoft/mimalloc#1327's repro exits
 > 139, and `os._exit(0)` avoids it entirely). Laterite's fault is **mid-run**:
 > deterministic zeroing of the first 64 bytes during `to_pylist`, with no teardown
-> involved. #1327 also has pyarrow on the **v2** line, whereas we measured
+> involved. microsoft/mimalloc#1327 also has pyarrow on the **v2** line, whereas we measured
 > pyarrow's pool as mimalloc. Shared root cause — multiple co-resident mimalloc
 > instances on macOS — **different manifestation**.
 >
@@ -355,7 +355,7 @@ matters, and it is documented in the wild:
 > datafusion-python#1607 genuinely does root-cause to it, so it is kept here — but
 > using a threading bug as the authority for a non-threading fault was an error,
 > and it propagated into source comments and a public upstream issue before being
-> caught. **#1327 is the co-residency citation; #1287 is not.**
+> caught. **microsoft/mimalloc#1327 is the co-residency citation; microsoft/mimalloc#1287 is not.**
 
 > [!success] Measured — this is the cause, and the cross-matrix is unambiguous
 > Varying **our `.so`'s allocator** against **pyarrow's memory pool**
@@ -526,7 +526,7 @@ delegating per-target (`crates/polars-ooc/src/global_alloc.rs`): **jemalloc on
 Unix** (`tikv-jemallocator`, with `disable_initial_exec_tls` — the pyo3#678 fix),
 **mimalloc on Windows/emscripten**, system without `fast_alloc` (which is in
 `default`). The runtime crate turns the feature on unconditionally. The choice is
-a **measured performance** decision (PR #3108), not a safety carve-out; PR #7194,
+a **measured performance** decision (PR pola-rs/polars#3108), not a safety carve-out; PR pola-rs/polars#7194,
 which would have dropped mimalloc on Windows, was **closed unmerged**.
 
 A library with polars' download volume, shipping a foreign global allocator and

@@ -11,7 +11,7 @@ exist), `test_wiki_cli_faithful` (the README's verbs vs a const in `cli.rs`). Al
 them can pass while two surfaces do entirely different things — and one of them can
 pass while a surface *does not implement the verb at all*.
 
-That is not hypothetical. `lat merge` shipped in the native binary (#494) and never
+That is not hypothetical. `lat merge` shipped in the native binary (laterite-dev#494) and never
 reached the uvx or npx launchers. Three launchers of "one tool", and one of them
 simply had no `merge`. Nothing failed, because the gates compared a hand-list to a
 hand-list and both were equally wrong.
@@ -170,7 +170,7 @@ def shape(census: dict) -> dict:
             a["name"]: bool(a["takes_value"]) for a in census.get("global_args", [])
         },
         # verb flag -> the CLOSED VALUE SET the flag accepts (sorted). This is the
-        # table #555 added: the args table above compares a flag's arity, not the
+        # table laterite-dev#555 added: the args table above compares a flag's arity, not the
         # modes it accepts, so a launcher offering a DIFFERENT `--on-type-clash` set
         # was invisible — the same shape as the swallowed `--encoding`, one level in.
         #
@@ -335,7 +335,7 @@ def divergences(surfaces: dict[str, dict]) -> list[dict]:
                 }
             )
 
-        # --- Per-flag value sets (#555). Compared as SETS: a launcher that accepts a
+        # --- Per-flag value sets (laterite-dev#555). Compared as SETS: a launcher that accepts a
         # different set of `--on-type-clash` modes is broken the same way one that
         # swallows `--encoding` is — it answers a question the user did not ask. A
         # flag present on only one side is skipped here: that's already an `args`
@@ -427,7 +427,7 @@ def render(ssot: dict) -> str:
         "The point is what a *value*-comparison gate structurally cannot reach. Feed one",
         "file through every surface and compare the outputs, and you still learn nothing",
         "about a verb one launcher never implemented: **a door that does not exist has no",
-        "output to compare.** `lat merge` shipped in the binary (#494) and reached neither",
+        "output to compare.** `lat merge` shipped in the binary (laterite-dev#494) and reached neither",
         "other launcher; every cross-surface gate stayed green, because each compared one",
         "hand-list against another hand-list and both were equally wrong. The census is the",
         "first thing that could see it — and it did, on its first run.",
@@ -608,7 +608,7 @@ def render(ssot: dict) -> str:
         "  compares streams.",
         "",
         "Closing that class means comparing what the surfaces *produce*, not what they",
-        "advertise. That gate has since landed: [[laterite-ags4-xcheck]] (#519-525) pushes a",
+        "advertise. That gate has since landed: [[laterite-ags4-xcheck]] (laterite-dev#519-525) pushes a",
         "committed case manifest through every surface and compares the observed *values*, with",
         "the in-process Rust leaf as an authority column. See [[modality-register]] for the",
         "I/O-form axis the value gate does not cover.",

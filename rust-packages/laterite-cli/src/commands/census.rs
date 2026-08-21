@@ -8,7 +8,7 @@
 //! from clap's introspection of the *same* [`Cli`] struct that parses the real
 //! command line, so the census cannot drift from the tool. A second hand-written
 //! table is exactly the failure this whole gate exists to catch: `lat merge` shipped
-//! in the binary (#494) and never reached the uvx or npx launchers, and no gate saw
+//! in the binary (laterite-dev#494) and never reached the uvx or npx launchers, and no gate saw
 //! it — because every gate we had compared *knob names against another hand-list*,
 //! and both hand-lists were equally wrong.
 //!

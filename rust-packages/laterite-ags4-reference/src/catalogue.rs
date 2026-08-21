@@ -1,4 +1,4 @@
-//! The rule-catalogue **data accessors** — moved out of the validator (#475
+//! The rule-catalogue **data accessors** — moved out of the validator (laterite-dev#475
 //! PR2) so a consumer that only wants the inventory / editorial metadata
 //! needn't depend on the whole rule engine. The faithfulness gate that
 //! cross-checks these against the engine's actual emissions (fixable rules,

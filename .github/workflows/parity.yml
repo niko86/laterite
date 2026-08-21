@@ -4,7 +4,7 @@
 # Manual `workflow_dispatch` + scheduled weekly so an upstream
 # silent drift surfaces before it bites a user.  cadence: parity
 #
-# That sentence was false for as long as it existed (#558): PYTHON_AGS4_VERSION
+# That sentence was false for as long as it existed (laterite-dev#558): PYTHON_AGS4_VERSION
 # below pins the oracle, so the cron re-ran one frozen version forever and could
 # never see upstream move. The pin is right — it is what makes the contract
 # reproducible — so the fix is the missing half, not unpinning: the
@@ -12,7 +12,7 @@
 # rationale above is now achievable rather than aspirational.
 #
 # The contract is the FAILING SET, by identity — `parity-known-failures.json`
-# names all 10 deliberate non-closures with the reason each is accepted (#556).
+# names all 10 deliberate non-closures with the reason each is accepted (laterite-dev#556).
 # It replaced a pass-count floor of 121, which was blind to a SWAP: one test
 # regressing while another started passing held the count and went green. The
 # ten reasons also lived only in prose that no job read — so the contract CI
@@ -33,10 +33,10 @@ on:
     - cron: "0 3 * * 0"
   # Per-PR regression gate (#190).  cadence: parity-pr
   # NO trigger-level `paths:` — that is what made
-  # this un-requireable (#556): a required check behind a trigger filter never
+  # this un-requireable (laterite-dev#556): a required check behind a trigger filter never
   # fires on an out-of-scope PR, so no check run is created and the requirement
   # pends FOREVER, exiting only via the admin bypass button. We already ate that
-  # on wiki-lint (PR #497). The path-gating moved into the `changes` job below, so
+  # on wiki-lint (PR laterite-dev#497). The path-gating moved into the `changes` job below, so
   # this workflow ALWAYS reports — skip-as-success when out of scope — which is
   # the shape a required check must have.
   pull_request:
@@ -51,8 +51,8 @@ permissions:
   contents: read
 
 jobs:
-  # Path-gating at JOB level (#556). Same shape as ci.yml, including the
-  # `!cancelled()` + `result != 'success'` clause below — see #561: when the
+  # Path-gating at JOB level (laterite-dev#556). Same shape as ci.yml, including the
+  # `!cancelled()` + `result != 'success'` clause below — see laterite-dev#561: when the
   # filter cannot answer, the honest read is "run it", never "nothing changed".
   changes:
     runs-on: ubuntu-latest
@@ -80,7 +80,7 @@ jobs:
               - 'parity-known-failures.json'
               - '.github/workflows/parity.yml'
 
-  # #558: the header's stated purpose, made achievable. Scheduled/dispatch only,
+  # laterite-dev#558: the header's stated purpose, made achievable. Scheduled/dispatch only,
   # NEVER on a PR — upstream releasing something while a PR is open is not that
   # PR's fault, and a required check that fails for reasons its author cannot act
   # on is a check people learn to click past. On the cron, a red run IS the notice.
@@ -159,7 +159,7 @@ jobs:
     needs: changes
     # `!cancelled()` is load-bearing — without it this clause is a NO-OP, because
     # GitHub applies an implicit success() to any `if:` lacking a status-check
-    # function and skips the job before reading it (measured, #561/#562).
+    # function and skips the job before reading it (measured, laterite-dev#561/#562).
     if: ${{ !cancelled() && (github.event_name != 'pull_request'
         || needs.changes.result != 'success'
         || needs.changes.outputs.compat == 'true') }}
@@ -227,7 +227,7 @@ jobs:
           - Contract: \`parity-known-failures.json\` (the failing SET, by identity)
           EOF
 
-      # The contract is the failing SET, not the pass COUNT (#556). A count is
+      # The contract is the failing SET, not the pass COUNT (laterite-dev#556). A count is
       # blind to a SWAP: one test regressing while another starts passing holds at
       # 121 and goes green. Proven — see the PR.
       - name: Enforce the parity contract by IDENTITY

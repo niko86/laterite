@@ -354,7 +354,7 @@ test("Tools → Anonymiser pseudonymises IDs (cross-refs intact) + hashes PROJ_I
   expect(m).not.toBeNull();
   expect(out.split(m![0]).length - 1).toBeGreaterThan(1);
 
-  // PROJ_ID "P1" → the file's full 64-hex content hash (Phase 2, #581: the web
+  // PROJ_ID "P1" → the file's full 64-hex content hash (Phase 2, laterite-dev#581: the web
   // now drives the shared Rust engine, which uses the full-width hash — a KEY
   // field, so collision-safe — not the old 16-hex TS truncation).
   expect(out).not.toMatch(/"DATA","P1"/);
@@ -490,7 +490,7 @@ test("PWA: the app loads and validates fully offline after first visit", async (
       const paths = reqs.map((r) => new URL(r.url).pathname);
       if (
         paths.some((p) => /\/ags4_wasm_bg-.*\.wasm$/.test(p)) &&
-        // The tiny tokenizer wasm (#533) is boot-critical: first render is
+        // The tiny tokenizer wasm (laterite-dev#533) is boot-critical: first render is
         // gated on it, so a precache drop breaks the app offline entirely.
         paths.some((p) => /\/ags4_tokenizer_bg-.*\.wasm$/.test(p)) &&
         paths.some((p) => /\/index\.html$/.test(p))

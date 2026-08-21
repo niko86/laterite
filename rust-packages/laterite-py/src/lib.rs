@@ -12,7 +12,7 @@
 //! the ENGINE's own renderer (`laterite_ags4_validator::findings`) — the
 //! same function the `lat` binary calls, so `--json`/`--ndjson` are
 //! byte-faithful by construction rather than by a hand-copy kept in step
-//! with a comment (#530); the python-ags4 `check_file` dict (with
+//! with a comment (laterite-dev#530); the python-ags4 `check_file` dict (with
 //! `Metadata`/`Summary`) is assembled in `laterite/compat.py`.
 
 use std::collections::HashSet;
@@ -84,7 +84,7 @@ pub(crate) fn parse_dv(s: Option<&str>) -> Result<Option<DictVersion>, String> {
 }
 
 /// Parse the `--dict` custom-dictionary override for a Python call, mirroring the CLI's
-/// `apply_dict_args` (#568). The dict arrives as a filesystem path OR raw bytes (wasm has
+/// `apply_dict_args` (laterite-dev#568). The dict arrives as a filesystem path OR raw bytes (wasm has
 /// no FS, so bytes is the portable spelling every surface shares); the base edition is a
 /// property of the dict, detected structurally, unless the caller forces one via
 /// `--dict-version` (`over`) or drops it entirely via `dict_replace`. `enc` is the caller's
@@ -102,7 +102,7 @@ fn build_custom_dict(
 ) -> Result<Option<overlay::CustomDict>, (i32, String, String)> {
     let bad = |m: String| (5, "bad_dict".to_string(), m);
     // Where the bytes come from, and the advisory name the cert records (basename for a
-    // path, a neutral label for in-memory bytes — never a filesystem path, #568 §4).
+    // path, a neutral label for in-memory bytes — never a filesystem path, laterite-dev#568 §4).
     let (bytes, name): (Vec<u8>, String) = if let Some(p) = dict_path {
         let b =
             std::fs::read(Path::new(p)).map_err(|e| bad(format!("cannot read --dict {p}: {e}")))?;
@@ -276,7 +276,7 @@ fn severity_str(s: Severity) -> &'static str {
 // (`laterite_ags4_validator::findings`), re-exported here at the old private
 // path so the call sites below are unchanged. This module used to carry its own
 // copy, marked "byte-identical to the binary's `ndjson_string`" — a comment is
-// not a guarantee, and there were three such copies (#530). Now `lat validate
+// not a guarantee, and there were three such copies (laterite-dev#530). Now `lat validate
 // --json`, `laterite`'s report JSON and Node's all come out of one function.
 use laterite_ags4_validator::findings::{findings_json, findings_ndjson};
 use laterite_ags4_validator::verdict::Verdict;
@@ -320,7 +320,7 @@ fn run_check<'py>(
     warnings_as_errors: bool,
     check_files: bool,
     encoding: Option<String>,
-    // The custom `--dict` overlay (#568): a path OR raw bytes, plus `dict_replace` to drop
+    // The custom `--dict` overlay (laterite-dev#568): a path OR raw bytes, plus `dict_replace` to drop
     // the base. wasm has no FS, so bytes is the spelling every surface can share.
     dict_path: Option<String>,
     dict_bytes: Option<Vec<u8>>,
@@ -789,7 +789,7 @@ fn merge_core(
         Err(e @ MergeError::TypeConflict { .. }) => {
             Err((6, "type_conflict".to_string(), e.to_string()))
         }
-        // Fatal in EVERY mode — no `on_type_clash` value absorbs it (#501). Its own
+        // Fatal in EVERY mode — no `on_type_clash` value absorbs it (laterite-dev#501). Its own
         // kind so a caller can tell "your files disagree on a column's TYPE, which
         // widen/promote CAN settle" from "your files disagree on its UNIT, which
         // nothing can" — the two need different fixes.
@@ -1244,7 +1244,7 @@ impl PySidecar {
                 encoding.unwrap_or("")
             ))
         })?;
-        // The cert records WHICH custom dictionary judged the file (#568, O-48): a mint
+        // The cert records WHICH custom dictionary judged the file (laterite-dev#568, O-48): a mint
         // against a `--dict` overlay stamps its {name, hash}, and a later read that names a
         // different dict revalidates rather than inheriting a stale verdict.
         let custom_dict = build_custom_dict(dict_path, dict_bytes, dict_replace, over, enc)
@@ -1592,7 +1592,7 @@ fn read_groups_raw(
 /// writer. `_cli.py` used to build this with Python's `json.dumps(indent=2,
 /// ensure_ascii=False)` while the binary used `serde_json` and Node used
 /// `JSON.stringify` — three different JSON libraries kept byte-identical by
-/// hand-discipline, with no gate on `read` output (#530).
+/// hand-discipline, with no gate on `read` output (laterite-dev#530).
 #[pyfunction]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
