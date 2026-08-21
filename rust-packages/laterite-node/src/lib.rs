@@ -499,6 +499,13 @@ fn validate_inner(
     data: Option<&[u8]>,
     opts: &CheckOptions,
     cert: Option<&laterite_ags4_core::index::Sidecar>,
+    // Did the CALLER name this certificate at THIS call? A cert reached through
+    // `read(file, {index})` and carried on the handle is a hint — the trust model
+    // declines it and says why. A cert named on `validate(file, {index})` is an
+    // ASSERTION that it belongs to these bytes, so a mismatch is an error. Mirrors
+    // laterite-py exactly; the distinction lives here rather than in TypeScript so
+    // the check can use bytes already in hand instead of reading the file twice.
+    strict_cert: bool,
 ) -> std::result::Result<
     (String, String, String, Findings, bool, Option<String>),
     (i32, &'static str, String),
@@ -536,6 +543,28 @@ fn validate_inner(
             "provide `path`, `text` or `data`".to_string(),
         ));
     };
+
+    // Fail before the engine, not after: the whole point of a named cert is to
+    // NOT do this work, so finding the mismatch afterwards costs exactly what the
+    // caller was trying to save. Only staleness is fatal — a cert genuinely for
+    // these bytes that cannot answer THIS question (a different engine
+    // fingerprint, an unmeasured tier, `checkFiles`) is not a caller error and
+    // falls through to the trust model's `revalidateReason`.
+    if strict_cert {
+        if let Some(c) = cert {
+            if !c.is_fresh_for(&bytes) {
+                return Err((
+                    4,
+                    "stale_cert",
+                    format!(
+                        "the certificate does not match {label} (size / SHA-256 differ) \
+                         — the file changed under it; rebuild it with \
+                         read(...).validate().certify()"
+                    ),
+                ));
+            }
+        }
+    }
 
     let out = laterite_ags4_trust::check(laterite_ags4_trust::Request {
         bytes: &bytes,
@@ -590,6 +619,9 @@ pub fn run_check(
     // The certificate, if the caller named one. Whether to TRUST it is not decided here,
     // nor in TypeScript — it is decided once, in `laterite_ags4_trust`, for every surface.
     cert: Option<&Sidecar>,
+    // Private to the napi ABI — neither `validate()` nor `Ags4File.validate()`
+    // exposes it. It records WHICH door the cert came through; see `validate_inner`.
+    strict_cert: Option<bool>,
 ) -> Result<ValidationReport> {
     let forced = match resolve_edition(dict_version.as_deref()) {
         Ok(v) => v,
@@ -626,6 +658,7 @@ pub fn run_check(
         data.as_deref(),
         &opts,
         cert.map(|c| &c.inner),
+        strict_cert.unwrap_or(false),
     ) {
         Ok(t) => t,
         Err((code, kind, msg)) => return Ok(ValidationReport::failure(kind, code, msg)),

@@ -54,11 +54,19 @@ export class BadDictError extends Ags4Error {
   }
 }
 
-/** A passed `index=` certificate (`.ags.idx`) does not match the file it was read
+/** A passed `index` certificate (`.ags.idx`) does not match the file it was named
  * for — its size / SHA-256 differ, so its byte offsets and clean verdict are now
- * lies. Raised at `read` time (fail-fast): an explicit `index=` asserts "this cert
- * is for this file", so a mismatch is an error, never a silent fall-back. Rebuild
- * it (`read(p).validate().certify()`). (#294 Batch E / #14) */
+ * lies. Thrown by **both** doors that take `index` — `read` and `validate` —
+ * because naming one asserts "this cert is for this file", and a false assertion
+ * is an error rather than a silent fall-back. Rebuild it
+ * (`read(p).validate().certify()`). (#294 Batch E / #14)
+ *
+ * NOT thrown for a cert genuinely for these bytes that cannot answer *this*
+ * question — a different rule engine, an unmeasured severity tier, `checkFiles`.
+ * That is not a caller error: the rules run and `report.revalidateReason` says
+ * why the cert did not stand in. A handle carrying a cert from
+ * `read(file, {index})` is in the same position — nothing was asserted at
+ * `.validate()`, so nothing is thrown there. (#271) */
 export class StaleCertError extends Ags4Error {
   constructor(message: string, exitCode = 4) {
     super(message, exitCode);
@@ -113,6 +121,10 @@ export function makeError(
       return new BadDictError(message, exitCode);
     case "world_check_requires_source":
       return new WorldCheckRequiresSourceError(message, exitCode);
+    // Raised BEFORE the engine runs — the point of naming a cert is to skip that
+    // work, so a mismatch found afterwards would cost what the caller was saving.
+    case "stale_cert":
+      return new StaleCertError(message, exitCode);
     case "merge_conflict":
     case "emit_error":
       return new MergeConflictError(message, exitCode);

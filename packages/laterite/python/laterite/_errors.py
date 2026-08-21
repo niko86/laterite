@@ -44,9 +44,17 @@ class BadDictError(Ags4Error):
 class StaleCertError(Ags4Error):
     """A passed ``index=`` certificate (``.ags.idx``) does not match the file it
     was read for — its size/SHA-256 differ, so its byte offsets and clean verdict
-    are now lies. Raised at [`read`][laterite.read] time (fail-fast): an explicit ``index=``
-    asserts "this cert is for this file", so a mismatch is an error, never a silent
-    fall-back to re-validation. Rebuild it (``read(p).validate().certify()``).
+    are now lies. Raised by **both** doors that take ``index=`` — [`read`][laterite.read]
+    and [`validate`][laterite.validate] — because naming one asserts "this cert is for
+    this file", and a false assertion is an error rather than a silent fall-back to
+    re-validation. Rebuild it (``read(p).validate().certify()``).
+
+    NOT raised for a cert that is genuinely for these bytes but cannot answer *this*
+    question — a different rule engine, a severity tier it never measured,
+    ``check_files=True``. That is not a caller error: the rules run and
+    [`Report.revalidate_reason`][laterite.Report.revalidate_reason] says why the cert
+    did not stand in. A handle carrying a cert from ``read(index=)`` is in the same
+    position: nothing was asserted at ``.validate()``, so nothing is raised there.
     """
 
     exit_code = 4
@@ -87,6 +95,9 @@ _KIND_TO_EXC: dict[str, type[Ags4Error]] = {
     "bad_dict": BadDictError,
     "bad_args": BadDictError,
     "world_check_requires_source": WorldCheckRequiresSourceError,
+    # Raised BEFORE the engine runs — the point of a named cert is to skip that
+    # work, so a mismatch found afterwards would cost what the caller was saving.
+    "stale_cert": StaleCertError,
     "type_conflict": MergeConflictError,
     # Fatal in EVERY merge mode — no `on_type_clash` value absorbs a unit clash (laterite-dev#501).
     "unit_conflict": MergeConflictError,

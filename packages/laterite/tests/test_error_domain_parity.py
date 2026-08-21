@@ -34,9 +34,7 @@ def _crate_src(crate: str) -> str:
     return "\n".join(p.read_text(encoding="utf-8") for p in sorted(src.glob("*.rs")))
 
 
-# The canonical PRODUCER table — the 6 `ValidatorError` variants. The surfaces
-# add two consumer-only kinds no Rust producer emits: `not_utf8` (the validator
-# decodes lossily, so it never surfaces) and `bad_args` (the arg/dispatch layer).
+# The canonical PRODUCER table — the 6 `ValidatorError` variants.
 # `world_check_requires_source` (5, a bad-*arguments* code): `check_files=True` asked
 # of an input with no path — a question about the on-disk `FILE/` tree that a
 # bytes/text read cannot answer, and must not answer with a clean Rule 20.
@@ -48,7 +46,22 @@ _PRODUCER = {
     "bad_dict": 5,
     "world_check_requires_source": 5,
 }
-_CONSUMER_ONLY = {"not_utf8": 4, "bad_args": 5}
+# Kinds no `ValidatorError` variant produces — they are raised at the BINDING
+# boundary, before or instead of reaching the validator. (`bad_args` and
+# `stale_cert` are both emitted from Rust, in laterite-py's `validate` and
+# laterite-node's `validate_inner`; what makes them consumer-only is that they
+# are not variants of the shared error enum, so no other surface inherits them
+# for free — each binding has to spell them itself, which is what this file is
+# here to keep honest.)
+#
+# `not_utf8` (4): the validator decodes lossily, so it never surfaces.
+# `bad_args` (5): the arg/dispatch layer.
+# `stale_cert` (4): `index=` named a cert whose size / SHA-256 do not match this
+#   file (#271). Emitted BEFORE the engine runs — the point of naming a cert is
+#   to skip that work, so a mismatch reported afterwards would cost exactly what
+#   the caller was trying to save. Shares StaleCertError's code with `read`,
+#   which raises the same exception from Python for the same assertion.
+_CONSUMER_ONLY = {"not_utf8": 4, "bad_args": 5, "stale_cert": 4}
 # The merge leaf (`laterite-ags4-merge::MergeError`) is a SECOND Rust producer,
 # distinct from `ValidatorError`: a strict TYPE conflict or a failed emit is a
 # schema-level rejection (exit 6). laterite-py's `merge_core` emits these two

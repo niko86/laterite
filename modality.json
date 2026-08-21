@@ -1263,7 +1263,7 @@
             "handle": "present"
           },
           "gaps": [],
-          "note": "explicit opt-in — autodiscovery is deliberately refused so naming index= asserts the cert is for THIS file."
+          "note": "explicit opt-in — autodiscovery is deliberately refused so naming index= asserts the cert is for THIS file. Spelled on BOTH doors since #271, and they are not two spellings of one thing: `validate(index=)` answers the verdict without PARSING, while `read(index=)` must parse to build the handle and so skips only the rules. A stale cert raises StaleCertError from either door — naming one is an assertion — but a cert merely INHERITED by `Ags4File.validate()` asserts nothing there and falls back with `revalidate_reason`."
         },
         {
           "surface": "node",
@@ -1286,7 +1286,7 @@
             "handle": "present"
           },
           "gaps": [],
-          "note": "explicit opt-in, mirrors Python."
+          "note": "explicit opt-in, mirrors Python — including #271's second door: `validate(file, {index})` skips the parse, `read(file, {index}).validate()` skips only the rules, and a stale cert throws StaleCertError from either while an inherited one falls back with `revalidateReason`."
         },
         {
           "surface": "duckdb",
@@ -1331,7 +1331,7 @@
           "output": {
             "handle": "present"
           },
-          "note": "Added 2026-08-05 (phase 4b). Spelled on VALIDATE rather than on read, because this facade's validate is a free function and has no `Document::validate()` for a cert attached at read time to reach. Same modality as python/node's `read(index=)` — cert as an input form — and the same refusal to auto-discover. NOTE the asymmetry this reveals in the siblings: a vouched cert with no world check lets the engine skip PARSING entirely, which python/node cannot reach because building a handle parses by definition.",
+          "note": "Added 2026-08-05 (phase 4b). Spelled on VALIDATE rather than on read, because this facade's validate is a free function and has no `Document::validate()` for a cert attached at read time to reach. Same modality as python/node's `read(index=)` — cert as an input form — and the same refusal to auto-discover. The asymmetry this revealed in the siblings — a vouched cert with no world check lets the engine skip PARSING entirely, which python/node could not reach because building a handle parses by definition — was closed by #271, which gave both of them the same validate-side door. This facade still has only the one, because it still has no `Document::validate()`.",
           "gaps": []
         },
         {

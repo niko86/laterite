@@ -8847,6 +8847,7 @@ def run_check(
     dict_bytes: Any = ...,
     dict_replace: Any = ...,
     cert: Any = ...,
+    strict_cert: Any = ...,
 ) -> Any: ...
 def transport_lock(
     src: Any, dest: Any, password: Any, level: Any = ..., log_n: Any = ...

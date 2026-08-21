@@ -1446,6 +1446,7 @@ def validate(
     source: Any = None,
     *,
     text: str | None = None,
+    index: str | os.PathLike[str] | None = None,
     dict_version: Edition | None = None,
     warnings: bool = True,
     fyi: bool = False,
@@ -1468,6 +1469,14 @@ def validate(
     Genuine *violations* of a parseable AGS4 file never raise: they come back as
     findings in the [`Report`][laterite.Report] (a file with nothing to say about it
     at all is a [`Report`][laterite.Report] with ``count == 0``).
+
+    **Two doors take a certificate, and they answer different questions.** Pass
+    ``index=`` here when the verdict is *all* you want: a vouched cert lets the
+    engine answer from the bytes' hash and the stamp, skipping the parse as well as
+    the rules. Reach for ``read(path, index=…).validate()`` when you want the data
+    too — that route must parse to build the handle, so it skips only the rules and
+    the cert saves less. Neither is a faster spelling of the other; they cost
+    different amounts because they do different work.
 
     ``source`` is auto-detected the same way [`read`][laterite.read] does it: a single
     positional argument is sniffed as a path (when it exists on disk — the
@@ -1493,6 +1502,13 @@ def validate(
             bytes, or in-memory AGS4 text. Mutually exclusive with ``text``.
         text: In-memory AGS4 text, given explicitly to bypass the ``source``
             sniff for an ambiguous string.
+        index: Path to this file's ``.ags.idx`` certificate (keyword-only), minted
+            by [`Ags4File.certify`][laterite.Ags4File.certify]. Strictly opt-in —
+            there is no autodiscovery, because naming it asserts the cert is for
+            *this* file. A fresh, same-engine, tier-covering cert answers the
+            verdict **without parsing**; anything less runs the rules as normal and
+            explains itself on
+            [`Report.revalidate_reason`][laterite.Report.revalidate_reason].
         dict_version: The AGS edition whose dictionary the rules are projected
             from (e.g. ``"4.1"``); ``None`` resolves the edition from the file
             (see [`Report.resolution`][laterite.Report.resolution]). An unknown value raises
@@ -1534,9 +1550,22 @@ def validate(
             edition (e.g. AGS3).
         BadDictError: ``dict_version`` is not a known edition, or ``dictionary`` is
             malformed / contradicts ``dict_replace``.
+        StaleCertError: ``index=`` names a certificate whose size / SHA-256 do not
+            match this file. Raised **before** the rule engine runs, because the
+            point of naming a cert is to skip that work — finding the mismatch
+            afterwards would cost exactly what the caller was trying to save.
     """
     path, txt, data = _resolve_source(source, text=text)
     dict_path, dict_bytes = _split_dict(dictionary)
+    # Loaded here, checked in the engine. The freshness comparison needs the
+    # source BYTES, and the native layer is about to read them anyway — doing it
+    # here would read a 25 MB delivery twice to save parsing it once, which is
+    # most of the saving this parameter exists to deliver.
+    cert = (
+        _native.Sidecar.from_json(Path(index).read_bytes())
+        if index is not None
+        else None
+    )
     r = _native.run_check(
         path=path,
         text=txt,
@@ -1550,6 +1579,12 @@ def validate(
         dict_path=dict_path,
         dict_bytes=dict_bytes,
         dict_replace=dict_replace,
+        cert=cert,
+        # This door NAMED the cert, so a stale one is an error. `Ags4File.validate`
+        # passes no such flag: a cert it inherited from `read(index=)` was asserted
+        # there, not here, and quietly re-validating is the right answer if the
+        # file has since moved under it.
+        strict_cert=cert is not None,
     )
     return Report(raise_for(r))
 

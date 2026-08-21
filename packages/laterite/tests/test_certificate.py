@@ -201,6 +201,112 @@ def test_fresh_cert_makes_validate_skip_the_engine(tmp_path):
     assert rep.resolution == "exact"
 
 
+# --- the second door: validate(index=) (#271) --------------------------------
+#
+# EVERY TEST HERE ASSERTS `certified`, NEVER THE VERDICT. A certified run and a
+# full run return the SAME answer — that is the whole point — so a test that
+# checks `is_valid` or `count` passes just as happily against a `validate()`
+# that ignored `index=` altogether. `certified` is the only observable that
+# distinguishes the fast path from the slow one.
+
+
+def test_validate_takes_a_cert_directly_without_a_handle(tmp_path):
+    """The door #271 exists for: a verdict with no parse and no DuckDB handle."""
+    src = _write(tmp_path)
+    cert = lat.read(src).certify()
+
+    rep = lat.validate(src, index=cert, warnings=False)
+    assert rep.certified, "the free validate did not consume the cert"
+    assert rep.is_valid and rep.count == 0
+
+
+def test_the_two_doors_agree(tmp_path):
+    """A faster answer is only worth having if it is the same answer."""
+    src = _write(tmp_path)
+    cert = lat.read(src).certify()
+
+    free = lat.validate(src, index=cert, warnings=False)
+    handle = lat.read(src, index=cert).validate(warnings=False).report
+    plain = lat.validate(src, warnings=False)
+
+    assert free.certified and handle.certified and not plain.certified
+    for other in (handle, plain):
+        assert (free.is_valid, free.count, free.dict_version) == (
+            other.is_valid,
+            other.count,
+            other.dict_version,
+        )
+
+
+def test_validate_without_index_ignores_a_sibling_cert(tmp_path):
+    """Never auto-discover. Naming `index=` is what asserts the cert is for THIS
+    file, and a cert silently applied to the wrong one is the failure the
+    explicit form exists to prevent — so `<file>.ags.idx` sitting next door must
+    do nothing at all."""
+    src = _write(tmp_path)
+    minted = lat.read(src).certify()
+    assert minted == tmp_path / "delivery.ags.idx", "the sibling is not where we think"
+
+    assert not lat.validate(src, warnings=False).certified
+
+
+def test_validate_raises_on_a_stale_cert(tmp_path):
+    """Naming a cert is an assertion; a false one is an error, not a slow path.
+
+    The alternative — quietly re-validating — is the failure mode this parameter
+    is most exposed to: you ask for the fast path, get none, and nothing says so
+    except a field you did not know to read.
+    """
+    src = _write(tmp_path)
+    cert = lat.read(src).certify()
+    src.write_bytes(src.read_bytes() + b"\r\n")  # one byte; the hash moves
+
+    with pytest.raises(StaleCertError):
+        lat.validate(src, index=cert, warnings=False)
+
+
+def test_a_stale_cert_raises_before_the_engine_runs(tmp_path):
+    """...and it must raise EARLY.
+
+    Raising after the rules have run would be correct and worthless: the caller
+    named a cert to avoid that work, so a late error costs exactly what it was
+    meant to save. Asserted structurally rather than by timing — a dirty file
+    whose findings would be reported proves the engine never ran, because a
+    raise cannot carry them.
+    """
+    dirty = CLEAN.split('"GROUP","TRAN"')[0]  # PROJ only — does not validate clean
+    src = _write(tmp_path, text=dirty)
+    clean = _write(tmp_path, name="clean.ags")
+    cert = lat.read(clean).certify()  # a real cert, for a DIFFERENT file
+
+    with pytest.raises(StaleCertError) as exc:
+        lat.validate(src, index=cert, warnings=False)
+    # The message names the file, not a rule — nothing about the dirty file's
+    # contents can be in it, because nothing looked.
+    assert "certificate" in str(exc.value).lower()
+
+
+def test_an_inherited_cert_does_not_make_validate_strict(tmp_path):
+    """The raise belongs to the door where `index=` was NAMED.
+
+    `read(index=)` asserted freshness at read time and passed. If the file then
+    moves on disk, the later `.validate()` asserted nothing — so it re-validates
+    and explains itself, rather than raising at a call that named no cert. This
+    is the one place the two doors deliberately differ, and it is guarded because
+    the natural "fix" is to make the check unconditional, which would turn an
+    existing chainable call into a raising one.
+    """
+    src = _write(tmp_path)
+    cert = lat.read(src).certify()
+    handle = lat.read(src, index=cert)  # fresh here — read() would have raised
+
+    src.write_bytes(src.read_bytes() + b"\r\n")  # now stale, under the handle
+
+    rep = handle.validate(warnings=False).report  # must NOT raise
+    assert not rep.certified
+    assert rep.revalidate_reason, "it declined the cert and said nothing about why"
+
+
 def test_read_without_index_still_runs_the_engine(tmp_path):
     src = _write(tmp_path)
     lat.read(src).certify()
