@@ -27,7 +27,7 @@ then _consumes_ that `.ags.idx` beside the file for fast single-group reads.
 -- read_ags returns one group, already cast to AGS4 types
 SELECT loca_id, loca_natn, loca_nate, loca_gl
 FROM read_ags('delivery.ags', 'LOCA')
-WHERE loca_gl < 0;
+WHERE loca_gl < 27;
 ```
 
 Because every group is a table function, **joins across groups are plain SQL** —
@@ -123,6 +123,7 @@ you want only the AGS columns.
 `read_ags` is just another table, so it joins straight to a Parquet (or CSV,
 JSON, database) table — here tagging each borehole with its planning zone:
 
+<!-- doc-code: skip — joins an external dataset the reader supplies; the point is that `read_ags` is just another table, and inventing a parquet to prove it would only test DuckDB -->
 ```sql
 SELECT l.loca_id, l.loca_gl, z.zone
 FROM read_ags('site.ags', 'LOCA') l
@@ -146,7 +147,7 @@ SELECT loca_id
 FROM read_ags('site.ags', 'LOCA')
 WHERE ST_DWithin(
         ST_Point(loca_nate, loca_natn),
-        ST_GeomFromText('LINESTRING(531000 181000, 531200 181150)'),
+        ST_GeomFromText('LINESTRING(451100 161993, 451470 161995)'),
         50);
 ```
 

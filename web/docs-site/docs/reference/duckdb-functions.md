@@ -27,7 +27,7 @@ whole file.
 | `read_ags_text(content, group)` | the same, from an AGS4 string instead of a path. |
 
 ```sql
-SELECT loca_id, loca_gl FROM read_ags('delivery.ags', 'LOCA') WHERE loca_gl < 0;
+SELECT loca_id, loca_gl FROM read_ags('delivery.ags', 'LOCA') WHERE loca_gl < 27;
 ```
 
 Every group is a table function, so **joins are plain SQL**:

@@ -203,3 +203,75 @@ def test_the_delivery_fixture_exists_and_carries_geol() -> None:
     text = gen_doc_outputs.DELIVERY_FIXTURE.read_text(encoding="utf-8")
     assert '"GROUP","GEOL"' in text
     assert "GEOL_GEOL" in text, "the join the docs select on needs this heading"
+
+
+# --- which runner owns a language, and the SQL split it hands over -----------
+
+
+def test_every_runnable_language_names_its_runner() -> None:
+    """A language classified as runnable but absent from the routing table is
+    the failure this whole exercise is about: counted as covered, run by nobody.
+
+    Adding a language to `PAGE_SURFACE` is what makes its fences `inline`
+    instead of prose — so the same edit has to say who executes them, even if
+    the answer is `None` (pending), which the census then reports out loud.
+    """
+    assert set(gen_doc_outputs.PAGE_RUNNER) == set(gen_doc_outputs.PAGE_SURFACE)
+
+
+def test_the_sql_runner_is_a_file_that_exists() -> None:
+    """The census prints this path at readers. A moved module would make it a
+    confident pointer at nothing — the census's whole job is to be believable."""
+    where = gen_doc_outputs.PAGE_RUNNER["sql"]
+    assert where and (ROOT / where).is_file()
+
+
+def test_run_pages_claims_only_the_languages_routed_to_it() -> None:
+    """`--run-pages` shells out per surface; SQL runs in-process under pytest.
+
+    If it claimed sql it would need the DuckDB CLI, which `pip install duckdb`
+    does not ship — so every run would print a SKIP line for a language that is
+    in fact gated, which reads as a hole rather than a handoff.
+    """
+    here = gen_doc_outputs.HERE
+    mine = {k for k, v in gen_doc_outputs.PAGE_RUNNER.items() if v == here}
+    assert mine == {"python"}
+    assert gen_doc_outputs.PAGE_RUNNER["sql"] != here
+
+
+def test_sql_split_flags_only_statements_that_ask_for_rows() -> None:
+    """`INSTALL`/`LOAD` return nothing by definition, so counting them as
+    zero-row findings would bury a real one in its own preamble."""
+    stmts = gen_doc_outputs.sql_statements(
+        "INSTALL laterite_ags4 FROM community;\nLOAD laterite_ags4;\nSELECT 1;\n"
+    )
+    assert [asks for _, asks in stmts] == [False, False, True]
+
+
+def test_sql_split_drops_blanks_but_keeps_a_comment_led_statement() -> None:
+    """A trailing `;` is not a statement; a comment ABOVE one does not hide it.
+
+    Dropping any chunk starting with `--` is the obvious way to skip comments,
+    and it silently swallowed the query underneath — which is how these pages
+    introduce one. The comment stays in the executed text, because what runs
+    should be what the page shows.
+    """
+    stmts = gen_doc_outputs.sql_statements("-- just a note\nSELECT 1;\n\n")
+    assert len(stmts) == 1
+    stmt, asks = stmts[0]
+    assert "SELECT 1" in stmt and "-- just a note" in stmt
+    assert asks, "the comment masked a row-returning query"
+
+
+def test_sql_split_drops_a_comment_only_chunk() -> None:
+    stmts = gen_doc_outputs.sql_statements("-- nothing to run here\n")
+    assert stmts == []
+
+
+def test_sql_split_sees_a_leading_cte_as_asking_for_rows() -> None:
+    """`WITH … SELECT` is the shape a cookbook query takes; missing it would
+    silently exempt exactly the queries most worth watching."""
+    ((stmt, asks),) = gen_doc_outputs.sql_statements(
+        "WITH x AS (SELECT 1) SELECT * FROM x;"
+    )
+    assert asks, stmt

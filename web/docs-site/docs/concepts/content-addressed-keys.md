@@ -20,6 +20,7 @@ That single property does the work:
 
 The join you'd otherwise write on AGS keys collapses to the id columns:
 
+<!-- doc-code: skip — illustrative relational shape, not a runnable query: the bare group names stand for whatever the reader's surface calls that table (`read_ags(...)` in SQL, `ags.sql(...)` in JS), and naming one would tie a cross-surface concept page to a single surface -->
 ```sql
 -- AGS-key join (what you write today across groups)
 SELECT * FROM SAMP s JOIN LOCA l USING (LOCA_ID);
@@ -30,8 +31,9 @@ SELECT * FROM SAMP s JOIN LOCA l ON s._parent_id = l._id;
 
 Both return the same rows. The difference is that the second join holds for
 _every_ parent/child edge in the dictionary with one column pair — you don't need
-to know that `SAMP` hangs off `LOCA` by `LOCA_ID`, or that `GEOL` hangs off `SAMP`
-by `(LOCA_ID, SAMP_TOP)`. The key-chain is baked into `_parent_id`.
+to know that `SAMP` hangs off `LOCA` by `LOCA_ID`, or that `LLPL` hangs off `SAMP`
+by the whole sample key, every column of it. The key-chain is baked into
+`_parent_id`.
 
 ## Where the keys live
 
