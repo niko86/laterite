@@ -1,0 +1,46 @@
+laterite CDN probe object
+=========================
+
+This file exists to be fetched, and for no other reason. If you have found it by
+curling around cdn.laterite.dev, nothing is wrong.
+
+Every real object on this host is a DuckDB engine bundle whose filename carries a
+content hash, so its URL changes on every build that changes the engine. That
+leaves nothing with a stable address to point a check at — and a check whose URL
+has rotted returns 404, which reads exactly like a broken CDN rather than like a
+broken check. That failure direction has cost time on this project before.
+
+So this object is uploaded by the deploy at a fixed key and never renamed, and
+two checks point at it:
+
+  1. The deploy asserts that a cross-origin ranged read of this file returns 206
+     with the right CORS headers. That proves the bucket's CORS configuration is
+     applied. It runs before the Workers are deployed, so a bucket without CORS
+     stops the release rather than shipping an app whose Explore tab hangs.
+
+  2. The nightly asserts that this file is served from the edge cache, and that a
+     URL which does not exist is not cached. That proves the zone's Cache Rule is
+     still in place, including the status-code exclusion that keeps a transient
+     404 from sticking at the edge for everyone.
+
+Neither setting is scoped to a particular object: the CORS configuration belongs
+to the whole bucket, and the Cache Rule matches on hostname with no path
+predicate. So whatever these checks establish here holds for the engine bundles
+too, which is the whole reason a stand-in is sound.
+
+The configuration both checks are about is recorded in the repository, under
+web/cloudflare/, alongside the reasoning for why it is recorded there and applied
+by hand rather than pushed from CI.
+
+Padding follows, so that a ranged request for the first kilobyte of this file has
+a second kilobyte to be a range OF. Without it the response is the whole object
+and the check would not be exercising a partial read at all.
+
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------
+----------------------------------------------------------------------------

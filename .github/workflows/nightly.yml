@@ -990,6 +990,79 @@ jobs:
           fi
           echo "main-protection ruleset matches the committed snapshot."
 
+  # #340/#341's other half. Two settings behind the Explore tab live in the
+  # Cloudflare account and nothing in this repo applies them; the deploy asserts
+  # the bucket's CORS, and this asserts the zone's Cache Rule. Here rather than on
+  # the deploy path because the severities differ: no CORS means Explore never
+  # starts, while a reverted Cache Rule means it still works and a first-time
+  # visitor far from the bucket waits longer for 7.6 MB. A fatal deploy gate on a
+  # latency regression is how a red run learns to be ignored.
+  #
+  # BOTH HALVES OF THE RULE, because the second exists to contain a hazard the
+  # first introduced: cache eligibility applies regardless of status, so a 404
+  # served during the window between a Worker deploy and its objects landing would
+  # stick at the edge for everyone until it expired. A status-code exclusion closes
+  # it, and an exclusion nobody checks is the kind that comes back.
+  #
+  # No credential and no checkout: this reads response headers from the public
+  # host, which is the only thing that can prove a dashboard setting is still live.
+  cdn-headers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The canary the deploy uploads — see web/cloudflare/README.md for why a
+      # stand-in is sound (both settings are scoped to the bucket and the host,
+      # not to any object) and why nothing fingerprinted can be probed twice.
+      - name: The Cache Rule still caches, and still refuses to cache errors
+        run: |
+          set -euo pipefail
+          base="https://cdn.laterite.dev/assets"
+          # Reachability is reported as itself, never as a verdict on the rule.
+          # An unreachable host yields no headers, which would otherwise read as
+          # "not cached" and send someone to the dashboard to fix a network fault.
+          probe() {
+            local out
+            if ! out=$(curl -sS --max-time 30 -D - -o /dev/null "$1" 2>&1); then
+              echo "::error::could not reach $1 — this says nothing about the Cache Rule, which is what this job checks. Retry; if it persists the host is down or the canary is gone." >&2
+              printf '%s\n' "$out" >&2
+              exit 1
+            fi
+            printf '%s' "$out" | tr -d '\r'
+          }
+          status_of() { printf '%s' "$1" | awk 'NR==1 {print $2}'; }
+          cache_of() {
+            printf '%s' "$1" | grep -i '^cf-cache-status:' | awk '{print $2}' | tail -1
+          }
+
+          # Cached: a MISS then HIT is the healthy shape, but the edge may already
+          # hold it, so accept a HIT on any request after the first rather than
+          # demanding one exact sequence.
+          hit=""
+          for i in 1 2 3; do
+            h=$(probe "$base/_probe.txt")
+            c=$(cache_of "$h")
+            echo "request $i: $(status_of "$h") cf-cache-status=$c"
+            [ "$i" -gt 1 ] && [ "$c" = "HIT" ] && hit=yes && break
+          done
+          [ -n "$hit" ] || {
+            echo "::error::cdn.laterite.dev is not serving from the edge cache. The Cache Rule on the laterite.dev zone (http.host eq \"cdn.laterite.dev\") is missing or no longer eligible-for-cache — see ags-wiki/design/dec-cdn-configuration.md for the fields."
+            exit 1
+          }
+
+          # ...and errors are NOT cached. A path that has never existed, so nothing
+          # can be pre-cached: it must stay uncached however many times it is asked.
+          for i in 1 2 3; do
+            h=$(probe "$base/_probe-does-not-exist.txt")
+            s=$(status_of "$h"); c=$(cache_of "$h")
+            echo "404 request $i: $s cf-cache-status=$c"
+            [ "$s" = "404" ] || { echo "::error::expected 404, got $s"; exit 1; }
+            [ "$c" != "HIT" ] || {
+              echo "::error::a 404 is being cached at the edge. The Status Code TTL (>= 400 -> No store) is missing from the Cache Rule, so a transient 404 during a deploy would stick for every visitor to that datacentre."
+              exit 1
+            }
+          done
+          echo "Cache Rule intact: objects cached, errors not."
+
   # Whole-vault wiki lint — the ENFORCING half of the wiki controls. wiki-lint.yml
   # runs the same checks per-PR, but diff-scoped (`--since`) and deliberately not
   # required: the wiki is the maintainer's to keep aligned, and a contributor
@@ -1084,6 +1157,7 @@ jobs:
       - docs-vs-released-crates
       - docs-vs-released-duckdb
       - ruleset-drift
+      - cdn-headers
       - output-values
       - wiki-lint
     if: always()

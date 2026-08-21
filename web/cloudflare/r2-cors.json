@@ -1,0 +1,17 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "https://app.laterite.dev",
+          "https://laterite.dev",
+          "https://docs.laterite.dev"
+        ],
+        "methods": ["GET", "HEAD"],
+        "headers": ["range", "content-type"]
+      },
+      "exposeHeaders": ["content-length", "content-range", "content-type"],
+      "maxAgeSeconds": 86400
+    }
+  ]
+}

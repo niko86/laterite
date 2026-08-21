@@ -204,6 +204,83 @@ jobs:
               --file "$f" --content-type application/wasm --remote
           done
 
+      # The one object on this host with a stable URL. Every engine bundle is
+      # fingerprinted, so nothing else can be pointed at twice — and a probe whose
+      # URL has rotted returns 404, which reads exactly like a broken CDN rather
+      # than a broken probe (#341 records that costing time twice).
+      #
+      # Always PUT, unlike the loop above: the bundles are immutable and skipping
+      # an existing one saves a large upload, but re-putting 2.6 kB is free and
+      # means a deleted canary heals itself on the next deploy instead of taking
+      # the check down with it.
+      - name: Upload the CDN probe canary
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: web
+        run: |
+          set -euxo pipefail
+          npx wrangler r2 object put "laterite-cdn/assets/_probe.txt" \
+            --file cloudflare/canary.txt --content-type text/plain --remote
+
+      # #340. The bucket's CORS configuration exists only in the Cloudflare
+      # account; nothing here applies it, so this asserts the live state instead.
+      # BEFORE the Workers deploy, deliberately: a bucket without CORS makes the
+      # Explore tab hang rather than error, and the ordering note above already
+      # establishes that shipping the app ahead of its data is the thing to avoid.
+      # The cost is accepted and worth stating — a CORS regression blocks a
+      # docs-only deploy, which beats publishing an app whose engine cannot start.
+      #
+      # A RANGED read, because that is what DuckDB issues, and the two assertions
+      # below are the two ways this actually breaks: the origin is refused, or the
+      # range metadata is unreadable. `expose-headers` is the load-bearing half —
+      # a single-byte-range `Range` is CORS-safelisted, so the common path issues
+      # no preflight and never consults `allowed.headers`.
+      #
+      # The URL carries the run id to defeat the edge cache. The Cache Rule stores
+      # 200s for a year, and a copy cached from a request that carried no `Origin`
+      # would answer this one without the CORS headers — a false red nobody could
+      # diagnose. A unique URL is a guaranteed MISS, so this reads R2's own
+      # response, which is the thing under test.
+      - name: The CDN serves the engine cross-origin (CORS is applied)
+        run: |
+          set -euo pipefail
+          url="https://cdn.laterite.dev/assets/_probe.txt?deploy=${GITHUB_RUN_ID}"
+          echo "probing $url"
+          # Reachability first, and reported as itself. Without this split an
+          # unreachable host produces empty headers, every assertion below fails,
+          # and the job blames the bucket's CORS for a network fault — telling
+          # someone to reapply a configuration that was never the problem.
+          if ! hdrs=$(curl -sS --max-time 30 -D - -o /dev/null \
+            -H "Origin: https://app.laterite.dev" \
+            -H "Range: bytes=0-1023" "$url" 2>&1); then
+            echo "::error::could not reach $url — this says nothing about the CORS configuration, which is what this step exists to check. Retry; if it persists the host or the object is gone."
+            printf '%s\n' "$hdrs"
+            exit 1
+          fi
+          hdrs=$(printf '%s' "$hdrs" | tr -d '\r')
+          status=$(printf '%s' "$hdrs" | awk 'NR==1 {print $2}')
+          fail=0
+          [ "$status" = "206" ] || {
+            echo "::error::expected 206 from a ranged read, got '$status'"
+            fail=1
+          }
+          printf '%s' "$hdrs" | grep -qi '^access-control-allow-origin:' || {
+            echo "::error::no access-control-allow-origin — the browser refuses the engine fetch and Explore hangs"
+            fail=1
+          }
+          printf '%s' "$hdrs" | grep -i '^access-control-expose-headers:' \
+            | grep -qi 'content-range' || {
+            echo "::error::content-range is not exposed — the client reads the bytes but not the range"
+            fail=1
+          }
+          if [ "$fail" -ne 0 ]; then
+            printf '%s\n' "--- response headers ---" "$hdrs"
+            echo "::error::Reapply the recorded configuration: npx wrangler r2 bucket cors set laterite-cdn --file web/cloudflare/r2-cors.json --force  (needs an R2 token with Admin Read & Write; see web/cloudflare/README.md)"
+            exit 1
+          fi
+          echo "CORS is applied: 206, origin allowed, content-range exposed."
+
       # Two Workers, one per host. Each config carries its own `custom_domain`
       # route, so Cloudflare creates the DNS record and issues the certificate
       # on deploy — nothing pre-creates the app./docs. records, and pre-creating
