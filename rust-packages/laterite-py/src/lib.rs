@@ -186,6 +186,13 @@ fn validate(
     dict_bytes: Option<&[u8]>,
     dict_replace: bool,
     cert: Option<&CoreSidecar>,
+    // Did the CALLER name this certificate at THIS call? A cert reached through
+    // `read(index=…)` and carried on the handle is a hint — the trust model
+    // declines it and says why. A cert named on `validate(index=…)` is an
+    // ASSERTION that it belongs to these bytes, so a mismatch is an error.
+    // Same distinction `read` already draws, one layer down so the check can use
+    // bytes that are already in hand instead of reading the file a second time.
+    strict_cert: bool,
 ) -> Result<Checked, (i32, String, String)> {
     let over = parse_dv(dvr).map_err(|m| (5, "bad_dict".to_string(), m))?;
     let enc = laterite_ags4_parse::resolve_encoding(encoding).ok_or_else(|| {
@@ -235,6 +242,28 @@ fn validate(
             "one of path, text, or data is required".to_string(),
         ));
     };
+
+    // Fail before the engine, not after: the whole point of a named cert is to
+    // NOT do this work, so discovering the mismatch afterwards would cost exactly
+    // what the caller was trying to save. Only staleness is fatal — a cert that is
+    // genuinely for these bytes but cannot answer THIS question (a different
+    // engine fingerprint, a tier it never measured, `check_files`) is not a
+    // caller error, and falls through to the trust model's `revalidate_reason`.
+    if strict_cert {
+        if let Some(c) = cert {
+            if !c.is_fresh_for(&bytes) {
+                return Err((
+                    4,
+                    "stale_cert".to_string(),
+                    format!(
+                        "the certificate does not match {label} (size / SHA-256 differ) \
+                         — the file changed under it; rebuild it with \
+                         read(...).validate().certify()"
+                    ),
+                ));
+            }
+        }
+    }
 
     let out = laterite_ags4_trust::check(laterite_ags4_trust::Request {
         bytes: &bytes,
@@ -301,7 +330,7 @@ fn err_dict<'py>(
 /// error, exit_code}` (the Python layer raises the mapped exception;
 /// the CLI uses `exit_code` directly).
 #[pyfunction]
-#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, warnings_as_errors=false, check_files=false, encoding=None, dict_path=None, dict_bytes=None, dict_replace=false, cert=None))]
+#[pyo3(signature = (path=None, text=None, data=None, dict_version=None, include_warnings=false, include_fyi=false, warnings_as_errors=false, check_files=false, encoding=None, dict_path=None, dict_bytes=None, dict_replace=false, cert=None, strict_cert=false))]
 #[allow(clippy::too_many_arguments)]
 // PyO3 boundary: owns the deserialized input
 #[allow(clippy::needless_pass_by_value)]
@@ -329,6 +358,9 @@ fn run_check<'py>(
     // Python — it is made once, in `laterite_ags4_trust`, alongside every other surface.
     // The Python layer used to make it itself, with its own conjunction of predicates.
     cert: Option<PyRef<'py, PySidecar>>,
+    // Private to the native ABI — neither `validate()` nor `Ags4File.validate()`
+    // exposes it. It records WHICH door the cert came through; see `validate`.
+    strict_cert: bool,
 ) -> PyResult<Bound<'py, PyDict>> {
     // Release the GIL for the whole parse+validate compute (pure Rust, touches no
     // Python) so concurrent validators actually parallelise across cores instead
@@ -351,6 +383,7 @@ fn run_check<'py>(
             dict_bytes.as_deref(),
             dict_replace,
             cert_inner.as_ref(),
+            strict_cert,
         )
     });
     match outcome {

@@ -31,7 +31,15 @@ import pytest
 # roles — input selector on free, output destination on chained — so it is listed
 # on both; that's fine, both are I/O, not behavioural.)
 _PAIRS = {
-    "validate": (L.validate, L.Ags4File.validate, {"source", "text"}, set()),
+    # `index` is a one-sided I/O knob, and one-sided BY DESIGN rather than by
+    # omission (#271). The free `validate()` names a cert to answer the verdict
+    # without parsing; the chained `Ags4File.validate()` cannot use one that way,
+    # because the handle it hangs off has already parsed — that is what building a
+    # handle IS. It reaches a cert the other way, through `read(index=)`, and the
+    # difference is the whole point of adding the free door. Putting `index` on
+    # both, which is what this gate would otherwise push someone to do, would add
+    # a parameter that could save nothing.
+    "validate": (L.validate, L.Ags4File.validate, {"source", "text", "index"}, set()),
     "fix": (
         L.fix,
         L.Ags4File.fix,

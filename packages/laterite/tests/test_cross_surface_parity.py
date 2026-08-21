@@ -50,7 +50,13 @@ _INDEX_TS = (
 #               node-missing allowlist: Python behavioural knobs deliberately NOT
 #               on Node — each with the reason it's a by-design gap, not drift).
 _MATRIX: dict[str, tuple] = {
-    "validate": (L.validate, {"source", "text"}, "ValidateOptions", {}),
+    # `index` joins the drop set for the same reason `_NODE_IO` below already
+    # excludes it: a cert PATH is an input selector, not a behavioural knob. It
+    # was absent from the free `validate()` until #271 gave that door a cert, so
+    # only Node's half of the exclusion existed — and the two sides fell out of
+    # step the moment Python caught up. The gate was right to fail: it is exactly
+    # the "one surface grew a knob" alarm, firing on a knob that is not one.
+    "validate": (L.validate, {"source", "text", "index"}, "ValidateOptions", {}),
     "fix": (
         L.fix,
         {"source", "path", "text", "data", "in_place", "out"},

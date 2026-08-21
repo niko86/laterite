@@ -135,6 +135,18 @@ export function read(
 }
 
 export interface ValidateOptions extends FileOptions {
+  /** Path to this file's `.ags.idx` certificate. Strictly opt-in — there is no
+   *  autodiscovery, because naming it asserts the cert is for THIS file.
+   *
+   *  A fresh, same-engine, tier-covering cert answers the verdict **without
+   *  parsing**; anything less runs the rules as normal and says why on
+   *  `report.revalidateReason`. A cert whose size / SHA-256 do not match throws
+   *  `StaleCertError` BEFORE the engine runs — finding that out afterwards would
+   *  cost exactly what naming a cert is meant to save.
+   *
+   *  Distinct from `read(file, {index}).validate()`, which must parse to build the
+   *  handle and so skips only the rules. Two doors, two costs, two questions. */
+  index?: string;
   /** Force an edition (`"4.0.3"`…`"4.2"`); default auto-detects from `TRAN_AGS`.
    *  With `dictionary`, selects the overlay base. */
   dictVersion?: string;
@@ -187,14 +199,17 @@ function splitDict(
  * @param source File path (string), or raw bytes (`Uint8Array`/`Buffer`); omit to
  *   validate `opts.text` instead.
  * @param opts Validation knobs (`ValidateOptions`) — the dictionary-version pin
- *   (`dictVersion`), severity gates, in-memory text/encoding, and the on-disk
- *   Rule-20 toggle; see the interface for each field.
+ *   (`dictVersion`), severity gates, in-memory text/encoding, the on-disk
+ *   Rule-20 toggle, and `index` (an `.ags.idx` certificate that can answer the
+ *   verdict without parsing); see the interface for each field.
  * @returns A `Report` carrying the findings, the resolved `dictVersion`, the
  *   finding `count`, `isValid`, and `lat-check`-faithful `toJson()` / `toNdjson()`.
  * @throws {FileNotFoundError} the path could not be opened.
  * @throws {NotAgs4Error} the input has no GROUP rows / is not decodable AGS4.
  * @throws {UnsupportedEditionError} a recognised-but-unsupported edition (AGS3).
  * @throws {BadDictError} an invalid `opts.dictVersion` / unimplemented dictionary.
+ * @throws {StaleCertError} `opts.index` names a cert whose size / SHA-256 do not
+ *   match this file — thrown before the rule engine runs.
  */
 export function validate(
   source?: string | Uint8Array,
@@ -204,6 +219,14 @@ export function validate(
   const data =
     typeof source === "string" || source == null ? undefined : source;
   const [dictPath, dictBytes] = splitDict(opts.dictionary);
+  // Loaded here, freshness-checked in the engine. The comparison needs the source
+  // BYTES and the native layer is about to read them anyway — doing it here would
+  // read a 25 MB delivery twice to save parsing it once, which is most of the
+  // saving this option exists to deliver.
+  const cert =
+    opts.index !== undefined
+      ? Sidecar.fromJson(readFileSync(opts.index))
+      : undefined;
   const r = runCheck(
     path,
     opts.text,
@@ -217,6 +240,12 @@ export function validate(
     dictPath,
     dictBytes,
     opts.dictReplace,
+    cert,
+    // This door NAMED the cert, so a stale one throws. `Ags4File.validate()`
+    // passes no such flag: a cert it inherited from `read(file, {index})` was
+    // asserted THERE, and quietly re-validating is right if the file has since
+    // moved under it.
+    cert !== undefined,
   );
   return new Report(raiseFor(r));
 }

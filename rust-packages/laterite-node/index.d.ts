@@ -454,7 +454,7 @@ export declare function resolveEncodingLabel(label?: string | undefined | null):
  * errors alone — `warningsAsErrors` (default `false`) is the separate dial that
  * makes warnings fatal too, the compiler's `-Werror`. FYIs never fail.
  */
-export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, warningsAsErrors?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null, cert?: Sidecar | undefined | null): ValidationReport
+export declare function runCheck(path?: string | undefined | null, text?: string | undefined | null, data?: Uint8Array | undefined | null, dictVersion?: string | undefined | null, includeWarnings?: boolean | undefined | null, includeFyi?: boolean | undefined | null, warningsAsErrors?: boolean | undefined | null, checkFiles?: boolean | undefined | null, encoding?: string | undefined | null, dictPath?: string | undefined | null, dictBytes?: Uint8Array | undefined | null, dictReplace?: boolean | undefined | null, cert?: Sidecar | undefined | null, strictCert?: boolean | undefined | null): ValidationReport
 
 /**
  * The merge result. `bytes` is the reconciled AGS4 document; `warningsJson` and

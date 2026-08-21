@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { Ags4Error, StaleCertError, read } from "../ts/index";
+import { Ags4Error, StaleCertError, read, validate } from "../ts/index";
 
 // The established clean fixture (0 errors, 0 warnings) — the same file the CLI's
 // --emit-index test mints from, so the cert values line up cross-surface.
@@ -99,6 +99,88 @@ describe("certify → .ags.idx (#294 Batch E / #14)", () => {
     // Mutate the source after minting → size/SHA no longer match.
     writeFileSync(f, Buffer.concat([CLEAN, Buffer.from('"DATA","EXTRA"\r\n')]));
     expect(() => read(f, { index: idx })).toThrow(StaleCertError);
+  });
+});
+
+// EVERY TEST BELOW ASSERTS `certified`, NEVER THE VERDICT. A certified run and a
+// full run return the SAME answer — that is the point — so a test checking
+// `isValid` or `count` passes just as happily against a `validate()` that
+// ignored `index` altogether. `certified` is the only observable that tells the
+// fast path from the slow one.
+describe("validate(file, { index }) — the second door (#271)", () => {
+  it("answers from a cert with no handle and no parse", () => {
+    const f = tmpFile("clean.ags", CLEAN);
+    const idx = read(f).validate({ warnings: false }).certify();
+
+    const rep = validate(f, { index: idx, warnings: false });
+    expect(rep.certified).toBe(true);
+    expect(rep.isValid).toBe(true);
+  });
+
+  it("agrees with the handle route and with a plain run", () => {
+    const f = tmpFile("clean.ags", CLEAN);
+    const idx = read(f).validate({ warnings: false }).certify();
+
+    const free = validate(f, { index: idx, warnings: false });
+    const handle = read(f, { index: idx }).validate({ warnings: false }).report;
+    const plain = validate(f, { warnings: false });
+    // `.report` is `Report | undefined` — it is unset until `.validate()` runs.
+    // Narrowed rather than optional-chained so a MISSING report fails loudly
+    // here instead of turning every comparison below into `undefined === …`.
+    if (!handle) throw new Error(".report is unset after validate()");
+
+    expect([free.certified, handle.certified, plain.certified]).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    for (const other of [handle, plain]) {
+      expect([free.isValid, free.count, free.dictVersion]).toEqual([
+        other.isValid,
+        other.count,
+        other.dictVersion,
+      ]);
+    }
+  });
+
+  it("never auto-discovers a sibling <file>.ags.idx", () => {
+    // Naming `index` is what asserts the cert is for THIS file; a cert silently
+    // applied to the wrong one is the failure the explicit form prevents.
+    const f = tmpFile("clean.ags", CLEAN);
+    read(f).validate({ warnings: false }).certify(); // mints f + ".idx" next door
+
+    expect(validate(f, { warnings: false }).certified).toBe(false);
+  });
+
+  it("throws StaleCertError when the named cert is not for this file", () => {
+    // Quietly re-validating is the failure this option is most exposed to: you
+    // ask for the fast path, get none, and nothing says so but a field you did
+    // not know to read.
+    const f = tmpFile("clean.ags", CLEAN);
+    const idx = read(f).validate({ warnings: false }).certify();
+    writeFileSync(f, Buffer.concat([CLEAN, Buffer.from('"DATA","EXTRA"\r\n')]));
+
+    expect(() => validate(f, { index: idx, warnings: false })).toThrow(
+      StaleCertError,
+    );
+  });
+
+  it("does not make an INHERITED cert strict", () => {
+    // The throw belongs to the door where `index` was NAMED. `read` asserted
+    // freshness and passed; if the file then moves, the later `.validate()`
+    // asserted nothing, so it re-validates and explains itself. Guarded because
+    // the natural "fix" is an unconditional check, which would turn an existing
+    // chainable call into a throwing one.
+    const f = tmpFile("clean.ags", CLEAN);
+    const idx = read(f).validate({ warnings: false }).certify();
+    const handle = read(f, { index: idx }); // fresh here — read would have thrown
+
+    writeFileSync(f, Buffer.concat([CLEAN, Buffer.from('"DATA","EXTRA"\r\n')]));
+
+    const rep = handle.validate({ warnings: false }).report; // must NOT throw
+    if (!rep) throw new Error(".report is unset after validate()");
+    expect(rep.certified).toBe(false);
+    expect(rep.revalidateReason).toBeTruthy();
   });
 });
 
