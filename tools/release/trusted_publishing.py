@@ -54,6 +54,14 @@ REPOSITORY_NAME = "laterite"
 WORKFLOW_FILENAME = "publish-crates.yml"
 ENVIRONMENT = "crates"
 
+# The crate name goes over the wire as `crate`, NOT as the Rust field name.
+# crates.io's `NewGitHubConfig` spells it `pub krate: String` because `crate` is
+# a reserved word in Rust, and carries `#[serde(rename = "crate")]` to put the
+# real name back on the JSON. Reading the handler and not the rename cost a
+# 422 — "missing field `crate`" — on the first create, which is at least the
+# side of the failure that stops rather than the side that half-succeeds.
+CRATE_KEY = "crate"
+
 
 def crates() -> list[str]:
     """The publishable set, from the script that already owns it."""
@@ -83,6 +91,19 @@ def existing(token: str) -> dict[str, list[dict]]:
             raise
         out[krate] = got.get("github_configs", [])
     return out
+
+
+def body_for(krate: str) -> dict:
+    """The create payload, factored out so a test can pin its wire names."""
+    return {
+        "github_config": {
+            CRATE_KEY: krate,
+            "repository_owner": REPOSITORY_OWNER,
+            "repository_name": REPOSITORY_NAME,
+            "workflow_filename": WORKFLOW_FILENAME,
+            "environment": ENVIRONMENT,
+        }
+    }
 
 
 def matches(cfg: dict) -> bool:
@@ -136,17 +157,8 @@ def main() -> int:
         return 1
 
     for krate in missing:
-        body = {
-            "github_config": {
-                "krate": krate,
-                "repository_owner": REPOSITORY_OWNER,
-                "repository_name": REPOSITORY_NAME,
-                "workflow_filename": WORKFLOW_FILENAME,
-                "environment": ENVIRONMENT,
-            }
-        }
         try:
-            call("POST", API, token, body)
+            call("POST", API, token, body_for(krate))
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode(errors="replace")[:300]
             print(f"  FAILED  {krate}: HTTP {exc.code} {detail}", file=sys.stderr)
