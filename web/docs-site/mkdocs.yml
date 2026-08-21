@@ -10,7 +10,7 @@
 # laterite-node/test/docs-examples.test.ts (node), tests/test_docs_cli_examples.py
 # (dev satellite; cli, vs committed .out files), tests/test_docs_duckdb_examples.py
 # (duckdb, nightly via docs-vs-released-duckdb, against the PUBLISHED community
-# extension; a local-build twin runs monthly in the dev satellite) — so a page and
+# extension; a local-build twin runs on-demand in the dev satellite) — so a page and
 # its test are the same bytes.  cadence: compliance-report
 # Every example's OUTPUT is generated too (tools/gen_doc_outputs.py): the `.out`
 # beside each example is what it really printed, and the page includes it, so a

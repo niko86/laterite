@@ -97,6 +97,18 @@ def authority_value(text: str, form: str) -> str:
         if not re.search(r"^\s{2}pull_request:", block, re.M):
             raise AuthorityError("no top-level `pull_request:` trigger")
         return "pull_request"
+    # `manual` is the ABSENCE of a schedule, so it is the one form whose fact is
+    # a negative — and a negative is exactly what a mirror record cannot assert
+    # by quoting a line. Both halves are checked: the trigger must be there AND
+    # no cron may be, or "on-demand" in the prose would survive somebody adding
+    # a schedule back.
+    if form == "manual":
+        if not re.search(r"^\s{2}workflow_dispatch:", block, re.M):
+            raise AuthorityError("no top-level `workflow_dispatch:` trigger")
+        crons = re.findall(r'^\s*-\s*cron:\s*"([^"]+)"', block, re.M)
+        if crons:
+            raise AuthorityError(f"claims manual but carries cron(s) {crons}")
+        return "workflow_dispatch"
     raise AuthorityError(f"unknown authority form {form!r}")
 
 
