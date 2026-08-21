@@ -18,7 +18,7 @@ import {
   type JoinSpec,
   type QualifiedCol,
 } from "../../lib/sqlgen";
-import { assembleSeries, seriesCap } from "../../lib/chartSeries";
+import { assembleSeries, foldFor, seriesCap } from "../../lib/chartSeries";
 import { Spinner } from "../Spinner";
 import { Chart } from "./Chart";
 import { ControlGrid } from "../ControlGrid";
@@ -203,15 +203,6 @@ export const ChartBuilder: Component<{
     agg: agg(),
   });
 
-  const sql = createMemo(() => {
-    if (!table()) return "";
-    return chartSql({
-      ...queryBase(),
-      colour: colourCol() ? ref(colourCol()) : undefined,
-      rowCap: ROW_CAP,
-    });
-  });
-
   // Which colour values keep a palette slot is a question about the whole
   // table, not about the sampled rows: the scatter query is a bare row LIMIT
   // with no ORDER BY, so its values are an arbitrary slice and a legend saying
@@ -226,16 +217,11 @@ export const ChartBuilder: Component<{
     });
   });
 
-  const [rows] = createResource(
-    () => sql(),
-    async (s) => {
-      if (!s) return null;
-      const { run } = await import("../../lib/duck");
-      const t = await run(s);
-      return t.toArray() as Record<string, unknown>[];
-    },
-  );
-
+  // Declared BEFORE the plot query below, and that order is load-bearing: both
+  // resources track their source in a `createComputed`, which run in creation
+  // order, so this one has already flipped `loading` by the time the plot
+  // query's recomputes and reads it. The other order dispatches one query
+  // against a stale ranking before correcting itself.
   const [ranked] = createResource(
     () => rankSql(),
     async (s) => {
@@ -250,12 +236,62 @@ export const ChartBuilder: Component<{
     },
   );
 
-  // Reading `rows` after a failed query THROWS (a Solid resource re-reads its
-  // error), and `option` below is an eager memo — unguarded, the throw took
+  // Reading a resource after a failed query THROWS (a Solid resource re-reads
+  // its error), and `option` below is an eager memo — unguarded, the throw took
   // the update down before the sibling error banner in the JSX could render
   // it (#359, same shape as ExplorePane's accessor).
-  const fetched = () => (rows.error ? undefined : rows());
   const rankedValues = () => (ranked.error ? undefined : ranked());
+
+  // On the aggregating bar path the plot query is composed AFTER the probe
+  // answers, so the tail folds inside the GROUP BY (#457): the one altitude
+  // where the merge is the aggregate's own, which is what makes "Other"
+  // correct for `avg` rather than a bar per folded value drawn on top of the
+  // last. The costs are deliberate — the plot query stops being a pure
+  // function of the form controls, and its round trip is serialised behind the
+  // probe's — and are paid on that path alone.
+  const sql = createMemo(() => {
+    const colour = colourCol();
+    const opts = {
+      ...queryBase(),
+      colour: colour ? ref(colour) : undefined,
+      rowCap: ROW_CAP,
+    };
+    if (!aggregating() || !colour) return chartSql(opts);
+    // Pending, refetching, or failed — none of them an answer. `chartSql`
+    // composes no query on this path without the fold, and one composed
+    // without it would draw a DIFFERENT chart, with nothing on screen saying
+    // the colouring had gone wrong. `ranked.loading` is load-bearing and not
+    // belt-and-braces: see `foldFor`.
+    const fold = foldFor({ loading: ranked.loading, values: rankedValues() });
+    if (!fold) return "";
+    return chartSql({ ...opts, fold });
+  });
+
+  const [rows] = createResource(
+    () => sql(),
+    async (s) => {
+      if (!s) return null;
+      const { run } = await import("../../lib/duck");
+      const t = await run(s);
+      return t.toArray() as Record<string, unknown>[];
+    },
+  );
+
+  const fetched = () => (rows.error ? undefined : rows());
+
+  // The probe is named FIRST when both failed: it runs first, and on the
+  // two-phase path a failed probe is why the plot query never ran, so the
+  // plot's error there is a consequence and not the fault to report.
+  const rankFailed = () => Boolean(ranked.error);
+  /** Either query failed — so nothing below may report a RESULT. */
+  const failed = () => Boolean(rows.error) || rankFailed();
+
+  // `sql()` is empty both when the form is incomplete and while the two-phase
+  // path waits on its probe, and those must not read alike: the second would
+  // tell the reader to pick a table they have already picked. The probe's own
+  // query is composed from the same completeness test, so either being
+  // non-empty is the honest gate.
+  const picked = () => Boolean(sql() || rankSql());
 
   // Build the ECharts option from the fetched rows + the current controls.
   const option = createMemo<Record<string, unknown> | null>(() => {
@@ -454,42 +490,58 @@ export const ChartBuilder: Component<{
       </Show>
 
       <Show
-        when={sql()}
+        when={picked()}
         fallback={
           <p class="text-sm text-fg-muted">
             Pick a table, X and Y column to build a chart.
           </p>
         }
       >
-        <Show when={Boolean(rows.error) || Boolean(ranked.error)}>
+        {/* Which query failed, and what followed from it. The probe is a
+            SECOND query the reader never asked for, and on the aggregating
+            path its failure stops the plot query being composed at all — so
+            "Chart query error" would name the wrong one and leave the reader
+            looking for a fault in a query that never ran. */}
+        <Show when={failed()}>
           <p class="text-sm text-err">
-            Chart query error: {String(rows.error ?? ranked.error)}
+            {rankFailed() ? "Colour ranking" : "Chart"} query error — no chart
+            drawn: {String(rankFailed() ? ranked.error : rows.error)}
           </p>
         </Show>
         <Show
           when={option()}
           fallback={
-            <span class="text-sm text-fg-muted">
-              <Show
-                when={rows.loading || ranked.loading}
-                fallback="No rows to plot for this selection."
-              >
-                <Spinner label="Querying…" />
-              </Show>
-            </span>
+            // Nothing here may read as a RESULT once something has failed:
+            // "No rows to plot" is an answer, and an answer under a red banner
+            // is the impression that the chart worked and the data was empty.
+            <Show when={!failed()}>
+              <span class="text-sm text-fg-muted">
+                <Show
+                  when={rows.loading || ranked.loading}
+                  fallback="No rows to plot for this selection."
+                >
+                  <Spinner label="Querying…" />
+                </Show>
+              </span>
+            </Show>
           }
         >
           <Chart option={option} height="420px" />
         </Show>
-        <details class="group text-xs">
-          <summary class="flex cursor-pointer list-none select-none items-center gap-1.5 text-fg-dim [&::-webkit-details-marker]:hidden">
-            <Chevron />
-            SQL
-          </summary>
-          <pre class="mono mt-1 overflow-x-auto rounded-sm border border-line bg-surface-raised p-2 text-fg-soft">
-            {sql()}
-          </pre>
-        </details>
+        {/* The query that RAN, or no pane at all — on the two-phase path there
+            is no plot query until the probe answers, and showing the unfolded
+            one would be showing a query the chart was never drawn from. */}
+        <Show when={sql()}>
+          <details class="group text-xs">
+            <summary class="flex cursor-pointer list-none select-none items-center gap-1.5 text-fg-dim [&::-webkit-details-marker]:hidden">
+              <Chevron />
+              SQL
+            </summary>
+            <pre class="mono mt-1 overflow-x-auto rounded-sm border border-line bg-surface-raised p-2 text-fg-soft">
+              {sql()}
+            </pre>
+          </details>
+        </Show>
       </Show>
     </div>
   );

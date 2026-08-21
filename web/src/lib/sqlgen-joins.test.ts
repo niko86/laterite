@@ -290,8 +290,12 @@ describe("the probe ranks over the plot's own population", () => {
     // hard-coded the raw plot's `x IS NOT NULL AND y IS NOT NULL` would pass
     // the three above and still get wrong.
     const opts = { ...base, chartType: "bar" as const, agg: "avg" as const };
+    // This arm is the two-phase one, so the plot query needs the probe's answer
+    // before it composes at all (#457) — the population it composes with that
+    // answer is still the probe's own.
+    const fold = { keep: ["CL"], label: "Other" };
     expect(population(chartRankSql({ ...opts, cap: 3 }))).toBe(
-      population(chartSql({ ...opts, rowCap: 5000 })),
+      population(chartSql({ ...opts, rowCap: 5000, fold })),
     );
     expect(chartRankSql({ ...opts, cap: 3 })).not.toContain(
       'WHERE t0."SAMP_TOP" IS NOT NULL AND',

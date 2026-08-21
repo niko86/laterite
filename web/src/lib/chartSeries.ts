@@ -1,5 +1,5 @@
 import { scalarText } from "./duckTypes";
-import type { ChartType } from "./sqlgen";
+import type { ChartFold, ChartType } from "./sqlgen";
 import { ALL_PAIRS_CAP, SLOT_COUNT } from "../shared/styles/chartSlots";
 
 // Turning fetched rows into ECharts series, with the colour-by split BOUNDED
@@ -82,11 +82,38 @@ export const seriesCap = (chartType: ChartType): number =>
  *  "Other" is a real value in more than one AGS abbreviation list, and two
  *  ECharts series sharing a name share a legend entry — so the fold steps
  *  aside rather than colliding with a value it is not. Same idiom as
- *  `dedupeOut` in the SQL composer. */
-function foldLabel(survivors: readonly string[]): string {
+ *  `dedupeOut` in the SQL composer.
+ *
+ *  Exported because the aggregating bar folds in SQL (#457): that query
+ *  materialises this label as DATA, so the literal it emits and the legend
+ *  entry here have to be one function's answer over one list. Two guesses at
+ *  it would put the fold's own rows in a series named something else. */
+export function foldLabel(survivors: readonly string[]): string {
   let label = OTHER;
   for (let n = 2; survivors.includes(label); n++) label = `${OTHER} (${n})`;
   return label;
+}
+
+/** The fold an aggregating bar's plot query may be composed with, given the
+ *  ranking probe's state — or `undefined`, meaning there is nothing to compose
+ *  yet and the query must wait (#457).
+ *
+ *  Extracted from the component because the guard is invisible there, and was
+ *  wrong for exactly that reason. A Solid resource keeps its PREVIOUS value
+ *  while refetching — `state: "refreshing"`, `loading: true`, the old value
+ *  still readable — so "have we an answer?" cannot be asked of the value alone.
+ *  It answers with the last colour column's survivors, an `IN (…)` list naming
+ *  a column the query no longer mentions; and before any colour is picked at
+ *  all it answers with the empty list the probe's own empty query resolves to,
+ *  which composes the unfolded query against exactly the high-cardinality
+ *  column the fold exists to bound. Loading is not an answer. */
+export function foldFor(probe: {
+  loading: boolean;
+  /** `undefined` when the probe failed — see the component's error accessor. */
+  values: readonly string[] | undefined;
+}): ChartFold | undefined {
+  if (probe.loading || probe.values === undefined) return undefined;
+  return { keep: probe.values, label: foldLabel(probe.values) };
 }
 
 /** Rows + ranked values + form → the ECharts series array.
@@ -124,14 +151,18 @@ export function assembleSeries(o: AssembleOpts): ChartSeries[] {
   // Bucketed by SLOT, not by name: `foldLabel` keeps the legend unambiguous,
   // but only an index can keep a value named "Other" out of the fold's DATA.
   //
-  // Points are POOLED, never merged. On an aggregated bar the query has already
-  // grouped by (x, colour), so folding several values leaves the tail with more
-  // than one point per category, drawn at the same place. Merging them here is
-  // not available: the right merge is the aggregate's own — sum for sum and
-  // count, min for min, max for max — and there is no honest one for avg, whose
-  // mean of means is not the mean. Doing it correctly means re-aggregating in
-  // SQL, which is a change to the plot query's shape rather than to the probe.
-  // Pinned by a test so the shape is known and not accidental.
+  // Points are POOLED, never merged, and that is the whole of what this loop
+  // may do. For a point cloud pooling IS the fold — scatter and line have
+  // nothing to merge. For an aggregated bar it was wrong: the query had already
+  // grouped by (x, colour), so folding several values left the tail with a bar
+  // per folded value at the same category, at the same width, one over another.
+  // The merge was never available here — the right one is the aggregate's own,
+  // and avg has none that is honest, since a mean of means is not the mean
+  // without each group's row count, which this row set does not carry. So that
+  // path now folds in SQL instead, inside the GROUP BY, where the aggregate
+  // runs over the merged group's raw rows and avg is as correct as sum (#457).
+  // The label arrives here as an ordinary colour value, absent from the
+  // ranking, and buckets to the fold below with no special case.
   const FOLD = -1;
   const buckets = new Map<number, ChartPoint[]>();
   for (const row of o.rows) {
@@ -173,6 +204,12 @@ export function assembleSeries(o: AssembleOpts): ChartSeries[] {
   pinned.forEach((p, i) => {
     emit(i, p.value, p.colour);
   });
-  emit(FOLD, foldLabel(pinned.map((p) => p.value)), o.other);
+  // Named from the RANKING, not from the slots it filled. `foldFor` labels the
+  // SQL literal off the same list, and the two have to be one answer over one
+  // list — they coincide only while the palette is exactly as long as the cap
+  // and the probe's LIMIT is the same number. Shrink the palette and `pinned`
+  // becomes a shorter list, whose `foldLabel` can differ from the string the
+  // query already wrote into the rows.
+  emit(FOLD, foldLabel(o.ranked), o.other);
   return out;
 }

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { assembleSeries, seriesCap, type AssembleOpts } from "./chartSeries";
+import {
+  assembleSeries,
+  foldFor,
+  foldLabel,
+  seriesCap,
+  type AssembleOpts,
+} from "./chartSeries";
 import { ALL_PAIRS_CAP, SLOT_COUNT } from "../shared/styles/chartSlots";
 
 // The colour-by split, at the only altitude below e2e it exists at.
@@ -85,29 +91,56 @@ describe("assembleSeries — the cap", () => {
     ).toHaveLength(1);
   });
 
-  it("pools the fold's points rather than merging them, on an aggregated bar", () => {
-    // The aggregating bar query GROUPs BY (x, colour), so one row per pair.
-    // Folding two of those onto one category leaves the tail with two points at
-    // the same x, drawn on top of each other. Pinned because it is a real
-    // limitation and not an accident: merging them needs the aggregate's own
-    // operation (and avg has none that is honest), which means re-aggregating
-    // in SQL — a change to the plot query, not to the probe.
-    const ranked = ["a", "b", "c", "d", "e", "f", "g"];
+  it("takes ONE folded point per category on an aggregated bar", () => {
+    // This replaces the pin that recorded the opposite (#457). The aggregating
+    // bar query GROUPs BY (x, colour), so folding here left the tail with one
+    // point per folded value per category — several bars at the same x, at the
+    // same width, one over another, reading as a single bar with no sign that
+    // more than one value was under it. That fold now happens in SQL, inside
+    // the GROUP BY, so the aggregate is computed over the merged group's own
+    // rows and the label arrives as an ORDINARY colour value: absent from the
+    // ranking, so it buckets to the fold with no special case here.
+    const ranked = ["a", "b", "c", "d", "e"];
     const series = assemble({
       chartType: "bar",
       categoricalX: true,
       ranked,
       rows: [
-        { x: "X1", y: 10, c: "f" },
-        { x: "X1", y: 20, c: "g" },
+        { x: "X1", y: 60, c: "Other" },
+        { x: "X2", y: 10, c: "Other" },
+        { x: "X1", y: 1, c: "a" },
       ],
     });
     const fold = series.at(-1);
     expect(fold?.name).toBe("Other");
+    expect(fold?.itemStyle.color).toBe(OTHER_COLOUR);
     expect(fold?.data).toEqual([
-      ["X1", 10],
-      ["X1", 20],
+      ["X1", 60],
+      ["X2", 10],
     ]);
+  });
+
+  it("names the fold what the query folded to, on the same input", () => {
+    // The legend entry and the literal the SQL emits are ONE string: the query
+    // materialises the label as data, so a second guess at it would put the
+    // fold's own rows in a series named something else. `foldLabel` is the
+    // single answer, and this is the case where it steps aside.
+    const ranked = ["Other", "b", "c", "d", "e"];
+    const label = foldLabel(ranked);
+    expect(label).toBe("Other (2)");
+    const series = assemble({
+      chartType: "bar",
+      categoricalX: true,
+      ranked,
+      rows: [
+        { x: "X1", y: 7, c: label },
+        { x: "X1", y: 3, c: "Other" },
+      ],
+    });
+    expect(names(series)).toEqual(["Other", "Other (2)"]);
+    // The real value's row stayed with the value; the fold's with the fold.
+    expect(series[0]?.data).toEqual([["X1", 3]]);
+    expect(series[1]?.data).toEqual([["X1", 7]]);
   });
 
   it("emits no fold when the values fit", () => {
@@ -126,6 +159,66 @@ describe("assembleSeries — the cap", () => {
     // And the value's OWN rows stayed with the value, not with the fold.
     expect(series[0]?.data).toHaveLength(1);
     expect(series[0]?.itemStyle.color).toBe(PALETTE[0]);
+  });
+});
+
+// The guard that decides whether the aggregating bar has a query to compose at
+// all. It lives here rather than in the component because it was WRONG there
+// and invisible: the component could only be read as "we wait for the probe",
+// which is not what the code did.
+describe("foldFor", () => {
+  it("treats a REFETCHING probe as no answer, however good its value looks", () => {
+    // The regression. A Solid resource keeps its previous value while
+    // refetching, so the value alone is the LAST colour column's survivors —
+    // an `IN (…)` list naming a column the query no longer mentions. Before
+    // any colour is picked it is worse: the empty list the probe's own empty
+    // query resolves to, which composes the UNFOLDED query against exactly the
+    // high-cardinality column the fold exists to bound.
+    expect(foldFor({ loading: true, values: ["a", "b"] })).toBeUndefined();
+    expect(foldFor({ loading: true, values: [] })).toBeUndefined();
+  });
+
+  it("treats a FAILED probe as no answer", () => {
+    expect(foldFor({ loading: false, values: undefined })).toBeUndefined();
+  });
+
+  it("hands back the survivors and the label from ONE list", () => {
+    // The query materialises the label as data, so this and the legend entry
+    // below have to be one function's answer over one list.
+    expect(foldFor({ loading: false, values: ["a", "b"] })).toEqual({
+      keep: ["a", "b"],
+      label: "Other",
+    });
+    expect(foldFor({ loading: false, values: ["Other", "b"] })).toEqual({
+      keep: ["Other", "b"],
+      label: "Other (2)",
+    });
+    // An empty answer is still an ANSWER — the probe found no rows, and the
+    // composer has a shape for that.
+    expect(foldFor({ loading: false, values: [] })).toEqual({
+      keep: [],
+      label: "Other",
+    });
+  });
+
+  it("names the fold what the assembler will name it, off a SHORT palette", () => {
+    // The two used to be computed from different lists — the assembler from
+    // the slots it filled, the composer from the whole probe answer — which
+    // agree only while the palette is exactly as long as the cap. Below that
+    // they diverge, and the series carrying the query's own rows is named
+    // something the query never wrote.
+    const ranked = ["a", "b", "Other"];
+    const fold = foldFor({ loading: false, values: ranked });
+    const series = assembleSeries({
+      rows: [{ x: "X1", y: 1, c: fold?.label }],
+      ranked,
+      chartType: "bar",
+      categoricalX: true,
+      palette: PALETTE.slice(0, 2),
+      other: OTHER_COLOUR,
+    });
+    expect(series.at(-1)?.name).toBe(fold?.label);
+    expect(series.at(-1)?.itemStyle.color).toBe(OTHER_COLOUR);
   });
 });
 
