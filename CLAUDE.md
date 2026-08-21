@@ -215,6 +215,19 @@ regress less. Spotted relics (dead code, stale comments, redundant tests) get
 they belong to — never an indiscriminate sweep. The living relic register is
 `ags-wiki/design/reliquary.md`.
 
+**A gate that drops input says what it dropped.** Every gate here carries a
+scope — a class of input it silently does not look at — and nothing audits those
+scopes, so a gate reports green while being blind to exactly the thing that later
+breaks. The worked example is `tools/check_doc_refs.py`, whose precision
+heuristic skips backticked tokens containing no `/`: `compat.py` was cited in the
+docs and never checked, and the blind spot surfaced months later by someone
+tripping over it rather than by the gate that was meant to catch it. So report
+what was filtered out **on every run, pass or fail** — a count is enough, and
+`tools/check_package_contents.py` and `tools/check_released_crate_readmes.py`
+already do it. A filter nobody can see is a blind spot with a green tick on it.
+(#295 found three of these in one day; #460 is the one gate still owing the
+report.)
+
 `output/` is gitignored working space. `experiments/` holds dictionary
 scaffolders — not production code.
 
