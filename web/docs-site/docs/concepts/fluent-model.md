@@ -32,6 +32,12 @@ takes `.filter` / `.select` (each returning a new `AgsQuery`) and materialises
 with `.frame()` / `.to_polars()` / `.to_pandas()` / `.relation()`; an `.at(...)`
 fan-out exposes `.groups` and `.frames()`.
 
+`.sql(...)` leaves laterite's surface: the `DuckDBPyRelation` it hands back
+materialises with **DuckDB's** terminals, which carry DuckDB's dependencies —
+`.pl()` and `.arrow()` need `laterite[pyarrow]`, `.df()` needs
+`laterite[compat]`. laterite's own terminals in the row above need neither; see
+[Dependency shape](dependency-shape.md).
+
 !!! warning "Single-result and fan-out are mutually exclusive"
     The single-result methods (`.filter` / `.select` / `.frame()`) and the
     fan-out methods (`.groups` / `.frames()`) live on **different `AgsQuery`

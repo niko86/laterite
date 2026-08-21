@@ -6,7 +6,7 @@ tags: [design, decision]
 decided: 2026-08-21
 supersedes: []
 from_gap: []
-related: [design/_README, concepts/docs-site, dec-duckdb-extension]
+related: [design/_README, concepts/docs-site, dec-duckdb-extension, dec-example-header-environment]
 sources: []
 ---
 

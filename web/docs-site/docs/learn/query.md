@@ -64,7 +64,9 @@ not strings.
 When you need a real join, `.sql(...)` exposes every group as a DuckDB table by
 its code — so `SAMP s JOIN LOCA l USING (LOCA_ID)` just works. It returns a
 `DuckDBPyRelation` (a terminal); call `.pl()`, `.df()`, or `.arrow()` to land it
-as polars, pandas, or Arrow.
+as polars, pandas, or Arrow. Those three are DuckDB's, and they bring DuckDB's
+dependencies: `.pl()` and `.arrow()` need `laterite[pyarrow]`, `.df()` needs
+`laterite[compat]` — see [Dependency shape](../concepts/dependency-shape.md).
 
 !!! tip
     `.query()` is the guard-railed builder for single-group work; `.sql()` is

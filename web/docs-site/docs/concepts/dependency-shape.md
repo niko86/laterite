@@ -36,13 +36,38 @@ actionable error rather than downgrading.
 --8<-- "python/ex22_string_dtype.out"
 ```
 
+## `.sql()` hands you DuckDB, and DuckDB has its own dependencies
+
+Everything above is about **laterite's** materialisers — `.frame()`,
+`.to_polars()`, `.to_pandas()`, `compat`'s frames — and all of them are
+pyarrow-free as described. [`.sql(...)`](../cookbook/sql-across-groups.md) is the
+escape hatch, and it stops returning laterite objects: what comes back is a
+**`DuckDBPyRelation`**, so the call that materialises it is DuckDB's, under
+DuckDB's rules and not ours.
+
+| Terminal on the relation | Needs                          |
+| ------------------------ | ------------------------------ |
+| `.df()` → pandas         | `[compat]` (pandas, via NumPy) |
+| `.pl()` → polars         | `[pyarrow]`                    |
+| `.arrow()` → Arrow table | `[pyarrow]`                    |
+
+`.pl()` is the one that surprises people: polars is in the **base** install, so
+the line looks like it cannot need an extra — but DuckDB routes it through Arrow
+and imports pyarrow to do it. A base install therefore gets
+`ModuleNotFoundError: No module named 'pyarrow'` from a script that never
+mentions pyarrow. That is why the `.sql()` examples on this site pin
+`laterite[pyarrow]` in their `uv run` headers.
+
+Staying on laterite's own terminals avoids the question entirely:
+`.query(...).to_polars()` needs nothing beyond the base install.
+
 !!! note "Which extra do I want?"
     Most callers want none. Reach for **`[compat]`** to use the `laterite.compat`
     python-ags4 shim (pandas-backed by default); it adds `pandas<3` and nothing
     else. Add **`[compat,pyarrow]`** for the faster pandas hop and the
     Arrow-backed `string` dtype. Reach for **`[pyarrow]`** when you explicitly want
     the Arrow backend — e.g. handing native `pyarrow.Table` objects to another
-    Arrow-native library.
+    Arrow-native library, or calling `.pl()` / `.arrow()` on a `.sql()` relation.
 
 So a base user gets polars + duckdb and an Arrow-capable bridge without dragging
 in two heavyweight dataframe stacks. Importing `laterite.compat` without the

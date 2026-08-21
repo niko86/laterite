@@ -15,6 +15,14 @@ same bytes.
 
 Discovery is by glob, deliberately — a new example is covered the moment it is
 added, with no list to forget to update.
+
+WHAT THIS FILE DOES NOT ASK, and it took #514 to notice: the environment. Each
+example carries a PEP 723 header naming its own dependencies, and the runs below
+supply the dev venv instead, so a header could be missing a dependency and
+nothing here could fail. `tests/test_docs_example_headers.py` asks that half —
+deliberately as a second gate rather than a change to this one, because honouring
+the header means testing the RELEASE it pins and would give up the tree
+guarantee above. See `ags-wiki/design/dec-example-header-environment.md`.
 """
 
 from __future__ import annotations
