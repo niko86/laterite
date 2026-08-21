@@ -191,11 +191,12 @@ Key facts:
   the runtime error tell a reader to install it**, then the examples. Building it
   is what surfaced that the published `peerDependencies` range matched no
   published version at all (see `repo:ags-wiki/tools/laterite-node.md`), so it was
-  earning its keep before it had run once. **Expect it red until that fix ships** —
-  the manifest on npm still carries the old range, the peer install fails with
-  ETARGET and the three `sql()`/`at()` examples fail with it. That is the correct
-  signal rather than a bug in the job: the published package IS broken for readers,
-  and the remedy is a release. Like the wheel leg it computes `tree_ahead` and every
+  earning its keep before it had run once; the fix has since shipped. A red run
+  here means the published package is behind what the site documents, and the
+  remedy is a release — stated as the *rule* rather than as a running commentary
+  on the current state, which is how this bullet came to carry "expect it red
+  until that fix ships" for weeks after it had. Like the wheel leg it computes
+  `tree_ahead` and every
   fatal step reads it, which is what lets it report to `notify` without filing an
   issue about a state already known.
 - **…and the browser twin, `docs-vs-released-wasm` (#283).** `npm install
@@ -211,9 +212,11 @@ Key facts:
   tree's HEAD date instead. The swap itself is one seam: `WASM_PKG_DIR` tells
   `gen_doc_outputs.py:_wasm_pkg()` which package to symlink into the examples'
   `node_modules`, exactly as `LAT_BIN` does for the CLI examples — and, like it,
-  the resolved path is printed rather than assumed. **Expect it red** until the
-  next `wasm-v*` release: `ex03_read.mjs` pulls rows through `rows_json()`, which
-  the published artifact predates.
+  the resolved path is printed rather than assumed. This bullet carried the npm
+  one's twin claim — expect it red until the next `wasm-v*` release, because
+  `ex03_read.mjs` pulls rows through `rows_json()` and the published artifact
+  predated it — and that release has shipped. The dates the step prints are what
+  answer "is it behind?" on the day it is asked; a page cannot.
 - **…and the crates.io twin, `docs-vs-released-crates` (#283).** #278 wired every
   publishable crate's README example into `cargo test --workspace` via
   `#[cfg(doctest)] #[doc = include_str!("../README.md")]` — which compiles it
