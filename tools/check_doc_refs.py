@@ -25,8 +25,19 @@ repo-root fallback — and links must be absolute URLs to escape the package.
 Not checked here, deliberately: URL liveness (network, flaky, and the docs job's
 mkdocs strict build already link-gates the site), and anchors.
 
+AND ONE MORE, WHICH THIS TOOL NOW SAYS OUT LOUD. A backticked token counts as a
+path only if it contains a `/`, or `read()` and `pandas` would be dead
+references. The cost is that a bare filename in prose — `compat.py` — is a
+citation nothing here can resolve, and for months nothing said so: the gate went
+green having never looked, and engaged only once that citation grew a slash
+(#460). So every run now reports how many tokens the rule dropped, pass or fail.
+The rule is unchanged; only its silence is. Whether to widen recall to suffixed
+bare filenames is a separate judgement, to be made on what that report shows.
+Gated by tests/test_check_doc_refs.py.
+
   check_doc_refs.py            report dead references
   check_doc_refs.py --check    same, but exit 1 if any (the CI gate)
+  check_doc_refs.py --skipped  also list the tokens the `/` rule dropped
 
 Run: `uv run --no-project python tools/check_doc_refs.py --check` (stdlib only).
 """
@@ -39,6 +50,7 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from typing import NamedTuple
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -88,10 +100,29 @@ def _gitignored(paths: list[str]) -> set[str]:
     return {line.strip() for line in r.stdout.splitlines() if line.strip()}
 
 
-def _targets(text: str) -> set[str]:
-    out = {m for m in PATH_RE.findall(text) if "/" in m}
-    out |= set(LINK_RE.findall(text))
-    return {t.split("#")[0].strip() for t in out if t and not t.startswith(EXTERNAL)}
+def _targets(text: str) -> tuple[set[str], set[str]]:
+    """A doc's references, split into (resolvable, dropped for want of a `/`).
+
+    The second half is the point. Both are produced in one walk of the same
+    matches so they cannot drift apart into a filter whose complement nobody
+    computes — which is exactly how the blind spot lasted.
+
+    Markdown links skip the `/` rule entirely — a link target is path-shaped by
+    definition — so the split is about backticked tokens and nothing else. Links
+    are still subject to `EXTERNAL` below, which is a second, narrower drop this
+    tool does not yet count (#295 item 2): `http://` and `#` are deliberately out
+    of scope, but `<` also swallows Markdown's angle-bracket form, so
+    `[x](<tools/gone.md>)` is a LOCAL dead reference that lands in neither half.
+    """
+    checked: set[str] = set()
+    skipped: set[str] = set()
+    for m in PATH_RE.findall(text):
+        (checked if "/" in m else skipped).add(m)
+    checked |= set(LINK_RE.findall(text))
+    resolvable = {
+        t.split("#")[0].strip() for t in checked if t and not t.startswith(EXTERNAL)
+    }
+    return resolvable, skipped
 
 
 def _published_crates() -> list[Path]:
@@ -105,15 +136,30 @@ def _published_crates() -> list[Path]:
     return out
 
 
-def scan() -> list[str]:
+class Scan(NamedTuple):
+    """What the gate found, beside what it never looked at.
+
+    Two fields rather than a bare list of problems, so a caller cannot report
+    the verdict without having been handed the scope it was reached under.
+    """
+
+    problems: list[str]
+    #: (doc, token) for every backticked reference the `/` rule dropped.
+    skipped: list[tuple[str, str]]
+
+
+def scan() -> Scan:
     problems: list[str] = []
+    skipped: list[tuple[str, str]] = []
 
     pending: list[tuple[str, str]] = []
     for rel in REPO_DOCS:
         doc = ROOT / rel
         if not doc.exists():
             continue
-        for t in sorted(_targets(doc.read_text(errors="replace"))):
+        resolvable, bare = _targets(doc.read_text(errors="replace"))
+        skipped += [(rel, t) for t in sorted(bare)]
+        for t in sorted(resolvable):
             if (doc.parent / t).exists() or (ROOT / t).exists():
                 continue
             pending.append((rel, t))
@@ -129,11 +175,9 @@ def scan() -> list[str]:
                 f"{crate.name}: PUBLISHED with no README — its crates.io page will be bare"
             )
             continue
-        missing = [
-            t
-            for t in sorted(_targets(rd.read_text(errors="replace")))
-            if not (crate / t).exists()
-        ]
+        resolvable, bare = _targets(rd.read_text(errors="replace"))
+        skipped += [(f"{crate.name}/README.md", t) for t in sorted(bare)]
+        missing = [t for t in sorted(resolvable) if not (crate / t).exists()]
         # Strict: only what ships inside the package exists on crates.io.
         ignored = _gitignored(missing)
         problems.extend(
@@ -143,7 +187,7 @@ def scan() -> list[str]:
             if t not in ignored
         )
 
-    return problems
+    return Scan(problems, skipped)
 
 
 def main() -> None:
@@ -151,15 +195,35 @@ def main() -> None:
     ap.add_argument(
         "--check", action="store_true", help="exit 1 if any reference is dead"
     )
+    ap.add_argument(
+        "--skipped",
+        action="store_true",
+        help="list the backticked tokens dropped for want of a `/`",
+    )
     args = ap.parse_args()
 
-    problems = scan()
-    for p in problems:
+    result = scan()
+    for p in result.problems:
         print(f"  {p}")
-    if not problems:
+    if args.skipped:
+        for doc, t in result.skipped:
+            print(f"  skipped {doc}: `{t}`")
+
+    # Unconditional, and above the verdict: a count printed only when it is
+    # non-zero, or only on the failure path, is a scope the reader of a green
+    # run still never sees.
+    docs = len({doc for doc, _ in result.skipped})
+    hint = "" if args.skipped or not result.skipped else " (--skipped lists them)"
+    print(
+        f"check_doc_refs: skipped {len(result.skipped)} slash-free backticked "
+        f"token(s) in {docs} doc(s) — a bare filename is not path-shaped, so "
+        f"this gate never resolved it as a citation{hint}"
+    )
+
+    if not result.problems:
         print("check_doc_refs: every referenced path exists")
         return
-    print(f"check_doc_refs: {len(problems)} dead reference(s)")
+    print(f"check_doc_refs: {len(result.problems)} dead reference(s)")
     if args.check:
         sys.exit(1)
 
