@@ -25,6 +25,7 @@ the group's `TYPE` row — no casting at the call site.
 
     **The three input doors** — `read` takes a path, or read from memory:
 
+    <!-- doc-code: skip — names placeholders to show the API shape; binding them would obscure the lesson -->
     ```python
     laterite.read("delivery.ags")          # a path
     laterite.read(text=ags_string)         # text already in hand

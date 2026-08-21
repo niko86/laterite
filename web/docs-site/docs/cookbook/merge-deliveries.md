@@ -40,12 +40,13 @@ _revisions_ a later file made, plus any warnings.
     (paths, text, bytes, `Ags4File` handles) and returns a `MergeResult` — the
     merged `bytes` plus the `warnings` and per-row `revisions` audit:
 
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
     ```python
     import laterite
 
     res = laterite.merge(
         "phase1.ags", "phase2.ags",
-        tran=TranStamp(
+        tran=laterite.TranStamp(
             issue="3", date="2024-01-15", producer="Us",
             recipient="Client", status="Merged",
         ),
@@ -108,6 +109,7 @@ least informative answer available. `promote` keeps the column _numeric_.
 
 === "Python"
 
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
     ```python
     res = laterite.merge("phase1.ags", "phase2.ags", on_type_clash="promote")
     ```

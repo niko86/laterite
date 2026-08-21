@@ -19,6 +19,7 @@ arithmetic just works because the column was numeric the moment it was read.
 `read` takes whichever form your data already has — there's no separate
 loader to pick:
 
+<!-- doc-code: skip — names placeholders to show the API shape; binding them would obscure the lesson -->
 ```python
 laterite.read("examples/sample_site.ags")   # a path
 laterite.read(text="GROUP,...\n...")          # an in-memory AGS4 string

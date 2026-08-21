@@ -123,3 +123,83 @@ def test_every_runnable_language_maps_to_a_real_surface(lang: str) -> None:
 def test_the_two_language_sets_do_not_overlap() -> None:
     """A language in both would be runnable AND require an opt-out — unresolvable."""
     assert not (set(gen_doc_outputs.PAGE_SURFACE) & gen_doc_outputs.EXCLUDED_LANGS)
+
+
+# --- page programs: the executing half (#513 step 2) -------------------------
+
+
+def test_a_page_program_concatenates_include_then_continuation() -> None:
+    """The pairing IS the point.
+
+    A continuation refers to names the include bound, so running them apart
+    proves nothing — and running them together is what turns an unbound name
+    into a NameError the gate can see.
+    """
+    md = (
+        '```python\n--8<-- "python/ex01_read_typed.py:code"\n```\n'
+        "\n```python\nprint(ags)\n```\n"
+    )
+    src, inline = gen_doc_outputs.page_program(md, "python")
+    assert inline == 1
+    assert "import laterite" in src, "the include's source was not pulled in"
+    assert src.rstrip().endswith("print(ags)"), "the continuation must come last"
+
+
+def test_document_order_is_preserved_across_a_tab_boundary() -> None:
+    """A tabbed include and a later top-level fence are one program."""
+    md = (
+        '=== "Python"\n\n    ```python\n    first = 1\n    ```\n'
+        "\n```python\nsecond = first + 1\n```\n"
+    )
+    src, _ = gen_doc_outputs.page_program(md, "python")
+    assert src.index("first = 1") < src.index("second = first + 1")
+
+
+def test_a_tabbed_fence_is_dedented() -> None:
+    """Concatenating a four-space-indented fence verbatim is an IndentationError."""
+    md = '=== "Python"\n\n    ```python\n    x = 1\n    ```\n'
+    src, _ = gen_doc_outputs.page_program(md, "python")
+    assert "\n    x = 1" not in f"\n{src}", "indent survived"
+    compile(src, "<page>", "exec")  # the real assertion: it parses
+
+
+def test_a_skipped_fence_is_left_out_of_the_program() -> None:
+    md = "<!-- doc-code: skip — why -->\n```python\nboom(\n```\n"
+    src, inline = gen_doc_outputs.page_program(md, "python")
+    assert inline == 0
+    assert not src.strip()
+
+
+def test_a_page_of_only_includes_yields_no_inline() -> None:
+    """`test_docs_examples.py` already runs those as files; re-running adds nothing."""
+    md = '```python\n--8<-- "python/ex01_read_typed.py:code"\n```\n'
+    _, inline = gen_doc_outputs.page_program(md, "python")
+    assert inline == 0
+
+
+def test_only_the_requested_language_is_collected() -> None:
+    md = "```python\na = 1\n```\n\n```js\nconst b = 2;\n```\n"
+    src, _ = gen_doc_outputs.page_program(md, "python")
+    assert "const b" not in src
+
+
+def test_resolve_include_extracts_the_named_section_only() -> None:
+    src = gen_doc_outputs.resolve_include("python/ex01_read_typed.py:code")
+    assert src is not None
+    assert "--8<--" not in src, "the section markers leaked into the program"
+
+
+def test_resolve_include_returns_none_for_a_missing_file() -> None:
+    """Silently contributing nothing would make a broken include look green."""
+    assert gen_doc_outputs.resolve_include("python/does_not_exist.py:code") is None
+
+
+def test_the_delivery_fixture_exists_and_carries_geol() -> None:
+    """The pages' narrative `delivery.ags` is seeded from this.
+
+    `cookbook/sql-across-groups.md` documents a three-way join through GEOL; a
+    fixture without it would make a working capability look broken.
+    """
+    text = gen_doc_outputs.DELIVERY_FIXTURE.read_text(encoding="utf-8")
+    assert '"GROUP","GEOL"' in text
+    assert "GEOL_GEOL" in text, "the join the docs select on needs this heading"

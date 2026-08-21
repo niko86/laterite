@@ -84,6 +84,39 @@ reader installs the release, not the working tree. The structural half stays on
 every PR because failing to classify a fence is a PR-time event, and finding it
 the next morning means working out which PR introduced it.
 
+## Executing them: two things the first run forced
+
+**A seeded working directory, not the repo root.** Pages say `delivery.ags` — the
+site's narrative filename, in 31 places — and rewriting every one to a fixture
+path would trade the docs' voice for the gate's convenience. Each page program
+runs in a temp directory holding `delivery.ags` and an `examples/` copy instead,
+so page text and executed text stay identical and only the environment is
+prepared. That is the same latitude `test_docs_examples.py` already takes by
+running from the repo root.
+
+It also closed a hazard nobody had noticed: `delivery.ags` EXISTS at the repo
+root as a gitignored working artifact holding only `PROJ`, so a first run from
+there gave `cookbook/read-a-group.md` a `KeyError` on a missing `LOCA` rather
+than the `FileNotFoundError` CI would have produced. A gate whose result depends
+on an untracked file is not a gate.
+
+`delivery.ags` is seeded from `examples/sample_strata.ags` — `sample_site` plus a
+`GEOL` group — because `cookbook/sql-across-groups.md` documents a three-way join
+through `GEOL`, and a fixture without it would make a working capability look
+broken. **The fixture serves the docs, not the reverse**: when the page selected
+`GEOL_GEOL`, the fixture grew that heading rather than the page being edited to
+match what the fixture happened to have.
+
+**Three classes of failure, and only one is a bug.** The first run failed eight of
+sixteen pages. They sorted into: snippets that are simply *wrong* and a reader
+hits (fixed); snippets that are right but name files the docs describe rather
+than ship, like `phase1.ags` (the defect inside them still fixed, the fence
+skipped, because merging the fixture with itself would assert nothing); and
+snippets that name placeholders *on purpose* to show an API shape, like
+`read(data=raw_bytes)` (skipped — binding them would obscure the lesson).
+Collapsing those three into "8 failures" would have produced eight edits, most
+of them wrong.
+
 ## Consequences
 
 - A new fence in a runnable language is covered from the moment it is added, and
@@ -95,13 +128,19 @@ the next morning means working out which PR introduced it.
 - `cookbook/index.md` could no longer claim the snippet on the page is the exact
   file CI executes. It now says the opening block is, and that later snippets
   continue from it — which is also the more useful thing for a reader to know.
-- SQL fences must name a real fixture before they can run. They currently use
-  `delivery.ags`, which is not one.
+- SQL fences still have to be run; `delivery.ags` is now seeded for them too, so
+  what remains is a duckdb runner rather than a fixture problem.
+- The nightly step is fatal only when the checkout matches the released tag. It is
+  amnestied when the tree is AHEAD, because the leg's banner promises that and
+  `test_nightly_wiring.py` enforces it — a page program breaking because this tree
+  moved ahead is a fact about the run, not about the page. The skip marker records
+  an author's intent; it is not for the calendar.
 - This commits the tool to being more than a generator: it now also reports on
   input it never rewrites.
 
 ## Related
 
 `repo: tools/gen_doc_outputs.py` · `repo: tests/test_doc_code_fences.py` ·
+`repo: examples/sample_strata.ags` · `repo: .github/workflows/nightly.yml` ·
 `repo: tests/test_docs_examples.py` ·
 `repo: rust-packages/laterite-node/test/docs-examples.test.ts`

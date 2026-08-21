@@ -451,6 +451,27 @@ jobs:
         run: |
           "$GITHUB_WORKSPACE/.released/bin/python" tools/gen_doc_outputs.py \
             --check --surface python
+
+      # Page programs (#513): a page's include plus the fences that continue it,
+      # concatenated and run as one program — the thing a reader actually does.
+      # Nightly rather than per-PR by decision (ags-wiki/design/dec-doc-code-fences.md):
+      # a broken snippet is not shipped code, and the released wheel is the more
+      # honest subject anyway, since a reader installs the release and not this tree.
+      #
+      # Fatal when the checkout matches the released tag, amnestied when it is
+      # AHEAD — the leg's own banner promises that, and `test_nightly_wiring.py`
+      # enforces it. Worth stating why, because the first draft of this step was
+      # unconditionally fatal on the reasoning that a fence documenting something
+      # unreleased should carry `<!-- doc-code: skip — … -->` and say so. That is
+      # true of a fence somebody wrote deliberately; it is not true of a page
+      # program that breaks because THIS TREE moved ahead of the release, which is
+      # a fact about the run and not about the page. The escape hatch is for the
+      # author's intent, not for the calendar.
+      - name: Page programs run against the released wheel
+        continue-on-error: ${{ steps.under-test.outputs.tree_ahead == 'true' }}
+        run: |
+          "$GITHUB_WORKSPACE/.released/bin/python" tools/gen_doc_outputs.py \
+            --run-pages --surface python
       # The CLI surface ships in this same wheel and nothing asked it anything
       # (#282). It matters more since #276 put `uvx --from laterite lat validate
       # delivery.ags` in the README — a reader-facing install path resolved

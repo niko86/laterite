@@ -31,9 +31,12 @@ aggregates — that a single-group query can't express. Drop to SQL.
     columns instead of a count:
 
     ```python
+    ags = laterite.read("delivery.ags")
     rel = ags.sql(
         "SELECT l.LOCA_ID, s.SAMP_REF, g.GEOL_GEOL "
-        "FROM SAMP s JOIN LOCA l USING (LOCA_ID) JOIN GEOL g USING (LOCA_ID, SAMP_TOP)"
+        "FROM SAMP s JOIN LOCA l USING (LOCA_ID) "
+        "JOIN GEOL g ON g.LOCA_ID = s.LOCA_ID "
+        "AND s.SAMP_TOP >= g.GEOL_TOP AND s.SAMP_TOP < g.GEOL_BASE"
     )
     df = rel.df()
     ```
@@ -73,6 +76,7 @@ engine — `_id` and `_parent_id` — so a parent/child join is the _same_ colum
 pair for every edge, with no `USING (…)` to look up per group:
 
 ```python
+ags = laterite.read("delivery.ags")
 rel = ags.sql("SELECT * FROM SAMP s JOIN LOCA l ON s._parent_id = l._id")
 ```
 

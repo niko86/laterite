@@ -7,6 +7,8 @@ terminates into a frame, a relation, or bytes. Nothing in the lazy parts runs
 until you ask for a result.
 
 ```python
+import laterite
+
 file = laterite.read("delivery.ags")                 # ── Ags4File
 locas = file.validate().query("SELECT * FROM LOCA")  # ── self → AgsQuery (lazy)
 ```
