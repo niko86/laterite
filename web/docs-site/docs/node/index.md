@@ -53,11 +53,11 @@ console.log(loca.numRows, file.headings("LOCA"));
 The read handle is fluent, so a whole workflow stays on one object:
 
 ```js
-const file = read("delivery.ags").validate({ warnings: true }); // returns the file; verdict on .report
+const checked = read("delivery.ags").validate({ warnings: true }); // returns the file; verdict on .report
 
-if (!file.report.isValid) {
-  const repaired = file.fix(); // returns a NEW repaired Ags4File
-  const delta = file.diff(repaired); // what changed, group by group
+if (!checked.report.isValid) {
+  const repaired = checked.fix(); // returns a NEW repaired Ags4File
+  const delta = checked.diff(repaired); // what changed, group by group
   repaired.save("clean.ags");
 }
 ```
@@ -73,7 +73,7 @@ if (!file.report.isValid) {
 DuckDB-free) and runs SQL across the file's groups:
 
 ```js
-const rows = await file.sql("SELECT loca_id FROM LOCA WHERE loca_gl < 0");
+const rows = await file.sql("SELECT loca_id FROM LOCA WHERE loca_gl < 27");
 ```
 
 ## Produce AGS4

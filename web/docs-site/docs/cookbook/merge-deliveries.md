@@ -66,6 +66,7 @@ _revisions_ a later file made, plus any warnings.
     `merge(sources, opts)` runs the same leaf and returns the same
     `{ bytes, warnings, revisions, text }`:
 
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
     ```js
     import { merge } from "laterite";
 
@@ -116,6 +117,7 @@ least informative answer available. `promote` keeps the column _numeric_.
 
 === "Node"
 
+    <!-- doc-code: skip — needs two separate deliveries, which the docs describe rather than ship; merging the fixture with itself would assert nothing -->
     ```js
     const res = merge(["phase1.ags", "phase2.ags"], { onTypeClash: "promote" });
     ```

@@ -70,6 +70,7 @@ resolved, `_link_wasm()` prints the package it linked.
 from __future__ import annotations
 
 import argparse
+import functools
 import os
 import re
 import shutil
@@ -129,6 +130,47 @@ def seed_workdir(work: Path) -> None:
 #: PATH, not by the manifest's `name`, so this works against either.
 WASM_PKG = ROOT / "web" / "src" / "wasm"
 WASM_LINK = EXAMPLES / "wasm" / "node_modules" / "@laterite" / "ags4-wasm"
+
+#: This checkout's Node package, and the symlink the node EXAMPLES resolve
+#: `import … from "laterite"` through. Following the link rather than pointing
+#: straight at the package is what makes a page program answer the released
+#: package's question for free: `docs-vs-released-npm` re-points this one link at
+#: what `npm install laterite` served, and everything downstream follows it.
+NODE_PKG = ROOT / "rust-packages" / "laterite-node"
+NODE_LINK = EXAMPLES / "node" / "node_modules" / "laterite"
+
+
+@functools.cache
+def _node_pkg() -> Path:
+    """Which `laterite` a Node page program imports — printed, once.
+
+    The same shape as `_lat()` and `_wasm_pkg()`, for the same reason: a gate
+    whose subject depends on the caller's environment has to say which subject it
+    got, or a green run means nothing in particular.
+    """
+    pkg = NODE_LINK.resolve() if NODE_LINK.exists() else NODE_PKG
+    if not (pkg / "dist" / "index.mjs").exists():
+        sys.exit(
+            f"gen_doc_outputs: node page programs need a built package at {pkg} — "
+            "run `npm run build:debug` in rust-packages/laterite-node first"
+        )
+    print(f"node package: {pkg}")
+    return pkg
+
+
+def _link_node(work: Path) -> None:
+    """Put `laterite` where Node's resolver finds it from the page program.
+
+    ESM resolution walks UP from the file, so the link has to sit in the temp
+    directory the program is written into — the examples get theirs from the tree
+    they live in, and a page program lives nowhere. NODE_PATH is ignored by ESM,
+    which is why this is a symlink and not an env var.
+    """
+    (work / "node_modules").mkdir(exist_ok=True)
+    (work / "node_modules" / "laterite").symlink_to(
+        _node_pkg(), target_is_directory=True
+    )
+
 
 #: A `--8<--` include fence followed by the `text` fence documenting its output.
 #: Both fences carry the tab-block indent (`=== "Python"`), which is captured so
@@ -194,11 +236,20 @@ HERE = "--run-pages"
 #: DuckDB CLI, a binary `pip install duckdb` does not ship. Routing sql through
 #: here would print "SKIPPED — duckdb not found" on every machine and read as a
 #: gap where there is a gate.
+#:
+#: `ts` stays pending on purpose, and not for want of a runner. A TypeScript
+#: fence's package is decided by the PAGE, not by the tag: the only one in the
+#: corpus is a type-only import on `reference/wasm-api.md`, whose package is the
+#: BROWSER one — running it under the node surface would answer a question nobody
+#: asked. Mapping language to surface cannot express that, and inventing a
+#: page-to-surface rule for a single type declaration would be machinery bought
+#: for a case that does not exist yet. The census reports it as pending on every
+#: run, which is the only claim that stays true either way.
 PAGE_RUNNER: dict[str, str | None] = {
     "python": HERE,
     "sql": "tests/test_docs_duckdb_examples.py",
-    "js": None,
-    "javascript": None,
+    "js": HERE,
+    "javascript": HERE,
     "ts": None,
 }
 #: Languages that LOOK runnable and are deliberately never run. A `bash` fence on
@@ -249,13 +300,19 @@ def resolve_include(ref: str) -> str | None:
     return m.group(1) if m else None
 
 
-def page_program(md: str, lang: str) -> tuple[str, int]:
-    """One page's fences of `lang`, concatenated in document order.
+def page_program(md: str, *langs: str) -> tuple[str, int]:
+    """One page's fences of `langs`, concatenated in document order.
 
     Document order, ignoring tab boundaries, because that is the order a reader
     meets them — and it is what makes a page's include and a continuation further
     down ONE program. That pairing is the whole point: the continuations refer to
     names the include bound, so running them apart proves nothing.
+
+    SEVERAL tags, because a language can be spelled more than one way in a fence
+    and a reader does not experience ```js and ```javascript as two languages.
+    Building one program per TAG would hand the second half to Node without the
+    first half's imports, and fail for a reason about this tool rather than about
+    the page.
 
     Returns the source and how many INLINE fences it contains. Zero inline means
     the page is only includes, which `test_docs_examples.py` already runs as
@@ -264,7 +321,7 @@ def page_program(md: str, lang: str) -> tuple[str, int]:
     parts: list[str] = []
     inline = 0
     for m in CODE_FENCE_RE.finditer(md):
-        if m.group("lang") != lang or CODE_SKIP_RE.search(m.group("skip")):
+        if m.group("lang") not in langs or CODE_SKIP_RE.search(m.group("skip")):
             continue
         body = _dedent(m.group("body"), m.group("indent"))
         if body.lstrip().startswith("--8<--"):
@@ -323,8 +380,28 @@ def _after_the_preamble(lines: list[str]) -> list[str]:
     return lines[i:]
 
 
-def run_page_programs(surface: Surface, lang: str) -> list[tuple[str, str]]:
+def _excerpt(err: str, keep: int = 4) -> str:
+    """Both ends of a failure, because runtimes disagree about which one matters.
+
+    A Python traceback ends with the exception; Node's stderr STARTS with it and
+    ends in loader frames. Keeping only the tail — which this did — printed four
+    lines of `node:internal/modules/esm/loader` and hid the `SyntaxError` that
+    said what was actually wrong. Keeping both ends is language-neutral, and the
+    elision says how much it dropped rather than trimming silently.
+    """
+    lines = [ln for ln in err.splitlines() if ln.strip()]
+    if len(lines) <= keep * 2:
+        return "\n    ".join(lines)
+    gap = f"… {len(lines) - keep * 2} line(s) elided …"
+    return "\n    ".join([*lines[:keep], gap, *lines[-keep:]])
+
+
+def run_page_programs(surface: Surface, langs: list[str]) -> list[tuple[str, str]]:
     """Execute every page program for one surface. Returns (page, stderr) failures.
+
+    Per SURFACE rather than per fence tag, because a surface can answer to more
+    than one: ```js and ```javascript are one language to Node, and splitting a
+    page between them would run the second half without the first half's imports.
 
     "Does not raise" is the bar. A continuation typically just prints, and
     demanding assertions would mean editing every one of them — the rewrite the
@@ -334,7 +411,7 @@ def run_page_programs(surface: Surface, lang: str) -> list[tuple[str, str]]:
     failures: list[tuple[str, str]] = []
     ran = 0
     for page in sorted(DOCS.rglob("*.md")):
-        src, inline = page_program(page.read_text(encoding="utf-8"), lang)
+        src, inline = page_program(page.read_text(encoding="utf-8"), *langs)
         if not inline or not src.strip():
             continue
         ran += 1
@@ -356,6 +433,8 @@ def run_page_programs(surface: Surface, lang: str) -> list[tuple[str, str]]:
             # the FileNotFoundError CI would have seen. A gate whose result depends
             # on an untracked file is not a gate.
             seed_workdir(work)
+            if surface.prepare:
+                surface.prepare(work)
             proc = subprocess.run(
                 surface.argv(f),
                 cwd=work,
@@ -366,7 +445,10 @@ def run_page_programs(surface: Surface, lang: str) -> list[tuple[str, str]]:
             )
         if proc.returncode != 0:
             failures.append((str(page.relative_to(DOCS)), proc.stderr.strip()))
-    print(f"gen_doc_outputs: ran {ran} {lang} page program(s); {len(failures)} failed")
+    print(
+        f"gen_doc_outputs: ran {ran} {surface.name} page program(s) "
+        f"({'/'.join(langs)}); {len(failures)} failed"
+    )
     return failures
 
 
@@ -426,6 +508,12 @@ class Surface:
     default: bool = True
     requires: str = ""
     env: dict[str, str] = field(default_factory=dict)
+    #: What a PAGE PROGRAM's temp directory needs beyond the seeded fixtures, if
+    #: anything. The example trees get this from where they sit in the repo — the
+    #: node examples resolve `import … from "laterite"` through a `node_modules`
+    #: symlink beside them — but a page program runs nowhere, so whatever the
+    #: examples get for free has to be built for it.
+    prepare: Callable[[Path], None] | None = None
 
 
 def _lat() -> str:
@@ -453,7 +541,7 @@ SURFACES = {
     s.name: s
     for s in (
         Surface("python", "ex*.py", lambda f: [sys.executable, str(f)]),
-        Surface("node", "ex*.mjs", lambda f: ["node", str(f)]),
+        Surface("node", "ex*.mjs", lambda f: ["node", str(f)], prepare=_link_node),
         # bash, not sh: the examples use bash-isms, and `lat` is put on PATH via
         # env rather than hard-coded so the committed .out stays machine-neutral.
         Surface("cli", "*.sh", lambda f: ["bash", str(f)]),
@@ -631,22 +719,33 @@ def main() -> None:
         # Nightly lane. The structural half (--check-pages) runs on every PR and
         # says which fences SHOULD run; this is what actually runs them.
         bad: list[tuple[str, str]] = []
-        for lang, surface_name in sorted(PAGE_SURFACE.items()):
-            if PAGE_RUNNER[lang] != HERE:
-                continue  # not this runner's language; the census says whose
+        for surface_name in sorted(set(PAGE_SURFACE.values())):
+            # Grouped by surface, then filtered to the tags routed HERE — the two
+            # are not the same cut. `ts` reaches the node surface and is still
+            # pending, so a surface can be half-claimed and the loop has to run
+            # the claimed half rather than all or nothing.
+            langs = sorted(
+                lang
+                for lang, s_name in PAGE_SURFACE.items()
+                if s_name == surface_name and PAGE_RUNNER[lang] == HERE
+            )
+            if not langs:
+                continue  # not this runner's surface; the census says whose
             if args.surface and surface_name not in args.surface:
                 continue
             s = SURFACES[surface_name]
             if s.requires and not shutil.which(s.requires):
                 print(
-                    f"gen_doc_outputs: {lang} page programs SKIPPED — {s.requires} not found"
+                    f"gen_doc_outputs: {surface_name} page programs SKIPPED — "
+                    f"{s.requires} not found"
                 )
                 continue
-            bad += [(f"{lang} · {p}", err) for p, err in run_page_programs(s, lang)]
+            bad += [
+                (f"{surface_name} · {p}", err) for p, err in run_page_programs(s, langs)
+            ]
         if bad:
             for where, err in bad:
-                tail = "\n    ".join(err.splitlines()[-4:])
-                print(f"\n  {where}\n    {tail}")
+                print(f"\n  {where}\n    {_excerpt(err)}")
             sys.exit(
                 f"\ngen_doc_outputs: {len(bad)} page program(s) do not run. A reader "
                 "following the page hits this."
@@ -781,11 +880,17 @@ def main() -> None:
         # and "known to run" are different claims and the gap between them is the
         # thing worth watching. This half runs no examples, so it reports the
         # SHAPE of the coverage; `--run-pages` is what proves it.
-        live = sorted(f"{k} ({v})" for k, v in PAGE_RUNNER.items() if v)
-        pending = sorted(k for k, v in PAGE_RUNNER.items() if not v)
+        # Grouped BY RUNNER rather than by language: one line per language read
+        # as five separate gates when it is two, and the question a reader has
+        # here is "what runs this, and what runs nothing".
+        by_runner: dict[str, list[str]] = {}
+        for lang, where in sorted(PAGE_RUNNER.items()):
+            by_runner.setdefault(where or "PENDING — nothing runs these", []).append(
+                lang
+            )
         print(
             "gen_doc_outputs: page programs execute in the nightly — "
-            f"{'; '.join(live)}; pending for {', '.join(pending)}"
+            + "; ".join(f"{w}: {', '.join(ls)}" for w, ls in sorted(by_runner.items()))
         )
         return
 
