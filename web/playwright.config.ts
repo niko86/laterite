@@ -12,6 +12,9 @@ const LANDING_PORT = Number(process.env.PW_LANDING_PORT ?? PORT + 1);
 // testMatch and the desktop project's testIgnore — so a rename cannot
 // desynchronize them into running the spec twice or not at all.
 const LANDING_SPEC = /landing\.spec\.ts$/;
+// The dark lane's spec, named the same way for the same reason — and NOT
+// ending in "landing.spec.ts", or all three light lanes would run it too.
+const LANDING_DARK_SPEC = /landing\.dark\.spec\.ts$/;
 
 // End-to-end tests drive the REAL app (wasm validator in a Web Worker +
 // DuckDB-wasm) in headless Chromium against a local `vite preview` of the
@@ -40,7 +43,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: LANDING_SPEC,
+      testIgnore: [LANDING_SPEC, LANDING_DARK_SPEC],
       use: { browserName: "chromium", viewport: { width: 1280, height: 800 } },
     },
     {
@@ -91,6 +94,22 @@ export default defineConfig({
         browserName: "chromium",
         baseURL: `http://localhost:${LANDING_PORT}`,
         viewport: { width: 1280, height: 800 },
+      },
+    },
+    {
+      // The landing in DARK (#547) — the one lane that renders the `.dark`
+      // tree. `colorScheme` is the real user path: index.html's bootstrap
+      // converts the system preference into the class when nothing is
+      // stored, so this exercises the mechanism, not a test-only shortcut.
+      // Strict 390 like the phone lane: the dark tree re-runs the same
+      // viewport contract.
+      name: "landing-dark",
+      testMatch: LANDING_DARK_SPEC,
+      use: {
+        browserName: "chromium",
+        baseURL: `http://localhost:${LANDING_PORT}`,
+        viewport: { width: 390, height: 844 },
+        colorScheme: "dark",
       },
     },
   ],

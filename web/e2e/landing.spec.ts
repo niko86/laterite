@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { expectViewportWide } from "./viewport";
 import { INSTALL_CHANNELS } from "../landing/installChannels";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -51,23 +52,6 @@ function seededFinalDepthLabel(): string {
  *  class name. */
 const scroller = (page: Page, section: string) =>
   page.locator(`section#${section} table`).locator("xpath=..");
-
-async function expectViewportWide(page: Page) {
-  const doc = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  // Exactly viewport-wide, no tolerance: any horizontal overflow is the bug.
-  // Against clientWidth rather than a literal 390 so a runner that draws
-  // space-taking scrollbars measures the same contract — with #523 unfixed,
-  // scrollWidth read ~783 while clientWidth stayed at the viewport. The
-  // ceiling closes the remaining direction, both numbers growing together
-  // (a wrong server or a wrong project viewport).
-  expect(doc.scrollWidth, "the page must not outgrow the viewport").toBe(
-    doc.clientWidth,
-  );
-  expect(doc.scrollWidth).toBeLessThanOrEqual(width(page));
-}
 
 test("phone: the page stays viewport-wide and each group table pans in its own scroller", async ({
   page,
