@@ -123,7 +123,18 @@ const { report, busy, counted } = createRoot(() => {
 });
 
 export { armed, busy, delivery, focusLine, picked, report, text };
-export { setFocusLine, setPicked };
+/** The exported pick setter is a RUN BOUNDARY (#550): coalescing survives
+ *  only an unbroken stay in one card, so opening, moving, or closing the
+ *  editor ends any open run — a reopened cell records fresh rather than
+ *  folding into the old run's base. Value-style only; no caller uses the
+ *  updater form. (The store's own internal setPicked calls sit inside commit
+ *  flows whose unkeyed commits already break the run.) */
+function pickCell(p: { group: string; row: number; col: number } | null): void {
+  history = { ...history, key: null };
+  setPicked(p);
+}
+
+export { setFocusLine, pickCell as setPicked };
 
 /** Start the engine once the page has painted and the thread is idle (#531).
  *  Called from the page root; any interaction that calls arm() first wins. */
@@ -166,11 +177,14 @@ let history: History<Delivery> = EMPTY;
  *  cell edits, row adds and deletes, the engine's fixes, the demo reset, and
  *  whatever joins them later. Identity short-circuit: a no-op mutation (an
  *  unknown group, an out-of-range row) must not burn an undo step. */
-function commit(next: (d: Delivery) => Delivery): boolean {
+function commit(
+  next: (d: Delivery) => Delivery,
+  coalesce: string | null = null,
+): boolean {
   const current = delivery();
   const changed = next(current);
   if (changed === current) return false;
-  history = record(history, current);
+  history = record(history, current, 100, coalesce);
   setDelivery(changed);
   dropStalePick(changed);
   return true;
@@ -191,9 +205,16 @@ export function setCell(
   row: number,
   col: number,
   value: string,
+  opts?: { coalesce?: boolean },
 ): void {
   arm();
-  commit((d) => setCellIn(d, group, row, col, value));
+  /* The carousel commits every keystroke (live revalidation), so it asks for
+   * coalescing: one cell's consecutive commits share a key and undo as one
+   * step (#550). The fine-pointer table already commits once per cell edit
+   * and stays unkeyed — an unkeyed commit also BREAKS any open run, as does
+   * every other mutation below. */
+  const key = opts?.coalesce ? `cell:${group}:${row}:${col}` : null;
+  commit((d) => setCellIn(d, group, row, col, value), key);
 }
 
 export function addRow(group: string, parent: string | null): void {

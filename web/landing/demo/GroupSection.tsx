@@ -210,10 +210,16 @@ export const GroupSection: Component<{
                         band={props.band}
                         row={cell().row}
                         col={cell().col}
-                        onMove={(col) =>
-                          setPicked({ group: props.code, row: cell().row, col })
-                        }
-                        onClose={() => setPicked(null)}
+                        onMove={(col) => {
+                          setPicked({
+                            group: props.code,
+                            row: cell().row,
+                            col,
+                          });
+                        }}
+                        onClose={() => {
+                          setPicked(null);
+                        }}
                         onDelete={() => {
                           deleteRow(props.code, cell().row);
                         }}

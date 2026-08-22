@@ -166,6 +166,100 @@ test("touch: a row deletes from the carousel and the findings follow", async ({
   await expect(proj.locator("li")).toHaveCount(0);
 });
 
+test("touch: a typed word is one undo step, not one per keystroke", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!hasTouch, "the carousel is the coarse pointer's editor (#550)");
+  await page.goto("/");
+
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_ID on row 1 of LLPL",
+  });
+  const before = await cell.innerText();
+  await cell.click();
+
+  // pressSequentially, never fill(): coalescing exists for the per-keystroke
+  // commits the carousel really makes, and fill() would collapse them into
+  // one input event — a test that cannot fail.
+  const input = page.getByRole("textbox", { name: "LOCA_ID value" });
+  await input.click();
+  await page.keyboard.press("End");
+  await input.pressSequentially("XYZ");
+  await expect(cell).toContainText("XYZ");
+
+  await page.getByRole("button", { name: "Close the row editor" }).click();
+  await expect(
+    page.getByRole("group", { name: "Editing row 1 of LLPL" }),
+  ).toBeHidden();
+
+  // ONE undo unwinds the whole word (#550) — before coalescing this needed
+  // one per character, and the third press here would still show a suffix.
+  await page.keyboard.press("Control+z");
+  await expect(cell).toHaveText(before);
+
+  // Redo rides the same coalescing: one step forward restores the whole
+  // word, and one step back clears it again.
+  await page.keyboard.press("Control+Shift+z");
+  await expect(cell).toContainText("XYZ");
+  await page.keyboard.press("Control+z");
+  await expect(cell).toHaveText(before);
+
+  // Reopening the SAME cell is a run boundary, not a continuation: two
+  // stays, two undo steps. Without the pick-setter boundary the second stay
+  // would fold into the first run's base and one undo would eat both words.
+  await cell.click();
+  await input.click();
+  await page.keyboard.press("End");
+  await input.pressSequentially("AB");
+  await page.getByRole("button", { name: "Close the row editor" }).click();
+  await cell.click();
+  await input.click();
+  await page.keyboard.press("End");
+  await input.pressSequentially("CD");
+  await page.getByRole("button", { name: "Close the row editor" }).click();
+  await expect(
+    page.getByRole("group", { name: "Editing row 1 of LLPL" }),
+  ).toBeHidden();
+  await page.keyboard.press("Control+z");
+  await expect(cell).toContainText("AB");
+  await expect(cell).not.toContainText("CD");
+  await page.keyboard.press("Control+z");
+  await expect(cell).toHaveText(before);
+});
+
+test("touch: while a card holds focus, undo stays native — the model timeline waits for the close", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!hasTouch, "the carousel is the coarse pointer's editor (#550)");
+  await page.goto("/");
+
+  // A model mutation to be undone: PROJ gains a second row.
+  const proj = page.locator("section#proj");
+  const rows = proj.locator("tbody tr");
+  await proj.getByRole("button", { name: "+ row" }).click();
+  await expect(rows).toHaveCount(2);
+
+  // With a field card holding focus, the shortcut must stay NATIVE — #525's
+  // recorded decision, pinned here (#550): the model shortcut would yank the
+  // delivery out from under a half-typed value. The row must not vanish.
+  await page
+    .getByRole("button", { name: "Edit LOCA_ID on row 1 of LLPL" })
+    .click();
+  await page.getByRole("textbox", { name: "LOCA_ID value" }).click();
+  await page.keyboard.press("Control+z");
+  await expect(rows).toHaveCount(2);
+
+  // Closed card, same shortcut: now it reaches the model and the add undoes.
+  await page.getByRole("button", { name: "Close the row editor" }).click();
+  await expect(
+    page.getByRole("group", { name: "Editing row 1 of LLPL" }),
+  ).toBeHidden();
+  await page.keyboard.press("Control+z");
+  await expect(rows).toHaveCount(1);
+});
+
 test("fine: click selects, Enter edits in place, Esc cancels, Tab commits and moves, arrows navigate, typing replaces", async ({
   page,
   hasTouch,
