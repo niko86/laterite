@@ -321,9 +321,9 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               when={armed()}
               fallback={
                 <p class="p-4 text-caption text-fg-muted">
-                  Edit any cell above, or press Fix, and the engine loads —
-                  about two megabytes of WebAssembly, fetched only if you
-                  actually want it.
+                  The engine is on its way — it loads itself shortly after the
+                  page paints, and this pane fills with the file and its
+                  findings, live.
                 </p>
               }
             >
@@ -362,8 +362,9 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
           </div>
         </div>
 
-        {/* The findings list. */}
-        <div>
+        {/* The findings list. The id is the scoreboard's jump target (#531):
+            the chip states the verdict, this panel is its evidence. */}
+        <div id="findings" class="scroll-mt-16">
           <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
             Findings
             <Show when={armed() && report()}>
@@ -375,7 +376,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
             when={armed()}
             fallback={
               <p class="mt-3 text-caption text-fg-muted">
-                The engine has not been loaded yet.
+                The engine is still on its way.
               </p>
             }
           >

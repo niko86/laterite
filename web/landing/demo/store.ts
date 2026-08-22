@@ -5,10 +5,15 @@
  * button because there is nothing to check — the file and the findings are
  * simply always current.
  *
- * The engine is ARMED rather than loaded: nothing is fetched until the reader
- * first touches the demo, so a visitor who came for an install command never
- * pays for it. `arm()` is idempotent and safe to call from every interactive
- * surface, which is why each of them calls it rather than one of them owning it.
+ * The engine loads EAGER-IDLE (#531, reversing the touch-gated decision):
+ * the fetch starts after first paint, in an idle callback, because the demo
+ * is the page's thesis and a reader who scrolls to it should find the
+ * findings already there — and because the wasm travels brotli-compressed on
+ * the real delivery path, the cost the old gate guarded against was smaller
+ * than the blank pane it caused. First render is never blocked: nothing
+ * engine-shaped happens before the page has painted. `arm()` stays idempotent
+ * and every interactive surface still calls it, so a reader who beats the
+ * idle callback to the demo starts the load that instant.
  */
 
 import {
@@ -108,11 +113,32 @@ const { report, busy, fixes } = createRoot(() => {
 export { armed, busy, delivery, fixes, focusLine, picked, report, text };
 export { setFocusLine, setPicked };
 
+/** Start the engine once the page has painted and the thread is idle (#531).
+ *  Called from the page root; any interaction that calls arm() first wins. */
+export function armWhenIdle(): void {
+  if (armed()) return;
+  // Feature-detected: older Safari lacks requestIdleCallback, and a missing
+  // idle hook must degrade to "shortly", not "never".
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(
+      () => {
+        arm();
+      },
+      { timeout: 2000 },
+    );
+  } else {
+    setTimeout(() => {
+      arm();
+    }, 200);
+  }
+}
+
 /** Load the engine. Idempotent; the first caller pays and the rest await.
  *
- * Arming flips the resource's source from `false` to the current text, which is
- * what starts the first validation — the reader's first interaction shows them
- * findings rather than an empty panel. */
+ * Arming flips the resource's source from `false` to the current text, which
+ * is what starts the first validation. Since #531 the usual first caller is
+ * the idle callback above; an interactive surface that beats it there wins,
+ * which is why every one of them still calls this. */
 export function arm(): void {
   if (armed()) return;
   setArmed(true);

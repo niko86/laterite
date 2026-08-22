@@ -1,11 +1,15 @@
-/* The engine seam (#397): the shipped wasm validator, behind first interaction.
+/* The engine seam (#397; loading policy revised by #531): the shipped wasm
+ * validator, behind a dynamic import and nothing else — no worker, no
+ * dispatch layer, no protocol. The app has all three because it validates
+ * arbitrary files of arbitrary size and must not block its own UI; the
+ * landing page validates one small committed fixture, where a worker would
+ * cost a second round trip per keystroke to avoid a pause too short to see.
  *
- * Somebody who arrived to copy an install command should not pay for an engine
- * they never scroll to. So this is a dynamic import and nothing else — no
- * worker, no dispatch layer, no protocol. The app has all three because it
- * validates arbitrary files of arbitrary size and must not block its own UI; the
- * landing page validates one 1.7 kB fixture, where a worker would cost a second
- * round trip per keystroke to avoid a pause too short to see.
+ * WHEN the import happens moved in #531: eager-idle after first paint rather
+ * than behind first interaction — the demo is the page's thesis, and the
+ * wasm travels brotli-compressed on the real delivery path, so the blank
+ * pane cost more than the bytes. store.ts's armWhenIdle records that
+ * decision; this module still only answers "load it now".
  *
  * That asymmetry is deliberate and it is the same reason the two surfaces have
  * two Vite configs: sharing a toolchain is not sharing a bundle.
