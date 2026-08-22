@@ -151,3 +151,28 @@ def test_the_committed_typescript_is_what_the_generator_emits() -> None:
         f"{gic.OUT} is stale — run "
         "`uv run --no-project python tools/gen_install_channels.py`"
     )
+
+
+def test_the_cli_card_leads_with_the_binary_not_pip() -> None:
+    """#533: the standalone binary is THE CLI. No pip command as the card's
+    headline — an empty command tells the grid to render the releases download
+    as the card's action — and wheel/npm inclusion is the note, phrased as
+    included, never as identical (three `lat` programs exist and only their
+    scriptable output is gated; #509 tracks the Node launcher's gap)."""
+    cards = {c.id: c for c in gic.resolve(_sources())}
+    cli = cards["cli"]
+    assert cli.command == ""
+    assert cli.href == "https://github.com/niko86/laterite/releases"
+    assert "wheel" in cli.note and "npm" in cli.note
+    assert "identical" not in cli.note
+
+
+def test_the_cli_card_is_caught_when_npm_stops_shipping_lat() -> None:
+    """The #533 note's npm half is a claim with a record behind it: strip the
+    `bin` entry from laterite-node's manifest and the refusal must fire."""
+    src = _sources()
+    manifest = json.loads(src["rust-packages/laterite-node/package.json"])
+    manifest.pop("bin", None)
+    src["rust-packages/laterite-node/package.json"] = json.dumps(manifest)
+    claims = gic.unpublished_claims(src)
+    assert any("npm" in c and c.startswith("cli:") for c in claims)
