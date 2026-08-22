@@ -1,10 +1,10 @@
 /* The file and the findings (#397) — the half that closes the loop.
  *
- * The AGS4 file the four tables emit, line for line, and what the shipped engine
- * says about it. Severity comes from the engine and is never decided here: the
- * seeded SAMP_TYPE defect is an ERROR, not the warning the design handoff
- * captions it as, and hard-coding a severity in the UI is how a demo comes to
- * disagree with the tool it is advertising.
+ * The AGS4 file the tables above emit, line for line, and what the shipped
+ * engine says about it. Severity comes from the engine and is never decided
+ * here: the seeded SAMP_TYPE defect is an ERROR, not the warning the design
+ * handoff captions it as, and hard-coding a severity in the UI is how a demo
+ * comes to disagree with the tool it is advertising.
  *
  * The output pane scrolls sideways rather than wrapping. AGS4 lines are long,
  * and wrapping them destroys the column alignment that makes the format readable
