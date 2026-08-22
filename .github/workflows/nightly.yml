@@ -1028,6 +1028,11 @@ jobs:
           uv run --no-sync python tools/xcheck/emit_cli.py --out "$O"
           cargo run -q --manifest-path "$M" -p laterite-ags4-xcheck --bin xcheck -- \
             --check "$O" --allow xcheck-allow.json --require-legs all --require-engines all
+      # The human tier of the launcher contract (#542): same FACTS from every
+      # launcher, layout each one's own — the byte comparator above cannot hold
+      # this tier, and all three launchers are already built in this job.
+      - name: Launcher human-content gate
+        run: uv run --no-sync python tools/xcheck/check_cli_content.py --require-legs all
       - name: upload observations on failure
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

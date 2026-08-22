@@ -90,11 +90,11 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
                 cert::why(reason)
             );
         }
-        o.findings
+        (o.findings, o.dict_version, o.resolution)
     });
 
     match result {
-        Ok(found) => {
+        Ok((found, dv, resolution)) => {
             // `n` is what the report SHOWS (every tier the caller asked for);
             // `verdict` is what it CONCLUDES. They stopped being the same
             // question in #321 — a warning prints and does not fail.
@@ -140,7 +140,7 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
                 } else if ndjson {
                     render::ndjson_string(&found)
                 } else {
-                    render::plain_string(path, &found, n)
+                    render::plain_string(path, &found, n, dv.as_str(), resolution.as_str())
                 };
                 if let Err(e) = write_atomic(p, body.as_bytes()) {
                     eprintln!("error: --out {}: {e}", p.display());
@@ -155,9 +155,17 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
             } else if ndjson {
                 print!("{}", render::ndjson_string(&found));
             } else if n == 0 {
-                println!("{}: clean (0 findings)", path.display());
+                // The dictionary that judged the file, and how it was chosen,
+                // is a FACT of the verdict — the launcher contract binds facts
+                // across launchers (npx already stated it; #542).
+                println!(
+                    "{}: clean (0 findings) — dictionary {} ({})",
+                    path.display(),
+                    dv.as_str(),
+                    resolution.as_str()
+                );
             } else {
-                render::report_table(path, &found, n);
+                render::report_table(path, &found, n, dv.as_str(), resolution.as_str());
             }
             exit(code);
         }

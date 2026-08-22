@@ -815,6 +815,73 @@ def test_cli_read_rust_binary_byte_parity():
         assert r.returncode == 0 and r.stdout == py, f"read PROJ {extra} diverged"
 
 
+_XCHECK_INPUTS = (
+    Path(__file__).parents[3]
+    / "rust-packages"
+    / "laterite-ags4-xcheck"
+    / "cases"
+    / "inputs"
+)
+
+
+@pytest.mark.skipif(not _RUST_BIN.exists(), reason="Rust lat not built")
+@pytest.mark.parametrize(
+    ("fixtures", "argv"),
+    [
+        (["rule8_dp_wrong_precision.ags"], ["fix", "rule8_dp_wrong_precision.ags"]),
+        (["clean_minimal.ags"], ["certify", "clean_minimal.ags"]),
+        (
+            ["diff_base.ags", "diff_rev.ags"],
+            ["merge", "diff_base.ags", "diff_rev.ags", "--out", "m.ags"],
+        ),
+        (["diff_base.ags", "diff_rev.ags"], ["diff", "diff_base.ags", "diff_rev.ags"]),
+    ],
+    ids=["fix", "certify", "merge", "diff"],
+)
+def test_cli_every_verb_rust_binary_byte_parity(tmp_path, fixtures, argv):
+    """`fix` / `certify` / `merge` / `diff` human stdout, byte-for-byte, binary vs
+    the wheel launcher — completing per-verb coverage beside the read / validate /
+    rules parity tests above.
+
+    This asserts MORE than the launcher contract promises. The contract
+    (dec-launcher-contract, #542) binds human output by FACTS, with layout each
+    launcher's own; these two launchers happen to share a hand-kept byte-identical
+    layout as an implementation choice, and this gate exists to stop that choice
+    drifting silently — not as evidence the contract requires it. npx is
+    deliberately absent here (its layout is its own; the content gate,
+    tools/xcheck/check_cli_content.py, is what binds it).
+
+    Scope it does NOT compare, so the cut is visible: stderr (spinners),
+    `--out`/`--json-out` confirmation lines, `census` (launcher-identifying by
+    design), `pack`/`unpack`/`lock`/`unlock` (byte artifacts — xcheck's ops
+    compare those), and `excel` (fixture-heavy; xcheck's excel cases own it).
+
+    Each launcher runs in its own temp dir with identical relative argv, because
+    the argv paths echo into the output (`a → b`, `→ <dest>`) and a differing
+    path would fail the comparison for a reason that is not drift."""
+    src = {
+        f: (_FIX / f) if (_FIX / f).exists() else (_XCHECK_INPUTS / f) for f in fixtures
+    }
+    dirs = {}
+    for leg in ("bin", "py"):
+        d = tmp_path / leg
+        d.mkdir()
+        for name, path in src.items():
+            (d / name).write_bytes(path.read_bytes())
+        dirs[leg] = d
+    r_bin = subprocess.run(
+        [str(_RUST_BIN), *argv], cwd=dirs["bin"], capture_output=True, text=True
+    )
+    r_py = subprocess.run(
+        [sys.executable, "-m", "laterite._cli", *argv],
+        cwd=dirs["py"],
+        capture_output=True,
+        text=True,
+    )
+    assert r_bin.returncode == r_py.returncode, f"exit codes diverged on {argv[0]}"
+    assert r_bin.stdout == r_py.stdout, f"{argv[0]} stdout diverged"
+
+
 def test_cli_transport_pack_unpack_round_trip(tmp_path):
     """`lat pack` / `unpack` via the Python CLI — a lossless zstd round-trip."""
     from laterite import _cli

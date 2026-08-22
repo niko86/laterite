@@ -498,18 +498,21 @@ describe("cli (in-process): fix", () => {
 
 // ---- diff ------------------------------------------------------------------
 describe("cli (in-process): diff", () => {
-  it("identical files → 'no differences'", () => {
+  it("identical files → the header and a zero total, not a bare shrug", () => {
+    // 'no differences' used to be the whole output — fewer facts than the other
+    // two launchers state (header + totals), a contract breach, not layout (#542).
     const { code, stdout } = runCli(["diff", CLEAN, CLEAN]);
     expect(code).toBe(0);
-    expect(stdout).toContain("no differences");
+    expect(stdout).toContain(`${CLEAN} → ${CLEAN}`);
+    expect(stdout).toContain("total: +0 -0 ~0");
   });
 
-  it("differing files → per-group +/-/~ lines", () => {
-    // The two merge deliveries genuinely differ, so this exercises the changed-group
-    // human output (`CODE: +a -r ~c`), not the 'no differences' short-circuit.
+  it("differing files → header, per-group +/-/~ lines and the total (#542)", () => {
     const { code, stdout } = runCli(["diff", MERGE_A, MERGE_B]);
     expect(code).toBe(0);
+    expect(stdout).toContain(`${MERGE_A} → ${MERGE_B}`);
     expect(stdout).toMatch(/[A-Z]{4}: \+\d+ -\d+ ~\d+/);
+    expect(stdout).toMatch(/total: \+\d+ -\d+ ~\d+/);
   });
 
   it("--json emits the delta as JSON", () => {

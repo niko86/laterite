@@ -715,16 +715,24 @@ function runDiff(p: Parsed, json: boolean): number {
     process.stdout.write(`${delta.toJson()}\n`);
     return 0;
   }
-  const changed = delta.groups.filter((g) => g.added || g.removed || g.changed);
-  if (changed.length === 0) {
-    process.stdout.write("no differences\n");
-  } else {
-    for (const g of changed) {
-      process.stdout.write(
-        `${g.code}: +${g.added} -${g.removed} ~${g.changed}\n`,
-      );
-    }
+  // Layout is this launcher's own; the FACTS are the contract's (#542). The
+  // other two state the a → b header, every delta group (a heading-only change
+  // is a delta — the old `added || removed || changed` filter dropped those),
+  // the group add/remove lines and the totals, so this launcher must too.
+  const lines = [`${a} → ${b}`];
+  for (const g of delta.groups) {
+    lines.push(`${g.code}: +${g.added} -${g.removed} ~${g.changed}`);
   }
+  if (delta.groups_added.length) {
+    lines.push(`groups added: ${delta.groups_added.join(", ")}`);
+  }
+  if (delta.groups_removed.length) {
+    lines.push(`groups removed: ${delta.groups_removed.join(", ")}`);
+  }
+  lines.push(
+    `total: +${delta.total_added} -${delta.total_removed} ~${delta.total_changed}`,
+  );
+  process.stdout.write(`${lines.join("\n")}\n`);
   return 0;
 }
 

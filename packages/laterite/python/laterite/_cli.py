@@ -209,9 +209,16 @@ def _box_table(headings: list[str], rows: list[list[str]], *, colour: bool) -> s
     return "\n".join(out) + "\n"
 
 
-def _plain(file: str, findings: list[dict], n: int) -> str:
+def _plain(
+    file: str, findings: list[dict], n: int, dict_version: str, resolution: str
+) -> str:
+    # `— dictionary <ed> (<res>)` rides the head line on the binary and here in
+    # the same bytes (the two share a hand-kept layout the byte-parity test
+    # pins); the judging dictionary is a launcher-contract FACT npx already
+    # stated and these two omitted (#542).
+    dict_note = f" — dictionary {dict_version} ({resolution})"
     if n == 0:
-        return f"{file}: clean (0 findings)\n"
+        return f"{file}: clean (0 findings){dict_note}\n"
     rows = [
         [
             f["rule"].removeprefix("AGS Format Rule "),
@@ -224,7 +231,7 @@ def _plain(file: str, findings: list[dict], n: int) -> str:
     table = _box_table(
         ["Rule", "Line", "Group", "Description"], rows, colour=_colour_enabled()
     )
-    return f"{file}: {n} finding(s)\n{table}"
+    return f"{file}: {n} finding(s){dict_note}\n{table}"
 
 
 def _engine(args: argparse.Namespace) -> dict:
@@ -324,13 +331,13 @@ def _run_validate(args: argparse.Namespace) -> int:
     elif args.ndjson:
         active = r["ndjson"]
     else:
-        active = _plain(r["file"], r["findings"], n)
+        active = _plain(r["file"], r["findings"], n, r["dict_version"], r["resolution"])
 
     if args.json_out:
         with Path(args.json_out).open("w", encoding="utf-8", newline="") as fh:
             fh.write(r["json"] + "\n")
         sys.stdout.write(
-            _plain(r["file"], r["findings"], n)
+            _plain(r["file"], r["findings"], n, r["dict_version"], r["resolution"])
         )  # tee: plain still to stdout
         return code
 
