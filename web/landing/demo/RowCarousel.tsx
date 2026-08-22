@@ -29,6 +29,7 @@
 
 import { For, Show, createMemo, type Component } from "solid-js";
 import { Button } from "@shared/components";
+import { FindingCallout } from "./FindingCallout";
 import type { DemoGroup } from "./schema";
 import type { Group } from "./delivery";
 import { findingsForCell, groupFindingsNaming, setCell } from "./store";
@@ -202,10 +203,14 @@ export const RowCarousel: Component<{
 
               <For each={explains()}>
                 {(finding) => (
-                  <p class="mt-2 rounded-md border border-err/40 bg-err-quiet px-3 py-2 text-caption text-err">
-                    <span class="font-semibold">{finding.rule}</span> —{" "}
-                    {finding.desc}
-                  </p>
+                  <div class="mt-2">
+                    <FindingCallout
+                      severity={finding.severity}
+                      rule={finding.rule}
+                    >
+                      {finding.desc}
+                    </FindingCallout>
+                  </div>
                 )}
               </For>
             </div>
