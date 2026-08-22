@@ -48,15 +48,52 @@ const CELL: Record<string, string> = {
   fyi: "bg-info-quiet text-info",
 };
 
+const LINE_ERROR = "border-l-err bg-err-quiet text-err";
+
+/** The banded output-pane LINE's variant of the same grammar — left edge plus
+ *  tint, the border width staying the pane's own. The last finding surface to
+ *  join this module (#548): the pane banded every line error-red regardless
+ *  of tier. Unknown tiers fall to error, loud, like every variant here. */
+export function severityLineTint(severity: string): string {
+  return LINE[severity] ?? LINE_ERROR;
+}
+
+const LINE: Record<string, string> = {
+  error: LINE_ERROR,
+  warning: "border-l-warn bg-warn-quiet text-warn",
+  fyi: "border-l-info bg-info-quiet text-info",
+};
+
 const RANK: Record<string, number> = { error: 3, warning: 2, fyi: 1 };
+
+/** One comparator for both worst-of aggregations below — an unknown tier
+ *  outranks everything known, the same loud-by-default rule as the tints. */
+const outranks = (a: string, b: string): boolean =>
+  (RANK[a] ?? 3) > (RANK[b] ?? 3);
+
+/** Worst severity per FILE LINE — the unit seam #548 names, DOM-free.
+ *  Findings that report an absence carry no line and band nothing, correctly:
+ *  delete the TRAN row and there is no line where "TRAN group not found"
+ *  happened. Unknown tiers rank as error, same as everywhere in this file. */
+export function worstPerLine(
+  findings: readonly Finding[],
+): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const f of findings) {
+    if (f.line === null) continue;
+    const cur = out.get(f.line);
+    if (cur === undefined || outranks(f.severity, cur))
+      out.set(f.line, f.severity);
+  }
+  return out;
+}
 
 /** The severity a CELL wears when several findings land on it — the worst
  *  one, by the engine's own tiers. Null when nothing is wrong. */
 export function worstSeverity(findings: readonly Finding[]): string | null {
   let worst: string | null = null;
   for (const f of findings) {
-    if (worst === null || (RANK[f.severity] ?? 3) > (RANK[worst] ?? 3))
-      worst = f.severity;
+    if (worst === null || outranks(f.severity, worst)) worst = f.severity;
   }
   return worst;
 }

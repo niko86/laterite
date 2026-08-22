@@ -3,7 +3,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { severityCellTint, severityTint, worstSeverity } from "./severity";
+import {
+  severityCellTint,
+  severityLineTint,
+  severityTint,
+  worstPerLine,
+  worstSeverity,
+} from "./severity";
 import type { Finding } from "./engine";
 
 const finding = (severity: Finding["severity"]): Finding => ({
@@ -29,6 +35,37 @@ describe("severityTint", () => {
     // nobody notices — on the callout AND on the cell variant.
     expect(severityTint("brand-new")).toBe(severityTint("error"));
     expect(severityCellTint("brand-new")).toBe(severityCellTint("error"));
+  });
+});
+
+const at = (line: number | null, severity: string): Finding => ({
+  ...finding(severity as Finding["severity"]),
+  line,
+});
+
+describe("severityLineTint", () => {
+  it("gives each tier its own band, and errors stay the loud fallback", () => {
+    expect(severityLineTint("error")).toContain("border-l-err");
+    expect(severityLineTint("warning")).toContain("border-l-warn");
+    expect(severityLineTint("fyi")).toContain("border-l-info");
+    expect(severityLineTint("brand-new-tier")).toBe(severityLineTint("error"));
+  });
+});
+
+describe("worstPerLine", () => {
+  it("bands each line with the worst tier among its findings", () => {
+    const map = worstPerLine([at(7, "warning"), at(7, "error"), at(9, "fyi")]);
+    expect(map.get(7)).toBe("error");
+    expect(map.get(9)).toBe("fyi");
+  });
+
+  it("skips absence findings — no line, no band", () => {
+    expect(worstPerLine([at(null, "error")]).size).toBe(0);
+  });
+
+  it("ranks an unknown tier as an error, so it wins its line", () => {
+    const map = worstPerLine([at(3, "warning"), at(3, "brand-new-tier")]);
+    expect(map.get(3)).toBe("brand-new-tier");
   });
 });
 
