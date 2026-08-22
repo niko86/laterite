@@ -66,19 +66,33 @@ def test_diag_re_parses_a_tsc_head_line():
     assert cdt._DIAG_RE.match("  nested detail line") is None
 
 
-def test_allow_entries_carry_code_and_reason():
-    """Every suppression names a TS code and says why — an entry without a
-    reason is a blind spot nobody can review, and the tool prints these on
-    every run."""
-    for pat, code, why in cdt.ALLOW:
-        assert code.startswith("TS") and code[2:].isdigit()
-        assert len(why) > 20, f"({pat}, {code}) needs a real reason"
+def test_allow_entries_carry_leg_code_and_reason():
+    """Every suppression names its leg, a TS code and a why — an entry
+    without a reason is a blind spot nobody can review, and the leg is what
+    lets a single-leg CI lane report node entries as unexercised rather than
+    failing them as stale."""
+    for entry in cdt.ALLOW:
+        assert entry.leg in cdt.LEGS
+        assert entry.code.startswith("TS") and entry.code[2:].isdigit()
+        assert len(entry.why) > 20, f"{entry.pattern} needs a real reason"
 
 
-def test_controls_carry_the_518_shape():
+def test_controls_carry_the_518_shape_and_an_expected_code():
     """The node control reads a field off a typed value (the #518 class); the
-    wasm control imports a name that does not exist. If someone edits either
-    into validity, the positive-control failure at run time is the backstop —
-    this is the cheaper first tripwire."""
-    assert "report.ok" in cdt._CONTROLS["node"]
-    assert "thisExportDoesNotExist565" in cdt._CONTROLS["wasm"]
+    wasm control imports a name that does not exist — and each pins the ONE
+    diagnostic it must produce, because any-nonzero would also accept a broken
+    tsconfig as "red". If someone edits either into validity, the
+    positive-control failure at run time is the backstop — this is the cheaper
+    first tripwire."""
+    src, code = cdt._CONTROLS["node"]
+    assert "report.ok" in src and code == "TS2339"
+    src, code = cdt._CONTROLS["wasm"]
+    assert "thisExportDoesNotExist565" in src and code.startswith("TS")
+
+
+def test_headless_diagnostics_are_recognised():
+    """A config/harness failure prints without a `path(line,col):` head; the
+    parser must classify it (as real, never allowlisted) rather than let it
+    ride an unmatched-line path into a green run."""
+    assert cdt._HEADLESS_RE.match("error TS5083: Cannot read file 'x.json'.")
+    assert cdt._HEADLESS_RE.match("  indented detail") is None

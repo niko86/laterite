@@ -65,6 +65,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import NamedTuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import gen_doc_outputs as gdo
@@ -72,29 +73,53 @@ import gen_doc_outputs as gdo
 ROOT = gdo.ROOT
 WASM_SPEC = "@laterite/ags4-wasm"
 
-#: leg → (module specifier as the pages import it, package directory holding the
-#: shipped types, the file whose absence means "not built"). The package dir
-#: follows the same symlink the runner follows (`docs-vs-released-npm` re-points
-#: it), so both gates answer about the same artifact.
-LEGS: dict[str, tuple[str, Path, str]] = {
-    "node": ("laterite", gdo.NODE_PKG, "dist/index.d.ts"),
-    "wasm": (WASM_SPEC, gdo.WASM_PKG, "ags4_wasm.d.ts"),
+
+class Leg(NamedTuple):
+    """One package the corpus imports: how pages spell it, where its shipped
+    types live, which file's absence means "not built", and the symlink the
+    runner resolves it through (`docs-vs-released-npm` re-points that link, so
+    both gates answer about the same artifact)."""
+
+    spec: str
+    pkg: Path
+    dts: str
+    link: Path
+
+
+LEGS: dict[str, Leg] = {
+    "node": Leg("laterite", gdo.NODE_PKG, "dist/index.d.ts", gdo.NODE_LINK),
+    "wasm": Leg(WASM_SPEC, gdo.WASM_PKG, "ags4_wasm.d.ts", gdo.WASM_LINK),
 }
 
-#: Diagnostics that are CHECKER limits, not page defects — each (item-key
-#: pattern, TS code, why). The corpus is written for readers; the #565 decision
-#: forbids rewriting it to satisfy the checker, so what the checker cannot
-#: infer is recorded here instead, visibly. An entry that matches nothing FAILS
-#: the run: a suppression must never outlive its diagnostic.
-ALLOW: list[tuple[str, str, str]] = [
-    (
+
+class Allow(NamedTuple):
+    """One suppressed diagnostic: which leg it lives on, the item-key pattern,
+    the TS code, and WHY it is a checker limit rather than a page defect."""
+
+    leg: str
+    pattern: str
+    code: str
+    why: str
+
+
+#: Diagnostics that are CHECKER limits, not page defects. The corpus is written
+#: for readers; the #565 decision forbids rewriting it to satisfy the checker,
+#: so what the checker cannot infer is recorded here instead, visibly. An entry
+#: whose leg WAS checked and that matched nothing FAILS the run — a suppression
+#: must never outlive its diagnostic — while an entry whose leg did not run
+#: this invocation is reported as unexercised, not stale: the `--leg wasm`
+#: CI lane must not fail over node-leg entries it cannot see.
+ALLOW: list[Allow] = [
+    Allow(
+        "node",
         r"ex05_query|filter-select",
         "TS2365",
         "sql() rows are honestly Record<string, unknown>; the example's bare "
         "numeric compare IS the page's point, and annotating it would rewrite "
         "the corpus for the checker",
     ),
-    (
+    Allow(
+        "node",
         r"ex09a_build_from_frames|build-from-frames",
         "TS2769",
         "a heterogeneous Map literal — tsc cannot unify the per-group row "
@@ -113,31 +138,41 @@ _URL_AMBIENT = (
     'declare module "*?url" {\n  const url: string;\n  export default url;\n}\n'
 )
 
-#: #518's defect, verbatim in kind: a read of a field the shipped type does not
-#: carry (node), and an import of a name the module does not export (wasm).
-_CONTROLS = {
+#: #518's defect, verbatim in kind — plus the ONE diagnostic code it must
+#: produce. Any-nonzero would also accept a broken tsconfig as "red", and a
+#: control that passes for the wrong reason warrants nothing.
+_CONTROLS: dict[str, tuple[str, str]] = {
     "node": (
         'import { validate } from "laterite";\n'
         'const report = validate("delivery.ags");\n'
-        "report.ok;\n"  # Report has no `ok` — the exact #518 expression
+        "report.ok;\n",  # Report has no `ok` — the exact #518 expression
+        "TS2339",  # property does not exist on type
     ),
     "wasm": (
         f'import {{ thisExportDoesNotExist565 }} from "{WASM_SPEC}";\n'
-        "thisExportDoesNotExist565;\n"
+        "thisExportDoesNotExist565;\n",
+        # TS2614, not TS2305: the wasm package HAS a default export, so tsc
+        # diagnoses a bad named import as "did you mean the default" — the
+        # control run itself corrected this expectation on its first firing.
+        "TS2614",
     ),
 }
 
 #: One tsc diagnostic head: `path(line,col): error TSnnnn: message`.
 _DIAG_RE = re.compile(r"^(?P<file>\S+?)\(\d+,\d+\): error (?P<code>TS\d+): ")
+#: A location-less diagnostic (`error TS5083: Cannot read file …` — config and
+#: harness failures carry no `path(line,col):` head). Always REAL, never
+#: allowlisted: it is about this gate's own setup, not a page.
+_HEADLESS_RE = re.compile(r"^error TS\d+: ")
 
 
 def leg_pkg(leg: str) -> Path:
-    link = gdo.NODE_LINK if leg == "node" else gdo.WASM_LINK
-    return link.resolve() if link.exists() else LEGS[leg][1]
+    lg = LEGS[leg]
+    return lg.link.resolve() if lg.link.exists() else lg.pkg
 
 
 def leg_available(leg: str) -> bool:
-    return (leg_pkg(leg) / LEGS[leg][2]).exists()
+    return (leg_pkg(leg) / LEGS[leg].dts).exists()
 
 
 def collect() -> dict[str, dict[str, str]]:
@@ -210,7 +245,7 @@ def run_leg(
     leg: str, corpus: dict[str, str], tsc: str, allow_hits: dict[int, int]
 ) -> int:
     """Control first, then the corpus; returns the failure count."""
-    spec = LEGS[leg][0]
+    spec = LEGS[leg].spec
     roots = type_roots()
     if roots is None:
         # Builtins go untyped rather than unresolvable — the laterite surface,
@@ -239,14 +274,21 @@ def run_leg(
                 timeout=300,
             )
 
-        (work / "_control.mjs").write_text(_CONTROLS[leg], encoding="utf-8")
-        if check(["_control.mjs"]).returncode == 0:
+        control_src, control_code = _CONTROLS[leg]
+        (work / "_control.mjs").write_text(control_src, encoding="utf-8")
+        cr = check(["_control.mjs"])
+        control_out = cr.stdout or cr.stderr
+        # The EXPECTED code, not any nonzero exit: a broken tsconfig also
+        # exits 2, and a control red for the wrong reason warrants nothing.
+        if cr.returncode == 0 or control_code not in control_out:
             print(
-                f"leg {leg}: POSITIVE CONTROL PASSED — tsc accepted #518's "
-                "defect, so this gate is checking nothing"
+                f"leg {leg}: POSITIVE CONTROL FAILED — expected {control_code} "
+                f"for #518's defect, got exit {cr.returncode}:"
             )
+            for line in control_out.strip().splitlines():
+                print(f"  {line}")
             return 1
-        print(f"leg {leg}: positive control red, as it must be")
+        print(f"leg {leg}: positive control red with {control_code}, as it must be")
 
         names: dict[str, str] = {}  # slug -> corpus key
         for key, src in corpus.items():
@@ -256,24 +298,41 @@ def run_leg(
         r = check(sorted(names))
         # Partition diagnostics: allowlisted (printed, counted) vs real (fail).
         real: list[str] = []
+        classified = 0
         current_allowed = False
         for line in (r.stdout or r.stderr).splitlines():
+            if _HEADLESS_RE.match(line):
+                # A config/harness failure — about this gate, never a page,
+                # so it can never be allowlisted away.
+                classified += 1
+                current_allowed = False
+                real.append(line)
+                continue
             m = _DIAG_RE.match(line)
             if m is None:
                 # Continuation of the previous diagnostic; follows its verdict.
                 if not current_allowed and real:
                     real.append(f"  {line}")
                 continue
-            key = names.get(Path(m.group("file")).name, m.group("file"))
+            classified += 1
+            item_key = names.get(Path(m.group("file")).name, m.group("file"))
             current_allowed = False
-            for i, (pat, code, _why) in enumerate(ALLOW):
-                if code == m.group("code") and re.search(pat, key):
+            for i, entry in enumerate(ALLOW):
+                if entry.code == m.group("code") and re.search(entry.pattern, item_key):
                     allow_hits[i] = allow_hits.get(i, 0) + 1
                     current_allowed = True
                     break
             if not current_allowed:
-                real.append(f"{key}: {line.split(': ', 1)[1]}")
-        if real:
+                real.append(f"{item_key}: {line.split(': ', 1)[1]}")
+        if r.returncode != 0 and classified == 0:
+            # tsc failed and this parser recognised NOTHING it printed — green
+            # here would be a blind spot with a tick on it, so the raw output
+            # becomes the failure instead.
+            failures += 1
+            print(f"[unclassified-tsc-failure] leg {leg} (exit {r.returncode}):")
+            for line in (r.stdout or r.stderr).strip().splitlines():
+                print(f"  {line}")
+        elif real:
             failures += 1
             print(f"[type-error] leg {leg}:")
             for line in real:
@@ -304,6 +363,7 @@ def main() -> None:
 
     failures = 0
     allow_hits: dict[int, int] = {}
+    legs_checked: set[str] = set()
     for leg in sorted(LEGS):
         corpus = corpora[leg]
         n_pages = sum(1 for k in corpus if k.startswith("page "))
@@ -329,16 +389,26 @@ def main() -> None:
             print(f"leg {leg}: zero items found — discovery is broken")
             failures += 1
             continue
+        legs_checked.add(leg)
         failures += run_leg(leg, corpus, tsc, allow_hits)
 
-    for i, (pat, code, why) in enumerate(ALLOW):
+    for i, entry in enumerate(ALLOW):
         n = allow_hits.get(i, 0)
         if n:
-            print(f"allowed {n}× {code} ({pat}): {why}")
+            print(f"allowed {n}× {entry.code} ({entry.pattern}): {entry.why}")
+        elif entry.leg not in legs_checked:
+            # Not stale — unjudged. The `--leg wasm` lane cannot see a
+            # node-leg diagnostic, and failing it over one would make the CI
+            # split red by construction.
+            print(
+                f"allow ({entry.pattern}, {entry.code}): not exercised — "
+                f"leg {entry.leg} was not checked this run"
+            )
         else:
             print(
-                f"STALE ALLOW ({pat}, {code}): matched nothing — delete the "
-                "entry or the diagnostic it excused has moved"
+                f"STALE ALLOW ({entry.pattern}, {entry.code}): leg {entry.leg} "
+                "ran and it matched nothing — delete the entry or the "
+                "diagnostic it excused has moved"
             )
             failures += 1
 
