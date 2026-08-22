@@ -1,7 +1,7 @@
 ---
 type: index
 generated: 2026-08-22
-counts: {rules: 28, groups: 177, types: 17, observations: 51, tools: 30, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 33}
+counts: {rules: 28, groups: 177, types: 17, observations: 51, tools: 30, concepts: 30, editions: 5, comparisons: 1, sources: 13, insights: 18, strategies: 11, design: 34}
 ---
 # AGS Wiki — Content Catalog
 
@@ -22,11 +22,11 @@ counts: {rules: 28, groups: 177, types: 17, observations: 51, tools: 30, concept
 | Sources | 13 |
 | Insights & Gaps | 18 |
 | Test Strategies | 11 |
-| Design | 33 |
-| **Total (live)** | **414** |
+| Design | 34 |
+| **Total (live)** | **415** |
 | _Retired / superseded_ | 1 |
 
-**Status distribution:** `accepted` 32 · `confirmed` 18 · `drafted` 333 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
+**Status distribution:** `accepted` 33 · `confirmed` 18 · `drafted` 333 · `hypothesis` 2 · `proposed` 2 · `ratified` 6 · `refuted` 2 · `reviewed` 6 · `stub` 13
 
 ## Rules
 
@@ -496,6 +496,7 @@ counts: {rules: 28, groups: 177, types: 17, observations: 51, tools: 30, concept
 | [[dec-facade-parity]] | accepted | — |
 | [[dec-landing-build-shared-tokens]] | accepted | — |
 | [[dec-laterite-ags4-types-leaf]] | accepted | — |
+| [[dec-launcher-contract]] | accepted | — |
 | [[dec-monorepo-structure]] | accepted | — |
 | [[dec-python-imports-rust-library]] | accepted | — |
 | [[dec-rust-api-crates-io]] | accepted | — |

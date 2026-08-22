@@ -14,6 +14,18 @@ Same verbs, same flags, and **byte-identical** `--json` / `--ndjson` output acro
 all three — so a CI gate, a Python shop, and a Node service can share the same
 downstream tooling.
 
+What that promise does and does not cover — the **launcher contract**:
+
+| | Across all three launchers |
+| --- | --- |
+| Verbs and flags | identical |
+| `--json` / `--ndjson` / `--csv` | **byte-identical** — one renderer in the engine, checked nightly against raw output |
+| Human-readable output | the same **facts**, drawn each launcher's own way |
+
+So a table you read on this site may have different rules and spacing than the one
+`npx laterite` prints, and the columns may be ordered differently. It will not tell
+you less. Scriptable output is the part you can diff.
+
 ## The verbs
 
 | Verb                  | What it does                                                                                                 |
