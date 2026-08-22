@@ -343,3 +343,44 @@ test("wide: the depth scale clears the masthead and labels the hole's floor", as
 
   await expectViewportWide(page);
 });
+
+test("fine: findings speak one vocabulary — tinted cell with tooltip, table strip, chipped panel", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the tooltip needs a pointer that can hover (#526)");
+  await page.goto("/");
+
+  // Arm the engine by selecting the seeded Rule 8 cell; the findings arrive
+  // and the cell wears the ERROR grammar: tint + marker + tooltip carrying
+  // what the engine actually said.
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_GL on row 1 of LOCA",
+  });
+  await cell.click();
+  await expect(cell).toContainText("✗");
+  const td = cell.locator("xpath=ancestor::td[1]");
+  await expect(td).toHaveClass(/bg-err-quiet/);
+  await cell.getByText("✗").hover();
+  const tooltip = page.getByRole("tooltip");
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText("Rule 8");
+
+  // Group-level findings live in a strip attached to the TABLE, not in the
+  // prose column: the strip's parent is the table's own column.
+  const strip = page.getByRole("list", { name: "SAMP findings" });
+  await expect(strip.getByText(/Rule/).first()).toBeVisible();
+  expect(
+    await strip.evaluate((el) => !!el.parentElement?.querySelector("table")),
+    "the strip must share a column with the table it judges",
+  ).toBe(true);
+
+  // The two Rule 16 findings carry byte-identical text against SAMP and LLPL;
+  // the panel's GROUP chip is what tells them apart. Without the chip no
+  // panel row mentions LLPL at all — the text itself only names SAMP_TYPE.
+  const panelRows = page
+    .locator("section#file li")
+    .filter({ hasText: "not defined" });
+  await expect(panelRows).toHaveCount(2);
+  await expect(panelRows.filter({ hasText: "LLPL" })).toHaveCount(1);
+});

@@ -43,9 +43,11 @@ import {
   onMount,
   type Component,
 } from "solid-js";
+import { Tooltip } from "@shared/components";
 import type { DemoGroup } from "./schema";
 import type { Group } from "./delivery";
 import { coarsePointer } from "./pointer";
+import { severityCellTint, worstSeverity } from "./severity";
 import { findingsForCell } from "./store";
 
 /** The in-place value input (#525), its own component for two reasons: mount
@@ -305,13 +307,19 @@ export const GroupTable: Component<{
                          — the page contradicting itself in the one place a
                          reader is looking. classList takes accessors and is
                          unambiguously reactive. */
-                      const failing = createMemo(
-                        () =>
-                          findingsForCell(
-                            props.schema.code,
-                            rowIndex(),
-                            heading.name,
-                          ).length > 0,
+                      const cellFindings = createMemo(() =>
+                        findingsForCell(
+                          props.schema.code,
+                          rowIndex(),
+                          heading.name,
+                        ),
+                      );
+                      const failing = () => cellFindings().length > 0;
+                      /* The engine's worst tier on this cell drives tint,
+                         text and marker alike — one severity grammar across
+                         all four tables (#526), never decided here. */
+                      const worst = createMemo(() =>
+                        worstSeverity(cellFindings()),
                       );
                       const isPicked = createMemo(() => {
                         const p = props.picked;
@@ -326,13 +334,23 @@ export const GroupTable: Component<{
                           class="px-3 py-1.5 text-caption whitespace-nowrap"
                           classList={{
                             // One region, one tint — no per-column striping.
-                            "bg-(--key-tint)": heading.key,
+                            // A failing cell's severity tint REPLACES the key
+                            // tint: the verdict outranks the region colour.
+                            "bg-(--key-tint)": heading.key && !failing(),
                             "border-r-[3px] border-r-(--band)":
                               col() === lastKey(),
-                            "font-semibold text-err": failing(),
+                            "font-semibold": failing(),
+                            [severityCellTint(worst() ?? "error")]: failing(),
                             "text-fg": !failing(),
-                            "sticky left-0 z-10 bg-surface dark:bg-surface-raised":
-                              col() === 0,
+                            "sticky left-0 z-10": col() === 0,
+                            /* The sticky column's opaque backing yields to a
+                               verdict: both are backgrounds, and leaving both
+                               classes on lets STYLESHEET ORDER pick — column
+                               0 untinted while columns 1+ tint. The quiet
+                               tokens are opaque, so nothing ghosts under the
+                               pinned cell. */
+                            "bg-surface dark:bg-surface-raised":
+                              col() === 0 && !failing(),
                           }}
                         >
                           <Show
@@ -364,12 +382,18 @@ export const GroupTable: Component<{
                                   {row[col()]}
                                 </Show>
                                 <Show when={failing()}>
-                                  <span
-                                    aria-hidden="true"
-                                    class="ml-1 text-err"
+                                  {/* The marker inherits the cell's severity
+                                      colour; the tooltip carries what the
+                                      engine actually said (#526). */}
+                                  <Tooltip
+                                    tip={cellFindings()
+                                      .map((f) => `${f.rule} — ${f.desc}`)
+                                      .join("  ·  ")}
                                   >
-                                    ✗
-                                  </span>
+                                    <span aria-hidden="true" class="ml-1">
+                                      ✗
+                                    </span>
+                                  </Tooltip>
                                 </Show>
                               </button>
                             }

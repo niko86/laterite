@@ -9,6 +9,7 @@
 
 import { For, Show, createMemo, type Component } from "solid-js";
 import { Button } from "@shared/components";
+import { FindingCallout } from "./FindingCallout";
 import { DEMO_GROUPS } from "./schema";
 import { RowCarousel } from "./RowCarousel";
 import { GroupTable } from "./GroupTable";
@@ -105,18 +106,6 @@ export const GroupSection: Component<{
               {b().schema.description}
             </h2>
             <p class="mt-2 text-fg-soft">{BLURB[props.code]}</p>
-
-            <Show when={groupFindings().length}>
-              <ul class="mt-4 list-none space-y-2 p-0">
-                <For each={groupFindings()}>
-                  {(f) => (
-                    <li class="rounded-md border border-err/40 bg-err-quiet px-3 py-2 text-caption text-err">
-                      <span class="font-semibold">{f.rule}</span> — {f.desc}
-                    </li>
-                  )}
-                </For>
-              </ul>
-            </Show>
           </div>
 
           <div
@@ -139,6 +128,27 @@ export const GroupSection: Component<{
                 deleteRow(props.code, row);
               }}
             />
+
+            {/* Group-level findings strip — attached to the TABLE it judges,
+                not the prose column beside it (#526): a finding rendered in
+                the essay reads as commentary; on the table it reads as a
+                verdict. Same callout as the carousel and the panel. */}
+            <Show when={groupFindings().length}>
+              <ul
+                aria-label={`${props.code} findings`}
+                class="mt-3 list-none space-y-2 p-0"
+              >
+                <For each={groupFindings()}>
+                  {(f) => (
+                    <li>
+                      <FindingCallout severity={f.severity} rule={f.rule}>
+                        {f.desc}
+                      </FindingCallout>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
 
             <div class="mt-3 flex flex-wrap items-center gap-3">
               <Button
