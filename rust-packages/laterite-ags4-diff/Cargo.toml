@@ -59,6 +59,9 @@ laterite-ags4-reference = { workspace = true }
 laterite-ags4-types = { workspace = true }
 # RevisionDelta + nested structs serialise to JS/JSON unchanged across hosts.
 serde = { version = "1", features = ["derive"] }
+# delta_json — the ONE `--json` render every launcher prints (#542). preserve_order
+# matches the rest of the workspace, so the feature set can't fork per consumer.
+serde_json = { version = "1", features = ["preserve_order"] }
 
 [lints]
 workspace = true

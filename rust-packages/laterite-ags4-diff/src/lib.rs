@@ -74,6 +74,18 @@ pub struct RevisionDelta {
     pub total_changed: usize,
 }
 
+/// The `diff --json` document: [`RevisionDelta`] as pretty JSON (2-space,
+/// field order = declaration order, non-ASCII raw, no trailing newline).
+///
+/// This is the launcher contract's ONE machine render for the diff verb
+/// (`ags-wiki/design/dec-launcher-contract.md`): the `lat` binary, the wheel's
+/// `_cli` and the npx launcher all print this string verbatim, so `--json` is
+/// byte-exact across them by construction rather than by three hand-kept
+/// serialisers agreeing (#542 — Python's round trip escaped non-ASCII).
+pub fn delta_json(delta: &RevisionDelta) -> String {
+    serde_json::to_string_pretty(delta).unwrap_or_default()
+}
+
 /// heading name → column index, for O(1) cell lookup by name on each side.
 fn heading_index(headings: &[String]) -> std::collections::HashMap<&str, usize> {
     headings
@@ -362,6 +374,29 @@ mod tests {
 \"UNIT\",\"\"\r\n\
 \"TYPE\",\"ID\"\r\n\
 \"DATA\",\"P1\"\r\n"
+    }
+
+    #[test]
+    fn delta_json_is_the_wire_render_and_keeps_non_ascii_raw() {
+        // The properties every launcher leans on when printing this string
+        // verbatim (#542): declaration-order fields, 2-space pretty layout,
+        // non-ASCII bytes untouched, no trailing newline.
+        let a = "\"GROUP\",\"LOCA\"\r\n\
+\"HEADING\",\"LOCA_ID\",\"LOCA_REM\"\r\n\
+\"UNIT\",\"\",\"\"\r\n\
+\"TYPE\",\"ID\",\"X\"\r\n\
+\"DATA\",\"BH01\",\"sec — argile\"\r\n";
+        let b = a.replace("sec — argile", "humide — boué");
+        let pa = parse_str(a).unwrap();
+        let pb = parse_str(&b).unwrap();
+        let dict = Dictionary::bundled(DictVersion::V4_1_1);
+        let json = delta_json(&diff_parsed(&pa, &pb, &dict, None));
+        assert!(json.starts_with("{\n  \"groups\""));
+        assert!(!json.ends_with('\n'));
+        assert!(json.contains("humide — boué"), "non-ASCII must stay raw");
+        assert!(!json.contains("\\u00"), "no ensure_ascii-style escapes");
+        let back: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(back["total_changed"], 1);
     }
 
     #[test]

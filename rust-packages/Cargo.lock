@@ -2182,6 +2182,7 @@ dependencies = [
  "laterite-ags4-reference",
  "laterite-ags4-types",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2235,6 +2236,7 @@ dependencies = [
  "laterite-ags4-reference",
  "laterite-ags4-types",
  "proptest",
+ "serde",
  "serde_json",
 ]
 

@@ -675,6 +675,11 @@ export interface RevisionDelta {
   total_added: number;
   total_removed: number;
   total_changed: number;
+  /** The delta's `--json` document — the engine's own render kept verbatim, so
+   * the npx launcher prints the same bytes `lat diff --json` and the uvx
+   * launcher do (#542). Mirrors `Report.toJson()`: the machine render lives on
+   * the result. Non-enumerable — `JSON.stringify(delta)` sees only the data. */
+  toJson(): string;
 }
 
 export interface DiffOptions {
@@ -738,9 +743,13 @@ export function diff(
   const aBytes = diffBytes(a);
   const bBytes = diffBytes(b);
   try {
-    return JSON.parse(
-      nativeDiff(aBytes, bBytes, opts.dictVersion, opts.encoding),
-    ) as RevisionDelta;
+    const raw = nativeDiff(aBytes, bBytes, opts.dictVersion, opts.encoding);
+    const delta = JSON.parse(raw) as RevisionDelta;
+    Object.defineProperty(delta, "toJson", {
+      value: () => raw,
+      enumerable: false,
+    });
+    return delta;
   } catch (e) {
     throw fromNativeError(e);
   }
@@ -853,7 +862,23 @@ export function merge(
     return {
       bytes,
       warnings: JSON.parse(out.warningsJson) as MergeWarning[],
-      revisions: JSON.parse(out.revisionsJson) as RevisionNote[],
+      // The wire is the engine structs' canonical snake_case (`winner_file`,
+      // identical to the Python fragments and the binary's `--json`, #542);
+      // camelCase is this TS API's own convention, so the rename happens here,
+      // at the boundary — never on the wire.
+      revisions: (
+        JSON.parse(out.revisionsJson) as {
+          group: string;
+          key: string[];
+          changed: string[];
+          winner_file: number;
+        }[]
+      ).map((r) => ({
+        group: r.group,
+        key: r.key,
+        changed: r.changed,
+        winnerFile: r.winner_file,
+      })),
       text: new TextDecoder().decode(bytes),
     };
   } catch (e) {

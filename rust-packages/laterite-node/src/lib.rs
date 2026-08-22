@@ -769,13 +769,18 @@ pub fn diff(
         .map_or(laterite_ags4_validator::dict::FALLBACK, |(dv, _)| dv);
     let dict = Dictionary::bundled(dv);
     let delta = laterite_ags4_diff::diff_parsed(&pa, &pb, &dict, None);
-    serde_json::to_string(&delta).map_err(|e| Error::from_reason(e.to_string()))
+    // The shared pretty render: the TS `diff()` parses it (layout-indifferent)
+    // AND keeps the raw string as `toJson()`, which the npx launcher prints
+    // verbatim — one `--json` byte shape across the three launchers (#542).
+    Ok(laterite_ags4_diff::delta_json(&delta))
 }
 
 /// The merge result. `bytes` is the reconciled AGS4 document; `warningsJson` and
 /// `revisionsJson` are the advisory-notes and per-row-revision audits (arrays of
-/// `{kind,group,heading,message}` / `{group,key,changed,winnerFile}`) that the TS
-/// `merge()` parses — the same shape PyO3's `merge()` returns.
+/// `{kind,group,heading,message}` / `{group,key,changed,winner_file}` — the
+/// engine structs' canonical wire shape, byte-identical to PyO3's fragments)
+/// that the TS `merge()` parses, renaming `winner_file` → `winnerFile` for its
+/// own API (#542).
 /// The transmission a file represents, as ONE napi object.
 ///
 /// Five REQUIRED headings crossed this boundary as five consecutive same-typed
@@ -897,34 +902,16 @@ pub fn merge(
 
     match merge_parsed(&parsed, &opts) {
         Ok(res) => {
-            let warnings: Vec<Value> = res
-                .warnings
-                .iter()
-                .map(|w| {
-                    serde_json::json!({
-                        "kind": w.kind,
-                        "group": w.group,
-                        "heading": w.heading,
-                        "message": w.message,
-                    })
-                })
-                .collect();
-            let revisions: Vec<Value> = res
-                .revisions
-                .iter()
-                .map(|r| {
-                    serde_json::json!({
-                        "group": r.group,
-                        "key": r.key,
-                        "changed": r.changed,
-                        "winnerFile": r.winner_file,
-                    })
-                })
-                .collect();
+            // Straight off the engine structs — their Serialize derive owns the
+            // wire shape, identical to the other two launchers' fragments. That
+            // makes this `winner_file` where it used to be `winnerFile`: the TS
+            // `merge()` renames at its API boundary, the wire stays canonical
+            // (#542).
             Ok(MergeOutput {
                 bytes: res.bytes.into(),
-                warnings_json: serde_json::to_string(&warnings).unwrap_or_else(|_| "[]".into()),
-                revisions_json: serde_json::to_string(&revisions).unwrap_or_else(|_| "[]".into()),
+                warnings_json: serde_json::to_string(&res.warnings).unwrap_or_else(|_| "[]".into()),
+                revisions_json: serde_json::to_string(&res.revisions)
+                    .unwrap_or_else(|_| "[]".into()),
             })
         }
         // A strict TYPE conflict / emit failure is a schema-level rejection (exit 6);

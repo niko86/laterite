@@ -459,8 +459,10 @@ export declare function runCheck(path?: string | undefined | null, text?: string
 /**
  * The merge result. `bytes` is the reconciled AGS4 document; `warningsJson` and
  * `revisionsJson` are the advisory-notes and per-row-revision audits (arrays of
- * `{kind,group,heading,message}` / `{group,key,changed,winnerFile}`) that the TS
- * `merge()` parses — the same shape PyO3's `merge()` returns.
+ * `{kind,group,heading,message}` / `{group,key,changed,winner_file}` — the
+ * engine structs' canonical wire shape, byte-identical to PyO3's fragments)
+ * that the TS `merge()` parses, renaming `winner_file` → `winnerFile` for its
+ * own API (#542).
  * The transmission a file represents, as ONE napi object.
  *
  * Five REQUIRED headings crossed this boundary as five consecutive same-typed

@@ -710,7 +710,9 @@ function runDiff(p: Parsed, json: boolean): number {
     fail((e as Error).message, exitCodeFor(e));
   }
   if (json) {
-    process.stdout.write(`${JSON.stringify(delta, null, 2)}\n`);
+    // The engine's own render, verbatim — the same bytes the other two
+    // launchers print (#542) — not a re-stringify of the parsed object.
+    process.stdout.write(`${delta.toJson()}\n`);
     return 0;
   }
   const changed = delta.groups.filter((g) => g.added || g.removed || g.changed);

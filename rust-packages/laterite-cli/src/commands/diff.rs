@@ -45,10 +45,9 @@ pub fn run(args: &DiffArgs, json: bool, quiet: bool) -> ! {
     let delta = laterite_ags4_diff::diff_parsed(&pa, &pb, &dict, None);
 
     if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&delta).unwrap_or_default()
-        );
+        // The shared render, printed verbatim — the same string the other two
+        // launchers print, so `--json` is byte-exact by construction (#542).
+        println!("{}", laterite_ags4_diff::delta_json(&delta));
     } else {
         println!("{} → {}", a.display(), b.display());
         for g in &delta.groups {
