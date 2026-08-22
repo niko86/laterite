@@ -17,11 +17,13 @@ import { GroupTable } from "./GroupTable";
 import { coarsePointer } from "./pointer";
 import {
   addRow,
+  applyGroupFixes,
   arm,
   deleteGroup,
   deleteRow,
   delivery,
   findingsForGroup,
+  groupFixes,
   picked,
   restoreGroup,
   setCell,
@@ -151,6 +153,10 @@ export const GroupSection: Component<{
                     }}
                     onDeleteRow={(row) => {
                       deleteRow(props.code, row);
+                    }}
+                    fixCount={groupFixes(props.code).length}
+                    onFix={() => {
+                      void applyGroupFixes(props.code);
                     }}
                   />
 

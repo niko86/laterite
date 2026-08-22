@@ -27,6 +27,9 @@ export const FindingCallout: Component<{
   rule?: string;
   /** The group the finding names — the panel's disambiguator. */
   group?: string;
+  /** #530: true when the engine's fixer will not touch this finding — the
+   *  reader's work, badged so the fix buttons' silence is explained. */
+  manual?: boolean;
   line?: number | null;
   onClick?: () => void;
   disabled?: boolean;
@@ -43,7 +46,9 @@ export const FindingCallout: Component<{
       severityTint(props.severity),
     ].join(" ")}
   >
-    <Show when={props.rule || props.group || props.line != null}>
+    <Show
+      when={props.rule || props.group || props.manual || props.line != null}
+    >
       <span class="flex flex-wrap items-baseline gap-2">
         <Show when={props.rule}>
           <span class="font-semibold">{props.rule}</span>
@@ -51,6 +56,11 @@ export const FindingCallout: Component<{
         <Show when={props.group}>
           <span class="rounded-sm border border-current/30 px-1 font-mono text-micro">
             {props.group}
+          </span>
+        </Show>
+        <Show when={props.manual}>
+          <span class="rounded-sm border border-current/30 px-1 font-mono text-micro uppercase">
+            manual
           </span>
         </Show>
         <Show when={props.line != null}>

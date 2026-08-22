@@ -43,12 +43,12 @@ import {
   onMount,
   type Component,
 } from "solid-js";
-import { Tooltip } from "@shared/components";
+import { Button, Tooltip } from "@shared/components";
 import type { DemoGroup } from "./schema";
 import type { Group } from "./delivery";
 import { coarsePointer } from "./pointer";
 import { severityCellTint, worstSeverity } from "./severity";
-import { findingsForCell } from "./store";
+import { findingsForCell, isManualFinding } from "./store";
 
 /** The in-place value input (#525), its own component for two reasons: mount
  *  focus/select read PROPS rather than signals inside a lifecycle callback,
@@ -111,6 +111,12 @@ export const GroupTable: Component<{
   picked: { row: number; col: number } | null;
   onCommit: (row: number, col: number, value: string) => void;
   onDeleteRow: (row: number) => void;
+  /** #530: how many of the engine's fixes anchor in this group, and what
+   *  clicking the header button applies. Count and action both come from the
+   *  store's scoping of the engine's own list — this component only renders
+   *  them. */
+  fixCount: number;
+  onFix: () => void;
 }> = (props) => {
   const lastKey = () =>
     props.schema.headings.reduce((at, h, i) => (h.key ? i : at), -1);
@@ -239,6 +245,23 @@ export const GroupTable: Component<{
       {/* The cap: a single solid band, not the masthead's four-band gradient —
           a gradient here would read as four groups rather than one. */}
       <div aria-hidden="true" class="h-[3px] w-full bg-(--band)" />
+
+      {/* The table's own header (#530): the fix budget lives ON the table it
+          repairs, disabled at zero rather than hidden so "nothing fixable
+          here" stays a visible fact, not an absence. */}
+      <div class="flex items-center justify-end border-b border-laterite-200 px-2 py-1">
+        <Button
+          variant="action"
+          size="sm"
+          disabled={props.fixCount === 0}
+          aria-label={`Fix ${props.fixCount} auto-fixable in ${props.schema.code}`}
+          onClick={() => {
+            props.onFix();
+          }}
+        >
+          Fix {props.fixCount} auto-fixable
+        </Button>
+      </div>
 
       <div class="overflow-x-auto overscroll-x-contain">
         <table class="w-full border-collapse text-left">
@@ -388,7 +411,10 @@ export const GroupTable: Component<{
                                       engine actually said (#526). */}
                                   <Tooltip
                                     tip={cellFindings()
-                                      .map((f) => `${f.rule} — ${f.desc}`)
+                                      .map(
+                                        (f) =>
+                                          `${f.rule} — ${f.desc}${isManualFinding(f) ? " — manual" : ""}`,
+                                      )
                                       .join("  ·  ")}
                                   >
                                     <span aria-hidden="true" class="ml-1">

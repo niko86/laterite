@@ -6,6 +6,7 @@
 
 import { For, Show, type Component } from "solid-js";
 import { FindingCallout } from "./FindingCallout";
+import { isManualFinding } from "./store";
 import type { Finding } from "./engine";
 
 export const FindingsStrip: Component<{
@@ -20,7 +21,11 @@ export const FindingsStrip: Component<{
       <For each={props.findings}>
         {(f) => (
           <li>
-            <FindingCallout severity={f.severity} rule={f.rule}>
+            <FindingCallout
+              severity={f.severity}
+              rule={f.rule}
+              manual={isManualFinding(f)}
+            >
               {f.desc}
             </FindingCallout>
           </li>
