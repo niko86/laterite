@@ -11,6 +11,7 @@ import { Show, createMemo, type Component } from "solid-js";
 import { Button } from "@shared/components";
 import { FindingsStrip } from "./FindingsStrip";
 import { DEMO_GROUPS } from "./schema";
+import { Presence } from "./Presence";
 import { RowCarousel } from "./RowCarousel";
 import { GroupStub } from "./GroupStub";
 import { GroupTable } from "./GroupTable";
@@ -201,7 +202,7 @@ export const GroupSection: Component<{
                   {/* The carousel is the COARSE pointer's editor (#525); on a fine
                 pointer the pick is a spreadsheet selection and opening a tray
                 under the table would double the editing surface. */}
-                  <Show when={coarsePointer() ? open() : null}>
+                  <Presence when={coarsePointer() ? open() : null}>
                     {(cell) => (
                       <RowCarousel
                         schema={b().schema}
@@ -218,7 +219,7 @@ export const GroupSection: Component<{
                         }}
                       />
                     )}
-                  </Show>
+                  </Presence>
                 </>
               )}
             </Show>

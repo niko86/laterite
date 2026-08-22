@@ -64,7 +64,7 @@ const Card: Component<{ channel: InstallChannel }> = (props) => (
 
     <a
       href={props.channel.href}
-      class="mt-2 font-mono text-body font-semibold break-all text-accent no-underline hover:underline"
+      class="mt-2 font-mono text-body font-semibold break-all text-accent no-underline transition-colors hover:underline"
     >
       {props.channel.package}
     </a>
@@ -115,7 +115,7 @@ export const InstallGrid: Component = () => (
 
     <p class="mt-6 text-caption text-fg-muted">
       <a
-        class="font-semibold text-cta no-underline hover:underline"
+        class="font-semibold text-cta no-underline transition-colors hover:underline"
         href="https://docs.laterite.dev/learn/install/"
       >
         Full install guide

@@ -14,12 +14,13 @@
  * who has to go looking for that sentence has already decided not to try.
  */
 
-import { For, Show, createMemo, type Component } from "solid-js";
+import { For, Index, Show, createMemo, type Component } from "solid-js";
 import { Button } from "@shared/components";
 import { FindingCallout } from "./FindingCallout";
 import { FindingsStrip } from "./FindingsStrip";
 import { GroupStub } from "./GroupStub";
 import { GroupTable } from "./GroupTable";
+import { Presence } from "./Presence";
 import { RowCarousel } from "./RowCarousel";
 import { DEMO_GROUPS } from "./schema";
 import { coarsePointer } from "./pointer";
@@ -223,7 +224,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                   delete group
                 </Button>
               </div>
-              <Show when={coarsePointer() ? tranOpen() : null}>
+              <Presence when={coarsePointer() ? tranOpen() : null}>
                 {(cell) => (
                   <RowCarousel
                     schema={t().schema}
@@ -240,7 +241,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                     }}
                   />
                 )}
-              </Show>
+              </Presence>
             </>
           )}
         </Show>
@@ -301,7 +302,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
           its zstd pack inside a passphrase-encrypted age envelope. Shown here,
           not run: this page's engine deliberately ships without transport.{" "}
           <a
-            class="font-semibold text-cta no-underline hover:underline"
+            class="font-semibold text-cta no-underline transition-colors hover:underline"
             href="https://docs.laterite.dev/cookbook/transport/"
           >
             Pack / encrypt for transport
@@ -387,10 +388,15 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                 </p>
               }
             >
+              {/* Index, not For (#534): every revalidation mints fresh
+                  finding objects, so a reference-keyed For would recreate
+                  every row per keystroke and re-fire the entrance fade
+                  across the whole panel. Index updates rows in place; only
+                  a row that genuinely appears fades in. */}
               <ul class="mt-3 list-none space-y-2 p-0">
-                <For each={findings()}>
-                  {(finding) => <FindingRow finding={finding} />}
-                </For>
+                <Index each={findings()}>
+                  {(finding) => <FindingRow finding={finding()} />}
+                </Index>
               </ul>
             </Show>
           </Show>
@@ -404,7 +410,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
           <p class="mt-3 text-caption text-fg-muted">
             Want to run this on your own delivery?{" "}
             <a
-              class="font-semibold text-cta no-underline hover:underline"
+              class="font-semibold text-cta no-underline transition-colors hover:underline"
               href="https://app.laterite.dev/"
             >
               Open the web app

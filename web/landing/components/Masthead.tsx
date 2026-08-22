@@ -72,7 +72,7 @@ export const Masthead: Component = () => (
           {(item) => (
             <a
               href={item.href}
-              class="text-caption text-fg-soft no-underline hover:text-accent hover:underline"
+              class="text-caption text-fg-soft no-underline transition-colors hover:text-accent hover:underline"
             >
               {item.label}
             </a>
