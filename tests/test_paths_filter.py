@@ -69,6 +69,10 @@ only thing that shows the claim is not stale:
                         — `tools/**` split into the nine scripts a gated job
                           runs, so the count went UP while the filter narrowed.
                           `dot: true`, as above.
+  #565 (doc type gate)  1718 paths x 49 patterns = 84182 pairs, exact agreement
+                        — `tools/check_doc_types.py` joined the `node` filter
+                          (the gate runs in `node` and `ts-lint`, both gated on
+                          it). `dot: true`, as above.
 
 Only the PATTERN COUNT in the newest entry is gated, by
 `test_cross_check_series_is_current`. The path count and the pair total are

@@ -21,6 +21,7 @@ repo_refs:
   band_gate: "repo:tests/test_docs_band_containment.py"
   duckdb_gate: "repo:tests/test_docs_duckdb_examples.py"
   header_gate: "repo:tests/test_docs_example_headers.py"
+  type_gate: "repo:tools/check_doc_types.py"
   released_legs: "repo:.github/workflows/nightly.yml"
   released_crates: "repo:tools/check_released_crate_readmes.py"
   released_crates_gate: "repo:tests/test_released_crate_readmes.py"
@@ -85,6 +86,18 @@ Key facts:
     workflow, and [[stated-cadences-faithful]] is what holds it to it.
     <!-- cadence: ci --><!-- cadence: compliance-report -->
   Browser tabs are **prose** (the web app has no user-facing code API).
+- **The js corpus is type-checked, not just executed** (#565).
+  `repo:tools/check_doc_types.py` runs `tsc` (resolution-only — no
+  `noImplicitAny`/`strictNullChecks`, the #565 decision) over the assembled
+  inline-bearing page programs *and* the node/wasm example files, against each
+  package's **shipped** types (`dist/index.d.ts` via the `exports` map; the
+  wasm-pack `.d.ts`). Execution's bar is "does not raise", which cannot see a
+  page running the wrong branch — #518's `report.ok` was always `undefined`, so
+  the example took the else branch and passed. The gate shares
+  `gen_doc_outputs.page_program` (assembly, not execution), starts every leg
+  with a #518-shaped positive control that must go red, reports an unbuilt leg
+  by name, and holds its allowlist entries stale-checked. Node leg in the
+  `node` job, wasm leg in `ts-lint`.
 - **A Python example is `uv run`-able on its own** — all 18, plus the marimo tour.
   Each carries a PEP 723 `# /// script` header pinning
   `requires-python` and an exact `laterite==<product>`, and the 15 that read a
