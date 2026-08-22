@@ -48,6 +48,13 @@ verb level — each launcher reflects its own parser rather than a
 hand-list, so a verb missing from one launcher (as `merge` briefly was,
 laterite-dev#494) is a finding, not a silent gap.
 
+"The same tool" is **tiered**, and the tiers are not equally strong — see
+[[dec-launcher-contract]]. Verbs and flags are identical; machine output is
+byte-exact; human output carries the same **facts** but is drawn each launcher's
+own way, because `comfy-table` lives bin-side in [[laterite-cliutil]] and the
+lean dep-graph guarantee above is what keeps it there. A rendering difference
+between launchers is therefore not a defect; a launcher stating **less** is.
+
 ## Diagram
 
 ```mermaid
