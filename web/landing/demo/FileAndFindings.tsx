@@ -24,6 +24,7 @@ import { Presence } from "./Presence";
 import { RowCarousel } from "./RowCarousel";
 import { DEMO_GROUPS } from "./schema";
 import { coarsePointer } from "./pointer";
+import { severityLineTint, worstPerLine } from "./severity";
 import {
   applyGroupFixes,
   arm,
@@ -85,18 +86,12 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
     return p && p.group === "TRAN" ? { row: p.row, col: p.col } : null;
   });
 
-  /** Lines carrying a finding, so the pane can band them without a lookup per
-   *  line. Rules that report an absence carry no line and band nothing,
-   *  correctly — delete the TRAN row and there is no line in the file where
-   *  "TRAN group not found" happened. */
-  const bandedLines = createMemo(
-    () =>
-      new Set(
-        findings()
-          .map((f) => f.line)
-          .filter((n): n is number => n !== null),
-      ),
-  );
+  /** Worst severity per banded line, so the pane can tint without a lookup
+   *  per line — the last finding surface to route through severity.ts
+   *  (#548): before this, every banded line wore the error tint whatever the
+   *  tier. The absence-rule story (no line, no band) lives with the map's
+   *  own docstring. */
+  const lineTiers = createMemo(() => worstPerLine(findings()));
 
   return (
     <div style={{ "--band": `var(${props.band})` }}>
@@ -330,15 +325,17 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
               <For each={lines()}>
                 {(line, i) => {
                   const n = () => i() + 1;
-                  const banded = () => bandedLines().has(n());
+                  const tier = () => lineTiers().get(n());
+                  const band = () => {
+                    const t = tier();
+                    return t === undefined
+                      ? "border-l-transparent text-fg-soft"
+                      : severityLineTint(t);
+                  };
                   return (
                     <div
-                      class="flex gap-3 whitespace-pre px-3 font-mono text-caption leading-[1.7]"
+                      class={`flex gap-3 whitespace-pre border-l-[3px] px-3 font-mono text-caption leading-[1.7] ${band()}`}
                       classList={{
-                        "border-l-[3px] border-l-err bg-err-quiet text-err":
-                          banded(),
-                        "border-l-[3px] border-l-transparent text-fg-soft":
-                          !banded(),
                         "[box-shadow:var(--focus-ring)]": focusLine() === n(),
                       }}
                       ref={(el) => {
