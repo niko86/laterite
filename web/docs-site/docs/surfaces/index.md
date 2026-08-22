@@ -1,6 +1,6 @@
 # One engine, every stack
 
-laterite is **one clean-room AGS4 engine** with several doors onto it. The rule
+laterite is **one AGS4 engine** with several doors onto it. The rule
 engine, the dictionary, and the born-typed decode are identical across all of
 them — so you pick the surface that fits your workflow, not a different
 validator.

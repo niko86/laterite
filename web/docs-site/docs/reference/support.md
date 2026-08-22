@@ -6,8 +6,8 @@ Beta is a statement about **how much real-world use laterite has had** — not a
 how much testing it has had. Those are different things, and only one of them can be
 fixed from inside the repo.
 
-The engine is a clean-room implementation of the AGS4 numbered rules, cross-checked
-against a real corpus, with every read surface asserted to report byte-identical
+The engine implements the AGS4 numbered rules from the published specification,
+cross-checked against a real corpus, with every read surface asserted to report byte-identical
 findings on each PR. What it has not had is your files. That is what beta is for, and
 [the feedback loop](../feedback.md) is how it ends.
 

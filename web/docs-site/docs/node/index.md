@@ -5,7 +5,7 @@
 npm install laterite
 ```
 
-`laterite` on npm is the **same clean-room engine** as the Python wheel, with a
+`laterite` on npm is the **same engine** as the Python wheel, with a
 born-typed **arrow-js** decode. The verbs match the [shared
 vocabulary](../surfaces/index.md#the-shared-vocabulary) — `read`, `validate`,
 `buildAgs4` — and, like Python, the read handle **chains**.

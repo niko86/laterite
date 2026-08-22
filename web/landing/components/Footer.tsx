@@ -1,10 +1,9 @@
-/* The footer (#395).
+/* The footer (#395; prose retired to reader-facts in #532).
  *
- * Two claims and no navigation. The clean-room statement is here rather than in
- * the hero because it answers a question a reader only asks once they have
- * decided to care — but it has to be answerable, because "another AGS4 library"
- * is the assumption this project spends its licence on not being.
- */
+ * Two claims and no navigation. The differs-from-python-ags4 paragraph sits
+ * here rather than in the hero because it answers a question a reader only
+ * asks once they have decided to care — and what they need then is where the
+ * differences are written down, not the project's licensing rationale. */
 
 import type { Component } from "solid-js";
 
@@ -22,9 +21,8 @@ export const Footer: Component = () => (
         .
       </p>
       <p class="mt-2 max-w-[70ch]">
-        The validator is clean-room from the published AGS4 specification, not
-        adapted from another library's source. That separation is what lets
-        laterite ship under MIT —{" "}
+        laterite implements the published AGS4 rules independently of
+        python-ags4, so results can differ between the two —{" "}
         <a
           class="text-accent no-underline hover:underline"
           href="https://github.com/niko86/laterite/blob/main/COMPAT.md"
@@ -38,7 +36,7 @@ export const Footer: Component = () => (
         >
           OBSERVATIONS.md
         </a>{" "}
-        record where it differs from python-ags4 and why.
+        record where and why.
       </p>
       <p class="mt-2">
         AGS4 is a format of the Association of Geotechnical and Geoenvironmental
