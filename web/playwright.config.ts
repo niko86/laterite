@@ -69,6 +69,19 @@ export default defineConfig({
       },
     },
     {
+      // The same strict 390 with a COARSE pointer (#525): hasTouch alone flips
+      // `pointer: coarse` in Chromium, so the carousel lane is testable
+      // without isMobile — whose zoom absorbs overflow, the #523 blind spot.
+      name: "landing-touch",
+      testMatch: LANDING_SPEC,
+      use: {
+        browserName: "chromium",
+        baseURL: `http://localhost:${LANDING_PORT}`,
+        viewport: { width: 390, height: 844 },
+        hasTouch: true,
+      },
+    },
+    {
       // The same spec at a desktop width: the rail's depth scale only renders
       // above the collapse breakpoint, so its geometry (#524) is only
       // assertable here. The spec is viewport-aware, like layout.spec.ts.

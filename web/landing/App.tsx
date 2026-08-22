@@ -18,6 +18,7 @@ import { InstallGrid } from "./components/InstallGrid";
 import { Footer } from "./components/Footer";
 import { Rail } from "./components/Rail";
 import { GroupSection } from "./demo/GroupSection";
+import { bindUndoShortcuts } from "./demo/store";
 import { FileAndFindings } from "./demo/FileAndFindings";
 import { SECTIONS, bandVar } from "./sections";
 
@@ -38,45 +39,50 @@ const Section: Component<{
   </section>
 );
 
-export const App: Component = () => (
-  <div class="min-h-screen bg-canvas text-fg">
-    <Rail />
-    <Masthead />
+export const App: Component = () => {
+  // Page-wide undo/redo (#525): one binding covers both editors, living and
+  // dying with the page component (the binder registers its own onCleanup).
+  bindUndoShortcuts();
+  return (
+    <div class="min-h-screen bg-canvas text-fg">
+      <Rail />
+      <Masthead />
 
-    {/* The rail is a sibling of the masthead and sits below it, so the content
+      {/* The rail is a sibling of the masthead and sits below it, so the content
         column is inset by the gutter rather than overlapped by it. Below the
         collapse breakpoint the rail is 8px and the column reclaims the space. */}
-    <div class="min-[68rem]:pl-24">
-      <main>
-        <For each={SECTIONS}>
-          {(section, i) => (
-            <Section id={section.id} index={i()}>
-              <Show when={section.id === "top"}>
-                <Hero />
-              </Show>
-              <Show when={section.group}>
-                {(code) => (
-                  <GroupSection
-                    code={code()}
-                    band={bandVar(i())}
-                    /* Alternate the table side. The first group section is
+      <div class="min-[68rem]:pl-24">
+        <main>
+          <For each={SECTIONS}>
+            {(section, i) => (
+              <Section id={section.id} index={i()}>
+                <Show when={section.id === "top"}>
+                  <Hero />
+                </Show>
+                <Show when={section.group}>
+                  {(code) => (
+                    <GroupSection
+                      code={code()}
+                      band={bandVar(i())}
+                      /* Alternate the table side. The first group section is
                        index 1, so the odd ones lead with the table and the
                        even ones lead with the prose. */
-                    tableFirst={i() % 2 === 1}
-                  />
-                )}
-              </Show>
-              <Show when={section.id === "file"}>
-                <FileAndFindings band={bandVar(i())} />
-              </Show>
-              <Show when={section.id === "install"}>
-                <InstallGrid />
-              </Show>
-            </Section>
-          )}
-        </For>
-      </main>
-      <Footer />
+                      tableFirst={i() % 2 === 1}
+                    />
+                  )}
+                </Show>
+                <Show when={section.id === "file"}>
+                  <FileAndFindings band={bandVar(i())} />
+                </Show>
+                <Show when={section.id === "install"}>
+                  <InstallGrid />
+                </Show>
+              </Section>
+            )}
+          </For>
+        </main>
+        <Footer />
+      </div>
     </div>
-  </div>
-);
+  );
+};

@@ -16,16 +16,25 @@ import {
   createResource,
   createRoot,
   createSignal,
+  onCleanup,
   type Accessor,
 } from "solid-js";
 import {
   SEEDED,
   addRow as addRowTo,
+  deleteRow as deleteRowFrom,
   emit,
   parse,
   setCell as setCellIn,
   type Delivery,
 } from "./delivery";
+import {
+  EMPTY,
+  record,
+  redo as redoIn,
+  undo as undoIn,
+  type History,
+} from "./history";
 import { keyHeadings } from "./schema";
 import { engine, validateText, type Finding, type Report } from "./engine";
 
@@ -91,6 +100,35 @@ export function arm(): void {
   void engine();
 }
 
+/* The undo stack (#525). Not a signal: nothing renders undo state — the only
+   readers are the keyboard shortcuts — so a plain module variable avoids
+   subscribing anything to a value that changes on every edit. */
+let history: History<Delivery> = EMPTY;
+
+/** Every model mutation funnels through here so undo covers all of them —
+ *  cell edits, row adds and deletes, the engine's fixes, the demo reset, and
+ *  whatever joins them later. Identity short-circuit: a no-op mutation (an
+ *  unknown group, an out-of-range row) must not burn an undo step. */
+function commit(next: (d: Delivery) => Delivery): boolean {
+  const current = delivery();
+  const changed = next(current);
+  if (changed === current) return false;
+  history = record(history, current);
+  setDelivery(changed);
+  dropStalePick(changed);
+  return true;
+}
+
+/** A pick can outlive its row — a row delete, an undo of an add. Close rather
+ *  than clamp: the row under the pick is GONE, and silently re-aiming the
+ *  editor at a neighbouring row would edit data the reader never chose. */
+function dropStalePick(d: Delivery): void {
+  const p = picked();
+  if (!p) return;
+  const rows = d.find((g) => g.code === p.group)?.rows.length ?? 0;
+  if (p.row >= rows) setPicked(null);
+}
+
 export function setCell(
   group: string,
   row: number,
@@ -98,16 +136,63 @@ export function setCell(
   value: string,
 ): void {
   arm();
-  setDelivery((d) => setCellIn(d, group, row, col, value));
+  commit((d) => setCellIn(d, group, row, col, value));
 }
 
 export function addRow(group: string, parent: string | null): void {
   arm();
-  setDelivery((d) => addRowTo(d, group, parent, keyHeadings(group)));
+  commit((d) => addRowTo(d, group, parent, keyHeadings(group)));
+}
+
+export function deleteRow(group: string, row: number): void {
+  arm();
+  const p = picked();
+  const changed = commit((d) => deleteRowFrom(d, group, row));
+  /* A pick names a POSITION. Deleting at or above it makes that position mean
+     a different row's data, and dropStalePick only catches the out-of-range
+     case — so close it here. Below the deletion the rows above are untouched
+     and the pick still means what the reader chose. */
+  if (changed && p && p.group === group && p.row >= row) setPicked(null);
+}
+
+function step(walk: typeof undoIn): void {
+  const stepped = walk(history, delivery());
+  if (!stepped) return;
+  history = stepped.history;
+  setDelivery(() => stepped.present);
+  dropStalePick(stepped.present);
+}
+
+export function undo(): void {
+  step(undoIn);
+}
+
+export function redo(): void {
+  step(redoIn);
+}
+
+/** Ctrl/Cmd+Z and +Shift+Z, bound at the window so both editors are covered
+ *  (#525). An open text input keeps its NATIVE undo — the model shortcut
+ *  would yank the delivery out from under a half-typed value. Call from a
+ *  component's setup; the unbind registers on that owner's onCleanup. */
+export function bindUndoShortcuts(): void {
+  const target = window;
+  const onKey = (e: KeyboardEvent) => {
+    if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+    const el = e.target;
+    if (el instanceof HTMLElement && el.closest("input, textarea")) return;
+    e.preventDefault();
+    if (e.shiftKey) redo();
+    else undo();
+  };
+  target.addEventListener("keydown", onKey);
+  onCleanup(() => {
+    target.removeEventListener("keydown", onKey);
+  });
 }
 
 export function reset(): void {
-  setDelivery(SEEDED);
+  commit(() => SEEDED);
 }
 
 /** Run the engine's OWN fixer over the current delivery.
@@ -130,7 +215,7 @@ export async function applyEngineFixes(): Promise<number> {
   const fixes = m.compute_fixes(bytes);
   if (!fixes.length) return 0;
   const fixed = m.apply_fixes(bytes, null, fixes);
-  setDelivery(parse(new TextDecoder().decode(fixed)));
+  commit(() => parse(new TextDecoder().decode(fixed)));
   return fixes.length;
 }
 

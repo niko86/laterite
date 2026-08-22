@@ -1,9 +1,16 @@
-/* The row carousel (#398) — the editing pattern, at every width.
+/* The row carousel (#398) — the COARSE pointer's editor.
  *
  * Tapping any cell opens THAT WHOLE ROW as a paged set of field cards, landing
  * on the field that was tapped. This is the pattern chosen to carry LLPL's nine
  * columns on a 390px phone: a plain grid cannot, and shrinking type to make one
  * fit destroys the KEY chain the page exists to show.
+ *
+ * It used to be the editing pattern AT EVERY WIDTH; #525 split the editors by
+ * modality instead. A fine pointer edits in the table itself — selection,
+ * arrows, type-to-replace — because on a desktop this tray is an indirection:
+ * click a cell, look away from it, edit somewhere else. The split reads
+ * `pointer: coarse` (pointer.ts), not the viewport width — a phone in
+ * landscape is still a touch device.
  *
  * It is a PANEL IN THE PAGE FLOW, between the table and what follows it. It
  * never floats over the content and never covers the findings the reader is
@@ -51,6 +58,7 @@ export const RowCarousel: Component<{
   col: number;
   onMove: (col: number) => void;
   onClose: () => void;
+  onDelete: () => void;
 }> = (props) => {
   /* `Show`'s callback form is what narrows this to a definite heading, rather
      than a non-null assertion the lint rule forbids — and it is honest: a col
@@ -104,14 +112,27 @@ export const RowCarousel: Component<{
           {props.schema.code} · row {props.row + 1} · field {props.col + 1} of{" "}
           {props.schema.headings.length}
         </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={props.onClose}
-          aria-label="Close the row editor"
-        >
-          ✕
-        </Button>
+        <span class="flex items-center gap-1">
+          {/* Deleting the open row closes the tray — the store drops a pick
+              whose row is gone (#525), so no half-open editor on a ghost row. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            tone="danger"
+            onClick={props.onDelete}
+            aria-label="Delete this row"
+          >
+            Delete row
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={props.onClose}
+            aria-label="Close the row editor"
+          >
+            ✕
+          </Button>
+        </span>
       </div>
 
       <div class="mt-3 flex items-stretch gap-2">

@@ -12,12 +12,15 @@ import { Button } from "@shared/components";
 import { DEMO_GROUPS } from "./schema";
 import { RowCarousel } from "./RowCarousel";
 import { GroupTable } from "./GroupTable";
+import { coarsePointer } from "./pointer";
 import {
   addRow,
   arm,
+  deleteRow,
   delivery,
   findingsForGroup,
   picked,
+  setCell,
   setPicked,
 } from "./store";
 
@@ -129,6 +132,12 @@ export const GroupSection: Component<{
                 arm();
                 setPicked({ group: props.code, row, col });
               }}
+              onCommit={(row, col, value) => {
+                setCell(props.code, row, col, value);
+              }}
+              onDeleteRow={(row) => {
+                deleteRow(props.code, row);
+              }}
             />
 
             <div class="mt-3 flex flex-wrap items-center gap-3">
@@ -149,11 +158,17 @@ export const GroupSection: Component<{
                 </Show>
               </Button>
               <span class="text-caption text-fg-faint">
-                Tap any cell to edit the row.
+                {/* The hint follows the editor the reader actually has (#525). */}
+                {coarsePointer()
+                  ? "Tap any cell to edit the row."
+                  : "Click a cell, then type — Enter commits, Esc cancels."}
               </span>
             </div>
 
-            <Show when={open()}>
+            {/* The carousel is the COARSE pointer's editor (#525); on a fine
+                pointer the pick is a spreadsheet selection and opening a tray
+                under the table would double the editing surface. */}
+            <Show when={coarsePointer() ? open() : null}>
               {(cell) => (
                 <RowCarousel
                   schema={b().schema}
@@ -165,6 +180,9 @@ export const GroupSection: Component<{
                     setPicked({ group: props.code, row: cell().row, col })
                   }
                   onClose={() => setPicked(null)}
+                  onDelete={() => {
+                    deleteRow(props.code, cell().row);
+                  }}
                 />
               )}
             </Show>
