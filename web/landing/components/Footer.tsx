@@ -13,7 +13,7 @@ export const Footer: Component = () => (
       <p>
         MIT licensed.{" "}
         <a
-          class="text-accent no-underline hover:underline"
+          class="text-accent no-underline transition-colors hover:underline"
           href="https://github.com/niko86/laterite/blob/main/LICENSE"
         >
           Read the licence
@@ -24,14 +24,14 @@ export const Footer: Component = () => (
         laterite implements the published AGS4 rules independently of
         python-ags4, so results can differ between the two —{" "}
         <a
-          class="text-accent no-underline hover:underline"
+          class="text-accent no-underline transition-colors hover:underline"
           href="https://github.com/niko86/laterite/blob/main/COMPAT.md"
         >
           COMPAT.md
         </a>{" "}
         and{" "}
         <a
-          class="text-accent no-underline hover:underline"
+          class="text-accent no-underline transition-colors hover:underline"
           href="https://github.com/niko86/laterite/blob/main/OBSERVATIONS.md"
         >
           OBSERVATIONS.md

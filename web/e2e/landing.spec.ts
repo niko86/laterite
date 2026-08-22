@@ -125,6 +125,22 @@ test("touch: the carousel opens, pages, closes — and never widens the page", a
   await expect(carousel).toBeVisible();
   await expectViewportWide(page);
 
+  // The editor's own enter/exit rides the slow tier (#534) — this is the one
+  // animated element the fine-pointer motion probe can never reach, and the
+  // fade came unprobed through review once already. Both sides normalized to
+  // milliseconds: the registered token serializes in seconds.
+  const ms = (v: string) =>
+    v.trim().endsWith("ms") ? parseFloat(v) : parseFloat(v) * 1000;
+  const wrapperDuration = await carousel.evaluate(
+    (el) =>
+      getComputedStyle(el.closest(".transition-opacity") ?? el)
+        .transitionDuration,
+  );
+  const slowToken = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--dur-slow"),
+  );
+  expect(ms(wrapperDuration), "editor wrapper").toBe(ms(slowToken));
+
   // Paging lands on the next field's card.
   await carousel
     .getByRole("button", { name: "Next field in this row" })
@@ -931,4 +947,55 @@ test("the page's hierarchy runs demo-first, and the CLI card is the binary", asy
   // whatever the generated module says, not a second copy of its prose.
   const cliChannel = INSTALL_CHANNELS.find((c) => c.id === "cli");
   await expect(cli).toContainText(cliChannel?.note ?? "unreachable");
+});
+
+test("fine: motion rides the tokens — the probed elements transition like the shared Button", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "hover states are the fine pointer's vocabulary (#534)");
+  await page.goto("/");
+  // Findings must exist before finding rows can be probed.
+  await expect(page.locator("section#file li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+
+  const durationOf = (sel: string) =>
+    page
+      .locator(sel)
+      .first()
+      .evaluate((el) => getComputedStyle(el).transitionDuration);
+
+  // The shared Button is the reference implementation of the motion tokens —
+  // every bespoke interactive element must compute the same duration it
+  // does, and that duration must be a real one.
+  const reference = await page
+    .getByRole("link", { name: "Open the app" })
+    .evaluate((el) => getComputedStyle(el).transitionDuration);
+  expect(reference).not.toBe("0s");
+
+  expect(await durationOf("header nav a"), "nav link").toBe(reference);
+  expect(
+    await durationOf('section#loca [data-cell="0-0"]'),
+    "cell button",
+  ).toBe(reference);
+  expect(
+    await page
+      .getByRole("button", { name: "Copy the Python install command" })
+      .evaluate((el) => getComputedStyle(el).transitionDuration),
+    "copy button",
+  ).toBe(reference);
+  // The finding row rides the fast opacity tier, not the base one — compare
+  // against the token's own computed value rather than a bare "not zero".
+  // Both sides normalized to milliseconds: the registered token serializes
+  // in seconds while an unregistered one would say "120ms".
+  const ms = (v: string) =>
+    v.trim().endsWith("ms") ? parseFloat(v) : parseFloat(v) * 1000;
+  const fastToken = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue("--dur-fast"),
+  );
+  expect(ms(await durationOf("section#file li > *")), "finding row").toBe(
+    ms(fastToken),
+  );
+  expect(await durationOf("footer a"), "footer link").toBe(reference);
 });
