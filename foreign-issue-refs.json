@@ -48,8 +48,8 @@
     "and expect it to go stale harmlessly — the gate takes whichever of the two",
     "is higher, so a forgotten override is overtaken rather than obeyed."
   ],
-  "claimed_through": 519,
-  "claimed_through_note": "#519 is an issue filed in THIS repo on 2026-08-21 (the ts fences no runner executes). It is the first time the override has RELEASED a number rather than merely got ahead of the watermark: the satellite also owns 519, and this repo's numbering reaching it is exactly when the entry stops being foreign — a bare #519 now means this repo, which is what the set's own rule says. The three qualified `laterite-dev#519` citations in the tree stay correct and stay unflagged; what is given up is the gate catching a FUTURE bare #519 that meant the satellite, which is the intended trade and not an oversight. Supersedes the #513/#514 note. Goes stale harmlessly: the gate takes whichever is higher.",
+  "claimed_through": 581,
+  "claimed_through_note": "#581 is an issue filed in THIS repo on 2026-08-23 (setCell burning an undo step on a no-op). The satellite also owns 581 — the shared scrub engine — so this releases a number the set genuinely held, on the same terms as the #519 override it supersedes: this repo's numbering reaching it is exactly when a bare #581 stops meaning the satellite. The ten qualified `laterite-dev#581` citations in the tree stay correct and stay unflagged; what is given up is the gate catching a FUTURE bare #581 that meant the satellite, which is the intended trade. The derived watermark stood at #579, one short. Goes stale harmlessly: the gate takes whichever is higher.",
   "satellite": {
     "repo": "laterite-dev",
     "note": "Same owner, private. Qualified rather than linked: a 404 is honest about being unreachable, where a bare number actively lies.",
