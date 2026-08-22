@@ -15,10 +15,22 @@ The **why** — design decisions, format concepts, the crate map, the O-1..O-N
 divergence catalogue, editions, and per-crate tool pages — lives in **`ags-wiki/`**
 in this repo. **Reach for it before** answering an AGS4 question, changing
 validator/parity behaviour, or touching the architecture (crate layout, the
-wheel/dep/build split, the PyO3 or wasm boundary).
+wheel/dep/build split, the PyO3 or wasm boundary) — **and before asserting how any
+part of this repo behaves**, in an issue, a PR body, a review comment or a triage
+note.
 
-**To find what covers the files you are about to change**, ask — don't guess from
-filenames, and don't assume nothing covers them:
+That last trigger is the one most easily missed, because it fires when you are
+**not editing anything**, so neither of the others does. A wrong claim published to
+the tracker outlives the session that made it and gets acted on by someone else.
+And much of the wiki — `concepts/`, `design/`, `tools/`, `strategies/` — is about
+how the **repo** works (CI, the docs gates, e2e, testing strategy) rather than how
+AGS4 does, so "not an AGS4 question" is not a reason to skip it. Worked example: an
+issue was filed claiming a docs gate read a marker nothing consumed;
+`ags-wiki/concepts/docs-site.md` already described the two-gate split that made it false.
+
+**To find what covers the files you are about to change — or the files a claim you
+are about to publish is about** — ask; don't guess from filenames, and don't assume
+nothing covers them:
 
 ```bash
 uv run --no-project python ags-wiki/.bootstrap/librarian.py --paths <files…>
@@ -85,10 +97,32 @@ uv run lat validate delivery.ags --json          # the shipped AGS4 validator CL
                                                  # (parity oracle; needs ../ags-python-library cloned from GitLab)
 ```
 
+**Run the gates before pushing, in this order.** `tools/check_changelog.py --base
+origin/main` **first** — it is surface-independent, so it is the one a
+"what did my change touch?" reading misses. Then `git add -A`, because the
+tracked-file scanners (`check_doc_refs.py`, `check_issue_refs.py`, the generator
+`--check` gates) are blind to a new file that is still unstaged and will report
+green over it. Then the touched surfaces' full sets — lint AND format AND types AND
+tests, not whichever one seems relevant. Derive that list from the workflows rather
+than from the diff: a default-feature clippy cannot see a broken `#[cfg]`, and node
+carries its own prettier.
+
+The changelog gate **refuses to report success on an empty diff** ("a gate that sees
+no diff has checked nothing"), so run it against a commit, not a dirty tree — a pass
+before you commit is not a pass.
+
 The python-ags4 parity runner shims `python_ags4` to `laterite.compat`. The
 `parity` CI gate (`.github/workflows/parity.yml`) enforces the failing SET **by
 identity** (`parity-known-failures.json`, `tools/check_parity.py`) — a required
 merge check.
+
+**Three programs answer to `lat`**: the shipped Rust binary (`laterite-cli`), the
+wheel's console script, and the Node launcher. They are the same tool **by contract,
+not by construction** — one guide, mirrored into each package and gate-held
+byte-identical — so a gate that resolves `lat` from `PATH` tests whichever one the
+environment happened to put there. Name the one you mean: `LAT_BIN` is how
+`tools/gen_doc_outputs.py` is pointed at a specific binary, and it prints what it
+resolved rather than assuming.
 
 The dev workspace floor is Python ≥ 3.12 (`requires-python` in the root
 `pyproject.toml`), matching the shipped wheel. There is **no `.python-version`**
@@ -248,6 +282,10 @@ scaffolders — not production code.
   reindex → lint → commit → push), make them separate, sequential,
   individually-checked calls — one failure in a batch cancels its siblings.
 - **Absolute paths always.** Don't rely on cwd.
+- **Keep each Bash call plain.** In a worktree-isolated session the harness refuses
+  any command it cannot verify stays inside the worktree — compound pipelines, `for`
+  loops, heredocs feeding a second command, output redirects. One command per call
+  costs a round trip; a refused one costs two and returns nothing.
 - **Verify against disk/git, then act.** When results look off, re-read the file
   or `git status` *first*, in its own step. Git state is the source of truth, not
   a possibly-stale tool echo.
