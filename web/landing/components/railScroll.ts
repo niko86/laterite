@@ -37,24 +37,30 @@ export function depthLabel(depth: number): string {
   return depth.toFixed(2);
 }
 
-/** Where the probe sits as a percentage of the strip, inset from both ends so
- *  the depth pill is never clipped against the top or bottom edge.
+/** The inset the whole rail runs inside, in percentage points at each end, so
+ *  the depth pill is never clipped against the top or bottom edge. */
+export const RAIL_INSET_PCT = 4;
+
+/** The rail's ONE vertical mapping: a 0–1 fraction of the hole to a percentage
+ *  of the strip. Bands, ticks, veil, probe and pill all position through it —
+ *  #524 was two mappings (ticks on a plain 0–100 run, the pill on the inset
+ *  run), so the pill's number never matched the label beside it.
  *
- * `inset` is expressed in the same percentage units, so a 4% inset means the
- * probe travels between 4% and 96% while depth still runs a true 0–total. The
- * two are deliberately decoupled: clamping the DEPTH to keep the pill on screen
- * would make the rail lie about how deep the reader is. */
-export function probeOffsetPct(progress: number, inset = 4): number {
-  return inset + progress * (100 - inset * 2);
+ * The inset applies to POSITION only while depth still runs a true 0–total.
+ * The two are deliberately decoupled: clamping the DEPTH to keep the pill on
+ * screen would make the rail lie about how deep the reader is. */
+export function railY(fraction: number, inset = RAIL_INSET_PCT): number {
+  return inset + fraction * (100 - inset * 2);
 }
 
-/** The band a section occupies, top and height, as percentages of the strip.
- *  Equal bands: the rail marks the sequence of sections, not their pixel
- *  heights, so a long section does not get a fatter stratum. */
+/** The band a section occupies, top and height, as percentages of the strip —
+ *  on the shared run, so a band top IS its tick's position. Equal bands: the
+ *  rail marks the sequence of sections, not their pixel heights, so a long
+ *  section does not get a fatter stratum. */
 export function bandBounds(
   index: number,
   count: number,
 ): { top: number; height: number } {
-  const height = 100 / count;
-  return { top: index * height, height };
+  const height = (100 - RAIL_INSET_PCT * 2) / count;
+  return { top: railY(index / count), height };
 }

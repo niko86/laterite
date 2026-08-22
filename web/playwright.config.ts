@@ -68,6 +68,18 @@ export default defineConfig({
         viewport: { width: 390, height: 844 },
       },
     },
+    {
+      // The same spec at a desktop width: the rail's depth scale only renders
+      // above the collapse breakpoint, so its geometry (#524) is only
+      // assertable here. The spec is viewport-aware, like layout.spec.ts.
+      name: "landing-wide",
+      testMatch: LANDING_SPEC,
+      use: {
+        browserName: "chromium",
+        baseURL: `http://localhost:${LANDING_PORT}`,
+        viewport: { width: 1280, height: 800 },
+      },
+    },
   ],
   webServer: [
     {
