@@ -112,10 +112,33 @@ That mattered here and would have mattered more later: CI runners are cold, so
 the fault would have been invisible in the one place that runs this nightly and
 live on every developer machine that ran it twice.
 
-**The positive control is in the module.** A synthetic header declaring no
+**The positive control is in the module** — a synthetic header declaring no
 dependencies must find none of the packages the calling interpreter can import.
 Without it, a runner quietly leaking the ambient environment would make this file
 a slower copy of its sibling, reporting the same green for the same reason.
+
+**And the first cut of that control skipped in the only job that runs it.** It
+probed for laterite / pyarrow / pandas and abstained when none was importable —
+which is exactly the nightly's environment, since the leg starts from `uv run
+--no-project --with pytest`. It passed locally, where a developer has all three,
+and would have skipped every night. `pytest` is now the canary: whatever else is
+around, it is importable in a process running under pytest. A control that can
+decline to run is a control with a hole the shape of its own subject.
+
+**A single transient would have been reported as a header defect.** Both verdicts
+are comparisons of two runs, so one flaky resolve during the header run followed
+by a clean widened run reads as "passes with `[all]`" — the FATAL arm, naming a
+defect that does not exist. The failure is confirmed by a second header run
+before it is classified, and an example that needed that second run is named in
+the census rather than quietly absorbed.
+
+**The widening scans the header block, not the file.** While every header names
+laterite the two are indistinguishable — the header is on line 3 and matches
+first either way — so the invariant is held by an adversarial case rather than by
+the happy path: `ex16_diff.py` carries `"laterite demo site (…)"` as fixture text
+it edits, and a whole-file scan rewrites *that* the moment a header stops naming
+laterite, producing a corrupt copy whose failure reads as "not decided by the
+extras". A real defect downgraded to a skip by the machinery meant to catch it.
 
 ## Consequences
 

@@ -209,8 +209,10 @@ Key facts:
   header the examples publish, so a header could be missing a dependency and
   nothing could fail — and two were (#514, above). `docs-example-headers`
   (`repo:tests/test_docs_example_headers.py`, opt-in behind
-  `LATERITE_DOCS_HEADER_ENV`) runs each example with `uv run --exact --script`,
-  which is the reader's own command. **It is a separate job because the amnesty
+  `LATERITE_DOCS_HEADER_ENV`) runs each example with `uv run --exact --script`
+  — the reader's command plus `--exact`, which is deliberately stricter than
+  what the docstrings tell a reader to type, for the reason below.
+  **It is a separate job because the amnesty
   is wrong for it**: a missing extra is not fixed by any release, so excusing it
   through the tree-ahead window — nearly every night — would leave the leg
   decorative. The classification happens in the test instead, by re-running a
