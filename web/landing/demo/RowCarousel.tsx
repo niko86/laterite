@@ -181,7 +181,11 @@ export const RowCarousel: Component<{
                 value={value()}
                 aria-label={`${h().name} value`}
                 aria-invalid={failing().length > 0}
-                /* Live, no submit — every keystroke re-emits and revalidates. */
+                /* Live, no submit — every keystroke re-emits and revalidates.
+                   Clipboard here is the browser's own (#551): nothing
+                   intercepts copy or paste on this input, and a paste is one
+                   input event, so it joins the card's coalescing run (#550)
+                   and undoes with the stay, like typing. */
                 onInput={(e) => {
                   setCell(
                     props.schema.code,
