@@ -16,34 +16,17 @@
 
 import { For, Index, Show, createMemo, type Component } from "solid-js";
 import { Button } from "@shared/components";
+import { EditableGroup } from "./EditableGroup";
 import { FindingCallout } from "./FindingCallout";
-import { FindingsStrip } from "./FindingsStrip";
-import { GroupStub } from "./GroupStub";
-import { GroupTable } from "./GroupTable";
-import { Presence } from "./Presence";
-import { RowCarousel } from "./RowCarousel";
-import { DEMO_GROUPS } from "./schema";
-import { coarsePointer } from "./pointer";
 import { severityLineTint, worstPerLine } from "./severity";
 import {
-  applyGroupFixes,
-  arm,
   armed,
   busy,
-  deleteGroup,
-  deleteRow,
-  delivery,
-  findingsForGroup,
   focusLine,
-  groupFixCount,
   isManualFinding,
-  picked,
   reset,
   report,
-  restoreGroup,
-  setCell,
   setFocusLine,
-  setPicked,
   text,
 } from "./store";
 import type { Finding } from "./engine";
@@ -71,20 +54,6 @@ const FindingRow: Component<{ finding: Finding }> = (props) => (
 export const FileAndFindings: Component<{ band: string }> = (props) => {
   const lines = createMemo(() => text().split("\r\n"));
   const findings = createMemo(() => report()?.findings ?? []);
-
-  /* The TRAN cover sheet (#527). Since #529 schema-without-data is no longer
-     a fixture mismatch — it means the reader DELETED the group, and the
-     narrowing's fallback answers with the restore stub, mirroring
-     GroupSection. */
-  const tran = createMemo(() => {
-    const schema = DEMO_GROUPS.find((g) => g.code === "TRAN");
-    const data = delivery().find((g) => g.code === "TRAN");
-    return schema && data ? { schema, data } : undefined;
-  });
-  const tranOpen = createMemo(() => {
-    const p = picked();
-    return p && p.group === "TRAN" ? { row: p.row, col: p.col } : null;
-  });
 
   /** Worst severity per banded line, so the pane can tint without a lookup
    *  per line — the last finding surface to route through severity.ts
@@ -164,84 +133,12 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
           file, for whom, and against which AGS edition. Delete its row — or the
           whole group — and Rule 14 has something to say.
         </p>
-        <Show
-          when={tran()}
-          fallback={
-            <>
-              <div class="mt-3">
-                <GroupStub
-                  code="TRAN"
-                  band={props.band}
-                  onRestore={() => {
-                    restoreGroup("TRAN");
-                  }}
-                />
-              </div>
-              <FindingsStrip code="TRAN" findings={findingsForGroup("TRAN")} />
-            </>
-          }
-        >
-          {(t) => (
-            <>
-              <div class="mt-3">
-                <GroupTable
-                  schema={t().schema}
-                  data={t().data}
-                  band={props.band}
-                  picked={tranOpen()}
-                  onPick={(row, col) => {
-                    arm();
-                    setPicked({ group: "TRAN", row, col });
-                  }}
-                  onCommit={(row, col, value) => {
-                    setCell("TRAN", row, col, value);
-                  }}
-                  onDeleteRow={(row) => {
-                    deleteRow("TRAN", row);
-                  }}
-                  fixCount={groupFixCount("TRAN")}
-                  onFix={() => {
-                    void applyGroupFixes("TRAN");
-                  }}
-                />
-              </div>
-              <FindingsStrip code="TRAN" findings={findingsForGroup("TRAN")} />
-              <div class="mt-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  tone="danger"
-                  aria-label="Delete the TRAN group"
-                  onClick={() => {
-                    deleteGroup("TRAN");
-                  }}
-                >
-                  delete group
-                </Button>
-              </div>
-              <Presence when={coarsePointer() ? tranOpen() : null}>
-                {(cell) => (
-                  <RowCarousel
-                    schema={t().schema}
-                    data={t().data}
-                    band={props.band}
-                    row={cell().row}
-                    col={cell().col}
-                    onMove={(col) => {
-                      setPicked({ group: "TRAN", row: cell().row, col });
-                    }}
-                    onClose={() => {
-                      setPicked(null);
-                    }}
-                    onDelete={() => {
-                      deleteRow("TRAN", cell().row);
-                    }}
-                  />
-                )}
-              </Presence>
-            </>
-          )}
-        </Show>
+        {/* The cover sheet's own wrapper, not the harness's: `mt-3` is what
+            separates the table from the prose HERE, where a descent section
+            has a grid column doing it instead (#549). */}
+        <div class="mt-3">
+          <EditableGroup code="TRAN" band={props.band} />
+        </div>
       </div>
 
       {/* The transport aside (#528): TRAN taken literally. The delivery is
