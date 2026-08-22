@@ -687,7 +687,11 @@ function runFix(p: Parsed, json: boolean): number {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     return residual === 0 ? 0 : 1;
   }
-  note(`${result.toString()} → ${dest}`);
+  // STDOUT, not note(): the applied/residual line is the RESULT, and the
+  // agent-first contract routes resolved-mode results to stdout — the other
+  // two launchers already print theirs there, so this was a content-reaching
+  // stream divergence, not layout (#542).
+  process.stdout.write(`${result.toString()} → ${dest}\n`);
   return residual === 0 ? 0 : 1;
 }
 

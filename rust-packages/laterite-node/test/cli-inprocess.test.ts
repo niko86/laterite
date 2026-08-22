@@ -413,14 +413,19 @@ describe("cli (in-process): validate --index", () => {
 
 // ---- fix -------------------------------------------------------------------
 describe("cli (in-process): fix", () => {
-  it("writes a sibling .fixed file and returns 0 on a clean file", () => {
+  it("writes a sibling .fixed file, and the RESULT goes to stdout (#542)", () => {
     const dir = tmp();
     const src = join(dir, "data.ags");
     copyFileSync(CLEAN, src);
-    const { code, stderr } = runCli(["fix", src]);
+    const { code, stdout, stderr } = runCli(["fix", src]);
     expect(code).toBe(0);
     expect(existsSync(join(dir, "data.fixed.ags"))).toBe(true);
-    expect(stderr).toContain("→");
+    // The agent-first contract routes resolved-mode RESULTS to stdout —
+    // `fix`'s applied/residual line is the result, not a progress note, and
+    // the other two launchers already print it there. Piping
+    // `npx laterite fix f.ags | ...` must see it.
+    expect(stdout).toContain("→");
+    expect(stderr).not.toContain("→");
   });
 
   it("--fix-out writes to the named path", () => {
