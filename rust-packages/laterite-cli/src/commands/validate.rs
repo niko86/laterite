@@ -157,12 +157,11 @@ pub fn run(args: &ValidateArgs, json: bool, ndjson: bool, quiet: bool) -> ! {
             } else if n == 0 {
                 // The dictionary that judged the file, and how it was chosen,
                 // is a FACT of the verdict — the launcher contract binds facts
-                // across launchers (npx already stated it; #542).
-                println!(
-                    "{}: clean (0 findings) — dictionary {} ({})",
-                    path.display(),
-                    dv.as_str(),
-                    resolution.as_str()
+                // across launchers (npx already stated it; #542). One clean-line
+                // shape, owned by render::plain_string, not a second copy here.
+                print!(
+                    "{}",
+                    render::plain_string(path, &found, 0, dv.as_str(), resolution.as_str())
                 );
             } else {
                 render::report_table(path, &found, n, dv.as_str(), resolution.as_str());

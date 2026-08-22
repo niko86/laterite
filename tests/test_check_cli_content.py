@@ -34,6 +34,8 @@ def _load():
 _mod = _load()
 diff_facts_binary = _mod.diff_facts_binary
 diff_facts_npx = _mod.diff_facts_npx
+fix_facts_binary = _mod.fix_facts_binary
+fix_facts_npx = _mod.fix_facts_npx
 validate_facts_binary = _mod.validate_facts_binary
 validate_facts_npx = _mod.validate_facts_npx
 
@@ -45,7 +47,7 @@ NPX_CLEAN = "f.ags — 4.2 (exact)\n  clean — no findings\n"
 NPX_FINDINGS = "f.ags — 4.1.1 (fallback)\n  5 finding(s)\n    8 (line 5, LOCA): bad\n"
 #: The binary's output BEFORE #542 — no dictionary stated. Extracts to None
 #: facts, which must not equal the npx extraction: that split was the finding.
-BINARY_CLEAN_PREFIX_542 = "f.ags: clean (0 findings)\n"
+BINARY_CLEAN_PRE_542 = "f.ags: clean (0 findings)\n"
 
 
 def test_validate_binary_extracts_edition_resolution_count():
@@ -66,10 +68,10 @@ def test_validate_npx_extracts_the_same_facts():
     assert validate_facts_npx(NPX_FINDINGS) == validate_facts_binary(BINARY_FINDINGS)
 
 
-def test_validate_prefix_output_disagrees_not_agrees():
+def test_validate_pre_fix_output_disagrees_not_agrees():
     """An output missing the fact must extract to a DIFFERENT dict, never be
     absorbed — None-vs-None agreement would be the gate lying green."""
-    facts = validate_facts_binary(BINARY_CLEAN_PREFIX_542)
+    facts = validate_facts_binary(BINARY_CLEAN_PRE_542)
     assert facts["edition"] is None
     assert facts != validate_facts_npx(NPX_CLEAN)
 
@@ -99,7 +101,7 @@ NPX_DIFF = (
 )
 #: npx BEFORE #542: changed groups only — no header, no heading-only PROJ, no
 #: group add/remove lines, no totals.
-NPX_DIFF_PREFIX_542 = "LOCA: +1 -1 ~1\n"
+NPX_DIFF_PRE_542 = "LOCA: +1 -1 ~1\n"
 
 
 def test_diff_binary_extracts_all_fact_classes():
@@ -127,7 +129,45 @@ def test_diff_npx_total_line_is_not_a_group():
     assert facts["total"] == [1, 1, 1]
 
 
-def test_diff_prefix_output_disagrees_not_agrees():
-    facts = diff_facts_npx(NPX_DIFF_PREFIX_542)
+def test_diff_pre_fix_output_disagrees_not_agrees():
+    facts = diff_facts_npx(NPX_DIFF_PRE_542)
     assert facts["header"] is None and facts["total"] is None
     assert facts != diff_facts_binary(BINARY_DIFF)
+
+
+# --- fix ---------------------------------------------------------------------
+
+BINARY_FIX = (
+    "applied 1 fix(es) [reformat_numeric] → d.fixed.ags\n"
+    "d.fixed.ags: 4 finding(s) remain (not mechanically fixable)\n"
+)
+NPX_FIX = (
+    "<FixResult 106 bytes, 1 fix(es) applied, 4 residual finding(s)>"
+    " [reformat_numeric] → d.fixed.ags\n"
+)
+#: npx BEFORE #542: the result line went to stderr, so stdout was EMPTY — the
+#: no-facts arm of the gate is what catches that world, not a value split.
+NPX_FIX_PRE_542_STDOUT = ""
+#: npx after the stream fix but before the kinds joined the line — the gap the
+#: content gate's first fix run caught live.
+NPX_FIX_NO_KINDS = (
+    "<FixResult 106 bytes, 1 fix(es) applied, 4 residual finding(s)> → d.fixed.ags\n"
+)
+
+
+def test_fix_extractors_agree_on_the_same_facts():
+    facts = fix_facts_binary(BINARY_FIX)
+    assert facts == {
+        "applied": 1,
+        "kinds": ["reformat_numeric"],
+        "dest": "d.fixed.ags",
+        "residual": 4,
+    }
+    assert fix_facts_npx(NPX_FIX) == facts
+
+
+def test_fix_pre_fix_outputs_extract_to_missing_facts():
+    empty = fix_facts_npx(NPX_FIX_PRE_542_STDOUT)
+    assert all(v is None for v in empty.values())
+    no_kinds = fix_facts_npx(NPX_FIX_NO_KINDS)
+    assert no_kinds["applied"] == 1 and no_kinds["kinds"] is None

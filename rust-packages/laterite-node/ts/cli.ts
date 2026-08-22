@@ -690,8 +690,12 @@ function runFix(p: Parsed, json: boolean): number {
   // STDOUT, not note(): the applied/residual line is the RESULT, and the
   // agent-first contract routes resolved-mode results to stdout — the other
   // two launchers already print theirs there, so this was a content-reaching
-  // stream divergence, not layout (#542).
-  process.stdout.write(`${result.toString()} → ${dest}\n`);
+  // stream divergence, not layout (#542). The distinct fix KINDS ride along
+  // because they are a fact the other two state (the content gate found this
+  // launcher omitting them) — sorted, so the set can't reorder per run.
+  const kinds = [...new Set(result.applied.map((a) => a.kind))].sort();
+  const kindNote = kinds.length ? ` [${kinds.join(", ")}]` : "";
+  process.stdout.write(`${result.toString()}${kindNote} → ${dest}\n`);
   return residual === 0 ? 0 : 1;
 }
 

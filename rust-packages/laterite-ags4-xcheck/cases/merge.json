@@ -10,11 +10,7 @@
           "rust-packages/laterite-ags4-xcheck/cases/inputs/diff_rev.ags"
         ]
       },
-      "legs": [
-        "cli-native",
-        "cli-uvx",
-        "cli-npx"
-      ],
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
       "spec_ref": "`lat merge <a> <b> --out merged.ags` — THE verb whose ABSENCE from npx started this arc (laterite-dev#494/#508) and had no standing cross-surface output-value case (proven by hand ONCE in laterite-dev#508; see arc-cross-surface-truth). Merging base then rev exercises the whole contract in one file: LOCA_NATE on BH1 resolves to 150.00 (LAST file wins the KEY conflict — argument-order recency), BH2 survives (union, not intersection), BH3 is added, and merge synthesises TRAN / UNIT / TYPE. The merged bytes are deterministic — the synthesised TRAN uses the FIXED `1900-01-01` placeholder, not a wall-clock date — so this pins the merged CONTENT byte-identical across the three launchers (laterite-dev#555 part 2)."
     },
     {
@@ -26,11 +22,7 @@
           "rust-packages/laterite-ags4-xcheck/cases/inputs/diff_rev_nonascii.ags"
         ]
       },
-      "legs": [
-        "cli-native",
-        "cli-uvx",
-        "cli-npx"
-      ],
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
       "spec_ref": "The merge half of #542's falsification step: the merged FILE must carry the non-ASCII cell bytes identically through all three launchers. This op observes the merged bytes, not the stdout wrapper, so it proves the emit path; the wrapper's own facts are the content gate's business."
     },
     {
@@ -43,11 +35,7 @@
         ],
         "out": "mergé.ags"
       },
-      "legs": [
-        "cli-native",
-        "cli-uvx",
-        "cli-npx"
-      ],
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
       "spec_ref": "The `merge --json` stdout wrapper (#542). The `warnings`/`revisions` arrays serialise off the engine structs on every launcher, but the `{out, bytes}` wrapper is CLI-local by decision (dec-launcher-contract), so this case is the only thing holding its composition byte-identical. The non-ASCII `--out` name is the point: the path the CLI echoes back is the wrapper's one non-ASCII surface, and a hand-kept serialiser's escaping (Python's `ensure_ascii` default) splits here and nowhere else. The revision-bearing fixture pair keeps the arrays non-trivial at the same time."
     }
   ]

@@ -428,6 +428,20 @@ describe("cli (in-process): fix", () => {
     expect(stderr).not.toContain("→");
   });
 
+  it("a landed fix names its KINDS on the result line (#542)", () => {
+    // The distinct fix kinds are a FACT the other two launchers state
+    // (`applied 1 fix(es) [reformat_numeric] → …`); the content gate caught
+    // this launcher omitting them. A zero-fix run states no kinds anywhere —
+    // every launcher prints `no fixes applicable` — so the fact is asserted
+    // where it exists: on a file with a mechanical repair.
+    const dir = tmp();
+    const src = join(dir, "data.ags");
+    copyFileSync(join(FIX, "rule8_dp_wrong_precision.ags"), src);
+    const { code, stdout } = runCli(["fix", src]);
+    expect(code).toBe(1); // residual findings remain
+    expect(stdout).toContain("[reformat_numeric]");
+  });
+
   it("--fix-out writes to the named path", () => {
     const dir = tmp();
     const src = join(dir, "data.ags");

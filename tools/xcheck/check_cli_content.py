@@ -15,8 +15,8 @@ is REPORTED on every run — never silently skipped — and `--require-legs all`
 (CI) turns absence into failure, mirroring `xcheck` itself.
 
 Scope — printed on every run, because a filter nobody can see is a blind spot
-with a green tick on it: this gate reads the human forms of `validate` and
-`diff` only. Machine forms (`--json`/`--ndjson`/`--csv`) are the byte-exact
+with a green tick on it: this gate reads the human forms of `validate`,
+`diff` and `fix` only. Machine forms (`--json`/`--ndjson`/`--csv`) are the byte-exact
 tier, held by `emit_cli.py` + `xcheck`; the other verbs' human facts have no
 recorded divergence and no extractor yet.
 
@@ -27,8 +27,10 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -102,7 +104,7 @@ def diff_facts_binary(stdout: str) -> dict:
     }
     for line in stdout.splitlines():
         if m := re.fullmatch(r"(\S+) → (\S+)", line.strip()):
-            if facts["header"] is None and "total" not in line:
+            if facts["header"] is None:
                 facts["header"] = [m.group(1), m.group(2)]
         elif m := re.fullmatch(r"\s+(\S+)\s+\+(\d+) -(\d+) ~(\d+)", line):
             facts["groups"][m.group(1)] = [
@@ -153,6 +155,36 @@ def diff_facts_npx(stdout: str) -> dict:
     return facts
 
 
+def fix_facts_binary(stdout: str) -> dict:
+    """The binary / wheel layout:
+    `applied N fix(es) [kind, kind] → dest` + `dest: M finding(s) remain (…)`."""
+    facts: dict = {"applied": None, "kinds": None, "dest": None, "residual": None}
+    if m := re.search(r"applied (\d+) fix\(es\) \[(.*?)\] → (\S+)", stdout):
+        facts["applied"] = int(m.group(1))
+        facts["kinds"] = sorted(k.strip() for k in m.group(2).split(","))
+        facts["dest"] = m.group(3)
+    if m := re.search(r"(\d+) finding\(s\) remain", stdout):
+        facts["residual"] = int(m.group(1))
+    return facts
+
+
+def fix_facts_npx(stdout: str) -> dict:
+    """npx: `<FixResult N bytes, N fix(es) applied, M residual finding(s)>
+    [kind, kind] → dest` — its own one-liner, same facts (#542)."""
+    facts: dict = {"applied": None, "kinds": None, "dest": None, "residual": None}
+    if m := re.search(
+        r"(\d+) fix\(es\) applied, (\d+) residual finding\(s\)>"
+        r"(?: \[(.*?)\])? → (\S+)",
+        stdout,
+    ):
+        facts["applied"] = int(m.group(1))
+        facts["residual"] = int(m.group(2))
+        if m.group(3) is not None:
+            facts["kinds"] = sorted(k.strip() for k in m.group(3).split(","))
+        facts["dest"] = m.group(4)
+    return facts
+
+
 _EXTRACTORS = {
     # (check, launcher family) → extractor. cli-native and cli-uvx share a
     # deliberately byte-identical human layout (test_cli_human_table_rust_binary
@@ -167,6 +199,22 @@ _EXTRACTORS = {
         "cli-uvx": diff_facts_binary,
         "cli-npx": diff_facts_npx,
     },
+    "fix": {
+        "cli-native": fix_facts_binary,
+        "cli-uvx": fix_facts_binary,
+        "cli-npx": fix_facts_npx,
+    },
+}
+
+#: Facts a launcher's output must actually CARRY, per family. Guards the gate's
+#: own blind spot: if every leg failed the same way (a bad fixture path, say),
+#: the extractors would all return all-None dicts that AGREE, and equality alone
+#: would tick green over three broken runs. The contract says the facts must be
+#: there, not merely equal.
+REQUIRED_FACTS = {
+    "validate": ("edition", "resolution", "count"),
+    "diff": ("header", "total"),
+    "fix": ("applied", "kinds", "dest", "residual"),
 }
 
 #: check name → (verb argv, which extractor family). Validate runs a clean and a
@@ -177,7 +225,15 @@ CHECKS: list[tuple[str, str, list[str]]] = [
     ("validate.findings", "validate", ["validate", _DIRTY]),
     ("diff.facts", "diff", ["diff", _DIFF_A, _DIFF_B]),
     ("diff.facts_reversed", "diff", ["diff", _DIFF_B, _DIFF_A]),
+    # fix WRITES a sibling file, so it runs in a per-leg temp dir (see main) —
+    # the fixture has one mechanical fix and four residual findings, so every
+    # fact is non-trivial.
+    ("fix.result_line", "fix", ["fix", "rule8_dp_wrong_precision.ags"]),
 ]
+
+#: Fixtures a check needs copied beside it when it runs in a temp dir (the ops
+#: that write files); path is repo-relative, the argv above names the basename.
+TEMPDIR_FIXTURES = {"fix.result_line": [_DIRTY]}
 
 
 def main() -> None:
@@ -196,7 +252,7 @@ def main() -> None:
     for name in absent:
         print(f"leg {name}: UNAVAILABLE (executable not built) — not compared")
     print(
-        f"scope: human `validate` + `diff` facts across {len(present)} leg(s); "
+        f"scope: human `validate` + `diff` + `fix` facts across {len(present)} leg(s); "
         "machine forms and the other verbs' human output are NOT examined here "
         "(the byte tier is emit_cli.py + xcheck's)"
     )
@@ -208,11 +264,35 @@ def main() -> None:
 
     for check_id, family, argv in CHECKS:
         got: dict[str, dict] = {}
+        missing: list[str] = []
         for name, argv0 in present.items():
-            r = subprocess.run(
-                [*argv0, *argv], cwd=root, capture_output=True, text=True
+            if fixtures := TEMPDIR_FIXTURES.get(check_id):
+                with tempfile.TemporaryDirectory() as tmp:
+                    for rel in fixtures:
+                        shutil.copyfile(root / rel, Path(tmp) / Path(rel).name)
+                    r = subprocess.run(
+                        [*argv0, *argv], cwd=tmp, capture_output=True, text=True
+                    )
+            else:
+                r = subprocess.run(
+                    [*argv0, *argv], cwd=root, capture_output=True, text=True
+                )
+            facts = _EXTRACTORS[family][name](r.stdout)
+            # The exit code is a fact too — the launchers must agree on the verdict.
+            facts["exit"] = r.returncode
+            got[name] = facts
+            missing.extend(
+                f"{name}.{k}" for k in REQUIRED_FACTS[family] if facts[k] is None
             )
-            got[name] = _EXTRACTORS[family][name](r.stdout)
+        if missing:
+            failures += 1
+            print(
+                f"[no-facts] {check_id}: {', '.join(missing)} — "
+                "output carried no such fact"
+            )
+            for name, facts in got.items():
+                print(f"  {name}: {facts}")
+            continue
         vals = list(got.values())
         if any(v != vals[0] for v in vals[1:]):
             failures += 1

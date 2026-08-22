@@ -8,11 +8,7 @@
         "base": "rust-packages/laterite-ags4-xcheck/cases/inputs/diff_base.ags",
         "rev": "rust-packages/laterite-ags4-xcheck/cases/inputs/diff_rev.ags"
       },
-      "legs": [
-        "cli-native",
-        "cli-uvx",
-        "cli-npx"
-      ],
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
       "spec_ref": "`lat diff <base> <rev> --json` — the KEY-aware / type-aware delta. The base changes LOCA_NATE on BH1 (100.00 -> 150.00), removes BH2 and adds BH3, so the serialized delta must report one changed / one removed / one added row with the 2DP cell pair. Documented byte-identical across the three launchers; the JSON body carries no file paths, so identity holds regardless of how each launcher was invoked. `--ndjson` is a SILENT NO-OP on diff (a global flag diff never reads), so `--json` is diff's only machine contract and the one this pins (laterite-dev#555 part 2)."
     },
     {
@@ -22,11 +18,7 @@
         "base": "rust-packages/laterite-ags4-xcheck/cases/inputs/diff_base_nonascii.ags",
         "rev": "rust-packages/laterite-ags4-xcheck/cases/inputs/diff_rev_nonascii.ags"
       },
-      "legs": [
-        "cli-native",
-        "cli-uvx",
-        "cli-npx"
-      ],
+      "legs": ["cli-native", "cli-uvx", "cli-npx"],
       "spec_ref": "The falsification case #542's brief orders FIRST: every prior fixture was pure ASCII, so the raw-stdout comparison was green over the one axis the three JSON serializers disagree on. The changed LOCA_REM pair and the added row both carry bytes > 127 (e-acute, em dash, degree sign) so the serialized delta must carry them — a launcher escaping them (json.dumps' default ensure_ascii, laterite-dev#545) splits here."
     }
   ]
