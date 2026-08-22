@@ -15,6 +15,11 @@ import seeded from "./seeded-delivery.ags?raw";
  *  AGS4 delivery. */
 export const HERO_LINE_COUNT = 5;
 
+/** The build-time render: the committed fixture's own opening lines, and the
+ *  card's content until the engine wakes. The drift gate compares THESE
+ *  against the file on disk — which is why this module stays store-free: the
+ *  gate imports it under plain vitest, where the store's Solid graph cannot
+ *  initialise. The live half (heroLines) lives with the Hero component. */
 export const HERO_LINES: readonly string[] = seeded
   .split(/\r?\n/)
   .slice(0, HERO_LINE_COUNT);

@@ -33,7 +33,7 @@ import {
   delivery,
   findingsForGroup,
   focusLine,
-  groupFixes,
+  groupFixCount,
   isManualFinding,
   picked,
   reset,
@@ -143,11 +143,10 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
           <FindingCallout severity="note">
             The orphaned <code class="font-mono">LLPL</code> row is left
             standing on purpose — no fix button will touch it, and its finding
-            wears a <span class="font-mono text-micro uppercase">manual</span>{" "}
-            badge. The engine can tell you a lab result points at a sample that
-            does not exist, but only a human knows whether the sample reference
-            is wrong or the sample is missing. That is the whole difference
-            between a validator and a fixer.
+            wears a manual badge. The engine can tell you a lab result points at
+            a sample that does not exist, but only a human knows whether the
+            sample reference is wrong or the sample is missing. That is the
+            whole difference between a validator and a fixer.
           </FindingCallout>
         </div>
       </Show>
@@ -204,7 +203,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                   onDeleteRow={(row) => {
                     deleteRow("TRAN", row);
                   }}
-                  fixCount={groupFixes("TRAN").length}
+                  fixCount={groupFixCount("TRAN")}
                   onFix={() => {
                     void applyGroupFixes("TRAN");
                   }}
