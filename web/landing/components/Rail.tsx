@@ -40,7 +40,7 @@ import {
   bandBounds,
   depthAt,
   depthLabel,
-  probeOffsetPct,
+  railY,
   scrollProgress,
 } from "./railScroll";
 
@@ -74,7 +74,7 @@ export const Rail: Component = () => {
     });
   });
 
-  const probe = () => probeOffsetPct(progress());
+  const probe = () => railY(progress());
 
   return (
     <div
@@ -82,8 +82,12 @@ export const Rail: Component = () => {
       class="pointer-events-none fixed top-0 bottom-0 left-0 z-20 w-2 min-[68rem]:w-24 min-[68rem]:border-r min-[68rem]:border-line min-[68rem]:bg-surface"
     >
       {/* Inset below the masthead so the first tick is not hidden behind it,
-          and off the bottom so the last one is not flush to the edge. */}
-      <div class="relative h-full pt-14 pb-6">
+          and off the bottom so the last one is not flush to the edge. OFFSETS,
+          not padding: every child is absolutely positioned, and an absolute
+          child anchors to its containing block's padding box — padding here
+          moved nothing, which is how the 0.00 tick ended up under the sticky
+          masthead (#524). */}
+      <div class="absolute inset-x-0 top-14 bottom-6">
         {/* The strip: seven equal bands, top to bottom, one per section. */}
         <div class="absolute inset-y-0 left-0 w-2 overflow-hidden min-[68rem]:left-6 min-[68rem]:w-[26px] min-[68rem]:rounded-sm">
           <For each={SECTIONS}>
@@ -139,7 +143,7 @@ export const Rail: Component = () => {
               >
                 <div class="h-px w-3 bg-line-strong" />
                 <p class="mt-0.5 font-mono text-[0.58rem] leading-tight text-fg-faint">
-                  {depthLabel((i() / SECTIONS.length) * total)} m
+                  {depthLabel(depthAt(i() / SECTIONS.length, total))} m
                 </p>
                 <p class="font-mono text-[0.58rem] leading-tight text-fg-muted">
                   {section.label}
@@ -147,6 +151,17 @@ export const Rail: Component = () => {
               </div>
             )}
           </For>
+
+          {/* The terminal tick: the hole has a floor, and the scale says so.
+              Section ticks mark section TOPS, so without this the deepest
+              label was the last section's top and the bottom of the hole went
+              unlabelled (#524). Depth only — there is no section down here. */}
+          <div class="absolute inset-x-0" style={{ top: `${railY(1)}%` }}>
+            <div class="h-px w-3 bg-line-strong" />
+            <p class="mt-0.5 font-mono text-[0.58rem] leading-tight text-fg-faint">
+              {depthLabel(total)} m
+            </p>
+          </div>
         </div>
       </div>
     </div>

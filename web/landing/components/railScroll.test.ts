@@ -4,10 +4,11 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  RAIL_INSET_PCT,
   bandBounds,
   depthAt,
   depthLabel,
-  probeOffsetPct,
+  railY,
   scrollProgress,
 } from "./railScroll";
 import { SECTIONS } from "../sections";
@@ -53,39 +54,54 @@ describe("depthLabel", () => {
   });
 });
 
-describe("probeOffsetPct", () => {
+describe("railY — the one vertical mapping", () => {
   it("keeps the pill on screen at both extremes", () => {
     // The failure this prevents: a pill clipped in half against the top edge.
-    expect(probeOffsetPct(0)).toBe(4);
-    expect(probeOffsetPct(1)).toBe(96);
+    expect(railY(0)).toBe(RAIL_INSET_PCT);
+    expect(railY(1)).toBe(100 - RAIL_INSET_PCT);
   });
 
   it("still travels monotonically between them", () => {
-    expect(probeOffsetPct(0.5)).toBeCloseTo(50);
-    expect(probeOffsetPct(0.25)).toBeLessThan(probeOffsetPct(0.75));
+    expect(railY(0.5)).toBeCloseTo(50);
+    expect(railY(0.25)).toBeLessThan(railY(0.75));
   });
 
   it("does not clamp the DEPTH to keep the pill visible", () => {
     // Decoupled on purpose — a rail that shortened the hole to fit its own
     // pill would lie about how deep the reader is.
     expect(depthLabel(depthAt(1, 25))).toBe("25.00");
-    expect(probeOffsetPct(1)).toBeLessThan(100);
+    expect(railY(1)).toBeLessThan(100);
+  });
+
+  it("positions a tick and the pill identically at the same depth (#524)", () => {
+    // The defect this pins, stated CROSS-function because that is where it
+    // lived: the component places section ticks at band TOPS (bandBounds) and
+    // the pill at railY(progress), and pre-#524 those were two different runs
+    // — bandBounds on a plain 0-100%, the pill inset — so the pill's number
+    // never matched the label beside it. Against that arithmetic this fails
+    // on every band but the first; two identical calls to one function would
+    // prove nothing.
+    const n = SECTIONS.length;
+    for (let i = 0; i < n; i++) {
+      const tickY = bandBounds(i, n).top;
+      const pillYAtTickDepth = railY(i / n);
+      expect(tickY).toBeCloseTo(pillYAtTickDepth);
+    }
+    // And the terminal tick: the pill's journey ends where the last band does.
+    const last = bandBounds(n - 1, n);
+    expect(railY(1)).toBeCloseTo(last.top + last.height);
   });
 });
 
 describe("bandBounds", () => {
-  it("tiles the strip exactly, with no gap and no overlap", () => {
+  it("tiles contiguously, with no gap and no overlap", () => {
     const bands = SECTIONS.map((_, i) => bandBounds(i, SECTIONS.length));
-    expect(bands.at(0)?.top).toBe(0);
     for (let i = 1; i < bands.length; i++) {
       const prev = bands[i - 1];
       const here = bands[i];
       if (!prev || !here) throw new Error("bandBounds returned a hole");
       expect(here.top).toBeCloseTo(prev.top + prev.height);
     }
-    const last = bands.at(-1);
-    if (!last) throw new Error("no bands");
-    expect(last.top + last.height).toBeCloseTo(100);
   });
 
   it("gives every section an equal band, whatever its pixel height", () => {

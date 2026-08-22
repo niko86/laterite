@@ -59,6 +59,9 @@
       },
       {
         "text": "**The landing page rendered zoomed-out on phones.** Below the 64rem breakpoint the group sections’ grid children kept `min-width: auto`, so the nowrap tables’ min-content sized the page — a 390px phone got a 783px layout viewport scaled down to fit, and every table’s own scroller sat inert because the page had grown instead. The width floor now holds at every width (`min-w-0` on both grid children): the document stays exactly viewport-wide and each table pans inside its own scroller, which is what the table component promises — nine columns on a phone move the table, not the page. A landing lane in the Playwright suite pins the contract at a strict 390px viewport, with no mobile emulation — emulation absorbs exactly this overflow into zoom, which is how it shipped unseen."
+      },
+      {
+        "text": "**The borehole rail’s scale hid its first tick and disagreed with its own pill.** Three geometry defects, one cause each: the rail inset itself with padding its absolutely-positioned children ignore, so “0.00 m / Surface” rendered under the sticky masthead (visible during macOS overscroll bounce); the pill, probe and veil positioned through an inset run while the bands and ticks used a plain 0–100% run, so the depth the pill showed never matched the tick label beside it; and ticks marked section tops only, so the bottom of the hole went unlabelled. The inner box now insets with offsets, ONE shared mapping positions bands, ticks, veil, probe and pill — unit tests pin that a tick and the pill land identically at the same depth — and a terminal tick labels the seeded final depth, read from the delivery fixture so a LOCA_FDEP edit moves it with no code change. A desktop lane joins the landing Playwright project to hold the scale’s geometry."
       }
     ],
     "security": []
