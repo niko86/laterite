@@ -2,9 +2,9 @@
  *
  * THE REPETITION IS THE RELATIONSHIP. AGS4 has no ids and no joins: a child
  * group restates its parent's KEY headings verbatim, which is why LLPL is nine
- * columns wide and why SAMP_ID appears in three of the four tables. The design
- * lets that land rather than hiding it — it is the most surprising thing about
- * the format to a newcomer, and the page's best four seconds.
+ * columns wide and why SAMP_ID appears in three of the four descent tables.
+ * The design lets that land rather than hiding it — it is the most surprising
+ * thing about the format to a newcomer, and the page's best four seconds.
  *
  * ## The table stays a table
  *
@@ -317,7 +317,8 @@ export const GroupTable: Component<{
                       const failing = () => cellFindings().length > 0;
                       /* The engine's worst tier on this cell drives tint,
                          text and marker alike — one severity grammar across
-                         all four tables (#526), never decided here. */
+                         every table on the page (#526), never decided
+                         here. */
                       const worst = createMemo(() =>
                         worstSeverity(cellFindings()),
                       );

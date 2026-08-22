@@ -83,8 +83,11 @@ test("phone: the page stays viewport-wide and each group table pans in its own s
   // Each table must overflow ITS OWN scroller and pan there — the design
   // contract on the table component: "nine columns on a 390px phone must move
   // the table, not the page". Before the fix all four scrollers reported
-  // clientWidth == scrollWidth: the page had grown instead.
-  for (const section of GROUPS) {
+  // clientWidth == scrollWidth: the page had grown instead. The contract
+  // covers every table added since, too: "file" is the TRAN cover sheet
+  // (#527), which lives in the File section rather than a descent section
+  // of its own.
+  for (const section of [...GROUPS, "file"]) {
     const el = scroller(page, section);
     const geo = await el.evaluate((node) => ({
       scrollWidth: node.scrollWidth,
