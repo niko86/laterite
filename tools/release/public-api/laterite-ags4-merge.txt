@@ -94,6 +94,8 @@ pub fn laterite_ags4_merge::MergeWarning::eq(&self, &laterite_ags4_merge::MergeW
 impl core::fmt::Debug for laterite_ags4_merge::MergeWarning
 pub fn laterite_ags4_merge::MergeWarning::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_merge::MergeWarning
+impl serde_core::ser::Serialize for laterite_ags4_merge::MergeWarning
+pub fn laterite_ags4_merge::MergeWarning::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
 impl core::marker::Freeze for laterite_ags4_merge::MergeWarning
 impl core::marker::Send for laterite_ags4_merge::MergeWarning
 impl core::marker::Sync for laterite_ags4_merge::MergeWarning
@@ -114,6 +116,8 @@ pub fn laterite_ags4_merge::RevisionNote::eq(&self, &laterite_ags4_merge::Revisi
 impl core::fmt::Debug for laterite_ags4_merge::RevisionNote
 pub fn laterite_ags4_merge::RevisionNote::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
 impl core::marker::StructuralPartialEq for laterite_ags4_merge::RevisionNote
+impl serde_core::ser::Serialize for laterite_ags4_merge::RevisionNote
+pub fn laterite_ags4_merge::RevisionNote::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
 impl core::marker::Freeze for laterite_ags4_merge::RevisionNote
 impl core::marker::Send for laterite_ags4_merge::RevisionNote
 impl core::marker::Sync for laterite_ags4_merge::RevisionNote
