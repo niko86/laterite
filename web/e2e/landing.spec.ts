@@ -322,6 +322,97 @@ test.describe("fine: the clipboard contract (#551)", () => {
     await page.evaluate(() => navigator.clipboard.readText());
     await expect(cell).toHaveText("BH01");
   });
+
+  test("fine: a multi-line clipboard lands as one line, the same one the editor's own input yields", async ({
+    page,
+    hasTouch,
+  }) => {
+    test.skip(hasTouch, "selected-cell chords are the fine pointer's (#525)");
+    await page.goto("/");
+    await page.evaluate(() => navigator.clipboard.writeText("AB\nCD"));
+
+    // MEASURE FIRST, off a live input: a native single-line field is the rule
+    // the handler is defined by, so the reference has to be observed rather
+    // than restated. The editor opens select-all, so the paste replaces.
+    const other = page.getByRole("button", {
+      name: "Edit LOCA_REM on row 1 of LOCA",
+    });
+    await other.click();
+    await page.keyboard.press("Enter");
+    const input = page.getByRole("textbox", {
+      name: "LOCA_REM on row 1 of LOCA",
+    });
+    // keyboard.press does NOT auto-wait; the editor focuses in onMount, and a
+    // paste that arrives first lands on the cell button, where onKeys returns
+    // early because editing() is already set — so nothing would paste anywhere.
+    await expect(input).toBeFocused();
+    await page.keyboard.press("ControlOrMeta+v");
+    const native = await input.inputValue();
+    await page.keyboard.press("Escape");
+
+    // The handler path (#574): the ONE entry point no browser sanitizes for
+    // us. Compare it to what was just MEASURED, not to a repeated literal —
+    // two hardcoded constants agree with each other whatever the handler does,
+    // which is exactly how a wrong normalization rule survives a green suite.
+    const target = page.getByRole("button", {
+      name: "Edit LOCA_ID on row 1 of LOCA",
+    });
+    await target.click();
+    await page.keyboard.press("ControlOrMeta+v");
+    // textContent, NOT toHaveText: the matcher normalizes whitespace, and the
+    // browser collapses a rendered newline to a space — so an unfixed handler
+    // that commits "AB\nCD" verbatim reads as "AB CD" and the assertion passes
+    // over the very defect it exists for. The raw string is the only witness.
+    await expect.poll(() => target.textContent()).toBe(native);
+
+    // And pin the measurement itself, so a browser that changes its mind is a
+    // visible failure here rather than a target both sides move to together.
+    // The value is a SPACE, not nothing: reading HTML's value sanitization
+    // algorithm suggests the terminator is stripped, and a live paste disagrees.
+    expect(native).toBe("AB CD");
+  });
+
+  test("fine: a pasted newline cannot make another group's fix truncate this row", async ({
+    page,
+    hasTouch,
+  }) => {
+    test.skip(hasTouch, "selected-cell chords are the fine pointer's (#525)");
+    await page.goto("/");
+    await page.evaluate(() => navigator.clipboard.writeText("AB\nCD"));
+
+    // The lossy path #574 was filed for. A terminator in a cell tears the
+    // DATA record in two; the demo's own parser then drops the fragment
+    // after the break, because it opens with no data descriptor. Applying
+    // ANOTHER group's fixes reparses the whole file, so the damage lands on
+    // a row the reader never touched — and the row COUNT survives it, which
+    // is why this asserts a sibling cell rather than a row tally.
+    const ref = page.getByRole("button", {
+      name: "Edit SAMP_REF on row 1 of SAMP",
+    });
+    await ref.click();
+    await page.keyboard.press("ControlOrMeta+v");
+    // Deliberately NO assertion on the pasted cell here. In a regressed world
+    // the handler commits a raw terminator, so checking the normalized value
+    // first fails at this line — and the cross-group truncation below, which
+    // is this test's entire subject, never runs. Settle the async clipboard
+    // read instead, using the ordering guarantee the sibling test relies on:
+    // a read issued now cannot resolve before one the handler queued earlier.
+    await page.evaluate(() => navigator.clipboard.readText());
+
+    // LOCA carries the one seeded engine fix and SAMP is not in its scope,
+    // so the fixer never visits the pasted cell (#530 scopes by group).
+    await page
+      .getByRole("button", { name: "Fix 1 auto-fixable in LOCA" })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Fix 0 auto-fixable in LOCA" }),
+    ).toBeVisible();
+
+    await expect(
+      page.getByRole("button", { name: "Edit SAMP_ID on row 1 of SAMP" }),
+    ).toHaveText("BH01-S1");
+    await expect.poll(() => ref.textContent()).toBe("AB CD");
+  });
 });
 
 test("fine: click selects, Enter edits in place, Esc cancels, Tab commits and moves, arrows navigate, typing replaces", async ({
