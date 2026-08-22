@@ -173,7 +173,9 @@ test("fine: click selects, Enter edits in place, Esc cancels, Tab commits and mo
   await page.goto("/");
 
   // The seeded Rule 8 defect: LOCA_GL is 11.8 where 2DP demands 11.80. The
-  // first click selects AND arms the engine, so the ✗ arrives on this cell.
+  // click selects the cell; the engine is already loading eagerly (#531),
+  // and the click's own arm() is just the fast path — either way the ✗
+  // arrives on this cell.
   const cell = page.getByRole("button", {
     name: "Edit LOCA_GL on row 1 of LOCA",
   });
@@ -354,7 +356,8 @@ test("fine: findings speak one vocabulary — tinted cell with tooltip, table st
   test.skip(hasTouch, "the tooltip needs a pointer that can hover (#526)");
   await page.goto("/");
 
-  // Arm the engine by selecting the seeded Rule 8 cell; the findings arrive
+  // Select the seeded Rule 8 cell (arming is eager since #531 — the click
+  // is only the fast path); the findings arrive
   // and the cell wears the ERROR grammar: tint + marker + tooltip carrying
   // what the engine actually said.
   const cell = page.getByRole("button", {
@@ -402,7 +405,8 @@ test("fine: the TRAN cover sheet seeds clean, and Rule 14 only fires when the re
   });
   await expect(coverCell).toBeVisible();
 
-  // Arm via the cover sheet itself; once findings render, Rule 14 is NOT
+  // Select via the cover sheet itself (arming is eager since #531); once
+  // findings render, Rule 14 is NOT
   // among them — the permanent unclearable finding is gone from the seed.
   await coverCell.click();
   await expect(file.getByText("AGS Format Rule 8").first()).toBeVisible();
@@ -586,7 +590,8 @@ test("fine: the fix budget lives on each table — scoped to its group, honest a
   test.skip(hasTouch, "the tooltip half needs a pointer that can hover (#530)");
   await page.goto("/");
 
-  // Arm on the seeded Rule 8 cell; the counts arrive with the findings.
+  // Select the seeded Rule 8 cell (arming is eager since #531); the
+  // counts arrive with the findings.
   const cell = page.getByRole("button", {
     name: "Edit LOCA_GL on row 1 of LOCA",
   });
@@ -673,7 +678,8 @@ test("touch: the fix budget applies from a tap too", async ({
   test.skip(!hasTouch, "the fine lane covers the hover-tooltip half (#530)");
   await page.goto("/");
 
-  // Arm by tapping the seeded Rule 8 cell (opens the carousel — fine), then
+  // Tap the seeded Rule 8 cell (opens the carousel — fine; arming is
+  // eager since #531), then
   // spend LOCA's budget from its table header.
   await page
     .getByRole("button", { name: "Edit LOCA_GL on row 1 of LOCA" })
@@ -799,6 +805,19 @@ test("wide: the hero card is the seed's own opening lines, and it verdicts live"
     .click();
   await expect(heroChip).not.toHaveText(before);
   await expect(heroChip).toContainText(/error/);
+
+  // The LINES hydrate too: a card labelled delivery.ags must show the
+  // delivery, not a snapshot of its seed. Edit the project name and the
+  // card's PROJ row follows.
+  await page
+    .getByRole("button", { name: "Edit PROJ_NAME on row 1 of PROJ" })
+    .click();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Barrow Lane, Phase 3");
+  await page.keyboard.press("Enter");
+  await expect(page.locator("section#top pre")).toContainText(
+    "Barrow Lane, Phase 3",
+  );
 });
 
 test("touch: the floating verdict follows without covering the editor", async ({

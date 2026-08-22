@@ -19,8 +19,17 @@
 
 import { For, type Component } from "solid-js";
 import { Button } from "@shared/components";
-import { HERO_LINES } from "../demo/heroExcerpt";
+import { HERO_LINES, HERO_LINE_COUNT } from "../demo/heroExcerpt";
 import { Scoreboard } from "../demo/Scoreboard";
+import { armed, text } from "../demo/store";
+
+/** What the card renders (#531 "hydrates"): the LIVE file's opening lines
+ *  once the engine is armed, the build-time slice before that. The two are
+ *  identical until the reader edits — and after an edit the card labelled
+ *  delivery.ags must show the delivery, not a snapshot of its seed, or the
+ *  hero is back to disagreeing with the demo below it. */
+const heroLines = (): readonly string[] =>
+  armed() ? text().split(/\r?\n/).slice(0, HERO_LINE_COUNT) : HERO_LINES;
 
 export const Hero: Component = () => (
   <div class="grid items-center gap-10 min-[64rem]:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
@@ -66,7 +75,7 @@ export const Hero: Component = () => (
         <Scoreboard />
       </div>
       <pre class="overflow-x-auto font-mono text-caption leading-[1.7] text-fg-soft">
-        <For each={HERO_LINES}>
+        <For each={heroLines()}>
           {(line) => {
             const at = line.indexOf(",");
             return (

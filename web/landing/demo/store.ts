@@ -89,28 +89,40 @@ const text = createMemo(() => emit(delivery()));
  * warns that the computations can never be disposed, and it is right — this
  * store IS the page's lifetime, so the root is stated rather than left implicit.
  */
-const { report, busy, fixes } = createRoot(() => {
+const { report, busy, counted } = createRoot(() => {
   const [res] = createResource(
-    () => (armed() ? text() : false),
-    // One fetch, both answers: the findings and the fixes describe the same
-    // text, so computing them together means the page can never show a fix
-    // count from one revision beside findings from another (#530). The cost
-    // is a second engine pass per revalidation — accepted for coherence.
-    async (current: string) => ({
-      report: await validateText(current),
-      fixes: await computeFixesText(current),
-    }),
+    () => (armed() ? delivery() : false),
+    // One fetch, all three answers: the findings, the fixes, AND the delivery
+    // they were computed against. Keying the fetcher on the delivery (not its
+    // text) lets the result carry that snapshot, so a fix's line is only ever
+    // mapped to a group through the SAME revision the engine saw — mixing a
+    // stale fix list with a fresh delivery could count a fix against the
+    // wrong table during the revalidation window (#530). The cost is a
+    // second engine pass per revalidation — accepted for coherence.
+    async (snapshot: Delivery) => {
+      const current = emit(snapshot);
+      return {
+        report: await validateText(current),
+        fixes: await computeFixesText(current),
+        snapshot,
+      };
+    },
   );
   // Named accessors rather than the resource itself, so callers read `report()`
   // and `busy()` without knowing this is a resource — and so the resource's
   // `undefined`-before-first-fetch becomes the `null` the UI already handles.
   const report: Accessor<Report | null> = () => res()?.report ?? null;
   const busy: Accessor<boolean> = () => res.loading;
-  const fixes: Accessor<readonly Fix[]> = () => res()?.fixes ?? [];
-  return { report, busy, fixes };
+  const counted: Accessor<
+    {
+      readonly fixes: readonly Fix[];
+      readonly snapshot: Delivery;
+    } | null
+  > = () => res() ?? null;
+  return { report, busy, counted };
 });
 
-export { armed, busy, delivery, fixes, focusLine, picked, report, text };
+export { armed, busy, delivery, focusLine, picked, report, text };
 export { setFocusLine, setPicked };
 
 /** Start the engine once the page has painted and the thread is idle (#531).
@@ -252,24 +264,17 @@ export function reset(): void {
   commit(() => SEEDED);
 }
 
-/** Run the engine's OWN fixer over the current delivery.
+/** Apply one group's share of the engine's OWN fixes (#530).
  *
- * Deliberately not a bespoke landing-page repair. #398 described Fix as
- * correcting the decimal places, the abbreviation case and the missing TRAN
- * group; TRAN has since joined the seed as a clean cover sheet (#527), and
- * the shipped fixer mechanically repairs only the decimals, reporting the
- * rest as findings a human has to decide about. Hand-rolling the other two here
- * would make the page repair more than `lat fix` does, so a reader who tried the
- * same file on their own machine would get a different answer from the demo that
- * sold them the tool. The engine is the authority, exactly as it is for severity.
+ * Deliberately not a bespoke landing-page repair: hand-rolling more than the
+ * shipped fixer does would make the page repair more than `lat fix`, and a
+ * reader who tried the same file on their own machine would get a different
+ * answer from the demo that sold them the tool. The engine is the authority,
+ * exactly as it is for severity — this function only FILTERS its list.
  *
- * What survives is the argument, intact and now true of the real tool: a
- * validator tells you what is wrong, and a human decides what is right.
- */
-/** Apply one group's share of the engine's fixes (#530). Recomputed fresh
- *  against the current text rather than read from the resource, so a click
- *  can never apply a list computed for an older revision. Only FILTERS the
- *  engine's list — the demo never repairs more than `lat fix` would. */
+ * Recomputed fresh against the current text rather than read from the
+ * resource, so a click can never apply a list computed for an older
+ * revision. */
 export async function applyGroupFixes(group: string): Promise<number> {
   arm();
   const current = text();
@@ -281,16 +286,21 @@ export async function applyGroupFixes(group: string): Promise<number> {
   return mine.length;
 }
 
-/** The fixes whose anchor falls in one group's block — the count on that
- *  table's header button. */
-export function groupFixes(group: string): readonly Fix[] {
-  return fixesForGroup(fixes(), delivery(), group);
+/** One table's fix budget (#530): how many of the engine's fixes anchor in
+ *  its block — or null before the first count exists, because "zero" and
+ *  "not yet counted" are different claims (the scoreboard's own rule). Lines
+ *  are mapped through the snapshot the fixes were computed against, never a
+ *  fresher delivery. */
+export function groupFixCount(group: string): number | null {
+  const c = counted();
+  if (!c) return null;
+  return fixesForGroup(c.fixes, c.snapshot, group).length;
 }
 
 /** True when the fixer will not touch this finding — the "manual" badge on
  *  strips and tooltips (#530). */
 export function isManualFinding(finding: Finding): boolean {
-  return isManual(finding, fixes());
+  return isManual(finding, counted()?.fixes ?? []);
 }
 
 /** The findings that land on one cell — used to mark it in the table and to

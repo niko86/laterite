@@ -111,11 +111,12 @@ export const GroupTable: Component<{
   picked: { row: number; col: number } | null;
   onCommit: (row: number, col: number, value: string) => void;
   onDeleteRow: (row: number) => void;
-  /** #530: how many of the engine's fixes anchor in this group, and what
-   *  clicking the header button applies. Count and action both come from the
-   *  store's scoping of the engine's own list — this component only renders
-   *  them. */
-  fixCount: number;
+  /** #530: how many of the engine's fixes anchor in this group — or null
+   *  before the engine's first count, which renders no button at all: "Fix 0"
+   *  before anything was counted would be a false zero (#531's scoreboard
+   *  rule). Count and action both come from the store's scoping of the
+   *  engine's own list — this component only renders them. */
+  fixCount: number | null;
   onFix: () => void;
 }> = (props) => {
   const lastKey = () =>
@@ -248,20 +249,24 @@ export const GroupTable: Component<{
 
       {/* The table's own header (#530): the fix budget lives ON the table it
           repairs, disabled at zero rather than hidden so "nothing fixable
-          here" stays a visible fact, not an absence. */}
-      <div class="flex items-center justify-end border-b border-laterite-200 px-2 py-1">
-        <Button
-          variant="action"
-          size="sm"
-          disabled={props.fixCount === 0}
-          aria-label={`Fix ${props.fixCount} auto-fixable in ${props.schema.code}`}
-          onClick={() => {
-            props.onFix();
-          }}
-        >
-          Fix {props.fixCount} auto-fixable
-        </Button>
-      </div>
+          here" stays a visible fact, not an absence — but only once a count
+          EXISTS. Before the engine's first pass the bar stays empty rather
+          than stating a zero nobody computed. */}
+      <Show when={props.fixCount !== null}>
+        <div class="flex items-center justify-end border-b border-laterite-200 px-2 py-1">
+          <Button
+            variant="action"
+            size="sm"
+            disabled={props.fixCount === 0}
+            aria-label={`Fix ${props.fixCount} auto-fixable in ${props.schema.code}`}
+            onClick={() => {
+              props.onFix();
+            }}
+          >
+            Fix {props.fixCount} auto-fixable
+          </Button>
+        </div>
+      </Show>
 
       <div class="overflow-x-auto overscroll-x-contain">
         <table class="w-full border-collapse text-left">
