@@ -10,11 +10,14 @@ import path from "node:path";
 // is how #523 was found: the group-section grids let the nowrap tables size
 // the page, and a 390px phone got a 783px layout viewport zoomed out to fit.
 //
-// This spec runs under the `landing` (390) and `landing-wide` (1280) projects
+// This spec runs under the `landing` (390, fine pointer), `landing-touch`
+// (390, coarse pointer) and `landing-wide` (1280) projects
 // (playwright.config.ts), against the landing's OWN preview server — the
 // landing is a separate build (see web/landing/vite.config.ts), so the app's
-// server cannot serve it. Width-specific tests skip themselves on the other
-// project, the way layout.spec.ts branches on viewport.
+// server cannot serve it. Width- and modality-specific tests skip themselves
+// on the other projects, the way layout.spec.ts branches on viewport. The
+// editors split by MODALITY (#525): `hasTouch` is what makes Chromium report
+// `pointer: coarse`, so it is the skip condition, not the width.
 
 const GROUPS = ["proj", "loca", "samp", "llpl"] as const;
 
@@ -100,23 +103,178 @@ test("phone: the page stays viewport-wide and each group table pans in its own s
   }
 });
 
-test("phone: opening the row editor does not widen the page", async ({
+test("touch: the carousel opens, pages, closes — and never widens the page", async ({
   page,
+  hasTouch,
 }) => {
+  test.skip(!hasTouch, "the carousel is the coarse pointer's editor (#525)");
   await page.goto("/");
 
-  // LLPL is the widest table (nine columns, every cell nowrap) and the row
-  // editor is the pattern chosen to carry it at 390px — so it is the
+  // LLPL is the widest table (nine columns, every cell nowrap) and the
+  // carousel is the pattern chosen to carry it at 390px — so it is the
   // pairing most able to push the page out. The first column is sticky, so
   // its cell is tappable without panning.
   await page
     .getByRole("button", { name: "Edit LOCA_ID on row 1 of LLPL" })
     .click();
+  const carousel = page.getByRole("group", { name: "Editing row 1 of LLPL" });
+  await expect(carousel).toBeVisible();
+  await expectViewportWide(page);
+
+  // Paging lands on the next field's card.
+  await carousel
+    .getByRole("button", { name: "Next field in this row" })
+    .click();
+  await expect(carousel.getByText("SAMP_TOP", { exact: true })).toBeVisible();
+
+  await carousel.getByRole("button", { name: "Close the row editor" }).click();
+  await expect(carousel).toBeHidden();
+  await expectViewportWide(page);
+});
+
+test("touch: a row deletes from the carousel and the findings follow", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!hasTouch, "the carousel is the coarse pointer's editor (#525)");
+  await page.goto("/");
+
+  // The Rule 13 teach-loop the delete exists to unwind (#525): a second PROJ
+  // row is flagged, and before row delete the only way back was a full reset.
+  const proj = page.locator("section#proj");
+  const rows = proj.locator("tbody tr");
+  await proj.getByRole("button", { name: "+ row" }).click();
+  await expect(rows).toHaveCount(2);
+  await expect(proj.locator("li").first()).toBeVisible();
+
+  await proj
+    .getByRole("button", { name: "Edit PROJ_ID on row 2 of PROJ" })
+    .click();
+  await page
+    .getByRole("group", { name: "Editing row 2 of PROJ" })
+    .getByRole("button", { name: "Delete this row" })
+    .click();
+  await expect(rows).toHaveCount(1);
+  // Deleting the row it edited closes the carousel — the row is gone.
   await expect(
-    page.getByRole("group", { name: "Editing row 1 of LLPL" }),
-  ).toBeVisible();
+    page.getByRole("group", { name: "Editing row 2 of PROJ" }),
+  ).toBeHidden();
+  await expect(proj.locator("li")).toHaveCount(0);
+});
+
+test("fine: click selects, Enter edits in place, Esc cancels, Tab commits and moves, arrows navigate, typing replaces", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "in-place editing is the fine pointer's editor (#525)");
+  await page.goto("/");
+
+  // The seeded Rule 8 defect: LOCA_GL is 11.8 where 2DP demands 11.80. The
+  // first click selects AND arms the engine, so the ✗ arrives on this cell.
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_GL on row 1 of LOCA",
+  });
+  await cell.click();
+  await expect(cell).toHaveClass(/bg-accent-quiet/);
+  await expect(cell).toContainText("✗");
+
+  // Enter opens the value in place; typing replaces the selection; Enter
+  // commits — and the live revalidation clears the finding.
+  await page.keyboard.press("Enter");
+  const editor = page.getByLabel("LOCA_GL on row 1 of LOCA", {
+    exact: true,
+  });
+  await expect(editor).toBeVisible();
+  await page.keyboard.type("11.80");
+  await page.keyboard.press("Enter");
+  await expect(editor).toBeHidden();
+  await expect(cell).toContainText("11.80");
+  await expect(cell).not.toContainText("✗");
+
+  // Esc restores: the draft dies with the editor.
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("999");
+  await page.keyboard.press("Escape");
+  await expect(cell).toContainText("11.80");
+
+  // Arrows move the selection, not the scroller.
+  await page.keyboard.press("ArrowRight");
+  const neighbour = page.getByRole("button", {
+    name: "Edit LOCA_REM on row 1 of LOCA",
+  });
+  await expect(neighbour).toHaveClass(/bg-accent-quiet/);
+
+  // Type-to-replace: a printable key opens the editor already holding it.
+  await page.keyboard.type("X");
+  const remEditor = page.getByLabel("LOCA_REM on row 1 of LOCA", {
+    exact: true,
+  });
+  await expect(remEditor).toHaveValue("X");
+
+  // Tab commits and moves on.
+  await page.keyboard.press("Tab");
+  await expect(neighbour).toHaveText("X");
+  await expect(
+    page.getByRole("button", { name: "Edit LOCA_FDEP on row 1 of LOCA" }),
+  ).toHaveClass(/bg-accent-quiet/);
 
   await expectViewportWide(page);
+});
+
+test("fine: rows delete from the table, and undo/redo walk the model timeline", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "in-place editing is the fine pointer's editor (#525)");
+  await page.goto("/");
+
+  // Row delete, fine-pointer affordance: the per-row ✕, revalidating live.
+  const proj = page.locator("section#proj");
+  const rows = proj.locator("tbody tr");
+  await proj.getByRole("button", { name: "+ row" }).click();
+  await expect(rows).toHaveCount(2);
+  await expect(proj.locator("li").first()).toBeVisible();
+  await proj.getByRole("button", { name: "Delete row 2 of PROJ" }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(proj.locator("li")).toHaveCount(0);
+
+  // Undo resurrects the deleted row; again, the add; redo replays it.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(rows).toHaveCount(2);
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(rows).toHaveCount(1);
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await expect(rows).toHaveCount(2);
+
+  // Deleting AT the pick with rows still below it: the selection must close,
+  // not silently re-aim at the row that shifted up. Four rows, pick row 2,
+  // delete row 2 — an out-of-range guard alone would keep the pick alive
+  // pointing at the former row 3.
+  await proj.getByRole("button", { name: "+ row" }).click();
+  await proj.getByRole("button", { name: "+ row" }).click();
+  await expect(rows).toHaveCount(4);
+  await proj
+    .getByRole("button", { name: "Edit PROJ_ID on row 2 of PROJ" })
+    .click();
+  // `.bg-accent-quiet` matches the class TOKEN — a [class*=] substring match
+  // would also catch every cell's hover:bg-accent-quiet.
+  await expect(proj.locator("td button.bg-accent-quiet")).toHaveCount(1);
+  await proj.getByRole("button", { name: "Delete row 2 of PROJ" }).click();
+  await expect(rows).toHaveCount(3);
+  await expect(proj.locator("td button.bg-accent-quiet")).toHaveCount(0);
+
+  // Undo covers cell edits from the in-place editor too.
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_GL on row 1 of LOCA",
+  });
+  await cell.click();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("11.80");
+  await page.keyboard.press("Enter");
+  await expect(cell).toContainText("11.80");
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(cell).toContainText("11.8");
+  await expect(cell).not.toContainText("11.80");
 });
 
 test("wide: the depth scale clears the masthead and labels the hole's floor", async ({

@@ -129,7 +129,9 @@ export function lineOfRow(
   return -1;
 }
 
-/** Replace one cell, returning a new delivery. */
+/** Replace one cell, returning a new delivery — or the SAME delivery when the
+ *  value already matches, so a commit-without-change (Enter on an untouched
+ *  editor, a click away) records no undo step. */
 export function setCell(
   delivery: Delivery,
   code: string,
@@ -137,6 +139,10 @@ export function setCell(
   colIndex: number,
   value: string,
 ): Delivery {
+  const current = delivery.find((g) => g.code === code)?.rows[rowIndex]?.[
+    colIndex
+  ];
+  if (current === value) return delivery;
   return delivery.map((g) =>
     g.code !== code
       ? g
@@ -148,6 +154,24 @@ export function setCell(
               : row.map((cell, j) => (j === colIndex ? value : cell)),
           ),
         },
+  );
+}
+
+/** Remove one DATA row, returning a new delivery — or the SAME delivery for a
+ *  group or row that is not there, so callers can use identity to skip a
+ *  history entry for a no-op. Declaration rows are untouchable by
+ *  construction: `rows` holds DATA lines only. */
+export function deleteRow(
+  delivery: Delivery,
+  code: string,
+  rowIndex: number,
+): Delivery {
+  const group = delivery.find((g) => g.code === code);
+  if (!group || rowIndex < 0 || rowIndex >= group.rows.length) return delivery;
+  return delivery.map((g) =>
+    g.code !== code
+      ? g
+      : { ...g, rows: g.rows.filter((_, i) => i !== rowIndex) },
   );
 }
 

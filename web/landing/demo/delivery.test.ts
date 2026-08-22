@@ -14,6 +14,7 @@ import seededText from "./seeded-delivery.ags?raw";
 import {
   SEEDED,
   addRow,
+  deleteRow,
   emit,
   lineOfRow,
   parse,
@@ -121,6 +122,14 @@ describe("setCell", () => {
     setCell(SEEDED, "LOCA", 0, 2, "99.99");
     expect(emit(SEEDED)).toBe(before);
   });
+
+  it("answers the same delivery for a value that already matches", () => {
+    // The undo contract rides on this identity: commit() skips history when
+    // a mutation changed nothing, so an untouched editor's Enter must not
+    // cost the reader an undo step (#525).
+    const current = SEEDED.find((g) => g.code === "PROJ")?.rows[0]?.[0] ?? "";
+    expect(setCell(SEEDED, "PROJ", 0, 0, current)).toBe(SEEDED);
+  });
 });
 
 describe("addRow", () => {
@@ -190,5 +199,37 @@ describe("seededFinalDepth", () => {
       "31.25",
     );
     expect(seededFinalDepth(moved)).toBe(31.25);
+  });
+});
+
+describe("deleteRow", () => {
+  it("removes exactly the named row and leaves every other group alone", () => {
+    const next = deleteRow(SEEDED, "SAMP", 1);
+    const samp = next.find((g) => g.code === "SAMP");
+    const before = SEEDED.find((g) => g.code === "SAMP");
+    expect(samp?.rows).toHaveLength((before?.rows.length ?? 0) - 1);
+    expect(samp?.rows.map((r) => r[2])).toEqual(["S1", "S1"]);
+    for (const g of next) {
+      if (g.code === "SAMP") continue;
+      expect(g).toBe(SEEDED.find((o) => o.code === g.code));
+    }
+  });
+
+  it("only DATA rows: the group's declaration rows are untouchable by construction", () => {
+    // deleteRow indexes into `rows`, which parse() built from DATA lines only —
+    // pinned so a refactor storing declaration rows alongside them goes red.
+    const next = deleteRow(SEEDED, "PROJ", 0);
+    const proj = next.find((g) => g.code === "PROJ");
+    expect(proj?.rows).toHaveLength(0);
+    expect(proj?.headings).toEqual(
+      SEEDED.find((g) => g.code === "PROJ")?.headings,
+    );
+    expect(emit(next)).toContain('"GROUP","PROJ"');
+    expect(emit(next)).toContain('"TYPE","ID","X","X"');
+  });
+
+  it("answers the same delivery for a row or group that is not there", () => {
+    expect(deleteRow(SEEDED, "PROJ", 5)).toBe(SEEDED);
+    expect(deleteRow(SEEDED, "NOPE", 0)).toBe(SEEDED);
   });
 });
