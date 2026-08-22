@@ -235,7 +235,7 @@ def test_run_pages_claims_only_the_languages_routed_to_it() -> None:
     """
     here = gen_doc_outputs.HERE
     mine = {k for k, v in gen_doc_outputs.PAGE_RUNNER.items() if v == here}
-    assert mine == {"python"}
+    assert mine == {"python", "js", "javascript"}
     assert gen_doc_outputs.PAGE_RUNNER["sql"] != here
 
 
@@ -275,3 +275,89 @@ def test_sql_split_sees_a_leading_cte_as_asking_for_rows() -> None:
         "WITH x AS (SELECT 1) SELECT * FROM x;"
     )
     assert asks, stmt
+
+
+# --- one surface, several fence tags (step 4) --------------------------------
+
+
+def test_two_tags_for_one_language_make_one_program() -> None:
+    """```js and ```javascript are the same language to Node.
+
+    Split into two programs, the second half runs without the first half's
+    imports and fails for a reason that is about the gate, not the page.
+    """
+    md = (
+        '```js\nimport { read } from "laterite";\n```\n'
+        "\n```javascript\nconst f = read('delivery.ags');\n```\n"
+    )
+    src, inline = gen_doc_outputs.page_program(md, "js", "javascript")
+    assert inline == 2
+    assert src.index("import { read }") < src.index("const f =")
+
+
+def test_one_tag_still_collects_only_that_tag() -> None:
+    """The single-tag call is what the SQL and Python runners make; widening the
+    signature must not widen what they collect."""
+    md = "```js\nconst a = 1;\n```\n\n```javascript\nconst b = 2;\n```\n"
+    src, inline = gen_doc_outputs.page_program(md, "js")
+    assert inline == 1
+    assert "const b" not in src
+
+
+def test_every_surface_knows_all_the_tags_that_reach_it() -> None:
+    """The runner groups by SURFACE, so the tags a surface answers for have to be
+    derivable from the table rather than listed a second time somewhere."""
+    node_tags = {k for k, v in gen_doc_outputs.PAGE_SURFACE.items() if v == "node"}
+    assert node_tags == {"js", "javascript", "ts"}
+
+
+def test_the_node_surface_prepares_its_temp_directory() -> None:
+    """A page program lives nowhere, and ESM resolution walks UP from the file.
+
+    The node EXAMPLES resolve `import … from "laterite"` through a symlink beside
+    them in the repo; a program written into a temp directory has no such
+    neighbour, so the surface has to build one. Python needs nothing — the
+    interpreter running the gate already has the wheel — which is why this is a
+    per-surface hook and not a step in `seed_workdir`.
+    """
+    assert gen_doc_outputs.SURFACES["node"].prepare is not None
+    assert gen_doc_outputs.SURFACES["python"].prepare is None
+
+
+def test_a_failure_excerpt_keeps_both_ends() -> None:
+    """Python puts the exception last; Node puts it first and ends in loader
+    frames. Keeping one end hid the `SyntaxError` behind four lines of
+    `node:internal/modules/esm/loader`."""
+    err = "\n".join(["FIRST", *(f"noise{i}" for i in range(20)), "LAST"])
+    out = gen_doc_outputs._excerpt(err)
+    assert out.startswith("FIRST")
+    assert out.rstrip().endswith("LAST")
+
+
+def test_a_failure_excerpt_says_how_much_it_dropped() -> None:
+    """A silent trim is the blind spot this repo keeps re-finding: the reader
+    cannot tell a short failure from a truncated one."""
+    err = "\n".join(f"line{i}" for i in range(30))
+    assert "elided" in gen_doc_outputs._excerpt(err)
+
+
+def test_a_short_failure_is_not_elided() -> None:
+    """Nothing was dropped, so nothing should claim it was."""
+    err = "one\ntwo\nthree"
+    out = gen_doc_outputs._excerpt(err)
+    assert "elided" not in out
+    assert "three" in out
+
+
+def test_a_runner_that_finds_no_pages_fails(tmp_path, monkeypatch) -> None:
+    """Zero is the one result a green run cannot mean.
+
+    `test_docs_examples.py` guards its glob against a moved directory making
+    every example "pass" by not running, and #513 names that guard as the
+    precedent the page half had not inherited. With no pages to find, nothing is
+    executed — so this exercises the guard itself rather than any surface.
+    """
+    monkeypatch.setattr(gen_doc_outputs, "DOCS", tmp_path)
+    with pytest.raises(SystemExit) as e:
+        gen_doc_outputs.run_page_programs(gen_doc_outputs.SURFACES["node"], ["js"])
+    assert "discovery is broken" in str(e.value)

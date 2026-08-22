@@ -622,6 +622,21 @@ jobs:
             echo "--- $(basename "$f")"
             node "$f" >/dev/null
           done
+      # The other half of the same question: the fences typed onto a page rather
+      # than included from a file. It runs AFTER the step above and depends on
+      # what that step did — `_node_pkg()` follows the very symlink it re-points,
+      # so the page programs import the RELEASED package with no second swap to
+      # keep in step with the first. Ordering is the whole wiring here; moving
+      # this above its neighbour would silently test this tree's build instead.
+      #
+      # Same calibration as the wheel leg's twin: fatal when the checkout IS the
+      # released tag, amnestied when the tree is ahead, because a page program
+      # breaking on unreleased API is a fact about the run and not about the page.
+      # `test_nightly_wiring.py` enforces that this stays true of every step here.
+      - name: Page programs run against the released package
+        continue-on-error: ${{ steps.under-test.outputs.tree_ahead == 'true' }}
+        run: |
+          python3 tools/gen_doc_outputs.py --run-pages --surface node
       # The expected-drift class: reported, never fatal (see the header).
       - name: Committed .out still byte-matches (informational)
         continue-on-error: true

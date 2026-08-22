@@ -151,6 +151,68 @@ that *ask* are counted, because `INSTALL` and `LOAD` return nothing by definitio
 and a report that cries wolf on its own preamble is one nobody reads the day it
 means something.
 
+## The Node half: a surface with two names, and a page that was broken
+
+**A surface, not a language, is the unit.** Node answers to both ```js and
+```javascript, and building one program per TAG would have handed the second half
+to Node without the first half's imports — a failure about this tool rather than
+about the page. The runner groups by surface and filters to the tags routed to
+it, which are not the same cut: `ts` reaches the Node surface and is still
+pending, so a surface can be half-claimed.
+
+**`ts` stays pending, and not for want of a runner.** A TypeScript fence's
+package is decided by the PAGE, not by the tag: the only one in the corpus is a
+type-only import on `reference/wasm-api.md`, whose package is the browser one.
+Running it under the Node surface would answer a question nobody asked, and a
+page-to-surface rule built for a single type declaration would be machinery
+bought for a case that does not exist. The census reports it as pending on every
+run, which is the claim that stays true either way. #519 carries the three ways
+to close it — page-to-surface routing, a type-only fence class, or type-CHECKING
+rather than executing — and the choice between them is a decision rather than an
+implementation detail, which is why it is on the tracker and not in this page.
+
+**Two fences were marked because their twins already were.** Both Node tabs on
+`cookbook/merge-deliveries.md`, and the Node tab of an already-marked block on
+`concepts/certificate-lifecycle.md`, sit beside Python fences that opted out with
+a reason in the previous step. Nobody had judged them differently — there was no
+js runner to notice them. That is the opt-in argument made concrete: the marker
+went on the half that a gate could see.
+
+**One page was not illustrative, and was edited.** `node/index.md` declared
+`const file` twice — a `SyntaxError` in ESM, so a reader following the page top to
+bottom gets nothing at all. A skip marker there would have claimed the fence was
+illustrative, and it is real, runnable code; the validated handle is named
+separately instead, which is also what the section is about. **The marker records
+that a fence is not meant to run. It is not a way to quieten a page that is
+broken.**
+
+The same page asked for ground level below sea level, which every borehole in the
+fixture is above — the empty-result defect the SQL half found twice. **No gate
+forced this one**: the Node bar is "does not raise", and a query returning nothing
+raises nothing. It was fixed because it was found while fixing the fence beside
+it, and it is recorded here because a threshold nobody explains reads as
+arbitrary to whoever meets it next.
+
+**What "does not raise" still cannot see, stated rather than discovered later.**
+`reference/node-api.md` branched on `file.report.ok`. A `Report` has no `ok` — it
+carries `isValid`, the separate `count == 0`; `ok` belongs to the fix report and
+the un-validatable failure report. So `!file.report.ok` is `!undefined`, always
+true, and the documented example rewrote `clean.ags` for a **clean** file. The
+page program runs it without complaint, because taking the wrong branch raises
+nothing. The SQL half bought a cheap partial answer to the same blind spot by
+counting rows; there is no equally cheap equivalent here, and pretending
+otherwise is what would make the gate's green misleading. It was found by reading
+the shipped `index.d.ts` after the runner brought attention to the page — which
+is the honest description of what this class of gate does: it gets you to the
+page, not to the defect.
+
+**Both ends of a failure, because runtimes disagree about which one matters.** The
+failure display kept the last four lines of stderr, which is where a Python
+traceback puts the exception — and where Node puts loader frames. The first run
+of the Node programs printed four lines of `node:internal/modules/esm/loader` and
+hid every `SyntaxError` that said what was wrong. It now keeps both ends and says
+how many lines it dropped.
+
 ## Consequences
 
 - A new fence in a runnable language is covered from the moment it is added, and
@@ -162,10 +224,19 @@ means something.
 - `cookbook/index.md` could no longer claim the snippet on the page is the exact
   file CI executes. It now says the opening block is, and that later snippets
   continue from it — which is also the more useful thing for a reader to know.
-- SQL page programs run against the **community-published** extension, in the
-  nightly leg that already asks the reader's question — so a page and the
-  extension a reader installs are checked together. What remains unrun is
-  `js`/`ts`, and `PAGE_RUNNER` says so on every structural run.
+- SQL page programs run against the **community-published** extension, and Node
+  ones against the **published npm package** — each in the nightly leg that
+  already asks that reader's question, so a page and the artefact a reader
+  installs are checked together. The Node step follows the same `node_modules`
+  symlink its neighbour re-points, so there is no second swap to keep in step.
+- What remains unrun is `ts` alone, and `PAGE_RUNNER` says so on every structural
+  run rather than leaving it to be inferred from silence.
+- **A runner that finds no pages fails.** Zero is the one result a green run
+  cannot mean: a fence-regex change, a routing-table typo or a moved docs
+  directory each empty the loop, and each would otherwise exit 0. This is
+  `test_docs_examples.py`'s vacuous-glob guard, finally extended to the page
+  half — the issue behind this work named that precedent and it had been left
+  unapplied through three of the four steps.
 - The nightly step is fatal only when the checkout matches the released tag. It is
   amnestied when the tree is AHEAD, because the leg's banner promises that and
   `test_nightly_wiring.py` enforces it — a page program breaking because this tree
