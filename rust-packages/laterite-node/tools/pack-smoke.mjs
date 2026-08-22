@@ -54,6 +54,11 @@ const required = [
   // — a gap the library-only smoke below never saw (laterite-dev#554).
   "bin.mjs",
   "dist/cli.mjs",
+  // `lat --readme` and `lat <verb> --help` read this at runtime (#509). Dropping
+  // it from `files` does not break the build or any test that runs from the
+  // repo, where the file is simply there — it breaks only for someone who
+  // installed the package, which is the failure this tarball check exists for.
+  "README-cli.md",
 ];
 for (const f of required) {
   if (!entries.includes(f)) {

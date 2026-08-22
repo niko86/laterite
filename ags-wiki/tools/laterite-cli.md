@@ -26,6 +26,24 @@ sources: []
 
 `lat` is a subcommand tool — a bare `lat <file.ags>` is shorthand for `lat validate`. Each verb owns its flags (`lat <verb> --help`); the table below is generated from the shipped guide (`lat --readme`) so it can't drift from the tool:
 
+**Both of those sentences were true of THIS binary and of no other launcher, until
+#509.** `README-cli.md` is `include_str!`d here, and the wheel ships its own copy
+that `_print_readme()` reads from the installed package — a copy every gate was
+blind to, because `repo:tests/test_cli_readme_flags.py` and
+`repo:tools/gen_wiki_cli.py` both read the crate's. It had last moved in a bulk
+tree sync while the authority went on without it, so `pip install laterite`
+documented `--check-files` under `## certify` — the flag `certify` gave up in
+[[cert-trust-v2]], and the exact line that gate exists to prevent — and never
+mentioned `--warnings-as-errors` at all. `repo:tools/gen_cli_readme.py` generates
+every mirror from the one authority now and `repo:tests/test_cli_readme_mirrors.py`
+holds them byte-identical, which is what makes the flags gate's reach real: what
+it proves about the authority is true of every launcher rather than of one file.
+Scoped `--help` followed, since the guide promises it and only this binary
+delivered — the launchers slice the verb's own `## <verb>` section plus
+`## Global options` rather than writing help prose, because a fourth description
+of the same flags is the defect one level up. See [[surface-census]] for the
+declaration-level half of the same question.
+
 <!-- generated:cli-verbs — DO NOT EDIT; source repo:rust-packages/laterite-cli/README-cli.md (== `lat --readme`); regenerate: uv run --no-sync python tools/gen_wiki_cli.py -->
 | Verb | Arguments | What it does |
 |---|---|---|
