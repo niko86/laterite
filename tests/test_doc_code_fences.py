@@ -219,6 +219,115 @@ def test_every_runnable_language_names_its_runner() -> None:
     assert set(gen_doc_outputs.PAGE_RUNNER) == set(gen_doc_outputs.PAGE_SURFACE)
 
 
+def test_a_type_only_ts_fence_is_not_a_program() -> None:
+    """The #519 decision: a fence that declares types and executes nothing is
+    not a program, so it belongs with prose — not with runnable languages,
+    where its only effect was a standing PENDING line for a runner nobody
+    should build. Shaped like the corpus's one instance (wasm-api.md)."""
+    md = (
+        "```ts\n"
+        "import type {\n"
+        "  FindingDto,\n"
+        "  RuleGroup,\n"
+        "  ValidationReport,\n"
+        '} from "@laterite/ags4-wasm";\n'
+        "```\n"
+    )
+    counts, problems = census(md, "p.md")
+    assert counts["prose"] == 1
+    assert counts["inline"] == 0
+    assert not problems
+
+
+def test_an_executable_ts_fence_is_reported_not_absorbed() -> None:
+    """The guard on the same decision: type-only is the ONLY ts class the
+    census accepts. A ts fence with a real statement must not ride into prose
+    on the tag — it is a new case #519 deliberately did not route, and the
+    census has to say so rather than absorb it."""
+    md = "```ts\nconst report = validate(bytes);\n```\n"
+    counts, problems = census(md, "p.md")
+    assert counts["prose"] == 0
+    assert counts["inline"] == 0
+    assert len(problems) == 1
+    assert "executable" in problems[0]
+
+
+def test_a_ts_fence_mixing_types_and_execution_is_reported() -> None:
+    """One executable statement poisons the fence — the type-only judgement is
+    per-fence, not per-line, and the safe direction is out of prose."""
+    md = (
+        "```ts\n"
+        'import type { ValidationReport } from "@laterite/ags4-wasm";\n'
+        "console.log(report.ok);\n"
+        "```\n"
+    )
+    counts, problems = census(md, "p.md")
+    assert counts["prose"] == 0
+    assert len(problems) == 1
+
+
+def test_a_declare_and_interface_block_is_type_only() -> None:
+    md = (
+        "```ts\n"
+        "interface Row {\n"
+        "  id: string;\n"
+        "  depth(): number;\n"
+        "}\n"
+        "declare const VERSION: string;\n"
+        "type Pair = [Row, Row];\n"
+        "```\n"
+    )
+    counts, problems = census(md, "p.md")
+    assert counts["prose"] == 1
+    assert not problems
+
+
+def test_a_brace_inside_a_string_cannot_hide_executable_code() -> None:
+    """Review-found hole: `type X = "{";` used to leave the depth counter open,
+    so every later line passed the depth>0 check and executable code rode into
+    prose unreported. Strings are stripped before depth is counted."""
+    md = '```ts\ntype X = "{";\nsomeCall();\n```\n'
+    counts, problems = census(md, "p.md")
+    assert counts["prose"] == 0
+    assert len(problems) == 1
+
+
+def test_code_trailing_a_type_import_on_one_line_is_refused() -> None:
+    """Review-found hole: the opener check reads the START of a line, so
+    `import type { Foo } from "x"; doSomething();` passed as type-only. A
+    statement completing at depth zero with code after its `;` is refused."""
+    md = '```ts\nimport type { Foo } from "x"; doSomething();\n```\n'
+    counts, problems = census(md, "p.md")
+    assert counts["prose"] == 0
+    assert len(problems) == 1
+
+
+def test_a_multiline_template_literal_refuses_the_fence() -> None:
+    """A quote surviving the single-line strip is a string this reader cannot
+    follow — refuse rather than guess, and refusal is a reported problem."""
+    md = "```ts\ntype T = `\n{\n`;\nrun();\n```\n"
+    counts, problems = census(md, "p.md")
+    assert counts["prose"] == 0
+    assert len(problems) == 1
+
+
+def test_a_url_in_a_type_string_is_not_read_as_a_comment() -> None:
+    """`//` inside a string must not truncate the line: strings are stripped
+    before comments, so `type U = "https://x";` stays a clean declaration."""
+    md = '```ts\ntype U = "https://example.org";\n```\n'
+    counts, problems = census(md, "p.md")
+    assert counts["prose"] == 1
+    assert not problems
+
+
+def test_ts_is_not_a_runnable_language_nothing_runs() -> None:
+    """AC1 of #519 at the seam the pending line is derived from: membership in
+    PAGE_SURFACE is the claim a language is meant to be run, and PAGE_RUNNER
+    is what the census prints — ts must be in neither."""
+    assert "ts" not in gen_doc_outputs.PAGE_SURFACE
+    assert "ts" not in gen_doc_outputs.PAGE_RUNNER
+
+
 def test_the_sql_runner_is_a_file_that_exists() -> None:
     """The census prints this path at readers. A moved module would make it a
     confident pointer at nothing — the census's whole job is to be believable."""
@@ -308,7 +417,7 @@ def test_every_surface_knows_all_the_tags_that_reach_it() -> None:
     """The runner groups by SURFACE, so the tags a surface answers for have to be
     derivable from the table rather than listed a second time somewhere."""
     node_tags = {k for k, v in gen_doc_outputs.PAGE_SURFACE.items() if v == "node"}
-    assert node_tags == {"js", "javascript", "ts"}
+    assert node_tags == {"js", "javascript"}
 
 
 def test_the_node_surface_prepares_its_temp_directory() -> None:
