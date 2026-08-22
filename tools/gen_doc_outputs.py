@@ -253,7 +253,6 @@ PAGE_SURFACE = {
     "sql": "duckdb",
     "js": "node",
     "javascript": "node",
-    "ts": "node",
 }
 #: This script's own runner, named once so the routing table and the loop that
 #: obeys it cannot drift apart through a typo in a string literal.
@@ -266,22 +265,21 @@ HERE = "--run-pages"
 #: here would print "SKIPPED — duckdb not found" on every machine and read as a
 #: gap where there is a gate.
 #:
-#: `ts` stays pending on purpose, and not for want of a runner. A TypeScript
-#: fence's package is decided by the PAGE, not by the tag: the only one in the
-#: corpus is a type-only import on `reference/wasm-api.md`, whose package is the
-#: BROWSER one — running it under the node surface would answer a question nobody
-#: asked. Mapping language to surface cannot express that, and inventing a
-#: page-to-surface rule for a single type declaration would be machinery bought
-#: for a case that does not exist yet. The census reports it as pending on every
-#: run, which is the only claim that stays true either way; #519 carries the
-#: three ways to close it, because the choice between them is a decision and not
-#: an implementation detail.
+#: `ts` is deliberately absent (#519's decision). A TypeScript fence's package
+#: is decided by the PAGE, not by the tag — the corpus's one instance
+#: (`reference/wasm-api.md`) belongs to the BROWSER package, so routing the
+#: language to a surface cannot be right in general. And that fence is
+#: `import type { … }`: it erases to an empty program under type-stripping, so
+#: a runner would report a pass for executing nothing. The census therefore
+#: accepts `ts` only as TYPE-ONLY (counted with prose — declarations are not
+#: programs) and fails loudly on a `ts` fence with an executable statement,
+#: because that would be a new case needing its own routing decision, not one
+#: this table quietly absorbed on the tag.
 PAGE_RUNNER: dict[str, str | None] = {
     "python": HERE,
     "sql": "tests/test_docs_duckdb_examples.py",
     "js": HERE,
     "javascript": HERE,
-    "ts": None,
 }
 #: Languages that LOOK runnable and are deliberately never run. A `bash` fence on
 #: a page is an install instruction — `pip install laterite[compat]` — and a gate
@@ -496,6 +494,60 @@ def run_page_programs(surface: Surface, langs: list[str]) -> list[tuple[str, str
     return failures
 
 
+#: Statement openers that declare types without executing anything. The
+#: judgement is conservative by construction: whenever a line cannot be read
+#: with confidence — an opener missing, an unbalanced string, code trailing a
+#: completed statement — the whole fence is refused, and refusal surfaces as a
+#: loud census problem, never a quiet ride into prose.
+_TYPE_ONLY_OPENERS = (
+    "import type ",
+    "import type{",
+    "export type ",
+    "export interface ",
+    "export declare ",
+    "type ",
+    "interface ",
+    "declare ",
+)
+
+#: One single-line string literal, any quote style. Stripped before depth is
+#: counted so a brace INSIDE a string cannot poison the bracket balance and
+#: smuggle later executable lines past the depth check.
+_TS_STRING_RE = re.compile(r'"[^"\n]*"|\'[^\'\n]*\'|`[^`\n]*`')
+
+
+def is_type_only_ts(body: str) -> bool:
+    """True when every statement in a `ts` fence declares a type (#519).
+
+    A fence of `import type` / `interface` / `type` / `declare` erases to an
+    empty program under type-stripping — it is documentation of a shape, not a
+    program, and classifying it as runnable manufactured a standing PENDING
+    line for a runner nobody should build.
+
+    Line-based, and every ambiguity refuses the fence rather than absorbing
+    it: string literals are stripped BEFORE depth counting (a `"{"` must not
+    open a scope); a quote that survives the strip means a string this reader
+    cannot follow (multi-line template literal, escaped quote) — refuse; a
+    statement that completes at depth zero with code still trailing after its
+    `;` is a second statement the opener check never saw — refuse.
+    """
+    depth = 0
+    for raw in body.splitlines():
+        code = _TS_STRING_RE.sub("", raw)
+        if any(q in code for q in "\"'`"):
+            return False
+        code = re.sub(r"//.*", "", code).strip()
+        if not code:
+            continue
+        if depth == 0 and not code.startswith(_TYPE_ONLY_OPENERS):
+            return False
+        depth += sum(code.count(c) for c in "{([") - sum(code.count(c) for c in "})]")
+        depth = max(depth, 0)
+        if depth == 0 and re.search(r";\s*\S", code):
+            return False
+    return True
+
+
 def census_code_fences(md: str, page: str) -> tuple[dict[str, int], list[str]]:
     """Classify every code fence on one page, and report what cannot stand.
 
@@ -505,7 +557,9 @@ def census_code_fences(md: str, page: str) -> tuple[dict[str, int], list[str]]:
       inline    typed on the page, in a language meant to run (executed once its
                 page-program runner lands);
       skipped   opts out, with a reason;
-      prose     a language nothing claims to run (json, yaml, diff).
+      prose     a language nothing claims to run (json, yaml, diff) — and a
+                type-only `ts` fence, which declares a shape and executes
+                nothing (#519).
 
     Two things fail. An opt-out with no reason, because an escape hatch whose use
     is not on the record is just a silence. And an EXCLUDED language that has not
@@ -533,6 +587,20 @@ def census_code_fences(md: str, page: str) -> tuple[dict[str, int], list[str]]:
                 f"{where}: `{lang}` is never executed — it must say so with "
                 "`<!-- doc-code: skip — why -->`"
             )
+            continue
+        if lang == "ts":
+            # Type-only is the ONLY ts class this census accepts (#519): the
+            # tag cannot name a surface (the page decides the package), so a
+            # fence with a real statement is a routing decision nobody has
+            # made yet — report it, never absorb it on the tag.
+            if is_type_only_ts(m.group("body")):
+                counts["prose"] += 1
+            else:
+                problems.append(
+                    f"{where}: `ts` fence contains executable statements — "
+                    "type-only is the only ts class the census accepts; a "
+                    "runnable ts program needs a routing decision (#519)"
+                )
             continue
         counts["inline" if lang in PAGE_SURFACE else "prose"] += 1
     return counts, problems
@@ -764,10 +832,10 @@ def main() -> None:
         # says which fences SHOULD run; this is what actually runs them.
         bad: list[tuple[str, str]] = []
         for surface_name in sorted(set(PAGE_SURFACE.values())):
-            # Grouped by surface, then filtered to the tags routed HERE — the two
-            # are not the same cut. `ts` reaches the node surface and is still
-            # pending, so a surface can be half-claimed and the loop has to run
-            # the claimed half rather than all or nothing.
+            # Grouped by surface, then filtered to the tags routed HERE — the
+            # two are not the same cut: a surface's tag can be routed to another
+            # runner (sql runs under pytest), so the loop has to run the claimed
+            # half rather than all or nothing.
             langs = sorted(
                 lang
                 for lang, s_name in PAGE_SURFACE.items()
