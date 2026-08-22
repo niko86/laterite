@@ -175,8 +175,19 @@ export function singleLine(value: string): string {
 }
 
 /** Replace one cell, returning a new delivery — or the SAME delivery when the
- *  value already matches, so a commit-without-change (Enter on an untouched
- *  editor, a click away) records no undo step. */
+ *  write changes nothing, so callers can use identity to skip a history entry
+ *  for a no-op: the value already matches (Enter on an untouched editor, a
+ *  click away), or the group, the row or the column is not there.
+ *
+ *  A write that cannot land wrote nothing before the bounds check either — the
+ *  rebuild below simply matches no cell — so what the check buys is the undo
+ *  step, not the data. Without it a miss cost the reader a history entry, and
+ *  the Ctrl/Cmd+Z that followed appeared to do nothing at all (#581); a cell
+ *  index captured before an async commit reaches that for real (#580).
+ *
+ *  The column bound is the target ROW's own length, not the group's heading
+ *  count: a DATA row shorter than its HEADING row is a real AGS4 shape, and
+ *  this write has never extended one. */
 export function setCell(
   delivery: Delivery,
   code: string,
@@ -187,10 +198,9 @@ export function setCell(
   // Normalize BEFORE the comparison below, or a paste that reduces to the
   // current value would spend an undo step on a change nobody can see.
   const next = singleLine(value);
-  const current = delivery.find((g) => g.code === code)?.rows[rowIndex]?.[
-    colIndex
-  ];
-  if (current === next) return delivery;
+  const target = delivery.find((g) => g.code === code)?.rows[rowIndex];
+  if (!target || colIndex < 0 || colIndex >= target.length) return delivery;
+  if (target[colIndex] === next) return delivery;
   return delivery.map((g) =>
     g.code !== code
       ? g
