@@ -30,8 +30,9 @@ import { Button, ThemeToggle } from "@shared/components";
 import mark from "../../../assets/laterite-icon-128.png";
 
 const NAV = [
-  { href: "#install", label: "Install" },
+  // Demo before Install (#533): the nav promises the order the page keeps.
   { href: "#file", label: "Demo" },
+  { href: "#install", label: "Install" },
   { href: "https://docs.laterite.dev/", label: "Docs" },
   { href: "https://github.com/niko86/laterite", label: "Source" },
 ];

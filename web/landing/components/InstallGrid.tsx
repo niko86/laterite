@@ -14,7 +14,7 @@
  * job.
  */
 
-import { createSignal, For, type Component } from "solid-js";
+import { createSignal, For, Show, type Component } from "solid-js";
 import { Button } from "@shared/components";
 import { INSTALL_CHANNELS, type InstallChannel } from "../installChannels";
 
@@ -69,12 +69,29 @@ const Card: Component<{ channel: InstallChannel }> = (props) => (
       {props.channel.package}
     </a>
 
-    <div class="mt-3 flex items-start gap-2 rounded-md border border-line-subtle bg-surface-code px-3 py-2">
-      <code class="min-w-0 flex-1 font-mono text-caption break-words whitespace-pre-wrap text-fg">
-        {props.channel.command}
-      </code>
-      <CopyButton command={props.channel.command} label={props.channel.label} />
-    </div>
+    {/* A channel with no install command (#533: the CLI — the standalone
+        binary IS the thing) gets the download as its action instead of an
+        empty code box with a copy button that copies nothing. */}
+    <Show
+      when={props.channel.command}
+      fallback={
+        <div class="mt-3">
+          <Button variant="outline" size="sm" href={props.channel.href}>
+            Download from GitHub releases
+          </Button>
+        </div>
+      }
+    >
+      <div class="mt-3 flex items-start gap-2 rounded-md border border-line-subtle bg-surface-code px-3 py-2">
+        <code class="min-w-0 flex-1 font-mono text-caption break-words whitespace-pre-wrap text-fg">
+          {props.channel.command}
+        </code>
+        <CopyButton
+          command={props.channel.command}
+          label={props.channel.label}
+        />
+      </div>
+    </Show>
 
     <p class="mt-3 text-caption text-fg-muted">{props.channel.note}</p>
   </li>

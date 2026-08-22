@@ -14,6 +14,9 @@ export type InstallChannel = {
   /** The registry a reader would look on, or "" where there isn't one. */
   readonly registry: string;
   readonly package: string;
+  /** The copyable install command, or "" where the card's action is its
+   *  href — the grid then renders a download button instead of a copy box
+   *  (#533: the CLI, whose install is a release download, not a command). */
   readonly command: string;
   readonly href: string;
   readonly note: string;
@@ -47,9 +50,9 @@ export const INSTALL_CHANNELS: readonly InstallChannel[] = [
     label: "CLI",
     registry: "",
     package: "lat",
-    command: "pip install laterite",
+    command: "",
     href: "https://github.com/niko86/laterite/releases",
-    note: "lat ships with the wheel \u2014 or take the standalone binary",
+    note: "lat also ships with the Python wheel and the npm package",
     primary: false,
   },
   {

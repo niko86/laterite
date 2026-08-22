@@ -55,12 +55,14 @@ export const Hero: Component = () => (
         here, in this page.
       </p>
 
+      {/* Demo first (#533): the page's thesis is the demo, so the filled
+          primary sends the reader there; install is the outline second. */}
       <div class="mt-7 flex flex-wrap items-center gap-3">
-        <Button variant="primary" size="lg" href="#install">
-          Pick your stack
-        </Button>
-        <Button variant="outline" size="lg" href="#file">
+        <Button variant="primary" size="lg" href="#file">
           See it break
+        </Button>
+        <Button variant="outline" size="lg" href="#install">
+          Pick your stack
         </Button>
       </div>
     </div>
