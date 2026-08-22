@@ -6,7 +6,7 @@ Four surfaces run "the same" AGS4 validator. That's a strong claim — so it's
 ## One engine, many doors
 
 Python, Node, the browser (wasm), and the `lat` CLI don't each re-implement the
-AGS4 rules. They're thin bindings over **one** clean-room Rust core. A finding
+AGS4 rules. They're thin bindings over **one** Rust core. A finding
 you get in Python is produced by the exact code that produces it in the browser —
 the only thing that differs is the door.
 

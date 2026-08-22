@@ -176,8 +176,8 @@ const App: Component = () => {
             >
               laterite
             </a>
-            , a clean-room Rust AGS4 engine compiled to WebAssembly — the same
-            engine runs this app.
+            , a Rust AGS4 engine compiled to WebAssembly — the same engine runs
+            this app.
           </span>
           <span class="whitespace-nowrap">
             <span class="text-fg-faint" aria-hidden="true">

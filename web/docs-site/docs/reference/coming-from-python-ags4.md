@@ -122,9 +122,10 @@ dials and the full table.
 
 ## What differs, and why
 
-laterite is a clean-room re-implementation. Two independent implementations of
-one specification will disagree, so every disagreement is written down rather
-than smoothed over — including the ones where laterite was the one in the wrong.
+laterite implements the AGS4 rules independently of python-ags4. Two independent
+implementations of one specification will disagree, so every disagreement is
+written down rather than smoothed over — including the ones where laterite was
+the one in the wrong.
 
 The full user-facing list is
 [Where laterite and python-ags4 differ](divergences.md), generated from the same

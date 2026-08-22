@@ -13,8 +13,8 @@ your machine, not our benchmarks on ours. If it wasn't fast, that's the more use
 report of the two.
 
 **What did it flag that python-ags4 didn't — or miss that python-ags4 caught?**
-This is the sharpest thing you can send us. laterite's validator is a clean-room
-implementation of the numbered rules, so where the two disagree, one of three
+This is the sharpest thing you can send us. laterite's validator implements the
+numbered rules independently of python-ags4, so where the two disagree, one of three
 things is true: it's a deliberate divergence, it's a bug in laterite, or it's
 something worth taking to the AGS Data Format Working Group. We can only tell which
 if we hear about it.

@@ -1,6 +1,6 @@
 # Where laterite and python-ags4 differ
 
-laterite is a **clean-room** re-implementation of the AGS4 rules, calibrated against the incumbent
+laterite is an **independent** implementation of the AGS4 rules, calibrated against the incumbent
 [`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library) on its own test corpus
 (see [Cross-surface parity](../concepts/cross-surface-parity.md)). Two independent implementations of
 one specification will disagree, so every disagreement is written down rather than smoothed over.
