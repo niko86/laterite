@@ -56,6 +56,9 @@
       },
       {
         "text": "**A failed chart query said “No rows to plot for this selection”.** That is an answer — the query ran, the delivery had nothing to show — and it was printed under the red banner reporting that the query had not run at all. It now says which of the two queries failed and that no chart was drawn: the colour ranking is a second query the reader never asked for, and on an aggregated bar its failure stops the plot query being composed at all, so naming the wrong one leaves the reader hunting a fault in a query that never ran."
+      },
+      {
+        "text": "**The landing page rendered zoomed-out on phones.** Below the 64rem breakpoint the group sections’ grid children kept `min-width: auto`, so the nowrap tables’ min-content sized the page — a 390px phone got a 783px layout viewport scaled down to fit, and every table’s own scroller sat inert because the page had grown instead. The width floor now holds at every width (`min-w-0` on both grid children): the document stays exactly viewport-wide and each table pans inside its own scroller, which is what the table component promises — nine columns on a phone move the table, not the page. A landing lane in the Playwright suite pins the contract at a strict 390px viewport, with no mobile emulation — emulation absorbs exactly this overflow into zoom, which is how it shipped unseen."
       }
     ],
     "security": []

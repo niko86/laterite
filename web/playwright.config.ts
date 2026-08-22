@@ -5,6 +5,13 @@ const BASE = process.env.VITE_BASE ?? "/";
 // one machine without reusing each other's preview server — reuseExistingServer
 // makes a same-port collision silently test the OTHER checkout's build.
 const PORT = Number(process.env.PW_PORT ?? 4173);
+// The landing page is a separate build with its own preview (one dependency
+// set, two builds — web/landing/vite.config.ts), so it gets its own port.
+const LANDING_PORT = Number(process.env.PW_LANDING_PORT ?? PORT + 1);
+// One name for the landing lane's spec, shared by the `landing` project's
+// testMatch and the desktop project's testIgnore — so a rename cannot
+// desynchronize them into running the spec twice or not at all.
+const LANDING_SPEC = /landing\.spec\.ts$/;
 
 // End-to-end tests drive the REAL app (wasm validator in a Web Worker +
 // DuckDB-wasm) in headless Chromium against a local `vite preview` of the
@@ -33,6 +40,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      testIgnore: LANDING_SPEC,
       use: { browserName: "chromium", viewport: { width: 1280, height: 800 } },
     },
     {
@@ -48,11 +56,34 @@ export default defineConfig({
         isMobile: true,
       },
     },
+    {
+      // The landing page at a STRICT phone viewport — no isMobile: mobile
+      // emulation absorbs a too-wide layout into zoom, which is exactly how
+      // the #523 overflow shipped invisibly. Strict 390 makes it measurable.
+      name: "landing",
+      testMatch: LANDING_SPEC,
+      use: {
+        browserName: "chromium",
+        baseURL: `http://localhost:${LANDING_PORT}`,
+        viewport: { width: 390, height: 844 },
+      },
+    },
   ],
-  webServer: {
-    command: `npm run preview -- --port ${PORT} --strictPort`,
-    url: `http://localhost:${PORT}${BASE}`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: `npm run preview -- --port ${PORT} --strictPort`,
+      url: `http://localhost:${PORT}${BASE}`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      // Serves an existing landing/dist — `npm run build:landing` first, same
+      // contract as the app's preview above. Always at base "/": the apex has
+      // no VITE_BASE knob (see web/landing/vite.config.ts).
+      command: `npm run preview:landing -- --port ${LANDING_PORT} --strictPort`,
+      url: `http://localhost:${LANDING_PORT}/`,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+  ],
 });
