@@ -102,9 +102,15 @@ export const InstallGrid: Component = () => (
     <h2 class="font-display text-h2 font-extrabold tracking-(--track-tight) text-accent">
       Pick your stack
     </h2>
+    {/* The claim below is scoped to the surfaces the nightly output-value
+        gate actually walks — #536 records the leg-by-leg check. DuckDB is a
+        read-only surface, so it has no AGS4 writer for the gate to compare:
+        don't re-widen the sentence to all five cards. */}
     <p class="mt-2 max-w-[60ch] text-fg-soft">
-      One engine behind every one of these. Scriptable output is byte-identical
-      across them, so a CI gate and a notebook cannot disagree.
+      One engine behind every one of these. Every surface that writes AGS4
+      &mdash; Python, Node, the CLI, the browser &mdash; emits byte-identical
+      scriptable output, gate-checked nightly, so a CI job and a notebook cannot
+      disagree. DuckDB is the read-only surface: there is no writer to diverge.
     </p>
 
     <ul class="mt-6 grid list-none grid-cols-1 gap-3 p-0 min-[38rem]:grid-cols-2 min-[64rem]:grid-cols-3">
