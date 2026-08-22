@@ -114,13 +114,19 @@ gate.
 - `comfy-table` / `indicatif` as dependencies of the napi addon.
 - Reading the byte gate as a contract term.
 
-**Left open:** whether a fixture carrying non-ASCII splits `diff --json` and
-`merge` across launchers. `uvx` renders both through `json.dumps` without
-`ensure_ascii=False`, which ASCII-escapes what `serde_json` and `JSON.stringify`
-emit raw — the defect laterite-dev#545 fixed on `fix` alone. The xcheck CLI legs
-compare raw stdout and would catch it, but every current fixture is pure ASCII,
-so the gate is green over a case it cannot construct. The fixture comes first;
-what it shows decides whether the shared renderer is a repair or hygiene.
+**Resolved (was left open):** whether a fixture carrying non-ASCII splits
+`diff --json` and `merge` across launchers. It did, and asymmetrically — the
+falsification record is on #542. `diff --json` split (`uvx`'s `json.dumps`
+round trip ASCII-escaped what the other two emit raw), so the shared renderer
+was a **repair** there; the merged *file* bytes came through identical, so the
+merge half was hygiene. The merge `--json` stdout wrapper turned out to carry
+its own non-ASCII surface — the `--out` path the CLI echoes back — and split on
+that, which is why the wrapper has a non-ASCII case of its own
+(`merge.json.nonascii_out`). All the committed gates now exist: the shared
+`delta_json` renderer in `laterite-ags4-diff`, the engine-owned merge audit
+shape, the human-content gate (`tools/xcheck/check_cli_content.py`, nightly)
+and the every-verb binary ↔ `uvx` byte gate — and the three known human
+divergences are closed.
 
 ## Related
 
