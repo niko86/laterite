@@ -33,6 +33,9 @@
       {
         "text": "**A custom dictionary that overrides a standard heading's type or status is now an FYI, not a warning.** #321 gave the warning tier a rule — a warning predicts a downstream *surprise*, where a consumer silently receives something other than the author meant — and this is the one site out of seven that fails it: the caller declared the override in the dictionary they passed, it is honoured exactly as declared, and nothing downstream differs from what the file says. Re-parenting a standard group and demoting a standard KEY both stay WARNINGs, because both change row identity and the rules that key off parentage and KEYs then answer differently about rows nobody edited. The demoted finding moves to its own `FYI (Related to DICT)` label, leaving `DICT` warning-pure — the separation `Warning (Related to Rule 18)` already exists for, and the reason `compat`'s `count_errors` can classify it at all (a bare `DICT` key matched none of its branches and counted as nothing). See O-51.",
         "breaking": false
+      },
+      {
+        "text": "**Reader-facing prose across the app, landing, and docs drops the clean-room licensing rationale** — the app shell's footer credit, the landing footer, and seven docs pages said the validator is a clean-room implementation and that this is what permits the MIT licence. Readers need what the tool does for them, not why its licence was possible, so each location keeps only what serves the reader — at most the fact the aside was carrying: the engine is one independent implementation of the published AGS4 rules, results can differ from python-ags4's, and COMPAT.md / OBSERVATIONS.md record where and why. No behaviour changes; wording only."
       }
     ],
     "deprecated": [

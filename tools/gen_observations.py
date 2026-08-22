@@ -233,7 +233,7 @@ def render_divergences(data: dict) -> str:
     out = [
         "# Where laterite and python-ags4 differ\n",
         "\n",
-        "laterite is a **clean-room** re-implementation of the AGS4 rules, "
+        "laterite is an **independent** implementation of the AGS4 rules, "
         "calibrated against the incumbent\n"
         "[`python-ags4`](https://gitlab.com/ags-data-format-wg/ags-python-library) "
         "on its own test corpus\n"
