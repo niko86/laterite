@@ -434,16 +434,11 @@ test("fine: the TRAN cover sheet seeds clean, and Rule 14 only fires when the re
 test("the transport aside tells the packed story without running it", async ({
   page,
 }) => {
-  // #528: a story, not a demo — this page's wasm build has no transport
-  // feature, so the aside must never cost the reader a fetch. The listener
-  // goes on BEFORE navigation: the regression it exists to catch — the
-  // aside arming an eager engine load — would fire during the initial page
-  // load, inside the window a post-goto listener never sees.
-  const wasmRequests: string[] = [];
-  page.on("request", (r) => {
-    if (r.url().endsWith(".wasm")) wasmRequests.push(r.url());
-  });
-
+  // #528: a story, not a demo. The engine now loads eagerly (#531), so a
+  // wasm request is the PAGE's normal behaviour and proves nothing about the
+  // aside; what keeps the aside honest is that it stays static markup — one
+  // link out, no handlers — and that the shipped wasm build carries no
+  // transport functions at all (its feature set, gated at release).
   await page.goto("/");
 
   const aside = page.getByRole("complementary", { name: "Transport" });
@@ -463,9 +458,7 @@ test("the transport aside tells the packed story without running it", async ({
     "https://docs.laterite.dev/cookbook/transport/",
   );
 
-  // Static presentation: nothing about it fetched the engine, and the page
-  // still fits the viewport with the aside in the layout.
-  expect(wasmRequests).toEqual([]);
+  // The page still fits the viewport with the aside in the layout.
   await expectViewportWide(page);
 });
 
@@ -731,4 +724,146 @@ test("fine: a table's budget reacts to new defects, and the tooltip badges the f
   ).toBeDisabled();
   await top.getByText("✗").hover();
   await expect(page.getByRole("tooltip")).toContainText("manual");
+});
+
+test("the engine arrives uninvited — after paint, without a touch", async ({
+  page,
+}) => {
+  // The waiter goes on BEFORE navigation: under a warm cache the eager
+  // fetch can start and finish before goto() returns, and a waiter armed
+  // after the fact would time out on a request that already happened.
+  const sawWasm = page.waitForRequest((r) => r.url().endsWith(".wasm"), {
+    timeout: 15_000,
+  });
+  await page.goto("/");
+  // The size-quoting fallback copy died with the lazy gate: sweep the prose
+  // BEFORE the findings replace the fallback (where the figure lived), and
+  // again after. The pattern also catches "2MB", which \bMB\b would not —
+  // no word boundary sits between a digit and a letter.
+  const sizeFigure = /megabyte|\d\s*MB\b|\bMB\b/i;
+  expect(await page.locator("body").innerText()).not.toMatch(sizeFigure);
+  // No interaction at all: the fetch must begin on its own (#531 replaces
+  // touch-gated arming with eager-idle), and the findings must follow.
+  await sawWasm;
+  await expect(page.locator("section#file li").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  expect(await page.locator("body").innerText()).not.toMatch(sizeFigure);
+  // "After first paint" is the other half of the criterion, and the browser
+  // records both instants: the wasm fetch must not start before first paint.
+  const startedAfterPaint = await page.evaluate(() => {
+    const paint = performance.getEntriesByName("first-paint")[0];
+    const wasm = performance
+      .getEntriesByType("resource")
+      .find((e) => e.name.endsWith(".wasm"));
+    if (!paint || !wasm) return "missing-entries";
+    return wasm.startTime >= paint.startTime;
+  });
+  expect(startedAfterPaint).toBe(true);
+});
+
+test("wide: the hero card is the seed's own opening lines, and it verdicts live", async ({
+  page,
+}) => {
+  test.skip(
+    width(page) < 1024,
+    "the hero card is a wide-viewport affordance — absent below the grid breakpoint",
+  );
+  await page.goto("/");
+
+  // The drift gate, not discipline (#531): the rendered card must be the
+  // committed fixture's opening lines, byte for byte. The old hand-written
+  // excerpt showed a corrected decimal the live file deliberately does not
+  // carry — the one thing the picture must never do.
+  const expected = readFileSync(
+    new URL("../landing/demo/seeded-delivery.ags", import.meta.url),
+    "utf8",
+  )
+    .split(/\r?\n/)
+    .slice(0, 5);
+  const rendered = (await page.locator("section#top pre").innerText()).split(
+    "\n",
+  );
+  expect(rendered).toEqual(expected);
+
+  // The card hydrates: the seeded verdict appears in the hero without any
+  // interaction, engine willing.
+  const heroChip = page.locator("section#top").getByText(/error/);
+  await expect(heroChip).toBeVisible({ timeout: 15_000 });
+
+  // And it is LIVE, not a snapshot: spending LOCA's fix budget below must
+  // move the hero's count too — both mounts are one component on one store.
+  const before = await heroChip.innerText();
+  await page
+    .getByRole("button", { name: "Fix 1 auto-fixable in LOCA" })
+    .click();
+  await expect(heroChip).not.toHaveText(before);
+  await expect(heroChip).toContainText(/error/);
+});
+
+test("touch: the floating verdict follows without covering the editor", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!hasTouch, "the 390 touch reader is the floating chip's audience");
+  await page.goto("/");
+
+  // Open the carousel on the widest table — chip and editor now share the
+  // 390px viewport. The chip must be visible…
+  await page
+    .getByRole("button", { name: "Edit LOCA_ID on row 1 of LLPL" })
+    .click();
+  const floating = page.locator('[data-scoreboard="floating"]');
+  await expect(floating).toBeVisible({ timeout: 15_000 });
+
+  // …and must NOT sit on the carousel's controls: Playwright refuses a tap
+  // that another element would intercept, so paging the carousel IS the
+  // occlusion probe.
+  const carousel = page.getByRole("group", { name: "Editing row 1 of LLPL" });
+  await carousel.scrollIntoViewIfNeeded();
+  await carousel
+    .getByRole("button", { name: "Next field in this row" })
+    .click();
+  await expect(carousel.getByText("SAMP_TOP", { exact: true })).toBeVisible();
+  await expectViewportWide(page);
+});
+
+test("fine: the scoreboard follows the reader and lands on the verdict", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "drives the in-place editor (#531)");
+  await page.goto("/");
+
+  // The floating chip appears once a table is on screen, carrying the count.
+  await page.locator("section#loca").scrollIntoViewIfNeeded();
+  const floating = page.locator('[data-scoreboard="floating"]');
+  await expect(floating).toBeVisible({ timeout: 15_000 });
+  await expect(floating).toContainText(/error/);
+
+  // Clear every seeded finding: spend LOCA's fix budget (Rule 8), retire the
+  // unlisted abbreviation on BOTH rows that carry it (Rule 16 twice — SAMP's
+  // key and LLPL's restatement must move together or the chain orphans), and
+  // delete the orphaned lab row (Rule 10c).
+  await page
+    .getByRole("button", { name: "Fix 1 auto-fixable in LOCA" })
+    .click();
+  for (const name of [
+    "Edit SAMP_TYPE on row 1 of SAMP",
+    "Edit SAMP_TYPE on row 1 of LLPL",
+  ]) {
+    await page.getByRole("button", { name }).click();
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("D");
+    await page.keyboard.press("Enter");
+  }
+  await page.getByRole("button", { name: "Delete row 3 of LLPL" }).click();
+
+  // Zero findings is a stated verdict, not an empty panel.
+  await expect(floating).toContainText("valid AGS4");
+
+  // The chip is a door: clicking it lands the reader on the findings panel.
+  await floating.click();
+  await expect(page.locator("#findings")).toBeInViewport();
+  await expectViewportWide(page);
 });

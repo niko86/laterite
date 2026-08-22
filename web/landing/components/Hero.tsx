@@ -8,25 +8,19 @@
  * The file excerpt is a WIDE-VIEWPORT affordance, not a universal one. The
  * mobile artboard drops it, and it is right to: on a phone, an install command
  * answers "what is this" faster than raw AGS4 does, and the reader who wants the
- * format has the whole demo three sections down. It is `aria-hidden` because it
- * is a picture of the format rather than content — the same lines are live,
- * selectable and labelled in the output pane (#397).
+ * format has the whole demo three sections down.
+ *
+ * Since #531 the card is CONTENT, not a picture: its lines are sliced from the
+ * committed fixture (heroExcerpt.ts — the hand-written excerpt it replaces had
+ * drifted into showing a corrected value the live file deliberately does not
+ * carry), and the scoreboard chip beside the filename is the engine's own live
+ * verdict on that same file.
  */
 
 import { For, type Component } from "solid-js";
 import { Button } from "@shared/components";
-
-/* Four lines of the seeded delivery, chosen to show the shape rather than the
-   data: the GROUP/HEADING/UNIT/TYPE stanza that opens every AGS4 group. Not
-   read from the fixture — this is a fragment sized to the card, and the honest
-   rendering of the whole file is #397's job. */
-const EXCERPT = [
-  ['"GROUP"', '"LOCA"'],
-  ['"HEADING"', '"LOCA_ID"', '"LOCA_TYPE"', '"LOCA_GL"'],
-  ['"UNIT"', '""', '""', '"m"'],
-  ['"TYPE"', '"ID"', '"PA"', '"2DP"'],
-  ['"DATA"', '"BH01"', '"CP"', '"11.80"'],
-];
+import { HERO_LINES } from "../demo/heroExcerpt";
+import { Scoreboard } from "../demo/Scoreboard";
 
 export const Hero: Component = () => (
   <div class="grid items-center gap-10 min-[64rem]:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
@@ -64,22 +58,26 @@ export const Hero: Component = () => (
 
     {/* Wide viewports only. `hidden` rather than a media query in CSS so the
         markup itself is absent from the phone layout's flow. */}
-    <div
-      aria-hidden="true"
-      class="hidden rounded-lg border border-laterite-200 bg-surface-code p-4 min-[64rem]:block"
-    >
-      <p class="mb-3 font-mono text-micro uppercase tracking-(--track-micro) text-fg-faint">
-        delivery.ags
-      </p>
+    <div class="hidden rounded-lg border border-laterite-200 bg-surface-code p-4 min-[64rem]:block">
+      <div class="mb-3 flex items-center justify-between gap-3">
+        <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-faint">
+          delivery.ags
+        </p>
+        <Scoreboard />
+      </div>
       <pre class="overflow-x-auto font-mono text-caption leading-[1.7] text-fg-soft">
-        <For each={EXCERPT}>
-          {(cells) => (
-            <div class="whitespace-pre">
-              <span class="text-accent">{cells[0]}</span>
-              {cells.length > 1 ? "," : ""}
-              {cells.slice(1).join(",")}
-            </div>
-          )}
+        <For each={HERO_LINES}>
+          {(line) => {
+            const at = line.indexOf(",");
+            return (
+              <div class="whitespace-pre">
+                <span class="text-accent">
+                  {at === -1 ? line : line.slice(0, at)}
+                </span>
+                {at === -1 ? "" : line.slice(at)}
+              </div>
+            );
+          }}
         </For>
       </pre>
     </div>

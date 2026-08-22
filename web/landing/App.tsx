@@ -11,14 +11,15 @@
  * than depth.
  */
 
-import { For, Show, type Component, type JSX } from "solid-js";
+import { For, Show, onMount, type Component, type JSX } from "solid-js";
 import { Masthead } from "./components/Masthead";
 import { Hero } from "./components/Hero";
 import { InstallGrid } from "./components/InstallGrid";
 import { Footer } from "./components/Footer";
 import { Rail } from "./components/Rail";
 import { GroupSection } from "./demo/GroupSection";
-import { bindUndoShortcuts } from "./demo/store";
+import { armWhenIdle, bindUndoShortcuts } from "./demo/store";
+import { FloatingScoreboard } from "./demo/Scoreboard";
 import { FileAndFindings } from "./demo/FileAndFindings";
 import { SECTIONS, bandVar } from "./sections";
 
@@ -43,6 +44,12 @@ export const App: Component = () => {
   // Page-wide undo/redo (#525): one binding covers both editors, living and
   // dying with the page component (the binder registers its own onCleanup).
   bindUndoShortcuts();
+  // Eager-idle engine (#531): onMount runs once the component is in the
+  // DOM — before paint — and the idle callback inside armWhenIdle is what
+  // pushes the fetch past first paint, so rendering never waits on it.
+  onMount(() => {
+    armWhenIdle();
+  });
   return (
     <div class="min-h-screen bg-canvas text-fg">
       <Rail />
@@ -83,6 +90,7 @@ export const App: Component = () => {
         </main>
         <Footer />
       </div>
+      <FloatingScoreboard />
     </div>
   );
 };
