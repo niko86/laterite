@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { INSTALL_CHANNELS } from "../landing/installChannels";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -885,4 +886,49 @@ test("fine: the scoreboard follows the reader and lands on the verdict", async (
   await floating.click();
   await expect(page.locator("#findings")).toBeInViewport();
   await expectViewportWide(page);
+});
+
+test("the page's hierarchy runs demo-first, and the CLI card is the binary", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  // Nav order matches section order (#533): the demo comes before install on
+  // the page, so it comes before install in the nav. toHaveText retries and
+  // reads textContent, so the assertion also holds on the lanes where the
+  // nav is display:none below the 52rem breakpoint.
+  await expect(page.locator("header nav a")).toHaveText([
+    "Demo",
+    "Install",
+    "Docs",
+    "Source",
+  ]);
+
+  // The hero's filled primary is the demo; install is the outline second.
+  const ctas = page.locator("section#top").getByRole("link", {
+    name: /See it break|Pick your stack/,
+  });
+  await expect(ctas.first()).toHaveText("See it break");
+  await expect(ctas.first()).toHaveAttribute("href", "#file");
+  // Primacy is the FILL, not just the order: the demo CTA wears the rust
+  // primary (bg-cta), the install CTA does not.
+  await expect(ctas.first()).toHaveClass(/bg-cta/);
+  await expect(ctas.nth(1)).toHaveAttribute("href", "#install");
+  await expect(ctas.nth(1)).not.toHaveClass(/bg-cta/);
+
+  // The CLI card: the binary is the identity, the releases download is the
+  // action, and no pip command appears anywhere on it.
+  const cli = page
+    .locator("li")
+    .filter({ has: page.getByRole("link", { name: "lat", exact: true }) });
+  await expect(cli).toHaveCount(1);
+  await expect(cli.getByRole("link", { name: /release/i })).toHaveAttribute(
+    "href",
+    "https://github.com/niko86/laterite/releases",
+  );
+  await expect(cli).not.toContainText("pip install");
+  // The note's wording is the GENERATOR's to own — assert the card renders
+  // whatever the generated module says, not a second copy of its prose.
+  const cliChannel = INSTALL_CHANNELS.find((c) => c.id === "cli");
+  await expect(cli).toContainText(cliChannel?.note ?? "unreachable");
 });

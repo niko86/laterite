@@ -162,9 +162,15 @@ def resolve(sources: dict[str, str]) -> list[Card]:
             # registry here would name one that 404s.
             registry="",
             package=cli,
-            command=f"pip install {wheel}",
+            # Empty ON PURPOSE (#533): the standalone binary is THE CLI, so
+            # the card's action is the releases download, not a pip command —
+            # the grid renders the href as the action when there is nothing
+            # to copy. Wheel/npm inclusion is the note, phrased as included
+            # rather than identical (three programs answer to the binary's
+            # name and only their scriptable output is gated).
+            command="",
             href="https://github.com/niko86/laterite/releases",
-            note=f"{cli} ships with the wheel — or take the standalone binary",
+            note=f"{cli} also ships with the Python wheel and the npm package",
         ),
         Card(
             id="duckdb",
@@ -258,6 +264,18 @@ def unpublished_claims(
                 "cli: the wheel's `[project.scripts]` no longer declares `lat`, so "
                 "the card's claim that the CLI ships with the wheel is false"
             )
+        # The note's npm half (#533) is a fact claim like any other: it is
+        # only emitted while laterite-node's manifest actually declares a
+        # `bin` entry with the binary's name.
+        node_manifest = json.loads(
+            _text(sources, "rust-packages/laterite-node/package.json")
+        )
+        if by_id["cli"].package not in node_manifest.get("bin", {}):
+            claims.append(
+                f"cli: the note says `{by_id['cli'].package}` ships with the npm "
+                "package, but laterite-node's package.json declares no such "
+                "`bin` entry — the claim has no record behind it"
+            )
         if _crate_publishes(sources, "laterite-cli") and not by_id["cli"].registry:
             claims.append(
                 "cli: `laterite-cli` is now published — the card should name "
@@ -318,6 +336,9 @@ export type InstallChannel = {{
   /** The registry a reader would look on, or "" where there isn't one. */
   readonly registry: string;
   readonly package: string;
+  /** The copyable install command, or "" where the card's action is its
+   *  href — the grid then renders a download button instead of a copy box
+   *  (#533: the CLI, whose install is a release download, not a command). */
   readonly command: string;
   readonly href: string;
   readonly note: string;
