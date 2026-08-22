@@ -384,3 +384,46 @@ test("fine: findings speak one vocabulary — tinted cell with tooltip, table st
   await expect(panelRows).toHaveCount(2);
   await expect(panelRows.filter({ hasText: "LLPL" })).toHaveCount(1);
 });
+
+test("fine: the TRAN cover sheet seeds clean, and Rule 14 only fires when the reader causes it", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "drives the in-place editor (#527)");
+  await page.goto("/");
+
+  // The cover sheet renders in the File section as an ordinary group table.
+  const file = page.locator("section#file");
+  const coverCell = file.getByRole("button", {
+    name: "Edit TRAN_PROD on row 1 of TRAN",
+  });
+  await expect(coverCell).toBeVisible();
+
+  // Arm via the cover sheet itself; once findings render, Rule 14 is NOT
+  // among them — the permanent unclearable finding is gone from the seed.
+  await coverCell.click();
+  await expect(file.getByText("AGS Format Rule 8").first()).toBeVisible();
+  // Scoped to findings rows — the cover sheet's own PROSE names Rule 14
+  // (that is the lesson), so a bare text match would always hit.
+  await expect(file.locator("li").filter({ hasText: "Rule 14" })).toHaveCount(
+    0,
+  );
+
+  // Blanking a REQUIRED value raises a finding live, in the cover sheet's
+  // own strip (the engine answers Rule 10b, against the group)...
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Enter");
+  const strip = page.getByRole("list", { name: "TRAN findings" });
+  await expect(strip.getByText("Rule 10b")).toBeVisible();
+
+  // ...and undo clears it — cause, read, unwind.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(strip).toBeHidden();
+
+  // Deleting the cover sheet's one row is what Rule 14 exists to catch.
+  await file.getByRole("button", { name: "Delete row 1 of TRAN" }).click();
+  await expect(strip.getByText("Rule 14")).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(strip).toBeHidden();
+});

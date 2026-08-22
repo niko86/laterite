@@ -197,9 +197,10 @@ export function reset(): void {
 
 /** Run the engine's OWN fixer over the current delivery.
  *
- * Deliberately not a bespoke landing-page repair. #398 describes Fix as
+ * Deliberately not a bespoke landing-page repair. #398 described Fix as
  * correcting the decimal places, the abbreviation case and the missing TRAN
- * group; the shipped fixer mechanically repairs only the first, and reports the
+ * group; TRAN has since joined the seed as a clean cover sheet (#527), and
+ * the shipped fixer mechanically repairs only the decimals, reporting the
  * rest as findings a human has to decide about. Hand-rolling the other two here
  * would make the page repair more than `lat fix` does, so a reader who tried the
  * same file on their own machine would get a different answer from the demo that

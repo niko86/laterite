@@ -74,6 +74,19 @@ export const DEMO_GROUPS: readonly DemoGroup[] = [
       { name: "LLPL_PL", key: false, type: "XN", unit: "%", description: "Plastic limit" },
     ],
   },
+  {
+    code: "TRAN",
+    parent: null,
+    description: "Data File Transmission Information / Data Status",
+    headings: [
+      { name: "TRAN_ISNO", key: true, type: "X", unit: "", description: "Issue sequence reference" },
+      { name: "TRAN_DATE", key: false, type: "DT", unit: "yyyy-mm-dd", description: "Date of production of data file" },
+      { name: "TRAN_PROD", key: false, type: "X", unit: "", description: "Data file producer" },
+      { name: "TRAN_STAT", key: false, type: "X", unit: "", description: "Status of data within submission" },
+      { name: "TRAN_AGS", key: false, type: "X", unit: "", description: "AGS Edition Reference" },
+      { name: "TRAN_RECV", key: false, type: "X", unit: "", description: "Data file recipient" },
+    ],
+  },
 ] as const;
 
 /** The KEY headings of `code`, in dictionary order — the tuple Rule 10c

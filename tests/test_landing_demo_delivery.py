@@ -1,5 +1,6 @@
-"""The landing demo's seeded delivery must fail in exactly the four ways the
-page narrates, and in no others (#393).
+"""The landing demo's seeded delivery must fail in exactly the ways the
+page narrates, and in no others (#393; the set shrank when #527 seeded TRAN
+and retired the permanent Rule 14).
 
 The demo's whole argument is "here is a real delivery, and here is what the
 engine thinks of it". That argument dies if the engine thinks a dozen things the
@@ -41,15 +42,20 @@ SCHEMA_TS = REPO / "web" / "landing" / "demo" / "schema.ts"
 #: The chain the page draws, parent first.
 CHAIN = ["PROJ", "LOCA", "SAMP", "LLPL"]
 
-#: The four seeded defects, as (rule, group, what it must be about). Rule 16
+#: Every group whose drawn headings must agree with the registry — the chain
+#: plus the File section's TRAN cover sheet (#527).
+DRAWN = [*CHAIN, "TRAN"]
+
+#: The three seeded defects, as (rule, group, what it must be about). Rule 16
 #: appears TWICE on purpose: the bad `SAMP_TYPE` value is part of `LLPL`'s key
 #: tuple, so one bad cell is two findings. The page shows both rather than
 #: deduping, because that duplication is the repeated-KEY lesson firing live.
+#: Rule 14 left the set when #527 seeded a clean TRAN cover sheet — a finding
+#: no demo interaction could clear taught only that green was unreachable.
 SEEDED = {
     ("AGS Format Rule 8", "LOCA", "LOCA_GL"),
     ("AGS Format Rule 16", "SAMP", "SAMP_TYPE"),
     ("AGS Format Rule 16", "LLPL", "SAMP_TYPE"),
-    ("AGS Format Rule 14", "TRAN", None),
     ("AGS Format Rule 10c", "LLPL", None),
 }
 
@@ -78,7 +84,7 @@ def test_the_delivery_fails_in_exactly_the_seeded_ways(report) -> None:
     count-based assertion would still see five."""
     got = {_identity(r) for r in report.findings.to_dicts()}
     assert got == SEEDED, (
-        "the seeded delivery no longer fails in exactly the four ways the page "
+        "the seeded delivery no longer fails in exactly the ways the page "
         f"narrates\n  unexpected: {sorted(map(str, got - SEEDED))}\n"
         f"  missing:    {sorted(map(str, SEEDED - got))}"
     )
@@ -135,7 +141,7 @@ def test_the_fixture_draws_every_key_heading_the_registry_defines() -> None:
     heading named, rather than there."""
     registry = pytest.importorskip("laterite.registry")
     drawn = _drawn_headings()
-    for code in CHAIN:
+    for code in DRAWN:
         keys = [h.name for h in registry.GROUPS[code].headings if "KEY" in h.status]
         assert keys, f"{code} has no KEY headings — the registry shape changed"
         missing = [k for k in keys if k not in drawn.get(code, [])]
@@ -151,7 +157,7 @@ def test_key_headings_are_drawn_in_dictionary_order() -> None:
     the other way round, which is a finding the page would never explain."""
     registry = pytest.importorskip("laterite.registry")
     drawn = _drawn_headings()
-    for code in CHAIN:
+    for code in DRAWN:
         order = [h.name for h in registry.GROUPS[code].headings]
         got = [h for h in drawn[code] if h in order]
         assert got == sorted(got, key=order.index), (
@@ -221,10 +227,10 @@ def test_the_generated_schema_parses_at_all() -> None:
     failure mode — a generator whose output shape changed — is caught here
     rather than showing up as "the dictionary agrees with nothing"."""
     parsed = _schema_ts()
-    assert sorted(parsed) == sorted(CHAIN), (
-        f"schema.ts no longer parses into the four demo groups: {sorted(parsed)}"
+    assert sorted(parsed) == sorted(DRAWN), (
+        f"schema.ts no longer parses into the drawn demo groups: {sorted(parsed)}"
     )
-    for code in CHAIN:
+    for code in DRAWN:
         assert parsed[code]["headings"], f"{code} parsed with no headings"
 
 
@@ -236,7 +242,7 @@ def test_the_committed_schema_agrees_with_the_dictionary() -> None:
     registry = pytest.importorskip("laterite.registry")
     parsed = _schema_ts()
 
-    for code in CHAIN:
+    for code in DRAWN:
         group = registry.GROUPS[code]
         assert parsed[code]["parent"] == group.parent, (
             f"{code}'s parent is {parsed[code]['parent']!r} in schema.ts and "
@@ -271,7 +277,7 @@ def test_the_committed_schema_carries_every_key_heading() -> None:
     registry = pytest.importorskip("laterite.registry")
     parsed = _schema_ts()
 
-    for code in CHAIN:
+    for code in DRAWN:
         keys = [h.name for h in registry.GROUPS[code].headings if "KEY" in h.status]
         drawn = [h["name"] for h in parsed[code]["headings"]]
         missing = [k for k in keys if k not in drawn]
@@ -292,7 +298,7 @@ def test_the_schema_the_page_renders_matches_the_fixture_it_renders() -> None:
     it, or drops a column the file carries."""
     drawn = _drawn_headings()
     ts = SCHEMA_TS.read_text(encoding="utf-8")
-    for code in CHAIN:
+    for code in DRAWN:
         names = [
             line.split('name: "', 1)[1].split('"', 1)[0]
             for line in ts.splitlines()
@@ -321,10 +327,17 @@ def test_the_seeded_final_depth_is_the_rails_total() -> None:
     )
 
 
-def test_the_delivery_has_no_tran_group() -> None:
-    """Seeded defect 3, asserted directly: Rule 14's absence would otherwise be
-    indistinguishable from the rule not running."""
-    assert '"GROUP","TRAN"' not in DELIVERY.read_text(encoding="utf-8")
+def test_the_delivery_seeds_one_clean_tran_row() -> None:
+    """The inverse of the retired seeded defect 3 (#527): TRAN is present with
+    exactly ONE data row — Rule 14's whole demand — so the finding set above
+    proves the rule ran and passed, not that it never fired. A second row or a
+    missing group would both surface as a Rule 14 the page no longer
+    narrates."""
+    text = DELIVERY.read_text(encoding="utf-8")
+    assert '"GROUP","TRAN"' in text
+    tran = text.split('"GROUP","TRAN"')[1].split('"GROUP"')[0]
+    rows = [line for line in tran.splitlines() if line.startswith('"DATA"')]
+    assert len(rows) == 1, f"TRAN must carry exactly one data row, got {len(rows)}"
 
 
 if __name__ == "__main__":

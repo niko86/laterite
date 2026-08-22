@@ -4,6 +4,12 @@
 "TYPE","ID","X","X"
 "DATA","121-0234","Barrow Lane, Phase 2","Northgate Developments"
 
+"GROUP","TRAN"
+"HEADING","TRAN_ISNO","TRAN_DATE","TRAN_PROD","TRAN_STAT","TRAN_AGS","TRAN_RECV"
+"UNIT","","yyyy-mm-dd","","","",""
+"TYPE","X","DT","X","X","X","X"
+"DATA","1","2026-08-14","Redstone Site Investigations","Final","4.1","Northgate Developments"
+
 "GROUP","LOCA"
 "HEADING","LOCA_ID","LOCA_TYPE","LOCA_GL","LOCA_REM","LOCA_FDEP"
 "UNIT","","","m","","m"
@@ -33,6 +39,7 @@
 "TYPE","X","X"
 "DATA","m","metres"
 "DATA","%","percent"
+"DATA","yyyy-mm-dd","date format"
 
 "GROUP","TYPE"
 "HEADING","TYPE_TYPE","TYPE_DESC"
@@ -44,6 +51,7 @@
 "DATA","2DP","2 decimal places"
 "DATA","0DP","0 decimal places"
 "DATA","XN","Text or number"
+"DATA","DT","Date in the declared format"
 
 "GROUP","ABBR"
 "HEADING","ABBR_HDNG","ABBR_CODE","ABBR_DESC"

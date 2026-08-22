@@ -27,6 +27,7 @@ describe("parse", () => {
   it("reads every group in the seeded delivery", () => {
     expect(SEEDED.map((g) => g.code)).toEqual([
       "PROJ",
+      "TRAN",
       "LOCA",
       "SAMP",
       "LLPL",
@@ -94,10 +95,12 @@ describe("lineOfRow", () => {
   });
 
   it("agrees with the validator's line for the seeded Rule 8 defect", () => {
-    // `lat validate` reports the bad LOCA_GL on line 11 of the fixture. The
+    // The literal the engine reports for the bad LOCA_GL — pinned because the
     // page bands that line from this function, so a drift here would band the
-    // wrong row while the finding text stayed correct.
-    expect(lineOfRow(SEEDED, "LOCA", 0)).toBe(11);
+    // wrong row while the finding text stayed correct. The number lives ONLY
+    // in the assertion; tests/test_landing_demo_delivery.py holds the other
+    // half of the contract against the real validator.
+    expect(lineOfRow(SEEDED, "LOCA", 0)).toBe(17);
   });
 
   it("answers -1 for a group the delivery does not carry", () => {

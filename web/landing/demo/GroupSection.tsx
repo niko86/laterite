@@ -7,9 +7,9 @@
  * this sentence without a code edit.
  */
 
-import { For, Show, createMemo, type Component } from "solid-js";
+import { Show, createMemo, type Component } from "solid-js";
 import { Button } from "@shared/components";
-import { FindingCallout } from "./FindingCallout";
+import { FindingsStrip } from "./FindingsStrip";
 import { DEMO_GROUPS } from "./schema";
 import { RowCarousel } from "./RowCarousel";
 import { GroupTable } from "./GroupTable";
@@ -129,26 +129,7 @@ export const GroupSection: Component<{
               }}
             />
 
-            {/* Group-level findings strip — attached to the TABLE it judges,
-                not the prose column beside it (#526): a finding rendered in
-                the essay reads as commentary; on the table it reads as a
-                verdict. Same callout as the carousel and the panel. */}
-            <Show when={groupFindings().length}>
-              <ul
-                aria-label={`${props.code} findings`}
-                class="mt-3 list-none space-y-2 p-0"
-              >
-                <For each={groupFindings()}>
-                  {(f) => (
-                    <li>
-                      <FindingCallout severity={f.severity} rule={f.rule}>
-                        {f.desc}
-                      </FindingCallout>
-                    </li>
-                  )}
-                </For>
-              </ul>
-            </Show>
+            <FindingsStrip code={props.code} findings={groupFindings()} />
 
             <div class="mt-3 flex flex-wrap items-center gap-3">
               <Button

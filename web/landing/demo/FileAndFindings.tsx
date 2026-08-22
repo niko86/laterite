@@ -17,14 +17,26 @@
 import { For, Show, createMemo, createSignal, type Component } from "solid-js";
 import { Button } from "@shared/components";
 import { FindingCallout } from "./FindingCallout";
+import { FindingsStrip } from "./FindingsStrip";
+import { GroupTable } from "./GroupTable";
+import { RowCarousel } from "./RowCarousel";
+import { DEMO_GROUPS } from "./schema";
+import { coarsePointer } from "./pointer";
 import {
   applyEngineFixes,
+  arm,
   armed,
   busy,
+  deleteRow,
+  delivery,
+  findingsForGroup,
   focusLine,
+  picked,
   reset,
   report,
+  setCell,
   setFocusLine,
+  setPicked,
   text,
 } from "./store";
 import type { Finding } from "./engine";
@@ -54,9 +66,23 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
   const lines = createMemo(() => text().split("\r\n"));
   const findings = createMemo(() => report()?.findings ?? []);
 
+  /* The TRAN cover sheet (#527) — same all-or-nothing narrowing as
+     GroupSection's `bits`: schema without data is a generated-file/fixture
+     mismatch the Python gate fails on. */
+  const tran = createMemo(() => {
+    const schema = DEMO_GROUPS.find((g) => g.code === "TRAN");
+    const data = delivery().find((g) => g.code === "TRAN");
+    return schema && data ? { schema, data } : undefined;
+  });
+  const tranOpen = createMemo(() => {
+    const p = picked();
+    return p && p.group === "TRAN" ? { row: p.row, col: p.col } : null;
+  });
+
   /** Lines carrying a finding, so the pane can band them without a lookup per
-   *  line. Rules with no line (14, 16) band nothing, correctly — there is no
-   *  line in the file where "TRAN group not found" happened. */
+   *  line. Rules that report an absence carry no line and band nothing,
+   *  correctly — delete the TRAN row and there is no line in the file where
+   *  "TRAN group not found" happened. */
   const bandedLines = createMemo(
     () =>
       new Set(
@@ -74,7 +100,7 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
             The file, and what the engine says
           </h2>
           <p class="mt-2 max-w-[60ch] text-fg-soft">
-            This is the delivery those four tables emit, and these are the
+            This is the delivery the tables above emit, and these are the
             findings the shipped validator returns for it — the same engine the
             CLI and the Python library run.
           </p>
@@ -119,6 +145,66 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
             is the whole difference between a validator and a fixer.
           </FindingCallout>
         </div>
+      </Show>
+
+      {/* The cover sheet (#527): TRAN, the delivery's transmission header —
+          an ORDINARY editable group table, same component and contracts as
+          the four above, not an eighth descent section (the strata ramp
+          stays at seven; recorded decision). It lives here because a
+          transmission header is ABOUT the file beside it. Rule 14 used to be
+          a permanent seeded finding no interaction could clear; the seed now
+          carries a clean TRAN, and the rule only fires when the reader
+          deletes its one row — a finding they can cause, read, and undo. */}
+      <Show when={tran()}>
+        {(t) => (
+          <div class="mt-8 max-w-[46rem]">
+            <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
+              The cover sheet — TRAN
+            </p>
+            <p class="mt-1 max-w-[60ch] text-caption text-fg-soft">
+              Every delivery opens with its transmission header: who produced
+              the file, for whom, and against which AGS edition. Delete its row
+              and Rule 14 has something to say.
+            </p>
+            <div class="mt-3">
+              <GroupTable
+                schema={t().schema}
+                data={t().data}
+                band={props.band}
+                picked={tranOpen()}
+                onPick={(row, col) => {
+                  arm();
+                  setPicked({ group: "TRAN", row, col });
+                }}
+                onCommit={(row, col, value) => {
+                  setCell("TRAN", row, col, value);
+                }}
+                onDeleteRow={(row) => {
+                  deleteRow("TRAN", row);
+                }}
+              />
+            </div>
+            <FindingsStrip code="TRAN" findings={findingsForGroup("TRAN")} />
+            <Show when={coarsePointer() ? tranOpen() : null}>
+              {(cell) => (
+                <RowCarousel
+                  schema={t().schema}
+                  data={t().data}
+                  band={props.band}
+                  row={cell().row}
+                  col={cell().col}
+                  onMove={(col) =>
+                    setPicked({ group: "TRAN", row: cell().row, col })
+                  }
+                  onClose={() => setPicked(null)}
+                  onDelete={() => {
+                    deleteRow("TRAN", cell().row);
+                  }}
+                />
+              )}
+            </Show>
+          </div>
+        )}
       </Show>
 
       <div class="mt-6 grid gap-6 min-[64rem]:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] min-[64rem]:items-start">

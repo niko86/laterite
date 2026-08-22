@@ -207,8 +207,8 @@ export function addRow(
 }
 
 /** The seeded delivery, parsed once. The fixture is committed and gated by
- *  tests/test_landing_demo_delivery.py, which asserts it fails in exactly the
- *  four ways this page narrates. */
+ *  tests/test_landing_demo_delivery.py, which asserts the exact seeded-finding
+ *  set this page narrates. */
 export const SEEDED: Delivery = parse(seeded);
 
 /** `LOCA_FDEP` for the first location — the total depth #399's rail runs to,
