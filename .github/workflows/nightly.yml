@@ -521,6 +521,44 @@ jobs:
           "$GITHUB_WORKSPACE/.released/bin/python" tools/gen_doc_outputs.py \
             --surface cli
 
+  # The environment a docs example PUBLISHES, which is not the one anything ran it
+  # in (#514). Every `ex*.py` carries a PEP 723 header naming its dependencies and
+  # a docstring telling the reader to `uv run` it; both per-PR and the leg above
+  # supply the environment themselves, so a header could be missing a dependency
+  # and no gate could fail. Two of them were, and the same script exited 0 for the
+  # gate and died on `ModuleNotFoundError: pyarrow` for a reader.
+  #
+  # ITS OWN JOB, NOT A STEP ABOVE, BECAUSE THE CALIBRATION IS DIFFERENT. The
+  # `docs-vs-released-*` legs amnesty everything below their determination while
+  # the tree is ahead of the released tag — right for an example using an API the
+  # release does not have yet, and wrong for a missing extra, which no release
+  # fixes and which would then be excused on nearly every night. So the
+  # classification lives in the test rather than in this YAML: a failure is
+  # re-run with the pin widened to `laterite[all]`, and only a failure the extras
+  # DECIDE is fatal. The tree-ahead class skips, loudly, which is why `-rs` is not
+  # decoration here — it is the leg's report.
+  #
+  # No released venv and no toolchain: `uv` builds each header's environment from
+  # the pin, so this job needs neither the wheel nor Rust. The cache stays off for
+  # the same reason its neighbour's does — a reader installs cold, and a leg
+  # asking what a reader gets should resolve the way a reader does.
+  docs-example-headers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: false
+      - name: Docs examples run in the environment their own header declares
+        env:
+          LATERITE_DOCS_HEADER_ENV: "1"
+        run: |
+          uv run --no-project --with pytest pytest \
+            tests/test_docs_example_headers.py \
+            -o addopts="" -q --no-header -rs
+
   # The Node twin of docs-vs-released-wheel: does the live docs site work against
   # the package `npm install laterite` actually gives you?
   #
@@ -1188,6 +1226,7 @@ jobs:
       - links
       - wheel-smoke
       - docs-vs-released-wheel
+      - docs-example-headers
       - docs-vs-released-npm
       - docs-vs-released-wasm
       - docs-vs-released-crates

@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["laterite==0.11.0"]
+# dependencies = ["laterite[pyarrow]==0.11.0"]
 # ///
 """Docs example — run it with `uv run ex21_synthetic_keys.py`, from anywhere.
 
@@ -10,6 +10,10 @@ arm that makes its repo-relative path resolve outside a checkout.
 
 Prints the COLUMN LISTS rather than the frames: which columns appear is the
 whole lesson here, and two full frames would bury it.
+
+`[pyarrow]` is here for the closing `rel.pl()`, not for anything laterite does:
+the relation `.sql()` hands back is DuckDB's, and its `.pl()` imports pyarrow.
+See `ex06_sql_join.py`, which carries the same extra for the same reason.
 """
 
 import urllib.request

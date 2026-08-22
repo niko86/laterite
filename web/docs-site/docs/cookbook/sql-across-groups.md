@@ -23,9 +23,15 @@ aggregates — that a single-group query can't express. Drop to SQL.
     `.sql()` is a **terminal** — it returns a `DuckDBPyRelation`, not an
     `AgsQuery`. Finish it by materialising into the frame library you want:
 
-    - `.pl()` → polars (shown above)
-    - `.df()` → pandas
-    - `.arrow()` → an Arrow table
+    - `.pl()` → polars (shown above) — needs `laterite[pyarrow]`
+    - `.df()` → pandas — needs `laterite[compat]`
+    - `.arrow()` → an Arrow table — needs `laterite[pyarrow]`
+
+    Those are **DuckDB's** terminals, not laterite's, so they carry DuckDB's
+    dependencies rather than ours: `.pl()` goes through Arrow even though polars
+    is in the base install, which is why the example above pins
+    `laterite[pyarrow]`. laterite's own materialisers stay pyarrow-free — see
+    [Dependency shape](../concepts/dependency-shape.md).
 
     One variation — fold a third group in with another `JOIN` and pull real
     columns instead of a count:

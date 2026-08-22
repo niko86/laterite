@@ -20,10 +20,11 @@ repo_refs:
   token_sync: "repo:web/scripts/sync-docs-tokens.mjs"
   band_gate: "repo:tests/test_docs_band_containment.py"
   duckdb_gate: "repo:tests/test_docs_duckdb_examples.py"
+  header_gate: "repo:tests/test_docs_example_headers.py"
   released_legs: "repo:.github/workflows/nightly.yml"
   released_crates: "repo:tools/check_released_crate_readmes.py"
   released_crates_gate: "repo:tests/test_released_crate_readmes.py"
-related: [validator-site, playwright-e2e, dec-landing-build-shared-tokens]
+related: [validator-site, playwright-e2e, dec-landing-build-shared-tokens, dec-example-header-environment]
 sources: []
 ---
 
@@ -98,7 +99,13 @@ Key facts:
   import pandas — which is NOT in the base install — so they pin
   `laterite[compat]==<product>`. A uniform bare pin makes both die under
   `uv run` on `ModuleNotFoundError: pandas`, the exact failure the header exists
-  to prevent. Header and fixture arm live ABOVE a
+  to prevent. **`ex06` + `ex21` are the same case one library along, and it took
+  a gate to find them** (#514): both finish on `rel.pl()`, and the relation
+  `.sql()` returns is DuckDB's, so the materialiser is DuckDB's and imports
+  pyarrow. Nothing on the page imports it and polars is in the base install, so
+  the bare pin looked right; they now pin `laterite[pyarrow]==<product>`. The
+  extras a header needs are not derivable from the imports it shows —
+  [[dec-example-header-environment]]. Header and fixture arm live ABOVE a
   `--8<-- [start:code]` marker and the page includes `…py:code`, so the rendered
   snippet is byte-identical to before the header existed; the machinery is in the
   file, not on the page. That is the CLI tree's `[start:cmd]` trick
@@ -196,6 +203,24 @@ Key facts:
   real failures, so the legs report and the determination does the separating
   (`repo:tests/test_nightly_wiring.py` holds both halves). GitHub-hosted and
   toolchain-free: a published wheel needs no Rust and no maturin.
+- **A second nightly leg asks it about the ENVIRONMENT, not the wheel.** The leg
+  above installs the released wheel *with every extra* and supplies the
+  environment itself; so does the per-PR gate. Neither has ever run the PEP 723
+  header the examples publish, so a header could be missing a dependency and
+  nothing could fail — and two were (#514, above). `docs-example-headers`
+  (`repo:tests/test_docs_example_headers.py`, opt-in behind
+  `LATERITE_DOCS_HEADER_ENV`) runs each example with `uv run --exact --script`
+  — the reader's command plus `--exact`, which is deliberately stricter than
+  what the docstrings tell a reader to type, for the reason below.
+  **It is a separate job because the amnesty
+  is wrong for it**: a missing extra is not fixed by any release, so excusing it
+  through the tree-ahead window — nearly every night — would leave the leg
+  decorative. The classification happens in the test instead, by re-running a
+  failure with the pin widened to `laterite[all]`: decided by the extras is
+  fatal, anything else is a loud skip. `--exact` is load-bearing, not tidiness —
+  uv caches a script environment by PATH and does not shrink it, so without the
+  flag the module's own falsification passed against a deliberately broken
+  header. [[dec-example-header-environment]] carries the rest.
 - **…and its Node twin, `docs-vs-released-npm`.** Same question, same calibration:
   `npm install laterite` unpinned, then the optional peer **exactly as the docs and
   the runtime error tell a reader to install it**, then the examples. Building it

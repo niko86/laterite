@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["laterite==0.11.0"]
+# dependencies = ["laterite[pyarrow]==0.11.0"]
 # ///
 """Docs example — run it with `uv run ex06_sql_join.py`, from anywhere.
 
@@ -8,6 +8,12 @@ Everything above the `[start:code]` marker is machinery the page does not
 show: the PEP 723 header that makes the file self-installing,
 and the fixture arm that makes its repo-relative path resolve outside a
 checkout.
+
+The header asks for `[pyarrow]`, and the dependency is not laterite's. `.sql()`
+returns a DuckDB relation, and DuckDB's `.pl()` / `.arrow()` materialisers
+import pyarrow themselves; laterite's own `.frame()` / `.to_polars()` stay
+pyarrow-free. A bare pin runs green in any environment that happens to have
+pyarrow and hands a reader `ModuleNotFoundError` at line `rel.pl()`.
 """
 
 import urllib.request
