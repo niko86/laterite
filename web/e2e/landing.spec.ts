@@ -260,6 +260,70 @@ test("touch: while a card holds focus, undo stays native — the model timeline 
   await expect(rows).toHaveCount(1);
 });
 
+test.describe("fine: the clipboard contract (#551)", () => {
+  // The contract is stated beside the handler it pins (GroupTable's onKeys):
+  // selected-cell chords are OURS, open editors are the browser's. These are
+  // the tests that go red if either half changes.
+  test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+
+  test("fine: copy takes the raw value, paste commits once, undo unwinds it in one step", async ({
+    page,
+    hasTouch,
+  }) => {
+    test.skip(hasTouch, "selected-cell chords are the fine pointer's (#525)");
+    await page.goto("/");
+
+    // Copy: the cell's VALUE, never the status glyph rendered beside it.
+    const src = page.getByRole("button", {
+      name: "Edit LOCA_GL on row 1 of LOCA",
+    });
+    await src.click();
+    await page.keyboard.press("Control+c");
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      "11.8",
+    );
+
+    // Paste: committed through the store funnel — ONE history entry, so one
+    // undo restores, exactly like a typed edit (the AC #551 names).
+    const target = page.getByRole("button", {
+      name: "Edit LOCA_ID on row 1 of LOCA",
+    });
+    await target.click();
+    await page.keyboard.press("Control+v");
+    await expect(target).toContainText("11.8");
+    await page.keyboard.press("Control+z");
+    await expect(target).toHaveText("BH01");
+  });
+
+  test("fine: an open editor is the browser's clipboard, not the cell handler's", async ({
+    page,
+    hasTouch,
+  }) => {
+    test.skip(hasTouch, "selected-cell chords are the fine pointer's (#525)");
+    await page.goto("/");
+    await page.evaluate(() => navigator.clipboard.writeText("SENTINEL"));
+
+    const cell = page.getByRole("button", {
+      name: "Edit LOCA_ID on row 1 of LOCA",
+    });
+    await cell.click();
+    await page.keyboard.press("Enter");
+    // With the editor open, the chord must reach the INPUT (native paste,
+    // which Escape then discards) and never the cell-level handler — had the
+    // handler fired, SENTINEL would be committed past the cancel.
+    await page.keyboard.press("Control+v");
+    await page.keyboard.press("Escape");
+    // The cell handler's paste is ASYNC (clipboard read then commit), so an
+    // immediate assertion can win the race and pass in a world where the
+    // handler fired. The settle is an OBSERVABLE, not a timeout: the browser
+    // services clipboard requests in order, so a read issued now cannot
+    // resolve before any read the handler queued earlier — by the time this
+    // returns, a fired handler would already have committed.
+    await page.evaluate(() => navigator.clipboard.readText());
+    await expect(cell).toHaveText("BH01");
+  });
+});
+
 test("fine: click selects, Enter edits in place, Esc cancels, Tab commits and moves, arrows navigate, typing replaces", async ({
   page,
   hasTouch,

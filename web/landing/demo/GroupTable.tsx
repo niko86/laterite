@@ -181,7 +181,18 @@ export const GroupTable: Component<{
 
   /* One handler for the spreadsheet keys. Bubbling from the open input never
      reaches the branches below (`editing()` guards them), and modifier chords
-     other than copy/paste fall through so the page-level undo hears them. */
+     other than copy/paste fall through so the page-level undo hears them.
+
+     THE CLIPBOARD CONTRACT (#551), stated as observed rather than designed:
+     on a SELECTED cell, Ctrl/Cmd+C writes the cell's raw value (never the
+     status glyph) via the async clipboard API, and Ctrl/Cmd+V commits the
+     clipboard string verbatim through the store funnel — one commit, so undo
+     unwinds a paste in one step exactly like a typed edit. An OPEN editor is
+     deliberately not ours: the INPUT early-return above hands the browser its
+     native input clipboard, and the carousel's cards are the same story.
+     There is no normalization on the handler path — a multi-line clipboard
+     commits verbatim, which no native input path can produce; that gap is
+     #574, a defect, not part of this contract. */
   const onKeys = (e: KeyboardEvent) => {
     const at = props.picked;
     // The target check, not just `editing()`: the editor's own Enter has
