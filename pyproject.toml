@@ -258,17 +258,6 @@ ignore = [
 # Ordering it legally would mean hoisting the import out of the shown region —
 # publishing a snippet that omits its own import to satisfy a linter.
 "web/docs-site/examples/**" = ["E402", "ANN"]
-# UP033: ruff takes its target-version from `requires-python` (>=3.12), and this
-# one file does not run on that. Two ci.yml steps execute it with the runner
-# image's bare `python3` — floor 3.8 — so `@functools.cache` is not an "upgrade"
-# here, it is an AttributeError at import that takes the `node` and `ts-lint` jobs
-# down before a check runs. It has already done so once. The rule is not merely
-# blind to this file's floor, it argues against it, which is why the exemption is
-# recorded here rather than left to whoever next runs `ruff check --fix`.
-# #521 covers gating the floor properly; the file's own docstring carries the
-# `vermin` command to check it by hand meanwhile.
-"tools/gen_doc_outputs.py" = ["UP033"]
-
 # --- Type-faithfulness gate (#303 Phase 1) --------------------------------
 # Astral `ty` (preview). Originally scoped to the SHIPPED `laterite` package
 # only; widened (lever 7 of laterite-dev#585) to also cover the repo's own `tools/` +
