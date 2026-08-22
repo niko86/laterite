@@ -67,6 +67,29 @@ export async function validateText(text: string): Promise<Report> {
   return { ok: raw.ok, findings: flatten(raw.findings) };
 }
 
+/** The engine's own fix record — re-exported so the store and the pure
+ *  scoping helpers (fixes.ts) speak the wasm surface's type, never a copy. */
+export type Fix = import("../../src/wasm/ags4_wasm").Fix;
+
+/** The safe fixes the engine offers for this text (#530). The demo never
+ *  repairs more than `lat fix` would: this list IS the repair budget. */
+export async function computeFixesText(text: string): Promise<Fix[]> {
+  const m = await engine();
+  return m.compute_fixes(encoder.encode(text));
+}
+
+/** Apply a subset of the engine's fixes to the text, returning the new text.
+ *  The subset is the caller's scoping decision; the edits are the engine's. */
+export async function applyFixesText(
+  text: string,
+  fixes: readonly Fix[],
+): Promise<string> {
+  const m = await engine();
+  return new TextDecoder().decode(
+    m.apply_fixes(encoder.encode(text), null, fixes),
+  );
+}
+
 type RuleGroupLike = {
   rule: string;
   items: {

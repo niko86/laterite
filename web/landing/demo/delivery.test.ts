@@ -17,6 +17,7 @@ import {
   deleteGroup,
   deleteRow,
   emit,
+  groupOfLine,
   lineOfRow,
   parse,
   restoreGroup,
@@ -236,6 +237,28 @@ describe("deleteRow", () => {
   it("answers the same delivery for a row or group that is not there", () => {
     expect(deleteRow(SEEDED, "PROJ", 5)).toBe(SEEDED);
     expect(deleteRow(SEEDED, "NOPE", 0)).toBe(SEEDED);
+  });
+});
+
+describe("groupOfLine", () => {
+  it("maps every line of a group's block to its code, blanks to null", () => {
+    // PROJ owns lines 1-5 (GROUP/HEADING/UNIT/TYPE/DATA); line 6 is the
+    // separator; TRAN's block starts at 7. Derived from the same walk as
+    // lineOfRow, and pinned against it so the two can never disagree.
+    expect(groupOfLine(SEEDED, 1)).toBe("PROJ");
+    expect(groupOfLine(SEEDED, 5)).toBe("PROJ");
+    expect(groupOfLine(SEEDED, 6)).toBeNull();
+    expect(groupOfLine(SEEDED, 7)).toBe("TRAN");
+    for (const g of SEEDED) {
+      for (let r = 0; r < g.rows.length; r++) {
+        expect(groupOfLine(SEEDED, lineOfRow(SEEDED, g.code, r))).toBe(g.code);
+      }
+    }
+  });
+
+  it("answers null off the end of the file and on line 0", () => {
+    expect(groupOfLine(SEEDED, 0)).toBeNull();
+    expect(groupOfLine(SEEDED, 10_000)).toBeNull();
   });
 });
 

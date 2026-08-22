@@ -14,7 +14,7 @@
  * who has to go looking for that sentence has already decided not to try.
  */
 
-import { For, Show, createMemo, createSignal, type Component } from "solid-js";
+import { For, Show, createMemo, type Component } from "solid-js";
 import { Button } from "@shared/components";
 import { FindingCallout } from "./FindingCallout";
 import { FindingsStrip } from "./FindingsStrip";
@@ -24,7 +24,7 @@ import { RowCarousel } from "./RowCarousel";
 import { DEMO_GROUPS } from "./schema";
 import { coarsePointer } from "./pointer";
 import {
-  applyEngineFixes,
+  applyGroupFixes,
   arm,
   armed,
   busy,
@@ -33,6 +33,8 @@ import {
   delivery,
   findingsForGroup,
   focusLine,
+  groupFixes,
+  isManualFinding,
   picked,
   reset,
   report,
@@ -65,7 +67,6 @@ const FindingRow: Component<{ finding: Finding }> = (props) => (
 );
 
 export const FileAndFindings: Component<{ band: string }> = (props) => {
-  const [fixNote, setFixNote] = createSignal<string | null>(null);
   const lines = createMemo(() => text().split("\r\n"));
   const findings = createMemo(() => report()?.findings ?? []);
 
@@ -115,20 +116,6 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
       </div>
 
       <div class="mt-6 flex flex-wrap items-center gap-3">
-        <Button
-          variant="action"
-          onClick={() => {
-            void applyEngineFixes().then((n) => {
-              setFixNote(
-                n === 0
-                  ? "Nothing left that the fixer will touch on its own."
-                  : `Applied ${n} mechanical ${n === 1 ? "fix" : "fixes"}. What is left needs a human.`,
-              );
-            });
-          }}
-        >
-          Fix what is safe to fix
-        </Button>
         <Button variant="default" onClick={reset}>
           Reset the delivery
         </Button>
@@ -137,16 +124,30 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
         </Show>
       </div>
 
-      <Show when={fixNote()}>
-        {/* The neutral "note" tone — same callout as every finding, no
-            verdict. (Its surface/raised pairing carries #452's fix.) */}
+      {/* The validator-vs-fixer lesson (#530): shown while the orphan the
+          copy describes actually stands — pinned to Rule 10c on LLPL, the
+          orphan's own identity, so no OTHER manual LLPL finding can hold the
+          note up after the orphan is repaired. Gated on the finding, not a
+          click — the global fix button it used to follow is gone; each table
+          now carries its own fix budget. The neutral "note" tone — same
+          callout as every finding, no verdict. */}
+      <Show
+        when={report()?.findings.some(
+          (f) =>
+            f.rule === "AGS Format Rule 10c" &&
+            f.group === "LLPL" &&
+            isManualFinding(f),
+        )}
+      >
         <div class="mt-3 max-w-[70ch]">
           <FindingCallout severity="note">
-            {fixNote()} The orphaned <code class="font-mono">LLPL</code> row is
-            left standing on purpose: the engine can tell you a lab result
-            points at a sample that does not exist, but only a human knows
-            whether the sample reference is wrong or the sample is missing. That
-            is the whole difference between a validator and a fixer.
+            The orphaned <code class="font-mono">LLPL</code> row is left
+            standing on purpose — no fix button will touch it, and its finding
+            wears a <span class="font-mono text-micro uppercase">manual</span>{" "}
+            badge. The engine can tell you a lab result points at a sample that
+            does not exist, but only a human knows whether the sample reference
+            is wrong or the sample is missing. That is the whole difference
+            between a validator and a fixer.
           </FindingCallout>
         </div>
       </Show>
@@ -202,6 +203,10 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                   }}
                   onDeleteRow={(row) => {
                     deleteRow("TRAN", row);
+                  }}
+                  fixCount={groupFixes("TRAN").length}
+                  onFix={() => {
+                    void applyGroupFixes("TRAN");
                   }}
                 />
               </div>

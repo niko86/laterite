@@ -585,3 +585,150 @@ test("touch: the delete/restore loop works from a tap, and closes an open carous
   await expect(file.getByText("TRAN deleted")).toBeHidden();
   await expect(file.locator("table")).toHaveCount(1);
 });
+
+test("fine: the fix budget lives on each table — scoped to its group, honest about the rest", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "the tooltip half needs a pointer that can hover (#530)");
+  await page.goto("/");
+
+  // Arm on the seeded Rule 8 cell; the counts arrive with the findings.
+  const cell = page.getByRole("button", {
+    name: "Edit LOCA_GL on row 1 of LOCA",
+  });
+  await cell.click();
+
+  // LOCA carries the one seeded engine fix; every other table is a visible,
+  // disabled zero. The global button is GONE (#530).
+  const locaFix = page.getByRole("button", {
+    name: "Fix 1 auto-fixable in LOCA",
+  });
+  await expect(locaFix).toBeEnabled();
+  for (const code of ["PROJ", "SAMP", "LLPL", "TRAN"]) {
+    await expect(
+      page.getByRole("button", { name: `Fix 0 auto-fixable in ${code}` }),
+    ).toBeDisabled();
+  }
+  await expect(
+    page.getByRole("button", { name: "Fix what is safe to fix" }),
+  ).toHaveCount(0);
+
+  // The badge grammar: the fixable finding's tooltip says nothing about
+  // "manual"; the fixer-proof Rule 16 on SAMP's strip wears the chip.
+  await cell.getByText("✗").hover();
+  const tooltip = page.getByRole("tooltip");
+  await expect(tooltip).toContainText("Rule 8");
+  await expect(tooltip).not.toContainText("manual");
+  await expect(
+    page
+      .getByRole("list", { name: "SAMP findings" })
+      .getByText("manual", { exact: true }),
+  ).toBeVisible();
+
+  // Apply LOCA's budget: the decimal is repaired, the count hits a disabled
+  // zero, and NOTHING outside LOCA moved — asserted on the emitted text the
+  // output pane renders, not sampled cells: the before/after diff must be
+  // exactly one line, the repaired one.
+  const pane = page
+    .locator("section#file")
+    .locator('div[class*="max-h-"]')
+    .first();
+  const before = (await pane.innerText()).split("\n");
+  await locaFix.click();
+  await expect(cell).toContainText("11.80");
+  const after = (await pane.innerText()).split("\n");
+  expect(after.length).toBe(before.length);
+  const changed = before.filter((line, i) => after[i] !== line);
+  expect(changed).toHaveLength(1);
+  expect(changed[0]).toContain("11.8");
+  await expect(
+    page.getByRole("button", { name: "Fix 0 auto-fixable in LOCA" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Edit SAMP_TYPE on row 1 of SAMP" }),
+  ).toContainText("b");
+  await expect(
+    page.getByRole("button", { name: "Edit LLPL_LL on row 3 of LLPL" }),
+  ).toContainText("38");
+  await expect(
+    page.locator("section#file li").filter({ hasText: "not defined" }),
+  ).toHaveCount(2);
+
+  // The validator-vs-fixer narrative survives where it stays true: pinned to
+  // the orphan the fixer refuses to touch — and it LEAVES when the orphan
+  // does. Deleting the orphaned LLPL row repairs it by hand; the note must
+  // follow its example out, and undo brings both back.
+  const narrative = page.getByText(
+    "difference between a validator and a fixer",
+  );
+  await expect(narrative).toBeVisible();
+  await page.getByRole("button", { name: "Delete row 3 of LLPL" }).click();
+  await expect(narrative).toBeHidden();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(narrative).toBeVisible();
+
+  // A scoped fix is one commit like any other: undo returns the raw decimal.
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(cell).not.toContainText("11.80");
+});
+
+test("touch: the fix budget applies from a tap too", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(!hasTouch, "the fine lane covers the hover-tooltip half (#530)");
+  await page.goto("/");
+
+  // Arm by tapping the seeded Rule 8 cell (opens the carousel — fine), then
+  // spend LOCA's budget from its table header.
+  await page
+    .getByRole("button", { name: "Edit LOCA_GL on row 1 of LOCA" })
+    .click();
+  await page
+    .getByRole("button", { name: "Fix 1 auto-fixable in LOCA" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Edit LOCA_GL on row 1 of LOCA" }),
+  ).toContainText("11.80");
+  await expect(
+    page.getByRole("button", { name: "Fix 0 auto-fixable in LOCA" }),
+  ).toBeDisabled();
+});
+
+test("fine: a table's budget reacts to new defects, and the tooltip badges the fixer-proof ones", async ({
+  page,
+  hasTouch,
+}) => {
+  test.skip(hasTouch, "drives the in-place editor and hovers (#530)");
+  await page.goto("/");
+
+  // SAMP starts with nothing fixable. A malformed 2DP the engine CAN repair
+  // moves its budget 0 -> 1 live — the count derives from the fixes list,
+  // recomputed with every revalidation, never a static seed.
+  const top = page.getByRole("button", {
+    name: "Edit SAMP_TOP on row 1 of SAMP",
+  });
+  await top.click();
+  await expect(
+    page.getByRole("button", { name: "Fix 0 auto-fixable in SAMP" }),
+  ).toBeDisabled();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("1.5");
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("button", { name: "Fix 1 auto-fixable in SAMP" }),
+  ).toBeEnabled();
+
+  // A value the fixer CANNOT repair is the other half: the finding stays,
+  // the budget returns to zero, and the cell's tooltip says so — "manual",
+  // in the same grammar as the strip.
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("abc");
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("button", { name: "Fix 0 auto-fixable in SAMP" }),
+  ).toBeDisabled();
+  await top.getByText("✗").hover();
+  await expect(page.getByRole("tooltip")).toContainText("manual");
+});

@@ -38,7 +38,16 @@ import {
   type History,
 } from "./history";
 import { keyHeadings } from "./schema";
-import { engine, validateText, type Finding, type Report } from "./engine";
+import { fixesForGroup, isManual } from "./fixes";
+import {
+  applyFixesText,
+  computeFixesText,
+  engine,
+  validateText,
+  type Finding,
+  type Fix,
+  type Report,
+} from "./engine";
 
 const [delivery, setDelivery] = createSignal<Delivery>(SEEDED);
 const [armed, setArmed] = createSignal(false);
@@ -75,20 +84,28 @@ const text = createMemo(() => emit(delivery()));
  * warns that the computations can never be disposed, and it is right — this
  * store IS the page's lifetime, so the root is stated rather than left implicit.
  */
-const { report, busy } = createRoot(() => {
+const { report, busy, fixes } = createRoot(() => {
   const [res] = createResource(
     () => (armed() ? text() : false),
-    (current: string) => validateText(current),
+    // One fetch, both answers: the findings and the fixes describe the same
+    // text, so computing them together means the page can never show a fix
+    // count from one revision beside findings from another (#530). The cost
+    // is a second engine pass per revalidation — accepted for coherence.
+    async (current: string) => ({
+      report: await validateText(current),
+      fixes: await computeFixesText(current),
+    }),
   );
   // Named accessors rather than the resource itself, so callers read `report()`
   // and `busy()` without knowing this is a resource — and so the resource's
   // `undefined`-before-first-fetch becomes the `null` the UI already handles.
-  const report: Accessor<Report | null> = () => res() ?? null;
+  const report: Accessor<Report | null> = () => res()?.report ?? null;
   const busy: Accessor<boolean> = () => res.loading;
-  return { report, busy };
+  const fixes: Accessor<readonly Fix[]> = () => res()?.fixes ?? [];
+  return { report, busy, fixes };
 });
 
-export { armed, busy, delivery, focusLine, picked, report, text };
+export { armed, busy, delivery, fixes, focusLine, picked, report, text };
 export { setFocusLine, setPicked };
 
 /** Load the engine. Idempotent; the first caller pays and the rest await.
@@ -223,15 +240,31 @@ export function reset(): void {
  * What survives is the argument, intact and now true of the real tool: a
  * validator tells you what is wrong, and a human decides what is right.
  */
-export async function applyEngineFixes(): Promise<number> {
+/** Apply one group's share of the engine's fixes (#530). Recomputed fresh
+ *  against the current text rather than read from the resource, so a click
+ *  can never apply a list computed for an older revision. Only FILTERS the
+ *  engine's list — the demo never repairs more than `lat fix` would. */
+export async function applyGroupFixes(group: string): Promise<number> {
   arm();
-  const m = await engine();
-  const bytes = new TextEncoder().encode(text());
-  const fixes = m.compute_fixes(bytes);
-  if (!fixes.length) return 0;
-  const fixed = m.apply_fixes(bytes, null, fixes);
-  commit(() => parse(new TextDecoder().decode(fixed)));
-  return fixes.length;
+  const current = text();
+  const all = await computeFixesText(current);
+  const mine = fixesForGroup(all, delivery(), group);
+  if (!mine.length) return 0;
+  const fixed = await applyFixesText(current, mine);
+  commit(() => parse(fixed));
+  return mine.length;
+}
+
+/** The fixes whose anchor falls in one group's block — the count on that
+ *  table's header button. */
+export function groupFixes(group: string): readonly Fix[] {
+  return fixesForGroup(fixes(), delivery(), group);
+}
+
+/** True when the fixer will not touch this finding — the "manual" badge on
+ *  strips and tooltips (#530). */
+export function isManualFinding(finding: Finding): boolean {
+  return isManual(finding, fixes());
 }
 
 /** The findings that land on one cell — used to mark it in the table and to

@@ -129,6 +129,22 @@ export function lineOfRow(
   return -1;
 }
 
+/** The group whose block owns 1-based line `n`, or null for the separators
+ *  and anything past the end. The same walk as lineOfRow — 4 declaration
+ *  lines + the DATA rows, one blank between groups — kept adjacent so the two
+ *  cannot drift apart. #530 uses it to scope the engine's fix list, whose
+ *  records carry a line but not a group. */
+export function groupOfLine(delivery: Delivery, n: number): string | null {
+  let line = 0;
+  for (const g of delivery) {
+    if (line) line += 1; // the blank separator between groups
+    const last = line + 4 + g.rows.length;
+    if (n > line && n <= last) return g.code;
+    line = last;
+  }
+  return null;
+}
+
 /** Replace one cell, returning a new delivery — or the SAME delivery when the
  *  value already matches, so a commit-without-change (Enter on an untouched
  *  editor, a click away) records no undo step. */
