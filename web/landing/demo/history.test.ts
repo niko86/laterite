@@ -15,6 +15,53 @@ describe("record", () => {
     expect(h.future).toEqual([]);
   });
 
+  it("coalesces a keyed run into one snapshot, keeping the run's base", () => {
+    let h: History<string> = EMPTY;
+    h = record(h, "start", 100, "cell:LOCA:1:2");
+    h = record(h, "s-typed", 100, "cell:LOCA:1:2");
+    h = record(h, "st-typed", 100, "cell:LOCA:1:2");
+    expect(h.past).toEqual(["start"]);
+  });
+
+  it("a different key starts a new run", () => {
+    let h: History<string> = EMPTY;
+    h = record(h, "a", 100, "cell:LOCA:1:2");
+    h = record(h, "b", 100, "cell:LOCA:1:3");
+    expect(h.past).toEqual(["a", "b"]);
+  });
+
+  it("an unkeyed record breaks the run", () => {
+    let h: History<string> = EMPTY;
+    h = record(h, "a", 100, "cell:LOCA:1:2");
+    h = record(h, "b");
+    h = record(h, "c", 100, "cell:LOCA:1:2");
+    expect(h.past).toEqual(["a", "b", "c"]);
+  });
+
+  it("an undo ends the run, so typing after it records fresh", () => {
+    let h: History<string> = EMPTY;
+    h = record(h, "a", 100, "cell:LOCA:1:2");
+    const back = undo(h, "b");
+    expect(back).not.toBeNull();
+    if (!back) return;
+    h = record(back.history, "a", 100, "cell:LOCA:1:2");
+    expect(h.past).toEqual(["a"]);
+    expect(h.future).toEqual([]);
+  });
+
+  it("redo after a coalesced undo restores the run's final state in one step", () => {
+    let h: History<string> = EMPTY;
+    h = record(h, "start", 100, "cell:LOCA:1:2");
+    h = record(h, "s-typed", 100, "cell:LOCA:1:2");
+    const back = undo(h, "st-typed");
+    expect(back?.present).toBe("start");
+    if (!back) return;
+    const fwd = redo(back.history, back.present);
+    expect(fwd?.present).toBe("st-typed");
+    expect(fwd?.history.past).toEqual(["start"]);
+    expect(fwd?.history.key).toBeNull();
+  });
+
   it("drops the oldest snapshot at the cap instead of growing unbounded", () => {
     let h: History<number> = EMPTY;
     for (let i = 0; i < 150; i++) h = record(h, i, 100);

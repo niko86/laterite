@@ -227,10 +227,12 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
                     band={props.band}
                     row={cell().row}
                     col={cell().col}
-                    onMove={(col) =>
-                      setPicked({ group: "TRAN", row: cell().row, col })
-                    }
-                    onClose={() => setPicked(null)}
+                    onMove={(col) => {
+                      setPicked({ group: "TRAN", row: cell().row, col });
+                    }}
+                    onClose={() => {
+                      setPicked(null);
+                    }}
                     onDelete={() => {
                       deleteRow("TRAN", cell().row);
                     }}

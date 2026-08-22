@@ -188,6 +188,7 @@ export const RowCarousel: Component<{
                     props.row,
                     props.col,
                     e.currentTarget.value,
+                    { coalesce: true },
                   );
                 }}
               />
