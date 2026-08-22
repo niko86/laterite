@@ -23,6 +23,7 @@ import {
   restoreGroup,
   seededFinalDepth,
   setCell,
+  singleLine,
 } from "./delivery";
 import { DEMO_GROUPS, keyHeadings } from "./schema";
 
@@ -71,6 +72,23 @@ describe("emit", () => {
     expect(stray).toHaveLength(1);
     expect(stray[0]?.code).toBe("PROJ");
     expect(stray[0]?.rows).toHaveLength(0);
+  });
+
+  it("round-trips a cell the paste path could once have torn in two", () => {
+    /* #574, and the assertion is `toEqual` for a specific reason. quote()
+       escapes a doubled quote and nothing else, so a terminator in a cell used
+       to reach the text as a raw byte inside a quoted field; parse() split on
+       it, and the fragment after the break opened with no data descriptor, so
+       the tag chain DROPPED it rather than reading it as a record. The row
+       count therefore survived and only the CELL count moved — a rows-length
+       assertion passes straight over that, and a deep equality does not.
+
+       What this pins is setCell's normalization, NOT emit/parse against
+       arbitrary content: nothing here can seat a raw terminator any more. The
+       emit/parse pair remains unguarded for a cell that arrives by another
+       route — see the note on singleLine. */
+    const next = setCell(SEEDED, "LOCA", 0, 0, "AB\nCD");
+    expect(parse(emit(next))).toEqual(next);
   });
 
   it("re-quotes a value containing a quote", () => {
@@ -135,6 +153,61 @@ describe("setCell", () => {
     // cost the reader an undo step (#525).
     const current = SEEDED.find((g) => g.code === "PROJ")?.rows[0]?.[0] ?? "";
     expect(setCell(SEEDED, "PROJ", 0, 0, current)).toBe(SEEDED);
+  });
+
+  /* #574: the model is the backstop, not just the handler that had the bug.
+     A cell holding a CR or LF makes emit() tear one DATA record across two
+     physical lines, and nothing downstream survives that — so the guard lives
+     on the value, where no present or future caller can route around it. */
+  it("folds a line break to the space a single-line input would hold", () => {
+    // setCell's own enforcement — singleLine's full contract is pinned in its
+    // own describe below, against the browser answers the e2e observed.
+    const cellAfter = (pasted: string) =>
+      setCell(SEEDED, "LOCA", 0, 0, pasted).find((g) => g.code === "LOCA")
+        ?.rows[0]?.[0];
+    expect(cellAfter("AB\nCD")).toBe("AB CD");
+    expect(cellAfter("AB\r\n\r\n")).toBe("AB");
+  });
+
+  it("answers the same delivery when only a trailing newline differs", () => {
+    // Normalization happens BEFORE the already-matches comparison, or pasting
+    // a value that reduces to the current one would cost an undo step for a
+    // change the reader cannot see.
+    const current = SEEDED.find((g) => g.code === "LOCA")?.rows[0]?.[0] ?? "";
+    expect(setCell(SEEDED, "LOCA", 0, 0, `${current}\r\n`)).toBe(SEEDED);
+  });
+});
+
+describe("singleLine", () => {
+  /* Every case here is an OBSERVED browser answer, not a derivation: each was
+     read off a live single-line input by pasting the left-hand string into a
+     real editor. The landing e2e keeps one of them wired to an actual paste,
+     so the source of truth stays checkable rather than frozen here. Deriving
+     these from HTML's value sanitization algorithm gives the wrong answer
+     twice over — that algorithm removes a break where a paste spaces it, and
+     says nothing at all about the trailing run. */
+  it.each([
+    ["AB\nCD", "AB CD"],
+    ["AB\r\nCD", "AB CD"],
+    ["AB\rCD", "AB CD"],
+    ["AB\n\nCD", "AB  CD"], // interior breaks each spend a space
+    ["AB\n", "AB"],
+    ["AB\n\n", "AB"], // the trailing RUN goes, not just the last break
+    ["AB\r\n\r\n", "AB"],
+    ["AB\n\n\n", "AB"],
+    ["AB\r\r", "AB"],
+    ["AB\nCD\n\n", "AB CD"],
+    ["\nAB", " AB"], // leading is interior: spaced, never dropped
+    ["plain", "plain"],
+    ["", ""],
+  ])("%j -> %j", (raw, want) => {
+    expect(singleLine(raw)).toBe(want);
+  });
+
+  it("is idempotent, which is what lets the handler and the model both call it", () => {
+    for (const raw of ["AB\nCD", "AB\r\n\r\n", "\nAB"]) {
+      expect(singleLine(singleLine(raw))).toBe(singleLine(raw));
+    }
   });
 });
 

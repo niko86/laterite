@@ -145,6 +145,35 @@ export function groupOfLine(delivery: Delivery, n: number): string | null {
   return null;
 }
 
+/** The value a single-line `<input>` would hold, so the clipboard handler can
+ *  agree with every other entry path (#574).
+ *
+ *  Why this matters: one cell holding a terminator tears a DATA record in two,
+ *  because `quote()` doubles an embedded quote and escapes nothing else, so the
+ *  byte reaches the text raw. The native paths — the in-place editor, the
+ *  carousel's field cards — are sanitized by the browser before we ever see the
+ *  value. The handler reads the clipboard itself, so it is the one path that
+ *  has to do it by hand.
+ *
+ *  The rule is TAKEN FROM the browser, not from the spec: an interior break
+ *  becomes a SPACE (not nothing), a CRLF pair counts as one break, and a
+ *  TRAILING RUN of breaks — however many — is dropped entirely. Reading HTML's
+ *  value sanitization algorithm suggests stripping every break instead, and
+ *  that is wrong for a paste. The `+` on the trailing match is the half that is
+ *  easy to get wrong and impossible to notice: `"AB\n\n"` is `"AB"` to the
+ *  browser and would be `"AB "` without it, and a trailing space in a KEY field
+ *  orphans every row that references it — the same failure shape #574 exists to
+ *  close. The landing e2e reads all of this off a live input, so the day an
+ *  engine disagrees it fails there rather than drifting silently. (A LEADING
+ *  break is not dropped; it becomes a space like any other interior one.)
+ *
+ *  Exported because the handler normalizes at the point of entry, where a
+ *  reader can see it happen. Two call sites, ONE definition — the alternative
+ *  is two rules that agree until someone edits one of them. */
+export function singleLine(value: string): string {
+  return value.replace(/(?:\r\n|[\r\n])+$/, "").replace(/\r\n|[\r\n]/g, " ");
+}
+
 /** Replace one cell, returning a new delivery — or the SAME delivery when the
  *  value already matches, so a commit-without-change (Enter on an untouched
  *  editor, a click away) records no undo step. */
@@ -155,10 +184,13 @@ export function setCell(
   colIndex: number,
   value: string,
 ): Delivery {
+  // Normalize BEFORE the comparison below, or a paste that reduces to the
+  // current value would spend an undo step on a change nobody can see.
+  const next = singleLine(value);
   const current = delivery.find((g) => g.code === code)?.rows[rowIndex]?.[
     colIndex
   ];
-  if (current === value) return delivery;
+  if (current === next) return delivery;
   return delivery.map((g) =>
     g.code !== code
       ? g
@@ -167,7 +199,7 @@ export function setCell(
           rows: g.rows.map((row, i) =>
             i !== rowIndex
               ? row
-              : row.map((cell, j) => (j === colIndex ? value : cell)),
+              : row.map((cell, j) => (j === colIndex ? next : cell)),
           ),
         },
   );

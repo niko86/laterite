@@ -45,7 +45,7 @@ import {
 } from "solid-js";
 import { Button, Tooltip } from "@shared/components";
 import type { DemoGroup } from "./schema";
-import type { Group } from "./delivery";
+import { singleLine, type Group } from "./delivery";
 import { coarsePointer } from "./pointer";
 import { severityCellTint, worstSeverity } from "./severity";
 import { findingsForCell, isManualFinding } from "./store";
@@ -190,9 +190,12 @@ export const GroupTable: Component<{
      unwinds a paste in one step exactly like a typed edit. An OPEN editor is
      deliberately not ours: the INPUT early-return above hands the browser its
      native input clipboard, and the carousel's cards are the same story.
-     There is no normalization on the handler path — a multi-line clipboard
-     commits verbatim, which no native input path can produce; that gap is
-     #574, a defect, not part of this contract. */
+     "Verbatim" stops at the line terminators (#574): the handler is the one
+     entry path a browser does not sanitize for us, so it applies the rule a
+     single-line input applies to a paste — each break becomes a space — via
+     `singleLine`. `setCell` enforces the same invariant on the model, which
+     is what makes it true rather than merely usual; the call here is where a
+     reader SEES it happen. */
   const onKeys = (e: KeyboardEvent) => {
     const at = props.picked;
     // The target check, not just `editing()`: the editor's own Enter has
@@ -211,7 +214,7 @@ export const GroupTable: Component<{
         void navigator.clipboard
           .readText()
           .then((value) => {
-            commitTo(at.row, at.col, value);
+            commitTo(at.row, at.col, singleLine(value));
           })
           .catch(() => undefined);
       }
