@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from importlib import resources
 from pathlib import Path
@@ -68,9 +69,67 @@ _ENCODING_PROBES = (
 )
 
 
+def _readme_text() -> str:
+    return resources.files(__package__).joinpath("README-cli.md").read_text("utf-8")
+
+
 def _print_readme() -> int:
-    print(resources.files(__package__).joinpath("README-cli.md").read_text("utf-8"))
+    print(_readme_text())
     return 0
+
+
+#: A `## ` heading and everything under it, up to the next one.
+_SECTION = re.compile(r"^## (?P<heading>.+?)\n(?P<body>.*?)(?=^## |\Z)", re.M | re.S)
+#: Words in a heading, so a verb can be matched against `## transport — pack /
+#: unpack / lock / unlock` as well as `## certify <file>`.
+_HEADING_WORDS = re.compile(r"[a-z][a-z0-9-]*")
+#: Appended to every verb's help, because clap does the same: `lat certify --help`
+#: on the binary lists `--quiet` and the dictionary flags, which belong to no one
+#: verb. Scoped help that hid them would send the reader back to the full guide,
+#: which is what they used `--help` to avoid.
+_GLOBAL_SECTION = "Global options"
+
+
+def _readme_section(verb: str) -> str | None:
+    """The guide's section for one verb, or None if it has none.
+
+    Matches a verb against the WORDS of a heading rather than its first token:
+    `## transport — pack / unpack / lock / unlock` documents four verbs at once,
+    and a first-token rule would silently drop all four back to the whole
+    document — the defect this exists to fix, wearing a fix's clothes.
+    """
+    sections = {
+        m.group("heading"): m.group(0).rstrip()
+        for m in _SECTION.finditer(_readme_text())
+    }
+    for heading, block in sections.items():
+        if verb in _HEADING_WORDS.findall(heading.lower()):
+            glob = next(
+                (b for h, b in sections.items() if h == _GLOBAL_SECTION),
+                "",
+            )
+            return f"{block}\n\n{glob}".rstrip() if glob else block
+    return None
+
+
+def _print_verb_help(verb: str) -> int:
+    """Help for one verb, falling back to the whole guide rather than to nothing.
+
+    A verb with no section is a documentation gap, not a reason to print an empty
+    page — `tests/test_cli_verb_help.py` fails on it, and a reader meanwhile gets
+    the document that does answer them.
+    """
+    section = _readme_section(verb)
+    if section is None:
+        return _print_readme()
+    print(section)
+    return 0
+
+
+def verbs() -> tuple[str, ...]:
+    """The verbs this launcher dispatches. Public for the gates; see
+    :func:`_subcommands` for why it is asked of the parser rather than listed."""
+    return _subcommands(_build_parser())
 
 
 # --- the human table ---------------------------------------------------
@@ -1073,8 +1132,25 @@ def census() -> dict:
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
 
-    if "--readme" in argv or "-h" in argv or "--help" in argv:
+    # `--readme` is the whole guide wherever it appears. `--help` is not: the
+    # binary scopes it to the verb, `README-cli.md`'s Usage block promises that,
+    # and this test used to be position-blind across the whole of argv — so
+    # `lat certify --help` printed all 203 lines, byte-identical to `lat --readme`
+    # (#509). Which verb, if any, is the parser's question, asked before argparse
+    # so `--help` beats a missing required argument the way clap orders it.
+    if "--readme" in argv:
         return _print_readme()
+    if "-h" in argv or "--help" in argv:
+        # Which verb, asked through the SAME splice the dispatch uses: `lat
+        # <file> --help` is `lat validate <file> --help`, and the binary answers
+        # it with validate's help because its argv pre-scan puts the default verb
+        # in before clap ever sees the flag. Reusing `_with_default_subcommand`
+        # rather than re-deriving the rule is what keeps the two agreed — with no
+        # file and no verb it splices nothing, and the whole guide is the answer.
+        hp = _build_parser()
+        verbs = _subcommands(hp)
+        verb = next((a for a in _with_default_subcommand(argv, hp) if a in verbs), None)
+        return _print_verb_help(verb) if verb else _print_readme()
 
     if argv[:1] == ["census"]:
         print(json.dumps(census(), indent=2))
