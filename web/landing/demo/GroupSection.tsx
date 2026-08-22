@@ -5,31 +5,15 @@
  * a row later. The parent named in each line comes from the generated schema's
  * `parent` field, so a dictionary edition that re-parented a group would change
  * this sentence without a code edit.
+ *
+ * What the section OWNS is the pairing: the prose column, the alternation, and
+ * which affordances a descent group offers. The table column is the shared
+ * harness (#549), which the TRAN cover sheet renders too.
  */
 
 import { Show, createMemo, type Component } from "solid-js";
-import { Button } from "@shared/components";
-import { FindingsStrip } from "./FindingsStrip";
+import { EditableGroup } from "./EditableGroup";
 import { DEMO_GROUPS } from "./schema";
-import { Presence } from "./Presence";
-import { RowCarousel } from "./RowCarousel";
-import { GroupStub } from "./GroupStub";
-import { GroupTable } from "./GroupTable";
-import { coarsePointer } from "./pointer";
-import {
-  addRow,
-  applyGroupFixes,
-  arm,
-  deleteGroup,
-  deleteRow,
-  delivery,
-  findingsForGroup,
-  groupFixCount,
-  picked,
-  restoreGroup,
-  setCell,
-  setPicked,
-} from "./store";
 
 /** What each group is FOR, in one sentence a geotechnical newcomer can hold.
  *  Editorial rather than derived: the dictionary's own descriptions ("Location
@@ -46,27 +30,14 @@ export const GroupSection: Component<{
   band: string;
   tableFirst: boolean;
 }> = (props) => {
-  /* Since #529 the pair is no longer all-or-nothing: a schema without
-     matching data now means the reader DELETED the group, and the section
-     answers with the restore stub instead of vanishing. A missing schema is
-     still the old story — a generated-file/fixture mismatch the Python gate
-     fails on — so the outer narrowing stays on the schema alone. */
+  /* The section narrows on the SCHEMA alone. A schema without matching data
+     means the reader deleted the group, and the harness answers that with the
+     restore stub; a missing schema is the other story — a generated-file /
+     fixture mismatch the Python gate fails on — and there is nothing to say
+     about a group the dictionary does not describe. */
   const schema = createMemo(() =>
     DEMO_GROUPS.find((g) => g.code === props.code),
   );
-  const data = createMemo(() => delivery().find((g) => g.code === props.code));
-  const bits = createMemo(() => {
-    const sch = schema();
-    const dat = data();
-    return sch && dat ? { schema: sch, data: dat } : undefined;
-  });
-
-  const open = createMemo(() => {
-    const p = picked();
-    return p && p.group === props.code ? { row: p.row, col: p.col } : null;
-  });
-
-  const groupFindings = createMemo(() => findingsForGroup(props.code));
 
   return (
     <Show when={schema()}>
@@ -123,112 +94,15 @@ export const GroupSection: Component<{
             class="min-w-0"
             classList={{ "min-[64rem]:order-1": props.tableFirst }}
           >
-            <Show
-              when={bits()}
-              fallback={
-                <>
-                  <GroupStub
-                    code={props.code}
-                    band={props.band}
-                    onRestore={() => {
-                      restoreGroup(props.code);
-                    }}
-                  />
-                  <FindingsStrip code={props.code} findings={groupFindings()} />
-                </>
-              }
-            >
-              {(b) => (
-                <>
-                  <GroupTable
-                    schema={b().schema}
-                    data={b().data}
-                    band={props.band}
-                    picked={open()}
-                    onPick={(row, col) => {
-                      arm();
-                      setPicked({ group: props.code, row, col });
-                    }}
-                    onCommit={(row, col, value) => {
-                      setCell(props.code, row, col, value);
-                    }}
-                    onDeleteRow={(row) => {
-                      deleteRow(props.code, row);
-                    }}
-                    fixCount={groupFixCount(props.code)}
-                    onFix={() => {
-                      void applyGroupFixes(props.code);
-                    }}
-                  />
-
-                  <FindingsStrip code={props.code} findings={groupFindings()} />
-
-                  <div class="mt-3 flex flex-wrap items-center gap-3">
-                    <Button
-                      variant="add"
-                      onClick={() => {
-                        addRow(props.code, b().schema.parent);
-                      }}
-                    >
-                      + row
-                      <Show when={b().schema.parent}>
-                        {(parent) => (
-                          <span class="text-fg-faint">
-                            {" "}
-                            (inherits {parent()}'s key)
-                          </span>
-                        )}
-                      </Show>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      tone="danger"
-                      aria-label={`Delete the ${props.code} group`}
-                      onClick={() => {
-                        deleteGroup(props.code);
-                      }}
-                    >
-                      delete group
-                    </Button>
-                    <span class="text-caption text-fg-faint">
-                      {/* The hint follows the editor the reader actually has (#525). */}
-                      {coarsePointer()
-                        ? "Tap any cell to edit the row."
-                        : "Click a cell, then type — Enter commits, Esc cancels."}
-                    </span>
-                  </div>
-
-                  {/* The carousel is the COARSE pointer's editor (#525); on a fine
-                pointer the pick is a spreadsheet selection and opening a tray
-                under the table would double the editing surface. */}
-                  <Presence when={coarsePointer() ? open() : null}>
-                    {(cell) => (
-                      <RowCarousel
-                        schema={b().schema}
-                        data={b().data}
-                        band={props.band}
-                        row={cell().row}
-                        col={cell().col}
-                        onMove={(col) => {
-                          setPicked({
-                            group: props.code,
-                            row: cell().row,
-                            col,
-                          });
-                        }}
-                        onClose={() => {
-                          setPicked(null);
-                        }}
-                        onDelete={() => {
-                          deleteRow(props.code, cell().row);
-                        }}
-                      />
-                    )}
-                  </Presence>
-                </>
-              )}
-            </Show>
+            {/* Both affordances, unlike the cover sheet: a descent group takes
+                as many rows as the reader wants, and this is where the page
+                first says how to edit one. */}
+            <EditableGroup
+              code={props.code}
+              band={props.band}
+              canAddRow
+              showEditHint
+            />
           </div>
         </div>
       )}
