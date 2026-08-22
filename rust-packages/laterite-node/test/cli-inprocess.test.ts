@@ -413,14 +413,33 @@ describe("cli (in-process): validate --index", () => {
 
 // ---- fix -------------------------------------------------------------------
 describe("cli (in-process): fix", () => {
-  it("writes a sibling .fixed file and returns 0 on a clean file", () => {
+  it("writes a sibling .fixed file, and the RESULT goes to stdout (#542)", () => {
     const dir = tmp();
     const src = join(dir, "data.ags");
     copyFileSync(CLEAN, src);
-    const { code, stderr } = runCli(["fix", src]);
+    const { code, stdout, stderr } = runCli(["fix", src]);
     expect(code).toBe(0);
     expect(existsSync(join(dir, "data.fixed.ags"))).toBe(true);
-    expect(stderr).toContain("→");
+    // The agent-first contract routes resolved-mode RESULTS to stdout —
+    // `fix`'s applied/residual line is the result, not a progress note, and
+    // the other two launchers already print it there. Piping
+    // `npx laterite fix f.ags | ...` must see it.
+    expect(stdout).toContain("→");
+    expect(stderr).not.toContain("→");
+  });
+
+  it("a landed fix names its KINDS on the result line (#542)", () => {
+    // The distinct fix kinds are a FACT the other two launchers state
+    // (`applied 1 fix(es) [reformat_numeric] → …`); the content gate caught
+    // this launcher omitting them. A zero-fix run states no kinds anywhere —
+    // every launcher prints `no fixes applicable` — so the fact is asserted
+    // where it exists: on a file with a mechanical repair.
+    const dir = tmp();
+    const src = join(dir, "data.ags");
+    copyFileSync(join(FIX, "rule8_dp_wrong_precision.ags"), src);
+    const { code, stdout } = runCli(["fix", src]);
+    expect(code).toBe(1); // residual findings remain
+    expect(stdout).toContain("[reformat_numeric]");
   });
 
   it("--fix-out writes to the named path", () => {
@@ -493,18 +512,21 @@ describe("cli (in-process): fix", () => {
 
 // ---- diff ------------------------------------------------------------------
 describe("cli (in-process): diff", () => {
-  it("identical files → 'no differences'", () => {
+  it("identical files → the header and a zero total, not a bare shrug", () => {
+    // 'no differences' used to be the whole output — fewer facts than the other
+    // two launchers state (header + totals), a contract breach, not layout (#542).
     const { code, stdout } = runCli(["diff", CLEAN, CLEAN]);
     expect(code).toBe(0);
-    expect(stdout).toContain("no differences");
+    expect(stdout).toContain(`${CLEAN} → ${CLEAN}`);
+    expect(stdout).toContain("total: +0 -0 ~0");
   });
 
-  it("differing files → per-group +/-/~ lines", () => {
-    // The two merge deliveries genuinely differ, so this exercises the changed-group
-    // human output (`CODE: +a -r ~c`), not the 'no differences' short-circuit.
+  it("differing files → header, per-group +/-/~ lines and the total (#542)", () => {
     const { code, stdout } = runCli(["diff", MERGE_A, MERGE_B]);
     expect(code).toBe(0);
+    expect(stdout).toContain(`${MERGE_A} → ${MERGE_B}`);
     expect(stdout).toMatch(/[A-Z]{4}: \+\d+ -\d+ ~\d+/);
+    expect(stdout).toMatch(/total: \+\d+ -\d+ ~\d+/);
   });
 
   it("--json emits the delta as JSON", () => {

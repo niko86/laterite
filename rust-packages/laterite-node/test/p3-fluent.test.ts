@@ -97,6 +97,13 @@ describe("Ags4File.diff — baseline = self", () => {
       a: "12.30",
       b: "13.30",
     });
+    // toJson() is the engine's own render kept verbatim (#542): same data as
+    // the parsed delta, and invisible to JSON.stringify — an accessor, not a
+    // field the wire shape suddenly grew.
+    const raw = delta.toJson();
+    expect(JSON.parse(raw)).toEqual({ ...delta });
+    expect(raw.startsWith('{\n  "groups"')).toBe(true);
+    expect(JSON.stringify(delta)).not.toContain("toJson");
     // no diff against itself
     expect(
       read(undefined, { text: CLEAN }).diff(Buffer.from(CLEAN)).total_changed,

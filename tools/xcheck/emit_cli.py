@@ -66,6 +66,7 @@ OP_VERBS: dict[str, str] = {
     "validate_ndjson": "validate",
     "diff_json": "diff",
     "merge_out": "merge",
+    "merge_json": "merge",
     "pack_out": "pack",
     "unpack_roundtrip": "unpack",
 }
@@ -270,6 +271,28 @@ def merge_out(argv0: list[str], case: dict, repo_root: Path) -> dict:
         return {"ok": {"merged": merged, "exit": r.returncode}}
 
 
+def merge_json(argv0: list[str], case: dict, repo_root: Path) -> dict:
+    """`lat merge <files...> --out <name> --json` — the stdout SUMMARY, where
+    `merge_out` observes the merged file. The `{out, bytes}` wrapper is CLI-local
+    by decision (dec-launcher-contract, #542), so nothing but this case holds its
+    composition byte-identical across the three launchers. The case's `out` name
+    deliberately carries non-ASCII: the wrapper's only non-ASCII surface is the
+    path the CLI itself echoes back, which is exactly where a hand-kept
+    serialiser's escaping shows (Python's `ensure_ascii` default). Raw stdout +
+    exit; the merged file itself is `merge_out`'s business."""
+    inputs = case["input"]["files"]
+    out_name = case["input"]["out"]
+    with tempfile.TemporaryDirectory() as tmp:
+        d = Path(tmp)
+        names: list[str] = []
+        for rel in inputs:
+            shutil.copyfile((repo_root / rel).resolve(), d / Path(rel).name)
+            names.append(Path(rel).name)
+        argv = [*argv0, "merge", *names, "--out", out_name, "--json"]
+        r = subprocess.run(argv, cwd=d, capture_output=True, text=True)
+        return {"ok": {"stdout": r.stdout, "exit": r.returncode}}
+
+
 def pack_out(argv0: list[str], case: dict, repo_root: Path) -> dict:
     """`lat pack <input> out.zst` — the zstd transport envelope. zstd is deterministic
     for a fixed input + level, so the packed bytes are identical across launchers;
@@ -339,6 +362,8 @@ def observe(argv0: list[str], case: dict, repo_root: Path) -> dict | None:
         return diff_json(argv0, case, repo_root)
     if op == "merge_out":
         return merge_out(argv0, case, repo_root)
+    if op == "merge_json":
+        return merge_json(argv0, case, repo_root)
     if op == "pack_out":
         return pack_out(argv0, case, repo_root)
     if op == "unpack_roundtrip":

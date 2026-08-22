@@ -63,4 +63,5 @@ impl core::marker::Unpin for laterite_ags4_diff::RowDelta
 impl core::marker::UnsafeUnpin for laterite_ags4_diff::RowDelta
 impl core::panic::unwind_safe::RefUnwindSafe for laterite_ags4_diff::RowDelta
 impl core::panic::unwind_safe::UnwindSafe for laterite_ags4_diff::RowDelta
+pub fn laterite_ags4_diff::delta_json(&laterite_ags4_diff::RevisionDelta) -> alloc::string::String
 pub fn laterite_ags4_diff::diff_parsed(&laterite_ags4_parse::ParsedFile, &laterite_ags4_parse::ParsedFile, &laterite_ags4_reference::dict::Dictionary<'_>, core::option::Option<usize>) -> laterite_ags4_diff::RevisionDelta

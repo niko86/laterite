@@ -687,7 +687,15 @@ function runFix(p: Parsed, json: boolean): number {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     return residual === 0 ? 0 : 1;
   }
-  note(`${result.toString()} → ${dest}`);
+  // STDOUT, not note(): the applied/residual line is the RESULT, and the
+  // agent-first contract routes resolved-mode results to stdout — the other
+  // two launchers already print theirs there, so this was a content-reaching
+  // stream divergence, not layout (#542). The distinct fix KINDS ride along
+  // because they are a fact the other two state (the content gate found this
+  // launcher omitting them) — sorted, so the set can't reorder per run.
+  const kinds = [...new Set(result.applied.map((a) => a.kind))].sort();
+  const kindNote = kinds.length ? ` [${kinds.join(", ")}]` : "";
+  process.stdout.write(`${result.toString()}${kindNote} → ${dest}\n`);
   return residual === 0 ? 0 : 1;
 }
 
@@ -706,19 +714,29 @@ function runDiff(p: Parsed, json: boolean): number {
     fail((e as Error).message, exitCodeFor(e));
   }
   if (json) {
-    process.stdout.write(`${JSON.stringify(delta, null, 2)}\n`);
+    // The engine's own render, verbatim — the same bytes the other two
+    // launchers print (#542) — not a re-stringify of the parsed object.
+    process.stdout.write(`${delta.toJson()}\n`);
     return 0;
   }
-  const changed = delta.groups.filter((g) => g.added || g.removed || g.changed);
-  if (changed.length === 0) {
-    process.stdout.write("no differences\n");
-  } else {
-    for (const g of changed) {
-      process.stdout.write(
-        `${g.code}: +${g.added} -${g.removed} ~${g.changed}\n`,
-      );
-    }
+  // Layout is this launcher's own; the FACTS are the contract's (#542). The
+  // other two state the a → b header, every delta group (a heading-only change
+  // is a delta — the old `added || removed || changed` filter dropped those),
+  // the group add/remove lines and the totals, so this launcher must too.
+  const lines = [`${a} → ${b}`];
+  for (const g of delta.groups) {
+    lines.push(`${g.code}: +${g.added} -${g.removed} ~${g.changed}`);
   }
+  if (delta.groups_added.length) {
+    lines.push(`groups added: ${delta.groups_added.join(", ")}`);
+  }
+  if (delta.groups_removed.length) {
+    lines.push(`groups removed: ${delta.groups_removed.join(", ")}`);
+  }
+  lines.push(
+    `total: +${delta.total_added} -${delta.total_removed} ~${delta.total_changed}`,
+  );
+  process.stdout.write(`${lines.join("\n")}\n`);
   return 0;
 }
 

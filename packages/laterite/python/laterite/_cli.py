@@ -209,9 +209,16 @@ def _box_table(headings: list[str], rows: list[list[str]], *, colour: bool) -> s
     return "\n".join(out) + "\n"
 
 
-def _plain(file: str, findings: list[dict], n: int) -> str:
+def _plain(
+    file: str, findings: list[dict], n: int, dict_version: str, resolution: str
+) -> str:
+    # `— dictionary <ed> (<res>)` rides the head line on the binary and here in
+    # the same bytes (the two share a hand-kept layout the byte-parity test
+    # pins); the judging dictionary is a launcher-contract FACT npx already
+    # stated and these two omitted (#542).
+    dict_note = f" — dictionary {dict_version} ({resolution})"
     if n == 0:
-        return f"{file}: clean (0 findings)\n"
+        return f"{file}: clean (0 findings){dict_note}\n"
     rows = [
         [
             f["rule"].removeprefix("AGS Format Rule "),
@@ -224,7 +231,7 @@ def _plain(file: str, findings: list[dict], n: int) -> str:
     table = _box_table(
         ["Rule", "Line", "Group", "Description"], rows, colour=_colour_enabled()
     )
-    return f"{file}: {n} finding(s)\n{table}"
+    return f"{file}: {n} finding(s){dict_note}\n{table}"
 
 
 def _engine(args: argparse.Namespace) -> dict:
@@ -324,13 +331,13 @@ def _run_validate(args: argparse.Namespace) -> int:
     elif args.ndjson:
         active = r["ndjson"]
     else:
-        active = _plain(r["file"], r["findings"], n)
+        active = _plain(r["file"], r["findings"], n, r["dict_version"], r["resolution"])
 
     if args.json_out:
         with Path(args.json_out).open("w", encoding="utf-8", newline="") as fh:
             fh.write(r["json"] + "\n")
         sys.stdout.write(
-            _plain(r["file"], r["findings"], n)
+            _plain(r["file"], r["findings"], n, r["dict_version"], r["resolution"])
         )  # tee: plain still to stdout
         return code
 
@@ -465,10 +472,14 @@ def _run_diff(args: argparse.Namespace) -> int:
     if not r.get("ok"):
         print(f"error: {r.get('error')}", file=sys.stderr)
         return int(r.get("exit_code", 5))
-    delta = json.loads(r["delta_json"])
     if args.json:
-        print(json.dumps(delta, indent=2))
+        # Verbatim: delta_json IS the shared engine render (pretty, non-ASCII
+        # raw) that all three launchers print. The json.loads → json.dumps round
+        # trip this replaces escaped non-ASCII (`ensure_ascii` default), the one
+        # byte split the xcheck non-ASCII case caught (#542).
+        print(r["delta_json"])
         return 0
+    delta = json.loads(r["delta_json"])
     print(f"{args.file} → {args.other}")
     for g in delta["groups"]:
         print(f"  {g['code']:<6} +{g['added']} -{g['removed']} ~{g['changed']}")
@@ -573,6 +584,11 @@ def _run_merge(args: argparse.Namespace) -> int:
         return 3
 
     if args.json:
+        # The {out, bytes} wrapper is CLI-local by decision (the engine is never
+        # told the output path; dec-launcher-contract, #542); the arrays inside
+        # are the engine structs' wire shape, parsed untouched. ensure_ascii=False
+        # because the other two launchers write the out path's bytes raw — the
+        # xcheck merge.json.nonascii_out case holds the composition together.
         print(
             json.dumps(
                 {
@@ -582,6 +598,7 @@ def _run_merge(args: argparse.Namespace) -> int:
                     "revisions": res.revisions,
                 },
                 indent=2,
+                ensure_ascii=False,
             )
         )
         return 0

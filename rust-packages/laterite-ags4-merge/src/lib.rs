@@ -157,7 +157,11 @@ impl Default for MergeOpts {
 
 /// A non-fatal note about something merge resolved (recency contradiction, a
 /// non-`X` type widen, a missing merge-TRAN stamp).
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// The `Serialize` derive IS the wire shape of every `merge --json`'s
+/// `warnings` array — the launcher bindings serialise this struct rather than
+/// hand-mapping its fields, so the shape has one author (#542).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct MergeWarning {
     pub kind: &'static str,
     pub group: Option<String>,
@@ -222,7 +226,10 @@ impl std::error::Error for MergeError {}
 /// is auditable — the closest we can get to per-row staleness detection, since
 /// AGS4 carries no per-row timestamp (a stale row inside an overall-newer file
 /// can't be auto-detected, only surfaced here for a human to review).
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// The `Serialize` derive IS the wire shape of every `merge --json`'s
+/// `revisions` array (`winner_file` stays snake on the wire — a TS surface
+/// that wants `winnerFile` renames at its own API boundary, not here) (#542).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct RevisionNote {
     pub group: String,
     /// The KEY tuple identifying the revised row.

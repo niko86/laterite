@@ -34,8 +34,13 @@ pub fn findings_table(found: &Findings, use_color: bool) -> String {
     styled_table(&["Rule", "Line", "Group", "Description"], rows, use_color).to_string()
 }
 
-pub fn report_table(path: &Path, found: &Findings, n: usize) {
-    println!("{}: {n} finding(s)", path.display());
+pub fn report_table(path: &Path, found: &Findings, n: usize, dict: &str, resolution: &str) {
+    // `dict`/`resolution` ride the head line: which dictionary judged the file
+    // is a launcher-contract FACT, not decoration (#542).
+    println!(
+        "{}: {n} finding(s) — dictionary {dict} ({resolution})",
+        path.display()
+    );
     println!("{}", findings_table(found, colour_enabled(false)));
 }
 
@@ -65,12 +70,21 @@ pub fn ndjson_string(found: &Findings) -> String {
 
 /// The plain report rendered to a `String` (no colour) — for `--out` when
 /// neither `--json` nor `--ndjson` is active.
-pub fn plain_string(path: &Path, found: &Findings, n: usize) -> String {
+pub fn plain_string(
+    path: &Path,
+    found: &Findings,
+    n: usize,
+    dict: &str,
+    resolution: &str,
+) -> String {
     if n == 0 {
-        return format!("{}: clean (0 findings)\n", path.display());
+        return format!(
+            "{}: clean (0 findings) — dictionary {dict} ({resolution})\n",
+            path.display()
+        );
     }
     format!(
-        "{}: {n} finding(s)\n{}\n",
+        "{}: {n} finding(s) — dictionary {dict} ({resolution})\n{}\n",
         path.display(),
         findings_table(found, false)
     )
@@ -126,10 +140,14 @@ mod tests {
 
     #[test]
     fn plain_string_reports_clean_and_findings() {
+        let clean = plain_string(Path::new("x.ags"), &Findings::new(), 0, "4.1.1", "exact");
+        assert!(clean.contains("clean (0 findings)"));
         assert!(
-            plain_string(Path::new("x.ags"), &Findings::new(), 0).contains("clean (0 findings)")
+            clean.contains("— dictionary 4.1.1 (exact)"),
+            "the judging dictionary is a launcher-contract fact (#542)"
         );
-        let p = plain_string(Path::new("x.ags"), &sample(), 2);
+        let p = plain_string(Path::new("x.ags"), &sample(), 2, "4.0.4", "fallback");
         assert!(p.contains("2 finding(s)") && p.contains("LOCA"));
+        assert!(p.contains("— dictionary 4.0.4 (fallback)"));
     }
 }

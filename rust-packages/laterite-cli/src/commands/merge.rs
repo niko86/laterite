@@ -84,21 +84,14 @@ pub fn run(args: &MergeArgs, json: bool, quiet: bool) -> ! {
                 exit(3);
             }
             if json {
+                // The two-key `{out, bytes}` wrapper is CLI-local (the engine is
+                // never told the output path); the arrays serialise straight off
+                // the engine structs, whose derive owns the wire shape (#542).
                 let summary = serde_json::json!({
                     "out": args.out.display().to_string(),
                     "bytes": res.bytes.len(),
-                    "warnings": res.warnings.iter().map(|w| serde_json::json!({
-                        "kind": w.kind,
-                        "group": w.group,
-                        "heading": w.heading,
-                        "message": w.message,
-                    })).collect::<Vec<_>>(),
-                    "revisions": res.revisions.iter().map(|r| serde_json::json!({
-                        "group": r.group,
-                        "key": r.key,
-                        "changed": r.changed,
-                        "winner_file": r.winner_file,
-                    })).collect::<Vec<_>>(),
+                    "warnings": res.warnings,
+                    "revisions": res.revisions,
                 });
                 println!(
                     "{}",

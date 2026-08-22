@@ -672,7 +672,10 @@ fn diff_core(
         .map_or(laterite_ags4_validator::dict::FALLBACK, |(dv, _)| dv);
     let dict = Dictionary::bundled(dv);
     let delta = laterite_ags4_diff::diff_parsed(&pa, &pb, &dict, None);
-    Ok(serde_json::to_string(&delta).unwrap_or_else(|_| "{}".to_string()))
+    // The shared pretty render, NOT a local to_string: `_cli.py` prints this
+    // string verbatim (its json.loads → json.dumps round trip escaped non-ASCII,
+    // #542), and the Python API's json.loads is indifferent to layout.
+    Ok(laterite_ags4_diff::delta_json(&delta))
 }
 
 /// Compare two AGS4 documents (raw `a`/`b` bytes). Returns `{ok:true,
@@ -787,34 +790,12 @@ fn merge_core(
 
     match merge_parsed(&parsed, &opts) {
         Ok(res) => {
-            let warnings: Vec<_> = res
-                .warnings
-                .iter()
-                .map(|w| {
-                    serde_json::json!({
-                        "kind": w.kind,
-                        "group": w.group,
-                        "heading": w.heading,
-                        "message": w.message,
-                    })
-                })
-                .collect();
-            let revisions: Vec<_> = res
-                .revisions
-                .iter()
-                .map(|r| {
-                    serde_json::json!({
-                        "group": r.group,
-                        "key": r.key,
-                        "changed": r.changed,
-                        "winner_file": r.winner_file,
-                    })
-                })
-                .collect();
+            // Straight off the engine structs — their Serialize derive owns the
+            // wire shape, so this binding can't drift from the other two (#542).
             Ok((
                 res.bytes,
-                serde_json::to_string(&warnings).unwrap_or_else(|_| "[]".to_string()),
-                serde_json::to_string(&revisions).unwrap_or_else(|_| "[]".to_string()),
+                serde_json::to_string(&res.warnings).unwrap_or_else(|_| "[]".to_string()),
+                serde_json::to_string(&res.revisions).unwrap_or_else(|_| "[]".to_string()),
             ))
         }
         // An unresolved TYPE conflict / emit failure is a schema-level rejection
