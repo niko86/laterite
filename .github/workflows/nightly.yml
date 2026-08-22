@@ -674,11 +674,18 @@ jobs:
       - name: Page programs run against the released package
         continue-on-error: ${{ steps.under-test.outputs.tree_ahead == 'true' }}
         run: |
+          # PRINTED, not asserted. The version this must clear is decided by the
+          # runner image, so asserting it here would put that number in a second
+          # place to keep in step — the defect #521 was opened about. A print
+          # costs nothing and puts the interpreter above the traceback.
+          python3 -V
           python3 tools/gen_doc_outputs.py --run-pages --surface node
       # The expected-drift class: reported, never fatal (see the header).
       - name: Committed .out still byte-matches (informational)
         continue-on-error: true
-        run: python3 tools/gen_doc_outputs.py --check --surface node
+        run: |
+          python3 -V
+          python3 tools/gen_doc_outputs.py --check --surface node
 
   # The BROWSER twin (#283): does `reference/wasm-api.md` work against the package
   # `npm install @laterite/ags4-wasm` actually gives you?
@@ -789,12 +796,16 @@ jobs:
       # hiding a failure to run, which the step below answers for all five.
       - name: Committed .out still byte-matches (informational)
         continue-on-error: true
-        run: python3 tools/gen_doc_outputs.py --check --surface wasm
+        run: |
+          python3 -V
+          python3 tools/gen_doc_outputs.py --check --surface wasm
       # The actionable class: a documented example that does not RUN. Write mode is
       # the fatal half — `run_example` exits hard when an example's exit code is
       # not its `expect-exit`. Its `.out` writes are discarded with the runner.
       - name: Docs examples run against the released package
-        run: python3 tools/gen_doc_outputs.py --surface wasm
+        run: |
+          python3 -V
+          python3 tools/gen_doc_outputs.py --surface wasm
 
   # The crates.io twin (#283). #278 wired every publishable crate's README example
   # into `cargo test --workspace` — but through

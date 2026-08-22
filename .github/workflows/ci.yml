@@ -896,7 +896,13 @@ jobs:
       # would be the more fragile choice, not the safer one.
       - name: gen_doc_outputs --check (docs example output == real stdout, node)
         working-directory: ${{ github.workspace }}
-        run: python3 tools/gen_doc_outputs.py --check --surface node
+        run: |
+          # PRINTED, not asserted. The version this must clear is decided by the
+          # runner image, so asserting it here would put that number in a second
+          # place to keep in step — the defect #521 was opened about. A print
+          # costs nothing and puts the interpreter above the traceback.
+          python3 -V
+          python3 tools/gen_doc_outputs.py --check --surface node
 
       # Codecov `node` flag — public repo only (where the badge lives + the token
       # is set). Measures the TS wrapper; the Rust engine's number is the nightly
@@ -1029,7 +1035,9 @@ jobs:
       # (`--check-pages`, no build needed) runs unfiltered in wiki-lint.yml.
       - name: gen_doc_outputs --check (docs example output == real stdout, wasm)
         working-directory: ${{ github.workspace }}
-        run: python3 tools/gen_doc_outputs.py --check --surface wasm
+        run: |
+          python3 -V
+          python3 tools/gen_doc_outputs.py --check --surface wasm
 
       # The SLIM wasm (#330) — the artifact npm actually gets, which the step
       # above does NOT build: `build:wasm:all` builds the app's two engines,
