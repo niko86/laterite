@@ -61,6 +61,60 @@ const INCLUDE = /--8<-- "([^"]+)"/;
 /** Same shape as `gen_doc_outputs`'s `doc-output: skip`, reason equally required. */
 const SKIP = /<!-- doc-snippet: skip\s*[—-]\s*[^\n]*?-->/g;
 
+/** #543's companion sweep. The exact SKIP match above ignores every other
+ * `doc-*` comment silently, so a typo — or a marker this gate cannot act on —
+ * looked exactly like a fence nobody marked. One marker per JOB: `code` and
+ * `output` belong to gen_doc_outputs.py, whose own sweep walks the docs-site
+ * tree only, so those are attributed inside it and unread in this package's
+ * README, which no other sweep reaches. */
+const DOC_MARKER = /<!--\s*doc-([a-z-]+)\s*:([^\n]*?)-->/g;
+const CENSUS_JOBS = new Set(["code", "output"]);
+/** The python reader's fence shape, for attribution only: a marker above a
+ * python fence on a docs-site page is that gate's to act on. */
+const PY_FENCE = /^([ \t]*)```python\n([\s\S]*?)^\1```$/gm;
+
+function scanMarkers(
+  text: string,
+  inDocs: boolean,
+): { seen: number; attributed: number; unread: string[] } {
+  const fenceWindows = (re: RegExp, bodyGroup: number): number[] =>
+    [...text.matchAll(re)]
+      .filter((m) => !INCLUDE.test(m[bodyGroup] ?? ""))
+      .map((m) => m.index);
+  const mine = fenceWindows(FENCE, 3);
+  const python = fenceWindows(PY_FENCE, 2);
+  const inWindow = (at: number, end: number, starts: number[]): boolean =>
+    starts.some((s) => s - 300 <= at && end <= s);
+  let seen = 0;
+  let attributed = 0;
+  const unread: string[] = [];
+  for (const m of text.matchAll(DOC_MARKER)) {
+    seen += 1;
+    const job = m[1] ?? "";
+    const line = text.slice(0, m.index).split("\n").length;
+    const end = m.index + m[0].length;
+    SKIP.lastIndex = 0;
+    const skipShaped = job === "snippet" && SKIP.test(m[0]);
+    if (skipShaped && inWindow(m.index, end, mine)) continue; // mine, acted on
+    if (skipShaped && inDocs && inWindow(m.index, end, python)) {
+      attributed += 1; // the python half of this convention reads it
+    } else if (job === "snippet") {
+      unread.push(
+        `line ${line}: \`doc-snippet:\` outside every reader's window`,
+      );
+    } else if (CENSUS_JOBS.has(job) && inDocs) {
+      attributed += 1; // gen_doc_outputs.py sweeps the docs-site tree
+    } else if (CENSUS_JOBS.has(job)) {
+      unread.push(
+        `line ${line}: \`doc-${job}:\` on a page the census never walks`,
+      );
+    } else {
+      unread.push(`line ${line}: unrecognised marker \`doc-${job}:\``);
+    }
+  }
+  return { seen, attributed, unread };
+}
+
 /** Placeholder paths -> the copied fixture, so a snippet that only lacked a file runs. */
 const PATHS: Record<string, string> = {
   "delivery.ags": "examples/sample_site.ags",
@@ -220,6 +274,60 @@ beforeAll(() => {
 it("pages with literal fences are discovered", () => {
   // Zero is a bad witness: an empty list would make every case below vacuous.
   expect(pages.length).toBeGreaterThanOrEqual(4);
+});
+
+it("doc-* markers are swept for a reader, and the unread ones are named", () => {
+  // #543: report, never fail. The count prints on every run — a zero still
+  // prints, because a silent zero is indistinguishable from a sweep that did
+  // not run — and unread markers are named with their location: they are
+  // instructions nobody read, this repo's own dropped-input class.
+  const sweep = [...walk(docsDir), join(pkgDir, "README.md")].map((md) => ({
+    md,
+    r: scanMarkers(readFileSync(md, "utf8"), md.startsWith(docsDir)),
+  }));
+  const seen = sweep.reduce((n, p) => n + p.r.seen, 0);
+  const attributed = sweep.reduce((n, p) => n + p.r.attributed, 0);
+  const unread = sweep.flatMap((p) =>
+    p.r.unread.map((u) => `${p.md.slice(repoRoot.length + 1)} ${u}`),
+  );
+  console.log(
+    `docs-snippets: ${seen} doc-* marker(s) seen, ${attributed} another gate's, ${unread.length} unread`,
+  );
+  for (const u of unread) console.log(`  ${u}`);
+  expect(sweep.length).toBeGreaterThan(0); // zero pages = a vacuous sweep
+});
+
+// The classifier's A/B'd cases (#543): red when mis-spelled, green when not.
+it("a typo'd marker is named, not ignored", () => {
+  const r = scanMarkers(
+    "<!-- doc-snipet: skip — typo -->\n```js\nrun();\n```\n",
+    true,
+  );
+  expect(r.unread).toHaveLength(1);
+  expect(r.unread[0]).toContain("doc-snipet");
+});
+
+it("my own marker in its window is acted on, not reported", () => {
+  const r = scanMarkers(
+    "<!-- doc-snippet: skip — why -->\n```js\nrun();\n```\n",
+    true,
+  );
+  expect(r).toEqual({ seen: 1, attributed: 0, unread: [] });
+});
+
+it("a snippet marker above a python fence is the python gate's", () => {
+  const r = scanMarkers(
+    "<!-- doc-snippet: skip — theirs -->\n```python\nprint(1)\n```\n",
+    true,
+  );
+  expect(r.attributed).toBe(1);
+  expect(r.unread).toHaveLength(0);
+});
+
+it("a census marker in this package's README has no reader", () => {
+  const md = "<!-- doc-code: skip — why -->\n```bash\nx\n```\n";
+  expect(scanMarkers(md, true).attributed).toBe(1);
+  expect(scanMarkers(md, false).unread).toHaveLength(1);
 });
 
 const ran: string[] = [];

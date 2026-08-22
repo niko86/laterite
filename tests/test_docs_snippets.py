@@ -82,6 +82,20 @@ MARKER = re.compile(
     r"<!-- doc-snippet: (?P<verb>skip)\s*[—-]\s*(?P<reason>[^\n]*?)\s*-->"
 )
 
+#: #543's companion sweep. The exact match above ignores every other `doc-*`
+#: comment silently, so a typo — or a marker this gate cannot act on — looked
+#: exactly like a fence nobody marked. One marker per JOB: `code` and `output`
+#: belong to `gen_doc_outputs.py`, whose own sweep walks the docs-site tree
+#: only, so those are attributed inside it and unread anywhere else this
+#: gate's wider corpus reaches (the READMEs, COMPAT.md).
+DOC_MARKER = re.compile(r"<!--\s*doc-(?P<job>[a-z-]+)\s*:(?P<rest>[^\n]*?)-->")
+CENSUS_JOBS = {"code", "output"}
+#: The other doc-snippet reader's fence shape, for attribution only: a marker
+#: above a js/ts fence on a docs-site page is that gate's to act on.
+NODE_FENCE = re.compile(
+    r"^(?P<i>[ \t]*)```(?:js|ts)\n(?P<body>(?:.*?\n)*?)(?P=i)```\n", re.M
+)
+
 #: Fragment filenames -> the copied fixture. A snippet that only lacked a file can
 #: then really run. Word-boundary-guarded, or `site.ags` rewrites the
 #: `sample_site.ags` a page already names correctly (`learn/read.md` does).
@@ -107,6 +121,111 @@ MODULE_ROOTS = {"laterite", "L", "AGS4"}
 #: guards against next door ("Zero is a bad witness"). Raise it when it climbs;
 #: lowering it is a decision that needs a sentence in the commit message.
 EXEC_FLOOR = 80
+
+
+def _scan_markers(text: str, in_docs: bool) -> tuple[int, int, list[str]]:
+    """(seen, another gate's, unread) for one page's `doc-*` markers.
+
+    Mine-and-actionable is judged with this gate's own instruments — the
+    MARKER spelling and the same lookback window `_fences` consults, over a
+    literal (non-include) python fence. Everything else is either attributed
+    to the gate that does read it, or named as unread: an instruction is only
+    discharged by a reader, never by being a comment.
+    """
+
+    def windows(fence_re: re.Pattern[str]) -> list[int]:
+        return [
+            m.start()
+            for m in fence_re.finditer(text)
+            if not INCLUDE.search(m.group("body"))
+        ]
+
+    py_starts = windows(FENCE)
+    node_starts = windows(NODE_FENCE)
+
+    def in_window(m: re.Match[str], starts: list[int]) -> bool:
+        return any(s - 300 <= m.start() and m.end() <= s for s in starts)
+
+    seen = attributed = 0
+    unread: list[str] = []
+    for m in DOC_MARKER.finditer(text):
+        seen += 1
+        job = m.group("job")
+        line = text[: m.start()].count("\n") + 1
+        if job == "snippet" and MARKER.match(text, m.start()):
+            if in_window(m, py_starts):
+                continue  # mine, and acted on
+            if in_docs and in_window(m, node_starts):
+                attributed += 1  # the js/ts half of this convention reads it
+                continue
+            unread.append(f"line {line}: `doc-snippet:` outside every reader's window")
+        elif job in CENSUS_JOBS and in_docs:
+            attributed += 1  # gen_doc_outputs.py sweeps the docs-site tree
+        elif job in CENSUS_JOBS:
+            unread.append(f"line {line}: `doc-{job}:` on a page the census never walks")
+        else:
+            unread.append(f"line {line}: unrecognised marker `doc-{job}:`")
+    return seen, attributed, unread
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _doc_marker_report(request: pytest.FixtureRequest) -> object:
+    """Print the sweep on every run, pass or fail (#543): pytest captures a
+    passing test's output, so the report escapes through the capture manager —
+    a count nobody can see is half a report, and a silent zero would be
+    indistinguishable from a sweep that did not run."""
+    seen = attributed = 0
+    unread: list[str] = []
+    for page in PAGES:
+        t, a, u = _scan_markers(page.read_text(encoding="utf-8"), DOCS in page.parents)
+        seen += t
+        attributed += a
+        unread += [f"{page.relative_to(REPO)} {x}" for x in u]
+    capman = request.config.pluginmanager.getplugin("capturemanager")
+    with capman.global_and_fixture_disabled():
+        print(
+            f"\ndocs-snippets: {seen} doc-* marker(s) seen, "
+            f"{attributed} another gate's, {len(unread)} unread"
+        )
+        for u_ in unread:
+            print(f"  {u_}")
+    return None
+
+
+def test_a_typoed_marker_is_named_not_ignored() -> None:
+    seen, attributed, unread = _scan_markers(
+        "<!-- doc-snipet: skip — typo -->\n```python\nprint(1)\n```\n", True
+    )
+    assert (seen, attributed) == (1, 0)
+    assert len(unread) == 1
+    assert "doc-snipet" in unread[0]
+
+
+def test_my_own_marker_in_its_window_is_acted_on_not_reported() -> None:
+    seen, attributed, unread = _scan_markers(
+        "<!-- doc-snippet: skip — a reason -->\n```python\nprint(1)\n```\n", True
+    )
+    assert (seen, attributed, unread) == (1, 0, [])
+
+
+def test_a_snippet_marker_above_an_unscanned_language_is_unread() -> None:
+    _, _, unread = _scan_markers(
+        "<!-- doc-snippet: skip — for nobody -->\n```sql\nselect 1;\n```\n", True
+    )
+    assert len(unread) == 1
+
+
+def test_a_snippet_marker_above_a_js_fence_is_the_node_gates() -> None:
+    _, attributed, unread = _scan_markers(
+        "<!-- doc-snippet: skip — theirs -->\n```js\nrun();\n```\n", True
+    )
+    assert (attributed, unread) == (1, [])
+
+
+def test_a_census_marker_outside_the_docs_tree_is_unread() -> None:
+    md = "<!-- doc-code: skip — a reason -->\n```bash\nx\n```\n"
+    assert _scan_markers(md, True)[1] == 1
+    assert len(_scan_markers(md, False)[2]) == 1
 
 
 def _seed() -> dict[str, object]:

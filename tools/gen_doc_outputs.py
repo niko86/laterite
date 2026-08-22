@@ -548,6 +548,93 @@ def is_type_only_ts(body: str) -> bool:
     return True
 
 
+#: Every `doc-*` opt-out comment, whatever its job token (#543). The three
+#: readers each accept ONE job spelling, ONE verb, in ONE position — and until
+#: this sweep, an instruction outside those bounds (a typo'd job, a marker
+#: above a fence its gate never scans, a comment drifted away from its block)
+#: was dropped by every gate with no output at all: not a fence nobody looked
+#: at, an instruction nobody read.
+DOC_MARKER_RE = re.compile(r"<!--\s*doc-(?P<job>[a-z-]+)\s*:(?P<rest>[^\n]*?)-->")
+#: Job tokens with a reader: this script (code, output) and the two snippet
+#: gates (snippet). One marker per JOB, not per gate — dec-doc-code-fences.md.
+KNOWN_MARKER_JOBS = {"code", "snippet", "output"}
+#: The doc-snippet readers, mirrored exactly: the fence languages the two
+#: gates scan and the lookback window both use (tests/test_docs_snippets.py
+#: and laterite-node's docs-snippets.test.ts each take the 300 characters
+#: before a fence).
+SNIPPET_LANGS = {"python", "js", "ts"}
+SNIPPET_WINDOW = 300
+
+
+def census_doc_markers(md: str, page: str) -> tuple[int, list[str]]:
+    """Report every `doc-*` marker on a page that no gate will read (#543).
+
+    Mirrors each reader's consumption rule rather than inventing one:
+    `doc-code` is read only from the slot directly above a fence, `doc-output`
+    only from the slot between an include fence and its `text` block, and
+    `doc-snippet` only when it lies wholly inside the 300 characters before a
+    python/js/ts fence. The verb is checked too — a fence walk consumes a
+    `doc-code: skpi` positionally while the skip regex acts on nothing.
+    Returns (markers seen, problems); the count is reported on every run so
+    the sweep's own scope is visible, pass or fail.
+    """
+    problems: list[str] = []
+    code_slots: set[int] = set()
+    fence_starts: list[tuple[int, str]] = []
+    for f in CODE_FENCE_RE.finditer(md):
+        # Include-bodied fences are invisible to BOTH snippet gates — each
+        # skips an include before ever consulting the marker window — so a
+        # window over one must not count as a reader.
+        if not f.group("body").lstrip().startswith("--8<--"):
+            fence_starts.append((f.start("indent"), f.group("lang")))
+        if f.group("skip"):
+            code_slots.update(range(f.start("skip"), f.end("skip")))
+    output_slots: set[int] = set()
+    for b in BLOCK_RE.finditer(md):
+        if b.group("skip"):
+            output_slots.update(range(b.start("skip"), b.end("skip")))
+    total = 0
+    for m in DOC_MARKER_RE.finditer(md):
+        total += 1
+        job = m.group("job")
+        where = f"{page}:{md[: m.start()].count(chr(10)) + 1}"
+        if job not in KNOWN_MARKER_JOBS:
+            problems.append(
+                f"{where}: unrecognised marker `doc-{job}:` — the jobs with a "
+                "reader are doc-code, doc-snippet and doc-output; a misspelled "
+                "opt-out is an instruction nobody reads"
+            )
+        elif not m.group("rest").strip().startswith("skip"):
+            problems.append(
+                f"{where}: `doc-{job}:` without the `skip` verb — the readers "
+                f"accept only `doc-{job}: skip — reason`, so this is an "
+                "instruction nobody acts on"
+            )
+        elif job == "snippet" and not any(
+            lang in SNIPPET_LANGS
+            and start - SNIPPET_WINDOW <= m.start()
+            and m.end() <= start
+            for start, lang in fence_starts
+        ):
+            problems.append(
+                f"{where}: `doc-snippet:` marker no snippet gate will read — "
+                "both gates look 300 characters behind a python/js/ts fence, "
+                "and this marker sits in no such window"
+            )
+        elif job == "code" and m.start() not in code_slots:
+            problems.append(
+                f"{where}: `doc-code:` marker not directly above a fence — the "
+                "census reads it only from the slot immediately preceding one, "
+                "so here it is an instruction nobody reads"
+            )
+        elif job == "output" and m.start() not in output_slots:
+            problems.append(
+                f"{where}: `doc-output:` marker outside the slot between an "
+                "include fence and its `text` block — nothing reads it there"
+            )
+    return total, problems
+
+
 def census_code_fences(md: str, page: str) -> tuple[dict[str, int], list[str]]:
     """Classify every code fence on one page, and report what cannot stand.
 
@@ -928,6 +1015,8 @@ def main() -> None:
     hand_written: list[str] = []
     unreasoned: list[str] = []
     code_counts = {"included": 0, "inline": 0, "skipped": 0, "prose": 0}
+    marker_total = 0
+    marker_problems: list[str] = []
     code_problems: list[str] = []
     covered = orphan = 0
     for page in sorted(DOCS.rglob("*.md")):
@@ -941,6 +1030,9 @@ def main() -> None:
         for k, v in c.items():
             code_counts[k] += v
         code_problems += p_
+        n, p_ = census_doc_markers(md, str(page.relative_to(DOCS)))
+        marker_total += n
+        marker_problems += p_
         for m in blocks:
             if example_key(m.group("include")) not in wanted:
                 continue  # a surface this run didn't ask for
@@ -967,6 +1059,16 @@ def main() -> None:
             + [f"{u} opts out with no reason" for u in unreasoned]
             + code_problems
         )
+        # The marker sweep REPORTS and never fails (#543 fixes reporting; a
+        # failing gate is explicitly out of its scope, and can come later if
+        # the report shows it is needed). Count first, locations after, and
+        # both print before the verdict so they are visible pass or fail.
+        print(
+            f"gen_doc_outputs: {marker_total} doc-* marker(s) seen, "
+            f"{len(marker_problems)} with no reader"
+        )
+        for mp in marker_problems:
+            print(f"  {mp}")
         if problems:
             for p_ in problems:
                 print(f"  {p_}")

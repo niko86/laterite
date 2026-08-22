@@ -29,6 +29,7 @@ sys.modules["gen_doc_outputs"] = gen_doc_outputs
 _spec.loader.exec_module(gen_doc_outputs)
 
 census = gen_doc_outputs.census_code_fences
+markers = gen_doc_outputs.census_doc_markers
 
 
 def test_an_include_is_gated_elsewhere_and_raises_nothing() -> None:
@@ -126,6 +127,129 @@ def test_the_two_language_sets_do_not_overlap() -> None:
 
 
 # --- page programs: the executing half (#513 step 2) -------------------------
+
+
+def test_an_unrecognised_marker_job_is_reported() -> None:
+    """#543: `doc-snipet:` (typo) was ignored by every gate with no output —
+    indistinguishable from a fence nobody looked at. The marker census names
+    it, with its location."""
+    md = "<!-- doc-snipet: skip — typo -->\n```python\nprint(1)\n```\n"
+    total, problems = markers(md, "p.md")
+    assert total == 1
+    assert len(problems) == 1
+    assert "doc-snipet" in problems[0]
+    assert "p.md:1" in problems[0]
+
+
+def test_an_unrecognised_verb_is_reported() -> None:
+    """The convention has one verb; `doc-code: skpi` directly above a fence is
+    positionally consumed by the fence walk yet acted on by nothing."""
+    md = "<!-- doc-code: skpi — verb typo -->\n```bash\nx\n```\n"
+    total, problems = markers(md, "p.md")
+    assert total == 1
+    assert len(problems) == 1
+
+
+def test_the_known_markers_in_their_read_positions_pass() -> None:
+    md = (
+        "<!-- doc-code: skip — a reason -->\n"
+        "```bash\nx\n```\n"
+        "<!-- doc-snippet: skip — a reason -->\n"
+        "```python\nprint(1)\n```\n"
+    )
+    total, problems = markers(md, "p.md")
+    assert total == 2
+    assert not problems
+
+
+def test_a_snippet_marker_above_an_unscanned_language_is_reported() -> None:
+    """The issue's own example: a correctly-spelled marker above a fence in a
+    language neither snippet gate scans is an instruction nobody reads."""
+    md = "<!-- doc-snippet: skip — for nobody -->\n```sql\nselect 1;\n```\n"
+    total, problems = markers(md, "p.md")
+    assert total == 1
+    assert len(problems) == 1
+    assert "doc-snippet" in problems[0]
+
+
+def test_a_snippet_marker_outside_the_window_is_reported() -> None:
+    """Both gates look exactly 300 characters behind a fence; a marker pushed
+    beyond that by intervening prose falls out of every window."""
+    md = (
+        "<!-- doc-snippet: skip — too far -->\n"
+        + ("prose " * 60).strip()
+        + "\n```python\nprint(1)\n```\n"
+    )
+    total, problems = markers(md, "p.md")
+    assert total == 1
+    assert len(problems) == 1
+
+
+def test_a_detached_doc_code_marker_is_reported() -> None:
+    """`doc-code` is read only from the line(s) immediately above a fence;
+    prose in between detaches it from any reader."""
+    md = (
+        "<!-- doc-code: skip — floats free -->\n"
+        "\nSome prose.\n\n"
+        "```python\nprint(1)\n```\n"
+    )
+    total, problems = markers(md, "p.md")
+    assert total == 1
+    assert len(problems) == 1
+
+
+def test_a_doc_output_marker_outside_its_slot_is_reported() -> None:
+    md = "<!-- doc-output: skip — floats -->\n\nProse only.\n"
+    total, problems = markers(md, "p.md")
+    assert total == 1
+    assert len(problems) == 1
+
+
+def test_a_snippet_marker_above_an_include_fence_is_reported() -> None:
+    """Review-found hole: both snippet gates skip an include fence before
+    consulting the marker window, so a window over one has no reader — the
+    census must not count it as read."""
+    md = (
+        "<!-- doc-snippet: skip — nobody consults this -->\n"
+        "```python\n"
+        '--8<-- "python/x.py:code"\n'
+        "```\n"
+    )
+    total, problems = markers(md, "p.md")
+    assert total == 1
+    assert len(problems) == 1
+
+
+def test_the_mirrored_window_matches_both_real_gates() -> None:
+    """SNIPPET_WINDOW and SNIPPET_LANGS restate the two snippet gates; a
+    drifted copy would make the sweep vouch for windows nobody scans. Tie the
+    number to each gate's own source, and the languages to their fence
+    regexes."""
+    py_gate = (ROOT / "tests" / "test_docs_snippets.py").read_text()
+    ts_gate = (
+        ROOT / "rust-packages" / "laterite-node" / "test" / "docs-snippets.test.ts"
+    ).read_text()
+    w = gen_doc_outputs.SNIPPET_WINDOW
+    assert f"m.start() - {w}" in py_gate
+    assert f"m.index - {w}" in ts_gate
+    assert "```python" in py_gate
+    assert "```(js|ts)" in ts_gate
+    assert {"python", "js", "ts"} == gen_doc_outputs.SNIPPET_LANGS
+
+
+def test_a_doc_output_marker_in_its_slot_passes() -> None:
+    md = (
+        "```python\n"
+        '--8<-- "python/x.py:code"\n'
+        "```\n"
+        "\n"
+        "<!-- doc-output: skip — no output shown -->\n"
+        "```text\n"
+        "```\n"
+    )
+    total, problems = markers(md, "p.md")
+    assert total == 1
+    assert not problems
 
 
 def test_a_page_program_concatenates_include_then_continuation() -> None:
