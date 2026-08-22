@@ -59,28 +59,31 @@ surfaces it is asked for to be built: `lat` on PATH or in the workspace target d
 for cli, `laterite-node/dist` for node, the installed wheel for python,
 `web/src/wasm` for wasm.
 
-"STDLIB ONLY" IS NOT THE WHOLE CONTRACT — IT IS ALSO AN OLD STDLIB, AND THE FLOOR
-IS 3.8. Two CI steps run this file with the runner image's bare `python3` rather
-than through `uv`: ci.yml's `node` job (`--surface node`) and its `ts-lint` job
-(`--surface wasm`), both deliberately, because neither installs Python and pulling
-in setup-uv for one stdlib script is the more fragile choice. That interpreter is
-several releases behind this repo's dev floor, so `requires-python` in the root
-`pyproject.toml` says nothing about what may be written here.
+"STDLIB ONLY" WAS NOT THE WHOLE CONTRACT — IT WAS ALSO AN OLD STDLIB. Several CI
+steps run this file with the runner image's bare `python3` rather than through
+`uv` — ci.yml's `node` and `ts-lint` jobs, and nightly's `docs-vs-released-*`
+legs — deliberately, because none of them installs Python and pulling in setup-uv
+for one stdlib script is the more fragile choice. That reasoning still holds and
+is not what went wrong.
 
-A `@functools.cache` decorator — 3.9+, and identical in meaning to
-`lru_cache(maxsize=None)`, which is not — took both jobs down with
-`AttributeError: module 'functools' has no attribute 'cache'` at import, before a
-single check ran. Nothing local caught it: every other invocation in the repo goes
-through `uv` and a modern interpreter, so the two steps that hold this contract
-are the only two that state it, and they state it minutes into a job.
+What it left unsaid was WHICH python3. The runner image was Ubuntu focal, whose
+system interpreter sat four releases behind this repo's `requires-python`, and a
+`@functools.cache` decorator — 3.9+, and identical in meaning to
+`lru_cache(maxsize=None)`, which is not — took the `node` and `ts-lint` jobs down
+with `AttributeError: module 'functools' has no attribute 'cache'` at import,
+before a single check ran. Nothing local caught it: every other invocation in the
+repo goes through `uv` and a modern interpreter.
 
-Nothing gates the floor yet (#521). Until something does, the check to run by hand
-after touching this file is:
+RESOLVED BY MOVING THE INTERPRETER, NOT BY GATING IT (#521). The runner base is
+now Ubuntu noble, whose system python3 matches `requires-python`, so this file has
+no floor of its own any more — it runs under what the project already declares. A
+gate here would have held a THIRD copy of a number that originates in a
+base-image tag, in a repo this one cannot read, which is the shape of the defect
+rather than a fix for it.
 
-    uv run --no-project --with vermin vermin --target=3.8 --violations tools/gen_doc_outputs.py
-
-It reports the minimum this file requires and fails when that is above the target
-— verified both ways against the decorator above.
+Which interpreter actually ran is no longer assumed either way: those steps print
+`python3 -V` immediately above the command, so the answer sits in the log of the
+job that depends on it.
 
 TWO SURFACES TAKE THEIR ARTIFACT FROM THE ENVIRONMENT, and both are the same
 question asked twice: `LAT_BIN` for cli and `WASM_PKG_DIR` for wasm. Nightly's
@@ -163,10 +166,10 @@ NODE_PKG = ROOT / "rust-packages" / "laterite-node"
 NODE_LINK = EXAMPLES / "node" / "node_modules" / "laterite"
 
 
-# `lru_cache(maxsize=None)`, not the `cache` alias that means the same thing: see
-# the interpreter note in the module docstring. This decorator is why that note
-# exists.
-@functools.lru_cache(maxsize=None)
+# This decorator is the one that found the interpreter floor the module docstring
+# describes. The floor is gone — the runner now matches `requires-python` — so the
+# alias it tripped over is safe again.
+@functools.cache
 def _node_pkg() -> Path:
     """Which `laterite` a Node page program imports — printed, once.
 
