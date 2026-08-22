@@ -82,19 +82,3 @@ body {
 ::selection {
   background: var(--selection);
 }
-
-/* The three destination rows. Extracted because it is one thing repeated, not
-   three things that happen to match — and the next hand to touch this file is
-   #395, replacing the list with the real page. */
-@layer components {
-  .row-link {
-    @apply flex flex-col gap-1 py-3.5 text-accent no-underline;
-    @apply hover:text-accent-hover hover:underline focus-visible:underline;
-    @apply min-[30rem]:flex-row min-[30rem]:items-baseline;
-    @apply min-[30rem]:justify-between min-[30rem]:gap-4;
-  }
-
-  .row-note {
-    @apply text-caption text-fg-muted min-[30rem]:text-right;
-  }
-}
