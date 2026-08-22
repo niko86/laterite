@@ -27,6 +27,7 @@ import {
 } from "solid-js";
 import { report } from "./store";
 import { SECTIONS } from "../sections";
+import { verdictTint } from "./severity";
 import { scoreboardLabel, tally } from "./verdict";
 
 export const Scoreboard: Component = () => {
@@ -76,9 +77,7 @@ export const Scoreboard: Component = () => {
             "inline-flex cursor-pointer items-center rounded-full border px-3 py-1 font-mono text-micro font-semibold",
             "motion-safe:transition-opacity",
             "focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]",
-            clean()
-              ? "border-ok/40 bg-ok-quiet text-ok"
-              : "border-err/40 bg-err-quiet text-err",
+            verdictTint(clean()),
             bump() ? "motion-safe:opacity-40" : "",
           ].join(" ")}
           onClick={() => {
