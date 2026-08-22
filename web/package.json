@@ -19,6 +19,7 @@
     "dev:landing": "vite --config landing/vite.config.ts",
     "prebuild:landing": "npm run sync-demo-schema",
     "build:landing": "vite build --config landing/vite.config.ts",
+    "preview:landing": "vite preview --config landing/vite.config.ts",
     "build:wasm": "wasm-pack build ../rust-packages/laterite-ags4-wasm --target web --release --out-dir \"$PWD/src/wasm\" -- --no-default-features --features certify,diff,merge,censor",
     "build:wasm-full": "wasm-pack build ../rust-packages/laterite-ags4-wasm --target web --release --out-dir \"$PWD/src/wasm-full\" --out-name ags4_wasm_full",
     "build:wasm-tokenizer": "wasm-pack build ../rust-packages/laterite-ags4-tokenizer-wasm --target web --release --out-dir \"$PWD/src/wasm-tokenizer\"",

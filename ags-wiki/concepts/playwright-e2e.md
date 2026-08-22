@@ -73,6 +73,16 @@ The suite is split by intent across two spec files (shared helpers in
   (only a window of `[data-index]` rows mounts — scrolling mounts higher-indexed
   ones).
 
+Since #523 the harness also drives the **landing page**, which is a separate
+build with its own preview server (one dependency set, two builds — see
+[[dec-landing-build-shared-tokens]]): the `landing` Playwright project runs
+`repo:web/e2e/landing.spec.ts` at a **strict 390 px viewport — no mobile
+emulation**, because emulation absorbs a too-wide layout into zoom and hides
+exactly the overflow it exists to catch. It pins the no-page-overflow contract:
+the document stays viewport-wide and each group table pans inside its own
+scroller. CI builds the landing (`npm run build:landing`) alongside the app
+before the Playwright run.
+
 Fixtures (`repo:web/e2e/fixtures`) include `cp1252.ags` (one raw `0xE9` byte —
 the encoding-toggle case) and `many_findings.ags` (~250 unknown headings → a
 large report for the search + virtualization tests).

@@ -69,7 +69,15 @@ export const GroupSection: Component<{
               !props.tableFirst,
           }}
         >
-          <div classList={{ "min-[64rem]:order-2": props.tableFirst }}>
+          {/* `min-w-0` on BOTH children: below the breakpoint the grid has no
+              explicit template, so the items keep `min-width: auto` and the
+              nowrap tables' min-content sizes the PAGE (#523) — a 390px phone
+              got a 783px layout viewport. Above it, the `minmax(0,1fr)`
+              columns already hold the floor. */}
+          <div
+            class="min-w-0"
+            classList={{ "min-[64rem]:order-2": props.tableFirst }}
+          >
             {/* The group chip: band tint, a solid band rule inset on the left,
                 and MAROON text. Never white or black on a band fill — the
                 mid-ramp bands fail contrast in both directions. */}
@@ -108,7 +116,10 @@ export const GroupSection: Component<{
             </Show>
           </div>
 
-          <div classList={{ "min-[64rem]:order-1": props.tableFirst }}>
+          <div
+            class="min-w-0"
+            classList={{ "min-[64rem]:order-1": props.tableFirst }}
+          >
             <GroupTable
               schema={b().schema}
               data={b().data}

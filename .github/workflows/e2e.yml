@@ -144,6 +144,13 @@ jobs:
         working-directory: web
         run: npm run build
 
+      - name: Build landing
+        # The landing is a separate build (one dependency set, two builds —
+        # web/landing/vite.config.ts); the e2e config previews BOTH, and the
+        # landing lane (#523) drives this one at a strict phone viewport.
+        working-directory: web
+        run: npm run build:landing
+
       - name: Run e2e
         working-directory: web
         run: npm run e2e
