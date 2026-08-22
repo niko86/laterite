@@ -42,6 +42,9 @@ export const FindingCallout: Component<{
     onClick={props.onClick}
     class={[
       "w-full rounded-md border px-3 py-2 text-left text-caption",
+      // The callout FADES IN on insertion (#534): findings appearing is the
+      // page's most frequent motion, and it rides the fast opacity tier.
+      "transition-opacity duration-(--dur-fast) starting:opacity-0",
       "focus-visible:outline-hidden focus-visible:[box-shadow:var(--focus-ring)]",
       severityTint(props.severity),
     ].join(" ")}

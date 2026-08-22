@@ -4,7 +4,7 @@
  * the prose beside it reads as commentary; here it reads as a verdict.
  */
 
-import { For, Show, type Component } from "solid-js";
+import { Index, Show, type Component } from "solid-js";
 import { FindingCallout } from "./FindingCallout";
 import { isManualFinding } from "./store";
 import type { Finding } from "./engine";
@@ -16,21 +16,24 @@ export const FindingsStrip: Component<{
   <Show when={props.findings.length}>
     <ul
       aria-label={`${props.code} findings`}
-      class="mt-3 list-none space-y-2 p-0"
+      class="mt-3 list-none space-y-2 p-0 transition-opacity duration-(--dur-fast) starting:opacity-0"
     >
-      <For each={props.findings}>
+      {/* Index for the same reason the panel uses it (#534): fresh finding
+          objects arrive every revalidation, and only a truly new row should
+          fire the entrance fade. */}
+      <Index each={props.findings}>
         {(f) => (
           <li>
             <FindingCallout
-              severity={f.severity}
-              rule={f.rule}
-              manual={isManualFinding(f)}
+              severity={f().severity}
+              rule={f().rule}
+              manual={isManualFinding(f())}
             >
-              {f.desc}
+              {f().desc}
             </FindingCallout>
           </li>
         )}
-      </For>
+      </Index>
     </ul>
   </Show>
 );

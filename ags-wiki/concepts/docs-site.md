@@ -446,6 +446,48 @@ Key facts:
 > #17). Still pending: **TypeDoc** for Node (static `.d.ts`, no wheel), the
 > generated **rules / typed-graph** catalogues, and the **molab** `/try/` embed.
 
+## What the gates do not reach
+
+Every published snippet is executed, which makes it easy to read this page as saying
+the site is *covered*. It is not the same claim. A one-off walkthrough (#510) read the
+site the way a reader would — one agent per surface, running the documented examples
+against the **released** packages rather than the working tree — and its most durable
+output was not the nine defects it found but the list of places nobody had looked.
+A silent skip reads as coverage, so those scopes belong here rather than in a
+gitignored report that outlives nothing.
+
+None of the below is a known defect. Each is a place nobody has looked.
+
+- **A real browser.** The wasm examples run under Node, as `reference/wasm-api.md`
+  itself does. Untested: bundler asset-URL resolution, Web Workers, `ArrayBuffer`
+  transfer, and the app's own panes. The app compiles the crate from source with every
+  cargo feature on, so exercising it would not test the published
+  `@laterite/ags4-wasm` package either — these need separate coverage, not one
+  standing in for the other.
+- **Transport in the browser.** `cookbook/transport.md` says the browser reads the same
+  zstd+age envelope; the released wasm package exports no transport functions at all.
+  Whether the app — built from source, so with `transport` available — does is the open
+  half, and it decides whether that page is wrong or merely unqualified about which
+  build it means.
+- **DuckDB beyond Python's bindings.** Not the CLI, not `@duckdb/node-api`, not wasm.
+  `duckdb/index.md`'s "no download" claim was reasoned about rather than run under a
+  blocked network, which is the only way to test it.
+- **Non-macOS CLI builds**, and `--tui`.
+- **Rendered signatures.** Every symbol `reference/api.md` names exists on the released
+  package, but the built site's mkdocstrings *signatures* have never been diffed
+  against the real ones. `strict: true` fails on a name that no longer resolves; it has
+  nothing to say about one whose shape changed underneath it.
+- **Everything outside the docs site** — the PyPI, npm and crates.io landing READMEs
+  were out of scope by choice.
+
+**One entry has since been answered, and is recorded as corrected rather than
+deleted.** #510 listed `chaining/index.md` as entirely unaudited and a plausible
+carrier of release-skew. The page `--8<--`-includes its examples, and nightly's
+`docs-vs-released-wheel` leg runs `test_docs_examples.py` + `test_docs_snippets.py`
+against the **released wheel** — which is precisely the release-skew check that entry
+worried nobody was doing. What remains unreached there is a human read of its prose,
+which is a much smaller claim than the original.
+
 ## Why it matters
 
 A born-typed, fluent API is only as good as its discoverability. The example-led +
