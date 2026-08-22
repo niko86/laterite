@@ -233,6 +233,10 @@ jobs:
               # `ts-lint` runs the wasm surface and is gated `node || web`, so
               # this entry covers it too; `web` needs no twin.
               - 'tools/gen_doc_outputs.py'
+              # The docs type gate (#565) runs in this job (node leg) and in
+              # ts-lint (wasm leg) — same `node || web` coverage as the line
+              # above, and it imports gen_doc_outputs, so they travel together.
+              - 'tools/check_doc_types.py'
               - 'examples/sample_site.ags'        # the fixture those snippets read (subprocess cwd = repo root)
             docs:
               # The MkDocs site + its nav/config drive the `docs` job's
@@ -904,6 +908,14 @@ jobs:
           python3 -V
           python3 tools/gen_doc_outputs.py --check --surface node
 
+      # The TYPE half (#565): the docs' js programs against the SHIPPED
+      # `dist/index.d.ts` this job just built. Execution cannot see a page
+      # running the wrong branch (#518's `report.ok`); resolution can.
+      # `--leg node` makes an unbuilt dist a failure here, not a quiet skip.
+      - name: check_doc_types (docs js programs vs the shipped .d.ts, node)
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/check_doc_types.py --leg node
+
       # Codecov `node` flag — public repo only (where the badge lives + the token
       # is set). Measures the TS wrapper; the Rust engine's number is the nightly
       # cargo-llvm-cov `rust` flag. codecov-action is a `uses:` step so it runs at
@@ -1038,6 +1050,14 @@ jobs:
         run: |
           python3 -V
           python3 tools/gen_doc_outputs.py --check --surface wasm
+
+      # The TYPE half (#565) for the browser package: reference/wasm-api.md's
+      # example files against the wasm-pack `.d.ts` this job just built (the
+      # tsc comes from web/node_modules, installed above). `--leg wasm` makes
+      # an unbuilt package a failure here, not a quiet skip.
+      - name: check_doc_types (docs js programs vs the shipped .d.ts, wasm)
+        working-directory: ${{ github.workspace }}
+        run: python3 tools/check_doc_types.py --leg wasm
 
       # The SLIM wasm (#330) — the artifact npm actually gets, which the step
       # above does NOT build: `build:wasm:all` builds the app's two engines,
