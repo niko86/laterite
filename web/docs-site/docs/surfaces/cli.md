@@ -62,6 +62,18 @@ lat read delivery.ags LOCA --csv > loca.csv
 **A bare file validates.** `lat delivery.ags` is shorthand for
 `lat validate delivery.ags` — the common case needs no verb.
 
+**Help is scoped to the verb.** `lat certify --help` prints that verb's flags plus
+the global ones; `lat --readme` prints the whole guide. Both answer the same on all
+three launchers — one document, mirrored into each package and held byte-identical
+by a gate, so `lat --readme` is not a different guide depending on how you
+installed it.
+
+<!-- doc-code: skip — illustrative `lat` usage over placeholder paths; the CLI examples that ARE executed live in examples/cli/ (#513) -->
+```bash
+lat certify --help   # one verb: its flags, and the global ones
+lat --readme         # the whole reference
+```
+
 **Package for transport without a data round-trip.** `pack` / `lock` move bytes
 (any file type), so a `pack`ed-then-`unpack`ed file is byte-identical — safe to
 validate later. The passphrase for `lock` / `unlock` never appears on the command

@@ -45,7 +45,8 @@
     "bin.mjs",
     "index.js",
     "index.d.ts",
-    "README.md"
+    "README.md",
+    "README-cli.md"
   ],
   "publishConfig": {
     "access": "public"

@@ -967,8 +967,96 @@ function runExcel(p: Parsed): number {
   return 0;
 }
 
+// ---- the shipped guide ----------------------------------------------
+//
+// `lat --readme` and `lat <verb> --help` (#509). This launcher had neither: the
+// flag fell through to `rejectUnknownFlags` and exited 5, so there was no working
+// help path at all, while `README-cli.md`'s own Usage block promises one.
+//
+// The text is the guide the OTHER two launchers print — `gen_cli_readme.py`
+// mirrors the one authority into this package and `tests/test_cli_readme_mirrors.py`
+// holds them byte-identical. Writing Node its own help would have been a fourth
+// description of the same flags, which is the class of defect #509 is about.
+//
+// `../README-cli.md` resolves the same in all three places this module runs from:
+// the published package (`dist/cli.mjs` → package root), a repo build (same), and
+// vitest importing `ts/cli.ts` directly (→ the package dir). One path, no probing.
+const README_URL = new URL("../README-cli.md", import.meta.url);
+
+/** A `## ` heading and the block under it, keyed by heading. */
+function readmeSections(): Map<string, string> {
+  const text = readFileSync(README_URL, "utf8");
+  const out = new Map<string, string>();
+  const re = /^## (.+?)\n([\s\S]*?)(?=^## |$(?![\s\S]))/gm;
+  for (const m of text.matchAll(re)) {
+    if (m[1] !== undefined) out.set(m[1], m[0].replace(/\s+$/, ""));
+  }
+  return out;
+}
+
+/** The section documenting one verb, or undefined.
+ *
+ *  Matched against the WORDS of a heading, not its first token: `## transport —
+ *  pack / unpack / lock / unlock` documents four verbs at once, and a first-token
+ *  rule drops all four back to the full guide — silently, which is the shape of
+ *  the defect being fixed. `_readme_section` in `_cli.py` is the same rule. */
+function verbHelp(verb: string): string | undefined {
+  const sections = readmeSections();
+  for (const [heading, block] of sections) {
+    const words: string[] =
+      heading.toLowerCase().match(/[a-z][a-z0-9-]*/g) ?? [];
+    if (words.includes(verb)) {
+      // Appended for the same reason clap lists them under every verb: `--quiet`
+      // and the dictionary flags belong to no single verb, and a scoped help that
+      // hid them sends the reader back to the document they were avoiding.
+      const globals = sections.get("Global options");
+      return globals ? `${block}\n\n${globals}`.replace(/\s+$/, "") : block;
+    }
+  }
+  return undefined;
+}
+
+/** Which verb is this argv asking for help about, or undefined for the whole guide.
+ *
+ *  Deliberately NOT plain `pickVerb`, which answers `validate` for an argv with no
+ *  verb AND no file — that would scope a bare `lat --help` to validate and hide
+ *  the rest of the guide.
+ *
+ *  But `lat <file> --help` DOES scope, to validate: that is the same shorthand the
+ *  dispatch applies, and what the binary answers, since its argv pre-scan splices
+ *  the default verb in before clap sees the flag. So the rule is pickVerb's, with
+ *  "there is nothing here to work on" carved out. */
+function helpVerb(argv: string[]): string | undefined {
+  const explicit = argv.find((a) => SUBCOMMANDS.has(a));
+  if (explicit !== undefined) return explicit;
+  // The help flags come out first: `parseArgs` only knows `--`-prefixed flags, so
+  // a bare `-h` reads as a POSITIONAL and `lat -h` would scope itself to validate
+  // — which it did, until the whole-guide case caught it.
+  const rest = argv.filter((a) => a !== "--help" && a !== "-h");
+  return parseArgs(rest, ANY_VALUED).positionals.length > 0
+    ? "validate"
+    : undefined;
+}
+
 // ---- entrypoint ------------------------------------------------------
 export function main(argv: string[] = process.argv.slice(2)): number {
+  // Before the verb dispatch and before any parsing, so `--help` beats a missing
+  // required argument the way clap orders it: `lat certify --help` must print help
+  // rather than "a subcommand or input file is required".
+  if (argv.includes("--readme")) {
+    process.stdout.write(`${readFileSync(README_URL, "utf8")}\n`);
+    return 0;
+  }
+  if (argv.includes("--help") || argv.includes("-h")) {
+    const verb = helpVerb(argv);
+    const section = verb === undefined ? undefined : verbHelp(verb);
+    // A verb with no section is a documentation gap, not a reason to print an
+    // empty page. `cli-help.test.ts` fails on it; a reader meanwhile gets the
+    // document that does answer them.
+    process.stdout.write(`${section ?? readFileSync(README_URL, "utf8")}\n`);
+    return 0;
+  }
+
   // The verb first — it is what determines which flags take a value, and which are
   // accepted at all. (A single global flag table is what let `--encoding` and
   // `--dict` be swallowed by verbs that never used them.)
