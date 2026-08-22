@@ -207,6 +207,69 @@ export const FileAndFindings: Component<{ band: string }> = (props) => {
         )}
       </Show>
 
+      {/* The transport aside (#528): TRAN taken literally. The delivery is
+          built to travel, so the envelope gets told as a story beside the
+          transmission header — drawn, never run: this page's wasm build
+          ships without the transport feature on purpose, and the only way
+          out of the aside is the cookbook page. */}
+      <aside
+        aria-label="Transport"
+        class="mt-8 max-w-[46rem] rounded-lg border border-line bg-surface p-4 dark:bg-surface-raised"
+      >
+        <p class="font-mono text-micro uppercase tracking-(--track-micro) text-fg-muted">
+          TRAN, taken literally
+        </p>
+        <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-caption">
+          <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
+            delivery.ags
+          </code>
+          <span aria-hidden="true" class="text-fg-faint">
+            →
+          </span>
+          <span class="text-micro uppercase tracking-(--track-micro) text-fg-muted">
+            pack
+          </span>
+          <span aria-hidden="true" class="text-fg-faint">
+            →
+          </span>
+          <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
+            delivery.ags.zst
+          </code>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-caption">
+          <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
+            delivery.ags
+          </code>
+          <span aria-hidden="true" class="text-fg-faint">
+            →
+          </span>
+          <span class="text-micro uppercase tracking-(--track-micro) text-fg-muted">
+            lock
+          </span>
+          <span aria-hidden="true" class="text-fg-faint">
+            →
+          </span>
+          <code class="rounded-sm border border-line bg-surface-code px-2 py-1 text-fg">
+            delivery.ags.zst.age
+          </code>
+        </div>
+        <p class="mt-3 max-w-[60ch] text-caption text-fg-soft">
+          The delivery itself is built for the trip its cover sheet describes:{" "}
+          <code class="font-mono">pack</code> squeezes the file with zstd and{" "}
+          <code class="font-mono">unpack</code> restores it byte-for-byte — the
+          pair moves bytes, it never parses them — while{" "}
+          <code class="font-mono">lock</code> starts from the original and seals
+          its zstd pack inside a passphrase-encrypted age envelope. Shown here,
+          not run: this page's engine deliberately ships without transport.{" "}
+          <a
+            class="font-semibold text-cta no-underline hover:underline"
+            href="https://docs.laterite.dev/cookbook/transport/"
+          >
+            Pack / encrypt for transport
+          </a>
+        </p>
+      </aside>
+
       <div class="mt-6 grid gap-6 min-[64rem]:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] min-[64rem]:items-start">
         {/* The output pane. */}
         <div class="overflow-hidden rounded-lg border border-line bg-surface-code">

@@ -427,3 +427,41 @@ test("fine: the TRAN cover sheet seeds clean, and Rule 14 only fires when the re
   await page.keyboard.press("ControlOrMeta+z");
   await expect(strip).toBeHidden();
 });
+
+test("the transport aside tells the packed story without running it", async ({
+  page,
+}) => {
+  // #528: a story, not a demo — this page's wasm build has no transport
+  // feature, so the aside must never cost the reader a fetch. The listener
+  // goes on BEFORE navigation: the regression it exists to catch — the
+  // aside arming an eager engine load — would fire during the initial page
+  // load, inside the window a post-goto listener never sees.
+  const wasmRequests: string[] = [];
+  page.on("request", (r) => {
+    if (r.url().endsWith(".wasm")) wasmRequests.push(r.url());
+  });
+
+  await page.goto("/");
+
+  const aside = page.getByRole("complementary", { name: "Transport" });
+  await aside.scrollIntoViewIfNeeded();
+  await expect(aside).toBeVisible();
+
+  // The chain is the file's own name growing suffixes — pack then lock —
+  // asserted on the chain's step labels (spans), not the prose's own
+  // mentions of the verbs.
+  await expect(aside).toContainText("delivery.ags.zst.age");
+  await expect(aside.locator("span").filter({ hasText: "pack" })).toBeVisible();
+  await expect(aside.locator("span").filter({ hasText: "lock" })).toBeVisible();
+
+  // The one way out is the cookbook page, not a live demo.
+  await expect(aside.getByRole("link")).toHaveAttribute(
+    "href",
+    "https://docs.laterite.dev/cookbook/transport/",
+  );
+
+  // Static presentation: nothing about it fetched the engine, and the page
+  // still fits the viewport with the aside in the layout.
+  expect(wasmRequests).toEqual([]);
+  await expectViewportWide(page);
+});
