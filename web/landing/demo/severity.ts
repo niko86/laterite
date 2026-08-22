@@ -23,6 +23,13 @@ export function severityTint(severity: string): string {
   return TINT[severity] ?? ERROR_TINT;
 }
 
+/** The scoreboard's verdict pair (#531): the same grammar one step outside
+ *  severity — "clean" is not an engine tier, it is the absence of any.
+ *  Failing reuses ERROR_TINT so the chip and the callouts cannot drift. */
+export function verdictTint(clean: boolean): string {
+  return clean ? "border-ok/40 bg-ok-quiet text-ok" : ERROR_TINT;
+}
+
 const CELL_ERROR = "bg-err-quiet text-err";
 
 /** The failing CELL's variant of the same grammar — tint + text, no border

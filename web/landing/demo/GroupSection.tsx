@@ -23,7 +23,7 @@ import {
   deleteRow,
   delivery,
   findingsForGroup,
-  groupFixes,
+  groupFixCount,
   picked,
   restoreGroup,
   setCell,
@@ -154,7 +154,7 @@ export const GroupSection: Component<{
                     onDeleteRow={(row) => {
                       deleteRow(props.code, row);
                     }}
-                    fixCount={groupFixes(props.code).length}
+                    fixCount={groupFixCount(props.code)}
                     onFix={() => {
                       void applyGroupFixes(props.code);
                     }}
